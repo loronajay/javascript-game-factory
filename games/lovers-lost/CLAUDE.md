@@ -27,12 +27,14 @@ The game has two logically independent sides that share a clock:
 
 ## Sprite sheets
 
-| File            | Dimensions | Frame size | Frames |
-|-----------------|------------|------------|--------|
-| images/boy.png  | 96 × 16    | 16 × 16    | 6      |
-| images/girl.png | 96 × 16    | 16 × 16    | 6      |
+| File                    | Dimensions | Frame size | Frames | Notes                                      |
+|-------------------------|------------|------------|--------|--------------------------------------------|
+| images/boy.png          | 96 × 16    | 16 × 16    | 6      |                                            |
+| images/girl.png         | 96 × 16    | 16 × 16    | 6      |                                            |
+| images/SHORT SWORD.png  | 32 × 32    | 32 × 32    | 1      | Single frame; drawn offset from player during attack state |
 
-- Render scale: 3× (48 × 48 on canvas)
+- Render scale: 3× (48 × 48 on canvas for characters; 96 × 96 for sword)
+- Sword offset: extend in the direction the runner is facing (right for boy, left for girl)
 - `ctx.imageSmoothingEnabled = false` always
 
 ## State machine
@@ -46,12 +48,12 @@ menu → mode select → playing → reunion → score screen → menu
 
 Each obstacle type maps to exactly one required response. This is the core mechanic — do not add ambiguity.
 
-| Type       | Visual                      | Required response  | Sprite  |
-|------------|-----------------------------|--------------------|---------|
-| Spikes     | Ground spikes               | Jump               |         |
-| Bird       | Low-flying bird             | Crouch             | pending |
-| Arrow wall | 3 stacked arrows            | Block              |         |
-| Goblin     | Goblin (possible pre-attack)| Block → Attack or Attack | |
+| Type       | Visual                      | Required response        | Sprite notes                         |
+|------------|-----------------------------|--------------------------|------------------------------------- |
+| Spikes     | Ground spikes               | Jump                     |                                      |
+| Bird       | Low-flying bird             | Crouch                   | Temp: scale sprite down on Y axis, accept stretch until real sprites made |
+| Arrow wall | 3 stacked arrows            | Block                    |                                      |
+| Goblin     | Goblin (possible pre-attack)| Block → Attack or Attack |                                      |
 
 The goblin is the only two-phase obstacle. See GDD.md for full goblin mechanic spec.
 
@@ -69,20 +71,25 @@ Uses the existing Factory Network server (Railway). Do not introduce a separate 
 
 These values are validated by `archetype-model.js` — do not change without re-running the model.
 
-| Constant          | Value  | Description                                      |
-|-------------------|--------|--------------------------------------------------|
-| Run distance      | ~5400  | Units to finish line                             |
-| Hard cutoff       | 90s    | Failure deadline                                 |
-| Curve exponent    | 0.2    | `dist_per_frame = (speed / 5) ^ 0.2`            |
-| Base / floor speed| 5      | Starting speed, minimum speed                    |
-| Perfect window    | 1 frame| Timing window for Perfect grade                  |
-| Good window       | 4 frames| Timing window for Good grade                    |
-| Perfect speed gain| +3 × speed_multiplier | Per perfect clear                  |
-| Good speed gain   | +1     | Per good clear (after chain break penalty)       |
-| Hit penalty       | 15%    | Of current speed, after chain break penalty      |
-| Chain break penalty| `chain × 2.0` | Speed lost on any Good or Miss          |
-| Speed chain k     | 0.25   | `speed_mult = 1 + sqrt(chain) × 0.25 × (faced/104)` |
-| Score chain k     | 0.06   | `score_mult = 1 + chain × 0.06 × (faced/104)`   |
+| Constant              | Value       | Description                                          |
+|-----------------------|-------------|------------------------------------------------------|
+| Run distance          | ~5400       | Units to finish line                                 |
+| Hard cutoff           | 90s         | Failure deadline                                     |
+| Curve exponent        | 0.2         | `dist_per_frame = (speed / 5) ^ 0.2`                |
+| Base / floor speed    | 5           | Starting speed, minimum speed                        |
+| Perfect window        | 1 frame     | Timing window for Perfect grade                      |
+| Good window           | 4 frames    | Timing window for Good grade                         |
+| Perfect speed gain    | +3 × speed_multiplier | Per perfect clear                          |
+| Good speed gain       | +1          | Per good clear (after chain break penalty)           |
+| Hit penalty           | 15%         | Of current speed, after chain break penalty          |
+| Chain break penalty   | `chain × 2.0` | Speed lost on any Good or Miss                     |
+| Speed chain k         | 0.25        | `speed_mult = 1 + sqrt(chain) × 0.25 × (faced/104)` |
+| Score chain k         | 0.06        | `score_mult = 1 + chain × 0.06 × (faced/104)`       |
+| Obstacle repeat cap   | 3           | Max consecutive same obstacle type                   |
+| Assist trigger        | proj ≥ 90s  | Projected finish ≥ hard cutoff activates assist      |
+| Assist boost          | +60% speed  | Flat addition to current speed per opportunity       |
+| Assist opportunities  | 3           | Per trigger window; deactivates on recovery or exhaustion |
+| Adaptive diff tier 1  | proj ~54s   | Compresses obstacle intervals for fast runners       |
 
 ## Archetype model
 

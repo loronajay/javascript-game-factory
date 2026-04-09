@@ -58,6 +58,7 @@ The goblin is the only obstacle that can require two inputs:
 - Procedurally generated per run — types and input intervals are randomized
 - Fixed quantity per run — every run has the same total number of obstacles and speed boosts
 - Ensures leaderboard scores are comparable across runs
+- **Repeat cap:** max 3 consecutive obstacles of the same type
 
 ---
 
@@ -135,21 +136,31 @@ score_multiplier = 1 + chain × 0.06 × (obstacles_faced / 104)
 ### Speed boosts
 
 - 1 boost per wave, positioned within the wave
-- Occasional extra boost for struggle runners (threshold TBD)
 - **Boosts are elevated** — player must jump to collect them
 - The boost window overlaps with a nearby obstacle — player manages both simultaneously
 - Recovery is an active, risky decision, not a freebie
 - **Diminishing returns** — inversely proportional to current speed:
   - At high speed → ~+1 speed
   - At floor speed (5) → ~+5 speed
-- Recovery curve: exponential — `boost = max_boost × (1 - current_speed / peak_speed) ^ n`, n TBD
+
+### Struggle assist
+
+Activates when a runner's projected finish time ≥ 90s (estimated fail).
+
+- **Boost magnitude:** flat +60% of current speed per opportunity
+- **Opportunities:** 3 per trigger window
+- **Deactivation:** projected time drops below 90s OR all 3 opportunities exhausted (first-met)
+- No window widening — assist is speed only, nothing structural changes
+- A runner who plays well during the assist window will exit it naturally; a runner who continues to struggle gets a lifeline but not a guaranteed win
 
 ### Adaptive difficulty
 
 - As a player's speed pulls ahead of expected progress, the **interval between required inputs compresses**
 - This applies to: spacing between obstacles in a wave, and the gap between goblin phases
 - Perfect/Good frame windows themselves are never affected
-- Exact trigger threshold TBD
+- **Two tiers:**
+  - Tier 1 (tuning): activates when projected finish time ≈ competitive archetype (~54s)
+  - Tier 2 (assist): activates when projected finish time ≥ 90s — see Struggle assist above
 
 ---
 
@@ -222,9 +233,4 @@ Uses the existing **Factory Network server** (Railway, WebSocket + Express):
 
 ## Open Questions
 
-- [ ] Recovery boost exponent `n` (exponential formula confirmed, value TBD)
-- [ ] Adaptive difficulty trigger threshold (speed vs. expected progress ratio)
-- [ ] Struggle runner threshold for extra boost
-- [ ] Repeat cap on same obstacle type in a row
-- [ ] Crouch obstacle + sprites (pending assets)
 - [ ] Leaderboards + team leaderboards (post-launch)
