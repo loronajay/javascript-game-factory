@@ -103,18 +103,59 @@ Simulates perfect / competitive / average / casual / struggle / floor archetypes
 | `player.js` | Done | 65 passing |
 | `obstacles.js` | Done | 39 passing |
 | `scoring.js` | Done | 16 passing |
-| `renderer.js` | Next — pending art direction decisions | — |
+| `renderer.js` | Done — visually validated via renderer-test.html | — |
 | `input.js` | Not started | — |
 | `game.js` | Not started (rewrite from scratch) | — |
 | `online.js` | Not started (built last) | — |
 
 `game.js`, `index.html`, `style.css` exist from before scope was locked. Treat as throwaway scaffolding — rewrite to fit the architecture above.
 
-## Renderer notes (before starting renderer.js)
+`renderer-test.html` — standalone visual test harness. Open in browser to inspect environments, animations, and obstacle art. Not part of the final game.
 
+## Renderer notes
+
+- Canvas: 960×540 (16:9). Set by `createRenderer` — do not set in HTML.
+- `createRenderer(canvas, images)` — `images` must have `{ boy, girl, sword }` as `Image` objects.
+- `renderer.renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed)`
 - Players are stationary on screen; background scrolls based on `player.distance`
-- Each side has its own distinct world/background theme (art direction TBD)
-- Backgrounds converge and divider fades as both runners near the finish line
-- Split at screen center; boy on left half, girl on right half
-- Crouch: temp Y-axis scale on sprite until real crouch sprites exist
-- Sword (SHORT SWORD.png) drawn offset in runner's facing direction during attack state
+- Split at screen center; boy on left half (runs right), girl on right half (runs left)
+- Divider: 2px white line at x=480
+
+### Environments (5 per side, wave-aligned)
+
+| Wave | Distance | Boy | Girl |
+|------|----------|-----|------|
+| Warmup + 1 | 0–1020 | Cave | Desert ruins |
+| 2 | 1020–1770 | Enchanted forest | Frozen tundra |
+| 3 | 1770–2720 | Stormy cliffs | Lava fields |
+| 4 | 2720–3820 | Sunken ruins | Castle halls |
+| 5 | 3820–5400 | Night sky | Night sky |
+
+Transitions: a world-boundary seam travels across the screen at PPU=4 speed (matching obstacle movement). Old terrain scrolls out, new terrain enters from the same side as incoming obstacles.
+
+### Animation
+
+- Walk cycle: frames 3 and 4 only (the two sideways-facing frames)
+- All states (running, jumping, hit, attacking, blocking) continue the walk cycle — no frame change on state transition
+- Crouch: walk cycle frame, Y-scale 0.5, Y offset to keep feet on ground
+- Hit: walk cycle continues, sprite blinks at ~12hz
+- Attack: sword (SHORT SWORD.png, rotated ±90° to face forward) thrusts outward and retracts — 3-step animation, ~0.3s
+- Block: glowing magic shield rectangle appears in front of character — same 3-step timing as attack
+- Both attack and block use `animState.actionTick` (resets on state change) divided by `ACTION_STEP_DUR=6`
+
+### Obstacle visuals (code-drawn placeholders)
+
+| Type | Visual |
+|------|--------|
+| Spikes | 3 yellow triangles at ground level |
+| Bird | Animated flapping bird at standing-head height — crouch to dodge |
+| Arrow wall | 3 stacked arrows pointing toward runner |
+| Goblin | Green pixel humanoid; arm extended; bow drawn in windup phase |
+
+Obstacle sprites not yet made. Replace `_drawSpikes`, `_drawBird`, `_drawArrowWall`, `_drawGoblin` when real sprites are ready.
+
+### HUD
+
+- Clock: center top, turns red at <20s remaining
+- Score + chain (≥2): per side, top corners
+- Progress bars: bottom edge, each half — boy fills left→right, girl fills right→left
