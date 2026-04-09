@@ -221,13 +221,18 @@ Uses the existing **Factory Network server** (Railway, WebSocket + Express):
 
 ---
 
+## Backgrounds
+
+Each side of the screen has its own distinct world with a unique visual theme. As both runners approach the finish line, the two backgrounds begin to converge — the worlds bleed into each other toward the center. The dividing bar fades out as the backgrounds unify, so that by the time the characters meet in the middle for their hug, the screen is a single unified scene. The reunion moment is earned visually, not just mechanically.
+
+---
+
 ## End Sequence
 
-1. Both characters reach the finish
-2. Divider animates away
-3. Characters walk toward each other and hug
-4. Score screen: per-side breakdown + combined total
-5. Option to replay or return to menu
+1. Both characters approach the finish — backgrounds begin converging, divider fades
+2. Characters meet in the center and hug in the unified scene
+3. Score screen: per-side breakdown + combined total
+4. Option to replay or return to menu
 
 ---
 
