@@ -1,44 +1,78 @@
-# Lovers Lost — Pacing Questions
-
-Open questions to resolve before implementing obstacle spawning and run structure.
+# Lovers Lost — Pacing Design
 
 ---
 
 ## Run Structure
 
-- Is the run a fixed length (e.g. always 900 units) or does it vary by mode/difficulty?
-- Is there a difficulty setting, or does the game have one fixed difficulty?
+- Fixed distance — predictable but not rigid
+- Target run time: ~45 seconds for two decent runners
+- Exact distance and base speed values TBD (derived from target run time)
+- Run is divided into **waves** (phases), each with a fixed obstacle count and one speed boost
+- Difficulty ramps up as the run progresses
+
+---
+
+## Warmup Sequence
+
+The run opens with a fixed tutorial sequence before wave 1 begins:
+
+1. Jump obstacle
+2. Crouch obstacle
+3. Attack obstacle (single-phase goblin)
+4. Block obstacle (arrow wall)
+
+Obstacles are spread out with generous spacing. Purpose: teach all 4 inputs to new players immediately without punishing them.
+
+---
+
+## Wave Structure
+
+- Each wave contains a fixed number of obstacles (e.g. Wave 1 = 10 obstacles)
+- Each wave contains **1 speed boost**
+- Exact obstacle count per wave and total wave count TBD
+- Difficulty increases wave over wave: tighter windows, faster approach speeds, more two-phase goblins
 
 ---
 
 ## Obstacle Distribution
 
-- Are obstacles evenly spaced, or do they come in clusters with breathing room between them?
-- Is there a warmup period at the start of the run with no obstacles?
-- Can the same obstacle type appear back to back, or is there a rule against repeating?
+- All 4 obstacle types appear throughout
+- **Single-phase goblin**: as common as spikes, birds, arrow walls
+- **Two-phase goblin** (Block → Attack): less common, treated as a harder variant
+- Repeats are allowed but capped — no long chains of the same type
+- Exact repeat cap TBD
 
 ---
 
-## Goblin Frequency
+## Speed Boosts
 
-- How often does the goblin appear relative to the other three? He's significantly harder so he likely needs his own spawn weight.
-
----
-
-## Speed Boost Placement
-
-- Are boosts placed at fixed positions in the run, or are they also randomized within the fixed quantity?
-- Is there a rule about how close a boost can spawn to a hit obstacle (i.e. a recovery window after a hard section)?
+- 1 boost per wave, placed at a fixed position within the wave
+- Occasional extra boost for players whose speed has dropped significantly (struggle runner threshold TBD)
+- **Boosts are elevated** — player must jump to collect them
+- The boost window overlaps with a nearby obstacle window — player must manage both simultaneously
+- This makes recovery an active, risky decision rather than a freebie
 
 ---
 
-## Difficulty Curve
+## Adaptive Difficulty
 
-- Does the run get harder as it progresses — faster obstacles, tighter windows, more goblins — or is it consistent throughout?
-- If it ramps up, is the ramp linear or are there distinct phases (e.g. easy first third, medium middle, hard final stretch)?
+- If a player is performing well (high speed, high Perfect rate), the execution window between obstacles shortens
+- Creates a skill ceiling and keeps competitive players challenged
+- Exact trigger threshold TBD (e.g. X consecutive Perfects, or speed above Y% of max)
 
 ---
 
 ## Feel / Rhythm
 
-- Do you want the run to feel like a rhythm game with a consistent beat, or more like an action game where you're reacting to what comes at you?
+- Hybrid: flow is somewhat predictable (wave structure, warmup) but still reactionary
+- Competitive players are rewarded for reading ahead and chaining Perfects
+- Adaptive difficulty ensures good runs stay challenging
+
+---
+
+## Open / TBD
+
+- [ ] Exact run distance (back-calculate from 45s target once archetype models are run)
+- [ ] Repeat cap (max same obstacle type in a row)
+- [ ] Struggle runner threshold for extra boost
+- [ ] Adaptive difficulty trigger threshold (speed vs. expected progress ratio)

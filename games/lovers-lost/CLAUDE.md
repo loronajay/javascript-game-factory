@@ -65,6 +65,30 @@ Uses the existing Factory Network server (Railway). Do not introduce a separate 
 - State sync: `{ type: "room_message", messageType, value }`
 - `online.js` wraps all WebSocket logic — no raw WS calls outside this file
 
+## Locked constants
+
+These values are validated by `archetype-model.js` — do not change without re-running the model.
+
+| Constant          | Value  | Description                                      |
+|-------------------|--------|--------------------------------------------------|
+| Run distance      | ~5400  | Units to finish line                             |
+| Hard cutoff       | 90s    | Failure deadline                                 |
+| Curve exponent    | 0.2    | `dist_per_frame = (speed / 5) ^ 0.2`            |
+| Base / floor speed| 5      | Starting speed, minimum speed                    |
+| Perfect window    | 1 frame| Timing window for Perfect grade                  |
+| Good window       | 4 frames| Timing window for Good grade                    |
+| Perfect speed gain| +3 × speed_multiplier | Per perfect clear                  |
+| Good speed gain   | +1     | Per good clear (after chain break penalty)       |
+| Hit penalty       | 15%    | Of current speed, after chain break penalty      |
+| Chain break penalty| `chain × 2.0` | Speed lost on any Good or Miss          |
+| Speed chain k     | 0.25   | `speed_mult = 1 + sqrt(chain) × 0.25 × (faced/104)` |
+| Score chain k     | 0.06   | `score_mult = 1 + chain × 0.06 × (faced/104)`   |
+
+## Archetype model
+
+`archetype-model.js` — run with `node archetype-model.js` from this directory.
+Simulates perfect / competitive / average / casual / struggle / floor archetypes against the locked constants. Re-run whenever a constant changes.
+
 ## What's already built (pre-scope placeholder)
 
 `game.js`, `index.html`, `style.css` exist from before scope was locked. They should be treated as throwaway scaffolding — rewrite as needed to fit the architecture above.
