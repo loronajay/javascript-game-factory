@@ -11,9 +11,9 @@ All game design decisions live in `GDD.md`. Before implementing any feature, con
 The game has two logically independent sides that share a clock:
 
 - `game.js` — main loop, state machine, shared clock, mode routing
-- `player.js` — player entity (speed, score, state); instantiated twice (boy + girl)
-- `obstacles.js` — obstacle spawning, types, collision
-- `scoring.js` — timing grade calculation, score math
+- `player.js` — player entity (speed, score, chain, distance, assist); instantiated twice (boy + girl)
+- `obstacles.js` — obstacle types, wave/warmup generation, timing grade windows, collision
+- `scoring.js` — run-end evaluation (outcome, score totaling, leaderboard submission)
 - `renderer.js` — all canvas draw calls (no logic here)
 - `input.js` — input mapping for single player, local co-op, and online modes
 - `online.js` — network layer for online co-op *(built last)*
@@ -96,6 +96,25 @@ These values are validated by `archetype-model.js` — do not change without re-
 `archetype-model.js` — run with `node archetype-model.js` from this directory.
 Simulates perfect / competitive / average / casual / struggle / floor archetypes against the locked constants. Re-run whenever a constant changes.
 
-## What's already built (pre-scope placeholder)
+## Build status
 
-`game.js`, `index.html`, `style.css` exist from before scope was locked. They should be treated as throwaway scaffolding — rewrite as needed to fit the architecture above.
+| File | Status | Tests |
+|------|--------|-------|
+| `player.js` | Done | 65 passing |
+| `obstacles.js` | Done | 39 passing |
+| `scoring.js` | Done | 16 passing |
+| `renderer.js` | Next — pending art direction decisions | — |
+| `input.js` | Not started | — |
+| `game.js` | Not started (rewrite from scratch) | — |
+| `online.js` | Not started (built last) | — |
+
+`game.js`, `index.html`, `style.css` exist from before scope was locked. Treat as throwaway scaffolding — rewrite to fit the architecture above.
+
+## Renderer notes (before starting renderer.js)
+
+- Players are stationary on screen; background scrolls based on `player.distance`
+- Each side has its own distinct world/background theme (art direction TBD)
+- Backgrounds converge and divider fades as both runners near the finish line
+- Split at screen center; boy on left half, girl on right half
+- Crouch: temp Y-axis scale on sprite until real crouch sprites exist
+- Sword (SHORT SWORD.png) drawn offset in runner's facing direction during attack state
