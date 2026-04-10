@@ -112,10 +112,32 @@ Simulates perfect / competitive / average / casual / struggle / floor archetypes
 
 `renderer-test.html` — standalone visual test harness. Open in browser to inspect environments, animations, and obstacle art. Not part of the final game.
 
+## input.js notes
+
+- `keyToAction(key)` — pure function; normalises single-char keys to lowercase; returns `{ side, action }` or `null`.
+- `createInput()` — factory; call `inp.keydown(e.key)` / `inp.keyup(e.key)` from window event listeners in game.js.
+- `inp.tick()` — call once per frame to clear `pressed` state.
+- `inp.isHeld(side, action)` — true while key is physically held.
+- `inp.isPressed(side, action)` — true for exactly one frame on initial keydown (not browser key-repeat).
+- `inp.injectAction(side, action)` / `inp.clearAction(side, action)` — online mode: remote player's input.
+- No DOM wiring in input.js itself — attach listeners in game.js.
+
+| Key | Side | Action |
+|-----|------|--------|
+| W | boy | jump |
+| S | boy | crouch |
+| D | boy | attack |
+| A | boy | block |
+| ArrowUp | girl | jump |
+| ArrowDown | girl | crouch |
+| ArrowLeft | girl | attack |
+| ArrowRight | girl | block |
+
 ## Renderer notes
 
 - Canvas: 960×540 (16:9). Set by `createRenderer` — do not set in HTML.
-- `createRenderer(canvas, images)` — `images` must have `{ boy, girl, sword }` as `Image` objects.
+- `createRenderer(canvas, images)` — `images` must have `{ boy, girl, sword, birds: [Image, Image, Image] }`.
+- Bird frames: `images.birds[0]` = red1.png, `[1]` = red2.png, `[2]` = red3.png (38px wide, heights 20/24/18).
 - `renderer.renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed)`
 - Players are stationary on screen; background scrolls based on `player.distance`
 - Split at screen center; boy on left half (runs right), girl on right half (runs left)
@@ -135,24 +157,33 @@ Transitions: a world-boundary seam travels across the screen at PPU=4 speed (mat
 
 ### Animation
 
-- Walk cycle: frames 3 and 4 only (the two sideways-facing frames)
+- Walk cycle: sprite sheet frames **2 and 3** (0-indexed) — the two sideways-facing run frames. User calls these "frames 3 and 4" (1-indexed). Frames 0–1 are front/back-facing; do not use.
 - All states (running, jumping, hit, attacking, blocking) continue the walk cycle — no frame change on state transition
 - Crouch: walk cycle frame, Y-scale 0.5, Y offset to keep feet on ground
 - Hit: walk cycle continues, sprite blinks at ~12hz
-- Attack: sword (SHORT SWORD.png, rotated ±90° to face forward) thrusts outward and retracts — 3-step animation, ~0.3s
+- Jump: renderer reads `player.jumpY` (pixels above ground, positive = up); game.js drives this. Test harness simulates a parabolic arc.
+- Attack: sword drawn **behind** the player sprite, thrusts outward and retracts — 3-step animation, ~0.3s
 - Block: glowing magic shield rectangle appears in front of character — same 3-step timing as attack
 - Both attack and block use `animState.actionTick` (resets on state change) divided by `ACTION_STEP_DUR=6`
 
-### Obstacle visuals (code-drawn placeholders)
+### Obstacle visuals
 
-| Type | Visual |
-|------|--------|
-| Spikes | 3 yellow triangles at ground level |
-| Bird | Animated flapping bird at standing-head height — crouch to dodge |
-| Arrow wall | 3 stacked arrows pointing toward runner |
-| Goblin | Green pixel humanoid; arm extended; bow drawn in windup phase |
+| Type | Visual | Status |
+|------|--------|--------|
+| Spikes | 3 yellow triangles at ground level | Code-drawn placeholder |
+| Bird | `red1/2/3.png` animated sprite (38px wide, 3-frame flap cycle) | **Real sprite — done** |
+| Arrow wall | 3 stacked arrows pointing toward runner | Code-drawn placeholder |
+| Goblin | Green pixel humanoid; arm extended; bow drawn in windup phase | Code-drawn placeholder |
 
-Obstacle sprites not yet made. Replace `_drawSpikes`, `_drawBird`, `_drawArrowWall`, `_drawGoblin` when real sprites are ready.
+Bird faces RIGHT in source sprites. `_drawBird` flips for boy's side (bird faces left toward him), draws as-is for girl's side.
+Replace `_drawSpikes`, `_drawArrowWall`, `_drawGoblin` when real sprites are ready.
+
+### Sword
+
+- Sprite: `SHORT SWORD.png` — 65×20px, blade points RIGHT
+- Rendered at 1× (65×20). No rotation needed — boy draws as-is, girl uses `scale(-1,1)` to flip.
+- Handle anchored at ~55% across sprite width (overlaps character torso); drawn **behind** the player sprite.
+- Thrust animation: 3-step (OFFSETS = [4, 12, 4] px outward)
 
 ### HUD
 
