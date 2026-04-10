@@ -12,9 +12,20 @@ const SCALE        = 3;
 const SPRITE_W     = FRAME_W * SCALE;   // 48
 const SPRITE_H     = FRAME_H * SCALE;   // 48
 
-const SWORD_SRC    = 32;
-const SWORD_W      = SWORD_SRC * 2;     // 64 (2× scale keeps it proportionate to the 48px player)
-const SWORD_H      = SWORD_W;           // 64
+// Sword sprite: 65×20, blade points RIGHT
+const SWORD_SRC_W  = 65;
+const SWORD_SRC_H  = 20;
+const SWORD_W      = 65;   // 1× (natural size — proportionate to 48px player)
+const SWORD_H      = 20;
+
+// Bird sprite frames: red1/red2/red3 (38px wide, heights 20/24/18)
+const BIRD_SCALE      = 1.5;
+const BIRD_BOTTOM     = 434;   // bottom anchored just above crouch-top (436) so crouching clears it
+const BIRD_FRAME_DATA = [
+  { w: 38, h: 20 },
+  { w: 38, h: 24 },
+  { w: 38, h: 18 },
+];
 
 const GROUND_TOP   = 460;
 const BOY_LOCAL_X  = 120;
@@ -58,7 +69,7 @@ const GIRL_PALS = [
 const NIGHT_STAR = 'rgba(255,220,255,0.6)';
 
 // ─── Animation ────────────────────────────────────────────────────────────────
-const WALK_FRAMES     = [3, 4];   // the two sideways-facing run frames
+const WALK_FRAMES     = [2, 3];   // the two sideways-facing run frames (0-indexed; user calls these "3 and 4")
 const WALK_SPEED      = 7;        // display frames per walk step
 const ACTION_STEPS    = 3;        // visual steps for attack / block (in, hold, out)
 const ACTION_STEP_DUR = 6;        // display frames per step → 18 frames ≈ 0.3s total
@@ -175,9 +186,12 @@ function createRenderer(canvas, images) {
       }
     }
 
+    // Girl runs left — backgrounds must scroll in the opposite direction
+    const signedDist = side === 'boy' ? distance : -distance;
+
     function drawEnvWithStars(ei) {
-      _drawEnv(offsetX, pals[ei], scenes[ei], distance);
-      if (ei === 4) _drawStars(offsetX, stars, distance);
+      _drawEnv(offsetX, pals[ei], scenes[ei], signedDist);
+      if (ei === 4) _drawStars(offsetX, stars, signedDist);
     }
 
     if (seamX === null) {
@@ -585,7 +599,7 @@ function createRenderer(canvas, images) {
   function _drawObstacle(x, obs, flip) {
     switch (obs.type) {
       case 'spikes':    _drawSpikes(x);             break;
-      case 'bird':      _drawBird(x);               break;
+      case 'bird':      _drawBird(x, !flip);         break;
       case 'arrowwall': _drawArrowWall(x, flip);    break;
       case 'goblin':    _drawGoblin(x, obs, flip);  break;
     }
@@ -608,26 +622,31 @@ function createRenderer(canvas, images) {
     }
   }
 
-  // Bird: animated wing flap, flies at standing-head height — must crouch to dodge
-  function _drawBird(x) {
-    const by   = PLAYER_Y + 4;   // body overlaps standing player's head; crouching clears it
-    const flap = Math.sin(Date.now() / 150) > 0;
-    ctx.fillStyle = '#3388cc';
-    ctx.fillRect(x + 6, by + 5, 22, 10);     // body
-    ctx.fillStyle = '#44aaff';
-    ctx.fillRect(x + 24, by + 2, 10, 10);    // head
-    ctx.fillStyle = '#ffcc44';
-    ctx.fillRect(x + 33, by + 5, 5, 3);      // beak
-    ctx.fillStyle = '#5599dd';
-    if (flap) {
-      ctx.fillRect(x, by,      20, 8);        // wings up
-    } else {
-      ctx.fillRect(x, by + 10, 20, 8);        // wings down
+  // Bird: animated sprite (red1/2/3), flies at head height — must crouch to dodge.
+  // Sprites face right; flip=true mirrors for boy's side (bird comes from right, faces left).
+  function _drawBird(x, flip) {
+    const fi  = Math.floor(Date.now() / 120) % 3;
+    const fd  = BIRD_FRAME_DATA[fi];
+    const img = images.birds && images.birds[fi];
+    const dw  = fd.w * BIRD_SCALE;
+    const dh  = fd.h * BIRD_SCALE;
+    // Bottom anchored at BIRD_BOTTOM (just above crouch-top=436) so crouching clears it
+    const by  = BIRD_BOTTOM - dh;
+
+    ctx.save();
+    if (flip) {
+      ctx.translate(x + dw, 0);
+      ctx.scale(-1, 1);
+      x = 0;
     }
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x + 27, by + 3, 3, 3);      // eye
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(x + 28, by + 4, 2, 2);      // pupil
+    if (img && img.complete) {
+      ctx.drawImage(img, 0, 0, fd.w, fd.h, x, by, dw, dh);
+    } else {
+      // Fallback: simple rectangle placeholder
+      ctx.fillStyle = '#44aaff';
+      ctx.fillRect(x, by + dh * 0.25, dw, dh * 0.5);
+    }
+    ctx.restore();
   }
 
   // Arrow wall: canonical = arrows pointing LEFT (toward boy); flip for girl
@@ -751,13 +770,17 @@ function createRenderer(canvas, images) {
     _tickAnim(animState, player.state);
 
     const screenX = offsetX + localX;
-    let   screenY = PLAYER_Y;
+    let   screenY = PLAYER_Y - (player.jumpY || 0);   // jumpY is pixels above ground; game.js drives this
     let   scaleY  = 1;
 
     if (player.state === 'crouching') {
       scaleY  = 0.5;
       screenY = PLAYER_Y + SPRITE_H * 0.5;   // keep feet on ground
     }
+
+    const step = _actionStep(animState.actionTick);
+    // Sword drawn first so it appears behind the character sprite
+    if (player.state === 'attacking') _drawSword(screenX, screenY, flipX, step);
 
     // Hit blink — walk cycle continues, only visibility changes
     const hitFlash = player.state === 'hit' && (Math.floor(Date.now() / 80) % 2 === 0);
@@ -766,9 +789,7 @@ function createRenderer(canvas, images) {
     _blit(img, animState.frame, FRAME_W, FRAME_H, screenX, screenY, SPRITE_W, SPRITE_H, flipX, scaleY);
     ctx.restore();
 
-    const step = _actionStep(animState.actionTick);
-    if (player.state === 'attacking') _drawSword(screenX, screenY, flipX, step);
-    if (player.state === 'blocking')  _drawShield(screenX, screenY, flipX, step);
+    if (player.state === 'blocking') _drawShield(screenX, screenY, flipX, step);
   }
 
   // Walk cycle runs for ALL states — crouching just applies a Y-scale override.
@@ -791,29 +812,34 @@ function createRenderer(canvas, images) {
     return Math.min(Math.floor(actionTick / ACTION_STEP_DUR), ACTION_STEPS - 1);
   }
 
-  // Sword: rotated to point forward, thrusts outward then retracts.
-  // The sprite is assumed to have the blade pointing UP; rotating ±90° aims it forward.
+  // Sword: sprite has blade pointing RIGHT (65×20). Thrusts outward then retracts.
+  // Handle overlaps the character's torso; blade extends forward.
+  // Boy draws as-is; girl mirrors horizontally via scale(-1,1).
   function _drawSword(screenX, screenY, flipX, step) {
     if (!images.sword) return;
-    const ALPHAS   = [0.6, 1.0, 0.6];
-    const OFFSETS  = [4,   12,  4  ];   // pixels of thrust
-    const alpha    = ALPHAS[step];
-    const thrust   = OFFSETS[step];
+    const ALPHAS  = [0.6, 1.0, 0.6];
+    const OFFSETS = [4,   12,  4  ];   // pixels of outward thrust
+    const alpha   = ALPHAS[step];
+    const thrust  = OFFSETS[step];
+    const hy      = screenY + SPRITE_H * 0.65 - SWORD_H / 2;
 
-    // Center point at chest height, extended in facing direction
-    const cx = flipX
-      ? screenX - thrust - SWORD_W / 2
-      : screenX + SPRITE_W + thrust + SWORD_W / 2;
-    const cy = screenY + SPRITE_H * 0.38;
-
-    // Rotate blade to face forward: UP sprite → ±90°
-    const angle = flipX ? Math.PI / 2 : -Math.PI / 2;
-
+    // Handle sits at ~55% across the sprite for boy (his forward arm),
+    // and ~45% across for girl (her forward arm after mirroring).
+    // Sword extends from handle outward in the facing direction.
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
-    ctx.drawImage(images.sword, 0, 0, SWORD_SRC, SWORD_SRC, -SWORD_W / 2, -SWORD_H / 2, SWORD_W, SWORD_H);
+    if (flipX) {
+      // Girl: sword extends LEFT. Translate to handle position, mirror, draw.
+      // After scale(-1,1): local x=0 → screen handle position; blade goes left.
+      const handleX = screenX + SPRITE_W * 0.45 - thrust;
+      ctx.translate(handleX, hy + SWORD_H / 2);
+      ctx.scale(-1, 1);
+      ctx.drawImage(images.sword, 0, 0, SWORD_SRC_W, SWORD_SRC_H, 0, -SWORD_H / 2, SWORD_W, SWORD_H);
+    } else {
+      // Boy: sword extends RIGHT. Handle left edge at ~55% across the sprite.
+      const handleX = screenX + SPRITE_W * 0.55 + thrust;
+      ctx.drawImage(images.sword, 0, 0, SWORD_SRC_W, SWORD_SRC_H, handleX, hy, SWORD_W, SWORD_H);
+    }
     ctx.restore();
   }
 

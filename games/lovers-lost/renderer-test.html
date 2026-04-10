@@ -63,10 +63,16 @@
     }
 
     // ─── Images ───────────────────────────────────────────────────────────────
-    const images = { boy: new Image(), girl: new Image(), sword: new Image() };
-    images.boy.src   = 'images/boy.png';
-    images.girl.src  = 'images/girl.png';
-    images.sword.src = 'images/SHORT SWORD.png';
+    const images = {
+      boy: new Image(), girl: new Image(), sword: new Image(),
+      birds: [new Image(), new Image(), new Image()],
+    };
+    images.boy.src        = 'images/boy.png';
+    images.girl.src       = 'images/girl.png';
+    images.sword.src      = 'images/SHORT SWORD.png';
+    images.birds[0].src   = 'images/red1.png';
+    images.birds[1].src   = 'images/red2.png';
+    images.birds[2].src   = 'images/red3.png';
 
     // ─── Renderer ─────────────────────────────────────────────────────────────
     const canvas   = document.getElementById('gameCanvas');
@@ -78,10 +84,19 @@
     let paused      = false;
     let playerState = 'running';
     let elapsed     = 0;
+    let jumpTick    = 0;       // frame counter for simulated jump arc
+
+    const JUMP_DURATION = 36;   // frames (matches ~0.6s at 60fps)
+    const JUMP_HEIGHT   = 80;   // pixels at peak
 
     // ─── Mock data ────────────────────────────────────────────────────────────
     function makePlayer(side, dist, state) {
-      const ei = envIndex(dist);
+      let jumpY = 0;
+      if (state === 'jumping') {
+        // Parabolic arc: sin curve over JUMP_DURATION frames
+        const t = Math.min(jumpTick / JUMP_DURATION, 1);
+        jumpY = Math.sin(t * Math.PI) * JUMP_HEIGHT;
+      }
       return {
         side,
         speed:          10,
@@ -91,6 +106,7 @@
         obstaclesFaced: Math.floor(dist / 52),
         state,
         assistActive:   false,
+        jumpY,
       };
     }
 
@@ -120,7 +136,7 @@
         case 'ArrowUp':    advanceRate = Math.min(6, advanceRate + 0.5); break;
         case 'ArrowDown':  advanceRate = Math.max(0.1, advanceRate - 0.5); break;
         case 'KeyZ':       playerState = 'running';   break;
-        case 'KeyX':       playerState = 'jumping';   break;
+        case 'KeyX':       playerState = 'jumping'; jumpTick = 0; break;
         case 'KeyC':       playerState = 'crouching'; break;
         case 'KeyV':       playerState = 'attacking'; break;
         case 'KeyB':       playerState = 'blocking';  break;
@@ -153,6 +169,10 @@
       if (!paused) {
         distance = Math.min(distance + advanceRate, 5400);
         elapsed  = distance / (60 * 1);   // rough elapsed time approximation
+        if (playerState === 'jumping') {
+          jumpTick++;
+          if (jumpTick >= JUMP_DURATION) { jumpTick = 0; playerState = 'running'; }
+        }
       }
 
       const boy  = makePlayer('boy',  distance, playerState);

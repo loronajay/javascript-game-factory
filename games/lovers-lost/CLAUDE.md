@@ -104,7 +104,7 @@ Simulates perfect / competitive / average / casual / struggle / floor archetypes
 | `obstacles.js` | Done | 39 passing |
 | `scoring.js` | Done | 16 passing |
 | `renderer.js` | Done — visually validated via renderer-test.html | — |
-| `input.js` | Not started | — |
+| `input.js` | Done | 34 passing |
 | `game.js` | Not started (rewrite from scratch) | — |
 | `online.js` | Not started (built last) | — |
 
