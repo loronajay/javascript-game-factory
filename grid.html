@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Javascript Game Factory | Game Grid</title>
+  <link rel="stylesheet" href="css/arcade.css">
+  <link rel="stylesheet" href="css/grid.css">
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <div class="page-topbar">
+      <a class="back-link" href="index.html">Back To Factory</a>
+      <div class="page-indicator" id="pageIndicator">1 / 1</div>
+    </div>
+
+    <section class="page-header">
+      <p class="eyebrow">Quick Select</p>
+      <h1>Game Grid</h1>
+      <p>The factory reads each cabinet from <code>game.json</code>, then renders the grid from shared metadata instead of hard-coding a one-off page per game.</p>
+    </section>
+
+    <section class="grid-shell">
+      <div id="emptyState" class="empty-state" hidden>
+        No cabinets are registered yet.
+      </div>
+
+      <div id="gridTrack"></div>
+    </section>
+
+    <div class="pager-row">
+      <button id="prevPage" class="pager-button" type="button" hidden>Previous Page</button>
+      <button id="nextPage" class="pager-button" type="button" hidden>Next Page</button>
+    </div>
+
+    <p class="grid-hint">Use mouse, keyboard, or gamepad to move between JavaScript cabinets.</p>
+  </main>
+
+  <script src="js/arcade-input.js"></script>
+  <script type="module" src="js/arcade-grid.mjs"></script>
+</body>
+</html>

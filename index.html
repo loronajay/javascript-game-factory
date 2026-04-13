@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Javascript Game Factory</title>
+  <link rel="stylesheet" href="css/arcade.css">
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="hero">
+      <p class="eyebrow">Javascript Game Factory</p>
+      <h1>Build The Factory First.</h1>
+      <p>This repo is the JavaScript sister version: shared landing flow, shared game grid, and self-contained cabinets built in plain HTML, CSS, and JavaScript. <strong>Lovers Lost</strong> now lives inside that structure instead of carrying the whole platform by itself.</p>
+    </section>
+
+    <section class="mode-row">
+      <a class="mode-card mode-card--floor mode-link" href="grid.html">
+        <span class="mode-label">Quick Select</span>
+        <h2>Factory Floor</h2>
+        <p>Browse the shared platform first, then drop into a cabinet from a common front door.</p>
+        <div class="mode-badge-row">
+          <span class="mode-badge">Shared Architecture</span>
+          <span class="mode-badge">Built For JS Games</span>
+        </div>
+      </a>
+
+      <a class="mode-card mode-card--cabinet mode-link" href="games/lovers-lost/index.html">
+        <span class="mode-label">Current Cabinet</span>
+        <h2>Lovers Lost</h2>
+        <p>Jump straight into the current prototype while keeping its entry point consistent with the factory shell.</p>
+        <div class="mode-badge-row">
+          <span class="mode-badge">1-2 Players</span>
+          <span class="mode-badge">Playable Prototype</span>
+        </div>
+      </a>
+    </section>
+  </main>
+
+  <script src="js/arcade-input.js"></script>
+  <script type="module" src="js/arcade-home.mjs"></script>
+</body>
+</html>

@@ -1,42 +1,40 @@
-# Claude Code — HTML/JS Games
+# Project Orchestrator: HTML/JS Games
 
-This repo is a collection of browser games built with **vanilla HTML, CSS, and JavaScript** (no frameworks, no build tools unless explicitly added per-game).
+## 🛠 Project Standards
+Refer to **AGENTS.md** for the "Laws of the Repo" (TDD, File Structure, Discipline).
+Refer to **SKILLS.md** for technical "How-To" (Scaling, Sprite Logic, Hitbox Math).
 
-## Discipline
+## 🧠 Strategic Intent
+- **Asset Continuity**: If an asset is missing, use the `PlaceholderGenerator` pattern from SKILLS.md. Do not halt development for missing art; use CSS/Canvas.
+- **Scaling First**: Every new game must implement a `scaleFactor` immediately to ensure it fits the browser window without blurring pixel art.
+- **UI & HUD**: Always render UI last, on top of the game world, with a reset coordinate system.
 
-- **TDD always.** Write tests before implementation. No feature code without a corresponding test.
-- Keep each game self-contained in its own folder under `games/`.
-- Prefer editing existing files over creating new ones.
-- No external dependencies without explicit approval.
+## 🏭 Factory Launcher
+- **Shell**: `index.html` (home) + `grid.html` (game grid)
+- **Launcher Status**: Visual polish complete
+  - [x] Arcade aesthetic — scanlines, CRT overlay, amber/teal neons, monospace
+  - [x] CSS Grid responsive layout (`auto-fill, minmax(300px, 1fr)`)
+  - [x] Horizontal game cards — 88px tall, canvas thumbnail, hover description overlay
+  - [x] Featured card treatment — amber top bar + glow
+  - [x] Mode card top bars — teal (Factory Floor), amber (Current Cabinet)
+  - [x] Zoom-launch transition (280ms scale) + hover SFX (Web Audio API)
+  - [x] `game.json` drives all card data — `accentColor` field powers canvas thumbnail
+- **Pending**:
+  - [ ] Real preview GIFs — canvas placeholder active until art is ready
+  - [ ] Register new cabinets in `arcade-catalog.mjs` as games are added
 
-## File structure (per game)
+## 🕹 Current Focus: "Lovers Lost"
+- **Active Cabinet**: `games/lovers-lost/`
+- **Current Objective**: Obstacle Collision Tuning.
+- **Locked Obstacles**: 
+  - [x] Spikes (Validated via debug hitboxes)
+- **Pending Validation**:
+  - [ ] Bird
+  - [ ] Arrow Wall
+  - [ ] Goblin Variants
 
-```
-games/<game-name>/
-  index.html       # entry point
-  style.css        # styles
-  game.js          # game logic
-  game.test.js     # tests (or tests/ folder for larger games)
-  GDD.md           # game design document — source of truth for scope
-  CLAUDE.md        # game-specific instructions
-  images/          # sprites and assets
-```
-
-## Testing
-
-- Use a lightweight test runner that runs in the browser or Node (no Jest unless agreed).
-- Tests cover: game logic, collision, scoring, state transitions.
-- Tests do NOT cover: rendering, canvas draw calls.
-- Run tests before any feature is considered done.
-
-## Code style
-
-- Pure functions for game logic where possible (easier to test).
-- Separate concerns: input, update, draw, state.
-- `ctx.imageSmoothingEnabled = false` on all canvases (pixel art).
-- Game loop: `requestAnimationFrame` only.
-
-## Sprites
-
-- Assume pixel art sprite sheets (horizontal strip, single row per animation state).
-- Always confirm `frameW`, `frameH`, and `frameCount` from actual image dimensions before writing sprite code.
+## 🚦 Operational Workflow
+1. **Sync**: Read `games/<game-name>/GDD.md` before any feature work.
+2. **Test**: Create `game.test.js` cases for logic/collision.
+3. **Build**: Implement feature using `SKILLS.md` patterns.
+4. **Debug**: Use the in-game debug mode to verify hitboxes against the visible sprite pixels.
