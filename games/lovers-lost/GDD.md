@@ -6,6 +6,32 @@ A split-screen endless runner where two lovers run toward each other from opposi
 
 ---
 
+## Current Status
+
+- Development is currently following an **obstacle-by-obstacle validation** pass.
+- Collision work now follows one hard rule: **visible hurtboxes and hitboxes must match the visible sprite shapes on screen**.
+- Debug collision mode is available for local testing:
+  - Press `F3` during gameplay to toggle debug mode
+  - Open the game with `?debug=1` to start with debug mode enabled
+  - Practice filters are available with `?debugObstacle=spikes|birds|arrows|goblins`
+- Debug colors:
+  - **Cyan** = player hurtbox
+  - **Yellow / orange** = obstacle hitbox
+  - **Green** = shield hitbox / shield contact
+  - **Magenta** = sword hitbox / sword contact
+  - **Red** = actual body overlap/contact
+
+### Obstacle validation status
+
+| Obstacle   | Status | Current note |
+|------------|--------|--------------|
+| Spikes     | Locked for now | Spike resolution is now based on actual visible overlap only: touch = miss, fully pass without touch = clear. |
+| Bird       | Locked for now | Bird resolution is now based on visible body-vs-bird overlap only: touch = miss, fully duck under and pass = clear. |
+| Arrow wall | Locked for now | Arrow walls now resolve from visible arrow hitboxes against the visible shield hitbox or player hurtbox. |
+| Goblin     | Locked for now | Single-phase goblins and phase-1 goblins now resolve from visible sword-vs-goblin or body-vs-goblin contact. |
+
+---
+
 ## Screen Layout
 
 - Screen is split vertically down the middle (even split)
@@ -38,10 +64,10 @@ A split-screen endless runner where two lovers run toward each other from opposi
 
 | Obstacle   | Visual                      | Required response           | Notes                                   |
 |------------|-----------------------------|-----------------------------|-----------------------------------------|
-| Spikes     | Ground spikes               | Jump                        |                                         |
-| Bird       | Low-flying bird             | Crouch                      | Pending crouch sprites                  |
-| Arrow wall | 3 arrows stacked vertically | Block                       |                                         |
-| Goblin     | Goblin character            | Attack — or Block → Attack  | Two-phase if goblin winds up; see below |
+| Spikes     | Ground spikes               | Jump                        | Collision pass completed for current build |
+| Bird       | Low-flying bird             | Crouch                      | Collision pass completed for current build |
+| Arrow wall | 3 arrows stacked vertically | Block                       | Shield-vs-arrow contact now drives resolution |
+| Goblin     | Goblin character            | Attack — or Block → Attack  | Sword-vs-goblin and body-vs-goblin contact now drive the attack phase |
 
 ### Goblin mechanic
 
@@ -182,6 +208,18 @@ Fixed tutorial sequence with generous spacing:
 4. Arrow wall (Block)
 
 Purpose: teach all 4 inputs before the first scored wave begins.
+
+---
+
+## Collision Rules
+
+- Collision decisions should be made from the **same geometry shown in debug mode**, not from separate guessed logic.
+- A miss should only happen when the visible hurtbox and visible obstacle hitbox actually overlap.
+- A clear should only happen when the obstacle is fully passed without that overlap occurring.
+- Do not use hidden timing-window logic for obstacles that are meant to be resolved by on-screen contact.
+- Spikes, birds, arrow walls, and goblin attack phases now follow this rule in the live build.
+- Arrow walls use visible **shield vs arrow** contact before falling back to body contact.
+- Goblin attack phases use visible **sword vs goblin** contact before falling back to body contact.
 
 ---
 

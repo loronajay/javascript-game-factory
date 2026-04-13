@@ -6,6 +6,26 @@ Refer to the root `CLAUDE.md` for general project conventions. This file covers 
 
 All game design decisions live in `GDD.md`. Before implementing any feature, confirm it is scoped in the GDD. Open questions in the GDD must be resolved before the relevant feature is built.
 
+## Current Project Status
+
+- Development is currently following an **obstacle-by-obstacle validation** pass.
+- Spikes, birds, arrow walls, and goblin attack phases are currently locked for the active build.
+- Contact rules for the live build:
+  - visible player hurtbox touches visible spike hitbox = miss
+  - player fully passes spikes without contact = clear
+  - visible player hurtbox touches visible bird hitbox = miss
+  - player fully ducks under and passes bird without contact = clear
+  - visible shield hitbox touches visible arrow hitbox = clear
+  - visible player hurtbox touches visible arrow hitbox before shield contact = miss
+  - visible sword hitbox touches visible goblin hitbox = clear
+  - visible player hurtbox touches visible goblin hitbox before sword contact = miss
+- Debug collision mode is part of the working workflow:
+  - `F3` toggles debug hitboxes
+  - `?debug=1` enables debug mode from the URL
+  - `?debugObstacle=spikes|birds|arrows|goblins` swaps the run to one obstacle type for practice
+  - cyan = player hurtbox, yellow/orange = obstacle hitbox, green = shield, magenta = sword, red = body overlap/contact
+- Remaining validation work is mainly tuning and feel, not missing contact geometry.
+
 ## Architecture
 
 The game has two logically independent sides that share a clock:
@@ -18,6 +38,15 @@ The game has two logically independent sides that share a clock:
 - `input.js` — input mapping for single player, local co-op, and online modes
 - `online.js` — network layer for online co-op *(built last)*
 
+## Scaling & Asset Implementation
+- **Virtual Resolution**: The game is designed for a **320x180** virtual canvas.
+- **Dynamic Fit**: The `renderer.js` must use the `scaleFactor` logic from `SKILLS.md` to ensure the 3x render scale (48x48) remains crisp and centered on any screen size.
+- **Placeholder Fallback**: 
+  - If `boy.png` or `girl.png` fail to load, `renderer.js` must trigger the `generatePlaceholder` skill to draw 16x16 colored blocks (Cyan for Boy, Pink for Girl).
+  - **Bird Asset**: Per the Obstacle table, use a scaled/stretched Y-axis placeholder if the sprite is missing.
+- **Coordinate Reset**: HUD elements (Score, Speed, Chain) must be drawn after `ctx.setTransform(1,0,0,1,0,0)` to prevent them from moving with the game camera.
+
+
 ## TDD rules for this game
 
 - `player.js`, `obstacles.js`, and `scoring.js` must have full test coverage before any rendering code touches them
@@ -27,13 +56,15 @@ The game has two logically independent sides that share a clock:
 
 ## Sprite sheets
 
+Collision tuning rule: the gameplay decision must match the debug hitboxes shown on screen.
+
 | File                    | Dimensions | Frame size | Frames | Notes                                      |
 |-------------------------|------------|------------|--------|--------------------------------------------|
 | images/boy.png          | 96 × 16    | 16 × 16    | 6      |                                            |
 | images/girl.png         | 96 × 16    | 16 × 16    | 6      |                                            |
-| images/SHORT SWORD.png  | 32 × 32    | 32 × 32    | 1      | Single frame; drawn offset from player during attack state |
+| images/SHORT SWORD.png  | 65 × 20    | 65 × 20    | 1      | Single frame; drawn offset from player during attack state |
 
-- Render scale: 3× (48 × 48 on canvas for characters; 96 × 96 for sword)
+- Render scale: 3× (48 × 48 on canvas for characters; 65 × 20 for sword at 1×)
 - Sword offset: extend in the direction the runner is facing (right for boy, left for girl)
 - `ctx.imageSmoothingEnabled = false` always
 
@@ -51,9 +82,9 @@ Each obstacle type maps to exactly one required response. This is the core mecha
 | Type       | Visual                      | Required response        | Sprite notes                         |
 |------------|-----------------------------|--------------------------|------------------------------------- |
 | Spikes     | Ground spikes               | Jump                     |                                      |
-| Bird       | Low-flying bird             | Crouch                   | Temp: scale sprite down on Y axis, accept stretch until real sprites made |
-| Arrow wall | 3 stacked arrows            | Block                    |                                      |
-| Goblin     | Goblin (possible pre-attack)| Block → Attack or Attack |                                      |
+| Bird       | Low-flying bird             | Crouch                   | Real sprite; visible hitbox pass completed |
+| Arrow wall | 3 stacked arrows            | Block                    | Visible shield-vs-arrow contact drives resolution |
+| Goblin     | Goblin (possible pre-attack)| Block → Attack or Attack | Visible sword-vs-goblin contact drives attack phases |
 
 The goblin is the only two-phase obstacle. See GDD.md for full goblin mechanic spec.
 
@@ -96,6 +127,16 @@ These values are validated by `archetype-model.js` — do not change without re-
 `archetype-model.js` — run with `node archetype-model.js` from this directory.
 Simulates perfect / competitive / average / casual / struggle / floor archetypes against the locked constants. Re-run whenever a constant changes.
 
+## Module system
+
+All `.js` files use ES modules (`import`/`export`). `package.json` sets `"type": "module"` so Node runs them natively.
+
+**Running in browser requires a local server** — Chrome blocks ES module imports on `file://`. Use:
+```
+npx http-server . -p 8080 -c-1
+```
+Then open `http://localhost:8080/demo.html` or `http://localhost:8080/index.html`.
+
 ## Build status
 
 | File | Status | Tests |
@@ -103,14 +144,46 @@ Simulates perfect / competitive / average / casual / struggle / floor archetypes
 | `player.js` | Done | 65 passing |
 | `obstacles.js` | Done | 39 passing |
 | `scoring.js` | Done | 16 passing |
-| `renderer.js` | Done — visually validated via renderer-test.html | — |
+| `renderer.js` | Done — all environments, HUD, debug overlay, outcome effects | — |
 | `input.js` | Done | 34 passing |
-| `game.js` | Not started (rewrite from scratch) | — |
+| `game.js` | Done — contact-validated obstacle flow, debug practice filters, browser loop wired | 97 passing |
+| `index.html` | Entry point wired | — |
 | `online.js` | Not started (built last) | — |
 
-`game.js`, `index.html`, `style.css` exist from before scope was locked. Treat as throwaway scaffolding — rewrite to fit the architecture above.
-
 `renderer-test.html` — standalone visual test harness. Open in browser to inspect environments, animations, and obstacle art. Not part of the final game.
+
+## HUD
+
+- Score, speed (`spd X.X`), and chain (`chain ×N`) shown per side — top corners
+- Chain dim at 0/1, gold at 2+
+- Clock center top, turns red at <20s
+- Progress bars bottom edge
+- On obstacle clear: floating "PERFECT" (gold) or "GOOD" (white) text + ring effect (~0.7s)
+- On obstacle miss: red X effect
+
+## Two-phase goblin
+
+Disabled for now (`twoPhase = false` in `generateWave`). All goblins are single-phase (attack only). Re-enable when ready for the two-phase validation pass.
+
+## Hitbox / collision notes
+
+- `playerBottomAtLocalX` mirrors the body profile for the girl via `profileX = 15 - sourceX`. The girl's body in screen-local coords is at x=6–35 (not 12–41 like the boy).
+- `buildDebugCollisionSnapshot` iterates x=0–47 and relies on `playerBottomAtLocalX` returning null for non-body columns — do not change this back to fixed 12/41 constants.
+- outcome `feedback` values: `'perfect'` / `'good'` / `'hit'` (not `'clear'` — that string is gone).
+- Arrow walls do not resolve from raw `block` input; they resolve from visible shield-vs-arrow contact or body contact.
+- Single-phase goblins and phase-1 goblins do not resolve from raw `attack` input; they resolve from visible sword-vs-goblin contact or body contact.
+- Two-phase goblin phase 0 is still timing-graded from the fireball/block window, then advances to phase 1 for sword contact.
+
+## Input — CRITICAL design rule
+
+**All 4 actions are one-shot keypresses. There is no held state for any action.**
+
+- Jump: one-shot
+- Crouch: one-shot
+- Attack: one-shot
+- Block: one-shot
+
+`inp.isHeld()` is only used by `online.js` internals and should NOT drive any game state in the main loop. Only `inp.isPressed()` should be checked when processing player actions. Any code that calls `inp.isHeld(side, 'crouch')` or `inp.isHeld(side, 'block')` to sustain player state is wrong and must be removed.
 
 ## input.js notes
 
@@ -155,16 +228,27 @@ Simulates perfect / competitive / average / casual / struggle / floor archetypes
 
 Transitions: a world-boundary seam travels across the screen at PPU=4 speed (matching obstacle movement). Old terrain scrolls out, new terrain enters from the same side as incoming obstacles.
 
+### animState contract
+
+The renderer does not read `player.state` directly. Callers must pass a player object that has been augmented with an `animState` field:
+
+```js
+const boyPlayer = { ...gs.boy, animState: boyAnim };
+// where boyAnim = { state: 'running' | 'jumping' | 'crouch' | 'attack' | 'block' | 'hit', actionTick: number }
+```
+
+`actionTick` increments each frame while state is `attack` or `hit`, resets to 0 on state change. The renderer uses it to drive the thrust/shield animation steps.
+
 ### Animation
 
 - Walk cycle: sprite sheet frames **2 and 3** (0-indexed) — the two sideways-facing run frames. User calls these "frames 3 and 4" (1-indexed). Frames 0–1 are front/back-facing; do not use.
-- All states (running, jumping, hit, attacking, blocking) continue the walk cycle — no frame change on state transition
+- All states continue the walk cycle — no frame change on state transition
 - Crouch: walk cycle frame, Y-scale 0.5, Y offset to keep feet on ground
 - Hit: walk cycle continues, sprite blinks at ~12hz
-- Jump: renderer reads `player.jumpY` (pixels above ground, positive = up); game.js drives this. Test harness simulates a parabolic arc.
+- Jump: renderer reads `player.jumpY` (pixels above ground, positive = up); game.js drives this via `startJump` / `tickJumpArc`
 - Attack: sword drawn **behind** the player sprite, thrusts outward and retracts — 3-step animation, ~0.3s
 - Block: glowing magic shield rectangle appears in front of character — same 3-step timing as attack
-- Both attack and block use `animState.actionTick` (resets on state change) divided by `ACTION_STEP_DUR=6`
+- Both attack and block use `animState.actionTick` divided by `ACTION_STEP_DUR=6`
 
 ### Obstacle visuals
 
@@ -172,11 +256,11 @@ Transitions: a world-boundary seam travels across the screen at PPU=4 speed (mat
 |------|--------|--------|
 | Spikes | 3 yellow triangles at ground level | Code-drawn placeholder |
 | Bird | `red1/2/3.png` animated sprite (38px wide, 3-frame flap cycle) | **Real sprite — done** |
-| Arrow wall | 3 stacked arrows pointing toward runner | Code-drawn placeholder |
-| Goblin | Green pixel humanoid; arm extended; bow drawn in windup phase | Code-drawn placeholder |
+| Arrow wall | `arrows.png` — 3 stacked arrows pointing toward runner | **Real sprite — done** |
+| Goblin | `goblin-idle.png` / `goblin-attack.png` / `goblin-take-hit.png` / `goblin-death.png` | **Real sprites — done** |
 
 Bird faces RIGHT in source sprites. `_drawBird` flips for boy's side (bird faces left toward him), draws as-is for girl's side.
-Replace `_drawSpikes`, `_drawArrowWall`, `_drawGoblin` when real sprites are ready.
+`_drawSpikes` remains code-drawn for now. Arrow wall and goblin rendering already use the shipped sprite assets.
 
 ### Sword
 
@@ -184,6 +268,12 @@ Replace `_drawSpikes`, `_drawArrowWall`, `_drawGoblin` when real sprites are rea
 - Rendered at 1× (65×20). No rotation needed — boy draws as-is, girl uses `scale(-1,1)` to flip.
 - Handle anchored at ~55% across sprite width (overlaps character torso); drawn **behind** the player sprite.
 - Thrust animation: 3-step (OFFSETS = [4, 12, 4] px outward)
+- Debug collision uses a dedicated **sword hitbox** aligned to the visible attack pose.
+
+### Shield
+
+- Shield is a dedicated visible hitbox, not just a timing state.
+- Debug collision uses a dedicated **shield hitbox** aligned to the visible block pose.
 
 ### HUD
 

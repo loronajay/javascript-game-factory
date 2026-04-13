@@ -1,5 +1,3 @@
-'use strict';
-
 // ─── Layout ───────────────────────────────────────────────────────────────────
 const CANVAS_W     = 960;
 const CANVAS_H     = 540;
@@ -27,15 +25,334 @@ const BIRD_FRAME_DATA = [
   { w: 38, h: 18 },
 ];
 
+// Goblin sprites — all 28px tall (take-hit is 27px), rendered at 2×.
+// Source art faces RIGHT; flip on the boy side so enemies face the player.
+const GOBLIN_SCALE   = 2;
+const GOBLIN_H       = 28;
+
+const GI_FW = 99;  const GI_FC = 4;   // goblin-idle.png    396×28
+const GA_FW = 84;  const GA_FC = 6;   // goblin-attack.png  504×28
+const GD_FW = 75;  const GD_FC = 5;   // goblin-death.png   375×28
+const GH_FW = 87;  const GH_FC = 4;   const GH_H = 27; // goblin-take-hit.png 348×27
+const GOBLIN_IDLE_BOXES = [
+  { srcInset: 0,  srcWidth: 27 },
+  { srcInset: 26, srcWidth: 25 },
+  { srcInset: 49, srcWidth: 26 },
+  { srcInset: 73, srcWidth: 26 },
+];
+const GOBLIN_ATTACK_BOXES = [
+  { srcInset: 0,  srcWidth: 27 },
+  { srcInset: 38, srcWidth: 22 },
+  { srcInset: 74, srcWidth: 10 },
+  { srcInset: 0,  srcWidth: 12 },
+  { srcInset: 26, srcWidth: 22 },
+  { srcInset: 62, srcWidth: 22 },
+];
+const GOBLIN_TAKE_HIT_BOXES = [
+  { srcInset: 0,  srcWidth: 23 },
+  { srcInset: 20, srcWidth: 24 },
+  { srcInset: 39, srcWidth: 30 },
+  { srcInset: 59, srcWidth: 28 },
+];
+const GOBLIN_DEATH_BOXES = [
+  { srcInset: 0,  srcWidth: 32 },
+  { srcInset: 42, srcWidth: 23 },
+  { srcInset: 0,  srcWidth: 1 },
+  { srcInset: 0,  srcWidth: 28 },
+  { srcInset: 37, srcWidth: 38 },
+];
+
+// Fireball sprite — 4 frames, 30×12px each.
+// Source art faces RIGHT; flip on the boy side so it flies toward the player.
+const FB_FW = 30;  const FB_FC = 4;   const FB_H = 12;
+const FB_SCALE = 2;
+
+// Bird visual approach speed multiplier — bird swoops in faster than other obstacles.
+// Purely cosmetic: timing window is still game-logic based.
+const BIRD_SPEED_MULT = 2;
+
+// Arrow wall — single 48×44 image
+const AR_W = 48;  const AR_H = 44;
+const AR_SCALE = 1.5;   // rendered 72×66
+const ARROW_ROW_BANDS = [
+  { top: 0, bottom: 8 },
+  { top: 18, bottom: 26 },
+  { top: 35, bottom: 43 },
+];
+const SHIELD_W = 10;
+const SHIELD_GAP = 6;
+const SHIELD_SCALES = [0.5, 1.0, 0.5];
+const SWORD_THRUSTS = [4, 12, 4];
+
 const GROUND_TOP   = 460;
 const BOY_LOCAL_X  = 120;
 const GIRL_LOCAL_X = HALF_W - SPRITE_W - 120;   // 312
 const PLAYER_Y     = GROUND_TOP - SPRITE_H;      // 412
+const PLAYER_CONTACT_PAD = 6;
+const BOY_CONTACT_X = BOY_LOCAL_X + SPRITE_W - PLAYER_CONTACT_PAD;
+const GIRL_CONTACT_X = GIRL_LOCAL_X + PLAYER_CONTACT_PAD;
 
 const PPU          = 4;      // pixels per distance unit
 const RUN_DISTANCE = 5400;
 const HARD_CUTOFF  = 90;
 const TILE         = HALF_W * 3;   // parallax tile width (1440)
+const FIREBALL_SPEED_MULT = 2;
+const EFFECT_DURATION = 18;
+const ACTION_STEP_COUNT = 3;       // visual steps for attack / block (in, hold, out)
+const ACTION_STEP_FRAMES = 6;      // display frames per step → 18 frames ≈ 0.3s total
+
+function projectIncomingX(contactX, distDelta, facing, width, speedMult = 1) {
+  const offset = distDelta * PPU * speedMult;
+  return facing === 'right'
+    ? contactX + offset
+    : contactX - offset - width;
+}
+
+function getGoblinFrameMetrics(isAttack, frame) {
+  const boxes = isAttack ? GOBLIN_ATTACK_BOXES : GOBLIN_IDLE_BOXES;
+  return boxes[frame % boxes.length];
+}
+
+function getDyingGoblinFrameMetrics(tick) {
+  const TAKE_HIT_DUR = GH_FC * 6;
+  const DEATH_DUR = GD_FC * 8;
+
+  if (tick < TAKE_HIT_DUR) {
+    const frame = Math.min(Math.floor(tick / 6), GH_FC - 1);
+    return {
+      metrics: GOBLIN_TAKE_HIT_BOXES[frame],
+      srcH: GH_H,
+      active: true,
+    };
+  }
+
+  if (tick < TAKE_HIT_DUR + DEATH_DUR) {
+    const localTick = tick - TAKE_HIT_DUR;
+    const frame = Math.min(Math.floor(localTick / 8), GD_FC - 1);
+    return {
+      metrics: GOBLIN_DEATH_BOXES[frame],
+      srcH: GOBLIN_H,
+      active: true,
+    };
+  }
+
+  return {
+    metrics: GOBLIN_DEATH_BOXES[GD_FC - 1],
+    srcH: GOBLIN_H,
+    active: false,
+  };
+}
+
+function isObstacleOnScreen(localX, width) {
+  return localX + width > 0 && localX < HALF_W;
+}
+
+function projectDyingGoblinX(position, playerDistance, facing, tick) {
+  const contactX = facing === 'right' ? BOY_CONTACT_X : GIRL_CONTACT_X;
+  const distDelta = position - playerDistance;
+  const { metrics } = getDyingGoblinFrameMetrics(tick);
+  const width = metrics.srcWidth * GOBLIN_SCALE;
+  return projectIncomingX(contactX, distDelta, facing, width);
+}
+
+function shieldActionStep(actionTick = 0) {
+  return Math.min(Math.floor(actionTick / ACTION_STEP_FRAMES), ACTION_STEP_COUNT - 1);
+}
+
+function findBoxIntersection(boxes, target) {
+  if (!target || !boxes.length) return null;
+
+  for (const box of boxes) {
+    const left = Math.max(target.left, box.left);
+    const top = Math.max(target.top, box.top);
+    const right = Math.min(target.right, box.right);
+    const bottom = Math.min(target.bottom, box.bottom);
+    if (right >= left && bottom >= top) {
+      return { left, top, right, bottom, label: box.label };
+    }
+  }
+
+  return null;
+}
+
+function shieldBoxForSnapshot(side, player, snapshot) {
+  if (snapshot?.action !== 'block') return null;
+
+  const step = shieldActionStep(snapshot.actionTick || 0);
+  const scale = SHIELD_SCALES[step];
+  const height = SPRITE_H * scale;
+  const left = side === 'girl'
+    ? GIRL_LOCAL_X - SHIELD_W - SHIELD_GAP
+    : BOY_LOCAL_X + SPRITE_W + SHIELD_GAP;
+  const top = PLAYER_Y - (player.jumpY || 0) + (SPRITE_H - height) / 2;
+
+  return {
+    left,
+    top,
+    right: left + SHIELD_W,
+    bottom: top + height,
+  };
+}
+
+function swordBoxForSnapshot(side, player, snapshot) {
+  if (snapshot?.action !== 'attack') return null;
+
+  const step = shieldActionStep(snapshot.actionTick || 0);
+  const thrust = SWORD_THRUSTS[step];
+  const top = PLAYER_Y - (player.jumpY || 0) + SPRITE_H * 0.65 - SWORD_H / 2;
+
+  if (side === 'girl') {
+    const handleX = GIRL_LOCAL_X + SPRITE_W * 0.45 - thrust;
+    return {
+      left: handleX - SWORD_W,
+      top,
+      right: handleX,
+      bottom: top + SWORD_H,
+    };
+  }
+
+  const handleX = BOY_LOCAL_X + SPRITE_W * 0.55 + thrust;
+  return {
+    left: handleX,
+    top,
+    right: handleX + SWORD_W,
+    bottom: top + SWORD_H,
+  };
+}
+
+function getDebugOverlayGeometry(side, player, obstacles, snapshot, nowMs = 0) {
+  const baseX = side === 'boy' ? BOY_LOCAL_X : GIRL_LOCAL_X;
+  const facing = side === 'boy' ? 'right' : 'left';
+  const contactX = side === 'boy' ? BOY_CONTACT_X : GIRL_CONTACT_X;
+  const geometry = {
+    playerColumns: [],
+    playerBounds: null,
+    obstacleColumns: [],
+    obstacleBoxes: [],
+    overlapColumns: [],
+    swordBox: null,
+    swordCollisionBox: null,
+    shieldBox: null,
+    shieldCollisionBox: null,
+    collisionBox: null,
+  };
+
+  if (snapshot?.playerColumns?.length) {
+    geometry.playerColumns = snapshot.playerColumns.map(col => ({
+      x: baseX + col.x,
+      top: col.top,
+      bottom: col.bottom,
+    }));
+    const xs = geometry.playerColumns.map(col => col.x);
+    const tops = geometry.playerColumns.map(col => col.top);
+    const bottoms = geometry.playerColumns.map(col => col.bottom);
+    geometry.playerBounds = {
+      left: Math.min(...xs),
+      top: Math.min(...tops),
+      right: Math.max(...xs),
+      bottom: Math.max(...bottoms),
+    };
+  }
+
+  if (snapshot?.spikeColumns?.length) {
+    geometry.obstacleColumns = snapshot.spikeColumns.map(col => ({
+      x: baseX + col.x,
+      top: col.top,
+      bottom: col.bottom,
+    }));
+    const xs = geometry.obstacleColumns.map(col => col.x);
+    const tops = geometry.obstacleColumns.map(col => col.top);
+    const bottoms = geometry.obstacleColumns.map(col => col.bottom);
+    geometry.obstacleBoxes.push({
+      label: 'spikes',
+      left: Math.min(...xs),
+      top: Math.min(...tops),
+      right: Math.max(...xs),
+      bottom: Math.max(...bottoms),
+    });
+  }
+
+  const frontObstacle = obstacles && obstacles[0];
+  if (frontObstacle && frontObstacle.type !== 'spikes') {
+    const distDelta = frontObstacle.position - player.distance;
+
+    if (frontObstacle.type === 'bird') {
+      const frameIndex = Math.floor(nowMs / 120) % 3;
+      const frameData = BIRD_FRAME_DATA[frameIndex];
+      const width = frameData.w * BIRD_SCALE;
+      const height = frameData.h * BIRD_SCALE;
+      const left = projectIncomingX(contactX, distDelta, facing, width, BIRD_SPEED_MULT);
+      geometry.obstacleBoxes.push({
+        label: 'bird',
+        left,
+        top: BIRD_BOTTOM - height,
+        right: left + width,
+        bottom: BIRD_BOTTOM,
+      });
+    } else if (frontObstacle.type === 'arrowwall') {
+      const width = Math.round(AR_W * AR_SCALE);
+      const height = Math.round(AR_H * AR_SCALE);
+      const left = projectIncomingX(contactX, distDelta, facing, width);
+      const top = GROUND_TOP - height;
+      for (const band of ARROW_ROW_BANDS) {
+        geometry.obstacleBoxes.push({
+          label: 'arrowwall',
+          left,
+          top: top + band.top * AR_SCALE,
+          right: left + width,
+          bottom: top + (band.bottom + 1) * AR_SCALE,
+        });
+      }
+    } else if (frontObstacle.type === 'goblin') {
+      const isAttack = frontObstacle.twoPhase && frontObstacle.phase === 0;
+      const frame = Math.floor(nowMs / 120) % (isAttack ? GA_FC : GI_FC);
+      const metrics = getGoblinFrameMetrics(isAttack, frame);
+      const width = metrics.srcWidth * GOBLIN_SCALE;
+      const height = GOBLIN_H * GOBLIN_SCALE;
+      const left = projectIncomingX(contactX, distDelta, facing, width);
+      geometry.obstacleBoxes.push({
+        label: 'goblin',
+        left,
+        top: GROUND_TOP - height,
+        right: left + width,
+        bottom: GROUND_TOP,
+      });
+
+      if (isAttack) {
+        const fireballWidth = FB_FW * FB_SCALE;
+        const fireballHeight = FB_H * FB_SCALE;
+        const fireballLeft = projectIncomingX(contactX, distDelta, facing, fireballWidth, FIREBALL_SPEED_MULT);
+        const fireballTop = GROUND_TOP - height + height * 0.45 - fireballHeight / 2;
+        geometry.obstacleBoxes.push({
+          label: 'fireball',
+          left: fireballLeft,
+          top: fireballTop,
+          right: fireballLeft + fireballWidth,
+          bottom: fireballTop + fireballHeight,
+        });
+      }
+    }
+  }
+
+  if (geometry.playerColumns.length && geometry.obstacleColumns.length) {
+    const playerByX = new Map(geometry.playerColumns.map(col => [Math.round(col.x), col]));
+    geometry.overlapColumns = geometry.obstacleColumns.flatMap(col => {
+      const playerCol = playerByX.get(Math.round(col.x));
+      if (!playerCol) return [];
+      const top = Math.max(playerCol.top, col.top);
+      const bottom = Math.min(playerCol.bottom, col.bottom);
+      return bottom >= top ? [{ x: col.x, top, bottom }] : [];
+    });
+  }
+
+  geometry.swordBox = swordBoxForSnapshot(side, player, snapshot);
+  geometry.swordCollisionBox = findBoxIntersection(geometry.obstacleBoxes, geometry.swordBox);
+  geometry.shieldBox = shieldBoxForSnapshot(side, player, snapshot);
+  geometry.shieldCollisionBox = findBoxIntersection(geometry.obstacleBoxes, geometry.shieldBox);
+  geometry.collisionBox = findBoxIntersection(geometry.obstacleBoxes, geometry.playerBounds);
+
+  return geometry;
+}
 
 // ─── Environment transitions ──────────────────────────────────────────────────
 // Aligned exactly to wave start positions from obstacles.js:
@@ -125,33 +442,371 @@ function createRenderer(canvas, images) {
   const BOY_SCENES  = [_cave,   _forest, _cliffs, _sunken, _nightScene];
   const GIRL_SCENES = [_desert, _tundra, _lava,   _castle, _nightScene];
 
-  const boyAnim  = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0, actionTick: 0, prevState: 'running' };
-  const girlAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0, actionTick: 0, prevState: 'running' };
+  const boyAnim  = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
+  const girlAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
+
+  // Dying goblins — animated independently after being cleared.
+  // Each entry: { position, tick }. They stay in world space so runners pass them.
+  const boyDying = [];
+  const girlDying = [];
+
+  // Lingering cleared obstacles (spikes, bird) — scroll off naturally rather than popping out.
+  // Each entry is a copy of the obstacle object (has .position, .type).
+  // Caller adds via addTrailObstacle(). Pruned when distDelta < -10.
+  const boyTrail = [];
+  const girlTrail = [];
+  const boyEffects = [];
+  const girlEffects = [];
 
   // ── Public API ──────────────────────────────────────────────────────────────
   // boyObstacles / girlObstacles: each side's own obstacle list
   // boyBoosts / girlBoosts: each side's boost list ({ distance, collected })
   // elapsed: seconds since run started
-  function renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed) {
+  function renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed, debugState) {
+    const nowMs = Date.now();
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    _drawHalf(0,      'boy',  boyAnim,  boyPlayer,  boyObstacles,  boyBoosts);
-    _drawHalf(HALF_W, 'girl', girlAnim, girlPlayer, girlObstacles, girlBoosts);
+    _drawHalf(0,      'boy',  boyAnim,  boyPlayer,  boyObstacles,  boyBoosts,  boyDying,  boyTrail,  boyEffects,  nowMs, debugState?.enabled ? debugState.boy : null);
+    _drawHalf(HALF_W, 'girl', girlAnim, girlPlayer, girlObstacles, girlBoosts, girlDying, girlTrail, girlEffects, nowMs, debugState?.enabled ? debugState.girl : null);
     _drawDivider();
     _drawHUD(boyPlayer, girlPlayer, elapsed);
+    if (debugState?.enabled) _drawDebugBanner(debugState);
+  }
+
+  function renderMenu(debugState) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawBackground(0, 'boy', 0);
+    _drawBackground(HALF_W, 'girl', 0);
+    _drawDivider();
+    _drawOverlayPanel('Lovers Lost', [
+      'Split-screen co-op runner',
+      'Boy: W jump  S crouch  D attack  A block',
+      'Girl: Up jump  Down crouch  Left attack  Right block',
+      'Press any action key to begin',
+    ]);
+    if (debugState?.enabled) _drawDebugBanner(debugState);
+  }
+
+  function renderGameOver(boyPlayer, girlPlayer, runSummary) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawBackground(0, 'boy', boyPlayer.distance);
+    _drawBackground(HALF_W, 'girl', girlPlayer.distance);
+    _drawDivider();
+    const title = runSummary?.outcome === 'partial' ? 'One Lover Made It' : 'Time Up';
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Score screen incoming...');
+  }
+
+  function renderScore(boyPlayer, girlPlayer, runSummary) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawBackground(0, 'boy', boyPlayer.distance);
+    _drawBackground(HALF_W, 'girl', girlPlayer.distance);
+    _drawDivider();
+    let title = 'Run Complete';
+    if (runSummary?.outcome === 'partial') title = 'Partial Finish';
+    if (runSummary?.outcome === 'game_over') title = 'Run Over';
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to play again');
+  }
+
+  function addDyingGoblin(side, obstacle, playerDistance) {
+    const list = side === 'boy' ? boyDying : girlDying;
+    void playerDistance;
+    list.push({ position: obstacle.position, tick: 0 });
+  }
+
+  // Call when a spike or bird obstacle is cleared/missed — keeps it rendering until
+  // it scrolls off screen. Do NOT call for arrowwall or goblin (those vanish immediately).
+  function addTrailObstacle(side, obs) {
+    const list = side === 'boy' ? boyTrail : girlTrail;
+    list.push({ ...obs });
+  }
+
+  function addOutcomeEffect(side, kind, obstacleType) {
+    const list = side === 'boy' ? boyEffects : girlEffects;
+    list.push({ kind, obstacleType, tick: 0 });
   }
 
   // ── Half ────────────────────────────────────────────────────────────────────
-  function _drawHalf(offsetX, side, animState, player, obstacles, boosts) {
+  function _drawHalf(offsetX, side, animState, player, obstacles, boosts, dying, trail, effects, nowMs, debugSnapshot) {
     const facing = side === 'boy' ? 'right' : 'left';
     ctx.save();
     ctx.beginPath();
     ctx.rect(offsetX, 0, HALF_W, CANVAS_H);
     ctx.clip();
     _drawBackground(offsetX, side, player.distance);
-    _drawFieldObstacles(offsetX, player, facing, obstacles);
+    _drawTrailObstacles(offsetX, player, facing, trail, nowMs);
+    _drawFieldObstacles(offsetX, player, facing, obstacles, nowMs);
     _drawFieldBoosts(offsetX, player, facing, boosts, side);
+    _drawDyingGoblins(offsetX, player, facing, dying);
     _drawPlayerSprite(offsetX, player, facing, animState, side);
+    _drawOutcomeEffects(offsetX, side, effects);
+    if (debugSnapshot?.enabled) _drawDebugCollision(offsetX, side, player, obstacles, debugSnapshot, nowMs);
     ctx.restore();
+  }
+
+  function _drawDebugCollision(offsetX, side, player, obstacles, snapshot, nowMs) {
+    const geometry = getDebugOverlayGeometry(side, player, obstacles, snapshot, nowMs);
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.lineWidth = 2;
+
+    for (const box of geometry.obstacleBoxes) {
+      ctx.fillStyle = box.label === 'fireball' ? 'rgba(255,140,80,0.22)' : 'rgba(255,220,80,0.2)';
+      ctx.strokeStyle = box.label === 'fireball' ? 'rgba(255,140,80,0.95)' : 'rgba(255,220,80,0.95)';
+      ctx.fillRect(offsetX + box.left, box.top, box.right - box.left, box.bottom - box.top);
+      ctx.strokeRect(offsetX + box.left, box.top, box.right - box.left, box.bottom - box.top);
+    }
+
+    if (geometry.shieldBox) {
+      ctx.fillStyle = 'rgba(120,255,180,0.18)';
+      ctx.strokeStyle = 'rgba(120,255,180,0.95)';
+      ctx.fillRect(
+        offsetX + geometry.shieldBox.left,
+        geometry.shieldBox.top,
+        geometry.shieldBox.right - geometry.shieldBox.left,
+        geometry.shieldBox.bottom - geometry.shieldBox.top
+      );
+      ctx.strokeRect(
+        offsetX + geometry.shieldBox.left,
+        geometry.shieldBox.top,
+        geometry.shieldBox.right - geometry.shieldBox.left,
+        geometry.shieldBox.bottom - geometry.shieldBox.top
+      );
+    }
+
+    if (geometry.swordBox) {
+      ctx.fillStyle = 'rgba(255,120,220,0.18)';
+      ctx.strokeStyle = 'rgba(255,120,220,0.95)';
+      ctx.fillRect(
+        offsetX + geometry.swordBox.left,
+        geometry.swordBox.top,
+        geometry.swordBox.right - geometry.swordBox.left,
+        geometry.swordBox.bottom - geometry.swordBox.top
+      );
+      ctx.strokeRect(
+        offsetX + geometry.swordBox.left,
+        geometry.swordBox.top,
+        geometry.swordBox.right - geometry.swordBox.left,
+        geometry.swordBox.bottom - geometry.swordBox.top
+      );
+    }
+
+    if (geometry.obstacleColumns.length) {
+      ctx.strokeStyle = 'rgba(255,220,80,0.95)';
+      for (const col of geometry.obstacleColumns) {
+        ctx.beginPath();
+        ctx.moveTo(offsetX + col.x, col.top);
+        ctx.lineTo(offsetX + col.x, col.bottom);
+        ctx.stroke();
+      }
+    }
+
+    if (geometry.playerColumns.length) {
+      const playerXs = geometry.playerColumns.map(col => col.x);
+      const playerTops = geometry.playerColumns.map(col => col.top);
+      const playerBottoms = geometry.playerColumns.map(col => col.bottom);
+      ctx.fillStyle = 'rgba(80,220,255,0.18)';
+      ctx.fillRect(
+        offsetX + Math.min(...playerXs),
+        Math.min(...playerTops),
+        Math.max(...playerXs) - Math.min(...playerXs) + 1,
+        Math.max(...playerBottoms) - Math.min(...playerTops)
+      );
+      ctx.strokeStyle = 'rgba(80,220,255,0.9)';
+      for (const col of geometry.playerColumns) {
+        ctx.beginPath();
+        ctx.moveTo(offsetX + col.x, col.top);
+        ctx.lineTo(offsetX + col.x, col.bottom);
+        ctx.stroke();
+      }
+      ctx.strokeRect(
+        offsetX + Math.min(...playerXs),
+        Math.min(...playerTops),
+        Math.max(...playerXs) - Math.min(...playerXs) + 1,
+        Math.max(...playerBottoms) - Math.min(...playerTops)
+      );
+    }
+
+    if (geometry.overlapColumns.length) {
+      ctx.strokeStyle = 'rgba(255,70,70,1)';
+      ctx.lineWidth = 3;
+      for (const col of geometry.overlapColumns) {
+        ctx.beginPath();
+        ctx.moveTo(offsetX + col.x, col.top);
+        ctx.lineTo(offsetX + col.x, col.bottom);
+        ctx.stroke();
+      }
+    }
+
+    if (geometry.collisionBox) {
+      ctx.fillStyle = 'rgba(255,70,70,0.28)';
+      ctx.strokeStyle = 'rgba(255,70,70,1)';
+      ctx.fillRect(
+        offsetX + geometry.collisionBox.left,
+        geometry.collisionBox.top,
+        geometry.collisionBox.right - geometry.collisionBox.left,
+        geometry.collisionBox.bottom - geometry.collisionBox.top
+      );
+      ctx.strokeRect(
+        offsetX + geometry.collisionBox.left,
+        geometry.collisionBox.top,
+        geometry.collisionBox.right - geometry.collisionBox.left,
+        geometry.collisionBox.bottom - geometry.collisionBox.top
+      );
+    }
+
+    if (geometry.shieldCollisionBox) {
+      ctx.fillStyle = 'rgba(120,255,180,0.26)';
+      ctx.strokeStyle = 'rgba(120,255,180,0.98)';
+      ctx.fillRect(
+        offsetX + geometry.shieldCollisionBox.left,
+        geometry.shieldCollisionBox.top,
+        geometry.shieldCollisionBox.right - geometry.shieldCollisionBox.left,
+        geometry.shieldCollisionBox.bottom - geometry.shieldCollisionBox.top
+      );
+      ctx.strokeRect(
+        offsetX + geometry.shieldCollisionBox.left,
+        geometry.shieldCollisionBox.top,
+        geometry.shieldCollisionBox.right - geometry.shieldCollisionBox.left,
+        geometry.shieldCollisionBox.bottom - geometry.shieldCollisionBox.top
+      );
+    }
+
+    if (geometry.swordCollisionBox) {
+      ctx.fillStyle = 'rgba(255,120,220,0.26)';
+      ctx.strokeStyle = 'rgba(255,120,220,0.98)';
+      ctx.fillRect(
+        offsetX + geometry.swordCollisionBox.left,
+        geometry.swordCollisionBox.top,
+        geometry.swordCollisionBox.right - geometry.swordCollisionBox.left,
+        geometry.swordCollisionBox.bottom - geometry.swordCollisionBox.top
+      );
+      ctx.strokeRect(
+        offsetX + geometry.swordCollisionBox.left,
+        geometry.swordCollisionBox.top,
+        geometry.swordCollisionBox.right - geometry.swordCollisionBox.left,
+        geometry.swordCollisionBox.bottom - geometry.swordCollisionBox.top
+      );
+    }
+
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(offsetX + 8, 8, 226, 94);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.strokeRect(offsetX + 8, 8, 226, 94);
+    ctx.fillStyle = '#f3f5ff';
+    ctx.font = '12px monospace';
+    ctx.fillText(`obs: ${snapshot.obstacleType}`, offsetX + 16, 26);
+    ctx.fillText(`action: ${snapshot.action || 'none'}`, offsetX + 16, 42);
+    ctx.fillText(`feetY: ${Math.round(snapshot.playerBottomY)}`, offsetX + 16, 58);
+    ctx.fillText(`overlap: ${Math.round(snapshot.overlapHeight || 0)}`, offsetX + 16, 74);
+    ctx.fillText(`touch: ${geometry.collisionBox || geometry.shieldCollisionBox || geometry.swordCollisionBox || geometry.overlapColumns.length ? 'yes' : 'no'}`, offsetX + 16, 90);
+    ctx.restore();
+  }
+
+  function _drawDebugBanner(debugState) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 15, 20, 0.85)';
+    ctx.fillRect(260, 8, 440, 24);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.strokeRect(260, 8, 440, 24);
+    ctx.fillStyle = '#f6e96b';
+    ctx.font = '12px monospace';
+    ctx.fillText(`DEBUG HITBOXES ON  F3 toggle  ${debugState.hint || ''}`.trim(), 270, 24);
+    ctx.restore();
+  }
+
+  function _drawDyingGoblins(offsetX, player, facing, dying) {
+    for (let i = dying.length - 1; i >= 0; i--) {
+      const dg = dying[i];
+      const localX = projectDyingGoblinX(dg.position, player.distance, facing, dg.tick);
+      const { metrics } = getDyingGoblinFrameMetrics(dg.tick);
+      const width = metrics.srcWidth * GOBLIN_SCALE;
+      const still = isObstacleOnScreen(localX, width)
+        ? _drawDyingGoblin(offsetX + localX, facing === 'right', dg.tick)
+        : getDyingGoblinFrameMetrics(dg.tick).active;
+      dg.tick++;
+      if (!still) dying.splice(i, 1);
+    }
+  }
+
+  function _effectY(obstacleType) {
+    switch (obstacleType) {
+      case 'spikes':    return GROUND_TOP - 18;
+      case 'bird':      return BIRD_BOTTOM - 18;
+      case 'arrowwall': return GROUND_TOP - 34;
+      case 'goblin':    return GROUND_TOP - 44;
+      case 'fireball':  return GROUND_TOP - 30;
+      default:          return GROUND_TOP - 28;
+    }
+  }
+
+  function _effectRadius(obstacleType) {
+    switch (obstacleType) {
+      case 'spikes':    return 18;
+      case 'bird':      return 20;
+      case 'arrowwall': return 24;
+      case 'goblin':    return 26;
+      case 'fireball':  return 18;
+      default:          return 20;
+    }
+  }
+
+  const TEXT_DURATION = 42; // frames the grade label stays visible (~0.7s)
+
+  function _drawOutcomeEffects(offsetX, side, effects) {
+    const contactX = side === 'boy' ? BOY_CONTACT_X + 10 : GIRL_CONTACT_X - 10;
+
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const effect = effects[i];
+      const tCircle = effect.tick / EFFECT_DURATION;
+      const tText   = effect.tick / TEXT_DURATION;
+      if (tText >= 1) {
+        effects.splice(i, 1);
+        continue;
+      }
+
+      const cx = offsetX + contactX;
+      const cy = _effectY(effect.obstacleType);
+      const radius = _effectRadius(effect.obstacleType) + tCircle * 18;
+
+      ctx.save();
+      const isHit = effect.kind === 'hit';
+      if (!isHit && tCircle < 1) {
+        ctx.globalAlpha = 1 - tCircle;
+        ctx.strokeStyle = effect.kind === 'perfect' ? 'rgba(255,220,60,0.95)' : 'rgba(255,245,180,0.95)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(cx - 2, cy - radius * 0.5, 4, radius);
+        ctx.fillRect(cx - radius * 0.5, cy - 2, radius, 4);
+      } else if (isHit && tCircle < 1) {
+        ctx.globalAlpha = 0.95 - tCircle * 0.7;
+        ctx.strokeStyle = 'rgba(255,90,90,0.95)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(cx - radius * 0.55, cy - radius * 0.55);
+        ctx.lineTo(cx + radius * 0.55, cy + radius * 0.55);
+        ctx.moveTo(cx + radius * 0.55, cy - radius * 0.55);
+        ctx.lineTo(cx - radius * 0.55, cy + radius * 0.55);
+        ctx.stroke();
+      }
+
+      // Grade text — floats up, fades out
+      if (effect.kind === 'perfect' || effect.kind === 'good') {
+        const label    = effect.kind === 'perfect' ? 'PERFECT' : 'GOOD';
+        const floatY   = cy - 10 - tText * 22;
+        ctx.globalAlpha = Math.max(0, 1 - tText * 1.4);
+        ctx.font        = `bold 13px monospace`;
+        ctx.textAlign   = 'center';
+        ctx.fillStyle   = effect.kind === 'perfect' ? '#ffe040' : '#ffffff';
+        ctx.shadowColor = effect.kind === 'perfect' ? '#ffaa00' : 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur  = 6;
+        ctx.fillText(label, cx, floatY);
+      }
+
+      ctx.restore();
+      effect.tick++;
+    }
   }
 
   // ── Background / environment scroll seam ────────────────────────────────────
@@ -568,40 +1223,69 @@ function createRenderer(canvas, images) {
   }
 
   // ── Obstacles ────────────────────────────────────────────────────────────────
-  function _obsWidth(type) {
-    switch (type) {
+  function _obsWidth(obs, nowMs) {
+    switch (obs.type) {
       case 'spikes':    return 36;
-      case 'bird':      return 37;
-      case 'arrowwall': return 24;
-      case 'goblin':    return 24;
-      default:          return 24;
+      case 'bird':      return 57;                      // 38px × 1.5
+      case 'arrowwall': return Math.round(AR_W * AR_SCALE);  // 72px
+      case 'goblin': {
+        const isAttack = obs.twoPhase && obs.phase === 0;
+        const frameCount = isAttack ? GA_FC : GI_FC;
+        const frame = Math.floor(nowMs / 120) % frameCount;
+        return getGoblinFrameMetrics(isAttack, frame).srcWidth * GOBLIN_SCALE;
+      }
+      default:          return 36;
     }
   }
 
-  function _drawFieldObstacles(offsetX, player, facing, obstacles) {
+  // Returns the effective PPU for an obstacle type (bird swoops in faster).
+  function _obsPPU(type) {
+    return type === 'bird' ? PPU * BIRD_SPEED_MULT : PPU;
+  }
+
+  function _drawFieldObstacles(offsetX, player, facing, obstacles, nowMs) {
     if (!obstacles || !obstacles.length) return;
-    const localX = facing === 'right' ? BOY_LOCAL_X : GIRL_LOCAL_X;
+    const contactX = facing === 'right' ? BOY_CONTACT_X : GIRL_CONTACT_X;
 
     for (const obs of obstacles) {
       if (obs.cleared) continue;
-      const distDelta = obs.distance - player.distance;
-      if (distDelta < -10 || distDelta > 130) continue;
+      const distDelta = obs.position - player.distance;
+      const ppu       = _obsPPU(obs.type);
+      const obsW      = _obsWidth(obs, nowMs);
+      const speedMult = ppu / PPU;
+      const localObsX = projectIncomingX(contactX, distDelta, facing, obsW, speedMult);
+      if (!isObstacleOnScreen(localObsX, obsW)) continue;
 
-      const obsW      = _obsWidth(obs.type);
-      const localObsX = facing === 'right'
-        ? localX + distDelta * PPU
-        : localX - distDelta * PPU - obsW;
-
-      _drawObstacle(offsetX + localObsX, obs, facing === 'left');
+      _drawObstacle(offsetX + localObsX, obs, facing, offsetX + contactX, distDelta, nowMs);
     }
   }
 
-  function _drawObstacle(x, obs, flip) {
+  // Draw cleared spikes/birds from the trail array, scrolling them off naturally.
+  // Prunes entries that have moved off-screen.
+  function _drawTrailObstacles(offsetX, player, facing, trail, nowMs) {
+    if (!trail || !trail.length) return;
+    const contactX = facing === 'right' ? BOY_CONTACT_X : GIRL_CONTACT_X;
+
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const obs       = trail[i];
+      const distDelta = obs.position - player.distance;
+      const ppu       = _obsPPU(obs.type);
+      const obsW      = _obsWidth(obs, nowMs);
+      const speedMult = ppu / PPU;
+      const localObsX = projectIncomingX(contactX, distDelta, facing, obsW, speedMult);
+      if (!isObstacleOnScreen(localObsX, obsW)) { trail.splice(i, 1); continue; }
+
+      _drawObstacle(offsetX + localObsX, obs, facing, offsetX + contactX, distDelta, nowMs);
+    }
+  }
+
+  function _drawObstacle(x, obs, facing, contactX, distDelta, nowMs) {
+    const flip = facing === 'right';
     switch (obs.type) {
-      case 'spikes':    _drawSpikes(x);             break;
-      case 'bird':      _drawBird(x, !flip);         break;
-      case 'arrowwall': _drawArrowWall(x, flip);    break;
-      case 'goblin':    _drawGoblin(x, obs, flip);  break;
+      case 'spikes':    _drawSpikes(x);                              break;
+      case 'bird':      _drawBird(x, flip);                          break;
+      case 'arrowwall': _drawArrowWall(x, flip);                     break;
+      case 'goblin':    _drawGoblin(x, obs, facing, contactX, distDelta, nowMs); break;
     }
   }
 
@@ -649,71 +1333,130 @@ function createRenderer(canvas, images) {
     ctx.restore();
   }
 
-  // Arrow wall: canonical = arrows pointing LEFT (toward boy); flip for girl
+  // Arrow wall: arrows.png is a single 48×44 image, rendered at 1.5×.
+  // Source art points RIGHT; flip on the boy side so the arrows face the player.
   function _drawArrowWall(x, flip) {
+    const img = images.arrows;
+    const dw  = Math.round(AR_W * AR_SCALE);   // 72
+    const dh  = Math.round(AR_H * AR_SCALE);   // 66
+    const ay  = GROUND_TOP - dh;
     ctx.save();
-    if (flip) { ctx.translate(x + 24, 0); ctx.scale(-1, 1); x = 0; }
-    for (let i = 0; i < 3; i++) {
-      const ay = GROUND_TOP - 15 - i * 15;
-      ctx.fillStyle = '#885522';
-      ctx.fillRect(x + 4, ay + 3, 20, 6);    // shaft
+    if (flip) {
+      // Mirror horizontally so arrows point LEFT (toward boy)
+      ctx.translate(x + dw, 0);
+      ctx.scale(-1, 1);
+      x = 0;
+    }
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, 0, 0, AR_W, AR_H, x, ay, dw, dh);
+    } else {
+      // Fallback: simple placeholder block
       ctx.fillStyle = '#ccaa44';
-      ctx.beginPath();
-      ctx.moveTo(x,      ay + 6);             // arrowhead pointing left
-      ctx.lineTo(x + 10, ay);
-      ctx.lineTo(x + 10, ay + 12);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#aa4422';
-      ctx.fillRect(x + 21, ay,     3, 4);    // fletching
-      ctx.fillRect(x + 21, ay + 8, 3, 4);
+      ctx.fillRect(x, ay + dh * 0.2, dw, dh * 0.6);
     }
     ctx.restore();
   }
 
-  // Goblin: canonical = facing LEFT (toward boy); flip for girl
-  function _drawGoblin(x, obs, flip) {
+  // Goblin: sprite-based. Source art faces RIGHT; flip on the boy side.
+  // Single-phase or two-phase phase 1: goblin-idle animation.
+  // Two-phase phase 0: goblin-attack animation + fireball projectile.
+  // On clearance: caller should play take-hit → death (tracked in dyingGoblins).
+  function _drawGoblin(x, obs, facing, contactX, distDelta, nowMs) {
+    const flip = facing === 'right';
+    const isAttack = obs.twoPhase && obs.phase === 0;
+
+    // Pick sprite sheet and frame size
+    const img = isAttack ? images.goblinAttack : images.goblinIdle;
+    const fw  = isAttack ? GA_FW : GI_FW;
+    const fc  = isAttack ? GA_FC : GI_FC;
+
+    // Cycle frames at ~8fps (120ms per frame)
+    const frame = Math.floor(nowMs / 120) % fc;
+    const metrics = getGoblinFrameMetrics(isAttack, frame);
+    const dw    = metrics.srcWidth * GOBLIN_SCALE;
+    const dh    = GOBLIN_H * GOBLIN_SCALE;
+    const gy    = GROUND_TOP - dh;
+
     ctx.save();
-    if (flip) { ctx.translate(x + 24, 0); ctx.scale(-1, 1); x = 0; }
-    const gy = GROUND_TOP - 32;
-    // Legs
-    ctx.fillStyle = '#336633';
-    ctx.fillRect(x + 5,  gy + 24, 5, 8);
-    ctx.fillRect(x + 14, gy + 24, 5, 8);
-    // Torso
-    ctx.fillStyle = '#44aa44';
-    ctx.fillRect(x + 3, gy + 10, 18, 16);
-    // Head
-    ctx.fillStyle = '#55bb55';
-    ctx.fillRect(x + 5, gy, 14, 12);
-    // Ears
-    ctx.fillRect(x + 3,  gy + 2, 3, 5);
-    ctx.fillRect(x + 18, gy + 2, 3, 5);
-    // Eyes
-    ctx.fillStyle = '#ff3333';
-    ctx.fillRect(x + 7,  gy + 3, 3, 3);
-    ctx.fillRect(x + 14, gy + 3, 3, 3);
-    // Mouth
-    ctx.fillStyle = '#222222';
-    ctx.fillRect(x + 8, gy + 8, 8, 2);
-    // Arm extended toward runner
-    ctx.fillStyle = '#44aa44';
-    ctx.fillRect(x - 5, gy + 12, 9, 5);
-    ctx.fillStyle = '#55bb55';
-    ctx.fillRect(x - 8, gy + 10, 5, 8);   // fist
-    // Windup phase: goblin draws a bow
-    if (obs.phase === 'windup') {
-      ctx.fillStyle = '#885522';
-      ctx.fillRect(x - 12, gy + 12, 14, 3);
-      ctx.fillStyle = '#ccaa44';
-      ctx.beginPath();
-      ctx.moveTo(x - 12, gy + 13);
-      ctx.lineTo(x - 5,  gy + 10);
-      ctx.lineTo(x - 5,  gy + 17);
-      ctx.closePath();
-      ctx.fill();
+    if (flip) {
+      ctx.translate(x + dw, 0);
+      ctx.scale(-1, 1);
+      x = 0;
+    }
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(
+        img,
+        frame * fw + metrics.srcInset,
+        0,
+        metrics.srcWidth,
+        GOBLIN_H,
+        x,
+        gy,
+        dw,
+        dh
+      );
+    } else {
+      // Fallback: green rect placeholder
+      ctx.fillStyle = '#44aa44';
+      ctx.fillRect(x, gy, dw, dh);
     }
     ctx.restore();
+
+    // Fireball for two-phase phase 0 — flies ahead of goblin toward player
+    if (isAttack) {
+      const fbImg = images.fireball;
+      const fbF   = Math.floor(Date.now() / 80) % FB_FC;
+      const fbDw  = FB_FW * FB_SCALE;
+      const fbDh  = FB_H  * FB_SCALE;
+      const fbY   = gy + dh * 0.45 - fbDh / 2;  // vertically centered on goblin body
+      const fbX   = projectIncomingX(contactX, distDelta, facing, fbDw, FIREBALL_SPEED_MULT);
+
+      ctx.save();
+      if (fbImg && fbImg.complete && fbImg.naturalWidth > 0) {
+        if (flip) {
+          ctx.translate(fbX + fbDw, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(fbImg, fbF * FB_FW, 0, FB_FW, FB_H, 0, fbY, fbDw, fbDh);
+        } else {
+          ctx.drawImage(fbImg, fbF * FB_FW, 0, FB_FW, FB_H, fbX, fbY, fbDw, fbDh);
+        }
+      } else {
+        // Fallback: orange oval
+        ctx.fillStyle = '#ff6600';
+        ctx.fillRect(fbX, fbY, fbDw, fbDh);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Draw a dying goblin (take-hit → death animation sequence) at a world-projected x.
+  // Returns true if the animation is still running, false when complete.
+  function _drawDyingGoblin(screenX, flip, tick) {
+    const { metrics, srcH, active } = getDyingGoblinFrameMetrics(tick);
+    const img = tick < GH_FC * 6 ? images.goblinTakeHit : images.goblinDeath;
+    const fw = tick < GH_FC * 6 ? GH_FW : GD_FW;
+    const frame = tick < GH_FC * 6
+      ? Math.min(Math.floor(tick / 6), GH_FC - 1)
+      : Math.min(Math.floor((tick - GH_FC * 6) / 8), GD_FC - 1);
+    const ddw = metrics.srcWidth * GOBLIN_SCALE;
+    const ddh = srcH * GOBLIN_SCALE;
+    const dgy = GROUND_TOP - ddh;
+
+    ctx.save();
+    if (flip) {
+      ctx.translate(screenX + ddw, 0);
+      ctx.scale(-1, 1);
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, frame * fw + metrics.srcInset, 0, metrics.srcWidth, srcH, 0, dgy, ddw, ddh);
+      }
+    } else {
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, frame * fw + metrics.srcInset, 0, metrics.srcWidth, srcH, screenX, dgy, ddw, ddh);
+      }
+    }
+    ctx.restore();
+
+    return active;
   }
 
   // ── Boosts ───────────────────────────────────────────────────────────────────
@@ -762,54 +1505,56 @@ function createRenderer(canvas, images) {
   }
 
   // ── Player sprite ─────────────────────────────────────────────────────────────
-  function _drawPlayerSprite(offsetX, player, facing, animState, side) {
+  // walkAnim: renderer-internal walk cycle tracker (frame, tick, walkIdx).
+  // Visual state is read from player.animState (provided by game.js / demo.html):
+  //   { state: 'running'|'jumping'|'crouch'|'attack'|'block'|'hit', actionTick: number }
+  function _drawPlayerSprite(offsetX, player, facing, walkAnim, side) {
     const img    = side === 'boy' ? images.boy : images.girl;
     const localX = side === 'boy' ? BOY_LOCAL_X : GIRL_LOCAL_X;
     const flipX  = facing === 'left';
 
-    _tickAnim(animState, player.state);
+    _tickAnim(walkAnim);
+
+    // Visual state from caller — fall back to 'running' if not provided.
+    const vs     = player.animState || { state: 'running', actionTick: 0 };
+    const vState = vs.state;
 
     const screenX = offsetX + localX;
     let   screenY = PLAYER_Y - (player.jumpY || 0);   // jumpY is pixels above ground; game.js drives this
     let   scaleY  = 1;
 
-    if (player.state === 'crouching') {
+    if (vState === 'crouch') {
       scaleY  = 0.5;
       screenY = PLAYER_Y + SPRITE_H * 0.5;   // keep feet on ground
     }
 
-    const step = _actionStep(animState.actionTick);
+    const step = _actionStep(vs.actionTick);
     // Sword drawn first so it appears behind the character sprite
-    if (player.state === 'attacking') _drawSword(screenX, screenY, flipX, step);
+    if (vState === 'attack') _drawSword(screenX, screenY, flipX, step);
 
     // Hit blink — walk cycle continues, only visibility changes
-    const hitFlash = player.state === 'hit' && (Math.floor(Date.now() / 80) % 2 === 0);
+    const hitFlash = vState === 'hit' && (Math.floor(Date.now() / 80) % 2 === 0);
     ctx.save();
     if (hitFlash) ctx.globalAlpha = 0.35;
-    _blit(img, animState.frame, FRAME_W, FRAME_H, screenX, screenY, SPRITE_W, SPRITE_H, flipX, scaleY);
+    _blit(img, walkAnim.frame, FRAME_W, FRAME_H, screenX, screenY, SPRITE_W, SPRITE_H, flipX, scaleY);
     ctx.restore();
 
-    if (player.state === 'blocking') _drawShield(screenX, screenY, flipX, step);
+    if (vState === 'block') _drawShield(screenX, screenY, flipX, step);
   }
 
-  // Walk cycle runs for ALL states — crouching just applies a Y-scale override.
-  // actionTick resets on state change so attack/block animations always start fresh.
-  function _tickAnim(animState, state) {
-    if (state !== animState.prevState) {
-      animState.actionTick = 0;
-      animState.prevState  = state;
+  // Advances the walk cycle. Called once per frame per player.
+  // Visual state (attack/block/hit/crouch) is managed by the caller via player.animState.
+  function _tickAnim(walkAnim) {
+    walkAnim.tick++;
+    if (walkAnim.tick >= WALK_SPEED) {
+      walkAnim.tick    = 0;
+      walkAnim.walkIdx = (walkAnim.walkIdx + 1) % WALK_FRAMES.length;
     }
-    animState.tick++;
-    if (animState.tick >= WALK_SPEED) {
-      animState.tick    = 0;
-      animState.walkIdx = (animState.walkIdx + 1) % WALK_FRAMES.length;
-    }
-    animState.frame = WALK_FRAMES[animState.walkIdx];
-    if (state === 'attacking' || state === 'blocking') animState.actionTick++;
+    walkAnim.frame = WALK_FRAMES[walkAnim.walkIdx];
   }
 
   function _actionStep(actionTick) {
-    return Math.min(Math.floor(actionTick / ACTION_STEP_DUR), ACTION_STEPS - 1);
+    return shieldActionStep(actionTick);
   }
 
   // Sword: sprite has blade pointing RIGHT (65×20). Thrusts outward then retracts.
@@ -818,9 +1563,8 @@ function createRenderer(canvas, images) {
   function _drawSword(screenX, screenY, flipX, step) {
     if (!images.sword) return;
     const ALPHAS  = [0.6, 1.0, 0.6];
-    const OFFSETS = [4,   12,  4  ];   // pixels of outward thrust
     const alpha   = ALPHAS[step];
-    const thrust  = OFFSETS[step];
+    const thrust  = SWORD_THRUSTS[step];
     const hy      = screenY + SPRITE_H * 0.65 - SWORD_H / 2;
 
     // Handle sits at ~55% across the sprite for boy (his forward arm),
@@ -846,12 +1590,11 @@ function createRenderer(canvas, images) {
   // Shield: glowing magic rectangle that extends in front of the player.
   function _drawShield(screenX, screenY, flipX, step) {
     const ALPHAS = [0.5, 1.0, 0.5];
-    const SCALES = [0.5, 1.0, 0.5];
     const alpha  = ALPHAS[step];
-    const scl    = SCALES[step];
-    const sw     = 10;
+    const scl    = SHIELD_SCALES[step];
+    const sw     = SHIELD_W;
     const sh     = SPRITE_H * scl;
-    const sx     = flipX ? screenX - sw - 6 : screenX + SPRITE_W + 6;
+    const sx     = flipX ? screenX - sw - SHIELD_GAP : screenX + SPRITE_W + SHIELD_GAP;
     const sy     = screenY + (SPRITE_H - sh) / 2;
 
     ctx.save();
@@ -906,28 +1649,28 @@ function createRenderer(canvas, images) {
     ctx.fillText(timeStr, CANVAS_W / 2, 26);
     ctx.restore();
 
-    // Boy side — score + chain
+    // Boy side — score, speed, chain
     ctx.save();
     ctx.font      = '13px monospace';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#b04eff';
     ctx.fillText(boyPlayer.score, 8, 22);
-    if (boyPlayer.chain >= 2) {
-      ctx.fillStyle = '#ffcc44';
-      ctx.fillText(`chain ×${boyPlayer.chain}`, 8, 40);
-    }
+    ctx.fillStyle = '#aaffaa';
+    ctx.fillText(`spd ${boyPlayer.speed.toFixed(1)}`, 8, 38);
+    ctx.fillStyle = boyPlayer.chain >= 2 ? '#ffcc44' : 'rgba(255,255,255,0.35)';
+    ctx.fillText(`chain ×${boyPlayer.chain}`, 8, 54);
     ctx.restore();
 
-    // Girl side — score + chain
+    // Girl side — score, speed, chain
     ctx.save();
     ctx.font      = '13px monospace';
     ctx.textAlign = 'right';
     ctx.fillStyle = '#44aaff';
     ctx.fillText(girlPlayer.score, CANVAS_W - 8, 22);
-    if (girlPlayer.chain >= 2) {
-      ctx.fillStyle = '#ffcc44';
-      ctx.fillText(`chain ×${girlPlayer.chain}`, CANVAS_W - 8, 40);
-    }
+    ctx.fillStyle = '#aaffaa';
+    ctx.fillText(`spd ${girlPlayer.speed.toFixed(1)}`, CANVAS_W - 8, 38);
+    ctx.fillStyle = girlPlayer.chain >= 2 ? '#ffcc44' : 'rgba(255,255,255,0.35)';
+    ctx.fillText(`chain ×${girlPlayer.chain}`, CANVAS_W - 8, 54);
     ctx.restore();
 
     // Progress bars — bottom edge; boy fills left→right, girl fills right→left
@@ -948,14 +1691,62 @@ function createRenderer(canvas, images) {
     ctx.fillRect(rtl ? x - 1 : x + w - 1, y - 2, 2, 9);
   }
 
+  function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer) {
+    const boyLine = runSummary
+      ? `Boy: ${runSummary.boyFinished ? runSummary.boyScore : `${boyPlayer.score} (forfeit)`}`
+      : `Boy score: ${boyPlayer.score}`;
+    const girlLine = runSummary
+      ? `Girl: ${runSummary.girlFinished ? runSummary.girlScore : `${girlPlayer.score} (forfeit)`}`
+      : `Girl score: ${girlPlayer.score}`;
+    const total = runSummary ? runSummary.totalScore : boyPlayer.score + girlPlayer.score;
+    _drawOverlayPanel(title, [
+      boyLine,
+      girlLine,
+      `Combined: ${total}`,
+      footer,
+    ]);
+  }
+
+  function _drawOverlayPanel(title, lines) {
+    const panelW = 640;
+    const panelH = 220;
+    const panelX = (CANVAS_W - panelW) / 2;
+    const panelY = 110;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(4, 6, 16, 0.78)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    ctx.fillStyle = 'rgba(20, 18, 38, 0.92)';
+    ctx.fillRect(panelX, panelY, panelW, panelH);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffe3f6';
+    ctx.font = 'bold 36px monospace';
+    ctx.fillText(title, CANVAS_W / 2, panelY + 52);
+
+    ctx.fillStyle = '#d9d8ff';
+    ctx.font = '16px monospace';
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], CANVAS_W / 2, panelY + 100 + i * 26);
+    }
+    ctx.restore();
+  }
+
   // ─── Public API ───────────────────────────────────────────────────────────────
-  return { renderPlay };
+  return {
+    renderPlay,
+    renderMenu,
+    renderGameOver,
+    renderScore,
+    addDyingGoblin,
+    addTrailObstacle,
+    addOutcomeEffect,
+  };
 }
 
-if (typeof module !== 'undefined') {
-  module.exports = { createRenderer, CANVAS_W, CANVAS_H };
-} else {
-  window.createRenderer    = createRenderer;
-  window.RENDERER_CANVAS_W = CANVAS_W;
-  window.RENDERER_CANVAS_H = CANVAS_H;
-}
+export { createRenderer, CANVAS_W, CANVAS_H, projectIncomingX, projectDyingGoblinX, getGoblinFrameMetrics, isObstacleOnScreen, getDebugOverlayGeometry };
