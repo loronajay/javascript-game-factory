@@ -1049,12 +1049,6 @@ function initGame() {
       handleSideInput('boy');
       handleSideInput('girl');
 
-      // Snapshot before tickFrame so we can detect auto-misses from expired windows
-      const boyScoreBefore  = gs.boy.score;
-      const girlScoreBefore = gs.girl.score;
-      const boyObsBefore    = gs.boyObstacles;
-      const girlObsBefore   = gs.girlObstacles;
-
       const phaseBefore = gs.phase;
       const boyFinishedBefore = gs.boy.state === 'finished';
       const girlFinishedBefore = gs.girl.state === 'finished';
@@ -1070,22 +1064,16 @@ function initGame() {
         if (gs.phase === 'gameover') sounds.play('run-failed');
       }
 
-      // Auto-miss hit detection (obstacle window expired with no input)
-      if (gs.boy.score  < boyScoreBefore  && boyAnim.state  !== 'hit') {
-        boyAnim.state  = 'hit'; boyAnim.actionTick  = 0;
-        sounds.play('player-hit');
-      }
-      if (gs.girl.score < girlScoreBefore && girlAnim.state !== 'hit') {
-        girlAnim.state = 'hit'; girlAnim.actionTick = 0;
-        sounds.play('player-hit');
-      }
-
       for (const outcome of gs.boyResolved || []) {
         if (outcome.feedback) {
           renderer.addOutcomeEffect('boy', outcome.feedback, outcome.effectType);
         }
         if (outcome.linger) {
           renderer.addTrailObstacle('boy', outcome.obstacle);
+        }
+        if (outcome.hit && boyAnim.state !== 'hit') {
+          boyAnim.state = 'hit'; boyAnim.actionTick = 0;
+          sounds.play('player-hit');
         }
       }
       for (const outcome of gs.girlResolved || []) {
@@ -1094,6 +1082,10 @@ function initGame() {
         }
         if (outcome.linger) {
           renderer.addTrailObstacle('girl', outcome.obstacle);
+        }
+        if (outcome.hit && girlAnim.state !== 'hit') {
+          girlAnim.state = 'hit'; girlAnim.actionTick = 0;
+          sounds.play('player-hit');
         }
       }
     } else if (gs.phase === 'reunion' || gs.phase === 'gameover') {
