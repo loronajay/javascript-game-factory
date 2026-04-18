@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lovers Lost — Demo</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    #controls {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #9966cc;
+      font: 12px monospace;
+      text-align: center;
+      line-height: 2;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="errlog" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);
+    color:#ff4466;font:12px monospace;text-align:center;z-index:99;
+    max-width:900px;white-space:pre-wrap;pointer-events:none;"></div>
+
+  <div id="controls">
+    Boy (left):&nbsp; <b>W</b> jump &nbsp; <b>S</b> crouch &nbsp; <b>D</b> attack &nbsp; <b>A</b> block
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    Girl (right): <b>↑</b> jump &nbsp; <b>↓</b> crouch &nbsp; <b>←</b> attack &nbsp; <b>→</b> block
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    <b>R</b> restart
+  </div>
+
+  <script type="module">
+  import { createPlayer } from '../scripts/player.js';
+  import { createObstacle } from '../scripts/obstacles.js';
+  import { createRenderer } from '../scripts/renderer.js';
+  import { createInput } from '../scripts/input.js';
+  import { processAction, startJump, tickFrame } from '../game.js';
+
+  // ─── Demo obstacle sequence ──────────────────────────────────────────────────
+  const DEMO_SEQUENCE = [
+    createObstacle('spikes',    180),
+    createObstacle('bird',      400),
+    createObstacle('goblin',    620),
+    { ...createObstacle('goblin', 840, { twoPhase: true }) },
+    createObstacle('arrowwall', 1060),
+  ];
+
+  const NEXT_LABEL = {
+    spikes:    { boy: 'JUMP  (W)',    girl: 'JUMP  (↑)' },
+    bird:      { boy: 'CROUCH  (S)', girl: 'CROUCH  (↓)' },
+    goblin:    { boy: 'ATTACK  (D)', girl: 'ATTACK  (←)' },
+    arrowwall: { boy: 'BLOCK  (A)',  girl: 'BLOCK  (→)' },
+  };
+
+  // ─── Images ─────────────────────────────────────────────────────────────────
+  function loadImg(src) { const i = new Image(); i.src = src; return i; }
+
+  const boyImg        = loadImg('../images/boy.png');
+  const girlImg       = loadImg('../images/girl.png');
+  const swordImg      = loadImg('../images/SHORT SWORD.png');
+  const bird1         = loadImg('../images/red1.png');
+  const bird2         = loadImg('../images/red2.png');
+  const bird3         = loadImg('../images/red3.png');
+  const goblinIdle    = loadImg('../images/goblin-idle.png');
+  const goblinAttack  = loadImg('../images/goblin-attack.png');
+  const goblinTakeHit = loadImg('../images/goblin-take-hit.png');
+  const goblinDeath   = loadImg('../images/goblin-death.png');
+  const fireballImg   = loadImg('../images/fireball.png');
+  const arrowsImg     = loadImg('../images/arrows.png');
+
+  const images = {
+    boy: boyImg, girl: girlImg, sword: swordImg,
+    birds: [bird1, bird2, bird3],
+    goblinIdle, goblinAttack, goblinTakeHit, goblinDeath,
+    fireball: fireballImg,
+    arrows: arrowsImg,
+  };
+
+  // ─── Canvas + renderer ───────────────────────────────────────────────────────
+  const canvas   = document.getElementById('gameCanvas');
+  const renderer = createRenderer(canvas, images);
+
+  // ─── Input ───────────────────────────────────────────────────────────────────
+  const inp = createInput();
+  window.addEventListener('keydown', e => {
+    inp.keydown(e.key);
+    if (e.key === 'r' || e.key === 'R') initDemo();
+  });
+  window.addEventListener('keyup', e => inp.keyup(e.key));
+
+  // ─── Timing constants ────────────────────────────────────────────────────────
+  const ACTION_DUR = 18;
+  const HIT_DUR    = 30;
+
+  // ─── Game state ──────────────────────────────────────────────────────────────
+  let gs, boyAnim, girlAnim;
+
+  function initDemo() {
+    gs = {
+      phase:         'playing',
+      mode:          'single',
+      elapsed:       0,
+      boy:           createPlayer('boy'),
+      girl:          createPlayer('girl'),
+      boyObstacles:  DEMO_SEQUENCE.map(o => ({ ...o })),
+      girlObstacles: DEMO_SEQUENCE.map(o => ({ ...o })),
+      boyBoosts:     [],
+      girlBoosts:    [],
+    };
+    boyAnim  = { state: 'running', actionTick: 0 };
+    girlAnim = { state: 'running', actionTick: 0 };
+  }
+
+  // ─── Goblin screen X for addDyingGoblin ─────────────────────────────────────
+  const PPU       = 4;
+  const BOY_LX    = 120;
+  const GIRL_LX   = 480 - 48 - 120;
+  const GI_FW     = 99;
+  const GOBLIN_SC = 2;
+
+  function goblinScreenX(side) {
+    const obsW = GI_FW * GOBLIN_SC;
+    return side === 'boy' ? BOY_LX : GIRL_LX - obsW;
+  }
+
+  // ─── Per-side input + visual state management ────────────────────────────────
+  // Visual state lives in boyAnim/girlAnim (not on player.state).
+  // All actions are one-shot — no isHeld() for game state.
+  function handleSide(side) {
+    const anim = side === 'boy' ? boyAnim : girlAnim;
+    const pKey = side === 'boy' ? 'boy'   : 'girl';
+    const oKey = side === 'boy' ? 'boyObstacles' : 'girlObstacles';
+
+    let player    = gs[pKey];
+    let obstacles = gs[oKey];
+
+    // Advance timed states; return to running when duration elapsed
+    if (anim.state === 'attack' || anim.state === 'hit' || anim.state === 'crouch' || anim.state === 'block') {
+      anim.actionTick++;
+      const dur = anim.state === 'hit' ? HIT_DUR : ACTION_DUR;
+      if (anim.actionTick >= dur) {
+        anim.state     = 'running';
+        anim.actionTick = 0;
+      }
+    }
+
+    // Process pressed actions (one per frame per side)
+    for (const action of ['jump', 'crouch', 'attack', 'block']) {
+      if (!inp.isPressed(side, action)) continue;
+
+      const before     = player;
+      const frontObs   = obstacles[0];   // stash before removal
+      const result     = processAction(player, obstacles, action);
+      player    = result.player;
+      obstacles = result.obstacles;
+
+      const consumed = result.player.obstaclesFaced > before.obstaclesFaced;
+      const missed   = consumed && result.player.score < before.score;
+
+      if (consumed && frontObs) {
+        if (!missed && action === 'attack') {
+          renderer.addDyingGoblin(side, goblinScreenX(side), side === 'girl');
+        }
+        // Spikes and bird linger on screen until they scroll off
+        if (frontObs.type === 'spikes' || frontObs.type === 'bird') {
+          renderer.addTrailObstacle(side, frontObs);
+        }
+      }
+
+      if (missed) {
+        anim.state      = 'hit';
+        anim.actionTick = 0;
+      } else if (action === 'jump') {
+        player = startJump(player);
+        // jump keeps anim.state as 'running' — walk cycle continues, jumpY drives position
+      } else {
+        anim.state      = action;   // 'crouch' | 'attack' | 'block'
+        anim.actionTick = 0;
+      }
+
+      break;
+    }
+
+    gs = { ...gs, [pKey]: player, [oKey]: obstacles };
+  }
+
+  // ─── Overlay ─────────────────────────────────────────────────────────────────
+  function drawOverlay(title, line2) {
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(0, 0, 960, 540);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffaadd';
+    ctx.font      = 'bold 48px serif';
+    ctx.fillText(title, 480, 210);
+    ctx.fillStyle = '#cc88ff';
+    ctx.font      = '20px monospace';
+    ctx.fillText(line2, 480, 268);
+    ctx.fillStyle = '#664488';
+    ctx.font      = '14px monospace';
+    ctx.fillText('R  to restart', 480, 310);
+    ctx.restore();
+  }
+
+  function drawHints() {
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.font      = '13px monospace';
+    ctx.textAlign = 'center';
+
+    if (gs.boyObstacles.length > 0) {
+      const obs   = gs.boyObstacles[0];
+      const label = obs.twoPhase && obs.phase === 0
+        ? 'BLOCK then ATTACK  (A → D)'
+        : (NEXT_LABEL[obs.type] || {}).boy || '';
+      ctx.fillStyle = '#7744aa';
+      ctx.fillText('Next: ' + label, 240, 516);
+    }
+
+    if (gs.girlObstacles.length > 0) {
+      const obs   = gs.girlObstacles[0];
+      const label = obs.twoPhase && obs.phase === 0
+        ? 'BLOCK then ATTACK  (→ → ←)'
+        : (NEXT_LABEL[obs.type] || {}).girl || '';
+      ctx.fillStyle = '#224466';
+      ctx.fillText('Next: ' + label, 720, 516);
+    }
+
+    ctx.restore();
+  }
+
+  // ─── Main loop ───────────────────────────────────────────────────────────────
+  const LINGER_TYPES = new Set(['spikes', 'bird']);
+
+  function loop() {
+    if (gs.phase === 'playing') {
+      handleSide('boy');
+      handleSide('girl');
+
+      // Snapshot before tickFrame so we can detect auto-misses from expired windows
+      const boyScoreBefore  = gs.boy.score;
+      const girlScoreBefore = gs.girl.score;
+      const boyObsBefore    = gs.boyObstacles;
+      const girlObsBefore   = gs.girlObstacles;
+
+      gs = tickFrame(gs);
+
+      // Detect auto-misses (obstacle window expired, no input) → hit animation
+      if (gs.boy.score  < boyScoreBefore  && boyAnim.state  !== 'hit') {
+        boyAnim.state  = 'hit'; boyAnim.actionTick  = 0;
+      }
+      if (gs.girl.score < girlScoreBefore && girlAnim.state !== 'hit') {
+        girlAnim.state = 'hit'; girlAnim.actionTick = 0;
+      }
+
+      // Trail for any spikes/birds auto-missed by tickFrame
+      const boyMissed  = boyObsBefore.length  - gs.boyObstacles.length;
+      const girlMissed = girlObsBefore.length - gs.girlObstacles.length;
+      for (let i = 0; i < boyMissed;  i++) {
+        if (LINGER_TYPES.has(boyObsBefore[i].type))  renderer.addTrailObstacle('boy',  boyObsBefore[i]);
+      }
+      for (let i = 0; i < girlMissed; i++) {
+        if (LINGER_TYPES.has(girlObsBefore[i].type)) renderer.addTrailObstacle('girl', girlObsBefore[i]);
+      }
+
+      if (gs.boyObstacles.length === 0 && gs.girlObstacles.length === 0) {
+        gs = { ...gs, phase: 'done' };
+      }
+    }
+
+    // Merge animState onto players so renderer reads visual state correctly
+    const boyPlayer  = { ...gs.boy,  animState: boyAnim };
+    const girlPlayer = { ...gs.girl, animState: girlAnim };
+
+    renderer.renderPlay(
+      boyPlayer, girlPlayer,
+      gs.boyObstacles, gs.girlObstacles,
+      gs.boyBoosts, gs.girlBoosts,
+      gs.elapsed / 60
+    );
+
+    if (gs.phase === 'playing') drawHints();
+
+    if (gs.phase === 'done') {
+      drawOverlay('Demo Complete!',
+        'Boy: ' + gs.boy.score + '   Girl: ' + gs.girl.score);
+    }
+
+    inp.tick(); // clear pressed state at end of frame so isPressed is one-shot
+    requestAnimationFrame(loop);
+  }
+
+  // ─── Start ───────────────────────────────────────────────────────────────────
+  initDemo();
+
+  const allImgs = [boyImg, girlImg, swordImg, bird1, bird2, bird3,
+                   goblinIdle, goblinAttack, goblinTakeHit, goblinDeath,
+                   fireballImg, arrowsImg];
+  let loaded = 0;
+  function onLoad() { if (++loaded >= allImgs.length) loop(); }
+  allImgs.forEach(img => {
+    if (img.complete) { onLoad(); return; }
+    img.onload  = onLoad;
+    img.onerror = onLoad;
+  });
+  </script>
+</body>
+</html>

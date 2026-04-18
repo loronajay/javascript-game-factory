@@ -2,22 +2,23 @@ import {
   createPlayer, advanceDistance, isFinished,
   applyPerfect, applyGood, applyMiss,
   checkAssist, deactivateAssistIfRecovered,
-  RUN_DISTANCE,
-} from './player.js';
+  RUN_DISTANCE, STARTING_SPEED,
+} from './scripts/player.js';
 
 import {
   createObstacle, generateWarmup, generateWave,
-  requiredInput, advanceGoblinPhase,
+  requiredInput,
   gradeInput, windowExpired, makeRng,
   WAVE_COUNTS,
-} from './obstacles.js';
-import { evaluateRun } from './scoring.js';
-import { createRenderer, getDebugOverlayGeometry } from './renderer.js';
-import { createInput } from './input.js';
+} from './scripts/obstacles.js';
+import { evaluateRun } from './scripts/scoring.js';
+import { createRenderer, getDebugOverlayGeometry } from './scripts/renderer.js';
+import { createInput, keyToAction } from './scripts/input.js';
+import { createSounds } from './scripts/sounds.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const HARD_CUTOFF_FRAMES = 90 * 60;  // 5400 frames
-const END_PHASE_HOLD_FRAMES = 120;   // 2 seconds before score screen
+const END_PHASE_HOLD_FRAMES = 480;   // 8 seconds: 5s walk + 3s heart (reunion) or brief hold (gameover)
 const JUMP_VY            = 8;        // pixels/frame initial upward velocity
 const JUMP_GRAVITY       = 0.5;      // pixels/frame² downward acceleration
 
@@ -84,7 +85,12 @@ function createGameState(mode, seed, options) {
   const rng = makeRng(seed != null ? seed : (Date.now() >>> 0));
   const warmup = generateWarmup(0);
   const waves  = [];
-  for (let w = 1; w <= WAVE_COUNTS.length; w++) waves.push(...generateWave(w, rng));
+  let prevLast = warmup[warmup.length - 1] || null;
+  for (let w = 1; w <= WAVE_COUNTS.length; w++) {
+    const waveObs = generateWave(w, rng, prevLast);
+    waves.push(...waveObs);
+    prevLast = waveObs[waveObs.length - 1] || prevLast;
+  }
   const debugObstacleType = normalizeDebugObstacleType(options && options.debugObstacleType);
   const allObstacles = obstacleCourseForDebug([...warmup, ...waves], debugObstacleType);
 
@@ -92,8 +98,8 @@ function createGameState(mode, seed, options) {
     phase:          'menu',
     mode:           mode || 'single',
     elapsed:        0,
-    boy:            createPlayer('boy'),
-    girl:           createPlayer('girl'),
+    boy:            { ...createPlayer('boy'),  speed: STARTING_SPEED },
+    girl:           { ...createPlayer('girl'), speed: STARTING_SPEED },
     boyObstacles:   allObstacles.map(o => ({ ...o })),
     girlObstacles:  allObstacles.map(o => ({ ...o })),
     boyBoosts:      [],
@@ -113,9 +119,10 @@ function processAction(player, obstacles, action) {
   if (obstacles.length === 0) return { player, obstacles };
 
   const obs      = obstacles[0];
+  if (obs.type === 'spikes' || obs.type === 'bird' || obs.type === 'arrowwall' || obs.type === 'goblin') {
+    return { player, obstacles };
+  }
   const required = requiredInput(obs);
-  if (obs.type === 'spikes' || obs.type === 'arrowwall') return { player, obstacles };
-  if (obs.type === 'goblin' && required === 'attack') return { player, obstacles };
   const grade    = gradeInput(obs, player.distance);
 
   // Action too early (obstacle far ahead, window not open yet)
@@ -141,16 +148,34 @@ function processAction(player, obstacles, action) {
   else if (grade === 'good') newPlayer = applyGood(player);
   else newPlayer = applyMiss(player); // correct but past good window
 
-  // Two-phase goblin: block clears phase 0, advance to phase 1
-  if (obs.type === 'goblin' && obs.twoPhase && obs.phase === 0) {
-    return {
-      player:    newPlayer,
-      obstacles: [advanceGoblinPhase(obs), ...obstacles.slice(1)],
-      grade,
-    };
-  }
+
 
   return { player: newPlayer, obstacles: obstacles.slice(1), grade };
+}
+
+function applyGradeOutcome(player, grade) {
+  if (grade === 'perfect') return applyPerfect(player);
+  if (grade === 'good') return applyGood(player);
+  return applyMiss(player);
+}
+
+function spikeTimingGrade(player, obstacle) {
+  if (player.jumpStartDistance == null) return 'miss';
+  return gradeInput(obstacle, player.jumpStartDistance);
+}
+
+function spikeClearGrade(player, obstacle) {
+  const grade = spikeTimingGrade(player, obstacle);
+  if (player.jumpStartDistance == null) return 'miss';
+  if (grade === 'perfect') return 'perfect';
+  return 'good';
+}
+
+function animStateForPlayerState(player) {
+  if (player && player.state === 'crouching') {
+    return { state: 'crouch', actionTick: 0 };
+  }
+  return { state: 'running', actionTick: 0 };
 }
 
 // ─── processMissedObstacles ───────────────────────────────────────────────────
@@ -169,7 +194,8 @@ function processMissedObstacles(player, obstacles) {
         p = applyMiss(p);
         resolved.push({
           obstacle: frontObstacle,
-          ...classifyAutoResolvedObstacle(before, p, frontObstacle),
+          grade: 'miss',
+          ...classifyAutoResolvedObstacle(before, p, frontObstacle, 'miss'),
         });
         obs = obs.slice(1);
         continue;
@@ -177,10 +203,42 @@ function processMissedObstacles(player, obstacles) {
 
       if (spikeFullyBehindPlayer(p, frontObstacle)) {
         const before = p;
+        const grade = spikeClearGrade(p, frontObstacle);
+        p = grade === 'miss' ? applyMiss(p) : applyGradeOutcome(p, grade);
+        resolved.push({
+          obstacle: frontObstacle,
+          grade,
+          ...classifyAutoResolvedObstacle(before, p, frontObstacle, grade),
+        });
+        obs = obs.slice(1);
+        continue;
+      }
+
+      break;
+    }
+
+    if (frontObstacle.type === 'bird') {
+      const before = p;
+      const animState = animStateForPlayerState(p);
+
+      if (birdTouchesPlayer(p, frontObstacle, animState)) {
+        p = applyMiss(p);
+        resolved.push({
+          obstacle: frontObstacle,
+          grade: 'miss',
+          ...classifyAutoResolvedObstacle(before, p, frontObstacle, 'miss'),
+        });
+        obs = obs.slice(1);
+        continue;
+      }
+
+      if (birdFullyBehindPlayer(p, frontObstacle, animState)) {
+        const grade = 'good';
         p = applyGood(p);
         resolved.push({
           obstacle: frontObstacle,
-          ...classifyAutoResolvedObstacle(before, p, frontObstacle),
+          grade,
+          ...classifyAutoResolvedObstacle(before, p, frontObstacle, grade),
         });
         obs = obs.slice(1);
         continue;
@@ -190,7 +248,11 @@ function processMissedObstacles(player, obstacles) {
     }
 
     if (frontObstacle.type === 'goblin' && requiredInput(frontObstacle) === 'attack') {
-      break;
+      // Attack goblins must be resolved by contact (sword or body).
+      // But if the window has expired the goblin is off-screen — consume it as a miss
+      // so the obstacle queue doesn't get permanently stuck behind it.
+      if (!windowExpired(frontObstacle, p.distance)) break;
+      // fall through to the standard miss path below
     }
 
     if (!windowExpired(frontObstacle, p.distance)) {
@@ -199,21 +261,23 @@ function processMissedObstacles(player, obstacles) {
 
     const before = p;
     p   = applyMiss(p);
+    const nextObstacles = obs.slice(1);
     resolved.push({
       obstacle: frontObstacle,
-      ...classifyAutoResolvedObstacle(before, p, frontObstacle),
+      grade: 'miss',
+      ...classifyAutoResolvedObstacle(before, p, frontObstacle, 'miss'),
     });
-    obs = obs.slice(1);
+    obs = nextObstacles;
   }
   return { player: p, obstacles: obs, resolved };
 }
 
-function classifyAutoResolvedObstacle(playerBefore, playerAfter, obstacle) {
-  const hit = playerAfter.score < playerBefore.score;
-  const clear = playerAfter.score > playerBefore.score;
+function classifyAutoResolvedObstacle(playerBefore, playerAfter, obstacle, grade) {
+  const hit = grade === 'miss';
+  const clear = grade === 'perfect' || grade === 'good';
   return {
     hit,
-    feedback: hit ? 'hit' : (clear ? 'good' : null),
+    feedback: hit ? 'hit' : (clear ? (grade === 'perfect' ? 'perfect' : 'good') : null),
     linger: obstacle.type === 'spikes' || obstacle.type === 'bird',
     effectType: obstacle.type,
   };
@@ -243,18 +307,14 @@ function summarizeObstacleOutcome(playerBefore, result, frontObstacle) {
     };
   }
 
-  const hit = result.player.score < playerBefore.score;
-  const effectType = frontObstacle.type === 'goblin' && frontObstacle.twoPhase && frontObstacle.phase === 0
-    ? 'fireball'
-    : frontObstacle.type;
-
+  const hit = result.grade === 'miss';
   return {
     consumed: true,
     hit,
     linger: frontObstacle.type === 'spikes' || frontObstacle.type === 'bird',
-    goblinDeath: !hit && frontObstacle.type === 'goblin' && (!frontObstacle.twoPhase || frontObstacle.phase > 0),
+    goblinDeath: !hit && frontObstacle.type === 'goblin',
     feedback: hit ? 'hit' : (result.grade === 'perfect' ? 'perfect' : 'good'),
-    effectType,
+    effectType: frontObstacle.type,
   };
 }
 
@@ -289,10 +349,15 @@ function playerVisibleBoundsX(player) {
   return { left: PLAYER_VISIBLE_LEFT_PX, right: PLAYER_VISIBLE_RIGHT_PX };
 }
 
+function playerIsCrouching(player, animState) {
+  return !!(player && player.state === 'crouching')
+    || !!(animState && animState.state === 'crouch');
+}
+
 function playerHurtboxForAnim(player, animState) {
   const { left, right } = playerVisibleBoundsX(player);
   const jumpY = player.jumpY || 0;
-  const crouching = animState && animState.state === 'crouch';
+  const crouching = playerIsCrouching(player, animState);
 
   if (crouching) {
     return {
@@ -370,6 +435,16 @@ function shieldBlocksArrowWall(player, obstacle, animState) {
   return !!geometry.shieldCollisionBox;
 }
 
+function boxIntersects(a, b) {
+  if (!a || !b) return false;
+  return a.right >= b.left && b.right >= a.left && a.bottom >= b.top && b.bottom >= a.top;
+}
+
+function labeledObstacleIntersects(geometry, targetBox, label) {
+  if (!targetBox) return false;
+  return geometry.obstacleBoxes.some(box => box.label === label && boxIntersects(box, targetBox));
+}
+
 function arrowWallTouchesPlayer(player, obstacle, animState) {
   const geometry = arrowWallCollisionGeometry(player, obstacle, animState);
   return !!geometry.collisionBox;
@@ -428,9 +503,14 @@ function spikeFullyBehindPlayer(player, obstacle) {
 function buildDebugCollisionSnapshot(player, obstacles, animState) {
   const frontObstacle = obstacles && obstacles[0];
   const playerHurtbox = playerHurtboxForAnim(player, animState);
+  const timingGrade = frontObstacle
+    ? gradeInput(frontObstacle, player.distance)
+    : null;
   const snapshot = {
     enabled: true,
     obstacleType: frontObstacle ? frontObstacle.type : 'none',
+    timingGrade,
+    perfectWindowActive: timingGrade === 'perfect',
     playerBottomY: playerHurtbox.bottom,
     playerColumns: buildPlayerDebugColumns(player, animState, frontObstacle ? frontObstacle.type : null),
     overlapHeight: 0,
@@ -478,8 +558,8 @@ function toggleDebugHotkey(enabled, key) {
 
 function contactActionForPlayer(player, animState) {
   if (player.state === 'jumping') return 'jump';
+  if (playerIsCrouching(player, animState)) return 'crouch';
   if (!animState) return null;
-  if (animState.state === 'crouch') return 'crouch';
   if (animState.state === 'attack') return 'attack';
   if (animState.state === 'block') return 'block';
   return null;
@@ -497,14 +577,17 @@ function resolveContactAction(player, obstacles, animState) {
         player: applyMiss(player),
         obstacles: obstacles.slice(1),
         action: player.state === 'jumping' ? 'jump' : null,
+        grade: 'miss',
       };
     }
 
     if (spikeFullyBehindPlayer(player, frontObstacle)) {
+      const grade = spikeClearGrade(player, frontObstacle);
       return {
-        player: applyGood(player),
+        player: grade === 'miss' ? applyMiss(player) : applyGradeOutcome(player, grade),
         obstacles: obstacles.slice(1),
-        action: 'jump',
+        action: grade === 'miss' ? null : 'jump',
+        grade,
       };
     }
 
@@ -517,6 +600,7 @@ function resolveContactAction(player, obstacles, animState) {
         player: applyMiss(player),
         obstacles: obstacles.slice(1),
         action: contactActionForPlayer(player, animState) || BIRD_RESOLVE_ACTION,
+        grade: 'miss',
       };
     }
 
@@ -525,6 +609,7 @@ function resolveContactAction(player, obstacles, animState) {
         player: applyGood(player),
         obstacles: obstacles.slice(1),
         action: contactActionForPlayer(player, animState) || BIRD_RESOLVE_ACTION,
+        grade: 'good',
       };
     }
 
@@ -554,7 +639,7 @@ function resolveContactAction(player, obstacles, animState) {
     return { player, obstacles, action: null };
   }
 
-  if (frontObstacle.type === 'goblin' && requiredInput(frontObstacle) === 'attack') {
+  if (frontObstacle.type === 'goblin') {
     const grade = gradeInput(frontObstacle, player.distance);
     if (swordHitsGoblin(player, frontObstacle, animState) && grade !== 'miss') {
       return {
@@ -594,7 +679,13 @@ function resolveContactAction(player, obstacles, animState) {
 // ─── Jump physics ─────────────────────────────────────────────────────────────
 function startJump(player) {
   if (player.state !== 'running') return player;
-  return { ...player, state: 'jumping', jumpY: 0, jumpVY: JUMP_VY };
+  return {
+    ...player,
+    state: 'jumping',
+    jumpY: 0,
+    jumpVY: JUMP_VY,
+    jumpStartDistance: player.distance,
+  };
 }
 
 function tickJumpArc(player) {
@@ -602,7 +693,7 @@ function tickJumpArc(player) {
   const newVY = player.jumpVY - JUMP_GRAVITY;
   const newY  = player.jumpY + newVY;
   if (newY <= 0) {
-    return { ...player, state: 'running', jumpY: 0, jumpVY: 0 };
+    return { ...player, state: 'running', jumpY: 0, jumpVY: 0, jumpStartDistance: null };
   }
   return { ...player, jumpY: newY, jumpVY: newVY };
 }
@@ -661,12 +752,12 @@ function tickFrame(state) {
   let phase = state.phase;
   let phaseFrames = state.phaseFrames;
   let runSummary = state.runSummary;
-  if (boy.state === 'finished' && girl.state === 'finished') {
-    phase = 'reunion';
+  if (elapsed >= HARD_CUTOFF_FRAMES) {
+    phase = 'gameover';
     phaseFrames = 0;
     runSummary = evaluateRun(boy, girl);
-  } else if (elapsed >= HARD_CUTOFF_FRAMES) {
-    phase = 'gameover';
+  } else if (boy.state === 'finished' && girl.state === 'finished') {
+    phase = 'reunion';
     phaseFrames = 0;
     runSummary = evaluateRun(boy, girl);
   }
@@ -686,11 +777,14 @@ function tickFrame(state) {
   };
 }
 
+const GAMEOVER_HOLD_FRAMES = 120;  // 2 seconds
+
 function advancePhaseState(state) {
   if (state.phase !== 'reunion' && state.phase !== 'gameover') return state;
 
   const phaseFrames = state.phaseFrames + 1;
-  if (phaseFrames < END_PHASE_HOLD_FRAMES) {
+  const holdFrames  = state.phase === 'reunion' ? END_PHASE_HOLD_FRAMES : GAMEOVER_HOLD_FRAMES;
+  if (phaseFrames < holdFrames) {
     return { ...state, phaseFrames };
   }
 
@@ -702,6 +796,15 @@ function advancePhaseState(state) {
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
+function nextActionForSide(inp, side) {
+  if (inp.isHeld(side, 'crouch')) return 'crouch';
+  if (inp.isPressed(side, 'jump')) return 'jump';
+  if (inp.isPressed(side, 'attack')) return 'attack';
+  if (inp.isPressed(side, 'block')) return 'block';
+  if (inp.isPressed(side, 'crouch')) return 'crouch';
+  return null;
+}
+
 export {
   createGameState,
   processAction,
@@ -721,6 +824,7 @@ export {
   tickJumpArc,
   tickFrame,
   advancePhaseState,
+  nextActionForSide,
   JUMP_VY,
   JUMP_GRAVITY,
   HARD_CUTOFF_FRAMES,
@@ -741,7 +845,6 @@ function initGame() {
   const goblinAttack  = new Image(); goblinAttack.src  = 'images/goblin-attack.png';
   const goblinTakeHit = new Image(); goblinTakeHit.src = 'images/goblin-take-hit.png';
   const goblinDeath   = new Image(); goblinDeath.src   = 'images/goblin-death.png';
-  const fireballImg   = new Image(); fireballImg.src   = 'images/fireball.png';
   const arrowsImg     = new Image(); arrowsImg.src     = 'images/arrows.png';
 
   const images = {
@@ -753,9 +856,11 @@ function initGame() {
     goblinAttack,
     goblinTakeHit,
     goblinDeath,
-    fireball: fireballImg,
     arrows: arrowsImg,
   };
+
+  // ── Sounds ────────────────────────────────────────────────────────────────
+  const sounds = createSounds();
 
   // ── Canvas + renderer ─────────────────────────────────────────────────────
   const canvas   = document.getElementById('gameCanvas');
@@ -773,6 +878,9 @@ function initGame() {
       if (typeof e.preventDefault === 'function') e.preventDefault();
       return;
     }
+    if (keyToAction(e.key) && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     inp.keydown(e.key);
   });
   window.addEventListener('keyup',   e => inp.keyup(e.key));
@@ -789,6 +897,8 @@ function initGame() {
 
   // ── State-machine helpers ─────────────────────────────────────────────────
   function startPlaying() {
+    sounds.stop('run-success');
+    sounds.stop('run-failed');
     gs = { ...createGameState(gs.mode, Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
     boyAnim  = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
@@ -833,19 +943,49 @@ function initGame() {
 
       if (outcome.goblinDeath) {
         renderer.addDyingGoblin(side, frontObs, playerBefore.distance);
+        sounds.play('sword-success');
+        sounds.play('goblin-death');
+      }
+
+      if (outcome.feedback === 'good' || outcome.feedback === 'perfect') {
+        if (frontObs && frontObs.type === 'bird') sounds.play('bird');
+        if (frontObs && frontObs.type === 'arrowwall') sounds.play('shield-success');
       }
 
       if (gotHit) {
         anim.state = 'hit';
         anim.actionTick = 0;
+        sounds.play('player-hit');
       }
 
       return outcome;
     }
 
-    const actions = ['jump', 'crouch', 'attack', 'block'];
-    for (const action of actions) {
-      if (!inp.isPressed(side, action)) continue;
+    const crouchHeld = inp.isHeld(side, 'crouch');
+    const enteringHeldCrouch = crouchHeld && anim.state !== 'crouch';
+    if (crouchHeld && anim.state !== 'hit') {
+      anim.state = 'crouch';
+      if (enteringHeldCrouch) {
+        anim.actionTick = 0;
+        sounds.play('crouch');
+      }
+    }
+
+    if (side === 'boy') {
+      const wasJumping = crouchHeld && gs.boy.state === 'jumping';
+      gs = { ...gs, boy: { ...gs.boy, state: crouchHeld ? 'crouching' : (gs.boy.state === 'crouching' ? 'running' : gs.boy.state), ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null } : {}) } };
+    } else {
+      const wasJumping = crouchHeld && gs.girl.state === 'jumping';
+      gs = { ...gs, girl: { ...gs.girl, state: crouchHeld ? 'crouching' : (gs.girl.state === 'crouching' ? 'running' : gs.girl.state), ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null } : {}) } };
+    }
+
+    const action = crouchHeld ? null : nextActionForSide(inp, side);
+    if (action) {
+
+      // Input sounds — play immediately on keypress
+      if (action === 'jump' && inp.isPressed(side, 'jump')) sounds.play('jump');
+      if (action === 'attack' && inp.isPressed(side, 'attack')) sounds.play('sword');
+      if (action === 'block' && inp.isPressed(side, 'block')) sounds.play('shield');
 
       const player = getPlayer();
       const obstacles = getObstacles();
@@ -870,8 +1010,6 @@ function initGame() {
         if (side === 'boy') gs = { ...gs, boy: updated };
         else                gs = { ...gs, girl: updated };
       }
-
-      break; // one action per frame per side
     }
 
     if (!interacted) {
@@ -884,8 +1022,13 @@ function initGame() {
       }
     }
 
-    // Advance action timer; return to running when done (all actions are one-shot)
-    if (anim.state === 'attack' || anim.state === 'hit' || anim.state === 'crouch' || anim.state === 'block') {
+    if (anim.state === 'crouch' && !crouchHeld) {
+      anim.state = 'running';
+      anim.actionTick = 0;
+    }
+
+    // Advance action timer; crouch is held, other actions remain one-shot.
+    if (anim.state === 'attack' || anim.state === 'hit' || anim.state === 'block') {
       anim.actionTick++;
       const dur = anim.state === 'hit' ? HIT_DURATION : ACTION_DURATION;
       if (anim.actionTick >= dur) {
@@ -911,14 +1054,29 @@ function initGame() {
       const boyObsBefore    = gs.boyObstacles;
       const girlObsBefore   = gs.girlObstacles;
 
+      const phaseBefore = gs.phase;
+      const boyFinishedBefore = gs.boy.state === 'finished';
+      const girlFinishedBefore = gs.girl.state === 'finished';
       gs = tickFrame(gs);
+      if (!boyFinishedBefore && gs.boy.state === 'finished') {
+        renderer.clearSideObstacleVisuals('boy');
+      }
+      if (!girlFinishedBefore && gs.girl.state === 'finished') {
+        renderer.clearSideObstacleVisuals('girl');
+      }
+      if (gs.phase !== phaseBefore) {
+        if (gs.phase === 'reunion') sounds.play('run-success');
+        if (gs.phase === 'gameover') sounds.play('run-failed');
+      }
 
       // Auto-miss hit detection (obstacle window expired with no input)
       if (gs.boy.score  < boyScoreBefore  && boyAnim.state  !== 'hit') {
         boyAnim.state  = 'hit'; boyAnim.actionTick  = 0;
+        sounds.play('player-hit');
       }
       if (gs.girl.score < girlScoreBefore && girlAnim.state !== 'hit') {
         girlAnim.state = 'hit'; girlAnim.actionTick = 0;
+        sounds.play('player-hit');
       }
 
       for (const outcome of gs.boyResolved || []) {
@@ -945,8 +1103,8 @@ function initGame() {
     const boyPlayer  = { ...gs.boy,  animState: boyAnim };
     const girlPlayer = { ...gs.girl, animState: girlAnim };
     const debugHint = debugObstacleType
-      ? `yellow=obstacle cyan=player green=shield magenta=sword only=${DEBUG_OBSTACLE_LABELS[debugObstacleType]}`
-      : 'yellow=obstacle cyan=player green=shield magenta=sword';
+      ? `yellow=obstacle cyan=player green=perfect/shield magenta=sword only=${DEBUG_OBSTACLE_LABELS[debugObstacleType]}`
+      : 'yellow=obstacle cyan=player green=perfect/shield magenta=sword';
     const debugState = debugEnabled ? {
       enabled: true,
       hint: debugHint,
@@ -958,7 +1116,7 @@ function initGame() {
 
     if (gs.phase === 'menu') {
       renderer.renderMenu(debugState);
-    } else if (gs.phase === 'playing' || gs.phase === 'reunion') {
+    } else if (gs.phase === 'playing') {
       renderer.renderPlay(
         boyPlayer, girlPlayer,
         gs.boyObstacles, gs.girlObstacles,
@@ -966,6 +1124,8 @@ function initGame() {
         elapsed,
         debugState
       );
+    } else if (gs.phase === 'reunion') {
+      renderer.renderReunion(boyPlayer, girlPlayer, gs.phaseFrames);
     } else if (gs.phase === 'gameover') {
       renderer.renderGameOver(gs.boy, gs.girl, gs.runSummary);
     } else if (gs.phase === 'score_screen') {
@@ -993,7 +1153,6 @@ function initGame() {
     goblinAttack,
     goblinTakeHit,
     goblinDeath,
-    fireballImg,
     arrowsImg,
   ].forEach(img => {
     img.onload  = onLoad;

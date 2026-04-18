@@ -142,6 +142,7 @@ const emptyState = document.getElementById("emptyState");
 const pageIndicator = document.getElementById("pageIndicator");
 const prevPageButton = document.getElementById("prevPage");
 const nextPageButton = document.getElementById("nextPage");
+const floorCount = document.getElementById("floorCount");
 
 let pages = [];
 let currentPage = 0;
@@ -167,7 +168,6 @@ function createCard(game) {
     </div>
     <div class="game-desc-overlay">
       <p class="game-tagline">${game.tagline}</p>
-      ${game.description ? `<p class="game-description">${game.description}</p>` : ""}
     </div>
   `;
 
@@ -249,6 +249,9 @@ function buildPages(games) {
 
   emptyState.hidden = games.length > 0;
   track.hidden = games.length === 0;
+  if (floorCount) {
+    floorCount.textContent = `${games.length} Cabinet${games.length !== 1 ? "s" : ""}`;
+  }
 }
 
 function moveSelection(delta) {

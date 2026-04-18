@@ -14,10 +14,11 @@ A split-screen endless runner where two lovers run toward each other from opposi
   - Press `F3` during gameplay to toggle debug mode
   - Open the game with `?debug=1` to start with debug mode enabled
   - Practice filters are available with `?debugObstacle=spikes|birds|arrows|goblins`
+  - Debug overlay shows the current timing grade for the front obstacle (`perfect` / `good` / `miss` / `n/a`)
 - Debug colors:
   - **Cyan** = player hurtbox
   - **Yellow / orange** = obstacle hitbox
-  - **Green** = shield hitbox / shield contact
+  - **Green** = shield hitbox / shield contact / obstacle perfect window
   - **Magenta** = sword hitbox / sword contact
   - **Red** = actual body overlap/contact
 
@@ -25,7 +26,7 @@ A split-screen endless runner where two lovers run toward each other from opposi
 
 | Obstacle   | Status | Current note |
 |------------|--------|--------------|
-| Spikes     | Locked for now | Spike resolution is now based on actual visible overlap only: touch = miss, fully pass without touch = clear. |
+| Spikes     | Locked for now | Spikes still use visible overlap for hits and clean pass logic for clears; jump timing now decides Perfect vs Good on a clean clear instead of replacing hitbox resolution. |
 | Bird       | Locked for now | Bird resolution is now based on visible body-vs-bird overlap only: touch = miss, fully duck under and pass = clear. |
 | Arrow wall | Locked for now | Arrow walls now resolve from visible arrow hitboxes against the visible shield hitbox or player hurtbox. |
 | Goblin     | Locked for now | Single-phase goblins and phase-1 goblins now resolve from visible sword-vs-goblin or body-vs-goblin contact. |
@@ -50,7 +51,7 @@ A split-screen endless runner where two lovers run toward each other from opposi
 | Up     | Jump   | Spikes                         |
 | Toward | Attack | Goblin                         |
 | Away   | Block  | Arrow wall / Goblin pre-attack |
-| Down   | Crouch | Bird *(pending sprites)*       |
+| Down   | Crouch | Bird                           |
 
 - **Single player:** Left side = WASD, Right side = Arrow keys
 - **Local co-op:** Each player controls one side
@@ -64,10 +65,12 @@ A split-screen endless runner where two lovers run toward each other from opposi
 
 | Obstacle   | Visual                      | Required response           | Notes                                   |
 |------------|-----------------------------|-----------------------------|-----------------------------------------|
-| Spikes     | Ground spikes               | Jump                        | Collision pass completed for current build |
+| Spikes     | Ground spikes               | Jump                        | Visible overlap decides hit vs clear; clean clears now grade Perfect or Good from jump timing |
 | Bird       | Low-flying bird             | Crouch                      | Collision pass completed for current build |
 | Arrow wall | 3 arrows stacked vertically | Block                       | Shield-vs-arrow contact now drives resolution |
 | Goblin     | Goblin character            | Attack — or Block → Attack  | Sword-vs-goblin and body-vs-goblin contact now drive the attack phase |
+
+Current build note: two-phase goblins remain part of the design, but the procedural generator currently keeps `twoPhase = false` during the validation/tuning pass. Live random runs are single-phase goblins only for now.
 
 ### Goblin mechanic
 
@@ -76,7 +79,12 @@ The goblin is the only obstacle that can require two inputs:
 - **Goblin squares up** → player must Attack. Blocking is a miss.
 - **Goblin winds up an arrow** → player must Block first, then Attack. Attacking the arrow or blocking the charge are both misses.
 - Windup speed varies to prevent pattern memorization.
-- Both phases must be cleared correctly; failing either = hit.
+- In the two-phase version, the obstacle is a chained package made of **two separate clears**:
+  - **Phase 1: fireball** â†’ cleared by visible shield-vs-fireball contact
+  - **Phase 2: goblin** â†’ cleared by visible sword-vs-goblin contact
+- Both phases behave like the rest of the obstacle set: visible hitboxes determine the outcome, and each phase may award its own **Perfect**, **Good**, or **Hit** result.
+- The player must physically resolve the fireball first, then physically resolve the goblin second.
+- Failing either phase = hit for that phase; clearing phase 1 does not auto-clear phase 2.
 - The **warmup goblin** is always single-phase (squares up only) — the two-phase variant is never the player's first goblin.
 
 ### Obstacle spawning
@@ -85,6 +93,11 @@ The goblin is the only obstacle that can require two inputs:
 - Fixed quantity per run — every run has the same total number of obstacles and speed boosts
 - Ensures leaderboard scores are comparable across runs
 - **Repeat cap:** max 3 consecutive obstacles of the same type
+
+- Generation is now **feasibility-aware**: adjacent obstacles must be clearable with the live movement and input rules before they can be emitted
+- Mixed-action pairs must be spaced so the first obstacle can resolve before the next one demands a different input
+- Repeated spikes must be either close enough for a same-jump chain or far enough apart for a full land-and-rejump reset
+- Two-phase goblins must reserve enough total padding for the full **fireball â†’ goblin** sequence so there are no impossible overlaps before, during, or after the chained obstacle
 
 ---
 
@@ -98,32 +111,35 @@ The goblin is the only obstacle that can require two inputs:
 
 - Perfect and Good windows are **fixed** — they never change with adaptive difficulty
 - The **interval between required inputs** is what compresses/expands (see Adaptive Difficulty)
+- Two-phase goblin: both the fireball phase and the goblin phase can award **Perfect** if their own collision/timing windows are hit cleanly
 - Two-phase goblin: Perfect window applies to the **Attack phase only**. The Block phase has no Perfect opportunity — this prevents RNG from influencing Perfect chains
+
+- Spikes stay **hitbox-first**: visible overlap with the spikes is always a miss, while a clean pass is scored as **Perfect** or **Good** from the jump-start timing
 
 ---
 
 ## Speed System
 
-Distance is measured in abstract units. **1 unit = 1 frame at base speed.**
+Distance is measured in abstract units.
 
-- **Base speed:** 5 → 1 distance/frame
-- **Minimum speed:** 5 (floor) — hits at this speed cost score only, no speed loss
+- **Starting speed:** 10 → 1.0 distance/frame (run begins here)
+- **Floor speed:** 5 → ~0.707 distance/frame — punishment minimum; floor players cannot reach the finish in 90s
 - **No speed cap** — player skill determines how fast a run can go
-- **Run distance:** ~5400 units (derived so floor player fails at the 90s hard cutoff)
+- **Run distance:** ~5400 units
 - **Hard cutoff:** 90 seconds — players who have not reached the finish line fail
 
 ### Speed-to-distance curve
 
 ```
-dist_per_frame = (speed / 5) ^ 0.2
+dist_per_frame = sqrt(speed / 10)
 ```
 
 | Speed | dist/frame |
 |-------|------------|
-| 5     | 1.00       |
-| 10    | 1.15       |
-| 20    | 1.32       |
-| 50    | 1.59       |
+| 5     | ~0.707     |
+| 10    | 1.000      |
+| 20    | ~1.414     |
+| 50    | ~2.236     |
 
 ### Gaining speed
 
@@ -148,7 +164,7 @@ score_multiplier = 1 + chain × 0.06 × (obstacles_faced / 104)
 - Chain resets to 0 on any Good or Miss
 - Chain break penalty fires before the Good/Miss speed adjustment
 
-### Archetype benchmarks (validated, D ≈ 5400)
+### Archetype benchmarks (⚠️ invalidated — re-run `dev/archetype-model.js` after sqrt curve change)
 
 | Archetype   | Perfects | Goods | Misses | Finish  | Score  |
 |-------------|----------|-------|--------|---------|--------|
@@ -168,6 +184,8 @@ score_multiplier = 1 + chain × 0.06 × (obstacles_faced / 104)
 - **Diminishing returns** — inversely proportional to current speed:
   - At high speed → ~+1 speed
   - At floor speed (5) → ~+5 speed
+
+Current build note: boosts are still part of the design target, but the browser gameplay loop is not spawning live boosts yet.
 
 ### Struggle assist
 
@@ -198,6 +216,9 @@ Activates when a runner's projected finish time ≥ 90s (estimated fail).
 - Each subsequent wave: +5 obstacles (wave 2 = 15, wave 3 = 20, wave 4 = 25, wave 5 = 30)
 - Advanced runners receive additional obstacles proportional to their speed vs. expected progress
 - Difficulty increases wave over wave: faster approach speeds, more two-phase goblins, compressed intervals
+- Current generator preference is **fairness over density**: if spacing must expand to keep a sequence possible, the possible sequence wins
+
+Current build note: live waves already use the fixed obstacle counts and feasibility checks, but they are not yet spawning the per-wave boost layer and they currently keep goblins single-phase.
 
 ### Warmup sequence (pre-wave 1)
 
@@ -216,10 +237,12 @@ Purpose: teach all 4 inputs before the first scored wave begins.
 - Collision decisions should be made from the **same geometry shown in debug mode**, not from separate guessed logic.
 - A miss should only happen when the visible hurtbox and visible obstacle hitbox actually overlap.
 - A clear should only happen when the obstacle is fully passed without that overlap occurring.
-- Do not use hidden timing-window logic for obstacles that are meant to be resolved by on-screen contact.
+- Do not use hidden timing-window logic to replace on-screen contact resolution.
+- Spikes are a hybrid case: hit vs clear still comes from visible overlap/pass logic, but the score grade for a clean clear comes from jump timing.
 - Spikes, birds, arrow walls, and goblin attack phases now follow this rule in the live build.
 - Arrow walls use visible **shield vs arrow** contact before falling back to body contact.
 - Goblin attack phases use visible **sword vs goblin** contact before falling back to body contact.
+- Two-phase goblin fireballs should follow the same rule as other collision obstacles: no raw-input auto-clear, only visible shield/body collision resolution.
 
 ---
 

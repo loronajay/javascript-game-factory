@@ -8,11 +8,11 @@ All game design decisions live in `GDD.md`. Before implementing any feature, con
 
 ## Current Project Status
 
-- Development is currently following an **obstacle-by-obstacle validation** pass.
-- Spikes, birds, arrow walls, and goblin attack phases are currently locked for the active build.
+- **Obstacle collision validation pass is complete.** All 4 obstacle types (spikes, birds, arrow walls, goblins) have validated hitboxes and are locked for the active build.
 - Contact rules for the live build:
   - visible player hurtbox touches visible spike hitbox = miss
   - player fully passes spikes without contact = clear
+  - spike jump timing only grades that clean clear as perfect or good; it must not override the hitbox-based clear / miss decision
   - visible player hurtbox touches visible bird hitbox = miss
   - player fully ducks under and passes bird without contact = clear
   - visible shield hitbox touches visible arrow hitbox = clear
@@ -23,8 +23,20 @@ All game design decisions live in `GDD.md`. Before implementing any feature, con
   - `F3` toggles debug hitboxes
   - `?debug=1` enables debug mode from the URL
   - `?debugObstacle=spikes|birds|arrows|goblins` swaps the run to one obstacle type for practice
-  - cyan = player hurtbox, yellow/orange = obstacle hitbox, green = shield, magenta = sword, red = body overlap/contact
+  - debug panel also shows the front obstacle timing grade (`perfect` / `good` / `miss` / `n/a`)
+  - cyan = player hurtbox, yellow/orange = obstacle hitbox, green = perfect window or shield, magenta = sword, red = body overlap/contact
+- Wave generation is now feasibility-aware:
+  - adjacent pairs must be clearable with the live mechanics
+  - mixed-action pairs must resolve in sequence
+  - spike chains must be either same-jump close or full-reset far
 - Remaining validation work is mainly tuning and feel, not missing contact geometry.
+
+## Spike Timing Notes
+
+- Spikes remain hitbox-first: visible overlap is still the only way to get hit.
+- A spike is only cleared once it is fully passed without overlap.
+- Jump timing now grades that clean clear as `perfect` or `good`; it must not turn a clean physical clear into a miss.
+- Debug mode can show a green spike perfect window, but that highlight is informational and does not replace the overlap/pass rules.
 
 ## Architecture
 
@@ -38,13 +50,15 @@ The game has two logically independent sides that share a clock:
 - `input.js` — input mapping for single player, local co-op, and online modes
 - `online.js` — network layer for online co-op *(built last)*
 
-## Scaling & Asset Implementation
-- **Virtual Resolution**: The game is designed for a **320x180** virtual canvas.
-- **Dynamic Fit**: The `renderer.js` must use the `scaleFactor` logic from `SKILLS.md` to ensure the 3x render scale (48x48) remains crisp and centered on any screen size.
-- **Placeholder Fallback**: 
-  - If `boy.png` or `girl.png` fail to load, `renderer.js` must trigger the `generatePlaceholder` skill to draw 16x16 colored blocks (Cyan for Boy, Pink for Girl).
-  - **Bird Asset**: Per the Obstacle table, use a scaled/stretched Y-axis placeholder if the sprite is missing.
-- **Coordinate Reset**: HUD elements (Score, Speed, Chain) must be drawn after `ctx.setTransform(1,0,0,1,0,0)` to prevent them from moving with the game camera.
+## Browser shell
+
+- `index.html` is the shipped entry point and wraps the canvas in the Factory cabinet shell with a back link to `../../grid.html`.
+- `renderer.js` owns canvas sizing and currently renders at **960Ã—540**.
+- `game.js` now boots the full browser path: menu, play, reunion/game over hold, then score screen.
+- `sounds.js` is wired into the browser loop for action / hit / run outcome SFX.
+- The browser build currently supports debug startup params:
+  - `?debug=1`
+  - `?debugObstacle=spikes|birds|arrows|goblins`
 
 
 ## TDD rules for this game
@@ -106,8 +120,9 @@ These values are validated by `archetype-model.js` — do not change without re-
 |-----------------------|-------------|------------------------------------------------------|
 | Run distance          | ~5400       | Units to finish line                                 |
 | Hard cutoff           | 90s         | Failure deadline                                     |
-| Curve exponent        | 0.2         | `dist_per_frame = (speed / 5) ^ 0.2`                |
-| Base / floor speed    | 5           | Starting speed, minimum speed                        |
+| Dist curve            | sqrt        | `dist_per_frame = sqrt(speed / 10)`                  |
+| Starting speed        | 10          | Speed at run start; characters begin at 1.0 dist/frame |
+| Floor speed           | 5           | Minimum speed (punishment); gives ~0.707 dist/frame  |
 | Perfect window        | 1 frame     | Timing window for Perfect grade                      |
 | Good window           | 4 frames    | Timing window for Good grade                         |
 | Perfect speed gain    | +3 × speed_multiplier | Per perfect clear                          |
@@ -141,16 +156,24 @@ Then open `http://localhost:8080/demo.html` or `http://localhost:8080/index.html
 
 | File | Status | Tests |
 |------|--------|-------|
-| `player.js` | Done | 65 passing |
-| `obstacles.js` | Done | 39 passing |
+| `player.js` | Done | 67 passing |
+| `obstacles.js` | Done | 45 passing |
 | `scoring.js` | Done | 16 passing |
 | `renderer.js` | Done — all environments, HUD, debug overlay, outcome effects | — |
 | `input.js` | Done | 34 passing |
-| `game.js` | Done — contact-validated obstacle flow, debug practice filters, browser loop wired | 97 passing |
+| `game.js` | Done — contact-validated obstacle flow, debug practice filters, browser loop wired | 103 passing |
 | `index.html` | Entry point wired | — |
 | `online.js` | Not started (built last) | — |
 
 `renderer-test.html` — standalone visual test harness. Open in browser to inspect environments, animations, and obstacle art. Not part of the final game.
+
+Latest local verification:
+- `renderer.js` also owns the menu, game-over, and score-screen rendering paths.
+- `game.js` now handles phase holds before the score screen and drives sound effects via `sounds.js`.
+- `index.html` is the factory-shell entry point, not just a bare canvas mount.
+- `game.json` should be updated whenever the public card copy or release status changes.
+- `obstacles.js` currently has 45 passing tests, including feasibility-aware pair-spacing, bird visual-spacing, and cross-wave boundary coverage
+- `game.js` currently has 103 passing tests after the goblin-queue-stuck fix
 
 ## HUD
 
@@ -158,12 +181,20 @@ Then open `http://localhost:8080/demo.html` or `http://localhost:8080/index.html
 - Chain dim at 0/1, gold at 2+
 - Clock center top, turns red at <20s
 - Progress bars bottom edge
-- On obstacle clear: floating "PERFECT" (gold) or "GOOD" (white) text + ring effect (~0.7s)
-- On obstacle miss: red X effect
+- On obstacle clear: floating "PERFECT" (gold) or "GOOD" (white) text (~0.7s)
+- On obstacle miss: floating "MISS" text (red, ~0.7s)
 
 ## Two-phase goblin
 
 Disabled for now (`twoPhase = false` in `generateWave`). All goblins are single-phase (attack only). Re-enable when ready for the two-phase validation pass.
+
+When re-enabling it, the intended scope is locked:
+- The two-phase goblin is a chained obstacle with **two separate clears**, not one bundled clear.
+- **Phase 1: fireball** â†’ acts like the other collision obstacles and must resolve from visible **shield-vs-fireball** or body contact.
+- **Phase 2: goblin** â†’ acts like the current attack goblin and must resolve from visible **sword-vs-goblin** or body contact.
+- Both phases can independently award **Perfect**, **Good**, or **Hit**.
+- Clearing the fireball does not auto-clear the goblin; both contacts must resolve in order.
+- Generator spacing must reserve enough total room for the full **fireball â†’ goblin** sequence so there are no impossible overlaps.
 
 ## Hitbox / collision notes
 
@@ -172,7 +203,7 @@ Disabled for now (`twoPhase = false` in `generateWave`). All goblins are single-
 - outcome `feedback` values: `'perfect'` / `'good'` / `'hit'` (not `'clear'` — that string is gone).
 - Arrow walls do not resolve from raw `block` input; they resolve from visible shield-vs-arrow contact or body contact.
 - Single-phase goblins and phase-1 goblins do not resolve from raw `attack` input; they resolve from visible sword-vs-goblin contact or body contact.
-- Two-phase goblin phase 0 is still timing-graded from the fireball/block window, then advances to phase 1 for sword contact.
+- Two-phase goblin fireballs should follow the same collision rule as birds/arrow walls: no raw-input auto-clear, only visible shield/body collision resolution before advancing to the goblin phase.
 
 ## Input — CRITICAL design rule
 
@@ -207,6 +238,11 @@ Disabled for now (`twoPhase = false` in `generateWave`). All goblins are single-
 | ArrowRight | girl | block |
 
 ## Renderer notes
+
+Current contract additions:
+- The live image contract also includes `goblinIdle`, `goblinAttack`, `goblinTakeHit`, `goblinDeath`, `fireball`, and `arrows`.
+- `renderer.renderMenu(debugState)`, `renderer.renderGameOver(boyPlayer, girlPlayer, runSummary)`, and `renderer.renderScore(boyPlayer, girlPlayer, runSummary)` are part of the live contract.
+- `getDebugOverlayGeometry(...)` is the shared source for debug collision overlay placement and game-side collision assertions.
 
 - Canvas: 960×540 (16:9). Set by `createRenderer` — do not set in HTML.
 - `createRenderer(canvas, images)` — `images` must have `{ boy, girl, sword, birds: [Image, Image, Image] }`.

@@ -6,37 +6,64 @@
   <title>Javascript Game Factory</title>
   <link rel="stylesheet" href="css/arcade.css">
 </head>
-<body>
+<body class="home-page">
   <div class="scanlines"></div>
   <div class="crt-overlay"></div>
 
   <main class="arcade-shell">
-    <section class="hero">
-      <p class="eyebrow">Javascript Game Factory</p>
-      <h1>Build The Factory First.</h1>
-      <p>This repo is the JavaScript sister version: shared landing flow, shared game grid, and self-contained cabinets built in plain HTML, CSS, and JavaScript. <strong>Lovers Lost</strong> now lives inside that structure instead of carrying the whole platform by itself.</p>
+    <section class="hero home-hero">
+      <p class="eyebrow">Arcade Open</p>
+      <h1>STEP UP AND PLAY.</h1>
+      <p class="hero-sub">
+        Fast games. Bright screens. Straight to the action.
+      </p>
+
+      <div class="hero-strip">
+        <span class="hero-chip">Jump In</span>
+        <span class="hero-chip">Pick A Game</span>
+        <span class="hero-chip">Play Instantly</span>
+      </div>
     </section>
 
-    <section class="mode-row">
+    <section class="mode-row home-mode-row">
       <a class="mode-card mode-card--floor mode-link" href="grid.html">
-        <span class="mode-label">Quick Select</span>
-        <h2>Factory Floor</h2>
-        <p>Browse the shared platform first, then drop into a cabinet from a common front door.</p>
+        <span class="mode-label">Game Select</span>
+        <h2>Browse The Arcade</h2>
+        <p>Move through the lineup and choose your next game.</p>
         <div class="mode-badge-row">
-          <span class="mode-badge">Shared Architecture</span>
-          <span class="mode-badge">Built For JS Games</span>
+          <span class="mode-badge">&#x276F; Enter Arcade</span>
         </div>
       </a>
 
       <a class="mode-card mode-card--cabinet mode-link" href="games/lovers-lost/index.html">
-        <span class="mode-label">Current Cabinet</span>
+        <span class="mode-label">Featured Game</span>
         <h2>Lovers Lost</h2>
-        <p>Jump straight into the current prototype while keeping its entry point consistent with the factory shell.</p>
+        <p>Two players. One timer. A fast-paced race to reconnect before time runs out.</p>
         <div class="mode-badge-row">
           <span class="mode-badge">1-2 Players</span>
-          <span class="mode-badge">Playable Prototype</span>
+          <span class="mode-badge">Play Now</span>
         </div>
       </a>
+    </section>
+
+    <section class="home-signal-row">
+      <article class="signal-panel">
+        <span class="signal-label">Jump In</span>
+        <h3>Quick To Start</h3>
+        <p>No long setup. No clutter. Pick a cabinet and get moving.</p>
+      </article>
+
+      <article class="signal-panel">
+        <span class="signal-label">On The Floor</span>
+        <h3>Different Kinds Of Action</h3>
+        <p>Arcade-style games built for quick sessions, replays, and chasing better runs.</p>
+      </article>
+
+      <article class="signal-panel">
+        <span class="signal-label">Right Now</span>
+        <h3>Featured Picks</h3>
+        <p>Start with what is live on the floor, then explore the rest of the lineup.</p>
+      </article>
     </section>
   </main>
 

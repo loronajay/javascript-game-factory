@@ -25,13 +25,12 @@ Refer to **SKILLS.md** for technical "How-To" (Scaling, Sprite Logic, Hitbox Mat
 
 ## 🕹 Current Focus: "Lovers Lost"
 - **Active Cabinet**: `games/lovers-lost/`
-- **Current Objective**: Obstacle Collision Tuning.
-- **Locked Obstacles**: 
-  - [x] Spikes (Validated via debug hitboxes)
-- **Pending Validation**:
-  - [ ] Bird
-  - [ ] Arrow Wall
-  - [ ] Goblin Variants
+- **Current Objective**: TBD — obstacle collision validation pass complete.
+- **Locked Obstacles** (all validated):
+  - [x] Spikes
+  - [x] Bird
+  - [x] Arrow Wall
+  - [x] Goblin Variants
 
 ## 🚦 Operational Workflow
 1. **Sync**: Read `games/<game-name>/GDD.md` before any feature work.

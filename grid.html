@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Javascript Game Factory | Game Grid</title>
+  <title>Javascript Game Factory | Game Floor</title>
   <link rel="stylesheet" href="css/arcade.css">
   <link rel="stylesheet" href="css/grid.css">
 </head>
@@ -13,30 +13,31 @@
 
   <main class="arcade-shell">
     <div class="page-topbar">
-      <a class="back-link" href="index.html">Back To Factory</a>
+      <a class="back-link" href="index.html">&#x276E; Back To Factory</a>
       <div class="page-indicator" id="pageIndicator">1 / 1</div>
     </div>
 
     <section class="page-header">
-      <p class="eyebrow">Quick Select</p>
-      <h1>Game Grid</h1>
-      <p>The factory reads each cabinet from <code>game.json</code>, then renders the grid from shared metadata instead of hard-coding a one-off page per game.</p>
+      <p class="eyebrow">Factory Floor</p>
+      <h1>Game Floor</h1>
     </section>
 
-    <section class="grid-shell">
+    <div class="floor-bar">
+      <span class="floor-bar-label">Now Playing</span>
+      <span class="floor-bar-count" id="floorCount"></span>
+    </div>
+
+    <div class="grid-frame">
       <div id="emptyState" class="empty-state" hidden>
         No cabinets are registered yet.
       </div>
-
       <div id="gridTrack"></div>
-    </section>
-
-    <div class="pager-row">
-      <button id="prevPage" class="pager-button" type="button" hidden>Previous Page</button>
-      <button id="nextPage" class="pager-button" type="button" hidden>Next Page</button>
     </div>
 
-    <p class="grid-hint">Use mouse, keyboard, or gamepad to move between JavaScript cabinets.</p>
+    <div class="pager-row">
+      <button id="prevPage" class="pager-button" type="button" hidden>&#x276E; Prev</button>
+      <button id="nextPage" class="pager-button" type="button" hidden>Next &#x276F;</button>
+    </div>
   </main>
 
   <script src="js/arcade-input.js"></script>

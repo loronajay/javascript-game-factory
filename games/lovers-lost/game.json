@@ -1,0 +1,14 @@
+{
+  "title": "Lovers Lost",
+  "tagline": "A split-screen reunion runner where both sides have to survive the trip.",
+  "description": "Two runners cross mirrored worlds, clear collision-validated obstacles, and try to reunite before the 90 second cutoff.",
+  "players": "1-2",
+  "status": "Playable prototype - all four obstacle collision passes validated, tuning and polish in progress",
+  "order": 1,
+  "featured": true,
+  "theme": "ember",
+  "accentColor": "#ff6b35",
+  "card_classes": [
+    "featured"
+  ]
+}
