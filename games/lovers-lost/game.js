@@ -919,6 +919,7 @@ function initGame() {
   // ── Apply input for one side each frame ───────────────────────────────────
   function handleSideInput(side) {
     const getPlayer = () => (side === 'boy' ? gs.boy : gs.girl);
+    if (getPlayer().state === 'finished') return;
     const getObstacles = () => (side === 'boy' ? gs.boyObstacles : gs.girlObstacles);
     const anim      = side === 'boy' ? boyAnim : girlAnim;
     let interacted = false;
