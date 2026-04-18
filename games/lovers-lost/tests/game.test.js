@@ -291,14 +291,13 @@ test('jumping too early over spikes still clears if the physical hitbox clear is
   assertEq(result.grade, 'good');
 });
 
-test('spikes passed without an active jump still count as a miss', () => {
+test('spikes passed without an active jump clear as good if the hitbox never touched', () => {
   const player = playerAt(118, 'boy');
   const obs = [createObstacle('spikes', 100)];
   const result = resolveContactAction(player, obs, { state: 'running', actionTick: 0 });
 
-  assertEq(result.player.score, 0, 'spikes should not clear unless the player actually jumped over them');
   assertEq(result.obstacles.length, 0);
-  assertEq(result.grade, 'miss');
+  assertEq(result.grade, 'good');
 });
 
 test('running into spikes counts as a hit on contact', () => {
@@ -615,14 +614,13 @@ test('processMissedObstacles awards a perfect for a fully passed spike jump with
   assertEq(obstacles.length, 0);
 });
 
-test('processMissedObstacles treats passed spikes without a jump as a miss', () => {
+test('processMissedObstacles clears passed spikes as good if the hitbox never touched', () => {
   const p = playerAt(118, 'boy');
   const obs = [createObstacle('spikes', 100)];
   const { player, obstacles, resolved } = processMissedObstacles(p, obs);
 
-  assertEq(player.score, 0, 'fully passing spikes without jumping should still fail');
   assertEq(obstacles.length, 0);
-  assertEq(resolved[0]?.grade, 'miss');
+  assertEq(resolved[0]?.grade, 'good');
 });
 
 test('processMissedObstacles clears a fully passed bird while crouching', () => {

@@ -167,7 +167,6 @@ function spikeTimingGrade(player, obstacle) {
 
 function spikeClearGrade(player, obstacle) {
   const grade = spikeTimingGrade(player, obstacle);
-  if (player.jumpStartDistance == null) return 'miss';
   if (grade === 'perfect') return 'perfect';
   return 'good';
 }
