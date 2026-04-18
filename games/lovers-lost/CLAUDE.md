@@ -98,9 +98,7 @@ Each obstacle type maps to exactly one required response. This is the core mecha
 | Spikes     | Ground spikes               | Jump                     |                                      |
 | Bird       | Low-flying bird             | Crouch                   | Real sprite; visible hitbox pass completed |
 | Arrow wall | 3 stacked arrows            | Block                    | Visible shield-vs-arrow contact drives resolution |
-| Goblin     | Goblin (possible pre-attack)| Block → Attack or Attack | Visible sword-vs-goblin contact drives attack phases |
-
-The goblin is the only two-phase obstacle. See GDD.md for full goblin mechanic spec.
+| Goblin     | Goblin                      | Attack                   | Visible sword-vs-goblin contact drives resolution |
 
 ## Online mode
 
@@ -161,7 +159,7 @@ Then open `http://localhost:8080/demo.html` or `http://localhost:8080/index.html
 | `scoring.js` | Done | 16 passing |
 | `renderer.js` | Done — all environments, HUD, debug overlay, outcome effects | — |
 | `input.js` | Done | 34 passing |
-| `game.js` | Done — contact-validated obstacle flow, debug practice filters, browser loop wired | 103 passing |
+| `game.js` | Done — contact-validated obstacle flow, debug practice filters, browser loop wired, reunion animation | 107 passing |
 | `index.html` | Entry point wired | — |
 | `online.js` | Not started (built last) | — |
 
@@ -172,8 +170,8 @@ Latest local verification:
 - `game.js` now handles phase holds before the score screen and drives sound effects via `sounds.js`.
 - `index.html` is the factory-shell entry point, not just a bare canvas mount.
 - `game.json` should be updated whenever the public card copy or release status changes.
-- `obstacles.js` currently has 45 passing tests, including feasibility-aware pair-spacing, bird visual-spacing, and cross-wave boundary coverage
-- `game.js` currently has 103 passing tests after the goblin-queue-stuck fix
+- `obstacles.js` currently has 37 passing tests (two-phase goblin removed)
+- `game.js` currently has 107 passing tests
 
 ## HUD
 
@@ -186,15 +184,7 @@ Latest local verification:
 
 ## Two-phase goblin
 
-Disabled for now (`twoPhase = false` in `generateWave`). All goblins are single-phase (attack only). Re-enable when ready for the two-phase validation pass.
-
-When re-enabling it, the intended scope is locked:
-- The two-phase goblin is a chained obstacle with **two separate clears**, not one bundled clear.
-- **Phase 1: fireball** â†’ acts like the other collision obstacles and must resolve from visible **shield-vs-fireball** or body contact.
-- **Phase 2: goblin** â†’ acts like the current attack goblin and must resolve from visible **sword-vs-goblin** or body contact.
-- Both phases can independently award **Perfect**, **Good**, or **Hit**.
-- Clearing the fireball does not auto-clear the goblin; both contacts must resolve in order.
-- Generator spacing must reserve enough total room for the full **fireball â†’ goblin** sequence so there are no impossible overlaps.
+Removed. Goblins are single-phase (attack only). Do not re-introduce.
 
 ## Hitbox / collision notes
 
@@ -202,8 +192,7 @@ When re-enabling it, the intended scope is locked:
 - `buildDebugCollisionSnapshot` iterates x=0–47 and relies on `playerBottomAtLocalX` returning null for non-body columns — do not change this back to fixed 12/41 constants.
 - outcome `feedback` values: `'perfect'` / `'good'` / `'hit'` (not `'clear'` — that string is gone).
 - Arrow walls do not resolve from raw `block` input; they resolve from visible shield-vs-arrow contact or body contact.
-- Single-phase goblins and phase-1 goblins do not resolve from raw `attack` input; they resolve from visible sword-vs-goblin contact or body contact.
-- Two-phase goblin fireballs should follow the same collision rule as birds/arrow walls: no raw-input auto-clear, only visible shield/body collision resolution before advancing to the goblin phase.
+- Goblins do not resolve from raw `attack` input; they resolve from visible sword-vs-goblin contact or body contact.
 
 ## Input — CRITICAL design rule
 
@@ -240,7 +229,7 @@ When re-enabling it, the intended scope is locked:
 ## Renderer notes
 
 Current contract additions:
-- The live image contract also includes `goblinIdle`, `goblinAttack`, `goblinTakeHit`, `goblinDeath`, `fireball`, and `arrows`.
+- The live image contract also includes `goblinIdle`, `goblinAttack`, `goblinTakeHit`, `goblinDeath`, and `arrows`.
 - `renderer.renderMenu(debugState)`, `renderer.renderGameOver(boyPlayer, girlPlayer, runSummary)`, and `renderer.renderScore(boyPlayer, girlPlayer, runSummary)` are part of the live contract.
 - `getDebugOverlayGeometry(...)` is the shared source for debug collision overlay placement and game-side collision assertions.
 

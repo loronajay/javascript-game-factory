@@ -308,7 +308,7 @@ test('running into spikes counts as a hit on contact', () => {
 
   assertEq(result.player.score, 0, 'touching spikes on the ground should clamp score at 0');
   assertEq(result.obstacles.length, 0);
-  assertEq(result.action, null);
+  assertEq(result.action, 'spikes');
 });
 
 test('jumping above spikes while still overlapping does not resolve early', () => {

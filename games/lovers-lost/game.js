@@ -28,6 +28,7 @@ const SPIKE_TRI_WIDTH_PX = 12;
 const SPIKE_HEIGHT_PX = 20;
 const BOY_CONTACT_REL_PX = 42;
 const GIRL_CONTACT_REL_PX = 6;
+const SPIKE_RESOLVE_ACTION = 'spikes';
 const BIRD_RESOLVE_ACTION = 'bird';
 const ARROWWALL_RESOLVE_ACTION = 'arrowwall';
 const GOBLIN_RESOLVE_ACTION = 'goblin';
@@ -576,7 +577,7 @@ function resolveContactAction(player, obstacles, animState) {
       return {
         player: applyMiss(player),
         obstacles: obstacles.slice(1),
-        action: player.state === 'jumping' ? 'jump' : null,
+        action: player.state === 'jumping' ? 'jump' : SPIKE_RESOLVE_ACTION,
         grade: 'miss',
       };
     }
@@ -586,7 +587,7 @@ function resolveContactAction(player, obstacles, animState) {
       return {
         player: grade === 'miss' ? applyMiss(player) : applyGradeOutcome(player, grade),
         obstacles: obstacles.slice(1),
-        action: grade === 'miss' ? null : 'jump',
+        action: grade === 'miss' ? SPIKE_RESOLVE_ACTION : 'jump',
         grade,
       };
     }

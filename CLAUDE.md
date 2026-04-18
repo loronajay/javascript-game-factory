@@ -25,12 +25,12 @@ Refer to **SKILLS.md** for technical "How-To" (Scaling, Sprite Logic, Hitbox Mat
 
 ## 🕹 Current Focus: "Lovers Lost"
 - **Active Cabinet**: `games/lovers-lost/`
-- **Current Objective**: TBD — obstacle collision validation pass complete.
+- **Current Objective**: Polish and feel — reunion animation done, holdable crouch added, two-phase goblin removed.
 - **Locked Obstacles** (all validated):
   - [x] Spikes
   - [x] Bird
   - [x] Arrow Wall
-  - [x] Goblin Variants
+  - [x] Goblin (single-phase attack only)
 
 ## 🚦 Operational Workflow
 1. **Sync**: Read `games/<game-name>/GDD.md` before any feature work.
