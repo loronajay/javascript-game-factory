@@ -10,6 +10,12 @@ A split-screen endless runner where two lovers run toward each other from opposi
 
 - Development is currently following an **obstacle-by-obstacle validation** pass.
 - Collision work now follows one hard rule: **visible hurtboxes and hitboxes must match the visible sprite shapes on screen**.
+- The local/browser build now uses a **viewport-first presentation** where the gameplay canvas dominates the page instead of sitting inside a large cabinet header shell.
+- The menu and help flow are now part of the active polished build:
+  - menu uses a full-screen space splash
+  - help screen shows 4 obstacle demo cards plus explicit action labels (`JUMP`, `CROUCH`, `BLOCK`, `ATTACK`)
+- Finished runners now snap to a grounded neutral pose while waiting for the other side to finish.
+- Post-run summaries now show the total run time to the millisecond so close clears can still be compared.
 - Debug collision mode is available for local testing:
   - Press `F3` during gameplay to toggle debug mode
   - Open the game with `?debug=1` to start with debug mode enabled
@@ -274,11 +280,55 @@ Purpose: teach all 4 inputs before the first scored wave begins.
 
 ### Online mode
 
-Uses the existing **Factory Network server** (Railway, WebSocket + Express):
-- Matchmaking: `find_match` with `gameId: "lovers-lost"`
-- Private rooms: `create_room` / `join_room` with room code
-- In-game sync: `room_message` for state updates
-- Max 2 players per room (already enforced server-side)
+Uses the existing **Factory Network server** (Railway, WebSocket + Express).
+
+#### Player flow
+
+```
+menu → ONLINE MULTIPLAYER
+  └─ online_side_select  (Boy / Girl)
+       └─ online_lobby
+            ├─ FIND MATCH → "Searching…" + Cancel  (public queue)
+            └─ PLAY WITH FRIEND
+                 ├─ CREATE ROOM → show code, wait for partner
+                 └─ ENTER CODE → join friend's room, wait for partner
+                      └─ playing (online) → reunion / partial_finish / game_over → score_screen → menu
+```
+
+#### Matchmaking rules
+
+- Players queue by side — boys queue separately from girls.
+- Public match (`find_match`): server pairs the front of the Boy queue with the front of the Girl queue. Multiple players of the same side can be waiting simultaneously; each waits their turn. A Cancel button returns to the menu at any point.
+- Side is **never auto-switched** — a Boy who queues always plays Boy.
+- Friend match (`create_room` / `join_room`): one player creates a room and shares the code out-of-band; the other enters it. If the joining player picks a side already occupied in that room, they receive an error and return to side-select.
+
+#### Clock and obstacle sync
+
+- Server sends a `match_start` message containing a shared **seed** and a **server timestamp**.
+- Both clients generate identical obstacle waves from the shared seed (seeded RNG in `obstacles.js` replaces `Math.random()`). No obstacle data is transmitted during the run.
+- Both clients compute elapsed time as `Date.now() - serverStartTime`. The server records authoritative run duration (`match_end − match_start`) for leaderboard submission — neither client self-reports run time.
+
+#### In-game sync
+
+- Each client sends its own player actions (`jump` / `crouch` / `attack` / `block`) to the server the moment they fire; server relays them to the other client.
+- Remote actions are injected via `inp.injectAction(remoteSide, action)` in `online.js` — no raw WebSocket calls outside that file.
+- Only the local player's physical keys are read; the remote side's controls are disabled for the local player.
+
+#### Disconnect handling
+
+- If the remote player disconnects mid-run, the local player is sent immediately to the partial finish screen with a note: "Your partner disconnected."
+- No pausing or waiting — the run ends for the remaining player as a partial result.
+
+#### Server message types used
+
+| Message | Direction | Purpose |
+|---|---|---|
+| `find_match` | Client → Server | Enter public side queue |
+| `create_room` | Client → Server | Open a private room |
+| `join_room` | Client → Server | Join a friend's room by code |
+| `match_start` (seed + timestamp) | Server → both clients | Begin the run |
+| `room_message` (action) | Client → Server → other client | Relay player actions |
+| `room_message` (disconnect) | Server → remaining client | Notify of partner drop |
 
 ---
 
@@ -292,7 +342,7 @@ Each side of the screen has its own distinct world with a unique visual theme. A
 
 1. Both characters approach the finish — backgrounds begin converging, divider fades
 2. Characters meet in the center and hug in the unified scene
-3. Score screen: per-side breakdown + combined total
+3. Score screen: per-side breakdown + combined total + final run time
 4. Option to replay or return to menu
 
 ---

@@ -15,6 +15,7 @@ import { evaluateRun } from './scripts/scoring.js';
 import { createRenderer, getDebugOverlayGeometry } from './scripts/renderer.js';
 import { createInput, keyToAction } from './scripts/input.js';
 import { createSounds } from './scripts/sounds.js';
+import { createOnlineClient } from './scripts/online.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const HARD_CUTOFF_FRAMES = 90 * 60;  // 5400 frames
@@ -872,6 +873,34 @@ function initGame() {
   // ── Sounds ────────────────────────────────────────────────────────────────
   const sounds = createSounds();
 
+  // ── Online client ─────────────────────────────────────────────────────────
+  const onlineClient = createOnlineClient();
+  let onlineRemoteSide = null;
+
+  onlineClient.cb.onSearching       = () => { /* onlineLobbyPhase already shows searching UI */ };
+  onlineClient.cb.onSearchCancelled = () => { onlineLobbyPhase = 'main'; };
+  onlineClient.cb.onRoomCreated     = (code) => { onlineRoomCode = code; };
+  onlineClient.cb.onSideConflict    = () => { onlineLobbyPhase = 'main'; };
+  onlineClient.cb.onError           = (code, msg) => { console.warn('[online]', code, msg); };
+
+  onlineClient.cb.onMatchStart = (seed, remoteSide) => {
+    onlineRemoteSide = remoteSide;
+    startPlayingOnline(seed);
+  };
+
+  onlineClient.cb.onRemoteAction = (action) => {
+    if (onlineRemoteSide) inp.injectAction(onlineRemoteSide, action);
+  };
+
+  onlineClient.cb.onPartnerLeft = () => {
+    if (gs.phase === 'playing') {
+      const summary = { ...evaluateRun(gs.boy, gs.girl, gs.elapsed), disconnectNote: true };
+      gs = { ...gs, phase: 'gameover', phaseFrames: 0, runSummary: summary };
+      sounds.stopMusic();
+      sounds.play('run-failed');
+    }
+  };
+
   // ── Canvas + renderer ─────────────────────────────────────────────────────
   const canvas   = document.getElementById('gameCanvas');
   const renderer = createRenderer(canvas, images);
@@ -888,6 +917,26 @@ function initGame() {
       inp.tick();
       return;
     }
+    if (gs.phase === 'online_side_select') {
+      if (e.key === 'Escape') { onlineClient.disconnect(); gs = { ...gs, phase: 'menu' }; }
+      return;
+    }
+    if (gs.phase === 'online_lobby') {
+      if (onlineLobbyPhase === 'join') {
+        if (e.key === 'Backspace') { onlineCodeInput = onlineCodeInput.slice(0, -1); return; }
+        if (e.key === 'Enter')     { _tryJoinRoom(); return; }
+        if (e.key === 'Escape')    { onlineLobbyPhase = 'friend_options'; return; }
+        if (e.key.length === 1)    { if (onlineCodeInput.length < 8) onlineCodeInput += e.key.toUpperCase(); return; }
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (onlineLobbyPhase === 'main')                                        { onlineClient.disconnect(); gs = { ...gs, phase: 'online_side_select' }; }
+        else if (onlineLobbyPhase === 'searching')                              { _cancelSearch(); onlineLobbyPhase = 'main'; }
+        else if (onlineLobbyPhase === 'friend_options')                         onlineLobbyPhase = 'main';
+        else if (onlineLobbyPhase === 'create' || onlineLobbyPhase === 'join')  { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
+      }
+      return;
+    }
     const toggle = toggleDebugHotkey(debugEnabled, e.key);
     if (toggle.handled) {
       debugEnabled = toggle.enabled;
@@ -898,38 +947,119 @@ function initGame() {
       e.preventDefault();
     }
     inp.keydown(e.key);
+    // Online mode: send local action to server; block physical keys for remote side
+    if (gs.phase === 'playing' && gs.mode === 'online') {
+      const mapped = keyToAction(e.key);
+      if (mapped) {
+        if (mapped.side === onlineSide) onlineClient.sendAction(mapped.action);
+        else inp.clearAction(mapped.side, mapped.action);
+      }
+    }
   });
   window.addEventListener('keyup',   e => inp.keyup(e.key));
 
-  // Menu button click — "Local Multiplayer" button bounds (canvas space)
-  const MENU_BTN_X  = 300, MENU_BTN_Y  = 255, MENU_BTN_W  = 360, MENU_BTN_H  = 56;
-  const MENU_BTN2_X = 360, MENU_BTN2_Y = 345, MENU_BTN2_W = 240, MENU_BTN2_H = 44;
+  // Menu button bounds (canvas space)
+  const MENU_BTN_X  = 300, MENU_BTN_Y  = 210, MENU_BTN_W  = 360, MENU_BTN_H  = 56; // LOCAL MULTIPLAYER
+  const MENU_BTN2_X = 300, MENU_BTN2_Y = 286, MENU_BTN2_W = 360, MENU_BTN2_H = 56; // ONLINE MULTIPLAYER
+  const MENU_BTN3_X = 360, MENU_BTN3_Y = 362, MENU_BTN3_W = 240, MENU_BTN3_H = 44; // HOW TO PLAY
   let menuBtnHovered  = false;
   let menuBtn2Hovered = false;
+  let menuBtn3Hovered = false;
+
+  function _inBtn(cx, cy, bx, by, bw, bh) {
+    return cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh;
+  }
+
+  // ── Online UI state ───────────────────────────────────────────────────────
+  let onlineSide        = 'boy';      // 'boy' | 'girl'
+  let onlineLobbyPhase  = 'main';     // 'main' | 'searching' | 'friend_options' | 'create' | 'join'
+  let onlineCodeInput   = '';         // typed chars in join flow
+  let onlineRoomCode    = '';         // assigned code in create flow (set by online.js)
+  let onlineSearchTick  = 0;          // frame counter for dot animation
+
+  // Hover flags — online_side_select
+  let onlineSideBoyHov  = false, onlineSideGirlHov   = false;
+  // Hover flags — online_lobby
+  let onlineFindMatchHov = false, onlinePlayFriendHov = false;
+  let onlineCancelHov    = false;
+  let onlineCreateHov    = false, onlineJoinHov        = false;
+  let onlineJoinSubmitHov = false;
+
+  function _tryJoinRoom()  { if (onlineCodeInput.length > 0) onlineClient.joinRoom(onlineSide, onlineCodeInput); }
+  function _cancelSearch() { onlineClient.cancelSearch(); }
+  function _cancelRoom()   { onlineRoomCode = ''; onlineClient.cancelRoom(); }
+
   canvas.addEventListener('mousemove', e => {
-    if (gs.phase !== 'menu') { menuBtnHovered = false; menuBtn2Hovered = false; return; }
     const rect = canvas.getBoundingClientRect();
     const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
     const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
-    menuBtnHovered  = cx >= MENU_BTN_X  && cx <= MENU_BTN_X  + MENU_BTN_W  &&
-                      cy >= MENU_BTN_Y  && cy <= MENU_BTN_Y  + MENU_BTN_H;
-    menuBtn2Hovered = cx >= MENU_BTN2_X && cx <= MENU_BTN2_X + MENU_BTN2_W &&
-                      cy >= MENU_BTN2_Y && cy <= MENU_BTN2_Y + MENU_BTN2_H;
+
+    if (gs.phase === 'menu') {
+      menuBtnHovered  = _inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H);
+      menuBtn2Hovered = _inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H);
+      menuBtn3Hovered = _inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H);
+    } else {
+      menuBtnHovered = menuBtn2Hovered = menuBtn3Hovered = false;
+    }
+
+    if (gs.phase === 'online_side_select') {
+      onlineSideBoyHov  = _inBtn(cx, cy, 240, 130, 220, 240);
+      onlineSideGirlHov = _inBtn(cx, cy, 500, 130, 220, 240);
+    } else {
+      onlineSideBoyHov = onlineSideGirlHov = false;
+    }
+
+    if (gs.phase === 'online_lobby') {
+      onlineFindMatchHov  = onlineLobbyPhase === 'main'           && _inBtn(cx, cy, 320, 260, 320, 56);
+      onlinePlayFriendHov = onlineLobbyPhase === 'main'           && _inBtn(cx, cy, 320, 336, 320, 56);
+      onlineCancelHov     = (onlineLobbyPhase === 'searching'     && _inBtn(cx, cy, 380, 300, 200, 44))
+                         || (onlineLobbyPhase === 'create'        && _inBtn(cx, cy, 380, 310, 200, 44))
+                         || (onlineLobbyPhase === 'join'          && _inBtn(cx, cy, 400, 318, 160, 40));
+      onlineCreateHov     = onlineLobbyPhase === 'friend_options' && _inBtn(cx, cy, 340, 215, 280, 52);
+      onlineJoinHov       = onlineLobbyPhase === 'friend_options' && _inBtn(cx, cy, 340, 287, 280, 52);
+      onlineJoinSubmitHov = onlineLobbyPhase === 'join'           && _inBtn(cx, cy, 380, 244, 200, 52);
+    } else {
+      onlineFindMatchHov = onlinePlayFriendHov = onlineCancelHov =
+        onlineCreateHov = onlineJoinHov = onlineJoinSubmitHov = false;
+    }
   });
 
   canvas.addEventListener('click', e => {
     sounds.retryPendingMusic();
     if (gs.phase === 'menu_help') { gs = { ...gs, phase: 'menu' }; return; }
-    if (gs.phase !== 'menu') return;
     const rect = canvas.getBoundingClientRect();
     const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
     const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
-    if (cx >= MENU_BTN_X && cx <= MENU_BTN_X + MENU_BTN_W &&
-        cy >= MENU_BTN_Y && cy <= MENU_BTN_Y + MENU_BTN_H) {
-      startPlaying();
-    } else if (cx >= MENU_BTN2_X && cx <= MENU_BTN2_X + MENU_BTN2_W &&
-               cy >= MENU_BTN2_Y && cy <= MENU_BTN2_Y + MENU_BTN2_H) {
-      gs = { ...gs, phase: 'menu_help' };
+
+    if (gs.phase === 'menu') {
+      if      (_inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H))  startPlaying();
+      else if (_inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H)) { onlineSide = 'boy'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_side_select' }; }
+      else if (_inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H)) gs = { ...gs, phase: 'menu_help' };
+      return;
+    }
+
+    if (gs.phase === 'online_side_select') {
+      if (_inBtn(cx, cy, 240, 130, 220, 240)) { onlineSide = 'boy';  onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
+      if (_inBtn(cx, cy, 500, 130, 220, 240)) { onlineSide = 'girl'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
+      return;
+    }
+
+    if (gs.phase === 'online_lobby') {
+      if (onlineLobbyPhase === 'main') {
+        if (_inBtn(cx, cy, 320, 260, 320, 56)) { onlineLobbyPhase = 'searching'; onlineSearchTick = 0; onlineClient.findMatch(onlineSide); }
+        if (_inBtn(cx, cy, 320, 336, 320, 56)) { onlineLobbyPhase = 'friend_options'; }
+      } else if (onlineLobbyPhase === 'searching') {
+        if (_inBtn(cx, cy, 380, 300, 200, 44)) { _cancelSearch(); onlineLobbyPhase = 'main'; }
+      } else if (onlineLobbyPhase === 'friend_options') {
+        if (_inBtn(cx, cy, 340, 215, 280, 52)) { onlineLobbyPhase = 'create'; onlineSearchTick = 0; onlineClient.createRoom(onlineSide); }
+        if (_inBtn(cx, cy, 340, 287, 280, 52)) { onlineLobbyPhase = 'join'; onlineCodeInput = ''; }
+      } else if (onlineLobbyPhase === 'create') {
+        if (_inBtn(cx, cy, 380, 310, 200, 44)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
+      } else if (onlineLobbyPhase === 'join') {
+        if (_inBtn(cx, cy, 380, 244, 200, 52)) _tryJoinRoom();
+        if (_inBtn(cx, cy, 400, 318, 160, 40)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
+      }
+      return;
     }
   });
 
@@ -952,6 +1082,15 @@ function initGame() {
     boyAnim  = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
     inp.tick(); // clear the keypress that triggered the transition
+  }
+
+  function startPlayingOnline(seed) {
+    sounds.stop('run-success');
+    sounds.stop('run-failed');
+    gs = { ...createGameState('online', seed, { debugObstacleType }), phase: 'playing' };
+    boyAnim  = { state: 'running', actionTick: 0 };
+    girlAnim = { state: 'running', actionTick: 0 };
+    inp.tick();
   }
 
   function returnToMenu() {
@@ -1177,7 +1316,19 @@ function initGame() {
     const elapsed = gs.elapsed / 60; // convert frames → seconds for renderer
 
     if (gs.phase === 'menu') {
-      renderer.renderMenu(debugState, menuBtnHovered, menuBtn2Hovered);
+      renderer.renderMenu(debugState, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
+    } else if (gs.phase === 'online_side_select') {
+      renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov);
+    } else if (gs.phase === 'online_lobby') {
+      onlineSearchTick++;
+      renderer.renderOnlineLobby(onlineSide, onlineLobbyPhase, onlineRoomCode, onlineCodeInput, onlineSearchTick, {
+        findMatch:  onlineFindMatchHov,
+        playFriend: onlinePlayFriendHov,
+        cancel:     onlineCancelHov,
+        create:     onlineCreateHov,
+        join:       onlineJoinHov,
+        joinSubmit: onlineJoinSubmitHov,
+      });
     } else if (gs.phase === 'menu_help') {
       renderer.renderMenuHelp(debugState);
     } else if (gs.phase === 'playing') {
