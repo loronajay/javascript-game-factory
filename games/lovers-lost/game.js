@@ -872,6 +872,7 @@ function initGame() {
   // ── Input ─────────────────────────────────────────────────────────────────
   const inp = createInput();
   window.addEventListener('keydown', e => {
+    sounds.retryPendingMusic();
     const toggle = toggleDebugHotkey(debugEnabled, e.key);
     if (toggle.handled) {
       debugEnabled = toggle.enabled;
@@ -885,8 +886,33 @@ function initGame() {
   });
   window.addEventListener('keyup',   e => inp.keyup(e.key));
 
+  // Menu button click — "Local Multiplayer" button bounds (canvas space)
+  const MENU_BTN_X = 290, MENU_BTN_Y = 216, MENU_BTN_W = 380, MENU_BTN_H = 58;
+  let menuBtnHovered = false;
+  canvas.addEventListener('mousemove', e => {
+    if (gs.phase !== 'menu') { menuBtnHovered = false; return; }
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
+    const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    menuBtnHovered = cx >= MENU_BTN_X && cx <= MENU_BTN_X + MENU_BTN_W &&
+                     cy >= MENU_BTN_Y && cy <= MENU_BTN_Y + MENU_BTN_H;
+  });
+
+  canvas.addEventListener('click', e => {
+    sounds.retryPendingMusic();
+    if (gs.phase !== 'menu') return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
+    const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    if (cx >= MENU_BTN_X && cx <= MENU_BTN_X + MENU_BTN_W &&
+        cy >= MENU_BTN_Y && cy <= MENU_BTN_Y + MENU_BTN_H) {
+      startPlaying();
+    }
+  });
+
   // ── Game state ────────────────────────────────────────────────────────────
   let gs = createGameState('single', Date.now() >>> 0, { debugObstacleType });
+  let lastMusicPhase = null;
 
   // ── Action state timing ───────────────────────────────────────────────────
   // Tracks ticks since current action started (for renderer animState)
@@ -905,15 +931,11 @@ function initGame() {
     inp.tick(); // clear the keypress that triggered the transition
   }
 
-  function handleMenuInput() {
-    // Any action key from either side starts game from menu/gameover/score screens
-    const anyPressed =
-      inp.isPressed('boy',  'jump')  || inp.isPressed('boy',  'attack') ||
-      inp.isPressed('boy',  'block') || inp.isPressed('boy',  'crouch') ||
-      inp.isPressed('girl', 'jump')  || inp.isPressed('girl', 'attack') ||
-      inp.isPressed('girl', 'block') || inp.isPressed('girl', 'crouch');
-
-    if (anyPressed) startPlaying();
+  function returnToMenu() {
+    gs = { ...createGameState(gs.mode, Date.now() >>> 0, { debugObstacleType }), phase: 'menu' };
+    boyAnim  = { state: 'running', actionTick: 0 };
+    girlAnim = { state: 'running', actionTick: 0 };
+    inp.tick();
   }
 
   // ── Apply input for one side each frame ───────────────────────────────────
@@ -1041,8 +1063,25 @@ function initGame() {
 
   // ── Main loop ─────────────────────────────────────────────────────────────
   function loop() {
-    if (gs.phase === 'menu' || gs.phase === 'score_screen') {
-      handleMenuInput();
+    // Music — switch tracks on phase transition (after first user interaction)
+    if (gs.phase !== lastMusicPhase) {
+      if (gs.phase === 'menu') {
+        sounds.playMusic('bg-music-menu');
+      } else if (gs.phase === 'playing') {
+        sounds.playMusic('bg-music-game');
+      } else if (gs.phase === 'reunion' || gs.phase === 'gameover') {
+        sounds.stopMusic();
+      }
+      lastMusicPhase = gs.phase;
+    }
+
+    if (gs.phase === 'score_screen') {
+      const anyPressed =
+        inp.isPressed('boy',  'jump')  || inp.isPressed('boy',  'attack') ||
+        inp.isPressed('boy',  'block') || inp.isPressed('boy',  'crouch') ||
+        inp.isPressed('girl', 'jump')  || inp.isPressed('girl', 'attack') ||
+        inp.isPressed('girl', 'block') || inp.isPressed('girl', 'crouch');
+      if (anyPressed) returnToMenu();
     }
 
     if (gs.phase === 'playing') {
@@ -1108,7 +1147,7 @@ function initGame() {
     const elapsed = gs.elapsed / 60; // convert frames → seconds for renderer
 
     if (gs.phase === 'menu') {
-      renderer.renderMenu(debugState);
+      renderer.renderMenu(debugState, menuBtnHovered);
     } else if (gs.phase === 'playing') {
       renderer.renderPlay(
         boyPlayer, girlPlayer,

@@ -3,8 +3,8 @@
 const OBSTACLE_TYPES   = ['spikes', 'bird', 'arrowwall', 'goblin'];
 const WARMUP_SEQUENCE  = ['spikes', 'bird', 'goblin', 'arrowwall'];
 const WARMUP_SPACING   = 80;   // distance units between warmup obstacles
-const WAVE_SPACING_MIN = 35;   // min distance units between wave obstacles
-const WAVE_SPACING_MAX = 55;   // max distance units between wave obstacles
+const WAVE_SPACING_MIN = 44;   // min distance units between wave obstacles
+const WAVE_SPACING_MAX = 64;   // max distance units between wave obstacles
 const WAVE_COUNTS      = [10, 15, 20, 25, 30]; // obstacles per wave (waves 1–5)
 const MAX_REPEAT       = 3;
 const PAIR_SPACING_BUFFER = 1;

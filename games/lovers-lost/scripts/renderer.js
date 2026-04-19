@@ -450,17 +450,64 @@ function createRenderer(canvas, images) {
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
 
-  function renderMenu(debugState) {
+  function renderMenu(debugState, btnHovered) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawBackground(0, 'boy', 0);
     _drawBackground(HALF_W, 'girl', 0);
     _drawDivider();
-    _drawOverlayPanel('Lovers Lost', [
-      'Split-screen co-op runner',
-      'Boy: W jump  S crouch  D attack  A block',
-      'Girl: Up jump  Down crouch  Left attack  Right block',
-      'Press any action key to begin',
-    ]);
+
+    const panelW = 640;
+    const panelH = 320;
+    const panelX = (CANVAS_W - panelW) / 2;
+    const panelY = 80;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(4, 6, 16, 0.82)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    ctx.fillStyle = 'rgba(20, 18, 38, 0.94)';
+    ctx.fillRect(panelX, panelY, panelW, panelH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffe3f6';
+    ctx.font = 'bold 44px monospace';
+    ctx.fillText('Lovers Lost', CANVAS_W / 2, panelY + 62);
+
+    ctx.fillStyle = '#d9d8ff';
+    ctx.font = '16px monospace';
+    ctx.fillText('Split-screen co-op runner', CANVAS_W / 2, panelY + 96);
+
+    // "Local Multiplayer" button
+    const btnW = 380;
+    const btnH = 58;
+    const btnX = CANVAS_W / 2 - btnW / 2;
+    const btnY = panelY + 136;
+
+    if (btnHovered) {
+      ctx.shadowColor = '#e8c840';
+      ctx.shadowBlur = 18;
+    }
+    ctx.fillStyle = btnHovered ? '#f5d84a' : '#e8c840';
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = btnHovered ? '#fff' : 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+    ctx.fillStyle = '#1a1020';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText('Local Multiplayer', CANVAS_W / 2, btnY + 37);
+
+    ctx.fillStyle = 'rgba(217,216,255,0.55)';
+    ctx.font = '13px monospace';
+    ctx.fillText('Boy: W jump  S crouch  D attack  A block', CANVAS_W / 2, panelY + 258);
+    ctx.fillText('Girl: \u2191 jump  \u2193 crouch  \u2190 attack  \u2192 block', CANVAS_W / 2, panelY + 278);
+
+    ctx.restore();
+
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
 
@@ -481,7 +528,7 @@ function createRenderer(canvas, images) {
     let title = 'Run Complete';
     if (runSummary?.outcome === 'partial') title = 'Partial Finish';
     if (runSummary?.outcome === 'game_over') title = 'Run Over';
-    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to play again');
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to return to menu');
   }
 
   function addDyingGoblin(side, obstacle, playerDistance) {

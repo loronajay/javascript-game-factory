@@ -17,9 +17,11 @@ const SOUND_FILES = [
   'player-hit',
 ];
 
+const MUSIC_FILES = ['bg-music-menu', 'bg-music-game'];
+
 function createSounds() {
   if (typeof Audio === 'undefined') {
-    return { play() {}, stop() {}, stopAll() {} };
+    return { play() {}, stop() {}, stopAll() {}, playMusic() {}, stopMusic() {} };
   }
 
   const buffers = {};
@@ -32,6 +34,48 @@ function createSounds() {
     active[name] = new Set();
   }
 
+  // ── Looping music tracks ─────────────────────────────────────────────────────
+  const musicTracks = {};
+  let currentMusicName = null;
+
+  for (const name of MUSIC_FILES) {
+    const audio = new Audio(`sounds/${name}.wav`);
+    audio.preload = 'auto';
+    audio.loop = true;
+    musicTracks[name] = audio;
+  }
+
+  let pendingMusicName = null;
+
+  function playMusic(name) {
+    if (currentMusicName === name) return;
+    stopMusic();
+    currentMusicName = name;
+    pendingMusicName = null;
+    const track = musicTracks[name];
+    if (!track) return;
+    track.play().catch(() => { pendingMusicName = name; });
+  }
+
+  function stopMusic() {
+    if (!currentMusicName) return;
+    const track = musicTracks[currentMusicName];
+    if (track) { track.pause(); track.currentTime = 0; }
+    currentMusicName = null;
+    pendingMusicName = null;
+  }
+
+  // Call this inside a user-interaction handler to unblock audio that was
+  // silently rejected by the browser's autoplay policy.
+  function retryPendingMusic() {
+    if (!pendingMusicName || currentMusicName !== pendingMusicName) return;
+    const name = pendingMusicName;
+    pendingMusicName = null;
+    const track = musicTracks[name];
+    if (track) track.play().catch(() => { pendingMusicName = name; });
+  }
+
+  // ── SFX ─────────────────────────────────────────────────────────────────────
   function forget(name, instance) {
     active[name] && active[name].delete(instance);
   }
@@ -68,9 +112,10 @@ function createSounds() {
 
   function stopAll() {
     for (const name of SOUND_FILES) stop(name);
+    stopMusic();
   }
 
-  return { play, stop, stopAll };
+  return { play, stop, stopAll, playMusic, stopMusic, retryPendingMusic };
 }
 
 export { createSounds };

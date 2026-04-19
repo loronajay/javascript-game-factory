@@ -12,7 +12,7 @@ All game design decisions live in `GDD.md`. Before implementing any feature, con
 - Contact rules for the live build:
   - visible player hurtbox touches visible spike hitbox = miss
   - player fully passes spikes without contact = clear
-  - spike jump timing only grades that clean clear as perfect or good; it must not override the hitbox-based clear / miss decision
+  - spike jump timing only grades that clean clear as perfect or good; it must not override the hitbox-based clear / miss decision (**enforced in code** — `spikeClearGrade` never returns `'miss'`)
   - visible player hurtbox touches visible bird hitbox = miss
   - player fully ducks under and passes bird without contact = clear
   - visible shield hitbox touches visible arrow hitbox = clear
@@ -30,12 +30,13 @@ All game design decisions live in `GDD.md`. Before implementing any feature, con
   - mixed-action pairs must resolve in sequence
   - spike chains must be either same-jump close or full-reset far
 - Remaining validation work is mainly tuning and feel, not missing contact geometry.
+- **Input is gated on finish state**: `handleSideInput` returns immediately if `player.state === 'finished'` — no input (including held crouch) can overwrite the finished state or cause the backdrop to scroll after a side reaches the goal.
 
 ## Spike Timing Notes
 
 - Spikes remain hitbox-first: visible overlap is still the only way to get hit.
 - A spike is only cleared once it is fully passed without overlap.
-- Jump timing now grades that clean clear as `perfect` or `good`; it must not turn a clean physical clear into a miss.
+- Jump timing now grades that clean clear as `perfect` or `good`; it must not turn a clean physical clear into a miss. This is enforced — `spikeClearGrade` returns only `'perfect'` or `'good'`, never `'miss'`.
 - Debug mode can show a green spike perfect window, but that highlight is informational and does not replace the overlap/pass rules.
 
 ## Architecture
@@ -155,7 +156,7 @@ Then open `http://localhost:8080/demo.html` or `http://localhost:8080/index.html
 | File | Status | Tests |
 |------|--------|-------|
 | `player.js` | Done | 67 passing |
-| `obstacles.js` | Done | 45 passing |
+| `obstacles.js` | Done — `WAVE_SPACING_MIN 35→44`, `WAVE_SPACING_MAX 55→64` (warmup unaffected) | 45 passing |
 | `scoring.js` | Done | 16 passing |
 | `renderer.js` | Done — all environments, HUD, debug overlay, outcome effects | — |
 | `input.js` | Done | 34 passing |
