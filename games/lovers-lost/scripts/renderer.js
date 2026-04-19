@@ -567,10 +567,10 @@ function createRenderer(canvas, images) {
     const CARD_TY = GROUND_LINE_Y - GROUND_TOP;
 
     const HELP_CARDS = [
-      { type: 'spikes',    obsX: BOY_LOCAL_X + 18,            jY: 28, vs: { state: 'running', actionTick: 0 }, ps: 'jumping'   },
-      { type: 'bird',      obsX: BOY_LOCAL_X + SPRITE_W + 14, jY: 0,  vs: { state: 'crouch',  actionTick: 0 }, ps: 'crouching' },
-      { type: 'arrowwall', obsX: BOY_LOCAL_X + SPRITE_W + 2,  jY: 0,  vs: { state: 'block',   actionTick: 6 }, ps: 'running'   },
-      { type: 'goblin',    obsX: BOY_LOCAL_X + SPRITE_W + 6,  jY: 0,  vs: { state: 'attack',  actionTick: 6 }, ps: 'running'   },
+      { type: 'spikes',    label: 'JUMP',   obsX: BOY_LOCAL_X + 18,            jY: 28, vs: { state: 'running', actionTick: 0 }, ps: 'jumping'   },
+      { type: 'bird',      label: 'CROUCH', obsX: BOY_LOCAL_X + SPRITE_W + 14, jY: 0,  vs: { state: 'crouch',  actionTick: 0 }, ps: 'crouching' },
+      { type: 'arrowwall', label: 'BLOCK',  obsX: BOY_LOCAL_X + SPRITE_W + 2,  jY: 0,  vs: { state: 'block',   actionTick: 6 }, ps: 'running'   },
+      { type: 'goblin',    label: 'ATTACK', obsX: BOY_LOCAL_X + SPRITE_W + 6,  jY: 0,  vs: { state: 'attack',  actionTick: 6 }, ps: 'running'   },
     ];
 
     HELP_CARDS.forEach((card, i) => {
@@ -606,6 +606,10 @@ function createRenderer(canvas, images) {
 
       ctx.restore();
 
+      ctx.fillStyle = 'rgba(255,220,100,0.9)';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(card.label, cardX + CARD_W / 2, CARD_Y + CARD_H - 16);
     });
 
     const MID = CANVAS_W / 2;
