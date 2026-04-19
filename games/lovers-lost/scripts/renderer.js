@@ -423,6 +423,20 @@ function createRenderer(canvas, images) {
   const boyAnim  = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
   const girlAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
 
+  const menuBoyAnim  = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
+  const menuGirlAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
+  const helpWalkAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
+
+  const menuStars = (() => {
+    const rng = _makeRng(9999);
+    return Array.from({ length: 160 }, () => ({
+      x: rng() * CANVAS_W,
+      y: rng() * CANVAS_H,
+      r: rng() * 1.2 + 0.4,
+      a: rng() * 0.7 + 0.3,
+    }));
+  })();
+
   // Dying goblins — animated independently after being cleared.
   // Each entry: { position, tick }. They stay in world space so runners pass them.
   const boyDying = [];
@@ -450,82 +464,180 @@ function createRenderer(canvas, images) {
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
 
-  function renderMenu(debugState, btnHovered) {
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    _drawBackground(0, 'boy', 0);
-    _drawBackground(HALF_W, 'girl', 0);
-    _drawDivider();
-
-    const panelW = 640;
-    const panelH = 320;
-    const panelX = (CANVAS_W - panelW) / 2;
-    const panelY = 80;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(4, 6, 16, 0.82)';
+  // ─── Space background (menu / help) ────────────────────────────────────────
+  function _drawSpaceBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+    grad.addColorStop(0,    '#07141f');
+    grad.addColorStop(0.55, '#0d2233');
+    grad.addColorStop(1,    '#030c14');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    ctx.fillStyle = 'rgba(20, 18, 38, 0.94)';
-    ctx.fillRect(panelX, panelY, panelW, panelH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(panelX, panelY, panelW, panelH);
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe3f6';
-    ctx.font = 'bold 44px monospace';
-    ctx.fillText('Lovers Lost', CANVAS_W / 2, panelY + 62);
-
-    ctx.fillStyle = '#d9d8ff';
-    ctx.font = '16px monospace';
-    ctx.fillText('Split-screen co-op runner', CANVAS_W / 2, panelY + 96);
-
-    // "Local Multiplayer" button
-    const btnW = 380;
-    const btnH = 58;
-    const btnX = CANVAS_W / 2 - btnW / 2;
-    const btnY = panelY + 136;
-
-    if (btnHovered) {
-      ctx.shadowColor = '#e8c840';
-      ctx.shadowBlur = 18;
+    const blobs = [
+      { cx: 640, cy: 130, r: 250, c0: 'rgba(80,30,140,0.18)',  c1: 'rgba(40,60,140,0.10)',  s: 0.45 },
+      { cx: 490, cy: 290, r: 190, c0: 'rgba(10,80,100,0.15)',  c1: 'rgba(10,60,80,0.07)',   s: 0.5  },
+      { cx: 350, cy: 170, r: 210, c0: 'rgba(130,35,75,0.10)',  c1: 'rgba(70,20,55,0.04)',   s: 0.6  },
+    ];
+    for (const b of blobs) {
+      const ng = ctx.createRadialGradient(b.cx, b.cy, 10, b.cx, b.cy, b.r);
+      ng.addColorStop(0, b.c0); ng.addColorStop(b.s, b.c1); ng.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ng;
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     }
-    ctx.fillStyle = btnHovered ? '#f5d84a' : '#e8c840';
-    ctx.fillRect(btnX, btnY, btnW, btnH);
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = btnHovered ? '#fff' : 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(btnX, btnY, btnW, btnH);
 
-    ctx.fillStyle = '#1a1020';
-    ctx.font = 'bold 22px monospace';
-    ctx.fillText('Local Multiplayer', CANVAS_W / 2, btnY + 37);
-
-    ctx.fillStyle = 'rgba(217,216,255,0.55)';
-    ctx.font = '13px monospace';
-    ctx.fillText('Boy: W jump  S crouch  D attack  A block', CANVAS_W / 2, panelY + 258);
-    ctx.fillText('Girl: \u2191 jump  \u2193 crouch  \u2190 attack  \u2192 block', CANVAS_W / 2, panelY + 278);
-
+    ctx.save();
+    for (const s of menuStars) {
+      ctx.globalAlpha = s.a;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
+  }
+
+  function _drawRedButton(x, y, w, h, text, hovered, fontSize) {
+    ctx.save();
+    if (hovered) { ctx.shadowColor = 'rgba(220,60,80,0.65)'; ctx.shadowBlur = 18; }
+    ctx.fillStyle = hovered ? '#cc2a3a' : '#9a1b28';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillRect(x + 2, y + 2, w - 4, Math.floor(h / 2) - 2);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#550010';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(text, x + w / 2, y + h / 2 + Math.round(fontSize * 0.36));
+    ctx.restore();
+  }
+
+  function renderMenu(debugState, btnHovered, btn2Hovered) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawSpaceBackground();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 72px "Cinzel Decorative", serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.55)';
+    ctx.shadowBlur = 28;
+    ctx.fillText('LOVERS LOST', CANVAS_W / 2, 105);
+    ctx.restore();
+
+    const btnW = 360, btnH = 56;
+    _drawRedButton(CANVAS_W / 2 - btnW / 2, 255, btnW, btnH, 'LOCAL MULTIPLAYER', btnHovered, 20);
+    const btn2W = 240, btn2H = 44;
+    _drawRedButton(CANVAS_W / 2 - btn2W / 2, 345, btn2W, btn2H, 'HOW TO PLAY', btn2Hovered, 16);
+
+    _tickAnim(menuBoyAnim);
+    _blit(images.boy,  menuBoyAnim.frame,  FRAME_W, FRAME_H, 90,                       PLAYER_Y, SPRITE_W, SPRITE_H, false, 1);
+    _tickAnim(menuGirlAnim);
+    _blit(images.girl, menuGirlAnim.frame, FRAME_W, FRAME_H, CANVAS_W - 90 - SPRITE_W, PLAYER_Y, SPRITE_W, SPRITE_H, true,  1);
+
+    if (debugState?.enabled) _drawDebugBanner(debugState);
+  }
+
+  function renderMenuHelp(debugState) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawSpaceBackground();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 34px "Cinzel Decorative", serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.40)';
+    ctx.shadowBlur = 16;
+    ctx.fillText('HOW TO PLAY', CANVAS_W / 2, 72);
+    ctx.restore();
+
+    _tickAnim(helpWalkAnim);
+    const walkFrame = helpWalkAnim.frame;
+    const nowMs = Date.now();
+
+    const CARD_W = 200, CARD_H = 230, CGAP = 20;
+    const START_X = (CANVAS_W - (4 * CARD_W + 3 * CGAP)) / 2;
+    const CARD_Y = 105;
+    const GROUND_LINE_Y = CARD_Y + 195;
+    const CARD_TY = GROUND_LINE_Y - GROUND_TOP;
+
+    const HELP_CARDS = [
+      { type: 'spikes',    obsX: BOY_LOCAL_X + 18,            jY: 28, vs: { state: 'running', actionTick: 0 }, ps: 'jumping'   },
+      { type: 'bird',      obsX: BOY_LOCAL_X + SPRITE_W + 14, jY: 0,  vs: { state: 'crouch',  actionTick: 0 }, ps: 'crouching' },
+      { type: 'arrowwall', obsX: BOY_LOCAL_X + SPRITE_W + 2,  jY: 0,  vs: { state: 'block',   actionTick: 6 }, ps: 'running'   },
+      { type: 'goblin',    obsX: BOY_LOCAL_X + SPRITE_W + 6,  jY: 0,  vs: { state: 'attack',  actionTick: 6 }, ps: 'running'   },
+    ];
+
+    HELP_CARDS.forEach((card, i) => {
+      const cardX = START_X + i * (CARD_W + CGAP);
+      const tx    = cardX + CARD_W / 2 - (BOY_LOCAL_X + SPRITE_W / 2);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(5,14,28,0.78)';
+      ctx.fillRect(cardX, CARD_Y, CARD_W, CARD_H);
+      ctx.strokeStyle = 'rgba(90,130,210,0.28)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cardX, CARD_Y, CARD_W, CARD_H);
+
+      ctx.beginPath();
+      ctx.rect(cardX, CARD_Y, CARD_W, CARD_H);
+      ctx.clip();
+      ctx.translate(tx, CARD_TY);
+
+      // Obstacle drawn first so weapon/shield renders on top
+      _drawObstacle(card.obsX, { type: card.type }, 'right', BOY_CONTACT_X, 0, nowMs);
+
+      ctx.fillStyle = 'rgba(90,130,220,0.18)';
+      ctx.fillRect(BOY_LOCAL_X - 60, GROUND_TOP, 280, 1);
+
+      let screenY = PLAYER_Y - card.jY;
+      let scaleY  = 1;
+      if (card.ps === 'crouching') { scaleY = 0.5; screenY = PLAYER_Y + SPRITE_H * 0.5; }
+
+      const step = _actionStep(card.vs.actionTick);
+      if (card.vs.state === 'attack') _drawSword(BOY_LOCAL_X, screenY, false, step);
+      _blit(images.boy, walkFrame, FRAME_W, FRAME_H, BOY_LOCAL_X, screenY, SPRITE_W, SPRITE_H, false, scaleY);
+      if (card.vs.state === 'block')  _drawShield(BOY_LOCAL_X, screenY, false, step);
+
+      ctx.restore();
+
+    });
+
+    const MID = CANVAS_W / 2;
+    ctx.textAlign = 'center';
+    ctx.font = '12px monospace';
+    ctx.fillStyle = 'rgba(255,220,100,0.80)';
+    ctx.fillText('LEFT SIDE (BOY):', MID, 418);
+    ctx.fillStyle = 'rgba(210,215,255,0.80)';
+    ctx.fillText('W \u2014 jump    S \u2014 duck    D \u2014 attack    A \u2014 block', MID, 434);
+    ctx.fillStyle = 'rgba(255,220,100,0.80)';
+    ctx.fillText('RIGHT SIDE (GIRL):', MID, 454);
+    ctx.fillStyle = 'rgba(210,215,255,0.80)';
+    ctx.fillText('\u2191 \u2014 jump    \u2193 \u2014 duck    \u2190 \u2014 attack    \u2192 \u2014 block', MID, 470);
+
+    ctx.font = '12px monospace';
+    ctx.fillStyle = 'rgba(180,190,255,0.40)';
+    ctx.fillText('press any key or click to go back', MID, 492);
 
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
 
   function renderGameOver(boyPlayer, girlPlayer, runSummary) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    _drawBackground(0, 'boy', boyPlayer.distance);
-    _drawBackground(HALF_W, 'girl', girlPlayer.distance);
-    _drawDivider();
+    _drawSpaceBackground();
     const title = runSummary?.outcome === 'partial' ? 'One Lover Made It' : 'Time Up';
     _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Score screen incoming...');
   }
 
   function renderScore(boyPlayer, girlPlayer, runSummary) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    _drawBackground(0, 'boy', boyPlayer.distance);
-    _drawBackground(HALF_W, 'girl', girlPlayer.distance);
-    _drawDivider();
-    let title = 'Run Complete';
+    _drawSpaceBackground();
+    let title = 'Lovers Reunited';
     if (runSummary?.outcome === 'partial') title = 'Partial Finish';
     if (runSummary?.outcome === 'game_over') title = 'Run Over';
     _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to return to menu');
@@ -1722,36 +1834,41 @@ default:          return GROUND_TOP - 28;
       boyLine,
       girlLine,
       `Combined: ${total}`,
-      footer,
-    ]);
+    ], footer);
   }
 
-  function _drawOverlayPanel(title, lines) {
-    const panelW = 640;
-    const panelH = 220;
+  function _drawOverlayPanel(title, lines, footer) {
+    const rowH   = 30;
+    const panelW = 580;
+    const panelH = 72 + lines.length * rowH + (footer ? 48 : 24);
     const panelX = (CANVAS_W - panelW) / 2;
-    const panelY = 110;
+    const panelY = (CANVAS_H - panelH) / 2;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(4, 6, 16, 0.78)';
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-    ctx.fillStyle = 'rgba(20, 18, 38, 0.92)';
+    ctx.fillStyle = 'rgba(5,14,28,0.88)';
     ctx.fillRect(panelX, panelY, panelW, panelH);
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(100,140,220,0.32)';
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(panelX, panelY, panelW, panelH);
 
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe3f6';
-    ctx.font = 'bold 36px monospace';
-    ctx.fillText(title, CANVAS_W / 2, panelY + 52);
+    ctx.font = 'bold 40px "Cinzel Decorative", serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.50)';
+    ctx.shadowBlur = 20;
+    ctx.fillText(title, CANVAS_W / 2, panelY + 54);
+    ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#d9d8ff';
     ctx.font = '16px monospace';
+    ctx.fillStyle = 'rgba(210,215,255,0.90)';
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], CANVAS_W / 2, panelY + 100 + i * 26);
+      ctx.fillText(lines[i], CANVAS_W / 2, panelY + 88 + i * rowH);
+    }
+
+    if (footer) {
+      ctx.font = '13px monospace';
+      ctx.fillStyle = 'rgba(160,170,220,0.50)';
+      ctx.fillText(footer, CANVAS_W / 2, panelY + panelH - 16);
     }
     ctx.restore();
   }
@@ -1760,6 +1877,7 @@ default:          return GROUND_TOP - 28;
   return {
     renderPlay,
     renderMenu,
+    renderMenuHelp,
     renderGameOver,
     renderScore,
     renderReunion,

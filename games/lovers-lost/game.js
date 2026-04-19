@@ -873,6 +873,11 @@ function initGame() {
   const inp = createInput();
   window.addEventListener('keydown', e => {
     sounds.retryPendingMusic();
+    if (gs.phase === 'menu_help') {
+      gs = { ...gs, phase: 'menu' };
+      inp.tick();
+      return;
+    }
     const toggle = toggleDebugHotkey(debugEnabled, e.key);
     if (toggle.handled) {
       debugEnabled = toggle.enabled;
@@ -887,19 +892,24 @@ function initGame() {
   window.addEventListener('keyup',   e => inp.keyup(e.key));
 
   // Menu button click — "Local Multiplayer" button bounds (canvas space)
-  const MENU_BTN_X = 290, MENU_BTN_Y = 216, MENU_BTN_W = 380, MENU_BTN_H = 58;
-  let menuBtnHovered = false;
+  const MENU_BTN_X  = 300, MENU_BTN_Y  = 255, MENU_BTN_W  = 360, MENU_BTN_H  = 56;
+  const MENU_BTN2_X = 360, MENU_BTN2_Y = 345, MENU_BTN2_W = 240, MENU_BTN2_H = 44;
+  let menuBtnHovered  = false;
+  let menuBtn2Hovered = false;
   canvas.addEventListener('mousemove', e => {
-    if (gs.phase !== 'menu') { menuBtnHovered = false; return; }
+    if (gs.phase !== 'menu') { menuBtnHovered = false; menuBtn2Hovered = false; return; }
     const rect = canvas.getBoundingClientRect();
     const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
     const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
-    menuBtnHovered = cx >= MENU_BTN_X && cx <= MENU_BTN_X + MENU_BTN_W &&
-                     cy >= MENU_BTN_Y && cy <= MENU_BTN_Y + MENU_BTN_H;
+    menuBtnHovered  = cx >= MENU_BTN_X  && cx <= MENU_BTN_X  + MENU_BTN_W  &&
+                      cy >= MENU_BTN_Y  && cy <= MENU_BTN_Y  + MENU_BTN_H;
+    menuBtn2Hovered = cx >= MENU_BTN2_X && cx <= MENU_BTN2_X + MENU_BTN2_W &&
+                      cy >= MENU_BTN2_Y && cy <= MENU_BTN2_Y + MENU_BTN2_H;
   });
 
   canvas.addEventListener('click', e => {
     sounds.retryPendingMusic();
+    if (gs.phase === 'menu_help') { gs = { ...gs, phase: 'menu' }; return; }
     if (gs.phase !== 'menu') return;
     const rect = canvas.getBoundingClientRect();
     const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
@@ -907,6 +917,9 @@ function initGame() {
     if (cx >= MENU_BTN_X && cx <= MENU_BTN_X + MENU_BTN_W &&
         cy >= MENU_BTN_Y && cy <= MENU_BTN_Y + MENU_BTN_H) {
       startPlaying();
+    } else if (cx >= MENU_BTN2_X && cx <= MENU_BTN2_X + MENU_BTN2_W &&
+               cy >= MENU_BTN2_Y && cy <= MENU_BTN2_Y + MENU_BTN2_H) {
+      gs = { ...gs, phase: 'menu_help' };
     }
   });
 
@@ -1065,16 +1078,17 @@ function initGame() {
 
   // ── Main loop ─────────────────────────────────────────────────────────────
   function loop() {
-    // Music — switch tracks on phase transition (after first user interaction)
-    if (gs.phase !== lastMusicPhase) {
-      if (gs.phase === 'menu') {
+    // Music — switch tracks on phase transition (menu_help shares menu music)
+    const musicPhase = gs.phase === 'menu_help' ? 'menu' : gs.phase;
+    if (musicPhase !== lastMusicPhase) {
+      if (musicPhase === 'menu') {
         sounds.playMusic('bg-music-menu');
-      } else if (gs.phase === 'playing') {
+      } else if (musicPhase === 'playing') {
         sounds.playMusic('bg-music-game');
-      } else if (gs.phase === 'reunion' || gs.phase === 'gameover') {
+      } else if (musicPhase === 'reunion' || musicPhase === 'gameover') {
         sounds.stopMusic();
       }
-      lastMusicPhase = gs.phase;
+      lastMusicPhase = musicPhase;
     }
 
     if (gs.phase === 'score_screen') {
@@ -1149,7 +1163,9 @@ function initGame() {
     const elapsed = gs.elapsed / 60; // convert frames → seconds for renderer
 
     if (gs.phase === 'menu') {
-      renderer.renderMenu(debugState, menuBtnHovered);
+      renderer.renderMenu(debugState, menuBtnHovered, menuBtn2Hovered);
+    } else if (gs.phase === 'menu_help') {
+      renderer.renderMenuHelp(debugState);
     } else if (gs.phase === 'playing') {
       renderer.renderPlay(
         boyPlayer, girlPlayer,
