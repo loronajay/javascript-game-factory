@@ -5,6 +5,7 @@ const WS_URL = 'wss://factory-network-server-production.up.railway.app';
 
 export function createOnlineClient() {
   let ws           = null;
+  let _clientId    = null;   // assigned by server on connect; used to filter self-echo
   let _mySide      = null;
   let _remoteSide  = null;
   let _roomCode    = null;
@@ -104,6 +105,7 @@ export function createOnlineClient() {
     const ev = data.event;
 
     if (ev === 'connected') {
+      _clientId = data.clientId;
       cb.onConnected?.();
       return;
     }
@@ -148,6 +150,7 @@ export function createOnlineClient() {
     }
 
     if (ev === 'message') {
+      if (data.senderId === _clientId) return; // server echoes messages to sender — ignore own
       _handleRoomMsg(data);
       return;
     }
@@ -170,7 +173,7 @@ export function createOnlineClient() {
 
     ws.addEventListener('close', () => {
       if (_inRoom) cb.onPartnerLeft?.();
-      ws = null; _roomCode = null; _inRoom = false;
+      ws = null; _clientId = null; _roomCode = null; _inRoom = false;
     });
 
     ws.addEventListener('error', () => {
