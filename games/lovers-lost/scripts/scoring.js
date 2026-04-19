@@ -8,7 +8,7 @@ const OUTCOMES = {
 };
 
 // ─── Run-end evaluation ───────────────────────────────────────────────────────
-function evaluateRun(boy, girl) {
+function evaluateRun(boy, girl, elapsedFrames = 0) {
   const boyDone  = isFinished(boy);
   const girlDone = isFinished(girl);
 
@@ -27,6 +27,7 @@ function evaluateRun(boy, girl) {
     boyScore,
     girlScore,
     totalScore: boyScore + girlScore,
+    elapsedFrames,
   };
 }
 

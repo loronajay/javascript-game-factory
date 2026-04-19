@@ -510,7 +510,7 @@ function createRenderer(canvas, images) {
     ctx.strokeRect(x, y, w, h);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.font = `bold ${fontSize}px "Cinzel Decorative", serif`;
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 4;
     ctx.fillText(text, x + w / 2, y + h / 2 + Math.round(fontSize * 0.36));
@@ -1582,15 +1582,16 @@ default:          return GROUND_TOP - 28;
     const img    = side === 'boy' ? images.boy : images.girl;
     const localX = side === 'boy' ? BOY_LOCAL_X : GIRL_LOCAL_X;
     const flipX  = facing === 'left';
+    const isFinished = player.state === 'finished';
 
     _tickAnim(walkAnim);
 
     // Visual state from caller — fall back to 'running' if not provided.
-    const vs     = player.animState || { state: 'running', actionTick: 0 };
-    const vState = player.state === 'crouching' ? 'crouch' : vs.state;
+    const vs     = isFinished ? { state: 'running', actionTick: 0 } : (player.animState || { state: 'running', actionTick: 0 });
+    const vState = isFinished ? 'running' : (player.state === 'crouching' ? 'crouch' : vs.state);
 
     const screenX = offsetX + localX;
-    let   screenY = PLAYER_Y - (player.jumpY || 0);   // jumpY is pixels above ground; game.js drives this
+    let   screenY = isFinished ? PLAYER_Y : (PLAYER_Y - (player.jumpY || 0));   // jumpY is pixels above ground; game.js drives this
     let   scaleY  = 1;
 
     if (vState === 'crouch') {
@@ -1826,6 +1827,14 @@ default:          return GROUND_TOP - 28;
     ctx.fillRect(rtl ? x - 1 : x + w - 1, y - 2, 2, 9);
   }
 
+  function _formatRunTime(elapsedFrames = 0) {
+    const totalMs = Math.round((elapsedFrames * 1000) / 60);
+    const mins = Math.floor(totalMs / 60000);
+    const secs = Math.floor((totalMs % 60000) / 1000);
+    const millis = totalMs % 1000;
+    return `${mins}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+  }
+
   function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer) {
     const boyLine = runSummary
       ? `Boy: ${runSummary.boyFinished ? runSummary.boyScore : `${boyPlayer.score} (forfeit)`}`
@@ -1835,10 +1844,11 @@ default:          return GROUND_TOP - 28;
       : `Girl score: ${girlPlayer.score}`;
     const total = runSummary ? runSummary.totalScore : boyPlayer.score + girlPlayer.score;
     _drawOverlayPanel(title, [
+      runSummary ? `Time: ${_formatRunTime(runSummary.elapsedFrames)}` : null,
       boyLine,
       girlLine,
       `Combined: ${total}`,
-    ], footer);
+    ].filter(Boolean), footer);
   }
 
   function _drawOverlayPanel(title, lines, footer) {

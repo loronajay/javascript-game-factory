@@ -698,6 +698,16 @@ function tickJumpArc(player) {
   return { ...player, jumpY: newY, jumpVY: newVY };
 }
 
+function finishPlayer(player) {
+  return {
+    ...player,
+    state: 'finished',
+    jumpY: 0,
+    jumpVY: 0,
+    jumpStartDistance: null,
+  };
+}
+
 // ─── tickFrame ────────────────────────────────────────────────────────────────
 // Advances game state by one frame. Pure function — no side effects.
 function tickFrame(state) {
@@ -721,8 +731,8 @@ function tickFrame(state) {
   girl = tickJumpArc(girl);
 
   // Reaching the finish line ends obstacle processing for that side immediately.
-  if (isFinished(boy)  && boy.state  !== 'finished') boy  = { ...boy,  state: 'finished' };
-  if (isFinished(girl) && girl.state !== 'finished') girl = { ...girl, state: 'finished' };
+  if (isFinished(boy)  && boy.state  !== 'finished') boy  = finishPlayer(boy);
+  if (isFinished(girl) && girl.state !== 'finished') girl = finishPlayer(girl);
 
   // Auto-miss expired obstacles
   let boyObs = state.boyObstacles;
@@ -755,11 +765,11 @@ function tickFrame(state) {
   if (elapsed >= HARD_CUTOFF_FRAMES) {
     phase = 'gameover';
     phaseFrames = 0;
-    runSummary = evaluateRun(boy, girl);
+    runSummary = evaluateRun(boy, girl, elapsed);
   } else if (boy.state === 'finished' && girl.state === 'finished') {
     phase = 'reunion';
     phaseFrames = 0;
-    runSummary = evaluateRun(boy, girl);
+    runSummary = evaluateRun(boy, girl, elapsed);
   }
 
   return {
@@ -1109,9 +1119,13 @@ function initGame() {
       const girlFinishedBefore = gs.girl.state === 'finished';
       gs = tickFrame(gs);
       if (!boyFinishedBefore && gs.boy.state === 'finished') {
+        boyAnim.state = 'running';
+        boyAnim.actionTick = 0;
         renderer.clearSideObstacleVisuals('boy');
       }
       if (!girlFinishedBefore && gs.girl.state === 'finished') {
+        girlAnim.state = 'running';
+        girlAnim.actionTick = 0;
         renderer.clearSideObstacleVisuals('girl');
       }
       if (gs.phase !== phaseBefore) {

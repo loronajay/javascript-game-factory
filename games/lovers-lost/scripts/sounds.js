@@ -21,7 +21,7 @@ const MUSIC_FILES = ['bg-music-menu', 'bg-music-game'];
 
 function createSounds() {
   if (typeof Audio === 'undefined') {
-    return { play() {}, stop() {}, stopAll() {}, playMusic() {}, stopMusic() {} };
+    return { play() {}, stop() {}, stopAll() {}, playMusic() {}, stopMusic() {}, retryPendingMusic() {} };
   }
 
   const buffers = {};
