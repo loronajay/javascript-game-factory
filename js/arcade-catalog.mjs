@@ -2,7 +2,7 @@ export const ARCADE_GAME_SLUGS = Object.freeze([
   "lovers-lost",
 ]);
 
-export const GRID_PAGE_SIZE = 6;
+export const GRID_PAGE_SIZE = 9;
 
 function titleFromSlug(slug) {
   return String(slug || "")
@@ -25,6 +25,7 @@ export function normalizeGameEntry(slug, config = {}) {
     theme: config.theme || "ember",
     accentColor: config.accentColor || "#ffb84d",
     href: `games/${slug}/index.html`,
+    previewImage: config.previewImage || `grid-previews/${slug}.png`,
     cardClasses: Array.isArray(config.card_classes) ? [...config.card_classes] : [],
   };
 }
@@ -53,6 +54,32 @@ export function paginateArcadeGames(games, pageSize = GRID_PAGE_SIZE) {
   }
 
   return pages;
+}
+
+export function fillArcadePageSlots(games, pageSize = GRID_PAGE_SIZE) {
+  const size = Math.max(1, pageSize | 0);
+  const slots = games.slice(0, size);
+
+  while (slots.length < size) {
+    const slotNumber = slots.length + 1;
+    slots.push({
+      slug: `coming-soon-${slotNumber}`,
+      title: "Coming Soon",
+      tagline: "Another cabinet is warming up behind the neon glass.",
+      description: "",
+      players: "Soon",
+      status: "Coming Soon",
+      order: 9000 + slotNumber,
+      featured: false,
+      theme: "placeholder",
+      accentColor: "#8cf6d4",
+      href: "#",
+      cardClasses: ["game-card--placeholder"],
+      isPlaceholder: true,
+    });
+  }
+
+  return slots;
 }
 
 export async function loadArcadeCatalog(fetcher = fetch, slugs = ARCADE_GAME_SLUGS) {

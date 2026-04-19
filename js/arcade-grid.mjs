@@ -1,6 +1,9 @@
-import { GRID_PAGE_SIZE, loadArcadeCatalog, paginateArcadeGames } from "./arcade-catalog.mjs";
-
-// --- Thumbnail generation ---
+import {
+  GRID_PAGE_SIZE,
+  fillArcadePageSlots,
+  loadArcadeCatalog,
+  paginateArcadeGames,
+} from "./arcade-catalog.mjs";
 
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -10,66 +13,122 @@ function hexToRgba(hex, alpha) {
 }
 
 function generateThumb(game) {
-  const W = 192, H = 108;
-  const c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-  const ctx = c.getContext("2d");
+  const W = 192;
+  const H = 108;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+
+  const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
-  const accent = game.accentColor || "#ffb84d";
-
-  // Base
-  ctx.fillStyle = "#07050f";
+  ctx.fillStyle = "#050507";
   ctx.fillRect(0, 0, W, H);
 
-  // Accent radial glow
-  const glow = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2);
-  glow.addColorStop(0, hexToRgba(accent, 0.18));
-  glow.addColorStop(1, "transparent");
-  ctx.fillStyle = glow;
+  const accent = game.accentColor || "#ff6b35";
+
+  if (game.isPlaceholder) {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "rgba(2, 18, 10, 0.96)");
+    sky.addColorStop(0.45, "rgba(4, 38, 18, 0.92)");
+    sky.addColorStop(1, "rgba(0, 0, 0, 0.98)");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    const sunGlow = ctx.createRadialGradient(W / 2, 44, 4, W / 2, 44, 32);
+    sunGlow.addColorStop(0, "rgba(144, 255, 196, 0.92)");
+    sunGlow.addColorStop(0.45, "rgba(24, 255, 140, 0.22)");
+    sunGlow.addColorStop(1, "transparent");
+    ctx.fillStyle = sunGlow;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = "rgba(0, 8, 3, 0.96)";
+    ctx.fillRect(0, 64, W, 10);
+
+    ctx.strokeStyle = "rgba(24, 255, 140, 0.5)";
+    ctx.lineWidth = 1;
+    const gridTop = 70;
+    for (let x = -W; x < W * 2; x += 16) {
+      ctx.beginPath();
+      ctx.moveTo(x, H);
+      ctx.lineTo(W / 2 + (x - W / 2) * 0.28, gridTop);
+      ctx.stroke();
+    }
+    for (let y = gridTop; y < H; y += 8) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "rgba(120, 255, 182, 0.08)";
+    for (let y = 0; y < H; y += 3) {
+      ctx.fillRect(0, y, W, 1);
+    }
+
+    ctx.fillStyle = "#b6ffd4";
+    ctx.font = "bold 34px Consolas, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("?", W / 2, 48);
+
+    return canvas;
+  }
+
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "rgba(38, 38, 38, 0.42)");
+  sky.addColorStop(0.48, hexToRgba(accent, 0.14));
+  sky.addColorStop(1, "rgba(0, 0, 0, 0.9)");
+  ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
-  // Scanlines
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
   for (let y = 0; y < H; y += 3) {
     ctx.fillRect(0, y, W, 1);
   }
 
-  // Ground line
-  const groundY = 80;
-  ctx.strokeStyle = hexToRgba(accent, 0.45);
+  const sunGlow = ctx.createRadialGradient(W / 2, 44, 8, W / 2, 44, 42);
+  sunGlow.addColorStop(0, "rgba(255, 221, 189, 0.95)");
+  sunGlow.addColorStop(0.45, hexToRgba(accent, 0.58));
+  sunGlow.addColorStop(1, "transparent");
+  ctx.fillStyle = sunGlow;
+  ctx.fillRect(0, 0, W, H);
+
+  const skylineY = 62;
+  ctx.fillStyle = "rgba(14, 14, 28, 0.96)";
+  ctx.fillRect(0, skylineY, W, 8);
+
+  const towers = [
+    [18, 50, 8, 12],
+    [32, 42, 10, 20],
+    [47, 46, 7, 16],
+    [64, 38, 11, 24],
+    [82, 49, 8, 13],
+    [106, 40, 12, 22],
+    [128, 52, 9, 10],
+    [144, 44, 8, 18],
+    [162, 36, 12, 26],
+  ];
+  towers.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
+
+  const gridTop = 72;
+  ctx.strokeStyle = hexToRgba(accent, 0.84);
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, groundY);
-  ctx.lineTo(W, groundY);
-  ctx.stroke();
 
-  // Center divider (dashed)
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
-  ctx.setLineDash([2, 3]);
-  ctx.beginPath();
-  ctx.moveTo(W / 2, 0);
-  ctx.lineTo(W / 2, H);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  for (let x = -W; x < W * 2; x += 18) {
+    ctx.beginPath();
+    ctx.moveTo(x, H);
+    ctx.lineTo(W / 2 + (x - W / 2) * 0.28, gridTop);
+    ctx.stroke();
+  }
 
-  // Boy silhouette (cyan) — left side
-  const bx = 58, by = groundY - 20;
-  ctx.fillStyle = "#8cf6d4";
-  ctx.fillRect(bx + 1, by - 6, 6, 6);   // head
-  ctx.fillRect(bx, by, 8, 12);            // body
-  ctx.fillRect(bx + 8, by + 3, 4, 2);    // arm
+  for (let y = gridTop; y < H; y += 10) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
 
-  // Girl silhouette (pink) — right side (mirrored)
-  const gx = W - 58 - 8, gy = groundY - 20;
-  ctx.fillStyle = "#ff80ab";
-  ctx.fillRect(gx + 1, gy - 6, 6, 6);
-  ctx.fillRect(gx, gy, 8, 12);
-  ctx.fillRect(gx - 4, gy + 3, 4, 2);
-
-  // Pixel heart between them
-  const hx = W / 2 - 5, hy = groundY - 30;
   const heart = [
     [0, 1, 0, 1, 0],
     [1, 1, 1, 1, 1],
@@ -77,24 +136,41 @@ function generateThumb(game) {
     [0, 1, 1, 1, 0],
     [0, 0, 1, 0, 0],
   ];
-  ctx.fillStyle = hexToRgba(accent, 0.9);
+
+  ctx.fillStyle = hexToRgba(accent, 0.96);
   heart.forEach((row, r) => {
-    row.forEach((px, col) => {
-      if (px) ctx.fillRect(hx + col * 2, hy + r * 2, 2, 2);
+    row.forEach((pixel, col) => {
+      if (pixel) {
+        ctx.fillRect(W / 2 - 5 + col * 2, 56 + r * 2, 2, 2);
+      }
     });
   });
 
-  // Cabinet label
-  ctx.fillStyle = hexToRgba(accent, 0.7);
-  ctx.font = "7px Consolas, monospace";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText(`CAB ${String(game.order).padStart(2, "0")}`, 6, 6);
-
-  return c;
+  return canvas;
 }
 
-// --- SFX ---
+function createThumbNode(game) {
+  if (game.isPlaceholder) {
+    return generateThumb(game);
+  }
+
+  if (game.previewImage) {
+    const img = document.createElement("img");
+    img.src = game.previewImage;
+    img.alt = `${game.title} preview`;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.addEventListener("error", () => {
+      if (!img.dataset.fallbackApplied) {
+        img.dataset.fallbackApplied = "true";
+        img.replaceWith(generateThumb(game));
+      }
+    }, { once: true });
+    return img;
+  }
+
+  return generateThumb(game);
+}
 
 let sfx = null;
 
@@ -142,46 +218,53 @@ const emptyState = document.getElementById("emptyState");
 const pageIndicator = document.getElementById("pageIndicator");
 const prevPageButton = document.getElementById("prevPage");
 const nextPageButton = document.getElementById("nextPage");
-const floorCount = document.getElementById("floorCount");
+const pagerRow = document.querySelector(".grid-stage__pager");
 
 let pages = [];
 let currentPage = 0;
 let selectedIndex = 0;
+let showGamepadSelection = false;
 
 function createCard(game) {
-  const card = document.createElement("a");
-  const cardClasses = ["game-card", ...game.cardClasses];
-  card.className = cardClasses.join(" ");
-  card.href = game.href;
+  const card = document.createElement(game.isPlaceholder ? "article" : "a");
+  card.className = ["game-card", ...game.cardClasses].join(" ");
+
+  if (game.isPlaceholder) {
+    card.setAttribute("aria-disabled", "true");
+  } else {
+    card.href = game.href;
+  }
+
   card.innerHTML = `
-    <div class="game-thumb"></div>
-    <div class="game-card-content">
-      <div class="game-card-topline">
-        <span class="game-kicker">Cabinet ${String(game.order).padStart(2, "0")}</span>
-        <span class="game-players">${game.players}</span>
+    <div class="game-card-preview">
+      <div class="game-thumb"></div>
+      <div class="game-card-copy${game.isPlaceholder ? " game-card-copy--placeholder" : ""}">
+        <h2 class="game-title">${game.isPlaceholder ? "COMING SOON" : game.title}</h2>
       </div>
-      <h2 class="game-title">${game.title}</h2>
-      <div class="game-card-footer">
-        <span>Launch</span>
-        <span class="game-chevron">&#x276F;</span>
-      </div>
-    </div>
-    <div class="game-desc-overlay">
-      <p class="game-tagline">${game.tagline}</p>
     </div>
   `;
 
-  card.querySelector(".game-thumb").appendChild(generateThumb(game));
+  card.querySelector(".game-thumb").appendChild(createThumbNode(game));
 
-  card.addEventListener("click", (e) => {
-    e.preventDefault();
-    getSFX()?.select();
-    card.style.transition = "transform 280ms ease-in";
-    card.style.transform = "scale(1.08)";
-    setTimeout(() => {
-      window.location.href = card.href;
-    }, 260);
-  });
+  if (!game.isPlaceholder) {
+    card.addEventListener("click", (event) => {
+      event.preventDefault();
+      getSFX()?.select();
+      card.style.transition = "transform 280ms ease-in";
+      card.style.transform = "scale(1.05)";
+      setTimeout(() => {
+        window.location.href = card.href;
+      }, 220);
+    });
+
+    card.addEventListener("mouseenter", () => {
+      const index = visibleCards().indexOf(card);
+      if (index !== -1) {
+        setSelectedIndex(index);
+        getSFX()?.hover();
+      }
+    });
+  }
 
   return card;
 }
@@ -195,9 +278,8 @@ function setSelectedIndex(index) {
   if (!cards.length) return;
 
   selectedIndex = ((index % cards.length) + cards.length) % cards.length;
-
   cards.forEach((card, cardIndex) => {
-    card.classList.toggle("gamepad-selected", cardIndex === selectedIndex);
+    card.classList.toggle("gamepad-selected", showGamepadSelection && cardIndex === selectedIndex);
   });
 }
 
@@ -206,6 +288,10 @@ function syncPager() {
   pageIndicator.textContent = `${currentPage + 1} / ${totalPages}`;
   prevPageButton.hidden = currentPage === 0;
   nextPageButton.hidden = currentPage >= totalPages - 1;
+
+  if (pagerRow) {
+    pagerRow.hidden = totalPages <= 1;
+  }
 }
 
 function showPage(index, nextSelectedIndex = 0) {
@@ -221,37 +307,29 @@ function showPage(index, nextSelectedIndex = 0) {
 
 function buildPages(games) {
   const chunks = paginateArcadeGames(games, GRID_PAGE_SIZE);
+  const sourcePages = chunks.length > 0 ? chunks : [[]];
+
   pages = [];
   track.innerHTML = "";
 
-  chunks.forEach((chunk) => {
+  sourcePages.forEach((chunk) => {
     const page = document.createElement("section");
     page.className = "grid-page";
+
     const grid = document.createElement("div");
     grid.className = "game-grid";
 
-    chunk.forEach((game) => {
-      const card = createCard(game);
-      card.addEventListener("mouseenter", () => {
-        const index = visibleCards().indexOf(card);
-        if (index !== -1) {
-          setSelectedIndex(index);
-          getSFX()?.hover();
-        }
-      });
-      grid.appendChild(card);
+    fillArcadePageSlots(chunk, GRID_PAGE_SIZE).forEach((game) => {
+      grid.appendChild(createCard(game));
     });
 
     page.appendChild(grid);
     track.appendChild(page);
-    pages.push(Array.from(grid.querySelectorAll(".game-card")));
+    pages.push(Array.from(grid.querySelectorAll(".game-card:not(.game-card--placeholder)")));
   });
 
-  emptyState.hidden = games.length > 0;
-  track.hidden = games.length === 0;
-  if (floorCount) {
-    floorCount.textContent = `${games.length} Cabinet${games.length !== 1 ? "s" : ""}`;
-  }
+  emptyState.hidden = true;
+  track.hidden = false;
 }
 
 function moveSelection(delta) {
@@ -288,6 +366,9 @@ nextPageButton.addEventListener("click", () => {
 });
 
 window.ArcadeInput?.onAction((action) => {
+  showGamepadSelection = true;
+  setSelectedIndex(selectedIndex);
+
   if (action === "left" || action === "up") {
     moveSelection(-1);
   }

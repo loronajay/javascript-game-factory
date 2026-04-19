@@ -3,43 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Javascript Game Factory | Game Floor</title>
+  <title>Jay's Javascript Arcade | Arcade Grid</title>
   <link rel="stylesheet" href="css/arcade.css">
-  <link rel="stylesheet" href="css/grid.css">
 </head>
-<body>
+<body class="grid-page-shell">
   <div class="scanlines"></div>
   <div class="crt-overlay"></div>
 
   <main class="arcade-shell">
-    <div class="page-topbar">
-      <a class="back-link" href="index.html">&#x276E; Back To Factory</a>
-      <div class="page-indicator" id="pageIndicator">1 / 1</div>
-    </div>
-
-    <section class="page-header">
-      <p class="eyebrow">Factory Floor</p>
-      <h1>Game Floor</h1>
-    </section>
-
-    <div class="floor-bar">
-      <span class="floor-bar-label">Now Playing</span>
-      <span class="floor-bar-count" id="floorCount"></span>
-    </div>
-
-    <div class="grid-frame">
-      <div id="emptyState" class="empty-state" hidden>
-        No cabinets are registered yet.
+    <section class="grid-stage">
+      <div class="grid-stage__stars" aria-hidden="true"></div>
+      <div class="grid-stage__scene" aria-hidden="true">
+        <div class="grid-stage__sun"></div>
+        <div class="grid-stage__skyline"></div>
+        <div class="grid-stage__floor"></div>
       </div>
-      <div id="gridTrack"></div>
-    </div>
 
-    <div class="pager-row">
-      <button id="prevPage" class="pager-button" type="button" hidden>&#x276E; Prev</button>
-      <button id="nextPage" class="pager-button" type="button" hidden>Next &#x276F;</button>
-    </div>
+      <div class="grid-stage__header">
+        <a class="grid-stage__back" href="index.html">&#x276E; Back</a>
+        <h1 class="pixel-text pixel-text--title grid-stage__title">GAME GRID</h1>
+        <p class="grid-stage__subtitle">Click any game to jump right in.</p>
+      </div>
+
+      <div class="grid-board">
+        <div id="emptyState" class="empty-state" hidden>
+          No cabinets are registered yet.
+        </div>
+        <div id="gridTrack"></div>
+      </div>
+
+      <div class="grid-stage__pager pager-row">
+        <button id="prevPage" class="pager-button" type="button" hidden>&#x276E; Prev</button>
+        <div class="page-indicator" id="pageIndicator">1 / 1</div>
+        <button id="nextPage" class="pager-button" type="button" hidden>Next &#x276F;</button>
+      </div>
+    </section>
   </main>
 
+  <script src="js/pixel-text.js"></script>
   <script src="js/arcade-input.js"></script>
   <script type="module" src="js/arcade-grid.mjs"></script>
 </body>
