@@ -1,4 +1,4 @@
-const links = Array.from(document.querySelectorAll(".mode-link"));
+const links = Array.from(document.querySelectorAll(".mode-link, .hero-cta"));
 let selectedIndex = 0;
 
 function setSelectedIndex(index) {

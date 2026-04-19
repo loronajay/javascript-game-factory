@@ -7,3 +7,10 @@ Thumbs.db
 AGENTS.md
 CLAUDE.md
 SKILLS.md
+
+# Local test/dev harnesses should not ship
+*.test.js
+*.test.mjs
+__tests__/
+tests/
+dev/
