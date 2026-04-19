@@ -932,6 +932,8 @@ function initGame() {
   }
 
   function returnToMenu() {
+    sounds.stop('run-success');
+    sounds.stop('run-failed');
     gs = { ...createGameState(gs.mode, Date.now() >>> 0, { debugObstacleType }), phase: 'menu' };
     boyAnim  = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };

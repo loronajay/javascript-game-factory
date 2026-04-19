@@ -54,9 +54,9 @@ The game has two logically independent sides that share a clock:
 ## Browser shell
 
 - `index.html` is the shipped entry point and wraps the canvas in the Factory cabinet shell with a back link to `../../grid.html`.
-- `renderer.js` owns canvas sizing and currently renders at **960Ã—540**.
-- `game.js` now boots the full browser path: menu, play, reunion/game over hold, then score screen.
-- `sounds.js` is wired into the browser loop for action / hit / run outcome SFX.
+- `renderer.js` owns canvas sizing and currently renders at **960×540**.
+- `game.js` now boots the full browser path: menu → play → reunion/game over hold → score screen → menu.
+- `sounds.js` is wired into the browser loop for action / hit / run outcome SFX, plus looping background music.
 - The browser build currently supports debug startup params:
   - `?debug=1`
   - `?debugObstacle=spikes|birds|arrows|goblins`
@@ -86,9 +86,12 @@ Collision tuning rule: the gameplay decision must match the debug hitboxes shown
 ## State machine
 
 ```
-menu → mode select → playing → reunion → score screen → menu
-                              ↘ game over → score screen → menu
+menu → playing → reunion → score screen → menu
+              ↘ game over → score screen → menu
 ```
+
+- `menu` phase: title screen with clickable "Local Multiplayer" button (hover highlight active). No keyboard shortcut — button click only.
+- `score_screen` phase: any action key returns to `menu` (not directly to `playing`).
 
 ## Obstacle types (4)
 
@@ -174,6 +177,21 @@ Latest local verification:
 - `obstacles.js` currently has 37 passing tests (two-phase goblin removed)
 - `game.js` currently has 107 passing tests
 
+## Music
+
+`sounds.js` exposes three music methods alongside the SFX API:
+
+- `sounds.playMusic(name)` — starts a looping track; idempotent (won't restart if already playing). Stores the name as `pendingMusicName` if the browser rejects autoplay.
+- `sounds.stopMusic()` — pauses and resets the current track; clears pending.
+- `sounds.retryPendingMusic()` — call inside any user-interaction handler to unblock a track rejected by the browser's autoplay policy. Called in the `keydown` and `canvas click` handlers in `game.js`.
+
+| Phase | Music |
+|-------|-------|
+| `menu` | `sounds/bg-music-menu.wav` (loops) |
+| `playing` | `sounds/bg-music-game.wav` (loops) |
+| `reunion` / `gameover` | silence — `stopMusic()` called; outcome SFX plays instead |
+| `score_screen` | silence (inherited) |
+
 ## HUD
 
 - Score, speed (`spd X.X`), and chain (`chain ×N`) shown per side — top corners
@@ -231,7 +249,8 @@ Removed. Goblins are single-phase (attack only). Do not re-introduce.
 
 Current contract additions:
 - The live image contract also includes `goblinIdle`, `goblinAttack`, `goblinTakeHit`, `goblinDeath`, and `arrows`.
-- `renderer.renderMenu(debugState)`, `renderer.renderGameOver(boyPlayer, girlPlayer, runSummary)`, and `renderer.renderScore(boyPlayer, girlPlayer, runSummary)` are part of the live contract.
+- `renderer.renderMenu(debugState, btnHovered)` — `btnHovered` drives the gold glow highlight on the "Local Multiplayer" button.
+- `renderer.renderGameOver(boyPlayer, girlPlayer, runSummary)` and `renderer.renderScore(boyPlayer, girlPlayer, runSummary)` are part of the live contract.
 - `getDebugOverlayGeometry(...)` is the shared source for debug collision overlay placement and game-side collision assertions.
 
 - Canvas: 960×540 (16:9). Set by `createRenderer` — do not set in HTML.
