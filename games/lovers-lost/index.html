@@ -4,20 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lovers Lost | Javascript Game Factory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="game-shell">
-    <div class="game-topbar">
-      <a class="back-link" href="../../grid.html">Back To Factory</a>
-      <div class="game-marquee">
-        <p class="game-kicker">Cabinet 01</p>
-        <h1>Lovers Lost</h1>
-        <p class="game-subtitle">WASD controls the left runner. Arrow keys control the right runner.</p>
-      </div>
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas"></canvas>
     </div>
-
-    <canvas id="gameCanvas"></canvas>
   </main>
   <script type="module">
     import { initGame } from './game.js';

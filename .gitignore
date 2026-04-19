@@ -2,3 +2,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# Agent-facing local workflow docs
+AGENTS.md
+CLAUDE.md
+SKILLS.md
