@@ -19,11 +19,67 @@
         <div class="grid-stage__floor"></div>
       </div>
 
-      <div class="grid-stage__header">
+      <div class="grid-stage__controls">
         <a class="grid-stage__back" href="index.html">&#x276E; Back</a>
+        <button
+          id="playerProfileButton"
+          class="profile-chip"
+          type="button"
+          aria-controls="playerProfilePanel"
+          aria-expanded="false"
+        >
+          <span class="profile-chip__kicker">Factory Pilot</span>
+          <span id="playerProfileSummary" class="profile-chip__name">UNNAMED PILOT</span>
+        </button>
+      </div>
+
+      <div class="grid-stage__header">
         <h1 class="pixel-text pixel-text--title grid-stage__title">GAME GRID</h1>
         <p class="grid-stage__subtitle">Click any game to jump right in.</p>
       </div>
+
+      <aside id="playerProfilePanel" class="player-card" hidden>
+        <div class="player-card__topline">
+          <p class="player-card__brand">Javascript Game Factory</p>
+          <button id="playerProfileClose" class="player-card__close" type="button">Close</button>
+        </div>
+        <h2 class="pixel-text player-card__title">PLAYER CARD</h2>
+        <p id="playerProfileStatus" class="player-card__status">SET YOUR DEFAULT ARCADE NAME</p>
+
+        <div class="player-card__meta">
+          <div class="player-card__meta-block">
+            <span class="player-card__meta-label">Factory ID</span>
+            <span id="playerProfileId" class="player-card__meta-value">PENDING-ID</span>
+          </div>
+          <div class="player-card__meta-block">
+            <span class="player-card__meta-label">Arcade Default</span>
+            <span id="playerProfileDefault" class="player-card__meta-value">UNNAMED PILOT</span>
+          </div>
+        </div>
+
+        <form id="playerProfileForm" class="player-card__form">
+          <label class="player-card__field" for="playerProfileName">Arcade Name</label>
+          <input
+            id="playerProfileName"
+            class="player-card__input"
+            name="profileName"
+            type="text"
+            maxlength="12"
+            autocomplete="nickname"
+            spellcheck="false"
+          >
+          <p id="playerProfileHint" class="player-card__hint">
+            This becomes your default online identity across the arcade. Games can still use temporary match aliases.
+          </p>
+          <div class="player-card__actions">
+            <button class="player-card__action player-card__action--primary" type="submit">
+              <span id="playerProfileSaveLabel">STORE CARD</span>
+            </button>
+            <button id="playerProfileClear" class="player-card__action" type="button">CLEAR NAME</button>
+          </div>
+          <p id="playerProfileFlash" class="player-card__flash" aria-live="polite"></p>
+        </form>
+      </aside>
 
       <div class="grid-board">
         <div id="emptyState" class="empty-state" hidden>

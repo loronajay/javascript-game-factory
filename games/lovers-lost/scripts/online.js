@@ -181,6 +181,7 @@ export function createOnlineClient() {
     onRemoteAction:    null,  // ({ action, phase })
     onRemoteSnapshot:  null,  // (snapshot)
     onRemoteProfile:   null,  // ({ displayName, side })
+    onRemoteEmote:     null,  // (type: string)
     onSideConflict:    null,  // () — both players picked same side
     onPartnerLeft:     null,  // () — partner disconnected during a run
     onError:           null,  // (code: string, message: string)
@@ -225,6 +226,11 @@ export function createOnlineClient() {
     if (messageType === 'profile') {
       const profile = parseProfileMessage(value);
       if (profile) cb.onRemoteProfile?.(profile);
+      return;
+    }
+
+    if (messageType === 'emote') {
+      if (typeof value === 'string' && value.length > 0) cb.onRemoteEmote?.(value);
     }
   }
 
@@ -386,6 +392,10 @@ export function createOnlineClient() {
     _roomMsg('snapshot', serializeSnapshotMessage(snapshot));
   }
 
+  function sendEmote(type) {
+    _roomMsg('emote', type);
+  }
+
   function disconnect() {
     _inRoom = false; _roomCode = null;
     ws?.close();
@@ -397,7 +407,7 @@ export function createOnlineClient() {
     _inRoom = false; _coordinator = false;
   }
 
-  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, setIdentity, disconnect, reset, cb };
+  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, sendEmote, setIdentity, disconnect, reset, cb };
 }
 
 export {

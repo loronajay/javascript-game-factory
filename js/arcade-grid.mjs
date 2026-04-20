@@ -4,6 +4,7 @@ import {
   loadArcadeCatalog,
   paginateArcadeGames,
 } from "./arcade-catalog.mjs";
+import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -383,6 +384,7 @@ window.ArcadeInput?.onAction((action) => {
 });
 
 const catalog = await loadArcadeCatalog();
+initArcadeProfilePanel();
 buildPages(catalog);
 
 if (pages.length > 0) {
