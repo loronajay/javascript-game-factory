@@ -1429,7 +1429,8 @@ function initGame() {
   // ── Main loop ─────────────────────────────────────────────────────────────
   function loop(timestamp) {
     // Fixed timestep: accumulate real time and tick game logic at 60 hz
-    if (loopLastTime === null) loopLastTime = timestamp;
+    if (loopLastTime === null) loopLastTime = timestamp ?? performance.now();
+    if (timestamp == null) { requestAnimationFrame(loop); return; }
     const frameTime = Math.min(timestamp - loopLastTime, 100); // cap to avoid spiral of death
     loopLastTime = timestamp;
     loopAccumulator += frameTime;
