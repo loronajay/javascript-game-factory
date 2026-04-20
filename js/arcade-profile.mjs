@@ -3,7 +3,8 @@ import {
   loadFactoryProfile,
   normalizeFactoryProfile,
   saveFactoryProfile,
-} from "./factory-profile.mjs";
+} from "./platform/identity/factory-profile.mjs";
+import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 
 export function formatArcadePlayerId(playerId) {
   const id = typeof playerId === "string" ? playerId.trim().toUpperCase() : "";
@@ -41,7 +42,7 @@ export function saveArcadeProfileName(storage, profileName, options = {}) {
 
 export function initArcadeProfilePanel({
   doc = globalThis.document,
-  storage = globalThis.window?.localStorage ?? null,
+  storage = getDefaultPlatformStorage(),
   options = {},
 } = {}) {
   const button = doc?.getElementById?.("playerProfileButton");

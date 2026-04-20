@@ -16,8 +16,14 @@ import { createRenderer, getDebugOverlayGeometry } from './scripts/renderer.js';
 import { createInput, keyToAction } from './scripts/input.js';
 import { createSounds } from './scripts/sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './scripts/online.js';
-import { loadFactoryProfile, sanitizeFactoryProfileName } from '../../js/factory-profile.mjs';
-import { createMatchIdentity, createOnlineIdentityPayload } from '../../js/match-identity.mjs';
+import { loadFactoryProfile, sanitizeFactoryProfileName } from '../../js/platform/identity/factory-profile.mjs';
+import { createMatchIdentity, createOnlineIdentityPayload } from '../../js/platform/identity/match-identity.mjs';
+import {
+  getDefaultPlatformStorage,
+  getPlatformStorageKey,
+  readStorageText,
+  removeStorageText,
+} from '../../js/platform/storage/storage.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const HARD_CUTOFF_FRAMES = 90 * 60;  // 5400 frames
@@ -68,7 +74,7 @@ const DEBUG_OBSTACLE_LABELS = {
   goblin: 'goblins',
 };
 const ONLINE_NAME_MAX_LEN = 12;
-const LEGACY_ONLINE_NAME_STORAGE_KEY = 'lovers-lost.onlineIdentity.displayName';
+const LEGACY_ONLINE_NAME_STORAGE_KEY = getPlatformStorageKey('loversLostLegacyOnlineName');
 
 const EMOTE_BINDINGS = {
   jump:   'heart',
@@ -1111,19 +1117,13 @@ function initGame() {
   let onlineQueueCounts = null;
   let onlineSnapshotSeq = 0;
   const remoteLaneSeq = { boy: -1, girl: -1 };
-  const storage = window && typeof window.localStorage === 'object' ? window.localStorage : null;
+  const storage = getDefaultPlatformStorage(window);
   const legacyDisplayName = (() => {
-    try {
-      return sanitizeOnlineDisplayName(storage?.getItem?.(LEGACY_ONLINE_NAME_STORAGE_KEY) || '');
-    } catch {
-      return '';
-    }
+    return sanitizeOnlineDisplayName(readStorageText(storage, LEGACY_ONLINE_NAME_STORAGE_KEY) || '');
   })();
   const factoryProfile = loadFactoryProfile(storage, { seedProfileName: legacyDisplayName });
   if (legacyDisplayName) {
-    try {
-      storage?.removeItem?.(LEGACY_ONLINE_NAME_STORAGE_KEY);
-    } catch {}
+    removeStorageText(storage, LEGACY_ONLINE_NAME_STORAGE_KEY);
   }
 
   onlineClient.cb.onConnected       = () => { onlineClient.requestQueueStatus('lovers-lost'); };

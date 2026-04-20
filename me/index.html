@@ -3,27 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jay's Javascript Arcade | Arcade Grid</title>
-  <link rel="stylesheet" href="css/arcade.css">
+  <title>Jay's Javascript Arcade | Player Page</title>
+  <link rel="stylesheet" href="../css/arcade.css">
 </head>
-<body class="grid-page-shell">
+<body class="me-page-shell">
   <div class="scanlines"></div>
   <div class="crt-overlay"></div>
 
   <main class="arcade-shell">
-    <section class="grid-stage">
-      <div class="grid-stage__stars" aria-hidden="true"></div>
-      <div class="grid-stage__scene" aria-hidden="true">
-        <div class="grid-stage__sun"></div>
-        <div class="grid-stage__skyline"></div>
-        <div class="grid-stage__floor"></div>
+    <section class="me-stage">
+      <div class="me-stage__stars" aria-hidden="true"></div>
+      <div class="me-stage__scene" aria-hidden="true">
+        <div class="me-stage__sun"></div>
+        <div class="me-stage__skyline"></div>
+        <div class="me-stage__floor"></div>
       </div>
 
-      <div class="grid-stage__controls">
-        <div class="grid-stage__nav">
-          <a class="grid-stage__back" href="index.html">&#x276E; Back</a>
-          <a class="grid-stage__portal" href="me/index.html">Player Page</a>
-        </div>
+      <div class="me-stage__controls">
+        <a class="grid-stage__back" href="../grid.html">&#x276E; Arcade Grid</a>
         <button
           id="playerProfileButton"
           class="profile-chip"
@@ -36,9 +33,9 @@
         </button>
       </div>
 
-      <div class="grid-stage__header">
-        <h1 class="pixel-text pixel-text--title grid-stage__title">GAME GRID</h1>
-        <p class="grid-stage__subtitle">Click any game to jump right in.</p>
+      <div class="me-stage__header">
+        <h1 class="pixel-text pixel-text--title me-stage__title">PLAYER PAGE</h1>
+        <p class="me-stage__subtitle">Your corner of the arcade floor.</p>
       </div>
 
       <aside id="playerProfilePanel" class="player-card" hidden>
@@ -84,23 +81,17 @@
         </form>
       </aside>
 
-      <div class="grid-board">
-        <div id="emptyState" class="empty-state" hidden>
-          No cabinets are registered yet.
-        </div>
-        <div id="gridTrack"></div>
-      </div>
-
-      <div class="grid-stage__pager pager-row">
-        <button id="prevPage" class="pager-button" type="button" hidden>&#x276E; Prev</button>
-        <div class="page-indicator" id="pageIndicator">1 / 1</div>
-        <button id="nextPage" class="pager-button" type="button" hidden>Next &#x276F;</button>
+      <div class="me-layout">
+        <section id="meHeroCard" class="me-hero-card"></section>
+        <section id="meLinksPanel" class="me-panel"></section>
+        <section id="meFavoritesPanel" class="me-panel"></section>
+        <section id="meActivityPanel" class="me-panel"></section>
       </div>
     </section>
   </main>
 
-  <script src="js/pixel-text.js"></script>
-  <script src="js/arcade-input.js"></script>
-  <script type="module" src="js/arcade-grid.mjs"></script>
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/arcade-input.js"></script>
+  <script type="module" src="../js/arcade-me.mjs"></script>
 </body>
 </html>
