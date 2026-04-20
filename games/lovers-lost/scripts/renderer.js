@@ -818,12 +818,14 @@ function createRenderer(canvas, images, emoteImages = {}) {
 
     ctx.fillStyle = 'rgba(10,12,28,0.90)';
     ctx.fillRect(300, 228, 360, 56);
-    ctx.strokeStyle = errorText ? 'rgba(255,120,130,0.84)' : 'rgba(130,150,220,0.70)';
-    ctx.lineWidth = 2;
+    const _nameCursorOn = Math.floor(Date.now() / 530) % 2 === 0;
+    ctx.strokeStyle = errorText ? 'rgba(255,120,130,0.84)' : _nameCursorOn ? 'rgba(180,210,255,0.95)' : 'rgba(130,150,220,0.70)';
+    ctx.lineWidth = _nameCursorOn ? 2.5 : 2;
     ctx.strokeRect(300, 228, 360, 56);
     ctx.font = 'bold 28px monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(nameInput || '', CANVAS_W / 2, 266);
+    const _nameWithCursor = (nameInput || '') + (_nameCursorOn ? '|' : ' ');
+    ctx.fillText(_nameWithCursor, CANVAS_W / 2, 266);
 
     ctx.font = '13px monospace';
     ctx.fillStyle = errorText ? 'rgba(255,150,150,0.96)' : 'rgba(150,170,225,0.72)';
@@ -999,12 +1001,14 @@ function createRenderer(canvas, images, emoteImages = {}) {
     // Input box: x=320, y=170, w=320, h=52
     ctx.fillStyle = 'rgba(10,12,28,0.90)';
     ctx.fillRect(320, 232, 320, 52);
-    ctx.strokeStyle = 'rgba(130,150,220,0.70)';
-    ctx.lineWidth = 2;
+    const _codeCursorOn = Math.floor(Date.now() / 530) % 2 === 0;
+    ctx.strokeStyle = _codeCursorOn ? 'rgba(180,210,255,0.95)' : 'rgba(130,150,220,0.70)';
+    ctx.lineWidth = _codeCursorOn ? 2.5 : 2;
     ctx.strokeRect(320, 232, 320, 52);
     ctx.font = 'bold 28px monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(codeInput, CANVAS_W / 2, 232 + 52 / 2 + 10);
+    const _codeWithCursor = codeInput + (_codeCursorOn ? '|' : ' ');
+    ctx.fillText(_codeWithCursor, CANVAS_W / 2, 232 + 52 / 2 + 10);
     ctx.restore();
 
     // JOIN: btnW=200 btnX=380 y=244; CANCEL: btnW=160 btnX=400 y=320
