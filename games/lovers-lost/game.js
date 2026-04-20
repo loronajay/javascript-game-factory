@@ -15,7 +15,7 @@ import { evaluateRun } from './scripts/scoring.js';
 import { createRenderer, getDebugOverlayGeometry } from './scripts/renderer.js';
 import { createInput, keyToAction } from './scripts/input.js';
 import { createSounds } from './scripts/sounds.js';
-import { createOnlineClient } from './scripts/online.js';
+import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './scripts/online.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const HARD_CUTOFF_FRAMES = 90 * 60;  // 5400 frames
@@ -883,16 +883,29 @@ function initGame() {
   // ── Online client ─────────────────────────────────────────────────────────
   const onlineClient = createOnlineClient();
   let onlineRemoteSide = null;
+  let onlineCountdown = null;
 
   onlineClient.cb.onSearching       = () => { /* onlineLobbyPhase already shows searching UI */ };
   onlineClient.cb.onSearchCancelled = () => { onlineLobbyPhase = 'main'; };
   onlineClient.cb.onRoomCreated     = (code) => { onlineRoomCode = code; };
-  onlineClient.cb.onSideConflict    = () => { onlineLobbyPhase = 'main'; };
+  onlineClient.cb.onSideConflict    = () => {
+    onlineRoomCode = '';
+    onlineRemoteSide = null;
+    onlineCountdown = null;
+    onlineLobbyPhase = 'main';
+    gs = { ...gs, phase: 'online_lobby' };
+  };
   onlineClient.cb.onError           = (code, msg) => { console.warn('[online]', code, msg); };
 
-  onlineClient.cb.onMatchStart = (seed, remoteSide) => {
+  onlineClient.cb.onMatchReady = ({ seed, remoteSide, serverNow, startAt }) => {
     onlineRemoteSide = remoteSide;
-    startPlayingOnline(seed);
+    onlineCountdown = {
+      seed,
+      startAt,
+      clockOffsetMs: serverNow - Date.now(),
+    };
+    gs = { ...gs, phase: 'online_countdown' };
+    inp.tick();
   };
 
   onlineClient.cb.onRemoteAction = (message) => {
@@ -905,6 +918,14 @@ function initGame() {
   };
 
   onlineClient.cb.onPartnerLeft = () => {
+    if (gs.phase === 'online_countdown') {
+      onlineRemoteSide = null;
+      onlineCountdown = null;
+      onlineRoomCode = '';
+      onlineLobbyPhase = 'main';
+      gs = { ...gs, phase: 'online_lobby' };
+      return;
+    }
     if (gs.phase === 'playing') {
       const summary = { ...evaluateRun(gs.boy, gs.girl, gs.elapsed), disconnectNote: true };
       gs = { ...gs, phase: 'gameover', phaseFrames: 0, runSummary: summary };
@@ -931,6 +952,18 @@ function initGame() {
     }
     if (gs.phase === 'online_side_select') {
       if (e.key === 'Escape') { onlineClient.disconnect(); gs = { ...gs, phase: 'menu' }; }
+      return;
+    }
+    if (gs.phase === 'online_countdown') {
+      if (e.key === 'Escape') {
+        onlineClient.disconnect();
+        onlineClient.reset();
+        onlineRemoteSide = null;
+        onlineCountdown = null;
+        onlineRoomCode = '';
+        onlineLobbyPhase = 'main';
+        gs = { ...gs, phase: 'menu' };
+      }
       return;
     }
     if (gs.phase === 'online_lobby') {
@@ -1081,6 +1114,10 @@ function initGame() {
       }
       return;
     }
+
+    if (gs.phase === 'online_countdown') {
+      return;
+    }
   });
 
   // ── Game state ────────────────────────────────────────────────────────────
@@ -1107,6 +1144,7 @@ function initGame() {
   function startPlayingOnline(seed) {
     sounds.stop('run-success');
     sounds.stop('run-failed');
+    onlineCountdown = null;
     gs = { ...createGameState('online', seed, { debugObstacleType }), phase: 'playing' };
     boyAnim  = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
@@ -1116,7 +1154,13 @@ function initGame() {
   function returnToMenu() {
     sounds.stop('run-success');
     sounds.stop('run-failed');
-    if (gs.mode === 'online') { onlineClient.disconnect(); onlineClient.reset(); onlineRemoteSide = null; }
+    if (gs.mode === 'online' || gs.phase === 'online_countdown') {
+      onlineClient.disconnect();
+      onlineClient.reset();
+      onlineRemoteSide = null;
+      onlineCountdown = null;
+      onlineRoomCode = '';
+    }
     gs = { ...createGameState('single', Date.now() >>> 0, { debugObstacleType }), phase: 'menu' };
     boyAnim  = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
@@ -1270,6 +1314,10 @@ function initGame() {
       if (anyPressed) returnToMenu();
     }
 
+    if (gs.phase === 'online_countdown' && onlineCountdown && hasCountdownStarted(onlineCountdown.startAt, onlineCountdown.clockOffsetMs)) {
+      startPlayingOnline(onlineCountdown.seed);
+    }
+
     if (gs.phase === 'playing') {
       handleSideInput('boy');
       handleSideInput('girl');
@@ -1350,6 +1398,11 @@ function initGame() {
         join:       onlineJoinHov,
         joinSubmit: onlineJoinSubmitHov,
       });
+    } else if (gs.phase === 'online_countdown') {
+      const secondsRemaining = onlineCountdown
+        ? getCountdownSecondsRemaining(onlineCountdown.startAt, onlineCountdown.clockOffsetMs)
+        : 0;
+      renderer.renderOnlineCountdown(onlineSide, onlineRemoteSide, secondsRemaining);
     } else if (gs.phase === 'menu_help') {
       renderer.renderMenuHelp(debugState);
     } else if (gs.phase === 'playing') {

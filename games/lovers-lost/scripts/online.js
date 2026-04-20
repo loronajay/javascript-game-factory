@@ -11,6 +11,24 @@ function buildFindMatchPayload(side, gameId = 'lovers-lost') {
   return { type: 'find_match', gameId, side };
 }
 
+function buildCreateRoomPayload(side) {
+  return { type: 'create_room', side };
+}
+
+function buildJoinRoomPayload(side, code) {
+  return { type: 'join_room', roomCode: code.trim().toUpperCase(), side };
+}
+
+function getCountdownSecondsRemaining(startAt, clockOffsetMs, clientNow = Date.now()) {
+  const msRemaining = startAt - (clientNow + clockOffsetMs);
+  if (msRemaining <= 0) return 0;
+  return Math.ceil(msRemaining / 1000);
+}
+
+function hasCountdownStarted(startAt, clockOffsetMs, clientNow = Date.now()) {
+  return clientNow + clockOffsetMs >= startAt;
+}
+
 function parseActionMessage(value) {
   if (typeof value !== 'string' || value.length === 0) return null;
 
@@ -32,8 +50,7 @@ export function createOnlineClient() {
   let _mySide      = null;
   let _remoteSide  = null;
   let _roomCode    = null;
-  let _coordinator = false;  // true if we were the queue-waiter or room creator
-  let _pendingSeed = null;   // seed chosen by coordinator, sent in 'hello'
+  let _coordinator = false;  // true if we created the private room
   let _inRoom      = false;  // true once both players are confirmed in room
 
   // Callbacks — caller assigns these after createOnlineClient()
@@ -42,7 +59,7 @@ export function createOnlineClient() {
     onSearching:       null,  // () — entered public queue
     onSearchCancelled: null,  // () — cancelled before match
     onRoomCreated:     null,  // (code) — private room created, waiting for partner
-    onMatchStart:      null,  // (seed, remoteSide, startTime)
+    onMatchReady:      null,  // ({ seed, remoteSide, serverNow, startAt })
     onRemoteAction:    null,  // ({ action, phase })
     onSideConflict:    null,  // () — both players picked same side
     onPartnerLeft:     null,  // () — partner disconnected during a run
@@ -72,52 +89,8 @@ export function createOnlineClient() {
   //   coordinator  → match_start { seed, startTime }
   //   Both call onMatchStart and begin the run.
 
-  function _sendHello() {
-    _pendingSeed = (Math.random() * 0xFFFFFFFF) >>> 0;
-    _roomMsg('hello', { side: _mySide, seed: _pendingSeed });
-  }
-
   function _handleRoomMsg({ messageType, value }) {
-    if (messageType === 'hello') {
-      let payload;
-      try { payload = JSON.parse(value); } catch { return; }
-      _remoteSide = payload.side;
-
-      if (_remoteSide === _mySide) {
-        _roomMsg('side_conflict');
-        cb.onSideConflict?.();
-        return;
-      }
-      _roomMsg('hello_ack', { side: _mySide });
-      // Non-coordinator waits for match_start from coordinator.
-    }
-
-    else if (messageType === 'hello_ack') {
-      let payload;
-      try { payload = JSON.parse(value); } catch { return; }
-      _remoteSide = payload.side;
-
-      if (_remoteSide === _mySide) {
-        _roomMsg('side_conflict');
-        cb.onSideConflict?.();
-        return;
-      }
-      const startTime = Date.now();
-      _roomMsg('match_start', { seed: _pendingSeed, startTime });
-      cb.onMatchStart?.(_pendingSeed, _remoteSide, startTime);
-    }
-
-    else if (messageType === 'match_start') {
-      let payload;
-      try { payload = JSON.parse(value); } catch { return; }
-      cb.onMatchStart?.(payload.seed, _remoteSide, payload.startTime);
-    }
-
-    else if (messageType === 'side_conflict') {
-      cb.onSideConflict?.();
-    }
-
-    else if (messageType === 'action') {
+    if (messageType === 'action') {
       const actionMessage = parseActionMessage(value);
       if (actionMessage) cb.onRemoteAction?.(actionMessage);
     }
@@ -136,7 +109,7 @@ export function createOnlineClient() {
 
     // Entered public queue — we are now the coordinator (we were first in queue)
     if (ev === 'searching') {
-      _coordinator = true;
+      _coordinator = false;
       cb.onSearching?.();
       return;
     }
@@ -164,7 +137,18 @@ export function createOnlineClient() {
 
     if (ev === 'player_joined' && data.playerCount === 2) {
       _inRoom = true;
-      if (_coordinator) _sendHello();
+      return;
+    }
+
+    if (ev === 'match_ready') {
+      _inRoom = true;
+      _remoteSide = data.remoteSide || null;
+      cb.onMatchReady?.({
+        seed: data.seed,
+        remoteSide: _remoteSide,
+        serverNow: data.serverNow,
+        startAt: data.startAt,
+      });
       return;
     }
 
@@ -180,6 +164,10 @@ export function createOnlineClient() {
     }
 
     if (ev === 'error') {
+      if (data.code === 'SIDE_CONFLICT') {
+        cb.onSideConflict?.();
+        return;
+      }
       cb.onError?.(data.code, data.message);
       return;
     }
@@ -212,12 +200,12 @@ export function createOnlineClient() {
 
   function createRoom(side) {
     _mySide = side; _coordinator = true;
-    _send({ type: 'create_room' });
+    _send(buildCreateRoomPayload(side));
   }
 
   function joinRoom(side, code) {
     _mySide = side; _coordinator = false;
-    _send({ type: 'join_room', roomCode: code.trim().toUpperCase() });
+    _send(buildJoinRoomPayload(side, code));
   }
 
   function cancelSearch() {
@@ -227,7 +215,7 @@ export function createOnlineClient() {
 
   function cancelRoom() {
     _send({ type: 'leave_room' });
-    _roomCode = null; _inRoom = false; _coordinator = false; _pendingSeed = null;
+    _roomCode = null; _inRoom = false; _coordinator = false;
   }
 
   function sendAction(action, phase = 'press') {
@@ -242,10 +230,18 @@ export function createOnlineClient() {
 
   function reset() {
     _roomCode = null; _remoteSide = null;
-    _inRoom = false; _coordinator = false; _pendingSeed = null;
+    _inRoom = false; _coordinator = false;
   }
 
   return { connect, findMatch, createRoom, joinRoom, cancelSearch, cancelRoom, sendAction, disconnect, reset, cb };
 }
 
-export { buildFindMatchPayload, parseActionMessage, serializeActionMessage };
+export {
+  buildCreateRoomPayload,
+  buildFindMatchPayload,
+  buildJoinRoomPayload,
+  getCountdownSecondsRemaining,
+  hasCountdownStarted,
+  parseActionMessage,
+  serializeActionMessage,
+};

@@ -641,6 +641,46 @@ function createRenderer(canvas, images) {
     _onlineEscHint('ESC · BACK');
   }
 
+  function renderOnlineCountdown(side, remoteSide, secondsRemaining) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawSpaceBackground();
+
+    const img = side === 'boy' ? images.boy : images.girl;
+    const flipH = side === 'girl';
+    const anim = side === 'boy' ? menuBoyAnim : menuGirlAnim;
+    _tickAnim(anim);
+
+    _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 34px "Cinzel Decorative", serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.50)';
+    ctx.shadowBlur = 18;
+    ctx.fillText('MATCH FOUND', CANVAS_W / 2, 78);
+
+    ctx.shadowBlur = 0;
+    ctx.font = '16px "Cinzel Decorative", serif';
+    ctx.fillStyle = 'rgba(190,205,255,0.78)';
+    ctx.fillText(`YOU ARE ${side.toUpperCase()}`, CANVAS_W / 2, 214);
+    ctx.fillText(`PARTNER: ${(remoteSide || 'CONNECTING').toUpperCase()}`, CANVAS_W / 2, 240);
+
+    ctx.font = 'bold 104px monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.18)';
+    ctx.shadowBlur = 22;
+    ctx.fillText(secondsRemaining > 0 ? String(secondsRemaining) : 'GO', CANVAS_W / 2, 372);
+
+    ctx.shadowBlur = 0;
+    ctx.font = '15px "Cinzel Decorative", serif';
+    ctx.fillStyle = 'rgba(190,205,255,0.70)';
+    ctx.fillText('Get ready to run', CANVAS_W / 2, 420);
+    ctx.restore();
+
+    _onlineEscHint('ESC · CANCEL MATCH');
+  }
+
   function _renderLobbyMain(img, flipH, anim, side, hov) {
     // Character + "playing as" label
     _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
@@ -2083,6 +2123,7 @@ default:          return GROUND_TOP - 28;
     renderMenu,
     renderOnlineSideSelect,
     renderOnlineLobby,
+    renderOnlineCountdown,
     renderMenuHelp,
     renderGameOver,
     renderScore,
