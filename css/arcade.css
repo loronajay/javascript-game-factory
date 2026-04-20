@@ -11,6 +11,7 @@
   --select: #8cf6d4;
   --shadow: rgba(0, 0, 0, 0.44);
   --font-display: Consolas, "Lucida Console", "Courier New", monospace;
+  --profile-portrait-rail-width: clamp(156px, 18vw, 196px);
   --profile-avatar-frame-size: clamp(144px, 16vw, 164px);
   --profile-avatar-image-size: clamp(112px, 13vw, 132px);
   --profile-avatar-frame-padding: clamp(8px, 1vw, 10px);
@@ -1685,8 +1686,8 @@ body::before {
 .me-hero-card {
   grid-column: 1 / 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) var(--profile-portrait-rail-width);
+  gap: 16px;
   min-height: 360px;
   padding: 26px;
   align-items: start;
@@ -1697,6 +1698,7 @@ body::before {
   align-content: start;
   gap: 12px;
   min-width: 0;
+  padding-right: 6px;
 }
 
 .me-hero-card__kicker,
@@ -1713,25 +1715,31 @@ body::before {
 
 .me-hero-card__name {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  max-width: 100%;
+  font-size: clamp(1.8rem, 3.2vw, 3rem);
   line-height: 0.95;
   text-transform: uppercase;
   text-shadow: 0 4px 0 rgba(0, 0, 0, 0.34);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .me-hero-card__tagline {
   margin: 0;
+  max-width: 100%;
   color: #fff8ff;
   font-size: 0.96rem;
   line-height: 1.4;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .me-hero-card__bio {
   margin: 0;
-  max-width: 38rem;
+  max-width: 100%;
   color: rgba(255, 248, 255, 0.82);
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .me-hero-card__meta {
@@ -1759,8 +1767,10 @@ body::before {
 
 .me-hero-card__portrait {
   display: grid;
+  justify-self: end;
   justify-items: center;
   align-content: start;
+  width: var(--profile-portrait-rail-width);
   min-height: 0;
   padding: 4px 0 0;
 }
@@ -1769,7 +1779,7 @@ body::before {
   display: grid;
   justify-items: center;
   gap: 12px;
-  width: 100%;
+  width: min(100%, var(--profile-avatar-frame-size));
 }
 
 .me-hero-card__portrait-frame {
