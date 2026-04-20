@@ -902,6 +902,50 @@ function shouldHandleMappedKeyLocally(mode, onlineSide, mappedSide) {
   return mappedSide === onlineSide;
 }
 
+function getOnlineSideSelectRects() {
+  return {
+    boy: { x: 240, y: 130, w: 220, h: 240 },
+    girl: { x: 500, y: 130, w: 220, h: 240 },
+  };
+}
+
+function getOnlineLobbyButtonRects(lobbyPhase) {
+  if (lobbyPhase === 'main') {
+    return {
+      findMatch: { x: 320, y: 272, w: 320, h: 56 },
+      playFriend: { x: 320, y: 348, w: 320, h: 56 },
+    };
+  }
+
+  if (lobbyPhase === 'searching') {
+    return {
+      cancel: { x: 380, y: 350, w: 200, h: 44 },
+    };
+  }
+
+  if (lobbyPhase === 'friend_options') {
+    return {
+      create: { x: 340, y: 282, w: 280, h: 52 },
+      join: { x: 340, y: 354, w: 280, h: 52 },
+    };
+  }
+
+  if (lobbyPhase === 'create') {
+    return {
+      cancel: { x: 380, y: 390, w: 200, h: 44 },
+    };
+  }
+
+  if (lobbyPhase === 'join') {
+    return {
+      joinSubmit: { x: 380, y: 314, w: 200, h: 52 },
+      cancel: { x: 400, y: 390, w: 160, h: 40 },
+    };
+  }
+
+  return {};
+}
+
 export {
   createGameState,
   processAction,
@@ -923,6 +967,8 @@ export {
   advancePhaseState,
   nextActionForSide,
   shouldHandleMappedKeyLocally,
+  getOnlineSideSelectRects,
+  getOnlineLobbyButtonRects,
   buildLaneSnapshot,
   applyLaneSnapshot,
   JUMP_VY,
@@ -1096,6 +1142,10 @@ function initGame() {
     return cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh;
   }
 
+  function _inRect(cx, cy, rect) {
+    return !!rect && _inBtn(cx, cy, rect.x, rect.y, rect.w, rect.h);
+  }
+
   // ── Online UI state ───────────────────────────────────────────────────────
   let onlineSide        = 'boy';      // 'boy' | 'girl'
   let onlineLobbyPhase  = 'main';     // 'main' | 'searching' | 'friend_options' | 'create' | 'join'
@@ -1129,21 +1179,21 @@ function initGame() {
     }
 
     if (gs.phase === 'online_side_select') {
-      onlineSideBoyHov  = _inBtn(cx, cy, 240, 130, 220, 240);
-      onlineSideGirlHov = _inBtn(cx, cy, 500, 130, 220, 240);
+      const sideRects = getOnlineSideSelectRects();
+      onlineSideBoyHov  = _inRect(cx, cy, sideRects.boy);
+      onlineSideGirlHov = _inRect(cx, cy, sideRects.girl);
     } else {
       onlineSideBoyHov = onlineSideGirlHov = false;
     }
 
     if (gs.phase === 'online_lobby') {
-      onlineFindMatchHov  = onlineLobbyPhase === 'main'           && _inBtn(cx, cy, 320, 260, 320, 56);
-      onlinePlayFriendHov = onlineLobbyPhase === 'main'           && _inBtn(cx, cy, 320, 336, 320, 56);
-      onlineCancelHov     = (onlineLobbyPhase === 'searching'     && _inBtn(cx, cy, 380, 300, 200, 44))
-                         || (onlineLobbyPhase === 'create'        && _inBtn(cx, cy, 380, 310, 200, 44))
-                         || (onlineLobbyPhase === 'join'          && _inBtn(cx, cy, 400, 318, 160, 40));
-      onlineCreateHov     = onlineLobbyPhase === 'friend_options' && _inBtn(cx, cy, 340, 215, 280, 52);
-      onlineJoinHov       = onlineLobbyPhase === 'friend_options' && _inBtn(cx, cy, 340, 287, 280, 52);
-      onlineJoinSubmitHov = onlineLobbyPhase === 'join'           && _inBtn(cx, cy, 380, 244, 200, 52);
+      const lobbyRects = getOnlineLobbyButtonRects(onlineLobbyPhase);
+      onlineFindMatchHov  = _inRect(cx, cy, lobbyRects.findMatch);
+      onlinePlayFriendHov = _inRect(cx, cy, lobbyRects.playFriend);
+      onlineCancelHov     = _inRect(cx, cy, lobbyRects.cancel);
+      onlineCreateHov     = _inRect(cx, cy, lobbyRects.create);
+      onlineJoinHov       = _inRect(cx, cy, lobbyRects.join);
+      onlineJoinSubmitHov = _inRect(cx, cy, lobbyRects.joinSubmit);
     } else {
       onlineFindMatchHov = onlinePlayFriendHov = onlineCancelHov =
         onlineCreateHov = onlineJoinHov = onlineJoinSubmitHov = false;
@@ -1165,25 +1215,27 @@ function initGame() {
     }
 
     if (gs.phase === 'online_side_select') {
-      if (_inBtn(cx, cy, 240, 130, 220, 240)) { onlineSide = 'boy';  onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
-      if (_inBtn(cx, cy, 500, 130, 220, 240)) { onlineSide = 'girl'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
+      const sideRects = getOnlineSideSelectRects();
+      if (_inRect(cx, cy, sideRects.boy)) { onlineSide = 'boy';  onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
+      if (_inRect(cx, cy, sideRects.girl)) { onlineSide = 'girl'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
       return;
     }
 
     if (gs.phase === 'online_lobby') {
+      const lobbyRects = getOnlineLobbyButtonRects(onlineLobbyPhase);
       if (onlineLobbyPhase === 'main') {
-        if (_inBtn(cx, cy, 320, 260, 320, 56)) { onlineLobbyPhase = 'searching'; onlineSearchTick = 0; onlineClient.findMatch(onlineSide); }
-        if (_inBtn(cx, cy, 320, 336, 320, 56)) { onlineLobbyPhase = 'friend_options'; }
+        if (_inRect(cx, cy, lobbyRects.findMatch)) { onlineLobbyPhase = 'searching'; onlineSearchTick = 0; onlineClient.findMatch(onlineSide); }
+        if (_inRect(cx, cy, lobbyRects.playFriend)) { onlineLobbyPhase = 'friend_options'; }
       } else if (onlineLobbyPhase === 'searching') {
-        if (_inBtn(cx, cy, 380, 300, 200, 44)) { _cancelSearch(); onlineLobbyPhase = 'main'; }
+        if (_inRect(cx, cy, lobbyRects.cancel)) { _cancelSearch(); onlineLobbyPhase = 'main'; }
       } else if (onlineLobbyPhase === 'friend_options') {
-        if (_inBtn(cx, cy, 340, 215, 280, 52)) { onlineLobbyPhase = 'create'; onlineSearchTick = 0; onlineClient.createRoom(onlineSide); }
-        if (_inBtn(cx, cy, 340, 287, 280, 52)) { onlineLobbyPhase = 'join'; onlineCodeInput = ''; }
+        if (_inRect(cx, cy, lobbyRects.create)) { onlineLobbyPhase = 'create'; onlineSearchTick = 0; onlineClient.createRoom(onlineSide); }
+        if (_inRect(cx, cy, lobbyRects.join)) { onlineLobbyPhase = 'join'; onlineCodeInput = ''; }
       } else if (onlineLobbyPhase === 'create') {
-        if (_inBtn(cx, cy, 380, 310, 200, 44)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
+        if (_inRect(cx, cy, lobbyRects.cancel)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
       } else if (onlineLobbyPhase === 'join') {
-        if (_inBtn(cx, cy, 380, 244, 200, 52)) _tryJoinRoom();
-        if (_inBtn(cx, cy, 400, 318, 160, 40)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
+        if (_inRect(cx, cy, lobbyRects.joinSubmit)) _tryJoinRoom();
+        if (_inRect(cx, cy, lobbyRects.cancel)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
       }
       return;
     }
