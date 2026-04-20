@@ -2189,12 +2189,16 @@ default:          return GROUND_TOP - 28;
   }
 
   function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer) {
+    const boyScore  = runSummary ? (runSummary.boyFinished  ? runSummary.boyScore  : boyPlayer.score)  : boyPlayer.score;
+    const girlScore = runSummary ? (runSummary.girlFinished ? runSummary.girlScore : girlPlayer.score) : girlPlayer.score;
+    const boyTrophy  = boyScore  >= girlScore ? ' 🏆' : '';
+    const girlTrophy = girlScore >= boyScore  ? ' 🏆' : '';
     const boyLine = runSummary
-      ? `Boy: ${runSummary.boyFinished ? runSummary.boyScore : `${boyPlayer.score} (forfeit)`}`
-      : `Boy score: ${boyPlayer.score}`;
+      ? `${boyTrophy}Boy: ${runSummary.boyFinished ? runSummary.boyScore : `${boyPlayer.score} (forfeit)`}`
+      : `${boyTrophy}Boy score: ${boyPlayer.score}`;
     const girlLine = runSummary
-      ? `Girl: ${runSummary.girlFinished ? runSummary.girlScore : `${girlPlayer.score} (forfeit)`}`
-      : `Girl score: ${girlPlayer.score}`;
+      ? `${girlTrophy}Girl: ${runSummary.girlFinished ? runSummary.girlScore : `${girlPlayer.score} (forfeit)`}`
+      : `${girlTrophy}Girl score: ${girlPlayer.score}`;
     const total = runSummary ? runSummary.totalScore : boyPlayer.score + girlPlayer.score;
     _drawOverlayPanel(title, [
       runSummary ? `Time: ${_formatRunTime(runSummary.elapsedFrames)}` : null,
