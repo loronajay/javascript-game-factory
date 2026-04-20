@@ -454,13 +454,13 @@ function createRenderer(canvas, images) {
   // boyObstacles / girlObstacles: each side's own obstacle list
   // boyBoosts / girlBoosts: each side's boost list ({ distance, collected })
   // elapsed: seconds since run started
-  function renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed, debugState) {
+  function renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed, debugState, uiState = {}) {
     const nowMs = Date.now();
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawHalf(0,      'boy',  boyAnim,  boyPlayer,  boyObstacles,  boyBoosts,  boyDying,  boyTrail,  boyEffects,  nowMs, debugState?.enabled ? debugState.boy : null);
     _drawHalf(HALF_W, 'girl', girlAnim, girlPlayer, girlObstacles, girlBoosts, girlDying, girlTrail, girlEffects, nowMs, debugState?.enabled ? debugState.girl : null);
     _drawDivider();
-    _drawHUD(boyPlayer, girlPlayer, elapsed);
+    _drawHUD(boyPlayer, girlPlayer, elapsed, uiState);
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
 
@@ -592,9 +592,79 @@ function createRenderer(canvas, images) {
     ctx.restore();
   }
 
-  function renderOnlineSideSelect(boyHovered, girlHovered) {
+  function _otherSide(side) {
+    return side === 'girl' ? 'boy' : 'girl';
+  }
+
+  function _drawOnlineLabel(text, x, y, opts = {}) {
+    const font = opts.font || 'bold 12px monospace';
+    const padX = opts.padX || 10;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = font;
+    const textWidth = Math.max(72, ctx.measureText(text).width + padX * 2);
+    const boxH = opts.height || 24;
+    ctx.fillStyle = opts.bg || 'rgba(8,18,36,0.88)';
+    ctx.fillRect(x - textWidth / 2, y - boxH / 2, textWidth, boxH);
+    ctx.strokeStyle = opts.stroke || 'rgba(110,150,235,0.50)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x - textWidth / 2, y - boxH / 2, textWidth, boxH);
+    ctx.fillStyle = opts.textColor || '#ffffff';
+    ctx.fillText(text, x, y + 4);
+    ctx.restore();
+  }
+
+  function _getLobbyStatus(side, lobbyPhase) {
+    const partner = _otherSide(side).toUpperCase();
+    const locked = `SIDE LOCKED: ${side.toUpperCase()}`;
+
+    if (lobbyPhase === 'searching') {
+      return {
+        eyebrow: 'PUBLIC MATCHMAKING',
+        status: locked,
+        detail: `WAITING FOR ${partner} PLAYER`,
+      };
+    }
+
+    if (lobbyPhase === 'friend_options') {
+      return {
+        eyebrow: 'PRIVATE ROOM OPTIONS',
+        status: locked,
+        detail: `CONNECT WITH A ${partner} PLAYER`,
+      };
+    }
+
+    if (lobbyPhase === 'create') {
+      return {
+        eyebrow: 'PRIVATE ROOM',
+        status: locked,
+        detail: `WAITING FOR ${partner} PLAYER`,
+      };
+    }
+
+    if (lobbyPhase === 'join') {
+      return {
+        eyebrow: 'JOIN PRIVATE ROOM',
+        status: locked,
+        detail: `ENTER A ROOM CODE FOR ${partner} PLAYER`,
+      };
+    }
+
+    return {
+      eyebrow: 'ONLINE READY',
+      status: locked,
+      detail: `MATCH WITH A ${partner} PLAYER`,
+    };
+  }
+
+  function renderOnlineSideSelect(boyHovered, girlHovered, selectedSide = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawSpaceBackground();
+    _drawOnlineLabel('ONLINE MATCHMAKING', CANVAS_W / 2, 42, {
+      bg: 'rgba(18,28,56,0.86)',
+      stroke: 'rgba(120,165,255,0.50)',
+      textColor: 'rgba(220,232,255,0.95)',
+    });
 
     ctx.save();
     ctx.textAlign = 'center';
@@ -603,11 +673,21 @@ function createRenderer(canvas, images) {
     ctx.shadowColor = 'rgba(160,190,255,0.55)';
     ctx.shadowBlur = 22;
     ctx.fillText('CHOOSE YOUR SIDE', CANVAS_W / 2, 90);
+    ctx.shadowBlur = 0;
+    ctx.font = '15px "Cinzel Decorative", serif';
+    ctx.fillStyle = 'rgba(190,205,255,0.76)';
+    ctx.fillText(selectedSide ? `CURRENT PICK: ${selectedSide.toUpperCase()}` : 'PICK A SIDE TO LOCK IN', CANVAS_W / 2, 114);
     ctx.restore();
 
     // cardW=220, cardH=240, gap=40 → startX=(960-480)/2=240
     _tickAnim(menuBoyAnim);
     _tickAnim(menuGirlAnim);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '13px monospace';
+    ctx.fillStyle = 'rgba(255,210,120,0.88)';
+    ctx.fillText('YOUR SIDE STAYS LOCKED FOR THE MATCH', CANVAS_W / 2, 392);
+    ctx.restore();
     _drawSideCard(240, 130, 220, 240, images.boy,  false, 'BOY',  'LEFT SIDE',  'W  A  S  D', boyHovered,  menuBoyAnim.frame);
     _drawSideCard(500, 130, 220, 240, images.girl, true,  'GIRL', 'RIGHT SIDE', '←  ↑  ↓  →', girlHovered, menuGirlAnim.frame);
 
@@ -621,6 +701,7 @@ function createRenderer(canvas, images) {
     const img   = side === 'boy' ? images.boy  : images.girl;
     const flipH = side === 'girl';
     const anim  = side === 'boy' ? menuBoyAnim : menuGirlAnim;
+    const lobbyStatus = _getLobbyStatus(side, lobbyPhase);
     _tickAnim(anim);
 
     ctx.save();
@@ -630,6 +711,16 @@ function createRenderer(canvas, images) {
     ctx.shadowColor = 'rgba(160,190,255,0.50)';
     ctx.shadowBlur = 18;
     ctx.fillText('ONLINE MULTIPLAYER', CANVAS_W / 2, 72);
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = 'rgba(255,210,120,0.92)';
+    ctx.fillText(lobbyStatus.eyebrow, CANVAS_W / 2, 102);
+    ctx.font = '14px monospace';
+    ctx.fillStyle = 'rgba(220,230,255,0.86)';
+    ctx.fillText(lobbyStatus.status, CANVAS_W / 2, 122);
+    ctx.font = '12px monospace';
+    ctx.fillStyle = 'rgba(150,170,225,0.78)';
+    ctx.fillText(lobbyStatus.detail, CANVAS_W / 2, 142);
     ctx.restore();
 
     if      (lobbyPhase === 'main')           _renderLobbyMain(img, flipH, anim, side, hov);
@@ -650,6 +741,11 @@ function createRenderer(canvas, images) {
     const anim = side === 'boy' ? menuBoyAnim : menuGirlAnim;
     _tickAnim(anim);
 
+    _drawOnlineLabel('SERVER COUNTDOWN SYNCED', CANVAS_W / 2, 40, {
+      bg: 'rgba(16,34,62,0.88)',
+      stroke: 'rgba(120,200,255,0.55)',
+      textColor: 'rgba(220,240,255,0.96)',
+    });
     _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
 
     ctx.save();
@@ -1998,7 +2094,7 @@ default:          return GROUND_TOP - 28;
   }
 
   // ── HUD ───────────────────────────────────────────────────────────────────────
-  function _drawHUD(boyPlayer, girlPlayer, elapsed) {
+  function _drawHUD(boyPlayer, girlPlayer, elapsed, uiState = {}) {
     const remaining = Math.max(0, HARD_CUTOFF - elapsed);
     const urgent    = remaining < 20;
     const mins      = (remaining / 60) | 0;
@@ -2014,6 +2110,16 @@ default:          return GROUND_TOP - 28;
     ctx.shadowBlur  = urgent ? 10 : 4;
     ctx.fillText(timeStr, CANVAS_W / 2, 26);
     ctx.restore();
+
+    if (uiState.online) {
+      _drawOnlineLabel('ONLINE', CANVAS_W / 2, 52, {
+        bg: 'rgba(10,24,38,0.82)',
+        stroke: 'rgba(110,200,255,0.48)',
+        textColor: 'rgba(220,245,255,0.94)',
+        height: 22,
+        padX: 12,
+      });
+    }
 
     // Boy side — score, speed, chain
     ctx.save();
@@ -2075,6 +2181,7 @@ default:          return GROUND_TOP - 28;
     const total = runSummary ? runSummary.totalScore : boyPlayer.score + girlPlayer.score;
     _drawOverlayPanel(title, [
       runSummary ? `Time: ${_formatRunTime(runSummary.elapsedFrames)}` : null,
+      runSummary?.disconnectNote ? 'Your partner disconnected.' : null,
       boyLine,
       girlLine,
       `Combined: ${total}`,
@@ -2104,8 +2211,10 @@ default:          return GROUND_TOP - 28;
     ctx.shadowBlur = 0;
 
     ctx.font = '16px monospace';
-    ctx.fillStyle = 'rgba(210,215,255,0.90)';
     for (let i = 0; i < lines.length; i++) {
+      ctx.fillStyle = lines[i] === 'Your partner disconnected.'
+        ? 'rgba(255,176,176,0.96)'
+        : 'rgba(210,215,255,0.90)';
       ctx.fillText(lines[i], CANVAS_W / 2, panelY + 88 + i * rowH);
     }
 

@@ -1543,7 +1543,7 @@ function initGame() {
     if (gs.phase === 'menu') {
       renderer.renderMenu(debugState, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
     } else if (gs.phase === 'online_side_select') {
-      renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov);
+      renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov, onlineSide);
     } else if (gs.phase === 'online_lobby') {
       onlineSearchTick++;
       renderer.renderOnlineLobby(onlineSide, onlineLobbyPhase, onlineRoomCode, onlineCodeInput, onlineSearchTick, {
@@ -1567,7 +1567,8 @@ function initGame() {
         gs.boyObstacles, gs.girlObstacles,
         gs.boyBoosts, gs.girlBoosts,
         elapsed,
-        debugState
+        debugState,
+        { online: gs.mode === 'online' }
       );
     } else if (gs.phase === 'reunion') {
       renderer.renderReunion(boyPlayer, girlPlayer, gs.phaseFrames);
