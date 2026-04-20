@@ -7,6 +7,10 @@ function serializeActionMessage(action, phase = 'press') {
   return JSON.stringify({ action, phase });
 }
 
+function serializeSnapshotMessage(snapshot) {
+  return JSON.stringify(snapshot);
+}
+
 function buildFindMatchPayload(side, gameId = 'lovers-lost') {
   return { type: 'find_match', gameId, side };
 }
@@ -44,6 +48,49 @@ function parseActionMessage(value) {
   }
 }
 
+function parseSnapshotMessage(value) {
+  if (typeof value !== 'string' || value.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.player || typeof parsed.player !== 'object') return null;
+
+    const seq = Number(parsed.seq);
+    if (!Number.isFinite(seq)) return null;
+
+    const obstacleCount = Number(parsed.obstacleCount);
+    const elapsed = Number(parsed.elapsed);
+    const anim = parsed.anim && typeof parsed.anim === 'object'
+      ? {
+          state: typeof parsed.anim.state === 'string' ? parsed.anim.state : 'running',
+          actionTick: Math.max(0, Math.floor(Number(parsed.anim.actionTick) || 0)),
+        }
+      : { state: 'running', actionTick: 0 };
+
+    const resolved = Array.isArray(parsed.resolved)
+      ? parsed.resolved.map(item => ({
+          feedback: typeof item?.feedback === 'string' ? item.feedback : null,
+          effectType: typeof item?.effectType === 'string' ? item.effectType : null,
+          hit: !!item?.hit,
+          linger: !!item?.linger,
+          goblinDeath: !!item?.goblinDeath,
+        }))
+      : [];
+
+    return {
+      seq: Math.floor(seq),
+      elapsed: Number.isFinite(elapsed) ? Math.max(0, Math.floor(elapsed)) : 0,
+      obstacleCount: Number.isFinite(obstacleCount) ? Math.max(0, Math.floor(obstacleCount)) : 0,
+      player: { ...parsed.player },
+      anim,
+      resolved,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function createOnlineClient() {
   let ws           = null;
   let _clientId    = null;   // assigned by server on connect; used to filter self-echo
@@ -52,6 +99,9 @@ export function createOnlineClient() {
   let _roomCode    = null;
   let _coordinator = false;  // true if we created the private room
   let _inRoom      = false;  // true once both players are confirmed in room
+  let _pendingSeed = null;
+  let _startResolved = false;
+  let _legacyStartTimer = null;
 
   // Callbacks — caller assigns these after createOnlineClient()
   const cb = {
@@ -61,6 +111,7 @@ export function createOnlineClient() {
     onRoomCreated:     null,  // (code) — private room created, waiting for partner
     onMatchReady:      null,  // ({ seed, remoteSide, serverNow, startAt })
     onRemoteAction:    null,  // ({ action, phase })
+    onRemoteSnapshot:  null,  // (snapshot)
     onSideConflict:    null,  // () — both players picked same side
     onPartnerLeft:     null,  // () — partner disconnected during a run
     onError:           null,  // (code: string, message: string)
@@ -93,6 +144,12 @@ export function createOnlineClient() {
     if (messageType === 'action') {
       const actionMessage = parseActionMessage(value);
       if (actionMessage) cb.onRemoteAction?.(actionMessage);
+      return;
+    }
+
+    if (messageType === 'snapshot') {
+      const snapshot = parseSnapshotMessage(value);
+      if (snapshot) cb.onRemoteSnapshot?.(snapshot);
     }
   }
 
@@ -222,6 +279,10 @@ export function createOnlineClient() {
     _roomMsg('action', serializeActionMessage(action, phase));
   }
 
+  function sendSnapshot(snapshot) {
+    _roomMsg('snapshot', serializeSnapshotMessage(snapshot));
+  }
+
   function disconnect() {
     _inRoom = false; _roomCode = null;
     ws?.close();
@@ -233,7 +294,7 @@ export function createOnlineClient() {
     _inRoom = false; _coordinator = false;
   }
 
-  return { connect, findMatch, createRoom, joinRoom, cancelSearch, cancelRoom, sendAction, disconnect, reset, cb };
+  return { connect, findMatch, createRoom, joinRoom, cancelSearch, cancelRoom, sendAction, sendSnapshot, disconnect, reset, cb };
 }
 
 export {
@@ -243,5 +304,7 @@ export {
   getCountdownSecondsRemaining,
   hasCountdownStarted,
   parseActionMessage,
+  parseSnapshotMessage,
   serializeActionMessage,
+  serializeSnapshotMessage,
 };

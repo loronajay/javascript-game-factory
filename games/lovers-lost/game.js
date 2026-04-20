@@ -161,6 +161,85 @@ function applyGradeOutcome(player, grade) {
   return applyMiss(player);
 }
 
+function sanitizeResolvedOutcome(outcome) {
+  return {
+    feedback: typeof outcome?.feedback === 'string' ? outcome.feedback : null,
+    effectType: typeof outcome?.effectType === 'string' ? outcome.effectType : null,
+    hit: !!outcome?.hit,
+    linger: !!outcome?.linger,
+    goblinDeath: !!outcome?.goblinDeath,
+  };
+}
+
+function buildLaneSnapshot(player, obstacles, animState, resolved, elapsed, seq) {
+  return {
+    seq: Math.max(0, Math.floor(seq || 0)),
+    elapsed: Math.max(0, Math.floor(elapsed || 0)),
+    obstacleCount: Array.isArray(obstacles) ? obstacles.length : 0,
+    player: {
+      side: player?.side || 'boy',
+      speed: player?.speed ?? STARTING_SPEED,
+      score: player?.score ?? 0,
+      distance: player?.distance ?? 0,
+      chain: player?.chain ?? 0,
+      obstaclesFaced: player?.obstaclesFaced ?? 0,
+      state: player?.state || 'running',
+      jumpY: player?.jumpY ?? 0,
+      jumpVY: player?.jumpVY ?? 0,
+      jumpStartDistance: player?.jumpStartDistance ?? null,
+      assistActive: !!player?.assistActive,
+      assistOpportunities: player?.assistOpportunities ?? 0,
+    },
+    anim: {
+      state: animState?.state || 'running',
+      actionTick: Math.max(0, Math.floor(animState?.actionTick || 0)),
+    },
+    resolved: Array.isArray(resolved) ? resolved.map(sanitizeResolvedOutcome) : [],
+  };
+}
+
+function applyLaneSnapshot(currentLane, snapshot, lastSeq = -1) {
+  const seq = Number(snapshot?.seq);
+  if (!Number.isFinite(seq) || seq <= lastSeq) {
+    return {
+      applied: false,
+      lastSeq,
+      player: currentLane.player,
+      obstacles: currentLane.obstacles,
+      anim: currentLane.anim,
+      resolved: [],
+      consumedObstacles: [],
+    };
+  }
+
+  const obstacleCount = Math.max(0, Math.floor(Number(snapshot?.obstacleCount) || 0));
+  const currentObstacles = Array.isArray(currentLane.obstacles) ? currentLane.obstacles : [];
+  const consumedCount = Math.max(0, currentObstacles.length - obstacleCount);
+  const consumedObstacles = currentObstacles.slice(0, consumedCount);
+
+  return {
+    applied: true,
+    lastSeq: Math.floor(seq),
+    player: {
+      ...currentLane.player,
+      ...(snapshot?.player || {}),
+      side: currentLane.player?.side || snapshot?.player?.side || 'boy',
+      jumpY: snapshot?.player?.jumpY ?? 0,
+      jumpVY: snapshot?.player?.jumpVY ?? 0,
+      jumpStartDistance: snapshot?.player?.jumpStartDistance ?? null,
+      assistActive: !!snapshot?.player?.assistActive,
+      assistOpportunities: snapshot?.player?.assistOpportunities ?? 0,
+    },
+    obstacles: currentObstacles.slice(consumedCount),
+    anim: {
+      state: snapshot?.anim?.state || 'running',
+      actionTick: Math.max(0, Math.floor(snapshot?.anim?.actionTick || 0)),
+    },
+    resolved: Array.isArray(snapshot?.resolved) ? snapshot.resolved.map(sanitizeResolvedOutcome) : [],
+    consumedObstacles,
+  };
+}
+
 function spikeTimingGrade(player, obstacle) {
   if (player.jumpStartDistance == null) return 'miss';
   return gradeInput(obstacle, player.jumpStartDistance);
@@ -709,55 +788,56 @@ function finishPlayer(player) {
   };
 }
 
+function tickSideFrame(player, obstacles, elapsedSec, simulate = true) {
+  if (!simulate) {
+    return {
+      player,
+      obstacles,
+      resolved: [],
+    };
+  }
+
+  let nextPlayer = player.state !== 'finished' ? advanceDistance(player) : player;
+  nextPlayer = checkAssist(nextPlayer, elapsedSec);
+  nextPlayer = deactivateAssistIfRecovered(nextPlayer, elapsedSec);
+  nextPlayer = tickJumpArc(nextPlayer);
+
+  if (isFinished(nextPlayer) && nextPlayer.state !== 'finished') {
+    nextPlayer = finishPlayer(nextPlayer);
+  }
+
+  if (nextPlayer.state === 'finished') {
+    return {
+      player: nextPlayer,
+      obstacles: [],
+      resolved: [],
+    };
+  }
+
+  const result = processMissedObstacles(nextPlayer, obstacles);
+  return {
+    player: result.player,
+    obstacles: result.obstacles,
+    resolved: result.resolved || [],
+  };
+}
+
 // ─── tickFrame ────────────────────────────────────────────────────────────────
 // Advances game state by one frame. Pure function — no side effects.
-function tickFrame(state) {
+function tickFrame(state, options) {
   if (state.phase !== 'playing') return state;
 
   const elapsed    = state.elapsed + 1;
   const elapsedSec = elapsed / 60;
-
-  // Advance distances (skip finished players)
-  let boy  = state.boy.state  !== 'finished' ? advanceDistance(state.boy)  : state.boy;
-  let girl = state.girl.state !== 'finished' ? advanceDistance(state.girl) : state.girl;
-
-  // Assist checks
-  boy  = checkAssist(boy,  elapsedSec);
-  girl = checkAssist(girl, elapsedSec);
-  boy  = deactivateAssistIfRecovered(boy,  elapsedSec);
-  girl = deactivateAssistIfRecovered(girl, elapsedSec);
-
-  // Jump arcs
-  boy  = tickJumpArc(boy);
-  girl = tickJumpArc(girl);
-
-  // Reaching the finish line ends obstacle processing for that side immediately.
-  if (isFinished(boy)  && boy.state  !== 'finished') boy  = finishPlayer(boy);
-  if (isFinished(girl) && girl.state !== 'finished') girl = finishPlayer(girl);
-
-  // Auto-miss expired obstacles
-  let boyObs = state.boyObstacles;
-  let girlObs = state.girlObstacles;
-  let boyResolved = [];
-  let girlResolved = [];
-
-  if (boy.state === 'finished') {
-    boyObs = [];
-  } else {
-    const boyResult = processMissedObstacles(boy, state.boyObstacles);
-    boy = boyResult.player;
-    boyObs = boyResult.obstacles;
-    boyResolved = boyResult.resolved || [];
-  }
-
-  if (girl.state === 'finished') {
-    girlObs = [];
-  } else {
-    const girlResult = processMissedObstacles(girl, state.girlObstacles);
-    girl = girlResult.player;
-    girlObs = girlResult.obstacles;
-    girlResolved = girlResult.resolved || [];
-  }
+  const simulatedSides = options?.simulatedSides || {};
+  const boyResult = tickSideFrame(state.boy, state.boyObstacles, elapsedSec, simulatedSides.boy !== false);
+  const girlResult = tickSideFrame(state.girl, state.girlObstacles, elapsedSec, simulatedSides.girl !== false);
+  const boy = boyResult.player;
+  const girl = girlResult.player;
+  const boyObs = boyResult.obstacles;
+  const girlObs = girlResult.obstacles;
+  const boyResolved = boyResult.resolved || [];
+  const girlResolved = girlResult.resolved || [];
 
   // Determine new phase
   let phase = state.phase;
@@ -843,6 +923,8 @@ export {
   advancePhaseState,
   nextActionForSide,
   shouldHandleMappedKeyLocally,
+  buildLaneSnapshot,
+  applyLaneSnapshot,
   JUMP_VY,
   JUMP_GRAVITY,
   HARD_CUTOFF_FRAMES,
@@ -884,6 +966,8 @@ function initGame() {
   const onlineClient = createOnlineClient();
   let onlineRemoteSide = null;
   let onlineCountdown = null;
+  let onlineSnapshotSeq = 0;
+  const remoteLaneSeq = { boy: -1, girl: -1 };
 
   onlineClient.cb.onSearching       = () => { /* onlineLobbyPhase already shows searching UI */ };
   onlineClient.cb.onSearchCancelled = () => { onlineLobbyPhase = 'main'; };
@@ -908,13 +992,8 @@ function initGame() {
     inp.tick();
   };
 
-  onlineClient.cb.onRemoteAction = (message) => {
-    if (!onlineRemoteSide || !message) return;
-    if (message.phase === 'release') {
-      inp.clearAction(onlineRemoteSide, message.action);
-      return;
-    }
-    inp.injectAction(onlineRemoteSide, message.action);
+  onlineClient.cb.onRemoteAction = () => {
+    // Remote lanes are now snapshot-driven. Action relay is ignored for gameplay.
   };
 
   onlineClient.cb.onPartnerLeft = () => {
@@ -996,9 +1075,6 @@ function initGame() {
       return;
     }
     inp.keydown(e.key);
-    if (gs.phase === 'playing' && gs.mode === 'online' && mapped && mapped.side === onlineSide) {
-      onlineClient.sendAction(mapped.action, 'press');
-    }
   });
   window.addEventListener('keyup', e => {
     const mapped = keyToAction(e.key);
@@ -1006,9 +1082,6 @@ function initGame() {
       return;
     }
     inp.keyup(e.key);
-    if (gs.phase === 'playing' && gs.mode === 'online' && mapped && mapped.side === onlineSide) {
-      onlineClient.sendAction(mapped.action, 'release');
-    }
   });
 
   // Menu button bounds (canvas space)
@@ -1131,6 +1204,51 @@ function initGame() {
   const ACTION_DURATION = 18; // frames (3 steps × 6 ticks each)
   const HIT_DURATION    = 30; // frames player stays in hit state
 
+  function applyRemoteResolvedVisuals(side, resolved, consumedObstacles, playerBeforeDistance) {
+    for (let i = 0; i < resolved.length; i++) {
+      const outcome = resolved[i];
+      const obstacle = consumedObstacles[i] || null;
+      if (outcome.feedback) {
+        renderer.addOutcomeEffect(side, outcome.feedback, outcome.effectType);
+      }
+      if (outcome.linger && obstacle) {
+        renderer.addTrailObstacle(side, obstacle);
+      }
+      if (outcome.goblinDeath && obstacle) {
+        renderer.addDyingGoblin(side, obstacle, playerBeforeDistance);
+      }
+    }
+  }
+
+  function applyRemoteSnapshot(side, snapshot) {
+    if (gs.mode !== 'online' || gs.phase !== 'playing') return;
+    const currentLane = side === 'boy'
+      ? { player: gs.boy, obstacles: gs.boyObstacles, anim: boyAnim }
+      : { player: gs.girl, obstacles: gs.girlObstacles, anim: girlAnim };
+    const applied = applyLaneSnapshot(currentLane, snapshot, remoteLaneSeq[side]);
+    if (!applied.applied) return;
+
+    remoteLaneSeq[side] = applied.lastSeq;
+    applyRemoteResolvedVisuals(side, applied.resolved, applied.consumedObstacles, currentLane.player.distance);
+
+    if (side === 'boy') {
+      gs = { ...gs, boy: applied.player, boyObstacles: applied.obstacles, boyResolved: [] };
+      boyAnim = { ...applied.anim };
+    } else {
+      gs = { ...gs, girl: applied.player, girlObstacles: applied.obstacles, girlResolved: [] };
+      girlAnim = { ...applied.anim };
+    }
+
+    if (currentLane.player.state !== 'finished' && applied.player.state === 'finished') {
+      renderer.clearSideObstacleVisuals(side);
+    }
+  }
+
+  onlineClient.cb.onRemoteSnapshot = (snapshot) => {
+    if (!onlineRemoteSide || !snapshot) return;
+    applyRemoteSnapshot(onlineRemoteSide, snapshot);
+  };
+
   // ── State-machine helpers ─────────────────────────────────────────────────
   function startPlaying() {
     sounds.stop('run-success');
@@ -1145,6 +1263,9 @@ function initGame() {
     sounds.stop('run-success');
     sounds.stop('run-failed');
     onlineCountdown = null;
+    onlineSnapshotSeq = 0;
+    remoteLaneSeq.boy = -1;
+    remoteLaneSeq.girl = -1;
     gs = { ...createGameState('online', seed, { debugObstacleType }), phase: 'playing' };
     boyAnim  = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
@@ -1160,6 +1281,9 @@ function initGame() {
       onlineRemoteSide = null;
       onlineCountdown = null;
       onlineRoomCode = '';
+      onlineSnapshotSeq = 0;
+      remoteLaneSeq.boy = -1;
+      remoteLaneSeq.girl = -1;
     }
     gs = { ...createGameState('single', Date.now() >>> 0, { debugObstacleType }), phase: 'menu' };
     boyAnim  = { state: 'running', actionTick: 0 };
@@ -1170,10 +1294,11 @@ function initGame() {
   // ── Apply input for one side each frame ───────────────────────────────────
   function handleSideInput(side) {
     const getPlayer = () => (side === 'boy' ? gs.boy : gs.girl);
-    if (getPlayer().state === 'finished') return;
+    if (getPlayer().state === 'finished') return [];
     const getObstacles = () => (side === 'boy' ? gs.boyObstacles : gs.girlObstacles);
     const anim      = side === 'boy' ? boyAnim : girlAnim;
     let interacted = false;
+    const frameResolved = [];
 
     function applyResolvedResult(playerBefore, result, frontObs) {
       const outcome = summarizeObstacleOutcome(playerBefore, result, frontObs);
@@ -1208,6 +1333,10 @@ function initGame() {
         anim.state = 'hit';
         anim.actionTick = 0;
         sounds.play('player-hit');
+      }
+
+      if (outcome.consumed) {
+        frameResolved.push(sanitizeResolvedOutcome(outcome));
       }
 
       return outcome;
@@ -1288,6 +1417,8 @@ function initGame() {
         anim.actionTick = 0;
       }
     }
+
+    return frameResolved;
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────
@@ -1319,13 +1450,21 @@ function initGame() {
     }
 
     if (gs.phase === 'playing') {
-      handleSideInput('boy');
-      handleSideInput('girl');
+      let localResolvedForSnapshot = [];
+      if (gs.mode === 'online') {
+        localResolvedForSnapshot = handleSideInput(onlineSide);
+      } else {
+        handleSideInput('boy');
+        handleSideInput('girl');
+      }
 
       const phaseBefore = gs.phase;
       const boyFinishedBefore = gs.boy.state === 'finished';
       const girlFinishedBefore = gs.girl.state === 'finished';
-      gs = tickFrame(gs);
+      const simulatedSides = gs.mode === 'online'
+        ? { boy: onlineSide === 'boy', girl: onlineSide === 'girl' }
+        : null;
+      gs = tickFrame(gs, simulatedSides ? { simulatedSides } : undefined);
       if (!boyFinishedBefore && gs.boy.state === 'finished') {
         boyAnim.state = 'running';
         boyAnim.actionTick = 0;
@@ -1364,6 +1503,23 @@ function initGame() {
           girlAnim.state = 'hit'; girlAnim.actionTick = 0;
           sounds.play('player-hit');
         }
+      }
+
+      if (gs.mode === 'online') {
+        const snapshotSide = onlineSide;
+        const snapshotPlayer = snapshotSide === 'boy' ? gs.boy : gs.girl;
+        const snapshotObstacles = snapshotSide === 'boy' ? gs.boyObstacles : gs.girlObstacles;
+        const snapshotAnim = snapshotSide === 'boy' ? boyAnim : girlAnim;
+        const autoResolved = snapshotSide === 'boy' ? (gs.boyResolved || []) : (gs.girlResolved || []);
+        const snapshot = buildLaneSnapshot(
+          snapshotPlayer,
+          snapshotObstacles,
+          snapshotAnim,
+          [...localResolvedForSnapshot, ...autoResolved],
+          gs.elapsed,
+          ++onlineSnapshotSeq
+        );
+        onlineClient.sendSnapshot(snapshot);
       }
     } else if (gs.phase === 'reunion' || gs.phase === 'gameover') {
       gs = advancePhaseState(gs);
