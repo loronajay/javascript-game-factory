@@ -1197,6 +1197,11 @@ function initGame() {
   let gs = createGameState('single', Date.now() >>> 0, { debugObstacleType });
   let lastMusicPhase = null;
 
+  // ── Fixed timestep (60 ticks/s regardless of monitor refresh rate) ────────
+  const TICK_MS = 1000 / 60;
+  let loopLastTime = null;
+  let loopAccumulator = 0;
+
   // ── Action state timing ───────────────────────────────────────────────────
   // Tracks ticks since current action started (for renderer animState)
   let boyAnim  = { state: 'running', actionTick: 0 };
@@ -1422,7 +1427,16 @@ function initGame() {
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────
-  function loop() {
+  function loop(timestamp) {
+    // Fixed timestep: accumulate real time and tick game logic at 60 hz
+    if (loopLastTime === null) loopLastTime = timestamp;
+    const frameTime = Math.min(timestamp - loopLastTime, 100); // cap to avoid spiral of death
+    loopLastTime = timestamp;
+    loopAccumulator += frameTime;
+
+    while (loopAccumulator >= TICK_MS) {
+      loopAccumulator -= TICK_MS;
+
     // Music — switch tracks on phase transition (menu_help shares menu music)
     const musicPhase = gs.phase === 'menu_help' ? 'menu' : gs.phase;
     if (musicPhase !== lastMusicPhase) {
@@ -1525,6 +1539,9 @@ function initGame() {
       gs = advancePhaseState(gs);
     }
 
+    inp.tick(); // clear pressed state at end of tick so isPressed is one-shot
+    } // end fixed-timestep while loop
+
     // Sync visual state fields that renderer reads
     const boyPlayer  = { ...gs.boy,  animState: boyAnim };
     const girlPlayer = { ...gs.girl, animState: girlAnim };
@@ -1578,7 +1595,6 @@ function initGame() {
       renderer.renderScore(gs.boy, gs.girl, gs.runSummary);
     }
 
-    inp.tick(); // clear pressed state at end of frame so isPressed is one-shot
     requestAnimationFrame(loop);
   }
 
