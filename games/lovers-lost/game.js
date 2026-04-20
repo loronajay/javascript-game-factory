@@ -70,6 +70,14 @@ const DEBUG_OBSTACLE_LABELS = {
 const ONLINE_NAME_MAX_LEN = 12;
 const LEGACY_ONLINE_NAME_STORAGE_KEY = 'lovers-lost.onlineIdentity.displayName';
 
+const EMOTE_BINDINGS = {
+  jump:   'heart',
+  crouch: 'middle-finger',
+  attack: 'smile',
+  block:  'crying',
+};
+const EMOTE_COOLDOWN_MS = 1000;
+
 function normalizeDebugObstacleType(value) {
   if (typeof value !== 'string') return null;
   return DEBUG_OBSTACLE_ALIASES[value.trim().toLowerCase()] || null;
@@ -1068,6 +1076,11 @@ function initGame() {
   const goblinDeath   = new Image(); goblinDeath.src   = 'images/goblin-death.png';
   const arrowsImg     = new Image(); arrowsImg.src     = 'images/arrows.png';
 
+  const emoteHeart  = new Image(); emoteHeart.src  = 'images/emojis/heart.png';
+  const emoteMf     = new Image(); emoteMf.src     = 'images/emojis/middle-finger.png';
+  const emoteSmile  = new Image(); emoteSmile.src  = 'images/emojis/smile.png';
+  const emoteCrying = new Image(); emoteCrying.src = 'images/emojis/crying.png';
+
   const images = {
     boy: boyImg,
     girl: girlImg,
@@ -1078,6 +1091,13 @@ function initGame() {
     goblinTakeHit,
     goblinDeath,
     arrows: arrowsImg,
+  };
+
+  const emoteImages = {
+    heart:           emoteHeart,
+    'middle-finger': emoteMf,
+    smile:           emoteSmile,
+    crying:          emoteCrying,
   };
 
   // ── Sounds ────────────────────────────────────────────────────────────────
@@ -1144,6 +1164,10 @@ function initGame() {
     // Remote lanes are now snapshot-driven. Action relay is ignored for gameplay.
   };
 
+  onlineClient.cb.onRemoteEmote = (type) => {
+    renderer.addEmote(onlineSide, type);  // local player is the recipient
+  };
+
   onlineClient.cb.onPartnerLeft = () => {
     if (gs.phase === 'online_countdown') {
       onlineRemoteSide = null;
@@ -1171,7 +1195,7 @@ function initGame() {
 
   // ── Canvas + renderer ─────────────────────────────────────────────────────
   const canvas   = document.getElementById('gameCanvas');
-  const renderer = createRenderer(canvas, images);
+  const renderer = createRenderer(canvas, images, emoteImages);
   const search = window.location && window.location.search;
   const debugObstacleType = debugObstacleTypeFromSearch(search);
   let debugEnabled = debugEnabledFromSearch(search);
@@ -1241,6 +1265,19 @@ function initGame() {
       e.preventDefault();
     }
     const mapped = keyToAction(e.key);
+    if (gs.mode === 'online' && mapped && mapped.side !== onlineSide &&
+        (gs.phase === 'playing' || gs.phase === 'reunion')) {
+      const emoteType = EMOTE_BINDINGS[mapped.action];
+      if (emoteType) {
+        const now = Date.now();
+        if (now - lastEmoteSentAt >= EMOTE_COOLDOWN_MS) {
+          lastEmoteSentAt = now;
+          onlineClient.sendEmote(emoteType);
+          renderer.addEmote(onlineRemoteSide, emoteType);
+        }
+      }
+      return;
+    }
     if (!shouldHandleMappedKeyLocally(gs.mode, onlineSide, mapped && mapped.side)) {
       return;
     }
@@ -1271,6 +1308,7 @@ function initGame() {
   }
 
   // ── Online UI state ───────────────────────────────────────────────────────
+  let lastEmoteSentAt   = 0;
   let onlineSide        = 'boy';      // 'boy' | 'girl'
   let onlineRunOverrideName = '';
   let onlineIdentity    = buildOnlineIdentity(factoryProfile, onlineRunOverrideName);
@@ -1829,24 +1867,18 @@ function initGame() {
   }
 
   // Start when images load
-  let loaded = 0;
-  const totalImages = Object.values(images).flat().length;
-  function onLoad() {
-    if (++loaded >= totalImages) loop();
-  }
-  [
-    boyImg,
-    girlImg,
-    swordImg,
-    bird1,
-    bird2,
-    bird3,
-    goblinIdle,
-    goblinAttack,
-    goblinTakeHit,
-    goblinDeath,
+  const allImages = [
+    boyImg, girlImg, swordImg,
+    bird1, bird2, bird3,
+    goblinIdle, goblinAttack, goblinTakeHit, goblinDeath,
     arrowsImg,
-  ].forEach(img => {
+    ...Object.values(emoteImages),
+  ];
+  let loaded = 0;
+  function onLoad() {
+    if (++loaded >= allImages.length) loop();
+  }
+  allImages.forEach(img => {
     img.onload  = onLoad;
     img.onerror = onLoad;
   });

@@ -97,6 +97,17 @@ const HUD_SPEED_MIN = 5;
 const HUD_SPEED_SOFT_MAX = 30;
 const HUD_CHAIN_SOFT_MAX = 8;
 
+// ─── Emote bubble ─────────────────────────────────────────────────────────────
+const EMOTE_DURATION    = 180;  // frames (~3s)
+const EMOTE_FADE_FRAMES = 40;   // fade out over last N frames
+const EMOTE_BUBBLE_W    = 80;
+const EMOTE_BUBBLE_H    = 80;
+const EMOTE_BUBBLE_Y    = 118;  // top edge of bubble
+const EMOTE_BUBBLE_R    = 10;   // corner radius
+const EMOTE_SPRITE_SIZE = 56;
+const EMOTE_TAIL_LEN    = 18;   // pixels tail extends from bubble edge toward divider
+const EMOTE_TAIL_HALF   = 10;   // half-width of tail base on bubble edge
+
 function clamp01(value) {
   return Math.max(0, Math.min(value, 1));
 }
@@ -449,7 +460,7 @@ function _genStars(count, seed) {
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
-function createRenderer(canvas, images) {
+function createRenderer(canvas, images, emoteImages = {}) {
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   canvas.width  = CANVAS_W;
@@ -510,6 +521,9 @@ function createRenderer(canvas, images) {
   const boyEffects = [];
   const girlEffects = [];
 
+  const boyEmote  = { type: null, frames: 0 };
+  const girlEmote = { type: null, frames: 0 };
+
   // ── Public API ──────────────────────────────────────────────────────────────
   // boyObstacles / girlObstacles: each side's own obstacle list
   // boyBoosts / girlBoosts: each side's boost list ({ distance, collected })
@@ -522,6 +536,7 @@ function createRenderer(canvas, images) {
     _drawHalf(HALF_W, 'girl', girlAnim, girlPlayer, girlObstacles, girlBoosts, girlDying, girlTrail, girlEffects, nowMs, debugState?.enabled ? debugState.girl : null, gameTick);
     _drawDivider();
     _drawHUD(boyPlayer, girlPlayer, elapsed, uiState);
+    _drawEmoteBubbles();
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
 
@@ -1128,6 +1143,88 @@ function createRenderer(canvas, images) {
     trail.length = 0;
     dying.length = 0;
     effects.length = 0;
+  }
+
+  function addEmote(recipientSide, type) {
+    const state = recipientSide === 'boy' ? boyEmote : girlEmote;
+    state.type   = type;
+    state.frames = EMOTE_DURATION;
+  }
+
+  function _drawRoundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y,     x + w, y + r,     r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x,      y + h, x,      y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y,     x + r, y,               r);
+    ctx.closePath();
+  }
+
+  function _drawEmoteBubble(recipientSide, state) {
+    if (!state.type || state.frames <= 0) return;
+
+    const alpha   = state.frames <= EMOTE_FADE_FRAMES ? state.frames / EMOTE_FADE_FRAMES : 1;
+    const centerY = EMOTE_BUBBLE_Y + EMOTE_BUBBLE_H / 2;
+
+    let bubbleX, tailTipX, tailDir;
+    if (recipientSide === 'boy') {
+      bubbleX  = DIVIDER_X - EMOTE_TAIL_LEN - EMOTE_BUBBLE_W;
+      tailTipX = DIVIDER_X - 2;
+      tailDir  = 'right';
+    } else {
+      bubbleX  = DIVIDER_X + EMOTE_TAIL_LEN;
+      tailTipX = DIVIDER_X + 2;
+      tailDir  = 'left';
+    }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor    = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur     = 8;
+    ctx.shadowOffsetX  = 2;
+    ctx.shadowOffsetY  = 2;
+
+    _drawRoundRect(bubbleX, EMOTE_BUBBLE_Y, EMOTE_BUBBLE_W, EMOTE_BUBBLE_H, EMOTE_BUBBLE_R);
+    ctx.fill();
+
+    ctx.beginPath();
+    if (tailDir === 'right') {
+      const baseX = bubbleX + EMOTE_BUBBLE_W;
+      ctx.moveTo(baseX, centerY - EMOTE_TAIL_HALF);
+      ctx.lineTo(tailTipX, centerY);
+      ctx.lineTo(baseX, centerY + EMOTE_TAIL_HALF);
+    } else {
+      ctx.moveTo(bubbleX, centerY - EMOTE_TAIL_HALF);
+      ctx.lineTo(tailTipX, centerY);
+      ctx.lineTo(bubbleX, centerY + EMOTE_TAIL_HALF);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur  = 0;
+    const emoteImg = emoteImages[state.type];
+    if (emoteImg && emoteImg.complete && emoteImg.naturalWidth > 0) {
+      const sprX = bubbleX + (EMOTE_BUBBLE_W - EMOTE_SPRITE_SIZE) / 2;
+      const sprY = EMOTE_BUBBLE_Y + (EMOTE_BUBBLE_H - EMOTE_SPRITE_SIZE) / 2;
+      ctx.drawImage(emoteImg, sprX, sprY, EMOTE_SPRITE_SIZE, EMOTE_SPRITE_SIZE);
+    }
+
+    ctx.restore();
+
+    state.frames--;
+    if (state.frames <= 0) state.type = null;
+  }
+
+  function _drawEmoteBubbles() {
+    _drawEmoteBubble('boy',  boyEmote);
+    _drawEmoteBubble('girl', girlEmote);
   }
 
   // ── Half ────────────────────────────────────────────────────────────────────
@@ -2229,6 +2326,8 @@ default:          return GROUND_TOP - 28;
       const heartCY   = PLAYER_Y - 36;
       _drawHeart(heartCX, heartCY, heartSize);
     }
+
+    _drawEmoteBubbles();
   }
 
   // ── HUD ───────────────────────────────────────────────────────────────────────
@@ -2651,6 +2750,7 @@ default:          return GROUND_TOP - 28;
     addTrailObstacle,
     addOutcomeEffect,
     clearSideObstacleVisuals,
+    addEmote,
   };
 }
 
