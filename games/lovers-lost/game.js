@@ -816,6 +816,12 @@ function nextActionForSide(inp, side) {
   return null;
 }
 
+function shouldHandleMappedKeyLocally(mode, onlineSide, mappedSide) {
+  if (!mappedSide) return true;
+  if (mode !== 'online') return true;
+  return mappedSide === onlineSide;
+}
+
 export {
   createGameState,
   processAction,
@@ -836,6 +842,7 @@ export {
   tickFrame,
   advancePhaseState,
   nextActionForSide,
+  shouldHandleMappedKeyLocally,
   JUMP_VY,
   JUMP_GRAVITY,
   HARD_CUTOFF_FRAMES,
@@ -888,8 +895,13 @@ function initGame() {
     startPlayingOnline(seed);
   };
 
-  onlineClient.cb.onRemoteAction = (action) => {
-    if (onlineRemoteSide) inp.injectAction(onlineRemoteSide, action);
+  onlineClient.cb.onRemoteAction = (message) => {
+    if (!onlineRemoteSide || !message) return;
+    if (message.phase === 'release') {
+      inp.clearAction(onlineRemoteSide, message.action);
+      return;
+    }
+    inp.injectAction(onlineRemoteSide, message.action);
   };
 
   onlineClient.cb.onPartnerLeft = () => {
@@ -946,17 +958,25 @@ function initGame() {
     if (keyToAction(e.key) && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
+    const mapped = keyToAction(e.key);
+    if (!shouldHandleMappedKeyLocally(gs.mode, onlineSide, mapped && mapped.side)) {
+      return;
+    }
     inp.keydown(e.key);
-    // Online mode: send local action to server; block physical keys for remote side
-    if (gs.phase === 'playing' && gs.mode === 'online') {
-      const mapped = keyToAction(e.key);
-      if (mapped) {
-        if (mapped.side === onlineSide) onlineClient.sendAction(mapped.action);
-        else inp.clearAction(mapped.side, mapped.action);
-      }
+    if (gs.phase === 'playing' && gs.mode === 'online' && mapped && mapped.side === onlineSide) {
+      onlineClient.sendAction(mapped.action, 'press');
     }
   });
-  window.addEventListener('keyup',   e => inp.keyup(e.key));
+  window.addEventListener('keyup', e => {
+    const mapped = keyToAction(e.key);
+    if (!shouldHandleMappedKeyLocally(gs.mode, onlineSide, mapped && mapped.side)) {
+      return;
+    }
+    inp.keyup(e.key);
+    if (gs.phase === 'playing' && gs.mode === 'online' && mapped && mapped.side === onlineSide) {
+      onlineClient.sendAction(mapped.action, 'release');
+    }
+  });
 
   // Menu button bounds (canvas space)
   const MENU_BTN_X  = 300, MENU_BTN_Y  = 210, MENU_BTN_W  = 360, MENU_BTN_H  = 56; // LOCAL MULTIPLAYER

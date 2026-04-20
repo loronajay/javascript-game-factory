@@ -3,6 +3,29 @@
 
 const WS_URL = 'wss://factory-network-server-production.up.railway.app';
 
+function serializeActionMessage(action, phase = 'press') {
+  return JSON.stringify({ action, phase });
+}
+
+function buildFindMatchPayload(side, gameId = 'lovers-lost') {
+  return { type: 'find_match', gameId, side };
+}
+
+function parseActionMessage(value) {
+  if (typeof value !== 'string' || value.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed.action !== 'string') return null;
+    return {
+      action: parsed.action,
+      phase: parsed.phase === 'release' ? 'release' : 'press',
+    };
+  } catch {
+    return { action: value, phase: 'press' };
+  }
+}
+
 export function createOnlineClient() {
   let ws           = null;
   let _clientId    = null;   // assigned by server on connect; used to filter self-echo
@@ -20,7 +43,7 @@ export function createOnlineClient() {
     onSearchCancelled: null,  // () — cancelled before match
     onRoomCreated:     null,  // (code) — private room created, waiting for partner
     onMatchStart:      null,  // (seed, remoteSide, startTime)
-    onRemoteAction:    null,  // (action: string)
+    onRemoteAction:    null,  // ({ action, phase })
     onSideConflict:    null,  // () — both players picked same side
     onPartnerLeft:     null,  // () — partner disconnected during a run
     onError:           null,  // (code: string, message: string)
@@ -95,7 +118,8 @@ export function createOnlineClient() {
     }
 
     else if (messageType === 'action') {
-      cb.onRemoteAction?.(value);
+      const actionMessage = parseActionMessage(value);
+      if (actionMessage) cb.onRemoteAction?.(actionMessage);
     }
   }
 
@@ -183,7 +207,7 @@ export function createOnlineClient() {
 
   function findMatch(side) {
     _mySide = side; _coordinator = false;
-    _send({ type: 'find_match', gameId: 'lovers-lost' });
+    _send(buildFindMatchPayload(side));
   }
 
   function createRoom(side) {
@@ -206,8 +230,8 @@ export function createOnlineClient() {
     _roomCode = null; _inRoom = false; _coordinator = false; _pendingSeed = null;
   }
 
-  function sendAction(action) {
-    _roomMsg('action', action);
+  function sendAction(action, phase = 'press') {
+    _roomMsg('action', serializeActionMessage(action, phase));
   }
 
   function disconnect() {
@@ -223,3 +247,5 @@ export function createOnlineClient() {
 
   return { connect, findMatch, createRoom, joinRoom, cancelSearch, cancelRoom, sendAction, disconnect, reset, cb };
 }
+
+export { buildFindMatchPayload, parseActionMessage, serializeActionMessage };
