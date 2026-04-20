@@ -7,6 +7,8 @@ Thumbs.db
 AGENTS.md
 CLAUDE.md
 SKILLS.md
+games/*/GDD.md
+games/*/docs/
 
 # Local test/dev harnesses should not ship
 *.test.js
