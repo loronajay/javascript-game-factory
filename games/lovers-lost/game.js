@@ -1012,9 +1012,12 @@ function initGame() {
   const onlineClient = createOnlineClient();
   let onlineRemoteSide = null;
   let onlineCountdown = null;
+  let onlineQueueCounts = null;
   let onlineSnapshotSeq = 0;
   const remoteLaneSeq = { boy: -1, girl: -1 };
 
+  onlineClient.cb.onConnected       = () => { onlineClient.requestQueueStatus('lovers-lost'); };
+  onlineClient.cb.onQueueCounts     = (counts) => { onlineQueueCounts = counts; };
   onlineClient.cb.onSearching       = () => { /* onlineLobbyPhase already shows searching UI */ };
   onlineClient.cb.onSearchCancelled = () => { onlineLobbyPhase = 'main'; };
   onlineClient.cb.onRoomCreated     = (code) => { onlineRoomCode = code; };
@@ -1022,6 +1025,7 @@ function initGame() {
     onlineRoomCode = '';
     onlineRemoteSide = null;
     onlineCountdown = null;
+    onlineQueueCounts = null;
     onlineLobbyPhase = 'main';
     gs = { ...gs, phase: 'online_lobby' };
   };
@@ -1047,6 +1051,7 @@ function initGame() {
       onlineRemoteSide = null;
       onlineCountdown = null;
       onlineRoomCode = '';
+      onlineQueueCounts = null;
       onlineLobbyPhase = 'main';
       gs = { ...gs, phase: 'online_lobby' };
       return;
@@ -1076,7 +1081,7 @@ function initGame() {
       return;
     }
     if (gs.phase === 'online_side_select') {
-      if (e.key === 'Escape') { onlineClient.disconnect(); gs = { ...gs, phase: 'menu' }; }
+      if (e.key === 'Escape') { onlineClient.disconnect(); onlineQueueCounts = null; gs = { ...gs, phase: 'menu' }; }
       return;
     }
     if (gs.phase === 'online_countdown') {
@@ -1086,6 +1091,7 @@ function initGame() {
         onlineRemoteSide = null;
         onlineCountdown = null;
         onlineRoomCode = '';
+        onlineQueueCounts = null;
         onlineLobbyPhase = 'main';
         gs = { ...gs, phase: 'menu' };
       }
@@ -1100,7 +1106,7 @@ function initGame() {
         return;
       }
       if (e.key === 'Escape') {
-        if (onlineLobbyPhase === 'main')                                        { onlineClient.disconnect(); gs = { ...gs, phase: 'online_side_select' }; }
+        if (onlineLobbyPhase === 'main')                                        { onlineClient.disconnect(); onlineQueueCounts = null; gs = { ...gs, phase: 'online_side_select' }; }
         else if (onlineLobbyPhase === 'searching')                              { _cancelSearch(); onlineLobbyPhase = 'main'; }
         else if (onlineLobbyPhase === 'friend_options')                         onlineLobbyPhase = 'main';
         else if (onlineLobbyPhase === 'create' || onlineLobbyPhase === 'join')  { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
@@ -1337,6 +1343,7 @@ function initGame() {
       onlineClient.reset();
       onlineRemoteSide = null;
       onlineCountdown = null;
+      onlineQueueCounts = null;
       onlineRoomCode = '';
       onlineSnapshotSeq = 0;
       remoteLaneSeq.boy = -1;
@@ -1624,7 +1631,7 @@ function initGame() {
         create:     onlineCreateHov,
         join:       onlineJoinHov,
         joinSubmit: onlineJoinSubmitHov,
-      });
+      }, onlineQueueCounts);
     } else if (gs.phase === 'online_countdown') {
       const secondsRemaining = onlineCountdown
         ? getCountdownSecondsRemaining(onlineCountdown.startAt, onlineCountdown.clockOffsetMs)

@@ -23,6 +23,10 @@ function buildJoinRoomPayload(side, code) {
   return { type: 'join_room', roomCode: code.trim().toUpperCase(), side };
 }
 
+function buildQueueStatusPayload(gameId = 'lovers-lost') {
+  return { type: 'queue_status', gameId };
+}
+
 function getCountdownSecondsRemaining(startAt, clockOffsetMs, clientNow = Date.now()) {
   const msRemaining = startAt - (clientNow + clockOffsetMs);
   if (msRemaining <= 0) return 0;
@@ -91,6 +95,31 @@ function parseSnapshotMessage(value) {
   }
 }
 
+function _normalizeQueueCountValue(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count)) return null;
+  return Math.max(0, Math.floor(count));
+}
+
+function normalizeQueueCounts(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const directBoy = _normalizeQueueCountValue(payload.boyWaiting ?? payload.boyCount ?? payload.boyQueue);
+  const directGirl = _normalizeQueueCountValue(payload.girlWaiting ?? payload.girlCount ?? payload.girlQueue);
+
+  const nested = payload.queueCounts && typeof payload.queueCounts === 'object'
+    ? payload.queueCounts
+    : payload.waiting && typeof payload.waiting === 'object'
+      ? payload.waiting
+      : null;
+
+  const boy = directBoy ?? _normalizeQueueCountValue(nested?.boy);
+  const girl = directGirl ?? _normalizeQueueCountValue(nested?.girl);
+
+  if (boy == null && girl == null) return null;
+  return { boy, girl };
+}
+
 export function createOnlineClient() {
   let ws           = null;
   let _clientId    = null;   // assigned by server on connect; used to filter self-echo
@@ -106,6 +135,7 @@ export function createOnlineClient() {
   // Callbacks — caller assigns these after createOnlineClient()
   const cb = {
     onConnected:       null,  // ()
+    onQueueCounts:     null,  // ({ boy, girl })
     onSearching:       null,  // () — entered public queue
     onSearchCancelled: null,  // () — cancelled before match
     onRoomCreated:     null,  // (code) — private room created, waiting for partner
@@ -157,6 +187,9 @@ export function createOnlineClient() {
 
   function _onEvent(data) {
     const ev = data.event;
+    const queueCounts = normalizeQueueCounts(data);
+
+    if (queueCounts) cb.onQueueCounts?.(queueCounts);
 
     if (ev === 'connected') {
       _clientId = data.clientId;
@@ -173,6 +206,10 @@ export function createOnlineClient() {
 
     if (ev === 'search_cancelled') {
       cb.onSearchCancelled?.();
+      return;
+    }
+
+    if (ev === 'queue_status') {
       return;
     }
 
@@ -265,6 +302,10 @@ export function createOnlineClient() {
     _send(buildJoinRoomPayload(side, code));
   }
 
+  function requestQueueStatus(gameId = 'lovers-lost') {
+    _send(buildQueueStatusPayload(gameId));
+  }
+
   function cancelSearch() {
     _send({ type: 'cancel_match' });
     _coordinator = false;
@@ -294,15 +335,17 @@ export function createOnlineClient() {
     _inRoom = false; _coordinator = false;
   }
 
-  return { connect, findMatch, createRoom, joinRoom, cancelSearch, cancelRoom, sendAction, sendSnapshot, disconnect, reset, cb };
+  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, disconnect, reset, cb };
 }
 
 export {
   buildCreateRoomPayload,
   buildFindMatchPayload,
   buildJoinRoomPayload,
+  buildQueueStatusPayload,
   getCountdownSecondsRemaining,
   hasCountdownStarted,
+  normalizeQueueCounts,
   parseActionMessage,
   parseSnapshotMessage,
   serializeActionMessage,

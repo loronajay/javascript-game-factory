@@ -661,6 +661,21 @@ function createRenderer(canvas, images) {
     };
   }
 
+  function _getLobbyQueueLine(side, lobbyPhase, queueCounts) {
+    if (!queueCounts || (lobbyPhase !== 'main' && lobbyPhase !== 'searching')) return null;
+
+    const partnerSide = _otherSide(side);
+    const count = queueCounts[partnerSide];
+    if (!Number.isFinite(count)) return null;
+
+    const rounded = Math.max(0, Math.floor(count));
+    const noun = partnerSide === 'boy'
+      ? (rounded === 1 ? 'boy' : 'boys')
+      : (rounded === 1 ? 'girl' : 'girls');
+
+    return `${rounded} ${noun} in the yard`;
+  }
+
   function renderOnlineSideSelect(boyHovered, girlHovered, selectedSide = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawSpaceBackground();
@@ -693,13 +708,14 @@ function createRenderer(canvas, images) {
     _onlineEscHint('ESC · BACK TO MENU');
   }
 
-  function renderOnlineLobby(side, lobbyPhase, roomCode, codeInput, searchTick, hov) {
+  function renderOnlineLobby(side, lobbyPhase, roomCode, codeInput, searchTick, hov, queueCounts = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawSpaceBackground();
 
     const img   = side === 'boy' ? images.boy  : images.girl;
     const flipH = side === 'girl';
     const lobbyStatus = _getLobbyStatus(side, lobbyPhase);
+    const queueLine = _getLobbyQueueLine(side, lobbyPhase, queueCounts);
 
     ctx.save();
     ctx.textAlign = 'center';
@@ -718,6 +734,10 @@ function createRenderer(canvas, images) {
     ctx.font = '12px monospace';
     ctx.fillStyle = 'rgba(150,170,225,0.78)';
     ctx.fillText(lobbyStatus.detail, CANVAS_W / 2, 142);
+    if (queueLine) {
+      ctx.fillStyle = 'rgba(255,210,120,0.78)';
+      ctx.fillText(queueLine, CANVAS_W / 2, 162);
+    }
     ctx.restore();
 
     if      (lobbyPhase === 'main')           _renderLobbyMain(img, flipH, side, hov);
@@ -774,7 +794,7 @@ function createRenderer(canvas, images) {
 
   function _renderLobbyMain(img, flipH, side, hov) {
     void side;
-    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 168, SPRITE_W, SPRITE_H, flipH, 1);
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 186, SPRITE_W, SPRITE_H, flipH, 1);
 
     // btnW=320, btnX=(960-320)/2=320
     _drawRedButton(320, 272, 320, 56, 'FIND MATCH',       hov.findMatch,  20);
@@ -783,7 +803,7 @@ function createRenderer(canvas, images) {
 
   function _renderLobbySearching(img, flipH, side, searchTick, hov) {
     void side;
-    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 170, SPRITE_W, SPRITE_H, flipH, 1);
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 186, SPRITE_W, SPRITE_H, flipH, 1);
     const dots = '.'.repeat(Math.floor(searchTick / 20) % 4);
     ctx.save();
     ctx.textAlign = 'center';
@@ -798,7 +818,7 @@ function createRenderer(canvas, images) {
   }
 
   function _renderLobbyFriendOptions(img, flipH, hov) {
-    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 168, SPRITE_W, SPRITE_H, flipH, 1);
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 186, SPRITE_W, SPRITE_H, flipH, 1);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = '15px "Cinzel Decorative", serif';
