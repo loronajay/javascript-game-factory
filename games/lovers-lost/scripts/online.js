@@ -12,12 +12,21 @@ function serializeSnapshotMessage(snapshot) {
 }
 
 function sanitizeIdentityPayload(identity) {
-  if (!identity || typeof identity.displayName !== 'string') return {};
-  return { displayName: identity.displayName };
+  if (!identity || typeof identity !== 'object') return {};
+
+  const payload = {};
+  if (typeof identity.playerId === 'string' && identity.playerId.trim()) {
+    payload.playerId = identity.playerId.trim();
+  }
+  if (typeof identity.displayName === 'string') {
+    payload.displayName = identity.displayName;
+  }
+  return payload;
 }
 
 function buildProfileMessage(identity, side) {
   return JSON.stringify({
+    playerId: typeof identity?.playerId === 'string' ? identity.playerId : '',
     displayName: identity?.displayName || '',
     side: side || null,
   });
@@ -30,6 +39,7 @@ function parseProfileMessage(value) {
     const parsed = JSON.parse(value);
     if (!parsed || typeof parsed.displayName !== 'string') return null;
     return {
+      playerId: typeof parsed.playerId === 'string' ? parsed.playerId : '',
       displayName: parsed.displayName,
       side: typeof parsed.side === 'string' ? parsed.side : null,
     };
@@ -347,7 +357,10 @@ export function createOnlineClient() {
 
   function setIdentity(identity) {
     _identity = identity && typeof identity.displayName === 'string'
-      ? { displayName: identity.displayName }
+      ? {
+          playerId: typeof identity.playerId === 'string' ? identity.playerId : '',
+          displayName: identity.displayName,
+        }
       : null;
   }
 
