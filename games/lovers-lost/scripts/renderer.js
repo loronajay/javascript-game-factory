@@ -664,7 +664,8 @@ function createRenderer(canvas, images) {
   function renderOnlineSideSelect(boyHovered, girlHovered, selectedSide = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawSpaceBackground();
-    _drawOnlineLabel('ONLINE MATCHMAKING', CANVAS_W / 2, 42, {
+    void selectedSide;
+    _drawOnlineLabel('ONLINE MATCHMAKING', CANVAS_W / 2, 26, {
       bg: 'rgba(18,28,56,0.86)',
       stroke: 'rgba(120,165,255,0.50)',
       textColor: 'rgba(220,232,255,0.95)',
@@ -676,11 +677,7 @@ function createRenderer(canvas, images) {
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'rgba(160,190,255,0.55)';
     ctx.shadowBlur = 22;
-    ctx.fillText('CHOOSE YOUR SIDE', CANVAS_W / 2, 90);
-    ctx.shadowBlur = 0;
-    ctx.font = '15px "Cinzel Decorative", serif';
-    ctx.fillStyle = 'rgba(190,205,255,0.76)';
-    ctx.fillText(selectedSide ? `CURRENT PICK: ${selectedSide.toUpperCase()}` : 'PICK A SIDE TO LOCK IN', CANVAS_W / 2, 114);
+    ctx.fillText('CHOOSE YOUR SIDE', CANVAS_W / 2, 94);
     ctx.restore();
 
     // cardW=220, cardH=240, gap=40 → startX=(960-480)/2=240
@@ -776,22 +773,17 @@ function createRenderer(canvas, images) {
   }
 
   function _renderLobbyMain(img, flipH, side, hov) {
-    // Character + "playing as" label
-    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.font = '15px "Cinzel Decorative", serif';
-    ctx.fillStyle = 'rgba(190,205,255,0.78)';
-    ctx.fillText('PLAYING AS ' + side.toUpperCase(), CANVAS_W / 2, 115 + SPRITE_H + 22);
-    ctx.restore();
+    void side;
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 168, SPRITE_W, SPRITE_H, flipH, 1);
 
     // btnW=320, btnX=(960-320)/2=320
-    _drawRedButton(320, 260, 320, 56, 'FIND MATCH',       hov.findMatch,  20);
-    _drawRedButton(320, 336, 320, 56, 'PLAY WITH FRIEND', hov.playFriend, 20);
+    _drawRedButton(320, 272, 320, 56, 'FIND MATCH',       hov.findMatch,  20);
+    _drawRedButton(320, 348, 320, 56, 'PLAY WITH FRIEND', hov.playFriend, 20);
   }
 
   function _renderLobbySearching(img, flipH, side, searchTick, hov) {
-    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
+    void side;
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 170, SPRITE_W, SPRITE_H, flipH, 1);
     const dots = '.'.repeat(Math.floor(searchTick / 20) % 4);
     ctx.save();
     ctx.textAlign = 'center';
@@ -799,23 +791,23 @@ function createRenderer(canvas, images) {
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'rgba(160,190,255,0.40)';
     ctx.shadowBlur = 10;
-    ctx.fillText('Searching for a partner' + dots, CANVAS_W / 2, 236);
+    ctx.fillText('SEARCHING FOR A PARTNER' + dots, CANVAS_W / 2, 284);
     ctx.restore();
     // btnW=200, btnX=(960-200)/2=380
-    _drawRedButton(380, 300, 200, 44, 'CANCEL', hov.cancel, 16);
+    _drawRedButton(380, 350, 200, 44, 'CANCEL', hov.cancel, 16);
   }
 
   function _renderLobbyFriendOptions(img, flipH, hov) {
-    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 168, SPRITE_W, SPRITE_H, flipH, 1);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = '15px "Cinzel Decorative", serif';
     ctx.fillStyle = 'rgba(190,205,255,0.75)';
-    ctx.fillText('How would you like to connect?', CANVAS_W / 2, 195);
+    ctx.fillText('How would you like to connect?', CANVAS_W / 2, 250);
     ctx.restore();
     // btnW=280, btnX=(960-280)/2=340
-    _drawRedButton(340, 215, 280, 52, 'CREATE ROOM', hov.create, 18);
-    _drawRedButton(340, 287, 280, 52, 'ENTER CODE',  hov.join,   18);
+    _drawRedButton(340, 282, 280, 52, 'CREATE ROOM', hov.create, 18);
+    _drawRedButton(340, 354, 280, 52, 'ENTER CODE',  hov.join,   18);
   }
 
   function _renderLobbyCreate(roomCode, searchTick, hov) {
@@ -823,22 +815,22 @@ function createRenderer(canvas, images) {
     ctx.textAlign = 'center';
     ctx.font = '16px "Cinzel Decorative", serif';
     ctx.fillStyle = 'rgba(190,205,255,0.75)';
-    ctx.fillText('Share this code with your friend:', CANVAS_W / 2, 140);
+    ctx.fillText('Share this code with your friend:', CANVAS_W / 2, 198);
 
     ctx.font = 'bold 64px monospace';
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'rgba(160,190,255,0.60)';
     ctx.shadowBlur = 20;
-    ctx.fillText(roomCode || '------', CANVAS_W / 2, 230);
+    ctx.fillText(roomCode || '------', CANVAS_W / 2, 290);
     ctx.shadowBlur = 0;
 
     const dots = '.'.repeat(Math.floor(searchTick / 20) % 4);
     ctx.font = '17px "Cinzel Decorative", serif';
     ctx.fillStyle = 'rgba(190,205,255,0.65)';
-    ctx.fillText('Waiting for your partner' + dots, CANVAS_W / 2, 268);
+    ctx.fillText('Waiting for your partner' + dots, CANVAS_W / 2, 338);
     ctx.restore();
     // btnW=200, btnX=(960-200)/2=380
-    _drawRedButton(380, 310, 200, 44, 'CANCEL', hov.cancel, 16);
+    _drawRedButton(380, 390, 200, 44, 'CANCEL', hov.cancel, 16);
   }
 
   function _renderLobbyJoin(codeInput, hov) {
@@ -846,22 +838,22 @@ function createRenderer(canvas, images) {
     ctx.textAlign = 'center';
     ctx.font = '16px "Cinzel Decorative", serif';
     ctx.fillStyle = 'rgba(190,205,255,0.75)';
-    ctx.fillText("Enter your friend's room code:", CANVAS_W / 2, 150);
+    ctx.fillText("ENTER YOUR FRIEND'S ROOM CODE:", CANVAS_W / 2, 210);
 
     // Input box: x=320, y=170, w=320, h=52
     ctx.fillStyle = 'rgba(10,12,28,0.90)';
-    ctx.fillRect(320, 170, 320, 52);
+    ctx.fillRect(320, 232, 320, 52);
     ctx.strokeStyle = 'rgba(130,150,220,0.70)';
     ctx.lineWidth = 2;
-    ctx.strokeRect(320, 170, 320, 52);
+    ctx.strokeRect(320, 232, 320, 52);
     ctx.font = 'bold 28px monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(codeInput, CANVAS_W / 2, 170 + 52 / 2 + 10);
+    ctx.fillText(codeInput, CANVAS_W / 2, 232 + 52 / 2 + 10);
     ctx.restore();
 
     // JOIN: btnW=200 btnX=380 y=244; CANCEL: btnW=160 btnX=400 y=320
-    _drawRedButton(380, 244, 200, 52, 'JOIN',   hov.joinSubmit, 18);
-    _drawRedButton(400, 318, 160, 40, 'CANCEL', hov.cancel,     15);
+    _drawRedButton(380, 314, 200, 52, 'JOIN',   hov.joinSubmit, 18);
+    _drawRedButton(400, 390, 160, 40, 'CANCEL', hov.cancel,     15);
   }
 
   function renderMenuHelp(debugState) {
