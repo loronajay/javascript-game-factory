@@ -11,6 +11,9 @@
   --select: #8cf6d4;
   --shadow: rgba(0, 0, 0, 0.44);
   --font-display: Consolas, "Lucida Console", "Courier New", monospace;
+  --profile-avatar-frame-size: clamp(144px, 16vw, 164px);
+  --profile-avatar-image-size: clamp(112px, 13vw, 132px);
+  --profile-avatar-frame-padding: clamp(8px, 1vw, 10px);
 }
 
 * {
@@ -1682,16 +1685,18 @@ body::before {
 .me-hero-card {
   grid-column: 1 / 2;
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) 220px;
   gap: 20px;
   min-height: 360px;
   padding: 26px;
+  align-items: start;
 }
 
 .me-hero-card__copy {
   display: grid;
   align-content: start;
   gap: 12px;
+  min-width: 0;
 }
 
 .me-hero-card__kicker,
@@ -1731,9 +1736,10 @@ body::before {
 
 .me-hero-card__meta {
   display: grid;
+  grid-column: 1 / -1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin-top: auto;
+  margin-top: 8px;
 }
 
 .me-meta-block {
@@ -1752,37 +1758,67 @@ body::before {
 }
 
 .me-hero-card__portrait {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  min-height: 0;
+  padding: 4px 0 0;
+}
+
+.me-hero-card__portrait-shell {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.me-hero-card__portrait-frame {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 100%;
-  padding: 20px;
-  border: 1px solid rgba(255, 214, 189, 0.12);
+  width: var(--profile-avatar-frame-size);
+  aspect-ratio: 1 / 1;
+  padding: var(--profile-avatar-frame-padding);
+  border-radius: 22px;
+  border: 1px solid rgba(255, 214, 189, 0.16);
   background:
     radial-gradient(circle at 50% 32%, rgba(255, 214, 189, 0.18), transparent 24%),
     radial-gradient(circle at 50% 50%, rgba(255, 121, 183, 0.18), transparent 34%),
     linear-gradient(180deg, rgba(9, 9, 22, 0.6), rgba(7, 6, 18, 0.92));
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.28),
+    inset 0 0 18px rgba(255, 255, 255, 0.04);
 }
 
-.me-hero-card__portrait-core,
-.me-hero-card__portrait-ring {
-  border-radius: 50%;
-}
-
-.me-hero-card__portrait-core {
+.me-hero-card__portrait-frame::after {
+  content: "";
   position: relative;
-  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(153, 255, 255, 0.16);
+  pointer-events: none;
+}
+
+.me-hero-card__portrait-fallback,
+.me-hero-card__portrait-image {
+  grid-area: 1 / 1;
+}
+
+.me-hero-card__portrait-fallback {
   display: grid;
   place-items: center;
-  width: min(160px, 52vw);
+  width: var(--profile-avatar-image-size);
   aspect-ratio: 1 / 1;
   padding: 16px;
+  border-radius: 50%;
   border: 2px solid rgba(255, 214, 189, 0.28);
   background:
     radial-gradient(circle at 50% 30%, rgba(255, 248, 255, 0.32), rgba(255, 121, 183, 0.14) 38%, rgba(7, 6, 18, 0.96) 72%);
   color: #fff8ff;
-  font-size: clamp(1rem, 2vw, 1.1rem);
-  letter-spacing: 0.08em;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-align: center;
   text-transform: uppercase;
   box-shadow:
@@ -1790,14 +1826,29 @@ body::before {
     inset 0 0 24px rgba(255, 255, 255, 0.04);
 }
 
-.me-hero-card__portrait-ring {
-  position: absolute;
-  width: min(220px, 64vw);
-  aspect-ratio: 1 / 1;
-  border: 1px solid rgba(153, 255, 255, 0.24);
+.me-hero-card__portrait-image {
+  width: var(--profile-avatar-image-size);
+  height: var(--profile-avatar-image-size);
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 214, 189, 0.24);
   box-shadow:
-    0 0 18px rgba(153, 255, 255, 0.12),
-    inset 0 0 18px rgba(153, 255, 255, 0.04);
+    0 0 18px rgba(255, 121, 183, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+.me-hero-card--avatar-fallback .me-hero-card__portrait-image {
+  display: none;
+}
+
+.me-hero-card__portrait-caption {
+  margin: 0;
+  color: rgba(255, 248, 255, 0.68);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
 }
 
 .me-panel {
@@ -1909,6 +1960,11 @@ body::before {
   .me-hero-card {
     grid-template-columns: minmax(0, 1fr);
     padding: 18px 16px 18px;
+  }
+
+  .me-hero-card__portrait {
+    order: -1;
+    padding-top: 0;
   }
 
   .me-hero-card__meta {

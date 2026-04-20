@@ -2,6 +2,8 @@ import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
 
+const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -33,6 +35,23 @@ function normalizeStringList(value) {
   }
 
   return normalized;
+}
+
+function buildProfileInitials(name) {
+  const tokens = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (tokens.length >= 2) {
+    return `${tokens[0][0] || ""}${tokens[1][0] || ""}`.toUpperCase();
+  }
+
+  if (tokens.length === 1) {
+    return tokens[0].slice(0, 2).toUpperCase();
+  }
+
+  return "??";
 }
 
 export function buildMePageViewModel(profile, options = {}) {
@@ -92,6 +111,9 @@ export function buildMePageViewModel(profile, options = {}) {
     heroTagline,
     heroBio,
     heroChipLabel,
+    avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
+    avatarAlt: `${heroName} portrait`,
+    avatarInitials: buildProfileInitials(heroName),
     heroMeta: [
       { label: "Factory ID", value: publicView.playerId || "PENDING-ID" },
       { label: "Friends", value: String(friends.length) },
@@ -114,23 +136,52 @@ function renderHeroCard(container, model) {
     </div>
   `).join("");
 
-  const avatarLabel = model.avatarAssetId
-    ? `Asset ${model.avatarAssetId}`
-    : model.heroName.slice(0, 1) || "?";
-
   container.innerHTML = `
     <div class="me-hero-card__copy">
       <p class="me-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
       <h2 class="me-hero-card__name">${escapeHtml(model.heroName)}</h2>
       <p class="me-hero-card__tagline">${escapeHtml(model.heroTagline)}</p>
       <p class="me-hero-card__bio">${escapeHtml(model.heroBio)}</p>
-      <div class="me-hero-card__meta">${metaHtml}</div>
     </div>
     <div class="me-hero-card__portrait" aria-hidden="true">
-      <div class="me-hero-card__portrait-core">${escapeHtml(avatarLabel)}</div>
-      <div class="me-hero-card__portrait-ring"></div>
+      <div class="me-hero-card__portrait-shell">
+        <div class="me-hero-card__portrait-frame">
+          <div class="me-hero-card__portrait-fallback">${escapeHtml(model.avatarInitials)}</div>
+          <img
+            class="me-hero-card__portrait-image"
+            src="${escapeHtml(model.avatarSrc)}"
+            alt="${escapeHtml(model.avatarAlt)}"
+          >
+        </div>
+        <p class="me-hero-card__portrait-caption">Default arcade portrait</p>
+      </div>
     </div>
+    <div class="me-hero-card__meta">${metaHtml}</div>
   `;
+
+  const portraitImage = container.querySelector(".me-hero-card__portrait-image");
+  if (!portraitImage) return;
+
+  function showFallback() {
+    container.classList.add("me-hero-card--avatar-fallback");
+  }
+
+  function showImage() {
+    container.classList.remove("me-hero-card--avatar-fallback");
+  }
+
+  portraitImage.addEventListener("error", showFallback, { once: true });
+  portraitImage.addEventListener("load", showImage, { once: true });
+
+  if (portraitImage.complete) {
+    if (portraitImage.naturalWidth > 0) {
+      showImage();
+    } else {
+      showFallback();
+    }
+  } else {
+    showFallback();
+  }
 }
 
 function renderPanel(container, title, subtitle, items, formatter) {

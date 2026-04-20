@@ -541,6 +541,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `js/platform/profile/` now owns shared bio/tagline/link normalization plus public profile-view building.
 - `/me/index.html` now exists as the first non-game platform page and reuses the synthwave shell language rather than introducing a separate visual system.
 - Home and grid now expose direct navigation into the player page.
+- The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 
 ## Decision Gates
 
