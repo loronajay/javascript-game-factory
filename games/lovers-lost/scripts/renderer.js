@@ -427,6 +427,11 @@ function createRenderer(canvas, images) {
   const menuGirlAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
   const helpWalkAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
 
+  let menuTick = 0;
+  function _menuWalkFrame(offset = 0) {
+    return WALK_FRAMES[Math.floor((menuTick + offset) / WALK_SPEED) % WALK_FRAMES.length];
+  }
+
   const menuStars = (() => {
     const rng = _makeRng(9999);
     return Array.from({ length: 160 }, () => ({
@@ -454,11 +459,12 @@ function createRenderer(canvas, images) {
   // boyObstacles / girlObstacles: each side's own obstacle list
   // boyBoosts / girlBoosts: each side's boost list ({ distance, collected })
   // elapsed: seconds since run started
-  function renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed, debugState, uiState = {}) {
+  // gameTick: raw 60hz tick count (gs.elapsed) — drives walk cycle deterministically
+  function renderPlay(boyPlayer, girlPlayer, boyObstacles, girlObstacles, boyBoosts, girlBoosts, elapsed, debugState, uiState = {}, gameTick = Math.round(elapsed * 60)) {
     const nowMs = Date.now();
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    _drawHalf(0,      'boy',  boyAnim,  boyPlayer,  boyObstacles,  boyBoosts,  boyDying,  boyTrail,  boyEffects,  nowMs, debugState?.enabled ? debugState.boy : null);
-    _drawHalf(HALF_W, 'girl', girlAnim, girlPlayer, girlObstacles, girlBoosts, girlDying, girlTrail, girlEffects, nowMs, debugState?.enabled ? debugState.girl : null);
+    _drawHalf(0,      'boy',  boyAnim,  boyPlayer,  boyObstacles,  boyBoosts,  boyDying,  boyTrail,  boyEffects,  nowMs, debugState?.enabled ? debugState.boy : null, gameTick);
+    _drawHalf(HALF_W, 'girl', girlAnim, girlPlayer, girlObstacles, girlBoosts, girlDying, girlTrail, girlEffects, nowMs, debugState?.enabled ? debugState.girl : null, gameTick);
     _drawDivider();
     _drawHUD(boyPlayer, girlPlayer, elapsed, uiState);
     if (debugState?.enabled) _drawDebugBanner(debugState);
@@ -536,10 +542,8 @@ function createRenderer(canvas, images) {
     const btn3W = 240, btn3H = 44;
     _drawRedButton(CANVAS_W / 2 - btn3W / 2, 362, btn3W, btn3H, 'HOW TO PLAY', btn3Hovered, 16);
 
-    _tickAnim(menuBoyAnim);
-    _blit(images.boy,  menuBoyAnim.frame,  FRAME_W, FRAME_H, 90,                       PLAYER_Y, SPRITE_W, SPRITE_H, false, 1);
-    _tickAnim(menuGirlAnim);
-    _blit(images.girl, menuGirlAnim.frame, FRAME_W, FRAME_H, CANVAS_W - 90 - SPRITE_W, PLAYER_Y, SPRITE_W, SPRITE_H, true,  1);
+    _blit(images.boy,  _menuWalkFrame(),    FRAME_W, FRAME_H, 90,                       PLAYER_Y, SPRITE_W, SPRITE_H, false, 1);
+    _blit(images.girl, _menuWalkFrame(),    FRAME_W, FRAME_H, CANVAS_W - 90 - SPRITE_W, PLAYER_Y, SPRITE_W, SPRITE_H, true,  1);
 
     if (debugState?.enabled) _drawDebugBanner(debugState);
   }
@@ -680,16 +684,14 @@ function createRenderer(canvas, images) {
     ctx.restore();
 
     // cardW=220, cardH=240, gap=40 → startX=(960-480)/2=240
-    _tickAnim(menuBoyAnim);
-    _tickAnim(menuGirlAnim);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = '13px monospace';
     ctx.fillStyle = 'rgba(255,210,120,0.88)';
     ctx.fillText('YOUR SIDE STAYS LOCKED FOR THE MATCH', CANVAS_W / 2, 392);
     ctx.restore();
-    _drawSideCard(240, 130, 220, 240, images.boy,  false, 'BOY',  'LEFT SIDE',  'W  A  S  D', boyHovered,  menuBoyAnim.frame);
-    _drawSideCard(500, 130, 220, 240, images.girl, true,  'GIRL', 'RIGHT SIDE', '←  ↑  ↓  →', girlHovered, menuGirlAnim.frame);
+    _drawSideCard(240, 130, 220, 240, images.boy,  false, 'BOY',  'LEFT SIDE',  'W  A  S  D', boyHovered,  _menuWalkFrame());
+    _drawSideCard(500, 130, 220, 240, images.girl, true,  'GIRL', 'RIGHT SIDE', '←  ↑  ↓  →', girlHovered, _menuWalkFrame());
 
     _onlineEscHint('ESC · BACK TO MENU');
   }
@@ -700,9 +702,7 @@ function createRenderer(canvas, images) {
 
     const img   = side === 'boy' ? images.boy  : images.girl;
     const flipH = side === 'girl';
-    const anim  = side === 'boy' ? menuBoyAnim : menuGirlAnim;
     const lobbyStatus = _getLobbyStatus(side, lobbyPhase);
-    _tickAnim(anim);
 
     ctx.save();
     ctx.textAlign = 'center';
@@ -723,9 +723,9 @@ function createRenderer(canvas, images) {
     ctx.fillText(lobbyStatus.detail, CANVAS_W / 2, 142);
     ctx.restore();
 
-    if      (lobbyPhase === 'main')           _renderLobbyMain(img, flipH, anim, side, hov);
-    else if (lobbyPhase === 'searching')      _renderLobbySearching(img, flipH, anim, side, searchTick, hov);
-    else if (lobbyPhase === 'friend_options') _renderLobbyFriendOptions(img, flipH, anim, hov);
+    if      (lobbyPhase === 'main')           _renderLobbyMain(img, flipH, side, hov);
+    else if (lobbyPhase === 'searching')      _renderLobbySearching(img, flipH, side, searchTick, hov);
+    else if (lobbyPhase === 'friend_options') _renderLobbyFriendOptions(img, flipH, hov);
     else if (lobbyPhase === 'create')         _renderLobbyCreate(roomCode, searchTick, hov);
     else if (lobbyPhase === 'join')           _renderLobbyJoin(codeInput, hov);
 
@@ -738,15 +738,13 @@ function createRenderer(canvas, images) {
 
     const img = side === 'boy' ? images.boy : images.girl;
     const flipH = side === 'girl';
-    const anim = side === 'boy' ? menuBoyAnim : menuGirlAnim;
-    _tickAnim(anim);
 
     _drawOnlineLabel('SERVER COUNTDOWN SYNCED', CANVAS_W / 2, 40, {
       bg: 'rgba(16,34,62,0.88)',
       stroke: 'rgba(120,200,255,0.55)',
       textColor: 'rgba(220,240,255,0.96)',
     });
-    _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
 
     ctx.save();
     ctx.textAlign = 'center';
@@ -777,9 +775,9 @@ function createRenderer(canvas, images) {
     _onlineEscHint('ESC · CANCEL MATCH');
   }
 
-  function _renderLobbyMain(img, flipH, anim, side, hov) {
+  function _renderLobbyMain(img, flipH, side, hov) {
     // Character + "playing as" label
-    _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = '15px "Cinzel Decorative", serif';
@@ -792,8 +790,8 @@ function createRenderer(canvas, images) {
     _drawRedButton(320, 336, 320, 56, 'PLAY WITH FRIEND', hov.playFriend, 20);
   }
 
-  function _renderLobbySearching(img, flipH, anim, side, searchTick, hov) {
-    _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
+  function _renderLobbySearching(img, flipH, side, searchTick, hov) {
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 120, SPRITE_W, SPRITE_H, flipH, 1);
     const dots = '.'.repeat(Math.floor(searchTick / 20) % 4);
     ctx.save();
     ctx.textAlign = 'center';
@@ -807,8 +805,8 @@ function createRenderer(canvas, images) {
     _drawRedButton(380, 300, 200, 44, 'CANCEL', hov.cancel, 16);
   }
 
-  function _renderLobbyFriendOptions(img, flipH, anim, hov) {
-    _blit(img, anim.frame, FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
+  function _renderLobbyFriendOptions(img, flipH, hov) {
+    _blit(img, _menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 115, SPRITE_W, SPRITE_H, flipH, 1);
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = '15px "Cinzel Decorative", serif';
@@ -879,8 +877,7 @@ function createRenderer(canvas, images) {
     ctx.fillText('HOW TO PLAY', CANVAS_W / 2, 72);
     ctx.restore();
 
-    _tickAnim(helpWalkAnim);
-    const walkFrame = helpWalkAnim.frame;
+    const walkFrame = _menuWalkFrame();
     const nowMs = Date.now();
 
     const CARD_W = 200, CARD_H = 230, CGAP = 20;
@@ -1001,7 +998,7 @@ function createRenderer(canvas, images) {
   }
 
   // ── Half ────────────────────────────────────────────────────────────────────
-  function _drawHalf(offsetX, side, animState, player, obstacles, boosts, dying, trail, effects, nowMs, debugSnapshot) {
+  function _drawHalf(offsetX, side, animState, player, obstacles, boosts, dying, trail, effects, nowMs, debugSnapshot, gameTick) {
     const facing = side === 'boy' ? 'right' : 'left';
     ctx.save();
     ctx.beginPath();
@@ -1012,7 +1009,7 @@ function createRenderer(canvas, images) {
     _drawFieldObstacles(offsetX, player, facing, obstacles, nowMs);
     _drawFieldBoosts(offsetX, player, facing, boosts, side);
     _drawDyingGoblins(offsetX, player, facing, dying);
-    _drawPlayerSprite(offsetX, player, facing, animState, side);
+    _drawPlayerSprite(offsetX, player, facing, animState, side, gameTick);
     _drawOutcomeEffects(offsetX, side, effects);
     if (debugSnapshot?.enabled) _drawDebugCollision(offsetX, side, player, obstacles, debugSnapshot, nowMs);
     ctx.restore();
@@ -1904,13 +1901,17 @@ default:          return GROUND_TOP - 28;
   // walkAnim: renderer-internal walk cycle tracker (frame, tick, walkIdx).
   // Visual state is read from player.animState (provided by game.js / demo.html):
   //   { state: 'running'|'jumping'|'crouch'|'attack'|'block'|'hit', actionTick: number }
-  function _drawPlayerSprite(offsetX, player, facing, walkAnim, side) {
+  function _drawPlayerSprite(offsetX, player, facing, walkAnim, side, gameTick) {
     const img    = side === 'boy' ? images.boy : images.girl;
     const localX = side === 'boy' ? BOY_LOCAL_X : GIRL_LOCAL_X;
     const flipX  = facing === 'left';
     const isFinished = player.state === 'finished';
 
-    _tickAnim(walkAnim);
+    if (gameTick != null) {
+      walkAnim.frame = WALK_FRAMES[Math.floor(gameTick / WALK_SPEED) % WALK_FRAMES.length];
+    } else {
+      _tickAnim(walkAnim);
+    }
 
     // Visual state from caller — fall back to 'running' if not provided.
     const vs     = isFinished ? { state: 'running', actionTick: 0 } : (player.animState || { state: 'running', actionTick: 0 });
@@ -2029,8 +2030,12 @@ default:          return GROUND_TOP - 28;
   }
 
   // ── Reunion helpers ───────────────────────────────────────────────────────────
-  function _drawCharacterAtAbsX(absX, img, facing, walkAnim) {
-    _tickAnim(walkAnim);
+  function _drawCharacterAtAbsX(absX, img, facing, walkAnim, gameTick) {
+    if (gameTick != null) {
+      walkAnim.frame = WALK_FRAMES[Math.floor(gameTick / WALK_SPEED) % WALK_FRAMES.length];
+    } else {
+      _tickAnim(walkAnim);
+    }
     _blit(img, walkAnim.frame, FRAME_W, FRAME_H, absX, PLAYER_Y, SPRITE_W, SPRITE_H, facing === 'left', 1);
   }
 
@@ -2078,8 +2083,8 @@ default:          return GROUND_TOP - 28;
       ctx.fillRect(DIVIDER_X - 1, 0, 2, CANVAS_H);
     }
 
-    _drawCharacterAtAbsX(boyX,  images.boy,  'right', boyAnim);
-    _drawCharacterAtAbsX(girlX, images.girl, 'left',  girlAnim);
+    _drawCharacterAtAbsX(boyX,  images.boy,  'right', boyAnim,  phaseFrames);
+    _drawCharacterAtAbsX(girlX, images.girl, 'left',  girlAnim, phaseFrames);
 
     // Heart: pops in once they've met, then pulses
     if (phaseFrames >= WALK_FRAMES) {
@@ -2226,9 +2231,12 @@ default:          return GROUND_TOP - 28;
     ctx.restore();
   }
 
+  function tickMenuAnims() { menuTick++; }
+
   // ─── Public API ───────────────────────────────────────────────────────────────
   return {
     renderPlay,
+    tickMenuAnims,
     renderMenu,
     renderOnlineSideSelect,
     renderOnlineLobby,

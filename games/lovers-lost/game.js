@@ -1540,6 +1540,7 @@ function initGame() {
       gs = advancePhaseState(gs);
     }
 
+    renderer.tickMenuAnims();
     inp.tick(); // clear pressed state at end of tick so isPressed is one-shot
     } // end fixed-timestep while loop
 
@@ -1586,7 +1587,8 @@ function initGame() {
         gs.boyBoosts, gs.girlBoosts,
         elapsed,
         debugState,
-        { online: gs.mode === 'online' }
+        { online: gs.mode === 'online' },
+        gs.elapsed
       );
     } else if (gs.phase === 'reunion') {
       renderer.renderReunion(boyPlayer, girlPlayer, gs.phaseFrames);
