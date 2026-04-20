@@ -655,6 +655,12 @@ function createRenderer(canvas, images) {
     return side === 'girl' ? 'boy' : 'girl';
   }
 
+  function _formatIdentityLabel(side, identity) {
+    const sideLabel = side === 'girl' ? 'Girl' : 'Boy';
+    const name = typeof identity?.displayName === 'string' ? identity.displayName.trim() : '';
+    return name ? `${name} (${sideLabel})` : sideLabel;
+  }
+
   function _drawOnlineLabel(text, x, y, opts = {}) {
     const font = opts.font || 'bold 12px monospace';
     const padX = opts.padX || 10;
@@ -763,7 +769,57 @@ function createRenderer(canvas, images) {
     _onlineEscHint('ESC · BACK TO MENU');
   }
 
-  function renderOnlineLobby(side, lobbyPhase, roomCode, codeInput, searchTick, hov, queueCounts = null) {
+  function renderOnlineNameEntry(side, nameInput, errorText = '', hov = {}) {
+    const label = _formatIdentityLabel(side, { displayName: nameInput });
+
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    _drawSpaceBackground();
+    _drawOnlineLabel('ONLINE PROFILE', CANVAS_W / 2, 26, {
+      bg: 'rgba(18,28,56,0.86)',
+      stroke: 'rgba(120,165,255,0.50)',
+      textColor: 'rgba(220,232,255,0.95)',
+    });
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 36px "Cinzel Decorative", serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.50)';
+    ctx.shadowBlur = 18;
+    ctx.fillText('CHOOSE YOUR NAME', CANVAS_W / 2, 90);
+    ctx.shadowBlur = 0;
+    ctx.font = '14px monospace';
+    ctx.fillStyle = 'rgba(220,230,255,0.82)';
+    ctx.fillText(`PLAYING AS ${side.toUpperCase()}`, CANVAS_W / 2, 118);
+    ctx.fillStyle = 'rgba(255,210,120,0.88)';
+    ctx.fillText('12 CHARACTERS MAX', CANVAS_W / 2, 140);
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '16px "Cinzel Decorative", serif';
+    ctx.fillStyle = 'rgba(190,205,255,0.75)';
+    ctx.fillText('Enter the name you want other players to see:', CANVAS_W / 2, 206);
+
+    ctx.fillStyle = 'rgba(10,12,28,0.90)';
+    ctx.fillRect(300, 228, 360, 56);
+    ctx.strokeStyle = errorText ? 'rgba(255,120,130,0.84)' : 'rgba(130,150,220,0.70)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(300, 228, 360, 56);
+    ctx.font = 'bold 28px monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(nameInput || '', CANVAS_W / 2, 266);
+
+    ctx.font = '13px monospace';
+    ctx.fillStyle = errorText ? 'rgba(255,150,150,0.96)' : 'rgba(150,170,225,0.72)';
+    ctx.fillText(errorText || label, CANVAS_W / 2, 304);
+    ctx.restore();
+
+    _drawRedButton(380, 336, 200, 52, 'CONTINUE', hov.continue, 18);
+    _onlineEscHint('ESC · BACK');
+  }
+
+  function renderOnlineLobby(side, lobbyPhase, roomCode, codeInput, searchTick, hov, queueCounts = null, localIdentity = null, remoteIdentity = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawSpaceBackground();
 
@@ -793,6 +849,12 @@ function createRenderer(canvas, images) {
       ctx.fillStyle = 'rgba(255,210,120,0.78)';
       ctx.fillText(queueLine, CANVAS_W / 2, 162);
     }
+    ctx.fillStyle = 'rgba(220,230,255,0.84)';
+    ctx.fillText(`YOU: ${_formatIdentityLabel(side, localIdentity)}`, CANVAS_W / 2, 182);
+    if (remoteIdentity?.displayName) {
+      ctx.fillStyle = 'rgba(255,210,120,0.82)';
+      ctx.fillText(`PARTNER: ${_formatIdentityLabel(_otherSide(side), remoteIdentity)}`, CANVAS_W / 2, 202);
+    }
     ctx.restore();
 
     if      (lobbyPhase === 'main')           _renderLobbyMain(img, flipH, side, hov);
@@ -804,7 +866,7 @@ function createRenderer(canvas, images) {
     _onlineEscHint('ESC · BACK');
   }
 
-  function renderOnlineCountdown(side, remoteSide, secondsRemaining) {
+  function renderOnlineCountdown(side, remoteSide, secondsRemaining, localIdentity = null, remoteIdentity = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     _drawSpaceBackground();
 
@@ -829,8 +891,12 @@ function createRenderer(canvas, images) {
     ctx.shadowBlur = 0;
     ctx.font = '16px "Cinzel Decorative", serif';
     ctx.fillStyle = 'rgba(190,205,255,0.78)';
-    ctx.fillText(`YOU ARE ${side.toUpperCase()}`, CANVAS_W / 2, 214);
-    ctx.fillText(`PARTNER: ${(remoteSide || 'CONNECTING').toUpperCase()}`, CANVAS_W / 2, 240);
+    ctx.fillText(`YOU: ${_formatIdentityLabel(side, localIdentity)}`, CANVAS_W / 2, 214);
+    ctx.fillText(
+      `PARTNER: ${remoteIdentity?.displayName ? _formatIdentityLabel(remoteSide, remoteIdentity) : (remoteSide ? _formatIdentityLabel(remoteSide, null) : 'CONNECTING')}`,
+      CANVAS_W / 2,
+      240
+    );
 
     ctx.font = 'bold 104px monospace';
     ctx.fillStyle = '#ffffff';
@@ -2510,12 +2576,14 @@ default:          return GROUND_TOP - 28;
     const girlScore = runSummary ? (runSummary.girlFinished ? runSummary.girlScore : girlPlayer.score) : girlPlayer.score;
     const boyTrophy  = boyScore  >= girlScore ? ' 🏆' : '';
     const girlTrophy = girlScore >= boyScore  ? ' 🏆' : '';
+    const boyName = _formatIdentityLabel('boy', runSummary?.boyIdentity);
+    const girlName = _formatIdentityLabel('girl', runSummary?.girlIdentity);
     const boyLine = runSummary
-      ? `${boyTrophy}Boy: ${runSummary.boyFinished ? runSummary.boyScore : `${boyPlayer.score} (forfeit)`}`
-      : `${boyTrophy}Boy score: ${boyPlayer.score}`;
+      ? `${boyTrophy}${boyName}: ${runSummary.boyFinished ? runSummary.boyScore : `${boyPlayer.score} (forfeit)`}`
+      : `${boyTrophy}${boyName} score: ${boyPlayer.score}`;
     const girlLine = runSummary
-      ? `${girlTrophy}Girl: ${runSummary.girlFinished ? runSummary.girlScore : `${girlPlayer.score} (forfeit)`}`
-      : `${girlTrophy}Girl score: ${girlPlayer.score}`;
+      ? `${girlTrophy}${girlName}: ${runSummary.girlFinished ? runSummary.girlScore : `${girlPlayer.score} (forfeit)`}`
+      : `${girlTrophy}${girlName} score: ${girlPlayer.score}`;
     const total = runSummary ? runSummary.totalScore : boyPlayer.score + girlPlayer.score;
     _drawOverlayPanel(title, [
       runSummary ? `Time: ${_formatRunTime(runSummary.elapsedFrames)}` : null,
@@ -2572,6 +2640,7 @@ default:          return GROUND_TOP - 28;
     tickMenuAnims,
     renderMenu,
     renderOnlineSideSelect,
+    renderOnlineNameEntry,
     renderOnlineLobby,
     renderOnlineCountdown,
     renderMenuHelp,

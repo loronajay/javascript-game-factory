@@ -65,10 +65,38 @@ const DEBUG_OBSTACLE_LABELS = {
   arrowwall: 'arrows',
   goblin: 'goblins',
 };
+const ONLINE_NAME_MAX_LEN = 12;
+const ONLINE_NAME_STORAGE_KEY = 'lovers-lost.onlineIdentity.displayName';
 
 function normalizeDebugObstacleType(value) {
   if (typeof value !== 'string') return null;
   return DEBUG_OBSTACLE_ALIASES[value.trim().toLowerCase()] || null;
+}
+
+function sanitizeOnlineDisplayName(value) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, ONLINE_NAME_MAX_LEN);
+}
+
+function isValidOnlineDisplayName(value) {
+  return sanitizeOnlineDisplayName(value).length > 0;
+}
+
+function formatOnlinePlayerLabel(side, identity) {
+  const sideLabel = side === 'girl' ? 'Girl' : 'Boy';
+  const name = sanitizeOnlineDisplayName(identity?.displayName || '');
+  return name ? `${name} (${sideLabel})` : sideLabel;
+}
+
+function attachOnlineResultIdentities(runSummary, localSide, localIdentity, remoteSide, remoteIdentity) {
+  if (!runSummary) return runSummary;
+
+  const summary = { ...runSummary };
+  if (localSide === 'boy') summary.boyIdentity = { displayName: sanitizeOnlineDisplayName(localIdentity?.displayName || '') };
+  if (localSide === 'girl') summary.girlIdentity = { displayName: sanitizeOnlineDisplayName(localIdentity?.displayName || '') };
+  if (remoteSide === 'boy') summary.boyIdentity = { displayName: sanitizeOnlineDisplayName(remoteIdentity?.displayName || '') };
+  if (remoteSide === 'girl') summary.girlIdentity = { displayName: sanitizeOnlineDisplayName(remoteIdentity?.displayName || '') };
+  return summary;
 }
 
 function obstacleCourseForDebug(obstacles, debugObstacleType) {
@@ -909,6 +937,12 @@ function getOnlineSideSelectRects() {
   };
 }
 
+function getOnlineNameEntryButtonRects() {
+  return {
+    continue: { x: 380, y: 336, w: 200, h: 52 },
+  };
+}
+
 function getOnlineLobbyButtonRects(lobbyPhase) {
   if (lobbyPhase === 'main') {
     return {
@@ -967,6 +1001,11 @@ export {
   advancePhaseState,
   nextActionForSide,
   shouldHandleMappedKeyLocally,
+  sanitizeOnlineDisplayName,
+  isValidOnlineDisplayName,
+  formatOnlinePlayerLabel,
+  attachOnlineResultIdentities,
+  getOnlineNameEntryButtonRects,
   getOnlineSideSelectRects,
   getOnlineLobbyButtonRects,
   buildLaneSnapshot,
@@ -1011,19 +1050,33 @@ function initGame() {
   // ── Online client ─────────────────────────────────────────────────────────
   const onlineClient = createOnlineClient();
   let onlineRemoteSide = null;
+  let onlineRemoteIdentity = null;
   let onlineCountdown = null;
   let onlineQueueCounts = null;
   let onlineSnapshotSeq = 0;
   const remoteLaneSeq = { boy: -1, girl: -1 };
+  const storage = window && typeof window.localStorage === 'object' ? window.localStorage : null;
+  const storedDisplayName = (() => {
+    try {
+      return sanitizeOnlineDisplayName(storage?.getItem?.(ONLINE_NAME_STORAGE_KEY) || '');
+    } catch {
+      return '';
+    }
+  })();
 
   onlineClient.cb.onConnected       = () => { onlineClient.requestQueueStatus('lovers-lost'); };
   onlineClient.cb.onQueueCounts     = (counts) => { onlineQueueCounts = counts; };
+  onlineClient.cb.onRemoteProfile   = (profile) => {
+    onlineRemoteIdentity = { displayName: sanitizeOnlineDisplayName(profile?.displayName || '') };
+    if (!onlineRemoteSide && (profile?.side === 'boy' || profile?.side === 'girl')) onlineRemoteSide = profile.side;
+  };
   onlineClient.cb.onSearching       = () => { /* onlineLobbyPhase already shows searching UI */ };
   onlineClient.cb.onSearchCancelled = () => { onlineLobbyPhase = 'main'; };
   onlineClient.cb.onRoomCreated     = (code) => { onlineRoomCode = code; };
   onlineClient.cb.onSideConflict    = () => {
     onlineRoomCode = '';
     onlineRemoteSide = null;
+    onlineRemoteIdentity = null;
     onlineCountdown = null;
     onlineQueueCounts = null;
     onlineLobbyPhase = 'main';
@@ -1049,6 +1102,7 @@ function initGame() {
   onlineClient.cb.onPartnerLeft = () => {
     if (gs.phase === 'online_countdown') {
       onlineRemoteSide = null;
+      onlineRemoteIdentity = null;
       onlineCountdown = null;
       onlineRoomCode = '';
       onlineQueueCounts = null;
@@ -1057,7 +1111,13 @@ function initGame() {
       return;
     }
     if (gs.phase === 'playing') {
-      const summary = { ...evaluateRun(gs.boy, gs.girl, gs.elapsed), disconnectNote: true };
+      const summary = attachOnlineResultIdentities(
+        { ...evaluateRun(gs.boy, gs.girl, gs.elapsed), disconnectNote: true },
+        onlineSide,
+        onlineIdentity,
+        onlineRemoteSide,
+        onlineRemoteIdentity
+      );
       gs = { ...gs, phase: 'gameover', phaseFrames: 0, runSummary: summary };
       sounds.stopMusic();
       sounds.play('run-failed');
@@ -1084,11 +1144,24 @@ function initGame() {
       if (e.key === 'Escape') { onlineClient.disconnect(); onlineQueueCounts = null; gs = { ...gs, phase: 'menu' }; }
       return;
     }
+    if (gs.phase === 'online_name_entry') {
+      if (e.key === 'Escape') { onlineNameError = ''; gs = { ...gs, phase: 'online_side_select' }; return; }
+      if (e.key === 'Backspace') { onlineNameInput = onlineNameInput.slice(0, -1); onlineNameError = ''; return; }
+      if (e.key === 'Enter') { _tryContinueNameEntry(); return; }
+      if (e.key.length === 1) {
+        const nextValue = sanitizeOnlineDisplayName(onlineNameInput + e.key);
+        onlineNameInput = nextValue;
+        onlineNameError = '';
+        return;
+      }
+      return;
+    }
     if (gs.phase === 'online_countdown') {
       if (e.key === 'Escape') {
         onlineClient.disconnect();
         onlineClient.reset();
         onlineRemoteSide = null;
+        onlineRemoteIdentity = null;
         onlineCountdown = null;
         onlineRoomCode = '';
         onlineQueueCounts = null;
@@ -1106,7 +1179,7 @@ function initGame() {
         return;
       }
       if (e.key === 'Escape') {
-        if (onlineLobbyPhase === 'main')                                        { onlineClient.disconnect(); onlineQueueCounts = null; gs = { ...gs, phase: 'online_side_select' }; }
+        if (onlineLobbyPhase === 'main')                                        { onlineClient.disconnect(); onlineQueueCounts = null; onlineRemoteIdentity = null; gs = { ...gs, phase: 'online_side_select' }; }
         else if (onlineLobbyPhase === 'searching')                              { _cancelSearch(); onlineLobbyPhase = 'main'; }
         else if (onlineLobbyPhase === 'friend_options')                         onlineLobbyPhase = 'main';
         else if (onlineLobbyPhase === 'create' || onlineLobbyPhase === 'join')  { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
@@ -1154,6 +1227,9 @@ function initGame() {
 
   // ── Online UI state ───────────────────────────────────────────────────────
   let onlineSide        = 'boy';      // 'boy' | 'girl'
+  let onlineIdentity    = { displayName: storedDisplayName };
+  let onlineNameInput   = storedDisplayName;
+  let onlineNameError   = '';
   let onlineLobbyPhase  = 'main';     // 'main' | 'searching' | 'friend_options' | 'create' | 'join'
   let onlineCodeInput   = '';         // typed chars in join flow
   let onlineRoomCode    = '';         // assigned code in create flow (set by online.js)
@@ -1161,6 +1237,7 @@ function initGame() {
 
   // Hover flags — online_side_select
   let onlineSideBoyHov  = false, onlineSideGirlHov   = false;
+  let onlineNameContinueHov = false;
   // Hover flags — online_lobby
   let onlineFindMatchHov = false, onlinePlayFriendHov = false;
   let onlineCancelHov    = false;
@@ -1170,6 +1247,25 @@ function initGame() {
   function _tryJoinRoom()  { if (onlineCodeInput.length > 0) onlineClient.joinRoom(onlineSide, onlineCodeInput); }
   function _cancelSearch() { onlineClient.cancelSearch(); }
   function _cancelRoom()   { onlineRoomCode = ''; onlineClient.cancelRoom(); }
+  function _tryContinueNameEntry() {
+    const displayName = sanitizeOnlineDisplayName(onlineNameInput);
+    if (!isValidOnlineDisplayName(displayName)) {
+      onlineNameError = 'NAME REQUIRED';
+      return;
+    }
+
+    onlineIdentity = { displayName };
+    onlineNameInput = displayName;
+    onlineNameError = '';
+    onlineRemoteIdentity = null;
+    try {
+      storage?.setItem?.(ONLINE_NAME_STORAGE_KEY, displayName);
+    } catch {}
+    onlineClient.setIdentity(onlineIdentity);
+    onlineClient.connect();
+    onlineLobbyPhase = 'main';
+    gs = { ...gs, phase: 'online_lobby' };
+  }
 
   canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
@@ -1190,6 +1286,13 @@ function initGame() {
       onlineSideGirlHov = _inRect(cx, cy, sideRects.girl);
     } else {
       onlineSideBoyHov = onlineSideGirlHov = false;
+    }
+
+    if (gs.phase === 'online_name_entry') {
+      const nameEntryRects = getOnlineNameEntryButtonRects();
+      onlineNameContinueHov = _inRect(cx, cy, nameEntryRects.continue);
+    } else {
+      onlineNameContinueHov = false;
     }
 
     if (gs.phase === 'online_lobby') {
@@ -1222,8 +1325,14 @@ function initGame() {
 
     if (gs.phase === 'online_side_select') {
       const sideRects = getOnlineSideSelectRects();
-      if (_inRect(cx, cy, sideRects.boy)) { onlineSide = 'boy';  onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
-      if (_inRect(cx, cy, sideRects.girl)) { onlineSide = 'girl'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_lobby' }; onlineClient.connect(); }
+      if (_inRect(cx, cy, sideRects.boy)) { onlineSide = 'boy'; onlineNameError = ''; gs = { ...gs, phase: 'online_name_entry' }; }
+      if (_inRect(cx, cy, sideRects.girl)) { onlineSide = 'girl'; onlineNameError = ''; gs = { ...gs, phase: 'online_name_entry' }; }
+      return;
+    }
+
+    if (gs.phase === 'online_name_entry') {
+      const nameEntryRects = getOnlineNameEntryButtonRects();
+      if (_inRect(cx, cy, nameEntryRects.continue)) _tryContinueNameEntry();
       return;
     }
 
@@ -1342,6 +1451,7 @@ function initGame() {
       onlineClient.disconnect();
       onlineClient.reset();
       onlineRemoteSide = null;
+      onlineRemoteIdentity = null;
       onlineCountdown = null;
       onlineQueueCounts = null;
       onlineRoomCode = '';
@@ -1539,6 +1649,18 @@ function initGame() {
         ? { boy: onlineSide === 'boy', girl: onlineSide === 'girl' }
         : null;
       gs = tickFrame(gs, simulatedSides ? { simulatedSides } : undefined);
+      if (gs.mode === 'online' && gs.runSummary) {
+        gs = {
+          ...gs,
+          runSummary: attachOnlineResultIdentities(
+            gs.runSummary,
+            onlineSide,
+            onlineIdentity,
+            onlineRemoteSide,
+            onlineRemoteIdentity
+          ),
+        };
+      }
       if (!boyFinishedBefore && gs.boy.state === 'finished') {
         boyAnim.state = 'running';
         boyAnim.actionTick = 0;
@@ -1622,6 +1744,8 @@ function initGame() {
       renderer.renderMenu(debugState, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
     } else if (gs.phase === 'online_side_select') {
       renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov, onlineSide);
+    } else if (gs.phase === 'online_name_entry') {
+      renderer.renderOnlineNameEntry(onlineSide, onlineNameInput, onlineNameError, { continue: onlineNameContinueHov });
     } else if (gs.phase === 'online_lobby') {
       onlineSearchTick++;
       renderer.renderOnlineLobby(onlineSide, onlineLobbyPhase, onlineRoomCode, onlineCodeInput, onlineSearchTick, {
@@ -1631,12 +1755,12 @@ function initGame() {
         create:     onlineCreateHov,
         join:       onlineJoinHov,
         joinSubmit: onlineJoinSubmitHov,
-      }, onlineQueueCounts);
+      }, onlineQueueCounts, onlineIdentity, onlineRemoteIdentity);
     } else if (gs.phase === 'online_countdown') {
       const secondsRemaining = onlineCountdown
         ? getCountdownSecondsRemaining(onlineCountdown.startAt, onlineCountdown.clockOffsetMs)
         : 0;
-      renderer.renderOnlineCountdown(onlineSide, onlineRemoteSide, secondsRemaining);
+      renderer.renderOnlineCountdown(onlineSide, onlineRemoteSide, secondsRemaining, onlineIdentity, onlineRemoteIdentity);
     } else if (gs.phase === 'menu_help') {
       renderer.renderMenuHelp(debugState);
     } else if (gs.phase === 'playing') {

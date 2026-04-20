@@ -11,16 +11,43 @@ function serializeSnapshotMessage(snapshot) {
   return JSON.stringify(snapshot);
 }
 
-function buildFindMatchPayload(side, gameId = 'lovers-lost') {
-  return { type: 'find_match', gameId, side };
+function sanitizeIdentityPayload(identity) {
+  if (!identity || typeof identity.displayName !== 'string') return {};
+  return { displayName: identity.displayName };
 }
 
-function buildCreateRoomPayload(side) {
-  return { type: 'create_room', side };
+function buildProfileMessage(identity, side) {
+  return JSON.stringify({
+    displayName: identity?.displayName || '',
+    side: side || null,
+  });
 }
 
-function buildJoinRoomPayload(side, code) {
-  return { type: 'join_room', roomCode: code.trim().toUpperCase(), side };
+function parseProfileMessage(value) {
+  if (typeof value !== 'string' || value.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed.displayName !== 'string') return null;
+    return {
+      displayName: parsed.displayName,
+      side: typeof parsed.side === 'string' ? parsed.side : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildFindMatchPayload(side, gameId = 'lovers-lost', identity = null) {
+  return { type: 'find_match', gameId, side, ...sanitizeIdentityPayload(identity) };
+}
+
+function buildCreateRoomPayload(side, identity = null) {
+  return { type: 'create_room', side, ...sanitizeIdentityPayload(identity) };
+}
+
+function buildJoinRoomPayload(side, code, identity = null) {
+  return { type: 'join_room', roomCode: code.trim().toUpperCase(), side, ...sanitizeIdentityPayload(identity) };
 }
 
 function buildQueueStatusPayload(gameId = 'lovers-lost') {
@@ -131,6 +158,7 @@ export function createOnlineClient() {
   let _pendingSeed = null;
   let _startResolved = false;
   let _legacyStartTimer = null;
+  let _identity = null;
 
   // Callbacks — caller assigns these after createOnlineClient()
   const cb = {
@@ -142,6 +170,7 @@ export function createOnlineClient() {
     onMatchReady:      null,  // ({ seed, remoteSide, serverNow, startAt })
     onRemoteAction:    null,  // ({ action, phase })
     onRemoteSnapshot:  null,  // (snapshot)
+    onRemoteProfile:   null,  // ({ displayName, side })
     onSideConflict:    null,  // () — both players picked same side
     onPartnerLeft:     null,  // () — partner disconnected during a run
     onError:           null,  // (code: string, message: string)
@@ -180,7 +209,18 @@ export function createOnlineClient() {
     if (messageType === 'snapshot') {
       const snapshot = parseSnapshotMessage(value);
       if (snapshot) cb.onRemoteSnapshot?.(snapshot);
+      return;
     }
+
+    if (messageType === 'profile') {
+      const profile = parseProfileMessage(value);
+      if (profile) cb.onRemoteProfile?.(profile);
+    }
+  }
+
+  function _broadcastProfile() {
+    if (!_identity?.displayName) return;
+    _roomMsg('profile', buildProfileMessage(_identity, _mySide));
   }
 
   // ─── Server event dispatcher ──────────────────────────────────────────────
@@ -215,6 +255,7 @@ export function createOnlineClient() {
 
     if (ev === 'room_joined') {
       _roomCode = data.roomCode;
+      _broadcastProfile();
 
       if (data.created) {
         // We created a private room — coordinator, waiting for partner
@@ -231,6 +272,7 @@ export function createOnlineClient() {
 
     if (ev === 'player_joined' && data.playerCount === 2) {
       _inRoom = true;
+      _broadcastProfile();
       return;
     }
 
@@ -243,6 +285,7 @@ export function createOnlineClient() {
         serverNow: data.serverNow,
         startAt: data.startAt,
       });
+      _broadcastProfile();
       return;
     }
 
@@ -289,17 +332,23 @@ export function createOnlineClient() {
 
   function findMatch(side) {
     _mySide = side; _coordinator = false;
-    _send(buildFindMatchPayload(side));
+    _send(buildFindMatchPayload(side, 'lovers-lost', _identity));
   }
 
   function createRoom(side) {
     _mySide = side; _coordinator = true;
-    _send(buildCreateRoomPayload(side));
+    _send(buildCreateRoomPayload(side, _identity));
   }
 
   function joinRoom(side, code) {
     _mySide = side; _coordinator = false;
-    _send(buildJoinRoomPayload(side, code));
+    _send(buildJoinRoomPayload(side, code, _identity));
+  }
+
+  function setIdentity(identity) {
+    _identity = identity && typeof identity.displayName === 'string'
+      ? { displayName: identity.displayName }
+      : null;
   }
 
   function requestQueueStatus(gameId = 'lovers-lost') {
@@ -335,10 +384,11 @@ export function createOnlineClient() {
     _inRoom = false; _coordinator = false;
   }
 
-  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, disconnect, reset, cb };
+  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, setIdentity, disconnect, reset, cb };
 }
 
 export {
+  buildProfileMessage,
   buildCreateRoomPayload,
   buildFindMatchPayload,
   buildJoinRoomPayload,
@@ -347,6 +397,7 @@ export {
   hasCountdownStarted,
   normalizeQueueCounts,
   parseActionMessage,
+  parseProfileMessage,
   parseSnapshotMessage,
   serializeActionMessage,
   serializeSnapshotMessage,
