@@ -21,20 +21,9 @@ function titleFromSlug(slug) {
     .join(" ");
 }
 
-function normalizeStringList(value) {
-  if (!Array.isArray(value)) return [];
-
-  const seen = new Set();
-  const normalized = [];
-
-  for (const entry of value) {
-    const item = typeof entry === "string" ? entry.trim() : "";
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    normalized.push(item);
-  }
-
-  return normalized;
+function gameHrefFromSlug(slug = "") {
+  const normalized = String(slug || "").trim();
+  return normalized ? `../games/${encodeURIComponent(normalized)}/index.html` : "../grid.html";
 }
 
 function sanitizePlayerId(value) {
@@ -58,6 +47,12 @@ function buildProfileInitials(name) {
   return "??";
 }
 
+function formatPresenceLabel(presence) {
+  const normalized = String(presence || "").trim().toLowerCase();
+  if (!normalized) return "Offline";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function buildActivityItems(publicView, profile) {
   if (publicView.recentActivity.length > 0) {
     return publicView.recentActivity.map((entry, index) => ({
@@ -67,15 +62,6 @@ function buildActivityItems(publicView, profile) {
       value: typeof entry.summary === "string" && entry.summary.trim()
         ? entry.summary.trim()
         : (typeof entry.value === "string" && entry.value.trim() ? entry.value.trim() : "Arcade floor signal logged."),
-      isPlaceholder: false,
-    }));
-  }
-
-  const recentPartners = normalizeStringList(profile?.recentPartners);
-  if (recentPartners.length > 0) {
-    return recentPartners.map((name) => ({
-      label: "Recent Partner",
-      value: name,
       isPlaceholder: false,
     }));
   }
@@ -116,8 +102,9 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       avatarInitials: "??",
       heroMeta: [
         { label: "Requested ID", value: requestedPlayerId || "NO-ID" },
-        { label: "Featured Cabinets", value: "0" },
-        { label: "Thought Count", value: "0" },
+        { label: "Status", value: "Offline" },
+        { label: "Badges", value: "0" },
+        { label: "Thoughts", value: "0" },
       ],
       linkItems: [{
         label: "Link Ports",
@@ -125,9 +112,19 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         kind: "placeholder",
         isPlaceholder: true,
       }],
-      featuredItems: [{
-        title: "Featured Cabinets",
-        value: "Public cabinet picks will appear here once player discovery is wired in.",
+      favoriteGameItems: [{
+        title: "Favorite Cabinet",
+        value: "A favorite game link will appear here once profile favorites are wired in.",
+        isPlaceholder: true,
+      }],
+      rankingItems: [{
+        title: "Top Ladder Rankings",
+        value: "Rank snapshots are not cached for this player yet.",
+        isPlaceholder: true,
+      }],
+      friendItems: [{
+        title: "Top Friends",
+        value: "Friend preview data is not cached for this player yet.",
         isPlaceholder: true,
       }],
       activityItems: [{
@@ -139,9 +136,6 @@ export function buildPlayerPageViewModel(profile, options = {}) {
   }
 
   const publicView = buildPlayerProfileView(profile, options);
-  const featuredGames = publicView.featuredGames.length > 0
-    ? publicView.featuredGames
-    : normalizeStringList(profile?.favorites);
   const linkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
         label: link.label,
@@ -155,17 +149,56 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         kind: "placeholder",
         isPlaceholder: true,
       }];
-  const featuredItems = featuredGames.length > 0
-    ? featuredGames.map((slug) => ({
-        title: favoriteTitleResolver(slug),
-        value: slug,
+  const favoriteSlug = publicView.favoriteGameSlug || publicView.featuredGames[0] || "";
+  const favoriteGameItems = favoriteSlug
+    ? [{
+        title: favoriteTitleResolver(favoriteSlug),
+        value: favoriteSlug,
+        href: gameHrefFromSlug(favoriteSlug),
+        linkLabel: "Launch Cabinet",
+        isPlaceholder: false,
+      }]
+    : [{
+        title: "Favorite Cabinet",
+        value: "No favorite cabinet is pinned on this player file yet.",
+        isPlaceholder: true,
+      }];
+  const rankingItems = publicView.ladderPlacements.length > 0
+    ? publicView.ladderPlacements.map((placement) => ({
+        title: favoriteTitleResolver(placement.gameSlug),
+        value: placement.ratingLabel || `Rank #${placement.rank}`,
+        meta: `Rank #${placement.rank}`,
         isPlaceholder: false,
       }))
     : [{
-        title: "Featured Cabinets",
-        value: "No featured cabinets are pinned on this player file yet.",
+        title: "Top Ladder Rankings",
+        value: "No shared ranking snapshots are attached to this player file yet.",
         isPlaceholder: true,
       }];
+  const friendItems = [];
+  if (publicView.mainSqueeze) {
+    friendItems.push({
+      title: "Main Squeeze",
+      value: publicView.mainSqueeze.profileName,
+      meta: `${publicView.mainSqueeze.friendPoints} friendship points`,
+      isPlaceholder: false,
+    });
+  }
+  publicView.friendsPreview.forEach((friend) => {
+    friendItems.push({
+      title: formatPresenceLabel(friend.presence),
+      value: friend.profileName,
+      meta: `${friend.friendPoints} friendship points`,
+      isPlaceholder: false,
+    });
+  });
+  if (friendItems.length === 0) {
+    friendItems.push({
+      title: "Top Friends",
+      value: "No friend preview is cached on this player file yet.",
+      isPlaceholder: true,
+    });
+  }
   const activityItems = buildActivityItems(publicView, profile);
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroTagline = publicView.tagline || "Public player file humming under the neon skyline.";
@@ -182,11 +215,14 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     avatarInitials: buildProfileInitials(heroName),
     heroMeta: [
       { label: "Factory ID", value: publicView.playerId || requestedPlayerId || "PENDING-ID" },
-      { label: "Featured Cabinets", value: String(featuredGames.length) },
-      { label: "Thought Count", value: String(publicView.thoughtCount) },
+      { label: "Status", value: formatPresenceLabel(publicView.presence) },
+      { label: "Badges", value: String(publicView.badgeIds.length) },
+      { label: "Thoughts", value: String(publicView.thoughtCount) },
     ],
     linkItems,
-    featuredItems,
+    favoriteGameItems,
+    rankingItems,
+    friendItems,
     activityItems,
   };
 }
@@ -282,11 +318,16 @@ function renderLinkItem(item) {
 
 function renderCardItem(item) {
   const itemClass = item.isPlaceholder ? "player-card-item player-card-item--placeholder" : "player-card-item";
+  const valueHtml = item.href
+    ? `<a class="player-card-item__link" href="${escapeHtml(item.href)}">${escapeHtml(item.linkLabel || item.value)}</a>`
+    : `<p class="player-card-item__value">${escapeHtml(item.value)}</p>`;
+  const metaHtml = item.meta ? `<p class="player-card-item__meta">${escapeHtml(item.meta)}</p>` : "";
 
   return `
     <article class="${itemClass}">
       <p class="player-card-item__title">${escapeHtml(item.title || item.label)}</p>
-      <p class="player-card-item__value">${escapeHtml(item.value)}</p>
+      ${valueHtml}
+      ${metaHtml}
     </article>
   `;
 }
@@ -302,7 +343,9 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
 
   renderHeroCard(doc.getElementById("playerHeroCard"), model);
   renderPanel(doc.getElementById("playerLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
-  renderPanel(doc.getElementById("playerFeaturedPanel"), "Featured Cabinets", "Public Lineup", model.featuredItems, renderCardItem);
+  renderPanel(doc.getElementById("playerFavoritePanel"), "Favorite Cabinet", "Grid Anchor", model.favoriteGameItems, renderCardItem);
+  renderPanel(doc.getElementById("playerRankingsPanel"), "Top Ladder Rankings", "Scoreboard Echo", model.rankingItems, renderCardItem);
+  renderPanel(doc.getElementById("playerFriendsPanel"), "Top Friends", "Social Orbit", model.friendItems, renderCardItem);
   renderPanel(doc.getElementById("playerActivityPanel"), "Recent Floor Activity", "Afterglow", model.activityItems, renderCardItem);
   return model;
 }

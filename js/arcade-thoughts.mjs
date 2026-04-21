@@ -1,0 +1,123 @@
+import { loadThoughtFeed } from "./platform/thoughts/thoughts.mjs";
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatThoughtDate(value) {
+  const timestamp = Date.parse(value || "");
+  if (!timestamp) return "Signal pending";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function formatCountLabel(count) {
+  return `${count} POST${count === 1 ? "" : "S"}`;
+}
+
+function formatCommentLabel(count) {
+  return `${count} comment${count === 1 ? "" : "s"}`;
+}
+
+function formatShareLabel(count) {
+  return `${count} share${count === 1 ? "" : "s"}`;
+}
+
+export function buildThoughtsPageViewModel(thoughtFeed = loadThoughtFeed()) {
+  const items = Array.isArray(thoughtFeed) ? thoughtFeed : [];
+
+  return {
+    heroTitle: "ARCADE THOUGHTS",
+    heroKicker: "STATUS FEED",
+    heroSummary: "This is the first scaffold for the future player-status feed: short posts, visible engagement counts, and a scrollable social lane that can later grow comments and sharing.",
+    heroCountLabel: formatCountLabel(items.length),
+    items: items.length > 0
+      ? items.map((item) => ({
+          id: item.id,
+          title: item.subject || item.authorDisplayName || "Arcade Signal",
+          summary: item.text || "Fresh player signal incoming.",
+          authorLabel: item.authorDisplayName || "Arcade Pilot",
+          publishedLabel: formatThoughtDate(item.createdAt),
+          commentLabel: formatCommentLabel(item.commentCount),
+          shareLabel: formatShareLabel(item.shareCount),
+          isPlaceholder: false,
+        }))
+      : [{
+          id: "thought-placeholder",
+          title: "Feed Warming Up",
+          summary: "The thoughts feed is still warming up. Player status posts will appear here once more social surfaces come online.",
+          authorLabel: "Arcade Pilot",
+          publishedLabel: "Soon",
+          commentLabel: "0 comments",
+          shareLabel: "0 shares",
+          isPlaceholder: true,
+        }],
+  };
+}
+
+function renderHeroCard(container, model) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="thoughts-hero-card__copy">
+      <p class="thoughts-hero-card__kicker">${escapeHtml(model.heroKicker)}</p>
+      <h2 class="thoughts-hero-card__title">${escapeHtml(model.heroTitle)}</h2>
+      <p class="thoughts-hero-card__summary">${escapeHtml(model.heroSummary)}</p>
+    </div>
+    <div class="thoughts-hero-card__meta">
+      <div class="thoughts-meta-block">
+        <span class="thoughts-meta-block__label">Feed Status</span>
+        <span class="thoughts-meta-block__value">${escapeHtml(model.heroCountLabel)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderThoughtCard(item) {
+  const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+
+  return `
+    <article class="${cardClass}">
+      <div class="thought-card__topline">
+        <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
+        <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
+      </div>
+      <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+      <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
+      <div class="thought-card__meta">
+        <span>${escapeHtml(item.commentLabel)}</span>
+        <span>${escapeHtml(item.shareLabel)}</span>
+      </div>
+    </article>
+  `;
+}
+
+export function renderThoughtsPage(doc = globalThis.document, thoughtFeed = loadThoughtFeed()) {
+  if (!doc?.getElementById) return null;
+
+  const model = buildThoughtsPageViewModel(thoughtFeed);
+  renderHeroCard(doc.getElementById("thoughtsHeroCard"), model);
+
+  const feed = doc.getElementById("thoughtsFeed");
+  if (feed) {
+    feed.innerHTML = model.items.map(renderThoughtCard).join("");
+  }
+
+  return model;
+}
+
+const doc = globalThis.document;
+
+if (doc?.getElementById) {
+  renderThoughtsPage(doc);
+}

@@ -21,20 +21,9 @@ function titleFromSlug(slug) {
     .join(" ");
 }
 
-function normalizeStringList(value) {
-  if (!Array.isArray(value)) return [];
-
-  const seen = new Set();
-  const normalized = [];
-
-  for (const entry of value) {
-    const item = typeof entry === "string" ? entry.trim() : "";
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    normalized.push(item);
-  }
-
-  return normalized;
+function gameHrefFromSlug(slug = "") {
+  const normalized = String(slug || "").trim();
+  return normalized ? `../games/${encodeURIComponent(normalized)}/index.html` : "../grid.html";
 }
 
 function buildProfileInitials(name) {
@@ -54,14 +43,93 @@ function buildProfileInitials(name) {
   return "??";
 }
 
+function formatPresenceLabel(presence) {
+  const normalized = String(presence || "").trim().toLowerCase();
+  if (!normalized) return "Offline";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function buildFavoriteGameItem(publicView, favoriteTitleResolver) {
+  const favoriteSlug = publicView.favoriteGameSlug
+    || publicView.featuredGames[0]
+    || "";
+
+  if (!favoriteSlug) {
+    return [{
+      title: "Favorite Cabinet",
+      value: "Pin a go-to cabinet once favorites are wired into the shared player profile.",
+      isPlaceholder: true,
+    }];
+  }
+
+  return [{
+    title: favoriteTitleResolver(favoriteSlug),
+    value: favoriteSlug,
+    href: gameHrefFromSlug(favoriteSlug),
+    linkLabel: "Launch Cabinet",
+    isPlaceholder: false,
+  }];
+}
+
+function buildRankingItems(publicView, favoriteTitleResolver) {
+  if (publicView.ladderPlacements.length > 0) {
+    return publicView.ladderPlacements.map((placement) => ({
+      title: favoriteTitleResolver(placement.gameSlug),
+      value: placement.ratingLabel || `Rank #${placement.rank}`,
+      meta: `Rank #${placement.rank}`,
+      isPlaceholder: false,
+    }));
+  }
+
+  return [{
+    title: "Top Ladder Rankings",
+    value: "Rank snapshots will appear here once shared standings come online.",
+    isPlaceholder: true,
+  }];
+}
+
+function buildFriendItems(publicView) {
+  const items = [];
+
+  if (publicView.mainSqueeze) {
+    items.push({
+      title: "Main Squeeze",
+      value: publicView.mainSqueeze.profileName,
+      meta: `${publicView.mainSqueeze.friendPoints} friendship points`,
+      isPlaceholder: false,
+    });
+  }
+
+  if (publicView.friendsPreview.length > 0) {
+    publicView.friendsPreview.forEach((friend) => {
+      items.push({
+        title: formatPresenceLabel(friend.presence),
+        value: friend.profileName,
+        meta: `${friend.friendPoints} friendship points`,
+        isPlaceholder: false,
+      });
+    });
+  }
+
+  if (items.length > 0) {
+    return items;
+  }
+
+  return [{
+    title: "Top Friends",
+    value: "Friends preview and main-squeeze slots are still warming up.",
+    isPlaceholder: true,
+  }];
+}
+
 export function buildMePageViewModel(profile, options = {}) {
   const publicView = buildPlayerProfileView(profile, options);
-  const favorites = normalizeStringList(profile?.favorites);
-  const friends = normalizeStringList(profile?.friends);
-  const recentPartners = normalizeStringList(profile?.recentPartners);
   const favoriteTitleResolver = typeof options?.favoriteTitleResolver === "function"
     ? options.favoriteTitleResolver
     : titleFromSlug;
+  const favoriteGameItems = buildFavoriteGameItem(publicView, favoriteTitleResolver);
+  const rankingItems = buildRankingItems(publicView, favoriteTitleResolver);
+  const friendItems = buildFriendItems(publicView);
 
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroTagline = publicView.tagline || "Arcade card warming up under the neon glass.";
@@ -82,22 +150,12 @@ export function buildMePageViewModel(profile, options = {}) {
         isPlaceholder: true,
       }];
 
-  const favoriteItems = favorites.length > 0
-    ? favorites.map((slug) => ({
-        title: favoriteTitleResolver(slug),
-        value: slug,
-        isPlaceholder: false,
-      }))
-    : [{
-        title: "Favorite Cabinets",
-        value: "Star a cabinet once favorites come online.",
-        isPlaceholder: true,
-      }];
-
-  const activityItems = recentPartners.length > 0
-    ? recentPartners.map((name) => ({
-        label: "Recent Partner",
-        value: name,
+  const activityItems = publicView.recentActivity.length > 0
+    ? publicView.recentActivity.map((entry, index) => ({
+        label: typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : `Activity ${index + 1}`,
+        value: typeof entry.summary === "string" && entry.summary.trim()
+          ? entry.summary.trim()
+          : (typeof entry.value === "string" && entry.value.trim() ? entry.value.trim() : "Arcade floor signal logged."),
         isPlaceholder: false,
       }))
     : [{
@@ -116,12 +174,16 @@ export function buildMePageViewModel(profile, options = {}) {
     avatarInitials: buildProfileInitials(heroName),
     heroMeta: [
       { label: "Factory ID", value: publicView.playerId || "PENDING-ID" },
-      { label: "Friends", value: String(friends.length) },
-      { label: "Recent Partners", value: String(recentPartners.length) },
+      { label: "Status", value: formatPresenceLabel(publicView.presence) },
+      { label: "Badges", value: String(publicView.badgeIds.length) },
+      { label: "Thoughts", value: String(publicView.thoughtCount) },
     ],
     avatarAssetId: publicView.avatarAssetId,
+    backgroundImageUrl: publicView.backgroundImageUrl,
     linkItems,
-    favoriteItems,
+    favoriteGameItems,
+    rankingItems,
+    friendItems,
     activityItems,
   };
 }
@@ -217,11 +279,16 @@ function renderLinkItem(item) {
 
 function renderCardItem(item) {
   const itemClass = item.isPlaceholder ? "me-card-item me-card-item--placeholder" : "me-card-item";
+  const valueHtml = item.href
+    ? `<a class="me-card-item__link" href="${escapeHtml(item.href)}">${escapeHtml(item.linkLabel || item.value)}</a>`
+    : `<p class="me-card-item__value">${escapeHtml(item.value)}</p>`;
+  const metaHtml = item.meta ? `<p class="me-card-item__meta">${escapeHtml(item.meta)}</p>` : "";
 
   return `
     <article class="${itemClass}">
       <p class="me-card-item__title">${escapeHtml(item.title || item.label)}</p>
-      <p class="me-card-item__value">${escapeHtml(item.value)}</p>
+      ${valueHtml}
+      ${metaHtml}
     </article>
   `;
 }
@@ -232,7 +299,9 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
   const model = buildMePageViewModel(profile);
   renderHeroCard(doc.getElementById("meHeroCard"), model);
   renderPanel(doc.getElementById("meLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
-  renderPanel(doc.getElementById("meFavoritesPanel"), "Favorite Cabinets", "Cabinet Memory", model.favoriteItems, renderCardItem);
+  renderPanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Cabinet", "Grid Anchor", model.favoriteGameItems, renderCardItem);
+  renderPanel(doc.getElementById("meRankingsPanel"), "Top Ladder Rankings", "Scoreboard Echo", model.rankingItems, renderCardItem);
+  renderPanel(doc.getElementById("meFriendsPanel"), "Top Friends", "Social Orbit", model.friendItems, renderCardItem);
   renderPanel(doc.getElementById("meActivityPanel"), "Recent Floor Activity", "Afterglow", model.activityItems, renderCardItem);
   return model;
 }

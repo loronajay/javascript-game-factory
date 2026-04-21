@@ -665,8 +665,9 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 1. Render the platform-owned activity page from the shared activity feed contract.
 2. Add simple thoughts feed scaffolding only after the activity surface is stable.
    This is where the future Facebook/Myspace-style status-update bulletin feed should begin.
-3. Add profile discovery only when it has a clear use case for the surrounding pages.
-4. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
+3. Enrich the shared player-profile data/view contract for favorite games, rankings, friend preview, presence, badges, and background fallbacks.
+4. Add profile discovery only when it has a clear use case for the surrounding pages.
+5. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
 
 ## Current Progress
 
@@ -681,8 +682,10 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `js/platform/events/` now owns shared event normalization, listing helpers, and slug-based event resolution.
 - `/events/index.html` and `/event/index.html?slug=<eventSlug>` now exist as read-only event listing/detail surfaces backed by shared event contracts.
 - `js/platform/activity/` now owns the first shared game-to-platform activity publishing contract plus the shared activity feed storage key.
+- `js/platform/thoughts/` now owns shared status-post normalization plus a fixture/storage-backed public thoughts feed.
+- `/thoughts/index.html` now exists as the first read-only player-status feed surface for the future social/home-feed layer.
 - `games/lovers-lost/` and `games/battleshits/` now publish platform-owned result/activity payloads through that shared activity contract instead of owning their own long-term activity schema.
-- Home, grid, bulletins, events, and player pages now expose direct navigation across the growing platform surface.
+- Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
 

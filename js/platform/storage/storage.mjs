@@ -1,6 +1,7 @@
 export const PLATFORM_STORAGE_KEYS = Object.freeze({
   factoryProfile: "javascript-game-factory.factoryProfile",
   activityFeed: "javascript-game-factory.activityFeed",
+  thoughtFeed: "javascript-game-factory.thoughtFeed",
   loversLostLegacyOnlineName: "lovers-lost.onlineIdentity.displayName",
 });
 

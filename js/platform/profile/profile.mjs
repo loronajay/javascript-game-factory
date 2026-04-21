@@ -1,12 +1,20 @@
-export const PROFILE_TAGLINE_MAX_LENGTH = 48;
+export const PROFILE_TAGLINE_MAX_LENGTH = 80;
 export const PROFILE_BIO_MAX_LENGTH = 280;
 export const PROFILE_LINK_LABEL_MAX_LENGTH = 24;
+export const PROFILE_BACKGROUND_URL_MAX_LENGTH = 280;
 
 const PROFILE_LINK_KINDS = new Set([
   "external",
   "social",
   "support",
   "portfolio",
+]);
+
+const PROFILE_PRESENCES = new Set([
+  "online",
+  "away",
+  "busy",
+  "offline",
 ]);
 
 function isPlainObject(value) {
@@ -20,6 +28,10 @@ function sanitizeSingleLine(value, maxLength = Number.POSITIVE_INFINITY) {
 
 function sanitizeAssetId(value) {
   return sanitizeSingleLine(value, 120);
+}
+
+function sanitizeGameSlug(value) {
+  return sanitizeSingleLine(value, 80);
 }
 
 function normalizePublicStringList(value) {
@@ -52,6 +64,89 @@ function normalizeUrl(value) {
   } catch {
     return "";
   }
+}
+
+function normalizePresence(value) {
+  const presence = sanitizeSingleLine(value, 24).toLowerCase();
+  return PROFILE_PRESENCES.has(presence) ? presence : "offline";
+}
+
+function normalizeBadgeIds(value) {
+  return normalizePublicStringList(value);
+}
+
+function normalizeLadderPlacement(entry) {
+  if (!isPlainObject(entry)) return null;
+
+  const gameSlug = sanitizeGameSlug(entry.gameSlug || entry.slug);
+  const rank = Math.max(0, Math.floor(Number(entry.rank) || 0));
+  const ratingLabel = sanitizeSingleLine(entry.ratingLabel, 32);
+  const score = Math.max(0, Math.floor(Number(entry.score) || 0));
+
+  if (!gameSlug || rank <= 0) return null;
+
+  return {
+    gameSlug,
+    rank,
+    ratingLabel: ratingLabel || (score > 0 ? `${score} ELO` : ""),
+    score,
+  };
+}
+
+function normalizeLadderPlacements(value) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set();
+  const normalized = [];
+
+  value.forEach((entry) => {
+    const placement = normalizeLadderPlacement(entry);
+    if (!placement || seen.has(placement.gameSlug)) return;
+    seen.add(placement.gameSlug);
+    normalized.push(placement);
+  });
+
+  return normalized;
+}
+
+function normalizeFriendPreviewEntry(entry, options = {}) {
+  if (!isPlainObject(entry)) return null;
+
+  const profileName = sanitizeSingleLine(entry.profileName || entry.displayName, 60);
+  const playerId = sanitizeSingleLine(entry.playerId, 80);
+  const friendPoints = Math.max(0, Math.floor(Number(entry.friendPoints) || 0));
+  const isMainSqueeze = !!options.isMainSqueeze || !!entry.isMainSqueeze;
+
+  if (!profileName && !playerId) return null;
+
+  return {
+    playerId,
+    profileName: profileName || "Arcade Pilot",
+    presence: normalizePresence(entry.presence),
+    friendPoints,
+    isMainSqueeze,
+  };
+}
+
+function normalizeFriendsPreview(value) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set();
+  const normalized = [];
+
+  value.forEach((entry) => {
+    const friend = normalizeFriendPreviewEntry(entry);
+    const dedupeKey = friend ? (friend.playerId || friend.profileName) : "";
+    if (!friend || seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    normalized.push(friend);
+  });
+
+  return normalized;
+}
+
+function normalizeMainSqueeze(value) {
+  return normalizeFriendPreviewEntry(value, { isMainSqueeze: true });
 }
 
 function defaultLinkLabelFromUrl(value) {
@@ -113,6 +208,13 @@ export function normalizeProfileFields(profile = {}) {
     bio: sanitizeProfileBio(source.bio),
     tagline: sanitizeProfileTagline(source.tagline),
     avatarAssetId: sanitizeAssetId(source.avatarAssetId),
+    backgroundImageUrl: normalizeUrl(sanitizeSingleLine(source.backgroundImageUrl, PROFILE_BACKGROUND_URL_MAX_LENGTH)),
+    presence: normalizePresence(source.presence),
+    favoriteGameSlug: sanitizeGameSlug(source.favoriteGameSlug),
+    ladderPlacements: normalizeLadderPlacements(source.ladderPlacements),
+    friendsPreview: normalizeFriendsPreview(source.friendsPreview),
+    mainSqueeze: normalizeMainSqueeze(source.mainSqueeze),
+    badgeIds: normalizeBadgeIds(source.badgeIds),
     links: normalizeProfileLinks(source.links),
   };
 }
@@ -130,11 +232,20 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
     bio: normalizedFields.bio,
     tagline: normalizedFields.tagline,
     avatarAssetId: normalizedFields.avatarAssetId,
+    backgroundImageUrl: normalizedFields.backgroundImageUrl,
+    presence: normalizedFields.presence,
     avatarUrl: normalizedFields.avatarAssetId && avatarUrlResolver
       ? String(avatarUrlResolver(normalizedFields.avatarAssetId) || "")
       : "",
     links: normalizedFields.links,
-    featuredGames: normalizePublicStringList(source.featuredGames),
+    favoriteGameSlug: normalizedFields.favoriteGameSlug,
+    ladderPlacements: normalizedFields.ladderPlacements,
+    friendsPreview: normalizedFields.friendsPreview,
+    mainSqueeze: normalizedFields.mainSqueeze,
+    badgeIds: normalizedFields.badgeIds,
+    featuredGames: normalizePublicStringList(source.featuredGames).length > 0
+      ? normalizePublicStringList(source.featuredGames)
+      : normalizePublicStringList(source.favorites),
     recentActivity: Array.isArray(source.recentActivity)
       ? source.recentActivity.filter((entry) => isPlainObject(entry))
       : [],
