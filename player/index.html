@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Public Player File</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+</head>
+<body class="player-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="player-stage">
+      <div class="player-stage__stars" aria-hidden="true"></div>
+      <div class="player-stage__scene" aria-hidden="true">
+        <div class="player-stage__sun"></div>
+        <div class="player-stage__skyline"></div>
+        <div class="player-stage__floor"></div>
+      </div>
+
+      <div class="player-stage__controls">
+        <div class="player-stage__nav">
+          <a class="player-stage__back" href="../grid.html">&#x276E; Arcade Grid</a>
+          <a class="player-stage__portal" href="../me/index.html">Open Me Page</a>
+        </div>
+      </div>
+
+      <div class="player-stage__header">
+        <h1 class="pixel-text pixel-text--title player-stage__title">PUBLIC PLAYER FILE</h1>
+        <p class="player-stage__subtitle">Shared profile view from the arcade floor.</p>
+      </div>
+
+      <div class="player-layout">
+        <section id="playerHeroCard" class="player-hero-card"></section>
+        <section id="playerLinksPanel" class="player-panel"></section>
+        <section id="playerFeaturedPanel" class="player-panel"></section>
+        <section id="playerActivityPanel" class="player-panel"></section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/arcade-input.js"></script>
+  <script type="module" src="../js/arcade-player.mjs"></script>
+</body>
+</html>

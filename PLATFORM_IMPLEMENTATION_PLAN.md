@@ -527,12 +527,10 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 
 ## Suggested Build Order For The Next Few Passes
 
-1. Formalize shared platform modules and storage keys.
-2. Create `me` page as the first non-game platform page.
-3. Create read-only bulletin and events pages using fixtures.
-4. Create public player profile page backed by shared view models.
-5. Define and test the game-to-platform activity publishing contract.
-6. Add simple thoughts feed only after the previous layers are clean.
+1. Render the platform-owned activity page from the shared activity feed contract.
+2. Add simple thoughts feed scaffolding only after the activity surface is stable.
+3. Add profile discovery only when it has a clear use case for the surrounding pages.
+4. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
 
 ## Current Progress
 
@@ -540,7 +538,14 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `js/platform/storage/` now owns shared platform storage keys and safe storage access helpers.
 - `js/platform/profile/` now owns shared bio/tagline/link normalization plus public profile-view building.
 - `/me/index.html` now exists as the first non-game platform page and reuses the synthwave shell language rather than introducing a separate visual system.
-- Home and grid now expose direct navigation into the player page.
+- `/player/index.html?id=<playerId>` now exists as a public player profile route backed by shared view models and explicit local-cache fallback behavior.
+- `js/platform/bulletins/` now owns shared bulletin normalization plus a fixture-backed public bulletin feed.
+- `/bulletins/index.html` now exists as the first read-only noticeboard surface for platform-owned announcements.
+- `js/platform/events/` now owns shared event normalization, listing helpers, and slug-based event resolution.
+- `/events/index.html` and `/event/index.html?slug=<eventSlug>` now exist as read-only event listing/detail surfaces backed by shared event contracts.
+- `js/platform/activity/` now owns the first shared game-to-platform activity publishing contract plus the shared activity feed storage key.
+- `games/lovers-lost/` and `games/battleshits/` now publish platform-owned result/activity payloads through that shared activity contract instead of owning their own long-term activity schema.
+- Home, grid, bulletins, events, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
 

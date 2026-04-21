@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Arcade Events</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+</head>
+<body class="events-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="events-stage">
+      <div class="events-stage__stars" aria-hidden="true"></div>
+      <div class="events-stage__scene" aria-hidden="true">
+        <div class="events-stage__sun"></div>
+        <div class="events-stage__skyline"></div>
+        <div class="events-stage__floor"></div>
+      </div>
+
+      <div class="events-stage__controls">
+        <div class="events-stage__nav">
+          <a class="events-stage__back" href="../grid.html">&#x276E; Arcade Grid</a>
+          <a class="events-stage__portal" href="../bulletins/index.html">Bulletins</a>
+        </div>
+      </div>
+
+      <div class="events-stage__header">
+        <h1 class="pixel-text pixel-text--title events-stage__title">ARCADE EVENTS</h1>
+        <p class="events-stage__subtitle">Upcoming runs and special floor sessions across the arcade.</p>
+      </div>
+
+      <div class="events-layout">
+        <section id="eventsHeroCard" class="events-hero-card"></section>
+        <section id="eventsFeed" class="events-feed"></section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/arcade-input.js"></script>
+  <script type="module" src="../js/arcade-events.mjs"></script>
+</body>
+</html>

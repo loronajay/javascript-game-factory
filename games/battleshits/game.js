@@ -5,6 +5,7 @@ import {
   isValidPlacement, placeShip, removeShip, resolveIncomingShot,
   isShipSunk, isFleetDestroyed, recordShotResult, isCellShot, shipCells,
 } from './scripts/board.js';
+import { publishBattleshitsMatchActivity } from '../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile } from '../../js/platform/identity/factory-profile.mjs';
 import { createOnlineIdentityPayload } from '../../js/platform/identity/match-identity.mjs';
 
@@ -483,6 +484,13 @@ function transitionToMatchEnded(result) {
   clearPublicMatchRetry();
   gs.phase = 'match_ended';
   gs.matchResult = result;
+  publishBattleshitsMatchActivity({
+    result,
+    myProfile: gs.myProfile,
+    opponentProfile: gs.opponentProfile,
+    matchmakingMode: gs.matchmakingMode,
+    roomCode: gs.roomCode,
+  });
 
   const titleEl   = document.getElementById('ended-title');
   const messageEl = document.getElementById('ended-message');

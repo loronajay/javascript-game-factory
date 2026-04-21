@@ -16,6 +16,7 @@ import { createRenderer, getDebugOverlayGeometry } from './scripts/renderer.js';
 import { createInput, keyToAction } from './scripts/input.js';
 import { createSounds } from './scripts/sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './scripts/online.js';
+import { publishLoversLostRunActivity } from '../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile, sanitizeFactoryProfileName } from '../../js/platform/identity/factory-profile.mjs';
 import { createMatchIdentity, createOnlineIdentityPayload } from '../../js/platform/identity/match-identity.mjs';
 import {
@@ -1754,6 +1755,13 @@ function initGame() {
         renderer.clearSideObstacleVisuals('girl');
       }
       if (gs.phase !== phaseBefore) {
+        if ((gs.phase === 'reunion' || gs.phase === 'gameover') && gs.runSummary) {
+          publishLoversLostRunActivity(gs.runSummary, {
+            storage,
+            actorPlayerId: factoryProfile.playerId,
+            actorDisplayName: gs.mode === 'online' ? onlineIdentity.displayName : factoryProfile.profileName,
+          });
+        }
         if (gs.phase === 'reunion') sounds.play('run-success');
         if (gs.phase === 'gameover') sounds.play('run-failed');
       }

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Event File</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+</head>
+<body class="event-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="event-stage">
+      <div class="event-stage__stars" aria-hidden="true"></div>
+      <div class="event-stage__scene" aria-hidden="true">
+        <div class="event-stage__sun"></div>
+        <div class="event-stage__skyline"></div>
+        <div class="event-stage__floor"></div>
+      </div>
+
+      <div class="event-stage__controls">
+        <div class="event-stage__nav">
+          <a class="event-stage__back" href="../events/index.html">&#x276E; Events</a>
+          <a class="event-stage__portal" href="../bulletins/index.html">Bulletins</a>
+        </div>
+      </div>
+
+      <div class="event-stage__header">
+        <h1 class="pixel-text pixel-text--title event-stage__title">EVENT FILE</h1>
+        <p class="event-stage__subtitle">Full event brief from the arcade calendar.</p>
+      </div>
+
+      <div class="event-layout">
+        <section id="eventHeroCard" class="event-hero-card"></section>
+        <section id="eventRelatedPanel" class="event-panel"></section>
+        <section id="eventBulletinsPanel" class="event-panel"></section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/arcade-input.js"></script>
+  <script type="module" src="../js/arcade-event-detail.mjs"></script>
+</body>
+</html>

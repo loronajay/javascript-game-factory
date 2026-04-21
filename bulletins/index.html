@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Arcade Bulletins</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+</head>
+<body class="bulletins-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="bulletins-stage">
+      <div class="bulletins-stage__stars" aria-hidden="true"></div>
+      <div class="bulletins-stage__scene" aria-hidden="true">
+        <div class="bulletins-stage__sun"></div>
+        <div class="bulletins-stage__skyline"></div>
+        <div class="bulletins-stage__floor"></div>
+      </div>
+
+      <div class="bulletins-stage__controls">
+        <div class="bulletins-stage__nav">
+          <a class="bulletins-stage__back" href="../grid.html">&#x276E; Arcade Grid</a>
+          <a class="bulletins-stage__portal" href="../me/index.html">Open Me Page</a>
+          <a class="bulletins-stage__portal" href="../events/index.html">Events</a>
+        </div>
+      </div>
+
+      <div class="bulletins-stage__header">
+        <h1 class="pixel-text pixel-text--title bulletins-stage__title">ARCADE BULLETINS</h1>
+        <p class="bulletins-stage__subtitle">Platform notices and cabinet calls from the arcade floor.</p>
+      </div>
+
+      <div class="bulletins-layout">
+        <section id="bulletinsHeroCard" class="bulletins-hero-card"></section>
+        <section id="bulletinsFeed" class="bulletins-feed"></section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/arcade-input.js"></script>
+  <script type="module" src="../js/arcade-bulletins.mjs"></script>
+</body>
+</html>
