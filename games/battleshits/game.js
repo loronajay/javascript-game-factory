@@ -1,6 +1,12 @@
 import { createOnlineClient, getOppositeMatchSide } from './scripts/online.js';
 import { createAudioController, getResolutionSoundId, LAUNCH_SOUND_ID } from './scripts/audio.js';
 import {
+  EMOTE_ASSET_PATHS,
+  EMOTE_COOLDOWN_MS,
+  EMOTE_DISPLAY_MS,
+  keyToEmoteType,
+} from './scripts/emojis.js';
+import {
   SHOT_ANIMATION_MS,
   getBattleStatusCopy,
   getEndedScreenCopy,
@@ -84,6 +90,10 @@ function createInitialState() {
     opponentWantsRematch: false,
     pendingNetAction: null, // called inside onConnected
     pendingShot: null, // { col, row, startedAt }
+    activeEmotes: {
+      mine: null,
+      theirs: null,
+    },
   };
 }
 
@@ -91,6 +101,8 @@ let gs = createInitialState();
 let net = null;
 let publicMatchRetryTimer = null;
 let pendingShotTimer = null;
+let emoteTimers = { mine: null, theirs: null };
+let lastEmoteSentAt = 0;
 const audio = createAudioController();
 
 function clearPublicMatchRetry() {
@@ -104,6 +116,15 @@ function clearPendingShotTimer() {
   if (pendingShotTimer !== null) {
     clearTimeout(pendingShotTimer);
     pendingShotTimer = null;
+  }
+}
+
+function clearEmoteTimers() {
+  for (const side of ['mine', 'theirs']) {
+    if (emoteTimers[side] !== null) {
+      clearTimeout(emoteTimers[side]);
+      emoteTimers[side] = null;
+    }
   }
 }
 
@@ -347,6 +368,62 @@ function renderFleetStatus() {
   }
 }
 
+function renderEmoteBubbles() {
+  const bubbleMap = [
+    {
+      stateKey: 'mine',
+      bubbleEl: document.getElementById('fleet-emote-bubble'),
+      imageEl: document.getElementById('fleet-emote-image'),
+    },
+    {
+      stateKey: 'theirs',
+      bubbleEl: document.getElementById('target-emote-bubble'),
+      imageEl: document.getElementById('target-emote-image'),
+    },
+  ];
+
+  for (const { stateKey, bubbleEl, imageEl } of bubbleMap) {
+    if (!bubbleEl || !imageEl) continue;
+    const emoteType = gs.activeEmotes[stateKey];
+    bubbleEl.classList.toggle('hidden', !emoteType);
+    if (emoteType) {
+      imageEl.src = EMOTE_ASSET_PATHS[emoteType];
+      imageEl.alt = emoteType;
+    } else {
+      imageEl.removeAttribute('src');
+      imageEl.alt = '';
+    }
+  }
+}
+
+function showBattleEmote(side, emoteType) {
+  if (!EMOTE_ASSET_PATHS[emoteType]) return;
+  gs.activeEmotes = {
+    ...gs.activeEmotes,
+    [side]: emoteType,
+  };
+  renderEmoteBubbles();
+
+  if (emoteTimers[side] !== null) clearTimeout(emoteTimers[side]);
+  emoteTimers[side] = setTimeout(() => {
+    emoteTimers[side] = null;
+    gs.activeEmotes = {
+      ...gs.activeEmotes,
+      [side]: null,
+    };
+    renderEmoteBubbles();
+  }, EMOTE_DISPLAY_MS);
+}
+
+function trySendBattleEmote(type) {
+  if (gs.phase !== 'battle' || !net) return;
+  const now = Date.now();
+  if (now - lastEmoteSentAt < EMOTE_COOLDOWN_MS) return;
+  lastEmoteSentAt = now;
+  net.sendEmote(type);
+  showBattleEmote('mine', type);
+}
+
 // ─── Screen management ────────────────────────────────────────────────────────
 
 const ALL_SCREENS = [
@@ -496,9 +573,11 @@ function determineTurnOrder() {
 function transitionToBattle() {
   clearPublicMatchRetry();
   clearPendingShotTimer();
+  clearEmoteTimers();
   gs.phase = 'battle';
   gs.turn = determineTurnOrder();
   gs.pendingShot = null;
+  gs.activeEmotes = { mine: null, theirs: null };
 
   showScreen('battle');
 
@@ -512,11 +591,13 @@ function transitionToBattle() {
   renderTargetBoard();
   renderBattleStatus();
   renderFleetStatus();
+  renderEmoteBubbles();
 }
 
 function transitionToMatchEnded(result) {
   clearPublicMatchRetry();
   clearPendingShotTimer();
+  clearEmoteTimers();
   gs.phase = 'match_ended';
   gs.matchResult = result;
   publishBattleshitsMatchActivity({
@@ -542,6 +623,7 @@ function transitionToMatchEnded(result) {
 function resetForRematch() {
   clearPublicMatchRetry();
   clearPendingShotTimer();
+  clearEmoteTimers();
   const side    = gs.mySide;
   const seed    = (gs.seed ?? 0) + 1;
   const myProf  = gs.myProfile;
@@ -623,6 +705,11 @@ function wireOnlineCallbacks() {
     handleShotResult(result);
   };
 
+  net.cb.onEmote = (type) => {
+    if (gs.phase !== 'battle') return;
+    showBattleEmote('theirs', type);
+  };
+
   net.cb.onRematch = (type) => {
     if (type !== 'request') return;
     gs.opponentWantsRematch = true;
@@ -634,6 +721,7 @@ function wireOnlineCallbacks() {
   net.cb.onPartnerLeft = () => {
     clearPublicMatchRetry();
     clearPendingShotTimer();
+    clearEmoteTimers();
     if (gs.phase === 'battle') {
       transitionToMatchEnded('forfeit_win');
     } else {
@@ -654,6 +742,7 @@ function wireOnlineCallbacks() {
     console.warn('Battleshits network error:', code, message);
     clearPublicMatchRetry();
     clearPendingShotTimer();
+    clearEmoteTimers();
     const myProf = gs.myProfile;
     gs = createInitialState();
     gs.myProfile = myProf;
@@ -748,6 +837,7 @@ function wireButtons() {
   document.getElementById('btn-cancel-match')?.addEventListener('click', () => {
     clearPublicMatchRetry();
     clearPendingShotTimer();
+    clearEmoteTimers();
     net?.cancelSearch();
     net?.disconnect();
     net = null;
@@ -758,6 +848,7 @@ function wireButtons() {
   document.getElementById('btn-cancel-room')?.addEventListener('click', () => {
     clearPublicMatchRetry();
     clearPendingShotTimer();
+    clearEmoteTimers();
     net?.cancelRoom();
     net?.disconnect();
     net = null;
@@ -780,6 +871,7 @@ function wireButtons() {
   document.getElementById('btn-exit-to-menu')?.addEventListener('click', () => {
     clearPublicMatchRetry();
     clearPendingShotTimer();
+    clearEmoteTimers();
     net?.disconnect();
     net = null;
     gs = createInitialState();
@@ -787,6 +879,12 @@ function wireButtons() {
   });
 
   window.addEventListener('keydown', (e) => {
+    const emoteType = keyToEmoteType(e.key);
+    if (emoteType && gs.phase === 'battle') {
+      trySendBattleEmote(emoteType);
+      return;
+    }
+
     if (gs.phase === 'placement') {
       if (e.key === 'r' || e.key === 'R') rotateShip();
       if (e.key === 'Enter') lockIn();

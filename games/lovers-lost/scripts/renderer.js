@@ -1930,7 +1930,9 @@ default:          return GROUND_TOP - 28;
 
       if (!isObstacleOnScreen(localObsX, obsW)) continue;
 
-      _drawObstacle(offsetX + localObsX, obs, facing, offsetX + contactX, distDelta, nowMs);
+      const absX = offsetX + localObsX;
+      _drawObstacle(absX, obs, facing, offsetX + contactX, distDelta, nowMs);
+      if (obs.isWarmup) _drawWarmupHint(absX + obsW / 2, obs.type, facing);
     }
   }
 
@@ -1961,6 +1963,58 @@ default:          return GROUND_TOP - 28;
       case 'arrowwall': _drawArrowWall(x, flip);                     break;
       case 'goblin':    _drawGoblin(x, obs, facing, contactX, distDelta, nowMs); break;
     }
+  }
+
+  const _HINT_KEYS = {
+    right: { jump: 'W', crouch: 'S', attack: 'D', block: 'A' },
+    left:  { jump: '↑', crouch: '↓', attack: '←', block: '→' },
+  };
+  const _OBS_ACTION = { spikes: 'jump', bird: 'crouch', arrowwall: 'block', goblin: 'attack' };
+  const _HINT_Y = {
+    spikes:    GROUND_TOP - 56,
+    bird:      BIRD_BOTTOM - 36 - 28,
+    arrowwall: GROUND_TOP - 96,
+    goblin:    GROUND_TOP - 86,
+  };
+
+  function _drawWarmupHint(cx, obsType, facing) {
+    const action = _OBS_ACTION[obsType];
+    const key    = _HINT_KEYS[facing]?.[action];
+    if (!key) return;
+    const y = _HINT_Y[obsType] ?? (GROUND_TOP - 70);
+
+    ctx.save();
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const tw   = ctx.measureText(key).width;
+    const pw   = Math.max(tw + 14, 28);
+    const ph   = 22;
+    const rx   = cx - pw / 2;
+    const ry   = y - ph / 2;
+    const rad  = 5;
+
+    // pill background
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.beginPath();
+    ctx.moveTo(rx + rad, ry);
+    ctx.lineTo(rx + pw - rad, ry);
+    ctx.arcTo(rx + pw, ry, rx + pw, ry + rad, rad);
+    ctx.lineTo(rx + pw, ry + ph - rad);
+    ctx.arcTo(rx + pw, ry + ph, rx + pw - rad, ry + ph, rad);
+    ctx.lineTo(rx + rad, ry + ph);
+    ctx.arcTo(rx, ry + ph, rx, ry + ph - rad, rad);
+    ctx.lineTo(rx, ry + rad);
+    ctx.arcTo(rx, ry, rx + rad, ry, rad);
+    ctx.closePath();
+    ctx.fill();
+
+    // key label
+    ctx.fillStyle = '#ffe066';
+    ctx.fillText(key, cx, y);
+
+    ctx.restore();
   }
 
   // Spikes: 3 yellow triangles + brown base

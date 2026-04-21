@@ -1,6 +1,7 @@
 // online.js — WebSocket network layer for Battleshits online play.
 // All raw WebSocket calls live here. Nothing outside this file may call new WebSocket directly.
 // Adapted from the Lovers Lost Factory Network baseline.
+import { sanitizeEmoteType } from './emojis.js';
 
 const PROD_WS_URL = 'wss://factory-network-server-production.up.railway.app';
 const LOCAL_WS_PORT = '3000';
@@ -92,6 +93,10 @@ function parseShotResultMessage(value) {
   }
 }
 
+function parseEmoteMessage(value) {
+  return sanitizeEmoteType(value);
+}
+
 function normalizeQueueCounts(payload) {
   if (!payload || typeof payload !== 'object') return null;
   const alpha = Number(payload.alphaWaiting ?? payload.alphaCount ?? 0);
@@ -123,6 +128,7 @@ export function createOnlineClient(gameId = 'battleshits') {
     onOpponentReady:   null,  // ()
     onOpponentShot:    null,  // ({ col, row })
     onShotResult:      null,  // ({ col, row, hit, sunk, shipId, fleetDestroyed })
+    onEmote:           null,  // (type: string)
     onRematch:         null,  // (type: 'request' | 'accept')
     onPartnerLeft:     null,  // ()
     onSideConflict:    null,  // ()
@@ -173,6 +179,12 @@ export function createOnlineClient(gameId = 'battleshits') {
     if (messageType === 'shot_result') {
       const result = parseShotResultMessage(value);
       if (result) cb.onShotResult?.(result);
+      return;
+    }
+
+    if (messageType === 'emote') {
+      const emoteType = parseEmoteMessage(value);
+      if (emoteType) cb.onEmote?.(emoteType);
       return;
     }
 
@@ -325,6 +337,12 @@ export function createOnlineClient(gameId = 'battleshits') {
     _roomMsg('rematch', type);
   }
 
+  function sendEmote(type) {
+    const emoteType = sanitizeEmoteType(type);
+    if (!emoteType) return;
+    _roomMsg('emote', emoteType);
+  }
+
   function disconnect() {
     _inRoom = false; _roomCode = null;
     ws?.close();
@@ -338,7 +356,7 @@ export function createOnlineClient(gameId = 'battleshits') {
   return {
     connect, findMatch, createRoom, joinRoom,
     setIdentity, requestQueueStatus, cancelSearch, cancelRoom,
-    sendPlacementReady, sendShot, sendShotResult, sendRematch,
+    sendPlacementReady, sendShot, sendShotResult, sendRematch, sendEmote,
     disconnect, reset,
     cb,
   };

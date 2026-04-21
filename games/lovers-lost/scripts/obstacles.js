@@ -126,9 +126,10 @@ function chooseFeasibleSpacing(previousObstacle, nextObstacle, desiredSpacing) {
 // ─── Warmup sequence (fixed) ──────────────────────────────────────────────────
 function generateWarmup(startPosition, spacing) {
   const sp = spacing !== undefined ? spacing : WARMUP_SPACING;
-  return WARMUP_SEQUENCE.map((type, i) =>
-    createObstacle(type, startPosition + sp * (i + 1))
-  );
+  return WARMUP_SEQUENCE.map((type, i) => ({
+    ...createObstacle(type, startPosition + sp * (i + 1)),
+    isWarmup: true,
+  }));
 }
 
 // ─── Wave generation (procedural) ────────────────────────────────────────────
