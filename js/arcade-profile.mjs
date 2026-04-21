@@ -4,6 +4,7 @@ import {
   normalizeFactoryProfile,
   saveFactoryProfile,
 } from "./platform/identity/factory-profile.mjs";
+import { PROFILE_TAGLINE_MAX_LENGTH } from "./platform/profile/profile.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 
 export function formatArcadePlayerId(playerId) {
@@ -20,23 +21,31 @@ export function buildArcadeProfileViewModel(profile, options = {}) {
   return {
     summaryName: hasName ? normalized.profileName : "UNNAMED PILOT",
     profileName: normalized.profileName,
-    inputValue: normalized.profileName,
-    inputMaxLength: FACTORY_PROFILE_NAME_MAX_LENGTH,
+    profileNameValue: normalized.profileName,
+    profileNameMaxLength: FACTORY_PROFILE_NAME_MAX_LENGTH,
+    taglineValue: normalized.tagline,
+    taglineMaxLength: PROFILE_TAGLINE_MAX_LENGTH,
     saveLabel: hasName ? "UPDATE CARD" : "STORE CARD",
-    statusLine: hasName
-      ? "DEFAULT ONLINE IDENTITY ACROSS THE ARCADE"
-      : "SET YOUR DEFAULT ARCADE NAME",
-    helperText: "This becomes your default online identity across the arcade. Games can still use temporary match aliases.",
+    statusLine: "EDIT YOUR PUBLIC PLAYER PROFILE",
+    helperText: "Update the name and custom tagline that appear on your profile. Games can still use temporary match aliases during a run.",
     playerIdLabel: formatArcadePlayerId(normalized.playerId),
     flashMessage: typeof options.flashMessage === "string" ? options.flashMessage : "",
+    inputValue: normalized.profileName,
+    inputMaxLength: FACTORY_PROFILE_NAME_MAX_LENGTH,
   };
 }
 
 export function saveArcadeProfileName(storage, profileName, options = {}) {
+  return saveArcadeProfileDetails(storage, { profileName }, options);
+}
+
+export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
   const current = loadFactoryProfile(storage, options);
+
   return saveFactoryProfile({
     ...current,
-    profileName,
+    profileName: fields.profileName ?? current.profileName,
+    tagline: fields.tagline ?? current.tagline,
   }, storage, options);
 }
 
@@ -49,10 +58,11 @@ export function initArcadeProfilePanel({
   const panel = doc?.getElementById?.("playerProfilePanel");
   const closeButton = doc?.getElementById?.("playerProfileClose");
   const form = doc?.getElementById?.("playerProfileForm");
-  const input = doc?.getElementById?.("playerProfileName");
+  const profileNameInput = doc?.getElementById?.("playerProfileName");
+  const taglineInput = doc?.getElementById?.("playerProfileTagline");
   const clearButton = doc?.getElementById?.("playerProfileClear");
 
-  if (!button || !panel || !form || !input) {
+  if (!button || !panel || !form || !profileNameInput) {
     return null;
   }
 
@@ -75,15 +85,20 @@ export function initArcadeProfilePanel({
     if (flash) flash.textContent = model.flashMessage;
     if (saveLabel) saveLabel.textContent = model.saveLabel;
 
-    input.value = model.inputValue;
-    input.maxLength = model.inputMaxLength;
+    profileNameInput.value = model.profileNameValue;
+    profileNameInput.maxLength = model.profileNameMaxLength;
+
+    if (taglineInput) {
+      taglineInput.value = model.taglineValue;
+      taglineInput.maxLength = model.taglineMaxLength;
+    }
   }
 
   function openPanel() {
     panel.hidden = false;
     button.setAttribute("aria-expanded", "true");
-    input.focus();
-    input.select();
+    profileNameInput.focus();
+    profileNameInput.select();
   }
 
   function closePanel() {
@@ -103,13 +118,19 @@ export function initArcadeProfilePanel({
   closeButton?.addEventListener("click", closePanel);
 
   clearButton?.addEventListener("click", () => {
-    saveArcadeProfileName(storage, "", options);
+    saveArcadeProfileDetails(storage, {
+      profileName: "",
+      tagline: "",
+    }, options);
     render("PLAYER CARD CLEARED");
   });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    saveArcadeProfileName(storage, input.value, options);
+    saveArcadeProfileDetails(storage, {
+      profileName: profileNameInput.value,
+      tagline: taglineInput?.value || "",
+    }, options);
     render("PLAYER CARD SAVED");
   });
 

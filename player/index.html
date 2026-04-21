@@ -26,12 +26,74 @@
           <a class="player-stage__portal" href="../activity/index.html">Activity</a>
           <a class="player-stage__portal" href="../thoughts/index.html">Thoughts</a>
         </div>
+        <button
+          id="playerProfileButton"
+          class="profile-chip"
+          type="button"
+          aria-controls="playerProfilePanel"
+          aria-expanded="false"
+          hidden
+        >
+          <span class="profile-chip__kicker">Owner Controls</span>
+          <span class="profile-chip__name">Edit Profile</span>
+        </button>
       </div>
 
       <div class="player-stage__header">
-        <h1 class="pixel-text pixel-text--title player-stage__title">PUBLIC PLAYER FILE</h1>
-        <p class="player-stage__subtitle">Shared profile view from the arcade floor.</p>
+        <h1 id="playerStageTitle" class="pixel-text pixel-text--title player-stage__title">UNNAMED PILOT</h1>
+        <p id="playerStageSubtitle" class="player-stage__subtitle">No tagline set yet.</p>
       </div>
+
+      <aside id="playerProfilePanel" class="player-card" hidden>
+        <div class="player-card__topline">
+          <p class="player-card__brand">Javascript Game Factory</p>
+          <button id="playerProfileClose" class="player-card__close" type="button">Close</button>
+        </div>
+        <h2 class="pixel-text player-card__title">PLAYER CARD</h2>
+        <p id="playerProfileStatus" class="player-card__status">EDIT YOUR PUBLIC PLAYER PROFILE</p>
+
+        <div class="player-card__meta">
+          <div class="player-card__meta-block">
+            <span class="player-card__meta-label">Factory ID</span>
+            <span id="playerProfileId" class="player-card__meta-value">PENDING-ID</span>
+          </div>
+          <div class="player-card__meta-block">
+            <span class="player-card__meta-label">Arcade Default</span>
+            <span id="playerProfileDefault" class="player-card__meta-value">UNNAMED PILOT</span>
+          </div>
+        </div>
+
+        <form id="playerProfileForm" class="player-card__form">
+          <label class="player-card__field" for="playerProfileName">Arcade Name</label>
+          <input
+            id="playerProfileName"
+            class="player-card__input"
+            name="profileName"
+            type="text"
+            autocomplete="nickname"
+            spellcheck="false"
+          >
+          <label class="player-card__field" for="playerProfileTagline">Tagline</label>
+          <input
+            id="playerProfileTagline"
+            class="player-card__input"
+            name="tagline"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <p id="playerProfileHint" class="player-card__hint">
+            Update the name and custom tagline that appear on your profile. Games can still use temporary match aliases during a run.
+          </p>
+          <div class="player-card__actions">
+            <button class="player-card__action player-card__action--primary" type="submit">
+              <span id="playerProfileSaveLabel">STORE CARD</span>
+            </button>
+            <button id="playerProfileClear" class="player-card__action" type="button">CLEAR PROFILE</button>
+          </div>
+          <p id="playerProfileFlash" class="player-card__flash" aria-live="polite"></p>
+        </form>
+      </aside>
 
       <div class="player-layout">
         <section id="playerHeroCard" class="player-hero-card"></section>

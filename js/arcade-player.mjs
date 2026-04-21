@@ -1,3 +1,4 @@
+import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
@@ -109,6 +110,7 @@ export function loadRequestedPlayerProfile(storage = getDefaultPlatformStorage()
 export function buildPlayerPageViewModel(profile, options = {}) {
   const requestedPlayerId = sanitizePlayerId(options.requestedPlayerId);
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : [];
+  const isOwnerView = !!options?.isOwnerView;
   const favoriteTitleResolver = typeof options?.favoriteTitleResolver === "function"
     ? options.favoriteTitleResolver
     : titleFromSlug;
@@ -116,10 +118,14 @@ export function buildPlayerPageViewModel(profile, options = {}) {
   if (!profile) {
     return {
       state: "missing",
+      pageTitle: "UNKNOWN PILOT",
+      pageSubtitle: "Signal not present on this local cabinet.",
       heroName: "UNKNOWN PILOT",
       heroTagline: "Signal not present on this local cabinet.",
       heroBio: "This public player file is not available in the local arcade cache yet. Open the Me page to inspect the current local profile or load this player from a future shared source.",
-      heroChipLabel: "LOCAL CACHE ONLY",
+      heroChipLabel: "PLAYER PROFILE",
+      showEditProfileButton: false,
+      editButtonLabel: "Edit Profile",
       avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
       avatarAlt: "Unknown pilot portrait",
       avatarInitials: "??",
@@ -235,7 +241,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     });
   }
   const heroName = publicView.profileName || "UNNAMED PILOT";
-  const heroTagline = publicView.tagline || "Public player file humming under the neon skyline.";
+  const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This public player file is running in local-first mode while broader arcade profile discovery comes online.";
   const badgeItems = publicView.badgeIds.length > 0
     ? publicView.badgeIds.map((badgeId) => ({
@@ -249,10 +255,14 @@ export function buildPlayerPageViewModel(profile, options = {}) {
 
   return {
     state: "ready",
+    pageTitle: heroName,
+    pageSubtitle: heroTagline,
     heroName,
     heroTagline,
     heroBio,
-    heroChipLabel: "PUBLIC PLAYER PROFILE",
+    heroChipLabel: "PLAYER PROFILE",
+    showEditProfileButton: isOwnerView,
+    editButtonLabel: "Edit Profile",
     presenceLabel: formatPresenceLabel(publicView.presence),
     presenceToneClass: buildPresenceToneClass(publicView.presence),
     avatarSrc: publicView.avatarUrl || DEFAULT_PROFILE_PICTURE_SRC,
@@ -273,6 +283,19 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     aboutText: heroBio,
     badgeItems,
   };
+}
+
+function renderPageHeader(doc, model) {
+  if (!doc?.getElementById) return;
+
+  const title = doc.getElementById("playerStageTitle");
+  const subtitle = doc.getElementById("playerStageSubtitle");
+
+  if (title) title.textContent = model.pageTitle;
+  if (subtitle) subtitle.textContent = model.pageSubtitle;
+  if (doc?.title) {
+    doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
+  }
 }
 
 function renderHeroCard(container, model) {
@@ -458,10 +481,18 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
   const params = new URLSearchParams(options.search || globalThis.location?.search || "");
   const requestedPlayerId = sanitizePlayerId(params.get("id"));
   const storage = options.storage || getDefaultPlatformStorage();
+  const localProfile = loadFactoryProfile(storage);
+  const isOwnerView = !requestedPlayerId || requestedPlayerId === localProfile.playerId;
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
   const profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId, { thoughtFeed });
-  const model = buildPlayerPageViewModel(profile, { requestedPlayerId, thoughtFeed });
+  const model = buildPlayerPageViewModel(profile, { requestedPlayerId, thoughtFeed, isOwnerView });
 
+  const editButton = doc.getElementById("playerProfileButton");
+  if (editButton) {
+    editButton.hidden = !model.showEditProfileButton;
+  }
+
+  renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("playerHeroCard"), model);
   renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", "Status Lane", model.thoughtItems);
   renderPanel(doc.getElementById("playerLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
@@ -476,5 +507,19 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  const profilePanel = initArcadeProfilePanel({ doc });
   renderPlayerPage(doc);
+
+  const rerender = () => {
+    profilePanel?.render?.("");
+    renderPlayerPage(doc);
+  };
+
+  doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
+    queueMicrotask(rerender);
+  });
+
+  doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
+    queueMicrotask(rerender);
+  });
 }

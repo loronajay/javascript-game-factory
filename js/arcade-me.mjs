@@ -159,9 +159,8 @@ export function buildMePageViewModel(profile, options = {}) {
   const friendItems = buildFriendItems(publicView);
 
   const heroName = publicView.profileName || "UNNAMED PILOT";
-  const heroTagline = publicView.tagline || "Arcade card warming up under the neon glass.";
+  const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This shared player page will grow into your public home base across the arcade as more platform features come online.";
-  const heroChipLabel = publicView.profileName ? "RETURNING PILOT" : "FACTORY PILOT";
 
   const linkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
@@ -188,10 +187,14 @@ export function buildMePageViewModel(profile, options = {}) {
       }];
 
   return {
+    pageTitle: heroName,
+    pageSubtitle: heroTagline,
     heroName,
     heroTagline,
     heroBio,
-    heroChipLabel,
+    heroChipLabel: "PLAYER PROFILE",
+    isOwnerView: true,
+    editButtonLabel: "Edit Profile",
     presenceLabel: formatPresenceLabel(publicView.presence),
     presenceToneClass: buildPresenceToneClass(publicView.presence),
     avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
@@ -213,6 +216,19 @@ export function buildMePageViewModel(profile, options = {}) {
     aboutText: heroBio,
     badgeItems,
   };
+}
+
+function renderPageHeader(doc, model) {
+  if (!doc?.getElementById) return;
+
+  const title = doc.getElementById("meStageTitle");
+  const subtitle = doc.getElementById("meStageSubtitle");
+
+  if (title) title.textContent = model.pageTitle;
+  if (subtitle) subtitle.textContent = model.pageSubtitle;
+  if (doc?.title) {
+    doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
+  }
 }
 
 function renderHeroCard(container, model) {
@@ -398,6 +414,7 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
   const storage = options.storage || getDefaultPlatformStorage();
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
   const model = buildMePageViewModel(profile, { thoughtFeed });
+  renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("meHeroCard"), model);
   renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", "Status Lane", model.thoughtItems);
   renderPanel(doc.getElementById("meLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);

@@ -28,14 +28,14 @@
           aria-controls="playerProfilePanel"
           aria-expanded="false"
         >
-          <span class="profile-chip__kicker">Factory Pilot</span>
-          <span id="playerProfileSummary" class="profile-chip__name">UNNAMED PILOT</span>
+          <span class="profile-chip__kicker">Owner Controls</span>
+          <span class="profile-chip__name">Edit Profile</span>
         </button>
       </div>
 
       <div class="me-stage__header">
-        <h1 class="pixel-text pixel-text--title me-stage__title">PLAYER PAGE</h1>
-        <p class="me-stage__subtitle">Your corner of the arcade floor.</p>
+        <h1 id="meStageTitle" class="pixel-text pixel-text--title me-stage__title">UNNAMED PILOT</h1>
+        <p id="meStageSubtitle" class="me-stage__subtitle">No tagline set yet.</p>
       </div>
 
       <aside id="playerProfilePanel" class="player-card" hidden>
@@ -44,7 +44,7 @@
           <button id="playerProfileClose" class="player-card__close" type="button">Close</button>
         </div>
         <h2 class="pixel-text player-card__title">PLAYER CARD</h2>
-        <p id="playerProfileStatus" class="player-card__status">SET YOUR DEFAULT ARCADE NAME</p>
+        <p id="playerProfileStatus" class="player-card__status">EDIT YOUR PUBLIC PLAYER PROFILE</p>
 
         <div class="player-card__meta">
           <div class="player-card__meta-block">
@@ -64,18 +64,26 @@
             class="player-card__input"
             name="profileName"
             type="text"
-            maxlength="12"
             autocomplete="nickname"
             spellcheck="false"
           >
+          <label class="player-card__field" for="playerProfileTagline">Tagline</label>
+          <input
+            id="playerProfileTagline"
+            class="player-card__input"
+            name="tagline"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+          >
           <p id="playerProfileHint" class="player-card__hint">
-            This becomes your default online identity across the arcade. Games can still use temporary match aliases.
+            Update the name and custom tagline that appear on your profile. Games can still use temporary match aliases during a run.
           </p>
           <div class="player-card__actions">
             <button class="player-card__action player-card__action--primary" type="submit">
               <span id="playerProfileSaveLabel">STORE CARD</span>
             </button>
-            <button id="playerProfileClear" class="player-card__action" type="button">CLEAR NAME</button>
+            <button id="playerProfileClear" class="player-card__action" type="button">CLEAR PROFILE</button>
           </div>
           <p id="playerProfileFlash" class="player-card__flash" aria-live="polite"></p>
         </form>
