@@ -8,106 +8,162 @@
 </head>
 <body>
   <main class="game-shell">
-    <a href="../../index.html" class="back-link">← Arcade</a>
+    <div class="bathroom-wall"></div>
+    <div class="bathroom-sheen"></div>
+    <a href="../../index.html" class="back-link">Arcade</a>
     <div id="game-root">
 
-      <!-- MENU -->
-      <section id="screen-menu" class="screen">
-        <h1 class="game-title">BATTLESHITS</h1>
-        <p class="game-tagline">Sink their fleet. Try not to stink.</p>
-        <div class="menu-buttons">
-          <button id="btn-find-match" class="btn btn-primary">Find Match</button>
-          <button id="btn-create-room" class="btn btn-secondary">Create Private Match</button>
-          <button id="btn-join-room" class="btn btn-secondary">Join Private Match</button>
-        </div>
-      </section>
-
-      <!-- MATCHMAKING -->
-      <section id="screen-matchmaking" class="screen hidden">
-        <h2 class="screen-heading">Searching for Opponent</h2>
-        <div class="spinner"></div>
-        <p id="matchmaking-status" class="status-text">Connecting...</p>
-        <button id="btn-cancel-match" class="btn btn-secondary">Cancel</button>
-      </section>
-
-      <!-- PRIVATE — creating -->
-      <section id="screen-room-create" class="screen hidden">
-        <h2 class="screen-heading">Private Match</h2>
-        <p class="status-text">Share this code with your opponent:</p>
-        <div id="room-code-display" class="room-code-display"></div>
-        <p class="status-text muted">Waiting for opponent to join...</p>
-        <button id="btn-cancel-room" class="btn btn-secondary">Cancel</button>
-      </section>
-
-      <!-- PRIVATE — joining -->
-      <section id="screen-room-join" class="screen hidden">
-        <h2 class="screen-heading">Join Private Match</h2>
-        <input id="room-code-input" type="text" placeholder="Enter room code" maxlength="8" class="room-code-input" autocomplete="off" spellcheck="false">
-        <div class="row-buttons">
-          <button id="btn-submit-join" class="btn btn-primary">Join</button>
-          <button id="btn-cancel-join" class="btn btn-secondary">Cancel</button>
-        </div>
-        <p id="join-error" class="error-text hidden"></p>
-      </section>
-
-      <!-- PLACEMENT -->
-      <section id="screen-placement" class="screen hidden">
-        <div class="placement-layout">
-          <div class="placement-main">
-            <div class="placement-header">
-              <h2 class="screen-heading">Place Your Fleet</h2>
-              <div class="placement-controls">
-                <button id="btn-rotate" class="btn btn-small">Rotate [R]</button>
-                <button id="btn-lock-in" class="btn btn-primary" disabled>Lock In</button>
-              </div>
-            </div>
-            <div id="fleet-board" class="board-grid"></div>
-            <p id="placement-hint" class="placement-hint">Select a ship → click board to place. Click a placed ship to pick it up.</p>
+      <section id="screen-menu" class="screen screen-menu">
+        <div class="menu-stage">
+          <div class="menu-title-frame">
+            <h1 class="game-title">BATTLESHITS</h1>
           </div>
-          <aside class="placement-sidebar">
-            <h3 class="sidebar-heading">Fleet</h3>
+          <div class="menu-throne" aria-hidden="true">
+            <div class="menu-throne-tank"></div>
+            <div class="menu-throne-seat"></div>
+            <div class="menu-throne-water"></div>
+          </div>
+          <p class="game-tagline">Sink their fleet. Try not to stink.</p>
+          <div class="menu-buttons">
+            <button id="btn-find-match" class="btn btn-primary">Find Match</button>
+            <button id="btn-create-room" class="btn btn-secondary">Create Private Match</button>
+            <button id="btn-join-room" class="btn btn-secondary">Join Private Match</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-matchmaking" class="screen screen-panel hidden">
+        <div class="porcelain-panel state-panel">
+          <div class="panel-badge">Queue</div>
+          <h2 class="screen-heading">Searching For Opponent</h2>
+          <div class="spinner"></div>
+          <p id="matchmaking-status" class="status-text">Connecting...</p>
+          <button id="btn-cancel-match" class="btn btn-secondary">Cancel</button>
+        </div>
+      </section>
+
+      <section id="screen-room-create" class="screen screen-panel hidden">
+        <div class="porcelain-panel state-panel">
+          <div class="panel-badge">Private Match</div>
+          <h2 class="screen-heading">Room Code</h2>
+          <p class="status-text">Share this with your opponent.</p>
+          <div id="room-code-display" class="room-code-display"></div>
+          <p class="status-text muted">Waiting for opponent to join...</p>
+          <button id="btn-cancel-room" class="btn btn-secondary">Cancel</button>
+        </div>
+      </section>
+
+      <section id="screen-room-join" class="screen screen-panel hidden">
+        <div class="porcelain-panel state-panel">
+          <div class="panel-badge">Private Match</div>
+          <h2 class="screen-heading">Join Room</h2>
+          <input id="room-code-input" type="text" placeholder="Enter room code" maxlength="8" class="room-code-input" autocomplete="off" spellcheck="false">
+          <div class="row-buttons">
+            <button id="btn-submit-join" class="btn btn-primary">Join</button>
+            <button id="btn-cancel-join" class="btn btn-secondary">Cancel</button>
+          </div>
+          <p id="join-error" class="error-text hidden"></p>
+        </div>
+      </section>
+
+      <section id="screen-placement" class="screen screen-placement hidden">
+        <div class="board-scene placement-scene">
+          <div class="board-column board-column--main">
+            <div class="status-placard">
+              <div class="board-label board-label--placard">Place Your Fleet</div>
+              <p id="placement-hint" class="placement-hint">Select a ship, then click the bowl grid to place it. Click a placed ship to pick it up.</p>
+            </div>
+            <div class="board-bowl board-bowl--fleet">
+              <div class="board-bowl-tank">
+                <div class="board-bowl-title">Your Bowl</div>
+                <div class="placement-controls">
+                  <button id="btn-rotate" class="btn btn-small">Rotate [R]</button>
+                  <button id="btn-lock-in" class="btn btn-primary" disabled>Lock In</button>
+                </div>
+              </div>
+              <div class="board-bowl-seat">
+                <div class="board-bowl-water">
+                  <div id="fleet-board" class="board-grid"></div>
+                </div>
+              </div>
+              <div class="board-bowl-base"></div>
+            </div>
+          </div>
+          <aside class="placement-sidebar porcelain-panel">
+            <div class="panel-badge">Fleet</div>
+            <h3 class="sidebar-heading">Choose A Ship</h3>
             <div id="ship-roster" class="ship-roster"></div>
           </aside>
         </div>
       </section>
 
-      <!-- WAITING FOR OPPONENT -->
-      <section id="screen-waiting" class="screen hidden">
-        <h2 class="screen-heading">Fleet Locked In</h2>
-        <div class="spinner"></div>
-        <p class="status-text">Waiting for opponent to place their fleet...</p>
-        <p id="opponent-name-waiting" class="opponent-name"></p>
-      </section>
-
-      <!-- BATTLE -->
-      <section id="screen-battle" class="screen hidden">
-        <div id="battle-status-bar" class="battle-status-bar">
-          <div id="battle-turn-indicator" class="turn-indicator"></div>
-          <div id="battle-last-result" class="last-result"></div>
-          <div id="battle-opponent-name" class="opponent-display"></div>
-        </div>
-        <div class="battle-boards">
-          <div class="board-section">
-            <div class="board-label">YOUR FLEET</div>
-            <div id="fleet-board-battle" class="board-grid"></div>
-            <div id="fleet-ships-status" class="ships-status"></div>
-          </div>
-          <div class="board-section">
-            <div class="board-label" id="target-label">TARGET</div>
-            <div id="target-board-battle" class="board-grid"></div>
-          </div>
+      <section id="screen-waiting" class="screen screen-panel hidden">
+        <div class="porcelain-panel state-panel">
+          <div class="panel-badge">Locked In</div>
+          <h2 class="screen-heading">Fleet Ready</h2>
+          <div class="spinner"></div>
+          <p class="status-text">Waiting for opponent to place their fleet...</p>
+          <p id="opponent-name-waiting" class="opponent-name"></p>
         </div>
       </section>
 
-      <!-- MATCH ENDED -->
-      <section id="screen-ended" class="screen hidden">
-        <h2 id="ended-title" class="ended-title"></h2>
-        <p id="ended-message" class="status-text"></p>
-        <div class="row-buttons">
-          <button id="btn-rematch" class="btn btn-primary">Rematch</button>
-          <button id="btn-exit-to-menu" class="btn btn-secondary">Back to Menu</button>
+      <section id="screen-battle" class="screen screen-battle hidden">
+        <div class="battle-stage">
+          <div class="battle-header">
+            <div class="status-placard status-placard--turn">
+              <div id="battle-turn-indicator" class="turn-indicator"></div>
+            </div>
+            <div class="status-placard status-placard--result">
+              <div id="battle-last-result" class="last-result"></div>
+            </div>
+            <div class="status-placard status-placard--opponent">
+              <div id="battle-opponent-name" class="opponent-display"></div>
+            </div>
+          </div>
+          <div class="battle-boards">
+            <div class="board-column">
+              <div class="board-bowl board-bowl--fleet">
+                <div class="board-bowl-tank">
+                  <div class="board-label board-label--tank">Your Fleet</div>
+                </div>
+                <div class="board-bowl-seat">
+                  <div class="board-bowl-water">
+                    <div id="fleet-board-battle" class="board-grid"></div>
+                  </div>
+                </div>
+                <div class="board-bowl-base"></div>
+              </div>
+              <div id="fleet-ships-status" class="ships-status"></div>
+            </div>
+            <div class="board-column">
+              <div class="board-bowl board-bowl--target">
+                <div class="board-bowl-tank">
+                  <div class="board-label board-label--tank" id="target-label">Target Bowl</div>
+                </div>
+                <div class="board-bowl-seat">
+                  <div class="board-bowl-water">
+                    <div id="target-board-battle" class="board-grid"></div>
+                  </div>
+                </div>
+                <div class="board-bowl-base"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <p id="rematch-status" class="rematch-status"></p>
+      </section>
+
+      <section id="screen-ended" class="screen screen-panel hidden">
+        <div class="porcelain-panel end-panel">
+          <div class="victory-placard">
+            <h2 id="ended-title" class="ended-title"></h2>
+          </div>
+          <p id="ended-message" class="status-text"></p>
+          <div class="row-buttons">
+            <button id="btn-rematch" class="btn btn-primary">Rematch</button>
+            <button id="btn-exit-to-menu" class="btn btn-secondary">Back To Menu</button>
+          </div>
+          <p id="rematch-status" class="rematch-status"></p>
+        </div>
       </section>
 
     </div>

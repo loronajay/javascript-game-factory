@@ -16,8 +16,14 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - event pages
 - user links
 - friends activity
-- a shared thoughts feed
+- a shared thoughts feed for user-authored status updates and repostable bulletin-style posts
 - eventual media upload
+
+Important terminology note:
+
+- `Bulletins` can continue to mean the current platform-owned announcement / noticeboard surface.
+- We also want a separate user-authored bulletin style: short status updates in a scrollable home feed, closer to old Myspace bulletins or Facebook status posts.
+- That future social surface should support feed-style interaction patterns such as comments, sharing/reposting, and profile-linked authorship once the platform is ready for heavier social features.
 
 The platform remains the owner of long-term identity and social state.
 Games remain self-contained experiences that can read platform data and publish approved activity/results, but games must not become the permanent home for profile ownership.
@@ -148,12 +154,76 @@ Recommended first-class pages:
 - `/activity/index.html`
   Friends and platform activity.
 - `/thoughts/index.html`
-  Shared thoughts feed.
+  Shared thoughts feed for user-authored status updates, social posting, and the eventual doomscroll-style home feed.
 
 Notes:
 
 - For now, prefer stable query-param detail pages over pretending we have full dynamic routing.
 - If we later move to a hosting setup that supports clean routes, the page logic can survive the URL change.
+
+## Long-Term Player Page Reference
+
+Use the current example profile mockup as a layout and feature-direction reference for the long-term player page.
+It is a placement / information architecture reference, not a mandate to match the exact visual treatment.
+
+Canonical reference asset:
+
+- `images/mock-page-references/user-profile-page-reference.png`
+- Keep this file as the single in-repo visual reference for the long-term player-page target unless we intentionally replace it with a newer canonical mock.
+
+Target long-term player page sections:
+
+- profile portrait with a small presence indicator
+- display name with a customizable tagline directly underneath
+- social links block
+- favorite game block with an actual grid-entry / cabinet link
+- ladder placement block that can show a player's top placements across games
+- scrollable player feed for status updates / posts
+- about-me block
+- badges block
+- friends block with a special `main squeeze` slot
+- customizable 16:9 background image behind the page composition
+
+Important behavior notes from the reference:
+
+- Presence should eventually support at least online, offline, and similar simple states.
+  The green dot in the mockup is the reference for that presence affordance.
+- The status feed area should behave like a constrained scrollable panel rather than forcing the whole page layout to expand infinitely.
+- Favorite games should not be plain text only.
+  They should link back into the arcade grid / cabinet entry once those routes are stable.
+- Ladder placement should focus on best placements, especially top-three finishes or top-ranked positions per game when available.
+- The `main squeeze` friend slot implies a future best-friend style relationship layer.
+  We are not building that yet, but it should be tracked as a future platform concept.
+- Future friend points should likely derive from shared play behavior, such as time spent playing together or a similar trust / affinity metric.
+  That system needs separate scoping later and should remain platform-owned.
+- The background image should eventually be a user-uploaded asset standardized to a 16:9 presentation area.
+  Until upload systems exist, use a default background image / fallback treatment.
+- Empty fields need strong defaults so the page still feels intentional when a player has no links, no rankings, no favorite game, no badges, no posts, no featured friend, or no custom background.
+- The current example image can serve as the default background reference until a proper background-image system is wired.
+
+Reference asset note:
+
+- Yes, keep a single copy of the screenshot in the repo if we want it to remain a durable design reference.
+- It should live as documentation/reference material, not as a shipped gameplay asset.
+- `images/mock-page-references/user-profile-page-reference.png` is now the canonical reference asset for this mockup.
+- We can move it to a docs/reference area later if we decide to separate runtime assets from design references more strictly.
+- Avoid scattering multiple duplicate screenshots through the repo. One canonical reference is enough.
+
+Suggested field-length constraints for future profile systems:
+
+- `profileName`: 24 characters max
+- `tagline`: 80 characters max
+- `bio` / `aboutMe`: 280 characters max
+- social link label: 24 characters max
+- social link URL: 280 characters max
+- status-post title / subject if used: 80 characters max
+- status-post body for the profile feed preview: 500 characters max before longer-read handling
+
+Constraint notes:
+
+- These limits are meant to protect layout integrity first, especially in the profile header, friends panel, and scrollable feed cards.
+- We can revise exact numbers later, but the platform should treat character limits as shared contract rules, not page-by-page styling hacks.
+- Empty-state fallback copy should be designed with the same space constraints in mind so blank profiles do not break the composition.
 
 ## Shared Data Objects
 
@@ -196,12 +266,66 @@ Suggested shape:
   bio: "",
   tagline: "",
   avatarUrl: "",
+  backgroundImageUrl: "",
+  presence: "offline",
   links: [],
   featuredGames: [],
+  favoriteGameSlug: "",
+  ladderPlacements: [],
+  friendsPreview: [],
+  mainSqueeze: null,
   recentActivity: [],
-  thoughtCount: 0
+  thoughtCount: 0,
+  badgeIds: []
 }
 ```
+
+Future-facing notes:
+
+- `presence` should stay lightweight at first and only expose simple user-facing states.
+- `favoriteGameSlug` should support linking back to the cabinet entry.
+- `ladderPlacements` should summarize a player's strongest rankings without requiring a full standings page inside the profile itself.
+- `mainSqueeze` is a future social-field concept, not an immediate implementation target.
+- `backgroundImageUrl` should resolve to a normalized 16:9 presentation asset once uploads exist.
+
+## Profile Page Contract Notes
+
+The long-term player page should be treated as a stable product target with incremental delivery underneath it.
+In practice that means we can ship simpler profile pages now, but each pass should move toward the same eventual composition instead of drifting into disconnected one-off layouts.
+
+Long-term page zones:
+
+- header identity area with display name, tagline, portrait, and presence indicator
+- social / links area
+- favorite game feature area with cabinet-entry link behavior
+- rankings area for strongest ladder placements
+- friends area with room for `main squeeze` plus a broader friend list
+- scrollable status-feed area
+- about-me area
+- badges / achievements area
+- background-image treatment behind the page shell
+
+Shared contract expectations:
+
+- text limits should be enforced in shared platform modules, not only in page forms
+- empty fields should render deliberate fallback copy or fallback panels, not collapsed blank boxes
+- layout-critical fields should be normalized before rendering so long names, broken links, and oversized text do not damage the page composition
+- uploaded visual assets should eventually resolve to standardized presentation shapes rather than letting each page crop differently
+
+Future systems that support this profile vision:
+
+- profile background image upload and moderation flow
+- lightweight presence states
+- favorites linking back into arcade grid entries
+- per-game ladder summary data
+- friend points / affinity scoring
+- user-authored status feed items with comments and sharing
+
+Important scoping reminder:
+
+- This profile vision is the destination.
+- We do not need to build every section before the platform is useful.
+- The rule is that new plumbing should make this page easier to realize later, not harder.
 
 ### `linkItem`
 
@@ -281,10 +405,19 @@ Suggested shape:
   authorPlayerId: "player-123",
   text: "Need one more clean goblin pass.",
   visibility: "public",
+  commentCount: 0,
+  shareCount: 0,
+  repostOfId: "",
   createdAt: "",
   editedAt: ""
 }
 ```
+
+Notes:
+
+- Treat `thoughtPost` as the first contract for the Myspace/Facebook-style bulletin concept.
+- In other words, announcement bulletins live in the `bulletin` model, while user status-update bulletins live in the feed/post model.
+- Naming can change later, but the product distinction should stay explicit in the shared contracts.
 
 ### `mediaAsset`
 
@@ -423,6 +556,7 @@ Features:
 - recent activity feed
 - game-published activity items
 - simple friends list display
+- groundwork for user-authored status posts that can later gain comments and sharing
 
 Guardrails:
 
@@ -430,6 +564,7 @@ Guardrails:
 - no rich replies/threads yet
 - no private messaging
 - no cross-user mutation without real backend planning
+- treat the first thoughts feed pass as the future doomscroll/home-feed surface, not as a replacement for the platform announcement board
 
 Exit criteria:
 
@@ -529,6 +664,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 
 1. Render the platform-owned activity page from the shared activity feed contract.
 2. Add simple thoughts feed scaffolding only after the activity surface is stable.
+   This is where the future Facebook/Myspace-style status-update bulletin feed should begin.
 3. Add profile discovery only when it has a clear use case for the surrounding pages.
 4. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
 
@@ -541,6 +677,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `/player/index.html?id=<playerId>` now exists as a public player profile route backed by shared view models and explicit local-cache fallback behavior.
 - `js/platform/bulletins/` now owns shared bulletin normalization plus a fixture-backed public bulletin feed.
 - `/bulletins/index.html` now exists as the first read-only noticeboard surface for platform-owned announcements.
+- The future user-authored "bulletin" concept is now explicitly tracked as part of the `thoughts` / social feed roadmap rather than replacing the current announcement board.
 - `js/platform/events/` now owns shared event normalization, listing helpers, and slug-based event resolution.
 - `/events/index.html` and `/event/index.html?slug=<eventSlug>` now exist as read-only event listing/detail surfaces backed by shared event contracts.
 - `js/platform/activity/` now owns the first shared game-to-platform activity publishing contract plus the shared activity feed storage key.

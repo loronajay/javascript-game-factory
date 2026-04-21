@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Arcade Activity</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+</head>
+<body class="activity-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="activity-stage">
+      <div class="activity-stage__stars" aria-hidden="true"></div>
+      <div class="activity-stage__scene" aria-hidden="true">
+        <div class="activity-stage__sun"></div>
+        <div class="activity-stage__skyline"></div>
+        <div class="activity-stage__floor"></div>
+      </div>
+
+      <div class="activity-stage__controls">
+        <div class="activity-stage__nav">
+          <a class="activity-stage__back" href="../grid.html">&#x276E; Arcade Grid</a>
+          <a class="activity-stage__portal" href="../bulletins/index.html">Bulletins</a>
+          <a class="activity-stage__portal" href="../events/index.html">Events</a>
+          <a class="activity-stage__portal" href="../me/index.html">Open Me Page</a>
+        </div>
+      </div>
+
+      <div class="activity-stage__header">
+        <h1 class="pixel-text pixel-text--title activity-stage__title">ARCADE ACTIVITY</h1>
+        <p class="activity-stage__subtitle">Recent game results and shared floor signals across the arcade.</p>
+      </div>
+
+      <div class="activity-layout">
+        <section id="activityHeroCard" class="activity-hero-card"></section>
+        <section id="activityFeed" class="activity-feed"></section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/arcade-input.js"></script>
+  <script type="module" src="../js/arcade-activity.mjs"></script>
+</body>
+</html>

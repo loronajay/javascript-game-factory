@@ -1,6 +1,12 @@
 import { createOnlineClient, getOppositeMatchSide } from './scripts/online.js';
 import { createAudioController, getResolutionSoundId, LAUNCH_SOUND_ID } from './scripts/audio.js';
 import {
+  SHOT_ANIMATION_MS,
+  getBattleStatusCopy,
+  getEndedScreenCopy,
+  getTargetLabelCopy,
+} from './scripts/presentation.js';
+import {
   createFleetBoard, createTargetBoard, FLEET_DEFS, BOARD_SIZE, cellIndex,
   isValidPlacement, placeShip, removeShip, resolveIncomingShot,
   isShipSunk, isFleetDestroyed, recordShotResult, isCellShot, shipCells,
@@ -77,18 +83,27 @@ function createInitialState() {
     rematchPending: false,
     opponentWantsRematch: false,
     pendingNetAction: null, // called inside onConnected
+    pendingShot: null, // { col, row, startedAt }
   };
 }
 
 let gs = createInitialState();
 let net = null;
 let publicMatchRetryTimer = null;
+let pendingShotTimer = null;
 const audio = createAudioController();
 
 function clearPublicMatchRetry() {
   if (publicMatchRetryTimer !== null) {
     clearTimeout(publicMatchRetryTimer);
     publicMatchRetryTimer = null;
+  }
+}
+
+function clearPendingShotTimer() {
+  if (pendingShotTimer !== null) {
+    clearTimeout(pendingShotTimer);
+    pendingShotTimer = null;
   }
 }
 
@@ -269,17 +284,22 @@ function renderTargetBoard() {
       if (!el) continue;
       el.className = 'board-cell';
       el.innerHTML = '';
+      const isPendingShot = gs.pendingShot?.col === c && gs.pendingShot?.row === r;
 
       if (cell === null) {
         if (isMyTurn) el.classList.add('cell-targetable');
+        if (isPendingShot) {
+          el.classList.add('cell-target-pending');
+          el.appendChild(makeSprite(SPRITES.missile, false, 'shot-marker shot-falling'));
+        }
       } else if (cell.result === 'miss') {
         el.classList.add('cell-target-miss');
       } else if (cell.result === 'hit') {
         el.classList.add('cell-target-hit');
-        el.appendChild(makeSprite(SPRITES.missile, false));
+        el.appendChild(makeSprite(SPRITES.missile, false, 'shot-marker'));
       } else if (cell.result === 'sunk') {
         el.classList.add('cell-target-sunk');
-        el.appendChild(makeSprite(SPRITES.missile, false));
+        el.appendChild(makeSprite(SPRITES.missile, false, 'shot-marker'));
       }
     }
   }
@@ -291,11 +311,7 @@ function renderBattleStatus() {
   const oppEl     = document.getElementById('battle-opponent-name');
   const labelEl   = document.getElementById('target-label');
 
-  if (turnEl) {
-    if (gs.turn === 'mine') turnEl.textContent = '💩 Your turn — click target to fire';
-    else if (gs.turn === 'awaiting_result') turnEl.textContent = '⏳ Awaiting result...';
-    else turnEl.textContent = '👀 Opponent is aiming...';
-  }
+  if (turnEl) turnEl.textContent = getBattleStatusCopy(gs.turn);
 
   if (resultEl) {
     if (gs.lastShotInfo) {
@@ -313,9 +329,7 @@ function renderBattleStatus() {
     oppEl.textContent = gs.opponentProfile?.displayName ? `vs. ${gs.opponentProfile.displayName}` : '';
   }
 
-  if (labelEl) {
-    labelEl.textContent = gs.turn === 'mine' ? '🎯 TARGET — Click to fire' : 'TARGET';
-  }
+  if (labelEl) labelEl.textContent = getTargetLabelCopy(gs.turn);
 }
 
 function renderFleetStatus() {
@@ -409,10 +423,13 @@ function lockIn() {
 function handleTargetClick(col, row) {
   if (gs.turn !== 'mine') return;
   if (isCellShot(gs.myTarget, col, row)) return;
+  clearPendingShotTimer();
   gs.turn = 'awaiting_result';
+  gs.pendingShot = { col, row, startedAt: Date.now() };
   audio.play(LAUNCH_SOUND_ID);
   net.sendShot(col, row);
   renderBattleStatus();
+  renderTargetBoard();
 }
 
 function handleIncomingShot(col, row) {
@@ -437,9 +454,11 @@ function handleIncomingShot(col, row) {
   }
 }
 
-function handleShotResult({ col, row, hit, sunk, shipId, fleetDestroyed }) {
+function applyShotResult({ col, row, hit, sunk, shipId, fleetDestroyed }) {
+  pendingShotTimer = null;
   gs.myTarget = recordShotResult(gs.myTarget, col, row, hit, sunk, shipId);
   gs.lastShotInfo = { hit, sunk, shipId };
+  gs.pendingShot = null;
   audio.play(getResolutionSoundId(hit));
 
   renderTargetBoard();
@@ -450,6 +469,19 @@ function handleShotResult({ col, row, hit, sunk, shipId, fleetDestroyed }) {
     gs.turn = 'theirs';
     renderBattleStatus();
   }
+}
+
+function handleShotResult(result) {
+  const pendingShot = gs.pendingShot;
+  if (!pendingShot) {
+    applyShotResult(result);
+    return;
+  }
+
+  const elapsed = Date.now() - pendingShot.startedAt;
+  const remaining = Math.max(0, SHOT_ANIMATION_MS - elapsed);
+  clearPendingShotTimer();
+  pendingShotTimer = setTimeout(() => applyShotResult(result), remaining);
 }
 
 // ─── Match flow ───────────────────────────────────────────────────────────────
@@ -463,8 +495,10 @@ function determineTurnOrder() {
 
 function transitionToBattle() {
   clearPublicMatchRetry();
+  clearPendingShotTimer();
   gs.phase = 'battle';
   gs.turn = determineTurnOrder();
+  gs.pendingShot = null;
 
   showScreen('battle');
 
@@ -482,6 +516,7 @@ function transitionToBattle() {
 
 function transitionToMatchEnded(result) {
   clearPublicMatchRetry();
+  clearPendingShotTimer();
   gs.phase = 'match_ended';
   gs.matchResult = result;
   publishBattleshitsMatchActivity({
@@ -496,16 +531,9 @@ function transitionToMatchEnded(result) {
   const messageEl = document.getElementById('ended-message');
   const statusEl  = document.getElementById('rematch-status');
 
-  if (titleEl) {
-    if (result === 'win')         titleEl.textContent = '🏆 VICTORY';
-    else if (result === 'forfeit_win') titleEl.textContent = '🏆 VICTORY — Forfeit';
-    else                          titleEl.textContent = '💩 DEFEATED';
-  }
-  if (messageEl) {
-    if (result === 'win')         messageEl.textContent = 'You sunk their entire fleet.';
-    else if (result === 'forfeit_win') messageEl.textContent = 'Opponent disconnected. The win is yours.';
-    else                          messageEl.textContent = 'Your fleet was destroyed. Better luck next time.';
-  }
+  const endedCopy = getEndedScreenCopy(result);
+  if (titleEl) titleEl.textContent = endedCopy.title;
+  if (messageEl) messageEl.textContent = endedCopy.message;
   if (statusEl) statusEl.textContent = '';
 
   showScreen('ended');
@@ -513,6 +541,7 @@ function transitionToMatchEnded(result) {
 
 function resetForRematch() {
   clearPublicMatchRetry();
+  clearPendingShotTimer();
   const side    = gs.mySide;
   const seed    = (gs.seed ?? 0) + 1;
   const myProf  = gs.myProfile;
@@ -604,6 +633,7 @@ function wireOnlineCallbacks() {
 
   net.cb.onPartnerLeft = () => {
     clearPublicMatchRetry();
+    clearPendingShotTimer();
     if (gs.phase === 'battle') {
       transitionToMatchEnded('forfeit_win');
     } else {
@@ -623,6 +653,7 @@ function wireOnlineCallbacks() {
   net.cb.onError = (code, message) => {
     console.warn('Battleshits network error:', code, message);
     clearPublicMatchRetry();
+    clearPendingShotTimer();
     const myProf = gs.myProfile;
     gs = createInitialState();
     gs.myProfile = myProf;
@@ -716,6 +747,7 @@ function wireButtons() {
 
   document.getElementById('btn-cancel-match')?.addEventListener('click', () => {
     clearPublicMatchRetry();
+    clearPendingShotTimer();
     net?.cancelSearch();
     net?.disconnect();
     net = null;
@@ -725,6 +757,7 @@ function wireButtons() {
 
   document.getElementById('btn-cancel-room')?.addEventListener('click', () => {
     clearPublicMatchRetry();
+    clearPendingShotTimer();
     net?.cancelRoom();
     net?.disconnect();
     net = null;
@@ -746,6 +779,7 @@ function wireButtons() {
 
   document.getElementById('btn-exit-to-menu')?.addEventListener('click', () => {
     clearPublicMatchRetry();
+    clearPendingShotTimer();
     net?.disconnect();
     net = null;
     gs = createInitialState();

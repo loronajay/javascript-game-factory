@@ -3317,6 +3317,393 @@ body::before {
   line-height: 1.7;
 }
 
+/* ---------- ACTIVITY PAGE ---------- */
+
+.activity-page-shell {
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(160, 247, 255, 0.16), transparent 18%),
+    linear-gradient(180deg, #111449 0%, #16255a 32%, #22567d 58%, #1d3b68 76%, #101946 100%);
+}
+
+.activity-page-shell .arcade-shell {
+  width: 100%;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.activity-page-shell::before {
+  background:
+    radial-gradient(circle at 50% 8%, rgba(169, 247, 255, 0.22), transparent 20%),
+    radial-gradient(circle at 16% 18%, rgba(255, 208, 137, 0.1), transparent 16%),
+    radial-gradient(circle at 86% 12%, rgba(123, 246, 255, 0.12), transparent 18%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
+}
+
+.activity-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 18px;
+  width: 100%;
+  min-height: 100vh;
+  padding: 18px clamp(16px, 4vw, 36px) 42px;
+  background:
+    linear-gradient(180deg, #10154c 0%, #17305f 18%, #23739b 52%, #204b78 72%, #101c4d 100%);
+}
+
+.activity-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 50% 42%, rgba(137, 239, 255, 0.16), transparent 18%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.activity-stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  background: linear-gradient(180deg, rgba(40, 97, 151, 0) 0%, #1e4f78 34%, #183a62 68%, #0f2148 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.activity-stage__stars {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(153, 255, 255, 0.95) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 16% 28%, rgba(255, 232, 167, 0.95) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 24% 19%, rgba(255, 255, 255, 0.82) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 40% 26%, rgba(153, 255, 255, 0.82) 0 1.1px, transparent 2px),
+    radial-gradient(circle at 58% 15%, rgba(255, 255, 255, 0.86) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 66% 31%, rgba(255, 232, 167, 0.96) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 78% 14%, rgba(153, 255, 255, 0.84) 0 1.1px, transparent 2px),
+    radial-gradient(circle at 88% 27%, rgba(255, 232, 167, 0.9) 0 1px, transparent 1.9px),
+    radial-gradient(circle at 10% 47%, rgba(255, 255, 255, 0.75) 0 1px, transparent 1.9px),
+    radial-gradient(circle at 82% 45%, rgba(153, 255, 255, 0.82) 0 1.1px, transparent 1.9px);
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 0;
+  animation: homeStageDrift 18s linear infinite;
+}
+
+.activity-stage__scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.activity-stage__sun {
+  position: absolute;
+  left: 50%;
+  bottom: 49%;
+  width: min(34vw, 340px);
+  aspect-ratio: 1 / 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, #caffff 0%, #9df0ff 38%, #4eb7ef 70%, #2b78d5 100%);
+  box-shadow:
+    0 0 70px rgba(146, 243, 255, 0.24),
+    0 0 120px rgba(78, 183, 239, 0.12);
+  z-index: 0;
+}
+
+.activity-stage__sun::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 14px,
+      rgba(255, 255, 255, 0.28) 14px 18px
+    );
+  opacity: 0.28;
+}
+
+.activity-stage__skyline {
+  position: absolute;
+  left: 50%;
+  bottom: 44%;
+  width: min(84vw, 860px);
+  height: min(10vw, 118px);
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #21436c, #101b3f);
+  clip-path: polygon(
+    0 100%, 0 92%, 4% 92%, 4% 72%, 6% 72%, 6% 88%, 8% 88%, 8% 64%, 10% 64%,
+    10% 84%, 12% 84%, 12% 52%, 14% 52%, 14% 78%, 16% 78%, 16% 46%, 18% 46%,
+    18% 82%, 20% 82%, 20% 58%, 22% 58%, 22% 86%, 25% 86%, 25% 34%, 27% 34%,
+    27% 80%, 29% 80%, 29% 24%, 31% 24%, 31% 86%, 34% 86%, 34% 56%, 36% 56%,
+    36% 76%, 39% 76%, 39% 42%, 41% 42%, 41% 18%, 43% 18%, 43% 82%, 46% 82%,
+    46% 38%, 48% 38%, 48% 22%, 50% 22%, 50% 86%, 53% 86%, 53% 44%, 55% 44%,
+    55% 84%, 58% 84%, 58% 48%, 60% 48%, 60% 74%, 63% 74%, 63% 56%, 66% 56%,
+    66% 86%, 69% 86%, 69% 40%, 71% 40%, 71% 70%, 74% 70%, 74% 84%, 77% 84%,
+    77% 58%, 80% 58%, 80% 86%, 84% 86%, 84% 66%, 87% 66%, 87% 82%, 91% 82%,
+    91% 74%, 94% 74%, 94% 90%, 100% 90%, 100% 100%
+  );
+  box-shadow: 0 -1px 0 rgba(168, 248, 255, 0.24);
+  z-index: 3;
+}
+
+.activity-stage__floor {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 54%;
+  bottom: -22%;
+  background:
+    linear-gradient(180deg, rgba(123, 246, 255, 0.12) 0%, rgba(59, 138, 196, 0.18) 10%, rgba(29, 89, 158, 0.36) 30%, rgba(18, 58, 113, 0.86) 62%, rgba(12, 28, 85, 1) 100%),
+    linear-gradient(90deg, rgba(123, 246, 255, 0.96) 0 2px, transparent 2px 76px),
+    linear-gradient(180deg, rgba(123, 246, 255, 0.96) 0 2px, transparent 2px 50px);
+  background-size: 100% 100%, 76px 100%, 100% 50px;
+  transform: perspective(980px) rotateX(74deg);
+  transform-origin: center top;
+  z-index: 1;
+}
+
+.activity-stage__controls,
+.activity-stage__header,
+.activity-layout,
+.activity-hero-card,
+.activity-feed {
+  position: relative;
+  z-index: 4;
+}
+
+.activity-stage__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1100px, 100%);
+  padding-top: 8px;
+}
+
+.activity-stage__nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.activity-stage__header {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: min(760px, 100%);
+  text-align: center;
+  padding-top: 4px;
+}
+
+.activity-page-shell .pixel-text {
+  color: transparent !important;
+  text-shadow: none !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+.activity-stage__title {
+  width: min(600px, 92vw);
+  margin: 0 auto;
+  filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.42));
+}
+
+.activity-stage__subtitle {
+  margin: 0;
+  color: #f4fdff;
+  font-size: clamp(0.95rem, 1.8vw, 1.35rem);
+  line-height: 1.3;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.34);
+}
+
+.activity-stage__back,
+.activity-stage__portal {
+  color: #f4fdff;
+  text-decoration: none;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 10px;
+  background: rgba(10, 10, 18, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+}
+
+.activity-stage__portal {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid rgba(168, 248, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(168, 248, 255, 0.14), rgba(13, 26, 54, 0.84) 38%, rgba(7, 14, 32, 0.96)),
+    rgba(8, 12, 26, 0.92);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.16),
+    0 0 16px rgba(123, 246, 255, 0.14);
+}
+
+.activity-stage__back:hover,
+.activity-stage__portal:hover,
+.activity-stage__back.gamepad-selected,
+.activity-stage__portal.gamepad-selected {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.activity-layout {
+  display: grid;
+  gap: 18px;
+  width: min(1100px, 100%);
+}
+
+.activity-hero-card,
+.activity-card {
+  overflow: hidden;
+  border: 2px solid rgba(168, 248, 255, 0.22);
+  background:
+    linear-gradient(135deg, rgba(168, 248, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(10, 26, 58, 0.96), rgba(5, 12, 26, 0.96));
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 24px rgba(123, 246, 255, 0.08);
+}
+
+.activity-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 18px;
+  padding: 24px;
+}
+
+.activity-hero-card__copy {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-hero-card__kicker,
+.activity-meta-block__label,
+.activity-card__visibility,
+.activity-card__meta {
+  margin: 0;
+  color: #b8fcff;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.activity-hero-card__title {
+  margin: 0;
+  font-size: clamp(1.8rem, 3.2vw, 3rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.34);
+}
+
+.activity-hero-card__summary {
+  margin: 0;
+  color: rgba(244, 253, 255, 0.82);
+  line-height: 1.7;
+}
+
+.activity-hero-card__meta {
+  display: grid;
+  align-content: center;
+}
+
+.activity-meta-block {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(168, 248, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.activity-meta-block__value {
+  color: #f4fdff;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+}
+
+.activity-feed {
+  display: grid;
+  gap: 16px;
+}
+
+.activity-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.activity-card--placeholder {
+  background:
+    linear-gradient(180deg, rgba(255, 221, 157, 0.05), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.activity-card__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.activity-card__date {
+  color: rgba(244, 253, 255, 0.72);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.activity-card__title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.activity-card__summary {
+  margin: 0;
+  color: rgba(244, 253, 255, 0.84);
+  line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+  .activity-stage {
+    padding: 16px 12px 30px;
+  }
+
+  .activity-stage__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .activity-stage__nav {
+    justify-content: space-between;
+  }
+
+  .activity-hero-card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 18px 16px;
+  }
+}
+
 /* ---------- EVENT DETAIL PAGE ---------- */
 
 .event-page-shell {
