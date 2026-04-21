@@ -226,7 +226,6 @@ body {
 .rematch-status,
 .opponent-name,
 .opponent-display,
-.last-result,
 .turn-indicator {
   font-family: var(--font-ui);
 }
@@ -542,22 +541,21 @@ body {
 }
 
 .battle-header {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
   gap: 16px;
 }
 
 .status-placard--turn,
-.status-placard--result,
 .status-placard--opponent {
   min-height: 70px;
+  min-width: clamp(180px, 28vw, 380px);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .turn-indicator,
-.last-result,
 .opponent-display,
 .opponent-name,
 .rematch-status {
@@ -568,9 +566,43 @@ body {
 
 .battle-boards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr clamp(100px, 9vw, 140px) 1fr;
   gap: 18px;
   align-items: start;
+}
+
+.battle-center-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: clamp(60px, 12vh, 100px);
+}
+
+.battle-announcement {
+  display: none;
+  width: 100%;
+  padding: clamp(10px, 1.4vh, 14px) clamp(8px, 1vw, 12px);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 2px solid rgba(186, 196, 210, 0.6);
+  box-shadow: 0 8px 24px rgba(8, 40, 64, 0.18);
+  font: 700 clamp(0.78rem, 1.4vh, 0.9rem) var(--font-ui);
+  text-align: center;
+  color: rgba(8, 34, 54, 0.88);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.battle-announcement.is-visible {
+  display: block;
+  animation: announcement-pop 2.6s ease forwards;
+}
+
+@keyframes announcement-pop {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.9); }
+  12%  { opacity: 1; transform: translateY(0) scale(1); }
+  72%  { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(4px) scale(0.96); }
 }
 
 .screen-battle .board-column {
@@ -933,6 +965,16 @@ body {
     grid-template-columns: 1fr;
     display: flex;
     flex-direction: column;
+  }
+
+  .battle-center-col {
+    padding-top: 0;
+    order: 2;
+  }
+
+  .battle-announcement {
+    max-width: 400px;
+    margin: 0 auto;
   }
 
   .placement-scene {

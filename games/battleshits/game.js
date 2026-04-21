@@ -326,25 +326,21 @@ function renderTargetBoard() {
   }
 }
 
+function showAnnouncement(text) {
+  const el = document.getElementById('battle-announcement');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('is-visible');
+  void el.offsetWidth;
+  el.classList.add('is-visible');
+}
+
 function renderBattleStatus() {
-  const turnEl    = document.getElementById('battle-turn-indicator');
-  const resultEl  = document.getElementById('battle-last-result');
-  const oppEl     = document.getElementById('battle-opponent-name');
-  const labelEl   = document.getElementById('target-label');
+  const turnEl  = document.getElementById('battle-turn-indicator');
+  const oppEl   = document.getElementById('battle-opponent-name');
+  const labelEl = document.getElementById('target-label');
 
   if (turnEl) turnEl.textContent = getBattleStatusCopy(gs.turn);
-
-  if (resultEl) {
-    if (gs.lastShotInfo) {
-      const { hit, sunk, shipId } = gs.lastShotInfo;
-      const def = FLEET_DEFS.find(d => d.id === shipId);
-      if (sunk && def) resultEl.textContent = `💀 You sunk their ${def.name}!`;
-      else if (hit)    resultEl.textContent = '💥 Direct hit!';
-      else             resultEl.textContent = '💦 Splash! Missed.';
-    } else {
-      resultEl.textContent = '';
-    }
-  }
 
   if (oppEl) {
     oppEl.textContent = gs.opponentProfile?.displayName ? `vs. ${gs.opponentProfile.displayName}` : '';
@@ -537,6 +533,11 @@ function applyShotResult({ col, row, hit, sunk, shipId, fleetDestroyed }) {
   gs.lastShotInfo = { hit, sunk, shipId };
   gs.pendingShot = null;
   audio.play(getResolutionSoundId(hit));
+
+  const def = FLEET_DEFS.find(d => d.id === shipId);
+  if (sunk && def) showAnnouncement(`💀 You sunk their ${def.name}!`);
+  else if (hit)    showAnnouncement('💥 Direct hit!');
+  else             showAnnouncement('💦 Splash! Missed.');
 
   renderTargetBoard();
 

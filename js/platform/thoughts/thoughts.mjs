@@ -90,6 +90,26 @@ function compareCreatedDesc(left, right) {
   return left.authorDisplayName.localeCompare(right.authorDisplayName);
 }
 
+export function formatThoughtDate(value) {
+  const timestamp = Date.parse(value || "");
+  if (!timestamp) return "Signal pending";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+export function formatThoughtCommentLabel(count) {
+  return `${count} comment${count === 1 ? "" : "s"}`;
+}
+
+export function formatThoughtShareLabel(count) {
+  return `${count} share${count === 1 ? "" : "s"}`;
+}
+
 function mergeThoughtSources(primary = [], fallback = []) {
   const merged = [];
   const seen = new Set();
@@ -130,6 +150,42 @@ export function buildPublicThoughtFeed(source = DEFAULT_THOUGHTS) {
     .map((entry, index) => normalizeThoughtPost(entry, index))
     .filter((entry) => entry.visibility === "public")
     .sort(compareCreatedDesc);
+}
+
+export function buildPlayerThoughtFeed(source = DEFAULT_THOUGHTS, playerId = "") {
+  const normalizedPlayerId = sanitizeSingleLine(playerId, 80);
+  if (!normalizedPlayerId) return [];
+
+  return buildPublicThoughtFeed(source)
+    .filter((entry) => entry.authorPlayerId === normalizedPlayerId);
+}
+
+export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
+  const items = Array.isArray(thoughtFeed) ? thoughtFeed : [];
+
+  if (items.length > 0) {
+    return items.map((item) => ({
+      id: item.id,
+      title: item.subject || item.authorDisplayName || "Arcade Signal",
+      summary: item.text || "Fresh player signal incoming.",
+      authorLabel: item.authorDisplayName || "Arcade Pilot",
+      publishedLabel: formatThoughtDate(item.createdAt),
+      commentLabel: formatThoughtCommentLabel(item.commentCount),
+      shareLabel: formatThoughtShareLabel(item.shareCount),
+      isPlaceholder: false,
+    }));
+  }
+
+  return [{
+    id: sanitizeSingleLine(options.placeholderId, 80) || "thought-placeholder",
+    title: sanitizeSingleLine(options.placeholderTitle, 80) || "Feed Warming Up",
+    summary: sanitizeTextBlock(options.placeholderSummary, 500) || "Player status posts will appear here once more social surfaces come online.",
+    authorLabel: sanitizeSingleLine(options.placeholderAuthorLabel, 60) || "Arcade Pilot",
+    publishedLabel: sanitizeSingleLine(options.placeholderPublishedLabel, 40) || "Soon",
+    commentLabel: sanitizeSingleLine(options.placeholderCommentLabel, 40) || "0 comments",
+    shareLabel: sanitizeSingleLine(options.placeholderShareLabel, 40) || "0 shares",
+    isPlaceholder: true,
+  }];
 }
 
 export function loadThoughtFeed(storage = getDefaultPlatformStorage()) {

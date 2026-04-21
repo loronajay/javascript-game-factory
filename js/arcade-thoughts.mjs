@@ -1,4 +1,7 @@
-import { loadThoughtFeed } from "./platform/thoughts/thoughts.mjs";
+import {
+  buildThoughtCardItems,
+  loadThoughtFeed,
+} from "./platform/thoughts/thoughts.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -9,28 +12,8 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function formatThoughtDate(value) {
-  const timestamp = Date.parse(value || "");
-  if (!timestamp) return "Signal pending";
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
-}
-
 function formatCountLabel(count) {
   return `${count} POST${count === 1 ? "" : "S"}`;
-}
-
-function formatCommentLabel(count) {
-  return `${count} comment${count === 1 ? "" : "s"}`;
-}
-
-function formatShareLabel(count) {
-  return `${count} share${count === 1 ? "" : "s"}`;
 }
 
 export function buildThoughtsPageViewModel(thoughtFeed = loadThoughtFeed()) {
@@ -41,27 +24,10 @@ export function buildThoughtsPageViewModel(thoughtFeed = loadThoughtFeed()) {
     heroKicker: "STATUS FEED",
     heroSummary: "This is the first scaffold for the future player-status feed: short posts, visible engagement counts, and a scrollable social lane that can later grow comments and sharing.",
     heroCountLabel: formatCountLabel(items.length),
-    items: items.length > 0
-      ? items.map((item) => ({
-          id: item.id,
-          title: item.subject || item.authorDisplayName || "Arcade Signal",
-          summary: item.text || "Fresh player signal incoming.",
-          authorLabel: item.authorDisplayName || "Arcade Pilot",
-          publishedLabel: formatThoughtDate(item.createdAt),
-          commentLabel: formatCommentLabel(item.commentCount),
-          shareLabel: formatShareLabel(item.shareCount),
-          isPlaceholder: false,
-        }))
-      : [{
-          id: "thought-placeholder",
-          title: "Feed Warming Up",
-          summary: "The thoughts feed is still warming up. Player status posts will appear here once more social surfaces come online.",
-          authorLabel: "Arcade Pilot",
-          publishedLabel: "Soon",
-          commentLabel: "0 comments",
-          shareLabel: "0 shares",
-          isPlaceholder: true,
-        }],
+    items: buildThoughtCardItems(items, {
+      placeholderTitle: "Feed Warming Up",
+      placeholderSummary: "The thoughts feed is still warming up. Player status posts will appear here once more social surfaces come online.",
+    }),
   };
 }
 

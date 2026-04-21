@@ -1,6 +1,11 @@
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+import {
+  buildPlayerThoughtFeed,
+  buildThoughtCardItems,
+  loadThoughtFeed,
+} from "./platform/thoughts/thoughts.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 
@@ -53,39 +58,57 @@ function formatPresenceLabel(presence) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function buildActivityItems(publicView, profile) {
-  if (publicView.recentActivity.length > 0) {
-    return publicView.recentActivity.map((entry, index) => ({
-      label: typeof entry.label === "string" && entry.label.trim()
-        ? entry.label.trim()
-        : `Activity ${index + 1}`,
-      value: typeof entry.summary === "string" && entry.summary.trim()
-        ? entry.summary.trim()
-        : (typeof entry.value === "string" && entry.value.trim() ? entry.value.trim() : "Arcade floor signal logged."),
-      isPlaceholder: false,
-    }));
-  }
-
-  return [{
-    label: "Floor Activity",
-    value: "Recent public activity is not cached on this cabinet yet.",
-    isPlaceholder: true,
-  }];
+function humanizeToken(value) {
+  return String(value || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
-export function loadRequestedPlayerProfile(storage = getDefaultPlatformStorage(), requestedPlayerId = "") {
+function buildPresenceToneClass(presence) {
+  const normalized = String(presence || "").trim().toLowerCase();
+  return normalized || "offline";
+}
+
+function buildThoughtBackedProfile(thoughtFeed = [], requestedPlayerId = "") {
+  const playerThoughtFeed = buildPlayerThoughtFeed(thoughtFeed, requestedPlayerId);
+  if (playerThoughtFeed.length === 0) return null;
+
+  return {
+    version: 1,
+    playerId: requestedPlayerId,
+    profileName: playerThoughtFeed[0].authorDisplayName,
+    bio: "",
+    tagline: "",
+    avatarAssetId: "",
+    favoriteGameSlug: "",
+    ladderPlacements: [],
+    friendsPreview: [],
+    mainSqueeze: null,
+    badgeIds: [],
+    links: [],
+    recentActivity: [],
+    thoughtCount: playerThoughtFeed.length,
+    preferences: {},
+  };
+}
+
+export function loadRequestedPlayerProfile(storage = getDefaultPlatformStorage(), requestedPlayerId = "", options = {}) {
   const cachedProfile = loadFactoryProfile(storage);
   const routePlayerId = sanitizePlayerId(requestedPlayerId);
+  const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : [];
 
   if (!routePlayerId || routePlayerId === cachedProfile.playerId) {
     return cachedProfile;
   }
 
-  return null;
+  return buildThoughtBackedProfile(thoughtFeed, routePlayerId);
 }
 
 export function buildPlayerPageViewModel(profile, options = {}) {
   const requestedPlayerId = sanitizePlayerId(options.requestedPlayerId);
+  const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : [];
   const favoriteTitleResolver = typeof options?.favoriteTitleResolver === "function"
     ? options.favoriteTitleResolver
     : titleFromSlug;
@@ -127,15 +150,27 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         value: "Friend preview data is not cached for this player yet.",
         isPlaceholder: true,
       }],
-      activityItems: [{
-        label: "Floor Activity",
-        value: "Recent public activity is not cached on this cabinet yet.",
+      thoughtItems: buildThoughtCardItems([], {
+        placeholderId: "player-thought-placeholder",
+        placeholderTitle: "Player Feed Warming Up",
+        placeholderSummary: "No public player thoughts are cached for this pilot yet.",
+      }),
+      aboutText: "This player has not filled out an about block in the local arcade cache yet.",
+      badgeItems: [{
+        label: "Badge case still empty",
         isPlaceholder: true,
       }],
     };
   }
 
   const publicView = buildPlayerProfileView(profile, options);
+  const playerThoughtFeed = buildPlayerThoughtFeed(thoughtFeed, publicView.playerId || requestedPlayerId);
+  const thoughtItems = buildThoughtCardItems(playerThoughtFeed, {
+    placeholderId: "player-thought-placeholder",
+    placeholderTitle: "Player Feed Warming Up",
+    placeholderSummary: "No public player thoughts are cached for this pilot yet.",
+  });
+  const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);
   const linkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
         label: link.label,
@@ -199,10 +234,18 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       isPlaceholder: true,
     });
   }
-  const activityItems = buildActivityItems(publicView, profile);
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroTagline = publicView.tagline || "Public player file humming under the neon skyline.";
   const heroBio = publicView.bio || "This public player file is running in local-first mode while broader arcade profile discovery comes online.";
+  const badgeItems = publicView.badgeIds.length > 0
+    ? publicView.badgeIds.map((badgeId) => ({
+        label: humanizeToken(badgeId) || "Arcade Badge",
+        isPlaceholder: false,
+      }))
+    : [{
+        label: "Badge case still empty",
+        isPlaceholder: true,
+      }];
 
   return {
     state: "ready",
@@ -210,6 +253,8 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     heroTagline,
     heroBio,
     heroChipLabel: "PUBLIC PLAYER PROFILE",
+    presenceLabel: formatPresenceLabel(publicView.presence),
+    presenceToneClass: buildPresenceToneClass(publicView.presence),
     avatarSrc: publicView.avatarUrl || DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
@@ -217,13 +262,16 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       { label: "Factory ID", value: publicView.playerId || requestedPlayerId || "PENDING-ID" },
       { label: "Status", value: formatPresenceLabel(publicView.presence) },
       { label: "Badges", value: String(publicView.badgeIds.length) },
-      { label: "Thoughts", value: String(publicView.thoughtCount) },
+      { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
+    backgroundImageUrl: publicView.backgroundImageUrl,
     linkItems,
     favoriteGameItems,
     rankingItems,
     friendItems,
-    activityItems,
+    thoughtItems,
+    aboutText: heroBio,
+    badgeItems,
   };
 }
 
@@ -238,9 +286,13 @@ function renderHeroCard(container, model) {
   `).join("");
 
   container.innerHTML = `
+    <div class="player-hero-card__backdrop" aria-hidden="true"></div>
     <div class="player-hero-card__copy">
       <p class="player-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
-      <h2 class="player-hero-card__name">${escapeHtml(model.heroName)}</h2>
+      <div class="player-hero-card__identity-row">
+        <h2 class="player-hero-card__name">${escapeHtml(model.heroName)}</h2>
+        <span class="player-presence-dot player-presence-dot--${escapeHtml(model.presenceToneClass || "offline")}" title="${escapeHtml(model.presenceLabel || "Offline")}"></span>
+      </div>
       <p class="player-hero-card__tagline">${escapeHtml(model.heroTagline)}</p>
       <p class="player-hero-card__bio">${escapeHtml(model.heroBio)}</p>
     </div>
@@ -259,6 +311,13 @@ function renderHeroCard(container, model) {
     </div>
     <div class="player-hero-card__meta">${metaHtml}</div>
   `;
+
+  const backdrop = container.querySelector(".player-hero-card__backdrop");
+  if (backdrop) {
+    backdrop.style.backgroundImage = model.backgroundImageUrl
+      ? `url("${model.backgroundImageUrl}")`
+      : "";
+  }
 
   const portraitImage = container.querySelector(".player-hero-card__portrait-image");
   if (!portraitImage) return;
@@ -332,21 +391,85 @@ function renderCardItem(item) {
   `;
 }
 
+function renderThoughtItem(item) {
+  const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+
+  return `
+    <article class="${cardClass}">
+      <div class="thought-card__topline">
+        <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
+        <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
+      </div>
+      <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+      <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
+      <div class="thought-card__meta">
+        <span>${escapeHtml(item.commentLabel)}</span>
+        <span>${escapeHtml(item.shareLabel)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderThoughtsPanel(container, title, subtitle, items) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="player-panel__topline">
+      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
+      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    </div>
+    <div class="player-thoughts-feed thoughts-feed">
+      ${items.map(renderThoughtItem).join("")}
+    </div>
+  `;
+}
+
+function renderAboutPanel(container, title, subtitle, text) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="player-panel__topline">
+      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
+      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    </div>
+    <p class="player-about-copy">${escapeHtml(text)}</p>
+  `;
+}
+
+function renderBadgesPanel(container, title, subtitle, items) {
+  if (!container) return;
+
+  const badgesHtml = items[0]?.isPlaceholder
+    ? `<p class="player-badge-empty">${escapeHtml(items[0].label)}</p>`
+    : `<div class="player-badge-list">${items.map((item) => `<span class="player-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
+
+  container.innerHTML = `
+    <div class="player-panel__topline">
+      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
+      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    </div>
+    ${badgesHtml}
+  `;
+}
+
 export function renderPlayerPage(doc = globalThis.document, options = {}) {
   if (!doc?.getElementById) return null;
 
   const params = new URLSearchParams(options.search || globalThis.location?.search || "");
   const requestedPlayerId = sanitizePlayerId(params.get("id"));
   const storage = options.storage || getDefaultPlatformStorage();
-  const profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId);
-  const model = buildPlayerPageViewModel(profile, { requestedPlayerId });
+  const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
+  const profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId, { thoughtFeed });
+  const model = buildPlayerPageViewModel(profile, { requestedPlayerId, thoughtFeed });
 
   renderHeroCard(doc.getElementById("playerHeroCard"), model);
+  renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", "Status Lane", model.thoughtItems);
   renderPanel(doc.getElementById("playerLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
   renderPanel(doc.getElementById("playerFavoritePanel"), "Favorite Cabinet", "Grid Anchor", model.favoriteGameItems, renderCardItem);
   renderPanel(doc.getElementById("playerRankingsPanel"), "Top Ladder Rankings", "Scoreboard Echo", model.rankingItems, renderCardItem);
   renderPanel(doc.getElementById("playerFriendsPanel"), "Top Friends", "Social Orbit", model.friendItems, renderCardItem);
-  renderPanel(doc.getElementById("playerActivityPanel"), "Recent Floor Activity", "Afterglow", model.activityItems, renderCardItem);
+  renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", "Player Bio", model.aboutText);
+  renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", "Cabinet Shine", model.badgeItems);
   return model;
 }
 

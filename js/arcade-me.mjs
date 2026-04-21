@@ -1,6 +1,12 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
+import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+import {
+  buildPlayerThoughtFeed,
+  buildThoughtCardItems,
+  loadThoughtFeed,
+} from "./platform/thoughts/thoughts.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 
@@ -47,6 +53,19 @@ function formatPresenceLabel(presence) {
   const normalized = String(presence || "").trim().toLowerCase();
   if (!normalized) return "Offline";
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function humanizeToken(value) {
+  return String(value || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function buildPresenceToneClass(presence) {
+  const normalized = String(presence || "").trim().toLowerCase();
+  return normalized || "offline";
 }
 
 function buildFavoriteGameItem(publicView, favoriteTitleResolver) {
@@ -124,6 +143,14 @@ function buildFriendItems(publicView) {
 
 export function buildMePageViewModel(profile, options = {}) {
   const publicView = buildPlayerProfileView(profile, options);
+  const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : [];
+  const playerThoughtFeed = buildPlayerThoughtFeed(thoughtFeed, publicView.playerId);
+  const thoughtItems = buildThoughtCardItems(playerThoughtFeed, {
+    placeholderId: "me-thought-placeholder",
+    placeholderTitle: "Player Feed Warming Up",
+    placeholderSummary: "Your player feed is waiting for the first shared thought. Status posts will land here once personal posting flows come online.",
+  });
+  const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);
   const favoriteTitleResolver = typeof options?.favoriteTitleResolver === "function"
     ? options.favoriteTitleResolver
     : titleFromSlug;
@@ -150,17 +177,13 @@ export function buildMePageViewModel(profile, options = {}) {
         isPlaceholder: true,
       }];
 
-  const activityItems = publicView.recentActivity.length > 0
-    ? publicView.recentActivity.map((entry, index) => ({
-        label: typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : `Activity ${index + 1}`,
-        value: typeof entry.summary === "string" && entry.summary.trim()
-          ? entry.summary.trim()
-          : (typeof entry.value === "string" && entry.value.trim() ? entry.value.trim() : "Arcade floor signal logged."),
+  const badgeItems = publicView.badgeIds.length > 0
+    ? publicView.badgeIds.map((badgeId) => ({
+        label: humanizeToken(badgeId) || "Arcade Badge",
         isPlaceholder: false,
       }))
     : [{
-        label: "Floor Activity",
-        value: "Shared thoughts and friend activity are still warming up.",
+        label: "Badge case still empty",
         isPlaceholder: true,
       }];
 
@@ -169,6 +192,8 @@ export function buildMePageViewModel(profile, options = {}) {
     heroTagline,
     heroBio,
     heroChipLabel,
+    presenceLabel: formatPresenceLabel(publicView.presence),
+    presenceToneClass: buildPresenceToneClass(publicView.presence),
     avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
@@ -176,7 +201,7 @@ export function buildMePageViewModel(profile, options = {}) {
       { label: "Factory ID", value: publicView.playerId || "PENDING-ID" },
       { label: "Status", value: formatPresenceLabel(publicView.presence) },
       { label: "Badges", value: String(publicView.badgeIds.length) },
-      { label: "Thoughts", value: String(publicView.thoughtCount) },
+      { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
     avatarAssetId: publicView.avatarAssetId,
     backgroundImageUrl: publicView.backgroundImageUrl,
@@ -184,7 +209,9 @@ export function buildMePageViewModel(profile, options = {}) {
     favoriteGameItems,
     rankingItems,
     friendItems,
-    activityItems,
+    thoughtItems,
+    aboutText: heroBio,
+    badgeItems,
   };
 }
 
@@ -199,9 +226,13 @@ function renderHeroCard(container, model) {
   `).join("");
 
   container.innerHTML = `
+    <div class="me-hero-card__backdrop" aria-hidden="true"></div>
     <div class="me-hero-card__copy">
       <p class="me-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
-      <h2 class="me-hero-card__name">${escapeHtml(model.heroName)}</h2>
+      <div class="me-hero-card__identity-row">
+        <h2 class="me-hero-card__name">${escapeHtml(model.heroName)}</h2>
+        <span class="me-presence-dot me-presence-dot--${escapeHtml(model.presenceToneClass)}" title="${escapeHtml(model.presenceLabel)}"></span>
+      </div>
       <p class="me-hero-card__tagline">${escapeHtml(model.heroTagline)}</p>
       <p class="me-hero-card__bio">${escapeHtml(model.heroBio)}</p>
     </div>
@@ -220,6 +251,13 @@ function renderHeroCard(container, model) {
     </div>
     <div class="me-hero-card__meta">${metaHtml}</div>
   `;
+
+  const backdrop = container.querySelector(".me-hero-card__backdrop");
+  if (backdrop) {
+    backdrop.style.backgroundImage = model.backgroundImageUrl
+      ? `url("${model.backgroundImageUrl}")`
+      : "";
+  }
 
   const portraitImage = container.querySelector(".me-hero-card__portrait-image");
   if (!portraitImage) return;
@@ -293,16 +331,81 @@ function renderCardItem(item) {
   `;
 }
 
-export function renderMePage(doc = globalThis.document, profile = loadFactoryProfile()) {
+function renderThoughtItem(item) {
+  const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+
+  return `
+    <article class="${cardClass}">
+      <div class="thought-card__topline">
+        <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
+        <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
+      </div>
+      <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+      <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
+      <div class="thought-card__meta">
+        <span>${escapeHtml(item.commentLabel)}</span>
+        <span>${escapeHtml(item.shareLabel)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderThoughtsPanel(container, title, subtitle, items) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="me-panel__topline">
+      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
+      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    </div>
+    <div class="me-thoughts-feed thoughts-feed">
+      ${items.map(renderThoughtItem).join("")}
+    </div>
+  `;
+}
+
+function renderAboutPanel(container, title, subtitle, text) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="me-panel__topline">
+      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
+      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    </div>
+    <p class="me-about-copy">${escapeHtml(text)}</p>
+  `;
+}
+
+function renderBadgesPanel(container, title, subtitle, items) {
+  if (!container) return;
+
+  const badgesHtml = items[0]?.isPlaceholder
+    ? `<p class="me-badge-empty">${escapeHtml(items[0].label)}</p>`
+    : `<div class="me-badge-list">${items.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
+
+  container.innerHTML = `
+    <div class="me-panel__topline">
+      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
+      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    </div>
+    ${badgesHtml}
+  `;
+}
+
+export function renderMePage(doc = globalThis.document, profile = loadFactoryProfile(), options = {}) {
   if (!doc?.getElementById) return null;
 
-  const model = buildMePageViewModel(profile);
+  const storage = options.storage || getDefaultPlatformStorage();
+  const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
+  const model = buildMePageViewModel(profile, { thoughtFeed });
   renderHeroCard(doc.getElementById("meHeroCard"), model);
+  renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", "Status Lane", model.thoughtItems);
   renderPanel(doc.getElementById("meLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
   renderPanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Cabinet", "Grid Anchor", model.favoriteGameItems, renderCardItem);
   renderPanel(doc.getElementById("meRankingsPanel"), "Top Ladder Rankings", "Scoreboard Echo", model.rankingItems, renderCardItem);
   renderPanel(doc.getElementById("meFriendsPanel"), "Top Friends", "Social Orbit", model.friendItems, renderCardItem);
-  renderPanel(doc.getElementById("meActivityPanel"), "Recent Floor Activity", "Afterglow", model.activityItems, renderCardItem);
+  renderAboutPanel(doc.getElementById("meAboutPanel"), "About Me", "Player Bio", model.aboutText);
+  renderBadgesPanel(doc.getElementById("meBadgesPanel"), "Badges", "Cabinet Shine", model.badgeItems);
   return model;
 }
 
