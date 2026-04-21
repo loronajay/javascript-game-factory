@@ -1,0 +1,11 @@
+{
+  "title": "Battleshits",
+  "tagline": "Sink their fleet. Try not to stink.",
+  "description": "Classic 1v1 Battleship with poop-themed presentation. Place your fleet, alternate fire, and destroy the enemy before they destroy you.",
+  "players": "2",
+  "status": "Online multiplayer — public matchmaking",
+  "order": 2,
+  "featured": false,
+  "theme": "ember",
+  "accentColor": "#c8a000"
+}
