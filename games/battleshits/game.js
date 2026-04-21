@@ -1,4 +1,5 @@
 import { createOnlineClient, getOppositeMatchSide } from './scripts/online.js';
+import { createAudioController, getResolutionSoundId, LAUNCH_SOUND_ID } from './scripts/audio.js';
 import {
   createFleetBoard, createTargetBoard, FLEET_DEFS, BOARD_SIZE, cellIndex,
   isValidPlacement, placeShip, removeShip, resolveIncomingShot,
@@ -81,6 +82,7 @@ function createInitialState() {
 let gs = createInitialState();
 let net = null;
 let publicMatchRetryTimer = null;
+const audio = createAudioController();
 
 function clearPublicMatchRetry() {
   if (publicMatchRetryTimer !== null) {
@@ -407,6 +409,7 @@ function handleTargetClick(col, row) {
   if (gs.turn !== 'mine') return;
   if (isCellShot(gs.myTarget, col, row)) return;
   gs.turn = 'awaiting_result';
+  audio.play(LAUNCH_SOUND_ID);
   net.sendShot(col, row);
   renderBattleStatus();
 }
@@ -417,6 +420,7 @@ function handleIncomingShot(col, row) {
 
   gs.myFleet = board;
   const fleetDestroyed = isFleetDestroyed(gs.myFleet);
+  audio.play(getResolutionSoundId(hit));
 
   net.sendShotResult(col, row, hit, sunk, shipId, fleetDestroyed);
 
@@ -435,6 +439,7 @@ function handleIncomingShot(col, row) {
 function handleShotResult({ col, row, hit, sunk, shipId, fleetDestroyed }) {
   gs.myTarget = recordShotResult(gs.myTarget, col, row, hit, sunk, shipId);
   gs.lastShotInfo = { hit, sunk, shipId };
+  audio.play(getResolutionSoundId(hit));
 
   renderTargetBoard();
 
