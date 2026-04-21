@@ -49,6 +49,28 @@ body {
   image-rendering: pixelated;
 }
 
+.back-btn {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 100;
+  color: rgba(247, 241, 219, 0.55);
+  font-family: Consolas, "Lucida Console", "Courier New", monospace;
+  font-size: 12px;
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  border: 1px solid rgba(102, 51, 170, 0.4);
+  border-radius: 3px;
+  background: rgba(7, 4, 13, 0.6);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.back-btn:hover {
+  color: #f7b84d;
+  border-color: rgba(247, 184, 77, 0.6);
+}
+
 @media (max-width: 720px) {
   body {
     --shell-gutter: 8px;
