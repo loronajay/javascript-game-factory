@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@400;700&display=swap');
+
 :root {
   --tile-blue-dark: #4f8fd0;
   --tile-blue: #72ade2;
@@ -14,6 +16,8 @@
   --sign-bottom: #111214;
   --error: #af1e16;
   --label: rgba(10, 31, 46, 0.72);
+  --font-stencil: "Stardos Stencil", "Stencil Std", "Stencil", "Copperplate", "Copperplate Gothic Bold", serif;
+  --font-ui: "Trebuchet MS", Arial, sans-serif;
 }
 
 * {
@@ -94,7 +98,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 20px 28px;
+  padding: 36px 20px 20px;
 }
 
 .screen {
@@ -125,27 +129,36 @@ body {
   align-items: center;
 }
 
+.screen-menu {
+  align-items: flex-start;
+}
+
 .menu-stage {
-  width: min(720px, 100%);
+  width: min(1040px, 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
+  gap: 14px;
+  padding-block: 12px 0;
+  max-height: calc(100vh - 72px);
 }
 
 .menu-title-frame {
-  width: min(100%, 1240px);
-  padding: 14px 26px;
+  width: 100%;
+  max-width: 860px;
+  padding: 14px 24px;
   border: 4px solid rgba(0, 0, 0, 0.78);
   background: rgba(255, 255, 255, 0.14);
   box-shadow: 0 14px 30px rgba(7, 31, 52, 0.18);
+  overflow: hidden;
 }
 
 .game-title {
   text-align: center;
-  font-size: clamp(3.3rem, 10vw, 8rem);
-  line-height: 0.92;
-  letter-spacing: 0.05em;
+  font-family: var(--font-stencil);
+  font-size: clamp(2.8rem, 7vw, 5.6rem);
+  line-height: 0.9;
+  letter-spacing: 0.03em;
   color: #080808;
   text-transform: uppercase;
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.18);
@@ -153,9 +166,10 @@ body {
 
 .menu-throne {
   position: relative;
-  width: min(320px, 58vw);
+  width: min(250px, 30vw, 40vh);
   aspect-ratio: 0.82;
-  margin-top: -10px;
+  margin-top: -2px;
+  flex: 0 0 auto;
 }
 
 .menu-throne-tank,
@@ -212,33 +226,35 @@ body {
 .opponent-display,
 .last-result,
 .turn-indicator {
-  font-family: 'Trebuchet MS', Arial, sans-serif;
+  font-family: var(--font-ui);
 }
 
 .game-tagline {
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(6, 33, 56, 0.72);
+  text-align: center;
 }
 
 .menu-buttons {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  width: min(600px, 100%);
+  gap: 12px;
+  width: min(540px, 100%);
 }
 
 .btn {
-  min-width: min(100%, 540px);
-  padding: 14px 30px;
+  min-width: min(100%, 520px);
+  padding: 12px 26px;
   border: 3px solid #0e0e0f;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 900;
-  font-size: clamp(1rem, 2vw, 1.28rem);
+  font-family: var(--font-stencil);
+  font-size: clamp(0.95rem, 1.8vw, 1.2rem);
   color: white;
   background: linear-gradient(180deg, var(--sign-top), var(--sign-bottom));
   box-shadow:
@@ -328,7 +344,7 @@ body {
 
 .panel-badge {
   padding: 8px 14px;
-  font: 700 0.75rem 'Trebuchet MS', Arial, sans-serif;
+  font: 700 0.75rem var(--font-ui);
 }
 
 .screen-heading {
@@ -442,7 +458,7 @@ body {
 .board-label--tank {
   display: inline-block;
   padding: 10px 16px;
-  font: 800 0.84rem 'Trebuchet MS', Arial, sans-serif;
+  font: 800 0.84rem var(--font-ui);
 }
 
 .placement-hint {
@@ -468,7 +484,7 @@ body {
 
 .sidebar-heading {
   margin: 10px 0 16px;
-  font: 800 0.8rem 'Trebuchet MS', Arial, sans-serif;
+  font: 800 0.8rem var(--font-ui);
   color: rgba(9, 34, 55, 0.8);
 }
 
@@ -503,7 +519,7 @@ body {
 
 .roster-ship-name {
   margin-bottom: 8px;
-  font: 700 0.92rem 'Trebuchet MS', Arial, sans-serif;
+  font: 700 0.92rem var(--font-ui);
   color: rgba(7, 35, 55, 0.84);
 }
 
@@ -626,7 +642,7 @@ body {
 }
 
 .board-bowl-title {
-  font: 800 0.88rem 'Trebuchet MS', Arial, sans-serif;
+  font: 800 0.88rem var(--font-ui);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(9, 31, 48, 0.84);
@@ -657,7 +673,7 @@ body {
   justify-content: center;
   border-radius: 10px;
   background: rgba(0, 33, 58, 0.24);
-  font: 700 0.72rem 'Trebuchet MS', Arial, sans-serif;
+  font: 700 0.72rem var(--font-ui);
   color: rgba(239, 250, 255, 0.92);
   text-transform: uppercase;
 }
@@ -810,7 +826,7 @@ body {
 }
 
 .ship-status-row {
-  font: 700 0.86rem 'Trebuchet MS', Arial, sans-serif;
+  font: 700 0.86rem var(--font-ui);
   letter-spacing: 0.04em;
 }
 
@@ -876,5 +892,14 @@ body {
 
   .menu-title-frame {
     padding-inline: 16px;
+  }
+
+  .menu-stage {
+    gap: 12px;
+    max-height: none;
+  }
+
+  .menu-throne {
+    width: min(220px, 42vw);
   }
 }
