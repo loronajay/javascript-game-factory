@@ -5395,6 +5395,26 @@ body::before {
   text-transform: uppercase;
 }
 
+.thought-card__delete {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 80, 120, 0.35);
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(255, 100, 130, 0.7);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.thought-card__delete:hover {
+  border-color: rgba(255, 80, 120, 0.7);
+  background: rgba(255, 80, 120, 0.12);
+  color: #ff6488;
+}
+
 .thought-composer {
   display: grid;
   gap: 12px;

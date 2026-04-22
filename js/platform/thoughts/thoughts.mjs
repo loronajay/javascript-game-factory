@@ -197,6 +197,7 @@ export function buildPlayerThoughtFeed(source = DEFAULT_THOUGHTS, playerId = "")
 
 export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
   const items = Array.isArray(thoughtFeed) ? thoughtFeed : [];
+  const isOwner = !!options?.isOwner;
 
   if (items.length > 0) {
     return items.map((item) => ({
@@ -214,6 +215,7 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
         { id: "share", label: "Share" },
         { id: "react", label: "React" },
       ],
+      canDelete: isOwner,
       isPlaceholder: false,
     }));
   }
@@ -233,6 +235,7 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
       { id: "share", label: "Share" },
       { id: "react", label: "React" },
     ],
+    canDelete: false,
     isPlaceholder: true,
   }];
 }
@@ -240,6 +243,18 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
 export function loadThoughtFeed(storage = getDefaultPlatformStorage()) {
   const stored = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY));
   return buildPublicThoughtFeed(mergeThoughtSources(stored, DEFAULT_THOUGHTS));
+}
+
+export function deleteThoughtPost(id, storage = getDefaultPlatformStorage()) {
+  const normalizedId = sanitizeSingleLine(id, 80);
+  if (!normalizedId) return false;
+
+  const current = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY))
+    .map((entry, index) => normalizeThoughtPost(entry, index))
+    .filter((entry) => entry.id !== normalizedId);
+
+  writeStorageText(storage, THOUGHT_FEED_STORAGE_KEY, JSON.stringify(current));
+  return true;
 }
 
 export function publishThoughtPost(post, storage = getDefaultPlatformStorage()) {

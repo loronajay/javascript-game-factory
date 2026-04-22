@@ -5,6 +5,7 @@ import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
   buildPlayerThoughtFeed,
   buildThoughtCardItems,
+  deleteThoughtPost,
   loadThoughtFeed,
   publishThoughtPost,
 } from "./platform/thoughts/thoughts.mjs";
@@ -197,6 +198,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     placeholderId: "player-thought-placeholder",
     placeholderTitle: "Player Feed Warming Up",
     placeholderSummary: "No public player thoughts are cached for this pilot yet.",
+    isOwner: isOwnerView,
   });
   const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);
   const identityLinkItems = publicView.links.length > 0
@@ -535,12 +537,16 @@ function renderThoughtItem(item) {
   const actionsHtml = actionItems.map((action) => `
     <span class="thought-card__action">${escapeHtml(action.label)}</span>
   `).join("");
+  const deleteHtml = item.canDelete
+    ? `<button class="thought-card__delete" type="button" data-delete-id="${escapeHtml(item.id)}" aria-label="Delete thought">Delete</button>`
+    : "";
 
   return `
     <article class="${cardClass}">
       <div class="thought-card__signal-line">
         <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
         <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
+        ${deleteHtml}
       </div>
       <div class="thought-card__topline">
         <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
@@ -704,5 +710,16 @@ if (doc?.getElementById) {
     }
 
     rerender("Thought posted.");
+  });
+
+  doc.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-delete-id]");
+    if (!button) return;
+
+    const id = button.dataset.deleteId;
+    if (!id) return;
+
+    deleteThoughtPost(id, getDefaultPlatformStorage());
+    rerender();
   });
 }
