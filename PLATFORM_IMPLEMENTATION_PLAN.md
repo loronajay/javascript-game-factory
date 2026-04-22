@@ -23,6 +23,7 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - friend / affinity metrics
 - badge and reputation surfaces
 - eventual media upload
+- profile music: a player-assigned audio track that autoplays on profile page load, in the Myspace tradition
 
 Important terminology note:
 
@@ -208,6 +209,7 @@ Target long-term player page sections:
 - badges block
 - friends block with a special `main squeeze` slot
 - customizable 16:9 background image behind the page composition
+- profile music: a player-assigned audio track that autoplays on profile page load, just like Myspace song selection
 
 Important behavior notes from the reference:
 
@@ -342,7 +344,8 @@ Suggested shape:
   mainSqueeze: null,
   recentActivity: [],
   thoughtCount: 0,
-  badgeIds: []
+  badgeIds: [],
+  profileMusic: null
 }
 ```
 
@@ -358,6 +361,7 @@ Future-facing notes:
 - `bio` is the canonical editable about-me field and should not drift into a second duplicated description concept.
 - `links` should support multiple normalized entries and render cleanly whether a player has zero, one, or many links.
 - `favoriteGameSlug` should represent an explicit public pin first, while most-played telemetry remains a separate metric rather than silently replacing the player's stated favorite.
+- `profileMusic` is a player-assigned audio track that autoplays on profile page load. It is `null` when unset and should never autoplay silently without a visible player widget that lets visitors pause or mute.
 
 ### `profileMetrics`
 
@@ -518,6 +522,7 @@ Future systems that support this profile vision:
 - recommended canonical metrics split covering public/support metrics, relationship/discovery metrics, and backend-only analytics
 - user-authored status feed items with comments, sharing, and emoji-style reactions
 - direct / private messaging once authenticated identity and cross-user backend rules exist
+- profile music: a player-assigned audio track with a persistent mini player widget on the profile page, in the Myspace tradition; richer embed kinds (YouTube, SoundCloud) and playlist support belong to the backend phase
 
 Important scoping reminder:
 
@@ -628,6 +633,32 @@ Notes:
 - `reactionTotals` is the shared contract for emoji-style reactions with visible per-emoji totals.
 - `viewerReaction` is the future field for the current viewer's chosen reaction on a given post.
 - Reaction UI should read like a Facebook-style social feed affordance rather than a generic counter-only metric.
+
+### `profileMusic`
+
+Suggested shape:
+
+```js
+{
+  trackTitle: "",
+  trackArtist: "",
+  trackUrl: "",
+  embedKind: "url",
+  autoplay: true,
+  volume: 0.7,
+  setAt: ""
+}
+```
+
+Notes:
+
+- `trackUrl` is the canonical source for playback. In the local-first phase this is a direct audio file URL or a publicly embeddable stream link the player supplies manually.
+- `embedKind` describes how the URL should be interpreted. `"url"` means a direct `<audio>` src. Other kinds such as `"youtube"` or `"soundcloud"` belong to the backend phase once embed policy is clear.
+- Autoplay must always be paired with a visible mini music player widget on the profile page so visitors can immediately pause or mute. Silent forced autoplay is not acceptable UX.
+- Volume should be normalized to a range of 0–1 and clamped before storage.
+- `profileMusic` is `null` when the player has not set a track. Empty profiles must render gracefully with no broken player widget.
+- The profile editor should treat `profileMusic` as a simple set-or-clear form: one track at a time, no playlist.
+- Multi-track playlists and richer embed integrations belong to the backend phase.
 
 ### `mediaAsset`
 
@@ -740,6 +771,7 @@ Writes allowed in this phase:
 - set favorite game / featured cabinet
 - fix profile-picture presentation constraints and fallback behavior without introducing upload
 - set lightweight preferences
+- set or clear profile music track (title, artist, URL, autoplay flag, volume)
 
 Writes not allowed yet:
 
@@ -949,12 +981,14 @@ Immediate local-first priorities:
 - seasonal programming links between bulletins, events, featured cabinets, ladder snapshots, and thought prompts
 - badges as a shared profile contract even if the first pass is placeholder-only
 - remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
+- profile music contract and mini player widget so players can assign a track that autoplays on profile load
 
 Default product calls for this scope:
 
 - favorite game is manual first; most-played data can inform later suggestions but must not silently replace the player's chosen favorite
 - social links are repeatable structured items with normalized label/url/kind fields
 - panel headers should be visually separated from panel content, preferably with boxed section labels in the shared profile composition
+- profile music is a single player-assigned track (no playlist); autoplay is paired with a visible mini player widget so visitors can pause or mute immediately; multi-track and rich embeds belong to the backend phase
 - the recommended canonical metrics split should lock public/support metrics first, then relationship/discovery metrics, while keeping backend analytics separate from public profile identity
 - friend points should stay platform-derived while visible friend placement supports either manual or automatic behavior for `Main Squeeze` and the four standard friend slots
 - relationship ordering should be able to use both affinity (`friendPoints`, shared counts) and recency (`last played with`, `recently played with`, last shared session/event, last interaction) without forcing one permanent display mode
