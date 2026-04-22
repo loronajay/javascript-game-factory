@@ -86,6 +86,7 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
     version: FACTORY_PROFILE_VERSION,
     playerId: playerId || playerIdGenerator(),
     profileName,
+    realName: profileFields.realName,
     bio: profileFields.bio,
     tagline: profileFields.tagline,
     avatarAssetId: profileFields.avatarAssetId,

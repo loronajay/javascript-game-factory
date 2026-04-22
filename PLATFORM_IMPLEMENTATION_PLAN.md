@@ -23,7 +23,12 @@ Important terminology note:
 
 - `Bulletins` can continue to mean the current platform-owned announcement / noticeboard surface.
 - We also want a separate user-authored bulletin style: short status updates in a scrollable home feed, closer to old Myspace bulletins or Facebook status posts.
-- That future social surface should support feed-style interaction patterns such as comments, sharing/reposting, and profile-linked authorship once the platform is ready for heavier social features.
+- That future social surface should support feed-style interaction patterns such as comments, sharing/reposting, emoji-style reactions with visible totals, and profile-linked authorship once the platform is ready for heavier social features.
+
+Product framing note:
+
+- Treat this project as a Facebook/Myspace-style social-media platform built around arcade identity and games, not as a generic launcher with a few profile extras.
+- Games are a major content pillar, but the long-term product is still a social platform: profiles, feeds, friends, reactions, reposting, personal identity fields, and public/self expression all matter as first-class product goals.
 
 The platform remains the owner of long-term identity and social state.
 Games remain self-contained experiences that can read platform data and publish approved activity/results, but games must not become the permanent home for profile ownership.
@@ -175,6 +180,7 @@ Target long-term player page sections:
 
 - profile portrait with a small presence indicator
 - display name with a customizable tagline directly underneath
+- optional real-name field in the identity panel, separate from the arcade username/display name
 - social links block
 - favorite game block with an actual grid-entry / cabinet link
 - ladder placement block that can show a player's top placements across games
@@ -186,6 +192,14 @@ Target long-term player page sections:
 
 Important behavior notes from the reference:
 
+- The page title must be the player's `profileName`.
+  This is not optional flavor copy. The canonical profile page headline is the player's public display name.
+- The line directly underneath the page title must be the player's editable `tagline`.
+  This is a public-facing identity field, not throwaway helper copy or a dashboard subtitle.
+- The in-profile `Name` field is an optional real-name field.
+  It is separate from the arcade `profileName` / username and should only render player-supplied real-name text when the player chooses to share it.
+- Do not collapse the optional real-name field into the page title.
+  The header title remains `profileName`; the identity-panel `Name` field is a distinct profile field with different meaning.
 - Presence should eventually support at least online, offline, and similar simple states.
   The green dot in the mockup is the reference for that presence affordance.
 - The status feed area should behave like a constrained scrollable panel rather than forcing the whole page layout to expand infinitely.
@@ -201,6 +215,18 @@ Important behavior notes from the reference:
 - Empty fields need strong defaults so the page still feels intentional when a player has no links, no rankings, no favorite game, no badges, no posts, no featured friend, or no custom background.
 - The current example image can serve as the default background reference until a proper background-image system is wired.
 
+Canonical composition notes:
+
+- Treat `/me` and `/player` as the same public profile composition.
+- The owner view should not become a separate dashboard layout.
+- The owner-specific difference is an owner-only `Edit Profile` button and related editing controls layered onto the same public-facing page.
+- The intended composition from the reference is:
+  left rail for portrait, identity support, rankings, and friends
+  center feature for the favorite game / featured cabinet
+  right rail for the player feed, about block, and badges
+  top header for `profileName` with `tagline` directly underneath
+- New passes should move toward this composition instead of rearranging the same panels into unrelated dashboard layouts.
+
 Reference asset note:
 
 - Yes, keep a single copy of the screenshot in the repo if we want it to remain a durable design reference.
@@ -212,6 +238,7 @@ Reference asset note:
 Suggested field-length constraints for future profile systems:
 
 - `profileName`: 24 characters max
+- `realName`: 48 characters max
 - `tagline`: 80 characters max
 - `bio` / `aboutMe`: 280 characters max
 - social link label: 24 characters max
@@ -240,6 +267,7 @@ Suggested shape:
   version: 1,
   playerId: "player-123",
   profileName: "Maya",
+  realName: "",
   bio: "",
   tagline: "",
   avatarAssetId: "",
@@ -263,6 +291,7 @@ Suggested shape:
 {
   playerId: "player-123",
   profileName: "Maya",
+  realName: "",
   bio: "",
   tagline: "",
   avatarUrl: "",
@@ -296,6 +325,7 @@ In practice that means we can ship simpler profile pages now, but each pass shou
 Long-term page zones:
 
 - header identity area with display name, tagline, portrait, and presence indicator
+- identity-support area with optional real name, social links, and lightweight profile facts
 - social / links area
 - favorite game feature area with cabinet-entry link behavior
 - rankings area for strongest ladder placements
@@ -311,6 +341,12 @@ Shared contract expectations:
 - empty fields should render deliberate fallback copy or fallback panels, not collapsed blank boxes
 - layout-critical fields should be normalized before rendering so long names, broken links, and oversized text do not damage the page composition
 - uploaded visual assets should eventually resolve to standardized presentation shapes rather than letting each page crop differently
+- the profile page headline must render the player's `profileName`, not generic page copy such as `Player Page`
+- the public subtitle line under the headline must render the player's editable `tagline`
+- the identity-panel `Name` field must remain a separate optional real-name field rather than echoing `profileName`
+- owner-mode UI must not replace the public profile composition; it only adds owner-only controls such as `Edit Profile`
+- the profile page should be treated as a public social profile first, not as a generic account dashboard
+- the profile page should read like a social-media profile in the Facebook/Myspace family, adapted to the arcade setting
 
 Future systems that support this profile vision:
 
@@ -319,7 +355,7 @@ Future systems that support this profile vision:
 - favorites linking back into arcade grid entries
 - per-game ladder summary data
 - friend points / affinity scoring
-- user-authored status feed items with comments and sharing
+- user-authored status feed items with comments, sharing, and emoji-style reactions
 
 Important scoping reminder:
 
@@ -407,6 +443,15 @@ Suggested shape:
   visibility: "public",
   commentCount: 0,
   shareCount: 0,
+  reactionTotals: {
+    like: 0,
+    love: 0,
+    haha: 0,
+    wow: 0,
+    sad: 0,
+    angry: 0
+  },
+  viewerReaction: "",
   repostOfId: "",
   createdAt: "",
   editedAt: ""
@@ -418,6 +463,9 @@ Notes:
 - Treat `thoughtPost` as the first contract for the Myspace/Facebook-style bulletin concept.
 - In other words, announcement bulletins live in the `bulletin` model, while user status-update bulletins live in the feed/post model.
 - Naming can change later, but the product distinction should stay explicit in the shared contracts.
+- `reactionTotals` is the shared contract for emoji-style reactions with visible per-emoji totals.
+- `viewerReaction` is the future field for the current viewer's chosen reaction on a given post.
+- Reaction UI should read like a Facebook-style social feed affordance rather than a generic counter-only metric.
 
 ### `mediaAsset`
 
@@ -524,8 +572,10 @@ Goal: allow the current player to edit platform-owned personal data.
 Writes allowed in this phase:
 
 - edit canonical profile name
+- edit optional real name
 - edit bio/tagline
 - add/remove personal links
+- set favorite game / featured cabinet
 - set lightweight preferences
 
 Writes not allowed yet:
@@ -556,7 +606,8 @@ Features:
 - recent activity feed
 - game-published activity items
 - simple friends list display
-- groundwork for user-authored status posts that can later gain comments and sharing
+- groundwork for user-authored status posts that can later gain comments, sharing, and emoji-style reactions
+- stronger profile identity fields so player pages feel like social-media profiles rather than launcher-side stat cards
 
 Guardrails:
 
@@ -675,6 +726,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `js/platform/identity/` is now the source of truth for canonical platform identity.
 - `js/platform/storage/` now owns shared platform storage keys and safe storage access helpers.
 - `js/platform/profile/` now owns shared bio/tagline/link normalization plus public profile-view building.
+- The canonical long-term profile contract now explicitly treats the page title as `profileName`, the subtitle as editable `tagline`, and the owner view as the same public composition plus an `Edit Profile` affordance.
 - `/me/index.html` now exists as the first non-game platform page and reuses the synthwave shell language rather than introducing a separate visual system.
 - `/player/index.html?id=<playerId>` now exists as a public player profile route backed by shared view models and explicit local-cache fallback behavior.
 - `js/platform/bulletins/` now owns shared bulletin normalization plus a fixture-backed public bulletin feed.
@@ -687,6 +739,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `/thoughts/index.html` now exists as the first read-only player-status feed surface for the future social/home-feed layer.
 - `js/platform/profile/` now normalizes richer public profile fields including favorite game, ladder placements, friends preview, main squeeze, presence, badges, and background-image fallback data.
 - `/me/index.html` and `/player/index.html?id=<playerId>` now expose read-only favorite-cabinet, ranking, and friends sections with fallback content instead of only the earlier summary panels.
+- The long-term feed contract now explicitly includes emoji-style reactions with visible totals so the thoughts/feed layer does not drift away from the intended Facebook-style interaction model.
 - `games/lovers-lost/` and `games/battleshits/` now publish platform-owned result/activity payloads through that shared activity contract instead of owning their own long-term activity schema.
 - Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.

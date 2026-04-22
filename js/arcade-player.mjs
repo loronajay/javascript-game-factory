@@ -32,6 +32,11 @@ function gameHrefFromSlug(slug = "") {
   return normalized ? `../games/${encodeURIComponent(normalized)}/index.html` : "../grid.html";
 }
 
+function gamePreviewSrcFromSlug(slug = "") {
+  const normalized = String(slug || "").trim();
+  return normalized ? `../grid-previews/${encodeURIComponent(normalized)}.png` : "";
+}
+
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -121,6 +126,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       pageTitle: "UNKNOWN PILOT",
       pageSubtitle: "Signal not present on this local cabinet.",
       heroName: "UNKNOWN PILOT",
+      heroRealName: "",
       heroTagline: "Signal not present on this local cabinet.",
       heroBio: "This public player file is not available in the local arcade cache yet. Open the Me page to inspect the current local profile or load this player from a future shared source.",
       heroChipLabel: "PLAYER PROFILE",
@@ -135,7 +141,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         { label: "Badges", value: "0" },
         { label: "Thoughts", value: "0" },
       ],
-      linkItems: [{
+      identityLinkItems: [{
         label: "Link Ports",
         value: "No public links are cached for this player yet.",
         kind: "placeholder",
@@ -177,7 +183,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     placeholderSummary: "No public player thoughts are cached for this pilot yet.",
   });
   const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);
-  const linkItems = publicView.links.length > 0
+  const identityLinkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
         label: link.label,
         value: link.url,
@@ -196,6 +202,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         title: favoriteTitleResolver(favoriteSlug),
         value: favoriteSlug,
         href: gameHrefFromSlug(favoriteSlug),
+        previewSrc: gamePreviewSrcFromSlug(favoriteSlug),
         linkLabel: "Launch Cabinet",
         isPlaceholder: false,
       }]
@@ -241,6 +248,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     });
   }
   const heroName = publicView.profileName || "UNNAMED PILOT";
+  const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This public player file is running in local-first mode while broader arcade profile discovery comes online.";
   const badgeItems = publicView.badgeIds.length > 0
@@ -258,6 +266,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     pageTitle: heroName,
     pageSubtitle: heroTagline,
     heroName,
+    heroRealName,
     heroTagline,
     heroBio,
     heroChipLabel: "PLAYER PROFILE",
@@ -275,7 +284,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
     backgroundImageUrl: publicView.backgroundImageUrl,
-    linkItems,
+    identityLinkItems,
     favoriteGameItems,
     rankingItems,
     friendItems,
@@ -296,43 +305,103 @@ function renderPageHeader(doc, model) {
   if (doc?.title) {
     doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
   }
+  globalThis.PixelText?.render?.(title);
 }
 
 function renderHeroCard(container, model) {
   if (!container) return;
 
-  const metaHtml = model.heroMeta.map((item) => `
-    <div class="player-meta-block">
-      <span class="player-meta-block__label">${escapeHtml(item.label)}</span>
-      <span class="player-meta-block__value">${escapeHtml(item.value)}</span>
-    </div>
+  const linksHtml = model.identityLinkItems.map((item) => {
+    const itemClass = item.isPlaceholder ? "player-identity-link player-identity-link--placeholder" : "player-identity-link";
+    const labelHtml = item.isPlaceholder ? "" : `<span class="player-identity-link__label">${escapeHtml(item.label)}</span>`;
+    const valueHtml = item.isPlaceholder
+      ? `<p class="player-identity-link__value">${escapeHtml(item.value)}</p>`
+      : `<a class="player-identity-link__value" href="${escapeHtml(item.value)}" target="_blank" rel="noreferrer">${escapeHtml(item.value)}</a>`;
+
+    return `
+      <article class="${itemClass}">
+        ${labelHtml}
+        ${valueHtml}
+      </article>
+    `;
+  }).join("");
+
+  const rankingHtml = model.rankingItems.map((item) => `
+    <article class="${item.isPlaceholder ? "player-hero-card__rail-item player-hero-card__rail-item--placeholder" : "player-hero-card__rail-item"}">
+      ${item.isPlaceholder ? "" : `<p class="player-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
+      <div class="player-hero-card__rail-value-row">
+        <p class="player-hero-card__rail-value">${escapeHtml(item.value)}</p>
+        ${item.meta ? `<span class="player-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+      </div>
+    </article>
   `).join("");
+
+  const friendHtml = model.friendItems.map((item) => `
+    <article class="${item.isPlaceholder ? "player-hero-card__rail-item player-hero-card__rail-item--placeholder" : "player-hero-card__rail-item"}">
+      ${item.isPlaceholder ? "" : `<p class="player-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
+      <div class="player-hero-card__rail-value-row">
+        <p class="player-hero-card__rail-value">${escapeHtml(item.value)}</p>
+        ${item.meta ? `<span class="player-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+      </div>
+    </article>
+  `).join("");
+
+  const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
+  const realNameValue = model.heroRealName || "Not shared";
 
   container.innerHTML = `
     <div class="player-hero-card__backdrop" aria-hidden="true"></div>
-    <div class="player-hero-card__copy">
-      <p class="player-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
-      <div class="player-hero-card__identity-row">
-        <h2 class="player-hero-card__name">${escapeHtml(model.heroName)}</h2>
-        <span class="player-presence-dot player-presence-dot--${escapeHtml(model.presenceToneClass || "offline")}" title="${escapeHtml(model.presenceLabel || "Offline")}"></span>
-      </div>
-      <p class="player-hero-card__tagline">${escapeHtml(model.heroTagline)}</p>
-      <p class="player-hero-card__bio">${escapeHtml(model.heroBio)}</p>
-    </div>
-    <div class="player-hero-card__portrait" aria-hidden="true">
-      <div class="player-hero-card__portrait-shell">
-        <div class="player-hero-card__portrait-frame">
-          <div class="player-hero-card__portrait-fallback">${escapeHtml(model.avatarInitials)}</div>
-          <img
-            class="player-hero-card__portrait-image"
-            src="${escapeHtml(model.avatarSrc)}"
-            alt="${escapeHtml(model.avatarAlt)}"
-          >
+    <section class="player-hero-card__portrait-panel">
+      <div class="player-hero-card__portrait" aria-hidden="true">
+        <div class="player-hero-card__portrait-shell">
+          <div class="player-hero-card__portrait-frame">
+            <div class="player-hero-card__portrait-fallback">${escapeHtml(model.avatarInitials)}</div>
+            <img
+              class="player-hero-card__portrait-image"
+              src="${escapeHtml(model.avatarSrc)}"
+              alt="${escapeHtml(model.avatarAlt)}"
+            >
+          </div>
+          <p class="player-hero-card__portrait-caption">Profile Pic</p>
         </div>
-        <p class="player-hero-card__portrait-caption">Public player portrait</p>
       </div>
-    </div>
-    <div class="player-hero-card__meta">${metaHtml}</div>
+    </section>
+    <section class="player-hero-card__identity-panel">
+      <p class="player-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
+      <div class="player-hero-card__identity-field">
+        <span class="player-hero-card__identity-field-label">Name</span>
+        <div class="player-hero-card__identity-field-value-row">
+          <span class="player-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
+          <span class="player-presence-dot player-presence-dot--${escapeHtml(model.presenceToneClass || "offline")}" title="${escapeHtml(model.presenceLabel || "Offline")}"></span>
+        </div>
+      </div>
+      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
+        <span class="player-hero-card__identity-field-label">Factory ID</span>
+        <span class="player-hero-card__identity-field-value player-hero-card__identity-field-value--mono">${escapeHtml(factoryId)}</span>
+      </div>
+      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
+        <span class="player-hero-card__identity-field-label">Social Links</span>
+        <div class="player-identity-links">
+          ${linksHtml}
+        </div>
+      </div>
+    </section>
+    <section class="player-hero-card__rankings-panel">
+      <div class="player-hero-card__section-topline">
+        <h3 class="player-hero-card__section-title">Top Ladder Rankings</h3>
+      </div>
+      <div class="player-hero-card__rail-list">
+        ${rankingHtml}
+      </div>
+    </section>
+    <section class="player-hero-card__friends-panel">
+      <div class="player-hero-card__section-topline">
+        <h3 class="player-hero-card__section-title">Top Friends</h3>
+      </div>
+      <div class="player-hero-card__rail-list">
+        ${friendHtml}
+      </div>
+    </section>
   `;
 
   const backdrop = container.querySelector(".player-hero-card__backdrop");
@@ -367,39 +436,20 @@ function renderHeroCard(container, model) {
   }
 }
 
-function renderPanel(container, title, subtitle, items, formatter) {
+function renderPanel(container, title, items, formatter) {
   if (!container) return;
 
   const itemsHtml = items.map(formatter).join("");
 
   container.innerHTML = `
-    <div class="player-panel__topline">
-      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
     ${itemsHtml}
-  `;
-}
-
-function renderLinkItem(item) {
-  const itemClass = item.isPlaceholder ? "player-link player-link--placeholder" : "player-link";
-  const valueHtml = item.isPlaceholder
-    ? `<p class="player-link__url">${escapeHtml(item.value)}</p>`
-    : `<a class="player-link__url" href="${escapeHtml(item.value)}" target="_blank" rel="noreferrer">${escapeHtml(item.value)}</a>`;
-
-  return `
-    <article class="${itemClass}">
-      <div class="player-link__topline">
-        <span class="player-link__label">${escapeHtml(item.label)}</span>
-        <span class="player-link__kind">${escapeHtml(item.kind)}</span>
-      </div>
-      ${valueHtml}
-    </article>
   `;
 }
 
 function renderCardItem(item) {
   const itemClass = item.isPlaceholder ? "player-card-item player-card-item--placeholder" : "player-card-item";
+  const titleHtml = item.isPlaceholder ? "" : `<p class="player-card-item__title">${escapeHtml(item.title || item.label)}</p>`;
   const valueHtml = item.href
     ? `<a class="player-card-item__link" href="${escapeHtml(item.href)}">${escapeHtml(item.linkLabel || item.value)}</a>`
     : `<p class="player-card-item__value">${escapeHtml(item.value)}</p>`;
@@ -407,59 +457,104 @@ function renderCardItem(item) {
 
   return `
     <article class="${itemClass}">
-      <p class="player-card-item__title">${escapeHtml(item.title || item.label)}</p>
+      ${titleHtml}
       ${valueHtml}
       ${metaHtml}
     </article>
   `;
 }
 
+function renderFavoritePanel(container, title, item) {
+  if (!container) return;
+
+  const favorite = item || {};
+  const cardHtml = favorite.isPlaceholder
+    ? `
+      <article class="game-card featured player-featured-cabinet__card game-card--placeholder" aria-disabled="true">
+        <div class="game-card-preview">
+          <div class="game-thumb player-featured-cabinet__thumb player-featured-cabinet__thumb--placeholder"></div>
+          <div class="game-card-copy game-card-copy--placeholder">
+            <h3 class="game-title">PIN A FAVORITE</h3>
+          </div>
+        </div>
+      </article>
+    `
+    : `
+      <a class="game-card featured player-featured-cabinet__card" href="${escapeHtml(favorite.href)}">
+        <div class="game-card-preview">
+          <div class="game-thumb player-featured-cabinet__thumb">
+            <img class="player-featured-cabinet__image" src="${escapeHtml(favorite.previewSrc || "")}" alt="${escapeHtml(favorite.title || "Favorite cabinet preview")}">
+          </div>
+          <div class="game-card-copy">
+            <h3 class="game-title">${escapeHtml(favorite.title || "Favorite Cabinet")}</h3>
+          </div>
+        </div>
+      </a>
+    `;
+
+  container.innerHTML = `
+    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    <div class="player-featured-cabinet">
+      ${cardHtml}
+    </div>
+  `;
+}
+
 function renderThoughtItem(item) {
   const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+  const actionItems = Array.isArray(item.actionItems) && item.actionItems.length > 0
+    ? item.actionItems
+    : [
+        { label: "Comments" },
+        { label: "Share" },
+        { label: "React" },
+      ];
+  const actionsHtml = actionItems.map((action) => `
+    <span class="thought-card__action">${escapeHtml(action.label)}</span>
+  `).join("");
 
   return `
     <article class="${cardClass}">
-      <div class="thought-card__topline">
+      <div class="thought-card__signal-line">
         <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
         <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
       </div>
-      <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+      <div class="thought-card__topline">
+        <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+        <div class="thought-card__reactions">
+          <span>${escapeHtml(item.reactionLabel)}</span>
+          <span>${escapeHtml(item.shareLabel)}</span>
+        </div>
+      </div>
       <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
-      <div class="thought-card__meta">
-        <span>${escapeHtml(item.commentLabel)}</span>
-        <span>${escapeHtml(item.shareLabel)}</span>
+      <div class="thought-card__actions">
+        ${actionsHtml}
       </div>
     </article>
   `;
 }
 
-function renderThoughtsPanel(container, title, subtitle, items) {
+function renderThoughtsPanel(container, title, items) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="player-panel__topline">
-      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
     <div class="player-thoughts-feed thoughts-feed">
       ${items.map(renderThoughtItem).join("")}
     </div>
   `;
 }
 
-function renderAboutPanel(container, title, subtitle, text) {
+function renderAboutPanel(container, title, text) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="player-panel__topline">
-      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
     <p class="player-about-copy">${escapeHtml(text)}</p>
   `;
 }
 
-function renderBadgesPanel(container, title, subtitle, items) {
+function renderBadgesPanel(container, title, items) {
   if (!container) return;
 
   const badgesHtml = items[0]?.isPlaceholder
@@ -467,10 +562,7 @@ function renderBadgesPanel(container, title, subtitle, items) {
     : `<div class="player-badge-list">${items.map((item) => `<span class="player-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
 
   container.innerHTML = `
-    <div class="player-panel__topline">
-      <p class="player-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="player-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
     ${badgesHtml}
   `;
 }
@@ -494,13 +586,20 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
 
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("playerHeroCard"), model);
-  renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", "Status Lane", model.thoughtItems);
-  renderPanel(doc.getElementById("playerLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
-  renderPanel(doc.getElementById("playerFavoritePanel"), "Favorite Cabinet", "Grid Anchor", model.favoriteGameItems, renderCardItem);
-  renderPanel(doc.getElementById("playerRankingsPanel"), "Top Ladder Rankings", "Scoreboard Echo", model.rankingItems, renderCardItem);
-  renderPanel(doc.getElementById("playerFriendsPanel"), "Top Friends", "Social Orbit", model.friendItems, renderCardItem);
-  renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", "Player Bio", model.aboutText);
-  renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", "Cabinet Shine", model.badgeItems);
+  renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", model.thoughtItems);
+  renderFavoritePanel(doc.getElementById("playerFavoritePanel"), "Favorite Game", model.favoriteGameItems[0]);
+  const rankingsPanel = doc.getElementById("playerRankingsPanel");
+  if (rankingsPanel) {
+    rankingsPanel.hidden = true;
+    rankingsPanel.innerHTML = "";
+  }
+  const friendsPanel = doc.getElementById("playerFriendsPanel");
+  if (friendsPanel) {
+    friendsPanel.hidden = true;
+    friendsPanel.innerHTML = "";
+  }
+  renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", model.aboutText);
+  renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", model.badgeItems);
   return model;
 }
 

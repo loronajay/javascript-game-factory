@@ -32,6 +32,11 @@ function gameHrefFromSlug(slug = "") {
   return normalized ? `../games/${encodeURIComponent(normalized)}/index.html` : "../grid.html";
 }
 
+function gamePreviewSrcFromSlug(slug = "") {
+  const normalized = String(slug || "").trim();
+  return normalized ? `../grid-previews/${encodeURIComponent(normalized)}.png` : "";
+}
+
 function buildProfileInitials(name) {
   const tokens = String(name || "")
     .trim()
@@ -85,6 +90,7 @@ function buildFavoriteGameItem(publicView, favoriteTitleResolver) {
     title: favoriteTitleResolver(favoriteSlug),
     value: favoriteSlug,
     href: gameHrefFromSlug(favoriteSlug),
+    previewSrc: gamePreviewSrcFromSlug(favoriteSlug),
     linkLabel: "Launch Cabinet",
     isPlaceholder: false,
   }];
@@ -159,10 +165,11 @@ export function buildMePageViewModel(profile, options = {}) {
   const friendItems = buildFriendItems(publicView);
 
   const heroName = publicView.profileName || "UNNAMED PILOT";
+  const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This shared player page will grow into your public home base across the arcade as more platform features come online.";
 
-  const linkItems = publicView.links.length > 0
+  const identityLinkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
         label: link.label,
         value: link.url,
@@ -190,6 +197,7 @@ export function buildMePageViewModel(profile, options = {}) {
     pageTitle: heroName,
     pageSubtitle: heroTagline,
     heroName,
+    heroRealName,
     heroTagline,
     heroBio,
     heroChipLabel: "PLAYER PROFILE",
@@ -208,7 +216,7 @@ export function buildMePageViewModel(profile, options = {}) {
     ],
     avatarAssetId: publicView.avatarAssetId,
     backgroundImageUrl: publicView.backgroundImageUrl,
-    linkItems,
+    identityLinkItems,
     favoriteGameItems,
     rankingItems,
     friendItems,
@@ -229,43 +237,103 @@ function renderPageHeader(doc, model) {
   if (doc?.title) {
     doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
   }
+  globalThis.PixelText?.render?.(title);
 }
 
 function renderHeroCard(container, model) {
   if (!container) return;
 
-  const metaHtml = model.heroMeta.map((item) => `
-    <div class="me-meta-block">
-      <span class="me-meta-block__label">${escapeHtml(item.label)}</span>
-      <span class="me-meta-block__value">${escapeHtml(item.value)}</span>
-    </div>
+  const linksHtml = model.identityLinkItems.map((item) => {
+    const itemClass = item.isPlaceholder ? "me-identity-link me-identity-link--placeholder" : "me-identity-link";
+    const labelHtml = item.isPlaceholder ? "" : `<span class="me-identity-link__label">${escapeHtml(item.label)}</span>`;
+    const valueHtml = item.isPlaceholder
+      ? `<p class="me-identity-link__value">${escapeHtml(item.value)}</p>`
+      : `<a class="me-identity-link__value" href="${escapeHtml(item.value)}" target="_blank" rel="noreferrer">${escapeHtml(item.value)}</a>`;
+
+    return `
+      <article class="${itemClass}">
+        ${labelHtml}
+        ${valueHtml}
+      </article>
+    `;
+  }).join("");
+
+  const rankingHtml = model.rankingItems.map((item) => `
+    <article class="${item.isPlaceholder ? "me-hero-card__rail-item me-hero-card__rail-item--placeholder" : "me-hero-card__rail-item"}">
+      ${item.isPlaceholder ? "" : `<p class="me-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
+      <div class="me-hero-card__rail-value-row">
+        <p class="me-hero-card__rail-value">${escapeHtml(item.value)}</p>
+        ${item.meta ? `<span class="me-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+      </div>
+    </article>
   `).join("");
+
+  const friendHtml = model.friendItems.map((item) => `
+    <article class="${item.isPlaceholder ? "me-hero-card__rail-item me-hero-card__rail-item--placeholder" : "me-hero-card__rail-item"}">
+      ${item.isPlaceholder ? "" : `<p class="me-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
+      <div class="me-hero-card__rail-value-row">
+        <p class="me-hero-card__rail-value">${escapeHtml(item.value)}</p>
+        ${item.meta ? `<span class="me-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+      </div>
+    </article>
+  `).join("");
+
+  const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
+  const realNameValue = model.heroRealName || "Not shared";
 
   container.innerHTML = `
     <div class="me-hero-card__backdrop" aria-hidden="true"></div>
-    <div class="me-hero-card__copy">
-      <p class="me-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
-      <div class="me-hero-card__identity-row">
-        <h2 class="me-hero-card__name">${escapeHtml(model.heroName)}</h2>
-        <span class="me-presence-dot me-presence-dot--${escapeHtml(model.presenceToneClass)}" title="${escapeHtml(model.presenceLabel)}"></span>
-      </div>
-      <p class="me-hero-card__tagline">${escapeHtml(model.heroTagline)}</p>
-      <p class="me-hero-card__bio">${escapeHtml(model.heroBio)}</p>
-    </div>
-    <div class="me-hero-card__portrait" aria-hidden="true">
-      <div class="me-hero-card__portrait-shell">
-        <div class="me-hero-card__portrait-frame">
-          <div class="me-hero-card__portrait-fallback">${escapeHtml(model.avatarInitials)}</div>
-          <img
-            class="me-hero-card__portrait-image"
-            src="${escapeHtml(model.avatarSrc)}"
-            alt="${escapeHtml(model.avatarAlt)}"
-          >
+    <section class="me-hero-card__portrait-panel">
+      <div class="me-hero-card__portrait" aria-hidden="true">
+        <div class="me-hero-card__portrait-shell">
+          <div class="me-hero-card__portrait-frame">
+            <div class="me-hero-card__portrait-fallback">${escapeHtml(model.avatarInitials)}</div>
+            <img
+              class="me-hero-card__portrait-image"
+              src="${escapeHtml(model.avatarSrc)}"
+              alt="${escapeHtml(model.avatarAlt)}"
+            >
+          </div>
+          <p class="me-hero-card__portrait-caption">Profile Pic</p>
         </div>
-        <p class="me-hero-card__portrait-caption">Default arcade portrait</p>
       </div>
-    </div>
-    <div class="me-hero-card__meta">${metaHtml}</div>
+    </section>
+    <section class="me-hero-card__identity-panel">
+      <p class="me-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
+      <div class="me-hero-card__identity-field">
+        <span class="me-hero-card__identity-field-label">Name</span>
+        <div class="me-hero-card__identity-field-value-row">
+          <span class="me-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
+          <span class="me-presence-dot me-presence-dot--${escapeHtml(model.presenceToneClass)}" title="${escapeHtml(model.presenceLabel)}"></span>
+        </div>
+      </div>
+      <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
+        <span class="me-hero-card__identity-field-label">Factory ID</span>
+        <span class="me-hero-card__identity-field-value me-hero-card__identity-field-value--mono">${escapeHtml(factoryId)}</span>
+      </div>
+      <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
+        <span class="me-hero-card__identity-field-label">Social Links</span>
+        <div class="me-identity-links">
+          ${linksHtml}
+        </div>
+      </div>
+    </section>
+    <section class="me-hero-card__rankings-panel">
+      <div class="me-hero-card__section-topline">
+        <h3 class="me-hero-card__section-title">Top Ladder Rankings</h3>
+      </div>
+      <div class="me-hero-card__rail-list">
+        ${rankingHtml}
+      </div>
+    </section>
+    <section class="me-hero-card__friends-panel">
+      <div class="me-hero-card__section-topline">
+        <h3 class="me-hero-card__section-title">Top Friends</h3>
+      </div>
+      <div class="me-hero-card__rail-list">
+        ${friendHtml}
+      </div>
+    </section>
   `;
 
   const backdrop = container.querySelector(".me-hero-card__backdrop");
@@ -300,39 +368,20 @@ function renderHeroCard(container, model) {
   }
 }
 
-function renderPanel(container, title, subtitle, items, formatter) {
+function renderPanel(container, title, items, formatter) {
   if (!container) return;
 
   const itemsHtml = items.map(formatter).join("");
 
   container.innerHTML = `
-    <div class="me-panel__topline">
-      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
     ${itemsHtml}
-  `;
-}
-
-function renderLinkItem(item) {
-  const itemClass = item.isPlaceholder ? "me-link me-link--placeholder" : "me-link";
-  const valueHtml = item.isPlaceholder
-    ? `<p class="me-link__url">${escapeHtml(item.value)}</p>`
-    : `<a class="me-link__url" href="${escapeHtml(item.value)}" target="_blank" rel="noreferrer">${escapeHtml(item.value)}</a>`;
-
-  return `
-    <article class="${itemClass}">
-      <div class="me-link__topline">
-        <span class="me-link__label">${escapeHtml(item.label)}</span>
-        <span class="me-link__kind">${escapeHtml(item.kind)}</span>
-      </div>
-      ${valueHtml}
-    </article>
   `;
 }
 
 function renderCardItem(item) {
   const itemClass = item.isPlaceholder ? "me-card-item me-card-item--placeholder" : "me-card-item";
+  const titleHtml = item.isPlaceholder ? "" : `<p class="me-card-item__title">${escapeHtml(item.title || item.label)}</p>`;
   const valueHtml = item.href
     ? `<a class="me-card-item__link" href="${escapeHtml(item.href)}">${escapeHtml(item.linkLabel || item.value)}</a>`
     : `<p class="me-card-item__value">${escapeHtml(item.value)}</p>`;
@@ -340,59 +389,104 @@ function renderCardItem(item) {
 
   return `
     <article class="${itemClass}">
-      <p class="me-card-item__title">${escapeHtml(item.title || item.label)}</p>
+      ${titleHtml}
       ${valueHtml}
       ${metaHtml}
     </article>
   `;
 }
 
+function renderFavoritePanel(container, title, item) {
+  if (!container) return;
+
+  const favorite = item || {};
+  const cardHtml = favorite.isPlaceholder
+    ? `
+      <article class="game-card featured me-featured-cabinet__card game-card--placeholder" aria-disabled="true">
+        <div class="game-card-preview">
+          <div class="game-thumb me-featured-cabinet__thumb me-featured-cabinet__thumb--placeholder"></div>
+          <div class="game-card-copy game-card-copy--placeholder">
+            <h3 class="game-title">PIN A FAVORITE</h3>
+          </div>
+        </div>
+      </article>
+    `
+    : `
+      <a class="game-card featured me-featured-cabinet__card" href="${escapeHtml(favorite.href)}">
+        <div class="game-card-preview">
+          <div class="game-thumb me-featured-cabinet__thumb">
+            <img class="me-featured-cabinet__image" src="${escapeHtml(favorite.previewSrc || "")}" alt="${escapeHtml(favorite.title || "Favorite cabinet preview")}">
+          </div>
+          <div class="game-card-copy">
+            <h3 class="game-title">${escapeHtml(favorite.title || "Favorite Cabinet")}</h3>
+          </div>
+        </div>
+      </a>
+    `;
+
+  container.innerHTML = `
+    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    <div class="me-featured-cabinet">
+      ${cardHtml}
+    </div>
+  `;
+}
+
 function renderThoughtItem(item) {
   const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+  const actionItems = Array.isArray(item.actionItems) && item.actionItems.length > 0
+    ? item.actionItems
+    : [
+        { label: "Comments" },
+        { label: "Share" },
+        { label: "React" },
+      ];
+  const actionsHtml = actionItems.map((action) => `
+    <span class="thought-card__action">${escapeHtml(action.label)}</span>
+  `).join("");
 
   return `
     <article class="${cardClass}">
-      <div class="thought-card__topline">
+      <div class="thought-card__signal-line">
         <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
         <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
       </div>
-      <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+      <div class="thought-card__topline">
+        <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+        <div class="thought-card__reactions">
+          <span>${escapeHtml(item.reactionLabel)}</span>
+          <span>${escapeHtml(item.shareLabel)}</span>
+        </div>
+      </div>
       <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
-      <div class="thought-card__meta">
-        <span>${escapeHtml(item.commentLabel)}</span>
-        <span>${escapeHtml(item.shareLabel)}</span>
+      <div class="thought-card__actions">
+        ${actionsHtml}
       </div>
     </article>
   `;
 }
 
-function renderThoughtsPanel(container, title, subtitle, items) {
+function renderThoughtsPanel(container, title, items) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="me-panel__topline">
-      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
     <div class="me-thoughts-feed thoughts-feed">
       ${items.map(renderThoughtItem).join("")}
     </div>
   `;
 }
 
-function renderAboutPanel(container, title, subtitle, text) {
+function renderAboutPanel(container, title, text) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="me-panel__topline">
-      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
     <p class="me-about-copy">${escapeHtml(text)}</p>
   `;
 }
 
-function renderBadgesPanel(container, title, subtitle, items) {
+function renderBadgesPanel(container, title, items) {
   if (!container) return;
 
   const badgesHtml = items[0]?.isPlaceholder
@@ -400,10 +494,7 @@ function renderBadgesPanel(container, title, subtitle, items) {
     : `<div class="me-badge-list">${items.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
 
   container.innerHTML = `
-    <div class="me-panel__topline">
-      <p class="me-panel__eyebrow">${escapeHtml(subtitle)}</p>
-      <h2 class="me-panel__title">${escapeHtml(title)}</h2>
-    </div>
+    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
     ${badgesHtml}
   `;
 }
@@ -416,13 +507,20 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
   const model = buildMePageViewModel(profile, { thoughtFeed });
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("meHeroCard"), model);
-  renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", "Status Lane", model.thoughtItems);
-  renderPanel(doc.getElementById("meLinksPanel"), "Link Ports", "Signal Board", model.linkItems, renderLinkItem);
-  renderPanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Cabinet", "Grid Anchor", model.favoriteGameItems, renderCardItem);
-  renderPanel(doc.getElementById("meRankingsPanel"), "Top Ladder Rankings", "Scoreboard Echo", model.rankingItems, renderCardItem);
-  renderPanel(doc.getElementById("meFriendsPanel"), "Top Friends", "Social Orbit", model.friendItems, renderCardItem);
-  renderAboutPanel(doc.getElementById("meAboutPanel"), "About Me", "Player Bio", model.aboutText);
-  renderBadgesPanel(doc.getElementById("meBadgesPanel"), "Badges", "Cabinet Shine", model.badgeItems);
+  renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", model.thoughtItems);
+  renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
+  const rankingsPanel = doc.getElementById("meRankingsPanel");
+  if (rankingsPanel) {
+    rankingsPanel.hidden = true;
+    rankingsPanel.innerHTML = "";
+  }
+  const friendsPanel = doc.getElementById("meFriendsPanel");
+  if (friendsPanel) {
+    friendsPanel.hidden = true;
+    friendsPanel.innerHTML = "";
+  }
+  renderAboutPanel(doc.getElementById("meAboutPanel"), "About Me", model.aboutText);
+  renderBadgesPanel(doc.getElementById("meBadgesPanel"), "Badges", model.badgeItems);
   return model;
 }
 

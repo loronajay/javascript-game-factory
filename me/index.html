@@ -67,6 +67,15 @@
             autocomplete="nickname"
             spellcheck="false"
           >
+          <label class="player-card__field" for="playerProfileRealName">Name</label>
+          <input
+            id="playerProfileRealName"
+            class="player-card__input"
+            name="realName"
+            type="text"
+            autocomplete="name"
+            spellcheck="false"
+          >
           <label class="player-card__field" for="playerProfileTagline">Tagline</label>
           <input
             id="playerProfileTagline"
@@ -77,7 +86,7 @@
             spellcheck="false"
           >
           <p id="playerProfileHint" class="player-card__hint">
-            Update the name and custom tagline that appear on your profile. Games can still use temporary match aliases during a run.
+            Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.
           </p>
           <div class="player-card__actions">
             <button class="player-card__action player-card__action--primary" type="submit">
@@ -92,12 +101,11 @@
       <div class="me-layout">
         <section id="meHeroCard" class="me-hero-card"></section>
         <section id="meThoughtsPanel" class="me-panel me-panel--thoughts"></section>
-        <section id="meLinksPanel" class="me-panel"></section>
-        <section id="meFavoriteGamePanel" class="me-panel"></section>
-        <section id="meRankingsPanel" class="me-panel"></section>
-        <section id="meFriendsPanel" class="me-panel"></section>
-        <section id="meAboutPanel" class="me-panel"></section>
-        <section id="meBadgesPanel" class="me-panel"></section>
+        <section id="meFavoriteGamePanel" class="me-panel me-panel--favorite"></section>
+        <section id="meRankingsPanel" class="me-panel me-panel--rankings"></section>
+        <section id="meFriendsPanel" class="me-panel me-panel--friends"></section>
+        <section id="meAboutPanel" class="me-panel me-panel--about"></section>
+        <section id="meBadgesPanel" class="me-panel me-panel--badges"></section>
       </div>
     </section>
   </main>

@@ -4,7 +4,7 @@ import {
   normalizeFactoryProfile,
   saveFactoryProfile,
 } from "./platform/identity/factory-profile.mjs";
-import { PROFILE_TAGLINE_MAX_LENGTH } from "./platform/profile/profile.mjs";
+import { PROFILE_REAL_NAME_MAX_LENGTH, PROFILE_TAGLINE_MAX_LENGTH } from "./platform/profile/profile.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 
 export function formatArcadePlayerId(playerId) {
@@ -23,11 +23,13 @@ export function buildArcadeProfileViewModel(profile, options = {}) {
     profileName: normalized.profileName,
     profileNameValue: normalized.profileName,
     profileNameMaxLength: FACTORY_PROFILE_NAME_MAX_LENGTH,
+    realNameValue: normalized.realName,
+    realNameMaxLength: PROFILE_REAL_NAME_MAX_LENGTH,
     taglineValue: normalized.tagline,
     taglineMaxLength: PROFILE_TAGLINE_MAX_LENGTH,
     saveLabel: hasName ? "UPDATE CARD" : "STORE CARD",
     statusLine: "EDIT YOUR PUBLIC PLAYER PROFILE",
-    helperText: "Update the name and custom tagline that appear on your profile. Games can still use temporary match aliases during a run.",
+    helperText: "Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.",
     playerIdLabel: formatArcadePlayerId(normalized.playerId),
     flashMessage: typeof options.flashMessage === "string" ? options.flashMessage : "",
     inputValue: normalized.profileName,
@@ -45,6 +47,7 @@ export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
   return saveFactoryProfile({
     ...current,
     profileName: fields.profileName ?? current.profileName,
+    realName: fields.realName ?? current.realName,
     tagline: fields.tagline ?? current.tagline,
   }, storage, options);
 }
@@ -59,6 +62,7 @@ export function initArcadeProfilePanel({
   const closeButton = doc?.getElementById?.("playerProfileClose");
   const form = doc?.getElementById?.("playerProfileForm");
   const profileNameInput = doc?.getElementById?.("playerProfileName");
+  const realNameInput = doc?.getElementById?.("playerProfileRealName");
   const taglineInput = doc?.getElementById?.("playerProfileTagline");
   const clearButton = doc?.getElementById?.("playerProfileClear");
 
@@ -87,6 +91,10 @@ export function initArcadeProfilePanel({
 
     profileNameInput.value = model.profileNameValue;
     profileNameInput.maxLength = model.profileNameMaxLength;
+    if (realNameInput) {
+      realNameInput.value = model.realNameValue;
+      realNameInput.maxLength = model.realNameMaxLength;
+    }
 
     if (taglineInput) {
       taglineInput.value = model.taglineValue;
@@ -120,6 +128,7 @@ export function initArcadeProfilePanel({
   clearButton?.addEventListener("click", () => {
     saveArcadeProfileDetails(storage, {
       profileName: "",
+      realName: "",
       tagline: "",
     }, options);
     render("PLAYER CARD CLEARED");
@@ -129,6 +138,7 @@ export function initArcadeProfilePanel({
     event.preventDefault();
     saveArcadeProfileDetails(storage, {
       profileName: profileNameInput.value,
+      realName: realNameInput?.value || "",
       tagline: taglineInput?.value || "",
     }, options);
     render("PLAYER CARD SAVED");

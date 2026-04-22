@@ -22,6 +22,10 @@ const DEFAULT_THOUGHTS = Object.freeze([
     visibility: "public",
     commentCount: 4,
     shareCount: 2,
+    reactionTotals: {
+      like: 9,
+      fire: 2,
+    },
     repostOfId: "",
     createdAt: "2026-04-21T08:30:00Z",
     editedAt: "",
@@ -35,6 +39,10 @@ const DEFAULT_THOUGHTS = Object.freeze([
     visibility: "public",
     commentCount: 3,
     shareCount: 1,
+    reactionTotals: {
+      like: 4,
+      wow: 1,
+    },
     repostOfId: "",
     createdAt: "2026-04-21T12:00:00Z",
     editedAt: "",
@@ -48,6 +56,7 @@ const DEFAULT_THOUGHTS = Object.freeze([
     visibility: "friends",
     commentCount: 0,
     shareCount: 0,
+    reactionTotals: {},
     repostOfId: "",
     createdAt: "2026-04-22T09:00:00Z",
     editedAt: "",
@@ -67,6 +76,22 @@ function sanitizeTextBlock(value, maxLength = Number.POSITIVE_INFINITY) {
 function sanitizeCount(value) {
   const number = Math.floor(Number(value) || 0);
   return Math.max(0, number);
+}
+
+function sanitizeReactionTotals(value) {
+  if (!value || typeof value !== "object") return {};
+
+  return Object.entries(value).reduce((totals, [key, count]) => {
+    const normalizedKey = sanitizeSingleLine(key, 24).toLowerCase();
+    if (!normalizedKey) return totals;
+
+    totals[normalizedKey] = sanitizeCount(count);
+    return totals;
+  }, {});
+}
+
+function countThoughtReactions(reactionTotals = {}) {
+  return Object.values(reactionTotals).reduce((total, count) => total + sanitizeCount(count), 0);
 }
 
 function parseStoredFeed(raw) {
@@ -106,6 +131,10 @@ export function formatThoughtCommentLabel(count) {
   return `${count} comment${count === 1 ? "" : "s"}`;
 }
 
+export function formatThoughtReactionLabel(count) {
+  return `${count} reaction${count === 1 ? "" : "s"}`;
+}
+
 export function formatThoughtShareLabel(count) {
   return `${count} share${count === 1 ? "" : "s"}`;
 }
@@ -137,6 +166,7 @@ export function normalizeThoughtPost(post = {}, index = 0) {
     visibility: THOUGHT_VISIBILITIES.has(visibility) ? visibility : "public",
     commentCount: sanitizeCount(post?.commentCount),
     shareCount: sanitizeCount(post?.shareCount),
+    reactionTotals: sanitizeReactionTotals(post?.reactionTotals),
     repostOfId: sanitizeSingleLine(post?.repostOfId, 80),
     createdAt: sanitizeSingleLine(post?.createdAt, 40) || new Date().toISOString(),
     editedAt: sanitizeSingleLine(post?.editedAt, 40),
@@ -165,13 +195,20 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
 
   if (items.length > 0) {
     return items.map((item) => ({
+      reactionCount: countThoughtReactions(item.reactionTotals),
       id: item.id,
       title: item.subject || item.authorDisplayName || "Arcade Signal",
       summary: item.text || "Fresh player signal incoming.",
       authorLabel: item.authorDisplayName || "Arcade Pilot",
       publishedLabel: formatThoughtDate(item.createdAt),
+      reactionLabel: formatThoughtReactionLabel(countThoughtReactions(item.reactionTotals)),
       commentLabel: formatThoughtCommentLabel(item.commentCount),
       shareLabel: formatThoughtShareLabel(item.shareCount),
+      actionItems: [
+        { id: "comment", label: "Comments" },
+        { id: "share", label: "Share" },
+        { id: "react", label: "React" },
+      ],
       isPlaceholder: false,
     }));
   }
@@ -182,8 +219,15 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
     summary: sanitizeTextBlock(options.placeholderSummary, 500) || "Player status posts will appear here once more social surfaces come online.",
     authorLabel: sanitizeSingleLine(options.placeholderAuthorLabel, 60) || "Arcade Pilot",
     publishedLabel: sanitizeSingleLine(options.placeholderPublishedLabel, 40) || "Soon",
+    reactionCount: 0,
+    reactionLabel: sanitizeSingleLine(options.placeholderReactionLabel, 40) || "0 reactions",
     commentLabel: sanitizeSingleLine(options.placeholderCommentLabel, 40) || "0 comments",
     shareLabel: sanitizeSingleLine(options.placeholderShareLabel, 40) || "0 shares",
+    actionItems: [
+      { id: "comment", label: "Comments" },
+      { id: "share", label: "Share" },
+      { id: "react", label: "React" },
+    ],
     isPlaceholder: true,
   }];
 }

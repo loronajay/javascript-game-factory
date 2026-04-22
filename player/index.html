@@ -73,6 +73,15 @@
             autocomplete="nickname"
             spellcheck="false"
           >
+          <label class="player-card__field" for="playerProfileRealName">Name</label>
+          <input
+            id="playerProfileRealName"
+            class="player-card__input"
+            name="realName"
+            type="text"
+            autocomplete="name"
+            spellcheck="false"
+          >
           <label class="player-card__field" for="playerProfileTagline">Tagline</label>
           <input
             id="playerProfileTagline"
@@ -83,7 +92,7 @@
             spellcheck="false"
           >
           <p id="playerProfileHint" class="player-card__hint">
-            Update the name and custom tagline that appear on your profile. Games can still use temporary match aliases during a run.
+            Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.
           </p>
           <div class="player-card__actions">
             <button class="player-card__action player-card__action--primary" type="submit">
@@ -98,12 +107,11 @@
       <div class="player-layout">
         <section id="playerHeroCard" class="player-hero-card"></section>
         <section id="playerThoughtsPanel" class="player-panel player-panel--thoughts"></section>
-        <section id="playerLinksPanel" class="player-panel"></section>
-        <section id="playerFavoritePanel" class="player-panel"></section>
-        <section id="playerRankingsPanel" class="player-panel"></section>
-        <section id="playerFriendsPanel" class="player-panel"></section>
-        <section id="playerAboutPanel" class="player-panel"></section>
-        <section id="playerBadgesPanel" class="player-panel"></section>
+        <section id="playerFavoritePanel" class="player-panel player-panel--favorite"></section>
+        <section id="playerRankingsPanel" class="player-panel player-panel--rankings"></section>
+        <section id="playerFriendsPanel" class="player-panel player-panel--friends"></section>
+        <section id="playerAboutPanel" class="player-panel player-panel--about"></section>
+        <section id="playerBadgesPanel" class="player-panel player-panel--badges"></section>
       </div>
     </section>
   </main>

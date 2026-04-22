@@ -51,18 +51,33 @@ function renderHeroCard(container, model) {
 
 function renderThoughtCard(item) {
   const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+  const actionItems = Array.isArray(item.actionItems) && item.actionItems.length > 0
+    ? item.actionItems
+    : [
+        { label: "Comments" },
+        { label: "Share" },
+        { label: "React" },
+      ];
+  const actionsHtml = actionItems.map((action) => `
+    <span class="thought-card__action">${escapeHtml(action.label)}</span>
+  `).join("");
 
   return `
     <article class="${cardClass}">
-      <div class="thought-card__topline">
+      <div class="thought-card__signal-line">
         <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
         <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
       </div>
-      <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+      <div class="thought-card__topline">
+        <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+        <div class="thought-card__reactions">
+          <span>${escapeHtml(item.reactionLabel)}</span>
+          <span>${escapeHtml(item.shareLabel)}</span>
+        </div>
+      </div>
       <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
-      <div class="thought-card__meta">
-        <span>${escapeHtml(item.commentLabel)}</span>
-        <span>${escapeHtml(item.shareLabel)}</span>
+      <div class="thought-card__actions">
+        ${actionsHtml}
       </div>
     </article>
   `;

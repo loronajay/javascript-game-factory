@@ -1,4 +1,6 @@
 (function () {
+  if (window.PixelText) return;
+
   const glyphs = {
     A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
     B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
@@ -74,7 +76,9 @@
     return svg;
   }
 
-  document.querySelectorAll(".pixel-text").forEach((element) => {
+  function renderElement(element) {
+    if (!element) return;
+
     const label = element.textContent.trim();
     element.setAttribute("aria-label", label);
     element.textContent = "";
@@ -84,5 +88,16 @@
     srText.textContent = label;
 
     element.append(srText, buildPixelSvg(label));
-  });
+  }
+
+  function renderAll(root = document) {
+    root.querySelectorAll(".pixel-text").forEach(renderElement);
+  }
+
+  renderAll();
+
+  window.PixelText = {
+    render: renderElement,
+    renderAll,
+  };
 }());

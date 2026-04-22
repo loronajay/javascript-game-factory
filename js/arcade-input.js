@@ -3,6 +3,14 @@
 
   const listeners = [];
 
+  function isEditableTarget(target) {
+    if (!target) return false;
+    if (target.isContentEditable) return true;
+
+    const tagName = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
+    return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+  }
+
   function emit(action, source) {
     listeners.forEach((listener) => listener(action, source));
   }
@@ -18,6 +26,8 @@
     if (event.key === "ArrowRight" || event.key === "d" || event.key === "D") emit("right", "keyboard");
     if (event.key === "ArrowUp" || event.key === "w" || event.key === "W") emit("up", "keyboard");
     if (event.key === "ArrowDown" || event.key === "s" || event.key === "S") emit("down", "keyboard");
+
+    if (isEditableTarget(event.target)) return;
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();

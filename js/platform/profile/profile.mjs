@@ -1,5 +1,6 @@
 export const PROFILE_TAGLINE_MAX_LENGTH = 80;
 export const PROFILE_BIO_MAX_LENGTH = 280;
+export const PROFILE_REAL_NAME_MAX_LENGTH = 48;
 export const PROFILE_LINK_LABEL_MAX_LENGTH = 24;
 export const PROFILE_BACKGROUND_URL_MAX_LENGTH = 280;
 
@@ -162,6 +163,10 @@ export function sanitizeProfileTagline(value) {
   return sanitizeSingleLine(value, PROFILE_TAGLINE_MAX_LENGTH);
 }
 
+export function sanitizeProfileRealName(value) {
+  return sanitizeSingleLine(value, PROFILE_REAL_NAME_MAX_LENGTH);
+}
+
 export function sanitizeProfileBio(value) {
   if (typeof value !== "string") return "";
   return value.replace(/\r\n?/g, "\n").trim().slice(0, PROFILE_BIO_MAX_LENGTH);
@@ -205,6 +210,7 @@ export function normalizeProfileFields(profile = {}) {
   const source = isPlainObject(profile) ? profile : {};
 
   return {
+    realName: sanitizeProfileRealName(source.realName),
     bio: sanitizeProfileBio(source.bio),
     tagline: sanitizeProfileTagline(source.tagline),
     avatarAssetId: sanitizeAssetId(source.avatarAssetId),
@@ -229,6 +235,7 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
   return {
     playerId: sanitizeSingleLine(source.playerId, 80),
     profileName: sanitizeSingleLine(source.profileName, 60),
+    realName: normalizedFields.realName,
     bio: normalizedFields.bio,
     tagline: normalizedFields.tagline,
     avatarAssetId: normalizedFields.avatarAssetId,
