@@ -220,6 +220,11 @@ Important behavior notes from the reference:
   Owner-controlled pinning or manual reordering can exist later, but the default order should come from shared rules rather than page-local drag/drop state.
 - The background image should eventually be a user-uploaded asset standardized to a 16:9 presentation area.
   Until upload systems exist, use a default background image / fallback treatment.
+- Treat that background as a static profile backdrop rather than a scrolling page layer.
+  The profile content and feed areas should scroll while the background image remains visually fixed behind the composition.
+- Backgrounds should render inside a fixed 16:9 presentation area even when the uploaded image is not 16:9.
+  Preserve the full uploaded image and handle dead space with matte / letterbox treatment rather than forcing destructive auto-cropping.
+- Dead space should default to a simple matte treatment such as black or white, with room for a future player-controlled matte color option.
 - The avatar / profile-picture area should also obey shared presentation constraints.
   Standardize portrait cropping, sizing, and fallback behavior in platform code before real uploads exist so later media work plugs into a stable frame.
 - Social links should be modeled as a repeatable structured list, not a single freeform text blob.
@@ -331,6 +336,8 @@ Future-facing notes:
 - `ladderPlacements` should summarize a player's strongest rankings without requiring a full standings page inside the profile itself.
 - `mainSqueeze` is a future social-field concept, not an immediate implementation target.
 - `backgroundImageUrl` should resolve to a normalized 16:9 presentation asset once uploads exist.
+- profile backgrounds should render as static backdrops while the foreground profile composition scrolls independently.
+- non-16:9 uploads should be letterboxed or pillarboxed inside that 16:9 frame instead of forcing arbitrary crop rules.
 - `bio` is the canonical editable about-me field and should not drift into a second duplicated description concept.
 - `links` should support multiple normalized entries and render cleanly whether a player has zero, one, or many links.
 - `favoriteGameSlug` should represent an explicit public pin first, while most-played telemetry remains a separate metric rather than silently replacing the player's stated favorite.
@@ -383,6 +390,8 @@ Shared contract expectations:
 - empty fields should render deliberate fallback copy or fallback panels, not collapsed blank boxes
 - layout-critical fields should be normalized before rendering so long names, broken links, and oversized text do not damage the page composition
 - uploaded visual assets should eventually resolve to standardized presentation shapes rather than letting each page crop differently
+- profile background imagery should stay static behind the page composition while profile panels and feed content do the scrolling
+- profile background uploads may use flexible source aspect ratios as long as the displayed profile frame remains a fixed 16:9 area with deliberate dead-space handling
 - the owner-edit surface should cover the profile picture frame, about-me text, favorite game pin, and structured social links instead of scattering those writes through unrelated pages
 - the profile page headline must render the player's `profileName`, not generic page copy such as `Player Page`
 - the public subtitle line under the headline must render the player's editable `tagline`
@@ -395,6 +404,7 @@ Shared contract expectations:
 Future systems that support this profile vision:
 
 - profile background image upload and moderation flow
+- static profile-background rendering with a fixed 16:9 display contract and flexible source-image aspect ratios
 - lightweight presence states
 - favorites linking back into arcade grid entries
 - per-game ladder summary data
@@ -709,6 +719,7 @@ Required before implementation:
 - supported mime types
 - file size caps
 - image dimension rules
+- fixed 16:9 profile background presentation with matte / dead-space handling for non-16:9 uploads
 - avatar crop / display-shape rules
 - upload failure states
 - asset replacement rules

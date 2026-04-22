@@ -4,8 +4,53 @@ import {
   normalizeFactoryProfile,
   saveFactoryProfile,
 } from "./platform/identity/factory-profile.mjs";
-import { PROFILE_REAL_NAME_MAX_LENGTH, PROFILE_TAGLINE_MAX_LENGTH } from "./platform/profile/profile.mjs";
+import {
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_LINK_LABEL_MAX_LENGTH,
+  PROFILE_REAL_NAME_MAX_LENGTH,
+  PROFILE_TAGLINE_MAX_LENGTH,
+} from "./platform/profile/profile.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+
+const PROFILE_LINK_ROW_COUNT = 3;
+const PROFILE_LINK_URL_MAX_LENGTH = 280;
+
+function createEmptyLinkRow(index) {
+  return {
+    index,
+    idValue: "",
+    labelValue: "",
+    labelMaxLength: PROFILE_LINK_LABEL_MAX_LENGTH,
+    urlValue: "",
+    urlMaxLength: PROFILE_LINK_URL_MAX_LENGTH,
+    kindValue: "external",
+  };
+}
+
+function buildLinkRows(links = []) {
+  const rows = Array.from({ length: PROFILE_LINK_ROW_COUNT }, (_, index) => createEmptyLinkRow(index));
+
+  links.slice(0, PROFILE_LINK_ROW_COUNT).forEach((link, index) => {
+    rows[index] = {
+      ...rows[index],
+      idValue: link.id || "",
+      labelValue: link.label || "",
+      urlValue: link.url || "",
+      kindValue: link.kind || "external",
+    };
+  });
+
+  return rows;
+}
+
+function collectLinkRows(doc) {
+  return Array.from({ length: PROFILE_LINK_ROW_COUNT }, (_, index) => ({
+    id: doc?.getElementById?.(`playerProfileLinkId${index + 1}`)?.value || "",
+    label: doc?.getElementById?.(`playerProfileLinkLabel${index + 1}`)?.value || "",
+    url: doc?.getElementById?.(`playerProfileLinkUrl${index + 1}`)?.value || "",
+    kind: doc?.getElementById?.(`playerProfileLinkKind${index + 1}`)?.value || "external",
+  }));
+}
 
 export function formatArcadePlayerId(playerId) {
   const id = typeof playerId === "string" ? playerId.trim().toUpperCase() : "";
@@ -25,11 +70,14 @@ export function buildArcadeProfileViewModel(profile, options = {}) {
     profileNameMaxLength: FACTORY_PROFILE_NAME_MAX_LENGTH,
     realNameValue: normalized.realName,
     realNameMaxLength: PROFILE_REAL_NAME_MAX_LENGTH,
+    bioValue: normalized.bio,
+    bioMaxLength: PROFILE_BIO_MAX_LENGTH,
     taglineValue: normalized.tagline,
     taglineMaxLength: PROFILE_TAGLINE_MAX_LENGTH,
+    linkRows: buildLinkRows(normalized.links),
     saveLabel: hasName ? "UPDATE CARD" : "STORE CARD",
     statusLine: "EDIT YOUR PUBLIC PLAYER PROFILE",
-    helperText: "Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.",
+    helperText: "Update your arcade username, optional real name, about-me copy, public links, and custom tagline. Games can still use temporary match aliases during a run.",
     playerIdLabel: formatArcadePlayerId(normalized.playerId),
     flashMessage: typeof options.flashMessage === "string" ? options.flashMessage : "",
     inputValue: normalized.profileName,
@@ -48,7 +96,9 @@ export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
     ...current,
     profileName: fields.profileName ?? current.profileName,
     realName: fields.realName ?? current.realName,
+    bio: fields.bio ?? current.bio,
     tagline: fields.tagline ?? current.tagline,
+    links: fields.links ?? current.links,
   }, storage, options);
 }
 
@@ -63,6 +113,7 @@ export function initArcadeProfilePanel({
   const form = doc?.getElementById?.("playerProfileForm");
   const profileNameInput = doc?.getElementById?.("playerProfileName");
   const realNameInput = doc?.getElementById?.("playerProfileRealName");
+  const bioInput = doc?.getElementById?.("playerProfileBio");
   const taglineInput = doc?.getElementById?.("playerProfileTagline");
   const clearButton = doc?.getElementById?.("playerProfileClear");
 
@@ -96,10 +147,40 @@ export function initArcadeProfilePanel({
       realNameInput.maxLength = model.realNameMaxLength;
     }
 
+    if (bioInput) {
+      bioInput.value = model.bioValue;
+      bioInput.maxLength = model.bioMaxLength;
+    }
+
     if (taglineInput) {
       taglineInput.value = model.taglineValue;
       taglineInput.maxLength = model.taglineMaxLength;
     }
+
+    model.linkRows.forEach((row, index) => {
+      const labelInput = doc.getElementById(`playerProfileLinkLabel${index + 1}`);
+      const urlInput = doc.getElementById(`playerProfileLinkUrl${index + 1}`);
+      const kindInput = doc.getElementById(`playerProfileLinkKind${index + 1}`);
+      const idInput = doc.getElementById(`playerProfileLinkId${index + 1}`);
+
+      if (labelInput) {
+        labelInput.value = row.labelValue;
+        labelInput.maxLength = row.labelMaxLength;
+      }
+
+      if (urlInput) {
+        urlInput.value = row.urlValue;
+        urlInput.maxLength = row.urlMaxLength;
+      }
+
+      if (kindInput) {
+        kindInput.value = row.kindValue;
+      }
+
+      if (idInput) {
+        idInput.value = row.idValue;
+      }
+    });
   }
 
   function openPanel() {
@@ -129,7 +210,9 @@ export function initArcadeProfilePanel({
     saveArcadeProfileDetails(storage, {
       profileName: "",
       realName: "",
+      bio: "",
       tagline: "",
+      links: [],
     }, options);
     render("PLAYER CARD CLEARED");
   });
@@ -139,7 +222,9 @@ export function initArcadeProfilePanel({
     saveArcadeProfileDetails(storage, {
       profileName: profileNameInput.value,
       realName: realNameInput?.value || "",
+      bio: bioInput?.value || "",
       tagline: taglineInput?.value || "",
+      links: collectLinkRows(doc),
     }, options);
     render("PLAYER CARD SAVED");
   });

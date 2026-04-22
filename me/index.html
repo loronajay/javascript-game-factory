@@ -76,6 +76,107 @@
             autocomplete="name"
             spellcheck="false"
           >
+          <label class="player-card__field" for="playerProfileBio">About Me</label>
+          <textarea
+            id="playerProfileBio"
+            class="player-card__textarea"
+            name="bio"
+            rows="4"
+            autocomplete="off"
+            spellcheck="true"
+          ></textarea>
+          <fieldset class="player-card__field player-card__field-group">
+            <legend class="player-card__field-legend">Social Links</legend>
+            <div class="player-card__links">
+              <div class="player-card__link-row">
+                <input id="playerProfileLinkId1" name="links[0][id]" type="hidden">
+                <input
+                  id="playerProfileLinkLabel1"
+                  class="player-card__input player-card__input--plain player-card__input--compact"
+                  name="links[0][label]"
+                  type="text"
+                  placeholder="Label"
+                  spellcheck="false"
+                >
+                <input
+                  id="playerProfileLinkUrl1"
+                  class="player-card__input player-card__input--plain"
+                  name="links[0][url]"
+                  type="url"
+                  placeholder="https://example.com"
+                  spellcheck="false"
+                >
+                <select
+                  id="playerProfileLinkKind1"
+                  class="player-card__select"
+                  name="links[0][kind]"
+                >
+                  <option value="external">External</option>
+                  <option value="social">Social</option>
+                  <option value="support">Support</option>
+                  <option value="portfolio">Portfolio</option>
+                </select>
+              </div>
+              <div class="player-card__link-row">
+                <input id="playerProfileLinkId2" name="links[1][id]" type="hidden">
+                <input
+                  id="playerProfileLinkLabel2"
+                  class="player-card__input player-card__input--plain player-card__input--compact"
+                  name="links[1][label]"
+                  type="text"
+                  placeholder="Label"
+                  spellcheck="false"
+                >
+                <input
+                  id="playerProfileLinkUrl2"
+                  class="player-card__input player-card__input--plain"
+                  name="links[1][url]"
+                  type="url"
+                  placeholder="https://example.com"
+                  spellcheck="false"
+                >
+                <select
+                  id="playerProfileLinkKind2"
+                  class="player-card__select"
+                  name="links[1][kind]"
+                >
+                  <option value="external">External</option>
+                  <option value="social">Social</option>
+                  <option value="support">Support</option>
+                  <option value="portfolio">Portfolio</option>
+                </select>
+              </div>
+              <div class="player-card__link-row">
+                <input id="playerProfileLinkId3" name="links[2][id]" type="hidden">
+                <input
+                  id="playerProfileLinkLabel3"
+                  class="player-card__input player-card__input--plain player-card__input--compact"
+                  name="links[2][label]"
+                  type="text"
+                  placeholder="Label"
+                  spellcheck="false"
+                >
+                <input
+                  id="playerProfileLinkUrl3"
+                  class="player-card__input player-card__input--plain"
+                  name="links[2][url]"
+                  type="url"
+                  placeholder="https://example.com"
+                  spellcheck="false"
+                >
+                <select
+                  id="playerProfileLinkKind3"
+                  class="player-card__select"
+                  name="links[2][kind]"
+                >
+                  <option value="external">External</option>
+                  <option value="social">Social</option>
+                  <option value="support">Support</option>
+                  <option value="portfolio">Portfolio</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
           <label class="player-card__field" for="playerProfileTagline">Tagline</label>
           <input
             id="playerProfileTagline"

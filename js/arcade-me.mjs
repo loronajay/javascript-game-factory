@@ -299,7 +299,6 @@ function renderHeroCard(container, model) {
               alt="${escapeHtml(model.avatarAlt)}"
             >
           </div>
-          <p class="me-hero-card__portrait-caption">Profile Pic</p>
         </div>
       </div>
     </section>
