@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "description": "Persistent platform API for Javascript Game Factory.",
   "scripts": {
+    "migrate": "node ./src/migrate.mjs",
     "start": "node ./src/server.mjs",
     "test": "node --test ./tests/*.test.mjs"
   },

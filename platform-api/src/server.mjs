@@ -4,6 +4,8 @@ import pg from "pg";
 
 import { createApp } from "./app.mjs";
 import { readConfig } from "./config.mjs";
+import { applyMigrations } from "./db/migrations.mjs";
+import { loadPlayerProfile, savePlayerProfile } from "./db/profiles.mjs";
 
 const { Pool } = pg;
 
@@ -32,39 +34,49 @@ async function closePool(pool) {
   }
 }
 
-const config = readConfig();
-const pool = config.hasDatabaseUrl ? new Pool({ connectionString: config.databaseUrl }) : null;
-const app = createApp({
-  config,
-  checkDatabase: createDatabaseCheck(pool),
-});
-const server = createServer(app);
+async function bootstrap() {
+  const config = readConfig();
+  const pool = config.hasDatabaseUrl ? new Pool({ connectionString: config.databaseUrl }) : null;
 
-async function shutdown(signal) {
-  server.close(async () => {
-    await closePool(pool);
-    process.exit(0);
+  if (pool) {
+    await applyMigrations(pool);
+  }
+
+  const app = createApp({
+    config,
+    checkDatabase: createDatabaseCheck(pool),
+    loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),
+    savePlayerProfile: (playerId, patch) => savePlayerProfile(pool, playerId, patch),
+  });
+  const server = createServer(app);
+
+  async function shutdown(signal) {
+    server.close(async () => {
+      await closePool(pool);
+      process.exit(0);
+    });
+
+    setTimeout(async () => {
+      await closePool(pool);
+      process.exit(1);
+    }, 5000).unref();
+
+    if (signal) {
+      process.stdout.write(`[platform-api] received ${signal}, shutting down\n`);
+    }
+  }
+
+  server.listen(config.port, () => {
+    process.stdout.write(`[platform-api] listening on port ${config.port}\n`);
   });
 
-  setTimeout(async () => {
-    await closePool(pool);
-    process.exit(1);
-  }, 5000).unref();
+  process.on("SIGINT", () => {
+    shutdown("SIGINT");
+  });
 
-  if (signal) {
-    process.stdout.write(`[platform-api] received ${signal}, shutting down\n`);
-  }
+  process.on("SIGTERM", () => {
+    shutdown("SIGTERM");
+  });
 }
 
-server.listen(config.port, () => {
-  process.stdout.write(`[platform-api] listening on port ${config.port}\n`);
-});
-
-process.on("SIGINT", () => {
-  shutdown("SIGINT");
-});
-
-process.on("SIGTERM", () => {
-  shutdown("SIGTERM");
-});
-
+await bootstrap();

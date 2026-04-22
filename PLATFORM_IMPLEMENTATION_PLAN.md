@@ -24,6 +24,8 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - badge and reputation surfaces
 - eventual media upload
 - profile music: a player-assigned audio track that autoplays on profile page load, in the Myspace tradition
+- player gestures: lightweight expressive social interactions triggered from a player's public profile — Poke, Hug, Kick, Blow Kiss, Nudge, and Challenge to Game; each gesture generates a notification for the recipient
+- notification shell: a platform-owned notification bell and inbox that collects received gestures and later other social signals such as reactions, friend requests, and event invites
 
 Important terminology note:
 
@@ -180,6 +182,8 @@ Recommended first-class pages:
   Friends and platform activity.
 - `/thoughts/index.html`
   Shared thoughts feed for user-authored status updates, social posting, and the eventual doomscroll-style home feed.
+- `/notifications/index.html`
+  Platform notification inbox. Shows received gestures (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge to Game) in the local-first phase; expands to all social signals (reactions, friend requests, event invites) once backend delivery exists.
 
 Notes:
 
@@ -660,6 +664,67 @@ Notes:
 - The profile editor should treat `profileMusic` as a simple set-or-clear form: one track at a time, no playlist.
 - Multi-track playlists and richer embed integrations belong to the backend phase.
 
+### `gestureItem`
+
+A player-to-player expressive social interaction triggered from a public profile view.
+
+Supported gesture kinds: `poke`, `hug`, `kick`, `blow-kiss`, `nudge`, `challenge`.
+
+Suggested shape:
+
+```js
+{
+  id: "gesture-1",
+  kind: "poke",
+  fromPlayerId: "player-123",
+  toPlayerId: "player-456",
+  createdAt: ""
+}
+```
+
+Notes:
+
+- `challenge` is a special kind that carries an optional `gameSlug` hint for which cabinet the challenge is for.
+- Gestures are one-directional; the recipient does not need to respond.
+- In the local-first phase, sent gestures are written into the sender's own localStorage and can be reflected locally; real cross-user delivery requires a backend push layer.
+- The gesture list is intended to expand with new kinds over time; `kind` should always be treated as an open enumeration, not a closed set.
+- Gestures should never auto-repeat silently; if a sender sends the same kind to the same player within a short window, the UI should acknowledge the repeat rather than silently stacking duplicates.
+
+### `notificationItem`
+
+A platform-owned notification targeting a specific player.
+
+Suggested shape:
+
+```js
+{
+  id: "notif-1",
+  kind: "gesture",
+  targetPlayerId: "player-456",
+  fromPlayerId: "player-123",
+  relatedId: "gesture-1",
+  summary: "Jay poked you",
+  read: false,
+  createdAt: ""
+}
+```
+
+Notification kinds (v1 scope):
+
+- `gesture` — a received Poke, Hug, Kick, Blow Kiss, Nudge, or Challenge
+- (future) `reaction` — a reaction on a thought post
+- (future) `friend-request` — a friend request received
+- (future) `event-invite` — an event team invitation
+
+Notes:
+
+- Notifications are platform-owned and live under the platform storage layer, not inside individual game modules.
+- `read` controls unread badge counts on the notification bell.
+- The notification bell in the nav shell should show an unread count badge when unread notifications exist.
+- In the local-first phase, only gesture notifications are generated and only the current player's own inbox is accessible.
+- Real cross-user notification delivery (push or polling) belongs to the backend transition phase.
+- The notification page (`/notifications/index.html`) is the primary inbox surface; a nav-level bell is the entry point.
+
 ### `mediaAsset`
 
 Do not implement uploads yet, but define the future boundary now.
@@ -807,6 +872,9 @@ Features:
 - groundwork for user-authored status posts that can later gain comments, sharing, and emoji-style reactions
 - stronger profile identity fields so player pages feel like social-media profiles rather than launcher-side stat cards
 - UI-contract prep for contextual profile surfacing, especially profile links from results/history surfaces and future add-friend entry points on game results screens
+- player gesture contract (`gestureItem`) and gesture buttons on public profile pages — Poke, Hug, Kick, Blow Kiss, Nudge, and Challenge to Game
+- notification shell groundwork: `notificationItem` contract, platform notification storage key, nav-level notification bell with unread badge, and `/notifications/index.html` inbox page
+- in the local-first phase the notification inbox surfaces received gestures only; the bell and inbox UI should be designed to accept additional notification kinds later without structural change
 
 Guardrails:
 
@@ -826,7 +894,15 @@ Exit criteria:
 
 ## Phase 4: Backend Transition
 
-Goal: move from local-first platform scaffolding to real persistent multi-user data.
+Goal: move from local-first platform scaffolding to real persistent multi-user data through shared backend adapters rather than page rewrites.
+
+Current status:
+
+- This phase has now started.
+- Railway Postgres is provisioned for the project.
+- `platform-api/` now exists as the first shared backend service scaffold and reads `DATABASE_URL`.
+- Initial migration/sql wiring plus the first profile read/write endpoints are now part of the active implementation path.
+- The frontend remains local-first until the page/domain seams are swapped from local storage to HTTP-backed adapters.
 
 This is the trigger point for:
 
@@ -838,6 +914,8 @@ This is the trigger point for:
 - real shared feed data
 - direct / private messaging
 - cross-user comments, reactions, and shares
+- real cross-user gesture delivery so Poke / Hug / Kick / Blow Kiss / Nudge / Challenge actually arrives in the recipient's inbox instead of staying local
+- backend-pushed notification delivery for all notification kinds (gestures, reactions, friend requests, event invites)
 - persistent profile/page metrics
 - event publishing workflows
 - cross-device state
@@ -878,7 +956,7 @@ Exit criteria:
 
 - direct messages
 - threaded comments
-- notifications system
+- real cross-user notification delivery (local-first gesture/notification UI is in scope; server push belongs to Phase 4)
 - generalized chat
 - multi-image galleries
 - arbitrary file upload
@@ -930,7 +1008,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 6. Reserve chat/lobby profile links and add-friend results-screen prompts as the primary future profile-surfacing routes once authenticated online profiles exist.
 7. Shape bulletins, events, featured cabinets, ladder snapshots, and feed prompts into the first pass of seasonal programming.
 8. Use those shared metrics/contracts to support durable memories on player pages and future home-feed/story surfaces without pretending full cross-user persistence already exists.
-9. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
+9. Keep backend work concentrated inside shared adapters and the new `platform-api/` service instead of leaking ad hoc fetch/storage logic into page code.
 
 ## Current Progress
 
@@ -956,11 +1034,19 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - the public and profile-embedded thought lanes now use constrained scroll windows so cards stay at full size instead of compressing as the feed grows.
 - `/me` and `/player` now follow the canonical reference composition much more closely with a true left rail, a square featured-cabinet tile that reuses the arcade grid-card shape, and a right-side feed/about/badges lane.
 - The profile identity contract now includes a separate optional `realName` field distinct from the arcade `profileName`, and the current owner edit surface supports editing that field locally.
-- the current owner edit surface now also supports canonical `bio`, structured multi-link editing, bare-domain link normalization, and local-first favorite cabinet storage.
+- the current owner edit surface now also supports canonical `bio`, structured multi-link editing, bare-domain link normalization, local-first favorite cabinet storage, and manual/automatic visible friend-rail settings.
 - The profile presence affordance now treats the dot beside the in-panel `Name` field as the visible source of truth for online/offline state instead of rendering a redundant status row.
 - The current profile pass has also removed redundant duplicate headers and placeholder labels inside the mock-defined sections so panel titles only read once.
 - The long-term feed contract now explicitly includes emoji-style reactions with visible totals so the thoughts/feed layer does not drift away from the intended Facebook-style interaction model.
 - `games/lovers-lost/` and `games/battleshits/` now publish platform-owned result/activity payloads through that shared activity contract instead of owning their own long-term activity schema.
+- `js/platform/relationships/` now owns canonical relationship normalization, fixed-slot friend-rail resolution, local-first relationship storage, and symmetric write APIs for friendship creation, qualifying shared sessions, qualifying linked events, and capped direct interactions.
+- qualifying shared-session relationship credit now flows through `js/platform/activity/` for `Lovers Lost` and `Battleshits`, so result publishing stays cabinet-owned while affinity/recency math stays platform-owned.
+- `Battleshits` now preserves opponent `playerId` through the online match/result flow so shared-session relationship updates can bind to real platform identities.
+- Railway Postgres is now provisioned for the product as the long-term source of truth for cross-game platform data.
+- `platform-api/` now exists as a separate Node.js service scaffold for the platform backend, with `DATABASE_URL` wiring, health/readiness routes, and the first migration runner.
+- `platform-api/` now includes the first Postgres schema covering players, profiles, metrics, relationships, relationship ledger entries, activity items, and thought posts.
+- `platform-api/` now exposes the first real backend profile routes: `GET /players/:playerId` and `PUT /players/:playerId/profile`.
+- the backend transition is now adapter-first: shared frontend seams stay in place while persistence logic moves behind the new API service.
 - Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
@@ -970,11 +1056,13 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 
 Use this section as a drift guard when work moves across threads.
 
-Immediate local-first priorities:
+Immediate priorities across the current local/backend boundary:
 
-- panel headers that read as distinct container labels instead of blending into panel content
-- profile-picture and background presentation constraints plus fallback polish
-- favorite-game pinning and featured-cabinet presentation as an explicit player-controlled identity surface
+- stabilize the first backend schema and migration flow inside `platform-api/`
+- add backend adapters for profiles, metrics, relationships, activity, and thoughts without changing page-owned contracts
+- wire the frontend/player pages to real profile reads once the API contract is stable
+- explicit friendship-creation entry points that feed the centralized relationship seam
+- qualifying linked-event participation wired into the relationship seam
 - shared profile metrics groundwork built around the recommended canonical metrics split instead of one-off counters
 - context-driven discovery rules tied to games, events, activity, and feed participation
 - durable memories on player pages so activity/posts/results can become reusable profile highlights
@@ -982,6 +1070,8 @@ Immediate local-first priorities:
 - badges as a shared profile contract even if the first pass is placeholder-only
 - remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
 - profile music contract and mini player widget so players can assign a track that autoplays on profile load
+- player gesture buttons on public profile pages (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge to Game) plus the `gestureItem` contract and platform notification storage
+- notification bell in the platform nav shell with an unread badge, and `/notifications/index.html` as the inbox surface for received gestures in the local-first phase
 
 Default product calls for this scope:
 
@@ -1002,11 +1092,14 @@ Default product calls for this scope:
 Deferred until later phases:
 
 - authentication / login / sign up
-- database-backed profiles
 - real uploads
-- true cross-user friend relationships
 - real shared comments/reactions/shares across devices
 - ladder ranking systems beyond current contract prep
+
+Now actively in progress rather than deferred:
+
+- database-backed profiles through the shared `platform-api/` service
+- backend-owned profile/relationship/activity/thought persistence behind the existing frontend seams
 
 ## Decision Gates
 
