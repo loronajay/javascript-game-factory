@@ -2091,8 +2091,10 @@ body::before {
   text-transform: uppercase;
 }
 
-.me-thoughts-feed {
-  max-height: min(58vh, 620px);
+#meThoughtsPanel .thoughts-feed {
+  grid-auto-rows: max-content;
+  align-content: start;
+  max-height: 560px;
   overflow-y: auto;
   padding-right: 8px;
 }
@@ -2638,7 +2640,7 @@ body::before {
     justify-self: center;
   }
 
-  .me-thoughts-feed {
+  #meThoughtsPanel .thoughts-feed {
     max-height: none;
     overflow: visible;
     padding-right: 0;
@@ -3250,8 +3252,10 @@ body::before {
   text-transform: uppercase;
 }
 
-.player-thoughts-feed {
-  max-height: min(58vh, 620px);
+#playerThoughtsPanel .thoughts-feed {
+  grid-auto-rows: max-content;
+  align-content: start;
+  max-height: 560px;
   overflow-y: auto;
   padding-right: 8px;
 }
@@ -3802,7 +3806,7 @@ body::before {
     justify-self: center;
   }
 
-  .player-thoughts-feed {
+  #playerThoughtsPanel .thoughts-feed {
     max-height: none;
     overflow: visible;
     padding-right: 0;
