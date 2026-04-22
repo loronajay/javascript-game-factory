@@ -6,6 +6,7 @@ import {
   buildPlayerThoughtFeed,
   buildThoughtCardItems,
   loadThoughtFeed,
+  publishThoughtPost,
 } from "./platform/thoughts/thoughts.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
@@ -175,6 +176,13 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         placeholderTitle: "Player Feed Warming Up",
         placeholderSummary: "No public player thoughts are cached for this pilot yet.",
       }),
+      thoughtComposer: {
+        enabled: false,
+        subjectPlaceholder: "Optional headline",
+        textPlaceholder: "Share a thought from your profile lane.",
+        submitLabel: "Post Thought",
+        flashMessage: "",
+      },
       aboutText: "This player has not filled out an about block in the local arcade cache yet.",
       badgeItems: [{
         label: "Badge case still empty",
@@ -298,6 +306,13 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     rankingItems,
     friendItems,
     thoughtItems,
+    thoughtComposer: {
+      enabled: isOwnerView,
+      subjectPlaceholder: "Optional headline",
+      textPlaceholder: "Share a thought from your profile lane.",
+      submitLabel: "Post Thought",
+      flashMessage: typeof options?.thoughtComposerFlash === "string" ? options.thoughtComposerFlash : "",
+    },
     aboutText: heroBio,
     badgeItems,
   };
@@ -542,11 +557,39 @@ function renderThoughtItem(item) {
   `;
 }
 
-function renderThoughtsPanel(container, title, items) {
+function renderThoughtsPanel(container, title, items, composer = null) {
   if (!container) return;
+
+  const composerHtml = composer?.enabled
+    ? `
+      <form id="playerThoughtComposer" class="thought-composer thought-composer--owner">
+        <input
+          id="playerThoughtSubject"
+          class="thought-composer__subject"
+          name="subject"
+          type="text"
+          maxlength="80"
+          placeholder="${escapeHtml(composer.subjectPlaceholder || "Optional headline")}"
+        >
+        <textarea
+          id="playerThoughtBody"
+          class="thought-composer__body"
+          name="text"
+          rows="4"
+          maxlength="500"
+          placeholder="${escapeHtml(composer.textPlaceholder || "Share a thought.")}"
+        ></textarea>
+        <div class="thought-composer__actions">
+          <button class="thought-composer__submit" type="submit">${escapeHtml(composer.submitLabel || "Post Thought")}</button>
+          <p id="playerThoughtComposerFlash" class="thought-composer__flash" aria-live="polite">${escapeHtml(composer.flashMessage || "")}</p>
+        </div>
+      </form>
+    `
+    : "";
 
   container.innerHTML = `
     <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    ${composerHtml}
     <div class="player-thoughts-feed thoughts-feed">
       ${items.map(renderThoughtItem).join("")}
     </div>
@@ -585,7 +628,12 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
   const isOwnerView = !requestedPlayerId || requestedPlayerId === localProfile.playerId;
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
   const profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId, { thoughtFeed });
-  const model = buildPlayerPageViewModel(profile, { requestedPlayerId, thoughtFeed, isOwnerView });
+  const model = buildPlayerPageViewModel(profile, {
+    requestedPlayerId,
+    thoughtFeed,
+    isOwnerView,
+    thoughtComposerFlash: options?.thoughtComposerFlash || "",
+  });
 
   const editButton = doc.getElementById("playerProfileButton");
   if (editButton) {
@@ -594,7 +642,7 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
 
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("playerHeroCard"), model);
-  renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", model.thoughtItems);
+  renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", model.thoughtItems, model.thoughtComposer);
   renderFavoritePanel(doc.getElementById("playerFavoritePanel"), "Favorite Game", model.favoriteGameItems[0]);
   const rankingsPanel = doc.getElementById("playerRankingsPanel");
   if (rankingsPanel) {
@@ -617,9 +665,9 @@ if (doc?.getElementById) {
   const profilePanel = initArcadeProfilePanel({ doc });
   renderPlayerPage(doc);
 
-  const rerender = () => {
+  const rerender = (thoughtComposerFlash = "") => {
     profilePanel?.render?.("");
-    renderPlayerPage(doc);
+    renderPlayerPage(doc, { thoughtComposerFlash });
   };
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
@@ -628,5 +676,33 @@ if (doc?.getElementById) {
 
   doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
     queueMicrotask(rerender);
+  });
+
+  doc.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!form || typeof form !== "object" || form.id !== "playerThoughtComposer") {
+      return;
+    }
+
+    event.preventDefault();
+
+    const storage = getDefaultPlatformStorage();
+    const currentProfile = loadFactoryProfile(storage);
+    const subjectInput = doc.getElementById("playerThoughtSubject");
+    const bodyInput = doc.getElementById("playerThoughtBody");
+    const saved = publishThoughtPost({
+      authorPlayerId: currentProfile.playerId,
+      authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
+      subject: subjectInput?.value || "",
+      text: bodyInput?.value || "",
+      visibility: "public",
+    }, storage);
+
+    if (!saved) {
+      rerender("Write a thought before posting.");
+      return;
+    }
+
+    rerender("Thought posted.");
   });
 }

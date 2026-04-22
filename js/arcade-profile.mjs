@@ -1,3 +1,4 @@
+import { ARCADE_GAME_SLUGS, normalizeGameEntry } from "./arcade-catalog.mjs";
 import {
   FACTORY_PROFILE_NAME_MAX_LENGTH,
   loadFactoryProfile,
@@ -52,6 +53,19 @@ function collectLinkRows(doc) {
   }));
 }
 
+function buildFavoriteGameOptions() {
+  return [
+    { value: "", label: "No favorite pinned" },
+    ...ARCADE_GAME_SLUGS.map((slug) => {
+      const entry = normalizeGameEntry(slug);
+      return {
+        value: entry.slug,
+        label: entry.title,
+      };
+    }),
+  ];
+}
+
 export function formatArcadePlayerId(playerId) {
   const id = typeof playerId === "string" ? playerId.trim().toUpperCase() : "";
   if (!id) return "PENDING-ID";
@@ -74,6 +88,8 @@ export function buildArcadeProfileViewModel(profile, options = {}) {
     bioMaxLength: PROFILE_BIO_MAX_LENGTH,
     taglineValue: normalized.tagline,
     taglineMaxLength: PROFILE_TAGLINE_MAX_LENGTH,
+    favoriteGameValue: normalized.favoriteGameSlug,
+    favoriteGameOptions: buildFavoriteGameOptions(),
     linkRows: buildLinkRows(normalized.links),
     saveLabel: hasName ? "UPDATE CARD" : "STORE CARD",
     statusLine: "EDIT YOUR PUBLIC PLAYER PROFILE",
@@ -98,6 +114,7 @@ export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
     realName: fields.realName ?? current.realName,
     bio: fields.bio ?? current.bio,
     tagline: fields.tagline ?? current.tagline,
+    favoriteGameSlug: fields.favoriteGameSlug ?? current.favoriteGameSlug,
     links: fields.links ?? current.links,
   }, storage, options);
 }
@@ -115,6 +132,7 @@ export function initArcadeProfilePanel({
   const realNameInput = doc?.getElementById?.("playerProfileRealName");
   const bioInput = doc?.getElementById?.("playerProfileBio");
   const taglineInput = doc?.getElementById?.("playerProfileTagline");
+  const favoriteGameInput = doc?.getElementById?.("playerProfileFavoriteGame");
   const clearButton = doc?.getElementById?.("playerProfileClear");
 
   if (!button || !panel || !form || !profileNameInput) {
@@ -155,6 +173,13 @@ export function initArcadeProfilePanel({
     if (taglineInput) {
       taglineInput.value = model.taglineValue;
       taglineInput.maxLength = model.taglineMaxLength;
+    }
+
+    if (favoriteGameInput) {
+      favoriteGameInput.innerHTML = model.favoriteGameOptions
+        .map((option) => `<option value="${option.value}">${option.label}</option>`)
+        .join("");
+      favoriteGameInput.value = model.favoriteGameValue;
     }
 
     model.linkRows.forEach((row, index) => {
@@ -212,6 +237,7 @@ export function initArcadeProfilePanel({
       realName: "",
       bio: "",
       tagline: "",
+      favoriteGameSlug: "",
       links: [],
     }, options);
     render("PLAYER CARD CLEARED");
@@ -224,6 +250,7 @@ export function initArcadeProfilePanel({
       realName: realNameInput?.value || "",
       bio: bioInput?.value || "",
       tagline: taglineInput?.value || "",
+      favoriteGameSlug: favoriteGameInput?.value || "",
       links: collectLinkRows(doc),
     }, options);
     render("PLAYER CARD SAVED");

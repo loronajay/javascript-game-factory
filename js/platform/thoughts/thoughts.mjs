@@ -2,6 +2,7 @@ import {
   getDefaultPlatformStorage,
   getPlatformStorageKey,
   readStorageText,
+  writeStorageText,
 } from "../storage/storage.mjs";
 
 export const THOUGHT_FEED_STORAGE_KEY = getPlatformStorageKey("thoughtFeed");
@@ -88,6 +89,10 @@ function sanitizeReactionTotals(value) {
     totals[normalizedKey] = sanitizeCount(count);
     return totals;
   }, {});
+}
+
+function createFallbackThoughtId() {
+  return `thought-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function countThoughtReactions(reactionTotals = {}) {
@@ -235,4 +240,26 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
 export function loadThoughtFeed(storage = getDefaultPlatformStorage()) {
   const stored = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY));
   return buildPublicThoughtFeed(mergeThoughtSources(stored, DEFAULT_THOUGHTS));
+}
+
+export function publishThoughtPost(post, storage = getDefaultPlatformStorage()) {
+  const normalized = normalizeThoughtPost({
+    id: createFallbackThoughtId(),
+    ...post,
+    commentCount: 0,
+    shareCount: 0,
+    reactionTotals: {},
+    repostOfId: "",
+  });
+
+  if (!normalized.subject && !normalized.text) {
+    return null;
+  }
+
+  const current = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY))
+    .map((entry, index) => normalizeThoughtPost(entry, index))
+    .filter((entry) => entry.id !== normalized.id);
+
+  writeStorageText(storage, THOUGHT_FEED_STORAGE_KEY, JSON.stringify([normalized, ...current]));
+  return normalized;
 }

@@ -19,6 +19,7 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - favorite-game pinning
 - friends activity
 - a shared thoughts feed for user-authored status updates and repostable bulletin-style posts
+- eventual direct / private messaging
 - friend / affinity metrics
 - badge and reputation surfaces
 - eventual media upload
@@ -32,7 +33,7 @@ Important terminology note:
 Product framing note:
 
 - Treat this project as a Facebook/Myspace-style social-media platform built around arcade identity and games, not as a generic launcher with a few profile extras.
-- Games are a major content pillar, but the long-term product is still a social platform: profiles, feeds, friends, reactions, reposting, personal identity fields, and public/self expression all matter as first-class product goals.
+- Games are a major content pillar, but the long-term product is still a social platform: profiles, feeds, friends, reactions, reposting, personal identity fields, private messaging, and public/self expression all matter as first-class product goals.
 
 The platform remains the owner of long-term identity and social state.
 Games remain self-contained experiences that can read platform data and publish approved activity/results, but games must not become the permanent home for profile ownership.
@@ -411,6 +412,7 @@ Future systems that support this profile vision:
 - friend points / affinity scoring
 - profile metrics such as page views, most-played-with, comment totals, share totals, and reaction totals
 - user-authored status feed items with comments, sharing, and emoji-style reactions
+- direct / private messaging once authenticated identity and cross-user backend rules exist
 
 Important scoping reminder:
 
@@ -693,6 +695,7 @@ This is the trigger point for:
 - database-backed profiles
 - friend relationships
 - real shared feed data
+- direct / private messaging
 - cross-user comments, reactions, and shares
 - persistent profile/page metrics
 - event publishing workflows

@@ -6,6 +6,7 @@ import {
   buildPlayerThoughtFeed,
   buildThoughtCardItems,
   loadThoughtFeed,
+  publishThoughtPost,
 } from "./platform/thoughts/thoughts.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
@@ -226,6 +227,13 @@ export function buildMePageViewModel(profile, options = {}) {
     rankingItems,
     friendItems,
     thoughtItems,
+    thoughtComposer: {
+      enabled: true,
+      subjectPlaceholder: "Optional headline",
+      textPlaceholder: "Share a thought from your profile lane.",
+      submitLabel: "Post Thought",
+      flashMessage: typeof options?.thoughtComposerFlash === "string" ? options.thoughtComposerFlash : "",
+    },
     aboutText: heroBio,
     badgeItems,
   };
@@ -470,11 +478,39 @@ function renderThoughtItem(item) {
   `;
 }
 
-function renderThoughtsPanel(container, title, items) {
+function renderThoughtsPanel(container, title, items, composer = null) {
   if (!container) return;
+
+  const composerHtml = composer?.enabled
+    ? `
+      <form id="meThoughtComposer" class="thought-composer thought-composer--owner">
+        <input
+          id="meThoughtSubject"
+          class="thought-composer__subject"
+          name="subject"
+          type="text"
+          maxlength="80"
+          placeholder="${escapeHtml(composer.subjectPlaceholder || "Optional headline")}"
+        >
+        <textarea
+          id="meThoughtBody"
+          class="thought-composer__body"
+          name="text"
+          rows="4"
+          maxlength="500"
+          placeholder="${escapeHtml(composer.textPlaceholder || "Share a thought.")}"
+        ></textarea>
+        <div class="thought-composer__actions">
+          <button class="thought-composer__submit" type="submit">${escapeHtml(composer.submitLabel || "Post Thought")}</button>
+          <p id="meThoughtComposerFlash" class="thought-composer__flash" aria-live="polite">${escapeHtml(composer.flashMessage || "")}</p>
+        </div>
+      </form>
+    `
+    : "";
 
   container.innerHTML = `
     <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    ${composerHtml}
     <div class="me-thoughts-feed thoughts-feed">
       ${items.map(renderThoughtItem).join("")}
     </div>
@@ -508,10 +544,13 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
 
   const storage = options.storage || getDefaultPlatformStorage();
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
-  const model = buildMePageViewModel(profile, { thoughtFeed });
+  const model = buildMePageViewModel(profile, {
+    thoughtFeed,
+    thoughtComposerFlash: options?.thoughtComposerFlash || "",
+  });
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("meHeroCard"), model);
-  renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", model.thoughtItems);
+  renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", model.thoughtItems, model.thoughtComposer);
   renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
   const rankingsPanel = doc.getElementById("meRankingsPanel");
   if (rankingsPanel) {
@@ -534,9 +573,9 @@ if (doc?.getElementById) {
   const profilePanel = initArcadeProfilePanel();
   renderMePage(doc);
 
-  const rerender = () => {
+  const rerender = (thoughtComposerFlash = "") => {
     profilePanel?.render?.("");
-    renderMePage(doc);
+    renderMePage(doc, loadFactoryProfile(), { thoughtComposerFlash });
   };
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
@@ -545,5 +584,33 @@ if (doc?.getElementById) {
 
   doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
     queueMicrotask(rerender);
+  });
+
+  doc.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!form || typeof form !== "object" || form.id !== "meThoughtComposer") {
+      return;
+    }
+
+    event.preventDefault();
+
+    const storage = getDefaultPlatformStorage();
+    const currentProfile = loadFactoryProfile(storage);
+    const subjectInput = doc.getElementById("meThoughtSubject");
+    const bodyInput = doc.getElementById("meThoughtBody");
+    const saved = publishThoughtPost({
+      authorPlayerId: currentProfile.playerId,
+      authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
+      subject: subjectInput?.value || "",
+      text: bodyInput?.value || "",
+      visibility: "public",
+    }, storage);
+
+    if (!saved) {
+      rerender("Write a thought before posting.");
+      return;
+    }
+
+    rerender("Thought posted.");
   });
 }
