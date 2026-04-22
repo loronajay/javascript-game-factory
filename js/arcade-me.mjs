@@ -548,7 +548,10 @@ function renderThoughtItem(item) {
         ${deleteHtml}
       </div>
       <div class="thought-card__topline">
-        <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+        <div class="thought-card__title-block">
+          <span class="thought-card__topic-kicker">Topic</span>
+          <h2 class="thought-card__title">${escapeHtml(item.title)}</h2>
+        </div>
         <div class="thought-card__reactions">
           <span>${escapeHtml(item.reactionLabel)}</span>
           <span>${escapeHtml(item.shareLabel)}</span>

@@ -1872,6 +1872,10 @@ body::before {
   text-transform: uppercase;
 }
 
+.me-hero-card__kicker {
+  text-align: center;
+}
+
 .me-hero-card__name {
   margin: 0;
   max-width: 100%;
@@ -2084,6 +2088,7 @@ body::before {
 .me-panel__header {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .me-panel__title {
@@ -2630,7 +2635,7 @@ body::before {
 .me-hero-card__section-topline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -2647,6 +2652,11 @@ body::before {
     linear-gradient(180deg, rgba(255, 220, 187, 0.14), rgba(255, 121, 183, 0.08)),
     rgba(9, 8, 22, 0.82);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.me-hero-card__identity-field .me-hero-card__identity-field-label {
+  width: 100%;
+  justify-content: center;
 }
 
 .me-hero-card__rail-list {
@@ -3200,6 +3210,10 @@ body::before {
   text-transform: uppercase;
 }
 
+.player-hero-card__kicker {
+  text-align: center;
+}
+
 .player-hero-card__name {
   margin: 0;
   max-width: 100%;
@@ -3412,6 +3426,7 @@ body::before {
 .player-panel__header {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .player-panel__title {
@@ -3953,7 +3968,7 @@ body::before {
 .player-hero-card__section-topline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -3970,6 +3985,11 @@ body::before {
     linear-gradient(180deg, rgba(255, 220, 187, 0.14), rgba(255, 121, 183, 0.08)),
     rgba(9, 8, 22, 0.82);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.player-hero-card__identity-field .player-hero-card__identity-field-label {
+  width: 100%;
+  justify-content: center;
 }
 
 .player-hero-card__rail-list {
@@ -5681,6 +5701,8 @@ body::before {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  border-top: 1px solid rgba(255, 197, 228, 0.16);
+  padding-top: 12px;
 }
 
 .thought-card__date {
@@ -5688,6 +5710,18 @@ body::before {
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+}
+
+.thought-card__title-block {
+  display: grid;
+  gap: 3px;
+}
+
+.thought-card__topic-kicker {
+  color: #ffd2eb;
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .thought-card__title {
@@ -5701,6 +5735,8 @@ body::before {
   margin: 0;
   color: rgba(255, 247, 252, 0.84);
   line-height: 1.7;
+  border-top: 1px solid rgba(255, 197, 228, 0.16);
+  padding-top: 12px;
 }
 
 .thought-card__signal-line {
@@ -5734,6 +5770,8 @@ body::before {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+  border-top: 1px solid rgba(255, 197, 228, 0.16);
+  padding-top: 12px;
 }
 
 .thought-card__action {
