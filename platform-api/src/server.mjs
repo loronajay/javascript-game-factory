@@ -3,9 +3,13 @@ import { createServer } from "node:http";
 import pg from "pg";
 
 import { createApp } from "./app.mjs";
+import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
+import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
 import { loadPlayerProfile, savePlayerProfile } from "./db/profiles.mjs";
+import { loadPlayerRelationships, savePlayerRelationships } from "./db/relationships.mjs";
+import { deleteThought, listThoughts, saveThought } from "./db/thoughts.mjs";
 
 const { Pool } = pg;
 
@@ -47,6 +51,15 @@ async function bootstrap() {
     checkDatabase: createDatabaseCheck(pool),
     loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),
     savePlayerProfile: (playerId, patch) => savePlayerProfile(pool, playerId, patch),
+    loadPlayerMetrics: (playerId) => loadPlayerMetrics(pool, playerId),
+    savePlayerMetrics: (playerId, patch) => savePlayerMetrics(pool, playerId, patch),
+    loadPlayerRelationships: (playerId) => loadPlayerRelationships(pool, playerId),
+    savePlayerRelationships: (playerId, patch) => savePlayerRelationships(pool, playerId, patch),
+    listActivityItems: () => listActivityItems(pool),
+    saveActivityItem: (item) => saveActivityItem(pool, item),
+    listThoughts: () => listThoughts(pool),
+    saveThought: (thought) => saveThought(pool, thought),
+    deleteThought: (thoughtId) => deleteThought(pool, thoughtId),
   });
   const server = createServer(app);
 

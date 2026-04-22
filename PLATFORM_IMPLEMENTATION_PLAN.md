@@ -169,7 +169,7 @@ Recommended first-class pages:
 - `/me/index.html`
   Personal dashboard for the signed-in or local current player.
 - `/players/index.html`
-  Player discovery or player list later if needed.
+  Deferred discovery surface only if context-driven discovery eventually needs a dedicated index. Do not treat this as an immediate page requirement.
 - `/player/index.html?id=<playerId>`
   Public player profile page.
 - `/bulletins/index.html`
@@ -1045,7 +1045,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - Railway Postgres is now provisioned for the product as the long-term source of truth for cross-game platform data.
 - `platform-api/` now exists as a separate Node.js service scaffold for the platform backend, with `DATABASE_URL` wiring, health/readiness routes, and the first migration runner.
 - `platform-api/` now includes the first Postgres schema covering players, profiles, metrics, relationships, relationship ledger entries, activity items, and thought posts.
-- `platform-api/` now exposes the first real backend profile routes: `GET /players/:playerId` and `PUT /players/:playerId/profile`.
+- `platform-api/` now exposes the first real backend record routes for profiles, metrics, relationships, activity items, and thought posts.
 - the backend transition is now adapter-first: shared frontend seams stay in place while persistence logic moves behind the new API service.
 - Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
@@ -1058,20 +1058,23 @@ Use this section as a drift guard when work moves across threads.
 
 Immediate priorities across the current local/backend boundary:
 
-- stabilize the first backend schema and migration flow inside `platform-api/`
-- add backend adapters for profiles, metrics, relationships, activity, and thoughts without changing page-owned contracts
-- wire the frontend/player pages to real profile reads once the API contract is stable
-- explicit friendship-creation entry points that feed the centralized relationship seam
-- qualifying linked-event participation wired into the relationship seam
-- shared profile metrics groundwork built around the recommended canonical metrics split instead of one-off counters
-- context-driven discovery rules tied to games, events, activity, and feed participation
-- durable memories on player pages so activity/posts/results can become reusable profile highlights
-- seasonal programming links between bulletins, events, featured cabinets, ladder snapshots, and thought prompts
-- badges as a shared profile contract even if the first pass is placeholder-only
-- remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
-- profile music contract and mini player widget so players can assign a track that autoplays on profile load
-- player gesture buttons on public profile pages (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge to Game) plus the `gestureItem` contract and platform notification storage
-- notification bell in the platform nav shell with an unread badge, and `/notifications/index.html` as the inbox surface for received gestures in the local-first phase
+- stabilize the first backend record routes inside `platform-api/` against the live Railway Postgres deployment
+- wire the frontend `/player` and `/me` pages to real profile/metrics/relationships reads without changing page-owned contracts
+- swap activity and thought reads/writes from local storage to the new API in controlled passes
+- add explicit friendship-creation entry points that feed the centralized relationship seam
+- wire qualifying linked-event participation into the relationship seam
+- finish the recommended canonical metrics split across public/support metrics, relationship/discovery metrics, and backend-only analytics
+- turn activity/posts/results into durable memories on player pages once the shared persistence path is stable
+- continue remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
+- keep context-driven discovery scoped to real profile surfacing from games, activity, events, and relationships rather than inventing a generic people directory early
+
+Important not-now items, even though they remain part of the product vision:
+
+- profile picture/avatar upload and profile background upload
+- profile music authoring/player UI
+- a generic `/players` discovery directory
+- player gesture buttons plus notification inbox/bell work
+- rich social actions such as comments, reactions, sharing, and direct/private messaging
 
 Default product calls for this scope:
 
@@ -1084,7 +1087,7 @@ Default product calls for this scope:
 - relationship ordering should be able to use both affinity (`friendPoints`, shared counts) and recency (`last played with`, `recently played with`, last shared session/event, last interaction) without forcing one permanent display mode
 - comments, emoji reactions, and sharing belong to the thoughts/feed contract, but cross-user persistence is backend-phase work
 - discovery should stay context-driven instead of becoming a generic empty people directory
-- once online profiles exist, add-friend entry points on game results screens and in-game chat and lobby surfaces should be treated as first-class profile-surfacing paths
+- once online profiles exist, add-friend entry points on game results screens and in-game chat and lobby surfaces should be treated as first-class profile-surfacing paths; a generic directory should stay secondary
 - player pages should accumulate durable memories from platform-owned activity/posts/results rather than forcing every cabinet to invent its own legacy/history UI
 - bulletins, events, ladders, and featured cabinets should be able to support seasonal programming without requiring a separate product line
 - uploads stay late even though avatar/background display constraints should be stabilized now
@@ -1093,7 +1096,11 @@ Deferred until later phases:
 
 - authentication / login / sign up
 - real uploads
+- profile music authoring/player UI
+- generic player-directory / broad discovery page
+- player gesture UI plus notification inbox/bell delivery work
 - real shared comments/reactions/shares across devices
+- direct / private messaging
 - ladder ranking systems beyond current contract prep
 
 Now actively in progress rather than deferred:

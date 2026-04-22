@@ -1,7 +1,10 @@
 import {
   buildThoughtCardItems,
   loadThoughtFeed,
+  syncThoughtFeedFromApi,
 } from "./platform/thoughts/thoughts.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -28,6 +31,19 @@ export function buildThoughtsPageViewModel(thoughtFeed = loadThoughtFeed()) {
       placeholderTitle: "Feed Warming Up",
       placeholderSummary: "The thoughts feed is still warming up. Player status posts will appear here once more social surfaces come online.",
     }),
+  };
+}
+
+export async function loadThoughtsPageData(options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options.apiClient || createPlatformApiClient(options);
+  const thoughtFeed = Array.isArray(options?.thoughtFeed)
+    ? options.thoughtFeed
+    : await syncThoughtFeedFromApi(storage, apiClient);
+
+  return {
+    storage,
+    thoughtFeed,
   };
 }
 
@@ -101,4 +117,7 @@ const doc = globalThis.document;
 
 if (doc?.getElementById) {
   renderThoughtsPage(doc);
+  void loadThoughtsPageData().then(({ thoughtFeed }) => {
+    renderThoughtsPage(doc, thoughtFeed);
+  });
 }

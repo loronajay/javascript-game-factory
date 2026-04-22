@@ -51,6 +51,33 @@ export function createApp(options = {}) {
   const savePlayerProfile = typeof options?.savePlayerProfile === "function"
     ? options.savePlayerProfile
     : async () => null;
+  const loadPlayerMetrics = typeof options?.loadPlayerMetrics === "function"
+    ? options.loadPlayerMetrics
+    : async () => null;
+  const savePlayerMetrics = typeof options?.savePlayerMetrics === "function"
+    ? options.savePlayerMetrics
+    : async () => null;
+  const loadPlayerRelationships = typeof options?.loadPlayerRelationships === "function"
+    ? options.loadPlayerRelationships
+    : async () => null;
+  const savePlayerRelationships = typeof options?.savePlayerRelationships === "function"
+    ? options.savePlayerRelationships
+    : async () => null;
+  const listActivityItems = typeof options?.listActivityItems === "function"
+    ? options.listActivityItems
+    : async () => [];
+  const saveActivityItem = typeof options?.saveActivityItem === "function"
+    ? options.saveActivityItem
+    : async () => null;
+  const listThoughts = typeof options?.listThoughts === "function"
+    ? options.listThoughts
+    : async () => [];
+  const saveThought = typeof options?.saveThought === "function"
+    ? options.saveThought
+    : async () => null;
+  const deleteThought = typeof options?.deleteThought === "function"
+    ? options.deleteThought
+    : async () => false;
   const now = options?.now;
 
   return async function app(req, res) {
@@ -59,6 +86,8 @@ export function createApp(options = {}) {
     const timestamp = buildTimestamp(now);
     const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
+    const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
+    const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
 
     if (method === "GET" && pathname === "/health") {
       writeJson(res, 200, {
@@ -91,8 +120,65 @@ export function createApp(options = {}) {
       return;
     }
 
-    if (method === "GET" && playerMatch) {
-      const profile = await loadPlayerProfile(decodeURIComponent(playerMatch[1]));
+    if (method === "GET" && pathname === "/activity") {
+      const items = await listActivityItems();
+      writeJson(res, 200, { items });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/activity") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const item = await saveActivityItem(body.value);
+      writeJson(res, 200, { item });
+      return;
+    }
+
+    if (method === "GET" && pathname === "/thoughts") {
+      const thoughts = await listThoughts();
+      writeJson(res, 200, { thoughts });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/thoughts") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const thought = await saveThought(body.value);
+      writeJson(res, 200, { thought });
+      return;
+    }
+
+    const thoughtDeleteMatch = pathname.match(/^\/thoughts\/([^/]+)$/);
+    if (method === "DELETE" && thoughtDeleteMatch) {
+      const thoughtId = decodeURIComponent(thoughtDeleteMatch[1]);
+      const deleted = await deleteThought(thoughtId);
+      writeJson(res, 200, {
+        deleted,
+        id: thoughtId,
+      });
+      return;
+    }
+
+    if (method === "GET" && (playerMatch || profileMatch)) {
+      const profile = await loadPlayerProfile(decodeURIComponent((profileMatch || playerMatch)[1]));
       if (!profile) {
         writeJson(res, 404, {
           status: "error",
@@ -124,6 +210,60 @@ export function createApp(options = {}) {
       const profile = await savePlayerProfile(decodeURIComponent(profileMatch[1]), body.value);
       writeJson(res, 200, {
         player: profile,
+      });
+      return;
+    }
+
+    if (method === "GET" && metricsMatch) {
+      const metrics = await loadPlayerMetrics(decodeURIComponent(metricsMatch[1]));
+      writeJson(res, 200, {
+        metrics,
+      });
+      return;
+    }
+
+    if (method === "PUT" && metricsMatch) {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const metrics = await savePlayerMetrics(decodeURIComponent(metricsMatch[1]), body.value);
+      writeJson(res, 200, {
+        metrics,
+      });
+      return;
+    }
+
+    if (method === "GET" && relationshipsMatch) {
+      const relationships = await loadPlayerRelationships(decodeURIComponent(relationshipsMatch[1]));
+      writeJson(res, 200, {
+        relationships,
+      });
+      return;
+    }
+
+    if (method === "PUT" && relationshipsMatch) {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const relationships = await savePlayerRelationships(decodeURIComponent(relationshipsMatch[1]), body.value);
+      writeJson(res, 200, {
+        relationships,
       });
       return;
     }

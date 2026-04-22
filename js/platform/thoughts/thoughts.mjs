@@ -4,6 +4,7 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
+import { createPlatformApiClient } from "../api/platform-api.mjs";
 
 export const THOUGHT_FEED_STORAGE_KEY = getPlatformStorageKey("thoughtFeed");
 
@@ -108,6 +109,23 @@ function parseStoredFeed(raw) {
   } catch {
     return [];
   }
+}
+
+function parseNormalizedStoredFeed(storage = getDefaultPlatformStorage()) {
+  return parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY))
+    .map((entry, index) => normalizeThoughtPost(entry, index));
+}
+
+function mergeStoredThoughtFeed(primary = [], fallback = []) {
+  return mergeThoughtSources(primary, fallback);
+}
+
+function writeThoughtFeed(storage, thoughtFeed = []) {
+  const normalized = Array.isArray(thoughtFeed)
+    ? thoughtFeed.map((entry, index) => normalizeThoughtPost(entry, index))
+    : [];
+  writeStorageText(storage, THOUGHT_FEED_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 function compareCreatedDesc(left, right) {
@@ -241,7 +259,7 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
 }
 
 export function loadThoughtFeed(storage = getDefaultPlatformStorage()) {
-  const stored = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY));
+  const stored = parseNormalizedStoredFeed(storage);
   return buildPublicThoughtFeed(mergeThoughtSources(stored, DEFAULT_THOUGHTS));
 }
 
@@ -249,11 +267,10 @@ export function deleteThoughtPost(id, storage = getDefaultPlatformStorage()) {
   const normalizedId = sanitizeSingleLine(id, 80);
   if (!normalizedId) return false;
 
-  const current = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY))
-    .map((entry, index) => normalizeThoughtPost(entry, index))
+  const current = parseNormalizedStoredFeed(storage)
     .filter((entry) => entry.id !== normalizedId);
 
-  writeStorageText(storage, THOUGHT_FEED_STORAGE_KEY, JSON.stringify(current));
+  writeThoughtFeed(storage, current);
   return true;
 }
 
@@ -271,10 +288,72 @@ export function publishThoughtPost(post, storage = getDefaultPlatformStorage()) 
     return null;
   }
 
-  const current = parseStoredFeed(readStorageText(storage, THOUGHT_FEED_STORAGE_KEY))
-    .map((entry, index) => normalizeThoughtPost(entry, index))
+  const current = parseNormalizedStoredFeed(storage)
     .filter((entry) => entry.id !== normalized.id);
 
-  writeStorageText(storage, THOUGHT_FEED_STORAGE_KEY, JSON.stringify([normalized, ...current]));
+  writeThoughtFeed(storage, [normalized, ...current]);
   return normalized;
+}
+
+export async function syncThoughtFeedFromApi(
+  storage = getDefaultPlatformStorage(),
+  apiClient = createPlatformApiClient(),
+) {
+  const canLoad = apiClient && typeof apiClient.listThoughts === "function";
+  if (!canLoad) {
+    return loadThoughtFeed(storage);
+  }
+
+  const remoteFeed = await apiClient.listThoughts().catch(() => null);
+  if (!Array.isArray(remoteFeed)) {
+    return loadThoughtFeed(storage);
+  }
+
+  const merged = mergeStoredThoughtFeed(
+    remoteFeed.map((entry, index) => normalizeThoughtPost(entry, index)),
+    parseNormalizedStoredFeed(storage),
+  );
+  writeThoughtFeed(storage, merged);
+  return loadThoughtFeed(storage);
+}
+
+export async function publishThoughtPostWithApi(
+  post,
+  storage = getDefaultPlatformStorage(),
+  options = {},
+) {
+  const saved = publishThoughtPost(post, storage);
+  if (!saved) return null;
+
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  if (typeof apiClient?.saveThought !== "function") {
+    return saved;
+  }
+
+  const remoteThought = await apiClient.saveThought(saved).catch(() => null);
+  if (remoteThought) {
+    const merged = mergeStoredThoughtFeed(
+      [normalizeThoughtPost(remoteThought)],
+      parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== remoteThought.id),
+    );
+    writeThoughtFeed(storage, merged);
+  }
+
+  return saved;
+}
+
+export async function deleteThoughtPostWithApi(
+  id,
+  storage = getDefaultPlatformStorage(),
+  options = {},
+) {
+  const deleted = deleteThoughtPost(id, storage);
+  if (!deleted) return false;
+
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  if (typeof apiClient?.deleteThought === "function") {
+    await apiClient.deleteThought(id).catch(() => null);
+  }
+
+  return true;
 }

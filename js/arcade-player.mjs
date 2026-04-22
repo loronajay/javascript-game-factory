@@ -1,9 +1,10 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
-import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
   incrementProfileViewCount,
   loadProfileMetricsRecord,
   normalizeProfileMetricsRecord,
+  saveProfileMetricsRecord,
   syncThoughtPostCount,
 } from "./platform/metrics/metrics.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
@@ -11,14 +12,17 @@ import {
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
   resolveProfileFriendSlots,
+  saveProfileRelationshipsRecord,
 } from "./platform/relationships/relationships.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
   buildPlayerThoughtFeed,
   buildThoughtCardItems,
-  deleteThoughtPost,
+  deleteThoughtPostWithApi,
   loadThoughtFeed,
-  publishThoughtPost,
+  publishThoughtPostWithApi,
+  syncThoughtFeedFromApi,
 } from "./platform/thoughts/thoughts.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
@@ -196,6 +200,74 @@ export function loadRequestedPlayerProfile(storage = getDefaultPlatformStorage()
   }
 
   return buildThoughtBackedProfile(thoughtFeed, routePlayerId);
+}
+
+export async function loadPlayerPageData(options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const params = new URLSearchParams(options.search || globalThis.location?.search || "");
+  const requestedPlayerId = sanitizePlayerId(params.get("id"));
+  const localProfile = loadFactoryProfile(storage);
+  const isOwnerView = !requestedPlayerId || requestedPlayerId === localProfile.playerId;
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  const thoughtFeed = Array.isArray(options?.thoughtFeed)
+    ? options.thoughtFeed
+    : await syncThoughtFeedFromApi(storage, apiClient);
+
+  let profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId, { thoughtFeed });
+  const targetPlayerId = sanitizePlayerId(profile?.playerId || requestedPlayerId || localProfile.playerId);
+  let metricsRecord = options?.metricsRecord?.playerId
+    ? options.metricsRecord
+    : loadProfileMetricsRecord(targetPlayerId, storage);
+  let relationshipsRecord = options?.relationshipsRecord?.playerId
+    ? options.relationshipsRecord
+    : loadProfileRelationshipsRecord(targetPlayerId, storage);
+  const canLoad = targetPlayerId
+    && apiClient
+    && typeof apiClient.loadPlayerProfile === "function"
+    && typeof apiClient.loadPlayerMetrics === "function"
+    && typeof apiClient.loadPlayerRelationships === "function";
+
+  if (canLoad) {
+    const [profileResult, metricsResult, relationshipsResult] = await Promise.all([
+      apiClient.loadPlayerProfile(targetPlayerId).catch(() => null),
+      apiClient.loadPlayerMetrics(targetPlayerId).catch(() => null),
+      apiClient.loadPlayerRelationships(targetPlayerId).catch(() => null),
+    ]);
+
+    if (profileResult?.playerId === targetPlayerId) {
+      profile = isOwnerView
+        ? saveFactoryProfile({
+            ...localProfile,
+            ...profileResult,
+            playerId: localProfile.playerId,
+          }, storage)
+        : profileResult;
+    }
+
+    if (metricsResult?.playerId === targetPlayerId) {
+      metricsRecord = saveProfileMetricsRecord({
+        ...metricsResult,
+        playerId: targetPlayerId,
+      }, storage) || metricsRecord;
+    }
+
+    if (relationshipsResult?.playerId === targetPlayerId) {
+      relationshipsRecord = saveProfileRelationshipsRecord({
+        ...relationshipsResult,
+        playerId: targetPlayerId,
+      }, storage) || relationshipsRecord;
+    }
+  }
+
+  return {
+    requestedPlayerId,
+    isOwnerView,
+    thoughtFeed,
+    profile,
+    metricsRecord,
+    relationshipsRecord,
+    storage,
+  };
 }
 
 export function buildPlayerPageViewModel(profile, options = {}) {
@@ -780,26 +852,35 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
-  const profilePanel = initArcadeProfilePanel({ doc });
+  const storage = getDefaultPlatformStorage();
+  const profilePanel = initArcadeProfilePanel({ doc, storage });
   renderPlayerPage(doc);
 
-  const rerender = (thoughtComposerFlash = "") => {
+  const rerender = async (thoughtComposerFlash = "", disableProfileViewTracking = true) => {
+    const pageData = await loadPlayerPageData({ storage });
     profilePanel?.render?.("");
     renderPlayerPage(doc, {
+      ...pageData,
       thoughtComposerFlash,
-      disableProfileViewTracking: true,
+      disableProfileViewTracking,
     });
   };
 
+  void rerender("", false);
+
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
-    queueMicrotask(rerender);
+    queueMicrotask(() => {
+      void rerender();
+    });
   });
 
   doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
-    queueMicrotask(rerender);
+    queueMicrotask(() => {
+      void rerender();
+    });
   });
 
-  doc.addEventListener("submit", (event) => {
+  doc.addEventListener("submit", async (event) => {
     const form = event.target;
     if (!form || typeof form !== "object" || form.id !== "playerThoughtComposer") {
       return;
@@ -807,11 +888,10 @@ if (doc?.getElementById) {
 
     event.preventDefault();
 
-    const storage = getDefaultPlatformStorage();
     const currentProfile = loadFactoryProfile(storage);
     const subjectInput = doc.getElementById("playerThoughtSubject");
     const bodyInput = doc.getElementById("playerThoughtBody");
-    const saved = publishThoughtPost({
+    const saved = await publishThoughtPostWithApi({
       authorPlayerId: currentProfile.playerId,
       authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
       subject: subjectInput?.value || "",
@@ -820,27 +900,26 @@ if (doc?.getElementById) {
     }, storage);
 
     if (!saved) {
-      rerender("Write a thought before posting.");
+      void rerender("Write a thought before posting.");
       return;
     }
 
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
-    rerender("Thought posted.");
+    void rerender("Thought posted.");
   });
 
-  doc.addEventListener("click", (event) => {
+  doc.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-delete-id]");
     if (!button) return;
 
     const id = button.dataset.deleteId;
     if (!id) return;
 
-    const storage = getDefaultPlatformStorage();
     const currentProfile = loadFactoryProfile(storage);
-    deleteThoughtPost(id, storage);
+    await deleteThoughtPostWithApi(id, storage);
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
-    rerender();
+    void rerender();
   });
 }

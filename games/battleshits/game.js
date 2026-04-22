@@ -84,7 +84,7 @@ function createInitialState() {
     matchResult: null,    // 'win'|'loss'|'forfeit_win'
     lastShotInfo: null,   // { hit, sunk, shipId } for status bar
     myProfile: null,      // { playerId, displayName }
-    opponentProfile: null,// { displayName }
+    opponentProfile: null,// { playerId, displayName }
     roomCode: null,
     rematchPending: false,
     opponentWantsRematch: false,
@@ -607,6 +607,7 @@ function transitionToMatchEnded(result) {
     opponentProfile: gs.opponentProfile,
     matchmakingMode: gs.matchmakingMode,
     roomCode: gs.roomCode,
+    sessionId: `battleshits:${gs.roomCode || gs.matchmakingMode || 'match'}:${gs.seed ?? 0}`,
   });
 
   const titleEl   = document.getElementById('ended-title');
@@ -685,8 +686,8 @@ function wireOnlineCallbacks() {
     renderShipRoster();
   };
 
-  net.cb.onRemoteProfile = ({ displayName }) => {
-    gs.opponentProfile = { displayName };
+  net.cb.onRemoteProfile = ({ playerId, displayName }) => {
+    gs.opponentProfile = { playerId, displayName };
     const waitEl = document.getElementById('opponent-name-waiting');
     if (waitEl) waitEl.textContent = `Opponent: ${displayName}`;
   };

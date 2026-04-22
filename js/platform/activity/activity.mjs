@@ -4,6 +4,8 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
+import { createPlatformApiClient } from "../api/platform-api.mjs";
+import { recordSharedSessionBetweenPlayers } from "../relationships/relationships.mjs";
 
 export const ACTIVITY_FEED_STORAGE_KEY = getPlatformStorageKey("activityFeed");
 export const ACTIVITY_FEED_LIMIT = 40;
@@ -82,6 +84,33 @@ function parseStoredFeed(raw) {
   }
 }
 
+function parseNormalizedStoredFeed(storage = getDefaultPlatformStorage()) {
+  return parseStoredFeed(readStorageText(storage, ACTIVITY_FEED_STORAGE_KEY))
+    .map((entry, index) => normalizeActivityItem(entry, index));
+}
+
+function mergeStoredActivityFeed(primary = [], fallback = []) {
+  const merged = [];
+  const seen = new Set();
+
+  for (const entry of [...primary, ...fallback]) {
+    const normalized = normalizeActivityItem(entry, merged.length);
+    if (!normalized.id || seen.has(normalized.id)) continue;
+    seen.add(normalized.id);
+    merged.push(normalized);
+  }
+
+  return merged.sort(compareActivityDesc).slice(0, ACTIVITY_FEED_LIMIT);
+}
+
+function writeActivityFeed(storage, activityFeed = []) {
+  const normalized = Array.isArray(activityFeed)
+    ? activityFeed.map((entry, index) => normalizeActivityItem(entry, index))
+    : [];
+  writeStorageText(storage, ACTIVITY_FEED_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
 function compareActivityDesc(left, right) {
   const leftTime = Date.parse(left.createdAt || "") || 0;
   const rightTime = Date.parse(right.createdAt || "") || 0;
@@ -111,9 +140,7 @@ export function normalizeActivityItem(item = {}, index = 0) {
 }
 
 export function loadActivityFeed(storage = getDefaultPlatformStorage()) {
-  const raw = readStorageText(storage, ACTIVITY_FEED_STORAGE_KEY);
-  return parseStoredFeed(raw)
-    .map((entry, index) => normalizeActivityItem(entry, index))
+  return parseNormalizedStoredFeed(storage)
     .sort(compareActivityDesc);
 }
 
@@ -121,7 +148,8 @@ export function publishActivityItem(item, storage = getDefaultPlatformStorage())
   const normalized = normalizeActivityItem(item);
   const current = loadActivityFeed(storage).filter((entry) => entry.id !== normalized.id);
   const next = [normalized, ...current].slice(0, ACTIVITY_FEED_LIMIT);
-  writeStorageText(storage, ACTIVITY_FEED_STORAGE_KEY, JSON.stringify(next));
+  writeActivityFeed(storage, next);
+  maybeRecordSharedSessionFromActivity(normalized, storage);
   return normalized;
 }
 
@@ -130,6 +158,55 @@ function normalizeIdentity(identity = {}) {
     playerId: sanitizeSingleLine(identity?.playerId, 80),
     displayName: sanitizeSingleLine(identity?.displayName, 60),
   };
+}
+
+function buildDerivedSessionId(activity) {
+  const gameSlug = sanitizeSingleLine(activity?.gameSlug, 80);
+  const createdAt = sanitizeSingleLine(activity?.createdAt, 40);
+  const leftPlayerId = sanitizeSingleLine(activity?.actorPlayerId, 80);
+  const opponentProfile = normalizeIdentity(activity?.metadata?.opponentProfile);
+  const boyIdentity = normalizeIdentity(activity?.metadata?.boyIdentity);
+  const girlIdentity = normalizeIdentity(activity?.metadata?.girlIdentity);
+  const rightPlayerId = opponentProfile.playerId || girlIdentity.playerId || boyIdentity.playerId;
+  if (!gameSlug || !createdAt || !leftPlayerId || !rightPlayerId) return "";
+  return `${gameSlug}:${leftPlayerId}:${rightPlayerId}:${createdAt}`;
+}
+
+function maybeRecordSharedSessionFromActivity(activity, storage) {
+  const item = normalizeActivityItem(activity);
+  if (item.type !== "game-result") return;
+
+  if (item.gameSlug === "lovers-lost") {
+    const boyIdentity = normalizeIdentity(item.metadata?.boyIdentity);
+    const girlIdentity = normalizeIdentity(item.metadata?.girlIdentity);
+    if (!boyIdentity.playerId || !girlIdentity.playerId || item.metadata?.disconnectNote) return;
+
+    recordSharedSessionBetweenPlayers(boyIdentity.playerId, girlIdentity.playerId, {
+      storage,
+      sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
+      gameSlug: item.gameSlug,
+      startedTogether: true,
+      reachedResults: true,
+      occurredAt: item.createdAt,
+    });
+    return;
+  }
+
+  if (item.gameSlug === "battleshits") {
+    const myProfile = normalizeIdentity(item.metadata?.myProfile);
+    const opponentProfile = normalizeIdentity(item.metadata?.opponentProfile);
+    const matchResult = sanitizeSingleLine(item.metadata?.matchResult, 24).toLowerCase();
+    if (!myProfile.playerId || !opponentProfile.playerId || matchResult === "forfeit_win") return;
+
+    recordSharedSessionBetweenPlayers(myProfile.playerId, opponentProfile.playerId, {
+      storage,
+      sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
+      gameSlug: item.gameSlug,
+      startedTogether: true,
+      reachedResults: true,
+      occurredAt: item.createdAt,
+    });
+  }
 }
 
 function actorNameFromOptions(options = {}) {
@@ -166,6 +243,7 @@ export function buildLoversLostRunActivity(runSummary, options = {}) {
       boyFinished: !!summary.boyFinished,
       girlFinished: !!summary.girlFinished,
       disconnectNote: !!summary.disconnectNote,
+      sessionId: sanitizeSingleLine(options?.sessionId, 120),
       boyIdentity: normalizeIdentity(summary.boyIdentity),
       girlIdentity: normalizeIdentity(summary.girlIdentity),
     },
@@ -202,6 +280,9 @@ export function buildBattleshitsMatchActivity(match, options = {}) {
       opponentDisplayName: opponentProfile.displayName,
       matchmakingMode: sanitizeSingleLine(source.matchmakingMode, 40),
       roomCode: sanitizeSingleLine(source.roomCode, 20),
+      sessionId: sanitizeSingleLine(source.sessionId, 120) || sanitizeSingleLine(options?.sessionId, 120),
+      myProfile,
+      opponentProfile,
     },
   });
 }
@@ -216,4 +297,48 @@ export function publishBattleshitsMatchActivity(match, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildBattleshitsMatchActivity(match, options);
   return publishActivityItem(item, storage);
+}
+
+export async function syncActivityFeedFromApi(
+  storage = getDefaultPlatformStorage(),
+  apiClient = createPlatformApiClient(),
+) {
+  const canLoad = apiClient && typeof apiClient.listActivityItems === "function";
+  if (!canLoad) {
+    return loadActivityFeed(storage);
+  }
+
+  const remoteFeed = await apiClient.listActivityItems().catch(() => null);
+  if (!Array.isArray(remoteFeed)) {
+    return loadActivityFeed(storage);
+  }
+
+  const merged = mergeStoredActivityFeed(
+    remoteFeed.map((entry, index) => normalizeActivityItem(entry, index)),
+    parseNormalizedStoredFeed(storage),
+  );
+  writeActivityFeed(storage, merged);
+  return loadActivityFeed(storage);
+}
+
+export async function publishActivityItemWithApi(
+  item,
+  storage = getDefaultPlatformStorage(),
+  options = {},
+) {
+  const saved = publishActivityItem(item, storage);
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+
+  if (typeof apiClient?.saveActivityItem === "function") {
+    const remoteItem = await apiClient.saveActivityItem(saved).catch(() => null);
+    if (remoteItem) {
+      const merged = mergeStoredActivityFeed(
+        [normalizeActivityItem(remoteItem)],
+        parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== remoteItem.id),
+      );
+      writeActivityFeed(storage, merged);
+    }
+  }
+
+  return saved;
 }

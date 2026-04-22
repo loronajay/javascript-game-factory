@@ -1,4 +1,6 @@
-import { loadActivityFeed } from "./platform/activity/activity.mjs";
+import { loadActivityFeed, syncActivityFeedFromApi } from "./platform/activity/activity.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -69,6 +71,19 @@ export function buildActivityPageViewModel(activityFeed = loadActivityFeed()) {
   };
 }
 
+export async function loadActivityPageData(options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options.apiClient || createPlatformApiClient(options);
+  const activityFeed = Array.isArray(options?.activityFeed)
+    ? options.activityFeed
+    : await syncActivityFeedFromApi(storage, apiClient);
+
+  return {
+    storage,
+    activityFeed,
+  };
+}
+
 function renderHeroCard(container, model) {
   if (!container) return;
 
@@ -121,4 +136,7 @@ const doc = globalThis.document;
 
 if (doc?.getElementById) {
   renderActivityPage(doc);
+  void loadActivityPageData().then(({ activityFeed }) => {
+    renderActivityPage(doc, activityFeed);
+  });
 }

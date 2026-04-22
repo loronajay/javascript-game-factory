@@ -1,4 +1,4 @@
-import { initArcadeProfilePanel } from "./arcade-profile.mjs";
+import { hydrateArcadeProfileFromApi, initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { loadProfileMetricsRecord, normalizeProfileMetricsRecord, syncThoughtPostCount } from "./platform/metrics/metrics.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
@@ -11,9 +11,10 @@ import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
   buildPlayerThoughtFeed,
   buildThoughtCardItems,
-  deleteThoughtPost,
+  deleteThoughtPostWithApi,
   loadThoughtFeed,
-  publishThoughtPost,
+  publishThoughtPostWithApi,
+  syncThoughtFeedFromApi,
 } from "./platform/thoughts/thoughts.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
@@ -661,23 +662,46 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
-  const profilePanel = initArcadeProfilePanel();
+  const storage = getDefaultPlatformStorage();
+  const profilePanel = initArcadeProfilePanel({ storage });
   renderMePage(doc);
 
-  const rerender = (thoughtComposerFlash = "") => {
+  const rerender = async (thoughtComposerFlash = "", shouldHydrate = false) => {
+    const currentProfile = loadFactoryProfile(storage);
+    const thoughtFeed = shouldHydrate
+      ? await syncThoughtFeedFromApi(storage)
+      : loadThoughtFeed(storage);
+    const hydrated = shouldHydrate
+      ? await hydrateArcadeProfileFromApi(storage)
+      : {
+          profile: currentProfile,
+          metricsRecord: loadProfileMetricsRecord(currentProfile.playerId, storage),
+          relationshipsRecord: loadProfileRelationshipsRecord(currentProfile.playerId, storage),
+        };
     profilePanel?.render?.("");
-    renderMePage(doc, loadFactoryProfile(), { thoughtComposerFlash });
+    renderMePage(doc, hydrated.profile, {
+      thoughtFeed,
+      thoughtComposerFlash,
+      metricsRecord: hydrated.metricsRecord,
+      relationshipsRecord: hydrated.relationshipsRecord,
+    });
   };
 
+  void rerender("", true);
+
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
-    queueMicrotask(rerender);
+    queueMicrotask(() => {
+      void rerender("", true);
+    });
   });
 
   doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
-    queueMicrotask(rerender);
+    queueMicrotask(() => {
+      void rerender("", true);
+    });
   });
 
-  doc.addEventListener("submit", (event) => {
+  doc.addEventListener("submit", async (event) => {
     const form = event.target;
     if (!form || typeof form !== "object" || form.id !== "meThoughtComposer") {
       return;
@@ -685,11 +709,10 @@ if (doc?.getElementById) {
 
     event.preventDefault();
 
-    const storage = getDefaultPlatformStorage();
     const currentProfile = loadFactoryProfile(storage);
     const subjectInput = doc.getElementById("meThoughtSubject");
     const bodyInput = doc.getElementById("meThoughtBody");
-    const saved = publishThoughtPost({
+    const saved = await publishThoughtPostWithApi({
       authorPlayerId: currentProfile.playerId,
       authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
       subject: subjectInput?.value || "",
@@ -698,27 +721,26 @@ if (doc?.getElementById) {
     }, storage);
 
     if (!saved) {
-      rerender("Write a thought before posting.");
+      void rerender("Write a thought before posting.");
       return;
     }
 
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
-    rerender("Thought posted.");
+    void rerender("Thought posted.");
   });
 
-  doc.addEventListener("click", (event) => {
+  doc.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-delete-id]");
     if (!button) return;
 
     const id = button.dataset.deleteId;
     if (!id) return;
 
-    const storage = getDefaultPlatformStorage();
     const currentProfile = loadFactoryProfile(storage);
-    deleteThoughtPost(id, storage);
+    await deleteThoughtPostWithApi(id, storage);
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
-    rerender();
+    void rerender();
   });
 }

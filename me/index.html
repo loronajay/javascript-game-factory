@@ -199,6 +199,61 @@
             autocomplete="off"
             spellcheck="false"
           >
+          <fieldset class="player-card__field player-card__field-group">
+            <legend class="player-card__field-legend">Friend Rail</legend>
+            <div class="player-card__rail-grid">
+              <div class="player-card__rail-row">
+                <label class="player-card__field" for="playerProfileMainSqueezeMode">Main Squeeze Mode</label>
+                <select
+                  id="playerProfileMainSqueezeMode"
+                  class="player-card__select"
+                  name="mainSqueezeMode"
+                ></select>
+                <label class="player-card__field" for="playerProfileMainSqueezePlayerId">Main Squeeze Pick</label>
+                <select
+                  id="playerProfileMainSqueezePlayerId"
+                  class="player-card__select"
+                  name="mainSqueezePlayerId"
+                ></select>
+              </div>
+              <div class="player-card__rail-row">
+                <label class="player-card__field" for="playerProfileFriendRailMode">Friend Rail Mode</label>
+                <select
+                  id="playerProfileFriendRailMode"
+                  class="player-card__select"
+                  name="friendRailMode"
+                ></select>
+              </div>
+              <div class="player-card__rail-row">
+                <label class="player-card__field" for="playerProfileFriendSlot1">Friend Slot 1</label>
+                <select
+                  id="playerProfileFriendSlot1"
+                  class="player-card__select"
+                  name="manualFriendSlotPlayerIds[0]"
+                ></select>
+                <label class="player-card__field" for="playerProfileFriendSlot2">Friend Slot 2</label>
+                <select
+                  id="playerProfileFriendSlot2"
+                  class="player-card__select"
+                  name="manualFriendSlotPlayerIds[1]"
+                ></select>
+              </div>
+              <div class="player-card__rail-row">
+                <label class="player-card__field" for="playerProfileFriendSlot3">Friend Slot 3</label>
+                <select
+                  id="playerProfileFriendSlot3"
+                  class="player-card__select"
+                  name="manualFriendSlotPlayerIds[2]"
+                ></select>
+                <label class="player-card__field" for="playerProfileFriendSlot4">Friend Slot 4</label>
+                <select
+                  id="playerProfileFriendSlot4"
+                  class="player-card__select"
+                  name="manualFriendSlotPlayerIds[3]"
+                ></select>
+              </div>
+            </div>
+          </fieldset>
           <p id="playerProfileHint" class="player-card__hint">
             Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.
           </p>

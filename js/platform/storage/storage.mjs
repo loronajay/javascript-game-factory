@@ -2,6 +2,7 @@ export const PLATFORM_STORAGE_KEYS = Object.freeze({
   factoryProfile: "javascript-game-factory.factoryProfile",
   profileMetrics: "javascript-game-factory.profileMetrics",
   profileRelationships: "javascript-game-factory.profileRelationships",
+  profileRelationshipLedger: "javascript-game-factory.profileRelationshipLedger",
   activityFeed: "javascript-game-factory.activityFeed",
   thoughtFeed: "javascript-game-factory.thoughtFeed",
   loversLostLegacyOnlineName: "lovers-lost.onlineIdentity.displayName",

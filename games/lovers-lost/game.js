@@ -1760,6 +1760,7 @@ function initGame() {
             storage,
             actorPlayerId: factoryProfile.playerId,
             actorDisplayName: gs.mode === 'online' ? onlineIdentity.displayName : factoryProfile.profileName,
+            sessionId: gs.mode === 'online' ? `lovers-lost:${onlineRoomCode || 'online'}:${gs.seed ?? 0}` : "",
           });
         }
         if (gs.phase === 'reunion') sounds.play('run-success');
