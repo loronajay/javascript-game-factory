@@ -15,8 +15,12 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - bulletin and announcement surfaces
 - event pages
 - user links
+- editable about-me / profile biography
+- favorite-game pinning
 - friends activity
 - a shared thoughts feed for user-authored status updates and repostable bulletin-style posts
+- friend / affinity metrics
+- badge and reputation surfaces
 - eventual media upload
 
 Important terminology note:
@@ -205,13 +209,23 @@ Important behavior notes from the reference:
 - The status feed area should behave like a constrained scrollable panel rather than forcing the whole page layout to expand infinitely.
 - Favorite games should not be plain text only.
   They should link back into the arcade grid / cabinet entry once those routes are stable.
+- Favorite game pinning should be player-controlled first.
+  We can track most-played cabinets separately and later offer a `use most played` shortcut, but the platform should not auto-overwrite a player's public favorite game without an explicit player action.
 - Ladder placement should focus on best placements, especially top-three finishes or top-ranked positions per game when available.
 - The `main squeeze` friend slot implies a future best-friend style relationship layer.
   We are not building that yet, but it should be tracked as a future platform concept.
 - Future friend points should likely derive from shared play behavior, such as time spent playing together or a similar trust / affinity metric.
   That system needs separate scoping later and should remain platform-owned.
+- Friend ordering should default to platform-owned affinity / friend-points sorting once that system exists.
+  Owner-controlled pinning or manual reordering can exist later, but the default order should come from shared rules rather than page-local drag/drop state.
 - The background image should eventually be a user-uploaded asset standardized to a 16:9 presentation area.
   Until upload systems exist, use a default background image / fallback treatment.
+- The avatar / profile-picture area should also obey shared presentation constraints.
+  Standardize portrait cropping, sizing, and fallback behavior in platform code before real uploads exist so later media work plugs into a stable frame.
+- Social links should be modeled as a repeatable structured list, not a single freeform text blob.
+  Each link item should normalize its own label, URL, and kind so the page never renders sloppy mixed-format link copy.
+- The profile feed should eventually support actual player-authored thought submission from the owner view.
+  Comments, reactions, and sharing belong to the same feed contract, but cross-user behavior should not force backend work into early local-first passes.
 - Empty fields need strong defaults so the page still feels intentional when a player has no links, no rankings, no favorite game, no badges, no posts, no featured friend, or no custom background.
 - The current example image can serve as the default background reference until a proper background-image system is wired.
 
@@ -271,6 +285,7 @@ Suggested shape:
   bio: "",
   tagline: "",
   avatarAssetId: "",
+  favoriteGameSlug: "",
   favorites: [],
   friends: [],
   recentPartners: [],
@@ -316,6 +331,33 @@ Future-facing notes:
 - `ladderPlacements` should summarize a player's strongest rankings without requiring a full standings page inside the profile itself.
 - `mainSqueeze` is a future social-field concept, not an immediate implementation target.
 - `backgroundImageUrl` should resolve to a normalized 16:9 presentation asset once uploads exist.
+- `bio` is the canonical editable about-me field and should not drift into a second duplicated description concept.
+- `links` should support multiple normalized entries and render cleanly whether a player has zero, one, or many links.
+- `favoriteGameSlug` should represent an explicit public pin first, while most-played telemetry remains a separate metric rather than silently replacing the player's stated favorite.
+
+### `profileMetrics`
+
+Suggested shape:
+
+```js
+{
+  playerId: "player-123",
+  pageViewCount: 0,
+  reactionCount: 0,
+  commentCount: 0,
+  shareCount: 0,
+  mostPlayedGameSlug: "",
+  mostPlayedWithPlayerId: "",
+  friendPoints: {}
+}
+```
+
+Notes:
+
+- Treat metrics as platform-owned support data, not as page-owned presentation state.
+- `mostPlayedGameSlug` and `mostPlayedWithPlayerId` should inform future UI and shortcuts without overriding explicit player profile choices.
+- `friendPoints` is the future affinity source for automatic friend ordering.
+- Exact storage strategy can change later, but the concepts should stay centralized.
 
 ## Profile Page Contract Notes
 
@@ -341,12 +383,14 @@ Shared contract expectations:
 - empty fields should render deliberate fallback copy or fallback panels, not collapsed blank boxes
 - layout-critical fields should be normalized before rendering so long names, broken links, and oversized text do not damage the page composition
 - uploaded visual assets should eventually resolve to standardized presentation shapes rather than letting each page crop differently
+- the owner-edit surface should cover the profile picture frame, about-me text, favorite game pin, and structured social links instead of scattering those writes through unrelated pages
 - the profile page headline must render the player's `profileName`, not generic page copy such as `Player Page`
 - the public subtitle line under the headline must render the player's editable `tagline`
 - the identity-panel `Name` field must remain a separate optional real-name field rather than echoing `profileName`
 - owner-mode UI must not replace the public profile composition; it only adds owner-only controls such as `Edit Profile`
 - the profile page should be treated as a public social profile first, not as a generic account dashboard
 - the profile page should read like a social-media profile in the Facebook/Myspace family, adapted to the arcade setting
+- redundant helper copy should be removed once the surrounding panel label already communicates the section purpose
 
 Future systems that support this profile vision:
 
@@ -355,6 +399,7 @@ Future systems that support this profile vision:
 - favorites linking back into arcade grid entries
 - per-game ladder summary data
 - friend points / affinity scoring
+- profile metrics such as page views, most-played-with, comment totals, share totals, and reaction totals
 - user-authored status feed items with comments, sharing, and emoji-style reactions
 
 Important scoping reminder:
@@ -576,6 +621,7 @@ Writes allowed in this phase:
 - edit bio/tagline
 - add/remove personal links
 - set favorite game / featured cabinet
+- fix profile-picture presentation constraints and fallback behavior without introducing upload
 - set lightweight preferences
 
 Writes not allowed yet:
@@ -606,6 +652,9 @@ Features:
 - recent activity feed
 - game-published activity items
 - simple friends list display
+- owner-authored thought submission on the profile/feed surface
+- profile metrics groundwork for views, reactions, comments, shares, and affinity
+- explicit friend-points / auto-sort contract with room for later manual override
 - groundwork for user-authored status posts that can later gain comments, sharing, and emoji-style reactions
 - stronger profile identity fields so player pages feel like social-media profiles rather than launcher-side stat cards
 
@@ -615,6 +664,7 @@ Guardrails:
 - no rich replies/threads yet
 - no private messaging
 - no cross-user mutation without real backend planning
+- comment, reaction, and share UI contracts may be defined early, but true cross-user persistence belongs to backend transition work
 - treat the first thoughts feed pass as the future doomscroll/home-feed surface, not as a replacement for the platform announcement board
 
 Exit criteria:
@@ -633,6 +683,8 @@ This is the trigger point for:
 - database-backed profiles
 - friend relationships
 - real shared feed data
+- cross-user comments, reactions, and shares
+- persistent profile/page metrics
 - event publishing workflows
 - cross-device state
 
@@ -657,6 +709,7 @@ Required before implementation:
 - supported mime types
 - file size caps
 - image dimension rules
+- avatar crop / display-shape rules
 - upload failure states
 - asset replacement rules
 - moderation/safety decisions
@@ -713,13 +766,14 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 
 ## Suggested Build Order For The Next Few Passes
 
-1. Render the platform-owned activity page from the shared activity feed contract.
-2. Add simple thoughts feed scaffolding only after the activity surface is stable.
-   This is where the future Facebook/Myspace-style status-update bulletin feed should begin.
-3. Enrich the shared player-profile data/view contract for favorite games, rankings, friend preview, presence, badges, and background fallbacks.
-4. Embed player-owned thoughts feeds into `/me` and `/player` so the profile page starts behaving like a social profile rather than only a summary card.
-5. Add profile discovery only when it has a clear use case for the surrounding pages.
-6. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
+1. Finish the current profile polish pass so the mock-aligned page stops carrying redundant or sloppy helper copy.
+   This includes things like duplicate profile-picture labeling and other presentation drift inside the shared profile composition.
+2. Expand the owner edit surface to cover the canonical about-me field, structured multi-link editing, favorite-game pinning, and stable profile-picture framing constraints.
+3. Add local-first owner-authored thought submission so the profile feed becomes meaningfully postable before backend work begins.
+4. Define platform-owned profile metrics and relationship metrics for page views, most-played cabinet, most-played-with player, reaction totals, comment totals, share totals, and friend points.
+5. Use those shared metrics/contracts to shape future friends preview ordering, reaction UI, and comment/share affordances without pretending cross-user persistence already exists.
+6. Add profile discovery only when it has a clear use case for the surrounding pages.
+7. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
 
 ## Current Progress
 
@@ -739,11 +793,49 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `/thoughts/index.html` now exists as the first read-only player-status feed surface for the future social/home-feed layer.
 - `js/platform/profile/` now normalizes richer public profile fields including favorite game, ladder placements, friends preview, main squeeze, presence, badges, and background-image fallback data.
 - `/me/index.html` and `/player/index.html?id=<playerId>` now expose read-only favorite-cabinet, ranking, and friends sections with fallback content instead of only the earlier summary panels.
+- `/me/index.html` and `/player/index.html?id=<playerId>` now embed player-owned thoughts feeds directly into the profile composition instead of leaving that social lane detached from the player page.
+- `/me` and `/player` now follow the canonical reference composition much more closely with a true left rail, a square featured-cabinet tile that reuses the arcade grid-card shape, and a right-side feed/about/badges lane.
+- The profile identity contract now includes a separate optional `realName` field distinct from the arcade `profileName`, and the current owner edit surface supports editing that field locally.
+- The profile presence affordance now treats the dot beside the in-panel `Name` field as the visible source of truth for online/offline state instead of rendering a redundant status row.
+- The current profile pass has also removed redundant duplicate headers and placeholder labels inside the mock-defined sections so panel titles only read once.
 - The long-term feed contract now explicitly includes emoji-style reactions with visible totals so the thoughts/feed layer does not drift away from the intended Facebook-style interaction model.
 - `games/lovers-lost/` and `games/battleshits/` now publish platform-owned result/activity payloads through that shared activity contract instead of owning their own long-term activity schema.
 - Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
+
+## Scope Lock For Upcoming Profile Passes
+
+Use this section as a drift guard when work moves across threads.
+
+Immediate local-first priorities:
+
+- profile-picture presentation constraints, fallback behavior, and owner-edit polish
+- editable structured social links with support for multiple links
+- editable canonical about-me / `bio` field
+- favorite-game pinning as an explicit player choice
+- owner-authored thought submission on the profile feed
+- shared profile metrics groundwork
+- badges as a shared profile contract even if the first pass is placeholder-only
+- removing redundant helper copy such as duplicate profile-picture labels when the surrounding section already communicates the purpose
+
+Default product calls for this scope:
+
+- favorite game is manual first; most-played data can inform later suggestions but must not silently replace the player's chosen favorite
+- social links are repeatable structured items with normalized label/url/kind fields
+- friend ordering should default to platform-owned friend-points / affinity sorting once available
+- manual pinning or reordering for friends can be added later as an explicit owner override
+- comments, emoji reactions, and sharing belong to the thoughts/feed contract, but cross-user persistence is backend-phase work
+- uploads stay late even though avatar/background display constraints should be stabilized now
+
+Deferred until later phases:
+
+- authentication / login / sign up
+- database-backed profiles
+- real uploads
+- true cross-user friend relationships
+- real shared comments/reactions/shares across devices
+- ladder ranking systems beyond current contract prep
 
 ## Decision Gates
 

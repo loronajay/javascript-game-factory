@@ -77,6 +77,14 @@ function buildPresenceToneClass(presence) {
   return normalized || "offline";
 }
 
+function resolveProfilePresence(presence, isOwnerView) {
+  const normalized = String(presence || "").trim().toLowerCase();
+  if (isOwnerView) {
+    return "online";
+  }
+  return normalized || "offline";
+}
+
 function buildThoughtBackedProfile(thoughtFeed = [], requestedPlayerId = "") {
   const playerThoughtFeed = buildPlayerThoughtFeed(thoughtFeed, requestedPlayerId);
   if (playerThoughtFeed.length === 0) return null;
@@ -251,6 +259,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
   const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This public player file is running in local-first mode while broader arcade profile discovery comes online.";
+  const resolvedPresence = resolveProfilePresence(publicView.presence, isOwnerView);
   const badgeItems = publicView.badgeIds.length > 0
     ? publicView.badgeIds.map((badgeId) => ({
         label: humanizeToken(badgeId) || "Arcade Badge",
@@ -272,14 +281,14 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     heroChipLabel: "PLAYER PROFILE",
     showEditProfileButton: isOwnerView,
     editButtonLabel: "Edit Profile",
-    presenceLabel: formatPresenceLabel(publicView.presence),
-    presenceToneClass: buildPresenceToneClass(publicView.presence),
+    presenceLabel: formatPresenceLabel(resolvedPresence),
+    presenceToneClass: buildPresenceToneClass(resolvedPresence),
     avatarSrc: publicView.avatarUrl || DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
     heroMeta: [
       { label: "Factory ID", value: publicView.playerId || requestedPlayerId || "PENDING-ID" },
-      { label: "Status", value: formatPresenceLabel(publicView.presence) },
+      { label: "Status", value: formatPresenceLabel(resolvedPresence) },
       { label: "Badges", value: String(publicView.badgeIds.length) },
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],

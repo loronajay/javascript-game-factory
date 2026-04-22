@@ -73,6 +73,10 @@ function buildPresenceToneClass(presence) {
   return normalized || "offline";
 }
 
+function resolveOwnerPresence(presence) {
+  return "online";
+}
+
 function buildFavoriteGameItem(publicView, favoriteTitleResolver) {
   const favoriteSlug = publicView.favoriteGameSlug
     || publicView.featuredGames[0]
@@ -168,6 +172,7 @@ export function buildMePageViewModel(profile, options = {}) {
   const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This shared player page will grow into your public home base across the arcade as more platform features come online.";
+  const sessionPresence = resolveOwnerPresence(publicView.presence);
 
   const identityLinkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
@@ -203,14 +208,14 @@ export function buildMePageViewModel(profile, options = {}) {
     heroChipLabel: "PLAYER PROFILE",
     isOwnerView: true,
     editButtonLabel: "Edit Profile",
-    presenceLabel: formatPresenceLabel(publicView.presence),
-    presenceToneClass: buildPresenceToneClass(publicView.presence),
+    presenceLabel: formatPresenceLabel(sessionPresence),
+    presenceToneClass: buildPresenceToneClass(sessionPresence),
     avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
     heroMeta: [
       { label: "Factory ID", value: publicView.playerId || "PENDING-ID" },
-      { label: "Status", value: formatPresenceLabel(publicView.presence) },
+      { label: "Status", value: formatPresenceLabel(sessionPresence) },
       { label: "Badges", value: String(publicView.badgeIds.length) },
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
