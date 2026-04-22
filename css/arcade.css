@@ -418,10 +418,12 @@ body::before {
   padding-top: 8px;
 }
 
-.grid-stage__nav {
+.grid-stage__nav,
+.me-stage__nav {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .grid-stage__header {
@@ -1046,7 +1048,8 @@ body::before {
     align-items: stretch;
   }
 
-  .grid-stage__nav {
+  .grid-stage__nav,
+  .me-stage__nav {
     flex-direction: column;
   }
 

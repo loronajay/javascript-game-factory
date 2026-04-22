@@ -44,11 +44,18 @@ function buildLinkRows(links = []) {
   return rows;
 }
 
+function normalizeUrl(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 function collectLinkRows(doc) {
   return Array.from({ length: PROFILE_LINK_ROW_COUNT }, (_, index) => ({
     id: doc?.getElementById?.(`playerProfileLinkId${index + 1}`)?.value || "",
     label: doc?.getElementById?.(`playerProfileLinkLabel${index + 1}`)?.value || "",
-    url: doc?.getElementById?.(`playerProfileLinkUrl${index + 1}`)?.value || "",
+    url: normalizeUrl(doc?.getElementById?.(`playerProfileLinkUrl${index + 1}`)?.value || ""),
     kind: doc?.getElementById?.(`playerProfileLinkKind${index + 1}`)?.value || "external",
   }));
 }
@@ -254,6 +261,7 @@ export function initArcadeProfilePanel({
       links: collectLinkRows(doc),
     }, options);
     render("PLAYER CARD SAVED");
+    closePanel();
   });
 
   doc.addEventListener("keydown", (event) => {
