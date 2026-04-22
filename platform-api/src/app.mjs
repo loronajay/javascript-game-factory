@@ -48,6 +48,9 @@ export function createApp(options = {}) {
   const loadPlayerProfile = typeof options?.loadPlayerProfile === "function"
     ? options.loadPlayerProfile
     : async () => null;
+  const loadPlayerProfileByFriendCode = typeof options?.loadPlayerProfileByFriendCode === "function"
+    ? options.loadPlayerProfileByFriendCode
+    : async () => null;
   const savePlayerProfile = typeof options?.savePlayerProfile === "function"
     ? options.savePlayerProfile
     : async () => null;
@@ -59,6 +62,18 @@ export function createApp(options = {}) {
     : async () => null;
   const loadPlayerRelationships = typeof options?.loadPlayerRelationships === "function"
     ? options.loadPlayerRelationships
+    : async () => null;
+  const createFriendshipBetweenPlayers = typeof options?.createFriendshipBetweenPlayers === "function"
+    ? options.createFriendshipBetweenPlayers
+    : async () => null;
+  const recordSharedSessionBetweenPlayers = typeof options?.recordSharedSessionBetweenPlayers === "function"
+    ? options.recordSharedSessionBetweenPlayers
+    : async () => null;
+  const recordSharedEventBetweenPlayers = typeof options?.recordSharedEventBetweenPlayers === "function"
+    ? options.recordSharedEventBetweenPlayers
+    : async () => null;
+  const recordDirectInteractionBetweenPlayers = typeof options?.recordDirectInteractionBetweenPlayers === "function"
+    ? options.recordDirectInteractionBetweenPlayers
     : async () => null;
   const savePlayerRelationships = typeof options?.savePlayerRelationships === "function"
     ? options.savePlayerRelationships
@@ -85,6 +100,7 @@ export function createApp(options = {}) {
     const pathname = new URL(req?.url || "/", "http://localhost").pathname;
     const timestamp = buildTimestamp(now);
     const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
+    const friendCodeMatch = pathname.match(/^\/players\/by-friend-code\/([^/]+)$/);
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
     const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
@@ -195,6 +211,24 @@ export function createApp(options = {}) {
       return;
     }
 
+    if (method === "GET" && friendCodeMatch) {
+      const profile = await loadPlayerProfileByFriendCode(decodeURIComponent(friendCodeMatch[1]));
+      if (!profile) {
+        writeJson(res, 404, {
+          status: "error",
+          service: "platform-api",
+          error: "player_not_found",
+          timestamp,
+        });
+        return;
+      }
+
+      writeJson(res, 200, {
+        player: profile,
+      });
+      return;
+    }
+
     if (method === "PUT" && profileMatch) {
       const body = await readJsonBody(req);
       if (!body.ok) {
@@ -265,6 +299,90 @@ export function createApp(options = {}) {
       writeJson(res, 200, {
         relationships,
       });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/friendships") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const friendship = await createFriendshipBetweenPlayers(
+        body.value?.leftPlayerId,
+        body.value?.rightPlayerId,
+        body.value,
+      );
+      writeJson(res, 200, { friendship });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/relationships/shared-session") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const relationshipUpdate = await recordSharedSessionBetweenPlayers(
+        body.value?.leftPlayerId,
+        body.value?.rightPlayerId,
+        body.value,
+      );
+      writeJson(res, 200, { relationshipUpdate });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/relationships/shared-event") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const relationshipUpdate = await recordSharedEventBetweenPlayers(
+        body.value?.leftPlayerId,
+        body.value?.rightPlayerId,
+        body.value,
+      );
+      writeJson(res, 200, { relationshipUpdate });
+      return;
+    }
+
+    if (method === "POST" && pathname === "/relationships/direct-interaction") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const relationshipUpdate = await recordDirectInteractionBetweenPlayers(
+        body.value?.leftPlayerId,
+        body.value?.rightPlayerId,
+        body.value,
+      );
+      writeJson(res, 200, { relationshipUpdate });
       return;
     }
 

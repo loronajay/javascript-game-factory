@@ -4,8 +4,41 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
+import { createPlatformApiClient } from "../api/platform-api.mjs";
 
 export const PROFILE_METRICS_STORAGE_KEY = getPlatformStorageKey("profileMetrics");
+export const PUBLIC_PROFILE_SUPPORT_METRIC_KEYS = Object.freeze([
+  "profileViewCount",
+  "thoughtPostCount",
+  "activityItemCount",
+  "receivedReactionCount",
+  "receivedCommentCount",
+  "receivedShareCount",
+  "mostPlayedGameSlug",
+  "mostPlayedWithPlayerId",
+  "friendCount",
+  "friendPoints",
+  "totalPlaySessionCount",
+  "totalPlayTimeMinutes",
+  "uniqueGamesPlayedCount",
+  "eventParticipationCount",
+  "topThreeFinishCount",
+]);
+export const RELATIONSHIP_DISCOVERY_METRIC_KEYS = Object.freeze([
+  "mutualFriendCount",
+  "sharedGameCount",
+  "sharedSessionCount",
+  "sharedEventCount",
+]);
+export const BACKEND_ANALYTICS_METRIC_KEYS = Object.freeze([
+  "resultsScreenProfileOpenCount",
+  "resultsScreenAddFriendClickCount",
+  "chatProfileOpenCount",
+  "friendRequestSentCount",
+  "friendRequestAcceptedCount",
+  "thoughtImpressionCount",
+  "profileOpenSourceBreakdown",
+]);
 
 const PROFILE_OPEN_SOURCE_KEYS = Object.freeze([
   "direct",
@@ -74,6 +107,15 @@ function parseStoredMetricsMap(raw) {
   } catch {
     return {};
   }
+}
+
+function pickMetricSubset(metrics, keys = []) {
+  const normalizedMetrics = normalizeProfileMetricsRecord(metrics);
+
+  return keys.reduce((subset, key) => {
+    subset[key] = normalizedMetrics[key];
+    return subset;
+  }, {});
 }
 
 export function buildDefaultProfileMetricsRecord(playerId = "") {
@@ -170,6 +212,36 @@ export function saveProfileMetricsRecord(record, storage = getDefaultPlatformSto
   return normalized;
 }
 
+export function pickPublicProfileSupportMetrics(record = {}) {
+  return pickMetricSubset(record, PUBLIC_PROFILE_SUPPORT_METRIC_KEYS);
+}
+
+export function pickRelationshipDiscoveryMetrics(record = {}) {
+  return pickMetricSubset(record, RELATIONSHIP_DISCOVERY_METRIC_KEYS);
+}
+
+export function pickBackendAnalyticsMetrics(record = {}) {
+  return pickMetricSubset(record, BACKEND_ANALYTICS_METRIC_KEYS);
+}
+
+function mirrorProfileMetricsRecord(
+  record,
+  storage = getDefaultPlatformStorage(),
+  apiClient = createPlatformApiClient(),
+) {
+  if (!record?.playerId || typeof apiClient?.savePlayerMetrics !== "function") {
+    return;
+  }
+
+  Promise.resolve(apiClient.savePlayerMetrics(record.playerId, record))
+    .then((savedRecord) => {
+      if (savedRecord?.playerId) {
+        saveProfileMetricsRecord(savedRecord, storage);
+      }
+    })
+    .catch(() => null);
+}
+
 export function updateProfileMetricsRecord(playerId, updater, storage = getDefaultPlatformStorage()) {
   const normalizedPlayerId = sanitizePlayerId(playerId);
   if (!normalizedPlayerId || typeof updater !== "function") return null;
@@ -203,4 +275,47 @@ export function incrementProfileViewCount(playerId, options = {}, storage = getD
       [sourceKey]: sanitizeCount(current.profileOpenSourceBreakdown[sourceKey]) + 1,
     },
   }), storage);
+}
+
+export async function syncProfileMetricsFromApi(
+  playerId,
+  storage = getDefaultPlatformStorage(),
+  apiClient = createPlatformApiClient(),
+) {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  if (!normalizedPlayerId || typeof apiClient?.loadPlayerMetrics !== "function") {
+    return loadProfileMetricsRecord(normalizedPlayerId, storage);
+  }
+
+  const remoteMetrics = await apiClient.loadPlayerMetrics(normalizedPlayerId).catch(() => null);
+  if (!remoteMetrics?.playerId) {
+    return loadProfileMetricsRecord(normalizedPlayerId, storage);
+  }
+
+  return saveProfileMetricsRecord({
+    ...remoteMetrics,
+    playerId: normalizedPlayerId,
+  }, storage) || loadProfileMetricsRecord(normalizedPlayerId, storage);
+}
+
+export function syncThoughtPostCountWithApi(
+  playerId,
+  thoughtPostCount,
+  storage = getDefaultPlatformStorage(),
+  apiClient = createPlatformApiClient(),
+) {
+  const record = syncThoughtPostCount(playerId, thoughtPostCount, storage);
+  mirrorProfileMetricsRecord(record, storage, apiClient);
+  return record;
+}
+
+export function incrementProfileViewCountWithApi(
+  playerId,
+  options = {},
+  storage = getDefaultPlatformStorage(),
+  apiClient = createPlatformApiClient(),
+) {
+  const record = incrementProfileViewCount(playerId, options, storage);
+  mirrorProfileMetricsRecord(record, storage, apiClient);
+  return record;
 }

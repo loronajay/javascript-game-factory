@@ -1,4 +1,13 @@
 import { resolvePublicEventBySlug } from "./platform/events/events.mjs";
+import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import {
+  loadProfileRelationshipsRecord,
+  normalizeProfileRelationshipsRecord,
+  recordSharedEventBetweenPlayers,
+  saveProfileRelationshipsRecord,
+} from "./platform/relationships/relationships.mjs";
+import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -10,6 +19,10 @@ function escapeHtml(value) {
 }
 
 function sanitizeSlug(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -40,6 +53,61 @@ function formatStatusLabel(status) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function buildLinkedEntryPartnerOptions(viewerPlayerId = "", viewerRelationshipsRecord = {}) {
+  const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
+  const normalizedRelationships = viewerRelationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(viewerRelationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: normalizedViewerPlayerId });
+  const seen = new Set();
+  const options = [];
+
+  [
+    ...normalizedRelationships.friendPlayerIds,
+    normalizedRelationships.mainSqueezePlayerId,
+    normalizedRelationships.mostPlayedWithPlayerId,
+    normalizedRelationships.lastPlayedWithPlayerId,
+    ...normalizedRelationships.recentlyPlayedWithPlayerIds,
+  ].forEach((playerId) => {
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId || normalizedPlayerId === normalizedViewerPlayerId || seen.has(normalizedPlayerId)) {
+      return;
+    }
+    seen.add(normalizedPlayerId);
+    options.push({
+      value: normalizedPlayerId,
+      label: normalizedPlayerId,
+    });
+  });
+
+  return options;
+}
+
+function buildLinkedEntryAction(event, options = {}) {
+  const viewerPlayerId = sanitizePlayerId(options.viewerPlayerId);
+  if (!event || !viewerPlayerId) {
+    return {
+      enabled: false,
+      disabled: true,
+      partnerOptions: [],
+      selectedPartnerId: "",
+      submitLabel: "Link Entry",
+      flashMessage: "",
+    };
+  }
+
+  const partnerOptions = buildLinkedEntryPartnerOptions(viewerPlayerId, options.viewerRelationshipsRecord);
+  const selectedPartnerId = sanitizePlayerId(options.selectedPartnerId) || partnerOptions[0]?.value || "";
+
+  return {
+    enabled: true,
+    disabled: !selectedPartnerId,
+    partnerOptions,
+    selectedPartnerId,
+    submitLabel: "Link Entry",
+    flashMessage: typeof options.relationshipFlash === "string" ? options.relationshipFlash : "",
+  };
+}
+
 export function buildEventDetailViewModel(event, options = {}) {
   const requestedSlug = sanitizeSlug(options.requestedSlug);
 
@@ -65,6 +133,7 @@ export function buildEventDetailViewModel(event, options = {}) {
         value: "No linked bulletins are cached for this event yet.",
         isPlaceholder: true,
       }],
+      linkedEntryAction: buildLinkedEntryAction(null, options),
     };
   }
 
@@ -96,11 +165,12 @@ export function buildEventDetailViewModel(event, options = {}) {
           value: id,
           isPlaceholder: false,
         }))
-      : [{
+        : [{
           title: "Related Bulletins",
           value: "No linked bulletins are attached to this event yet.",
           isPlaceholder: true,
         }],
+    linkedEntryAction: buildLinkedEntryAction(event, options),
   };
 }
 
@@ -113,6 +183,34 @@ function renderHeroCard(container, model) {
       <span class="event-meta-block__value">${escapeHtml(item.value)}</span>
     </div>
   `).join("");
+  const linkedEntryActionHtml = model.linkedEntryAction?.enabled
+    ? `
+      <form class="event-hero-card__entry-form">
+        <label class="event-hero-card__entry-label" for="eventLinkedEntryPartner">Linked Entry Partner</label>
+        <div class="event-hero-card__entry-row">
+          <select
+            id="eventLinkedEntryPartner"
+            class="event-hero-card__entry-select"
+            name="partnerPlayerId"
+            ${model.linkedEntryAction.disabled ? "disabled" : ""}
+          >
+            ${model.linkedEntryAction.partnerOptions.length > 0
+              ? model.linkedEntryAction.partnerOptions.map((option) => `
+                <option value="${escapeHtml(option.value)}" ${option.value === model.linkedEntryAction.selectedPartnerId ? "selected" : ""}>${escapeHtml(option.label)}</option>
+              `).join("")
+              : '<option value="">Add friends on player pages first.</option>'}
+          </select>
+          <button
+            class="event-hero-card__entry-submit"
+            type="submit"
+            data-event-link-submit="true"
+            ${model.linkedEntryAction.disabled ? "disabled" : ""}
+          >${escapeHtml(model.linkedEntryAction.submitLabel)}</button>
+        </div>
+        <p class="event-hero-card__entry-flash" aria-live="polite">${escapeHtml(model.linkedEntryAction.flashMessage || "")}</p>
+      </form>
+    `
+    : "";
 
   container.innerHTML = `
     <div class="event-hero-card__copy">
@@ -120,6 +218,7 @@ function renderHeroCard(container, model) {
       <h2 class="event-hero-card__title">${escapeHtml(model.heroTitle)}</h2>
       <p class="event-hero-card__summary">${escapeHtml(model.heroSummary)}</p>
       <p class="event-hero-card__body">${escapeHtml(model.body)}</p>
+      ${linkedEntryActionHtml}
     </div>
     <div class="event-hero-card__meta">${metaHtml}</div>
   `;
@@ -152,8 +251,19 @@ export function renderEventDetailPage(doc = globalThis.document, options = {}) {
 
   const params = new URLSearchParams(options.search || globalThis.location?.search || "");
   const requestedSlug = sanitizeSlug(params.get("slug"));
+  const storage = options.storage || getDefaultPlatformStorage();
+  const viewerProfile = options.viewerProfile || loadFactoryProfile(storage);
+  const viewerRelationshipsRecord = options.viewerRelationshipsRecord?.playerId
+    ? options.viewerRelationshipsRecord
+    : loadProfileRelationshipsRecord(viewerProfile.playerId, storage);
   const event = options.event ?? resolvePublicEventBySlug(options.source, requestedSlug);
-  const model = buildEventDetailViewModel(event, { requestedSlug });
+  const model = buildEventDetailViewModel(event, {
+    requestedSlug,
+    viewerPlayerId: viewerProfile.playerId,
+    viewerRelationshipsRecord,
+    selectedPartnerId: options.selectedPartnerId || "",
+    relationshipFlash: options.relationshipFlash || "",
+  });
 
   renderHeroCard(doc.getElementById("eventHeroCard"), model);
   renderPanel(doc.getElementById("eventRelatedPanel"), "Related Cabinets", "Floor Links", model.relatedItems);
@@ -161,8 +271,88 @@ export function renderEventDetailPage(doc = globalThis.document, options = {}) {
   return model;
 }
 
+function syncRelationshipUpdateToStorage(result, storage) {
+  if (result?.leftRecord?.playerId) {
+    saveProfileRelationshipsRecord(result.leftRecord, storage);
+  }
+  if (result?.rightRecord?.playerId) {
+    saveProfileRelationshipsRecord(result.rightRecord, storage);
+  }
+}
+
+export async function recordLinkedEntryBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
+
+  if (typeof apiClient?.recordSharedEventBetweenPlayers === "function") {
+    const result = await Promise.resolve(apiClient.recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, {
+      eventId: options.eventId,
+      isLinkedEntry: options.isLinkedEntry,
+      occurredAt: options.occurredAt,
+    })).catch(() => null);
+
+    if (result?.leftRecord?.playerId || result?.rightRecord?.playerId) {
+      syncRelationshipUpdateToStorage(result, storage);
+      return result;
+    }
+  }
+
+  return recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, options);
+}
+
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
-  renderEventDetailPage(doc);
+  const storage = getDefaultPlatformStorage();
+  let selectedPartnerId = "";
+
+  function rerender(relationshipFlash = "") {
+    const model = renderEventDetailPage(doc, {
+      storage,
+      selectedPartnerId,
+      relationshipFlash,
+    });
+    selectedPartnerId = model?.linkedEntryAction?.selectedPartnerId || selectedPartnerId;
+    return model;
+  }
+
+  rerender("");
+
+  doc.addEventListener("change", (event) => {
+    const select = event.target;
+    if (!select || typeof select !== "object" || select.id !== "eventLinkedEntryPartner") {
+      return;
+    }
+
+    selectedPartnerId = sanitizePlayerId(select.value);
+  });
+
+  doc.addEventListener("submit", async (event) => {
+    const form = event.target;
+    if (!form || typeof form !== "object" || !form.classList?.contains("event-hero-card__entry-form")) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const viewerProfile = loadFactoryProfile(storage);
+    const params = new URLSearchParams(globalThis.location?.search || "");
+    const requestedSlug = sanitizeSlug(params.get("slug"));
+    const resolvedEvent = resolvePublicEventBySlug(undefined, requestedSlug);
+    const partnerPlayerId = sanitizePlayerId(doc.getElementById("eventLinkedEntryPartner")?.value || selectedPartnerId);
+
+    if (!resolvedEvent?.id || !viewerProfile.playerId || !partnerPlayerId) {
+      rerender("Pick a linked-entry partner first.");
+      return;
+    }
+
+    selectedPartnerId = partnerPlayerId;
+    const result = await recordLinkedEntryBetweenPlayers(viewerProfile.playerId, partnerPlayerId, {
+      storage,
+      apiClient: createPlatformApiClient(),
+      eventId: resolvedEvent.id,
+      isLinkedEntry: true,
+    });
+    rerender(result.awarded ? "Linked entry recorded." : "Linked entry already recorded.");
+  });
 }

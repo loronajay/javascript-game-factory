@@ -1,4 +1,8 @@
 import { normalizeFactoryProfile } from "../../../js/platform/identity/factory-profile.mjs";
+import {
+  buildDefaultFriendCode,
+  sanitizeProfileFriendCode,
+} from "../../../js/platform/profile/profile.mjs";
 
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
@@ -55,6 +59,7 @@ function mapRowToFactoryProfile(row = {}) {
   return normalizeStoredProfile({
     playerId: row.player_id,
     profileName: row.profile_name,
+    friendCode: row.friend_code,
     realName: row.real_name,
     bio: row.bio,
     tagline: row.tagline,
@@ -81,6 +86,7 @@ function buildProfileParams(playerId, profile) {
   return [
     playerId,
     profile.profileName,
+    profile.friendCode,
     profile.realName,
     profile.bio,
     profile.tagline,
@@ -103,6 +109,63 @@ function buildProfileParams(playerId, profile) {
   ];
 }
 
+async function loadPlayerIdByFriendCode(db, friendCode) {
+  const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
+  if (!normalizedFriendCode) return "";
+
+  const result = await db.query(`
+    select player_id
+    from player_profiles
+    where friend_code = $1
+    limit 1
+  `, [normalizedFriendCode]);
+
+  return sanitizePlayerId(result?.rows?.[0]?.player_id);
+}
+
+async function claimAvailableFriendCode(db, playerId, preferredFriendCode = "") {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  const preferredCode = sanitizeProfileFriendCode(preferredFriendCode) || buildDefaultFriendCode(normalizedPlayerId);
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const candidate = attempt === 0
+      ? preferredCode
+      : buildDefaultFriendCode(normalizedPlayerId, attempt);
+    const ownerPlayerId = await loadPlayerIdByFriendCode(db, candidate);
+    if (!ownerPlayerId || ownerPlayerId === normalizedPlayerId) {
+      return candidate;
+    }
+  }
+
+  return preferredCode;
+}
+
+async function ensureStoredFriendCode(db, row = {}) {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const normalizedPlayerId = sanitizePlayerId(row.player_id);
+  const storedFriendCode = sanitizeProfileFriendCode(row.friend_code);
+  if (!normalizedPlayerId || storedFriendCode) {
+    return row;
+  }
+
+  const claimedFriendCode = await claimAvailableFriendCode(db, normalizedPlayerId);
+  await db.query(`
+    update player_profiles
+    set friend_code = $2,
+        updated_at = now()
+    where player_id = $1
+      and friend_code = ''
+  `, [normalizedPlayerId, claimedFriendCode]);
+
+  return {
+    ...row,
+    friend_code: claimedFriendCode,
+  };
+}
+
 export async function loadPlayerProfile(db, playerId) {
   const normalizedPlayerId = sanitizePlayerId(playerId);
   if (!normalizedPlayerId) return null;
@@ -111,6 +174,7 @@ export async function loadPlayerProfile(db, playerId) {
     select
       p.player_id,
       pp.profile_name,
+      pp.friend_code,
       pp.real_name,
       pp.bio,
       pp.tagline,
@@ -136,6 +200,44 @@ export async function loadPlayerProfile(db, playerId) {
     limit 1
   `, [normalizedPlayerId]);
 
+  const row = await ensureStoredFriendCode(db, result?.rows?.[0] || null);
+  return mapRowToFactoryProfile(row);
+}
+
+export async function loadPlayerProfileByFriendCode(db, friendCode) {
+  const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
+  if (!normalizedFriendCode) return null;
+
+  const result = await db.query(`
+    select
+      p.player_id,
+      pp.profile_name,
+      pp.friend_code,
+      pp.real_name,
+      pp.bio,
+      pp.tagline,
+      pp.avatar_asset_id,
+      pp.background_image_url,
+      pp.presence,
+      pp.favorite_game_slug,
+      pp.ladder_placements,
+      pp.friends_preview,
+      pp.main_squeeze,
+      pp.badge_ids,
+      pp.favorites,
+      pp.friends,
+      pp.recent_partners,
+      pp.links,
+      pp.preferences,
+      pp.featured_games,
+      pp.recent_activity,
+      pp.thought_count
+    from players p
+    join player_profiles pp on pp.player_id = p.player_id
+    where pp.friend_code = $1
+    limit 1
+  `, [normalizedFriendCode]);
+
   return mapRowToFactoryProfile(result?.rows?.[0] || null);
 }
 
@@ -152,6 +254,11 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
     ...normalized,
     playerId: normalizedPlayerId,
   });
+  normalizedProfile.friendCode = await claimAvailableFriendCode(
+    db,
+    normalizedPlayerId,
+    normalizedProfile.friendCode,
+  );
 
   await db.query(`
     insert into players (player_id)
@@ -164,6 +271,7 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
     insert into player_profiles (
       player_id,
       profile_name,
+      friend_code,
       real_name,
       bio,
       tagline,
@@ -184,12 +292,13 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       recent_activity,
       thought_count
     ) values (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9,
-      $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb,
-      $16::jsonb, $17::jsonb, $18::jsonb, $19::jsonb, $20::jsonb, $21
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+      $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb,
+      $17::jsonb, $18::jsonb, $19::jsonb, $20::jsonb, $21::jsonb, $22
     )
     on conflict (player_id) do update set
       profile_name = excluded.profile_name,
+      friend_code = excluded.friend_code,
       real_name = excluded.real_name,
       bio = excluded.bio,
       tagline = excluded.tagline,
@@ -213,6 +322,7 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
     returning
       player_id,
       profile_name,
+      friend_code,
       real_name,
       bio,
       tagline,

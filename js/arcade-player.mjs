@@ -1,14 +1,15 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
-  incrementProfileViewCount,
+  incrementProfileViewCountWithApi,
   loadProfileMetricsRecord,
   normalizeProfileMetricsRecord,
   saveProfileMetricsRecord,
-  syncThoughtPostCount,
+  syncThoughtPostCountWithApi,
 } from "./platform/metrics/metrics.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
 import {
+  createFriendshipBetweenPlayers,
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
   resolveProfileFriendSlots,
@@ -190,6 +191,38 @@ function buildFriendItems(publicView, relationshipsRecord) {
   return [mainSqueezeItem, ...friendPreviewItems];
 }
 
+function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "") {
+  const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
+  const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
+  const canRender = !isOwnerView
+    && !!normalizedViewerPlayerId
+    && !!normalizedTargetPlayerId
+    && normalizedViewerPlayerId !== normalizedTargetPlayerId;
+
+  if (!canRender) {
+    return {
+      enabled: false,
+      disabled: true,
+      label: "Add Friend",
+      flashMessage: "",
+      playerId: normalizedTargetPlayerId,
+    };
+  }
+
+  const normalizedViewerRelationships = viewerRelationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(viewerRelationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: normalizedViewerPlayerId });
+  const alreadyFriends = normalizedViewerRelationships.friendPlayerIds.includes(normalizedTargetPlayerId);
+
+  return {
+    enabled: true,
+    disabled: alreadyFriends,
+    label: alreadyFriends ? "Friends Linked" : "Add Friend",
+    flashMessage: typeof flashMessage === "string" ? flashMessage : "",
+    playerId: normalizedTargetPlayerId,
+  };
+}
+
 export function loadRequestedPlayerProfile(storage = getDefaultPlatformStorage(), requestedPlayerId = "", options = {}) {
   const cachedProfile = loadFactoryProfile(storage);
   const routePlayerId = sanitizePlayerId(requestedPlayerId);
@@ -338,6 +371,13 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         submitLabel: "Post Thought",
         flashMessage: "",
       },
+      friendAction: {
+        enabled: false,
+        disabled: true,
+        label: "Add Friend",
+        flashMessage: "",
+        playerId: requestedPlayerId,
+      },
       aboutText: "This player has not filled out an about block in the local arcade cache yet.",
       badgeItems: [{
         label: "Badge case still empty",
@@ -416,6 +456,13 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         label: "Badge case still empty",
         isPlaceholder: true,
       }];
+  const friendAction = buildFriendAction(
+    options?.viewerPlayerId,
+    publicView.playerId || requestedPlayerId,
+    options?.viewerRelationshipsRecord,
+    isOwnerView,
+    options?.relationshipFlash || "",
+  );
 
   return {
     state: "ready",
@@ -454,6 +501,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       submitLabel: "Post Thought",
       flashMessage: typeof options?.thoughtComposerFlash === "string" ? options.thoughtComposerFlash : "",
     },
+    friendAction,
     aboutText: heroBio,
     badgeItems,
   };
@@ -523,6 +571,19 @@ function renderHeroCard(container, model) {
   const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
   const realNameValue = model.heroRealName || "Not shared";
   const pageViewCount = model.pageViewCount || "0";
+  const friendActionHtml = model.friendAction?.enabled
+    ? `
+      <div class="player-hero-card__social-action">
+        <button
+          class="${model.friendAction.disabled ? "player-hero-card__friend-action player-hero-card__friend-action--linked" : "player-hero-card__friend-action"}"
+          type="button"
+          data-add-friend="${escapeHtml(model.friendAction.playerId || "")}"
+          ${model.friendAction.disabled ? "disabled" : ""}
+        >${escapeHtml(model.friendAction.label || "Add Friend")}</button>
+        <p class="player-hero-card__friend-flash" aria-live="polite">${escapeHtml(model.friendAction.flashMessage || "")}</p>
+      </div>
+    `
+    : "";
 
   container.innerHTML = `
     <div class="player-hero-card__backdrop" aria-hidden="true"></div>
@@ -571,6 +632,7 @@ function renderHeroCard(container, model) {
           ${linksHtml}
         </div>
       </div>
+      ${friendActionHtml}
     </section>
     <section class="player-hero-card__rankings-panel">
       <div class="player-hero-card__section-topline">
@@ -814,9 +876,17 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
   const relationshipsRecord = options?.relationshipsRecord?.playerId
     ? options.relationshipsRecord
     : loadProfileRelationshipsRecord(profile?.playerId || requestedPlayerId || localProfile.playerId, storage);
+  const viewerRelationshipsRecord = options?.viewerRelationshipsRecord?.playerId
+    ? options.viewerRelationshipsRecord
+    : loadProfileRelationshipsRecord(localProfile.playerId, storage);
 
   if (!isOwnerView && profile && !options?.disableProfileViewTracking) {
-    metricsRecord = incrementProfileViewCount(profile.playerId, { source: "direct" }, storage) || metricsRecord;
+    metricsRecord = incrementProfileViewCountWithApi(
+      profile.playerId,
+      { source: "direct" },
+      storage,
+      options?.apiClient || createPlatformApiClient(options),
+    ) || metricsRecord;
   }
 
   const model = buildPlayerPageViewModel(profile, {
@@ -825,7 +895,10 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
     isOwnerView,
     metricsRecord,
     relationshipsRecord,
+    viewerPlayerId: localProfile.playerId,
+    viewerRelationshipsRecord,
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
+    relationshipFlash: options?.relationshipFlash || "",
   });
 
   const editButton = doc.getElementById("playerProfileButton");
@@ -858,9 +931,11 @@ if (doc?.getElementById) {
   const storage = getDefaultPlatformStorage();
   const profilePanel = initArcadeProfilePanel({ doc, storage });
   renderPlayerPage(doc);
+  let currentPageData = null;
 
   const rerender = async (thoughtComposerFlash = "", disableProfileViewTracking = true) => {
     const pageData = await loadPlayerPageData({ storage });
+    currentPageData = pageData;
     profilePanel?.render?.("");
     renderPlayerPage(doc, {
       ...pageData,
@@ -908,11 +983,46 @@ if (doc?.getElementById) {
     }
 
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
-    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
+    syncThoughtPostCountWithApi(
+      currentProfile.playerId,
+      updatedThoughtCount,
+      storage,
+      createPlatformApiClient(),
+    );
     void rerender("Thought posted.");
   });
 
   doc.addEventListener("click", async (event) => {
+    const addFriendButton = event.target.closest("[data-add-friend]");
+    if (addFriendButton) {
+      const targetPlayerId = addFriendButton.dataset.addFriend;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!targetPlayerId || !currentProfile.playerId || currentProfile.playerId === targetPlayerId) {
+        return;
+      }
+
+      const result = createFriendshipBetweenPlayers(currentProfile.playerId, targetPlayerId, {
+        storage,
+        apiClient: createPlatformApiClient(),
+      });
+
+      currentPageData = {
+        ...(currentPageData || {}),
+        profile: currentPageData?.profile,
+        thoughtFeed: currentPageData?.thoughtFeed || loadThoughtFeed(storage),
+        metricsRecord: currentPageData?.metricsRecord,
+        relationshipsRecord: result.rightRecord,
+        viewerRelationshipsRecord: result.leftRecord,
+      };
+      profilePanel?.render?.("");
+      renderPlayerPage(doc, {
+        ...currentPageData,
+        relationshipFlash: result.awarded ? "Friend linked." : "Already linked as friends.",
+        disableProfileViewTracking: true,
+      });
+      return;
+    }
+
     const button = event.target.closest("[data-delete-id]");
     if (!button) return;
 
@@ -922,7 +1032,12 @@ if (doc?.getElementById) {
     const currentProfile = loadFactoryProfile(storage);
     await deleteThoughtPostWithApi(id, storage);
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
-    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
+    syncThoughtPostCountWithApi(
+      currentProfile.playerId,
+      updatedThoughtCount,
+      storage,
+      createPlatformApiClient(),
+    );
     void rerender();
   });
 }

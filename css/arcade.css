@@ -3779,6 +3779,12 @@ body::before {
   align-content: start;
 }
 
+.player-hero-card__social-action {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
 .player-hero-card__identity-field-label {
   margin: 0;
   color: #ffd7b9;
@@ -3805,6 +3811,62 @@ body::before {
 .player-hero-card__identity-field-value--mono {
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.player-hero-card__friend-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 214, 189, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 214, 189, 0.14), rgba(255, 121, 183, 0.12)),
+    rgba(255, 255, 255, 0.04);
+  color: #fff8ff;
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.player-hero-card__friend-action:hover,
+.player-hero-card__friend-action:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 214, 189, 0.36);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(255, 214, 189, 0.12) inset;
+}
+
+.player-hero-card__friend-action:disabled,
+.player-hero-card__friend-action--linked {
+  cursor: default;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.player-hero-card__friend-action:disabled:hover,
+.player-hero-card__friend-action:disabled:focus-visible,
+.player-hero-card__friend-action--linked:hover,
+.player-hero-card__friend-action--linked:focus-visible {
+  transform: none;
+  border-color: rgba(255, 214, 189, 0.22);
+}
+
+.player-hero-card__friend-flash {
+  min-height: 1.2em;
+  margin: 0;
+  color: rgba(255, 248, 255, 0.78);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .player-featured-cabinet {
@@ -5893,6 +5955,92 @@ body::before {
   letter-spacing: 0.08em;
 }
 
+.friend-code-card {
+  display: grid;
+  gap: 14px;
+}
+
+.friend-code-card__label,
+.friend-code-form__label {
+  margin: 0;
+  color: rgba(255, 197, 228, 0.72);
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.friend-code-card__value {
+  margin: 0;
+  color: #fff7fc;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 2vw, 1.9rem);
+  letter-spacing: 0.16em;
+}
+
+.friend-code-card__helper,
+.friend-code-form__flash {
+  margin: 0;
+  color: rgba(232, 225, 255, 0.84);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.friend-code-form {
+  display: grid;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.friend-code-form__row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.friend-code-form__input {
+  flex: 1 1 180px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid rgba(255, 197, 228, 0.22);
+  background: rgba(6, 4, 18, 0.9);
+  color: #fff7fc;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.friend-code-form__input:focus-visible {
+  outline: none;
+  border-color: rgba(153, 255, 255, 0.74);
+  box-shadow: 0 0 0 2px rgba(153, 255, 255, 0.16);
+}
+
+.friend-code-form__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 197, 228, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 197, 228, 0.16), rgba(255, 121, 183, 0.12)),
+    rgba(14, 10, 30, 0.94);
+  color: #fff7fc;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.friend-code-form__submit:hover,
+.friend-code-form__submit:focus-visible {
+  outline: none;
+  border-color: rgba(153, 255, 255, 0.72);
+  box-shadow: 0 0 0 2px rgba(153, 255, 255, 0.16);
+}
+
 @media (max-width: 640px) {
   .thoughts-stage {
     padding: 16px 12px 30px;
@@ -6199,6 +6347,15 @@ body::before {
   gap: 12px;
 }
 
+.event-hero-card__entry-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .event-hero-card__kicker,
 .event-meta-block__label,
 .event-panel__eyebrow,
@@ -6224,6 +6381,72 @@ body::before {
   margin: 0;
   color: rgba(255, 248, 255, 0.84);
   line-height: 1.7;
+}
+
+.event-hero-card__entry-label,
+.event-hero-card__entry-flash {
+  margin: 0;
+  color: #ffd7b9;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.event-hero-card__entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.event-hero-card__entry-select,
+.event-hero-card__entry-submit {
+  min-height: 42px;
+  border: 1px solid rgba(255, 214, 189, 0.18);
+  background: rgba(7, 6, 20, 0.74);
+  color: #fff8ff;
+  font: inherit;
+  letter-spacing: 0.08em;
+}
+
+.event-hero-card__entry-select {
+  width: 100%;
+  padding: 0 12px;
+}
+
+.event-hero-card__entry-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.event-hero-card__entry-submit:hover,
+.event-hero-card__entry-submit:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 214, 189, 0.34);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 214, 189, 0.08) inset;
+}
+
+.event-hero-card__entry-select:disabled,
+.event-hero-card__entry-submit:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.event-hero-card__entry-submit:disabled:hover,
+.event-hero-card__entry-submit:disabled:focus-visible {
+  transform: none;
+  border-color: rgba(255, 214, 189, 0.18);
+  box-shadow: none;
 }
 
 .event-hero-card__meta {
@@ -6302,6 +6525,10 @@ body::before {
   .events-hero-card {
     grid-template-columns: minmax(0, 1fr);
     padding: 18px 16px;
+  }
+
+  .event-hero-card__entry-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .event-layout {

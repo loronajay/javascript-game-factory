@@ -4,7 +4,7 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
-import { normalizeProfileFields } from "../profile/profile.mjs";
+import { buildDefaultFriendCode, normalizeProfileFields } from "../profile/profile.mjs";
 
 export const FACTORY_PROFILE_VERSION = 1;
 export const FACTORY_PROFILE_STORAGE_KEY = getPlatformStorageKey("factoryProfile");
@@ -79,13 +79,15 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
   const playerIdGenerator = getPlayerIdGenerator(options);
   const seededProfileName = sanitizeFactoryProfileName(options.seedProfileName || "");
   const playerId = typeof source.playerId === "string" ? source.playerId.trim() : "";
+  const resolvedPlayerId = playerId || playerIdGenerator();
   const profileName = sanitizeFactoryProfileName(source.profileName || "") || seededProfileName;
   const profileFields = normalizeProfileFields(source);
 
   return {
     version: FACTORY_PROFILE_VERSION,
-    playerId: playerId || playerIdGenerator(),
+    playerId: resolvedPlayerId,
     profileName,
+    friendCode: profileFields.friendCode || buildDefaultFriendCode(resolvedPlayerId),
     realName: profileFields.realName,
     bio: profileFields.bio,
     tagline: profileFields.tagline,

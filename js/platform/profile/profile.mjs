@@ -3,6 +3,7 @@ export const PROFILE_BIO_MAX_LENGTH = 280;
 export const PROFILE_REAL_NAME_MAX_LENGTH = 48;
 export const PROFILE_LINK_LABEL_MAX_LENGTH = 24;
 export const PROFILE_BACKGROUND_URL_MAX_LENGTH = 280;
+export const FRIEND_CODE_LENGTH = 8;
 
 const PROFILE_LINK_KINDS = new Set([
   "external",
@@ -29,6 +30,17 @@ function sanitizeSingleLine(value, maxLength = Number.POSITIVE_INFINITY) {
 
 function sanitizeAssetId(value) {
   return sanitizeSingleLine(value, 120);
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
 }
 
 function sanitizeGameSlug(value) {
@@ -167,9 +179,34 @@ export function sanitizeProfileRealName(value) {
   return sanitizeSingleLine(value, PROFILE_REAL_NAME_MAX_LENGTH);
 }
 
+export function sanitizeProfileFriendCode(value) {
+  return sanitizeSingleLine(value, FRIEND_CODE_LENGTH * 2)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, FRIEND_CODE_LENGTH);
+}
+
 export function sanitizeProfileBio(value) {
   if (typeof value !== "string") return "";
   return value.replace(/\r\n?/g, "\n").trim().slice(0, PROFILE_BIO_MAX_LENGTH);
+}
+
+export function buildDefaultFriendCode(playerId, attempt = 0) {
+  const normalizedPlayerId = sanitizeSingleLine(playerId, 80);
+  if (!normalizedPlayerId) return "";
+
+  const source = `${normalizedPlayerId}#${Math.max(0, Math.floor(Number(attempt) || 0))}`;
+  const left = hashString(`${source}:left`).toString(36).toUpperCase();
+  const right = hashString(`${source}:right`).toString(36).toUpperCase();
+
+  return `${left}${right}`.replace(/[^A-Z0-9]/g, "").padStart(FRIEND_CODE_LENGTH, "0").slice(0, FRIEND_CODE_LENGTH);
+}
+
+export function formatProfileFriendCode(value) {
+  const normalized = sanitizeProfileFriendCode(value);
+  if (!normalized) return "";
+  if (normalized.length <= 4) return normalized;
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
 }
 
 export function normalizeProfileLink(link, index = 0) {
@@ -215,6 +252,7 @@ export function normalizeProfileFields(profile = {}) {
     tagline: sanitizeProfileTagline(source.tagline),
     avatarAssetId: sanitizeAssetId(source.avatarAssetId),
     backgroundImageUrl: normalizeUrl(sanitizeSingleLine(source.backgroundImageUrl, PROFILE_BACKGROUND_URL_MAX_LENGTH)),
+    friendCode: sanitizeProfileFriendCode(source.friendCode),
     presence: normalizePresence(source.presence),
     favoriteGameSlug: sanitizeGameSlug(source.favoriteGameSlug),
     ladderPlacements: normalizeLadderPlacements(source.ladderPlacements),
@@ -240,6 +278,7 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
     tagline: normalizedFields.tagline,
     avatarAssetId: normalizedFields.avatarAssetId,
     backgroundImageUrl: normalizedFields.backgroundImageUrl,
+    friendCode: normalizedFields.friendCode || buildDefaultFriendCode(source.playerId),
     presence: normalizedFields.presence,
     avatarUrl: normalizedFields.avatarAssetId && avatarUrlResolver
       ? String(avatarUrlResolver(normalizedFields.avatarAssetId) || "")

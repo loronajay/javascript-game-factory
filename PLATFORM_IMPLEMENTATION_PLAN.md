@@ -26,6 +26,8 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - profile music: a player-assigned audio track that autoplays on profile page load, in the Myspace tradition
 - player gestures: lightweight expressive social interactions triggered from a player's public profile — Poke, Hug, Kick, Blow Kiss, Nudge, and Challenge to Game; each gesture generates a notification for the recipient
 - notification shell: a platform-owned notification bell and inbox that collects received gestures and later other social signals such as reactions, friend requests, and event invites
+- doomscroll: a dedicated personalized home feed page showing thoughts from friends and groups the player has joined, with support for inline YouTube/video embedding via iframes — the primary high-engagement social surface of the platform
+- groups: Facebook-style community spaces any player can create, join, or be invited to; thoughts posted inside a group surface in members' doomscroll feed alongside friend posts
 
 Important terminology note:
 
@@ -37,6 +39,7 @@ Product framing note:
 
 - Treat this project as a Facebook/Myspace-style social-media platform built around arcade identity and games, not as a generic launcher with a few profile extras.
 - Games are a major content pillar, but the long-term product is still a social platform: profiles, feeds, friends, reactions, reposting, personal identity fields, private messaging, and public/self expression all matter as first-class product goals.
+- Explicit sign-up, sign-in, and durable account ownership are part of the destination product, not optional extras. Auto-created local/browser profiles are acceptable scaffolding during early phases, but the platform is not "truly online" until players can intentionally register, own, and return to the same account across devices.
 
 The platform remains the owner of long-term identity and social state.
 Games remain self-contained experiences that can read platform data and publish approved activity/results, but games must not become the permanent home for profile ownership.
@@ -184,6 +187,12 @@ Recommended first-class pages:
   Shared thoughts feed for user-authored status updates, social posting, and the eventual doomscroll-style home feed.
 - `/notifications/index.html`
   Platform notification inbox. Shows received gestures (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge to Game) in the local-first phase; expands to all social signals (reactions, friend requests, event invites) once backend delivery exists.
+- `/doomscroll/index.html`
+  Personalized home feed. Shows thoughts from friends and groups the player has joined. YouTube/video links in posts render as inline iframe embeds. The page shell can be scaffolded locally but real cross-user feed content requires backend persistence. This is the primary high-engagement social surface of the platform.
+- `/groups/index.html`
+  Group discovery and listing. Shows groups the player has joined and allows browsing/searching public groups.
+- `/group/index.html?id=<groupId>`
+  Group detail page. Shows the group feed, member list, and group info. Owner view adds group management controls.
 
 Notes:
 
@@ -610,8 +619,11 @@ Suggested shape:
 {
   id: "thought-1",
   authorPlayerId: "player-123",
+  subject: "",
   text: "Need one more clean goblin pass.",
+  groupId: "",
   visibility: "public",
+  attachments: [],
   commentCount: 0,
   shareCount: 0,
   reactionTotals: {
@@ -637,6 +649,79 @@ Notes:
 - `reactionTotals` is the shared contract for emoji-style reactions with visible per-emoji totals.
 - `viewerReaction` is the future field for the current viewer's chosen reaction on a given post.
 - Reaction UI should read like a Facebook-style social feed affordance rather than a generic counter-only metric.
+- `groupId` is empty/null for non-group posts. When set, the post belongs to a group and should surface in that group's feed and in members' doomscroll feed.
+- `attachments` is a list of embedded media items (YouTube links, external links, etc.) attached to the post.
+- `visibility` should eventually support `"public"`, `"friends"`, and `"group"`. Group posts use `"group"` and require `groupId`.
+- The doomscroll feed is a filtered view: friends' posts with `"public"` or `"friends"` visibility, plus `"group"` posts from groups the player has joined.
+
+### `thoughtAttachment`
+
+A media item or link attached to a thought post.
+
+Suggested shape:
+
+```js
+{
+  kind: "youtube",
+  url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  embedId: "dQw4w9WgXcQ",
+  title: ""
+}
+```
+
+Attachment kinds:
+- `"youtube"` — YouTube video. `embedId` is extracted from the URL and rendered as a native `<iframe>` embed. No custom media player needed.
+- `"link"` — a bare external URL. Renders as a styled link card. Open Graph preview metadata belongs to the backend phase since cross-origin fetching requires a proxy.
+- (future) `"vimeo"` — same iframe embed pattern as YouTube.
+
+Notes:
+- YouTube and Vimeo embeds are handled entirely client-side via native iframes — no custom media player is required.
+- Link preview cards (title + thumbnail from Open Graph) require a backend proxy to fetch cross-origin metadata and belong to a later pass.
+- The post composer should auto-detect YouTube/Vimeo URLs pasted into the body and convert them to attachments rather than leaving them as raw text.
+
+### `group`
+
+A player-created community space. Any player can create a group, join a public group, or be invited by a member.
+
+Suggested shape:
+
+```js
+{
+  id: "group-1",
+  slug: "retro-runners",
+  name: "Retro Runners",
+  description: "",
+  createdByPlayerId: "player-123",
+  visibility: "public",
+  memberCount: 0,
+  createdAt: "",
+  updatedAt: ""
+}
+```
+
+### `groupMembership`
+
+Tracks a player's membership in a group.
+
+Suggested shape:
+
+```js
+{
+  groupId: "group-1",
+  playerId: "player-123",
+  role: "member",
+  joinedAt: ""
+}
+```
+
+Roles: `"owner"`, `"member"`. Owner is the player who created the group.
+
+Notes:
+- `visibility` controls discoverability: `"public"` groups can be browsed and joined by anyone; `"private"` groups require an invitation.
+- Group posts are `thoughtPost` records with a `groupId` set and `visibility: "group"`.
+- Group posts from groups a player has joined surface in that player's doomscroll feed alongside friend posts.
+- Group creation, membership management, and group-scoped feeds all require backend persistence and belong to Phase 4.
+- The page shell for `/groups/` and `/group/` can be scaffolded in a local-first pass, but real group data requires backend work.
 
 ### `profileMusic`
 
@@ -901,8 +986,8 @@ Current status:
 - This phase has now started.
 - Railway Postgres is provisioned for the project.
 - `platform-api/` now exists as the first shared backend service scaffold and reads `DATABASE_URL`.
-- Initial migration/sql wiring plus the first profile read/write endpoints are now part of the active implementation path.
-- The frontend remains local-first until the page/domain seams are swapped from local storage to HTTP-backed adapters.
+- Initial migration/sql wiring plus backend record routes for profiles, metrics, relationships, activity items, and thought posts are now part of the active implementation path.
+- The frontend is now in an adapter-first hybrid state: shared API seams are live for profile/feed/activity/metrics reads and mirrors, while local fallback remains in place intentionally for stability.
 
 This is the trigger point for:
 
@@ -912,6 +997,8 @@ This is the trigger point for:
 - add-friend entry points on game results screens
 - in-game chat and lobby surfaces that can link to public profiles
 - real shared feed data
+- doomscroll personalized feed (friends posts + group posts in one scroll)
+- group creation, membership, invitations, and group-scoped feeds
 - direct / private messaging
 - cross-user comments, reactions, and shares
 - real cross-user gesture delivery so Poke / Hug / Kick / Blow Kiss / Nudge / Challenge actually arrives in the recipient's inbox instead of staying local
@@ -962,6 +1049,8 @@ Exit criteria:
 - arbitrary file upload
 - per-game custom social schemas
 - backend-dependent UX before backend contracts exist
+- real group creation/membership/feeds (group data shapes and page shells can be defined locally; actual group persistence and member management require Phase 4 backend)
+- doomscroll cross-user feed content (the doomscroll page shell can be scaffolded locally; a real personalized feed of friends and group posts requires backend persistence)
 
 ## Navigation Strategy
 
@@ -1046,7 +1135,17 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `platform-api/` now exists as a separate Node.js service scaffold for the platform backend, with `DATABASE_URL` wiring, health/readiness routes, and the first migration runner.
 - `platform-api/` now includes the first Postgres schema covering players, profiles, metrics, relationships, relationship ledger entries, activity items, and thought posts.
 - `platform-api/` now exposes the first real backend record routes for profiles, metrics, relationships, activity items, and thought posts.
+- `js/platform/api/` now owns the shared browser-side client/adapters for talking to `platform-api/` without leaking fetch logic into page code.
 - the backend transition is now adapter-first: shared frontend seams stay in place while persistence logic moves behind the new API service.
+- `/me` and `/player` now hydrate profiles, metrics, and relationships through API-aware adapters with local fallback instead of staying pure local-cache readers.
+- the owner profile-edit persistence path now mirrors through the shared API seam, and `GET /players/:id/profile` now exists so public profile reads can stay symmetric.
+- `js/platform/thoughts/` and `js/platform/activity/` now perform merge-first API-aware feed sync so remote records can appear without wiping unsynced local items.
+- owner thought create/delete flows now mirror through the backend adapter path while preserving the local-first UX contract.
+- profile-view increments and thought-count updates now mirror through API-aware metrics helpers without blocking page flow.
+- `games/lovers-lost/` and `games/battleshits/` result activity now mirrors to the backend in the background while preserving immediate local activity publishing.
+- public `/player` pages now expose an explicit friendship-creation entry point backed by the centralized relationship seam rather than page-local friend state.
+- `/event` detail now exposes a qualifying linked-entry action backed by the centralized relationship seam so shared-event credit can be recorded from the platform surface itself.
+- `js/platform/metrics/` now exports an explicit canonical split for public/profile support metrics, relationship/discovery metrics, and backend-only analytics; `friendPoints` remains part of the public/support contract.
 - Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
@@ -1059,11 +1158,8 @@ Use this section as a drift guard when work moves across threads.
 Immediate priorities across the current local/backend boundary:
 
 - stabilize the first backend record routes inside `platform-api/` against the live Railway Postgres deployment
-- wire the frontend `/player` and `/me` pages to real profile/metrics/relationships reads without changing page-owned contracts
-- swap activity and thought reads/writes from local storage to the new API in controlled passes
-- add explicit friendship-creation entry points that feed the centralized relationship seam
-- wire qualifying linked-event participation into the relationship seam
-- finish the recommended canonical metrics split across public/support metrics, relationship/discovery metrics, and backend-only analytics
+- continue tightening the shared frontend adapters so `/player`, `/me`, `/thoughts`, and `/activity` keep reading shared backend data without losing local fallback behavior
+- start the first durable-memory/player-page pass so activity, posts, and results can surface more intentionally on top of the settled persistence seams
 - turn activity/posts/results into durable memories on player pages once the shared persistence path is stable
 - continue remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
 - keep context-driven discovery scoped to real profile surfacing from games, activity, events, and relationships rather than inventing a generic people directory early
@@ -1082,7 +1178,7 @@ Default product calls for this scope:
 - social links are repeatable structured items with normalized label/url/kind fields
 - panel headers should be visually separated from panel content, preferably with boxed section labels in the shared profile composition
 - profile music is a single player-assigned track (no playlist); autoplay is paired with a visible mini player widget so visitors can pause or mute immediately; multi-track and rich embeds belong to the backend phase
-- the recommended canonical metrics split should lock public/support metrics first, then relationship/discovery metrics, while keeping backend analytics separate from public profile identity
+- the recommended canonical metrics split is now explicit in code: public/support metrics stay separate from relationship/discovery metrics and backend analytics, with `friendPoints` staying visible/public-support data
 - friend points should stay platform-derived while visible friend placement supports either manual or automatic behavior for `Main Squeeze` and the four standard friend slots
 - relationship ordering should be able to use both affinity (`friendPoints`, shared counts) and recency (`last played with`, `recently played with`, last shared session/event, last interaction) without forcing one permanent display mode
 - comments, emoji reactions, and sharing belong to the thoughts/feed contract, but cross-user persistence is backend-phase work

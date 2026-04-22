@@ -273,11 +273,15 @@ export async function hydrateArcadeProfileFromApi(
     apiClient.loadPlayerRelationships(playerId).catch(() => null),
     apiClient.loadPlayerMetrics(playerId).catch(() => null),
   ]);
+  const seededProfileResult = !profileResult?.playerId && typeof apiClient.savePlayerProfile === "function"
+    ? await apiClient.savePlayerProfile(playerId, currentProfile).catch(() => null)
+    : null;
+  const resolvedProfileResult = profileResult?.playerId === playerId ? profileResult : seededProfileResult;
 
-  const profile = profileResult?.playerId === playerId
+  const profile = resolvedProfileResult?.playerId === playerId
     ? saveFactoryProfile({
         ...currentProfile,
-        ...profileResult,
+        ...resolvedProfileResult,
         playerId,
       }, storage, options)
     : currentProfile;
@@ -298,7 +302,7 @@ export async function hydrateArcadeProfileFromApi(
     profile,
     relationshipsRecord,
     metricsRecord,
-    usedApi: !!(profileResult || relationshipsResult || metricsResult),
+    usedApi: !!(resolvedProfileResult || relationshipsResult || metricsResult),
   };
 }
 

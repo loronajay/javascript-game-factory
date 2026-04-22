@@ -4,6 +4,7 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
+import { createPlatformApiClient } from "../api/platform-api.mjs";
 
 export const PROFILE_RELATIONSHIPS_STORAGE_KEY = getPlatformStorageKey("profileRelationships");
 export const PROFILE_RELATIONSHIP_LEDGER_STORAGE_KEY = getPlatformStorageKey("profileRelationshipLedger");
@@ -496,6 +497,18 @@ function savePairRecords(leftRecord, rightRecord, storage) {
   };
 }
 
+function mirrorPairRecordsToApi(leftRecord, rightRecord, options = {}) {
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  if (typeof apiClient?.savePlayerRelationships !== "function") {
+    return null;
+  }
+
+  return Promise.resolve().then(() => Promise.allSettled([
+    leftRecord?.playerId ? apiClient.savePlayerRelationships(leftRecord.playerId, leftRecord) : null,
+    rightRecord?.playerId ? apiClient.savePlayerRelationships(rightRecord.playerId, rightRecord) : null,
+  ]));
+}
+
 export function resolveProfileFriendSlots(profileView = {}, relationshipsRecord = {}) {
   const normalizedRelationships = normalizeProfileRelationshipsRecord({
     playerId: profileView?.playerId || relationshipsRecord?.playerId || "",
@@ -573,6 +586,7 @@ export function createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId, opti
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
+  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
 
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : FRIENDSHIP_CREATION_POINTS);
 }
@@ -635,6 +649,7 @@ export function recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, o
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
+  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : SHARED_SESSION_POINTS);
 }
 
@@ -678,6 +693,7 @@ export function recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, opt
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
+  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : SHARED_EVENT_POINTS);
 }
 
@@ -717,6 +733,7 @@ export function recordDirectInteractionBetweenPlayers(leftPlayerId, rightPlayerI
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
+  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
   return buildPairResult(saved.leftRecord, saved.rightRecord, canAward, canAward ? DIRECT_INTERACTION_POINTS : 0);
 }
 

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 export const MIGRATION_FILES = Object.freeze([
   "001-initial-schema.sql",
+  "002-friend-codes.sql",
 ]);
 
 export function migrationFileUrl(name) {
@@ -48,4 +49,3 @@ export async function applyMigrations(client) {
 
   return applied;
 }
-

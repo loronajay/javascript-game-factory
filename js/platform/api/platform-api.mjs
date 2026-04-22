@@ -1,3 +1,5 @@
+import { sanitizeProfileFriendCode } from "../profile/profile.mjs";
+
 function sanitizeSingleLine(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -118,6 +120,10 @@ export function createPlatformApiClient(options = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? get(`/players/${encoded}/profile`, "player") : Promise.resolve(null);
     },
+    loadPlayerProfileByFriendCode(friendCode) {
+      const encoded = encodePathSegment(sanitizeProfileFriendCode(friendCode));
+      return encoded ? get(`/players/by-friend-code/${encoded}`, "player") : Promise.resolve(null);
+    },
     savePlayerProfile(playerId, patch = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? put(`/players/${encoded}/profile`, patch, "player") : Promise.resolve(null);
@@ -137,6 +143,30 @@ export function createPlatformApiClient(options = {}) {
     savePlayerRelationships(playerId, patch = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? put(`/players/${encoded}/relationships`, patch, "relationships") : Promise.resolve(null);
+    },
+    createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId) {
+      return post("/friendships", { leftPlayerId, rightPlayerId }, "friendship");
+    },
+    recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+      return post("/relationships/shared-session", {
+        leftPlayerId,
+        rightPlayerId,
+        ...options,
+      }, "relationshipUpdate");
+    },
+    recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+      return post("/relationships/shared-event", {
+        leftPlayerId,
+        rightPlayerId,
+        ...options,
+      }, "relationshipUpdate");
+    },
+    recordDirectInteractionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+      return post("/relationships/direct-interaction", {
+        leftPlayerId,
+        rightPlayerId,
+        ...options,
+      }, "relationshipUpdate");
     },
     listActivityItems() {
       return get("/activity", "items");

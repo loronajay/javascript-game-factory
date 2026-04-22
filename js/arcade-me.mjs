@@ -1,11 +1,22 @@
 import { hydrateArcadeProfileFromApi, initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
-import { loadProfileMetricsRecord, normalizeProfileMetricsRecord, syncThoughtPostCount } from "./platform/metrics/metrics.mjs";
-import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
 import {
+  loadProfileMetricsRecord,
+  normalizeProfileMetricsRecord,
+  syncThoughtPostCountWithApi,
+} from "./platform/metrics/metrics.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import {
+  buildPlayerProfileView,
+  formatProfileFriendCode,
+  sanitizeProfileFriendCode,
+} from "./platform/profile/profile.mjs";
+import {
+  createFriendshipBetweenPlayers,
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
   resolveProfileFriendSlots,
+  saveProfileRelationshipsRecord,
 } from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
@@ -191,6 +202,65 @@ function buildHeroStats(publicView, resolvedThoughtCount, metricsRecord) {
   ];
 }
 
+export async function addFriendByCode(friendCode, options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options.apiClient || createPlatformApiClient();
+  const currentProfile = loadFactoryProfile(storage);
+  const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
+
+  if (!normalizedFriendCode) {
+    return { ok: false, message: "Enter a friend code first." };
+  }
+
+  if (!currentProfile?.playerId) {
+    return { ok: false, message: "Your player profile is not ready yet." };
+  }
+
+  if (currentProfile.friendCode === normalizedFriendCode) {
+    return { ok: false, message: "That is your friend code." };
+  }
+
+  if (typeof apiClient?.loadPlayerProfileByFriendCode !== "function") {
+    return { ok: false, message: "Friend-code lookup is unavailable right now." };
+  }
+
+  const targetProfile = await apiClient.loadPlayerProfileByFriendCode(normalizedFriendCode);
+  if (!targetProfile?.playerId) {
+    return { ok: false, message: "No player matched that friend code." };
+  }
+
+  if (targetProfile.playerId === currentProfile.playerId) {
+    return { ok: false, message: "That is your friend code." };
+  }
+
+  let result = null;
+
+  if (typeof apiClient?.createFriendshipBetweenPlayers === "function") {
+    result = await apiClient.createFriendshipBetweenPlayers(currentProfile.playerId, targetProfile.playerId);
+    if (result?.leftRecord?.playerId) {
+      saveProfileRelationshipsRecord(result.leftRecord, storage);
+    }
+    if (result?.rightRecord?.playerId) {
+      saveProfileRelationshipsRecord(result.rightRecord, storage);
+    }
+  }
+
+  if (!result?.leftRecord?.playerId || !result?.rightRecord?.playerId) {
+    result = createFriendshipBetweenPlayers(currentProfile.playerId, targetProfile.playerId, {
+      storage,
+      apiClient,
+    });
+  }
+
+  const label = targetProfile.profileName || targetProfile.playerId || "that player";
+  return {
+    ok: true,
+    message: result.awarded ? `Friend linked with ${label}.` : `${label} is already linked.`,
+    targetProfile,
+    relationshipResult: result,
+  };
+}
+
 export function buildMePageViewModel(profile, options = {}) {
   const publicView = buildPlayerProfileView(profile, options);
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : [];
@@ -220,6 +290,7 @@ export function buildMePageViewModel(profile, options = {}) {
   const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This shared player page will grow into your public home base across the arcade as more platform features come online.";
   const sessionPresence = resolveOwnerPresence(publicView.presence);
+  const friendCodeValue = publicView.friendCode || "";
 
   const identityLinkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
@@ -258,6 +329,9 @@ export function buildMePageViewModel(profile, options = {}) {
     presenceLabel: formatPresenceLabel(sessionPresence),
     presenceToneClass: buildPresenceToneClass(sessionPresence),
     pageViewCount: String(metricsRecord.profileViewCount),
+    friendCodeValue,
+    friendCodeDisplay: formatProfileFriendCode(friendCodeValue),
+    friendCodeFlashMessage: typeof options?.friendCodeFlash === "string" ? options.friendCodeFlash : "",
     avatarSrc: publicView.avatarUrl || DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
@@ -471,6 +545,36 @@ function renderPanel(container, title, items, formatter) {
   `;
 }
 
+function renderFriendCodePanel(container, title, model) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="friend-code-card">
+      <p class="friend-code-card__label">Your Friend Code</p>
+      <p class="friend-code-card__value">${escapeHtml(model.friendCodeDisplay || "PENDING")}</p>
+      <p class="friend-code-card__helper">Share this code so friends can link with you directly.</p>
+      <form id="meFriendCodeForm" class="friend-code-form">
+        <label class="friend-code-form__label" for="meFriendCodeInput">Add Friend By Code</label>
+        <div class="friend-code-form__row">
+          <input
+            id="meFriendCodeInput"
+            class="friend-code-form__input"
+            name="friendCode"
+            type="text"
+            inputmode="text"
+            maxlength="9"
+            placeholder="ABCD-1234"
+            spellcheck="false"
+          >
+          <button class="friend-code-form__submit" type="submit">Add Friend</button>
+        </div>
+        <p id="meFriendCodeFlash" class="friend-code-form__flash" aria-live="polite">${escapeHtml(model.friendCodeFlashMessage || "")}</p>
+      </form>
+    </div>
+  `;
+}
+
 function renderCardItem(item) {
   const itemClass = item.isPlaceholder ? "me-card-item me-card-item--placeholder" : "me-card-item";
   const titleHtml = item.isPlaceholder ? "" : `<p class="me-card-item__title">${escapeHtml(item.title || item.label)}</p>`;
@@ -642,10 +746,12 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
     metricsRecord,
     relationshipsRecord,
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
+    friendCodeFlash: options?.friendCodeFlash || "",
   });
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("meHeroCard"), model);
   renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", model.thoughtItems, model.thoughtComposer);
+  renderFriendCodePanel(doc.getElementById("meFriendCodePanel"), "Friend Code", model);
   renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
   const rankingsPanel = doc.getElementById("meRankingsPanel");
   if (rankingsPanel) {
@@ -669,7 +775,7 @@ if (doc?.getElementById) {
   const profilePanel = initArcadeProfilePanel({ storage });
   renderMePage(doc);
 
-  const rerender = async (thoughtComposerFlash = "", shouldHydrate = false) => {
+  const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
     const currentProfile = loadFactoryProfile(storage);
     const thoughtFeed = shouldHydrate
       ? await syncThoughtFeedFromApi(storage)
@@ -685,6 +791,7 @@ if (doc?.getElementById) {
     renderMePage(doc, hydrated.profile, {
       thoughtFeed,
       thoughtComposerFlash,
+      friendCodeFlash,
       metricsRecord: hydrated.metricsRecord,
       relationshipsRecord: hydrated.relationshipsRecord,
     });
@@ -706,6 +813,17 @@ if (doc?.getElementById) {
 
   doc.addEventListener("submit", async (event) => {
     const form = event.target;
+    if (form && typeof form === "object" && form.id === "meFriendCodeForm") {
+      event.preventDefault();
+      const input = doc.getElementById("meFriendCodeInput");
+      const outcome = await addFriendByCode(input?.value || "", {
+        storage,
+        apiClient: createPlatformApiClient(),
+      });
+      void rerender("", false, outcome.message);
+      return;
+    }
+
     if (!form || typeof form !== "object" || form.id !== "meThoughtComposer") {
       return;
     }
@@ -729,7 +847,12 @@ if (doc?.getElementById) {
     }
 
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
-    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
+    syncThoughtPostCountWithApi(
+      currentProfile.playerId,
+      updatedThoughtCount,
+      storage,
+      createPlatformApiClient(),
+    );
     void rerender("Thought posted.");
   });
 
@@ -743,7 +866,12 @@ if (doc?.getElementById) {
     const currentProfile = loadFactoryProfile(storage);
     await deleteThoughtPostWithApi(id, storage);
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
-    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
+    syncThoughtPostCountWithApi(
+      currentProfile.playerId,
+      updatedThoughtCount,
+      storage,
+      createPlatformApiClient(),
+    );
     void rerender();
   });
 }

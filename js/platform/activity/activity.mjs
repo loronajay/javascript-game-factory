@@ -5,7 +5,10 @@ import {
   writeStorageText,
 } from "../storage/storage.mjs";
 import { createPlatformApiClient } from "../api/platform-api.mjs";
-import { recordSharedSessionBetweenPlayers } from "../relationships/relationships.mjs";
+import {
+  recordSharedSessionBetweenPlayers,
+  saveProfileRelationshipsRecord,
+} from "../relationships/relationships.mjs";
 
 export const ACTIVITY_FEED_STORAGE_KEY = getPlatformStorageKey("activityFeed");
 export const ACTIVITY_FEED_LIMIT = 40;
@@ -111,6 +114,15 @@ function writeActivityFeed(storage, activityFeed = []) {
   return normalized;
 }
 
+function mergeRemoteActivityItemIntoStorage(remoteItem, storage) {
+  const normalizedRemoteItem = normalizeActivityItem(remoteItem);
+  const merged = mergeStoredActivityFeed(
+    [normalizedRemoteItem],
+    parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== normalizedRemoteItem.id),
+  );
+  writeActivityFeed(storage, merged);
+}
+
 function compareActivityDesc(left, right) {
   const leftTime = Date.parse(left.createdAt || "") || 0;
   const rightTime = Date.parse(right.createdAt || "") || 0;
@@ -144,12 +156,12 @@ export function loadActivityFeed(storage = getDefaultPlatformStorage()) {
     .sort(compareActivityDesc);
 }
 
-export function publishActivityItem(item, storage = getDefaultPlatformStorage()) {
+export function publishActivityItem(item, storage = getDefaultPlatformStorage(), options = {}) {
   const normalized = normalizeActivityItem(item);
   const current = loadActivityFeed(storage).filter((entry) => entry.id !== normalized.id);
   const next = [normalized, ...current].slice(0, ACTIVITY_FEED_LIMIT);
   writeActivityFeed(storage, next);
-  maybeRecordSharedSessionFromActivity(normalized, storage);
+  maybeRecordSharedSessionFromActivity(normalized, storage, options);
   return normalized;
 }
 
@@ -172,7 +184,7 @@ function buildDerivedSessionId(activity) {
   return `${gameSlug}:${leftPlayerId}:${rightPlayerId}:${createdAt}`;
 }
 
-function maybeRecordSharedSessionFromActivity(activity, storage) {
+function maybeRecordSharedSessionFromActivity(activity, storage, options = {}) {
   const item = normalizeActivityItem(activity);
   if (item.type !== "game-result") return;
 
@@ -181,14 +193,16 @@ function maybeRecordSharedSessionFromActivity(activity, storage) {
     const girlIdentity = normalizeIdentity(item.metadata?.girlIdentity);
     if (!boyIdentity.playerId || !girlIdentity.playerId || item.metadata?.disconnectNote) return;
 
-    recordSharedSessionBetweenPlayers(boyIdentity.playerId, girlIdentity.playerId, {
+    const sessionOptions = {
       storage,
+      apiClient: options?.apiClient,
       sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
       gameSlug: item.gameSlug,
       startedTogether: true,
       reachedResults: true,
       occurredAt: item.createdAt,
-    });
+    };
+    queueSharedSessionRelationshipUpdate(boyIdentity.playerId, girlIdentity.playerId, sessionOptions);
     return;
   }
 
@@ -198,15 +212,55 @@ function maybeRecordSharedSessionFromActivity(activity, storage) {
     const matchResult = sanitizeSingleLine(item.metadata?.matchResult, 24).toLowerCase();
     if (!myProfile.playerId || !opponentProfile.playerId || matchResult === "forfeit_win") return;
 
-    recordSharedSessionBetweenPlayers(myProfile.playerId, opponentProfile.playerId, {
+    const sessionOptions = {
       storage,
+      apiClient: options?.apiClient,
       sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
       gameSlug: item.gameSlug,
       startedTogether: true,
       reachedResults: true,
       occurredAt: item.createdAt,
-    });
+    };
+    queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
   }
+}
+
+function syncRelationshipUpdateToStorage(result, storage) {
+  if (result?.leftRecord?.playerId) {
+    saveProfileRelationshipsRecord(result.leftRecord, storage);
+  }
+  if (result?.rightRecord?.playerId) {
+    saveProfileRelationshipsRecord(result.rightRecord, storage);
+  }
+}
+
+function queueSharedSessionRelationshipUpdate(leftPlayerId, rightPlayerId, options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
+
+  if (typeof apiClient?.recordSharedSessionBetweenPlayers === "function") {
+    Promise.resolve(apiClient.recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, {
+      sessionId: options.sessionId,
+      gameSlug: options.gameSlug,
+      startedTogether: options.startedTogether,
+      reachedResults: options.reachedResults,
+      occurredAt: options.occurredAt,
+    }))
+      .then((result) => {
+        if (result?.leftRecord?.playerId || result?.rightRecord?.playerId) {
+          syncRelationshipUpdateToStorage(result, storage);
+          return;
+        }
+
+        recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
+      })
+      .catch(() => {
+        recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
+      });
+    return;
+  }
+
+  recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
 }
 
 function actorNameFromOptions(options = {}) {
@@ -290,13 +344,17 @@ export function buildBattleshitsMatchActivity(match, options = {}) {
 export function publishLoversLostRunActivity(runSummary, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildLoversLostRunActivity(runSummary, options);
-  return publishActivityItem(item, storage);
+  const saved = publishActivityItem(item, storage, options);
+  mirrorPublishedActivityItem(saved, storage, options);
+  return saved;
 }
 
 export function publishBattleshitsMatchActivity(match, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildBattleshitsMatchActivity(match, options);
-  return publishActivityItem(item, storage);
+  const saved = publishActivityItem(item, storage, options);
+  mirrorPublishedActivityItem(saved, storage, options);
+  return saved;
 }
 
 export async function syncActivityFeedFromApi(
@@ -326,19 +384,24 @@ export async function publishActivityItemWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const saved = publishActivityItem(item, storage);
-  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  const saved = publishActivityItem(item, storage, options);
+  await mirrorPublishedActivityItem(saved, storage, options);
+  return saved;
+}
 
-  if (typeof apiClient?.saveActivityItem === "function") {
-    const remoteItem = await apiClient.saveActivityItem(saved).catch(() => null);
-    if (remoteItem) {
-      const merged = mergeStoredActivityFeed(
-        [normalizeActivityItem(remoteItem)],
-        parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== remoteItem.id),
-      );
-      writeActivityFeed(storage, merged);
-    }
+async function mirrorPublishedActivityItem(
+  saved,
+  storage = getDefaultPlatformStorage(),
+  options = {},
+) {
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  if (typeof apiClient?.saveActivityItem !== "function") {
+    return null;
   }
 
-  return saved;
+  const remoteItem = await apiClient.saveActivityItem(saved).catch(() => null);
+  if (remoteItem) {
+    mergeRemoteActivityItemIntoStorage(remoteItem, storage);
+  }
+  return remoteItem;
 }

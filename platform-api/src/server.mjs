@@ -7,8 +7,15 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { loadPlayerProfile, savePlayerProfile } from "./db/profiles.mjs";
-import { loadPlayerRelationships, savePlayerRelationships } from "./db/relationships.mjs";
+import { loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerProfile } from "./db/profiles.mjs";
+import {
+  createFriendshipBetweenPlayers,
+  loadPlayerRelationships,
+  recordDirectInteractionBetweenPlayers,
+  recordSharedEventBetweenPlayers,
+  recordSharedSessionBetweenPlayers,
+  savePlayerRelationships,
+} from "./db/relationships.mjs";
 import { deleteThought, listThoughts, saveThought } from "./db/thoughts.mjs";
 
 const { Pool } = pg;
@@ -50,10 +57,15 @@ async function bootstrap() {
     config,
     checkDatabase: createDatabaseCheck(pool),
     loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),
+    loadPlayerProfileByFriendCode: (friendCode) => loadPlayerProfileByFriendCode(pool, friendCode),
     savePlayerProfile: (playerId, patch) => savePlayerProfile(pool, playerId, patch),
     loadPlayerMetrics: (playerId) => loadPlayerMetrics(pool, playerId),
     savePlayerMetrics: (playerId, patch) => savePlayerMetrics(pool, playerId, patch),
     loadPlayerRelationships: (playerId) => loadPlayerRelationships(pool, playerId),
+    createFriendshipBetweenPlayers: (leftPlayerId, rightPlayerId, options) => createFriendshipBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
+    recordSharedSessionBetweenPlayers: (leftPlayerId, rightPlayerId, options) => recordSharedSessionBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
+    recordSharedEventBetweenPlayers: (leftPlayerId, rightPlayerId, options) => recordSharedEventBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
+    recordDirectInteractionBetweenPlayers: (leftPlayerId, rightPlayerId, options) => recordDirectInteractionBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
     savePlayerRelationships: (playerId, patch) => savePlayerRelationships(pool, playerId, patch),
     listActivityItems: () => listActivityItems(pool),
     saveActivityItem: (item) => saveActivityItem(pool, item),
