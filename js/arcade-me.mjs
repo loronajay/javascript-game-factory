@@ -1,6 +1,12 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { loadProfileMetricsRecord, normalizeProfileMetricsRecord, syncThoughtPostCount } from "./platform/metrics/metrics.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
+import {
+  loadProfileRelationshipsRecord,
+  normalizeProfileRelationshipsRecord,
+  resolveProfileFriendSlots,
+} from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
   buildPlayerThoughtFeed,
@@ -75,6 +81,10 @@ function buildPresenceToneClass(presence) {
   return normalized || "offline";
 }
 
+function escapeCssUrl(value) {
+  return String(value || "").replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
 function resolveOwnerPresence(presence) {
   return "online";
 }
@@ -119,38 +129,65 @@ function buildRankingItems(publicView, favoriteTitleResolver) {
   }];
 }
 
-function buildFriendItems(publicView) {
-  const items = [];
+function createFriendCardItem({ title, value, meta, isPlaceholder = false }) {
+  return {
+    title,
+    value,
+    meta,
+    isPlaceholder,
+    avatarInitials: buildProfileInitials(value),
+  };
+}
 
-  if (publicView.mainSqueeze) {
-    items.push({
-      title: "Main Squeeze",
-      value: publicView.mainSqueeze.profileName,
-      meta: `${publicView.mainSqueeze.friendPoints} friendship points`,
-      isPlaceholder: false,
-    });
-  }
+function buildFriendItems(publicView, relationshipsRecord) {
+  const normalizedRelationships = relationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(relationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId });
+  const resolvedSlots = resolveProfileFriendSlots(publicView, normalizedRelationships);
 
-  if (publicView.friendsPreview.length > 0) {
-    publicView.friendsPreview.forEach((friend) => {
-      items.push({
-        title: formatPresenceLabel(friend.presence),
-        value: friend.profileName,
-        meta: `${friend.friendPoints} friendship points`,
-        isPlaceholder: false,
+  const mainSqueezeItem = resolvedSlots.mainSqueeze
+    ? createFriendCardItem({
+        title: "Main Squeeze",
+        value: resolvedSlots.mainSqueeze.profileName,
+        meta: `${resolvedSlots.mainSqueeze.resolvedFriendPoints} friendship points`,
+      })
+    : createFriendCardItem({
+        title: "Main Squeeze",
+        value: "Awaiting Main Squeeze",
+        meta: "Friendship points pending",
+        isPlaceholder: true,
       });
-    });
-  }
 
-  if (items.length > 0) {
-    return items;
-  }
+  const friendPreviewItems = resolvedSlots.friendSlots.map((friend) => (
+    friend
+      ? createFriendCardItem({
+          title: formatPresenceLabel(friend.presence),
+          value: friend.profileName,
+          meta: `${friend.resolvedFriendPoints} friendship points`,
+        })
+      : createFriendCardItem({
+          title: "Friend Slot",
+          value: "Awaiting Arcade Friend",
+          meta: "Friendship points pending",
+          isPlaceholder: true,
+        })
+  ));
 
-  return [{
-    title: "Top Friends",
-    value: "Friends preview and main-squeeze slots are still warming up.",
-    isPlaceholder: true,
-  }];
+  return [mainSqueezeItem, ...friendPreviewItems];
+}
+
+function buildHeroStats(publicView, resolvedThoughtCount, metricsRecord) {
+  const normalizedMetrics = metricsRecord?.playerId
+    ? normalizeProfileMetricsRecord(metricsRecord)
+    : normalizeProfileMetricsRecord({ playerId: publicView.playerId });
+  const derivedFriendCount = publicView.friendsPreview.length + (publicView.mainSqueeze ? 1 : 0);
+
+  return [
+    { label: "Thoughts", value: String(Math.max(resolvedThoughtCount, normalizedMetrics.thoughtPostCount)) },
+    { label: "Friends", value: String(Math.max(derivedFriendCount, normalizedMetrics.friendCount)) },
+    { label: "Sessions", value: String(normalizedMetrics.totalPlaySessionCount) },
+    { label: "Events", value: String(normalizedMetrics.eventParticipationCount) },
+  ];
 }
 
 export function buildMePageViewModel(profile, options = {}) {
@@ -167,9 +204,15 @@ export function buildMePageViewModel(profile, options = {}) {
   const favoriteTitleResolver = typeof options?.favoriteTitleResolver === "function"
     ? options.favoriteTitleResolver
     : titleFromSlug;
+  const metricsRecord = options?.metricsRecord?.playerId
+    ? normalizeProfileMetricsRecord(options.metricsRecord)
+    : normalizeProfileMetricsRecord({ playerId: publicView.playerId });
+  const relationshipsRecord = options?.relationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(options.relationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId });
   const favoriteGameItems = buildFavoriteGameItem(publicView, favoriteTitleResolver);
   const rankingItems = buildRankingItems(publicView, favoriteTitleResolver);
-  const friendItems = buildFriendItems(publicView);
+  const friendItems = buildFriendItems(publicView, relationshipsRecord);
 
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroRealName = publicView.realName || "";
@@ -213,7 +256,8 @@ export function buildMePageViewModel(profile, options = {}) {
     editButtonLabel: "Edit Profile",
     presenceLabel: formatPresenceLabel(sessionPresence),
     presenceToneClass: buildPresenceToneClass(sessionPresence),
-    avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
+    pageViewCount: String(metricsRecord.profileViewCount),
+    avatarSrc: publicView.avatarUrl || DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
     heroMeta: [
@@ -222,6 +266,7 @@ export function buildMePageViewModel(profile, options = {}) {
       { label: "Badges", value: String(publicView.badgeIds.length) },
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
+    heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord),
     avatarAssetId: publicView.avatarAssetId,
     backgroundImageUrl: publicView.backgroundImageUrl,
     identityLinkItems,
@@ -284,17 +329,27 @@ function renderHeroCard(container, model) {
   `).join("");
 
   const friendHtml = model.friendItems.map((item) => `
-    <article class="${item.isPlaceholder ? "me-hero-card__rail-item me-hero-card__rail-item--placeholder" : "me-hero-card__rail-item"}">
-      ${item.isPlaceholder ? "" : `<p class="me-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
-      <div class="me-hero-card__rail-value-row">
-        <p class="me-hero-card__rail-value">${escapeHtml(item.value)}</p>
-        ${item.meta ? `<span class="me-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+    <article class="${item.isPlaceholder ? "me-hero-card__friend-card me-hero-card__friend-card--placeholder" : "me-hero-card__friend-card"}">
+      <div class="me-hero-card__friend-avatar" aria-hidden="true">
+        <span class="me-hero-card__friend-avatar-text">${escapeHtml(item.avatarInitials || "??")}</span>
       </div>
+      <div class="me-hero-card__friend-copy">
+        <p class="me-hero-card__friend-label">${escapeHtml(item.title || "Friend Slot")}</p>
+        <p class="me-hero-card__friend-name">${escapeHtml(item.value)}</p>
+        <p class="me-hero-card__friend-points">${escapeHtml(item.meta || "Friendship points pending")}</p>
+      </div>
+    </article>
+  `).join("");
+  const statsHtml = (Array.isArray(model.heroStats) ? model.heroStats : []).map((item) => `
+    <article class="me-hero-card__metrics-stat">
+      <p class="me-hero-card__metrics-stat-label">${escapeHtml(item.label)}</p>
+      <p class="me-hero-card__metrics-stat-value">${escapeHtml(item.value)}</p>
     </article>
   `).join("");
 
   const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
   const realNameValue = model.heroRealName || "Not shared";
+  const pageViewCount = model.pageViewCount || "0";
 
   container.innerHTML = `
     <div class="me-hero-card__backdrop" aria-hidden="true"></div>
@@ -312,6 +367,14 @@ function renderHeroCard(container, model) {
         </div>
       </div>
     </section>
+    <section class="me-hero-card__metrics-panel">
+      <div class="me-hero-card__section-topline">
+        <h3 class="me-hero-card__section-title">Profile Metrics</h3>
+      </div>
+      <div class="me-hero-card__metrics-grid">
+        ${statsHtml}
+      </div>
+    </section>
     <section class="me-hero-card__identity-panel">
       <p class="me-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
       <div class="me-hero-card__identity-field">
@@ -320,6 +383,10 @@ function renderHeroCard(container, model) {
           <span class="me-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
           <span class="me-presence-dot me-presence-dot--${escapeHtml(model.presenceToneClass)}" title="${escapeHtml(model.presenceLabel)}"></span>
         </div>
+      </div>
+      <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
+        <span class="me-hero-card__identity-field-label">Page Views</span>
+        <span class="me-hero-card__identity-field-value">${escapeHtml(pageViewCount)}</span>
       </div>
       <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
         <span class="me-hero-card__identity-field-label">Factory ID</span>
@@ -351,11 +418,21 @@ function renderHeroCard(container, model) {
   `;
 
   const backdrop = container.querySelector(".me-hero-card__backdrop");
+  const hasCustomBackdrop = !!model.backgroundImageUrl;
   if (backdrop) {
-    backdrop.style.backgroundImage = model.backgroundImageUrl
-      ? `url("${model.backgroundImageUrl}")`
-      : "";
+    if (hasCustomBackdrop) {
+      backdrop.style.setProperty("--me-profile-backdrop-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+    } else {
+      backdrop.style.removeProperty("--me-profile-backdrop-image");
+    }
   }
+
+  container.classList.toggle("me-hero-card--default-backdrop", !hasCustomBackdrop);
+  container.classList.toggle("me-hero-card--custom-backdrop", hasCustomBackdrop);
+
+  const hasCustomAvatar = !!model.avatarSrc && model.avatarSrc !== DEFAULT_PROFILE_PICTURE_SRC;
+  container.classList.toggle("me-hero-card--default-avatar", !hasCustomAvatar);
+  container.classList.toggle("me-hero-card--custom-avatar", hasCustomAvatar);
 
   const portraitImage = container.querySelector(".me-hero-card__portrait-image");
   if (!portraitImage) return;
@@ -388,7 +465,7 @@ function renderPanel(container, title, items, formatter) {
   const itemsHtml = items.map(formatter).join("");
 
   container.innerHTML = `
-    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     ${itemsHtml}
   `;
 }
@@ -439,7 +516,7 @@ function renderFavoritePanel(container, title, item) {
     `;
 
   container.innerHTML = `
-    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-featured-cabinet">
       ${cardHtml}
     </div>
@@ -515,7 +592,7 @@ function renderThoughtsPanel(container, title, items, composer = null) {
     : "";
 
   container.innerHTML = `
-    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     ${composerHtml}
     <div class="me-thoughts-feed thoughts-feed">
       ${items.map(renderThoughtItem).join("")}
@@ -527,7 +604,7 @@ function renderAboutPanel(container, title, text) {
   if (!container) return;
 
   container.innerHTML = `
-    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <p class="me-about-copy">${escapeHtml(text)}</p>
   `;
 }
@@ -540,7 +617,7 @@ function renderBadgesPanel(container, title, items) {
     : `<div class="me-badge-list">${items.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
 
   container.innerHTML = `
-    <h2 class="me-panel__title">${escapeHtml(title)}</h2>
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     ${badgesHtml}
   `;
 }
@@ -550,8 +627,16 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
 
   const storage = options.storage || getDefaultPlatformStorage();
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
+  const metricsRecord = options?.metricsRecord?.playerId
+    ? options.metricsRecord
+    : loadProfileMetricsRecord(profile?.playerId, storage);
+  const relationshipsRecord = options?.relationshipsRecord?.playerId
+    ? options.relationshipsRecord
+    : loadProfileRelationshipsRecord(profile?.playerId, storage);
   const model = buildMePageViewModel(profile, {
     thoughtFeed,
+    metricsRecord,
+    relationshipsRecord,
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
   });
   renderPageHeader(doc, model);
@@ -617,6 +702,8 @@ if (doc?.getElementById) {
       return;
     }
 
+    const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
     rerender("Thought posted.");
   });
 
@@ -627,7 +714,11 @@ if (doc?.getElementById) {
     const id = button.dataset.deleteId;
     if (!id) return;
 
-    deleteThoughtPost(id, getDefaultPlatformStorage());
+    const storage = getDefaultPlatformStorage();
+    const currentProfile = loadFactoryProfile(storage);
+    deleteThoughtPost(id, storage);
+    const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
     rerender();
   });
 }

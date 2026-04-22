@@ -1,6 +1,17 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import {
+  incrementProfileViewCount,
+  loadProfileMetricsRecord,
+  normalizeProfileMetricsRecord,
+  syncThoughtPostCount,
+} from "./platform/metrics/metrics.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
+import {
+  loadProfileRelationshipsRecord,
+  normalizeProfileRelationshipsRecord,
+  resolveProfileFriendSlots,
+} from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
   buildPlayerThoughtFeed,
@@ -79,6 +90,10 @@ function buildPresenceToneClass(presence) {
   return normalized || "offline";
 }
 
+function escapeCssUrl(value) {
+  return String(value || "").replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
 function resolveProfilePresence(presence, isOwnerView) {
   const normalized = String(presence || "").trim().toLowerCase();
   if (isOwnerView) {
@@ -108,6 +123,67 @@ function buildThoughtBackedProfile(thoughtFeed = [], requestedPlayerId = "") {
     thoughtCount: playerThoughtFeed.length,
     preferences: {},
   };
+}
+
+function buildHeroStats(publicView, resolvedThoughtCount, metricsRecord) {
+  const normalizedMetrics = metricsRecord?.playerId
+    ? normalizeProfileMetricsRecord(metricsRecord)
+    : normalizeProfileMetricsRecord({ playerId: publicView.playerId });
+  const derivedFriendCount = publicView.friendsPreview.length + (publicView.mainSqueeze ? 1 : 0);
+
+  return [
+    { label: "Thoughts", value: String(Math.max(resolvedThoughtCount, normalizedMetrics.thoughtPostCount)) },
+    { label: "Friends", value: String(Math.max(derivedFriendCount, normalizedMetrics.friendCount)) },
+    { label: "Sessions", value: String(normalizedMetrics.totalPlaySessionCount) },
+    { label: "Events", value: String(normalizedMetrics.eventParticipationCount) },
+  ];
+}
+
+function createFriendCardItem({ title, value, meta, isPlaceholder = false }) {
+  return {
+    title,
+    value,
+    meta,
+    isPlaceholder,
+    avatarInitials: buildProfileInitials(value),
+  };
+}
+
+function buildFriendItems(publicView, relationshipsRecord) {
+  const normalizedRelationships = relationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(relationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId });
+  const resolvedSlots = resolveProfileFriendSlots(publicView, normalizedRelationships);
+
+  const mainSqueezeItem = resolvedSlots.mainSqueeze
+    ? createFriendCardItem({
+        title: "Main Squeeze",
+        value: resolvedSlots.mainSqueeze.profileName,
+        meta: `${resolvedSlots.mainSqueeze.resolvedFriendPoints} friendship points`,
+      })
+    : createFriendCardItem({
+        title: "Main Squeeze",
+        value: "Awaiting Main Squeeze",
+        meta: "Friendship points pending",
+        isPlaceholder: true,
+      });
+
+  const friendPreviewItems = resolvedSlots.friendSlots.map((friend) => (
+    friend
+      ? createFriendCardItem({
+          title: formatPresenceLabel(friend.presence),
+          value: friend.profileName,
+          meta: `${friend.resolvedFriendPoints} friendship points`,
+        })
+      : createFriendCardItem({
+          title: "Friend Slot",
+          value: "Awaiting Arcade Friend",
+          meta: "Friendship points pending",
+          isPlaceholder: true,
+        })
+  ));
+
+  return [mainSqueezeItem, ...friendPreviewItems];
 }
 
 export function loadRequestedPlayerProfile(storage = getDefaultPlatformStorage(), requestedPlayerId = "", options = {}) {
@@ -142,6 +218,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       heroChipLabel: "PLAYER PROFILE",
       showEditProfileButton: false,
       editButtonLabel: "Edit Profile",
+      pageViewCount: "0",
       avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
       avatarAlt: "Unknown pilot portrait",
       avatarInitials: "??",
@@ -151,6 +228,11 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         { label: "Badges", value: "0" },
         { label: "Thoughts", value: "0" },
       ],
+      heroStats: buildHeroStats({
+        playerId: requestedPlayerId,
+        friendsPreview: [],
+        mainSqueeze: null,
+      }, 0, options?.metricsRecord),
       identityLinkItems: [{
         label: "Link Ports",
         value: "No public links are cached for this player yet.",
@@ -167,11 +249,11 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         value: "Rank snapshots are not cached for this player yet.",
         isPlaceholder: true,
       }],
-      friendItems: [{
-        title: "Top Friends",
-        value: "Friend preview data is not cached for this player yet.",
-        isPlaceholder: true,
-      }],
+      friendItems: buildFriendItems({
+        playerId: requestedPlayerId,
+        friendsPreview: [],
+        mainSqueeze: null,
+      }, options?.relationshipsRecord),
       thoughtItems: buildThoughtCardItems([], {
         placeholderId: "player-thought-placeholder",
         placeholderTitle: "Player Feed Warming Up",
@@ -201,6 +283,12 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     isOwner: isOwnerView,
   });
   const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);
+  const metricsRecord = options?.metricsRecord?.playerId
+    ? normalizeProfileMetricsRecord(options.metricsRecord)
+    : normalizeProfileMetricsRecord({ playerId: publicView.playerId || requestedPlayerId });
+  const relationshipsRecord = options?.relationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(options.relationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId || requestedPlayerId });
   const identityLinkItems = publicView.links.length > 0
     ? publicView.links.map((link) => ({
         label: link.label,
@@ -241,30 +329,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         value: "No shared ranking snapshots are attached to this player file yet.",
         isPlaceholder: true,
       }];
-  const friendItems = [];
-  if (publicView.mainSqueeze) {
-    friendItems.push({
-      title: "Main Squeeze",
-      value: publicView.mainSqueeze.profileName,
-      meta: `${publicView.mainSqueeze.friendPoints} friendship points`,
-      isPlaceholder: false,
-    });
-  }
-  publicView.friendsPreview.forEach((friend) => {
-    friendItems.push({
-      title: formatPresenceLabel(friend.presence),
-      value: friend.profileName,
-      meta: `${friend.friendPoints} friendship points`,
-      isPlaceholder: false,
-    });
-  });
-  if (friendItems.length === 0) {
-    friendItems.push({
-      title: "Top Friends",
-      value: "No friend preview is cached on this player file yet.",
-      isPlaceholder: true,
-    });
-  }
+  const friendItems = buildFriendItems(publicView, relationshipsRecord);
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
@@ -293,6 +358,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     editButtonLabel: "Edit Profile",
     presenceLabel: formatPresenceLabel(resolvedPresence),
     presenceToneClass: buildPresenceToneClass(resolvedPresence),
+    pageViewCount: String(metricsRecord.profileViewCount),
     avatarSrc: publicView.avatarUrl || DEFAULT_PROFILE_PICTURE_SRC,
     avatarAlt: `${heroName} portrait`,
     avatarInitials: buildProfileInitials(heroName),
@@ -302,6 +368,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       { label: "Badges", value: String(publicView.badgeIds.length) },
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
+    heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord),
     backgroundImageUrl: publicView.backgroundImageUrl,
     identityLinkItems,
     favoriteGameItems,
@@ -363,17 +430,27 @@ function renderHeroCard(container, model) {
   `).join("");
 
   const friendHtml = model.friendItems.map((item) => `
-    <article class="${item.isPlaceholder ? "player-hero-card__rail-item player-hero-card__rail-item--placeholder" : "player-hero-card__rail-item"}">
-      ${item.isPlaceholder ? "" : `<p class="player-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
-      <div class="player-hero-card__rail-value-row">
-        <p class="player-hero-card__rail-value">${escapeHtml(item.value)}</p>
-        ${item.meta ? `<span class="player-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+    <article class="${item.isPlaceholder ? "player-hero-card__friend-card player-hero-card__friend-card--placeholder" : "player-hero-card__friend-card"}">
+      <div class="player-hero-card__friend-avatar" aria-hidden="true">
+        <span class="player-hero-card__friend-avatar-text">${escapeHtml(item.avatarInitials || "??")}</span>
       </div>
+      <div class="player-hero-card__friend-copy">
+        <p class="player-hero-card__friend-label">${escapeHtml(item.title || "Friend Slot")}</p>
+        <p class="player-hero-card__friend-name">${escapeHtml(item.value)}</p>
+        <p class="player-hero-card__friend-points">${escapeHtml(item.meta || "Friendship points pending")}</p>
+      </div>
+    </article>
+  `).join("");
+  const statsHtml = (Array.isArray(model.heroStats) ? model.heroStats : []).map((item) => `
+    <article class="player-hero-card__metrics-stat">
+      <p class="player-hero-card__metrics-stat-label">${escapeHtml(item.label)}</p>
+      <p class="player-hero-card__metrics-stat-value">${escapeHtml(item.value)}</p>
     </article>
   `).join("");
 
   const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
   const realNameValue = model.heroRealName || "Not shared";
+  const pageViewCount = model.pageViewCount || "0";
 
   container.innerHTML = `
     <div class="player-hero-card__backdrop" aria-hidden="true"></div>
@@ -391,6 +468,14 @@ function renderHeroCard(container, model) {
         </div>
       </div>
     </section>
+    <section class="player-hero-card__metrics-panel">
+      <div class="player-hero-card__section-topline">
+        <h3 class="player-hero-card__section-title">Profile Metrics</h3>
+      </div>
+      <div class="player-hero-card__metrics-grid">
+        ${statsHtml}
+      </div>
+    </section>
     <section class="player-hero-card__identity-panel">
       <p class="player-hero-card__kicker">${escapeHtml(model.heroChipLabel)}</p>
       <div class="player-hero-card__identity-field">
@@ -399,6 +484,10 @@ function renderHeroCard(container, model) {
           <span class="player-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
           <span class="player-presence-dot player-presence-dot--${escapeHtml(model.presenceToneClass || "offline")}" title="${escapeHtml(model.presenceLabel || "Offline")}"></span>
         </div>
+      </div>
+      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
+        <span class="player-hero-card__identity-field-label">Page Views</span>
+        <span class="player-hero-card__identity-field-value">${escapeHtml(pageViewCount)}</span>
       </div>
       <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
         <span class="player-hero-card__identity-field-label">Factory ID</span>
@@ -430,11 +519,21 @@ function renderHeroCard(container, model) {
   `;
 
   const backdrop = container.querySelector(".player-hero-card__backdrop");
+  const hasCustomBackdrop = !!model.backgroundImageUrl;
   if (backdrop) {
-    backdrop.style.backgroundImage = model.backgroundImageUrl
-      ? `url("${model.backgroundImageUrl}")`
-      : "";
+    if (hasCustomBackdrop) {
+      backdrop.style.setProperty("--player-profile-backdrop-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+    } else {
+      backdrop.style.removeProperty("--player-profile-backdrop-image");
+    }
   }
+
+  container.classList.toggle("player-hero-card--default-backdrop", !hasCustomBackdrop);
+  container.classList.toggle("player-hero-card--custom-backdrop", hasCustomBackdrop);
+
+  const hasCustomAvatar = !!model.avatarSrc && model.avatarSrc !== DEFAULT_PROFILE_PICTURE_SRC;
+  container.classList.toggle("player-hero-card--default-avatar", !hasCustomAvatar);
+  container.classList.toggle("player-hero-card--custom-avatar", hasCustomAvatar);
 
   const portraitImage = container.querySelector(".player-hero-card__portrait-image");
   if (!portraitImage) return;
@@ -467,7 +566,7 @@ function renderPanel(container, title, items, formatter) {
   const itemsHtml = items.map(formatter).join("");
 
   container.innerHTML = `
-    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     ${itemsHtml}
   `;
 }
@@ -518,7 +617,7 @@ function renderFavoritePanel(container, title, item) {
     `;
 
   container.innerHTML = `
-    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     <div class="player-featured-cabinet">
       ${cardHtml}
     </div>
@@ -594,7 +693,7 @@ function renderThoughtsPanel(container, title, items, composer = null) {
     : "";
 
   container.innerHTML = `
-    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     ${composerHtml}
     <div class="player-thoughts-feed thoughts-feed">
       ${items.map(renderThoughtItem).join("")}
@@ -606,7 +705,7 @@ function renderAboutPanel(container, title, text) {
   if (!container) return;
 
   container.innerHTML = `
-    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     <p class="player-about-copy">${escapeHtml(text)}</p>
   `;
 }
@@ -619,7 +718,7 @@ function renderBadgesPanel(container, title, items) {
     : `<div class="player-badge-list">${items.map((item) => `<span class="player-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
 
   container.innerHTML = `
-    <h2 class="player-panel__title">${escapeHtml(title)}</h2>
+    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     ${badgesHtml}
   `;
 }
@@ -634,10 +733,23 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
   const isOwnerView = !requestedPlayerId || requestedPlayerId === localProfile.playerId;
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
   const profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId, { thoughtFeed });
+  let metricsRecord = options?.metricsRecord?.playerId
+    ? options.metricsRecord
+    : loadProfileMetricsRecord(profile?.playerId || requestedPlayerId || localProfile.playerId, storage);
+  const relationshipsRecord = options?.relationshipsRecord?.playerId
+    ? options.relationshipsRecord
+    : loadProfileRelationshipsRecord(profile?.playerId || requestedPlayerId || localProfile.playerId, storage);
+
+  if (!isOwnerView && profile && !options?.disableProfileViewTracking) {
+    metricsRecord = incrementProfileViewCount(profile.playerId, { source: "direct" }, storage) || metricsRecord;
+  }
+
   const model = buildPlayerPageViewModel(profile, {
     requestedPlayerId,
     thoughtFeed,
     isOwnerView,
+    metricsRecord,
+    relationshipsRecord,
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
   });
 
@@ -673,7 +785,10 @@ if (doc?.getElementById) {
 
   const rerender = (thoughtComposerFlash = "") => {
     profilePanel?.render?.("");
-    renderPlayerPage(doc, { thoughtComposerFlash });
+    renderPlayerPage(doc, {
+      thoughtComposerFlash,
+      disableProfileViewTracking: true,
+    });
   };
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
@@ -709,6 +824,8 @@ if (doc?.getElementById) {
       return;
     }
 
+    const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
     rerender("Thought posted.");
   });
 
@@ -719,7 +836,11 @@ if (doc?.getElementById) {
     const id = button.dataset.deleteId;
     if (!id) return;
 
-    deleteThoughtPost(id, getDefaultPlatformStorage());
+    const storage = getDefaultPlatformStorage();
+    const currentProfile = loadFactoryProfile(storage);
+    deleteThoughtPost(id, storage);
+    const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+    syncThoughtPostCount(currentProfile.playerId, updatedThoughtCount, storage);
     rerender();
   });
 }

@@ -38,6 +38,18 @@ Product framing note:
 The platform remains the owner of long-term identity and social state.
 Games remain self-contained experiences that can read platform data and publish approved activity/results, but games must not become the permanent home for profile ownership.
 
+## Long-Term Experience Pillars
+
+- `context-driven discovery`
+  Discovery should come from shared games, recent opponents, event participation, ladder overlap, feed interaction, and most-played-with relationships rather than from a cold generic player directory.
+  Once registered online profiles exist, contextual discovery should be reinforced by add-friend entry points on game results screens and by profile-linked in-game chat and lobby surfaces rather than by relying only on a standalone people index.
+- `durable memories`
+  The platform should turn cabinet runs, event appearances, activity items, and status posts into durable memories that can resurface on player pages, profile highlights, and future seasonal-history surfaces instead of leaving meaningful moments trapped inside isolated game sessions.
+- `seasonal programming`
+  Bulletins, featured cabinets, event schedules, ladder snapshots, and thought-feed prompts should eventually work together as seasonal programming so the arcade feels like a living scene with recurring beats instead of a static list of pages.
+- connected social loop
+  Thoughts, activity, bulletins, events, and player profiles should eventually feel like parts of one shared social loop, with each surface able to reinforce the others without blurring ownership boundaries.
+
 ## Non-Negotiables
 
 These rules are here to protect stability.
@@ -69,10 +81,12 @@ The repo already has the start of a platform layer:
 
 - `index.html` and `grid.html` establish the arcade shell.
 - `js/arcade-catalog.mjs` owns game listing and launcher metadata loading.
-- `js/factory-profile.mjs` already defines canonical shared identity storage.
-- `js/match-identity.mjs` already separates permanent identity from temporary per-match aliases.
+- `js/platform/identity/factory-profile.mjs` defines canonical shared identity storage.
+- `js/platform/identity/match-identity.mjs` separates permanent identity from temporary per-match aliases.
 - `js/arcade-profile.mjs` already gives us a shell-level profile editor.
-- `games/lovers-lost/` already consumes the shared identity model.
+- `js/platform/profile/`, `js/platform/activity/`, `js/platform/thoughts/`, `js/platform/bulletins/`, and `js/platform/events/` now formalize the first shared platform contracts.
+- owner-authored thought submission on `/me` and owner-view `/player` now exists as a local-first platform capability rather than a future-only note.
+- `games/lovers-lost/` and `games/battleshits/` already consume the shared identity/activity model.
 
 This means the platform does not need to start from zero. It needs to become more deliberate and more formal.
 
@@ -217,8 +231,8 @@ Important behavior notes from the reference:
   We are not building that yet, but it should be tracked as a future platform concept.
 - Future friend points should likely derive from shared play behavior, such as time spent playing together or a similar trust / affinity metric.
   That system needs separate scoping later and should remain platform-owned.
-- Friend ordering should default to platform-owned affinity / friend-points sorting once that system exists.
-  Owner-controlled pinning or manual reordering can exist later, but the default order should come from shared rules rather than page-local drag/drop state.
+- Friend rail placement should support either manual or automatic behavior for every visible slot once that system exists.
+  `Main Squeeze` and the four standard friend slots should each be able to respect player curation or platform-owned affinity ordering without forcing one mode as the permanent default.
 - The background image should eventually be a user-uploaded asset standardized to a 16:9 presentation area.
   Until upload systems exist, use a default background image / fallback treatment.
 - Treat that background as a static profile backdrop rather than a scrolling page layer.
@@ -230,6 +244,8 @@ Important behavior notes from the reference:
   Standardize portrait cropping, sizing, and fallback behavior in platform code before real uploads exist so later media work plugs into a stable frame.
 - Social links should be modeled as a repeatable structured list, not a single freeform text blob.
   Each link item should normalize its own label, URL, and kind so the page never renders sloppy mixed-format link copy.
+- Profile panel headers should be visually separated from panel content.
+  Use boxed section labels or a similarly explicit treatment so headers such as `Social Links` read as container labels rather than blending into player-authored link labels or other body content.
 - The profile feed should eventually support actual player-authored thought submission from the owner view.
   Comments, reactions, and sharing belong to the same feed contract, but cross-user behavior should not force backend work into early local-first passes.
 - Empty fields need strong defaults so the page still feels intentional when a player has no links, no rankings, no favorite game, no badges, no posts, no featured friend, or no custom background.
@@ -350,22 +366,111 @@ Suggested shape:
 ```js
 {
   playerId: "player-123",
-  pageViewCount: 0,
-  reactionCount: 0,
-  commentCount: 0,
-  shareCount: 0,
+  profileViewCount: 0,
+  thoughtPostCount: 0,
+  activityItemCount: 0,
+  receivedReactionCount: 0,
+  receivedCommentCount: 0,
+  receivedShareCount: 0,
   mostPlayedGameSlug: "",
   mostPlayedWithPlayerId: "",
-  friendPoints: {}
+  friendCount: 0,
+  friendPoints: {},
+  totalPlaySessionCount: 0,
+  totalPlayTimeMinutes: 0,
+  uniqueGamesPlayedCount: 0,
+  eventParticipationCount: 0,
+  topThreeFinishCount: 0
 }
 ```
 
 Notes:
 
 - Treat metrics as platform-owned support data, not as page-owned presentation state.
+- `profileViewCount` is the canonical metric behind any future page/profile views UI.
+- `thoughtPostCount` and `activityItemCount` are support metrics that help player pages summarize output without scraping view markup.
+- `receivedReactionCount`, `receivedCommentCount`, and `receivedShareCount` should reflect totals received on the player's authored public content, not raw interaction controls rendered on a single page load.
 - `mostPlayedGameSlug` and `mostPlayedWithPlayerId` should inform future UI and shortcuts without overriding explicit player profile choices.
-- `friendPoints` is the future affinity source for automatic friend ordering.
+- `friendCount` is a first-class support metric even if friend lists later become richer objects.
+- `friendPoints` is the future affinity source for automatic friend ordering and other relationship/discovery surfaces, but visible slot placement can still be manual when the player chooses it.
+- `totalPlaySessionCount`, `totalPlayTimeMinutes`, and `uniqueGamesPlayedCount` summarize arcade participation without turning the shared metrics contract into a full game-stats dump.
+- `eventParticipationCount` matters because events are a first-class platform pillar in the long-term vision.
+- `topThreeFinishCount` is a compact competitive-social summary that reads well on a public profile without dragging cabinet-specific score tables into the shared contract.
+
+### `profileRelationships`
+
+Suggested shape:
+
+```js
+{
+  playerId: "player-123",
+  mainSqueezeMode: "manual",
+  mainSqueezePlayerId: "",
+  friendRailMode: "auto",
+  manualFriendSlotPlayerIds: ["", "", "", ""],
+  mostPlayedWithPlayerId: "",
+  lastPlayedWithPlayerId: "",
+  recentlyPlayedWithPlayerIds: [],
+  friendPlayerIds: [],
+  friendPointsByPlayerId: {},
+  mutualFriendCountByPlayerId: {},
+  sharedGameCountByPlayerId: {},
+  sharedSessionCountByPlayerId: {},
+  sharedEventCountByPlayerId: {},
+  lastSharedSessionAtByPlayerId: {},
+  lastSharedEventAtByPlayerId: {},
+  lastInteractionAtByPlayerId: {}
+}
+```
+
+Relationship-system notes:
+
+- `friendPoints` are platform-derived support data and should never be manually edited.
+  In other words, friendPoints are platform-derived, while visible slot placement can still be manual.
+- visible friend placement is separate from relationship strength
+- `Main Squeeze` can be either manual or automatic
+  Main Squeeze can be either manual or automatic depending on the player's chosen slot behavior.
+- the four standard friend slots can also be either manual or automatic
+- the visible profile rail should always resolve to five total slots: one `Main Squeeze` slot plus four standard friend slots
+- the system should track both affinity and recency
+- affinity signals include friend points plus shared counts
+- recency signals include last played with, recently played with, last shared session, last shared event, and last direct interaction
+
+Friend-points v1:
+
+- creating a friendship: `+100`
+- full shared session: `+10`
+  A qualifying shared session means both players started in the same lobby and reached the same results screen together.
+- shared event as a team / linked entry: `+50`
+  This bonus should only apply when two players enter an event together as a team or explicit linked entry; simply being present in the same broad event should not qualify.
+- direct social interaction: `+1`
+
+Guardrails:
+
+- apply the friendship bonus only once when the friendship is created
+- award session points only once per full shared session
+- award event points only once per qualifying team/linked event
+- cap repeated low-value interaction gains inside a short window so the system cannot be farmed through spam
+- do not decay points in v1
+- use recency later as a tiebreaker or suggestion signal rather than replacing the main affinity totals
 - Exact storage strategy can change later, but the concepts should stay centralized.
+
+Recommended canonical metrics split:
+
+- public/profile support metrics
+  `profileViewCount`, `thoughtPostCount`, `activityItemCount`, `receivedReactionCount`, `receivedCommentCount`, `receivedShareCount`, `mostPlayedGameSlug`, `mostPlayedWithPlayerId`, `friendCount`, `friendPoints`, `totalPlaySessionCount`, `totalPlayTimeMinutes`, `uniqueGamesPlayedCount`, `eventParticipationCount`, `topThreeFinishCount`
+- relationship/discovery metrics
+  `mutualFriendCount`, `sharedGameCount`, `sharedSessionCount`, `sharedEventCount`
+- backend-only analytics
+  `resultsScreenProfileOpenCount`, `resultsScreenAddFriendClickCount`, `chatProfileOpenCount`, `friendRequestSentCount`, `friendRequestAcceptedCount`, `thoughtImpressionCount`, `profileOpenSourceBreakdown`
+
+Scope rules for this list:
+
+- `favoriteGameSlug` stays explicit and player-authored and must not be replaced by `mostPlayedGameSlug`.
+- the shared public/support metrics contract should remain small, legible, and support-oriented; avoid turning it into a dumping ground for every cabinet-specific stat.
+- relationship/discovery metrics can be canonical without becoming first-wave public profile counters; they exist to support friend surfacing and contextual discovery.
+- backend-only analytics should stay separate from public/shared profile metrics even when they are useful for product decisions.
+- per-game high scores, streaks, and ladder details can exist in game/platform result systems, but they should only be promoted into shared profile metrics if they support multiple surfaces cleanly.
 
 ## Profile Page Contract Notes
 
@@ -410,7 +515,7 @@ Future systems that support this profile vision:
 - favorites linking back into arcade grid entries
 - per-game ladder summary data
 - friend points / affinity scoring
-- profile metrics such as page views, most-played-with, comment totals, share totals, and reaction totals
+- recommended canonical metrics split covering public/support metrics, relationship/discovery metrics, and backend-only analytics
 - user-authored status feed items with comments, sharing, and emoji-style reactions
 - direct / private messaging once authenticated identity and cross-user backend rules exist
 
@@ -665,10 +770,11 @@ Features:
 - game-published activity items
 - simple friends list display
 - owner-authored thought submission on the profile/feed surface
-- profile metrics groundwork for views, reactions, comments, shares, and affinity
+- profile metrics groundwork for the recommended canonical metrics split across profile support, engagement, play summaries, relationship discovery, and backend analytics boundaries
 - explicit friend-points / auto-sort contract with room for later manual override
 - groundwork for user-authored status posts that can later gain comments, sharing, and emoji-style reactions
 - stronger profile identity fields so player pages feel like social-media profiles rather than launcher-side stat cards
+- UI-contract prep for contextual profile surfacing, especially profile links from results/history surfaces and future add-friend entry points on game results screens
 
 Guardrails:
 
@@ -676,6 +782,7 @@ Guardrails:
 - no rich replies/threads yet
 - no private messaging
 - no cross-user mutation without real backend planning
+- in-game chat and lobby surfaces may be scoped visually or contractually, but real cross-user chat behavior belongs to backend transition work
 - comment, reaction, and share UI contracts may be defined early, but true cross-user persistence belongs to backend transition work
 - treat the first thoughts feed pass as the future doomscroll/home-feed surface, not as a replacement for the platform announcement board
 
@@ -694,6 +801,8 @@ This is the trigger point for:
 - authentication
 - database-backed profiles
 - friend relationships
+- add-friend entry points on game results screens
+- in-game chat and lobby surfaces that can link to public profiles
 - real shared feed data
 - direct / private messaging
 - cross-user comments, reactions, and shares
@@ -782,12 +891,14 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 
 1. Finish the current profile polish pass so the mock-aligned page stops carrying redundant or sloppy helper copy.
    This includes things like duplicate profile-picture labeling and other presentation drift inside the shared profile composition.
-2. Expand the owner edit surface to cover the canonical about-me field, structured multi-link editing, favorite-game pinning, and stable profile-picture framing constraints.
-3. Add local-first owner-authored thought submission so the profile feed becomes meaningfully postable before backend work begins.
-4. Define platform-owned profile metrics and relationship metrics for page views, most-played cabinet, most-played-with player, reaction totals, comment totals, share totals, and friend points.
-5. Use those shared metrics/contracts to shape future friends preview ordering, reaction UI, and comment/share affordances without pretending cross-user persistence already exists.
-6. Add profile discovery only when it has a clear use case for the surrounding pages.
-7. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
+2. Separate panel headers from panel content across the shared player profile composition, using boxed section labels or similarly explicit framing so labels like `Social Links` never blend into user-authored content.
+3. Finish stabilizing favorite-cabinet presentation, profile background fallback treatment, and avatar framing so the mock-aligned profile composition feels intentional even before uploads exist.
+4. Define the recommended canonical metrics split for platform-owned support data: public/profile support metrics, relationship/discovery metrics, and backend-only analytics.
+5. Turn future discovery into context-driven discovery through shared games, events, activity, and feed participation instead of shipping a generic empty player directory.
+6. Reserve chat/lobby profile links and add-friend results-screen prompts as the primary future profile-surfacing routes once authenticated online profiles exist.
+7. Shape bulletins, events, featured cabinets, ladder snapshots, and feed prompts into the first pass of seasonal programming.
+8. Use those shared metrics/contracts to support durable memories on player pages and future home-feed/story surfaces without pretending full cross-user persistence already exists.
+9. Keep backend/auth/database work in the later transition phase instead of leaking it into local-first pages.
 
 ## Current Progress
 
@@ -804,12 +915,16 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `/events/index.html` and `/event/index.html?slug=<eventSlug>` now exist as read-only event listing/detail surfaces backed by shared event contracts.
 - `js/platform/activity/` now owns the first shared game-to-platform activity publishing contract plus the shared activity feed storage key.
 - `js/platform/thoughts/` now owns shared status-post normalization plus a fixture/storage-backed public thoughts feed.
-- `/thoughts/index.html` now exists as the first read-only player-status feed surface for the future social/home-feed layer.
+- `/thoughts/index.html` now exists as the first public player-status feed surface for the future social/home-feed layer.
 - `js/platform/profile/` now normalizes richer public profile fields including favorite game, ladder placements, friends preview, main squeeze, presence, badges, and background-image fallback data.
 - `/me/index.html` and `/player/index.html?id=<playerId>` now expose read-only favorite-cabinet, ranking, and friends sections with fallback content instead of only the earlier summary panels.
 - `/me/index.html` and `/player/index.html?id=<playerId>` now embed player-owned thoughts feeds directly into the profile composition instead of leaving that social lane detached from the player page.
+- owner-authored thought submission on `/me` and owner-view `/player` now exists, with new posts written locally into the shared thought-feed contract.
+- owner-view thought cards can now be deleted from `/me` and owner-view `/player`, and those removals propagate cleanly to the shared local-first feed state.
+- the public and profile-embedded thought lanes now use constrained scroll windows so cards stay at full size instead of compressing as the feed grows.
 - `/me` and `/player` now follow the canonical reference composition much more closely with a true left rail, a square featured-cabinet tile that reuses the arcade grid-card shape, and a right-side feed/about/badges lane.
 - The profile identity contract now includes a separate optional `realName` field distinct from the arcade `profileName`, and the current owner edit surface supports editing that field locally.
+- the current owner edit surface now also supports canonical `bio`, structured multi-link editing, bare-domain link normalization, and local-first favorite cabinet storage.
 - The profile presence affordance now treats the dot beside the in-panel `Name` field as the visible source of truth for online/offline state instead of rendering a redundant status row.
 - The current profile pass has also removed redundant duplicate headers and placeholder labels inside the mock-defined sections so panel titles only read once.
 - The long-term feed contract now explicitly includes emoji-style reactions with visible totals so the thoughts/feed layer does not drift away from the intended Facebook-style interaction model.
@@ -817,6 +932,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
+- platform secondary pages now use consistent `Back` navigation plus normalized `Player Page` portal naming so the platform feels more like one connected shell.
 
 ## Scope Lock For Upcoming Profile Passes
 
@@ -824,22 +940,29 @@ Use this section as a drift guard when work moves across threads.
 
 Immediate local-first priorities:
 
-- profile-picture presentation constraints, fallback behavior, and owner-edit polish
-- editable structured social links with support for multiple links
-- editable canonical about-me / `bio` field
-- favorite-game pinning as an explicit player choice
-- owner-authored thought submission on the profile feed
-- shared profile metrics groundwork
+- panel headers that read as distinct container labels instead of blending into panel content
+- profile-picture and background presentation constraints plus fallback polish
+- favorite-game pinning and featured-cabinet presentation as an explicit player-controlled identity surface
+- shared profile metrics groundwork built around the recommended canonical metrics split instead of one-off counters
+- context-driven discovery rules tied to games, events, activity, and feed participation
+- durable memories on player pages so activity/posts/results can become reusable profile highlights
+- seasonal programming links between bulletins, events, featured cabinets, ladder snapshots, and thought prompts
 - badges as a shared profile contract even if the first pass is placeholder-only
-- removing redundant helper copy such as duplicate profile-picture labels when the surrounding section already communicates the purpose
+- remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
 
 Default product calls for this scope:
 
 - favorite game is manual first; most-played data can inform later suggestions but must not silently replace the player's chosen favorite
 - social links are repeatable structured items with normalized label/url/kind fields
-- friend ordering should default to platform-owned friend-points / affinity sorting once available
-- manual pinning or reordering for friends can be added later as an explicit owner override
+- panel headers should be visually separated from panel content, preferably with boxed section labels in the shared profile composition
+- the recommended canonical metrics split should lock public/support metrics first, then relationship/discovery metrics, while keeping backend analytics separate from public profile identity
+- friend points should stay platform-derived while visible friend placement supports either manual or automatic behavior for `Main Squeeze` and the four standard friend slots
+- relationship ordering should be able to use both affinity (`friendPoints`, shared counts) and recency (`last played with`, `recently played with`, last shared session/event, last interaction) without forcing one permanent display mode
 - comments, emoji reactions, and sharing belong to the thoughts/feed contract, but cross-user persistence is backend-phase work
+- discovery should stay context-driven instead of becoming a generic empty people directory
+- once online profiles exist, add-friend entry points on game results screens and in-game chat and lobby surfaces should be treated as first-class profile-surfacing paths
+- player pages should accumulate durable memories from platform-owned activity/posts/results rather than forcing every cabinet to invent its own legacy/history UI
+- bulletins, events, ladders, and featured cabinets should be able to support seasonal programming without requiring a separate product line
 - uploads stay late even though avatar/background display constraints should be stabilized now
 
 Deferred until later phases:
