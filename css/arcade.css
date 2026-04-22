@@ -5292,6 +5292,8 @@ body::before {
 
 .thoughts-feed {
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 16px;
   max-height: min(70vh, 760px);
   padding-right: 8px;
