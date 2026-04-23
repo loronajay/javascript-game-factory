@@ -5850,6 +5850,239 @@ body::before {
   font-size: 0.72rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  cursor: default;
+}
+
+button.thought-card__action {
+  cursor: pointer;
+}
+
+.thought-card__action--active {
+  border-color: rgba(146, 240, 255, 0.6);
+  background:
+    linear-gradient(180deg, rgba(146, 240, 255, 0.22), rgba(25, 16, 54, 0.94)),
+    rgba(14, 10, 30, 0.96);
+}
+
+.thought-card__reaction-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 197, 228, 0.16);
+  padding-top: 12px;
+}
+
+.thought-card__reaction-picker--hidden {
+  display: none;
+}
+
+.thought-card__share-sheet {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 197, 228, 0.16);
+  padding-top: 12px;
+}
+
+.thought-card__comment-sheet {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid rgba(146, 240, 255, 0.16);
+  padding-top: 12px;
+}
+
+.thought-card__comment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.thought-card__comment-kicker {
+  margin: 0;
+  color: #92f0ff;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.thought-card__comment-dismiss {
+  border: 1px solid rgba(146, 240, 255, 0.24);
+  background: rgba(14, 10, 30, 0.92);
+  color: #dffbff;
+  min-height: 32px;
+  padding: 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.thought-card__comment-thread {
+  display: grid;
+  gap: 10px;
+}
+
+.thought-card__comment {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(146, 240, 255, 0.18);
+  background: rgba(10, 12, 28, 0.84);
+}
+
+.thought-card__comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #bfefff;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.thought-card__comment-body,
+.thought-card__comment-empty {
+  margin: 0;
+  color: #f9f3ff;
+  line-height: 1.55;
+}
+
+.thought-card__comment-form {
+  display: grid;
+  gap: 10px;
+}
+
+.thought-card__share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.thought-card__share-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 197, 228, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 197, 228, 0.12), rgba(19, 10, 35, 0.92)),
+    rgba(14, 10, 30, 0.96);
+  color: #fff7fc;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.thought-card__share-button--primary {
+  border-color: rgba(146, 240, 255, 0.48);
+}
+
+.thought-card__share-button--danger {
+  border-color: rgba(255, 100, 130, 0.46);
+}
+
+.thought-card__share-composer {
+  display: grid;
+  gap: 10px;
+}
+
+.thought-card__share-label {
+  color: #ffd2eb;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.thought-card__share-input {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px;
+  border: 2px solid rgba(255, 197, 228, 0.24);
+  background: rgba(6, 4, 18, 0.9);
+  color: #fff7fc;
+  resize: vertical;
+}
+
+.thought-card__reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(146, 240, 255, 0.22);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(146, 240, 255, 0.12), rgba(19, 10, 35, 0.96)),
+    rgba(14, 10, 30, 0.94);
+  color: #fff7fc;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.thought-card__reaction-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(146, 240, 255, 0.54);
+}
+
+.thought-card__reaction-chip--selected {
+  border-color: rgba(255, 197, 228, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 197, 228, 0.34), rgba(61, 21, 74, 0.96)),
+    rgba(31, 10, 40, 0.96);
+}
+
+.thought-card__reaction-glyph {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.thought-card__reaction-count {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.thought-card__quoted-thought {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(146, 240, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(146, 240, 255, 0.08), rgba(19, 10, 35, 0.92)),
+    rgba(14, 10, 30, 0.94);
+}
+
+.thought-card__quoted-thought--sheet {
+  margin-top: 4px;
+}
+
+.thought-card__quoted-kicker,
+.thought-card__quoted-author,
+.thought-card__quoted-date {
+  margin: 0;
+  color: #ffd2eb;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.thought-card__quoted-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.thought-card__quoted-title,
+.thought-card__quoted-summary {
+  margin: 0;
+}
+
+.thought-card__quoted-title {
+  font-size: 0.94rem;
+  text-transform: uppercase;
+}
+
+.thought-card__quoted-summary {
+  color: rgba(255, 247, 252, 0.82);
+  line-height: 1.55;
 }
 
 .thought-card__delete {

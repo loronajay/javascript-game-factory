@@ -16,7 +16,15 @@ import {
   recordSharedSessionBetweenPlayers,
   savePlayerRelationships,
 } from "./db/relationships.mjs";
-import { deleteThought, listThoughts, saveThought } from "./db/thoughts.mjs";
+import {
+  commentOnThought,
+  deleteThought,
+  listThoughtComments,
+  listThoughts,
+  reactToThought,
+  saveThought,
+  shareThought,
+} from "./db/thoughts.mjs";
 
 const { Pool } = pg;
 
@@ -69,8 +77,12 @@ async function bootstrap() {
     savePlayerRelationships: (playerId, patch) => savePlayerRelationships(pool, playerId, patch),
     listActivityItems: () => listActivityItems(pool),
     saveActivityItem: (item) => saveActivityItem(pool, item),
-    listThoughts: () => listThoughts(pool),
+    listThoughts: (options) => listThoughts(pool, options),
+    listThoughtComments: (thoughtId, options) => listThoughtComments(pool, thoughtId, options),
     saveThought: (thought) => saveThought(pool, thought),
+    shareThought: (thoughtId, viewerPlayerId, viewerAuthorDisplayName, options) => shareThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, options),
+    commentOnThought: (thoughtId, viewerPlayerId, viewerAuthorDisplayName, text) => commentOnThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, text),
+    reactToThought: (thoughtId, viewerPlayerId, reactionId) => reactToThought(pool, thoughtId, viewerPlayerId, reactionId),
     deleteThought: (thoughtId) => deleteThought(pool, thoughtId),
   });
   const server = createServer(app);

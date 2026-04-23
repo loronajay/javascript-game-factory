@@ -3,6 +3,9 @@ import { readFile } from "node:fs/promises";
 export const MIGRATION_FILES = Object.freeze([
   "001-initial-schema.sql",
   "002-friend-codes.sql",
+  "003-thought-reactions.sql",
+  "004-thought-shares.sql",
+  "005-thought-comments.sql",
 ]);
 
 export function migrationFileUrl(name) {

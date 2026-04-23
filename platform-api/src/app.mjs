@@ -87,8 +87,20 @@ export function createApp(options = {}) {
   const listThoughts = typeof options?.listThoughts === "function"
     ? options.listThoughts
     : async () => [];
+  const listThoughtComments = typeof options?.listThoughtComments === "function"
+    ? options.listThoughtComments
+    : async () => [];
   const saveThought = typeof options?.saveThought === "function"
     ? options.saveThought
+    : async () => null;
+  const shareThought = typeof options?.shareThought === "function"
+    ? options.shareThought
+    : async () => null;
+  const commentOnThought = typeof options?.commentOnThought === "function"
+    ? options.commentOnThought
+    : async () => null;
+  const reactToThought = typeof options?.reactToThought === "function"
+    ? options.reactToThought
     : async () => null;
   const deleteThought = typeof options?.deleteThought === "function"
     ? options.deleteThought
@@ -97,7 +109,8 @@ export function createApp(options = {}) {
 
   return async function app(req, res) {
     const method = typeof req?.method === "string" ? req.method.toUpperCase() : "GET";
-    const pathname = new URL(req?.url || "/", "http://localhost").pathname;
+    const requestUrl = new URL(req?.url || "/", "http://localhost");
+    const pathname = requestUrl.pathname;
     const timestamp = buildTimestamp(now);
     const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
     const friendCodeMatch = pathname.match(/^\/players\/by-friend-code\/([^/]+)$/);
@@ -160,7 +173,9 @@ export function createApp(options = {}) {
     }
 
     if (method === "GET" && pathname === "/thoughts") {
-      const thoughts = await listThoughts();
+      const thoughts = await listThoughts({
+        viewerPlayerId: requestUrl.searchParams.get("viewerPlayerId") || "",
+      });
       writeJson(res, 200, { thoughts });
       return;
     }
@@ -183,6 +198,80 @@ export function createApp(options = {}) {
     }
 
     const thoughtDeleteMatch = pathname.match(/^\/thoughts\/([^/]+)$/);
+    const thoughtReactionMatch = pathname.match(/^\/thoughts\/([^/]+)\/reactions$/);
+    const thoughtShareMatch = pathname.match(/^\/thoughts\/([^/]+)\/shares$/);
+    const thoughtCommentMatch = pathname.match(/^\/thoughts\/([^/]+)\/comments$/);
+    if (method === "GET" && thoughtCommentMatch) {
+      const comments = await listThoughtComments(decodeURIComponent(thoughtCommentMatch[1]));
+      writeJson(res, 200, { comments });
+      return;
+    }
+
+    if (method === "POST" && thoughtCommentMatch) {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const commentRecord = await commentOnThought(
+        decodeURIComponent(thoughtCommentMatch[1]),
+        body.value?.viewerPlayerId,
+        body.value?.viewerAuthorDisplayName,
+        body.value?.text,
+      );
+      writeJson(res, 200, { commentRecord });
+      return;
+    }
+
+    if (method === "POST" && thoughtShareMatch) {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const share = await shareThought(
+        decodeURIComponent(thoughtShareMatch[1]),
+        body.value?.viewerPlayerId,
+        body.value?.viewerAuthorDisplayName,
+        body.value,
+      );
+      writeJson(res, 200, { share });
+      return;
+    }
+
+    if (method === "POST" && thoughtReactionMatch) {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, {
+          status: "error",
+          service: "platform-api",
+          error: body.error,
+          timestamp,
+        });
+        return;
+      }
+
+      const thought = await reactToThought(
+        decodeURIComponent(thoughtReactionMatch[1]),
+        body.value?.viewerPlayerId,
+        body.value?.reactionId,
+      );
+      writeJson(res, 200, { thought });
+      return;
+    }
+
     if (method === "DELETE" && thoughtDeleteMatch) {
       const thoughtId = decodeURIComponent(thoughtDeleteMatch[1]);
       const deleted = await deleteThought(thoughtId);

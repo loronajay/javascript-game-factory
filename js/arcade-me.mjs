@@ -22,9 +22,14 @@ import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
   buildPlayerThoughtFeed,
   buildThoughtCardItems,
+  commentOnThoughtPostWithApi,
   deleteThoughtPostWithApi,
   loadThoughtFeed,
+  loadThoughtComments,
   publishThoughtPostWithApi,
+  reactToThoughtPostWithApi,
+  shareThoughtPostWithApi,
+  syncThoughtCommentsFromApi,
   syncThoughtFeedFromApi,
 } from "./platform/thoughts/thoughts.mjs";
 
@@ -95,6 +100,92 @@ function buildPresenceToneClass(presence) {
 
 function escapeCssUrl(value) {
   return String(value || "").replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+function buildShareReference(item) {
+  if (item?.quotedThought) {
+    return item.quotedThought;
+  }
+
+  return item
+    ? {
+        title: item.title,
+        summary: item.summary,
+        authorLabel: item.authorLabel,
+        publishedLabel: item.publishedLabel,
+      }
+    : null;
+}
+
+function renderQuotedThought(reference, mode = "card") {
+  if (!reference) return "";
+
+  const className = mode === "share-sheet"
+    ? "thought-card__quoted-thought thought-card__quoted-thought--sheet"
+    : "thought-card__quoted-thought";
+
+  return `
+    <div class="${className}">
+      <p class="thought-card__quoted-kicker">Shared Post</p>
+      <div class="thought-card__quoted-meta">
+        <span class="thought-card__quoted-author">${escapeHtml(reference.authorLabel || "Arcade Pilot")}</span>
+        <span class="thought-card__quoted-date">${escapeHtml(reference.publishedLabel || "Signal pending")}</span>
+      </div>
+      <p class="thought-card__quoted-title">${escapeHtml(reference.title || "Arcade Signal")}</p>
+      <p class="thought-card__quoted-summary">${escapeHtml(reference.summary || "Shared arcade signal.")}</p>
+    </div>
+  `;
+}
+
+function formatCommentDate(value) {
+  return value || "Signal pending";
+}
+
+function renderCommentSheet(item, commentPanelState = {}) {
+  if (item.isPlaceholder || item.id !== commentPanelState?.cardId) {
+    return "";
+  }
+
+  const comments = Array.isArray(commentPanelState.comments) ? commentPanelState.comments : [];
+  const reference = buildShareReference(item);
+
+  return `
+    <div class="thought-card__comment-sheet">
+      <div class="thought-card__comment-header">
+        <p class="thought-card__comment-kicker">Comments</p>
+        <button class="thought-card__comment-dismiss" type="button" data-close-comment-sheet="${escapeHtml(item.id)}">Close</button>
+      </div>
+      ${renderQuotedThought(reference, "share-sheet")}
+      <div class="thought-card__comment-thread">
+        ${comments.length > 0
+          ? comments.map((comment) => `
+            <article class="thought-card__comment">
+              <div class="thought-card__comment-meta">
+                <span class="thought-card__comment-author">${escapeHtml(comment.authorDisplayName || "Arcade Pilot")}</span>
+                <span class="thought-card__comment-date">${escapeHtml(formatCommentDate(comment.createdAt))}</span>
+              </div>
+              <p class="thought-card__comment-body">${escapeHtml(comment.text || "")}</p>
+            </article>
+          `).join("")
+          : `<p class="thought-card__comment-empty">No comments yet. Start the thread.</p>`}
+      </div>
+      <form class="thought-card__comment-form" data-comment-form="${escapeHtml(item.commentTargetId || item.id)}" data-comment-card-id="${escapeHtml(item.id)}">
+        <label class="thought-card__share-label" for="me-comment-body-${escapeHtml(item.id)}">Write a comment</label>
+        <textarea
+          id="me-comment-body-${escapeHtml(item.id)}"
+          class="thought-card__share-input"
+          rows="3"
+          maxlength="500"
+          placeholder="Write your reply."
+          data-comment-input="${escapeHtml(item.id)}"
+        >${escapeHtml(commentPanelState.text || "")}</textarea>
+        <div class="thought-card__share-actions">
+          <button class="thought-card__share-button thought-card__share-button--primary" type="submit">Post Comment</button>
+          <button class="thought-card__share-button" type="button" data-close-comment-sheet="${escapeHtml(item.id)}">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
 }
 
 function resolveOwnerPresence(presence) {
@@ -628,7 +719,7 @@ function renderFavoritePanel(container, title, item) {
   `;
 }
 
-function renderThoughtItem(item) {
+function renderThoughtItem(item, openReactionThoughtId = "", sharePanelState = {}, commentPanelState = {}) {
   const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
   const actionItems = Array.isArray(item.actionItems) && item.actionItems.length > 0
     ? item.actionItems
@@ -637,12 +728,114 @@ function renderThoughtItem(item) {
         { label: "Share" },
         { label: "React" },
       ];
-  const actionsHtml = actionItems.map((action) => `
-    <span class="thought-card__action">${escapeHtml(action.label)}</span>
-  `).join("");
+  const isReactionPickerOpen = !item.isPlaceholder && item.id === openReactionThoughtId;
+  const isShareSheetOpen = !item.isPlaceholder && item.id === sharePanelState?.cardId;
+  const isShareCaptionOpen = isShareSheetOpen && sharePanelState?.mode === "caption";
+  const isCommentSheetOpen = !item.isPlaceholder && item.id === commentPanelState?.cardId;
+  const shareReference = buildShareReference(item);
+  const actionsHtml = actionItems.map((action) => {
+    if (action.id === "comment" && !item.isPlaceholder) {
+      return `
+        <button
+          class="${isCommentSheetOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
+          type="button"
+          data-comment-thought-id="${escapeHtml(item.commentTargetId || item.id)}"
+          data-comment-card-id="${escapeHtml(item.id)}"
+        >${escapeHtml(action.label)}</button>
+      `;
+    }
+
+    if (action.id === "share" && !item.isPlaceholder) {
+      return `
+        <button
+          class="${action.isActive ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
+          type="button"
+          data-share-thought-id="${escapeHtml(item.shareTargetId || item.id)}"
+          data-share-card-id="${escapeHtml(item.id)}"
+        >${escapeHtml(action.label)}</button>
+      `;
+    }
+
+    if (action.id === "react" && !item.isPlaceholder) {
+      return `
+        <button
+          class="${isReactionPickerOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
+          type="button"
+          data-toggle-thought-reactions="${escapeHtml(item.id)}"
+          aria-expanded="${isReactionPickerOpen ? "true" : "false"}"
+        >${escapeHtml(action.label)}</button>
+      `;
+    }
+
+    return `
+      <span class="thought-card__action">${escapeHtml(action.label)}</span>
+    `;
+  }).join("");
   const deleteHtml = item.canDelete
     ? `<button class="thought-card__delete" type="button" data-delete-id="${escapeHtml(item.id)}" aria-label="Delete thought">Delete</button>`
     : "";
+  const reactionPickerHtml = item.isPlaceholder
+    ? ""
+    : `
+      <div class="${isReactionPickerOpen ? "thought-card__reaction-picker" : "thought-card__reaction-picker thought-card__reaction-picker--hidden"}">
+        ${item.reactionPickerItems.map((reaction) => `
+          <button
+            class="${reaction.isSelected ? "thought-card__reaction-chip thought-card__reaction-chip--selected" : "thought-card__reaction-chip"}"
+            type="button"
+            data-react-thought-id="${escapeHtml(item.id)}"
+            data-thought-reaction-id="${escapeHtml(reaction.id)}"
+            aria-pressed="${reaction.isSelected ? "true" : "false"}"
+            title="${escapeHtml(reaction.label)}"
+          >
+            <span class="thought-card__reaction-glyph" aria-hidden="true">${escapeHtml(reaction.glyph || reaction.label)}</span>
+            <span class="thought-card__reaction-count">${escapeHtml(String(reaction.count || 0))}</span>
+          </button>
+        `).join("")}
+      </div>
+    `;
+  const shareSheetHtml = item.isPlaceholder || !isShareSheetOpen
+    ? ""
+    : `
+      <div class="thought-card__share-sheet">
+        ${item.actionItems.find((action) => action.id === "share")?.isActive
+          ? `
+            <div class="thought-card__share-actions">
+              <button class="thought-card__share-button thought-card__share-button--danger" type="button" data-share-now-thought-id="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">Remove Share</button>
+              <button class="thought-card__share-button" type="button" data-close-share-sheet="${escapeHtml(item.id)}">Done</button>
+            </div>
+          `
+          : `
+            <div class="thought-card__share-actions">
+              <button class="thought-card__share-button thought-card__share-button--primary" type="button" data-share-now-thought-id="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">Share Now</button>
+              <button class="thought-card__share-button" type="button" data-open-share-caption="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">Write Caption</button>
+            </div>
+          `}
+        ${isShareCaptionOpen
+          ? `
+            <form class="thought-card__share-composer" data-share-caption-form="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">
+              <label class="thought-card__share-label" for="me-share-caption-${escapeHtml(item.id)}">Add your caption</label>
+              <textarea
+                id="me-share-caption-${escapeHtml(item.id)}"
+                class="thought-card__share-input"
+                rows="4"
+                maxlength="500"
+                placeholder="Say something about this post."
+                data-share-caption-input="${escapeHtml(item.id)}"
+              >${escapeHtml(sharePanelState?.caption || "")}</textarea>
+              <div class="thought-card__share-actions">
+                <button class="thought-card__share-button thought-card__share-button--primary" type="submit">Share With Caption</button>
+                <button class="thought-card__share-button" type="button" data-close-share-sheet="${escapeHtml(item.id)}">Cancel</button>
+              </div>
+              ${renderQuotedThought(shareReference, "share-sheet")}
+            </form>
+          `
+          : ""}
+      </div>
+    `;
+  const quotedThoughtHtml = item.quotedThought
+    ? renderQuotedThought(item.quotedThought)
+    : "";
+  const commentSheetHtml = renderCommentSheet(item, commentPanelState);
 
   return `
     <article class="${cardClass}">
@@ -665,11 +858,15 @@ function renderThoughtItem(item) {
       <div class="thought-card__actions">
         ${actionsHtml}
       </div>
+      ${commentSheetHtml}
+      ${shareSheetHtml}
+      ${reactionPickerHtml}
+      ${quotedThoughtHtml}
     </article>
   `;
 }
 
-function renderThoughtsPanel(container, title, items, composer = null) {
+function renderThoughtsPanel(container, title, items, composer = null, options = {}) {
   if (!container) return;
 
   const composerHtml = composer?.enabled
@@ -703,7 +900,12 @@ function renderThoughtsPanel(container, title, items, composer = null) {
     <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     ${composerHtml}
     <div class="me-thoughts-feed thoughts-feed">
-      ${items.map(renderThoughtItem).join("")}
+      ${items.map((item) => renderThoughtItem(
+        item,
+        options?.openReactionThoughtId || "",
+        options?.sharePanelState || {},
+        options?.commentPanelState || {},
+      )).join("")}
     </div>
   `;
 }
@@ -750,7 +952,17 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
   });
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("meHeroCard"), model);
-  renderThoughtsPanel(doc.getElementById("meThoughtsPanel"), "Player Feed", model.thoughtItems, model.thoughtComposer);
+  renderThoughtsPanel(
+    doc.getElementById("meThoughtsPanel"),
+    "Player Feed",
+    model.thoughtItems,
+    model.thoughtComposer,
+    {
+      openReactionThoughtId: options?.openReactionThoughtId || "",
+      sharePanelState: options?.sharePanelState || {},
+      commentPanelState: options?.commentPanelState || {},
+    },
+  );
   renderFriendCodePanel(doc.getElementById("meFriendCodePanel"), "Friend Code", model);
   renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
   const rankingsPanel = doc.getElementById("meRankingsPanel");
@@ -772,13 +984,17 @@ const doc = globalThis.document;
 
 if (doc?.getElementById) {
   const storage = getDefaultPlatformStorage();
+  const apiClient = createPlatformApiClient();
   const profilePanel = initArcadeProfilePanel({ storage });
+  let openReactionThoughtId = "";
+  let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+  let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
   renderMePage(doc);
 
   const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
     const currentProfile = loadFactoryProfile(storage);
     const thoughtFeed = shouldHydrate
-      ? await syncThoughtFeedFromApi(storage)
+      ? await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId)
       : loadThoughtFeed(storage);
     const hydrated = shouldHydrate
       ? await hydrateArcadeProfileFromApi(storage)
@@ -794,7 +1010,32 @@ if (doc?.getElementById) {
       friendCodeFlash,
       metricsRecord: hydrated.metricsRecord,
       relationshipsRecord: hydrated.relationshipsRecord,
+      openReactionThoughtId,
+      sharePanelState,
+      commentPanelState,
     });
+  };
+
+  const openCommentSheet = async (cardId, thoughtId) => {
+    commentPanelState = {
+      cardId,
+      thoughtId,
+      text: "",
+      comments: loadThoughtComments(thoughtId, storage),
+    };
+    openReactionThoughtId = "";
+    sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+    await rerender();
+
+    const remoteComments = await syncThoughtCommentsFromApi(thoughtId, storage, apiClient);
+    if (commentPanelState.cardId !== cardId || commentPanelState.thoughtId !== thoughtId) {
+      return;
+    }
+    commentPanelState = {
+      ...commentPanelState,
+      comments: remoteComments,
+    };
+    await rerender();
   };
 
   void rerender("", true);
@@ -813,12 +1054,54 @@ if (doc?.getElementById) {
 
   doc.addEventListener("submit", async (event) => {
     const form = event.target;
+    if (form && typeof form === "object" && form.matches?.("[data-comment-form]")) {
+      event.preventDefault();
+      const currentProfile = loadFactoryProfile(storage);
+      if (!commentPanelState.thoughtId || !currentProfile?.playerId || !commentPanelState.text.trim()) {
+        return;
+      }
+
+      await commentOnThoughtPostWithApi(commentPanelState.thoughtId, {
+        playerId: currentProfile.playerId,
+        profileName: currentProfile.profileName || "UNNAMED PILOT",
+      }, commentPanelState.text, storage, {
+        apiClient,
+      });
+      commentPanelState = {
+        ...commentPanelState,
+        text: "",
+        comments: loadThoughtComments(commentPanelState.thoughtId, storage),
+      };
+      void rerender();
+      return;
+    }
+
+    if (form && typeof form === "object" && form.matches?.("[data-share-caption-form]")) {
+      event.preventDefault();
+      const currentProfile = loadFactoryProfile(storage);
+      if (!sharePanelState.thoughtId || !currentProfile?.playerId) {
+        return;
+      }
+
+      await shareThoughtPostWithApi(sharePanelState.thoughtId, {
+        playerId: currentProfile.playerId,
+        profileName: currentProfile.profileName || "UNNAMED PILOT",
+      }, storage, {
+        apiClient,
+        caption: sharePanelState.caption,
+      });
+      sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      void rerender();
+      return;
+    }
+
     if (form && typeof form === "object" && form.id === "meFriendCodeForm") {
       event.preventDefault();
       const input = doc.getElementById("meFriendCodeInput");
       const outcome = await addFriendByCode(input?.value || "", {
         storage,
-        apiClient: createPlatformApiClient(),
+        apiClient,
       });
       void rerender("", false, outcome.message);
       return;
@@ -851,14 +1134,147 @@ if (doc?.getElementById) {
       currentProfile.playerId,
       updatedThoughtCount,
       storage,
-      createPlatformApiClient(),
+      apiClient,
     );
     void rerender("Thought posted.");
   });
 
   doc.addEventListener("click", async (event) => {
+    const commentButton = event.target.closest("[data-comment-thought-id]");
+    if (commentButton) {
+      const thoughtId = commentButton.dataset.commentThoughtId || "";
+      const cardId = commentButton.dataset.commentCardId || "";
+      const currentProfile = loadFactoryProfile(storage);
+      if (!thoughtId || !currentProfile?.playerId) {
+        return;
+      }
+
+      if (commentPanelState.cardId === cardId) {
+        commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+        void rerender();
+        return;
+      }
+
+      void openCommentSheet(cardId, thoughtId);
+      return;
+    }
+
+    const shareButton = event.target.closest("[data-share-thought-id]");
+    if (shareButton) {
+      const thoughtId = shareButton.dataset.shareThoughtId;
+      const cardId = shareButton.dataset.shareCardId || "";
+      const currentProfile = loadFactoryProfile(storage);
+      if (!thoughtId || !currentProfile?.playerId) {
+        return;
+      }
+
+      openReactionThoughtId = "";
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      sharePanelState = sharePanelState.cardId === cardId
+        ? { cardId: "", thoughtId: "", mode: "", caption: "" }
+        : { cardId, thoughtId, mode: "", caption: "" };
+      void rerender();
+      return;
+    }
+
+    const shareNowButton = event.target.closest("[data-share-now-thought-id]");
+    if (shareNowButton) {
+      const thoughtId = shareNowButton.dataset.shareNowThoughtId;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!thoughtId || !currentProfile?.playerId) {
+        return;
+      }
+
+      await shareThoughtPostWithApi(thoughtId, {
+        playerId: currentProfile.playerId,
+        profileName: currentProfile.profileName || "UNNAMED PILOT",
+      }, storage, {
+        apiClient,
+      });
+      sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+      openReactionThoughtId = "";
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      void rerender();
+      return;
+    }
+
+    const openShareCaptionButton = event.target.closest("[data-open-share-caption]");
+    if (openShareCaptionButton) {
+      sharePanelState = {
+        cardId: openShareCaptionButton.dataset.shareCardId || "",
+        thoughtId: openShareCaptionButton.dataset.openShareCaption || "",
+        mode: "caption",
+        caption: sharePanelState.thoughtId === (openShareCaptionButton.dataset.openShareCaption || "")
+          ? sharePanelState.caption
+          : "",
+      };
+      openReactionThoughtId = "";
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      void rerender();
+      return;
+    }
+
+    const closeShareSheetButton = event.target.closest("[data-close-share-sheet]");
+    if (closeShareSheetButton) {
+      sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+      void rerender();
+      return;
+    }
+
+    const closeCommentSheetButton = event.target.closest("[data-close-comment-sheet]");
+    if (closeCommentSheetButton) {
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      void rerender();
+      return;
+    }
+
+    const toggleButton = event.target.closest("[data-toggle-thought-reactions]");
+    if (toggleButton) {
+      const thoughtId = toggleButton.dataset.toggleThoughtReactions || "";
+      openReactionThoughtId = openReactionThoughtId === thoughtId ? "" : thoughtId;
+      sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      void rerender();
+      return;
+    }
+
+    const reactionButton = event.target.closest("[data-react-thought-id]");
+    if (reactionButton) {
+      const thoughtId = reactionButton.dataset.reactThoughtId;
+      const reactionId = reactionButton.dataset.thoughtReactionId;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!thoughtId || !reactionId || !currentProfile?.playerId) {
+        return;
+      }
+
+      await reactToThoughtPostWithApi(thoughtId, currentProfile.playerId, reactionId, storage, {
+        apiClient,
+      });
+      openReactionThoughtId = "";
+      sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+      commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+      void rerender();
+      return;
+    }
+
     const button = event.target.closest("[data-delete-id]");
-    if (!button) return;
+    if (!button) {
+      if (!event.target.closest(".thought-card__reaction-picker") && openReactionThoughtId) {
+        openReactionThoughtId = "";
+        void rerender();
+        return;
+      }
+      if (!event.target.closest(".thought-card__share-sheet") && sharePanelState.cardId) {
+        sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
+        void rerender();
+        return;
+      }
+      if (!event.target.closest(".thought-card__comment-sheet") && commentPanelState.cardId) {
+        commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+        void rerender();
+      }
+      return;
+    }
 
     const id = button.dataset.deleteId;
     if (!id) return;
@@ -870,8 +1286,26 @@ if (doc?.getElementById) {
       currentProfile.playerId,
       updatedThoughtCount,
       storage,
-      createPlatformApiClient(),
+      apiClient,
     );
     void rerender();
+  });
+
+  doc.addEventListener("input", (event) => {
+    const captionInput = event.target.closest("[data-share-caption-input]");
+    if (captionInput) {
+      sharePanelState = {
+        ...sharePanelState,
+        caption: captionInput.value || "",
+      };
+      return;
+    }
+
+    const commentInput = event.target.closest("[data-comment-input]");
+    if (!commentInput) return;
+    commentPanelState = {
+      ...commentPanelState,
+      text: commentInput.value || "",
+    };
   });
 }

@@ -21,6 +21,13 @@ function encodePathSegment(value) {
   return encodeURIComponent(sanitizeSingleLine(value));
 }
 
+function buildThoughtListPath(viewerPlayerId = "") {
+  const encodedViewerPlayerId = encodePathSegment(viewerPlayerId);
+  return encodedViewerPlayerId
+    ? `/thoughts?viewerPlayerId=${encodedViewerPlayerId}`
+    : "/thoughts";
+}
+
 async function readJsonResponse(response) {
   try {
     return await response.json();
@@ -174,11 +181,33 @@ export function createPlatformApiClient(options = {}) {
     saveActivityItem(item = {}) {
       return post("/activity", item, "item");
     },
-    listThoughts() {
-      return get("/thoughts", "thoughts");
+    listThoughts(viewerPlayerId = "") {
+      return get(buildThoughtListPath(viewerPlayerId), "thoughts");
+    },
+    listThoughtComments(thoughtId) {
+      const encoded = encodePathSegment(thoughtId);
+      return encoded ? get(`/thoughts/${encoded}/comments`, "comments") : Promise.resolve(null);
     },
     saveThought(thought = {}) {
       return post("/thoughts", thought, "thought");
+    },
+    shareThought(thoughtId, viewerPlayerId, viewerAuthorDisplayName = "", shareOptions = {}) {
+      const encoded = encodePathSegment(thoughtId);
+      return encoded
+        ? post(`/thoughts/${encoded}/shares`, { viewerPlayerId, viewerAuthorDisplayName, ...shareOptions }, "share")
+        : Promise.resolve(null);
+    },
+    reactToThought(thoughtId, viewerPlayerId, reactionId) {
+      const encoded = encodePathSegment(thoughtId);
+      return encoded
+        ? post(`/thoughts/${encoded}/reactions`, { viewerPlayerId, reactionId }, "thought")
+        : Promise.resolve(null);
+    },
+    commentOnThought(thoughtId, viewerPlayerId, viewerAuthorDisplayName = "", text = "") {
+      const encoded = encodePathSegment(thoughtId);
+      return encoded
+        ? post(`/thoughts/${encoded}/comments`, { viewerPlayerId, viewerAuthorDisplayName, text }, "commentRecord")
+        : Promise.resolve(null);
     },
     deleteThought(thoughtId) {
       const encoded = encodePathSegment(thoughtId);
