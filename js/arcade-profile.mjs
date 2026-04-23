@@ -273,10 +273,13 @@ export async function hydrateArcadeProfileFromApi(
     apiClient.loadPlayerRelationships(playerId).catch(() => null),
     apiClient.loadPlayerMetrics(playerId).catch(() => null),
   ]);
-  const seededProfileResult = !profileResult?.playerId && typeof apiClient.savePlayerProfile === "function"
+  const profileMissingFriendCode = profileResult?.playerId === playerId && !profileResult.friendCode;
+  const seededProfileResult = (!profileResult?.playerId || profileMissingFriendCode) && typeof apiClient.savePlayerProfile === "function"
     ? await apiClient.savePlayerProfile(playerId, currentProfile).catch(() => null)
     : null;
-  const resolvedProfileResult = profileResult?.playerId === playerId ? profileResult : seededProfileResult;
+  const resolvedProfileResult = seededProfileResult?.playerId === playerId
+    ? seededProfileResult
+    : (profileResult?.playerId === playerId ? profileResult : null);
 
   const profile = resolvedProfileResult?.playerId === playerId
     ? saveFactoryProfile({

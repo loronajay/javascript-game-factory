@@ -7,12 +7,23 @@ import {
   saveProfileMetricsRecord,
   syncThoughtPostCountWithApi,
 } from "./platform/metrics/metrics.mjs";
+import {
+  buildBadgeItems,
+  buildFavoriteGameItems,
+  buildFriendItems,
+  buildHeroStats,
+  buildIdentityLinkItems,
+  buildPresenceToneClass,
+  buildProfileInitials,
+  buildRankingItems,
+  formatPresenceLabel,
+  titleFromSlug,
+} from "./arcade-profile-page-helpers.mjs";
 import { buildPlayerProfileView } from "./platform/profile/profile.mjs";
 import {
   createFriendshipBetweenPlayers,
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
-  resolveProfileFriendSlots,
   saveProfileRelationshipsRecord,
 } from "./platform/relationships/relationships.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
@@ -42,62 +53,8 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function titleFromSlug(slug) {
-  return String(slug || "")
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function gameHrefFromSlug(slug = "") {
-  const normalized = String(slug || "").trim();
-  return normalized ? `../games/${encodeURIComponent(normalized)}/index.html` : "../grid.html";
-}
-
-function gamePreviewSrcFromSlug(slug = "") {
-  const normalized = String(slug || "").trim();
-  return normalized ? `../grid-previews/${encodeURIComponent(normalized)}.png` : "";
-}
-
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function buildProfileInitials(name) {
-  const tokens = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (tokens.length >= 2) {
-    return `${tokens[0][0] || ""}${tokens[1][0] || ""}`.toUpperCase();
-  }
-
-  if (tokens.length === 1) {
-    return tokens[0].slice(0, 2).toUpperCase();
-  }
-
-  return "??";
-}
-
-function formatPresenceLabel(presence) {
-  const normalized = String(presence || "").trim().toLowerCase();
-  if (!normalized) return "Offline";
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function humanizeToken(value) {
-  return String(value || "")
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function buildPresenceToneClass(presence) {
-  const normalized = String(presence || "").trim().toLowerCase();
-  return normalized || "offline";
 }
 
 function escapeCssUrl(value) {
@@ -219,67 +176,6 @@ function buildThoughtBackedProfile(thoughtFeed = [], requestedPlayerId = "") {
     thoughtCount: playerThoughtFeed.length,
     preferences: {},
   };
-}
-
-function buildHeroStats(publicView, resolvedThoughtCount, metricsRecord) {
-  const normalizedMetrics = metricsRecord?.playerId
-    ? normalizeProfileMetricsRecord(metricsRecord)
-    : normalizeProfileMetricsRecord({ playerId: publicView.playerId });
-  const derivedFriendCount = publicView.friendsPreview.length + (publicView.mainSqueeze ? 1 : 0);
-
-  return [
-    { label: "Thoughts", value: String(Math.max(resolvedThoughtCount, normalizedMetrics.thoughtPostCount)) },
-    { label: "Friends", value: String(Math.max(derivedFriendCount, normalizedMetrics.friendCount)) },
-    { label: "Sessions", value: String(normalizedMetrics.totalPlaySessionCount) },
-    { label: "Events", value: String(normalizedMetrics.eventParticipationCount) },
-  ];
-}
-
-function createFriendCardItem({ title, value, meta, isPlaceholder = false }) {
-  return {
-    title,
-    value,
-    meta,
-    isPlaceholder,
-    avatarInitials: buildProfileInitials(value),
-  };
-}
-
-function buildFriendItems(publicView, relationshipsRecord) {
-  const normalizedRelationships = relationshipsRecord?.playerId
-    ? normalizeProfileRelationshipsRecord(relationshipsRecord)
-    : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId });
-  const resolvedSlots = resolveProfileFriendSlots(publicView, normalizedRelationships);
-
-  const mainSqueezeItem = resolvedSlots.mainSqueeze
-    ? createFriendCardItem({
-        title: "Main Squeeze",
-        value: resolvedSlots.mainSqueeze.profileName,
-        meta: `${resolvedSlots.mainSqueeze.resolvedFriendPoints} friendship points`,
-      })
-    : createFriendCardItem({
-        title: "Main Squeeze",
-        value: "Awaiting Main Squeeze",
-        meta: "Friendship points pending",
-        isPlaceholder: true,
-      });
-
-  const friendPreviewItems = resolvedSlots.friendSlots.map((friend) => (
-    friend
-      ? createFriendCardItem({
-          title: formatPresenceLabel(friend.presence),
-          value: friend.profileName,
-          meta: `${friend.resolvedFriendPoints} friendship points`,
-        })
-      : createFriendCardItem({
-          title: "Friend Slot",
-          value: "Awaiting Arcade Friend",
-          meta: "Friendship points pending",
-          isPlaceholder: true,
-        })
-  ));
-
-  return [mainSqueezeItem, ...friendPreviewItems];
 }
 
 function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "") {
@@ -435,16 +331,17 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         kind: "placeholder",
         isPlaceholder: true,
       }],
-      favoriteGameItems: [{
-        title: "Favorite Cabinet",
-        value: "A favorite game link will appear here once profile favorites are wired in.",
-        isPlaceholder: true,
-      }],
-      rankingItems: [{
-        title: "Top Ladder Rankings",
-        value: "Rank snapshots are not cached for this player yet.",
-        isPlaceholder: true,
-      }],
+      favoriteGameItems: buildFavoriteGameItems({
+        favoriteGameSlug: "",
+        featuredGames: [],
+      }, titleFromSlug, {
+        emptyValue: "A favorite game link will appear here once profile favorites are wired in.",
+      }),
+      rankingItems: buildRankingItems({
+        ladderPlacements: [],
+      }, titleFromSlug, {
+        emptyValue: "Rank snapshots are not cached for this player yet.",
+      }),
       friendItems: buildFriendItems({
         playerId: requestedPlayerId,
         friendsPreview: [],
@@ -492,61 +389,20 @@ export function buildPlayerPageViewModel(profile, options = {}) {
   const relationshipsRecord = options?.relationshipsRecord?.playerId
     ? normalizeProfileRelationshipsRecord(options.relationshipsRecord)
     : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId || requestedPlayerId });
-  const identityLinkItems = publicView.links.length > 0
-    ? publicView.links.map((link) => ({
-        label: link.label,
-        value: link.url,
-        kind: link.kind,
-        isPlaceholder: false,
-      }))
-    : [{
-        label: "Link Ports",
-        value: "This player has not pinned any public links yet.",
-        kind: "placeholder",
-        isPlaceholder: true,
-      }];
-  const favoriteSlug = publicView.favoriteGameSlug || publicView.featuredGames[0] || "";
-  const favoriteGameItems = favoriteSlug
-    ? [{
-        title: favoriteTitleResolver(favoriteSlug),
-        value: favoriteSlug,
-        href: gameHrefFromSlug(favoriteSlug),
-        previewSrc: gamePreviewSrcFromSlug(favoriteSlug),
-        linkLabel: "Launch Cabinet",
-        isPlaceholder: false,
-      }]
-    : [{
-        title: "Favorite Cabinet",
-        value: "No favorite cabinet is pinned on this player file yet.",
-        isPlaceholder: true,
-      }];
-  const rankingItems = publicView.ladderPlacements.length > 0
-    ? publicView.ladderPlacements.map((placement) => ({
-        title: favoriteTitleResolver(placement.gameSlug),
-        value: placement.ratingLabel || `Rank #${placement.rank}`,
-        meta: `Rank #${placement.rank}`,
-        isPlaceholder: false,
-      }))
-    : [{
-        title: "Top Ladder Rankings",
-        value: "No shared ranking snapshots are attached to this player file yet.",
-        isPlaceholder: true,
-      }];
+  const identityLinkItems = buildIdentityLinkItems(publicView.links, "This player has not pinned any public links yet.");
+  const favoriteGameItems = buildFavoriteGameItems(publicView, favoriteTitleResolver, {
+    emptyValue: "No favorite cabinet is pinned on this player file yet.",
+  });
+  const rankingItems = buildRankingItems(publicView, favoriteTitleResolver, {
+    emptyValue: "No shared ranking snapshots are attached to this player file yet.",
+  });
   const friendItems = buildFriendItems(publicView, relationshipsRecord);
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
   const heroBio = publicView.bio || "This public player file is running in local-first mode while broader arcade profile discovery comes online.";
   const resolvedPresence = resolveProfilePresence(publicView.presence, isOwnerView);
-  const badgeItems = publicView.badgeIds.length > 0
-    ? publicView.badgeIds.map((badgeId) => ({
-        label: humanizeToken(badgeId) || "Arcade Badge",
-        isPlaceholder: false,
-      }))
-    : [{
-        label: "Badge case still empty",
-        isPlaceholder: true,
-      }];
+  const badgeItems = buildBadgeItems(publicView.badgeIds);
   const friendAction = buildFriendAction(
     options?.viewerPlayerId,
     publicView.playerId || requestedPlayerId,

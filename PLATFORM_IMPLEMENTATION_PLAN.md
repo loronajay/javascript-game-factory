@@ -988,6 +988,7 @@ Current status:
 - `platform-api/` now exists as the first shared backend service scaffold and reads `DATABASE_URL`.
 - Initial migration/sql wiring plus backend record routes for profiles, metrics, relationships, activity items, and thought posts are now part of the active implementation path.
 - The frontend is now in an adapter-first hybrid state: shared API seams are live for profile/feed/activity/metrics reads and mirrors, while local fallback remains in place intentionally for stability.
+- Thought interactions are no longer placeholders: reactions, repost/share records, and comments now have real backend routes and shared frontend adapters, while the page layer still keeps local fallback behavior.
 
 This is the trigger point for:
 
@@ -1141,6 +1142,9 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - the owner profile-edit persistence path now mirrors through the shared API seam, and `GET /players/:id/profile` now exists so public profile reads can stay symmetric.
 - `js/platform/thoughts/` and `js/platform/activity/` now perform merge-first API-aware feed sync so remote records can appear without wiping unsynced local items.
 - owner thought create/delete flows now mirror through the backend adapter path while preserving the local-first UX contract.
+- the thoughts layer now includes real backend-backed social actions: emoji reactions, share/repost records, and thread comments through shared `js/platform/thoughts/` helpers and `platform-api/` routes.
+- `Share` now follows the intended social flow: a share sheet can either repost immediately or open a caption composer that keeps the original post attached underneath.
+- `Comments` now opens a thread panel that combines current replies with a write-comment composer on `/thoughts`, `/me`, and `/player`.
 - profile-view increments and thought-count updates now mirror through API-aware metrics helpers without blocking page flow.
 - `games/lovers-lost/` and `games/battleshits/` result activity now mirrors to the backend in the background while preserving immediate local activity publishing.
 - public `/player` pages now expose an explicit friendship-creation entry point backed by the centralized relationship seam rather than page-local friend state.
@@ -1181,7 +1185,7 @@ Default product calls for this scope:
 - the recommended canonical metrics split is now explicit in code: public/support metrics stay separate from relationship/discovery metrics and backend analytics, with `friendPoints` staying visible/public-support data
 - friend points should stay platform-derived while visible friend placement supports either manual or automatic behavior for `Main Squeeze` and the four standard friend slots
 - relationship ordering should be able to use both affinity (`friendPoints`, shared counts) and recency (`last played with`, `recently played with`, last shared session/event, last interaction) without forcing one permanent display mode
-- comments, emoji reactions, and sharing belong to the thoughts/feed contract, but cross-user persistence is backend-phase work
+- comments, emoji reactions, and sharing belong to the thoughts/feed contract, and their first real cross-user persistence is now part of the active backend transition work
 - discovery should stay context-driven instead of becoming a generic empty people directory
 - once online profiles exist, add-friend entry points on game results screens and in-game chat and lobby surfaces should be treated as first-class profile-surfacing paths; a generic directory should stay secondary
 - player pages should accumulate durable memories from platform-owned activity/posts/results rather than forcing every cabinet to invent its own legacy/history UI

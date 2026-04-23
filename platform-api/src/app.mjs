@@ -1,5 +1,12 @@
+function applyCorsHeaders(res) {
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+}
+
 function writeJson(res, statusCode, payload) {
   res.statusCode = statusCode;
+  applyCorsHeaders(res);
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.end(JSON.stringify(payload));
 }
@@ -117,6 +124,13 @@ export function createApp(options = {}) {
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
     const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
+
+    if (method === "OPTIONS") {
+      res.statusCode = 204;
+      applyCorsHeaders(res);
+      res.end("");
+      return;
+    }
 
     if (method === "GET" && pathname === "/health") {
       writeJson(res, 200, {
