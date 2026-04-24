@@ -6,8 +6,8 @@ export function getBattleStatusCopy(turn) {
   return 'Opponent is lining up a shot...';
 }
 
-export function getTargetLabelCopy(turn) {
-  return turn === 'mine' ? 'Target Bowl - Click to fire' : 'Target Bowl';
+export function getTargetLabelCopy() {
+  return 'Target Bowl';
 }
 
 export function getEndedScreenCopy(result) {

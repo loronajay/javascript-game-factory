@@ -724,6 +724,31 @@ body {
   top: calc(15% - 8px);
 }
 
+.board-bowl--target.bowl--your-turn .board-bowl-seat {
+  box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.9),
+    inset 0 -20px 24px rgba(131, 145, 158, 0.26),
+    0 20px 36px rgba(8, 40, 64, 0.18),
+    0 0 0 3px rgba(210, 30, 30, 0.65),
+    0 0 28px 6px rgba(210, 30, 30, 0.3);
+  animation: target-bowl-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes target-bowl-pulse {
+  0%, 100% { box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.9),
+    inset 0 -20px 24px rgba(131, 145, 158, 0.26),
+    0 20px 36px rgba(8, 40, 64, 0.18),
+    0 0 0 3px rgba(210, 30, 30, 0.65),
+    0 0 28px 6px rgba(210, 30, 30, 0.3); }
+  50% { box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.9),
+    inset 0 -20px 24px rgba(131, 145, 158, 0.26),
+    0 20px 36px rgba(8, 40, 64, 0.18),
+    0 0 0 3px rgba(210, 30, 30, 0.85),
+    0 0 44px 14px rgba(210, 30, 30, 0.5); }
+}
+
 .board-bowl-base {
   width: 28%;
   height: clamp(28px, 4vh, 40px);

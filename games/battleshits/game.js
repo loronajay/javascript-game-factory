@@ -348,7 +348,10 @@ function renderBattleStatus() {
     oppEl.textContent = gs.opponentProfile?.displayName ? `vs. ${gs.opponentProfile.displayName}` : '';
   }
 
-  if (labelEl) labelEl.textContent = getTargetLabelCopy(gs.turn);
+  if (labelEl) labelEl.textContent = getTargetLabelCopy();
+
+  const targetBowl = document.querySelector('.board-bowl--target');
+  if (targetBowl) targetBowl.classList.toggle('bowl--your-turn', gs.turn === 'mine');
 }
 
 function renderFleetStatus() {
