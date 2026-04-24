@@ -101,6 +101,7 @@ let gs = createInitialState();
 let net = null;
 let publicMatchRetryTimer = null;
 let pendingShotTimer = null;
+let pendingShotTimerResult = null; // stored so handleIncomingShot can flush it early
 let emoteTimers = { mine: null, theirs: null };
 let lastEmoteSentAt = 0;
 const audio = createAudioController();
@@ -117,6 +118,7 @@ function clearPendingShotTimer() {
     clearTimeout(pendingShotTimer);
     pendingShotTimer = null;
   }
+  pendingShotTimerResult = null;
 }
 
 function clearEmoteTimers() {
@@ -506,6 +508,14 @@ function handleTargetClick(col, row) {
 }
 
 function handleIncomingShot(col, row) {
+  // If our own shot result is still waiting on an animation timer, flush it now
+  // so the turn state is correct before we process the opponent's incoming shot.
+  if (pendingShotTimer !== null && pendingShotTimerResult !== null) {
+    const flushedResult = pendingShotTimerResult;
+    clearPendingShotTimer();
+    applyShotResult(flushedResult);
+  }
+
   const { valid, board, hit, shipId, sunk } = resolveIncomingShot(gs.myFleet, col, row);
   if (!valid) return;
 
@@ -543,7 +553,10 @@ function applyShotResult({ col, row, hit, sunk, shipId, fleetDestroyed }) {
 
   if (fleetDestroyed) {
     transitionToMatchEnded('win');
-  } else {
+  } else if (gs.turn === 'awaiting_result') {
+    // Only advance turn if still waiting — if an incoming opponent shot arrived
+    // during the animation delay, handleIncomingShot already set turn to 'mine'
+    // and we must not stomp it back to 'theirs'.
     gs.turn = 'theirs';
     renderBattleStatus();
   }
@@ -559,7 +572,11 @@ function handleShotResult(result) {
   const elapsed = Date.now() - pendingShot.startedAt;
   const remaining = Math.max(0, SHOT_ANIMATION_MS - elapsed);
   clearPendingShotTimer();
-  pendingShotTimer = setTimeout(() => applyShotResult(result), remaining);
+  pendingShotTimerResult = result;
+  pendingShotTimer = setTimeout(() => {
+    pendingShotTimerResult = null;
+    applyShotResult(result);
+  }, remaining);
 }
 
 // ─── Match flow ───────────────────────────────────────────────────────────────

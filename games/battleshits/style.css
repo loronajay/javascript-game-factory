@@ -667,7 +667,7 @@ body {
 
 .board-bowl-seat {
   width: 100%;
-  aspect-ratio: 1 / 1.05;
+  aspect-ratio: 1 / 1.12;
   padding: clamp(14px, 2vh, 26px);
   border-radius: 48% 48% 44% 44% / 36% 36% 62% 62%;
   background: linear-gradient(180deg, #ffffff 0%, #f3f4f5 46%, #d6dbe0 100%);
@@ -932,7 +932,7 @@ body {
 }
 
 .screen-battle {
-  --bowl-size: min(42vw, 48vh, 520px);
+  --bowl-size: min(42vw, 44vh, 500px);
 }
 
 .ship-status--afloat {

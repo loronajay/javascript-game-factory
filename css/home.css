@@ -288,13 +288,13 @@
   position: absolute;
   left: 50%;
   bottom: 12%;
+  transform: translateX(-50%) translateZ(0);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
   width: min(100%, 980px);
   flex-wrap: wrap;
-  transform: translateX(-50%);
   padding: 0 24px;
 }
 
