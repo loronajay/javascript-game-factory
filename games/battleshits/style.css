@@ -667,7 +667,7 @@ body {
 
 .board-bowl-seat {
   width: 100%;
-  aspect-ratio: 1 / 1.12;
+  aspect-ratio: 1 / 1.05;
   padding: clamp(14px, 2vh, 26px);
   border-radius: 48% 48% 44% 44% / 36% 36% 62% 62%;
   background: linear-gradient(180deg, #ffffff 0%, #f3f4f5 46%, #d6dbe0 100%);
@@ -922,6 +922,22 @@ body {
   gap: 6px;
 }
 
+.board-bowl-tank .ships-status {
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 10px;
+}
+
+.board-bowl-tank .ship-status-row {
+  font-size: clamp(0.68rem, 1.25vh, 0.76rem);
+}
+
 .ship-status-row {
   font: 700 clamp(0.76rem, 1.45vh, 0.86rem) var(--font-ui);
   letter-spacing: 0.04em;
@@ -932,7 +948,7 @@ body {
 }
 
 .screen-battle {
-  --bowl-size: min(42vw, 44vh, 500px);
+  --bowl-size: min(42vw, 48vh, 520px);
 }
 
 .ship-status--afloat {
