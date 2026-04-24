@@ -38,6 +38,7 @@ import {
 import { renderMePageView } from "./arcade-me-view.mjs";
 import { wireMePage } from "./arcade-me-wire.mjs";
 import { initSessionNav } from "./arcade-session-nav.mjs";
+import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 
@@ -216,14 +217,21 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
-  const storage = getDefaultPlatformStorage();
-  const apiClient = createPlatformApiClient();
-  const profilePanel = initArcadeProfilePanel({ storage });
-  renderMePage(doc);
-  wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, profilePanel });
-  initSessionNav(doc.getElementById("meAuthNav"), {
-    signInPath: "../sign-in/index.html",
-    signUpPath: "../sign-up/index.html",
-    homeOnLogout: "../index.html",
-  });
+  let session = null;
+  try { session = await createAuthApiClient().getSession(); } catch { /* network down */ }
+
+  if (!session?.ok || !session?.playerId) {
+    window.location.replace("../sign-in/index.html?next=/me/index.html");
+  } else {
+    const storage = getDefaultPlatformStorage();
+    const apiClient = createPlatformApiClient();
+    const profilePanel = initArcadeProfilePanel({ storage });
+    renderMePage(doc);
+    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, profilePanel });
+    initSessionNav(doc.getElementById("meAuthNav"), {
+      signInPath: "../sign-in/index.html",
+      signUpPath: "../sign-up/index.html",
+      homeOnLogout: "../index.html",
+    });
+  }
 }
