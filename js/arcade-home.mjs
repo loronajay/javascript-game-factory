@@ -1,3 +1,11 @@
+import { initSessionNav } from "./arcade-session-nav.mjs";
+
+initSessionNav(document.getElementById("homeAuthNav"), {
+  signInPath: "sign-in/index.html",
+  signUpPath: "sign-up/index.html",
+  homeOnLogout: "index.html",
+});
+
 const links = Array.from(document.querySelectorAll(".mode-link, .hero-cta"));
 let selectedIndex = 0;
 

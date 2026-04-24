@@ -5,6 +5,7 @@ import {
   paginateArcadeGames,
 } from "./arcade-catalog.mjs";
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
+import { initSessionNav } from "./arcade-session-nav.mjs";
 
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -386,6 +387,11 @@ window.ArcadeInput?.onAction((action) => {
 const catalog = await loadArcadeCatalog();
 initArcadeProfilePanel();
 buildPages(catalog);
+initSessionNav(document.getElementById("gridAuthNav"), {
+  signInPath: "sign-in/index.html",
+  signUpPath: "sign-up/index.html",
+  homeOnLogout: "index.html",
+});
 
 if (pages.length > 0) {
   showPage(0, 0);

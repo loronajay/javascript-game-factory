@@ -37,6 +37,7 @@ import {
 } from "./platform/thoughts/thoughts.mjs";
 import { renderMePageView } from "./arcade-me-view.mjs";
 import { wireMePage } from "./arcade-me-wire.mjs";
+import { initSessionNav } from "./arcade-session-nav.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 
@@ -220,4 +221,9 @@ if (doc?.getElementById) {
   const profilePanel = initArcadeProfilePanel({ storage });
   renderMePage(doc);
   wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, profilePanel });
+  initSessionNav(doc.getElementById("meAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
 }

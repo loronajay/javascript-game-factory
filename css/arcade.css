@@ -558,6 +558,25 @@ body::before {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
+/* ---------- SESSION NAV ---------- */
+.session-nav {
+  display: contents;
+}
+
+.session-nav__name {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0 2px;
+  align-self: center;
+}
+
+.session-nav__signout {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .player-card {
   width: min(980px, 100%);
   padding: 20px 22px 22px;

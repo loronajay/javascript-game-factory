@@ -1158,6 +1158,11 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `js/platform/thoughts/thoughts.mjs` is now a clean 4-layer module: `thoughts-schema.mjs` (storage keys, reaction IDs, shape constants), `thoughts-normalize.mjs` (sanitization, formatting helpers), `thoughts-store.mjs` (local feed, storage, card rendering, social writes), `thoughts-api.mjs` (API sync and backend mirrors) — the barrel `thoughts.mjs` re-exports everything so all existing import paths stay unchanged; all four modules stay under 500 lines.
 - `renderMePage` now calls `syncThoughtPostCount` on every page render so the thought-post-count metric stays canonical without a separate explicit write path.
 - `arcade-me-view.mjs` now exposes `renderSupportPanel`, a generic `me-card-item__title`-based card renderer ready for future side-panel wiring (rankings/friends side panels are still hidden pending that work).
+- authentication is now fully implemented: `platform-api/` has bcryptjs password hashing, JWT signing/verification, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, and `GET /auth/me` routes backed by the `accounts` Postgres table; the 30-day HttpOnly JWT cookie is set as `arcade_session`.
+- `sign-up/index.html` and `sign-in/index.html` exist as styled synthwave auth pages with full form validation, error messaging, and redirect-on-success; sign-up supports `claimPlayerId` so existing guest local identities can be attached to a new account.
+- `js/platform/api/auth-api.mjs` exposes `register`, `login`, `logout`, and `getSession` through the shared API seam so no page invents its own fetch logic for auth.
+- `js/arcade-session-nav.mjs` is a shared session chip module that calls `GET /auth/me` on load and injects either Sign In + Create Account links or the player name + Sign Out button into any container element; it is wired into `index.html`, `grid.html`, and `/me`.
+- player discovery design is locked: registered players have full public `/player` profiles; unregistered guests have no public profile page; guests can view registered profiles but cannot add friends; results screens show clickable usernames only for registered opponents, with a menu of Add Friend (signed-in viewers only) and View Profile; a `hasAccount` boolean will be added to the profile API response so games can make this decision without a separate round-trip; a `discoverable` opt-out preference will gate search inclusion without hiding the profile itself.
 
 ## Scope Lock For Upcoming Profile Passes
 
@@ -1171,6 +1176,14 @@ Immediate priorities across the current local/backend boundary:
 - turn activity/posts/results into durable memories on player pages once the shared persistence path is stable
 - continue remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
 - keep context-driven discovery scoped to real profile surfacing from games, activity, events, and relationships rather than inventing a generic people directory early
+
+Player discovery build order (active next steps):
+
+1. Add `hasAccount` boolean to `GET /players/:id/profile` response — checks whether an `accounts` row exists for that `player_id`; no new endpoint needed
+2. Add `discoverable` boolean to `player_profiles.preferences` jsonb column (default true) — respected by search only, not by direct profile links
+3. Build `GET /players/search?q=...` backend endpoint — queries `profile_name` and `real_name`, filters to `discoverable: true` records, requires the player to have an account row
+4. Build `/search/index.html` search UI page — synthwave shell, search input, result cards linking to `/player?id=xxx`
+5. Wire results screen menus in both games: fetch opponent profile on results load, use `hasAccount` to conditionally render clickable username → mini menu (Add Friend if viewer is signed in, View Profile always for registered opponents)
 
 Important not-now items, even though they remain part of the product vision:
 
@@ -1198,7 +1211,6 @@ Default product calls for this scope:
 
 Deferred until later phases:
 
-- authentication / login / sign up
 - real uploads
 - profile music authoring/player UI
 - generic player-directory / broad discovery page
@@ -1211,6 +1223,8 @@ Now actively in progress rather than deferred:
 
 - database-backed profiles through the shared `platform-api/` service
 - backend-owned profile/relationship/activity/thought persistence behind the existing frontend seams
+- authentication: sign-up, sign-in, sign-out, and 30-day JWT session management are built; `sign-in/index.html`, `sign-up/index.html`, `js/platform/api/auth-api.mjs`, and the `accounts` Postgres table are all live
+- player discovery: `hasAccount` flag on profile API, results-screen clickable usernames, and player search with `discoverable` opt-out are the active next implementation steps
 
 ## Decision Gates
 
