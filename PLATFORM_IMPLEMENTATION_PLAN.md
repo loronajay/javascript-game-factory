@@ -1154,6 +1154,10 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
 - The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
 - platform secondary pages now use consistent `Back` navigation plus normalized `Player Page` portal naming so the platform feels more like one connected shell.
+- `css/arcade.css` is now split into a shared base file plus 8 per-page CSS files (`home.css`, `me.css`, `player.css`, `thoughts.css`, `activity.css`, `bulletins.css`, `events.css`, `event.css`); each page loads only what it needs and the test infrastructure combines the relevant files to match what browsers load.
+- `js/platform/thoughts/thoughts.mjs` is now a clean 4-layer module: `thoughts-schema.mjs` (storage keys, reaction IDs, shape constants), `thoughts-normalize.mjs` (sanitization, formatting helpers), `thoughts-store.mjs` (local feed, storage, card rendering, social writes), `thoughts-api.mjs` (API sync and backend mirrors) — the barrel `thoughts.mjs` re-exports everything so all existing import paths stay unchanged; all four modules stay under 500 lines.
+- `renderMePage` now calls `syncThoughtPostCount` on every page render so the thought-post-count metric stays canonical without a separate explicit write path.
+- `arcade-me-view.mjs` now exposes `renderSupportPanel`, a generic `me-card-item__title`-based card renderer ready for future side-panel wiring (rankings/friends side panels are still hidden pending that work).
 
 ## Scope Lock For Upcoming Profile Passes
 
@@ -1174,7 +1178,7 @@ Important not-now items, even though they remain part of the product vision:
 - profile music authoring/player UI
 - a generic `/players` discovery directory
 - player gesture buttons plus notification inbox/bell work
-- rich social actions such as comments, reactions, sharing, and direct/private messaging
+- direct/private messaging (comments, reactions, and sharing are now live through the backend adapter layer)
 
 Default product calls for this scope:
 
