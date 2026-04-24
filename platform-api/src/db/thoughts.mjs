@@ -590,10 +590,9 @@ export async function commentOnThought(db, thoughtId, viewerPlayerId, viewerAuth
         author_player_id,
         author_display_name,
         text,
-        created_at,
-        edited_at
+        created_at
       ) values (
-        $1, $2, $3, $4, $5, $6, $7
+        $1, $2, $3, $4, $5, $6
       )
       returning
         id,
@@ -610,7 +609,6 @@ export async function commentOnThought(db, thoughtId, viewerPlayerId, viewerAuth
       normalizedViewerDisplayName,
       normalizedText,
       new Date().toISOString(),
-      "",
     ]);
     const insertedComment = mapRowToComment(insertedCommentResult?.rows?.[0] || {});
 

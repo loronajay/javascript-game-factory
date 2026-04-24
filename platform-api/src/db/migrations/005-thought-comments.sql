@@ -5,7 +5,7 @@ create table if not exists thought_post_comments (
   author_display_name text not null default '',
   text text not null default '',
   created_at timestamptz not null default now(),
-  edited_at timestamptz not null default ''
+  edited_at timestamptz
 );
 
 create index if not exists idx_thought_post_comments_thought_id_created_at
