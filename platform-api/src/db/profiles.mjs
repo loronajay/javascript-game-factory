@@ -1,8 +1,8 @@
-import { normalizeFactoryProfile } from "../../../js/platform/identity/factory-profile.mjs";
 import {
   buildDefaultFriendCode,
+  normalizeFactoryProfile,
   sanitizeProfileFriendCode,
-} from "../../../js/platform/profile/profile.mjs";
+} from "../normalize.mjs";
 
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";

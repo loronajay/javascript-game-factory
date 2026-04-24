@@ -1,7 +1,7 @@
 import {
   ACTIVITY_FEED_LIMIT,
   normalizeActivityItem,
-} from "../../../js/platform/activity/activity.mjs";
+} from "../normalize.mjs";
 
 function ensureJsonObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};

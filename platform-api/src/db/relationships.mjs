@@ -7,7 +7,7 @@ import {
   SHARED_SESSION_POINTS,
   buildDefaultProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
-} from "../../../js/platform/relationships/relationships.mjs";
+} from "../normalize.mjs";
 
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";

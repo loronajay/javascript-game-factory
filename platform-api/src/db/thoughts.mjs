@@ -2,7 +2,7 @@ import {
   normalizeThoughtComment,
   THOUGHT_REACTION_IDS,
   normalizeThoughtPost,
-} from "../../../js/platform/thoughts/thoughts.mjs";
+} from "../normalize.mjs";
 
 function sanitizeThoughtId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";

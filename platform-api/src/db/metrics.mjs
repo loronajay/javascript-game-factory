@@ -1,7 +1,7 @@
 import {
   buildDefaultProfileMetricsRecord,
   normalizeProfileMetricsRecord,
-} from "../../../js/platform/metrics/metrics.mjs";
+} from "../normalize.mjs";
 
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
