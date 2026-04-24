@@ -55,6 +55,7 @@ async function requestJson(fetchImpl, baseUrl, path, options = {}) {
 function buildJsonRequestOptions(method, value) {
   return {
     method,
+    credentials: "include",
     headers: {
       "content-type": "application/json; charset=utf-8",
     },

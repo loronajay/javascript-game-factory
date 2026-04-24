@@ -1,0 +1,73 @@
+import { createAuthApiClient } from "./platform/api/auth-api.mjs";
+import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+
+const ERROR_MESSAGES = {
+  invalid_credentials: "Email or password is incorrect.",
+  missing_credentials: "Please enter your email and password.",
+  auth_not_configured: "Sign-in is unavailable right now.",
+  network_error: "Could not reach the server. Try again.",
+  not_configured: "Sign-in is unavailable right now.",
+};
+
+function showFlash(el, message) {
+  if (el) el.textContent = message;
+}
+
+function clearFlash(el) {
+  if (el) el.textContent = "";
+}
+
+function setSubmitting(button, submitting) {
+  if (!button) return;
+  button.disabled = submitting;
+  button.textContent = submitting ? "Signing in..." : "Sign In";
+}
+
+function applySessionToProfile(playerId) {
+  const profile = loadFactoryProfile();
+  saveFactoryProfile({ ...profile, playerId });
+}
+
+function getRedirectTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  return "../me/index.html";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("signInForm");
+  const flashEl = document.getElementById("authFlash");
+  const submitBtn = document.getElementById("signInSubmit");
+  const auth = createAuthApiClient();
+
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearFlash(flashEl);
+
+    const email = form.email?.value?.trim() || "";
+    const password = form.password?.value || "";
+
+    if (!email || !password) {
+      showFlash(flashEl, "Please enter your email and password.");
+      return;
+    }
+
+    setSubmitting(submitBtn, true);
+
+    const result = await auth.login({ email, password });
+
+    setSubmitting(submitBtn, false);
+
+    if (!result?.ok) {
+      const msg = ERROR_MESSAGES[result?.error] || "Something went wrong. Please try again.";
+      showFlash(flashEl, msg);
+      return;
+    }
+
+    applySessionToProfile(result.playerId);
+    window.location.href = getRedirectTarget();
+  });
+});

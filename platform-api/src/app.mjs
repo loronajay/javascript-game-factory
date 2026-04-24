@@ -1,12 +1,26 @@
-function applyCorsHeaders(res) {
-  res.setHeader("access-control-allow-origin", "*");
+import {
+  buildClearCookieHeader,
+  buildSetCookieHeader,
+  extractTokenFromRequest,
+  signToken,
+  verifyToken,
+} from "./auth-helpers.mjs";
+
+function applyCorsHeaders(res, requestOrigin) {
+  if (requestOrigin) {
+    res.setHeader("access-control-allow-origin", requestOrigin);
+    res.setHeader("access-control-allow-credentials", "true");
+    res.setHeader("vary", "Origin");
+  } else {
+    res.setHeader("access-control-allow-origin", "*");
+  }
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.setHeader("access-control-allow-headers", "content-type");
 }
 
-function writeJson(res, statusCode, payload) {
+function writeJson(res, statusCode, payload, requestOrigin) {
   res.statusCode = statusCode;
-  applyCorsHeaders(res);
+  applyCorsHeaders(res, requestOrigin);
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.end(JSON.stringify(payload));
 }
@@ -43,6 +57,15 @@ function buildTimestamp(now) {
   }
 
   return new Date().toISOString();
+}
+
+function isValidEmail(value) {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  const atIdx = trimmed.indexOf("@");
+  if (atIdx < 1) return false;
+  const afterAt = trimmed.slice(atIdx + 1);
+  return afterAt.includes(".") && afterAt.length > 2 && !trimmed.includes(" ");
 }
 
 export function createApp(options = {}) {
@@ -112,13 +135,26 @@ export function createApp(options = {}) {
   const deleteThought = typeof options?.deleteThought === "function"
     ? options.deleteThought
     : async () => false;
+  const registerAccount = typeof options?.registerAccount === "function"
+    ? options.registerAccount
+    : async () => ({ error: "not_configured" });
+  const loginAccount = typeof options?.loginAccount === "function"
+    ? options.loginAccount
+    : async () => ({ error: "not_configured" });
+  const jwtSecret = typeof options?.jwtSecret === "string" ? options.jwtSecret : "";
+  const isProduction = Boolean(options?.isProduction);
   const now = options?.now;
 
   return async function app(req, res) {
     const method = typeof req?.method === "string" ? req.method.toUpperCase() : "GET";
     const requestUrl = new URL(req?.url || "/", "http://localhost");
     const pathname = requestUrl.pathname;
+    const requestOrigin = req?.headers?.origin || "";
     const timestamp = buildTimestamp(now);
+
+    const rawToken = extractTokenFromRequest(req);
+    const authClaims = rawToken && jwtSecret ? verifyToken(rawToken, jwtSecret) : null;
+
     const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
     const friendCodeMatch = pathname.match(/^\/players\/by-friend-code\/([^/]+)$/);
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
@@ -127,7 +163,7 @@ export function createApp(options = {}) {
 
     if (method === "OPTIONS") {
       res.statusCode = 204;
-      applyCorsHeaders(res);
+      applyCorsHeaders(res, requestOrigin);
       res.end("");
       return;
     }
@@ -138,7 +174,7 @@ export function createApp(options = {}) {
         service: "platform-api",
         databaseConfigured: Boolean(config.hasDatabaseUrl),
         timestamp,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -149,7 +185,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           database: "missing_configuration",
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -159,13 +195,99 @@ export function createApp(options = {}) {
         service: "platform-api",
         database: isDatabaseReady ? "up" : "down",
         timestamp,
-      });
+      }, requestOrigin);
+      return;
+    }
+
+    // Auth routes
+    if (method === "POST" && pathname === "/auth/register") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      const { email, password, profileName, claimPlayerId } = body.value || {};
+
+      if (!isValidEmail(email)) {
+        writeJson(res, 400, { status: "error", error: "invalid_email", timestamp }, requestOrigin);
+        return;
+      }
+
+      if (!password || String(password).length < 8) {
+        writeJson(res, 400, { status: "error", error: "password_too_short", timestamp }, requestOrigin);
+        return;
+      }
+
+      if (!jwtSecret) {
+        writeJson(res, 503, { status: "error", error: "auth_not_configured", timestamp }, requestOrigin);
+        return;
+      }
+
+      const result = await registerAccount({ email, password, profileName, claimPlayerId });
+
+      if (!result?.ok) {
+        const statusCode = result?.error === "email_taken" ? 409 : 400;
+        writeJson(res, statusCode, { status: "error", error: result?.error || "register_failed", timestamp }, requestOrigin);
+        return;
+      }
+
+      const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
+      res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
+      writeJson(res, 201, { playerId: result.playerId, profileName: result.profileName, email: result.email }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && pathname === "/auth/login") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      const { email, password } = body.value || {};
+
+      if (!isValidEmail(email) || !password) {
+        writeJson(res, 400, { status: "error", error: "missing_credentials", timestamp }, requestOrigin);
+        return;
+      }
+
+      if (!jwtSecret) {
+        writeJson(res, 503, { status: "error", error: "auth_not_configured", timestamp }, requestOrigin);
+        return;
+      }
+
+      const result = await loginAccount({ email, password });
+
+      if (!result?.ok) {
+        writeJson(res, 401, { status: "error", error: "invalid_credentials", timestamp }, requestOrigin);
+        return;
+      }
+
+      const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
+      res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
+      writeJson(res, 200, { playerId: result.playerId, email: result.email }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && pathname === "/auth/logout") {
+      res.setHeader("set-cookie", buildClearCookieHeader(isProduction));
+      writeJson(res, 200, { ok: true }, requestOrigin);
+      return;
+    }
+
+    if (method === "GET" && pathname === "/auth/me") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      writeJson(res, 200, { playerId: authClaims.playerId, email: authClaims.email }, requestOrigin);
       return;
     }
 
     if (method === "GET" && pathname === "/activity") {
       const items = await listActivityItems();
-      writeJson(res, 200, { items });
+      writeJson(res, 200, { items }, requestOrigin);
       return;
     }
 
@@ -177,12 +299,12 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       const item = await saveActivityItem(body.value);
-      writeJson(res, 200, { item });
+      writeJson(res, 200, { item }, requestOrigin);
       return;
     }
 
@@ -190,7 +312,7 @@ export function createApp(options = {}) {
       const thoughts = await listThoughts({
         viewerPlayerId: requestUrl.searchParams.get("viewerPlayerId") || "",
       });
-      writeJson(res, 200, { thoughts });
+      writeJson(res, 200, { thoughts }, requestOrigin);
       return;
     }
 
@@ -202,12 +324,12 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       const thought = await saveThought(body.value);
-      writeJson(res, 200, { thought });
+      writeJson(res, 200, { thought }, requestOrigin);
       return;
     }
 
@@ -217,7 +339,7 @@ export function createApp(options = {}) {
     const thoughtCommentMatch = pathname.match(/^\/thoughts\/([^/]+)\/comments$/);
     if (method === "GET" && thoughtCommentMatch) {
       const comments = await listThoughtComments(decodeURIComponent(thoughtCommentMatch[1]));
-      writeJson(res, 200, { comments });
+      writeJson(res, 200, { comments }, requestOrigin);
       return;
     }
 
@@ -229,7 +351,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -239,7 +361,7 @@ export function createApp(options = {}) {
         body.value?.viewerAuthorDisplayName,
         body.value?.text,
       );
-      writeJson(res, 200, { commentRecord });
+      writeJson(res, 200, { commentRecord }, requestOrigin);
       return;
     }
 
@@ -251,7 +373,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -261,7 +383,7 @@ export function createApp(options = {}) {
         body.value?.viewerAuthorDisplayName,
         body.value,
       );
-      writeJson(res, 200, { share });
+      writeJson(res, 200, { share }, requestOrigin);
       return;
     }
 
@@ -273,7 +395,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -282,7 +404,7 @@ export function createApp(options = {}) {
         body.value?.viewerPlayerId,
         body.value?.reactionId,
       );
-      writeJson(res, 200, { thought });
+      writeJson(res, 200, { thought }, requestOrigin);
       return;
     }
 
@@ -292,7 +414,7 @@ export function createApp(options = {}) {
       writeJson(res, 200, {
         deleted,
         id: thoughtId,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -304,13 +426,13 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: "player_not_found",
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       writeJson(res, 200, {
         player: profile,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -322,13 +444,13 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: "player_not_found",
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       writeJson(res, 200, {
         player: profile,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -340,14 +462,14 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       const profile = await savePlayerProfile(decodeURIComponent(profileMatch[1]), body.value);
       writeJson(res, 200, {
         player: profile,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -355,7 +477,7 @@ export function createApp(options = {}) {
       const metrics = await loadPlayerMetrics(decodeURIComponent(metricsMatch[1]));
       writeJson(res, 200, {
         metrics,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -367,14 +489,14 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       const metrics = await savePlayerMetrics(decodeURIComponent(metricsMatch[1]), body.value);
       writeJson(res, 200, {
         metrics,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -382,7 +504,7 @@ export function createApp(options = {}) {
       const relationships = await loadPlayerRelationships(decodeURIComponent(relationshipsMatch[1]));
       writeJson(res, 200, {
         relationships,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -394,14 +516,14 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
       const relationships = await savePlayerRelationships(decodeURIComponent(relationshipsMatch[1]), body.value);
       writeJson(res, 200, {
         relationships,
-      });
+      }, requestOrigin);
       return;
     }
 
@@ -413,7 +535,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -422,7 +544,7 @@ export function createApp(options = {}) {
         body.value?.rightPlayerId,
         body.value,
       );
-      writeJson(res, 200, { friendship });
+      writeJson(res, 200, { friendship }, requestOrigin);
       return;
     }
 
@@ -434,7 +556,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -443,7 +565,7 @@ export function createApp(options = {}) {
         body.value?.rightPlayerId,
         body.value,
       );
-      writeJson(res, 200, { relationshipUpdate });
+      writeJson(res, 200, { relationshipUpdate }, requestOrigin);
       return;
     }
 
@@ -455,7 +577,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -464,7 +586,7 @@ export function createApp(options = {}) {
         body.value?.rightPlayerId,
         body.value,
       );
-      writeJson(res, 200, { relationshipUpdate });
+      writeJson(res, 200, { relationshipUpdate }, requestOrigin);
       return;
     }
 
@@ -476,7 +598,7 @@ export function createApp(options = {}) {
           service: "platform-api",
           error: body.error,
           timestamp,
-        });
+        }, requestOrigin);
         return;
       }
 
@@ -485,7 +607,7 @@ export function createApp(options = {}) {
         body.value?.rightPlayerId,
         body.value,
       );
-      writeJson(res, 200, { relationshipUpdate });
+      writeJson(res, 200, { relationshipUpdate }, requestOrigin);
       return;
     }
 
@@ -494,6 +616,6 @@ export function createApp(options = {}) {
       service: "platform-api",
       error: "not_found",
       timestamp,
-    });
+    }, requestOrigin);
   };
 }

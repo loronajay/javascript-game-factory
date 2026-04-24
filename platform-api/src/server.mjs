@@ -25,6 +25,7 @@ import {
   saveThought,
   shareThought,
 } from "./db/thoughts.mjs";
+import { loginAccountService, registerAccountService } from "./services/auth.mjs";
 
 const { Pool } = pg;
 
@@ -64,6 +65,10 @@ async function bootstrap() {
   const app = createApp({
     config,
     checkDatabase: createDatabaseCheck(pool),
+    registerAccount: (params) => registerAccountService(pool, params),
+    loginAccount: (params) => loginAccountService(pool, params),
+    jwtSecret: config.jwtSecret,
+    isProduction: config.isProduction,
     loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),
     loadPlayerProfileByFriendCode: (friendCode) => loadPlayerProfileByFriendCode(pool, friendCode),
     savePlayerProfile: (playerId, patch) => savePlayerProfile(pool, playerId, patch),

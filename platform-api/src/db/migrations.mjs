@@ -6,6 +6,7 @@ export const MIGRATION_FILES = Object.freeze([
   "003-thought-reactions.sql",
   "004-thought-shares.sql",
   "005-thought-comments.sql",
+  "006-accounts.sql",
 ]);
 
 export function migrationFileUrl(name) {

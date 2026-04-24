@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Create Account</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/auth.css">
+</head>
+<body class="auth-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="auth-stage">
+      <div class="auth-stage__stars" aria-hidden="true"></div>
+      <div class="auth-stage__scene" aria-hidden="true">
+        <div class="auth-stage__sun"></div>
+        <div class="auth-stage__skyline"></div>
+        <div class="auth-stage__floor"></div>
+      </div>
+
+      <div class="auth-stage__controls">
+        <nav class="auth-stage__nav">
+          <a class="auth-stage__back" href="../index.html">&#x276E; Home</a>
+          <a class="auth-stage__portal" href="../grid.html">Arcade Grid</a>
+        </nav>
+      </div>
+
+      <div class="auth-stage__header">
+        <h1 class="pixel-text pixel-text--title auth-stage__title">CREATE ACCOUNT</h1>
+        <p class="auth-stage__subtitle">Claim your arcade identity.</p>
+      </div>
+
+      <div class="auth-layout">
+        <div class="auth-card">
+          <p class="auth-card__brand">Javascript Game Factory</p>
+          <h2 class="pixel-text auth-card__title">NEW PILOT</h2>
+
+          <p id="authFlash" class="auth-card__flash" role="alert" aria-live="polite"></p>
+
+          <form id="signUpForm" class="player-card__form" novalidate>
+            <label class="player-card__field" for="signUpName">Arcade Name</label>
+            <input
+              id="signUpName"
+              class="player-card__input"
+              type="text"
+              name="profileName"
+              autocomplete="nickname"
+              placeholder="Your callsign"
+              maxlength="40"
+            >
+
+            <label class="player-card__field" for="signUpEmail">Email</label>
+            <input
+              id="signUpEmail"
+              class="player-card__input"
+              type="email"
+              name="email"
+              autocomplete="email"
+              placeholder="pilot@example.com"
+              required
+            >
+
+            <label class="player-card__field" for="signUpPassword">Password</label>
+            <input
+              id="signUpPassword"
+              class="player-card__input"
+              type="password"
+              name="password"
+              autocomplete="new-password"
+              placeholder="••••••••"
+              required
+            >
+            <p class="player-card__hint">Minimum 8 characters.</p>
+
+            <div class="auth-card__actions">
+              <button id="signUpSubmit" class="auth-card__submit" type="submit">Create Account</button>
+              <a class="auth-card__switch" href="../sign-in/index.html">Already have an account? Sign in &rsaquo;</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script type="module" src="../js/arcade-sign-up.mjs"></script>
+</body>
+</html>

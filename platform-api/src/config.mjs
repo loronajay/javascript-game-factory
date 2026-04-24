@@ -8,11 +8,15 @@ function parsePort(value) {
 export function readConfig(options = {}) {
   const env = options?.env && typeof options.env === "object" ? options.env : process.env;
   const databaseUrl = typeof env.DATABASE_URL === "string" ? env.DATABASE_URL.trim() : "";
+  const jwtSecret = typeof env.JWT_SECRET === "string" ? env.JWT_SECRET.trim() : "";
+  const nodeEnv = typeof env.NODE_ENV === "string" ? env.NODE_ENV.trim() : "";
 
   return {
     port: parsePort(env.PORT),
     databaseUrl,
     hasDatabaseUrl: Boolean(databaseUrl),
+    jwtSecret,
+    hasJwtSecret: Boolean(jwtSecret),
+    isProduction: nodeEnv === "production",
   };
 }
-
