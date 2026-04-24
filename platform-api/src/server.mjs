@@ -25,7 +25,14 @@ import {
   saveThought,
   shareThought,
 } from "./db/thoughts.mjs";
-import { loginAccountService, registerAccountService } from "./services/auth.mjs";
+import {
+  deleteAccountService,
+  loginAccountService,
+  registerAccountService,
+  requestPasswordResetService,
+  resetPasswordService,
+} from "./services/auth.mjs";
+import { createEmailSender } from "./email.mjs";
 
 const { Pool } = pg;
 
@@ -62,11 +69,19 @@ async function bootstrap() {
     await applyMigrations(pool);
   }
 
+  const emailSender = createEmailSender({
+    apiKey: config.resendApiKey,
+    fromEmail: config.fromEmail,
+  });
+
   const app = createApp({
     config,
     checkDatabase: createDatabaseCheck(pool),
     registerAccount: (params) => registerAccountService(pool, params),
     loginAccount: (params) => loginAccountService(pool, params),
+    requestPasswordReset: ({ email }) => requestPasswordResetService(pool, emailSender, { email, appBaseUrl: config.appBaseUrl }),
+    resetPassword: (params) => resetPasswordService(pool, params),
+    deleteAccount: (playerId) => deleteAccountService(pool, playerId),
     jwtSecret: config.jwtSecret,
     isProduction: config.isProduction,
     loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),

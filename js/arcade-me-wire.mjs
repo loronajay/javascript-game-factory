@@ -18,7 +18,7 @@ import {
   syncThoughtFeedFromApi,
 } from "./platform/thoughts/thoughts.mjs";
 
-export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel }) {
+export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
   let openReactionThoughtId = "";
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
   let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
@@ -68,6 +68,21 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   };
 
   void rerender("", true);
+
+  doc.getElementById("meDeleteAccountBtn")?.addEventListener("click", async () => {
+    const flashEl = doc.getElementById("meDeleteAccountFlash");
+    const btn = doc.getElementById("meDeleteAccountBtn");
+    if (!confirm("Delete your account permanently? All your data will be removed and cannot be recovered.")) return;
+    if (btn) { btn.disabled = true; btn.textContent = "Deleting..."; }
+    const result = await authClient?.deleteAccount?.();
+    if (!result?.ok) {
+      if (flashEl) flashEl.textContent = "Could not delete account. Try again.";
+      if (btn) { btn.disabled = false; btn.textContent = "Delete Account"; }
+      return;
+    }
+    try { localStorage.clear(); } catch { /* ignore */ }
+    window.location.href = "../index.html";
+  });
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
     queueMicrotask(() => { void rerender("", true); });

@@ -225,9 +225,10 @@ if (doc?.getElementById) {
   } else {
     const storage = getDefaultPlatformStorage();
     const apiClient = createPlatformApiClient();
+    const authClient = createAuthApiClient();
     const profilePanel = initArcadeProfilePanel({ storage });
     renderMePage(doc);
-    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, profilePanel });
+    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, profilePanel, authClient });
     initSessionNav(doc.getElementById("meAuthNav"), {
       signInPath: "../sign-in/index.html",
       signUpPath: "../sign-up/index.html",

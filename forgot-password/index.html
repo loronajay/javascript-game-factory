@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jay's Javascript Arcade | Sign In</title>
+  <title>Jay's Javascript Arcade | Forgot Password</title>
   <link rel="stylesheet" href="../css/arcade.css">
   <link rel="stylesheet" href="../css/auth.css">
 </head>
@@ -22,27 +22,27 @@
 
       <div class="auth-stage__controls">
         <nav class="auth-stage__nav">
-          <a class="auth-stage__back" href="../index.html">&#x276E; Home</a>
-          <a class="auth-stage__portal" href="../grid.html">Arcade Grid</a>
+          <a class="auth-stage__back" href="../sign-in/index.html">&#x276E; Sign In</a>
+          <a class="auth-stage__portal" href="../index.html">Home</a>
         </nav>
       </div>
 
       <div class="auth-stage__header">
-        <h1 class="pixel-text pixel-text--title auth-stage__title">SIGN IN</h1>
-        <p class="auth-stage__subtitle">Welcome back, pilot.</p>
+        <h1 class="pixel-text pixel-text--title auth-stage__title">FORGOT PASSWORD</h1>
+        <p class="auth-stage__subtitle">We'll send a reset link to your email.</p>
       </div>
 
       <div class="auth-layout">
         <div class="auth-card">
           <p class="auth-card__brand">Javascript Game Factory</p>
-          <h2 class="pixel-text auth-card__title">ACCESS TERMINAL</h2>
+          <h2 class="pixel-text auth-card__title">RECOVERY</h2>
 
           <p id="authFlash" class="auth-card__flash" role="alert" aria-live="polite"></p>
 
-          <form id="signInForm" class="player-card__form" novalidate>
-            <label class="player-card__field" for="signInEmail">Email</label>
+          <form id="forgotPasswordForm" class="player-card__form" novalidate>
+            <label class="player-card__field" for="forgotEmail">Email</label>
             <input
-              id="signInEmail"
+              id="forgotEmail"
               class="player-card__input"
               type="email"
               name="email"
@@ -51,21 +51,9 @@
               required
             >
 
-            <label class="player-card__field" for="signInPassword">Password</label>
-            <input
-              id="signInPassword"
-              class="player-card__input"
-              type="password"
-              name="password"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              required
-            >
-
             <div class="auth-card__actions">
-              <button id="signInSubmit" class="auth-card__submit" type="submit">Sign In</button>
-              <a class="auth-card__switch" href="../forgot-password/index.html">Forgot your password? &rsaquo;</a>
-              <a class="auth-card__switch" href="../sign-up/index.html">New here? Create an account &rsaquo;</a>
+              <button id="forgotSubmit" class="auth-card__submit" type="submit">Send Reset Link</button>
+              <a class="auth-card__switch" href="../sign-in/index.html">Back to sign in &rsaquo;</a>
             </div>
           </form>
         </div>
@@ -75,6 +63,6 @@
 
   <script src="../js/pixel-text.js"></script>
   <script src="../js/platform-config.js"></script>
-  <script type="module" src="../js/arcade-sign-in.mjs"></script>
+  <script type="module" src="../js/arcade-forgot-password.mjs"></script>
 </body>
 </html>

@@ -141,6 +141,15 @@ export function createApp(options = {}) {
   const loginAccount = typeof options?.loginAccount === "function"
     ? options.loginAccount
     : async () => ({ error: "not_configured" });
+  const requestPasswordReset = typeof options?.requestPasswordReset === "function"
+    ? options.requestPasswordReset
+    : async () => ({ ok: true });
+  const resetPassword = typeof options?.resetPassword === "function"
+    ? options.resetPassword
+    : async () => ({ error: "not_configured" });
+  const deleteAccount = typeof options?.deleteAccount === "function"
+    ? options.deleteAccount
+    : async () => ({ error: "not_configured" });
   const jwtSecret = typeof options?.jwtSecret === "string" ? options.jwtSecret : "";
   const isProduction = Boolean(options?.isProduction);
   const now = options?.now;
@@ -282,6 +291,65 @@ export function createApp(options = {}) {
         return;
       }
       writeJson(res, 200, { playerId: authClaims.playerId, email: authClaims.email }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && pathname === "/auth/forgot-password") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      const { email } = body.value || {};
+      if (!isValidEmail(email)) {
+        // Still return 200 to avoid leaking whether the email exists
+        writeJson(res, 200, { ok: true }, requestOrigin);
+        return;
+      }
+
+      await requestPasswordReset({ email });
+      writeJson(res, 200, { ok: true }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && pathname === "/auth/reset-password") {
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      const { token, newPassword } = body.value || {};
+      const result = await resetPassword({ token, newPassword });
+
+      if (!result?.ok) {
+        const statusCode = result?.error === "token_expired" || result?.error === "token_already_used"
+          ? 410
+          : 400;
+        writeJson(res, statusCode, { status: "error", error: result?.error || "reset_failed", timestamp }, requestOrigin);
+        return;
+      }
+
+      writeJson(res, 200, { ok: true }, requestOrigin);
+      return;
+    }
+
+    if (method === "DELETE" && pathname === "/auth/account") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+
+      const result = await deleteAccount(authClaims.playerId);
+
+      if (!result?.ok) {
+        writeJson(res, 400, { status: "error", error: result?.error || "delete_failed", timestamp }, requestOrigin);
+        return;
+      }
+
+      res.setHeader("set-cookie", buildClearCookieHeader(isProduction));
+      writeJson(res, 200, { ok: true }, requestOrigin);
       return;
     }
 
