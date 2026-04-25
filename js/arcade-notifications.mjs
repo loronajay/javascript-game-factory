@@ -163,14 +163,7 @@ export async function initNotificationBell(containerEl, playerId) {
     }
   }
 
-  // initial unread count on page load (lightweight)
-  try {
-    const initial = await api.listNotifications();
-    setBadge(initial?.unreadCount || 0);
-  } catch {
-    // silently skip if auth session not available
-  }
-
+  // Register event listeners immediately so the bell is responsive before the initial fetch resolves.
   bell.addEventListener("click", async (e) => {
     e.stopPropagation();
     const isOpen = !dropdown.hidden;
@@ -193,4 +186,12 @@ export async function initNotificationBell(containerEl, playerId) {
       dropdown.hidden = true;
     }
   });
+
+  // initial unread count on page load (lightweight)
+  try {
+    const initial = await api.listNotifications();
+    setBadge(initial?.unreadCount || 0);
+  } catch {
+    // silently skip if auth session not available
+  }
 }

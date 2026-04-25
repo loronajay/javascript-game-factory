@@ -636,6 +636,46 @@ export async function recordSharedEventBetweenPlayers(db, leftPlayerId, rightPla
   }
 }
 
+export async function removeFriendBetweenPlayers(db, leftPlayerId, rightPlayerId) {
+  const normalizedLeftPlayerId = sanitizePlayerId(leftPlayerId);
+  const normalizedRightPlayerId = sanitizePlayerId(rightPlayerId);
+  const pairKey = buildRelationshipPairKey(normalizedLeftPlayerId, normalizedRightPlayerId);
+
+  if (!pairKey) return { removed: false };
+
+  const ledgerKey = `friendship:${pairKey}`;
+  const client = typeof db?.connect === "function" ? await db.connect() : db;
+
+  await client.query("begin");
+
+  try {
+    const leftRecord = await loadPlayerRelationships(client, normalizedLeftPlayerId);
+    const rightRecord = await loadPlayerRelationships(client, normalizedRightPlayerId);
+
+    leftRecord.friendPlayerIds = (leftRecord.friendPlayerIds || []).filter((id) => id !== normalizedRightPlayerId);
+    rightRecord.friendPlayerIds = (rightRecord.friendPlayerIds || []).filter((id) => id !== normalizedLeftPlayerId);
+
+    if (leftRecord.mainSqueezePlayerId === normalizedRightPlayerId) leftRecord.mainSqueezePlayerId = "";
+    if (rightRecord.mainSqueezePlayerId === normalizedLeftPlayerId) rightRecord.mainSqueezePlayerId = "";
+
+    leftRecord.manualFriendSlotPlayerIds = (leftRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== normalizedRightPlayerId);
+    rightRecord.manualFriendSlotPlayerIds = (rightRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== normalizedLeftPlayerId);
+
+    await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
+    await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
+
+    await client.query(`delete from relationship_ledger_entries where ledger_key = $1`, [ledgerKey]);
+
+    await client.query("commit");
+    return { removed: true };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client?.release?.();
+  }
+}
+
 export async function recordDirectInteractionBetweenPlayers(db, leftPlayerId, rightPlayerId, options = {}) {
   const normalizedLeftPlayerId = sanitizePlayerId(leftPlayerId);
   const normalizedRightPlayerId = sanitizePlayerId(rightPlayerId);

@@ -1,5 +1,5 @@
 import { hydrateArcadeProfileFromApi } from "./arcade-profile.mjs";
-import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
   loadProfileMetricsRecord,
   syncThoughtPostCountWithApi,
@@ -59,6 +59,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
         }));
         if (extra.length > 0) {
           enrichedProfile = { ...enrichedProfile, friendsPreview: [...(enrichedProfile?.friendsPreview || []), ...extra] };
+          saveFactoryProfile(enrichedProfile, storage);
         }
       }
     }

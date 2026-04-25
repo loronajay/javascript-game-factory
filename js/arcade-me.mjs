@@ -233,6 +233,7 @@ if (doc?.getElementById) {
       signInPath: "../sign-in/index.html",
       signUpPath: "../sign-up/index.html",
       homeOnLogout: "../index.html",
+      preloadedSession: session,
     });
   }
 }

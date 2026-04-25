@@ -227,6 +227,15 @@ export async function savePlayerMetrics(db, playerId, patch = {}) {
       profile_open_source_breakdown
   `, buildMetricsParams(normalizedPlayerId, normalized));
 
-  return mapRowToMetricsRecord(result?.rows?.[0] || null, normalizedPlayerId);
+  const savedRecord = mapRowToMetricsRecord(result?.rows?.[0] || null, normalizedPlayerId);
+
+  // keep player_profiles.thought_count in sync so the public profile endpoint stays accurate
+  await db.query(`
+    update player_profiles
+    set thought_count = $1, updated_at = now()
+    where player_id = $2
+  `, [savedRecord.thoughtPostCount, normalizedPlayerId]).catch(() => null);
+
+  return savedRecord;
 }
 

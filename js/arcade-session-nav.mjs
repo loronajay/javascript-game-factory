@@ -16,14 +16,17 @@ export async function initSessionNav(containerEl, {
   signInPath = "sign-in/index.html",
   signUpPath = "sign-up/index.html",
   homeOnLogout = "index.html",
+  preloadedSession = null,
 } = {}) {
   if (!containerEl) return;
 
-  let session = null;
-  try {
-    session = await auth.getSession();
-  } catch {
-    // network down — treat as logged out
+  let session = preloadedSession || null;
+  if (!session) {
+    try {
+      session = await auth.getSession();
+    } catch {
+      // network down — treat as logged out
+    }
   }
 
   if (session?.ok && session?.playerId) {

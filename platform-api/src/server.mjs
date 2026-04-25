@@ -14,6 +14,7 @@ import {
   recordDirectInteractionBetweenPlayers,
   recordSharedEventBetweenPlayers,
   recordSharedSessionBetweenPlayers,
+  removeFriendBetweenPlayers,
   savePlayerRelationships,
 } from "./db/relationships.mjs";
 import {
@@ -103,6 +104,7 @@ async function bootstrap() {
     savePlayerMetrics: (playerId, patch) => savePlayerMetrics(pool, playerId, patch),
     loadPlayerRelationships: (playerId) => loadPlayerRelationships(pool, playerId),
     createFriendshipBetweenPlayers: (leftPlayerId, rightPlayerId, options) => createFriendshipBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
+    removeFriendBetweenPlayers: (leftPlayerId, rightPlayerId) => removeFriendBetweenPlayers(pool, leftPlayerId, rightPlayerId),
     recordSharedSessionBetweenPlayers: (leftPlayerId, rightPlayerId, options) => recordSharedSessionBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
     recordSharedEventBetweenPlayers: (leftPlayerId, rightPlayerId, options) => recordSharedEventBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
     recordDirectInteractionBetweenPlayers: (leftPlayerId, rightPlayerId, options) => recordDirectInteractionBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),

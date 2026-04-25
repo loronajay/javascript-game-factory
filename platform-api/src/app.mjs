@@ -99,6 +99,9 @@ export function createApp(options = {}) {
   const createFriendshipBetweenPlayers = typeof options?.createFriendshipBetweenPlayers === "function"
     ? options.createFriendshipBetweenPlayers
     : async () => null;
+  const removeFriendBetweenPlayers = typeof options?.removeFriendBetweenPlayers === "function"
+    ? options.removeFriendBetweenPlayers
+    : async () => null;
   const recordSharedSessionBetweenPlayers = typeof options?.recordSharedSessionBetweenPlayers === "function"
     ? options.recordSharedSessionBetweenPlayers
     : async () => null;
@@ -193,6 +196,7 @@ export function createApp(options = {}) {
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
     const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
+    const playerFriendMatch = pathname.match(/^\/players\/([^/]+)\/friends\/([^/]+)$/);
     const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
 
     if (method === "OPTIONS") {
@@ -698,6 +702,22 @@ export function createApp(options = {}) {
       return;
     }
 
+    if (method === "DELETE" && playerFriendMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const viewerPlayerId = decodeURIComponent(playerFriendMatch[1]);
+      const targetPlayerId = decodeURIComponent(playerFriendMatch[2]);
+      if (authClaims.playerId !== viewerPlayerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+      const result = await removeFriendBetweenPlayers(viewerPlayerId, targetPlayerId);
+      writeJson(res, 200, { removed: result?.removed ?? false }, requestOrigin);
+      return;
+    }
+
     if (method === "POST" && pathname === "/relationships/shared-session") {
       const body = await readJsonBody(req);
       if (!body.ok) {
@@ -844,8 +864,12 @@ export function createApp(options = {}) {
           writeJson(res, 409, { status: "error", error: "request_not_pending", timestamp }, requestOrigin);
           return;
         }
-        // create actual friendship
-        void createFriendshipBetweenPlayers(accepted.fromPlayerId, accepted.toPlayerId, {});
+        // create actual friendship — awaited so failures surface rather than being silently swallowed
+        try {
+          await createFriendshipBetweenPlayers(accepted.fromPlayerId, accepted.toPlayerId, {});
+        } catch (err) {
+          process.stderr.write(`[accept-friend-request] createFriendshipBetweenPlayers failed: ${err?.message || err}\n`);
+        }
         // notify the sender — prefer name from body, then profile lookup, then generic fallback
         const resolvedAcceptorName = acceptorDisplayName
           || (await loadPlayerProfile(accepted.toPlayerId).catch(() => null))?.profileName

@@ -12,6 +12,11 @@ function sanitizeSingleLine(value, maxLength = Number.POSITIVE_INFINITY) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function normalizeTimestampField(value, maxLength = 40) {
+  if (value instanceof Date) return value.toISOString().slice(0, maxLength);
+  return sanitizeSingleLine(value, maxLength);
+}
+
 function sanitizeTextBlock(value, maxLength = Number.POSITIVE_INFINITY) {
   if (typeof value !== "string") return "";
   return value.replace(/\r\n?/g, "\n").trim().slice(0, maxLength);
@@ -90,7 +95,7 @@ export function normalizeActivityItem(item = {}, index = 0) {
     gameSlug: sanitizeSingleLine(item?.gameSlug, 80),
     summary: sanitizeTextBlock(item?.summary, 280),
     visibility: ACTIVITY_VISIBILITIES.has(visibility) ? visibility : "friends",
-    createdAt: sanitizeSingleLine(item?.createdAt, 40) || new Date().toISOString(),
+    createdAt: normalizeTimestampField(item?.createdAt) || new Date().toISOString(),
     metadata: sanitizeMetadataValue(item?.metadata) || {},
   };
 }
@@ -574,7 +579,7 @@ export function normalizeThoughtPost(post = {}, index = 0) {
     viewerReaction: sanitizeThoughtReactionId(post?.viewerReaction),
     viewerSharedThoughtId: sanitizeThoughtShareId(post?.viewerSharedThoughtId),
     repostOfId: sanitizeSingleLine(post?.repostOfId, 80),
-    createdAt: sanitizeSingleLine(post?.createdAt, 40) || new Date().toISOString(),
+    createdAt: normalizeTimestampField(post?.createdAt) || new Date().toISOString(),
     editedAt: sanitizeSingleLine(post?.editedAt, 40),
   };
 }
@@ -586,7 +591,7 @@ export function normalizeThoughtComment(comment = {}, index = 0) {
     authorPlayerId: sanitizeSingleLine(comment?.authorPlayerId, 80),
     authorDisplayName: sanitizeSingleLine(comment?.authorDisplayName, 60) || "Arcade Pilot",
     text: sanitizeTextBlock(comment?.text, 500),
-    createdAt: sanitizeSingleLine(comment?.createdAt, 40) || new Date().toISOString(),
+    createdAt: normalizeTimestampField(comment?.createdAt) || new Date().toISOString(),
     editedAt: sanitizeSingleLine(comment?.editedAt, 40),
   };
 }

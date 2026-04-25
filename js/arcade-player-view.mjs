@@ -49,7 +49,14 @@ function renderQuotedThought(reference, mode = "card") {
 }
 
 function formatCommentDate(value) {
-  return value || "Signal pending";
+  const timestamp = Date.parse(value || "");
+  if (!timestamp) return "Signal pending";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 function renderCommentSheet(item, commentPanelState = {}) {
@@ -167,14 +174,17 @@ function renderHeroCard(container, model) {
   const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
   const realNameValue = model.heroRealName || "Not shared";
   const pageViewCount = model.pageViewCount || "0";
+  const isUnfriendMode = model.friendAction?.mode === "unfriend";
   const friendActionHtml = model.friendAction?.enabled
     ? `
       <div class="player-hero-card__social-action">
         <button
-          class="${model.friendAction.disabled ? "player-hero-card__friend-action player-hero-card__friend-action--linked" : "player-hero-card__friend-action"}"
+          class="${isUnfriendMode ? "player-hero-card__friend-action player-hero-card__friend-action--unfriend" : "player-hero-card__friend-action"}"
           type="button"
-          data-add-friend="${escapeHtml(model.friendAction.playerId || "")}"
-          ${model.friendAction.disabled ? "disabled" : ""}
+          ${isUnfriendMode
+            ? `data-unfriend="${escapeHtml(model.friendAction.playerId || "")}"`
+            : `data-add-friend="${escapeHtml(model.friendAction.playerId || "")}"`
+          }
         >${escapeHtml(model.friendAction.label || "Add Friend")}</button>
         <p class="player-hero-card__friend-flash" aria-live="polite">${escapeHtml(model.friendAction.flashMessage || "")}</p>
       </div>

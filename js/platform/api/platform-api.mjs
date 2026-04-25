@@ -155,6 +155,13 @@ export function createPlatformApiClient(options = {}) {
     createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId) {
       return post("/friendships", { leftPlayerId, rightPlayerId }, "friendship");
     },
+    removeFriend(viewerPlayerId, targetPlayerId) {
+      const encodedViewer = encodePathSegment(viewerPlayerId);
+      const encodedTarget = encodePathSegment(targetPlayerId);
+      return encodedViewer && encodedTarget
+        ? del(`/players/${encodedViewer}/friends/${encodedTarget}`, "removed")
+        : Promise.resolve(null);
+    },
     recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
       return post("/relationships/shared-session", {
         leftPlayerId,

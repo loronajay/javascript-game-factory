@@ -49,7 +49,14 @@ function renderQuotedThought(reference, mode = "card") {
 }
 
 function formatCommentDate(value) {
-  return value || "Signal pending";
+  const timestamp = Date.parse(value || "");
+  if (!timestamp) return "Signal pending";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 function renderCommentSheet(item, commentPanelState = {}) {

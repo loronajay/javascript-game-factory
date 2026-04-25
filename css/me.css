@@ -175,6 +175,7 @@
   gap: 16px;
   width: min(1100px, 100%);
   padding-top: 8px;
+  z-index: 5;
 }
 
 .me-stage__header {

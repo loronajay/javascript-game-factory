@@ -119,8 +119,9 @@ function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRe
 
   return {
     enabled: true,
-    disabled: alreadyFriends,
-    label: alreadyFriends ? "Friends Linked" : "Add Friend",
+    disabled: false,
+    mode: alreadyFriends ? "unfriend" : "add-friend",
+    label: alreadyFriends ? "Unfriend" : "Add Friend",
     flashMessage: typeof flashMessage === "string" ? flashMessage : "",
     playerId: normalizedTargetPlayerId,
   };

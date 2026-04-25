@@ -1,6 +1,6 @@
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { syncThoughtPostCountWithApi } from "./platform/metrics/metrics.mjs";
-import { createFriendshipBetweenPlayers } from "./platform/relationships/relationships.mjs";
+import { createFriendshipBetweenPlayers, removeFriendBetweenPlayers } from "./platform/relationships/relationships.mjs";
 import { createNotificationsApiClient } from "./platform/api/notifications-api.mjs";
 import {
   buildPlayerThoughtFeed,
@@ -175,6 +175,40 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         relationshipFlash: result.awarded ? "Friend linked." : "Already linked as friends.",
         disableProfileViewTracking: true,
         sharePanelState,
+      });
+      return;
+    }
+
+    const unfriendButton = event.target.closest("[data-unfriend]");
+    if (unfriendButton) {
+      const targetPlayerId = unfriendButton.dataset.unfriend;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!targetPlayerId || !currentProfile.playerId || currentProfile.playerId === targetPlayerId) {
+        return;
+      }
+
+      if (authSession?.playerId) {
+        unfriendButton.disabled = true;
+        await apiClient.removeFriend(currentProfile.playerId, targetPlayerId).catch(() => null);
+        unfriendButton.disabled = false;
+      }
+
+      const result = removeFriendBetweenPlayers(currentProfile.playerId, targetPlayerId, { storage, apiClient });
+      currentPageData = {
+        ...(currentPageData || {}),
+        profile: currentPageData?.profile,
+        thoughtFeed: currentPageData?.thoughtFeed || loadThoughtFeed(storage),
+        metricsRecord: currentPageData?.metricsRecord,
+        relationshipsRecord: result.rightRecord,
+        viewerRelationshipsRecord: result.leftRecord,
+      };
+      profilePanel?.render?.("");
+      renderPage(doc, {
+        ...currentPageData,
+        relationshipFlash: "Friendship removed.",
+        disableProfileViewTracking: true,
+        sharePanelState,
+        commentPanelState,
       });
       return;
     }

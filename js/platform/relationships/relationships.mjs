@@ -592,6 +592,33 @@ export function createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId, opti
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : FRIENDSHIP_CREATION_POINTS);
 }
 
+export function removeFriendBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
+  if (!pair) {
+    return { removed: false, leftRecord: null, rightRecord: null };
+  }
+
+  const ledger = loadProfileRelationshipLedger(storage);
+  const pairKey = buildRelationshipPairKey(pair.leftPlayerId, pair.rightPlayerId);
+
+  pair.leftRecord.friendPlayerIds = (pair.leftRecord.friendPlayerIds || []).filter((id) => id !== pair.rightPlayerId);
+  pair.rightRecord.friendPlayerIds = (pair.rightRecord.friendPlayerIds || []).filter((id) => id !== pair.leftPlayerId);
+
+  if (pair.leftRecord.mainSqueezePlayerId === pair.rightPlayerId) pair.leftRecord.mainSqueezePlayerId = "";
+  if (pair.rightRecord.mainSqueezePlayerId === pair.leftPlayerId) pair.rightRecord.mainSqueezePlayerId = "";
+
+  pair.leftRecord.manualFriendSlotPlayerIds = (pair.leftRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== pair.rightPlayerId);
+  pair.rightRecord.manualFriendSlotPlayerIds = (pair.rightRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== pair.leftPlayerId);
+
+  delete ledger.friendshipCreatedAtByPairKey[pairKey];
+
+  const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
+  saveProfileRelationshipLedger(ledger, storage);
+
+  return { removed: true, leftRecord: saved.leftRecord, rightRecord: saved.rightRecord };
+}
+
 export function recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
