@@ -1,5 +1,6 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { initNotificationBell } from "./arcade-notifications.mjs";
 
 const auth = createAuthApiClient();
 
@@ -38,6 +39,9 @@ export async function initSessionNav(containerEl, {
       await auth.logout();
       window.location.href = homeOnLogout;
     });
+
+    // attach notification bell before the name
+    void initNotificationBell(containerEl, session.playerId);
   } else {
     containerEl.innerHTML = `
       <a class="session-nav__link grid-stage__portal" href="${signInPath}">Sign In</a>

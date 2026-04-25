@@ -1,6 +1,7 @@
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { syncThoughtPostCountWithApi } from "./platform/metrics/metrics.mjs";
 import { createFriendshipBetweenPlayers } from "./platform/relationships/relationships.mjs";
+import { createNotificationsApiClient } from "./platform/api/notifications-api.mjs";
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
@@ -13,7 +14,7 @@ import {
   syncThoughtCommentsFromApi,
 } from "./platform/thoughts/thoughts.mjs";
 
-export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel }) {
+export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession }) {
   let currentPageData = null;
   let openReactionThoughtId = "";
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
@@ -132,6 +133,27 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       if (!targetPlayerId || !currentProfile.playerId || currentProfile.playerId === targetPlayerId) {
         return;
       }
+
+      // authenticated users send a friend request; guests fall back to local link
+      if (authSession?.playerId) {
+        addFriendButton.disabled = true;
+        const notifApi = createNotificationsApiClient();
+        const request = await notifApi.sendFriendRequest(
+          targetPlayerId,
+          currentProfile.profileName || "UNNAMED PILOT",
+        );
+        addFriendButton.disabled = false;
+        profilePanel?.render?.("");
+        renderPage(doc, {
+          ...(currentPageData || {}),
+          relationshipFlash: request ? "Friend request sent." : "Could not send request — please try again.",
+          disableProfileViewTracking: true,
+          sharePanelState,
+          commentPanelState,
+        });
+        return;
+      }
+
       const result = createFriendshipBetweenPlayers(currentProfile.playerId, targetPlayerId, {
         storage,
         apiClient,

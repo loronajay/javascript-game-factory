@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="../css/arcade.css">
   <link rel="stylesheet" href="../css/me.css">
   <link rel="stylesheet" href="../css/thoughts.css">
+  <link rel="stylesheet" href="../css/notifications.css">
 </head>
 <body class="me-page-shell">
   <div class="scanlines"></div>
@@ -29,6 +30,7 @@
           <a class="grid-stage__portal" href="../thoughts/index.html">Thoughts</a>
           <a class="grid-stage__portal" href="../bulletins/index.html">Bulletins</a>
           <a class="grid-stage__portal" href="../events/index.html">Events</a>
+          <a class="grid-stage__portal" href="../search/index.html">Find Players</a>
           <div id="meAuthNav" class="session-nav"></div>
         </div>
         <button
@@ -257,6 +259,10 @@
               </div>
             </div>
           </fieldset>
+          <label class="player-card__field player-card__field--checkbox">
+            <input id="playerProfileDiscoverable" type="checkbox" name="discoverable" checked>
+            Show my profile in player search
+          </label>
           <p id="playerProfileHint" class="player-card__hint">
             Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.
           </p>

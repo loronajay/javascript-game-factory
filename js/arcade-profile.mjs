@@ -203,6 +203,7 @@ export function buildArcadeProfileViewModel(profile, options = {}) {
     relationshipCandidateOptions,
     friendSlotRows: buildFriendSlotRows(relationshipsRecord),
     linkRows: buildLinkRows(normalized.links),
+    discoverableValue: normalized.preferences?.discoverable !== false,
     saveLabel: hasName ? "UPDATE CARD" : "STORE CARD",
     statusLine: "EDIT YOUR PUBLIC PLAYER PROFILE",
     helperText: "Update your arcade username, optional real name, about-me copy, public links, custom tagline, and whether the visible friend rail is automatic or manually pinned. Games can still use temporary match aliases during a run.",
@@ -219,6 +220,10 @@ export function saveArcadeProfileName(storage, profileName, options = {}) {
 
 export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
   const current = loadFactoryProfile(storage, options);
+  const updatedPreferences = { ...(current.preferences || {}) };
+  if (typeof fields.discoverable === "boolean") {
+    updatedPreferences.discoverable = fields.discoverable;
+  }
   const savedProfile = saveFactoryProfile({
     ...current,
     profileName: fields.profileName ?? current.profileName,
@@ -227,6 +232,7 @@ export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
     tagline: fields.tagline ?? current.tagline,
     favoriteGameSlug: fields.favoriteGameSlug ?? current.favoriteGameSlug,
     links: fields.links ?? current.links,
+    preferences: updatedPreferences,
   }, storage, options);
 
   if (hasRelationshipField(fields)) {
@@ -353,6 +359,7 @@ export function initArcadeProfilePanel({
   const mainSqueezeModeInput = doc?.getElementById?.("playerProfileMainSqueezeMode");
   const mainSqueezePlayerIdInput = doc?.getElementById?.("playerProfileMainSqueezePlayerId");
   const friendRailModeInput = doc?.getElementById?.("playerProfileFriendRailMode");
+  const discoverableInput = doc?.getElementById?.("playerProfileDiscoverable");
   const clearButton = doc?.getElementById?.("playerProfileClear");
 
   if (!button || !panel || !form || !profileNameInput) {
@@ -412,6 +419,10 @@ export function initArcadeProfilePanel({
     if (taglineInput) {
       taglineInput.value = model.taglineValue;
       taglineInput.maxLength = model.taglineMaxLength;
+    }
+
+    if (discoverableInput) {
+      discoverableInput.checked = model.discoverableValue;
     }
 
     if (favoriteGameInput) {
@@ -513,6 +524,7 @@ export function initArcadeProfilePanel({
       bio: bioInput?.value || "",
       tagline: taglineInput?.value || "",
       favoriteGameSlug: favoriteGameInput?.value || "",
+      discoverable: discoverableInput ? discoverableInput.checked : true,
       links: collectLinkRows(doc),
       mainSqueezeMode: mainSqueezeModeInput?.value || "manual",
       mainSqueezePlayerId: mainSqueezePlayerIdInput?.value || "",

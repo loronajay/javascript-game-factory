@@ -56,7 +56,10 @@ function normalizeStoredProfile(source = {}) {
 function mapRowToFactoryProfile(row = {}) {
   if (!row?.player_id) return null;
 
-  return normalizeStoredProfile({
+  const preferences = ensureJsonObject(row.preferences);
+  const discoverable = preferences.discoverable !== false;
+
+  const profile = normalizeStoredProfile({
     playerId: row.player_id,
     profileName: row.profile_name,
     friendCode: row.friend_code,
@@ -75,11 +78,15 @@ function mapRowToFactoryProfile(row = {}) {
     friends: ensureJsonArray(row.friends),
     recentPartners: ensureJsonArray(row.recent_partners),
     links: ensureJsonArray(row.links),
-    preferences: ensureJsonObject(row.preferences),
+    preferences,
     featuredGames: ensureJsonArray(row.featured_games),
     recentActivity: ensureJsonArray(row.recent_activity),
     thoughtCount: Number(row.thought_count) || 0,
   });
+
+  profile.hasAccount = Boolean(row.has_account);
+  profile.discoverable = discoverable;
+  return profile;
 }
 
 function buildProfileParams(playerId, profile) {
@@ -193,9 +200,11 @@ export async function loadPlayerProfile(db, playerId) {
       pp.preferences,
       pp.featured_games,
       pp.recent_activity,
-      pp.thought_count
+      pp.thought_count,
+      (a.player_id is not null) as has_account
     from players p
     left join player_profiles pp on pp.player_id = p.player_id
+    left join accounts a on a.player_id = p.player_id
     where p.player_id = $1
     limit 1
   `, [normalizedPlayerId]);
@@ -231,14 +240,54 @@ export async function loadPlayerProfileByFriendCode(db, friendCode) {
       pp.preferences,
       pp.featured_games,
       pp.recent_activity,
-      pp.thought_count
+      pp.thought_count,
+      (a.player_id is not null) as has_account
     from players p
     join player_profiles pp on pp.player_id = p.player_id
+    left join accounts a on a.player_id = p.player_id
     where pp.friend_code = $1
     limit 1
   `, [normalizedFriendCode]);
 
   return mapRowToFactoryProfile(result?.rows?.[0] || null);
+}
+
+export async function searchPlayers(db, query, { limit = 20 } = {}) {
+  const trimmed = typeof query === "string" ? query.trim() : "";
+  if (!trimmed) return [];
+
+  const pattern = `%${trimmed}%`;
+  const safeLimit = Math.min(Math.max(1, Number.isInteger(limit) ? limit : 20), 50);
+
+  const result = await db.query(`
+    select
+      p.player_id,
+      pp.profile_name,
+      pp.friend_code,
+      pp.real_name,
+      pp.tagline,
+      pp.avatar_asset_id,
+      pp.preferences,
+      true as has_account
+    from players p
+    join player_profiles pp on pp.player_id = p.player_id
+    join accounts a on a.player_id = p.player_id
+    where (pp.profile_name ilike $1 or pp.real_name ilike $1)
+      and (pp.preferences->>'discoverable' is null or pp.preferences->>'discoverable' != 'false')
+    order by pp.profile_name asc
+    limit $2
+  `, [pattern, safeLimit]);
+
+  return (result?.rows || []).map((row) => ({
+    playerId: row.player_id,
+    profileName: row.profile_name || "",
+    friendCode: row.friend_code || "",
+    realName: row.real_name || "",
+    tagline: row.tagline || "",
+    avatarAssetId: row.avatar_asset_id || "",
+    hasAccount: true,
+    discoverable: true,
+  }));
 }
 
 export async function savePlayerProfile(db, playerId, patch = {}) {

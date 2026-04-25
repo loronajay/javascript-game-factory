@@ -1071,3 +1071,52 @@ body {
     width: min(220px, 42vw);
   }
 }
+
+
+/* ---------- RESULTS OPPONENT PROFILE CHIP ---------- */
+
+.ended-opponent-profile {
+  min-height: 28px;
+  margin: 4px 0;
+}
+
+.ended-profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ended-profile-label {
+  color: #8899aa;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ended-profile-name {
+  color: #a0d0ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.ended-profile-name:hover { text-decoration: underline; }
+
+.ended-profile-action {
+  color: #60c060;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  border: 1px solid rgba(80, 180, 80, 0.4);
+  padding: 2px 8px;
+}
+
+.ended-profile-action:hover {
+  border-color: rgba(80, 180, 80, 0.8);
+  color: #80e080;
+}

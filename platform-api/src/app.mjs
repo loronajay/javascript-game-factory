@@ -75,6 +75,9 @@ export function createApp(options = {}) {
   const checkDatabase = typeof options?.checkDatabase === "function"
     ? options.checkDatabase
     : async () => false;
+  const searchPlayers = typeof options?.searchPlayers === "function"
+    ? options.searchPlayers
+    : async () => [];
   const loadPlayerProfile = typeof options?.loadPlayerProfile === "function"
     ? options.loadPlayerProfile
     : async () => null;
@@ -135,6 +138,27 @@ export function createApp(options = {}) {
   const deleteThought = typeof options?.deleteThought === "function"
     ? options.deleteThought
     : async () => false;
+  const createNotification = typeof options?.createNotification === "function"
+    ? options.createNotification
+    : async () => null;
+  const listNotifications = typeof options?.listNotifications === "function"
+    ? options.listNotifications
+    : async () => ({ notifications: [], unreadCount: 0 });
+  const markAllNotificationsRead = typeof options?.markAllNotificationsRead === "function"
+    ? options.markAllNotificationsRead
+    : async () => {};
+  const createFriendRequest = typeof options?.createFriendRequest === "function"
+    ? options.createFriendRequest
+    : async () => null;
+  const getFriendRequest = typeof options?.getFriendRequest === "function"
+    ? options.getFriendRequest
+    : async () => null;
+  const acceptFriendRequest = typeof options?.acceptFriendRequest === "function"
+    ? options.acceptFriendRequest
+    : async () => null;
+  const rejectFriendRequest = typeof options?.rejectFriendRequest === "function"
+    ? options.rejectFriendRequest
+    : async () => null;
   const registerAccount = typeof options?.registerAccount === "function"
     ? options.registerAccount
     : async () => ({ error: "not_configured" });
@@ -169,6 +193,7 @@ export function createApp(options = {}) {
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
     const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
+    const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
 
     if (method === "OPTIONS") {
       res.statusCode = 204;
@@ -353,6 +378,17 @@ export function createApp(options = {}) {
       return;
     }
 
+    if (method === "GET" && pathname === "/players/search") {
+      const q = requestUrl.searchParams.get("q") || "";
+      if (!q.trim()) {
+        writeJson(res, 200, { players: [] }, requestOrigin);
+        return;
+      }
+      const players = await searchPlayers(q);
+      writeJson(res, 200, { players }, requestOrigin);
+      return;
+    }
+
     if (method === "GET" && pathname === "/activity") {
       const items = await listActivityItems();
       writeJson(res, 200, { items }, requestOrigin);
@@ -423,13 +459,29 @@ export function createApp(options = {}) {
         return;
       }
 
+      const actorPlayerId = String(body.value?.viewerPlayerId || "");
+      const actorDisplayName = String(body.value?.viewerAuthorDisplayName || "");
       const commentRecord = await commentOnThought(
         decodeURIComponent(thoughtCommentMatch[1]),
-        body.value?.viewerPlayerId,
-        body.value?.viewerAuthorDisplayName,
+        actorPlayerId,
+        actorDisplayName,
         body.value?.text,
       );
       writeJson(res, 200, { commentRecord }, requestOrigin);
+      if (commentRecord?.thought?.authorPlayerId && actorPlayerId && commentRecord.thought.authorPlayerId !== actorPlayerId) {
+        void createNotification({
+          recipientPlayerId: commentRecord.thought.authorPlayerId,
+          actorPlayerId,
+          actorDisplayName,
+          type: "thought_comment",
+          payload: {
+            thoughtId: commentRecord.thought.id,
+            commentId: commentRecord.comment?.id || "",
+            commentText: String(commentRecord.comment?.text || "").slice(0, 80),
+            thoughtText: String(commentRecord.thought.text || "").slice(0, 80),
+          },
+        });
+      }
       return;
     }
 
@@ -445,13 +497,27 @@ export function createApp(options = {}) {
         return;
       }
 
+      const actorPlayerId = String(body.value?.viewerPlayerId || "");
+      const actorDisplayName = String(body.value?.viewerAuthorDisplayName || "");
       const share = await shareThought(
         decodeURIComponent(thoughtShareMatch[1]),
-        body.value?.viewerPlayerId,
-        body.value?.viewerAuthorDisplayName,
+        actorPlayerId,
+        actorDisplayName,
         body.value,
       );
       writeJson(res, 200, { share }, requestOrigin);
+      if (share?.sharedThought && share?.originalThought?.authorPlayerId && actorPlayerId && share.originalThought.authorPlayerId !== actorPlayerId) {
+        void createNotification({
+          recipientPlayerId: share.originalThought.authorPlayerId,
+          actorPlayerId,
+          actorDisplayName,
+          type: "thought_share",
+          payload: {
+            thoughtId: share.originalThought.id,
+            thoughtText: String(share.originalThought.text || "").slice(0, 80),
+          },
+        });
+      }
       return;
     }
 
@@ -467,12 +533,28 @@ export function createApp(options = {}) {
         return;
       }
 
+      const actorPlayerId = String(body.value?.viewerPlayerId || "");
+      const actorDisplayName = String(body.value?.actorDisplayName || "");
       const thought = await reactToThought(
         decodeURIComponent(thoughtReactionMatch[1]),
-        body.value?.viewerPlayerId,
+        actorPlayerId,
         body.value?.reactionId,
       );
       writeJson(res, 200, { thought }, requestOrigin);
+      // fire-and-forget notification when reaction is set (not removed) on someone else's thought
+      if (thought?.authorPlayerId && actorPlayerId && thought.authorPlayerId !== actorPlayerId && thought.viewerReaction) {
+        void createNotification({
+          recipientPlayerId: thought.authorPlayerId,
+          actorPlayerId,
+          actorDisplayName,
+          type: "thought_reaction",
+          payload: {
+            thoughtId: thought.id,
+            reactionId: thought.viewerReaction,
+            thoughtText: String(thought.text || "").slice(0, 80),
+          },
+        });
+      }
       return;
     }
 
@@ -676,6 +758,109 @@ export function createApp(options = {}) {
         body.value,
       );
       writeJson(res, 200, { relationshipUpdate }, requestOrigin);
+      return;
+    }
+
+    // Notification routes (auth required)
+    if (method === "GET" && pathname === "/notifications") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const result = await listNotifications(authClaims.playerId);
+      writeJson(res, 200, result, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && pathname === "/notifications/read-all") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      await markAllNotificationsRead(authClaims.playerId);
+      writeJson(res, 200, { ok: true }, requestOrigin);
+      return;
+    }
+
+    // Friend request routes (auth required)
+    if (method === "POST" && pathname === "/friend-requests") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+      const { toPlayerId, fromDisplayName } = body.value || {};
+      const fromPlayerId = authClaims.playerId;
+      if (!toPlayerId || toPlayerId === fromPlayerId) {
+        writeJson(res, 400, { status: "error", error: "invalid_target", timestamp }, requestOrigin);
+        return;
+      }
+      // create request first so we have the ID for the notification payload
+      const request = await createFriendRequest({
+        fromPlayerId,
+        toPlayerId,
+        fromDisplayName: String(fromDisplayName || ""),
+      });
+      if (!request) {
+        writeJson(res, 409, { status: "error", error: "request_already_pending", timestamp }, requestOrigin);
+        return;
+      }
+      void createNotification({
+        recipientPlayerId: toPlayerId,
+        actorPlayerId: fromPlayerId,
+        actorDisplayName: String(fromDisplayName || ""),
+        type: "friend_request",
+        payload: { requestId: request.id },
+      });
+      writeJson(res, 201, { request }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && friendRequestActionMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const requestId = decodeURIComponent(friendRequestActionMatch[1]);
+      const action = friendRequestActionMatch[2];
+      const friendRequest = await getFriendRequest(requestId);
+      if (!friendRequest) {
+        writeJson(res, 404, { status: "error", error: "request_not_found", timestamp }, requestOrigin);
+        return;
+      }
+      if (friendRequest.toPlayerId !== authClaims.playerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+      if (action === "accept") {
+        const accepted = await acceptFriendRequest(requestId);
+        if (!accepted) {
+          writeJson(res, 409, { status: "error", error: "request_not_pending", timestamp }, requestOrigin);
+          return;
+        }
+        // create actual friendship
+        void createFriendshipBetweenPlayers(accepted.fromPlayerId, accepted.toPlayerId, {});
+        // notify the sender
+        void createNotification({
+          recipientPlayerId: accepted.fromPlayerId,
+          actorPlayerId: accepted.toPlayerId,
+          actorDisplayName: "",
+          type: "friend_accept",
+          payload: { requestId },
+        });
+        writeJson(res, 200, { ok: true, request: accepted }, requestOrigin);
+      } else {
+        const rejected = await rejectFriendRequest(requestId);
+        if (!rejected) {
+          writeJson(res, 409, { status: "error", error: "request_not_pending", timestamp }, requestOrigin);
+          return;
+        }
+        writeJson(res, 200, { ok: true, request: rejected }, requestOrigin);
+      }
       return;
     }
 

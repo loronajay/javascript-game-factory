@@ -19,6 +19,8 @@ import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted }
 import { publishLoversLostRunActivity } from '../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile, sanitizeFactoryProfileName } from '../../js/platform/identity/factory-profile.mjs';
 import { createMatchIdentity, createOnlineIdentityPayload } from '../../js/platform/identity/match-identity.mjs';
+import { createPlatformApiClient } from '../../js/platform/api/platform-api.mjs';
+import { createAuthApiClient } from '../../js/platform/api/auth-api.mjs';
 import {
   getDefaultPlatformStorage,
   getPlatformStorageKey,
@@ -1445,6 +1447,7 @@ function initGame() {
 
   // ── Game state ────────────────────────────────────────────────────────────
   let gs = createGameState('single', Date.now() >>> 0, { debugObstacleType });
+  let prevPhase = gs.phase;
   let lastMusicPhase = null;
 
   // ── Fixed timestep (60 ticks/s regardless of monitor refresh rate) ────────
@@ -1870,6 +1873,42 @@ function initGame() {
       renderer.renderGameOver(gs.boy, gs.girl, gs.runSummary);
     } else if (gs.phase === 'score_screen') {
       renderer.renderScore(gs.boy, gs.girl, gs.runSummary);
+    }
+
+    if (gs.phase !== prevPhase) {
+      const overlay = document.getElementById('score-overlay');
+      if (overlay) {
+        if (gs.phase === 'score_screen') {
+          overlay.classList.add('hidden');
+          const remoteSideKey = onlineSide === 'boy' ? 'girlIdentity' : 'boyIdentity';
+          const oppPlayerId = gs.runSummary?.[remoteSideKey]?.playerId;
+          if (oppPlayerId) {
+            const apiClient = createPlatformApiClient();
+            const authClient = createAuthApiClient();
+            Promise.all([
+              apiClient.loadPlayerProfile(oppPlayerId),
+              authClient.getSession(),
+            ]).then(([oppProfile, session]) => {
+              if (!oppProfile?.hasAccount) return;
+              const profileUrl = `../../player/index.html?id=${encodeURIComponent(oppPlayerId)}`;
+              const isSignedIn = Boolean(session?.ok && session?.playerId);
+              const addFriendBtn = isSignedIn
+                ? `<a class="score-overlay__action" href="${profileUrl}">Add Friend &rsaquo;</a>`
+                : '';
+              overlay.innerHTML = `
+                <span class="score-overlay__label">Opponent:</span>
+                <a class="score-overlay__name" href="${profileUrl}">${oppProfile.profileName || oppPlayerId}</a>
+                ${addFriendBtn}
+              `;
+              overlay.classList.remove('hidden');
+            }).catch(() => {});
+          }
+        } else {
+          overlay.classList.add('hidden');
+          overlay.innerHTML = '';
+        }
+      }
+      prevPhase = gs.phase;
     }
 
     requestAnimationFrame(loop);

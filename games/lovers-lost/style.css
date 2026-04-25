@@ -76,3 +76,56 @@ body {
     --shell-gutter: 8px;
   }
 }
+
+/* ---------- SCORE SCREEN OPPONENT OVERLAY ---------- */
+
+.score-overlay {
+  position: absolute;
+  bottom: clamp(12px, 3vh, 28px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 8px 16px;
+  background: rgba(5, 3, 14, 0.82);
+  border: 1px solid rgba(180, 120, 240, 0.3);
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.score-overlay.hidden { display: none; }
+
+.score-overlay__label {
+  color: #8877aa;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.score-overlay__name {
+  color: #c8a0ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.score-overlay__name:hover { text-decoration: underline; }
+
+.score-overlay__action {
+  color: #80e080;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  border: 1px solid rgba(80, 180, 80, 0.4);
+  padding: 2px 8px;
+}
+
+.score-overlay__action:hover {
+  border-color: rgba(80, 180, 80, 0.8);
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Find Players</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/search.css">
+</head>
+<body class="search-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="search-stage">
+      <div class="search-stage__stars" aria-hidden="true"></div>
+      <div class="search-stage__scene" aria-hidden="true">
+        <div class="search-stage__sun"></div>
+        <div class="search-stage__skyline"></div>
+        <div class="search-stage__floor"></div>
+      </div>
+
+      <div class="search-stage__controls">
+        <nav class="search-stage__nav">
+          <a class="search-stage__back" href="#" onclick="event.preventDefault(); history.back()">&#x276E; Back</a>
+          <a class="search-stage__portal" href="../grid.html">Arcade Grid</a>
+          <a class="search-stage__portal" href="../me/index.html">Player Page</a>
+        </nav>
+      </div>
+
+      <div class="search-stage__header">
+        <h1 class="pixel-text pixel-text--title search-stage__title">FIND PLAYERS</h1>
+        <p class="search-stage__subtitle">Search for registered pilots by arcade name or real name.</p>
+      </div>
+
+      <div class="search-layout">
+        <div class="search-bar">
+          <input
+            id="searchInput"
+            class="search-bar__input"
+            type="search"
+            placeholder="Search players..."
+            autocomplete="off"
+            maxlength="60"
+          >
+          <button id="searchBtn" class="search-bar__btn" type="button">Search</button>
+        </div>
+
+        <p id="searchFlash" class="search-flash" role="status" aria-live="polite"></p>
+
+        <ul id="searchResults" class="search-results" aria-label="Search results"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/platform-config.js"></script>
+  <script type="module" src="../js/arcade-search.mjs"></script>
+</body>
+</html>

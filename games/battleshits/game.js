@@ -20,6 +20,8 @@ import {
 import { publishBattleshitsMatchActivity } from '../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile } from '../../js/platform/identity/factory-profile.mjs';
 import { createOnlineIdentityPayload } from '../../js/platform/identity/match-identity.mjs';
+import { createPlatformApiClient } from '../../js/platform/api/platform-api.mjs';
+import { createAuthApiClient } from '../../js/platform/api/auth-api.mjs';
 
 const COL_LABELS = 'ABCDEFGHIJ';
 
@@ -633,13 +635,39 @@ function transitionToMatchEnded(result) {
   const titleEl   = document.getElementById('ended-title');
   const messageEl = document.getElementById('ended-message');
   const statusEl  = document.getElementById('rematch-status');
+  const oppProfileEl = document.getElementById('ended-opponent-profile');
 
   const endedCopy = getEndedScreenCopy(result);
   if (titleEl) titleEl.textContent = endedCopy.title;
   if (messageEl) messageEl.textContent = endedCopy.message;
   if (statusEl) statusEl.textContent = '';
+  if (oppProfileEl) oppProfileEl.innerHTML = '';
 
   showScreen('ended');
+
+  const oppPlayerId = gs.opponentProfile?.playerId;
+  if (oppPlayerId && oppProfileEl) {
+    const apiClient = createPlatformApiClient();
+    const authClient = createAuthApiClient();
+    Promise.all([
+      apiClient.loadPlayerProfile(oppPlayerId),
+      authClient.getSession(),
+    ]).then(([oppProfile, session]) => {
+      if (!oppProfile?.hasAccount) return;
+      const profileUrl = `../../player/index.html?id=${encodeURIComponent(oppPlayerId)}`;
+      const isSignedIn = Boolean(session?.ok && session?.playerId);
+      const addFriendBtn = isSignedIn
+        ? `<a class="ended-profile-action" href="${profileUrl}">Add Friend &rsaquo;</a>`
+        : '';
+      oppProfileEl.innerHTML = `
+        <div class="ended-profile-chip">
+          <span class="ended-profile-label">Opponent:</span>
+          <a class="ended-profile-name" href="${profileUrl}">${oppProfile.profileName || oppPlayerId}</a>
+          ${addFriendBtn}
+        </div>
+      `;
+    }).catch(() => {});
+  }
 }
 
 function resetForRematch() {

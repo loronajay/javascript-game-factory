@@ -176,6 +176,10 @@ export function createPlatformApiClient(options = {}) {
         ...options,
       }, "relationshipUpdate");
     },
+    searchPlayers(q = "") {
+      const encoded = encodeURIComponent(q.trim());
+      return encoded ? get(`/players/search?q=${encoded}`, "players") : Promise.resolve([]);
+    },
     listActivityItems() {
       return get("/activity", "items");
     },

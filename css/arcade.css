@@ -703,6 +703,22 @@ body::before {
   letter-spacing: 0.14em;
 }
 
+.player-card__field--checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.player-card__field--checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #ff6ec7;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .player-card__field-group {
   border: 0;
   margin: 0;

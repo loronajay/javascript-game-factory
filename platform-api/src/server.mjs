@@ -7,7 +7,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerProfile } from "./db/profiles.mjs";
+import { loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import {
   createFriendshipBetweenPlayers,
   loadPlayerRelationships,
@@ -33,6 +33,17 @@ import {
   resetPasswordService,
 } from "./services/auth.mjs";
 import { createEmailSender } from "./email.mjs";
+import {
+  createNotification,
+  listNotifications,
+  markAllNotificationsRead,
+} from "./db/notifications.mjs";
+import {
+  createFriendRequest,
+  getFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+} from "./db/friend-requests.mjs";
 
 const { Pool } = pg;
 
@@ -77,6 +88,7 @@ async function bootstrap() {
   const app = createApp({
     config,
     checkDatabase: createDatabaseCheck(pool),
+    searchPlayers: (q) => searchPlayers(pool, q),
     registerAccount: (params) => registerAccountService(pool, params),
     loginAccount: (params) => loginAccountService(pool, params),
     requestPasswordReset: ({ email }) => requestPasswordResetService(pool, emailSender, { email, appBaseUrl: config.appBaseUrl }),
@@ -104,6 +116,13 @@ async function bootstrap() {
     commentOnThought: (thoughtId, viewerPlayerId, viewerAuthorDisplayName, text) => commentOnThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, text),
     reactToThought: (thoughtId, viewerPlayerId, reactionId) => reactToThought(pool, thoughtId, viewerPlayerId, reactionId),
     deleteThought: (thoughtId) => deleteThought(pool, thoughtId),
+    createNotification: (params) => createNotification(pool, params),
+    listNotifications: (recipientPlayerId) => listNotifications(pool, recipientPlayerId),
+    markAllNotificationsRead: (recipientPlayerId) => markAllNotificationsRead(pool, recipientPlayerId),
+    createFriendRequest: (params) => createFriendRequest(pool, params),
+    getFriendRequest: (id) => getFriendRequest(pool, id),
+    acceptFriendRequest: (id) => acceptFriendRequest(pool, id),
+    rejectFriendRequest: (id) => rejectFriendRequest(pool, id),
   });
   const server = createServer(app);
 

@@ -1,5 +1,6 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import {
   incrementProfileViewCountWithApi,
   loadProfileMetricsRecord,
@@ -400,5 +401,11 @@ if (doc?.getElementById) {
   const apiClient = createPlatformApiClient();
   const profilePanel = initArcadeProfilePanel({ doc, storage });
   renderPlayerPage(doc);
-  wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel });
+
+  let authSession = null;
+  try {
+    authSession = await createAuthApiClient().getSession();
+  } catch { /* no session */ }
+
+  wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel, authSession });
 }

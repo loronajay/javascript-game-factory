@@ -777,38 +777,48 @@ Notes:
 
 ### `notificationItem`
 
-A platform-owned notification targeting a specific player.
+A platform-owned notification targeting a specific player. This shape is now live in the `notifications` Postgres table.
 
-Suggested shape:
+Canonical shape (live):
 
 ```js
 {
-  id: "notif-1",
-  kind: "gesture",
-  targetPlayerId: "player-456",
-  fromPlayerId: "player-123",
-  relatedId: "gesture-1",
-  summary: "Jay poked you",
-  read: false,
+  id: "notif-abc123",
+  recipientPlayerId: "player-456",
+  actorPlayerId: "player-123",
+  actorDisplayName: "Jay",
+  type: "thought_reaction",
+  status: "unread",
+  payload: {
+    thoughtId: "thought-1",
+    reactionId: "like",
+    thoughtText: "Need one more clean goblin pass."
+  },
   createdAt: ""
 }
 ```
 
-Notification kinds (v1 scope):
+Live notification types:
 
-- `gesture` — a received Poke, Hug, Kick, Blow Kiss, Nudge, or Challenge
-- (future) `reaction` — a reaction on a thought post
-- (future) `friend-request` — a friend request received
-- (future) `event-invite` — an event team invitation
+- `thought_reaction` — someone reacted to your thought (payload: `thoughtId`, `reactionId`, `thoughtText`)
+- `thought_comment` — someone commented on your thought (payload: `thoughtId`, `commentId`, `commentText`, `thoughtText`)
+- `thought_share` — someone shared your thought (payload: `thoughtId`, `thoughtText`)
+- `friend_request` — someone sent you a friend request (payload: `requestId`)
+- `friend_accept` — someone accepted your friend request (payload: `requestId`)
+
+Planned future types:
+
+- `gesture` — a received Poke, Hug, Kick, Blow Kiss, Nudge, or Challenge (requires gesture UI to be built)
+- `event_invite` — an event team invitation
 
 Notes:
 
-- Notifications are platform-owned and live under the platform storage layer, not inside individual game modules.
-- `read` controls unread badge counts on the notification bell.
-- The notification bell in the nav shell should show an unread count badge when unread notifications exist.
-- In the local-first phase, only gesture notifications are generated and only the current player's own inbox is accessible.
-- Real cross-user notification delivery (push or polling) belongs to the backend transition phase.
-- The notification page (`/notifications/index.html`) is the primary inbox surface; a nav-level bell is the entry point.
+- Notifications are platform-owned and live in Postgres, not browser localStorage.
+- `status` is `"unread"` or `"read"`; `"unread"` count drives the bell badge.
+- `GET /notifications` requires an authenticated session and returns `{ notifications, unreadCount }`.
+- `POST /notifications/read-all` marks all of the authenticated player's unread notifications as read.
+- The notification bell in the nav shell shows an unread badge; clicking it opens the dropdown and triggers a delayed mark-all-read.
+- The `/notifications/index.html` inbox page is planned as a dedicated full-page surface; the nav bell dropdown is the current entry point.
 
 ### `mediaAsset`
 
@@ -989,6 +999,7 @@ Current status:
 - Initial migration/sql wiring plus backend record routes for profiles, metrics, relationships, activity items, and thought posts are now part of the active implementation path.
 - The frontend is now in an adapter-first hybrid state: shared API seams are live for profile/feed/activity/metrics reads and mirrors, while local fallback remains in place intentionally for stability.
 - Thought interactions are no longer placeholders: reactions, repost/share records, and comments now have real backend routes and shared frontend adapters, while the page layer still keeps local fallback behavior.
+- Notifications are live: `notifications` + `friend_requests` tables added; bell + dropdown in the session nav; friend requests replace direct friendship creation for authenticated users; thought reactions/comments/shares trigger notifications to the thought author.
 
 This is the trigger point for:
 
@@ -1162,7 +1173,10 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - `sign-up/index.html` and `sign-in/index.html` exist as styled synthwave auth pages with full form validation, error messaging, and redirect-on-success; sign-up supports `claimPlayerId` so existing guest local identities can be attached to a new account.
 - `js/platform/api/auth-api.mjs` exposes `register`, `login`, `logout`, and `getSession` through the shared API seam so no page invents its own fetch logic for auth.
 - `js/arcade-session-nav.mjs` is a shared session chip module that calls `GET /auth/me` on load and injects either Sign In + Create Account links or the player name + Sign Out button into any container element; it is wired into `index.html`, `grid.html`, and `/me`.
-- player discovery design is locked: registered players have full public `/player` profiles; unregistered guests have no public profile page; guests can view registered profiles but cannot add friends; results screens show clickable usernames only for registered opponents, with a menu of Add Friend (signed-in viewers only) and View Profile; a `hasAccount` boolean will be added to the profile API response so games can make this decision without a separate round-trip; a `discoverable` opt-out preference will gate search inclusion without hiding the profile itself.
+- player discovery is live: `hasAccount` and `discoverable` ship on every profile API response; `GET /players/search?q=...` queries registered discoverable players by name; `/search/index.html` is the player search page; both games surface opponent profiles on results screens with Add Friend entry points for signed-in viewers; `discoverable` opt-out lives in the profile editor.
+- notification system is live: `notifications` and `friend_requests` Postgres tables added via migration 008; `platform-api/` exposes `GET /notifications`, `POST /notifications/read-all`, `POST /friend-requests`, `POST /friend-requests/:id/accept`, `POST /friend-requests/:id/reject`; `js/platform/api/notifications-api.mjs` is the shared browser client; `js/arcade-notifications.mjs` is the bell component (unread badge + dropdown) wired into the session nav on home, grid, and `/me`; friend-request notifications include inline Accept/Reject buttons; notifications mark all-read automatically 1.5 s after the dropdown opens.
+- friend requests are the canonical add-friend flow for authenticated players: Add Friend on `/player` sends `POST /friend-requests`, creating a request record and a `friend_request` notification for the recipient; Accept triggers `POST /friend-requests/:id/accept`, which creates the friendship and fires a `friend_accept` notification back to the sender; Reject silently updates the record; guest viewers fall back to the existing local direct-link path.
+- thought social actions now generate backend notifications to the thought author: `thought_reaction` (when setting, not removing), `thought_comment`, and `thought_share` notifications fire when actor ≠ author; payloads include excerpt text so the bell UI can render context without extra API calls.
 
 ## Scope Lock For Upcoming Profile Passes
 
@@ -1190,7 +1204,7 @@ Important not-now items, even though they remain part of the product vision:
 - profile picture/avatar upload and profile background upload
 - profile music authoring/player UI
 - a generic `/players` discovery directory
-- player gesture buttons plus notification inbox/bell work
+- player gesture buttons (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge) — the notification infrastructure now exists to deliver them but the gesture UI buttons are not built yet
 - direct/private messaging (comments, reactions, and sharing are now live through the backend adapter layer)
 
 Default product calls for this scope:
@@ -1214,17 +1228,17 @@ Deferred until later phases:
 - real uploads
 - profile music authoring/player UI
 - generic player-directory / broad discovery page
-- player gesture UI plus notification inbox/bell delivery work
-- real shared comments/reactions/shares across devices
+- player gesture UI (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge) — notification delivery infrastructure exists now; gesture buttons on public profiles are the remaining gap
+- real shared comments/reactions/shares across devices (backend now live; cross-device state follows from auth being stable)
 - direct / private messaging
 - ladder ranking systems beyond current contract prep
 
-Now actively in progress rather than deferred:
+Now active (no longer deferred):
 
-- database-backed profiles through the shared `platform-api/` service
-- backend-owned profile/relationship/activity/thought persistence behind the existing frontend seams
-- authentication: sign-up, sign-in, sign-out, and 30-day JWT session management are built; `sign-in/index.html`, `sign-up/index.html`, `js/platform/api/auth-api.mjs`, and the `accounts` Postgres table are all live
-- player discovery: `hasAccount` flag on profile API, results-screen clickable usernames, and player search with `discoverable` opt-out are the active next implementation steps
+- database-backed profiles, relationships, activity, thoughts, reactions, shares, comments — all live through `platform-api/`
+- authentication: sign-up, sign-in, sign-out, 30-day JWT sessions, password reset, and account deletion are all live
+- player discovery: `hasAccount` on profile API, player search, results-screen opponent menus, and `discoverable` opt-out are all live
+- notification system: bell + dropdown, friend requests, thought-action notifications — all live through `platform-api/` and `js/arcade-notifications.mjs`
 
 ## Decision Gates
 
