@@ -1151,6 +1151,13 @@
   font-size: 0.82rem;
 }
 
+.me-hero-card__friend-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .me-hero-card__friend-copy {
   display: grid;
   gap: 4px;

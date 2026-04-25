@@ -117,13 +117,14 @@ export function buildRankingItems(publicView, favoriteTitleResolver, options = {
   }];
 }
 
-function createFriendCardItem({ title, value, meta, isPlaceholder = false }) {
+function createFriendCardItem({ title, value, meta, isPlaceholder = false, avatarSrc = "" }) {
   return {
     title,
     value,
     meta,
     isPlaceholder,
     avatarInitials: buildProfileInitials(value),
+    avatarSrc,
   };
 }
 
@@ -138,6 +139,7 @@ export function buildFriendItems(publicView, relationshipsRecord) {
         title: "Main Squeeze",
         value: resolvedSlots.mainSqueeze.profileName,
         meta: `${resolvedSlots.mainSqueeze.resolvedFriendPoints} friendship points`,
+        avatarSrc: resolvedSlots.mainSqueeze.avatarUrl || "",
       })
     : createFriendCardItem({
         title: "Main Squeeze",
@@ -152,6 +154,7 @@ export function buildFriendItems(publicView, relationshipsRecord) {
           title: formatPresenceLabel(friend.presence),
           value: friend.profileName,
           meta: `${friend.resolvedFriendPoints} friendship points`,
+          avatarSrc: friend.avatarUrl || "",
         })
       : createFriendCardItem({
           title: "Friend Slot",

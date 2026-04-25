@@ -234,6 +234,7 @@ function normalizeFriendCandidate(entry = {}, originalIndex = 0, isMainSqueeze =
     friendPoints: sanitizeCount(source.friendPoints),
     isMainSqueeze: !!isMainSqueeze || !!source.isMainSqueeze,
     originalIndex,
+    avatarUrl: sanitizeSingleLine(source.avatarUrl || "", 500),
   };
 }
 

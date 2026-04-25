@@ -4,7 +4,10 @@ import {
   loadProfileMetricsRecord,
   syncThoughtPostCountWithApi,
 } from "./platform/metrics/metrics.mjs";
-import { loadProfileRelationshipsRecord } from "./platform/relationships/relationships.mjs";
+import {
+  loadProfileRelationshipsRecord,
+  normalizeProfileRelationshipsRecord,
+} from "./platform/relationships/relationships.mjs";
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
@@ -35,8 +38,33 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
           metricsRecord: loadProfileMetricsRecord(currentProfile.playerId, storage),
           relationshipsRecord: loadProfileRelationshipsRecord(currentProfile.playerId, storage),
         };
+
+    let enrichedProfile = hydrated.profile;
+    if (apiClient?.loadPlayerProfile) {
+      const normalizedRel = normalizeProfileRelationshipsRecord(
+        hydrated.relationshipsRecord?.playerId
+          ? hydrated.relationshipsRecord
+          : { playerId: currentProfile.playerId },
+      );
+      const knownIds = new Set((enrichedProfile?.friendsPreview || []).map((f) => f.playerId).filter(Boolean));
+      const missingIds = normalizedRel.friendPlayerIds.filter((id) => !knownIds.has(id)).slice(0, 8);
+      if (missingIds.length > 0) {
+        const fetched = await Promise.all(missingIds.map((id) => apiClient.loadPlayerProfile(id).catch(() => null)));
+        const extra = fetched.filter((p) => p?.playerId).map((p) => ({
+          playerId: p.playerId,
+          profileName: p.profileName || "Arcade Pilot",
+          presence: p.presence || "offline",
+          friendPoints: normalizedRel.friendPointsByPlayerId[p.playerId] || 0,
+          avatarUrl: p.avatarUrl || "",
+        }));
+        if (extra.length > 0) {
+          enrichedProfile = { ...enrichedProfile, friendsPreview: [...(enrichedProfile?.friendsPreview || []), ...extra] };
+        }
+      }
+    }
+
     profilePanel?.render?.("");
-    renderPage(doc, hydrated.profile, {
+    renderPage(doc, enrichedProfile, {
       thoughtFeed,
       thoughtComposerFlash,
       friendCodeFlash,

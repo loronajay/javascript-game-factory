@@ -138,6 +138,7 @@ function normalizeFriendPreviewEntry(entry, options = {}) {
     presence: normalizePresence(entry.presence),
     friendPoints,
     isMainSqueeze,
+    avatarUrl: sanitizeSingleLine(entry.avatarUrl || "", 500),
   };
 }
 

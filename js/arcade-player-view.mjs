@@ -144,7 +144,10 @@ function renderHeroCard(container, model) {
   const friendHtml = model.friendItems.map((item) => `
     <article class="${item.isPlaceholder ? "player-hero-card__friend-card player-hero-card__friend-card--placeholder" : "player-hero-card__friend-card"}">
       <div class="player-hero-card__friend-avatar" aria-hidden="true">
-        <span class="player-hero-card__friend-avatar-text">${escapeHtml(item.avatarInitials || "??")}</span>
+        ${item.avatarSrc
+          ? `<img class="player-hero-card__friend-avatar-img" src="${escapeHtml(item.avatarSrc)}" alt="" loading="lazy">`
+          : `<span class="player-hero-card__friend-avatar-text">${escapeHtml(item.avatarInitials || "??")}</span>`
+        }
       </div>
       <div class="player-hero-card__friend-copy">
         <p class="player-hero-card__friend-label">${escapeHtml(item.title || "Friend Slot")}</p>

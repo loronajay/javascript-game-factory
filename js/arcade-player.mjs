@@ -42,6 +42,27 @@ function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function enrichProfileFriendsFromApi(profile, relationshipsRecord, apiClient) {
+  if (!apiClient?.loadPlayerProfile) return profile;
+  const normalized = normalizeProfileRelationshipsRecord(
+    relationshipsRecord?.playerId ? relationshipsRecord : { playerId: profile?.playerId || "" },
+  );
+  if (normalized.friendPlayerIds.length === 0) return profile;
+  const knownIds = new Set((profile?.friendsPreview || []).map((f) => f.playerId).filter(Boolean));
+  const missingIds = normalized.friendPlayerIds.filter((id) => !knownIds.has(id)).slice(0, 8);
+  if (missingIds.length === 0) return profile;
+  const fetched = await Promise.all(missingIds.map((id) => apiClient.loadPlayerProfile(id).catch(() => null)));
+  const enriched = fetched.filter((p) => p?.playerId).map((p) => ({
+    playerId: p.playerId,
+    profileName: p.profileName || "Arcade Pilot",
+    presence: p.presence || "offline",
+    friendPoints: normalized.friendPointsByPlayerId[p.playerId] || 0,
+    avatarUrl: p.avatarUrl || "",
+  }));
+  if (enriched.length === 0) return profile;
+  return { ...profile, friendsPreview: [...(profile?.friendsPreview || []), ...enriched] };
+}
+
 function resolveProfilePresence(presence, isOwnerView) {
   const normalized = String(presence || "").trim().toLowerCase();
   if (isOwnerView) {
@@ -175,11 +196,13 @@ export async function loadPlayerPageData(options = {}) {
     }
   }
 
+  const enrichedProfile = await enrichProfileFriendsFromApi(profile, relationshipsRecord, apiClient);
+
   return {
     requestedPlayerId,
     isOwnerView,
     thoughtFeed,
-    profile,
+    profile: enrichedProfile,
     metricsRecord,
     relationshipsRecord,
     storage,

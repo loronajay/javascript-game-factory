@@ -1257,6 +1257,13 @@
   font-size: 0.82rem;
 }
 
+.player-hero-card__friend-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .player-hero-card__friend-copy {
   display: grid;
   gap: 4px;
