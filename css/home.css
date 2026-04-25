@@ -1,9 +1,8 @@
 /* ---------- HOME PAGE ---------- */
 
 .home-auth-bar {
-  position: fixed;
-  top: 14px;
-  right: 18px;
+  justify-self: end;
+  position: relative;
   z-index: 200;
   display: flex;
   align-items: center;

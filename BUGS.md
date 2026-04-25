@@ -1,29 +1,21 @@
-# Bugs:
+# Bugs
 
-## PLATFORM
+---
 
-### Database has no record of me and my friend's friendship status: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002117.png"
+## HARD — Backend / Data Integrity
 
-### Comments displays '0' but there are comments in the thread: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002204.png"
+### [PLATFORM] Timestamps are unstable — change on every refresh and show raw ISO strings
+Comment timestamps display as raw `2026-04-25T07:21:51.371Z` instead of a formatted relative time, and the relative label changes on every page load. Timestamps need to be stored as fixed absolute values and formatted at render time, not regenerated.
+Screenshot: `Screenshots/Screenshot 2026-04-25 002949.png`
 
-### Friend not actually showing up at all in the Friend's Rail editor: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 003458.png"
+### [PLATFORM] Friend not appearing in Friends Rail editor dropdown
+The rail editor "Main Squeeze Pick" dropdown only shows "No manual pick" — actual friends are not populating it. Depends on the friendship record being correct in the DB (see below).
+Screenshot: `Screenshots/Screenshot 2026-04-25 003458.png`
 
-### Thought count in database doesn't reflect thought count on my friend's profile: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002448.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002511.png"
+### [PLATFORM] Friend's thought count in DB doesn't match count shown on their profile
+The thought-count metric stored for the friend's player record is out of sync with the actual post count visible on their public profile. The count write path isn't firing on their behalf, or it's writing to the wrong record.
+Screenshots: `Screenshots/Screenshot 2026-04-25 002448.png`, `Screenshots/Screenshot 2026-04-25 002511.png`
 
-### Arcade Grid Page still has the "FACTORY PILOT" editor visible even thought i'm registered and logged in: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002653.png"
-
-### Notification fell back to player ID instead of using his username: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002801.png"
-
-### Timestamps still seem inaccurate, they're changing every refresh, these two comments were posted hours apart: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 002949.png"
-
-### Notification displays on Arcade Grid Page, but not on my profile page, though it seems to when i view the page via mobile, though it is still not showing my friend's username, it's showing ID: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 003830.png"
-
-
-### We might need to move these two buttons, they're too close to the title text of the page. we either move them somewhere else or make them smaller: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 003631.png"
-
-
-
-## GAMES
-
-### "Server countdown Synced" display is overlapping with "MATCH FOUND" text in Lovers Lost: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-25 003246.png"
-
+### [PLATFORM] Friendship not saved to DB after friend request is accepted — root cause bug
+The `friends` column in the relationships table is still an empty array after the friend request accept flow completes. This is likely the root cause of the rail editor bug and the friend-count discrepancy. The `POST /friend-requests/:id/accept` route is probably not writing the friendship record into the relationships table correctly.
+Screenshot: `Screenshots/Screenshot 2026-04-25 002117.png`

@@ -837,6 +837,8 @@ export function createApp(options = {}) {
         return;
       }
       if (action === "accept") {
+        const acceptBody = await readJsonBody(req).catch(() => ({ ok: false }));
+        const acceptorDisplayName = String(acceptBody?.value?.acceptorDisplayName || "");
         const accepted = await acceptFriendRequest(requestId);
         if (!accepted) {
           writeJson(res, 409, { status: "error", error: "request_not_pending", timestamp }, requestOrigin);
@@ -844,12 +846,14 @@ export function createApp(options = {}) {
         }
         // create actual friendship
         void createFriendshipBetweenPlayers(accepted.fromPlayerId, accepted.toPlayerId, {});
-        // notify the sender with the acceptor's display name
-        const acceptorProfile = await loadPlayerProfile(accepted.toPlayerId).catch(() => null);
+        // notify the sender — prefer name from body, then profile lookup, then generic fallback
+        const resolvedAcceptorName = acceptorDisplayName
+          || (await loadPlayerProfile(accepted.toPlayerId).catch(() => null))?.profileName
+          || "A player";
         void createNotification({
           recipientPlayerId: accepted.fromPlayerId,
           actorPlayerId: accepted.toPlayerId,
-          actorDisplayName: acceptorProfile?.profileName || accepted.toPlayerId,
+          actorDisplayName: resolvedAcceptorName,
           type: "friend_accept",
           payload: { requestId },
         });

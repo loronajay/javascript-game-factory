@@ -65,6 +65,14 @@ export async function syncThoughtCommentsFromApi(
     remoteComments.map((entry, index) => normalizeThoughtComment(entry, index)),
   );
   writeThoughtComments(storage, merged);
+
+  const realCount = merged.filter((c) => c.thoughtId === normalizedThoughtId).length;
+  const storedFeed = parseNormalizedStoredFeed(storage);
+  const matchingThought = storedFeed.find((t) => t.id === normalizedThoughtId);
+  if (matchingThought && matchingThought.commentCount !== realCount) {
+    writeMergedThoughtFeed(storage, [normalizeThoughtPost({ ...matchingThought, commentCount: realCount })]);
+  }
+
   return loadThoughtComments(normalizedThoughtId, storage);
 }
 

@@ -890,7 +890,7 @@ function createRenderer(canvas, images, emoteImages = {}) {
     const img = side === 'boy' ? images.boy : images.girl;
     const flipH = side === 'girl';
 
-    _drawOnlineLabel('SERVER COUNTDOWN SYNCED', CANVAS_W / 2, 40, {
+    _drawOnlineLabel('SERVER COUNTDOWN SYNCED', CANVAS_W / 2, 18, {
       bg: 'rgba(16,34,62,0.88)',
       stroke: 'rgba(120,200,255,0.55)',
       textColor: 'rgba(220,240,255,0.96)',

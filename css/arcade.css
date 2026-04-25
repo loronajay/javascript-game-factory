@@ -590,8 +590,9 @@ body::before {
     0 0 24px rgba(255, 121, 183, 0.08);
 }
 
-.player-card[hidden] {
-  display: none;
+.player-card[hidden],
+.profile-chip[hidden] {
+  display: none !important;
 }
 
 .player-card__topline,

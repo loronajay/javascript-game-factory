@@ -48,13 +48,13 @@ export function createNotificationsApiClient(options = {}) {
       return payload?.request || null;
     },
 
-    async acceptFriendRequest(requestId) {
+    async acceptFriendRequest(requestId, acceptorDisplayName = "") {
       const encoded = encodeURIComponent(requestId);
       const payload = await requestJson(
         fetchImpl,
         baseUrl,
         `/friend-requests/${encoded}/accept`,
-        buildJsonOptions("POST", {}),
+        buildJsonOptions("POST", { acceptorDisplayName }),
       );
       return payload?.ok === true;
     },

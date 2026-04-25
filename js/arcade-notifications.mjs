@@ -1,4 +1,5 @@
 import { createNotificationsApiClient } from "./platform/api/notifications-api.mjs";
+import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -22,7 +23,7 @@ function formatRelativeTime(isoString) {
 }
 
 function formatNotificationText(notif) {
-  const actor = notif.actorDisplayName || notif.actorPlayerId || "Someone";
+  const actor = notif.actorDisplayName || "Someone";
   switch (notif.type) {
     case "thought_reaction":
       return `<strong>${escapeHtml(actor)}</strong> reacted to your thought`;
@@ -141,7 +142,8 @@ export async function initNotificationBell(containerEl, playerId) {
       const item = renderNotificationItem(
         notif,
         async (requestId, itemEl) => {
-          const ok = await api.acceptFriendRequest(requestId);
+          const acceptorName = loadFactoryProfile()?.profileName || "";
+          const ok = await api.acceptFriendRequest(requestId, acceptorName);
           if (ok) {
             itemEl.querySelector(".notif-item__actions")?.remove();
             const p = itemEl.querySelector(".notif-item__text");
