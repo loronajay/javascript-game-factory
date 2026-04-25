@@ -31,7 +31,7 @@ export function buildBulletinsPageViewModel(bulletins = buildPublicBulletinFeed(
   return {
     heroTitle: "ARCADE BULLETINS",
     heroKicker: "SYSTEM NOTICEBOARD",
-    heroSummary: "Platform notices, event calls, and cabinet-floor updates can land here without games taking ownership of the social layer.",
+    heroSummary: "Platform notices, event calls, and cabinet-floor updates land here.",
     heroCountLabel: `${items.length} LIVE`,
     items: items.length > 0
       ? items.map((bulletin) => ({
