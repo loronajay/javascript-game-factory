@@ -356,6 +356,14 @@
     rgba(255, 255, 255, 0.03);
 }
 
+.thought-feed__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+
 .thought-card__topline {
   display: flex;
   align-items: center;

@@ -161,7 +161,10 @@ function renderHeroCard(container, model) {
 }
 
 function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {}, commentPanelState = {}) {
-  const cardClass = item.isPlaceholder ? "thought-card thought-card--placeholder" : "thought-card";
+  if (item.isPlaceholder) {
+    return `<p class="thought-feed__empty">${escapeHtml(item.summary || "No posts yet.")}</p>`;
+  }
+  const cardClass = "thought-card";
   const actionItems = Array.isArray(item.actionItems) && item.actionItems.length > 0
     ? item.actionItems
     : [
