@@ -204,8 +204,8 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
 
   return [{
     id: sanitizeSingleLine(options.placeholderId, 80) || "thought-placeholder",
-    title: sanitizeSingleLine(options.placeholderTitle, 80) || "Feed Warming Up",
-    summary: sanitizeTextBlock(options.placeholderSummary, 500) || "Player status posts will appear here once more social surfaces come online.",
+    title: sanitizeSingleLine(options.placeholderTitle, 80) || "No posts yet",
+    summary: sanitizeTextBlock(options.placeholderSummary, 500) || "No thoughts have been shared yet.",
     authorLabel: sanitizeSingleLine(options.placeholderAuthorLabel, 60) || "Arcade Pilot",
     publishedLabel: sanitizeSingleLine(options.placeholderPublishedLabel, 40) || "Soon",
     reactionCount: 0,

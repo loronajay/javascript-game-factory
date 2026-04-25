@@ -244,8 +244,8 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       }, options?.relationshipsRecord),
       thoughtItems: buildThoughtCardItems([], {
         placeholderId: "player-thought-placeholder",
-        placeholderTitle: "Player Feed Warming Up",
-        placeholderSummary: "No public player thoughts are cached for this pilot yet.",
+        placeholderTitle: "No posts yet",
+        placeholderSummary: "This player hasn't shared any thoughts yet.",
       }),
       thoughtComposer: {
         enabled: false,
@@ -273,8 +273,8 @@ export function buildPlayerPageViewModel(profile, options = {}) {
   const playerThoughtFeed = buildPlayerThoughtFeed(thoughtFeed, publicView.playerId || requestedPlayerId);
   const thoughtItems = buildThoughtCardItems(playerThoughtFeed, {
     placeholderId: "player-thought-placeholder",
-    placeholderTitle: "Player Feed Warming Up",
-    placeholderSummary: "No public player thoughts are cached for this pilot yet.",
+    placeholderTitle: "No posts yet",
+    placeholderSummary: isOwnerView ? "Share your first thought using the composer above." : "This player hasn't shared any thoughts yet.",
     isOwner: isOwnerView,
   });
   const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);

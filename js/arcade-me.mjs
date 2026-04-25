@@ -111,8 +111,8 @@ export function buildMePageViewModel(profile, options = {}) {
   const playerThoughtFeed = buildPlayerThoughtFeed(thoughtFeed, publicView.playerId);
   const thoughtItems = buildThoughtCardItems(playerThoughtFeed, {
     placeholderId: "me-thought-placeholder",
-    placeholderTitle: "Player Feed Warming Up",
-    placeholderSummary: "Your player feed is waiting for the first shared thought. Status posts will land here once personal posting flows come online.",
+    placeholderTitle: "No posts yet",
+    placeholderSummary: "Share your first thought using the composer above.",
     isOwner: true,
   });
   const resolvedThoughtCount = Math.max(publicView.thoughtCount, playerThoughtFeed.length);

@@ -120,8 +120,8 @@ export function buildThoughtsPageViewModel(thoughtFeed = loadThoughtFeed()) {
     heroSummary: "This is the first scaffold for the future player-status feed: short posts, visible engagement counts, and a scrollable social lane that can later grow comments and sharing.",
     heroCountLabel: formatCountLabel(items.length),
     items: buildThoughtCardItems(items, {
-      placeholderTitle: "Feed Warming Up",
-      placeholderSummary: "The thoughts feed is still warming up. Player status posts will appear here once more social surfaces come online.",
+      placeholderTitle: "No posts yet",
+      placeholderSummary: "No thoughts have been shared yet. Be the first to post.",
     }),
   };
 }
