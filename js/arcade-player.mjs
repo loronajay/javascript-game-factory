@@ -122,7 +122,8 @@ export async function loadPlayerPageData(options = {}) {
   const params = new URLSearchParams(options.search || globalThis.location?.search || "");
   const requestedPlayerId = sanitizePlayerId(params.get("id"));
   const localProfile = loadFactoryProfile(storage);
-  const isOwnerView = !requestedPlayerId || requestedPlayerId === localProfile.playerId;
+  const viewerPlayerId = sanitizePlayerId(options?.authSessionPlayerId || localProfile.playerId);
+  const isOwnerView = !requestedPlayerId || requestedPlayerId === viewerPlayerId;
   const apiClient = options?.apiClient || createPlatformApiClient(options);
   const thoughtFeed = Array.isArray(options?.thoughtFeed)
     ? options.thoughtFeed
@@ -219,7 +220,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         playerId: requestedPlayerId,
         friendsPreview: [],
         mainSqueeze: null,
-      }, 0, options?.metricsRecord),
+      }, 0, options?.metricsRecord, options?.relationshipsRecord),
       identityLinkItems: [{
         label: "Link Ports",
         value: "No public links are cached for this player yet.",
@@ -329,7 +330,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       { label: "Badges", value: String(publicView.badgeIds.length) },
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
-    heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord),
+    heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord, relationshipsRecord),
     backgroundImageUrl: publicView.backgroundImageUrl,
     identityLinkItems,
     favoriteGameItems,
@@ -356,7 +357,8 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
   const requestedPlayerId = sanitizePlayerId(params.get("id"));
   const storage = options.storage || getDefaultPlatformStorage();
   const localProfile = loadFactoryProfile(storage);
-  const isOwnerView = !requestedPlayerId || requestedPlayerId === localProfile.playerId;
+  const viewerPlayerId = sanitizePlayerId(options?.authSessionPlayerId || localProfile.playerId);
+  const isOwnerView = !requestedPlayerId || requestedPlayerId === viewerPlayerId;
   const thoughtFeed = Array.isArray(options?.thoughtFeed) ? options.thoughtFeed : loadThoughtFeed(storage);
   const profile = options.profile ?? loadRequestedPlayerProfile(storage, requestedPlayerId, { thoughtFeed });
   let metricsRecord = options?.metricsRecord?.playerId

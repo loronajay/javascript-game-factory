@@ -259,6 +259,7 @@ export function deleteThoughtPost(id, storage = getDefaultPlatformStorage()) {
 export function publishThoughtPost(post, storage = getDefaultPlatformStorage()) {
   const normalized = normalizeThoughtPost({
     id: createFallbackThoughtId(),
+    createdAt: new Date().toISOString(),
     ...post,
     commentCount: 0,
     shareCount: 0,

@@ -20,12 +20,15 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
   let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
 
+  const authSessionPlayerId = authSession?.playerId || "";
+
   const rerender = async (thoughtComposerFlash = "", disableProfileViewTracking = true) => {
-    const pageData = await loadPageData({ storage, apiClient });
+    const pageData = await loadPageData({ storage, apiClient, authSessionPlayerId });
     currentPageData = pageData;
     profilePanel?.render?.("");
     renderPage(doc, {
       ...pageData,
+      authSessionPlayerId,
       thoughtComposerFlash,
       disableProfileViewTracking,
       openReactionThoughtId,

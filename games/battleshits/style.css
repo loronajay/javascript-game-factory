@@ -1075,6 +1075,45 @@ body {
 
 /* ---------- RESULTS OPPONENT PROFILE CHIP ---------- */
 
+.ended-match-stats {
+  margin: 12px 0 6px;
+}
+
+.ended-stats {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+}
+
+.ended-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(160, 200, 255, 0.15);
+  border-radius: 4px;
+  padding: 6px 14px;
+  min-width: 72px;
+}
+
+.ended-stat dt {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8899aa;
+  margin-bottom: 2px;
+}
+
+.ended-stat dd {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #a0d0ff;
+  margin: 0;
+}
+
 .ended-opponent-profile {
   min-height: 28px;
   margin: 4px 0;

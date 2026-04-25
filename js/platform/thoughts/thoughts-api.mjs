@@ -140,6 +140,7 @@ export async function commentOnThoughtPostWithApi(
 
       writeMergedThoughtFeed(storage, [resolvedRecord.thought]);
       const current = parseNormalizedStoredComments(storage)
+        .filter((entry) => entry.id !== localCommentRecord.comment.id)
         .filter((entry) => entry.id !== resolvedRecord.comment.id);
       writeThoughtComments(storage, mergeThoughtComments(current, [resolvedRecord.comment]));
     }

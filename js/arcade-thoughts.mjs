@@ -291,6 +291,7 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
         </div>
         <div class="thought-card__reactions">
           <span>${escapeHtml(item.reactionLabel)}</span>
+          <span>${escapeHtml(item.commentLabel)}</span>
           <span>${escapeHtml(item.shareLabel)}</span>
         </div>
       </div>

@@ -617,6 +617,15 @@ function transitionToBattle() {
   renderEmoteBubbles();
 }
 
+function buildMatchStats(myTarget, myFleet) {
+  const shots = myTarget.filter(c => c !== null).length;
+  const hits = myTarget.filter(c => c && (c.result === 'hit' || c.result === 'sunk')).length;
+  const sunkIds = new Set(myTarget.filter(c => c?.result === 'sunk' && c.shipId).map(c => c.shipId));
+  const shipsSunk = sunkIds.size;
+  const shipsLost = FLEET_DEFS.filter(def => isShipSunk(myFleet, def.id)).length;
+  return { shots, hits, shipsSunk, shipsLost };
+}
+
 function transitionToMatchEnded(result) {
   clearPublicMatchRetry();
   clearPendingShotTimer();
@@ -632,9 +641,10 @@ function transitionToMatchEnded(result) {
     sessionId: `battleshits:${gs.roomCode || gs.matchmakingMode || 'match'}:${gs.seed ?? 0}`,
   });
 
-  const titleEl   = document.getElementById('ended-title');
-  const messageEl = document.getElementById('ended-message');
-  const statusEl  = document.getElementById('rematch-status');
+  const titleEl     = document.getElementById('ended-title');
+  const messageEl   = document.getElementById('ended-message');
+  const statsEl     = document.getElementById('ended-match-stats');
+  const statusEl    = document.getElementById('rematch-status');
   const oppProfileEl = document.getElementById('ended-opponent-profile');
 
   const endedCopy = getEndedScreenCopy(result);
@@ -642,6 +652,18 @@ function transitionToMatchEnded(result) {
   if (messageEl) messageEl.textContent = endedCopy.message;
   if (statusEl) statusEl.textContent = '';
   if (oppProfileEl) oppProfileEl.innerHTML = '';
+
+  if (statsEl) {
+    const { shots, hits, shipsSunk, shipsLost } = buildMatchStats(gs.myTarget, gs.myFleet);
+    statsEl.innerHTML = `
+      <dl class="ended-stats">
+        <div class="ended-stat"><dt>Shots Fired</dt><dd>${shots}</dd></div>
+        <div class="ended-stat"><dt>Direct Hits</dt><dd>${hits}</dd></div>
+        <div class="ended-stat"><dt>Ships Sunk</dt><dd>${shipsSunk}</dd></div>
+        <div class="ended-stat"><dt>Ships Lost</dt><dd>${shipsLost}</dd></div>
+      </dl>
+    `;
+  }
 
   showScreen('ended');
 
@@ -774,6 +796,8 @@ function wireOnlineCallbacks() {
     clearEmoteTimers();
     if (gs.phase === 'battle') {
       transitionToMatchEnded('forfeit_win');
+    } else if (gs.phase === 'match_ended') {
+      // opponent left after results — stay on the ended screen so the player can still add friend
     } else {
       const myProf = gs.myProfile;
       gs = createInitialState();

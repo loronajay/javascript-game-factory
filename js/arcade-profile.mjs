@@ -110,14 +110,22 @@ function buildRelationshipCandidateOptions(profile, relationshipsRecord) {
   const options = [createRelationshipCandidateOption("", "No manual pick")];
   const seen = new Set([""]);
 
+  const nameByPlayerId = new Map();
+  if (normalizedProfile.mainSqueeze?.playerId && normalizedProfile.mainSqueeze?.profileName) {
+    nameByPlayerId.set(normalizedProfile.mainSqueeze.playerId.trim(), normalizedProfile.mainSqueeze.profileName.trim());
+  }
+  normalizedProfile.friendsPreview.forEach((friend) => {
+    const id = typeof friend.playerId === "string" ? friend.playerId.trim() : "";
+    const name = typeof friend.profileName === "string" ? friend.profileName.trim() : "";
+    if (id && name) nameByPlayerId.set(id, name);
+  });
+
   function addCandidate(playerId, profileName = "") {
     const id = typeof playerId === "string" ? playerId.trim() : "";
-    const name = typeof profileName === "string" ? profileName.trim() : "";
-    const value = id || name;
-    const label = name || id;
-    if (!value || !label || seen.has(value)) return;
-    seen.add(value);
-    options.push(createRelationshipCandidateOption(value, label));
+    const name = (typeof profileName === "string" ? profileName.trim() : "") || nameByPlayerId.get(id) || "";
+    if (!id || !name || seen.has(id)) return;
+    seen.add(id);
+    options.push(createRelationshipCandidateOption(id, name));
   }
 
   addCandidate(normalizedProfile.mainSqueeze?.playerId, normalizedProfile.mainSqueeze?.profileName);

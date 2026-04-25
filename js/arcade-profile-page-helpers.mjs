@@ -164,15 +164,19 @@ export function buildFriendItems(publicView, relationshipsRecord) {
   return [mainSqueezeItem, ...friendPreviewItems];
 }
 
-export function buildHeroStats(publicView, resolvedThoughtCount, metricsRecord) {
+export function buildHeroStats(publicView, resolvedThoughtCount, metricsRecord, relationshipsRecord) {
   const normalizedMetrics = metricsRecord?.playerId
     ? normalizeProfileMetricsRecord(metricsRecord)
     : normalizeProfileMetricsRecord({ playerId: publicView.playerId });
+  const normalizedRelationships = relationshipsRecord?.playerId
+    ? normalizeProfileRelationshipsRecord(relationshipsRecord)
+    : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId });
   const derivedFriendCount = (publicView.friendsPreview?.length || 0) + (publicView.mainSqueeze ? 1 : 0);
+  const resolvedFriendCount = Math.max(derivedFriendCount, normalizedMetrics.friendCount, normalizedRelationships.friendPlayerIds.length);
 
   return [
     { label: "Thoughts", value: String(Math.max(resolvedThoughtCount, normalizedMetrics.thoughtPostCount)) },
-    { label: "Friends", value: String(Math.max(derivedFriendCount, normalizedMetrics.friendCount)) },
+    { label: "Friends", value: String(resolvedFriendCount) },
     { label: "Sessions", value: String(normalizedMetrics.totalPlaySessionCount) },
     { label: "Events", value: String(normalizedMetrics.eventParticipationCount) },
   ];

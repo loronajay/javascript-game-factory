@@ -5,6 +5,7 @@ import {
   paginateArcadeGames,
 } from "./arcade-catalog.mjs";
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
+import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { initSessionNav } from "./arcade-session-nav.mjs";
 
 function hexToRgba(hex, alpha) {
@@ -392,6 +393,17 @@ initSessionNav(document.getElementById("gridAuthNav"), {
   signUpPath: "sign-up/index.html",
   homeOnLogout: "index.html",
 });
+
+// registered users manage their full profile at /me — hide the guest name chip
+try {
+  const session = await createAuthApiClient().getSession();
+  if (session?.ok && session?.playerId) {
+    const chip = document.getElementById("playerProfileButton");
+    const panel = document.getElementById("playerProfilePanel");
+    if (chip) chip.hidden = true;
+    if (panel) panel.hidden = true;
+  }
+} catch { /* network down, keep chip visible */ }
 
 if (pages.length > 0) {
   showPage(0, 0);

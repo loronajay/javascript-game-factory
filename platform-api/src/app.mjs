@@ -844,11 +844,12 @@ export function createApp(options = {}) {
         }
         // create actual friendship
         void createFriendshipBetweenPlayers(accepted.fromPlayerId, accepted.toPlayerId, {});
-        // notify the sender
+        // notify the sender with the acceptor's display name
+        const acceptorProfile = await loadPlayerProfile(accepted.toPlayerId).catch(() => null);
         void createNotification({
           recipientPlayerId: accepted.fromPlayerId,
           actorPlayerId: accepted.toPlayerId,
-          actorDisplayName: "",
+          actorDisplayName: acceptorProfile?.profileName || accepted.toPlayerId,
           type: "friend_accept",
           payload: { requestId },
         });

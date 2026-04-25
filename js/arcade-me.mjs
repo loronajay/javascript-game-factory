@@ -168,7 +168,7 @@ export function buildMePageViewModel(profile, options = {}) {
       { label: "Badges", value: String(publicView.badgeIds.length) },
       { label: "Thoughts", value: String(resolvedThoughtCount) },
     ],
-    heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord),
+    heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord, relationshipsRecord),
     avatarAssetId: publicView.avatarAssetId,
     backgroundImageUrl: publicView.backgroundImageUrl,
     identityLinkItems,

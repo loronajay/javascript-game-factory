@@ -101,7 +101,7 @@ export function normalizeThoughtPost(post = {}, index = 0) {
     viewerReaction: sanitizeThoughtReactionId(post?.viewerReaction),
     viewerSharedThoughtId: sanitizeThoughtShareId(post?.viewerSharedThoughtId),
     repostOfId: sanitizeSingleLine(post?.repostOfId, 80),
-    createdAt: sanitizeSingleLine(post?.createdAt, 40) || new Date().toISOString(),
+    createdAt: sanitizeSingleLine(post?.createdAt, 40),
     editedAt: sanitizeSingleLine(post?.editedAt, 40),
   };
 }
@@ -113,7 +113,7 @@ export function normalizeThoughtComment(comment = {}, index = 0) {
     authorPlayerId: sanitizeSingleLine(comment?.authorPlayerId, 80),
     authorDisplayName: sanitizeSingleLine(comment?.authorDisplayName, 60) || "Arcade Pilot",
     text: sanitizeTextBlock(comment?.text, 500),
-    createdAt: sanitizeSingleLine(comment?.createdAt, 40) || new Date().toISOString(),
+    createdAt: sanitizeSingleLine(comment?.createdAt, 40),
     editedAt: sanitizeSingleLine(comment?.editedAt, 40),
   };
 }
