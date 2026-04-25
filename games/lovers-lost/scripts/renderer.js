@@ -2602,7 +2602,7 @@ default:          return GROUND_TOP - 28;
     _drawHudSide(hud.girl, CANVAS_W - 10, 'right');
 
     if (hud.clock.online) {
-      _drawOnlineLabel('ONLINE', CANVAS_W / 2, 52, {
+      _drawOnlineLabel('ONLINE', CANVAS_W / 2, 80, {
         bg: 'rgba(10,24,38,0.82)',
         stroke: 'rgba(110,200,255,0.48)',
         textColor: 'rgba(220,245,255,0.94)',
@@ -2613,61 +2613,6 @@ default:          return GROUND_TOP - 28;
 
     _drawProgressBar(10, CANVAS_H - 18, HALF_W - 20, hud.boy, _hudPalette('boy'), false);
     _drawProgressBar(HALF_W + 10, CANVAS_H - 18, HALF_W - 20, hud.girl, _hudPalette('girl'), true);
-    return;
-
-    const remaining = Math.max(0, HARD_CUTOFF - elapsed);
-    const urgent    = remaining < 20;
-    const mins      = (remaining / 60) | 0;
-    const secs      = (remaining % 60) | 0;
-    const timeStr   = `${mins}:${secs.toString().padStart(2, '0')}`;
-
-    // Clock — center top
-    ctx.save();
-    ctx.textAlign   = 'center';
-    ctx.font        = 'bold 20px monospace';
-    ctx.fillStyle   = urgent ? '#ff4466' : '#ffffff';
-    ctx.shadowColor = urgent ? '#ff0044' : 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur  = urgent ? 10 : 4;
-    ctx.fillText(timeStr, CANVAS_W / 2, 26);
-    ctx.restore();
-
-    if (uiState.online) {
-      _drawOnlineLabel('ONLINE', CANVAS_W / 2, 52, {
-        bg: 'rgba(10,24,38,0.82)',
-        stroke: 'rgba(110,200,255,0.48)',
-        textColor: 'rgba(220,245,255,0.94)',
-        height: 22,
-        padX: 12,
-      });
-    }
-
-    // Boy side — score, speed, chain
-    ctx.save();
-    ctx.font      = '13px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#b04eff';
-    ctx.fillText(boyPlayer.score, 8, 22);
-    ctx.fillStyle = '#aaffaa';
-    ctx.fillText(`spd ${boyPlayer.speed.toFixed(1)}`, 8, 38);
-    ctx.fillStyle = boyPlayer.chain >= 2 ? '#ffcc44' : 'rgba(255,255,255,0.35)';
-    ctx.fillText(`chain ×${boyPlayer.chain}`, 8, 54);
-    ctx.restore();
-
-    // Girl side — score, speed, chain
-    ctx.save();
-    ctx.font      = '13px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#44aaff';
-    ctx.fillText(girlPlayer.score, CANVAS_W - 8, 22);
-    ctx.fillStyle = '#aaffaa';
-    ctx.fillText(`spd ${girlPlayer.speed.toFixed(1)}`, CANVAS_W - 8, 38);
-    ctx.fillStyle = girlPlayer.chain >= 2 ? '#ffcc44' : 'rgba(255,255,255,0.35)';
-    ctx.fillText(`chain ×${girlPlayer.chain}`, CANVAS_W - 8, 54);
-    ctx.restore();
-
-    // Progress bars — bottom edge; boy fills left→right, girl fills right→left
-    _drawProgressBar(8,          CANVAS_H - 14, HALF_W - 16, boyPlayer,  '#b04eff', false);
-    _drawProgressBar(HALF_W + 8, CANVAS_H - 14, HALF_W - 16, girlPlayer, '#44aaff', true);
   }
 
   function _drawProgressBar(x, y, w, player, color, rtl) {
