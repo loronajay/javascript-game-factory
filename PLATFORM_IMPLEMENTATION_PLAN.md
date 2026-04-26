@@ -1016,7 +1016,7 @@ This is the trigger point for:
 - real shared feed data
 - doomscroll personalized feed (friends posts + group posts in one scroll)
 - group creation, membership, invitations, and group-scoped feeds
-- direct / private messaging
+- direct / private messaging ✓ live (polling-based; WebSocket push deferred)
 - cross-user comments, reactions, and shares
 - real cross-user gesture delivery so Poke / Hug / Kick / Blow Kiss / Nudge / Challenge actually arrives in the recipient's inbox instead of staying local
 - backend-pushed notification delivery for all notification kinds (gestures, reactions, friend requests, event invites)
@@ -1058,7 +1058,8 @@ Exit criteria:
 
 ## Things We Should Explicitly Not Build Yet
 
-- direct messages
+- real-time WebSocket message delivery (polling is live; push delivery belongs to a later pass)
+- group messaging
 - threaded comments
 - real cross-user notification delivery (local-first gesture/notification UI is in scope; server push belongs to Phase 4)
 - generalized chat
@@ -1184,6 +1185,7 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - thought social actions now generate backend notifications to the thought author: `thought_reaction` (when setting, not removing), `thought_comment`, and `thought_share` notifications fire when actor ≠ author; payloads include excerpt text so the bell UI can render context without extra API calls; `thought_reaction` notifications now display the actual emoji (e.g. "Jay ❤️'d your thought") via `THOUGHT_REACTION_GLYPHS`.
 - player gesture buttons are now live on public `/player` profiles for authenticated viewers: Poke 👈, Hug 🤗, Kick 👟, Blow Kiss 💋, Nudge 👇 each fire `POST /players/:id/gesture` and deliver a `player_gesture` notification; `VALID_GESTURE_TYPES` is enforced on the backend; actor name resolved from the profile record.
 - challenge system is now live: Challenge 🎮 in the gesture rail opens an inline game picker rather than sending immediately; game selection calls `POST /challenges`, creating a `challenges` DB record (migration 009, `platform-api/src/db/challenges.mjs`) and a `player_challenge` notification with Accept/Decline buttons; Accept calls `POST /challenges/:id/accept`, notifies the challenger with `challenge_accepted`, and navigates the acceptor to the game via `buildGameHref(slug)`; Decline calls `POST /challenges/:id/decline` and delivers `challenge_declined` to the challenger; `notifications-api.mjs` exposes `sendChallenge`, `acceptChallenge`, and `declineChallenge`.
+- direct messaging is now live: migration 010 adds `conversations` (normalized pair via `player_a_id ≤ player_b_id`, per-player unread counts) and `messages` tables; `platform-api/src/db/messages.mjs` provides `findOrCreateConversation`, `findConversationBetween`, `listConversations` (with other player name + last message preview via lateral join), `getConversation`, `listMessages`, `createMessage` (increments recipient unread in a single SQL update), `markConversationRead`; five backend routes in `app.mjs`: `GET /messages`, `GET /messages/with/:playerId`, `POST /messages` (findOrCreate + send + `new_message` notification), `GET /messages/:convId` (participant-guarded, returns other player name), `POST /messages/:convId/read`; `js/platform/api/messages-api.mjs` is the shared browser client; `/messages/index.html` is the inbox with conversation list and inline player search for new messages; `/messages/conversation/index.html` is the thread view (magenta sent / cyan received bubbles, 5s polling for new messages, Enter-to-send, URL upgrade from `?player=` to `?id=` on first send); `css/messages.css` added; `new_message` bell notification type renders "View Message →" link via `buildHref`; Messages nav link added to `/me`.
 
 ## Scope Lock For Upcoming Profile Passes
 
@@ -1235,9 +1237,8 @@ Deferred until later phases:
 - real uploads
 - profile music authoring/player UI
 - generic player-directory / broad discovery page
-- player gesture UI (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge) — notification delivery infrastructure exists now; gesture buttons on public profiles are the remaining gap
+- real-time WebSocket message delivery (polling is live; push delivery belongs here)
 - real shared comments/reactions/shares across devices (backend now live; cross-device state follows from auth being stable)
-- direct / private messaging
 - ladder ranking systems beyond current contract prep
 
 Now active (no longer deferred):
@@ -1246,6 +1247,7 @@ Now active (no longer deferred):
 - authentication: sign-up, sign-in, sign-out, 30-day JWT sessions, password reset, and account deletion are all live
 - player discovery: `hasAccount` on profile API, player search, results-screen opponent menus, and `discoverable` opt-out are all live
 - notification system: bell + dropdown, friend requests, thought-action notifications — all live through `platform-api/` and `js/arcade-notifications.mjs`
+- direct messaging: `conversations` + `messages` Postgres tables (migration 010), five backend routes, shared API client (`messages-api.mjs`), inbox page, thread page with 5s polling, `new_message` bell notification type — all live
 
 ## Decision Gates
 

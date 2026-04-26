@@ -97,7 +97,9 @@ function buildHref(path) {
   return `${prefix}${path.replace(/^\//, "")}`;
 }
 
-function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, onChallengeDecline) {
+export { formatNotificationText, buildHref };
+
+export function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, onChallengeDecline) {
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";
   const isChallenge = notif.type === "player_challenge" && notif.status === "unread";
   const isMessage = notif.type === "new_message";

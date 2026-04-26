@@ -1,5 +1,6 @@
 import { createMessagesApiClient } from "./platform/api/messages-api.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { initSessionNav } from "./arcade-session-nav.mjs";
 import { initNotificationBell } from "./arcade-notifications.mjs";
 
@@ -74,10 +75,7 @@ async function run() {
   const newSearchEl = document.getElementById("newMsgSearch");
   const newResultsEl = document.getElementById("newMsgResults");
 
-  const session = await initSessionNav(navEl);
-  if (session?.playerId && navEl) {
-    initNotificationBell(navEl, session.playerId);
-  }
+  await initSessionNav(navEl);
 
   const api = createMessagesApiClient();
   if (!api.isConfigured) {
@@ -85,9 +83,22 @@ async function run() {
     return;
   }
 
+  let authSession = null;
+  try {
+    authSession = await createAuthApiClient().getSession();
+  } catch { /* no session */ }
+
+  if (!authSession?.playerId) {
+    if (flashEl) flashEl.textContent = "Sign in to view your messages.";
+    if (newBtnEl) newBtnEl.hidden = true;
+    return;
+  }
+
+  if (navEl) initNotificationBell(navEl, authSession.playerId);
+
   const conversations = await api.listConversations();
   if (conversations === null) {
-    if (flashEl) flashEl.textContent = "Sign in to view your messages.";
+    if (flashEl) flashEl.textContent = "Could not load messages. Try again later.";
     if (newBtnEl) newBtnEl.hidden = true;
     return;
   }

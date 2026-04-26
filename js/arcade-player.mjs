@@ -126,6 +126,21 @@ function buildGestureAction(viewerPlayerId, targetPlayerId, isOwnerView, authSes
   };
 }
 
+function buildMessageAction(viewerPlayerId, targetPlayerId, targetProfileName, isOwnerView, authSessionPlayerId) {
+  const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
+  const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
+  const normalizedAuthPlayerId = sanitizePlayerId(authSessionPlayerId);
+  const enabled = !isOwnerView
+    && !!normalizedAuthPlayerId
+    && !!normalizedTargetPlayerId
+    && normalizedAuthPlayerId !== normalizedTargetPlayerId;
+  return {
+    enabled,
+    playerId: normalizedTargetPlayerId,
+    profileName: typeof targetProfileName === "string" ? targetProfileName : "",
+  };
+}
+
 function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "") {
   const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
   const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
@@ -318,6 +333,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
         flashMessage: "",
         playerId: requestedPlayerId,
       },
+      messageAction: { enabled: false, playerId: requestedPlayerId, profileName: "" },
       aboutText: "This player has not filled out an about block in the local arcade cache yet.",
       badgeItems: [{
         label: "Badge case still empty",
@@ -370,6 +386,13 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     options?.gestureFlash || "",
     options?.challengePickerOpen || false,
   );
+  const messageAction = buildMessageAction(
+    options?.viewerPlayerId,
+    publicView.playerId || requestedPlayerId,
+    publicView.profileName || heroName,
+    isOwnerView,
+    options?.authSessionPlayerId || "",
+  );
 
   return {
     state: "ready",
@@ -410,6 +433,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     },
     friendAction,
     gestureAction,
+    messageAction,
     aboutText: heroBio,
     badgeItems,
   };

@@ -215,6 +215,19 @@ function renderHeroCard(container, model) {
     `
     : "";
 
+  const messageActionHtml = model.messageAction?.enabled
+    ? `
+      <div class="player-hero-card__social-action">
+        <button
+          class="player-hero-card__friend-action player-hero-card__friend-action--message"
+          type="button"
+          data-message="${escapeHtml(model.messageAction.playerId || "")}"
+          data-message-name="${escapeHtml(model.messageAction.profileName || "")}"
+        >Message 💬</button>
+      </div>
+    `
+    : "";
+
   const gestureActionHtml = model.gestureAction?.enabled
     ? `
       <div class="player-hero-card__gesture-rail">
@@ -288,6 +301,7 @@ function renderHeroCard(container, model) {
         </div>
       </div>
       ${friendActionHtml}
+      ${messageActionHtml}
       ${gestureActionHtml}
     </section>
     <section class="player-hero-card__rankings-panel">

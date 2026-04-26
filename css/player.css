@@ -168,6 +168,8 @@
 }
 
 .player-stage__controls {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1001,6 +1003,21 @@
 .player-hero-card__friend-action--linked:focus-visible {
   transform: none;
   border-color: rgba(255, 214, 189, 0.22);
+}
+
+.player-hero-card__friend-action--message {
+  border-color: rgba(0, 230, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(0, 230, 255, 0.10), rgba(0, 180, 255, 0.08)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.player-hero-card__friend-action--message:hover,
+.player-hero-card__friend-action--message:focus-visible {
+  border-color: rgba(0, 230, 255, 0.48);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(0, 230, 255, 0.14) inset;
 }
 
 .player-hero-card__friend-flash {

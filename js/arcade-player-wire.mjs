@@ -304,6 +304,17 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       return;
     }
 
+    const messageButton = event.target.closest("[data-message]");
+    if (messageButton) {
+      const targetPlayerId = messageButton.dataset.message;
+      const targetName = messageButton.dataset.messageName || "";
+      if (!targetPlayerId) return;
+      const params = new URLSearchParams({ player: targetPlayerId });
+      if (targetName) params.set("name", targetName);
+      globalThis.location.assign(`../messages/conversation/index.html?${params.toString()}`);
+      return;
+    }
+
     const commentButton = event.target.closest("[data-comment-thought-id]");
     if (commentButton) {
       const thoughtId = commentButton.dataset.commentThoughtId || "";
