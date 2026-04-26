@@ -692,6 +692,46 @@ export async function removeFriendBetweenPlayers(db, leftPlayerId, rightPlayerId
     await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
     await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
 
+    // Sync friends column and remove the unfriended player from friends_preview for both sides
+    const leftFriendIds = leftRecord.friendPlayerIds;
+    const rightFriendIds = rightRecord.friendPlayerIds;
+
+    await client.query(`
+      update player_profiles
+      set friends = $2::jsonb,
+          friends_preview = (
+            select coalesce(jsonb_agg(entry), '[]'::jsonb)
+            from jsonb_array_elements(coalesce(friends_preview, '[]'::jsonb)) as entry
+            where entry->>'playerId' != $3
+          ),
+          updated_at = now()
+      where player_id = $1
+    `, [normalizedLeftPlayerId, JSON.stringify(leftFriendIds), normalizedRightPlayerId]);
+
+    await client.query(`
+      update player_profiles
+      set friends = $2::jsonb,
+          friends_preview = (
+            select coalesce(jsonb_agg(entry), '[]'::jsonb)
+            from jsonb_array_elements(coalesce(friends_preview, '[]'::jsonb)) as entry
+            where entry->>'playerId' != $3
+          ),
+          updated_at = now()
+      where player_id = $1
+    `, [normalizedRightPlayerId, JSON.stringify(rightFriendIds), normalizedLeftPlayerId]);
+
+    // Sync friend_count into player_metrics for both players
+    const leftMetrics = await loadPlayerMetrics(client, normalizedLeftPlayerId);
+    await savePlayerMetrics(client, normalizedLeftPlayerId, {
+      ...leftMetrics,
+      friendCount: leftFriendIds.length,
+    });
+    const rightMetrics = await loadPlayerMetrics(client, normalizedRightPlayerId);
+    await savePlayerMetrics(client, normalizedRightPlayerId, {
+      ...rightMetrics,
+      friendCount: rightFriendIds.length,
+    });
+
     await client.query(`delete from relationship_ledger_entries where ledger_key = $1`, [ledgerKey]);
 
     await client.query("commit");
