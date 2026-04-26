@@ -529,7 +529,8 @@ export function resolveProfileFriendSlots(profileView = {}, relationshipsRecord 
       normalizedRelationships.mainSqueezePlayerId,
       relationshipPoints,
     );
-  } else {
+  } else if (normalizedRelationships.mainSqueezeMode !== "manual") {
+    // auto mode: prefer the profile's pinned mainSqueeze, then most/last played, then top automatic candidate
     mainSqueeze = takeFriendCandidateByPlayerId(
       candidatesByPlayerId,
       usedKeys,
@@ -537,6 +538,7 @@ export function resolveProfileFriendSlots(profileView = {}, relationshipsRecord 
       relationshipPoints,
     ) || takeAutomaticFriendCandidate(automaticCandidates, usedKeys, relationshipPoints);
   }
+  // manual mode with no pick selected → mainSqueeze stays null
 
   const friendSlots = [];
   if (normalizedRelationships.friendRailMode === "manual") {

@@ -49,10 +49,19 @@ export async function listNotifications(db, recipientPlayerId, options = {}) {
 
   const [listResult, countResult] = await Promise.all([
     db.query(`
-      select id, recipient_player_id, actor_player_id, actor_display_name, type, status, payload, created_at
-      from notifications
-      where recipient_player_id = $1
-      order by created_at desc, id desc
+      select
+        n.id,
+        n.recipient_player_id,
+        n.actor_player_id,
+        coalesce(nullif(n.actor_display_name, ''), pp.profile_name, '') as actor_display_name,
+        n.type,
+        n.status,
+        n.payload,
+        n.created_at
+      from notifications n
+      left join player_profiles pp on pp.player_id = n.actor_player_id
+      where n.recipient_player_id = $1
+      order by n.created_at desc, n.id desc
       limit $2
     `, [recipientPlayerId, limit]),
     db.query(`

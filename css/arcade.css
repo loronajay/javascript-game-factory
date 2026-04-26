@@ -401,12 +401,16 @@ body::before {
 }
 
 .grid-stage__header,
-.grid-stage__controls,
 .player-card,
 .grid-board,
 .grid-stage__pager {
   position: relative;
   z-index: 4;
+}
+
+.grid-stage__controls {
+  position: relative;
+  z-index: 10;
 }
 
 .grid-stage__controls {

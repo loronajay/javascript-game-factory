@@ -429,6 +429,14 @@ export async function createFriendshipBetweenPlayers(db, leftPlayerId, rightPlay
     const savedLeftRecord = await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
     const savedRightRecord = await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
 
+    // Keep player_profiles.friends in sync so the profiles table reflects the relationship
+    await client.query(`
+      update player_profiles set friends = $2::jsonb, updated_at = now() where player_id = $1
+    `, [normalizedLeftPlayerId, JSON.stringify(savedLeftRecord.friendPlayerIds)]);
+    await client.query(`
+      update player_profiles set friends = $2::jsonb, updated_at = now() where player_id = $1
+    `, [normalizedRightPlayerId, JSON.stringify(savedRightRecord.friendPlayerIds)]);
+
     if (!alreadyAwarded) {
       await saveRelationshipLedgerEntry(client, {
         ledgerKey,
