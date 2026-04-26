@@ -189,7 +189,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
 
       if (authSession?.playerId) {
         unfriendButton.disabled = true;
-        await apiClient.removeFriend(currentProfile.playerId, targetPlayerId).catch(() => null);
+        await apiClient.removeFriend(authSession.playerId, targetPlayerId).catch(() => null);
         unfriendButton.disabled = false;
       }
 

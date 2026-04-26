@@ -617,6 +617,7 @@ export function removeFriendBetweenPlayers(leftPlayerId, rightPlayerId, options 
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
+  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
 
   return { removed: true, leftRecord: saved.leftRecord, rightRecord: saved.rightRecord };
 }
