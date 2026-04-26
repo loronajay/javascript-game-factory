@@ -176,6 +176,27 @@ export function createApp(options = {}) {
   const declineChallenge = typeof options?.declineChallenge === "function"
     ? options.declineChallenge
     : async () => null;
+  const findOrCreateConversation = typeof options?.findOrCreateConversation === "function"
+    ? options.findOrCreateConversation
+    : async () => null;
+  const findConversationBetween = typeof options?.findConversationBetween === "function"
+    ? options.findConversationBetween
+    : async () => null;
+  const listConversations = typeof options?.listConversations === "function"
+    ? options.listConversations
+    : async () => [];
+  const getConversation = typeof options?.getConversation === "function"
+    ? options.getConversation
+    : async () => null;
+  const listMessages = typeof options?.listMessages === "function"
+    ? options.listMessages
+    : async () => [];
+  const createMessage = typeof options?.createMessage === "function"
+    ? options.createMessage
+    : async () => null;
+  const markConversationRead = typeof options?.markConversationRead === "function"
+    ? options.markConversationRead
+    : async () => {};
   const registerAccount = typeof options?.registerAccount === "function"
     ? options.registerAccount
     : async () => ({ error: "not_configured" });
@@ -214,6 +235,9 @@ export function createApp(options = {}) {
     const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
     const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
     const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);
+    const messagesWithMatch = pathname.match(/^\/messages\/with\/([^/]+)$/);
+    const conversationMatch = pathname.match(/^\/messages\/([^/]+)$/);
+    const conversationReadMatch = pathname.match(/^\/messages\/([^/]+)\/read$/);
 
     if (method === "OPTIONS") {
       res.statusCode = 204;
@@ -1038,6 +1062,126 @@ export function createApp(options = {}) {
         type: "player_gesture",
         payload: { gestureType },
       });
+      writeJson(res, 200, { ok: true }, requestOrigin);
+      return;
+    }
+
+    // Direct message routes (auth required)
+    if (method === "GET" && pathname === "/messages") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const conversations = await listConversations(authClaims.playerId);
+      writeJson(res, 200, { conversations }, requestOrigin);
+      return;
+    }
+
+    if (method === "GET" && messagesWithMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const otherPlayerId = decodeURIComponent(messagesWithMatch[1]);
+      const conversation = await findConversationBetween(authClaims.playerId, otherPlayerId);
+      writeJson(res, 200, { conversation: conversation || null }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && pathname === "/messages") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+      const { toPlayerId, text } = body.value || {};
+      const fromPlayerId = authClaims.playerId;
+      if (!toPlayerId || toPlayerId === fromPlayerId) {
+        writeJson(res, 400, { status: "error", error: "invalid_target", timestamp }, requestOrigin);
+        return;
+      }
+      if (!text?.trim()) {
+        writeJson(res, 400, { status: "error", error: "empty_message", timestamp }, requestOrigin);
+        return;
+      }
+      const conversation = await findOrCreateConversation(fromPlayerId, toPlayerId);
+      if (!conversation) {
+        writeJson(res, 500, { status: "error", error: "conversation_failed", timestamp }, requestOrigin);
+        return;
+      }
+      const message = await createMessage({ conversationId: conversation.id, fromPlayerId, text });
+      if (!message) {
+        writeJson(res, 500, { status: "error", error: "send_failed", timestamp }, requestOrigin);
+        return;
+      }
+      const senderProfile = await loadPlayerProfile(fromPlayerId).catch(() => null);
+      const senderName = senderProfile?.profileName || "";
+      void createNotification({
+        recipientPlayerId: toPlayerId,
+        actorPlayerId: fromPlayerId,
+        actorDisplayName: senderName,
+        type: "new_message",
+        payload: { conversationId: conversation.id, preview: String(text).trim().slice(0, 80) },
+      });
+      writeJson(res, 201, { message, conversationId: conversation.id }, requestOrigin);
+      return;
+    }
+
+    if (method === "GET" && conversationMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const convId = decodeURIComponent(conversationMatch[1]);
+      const conversation = await getConversation(convId);
+      if (!conversation) {
+        writeJson(res, 404, { status: "error", error: "conversation_not_found", timestamp }, requestOrigin);
+        return;
+      }
+      const isParticipant = conversation.playerAId === authClaims.playerId || conversation.playerBId === authClaims.playerId;
+      if (!isParticipant) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+      const otherPlayerId = conversation.playerAId === authClaims.playerId ? conversation.playerBId : conversation.playerAId;
+      const [messages, otherProfile] = await Promise.all([
+        listMessages(convId),
+        loadPlayerProfile(otherPlayerId).catch(() => null),
+      ]);
+      const isPlayerA = conversation.playerAId === authClaims.playerId;
+      writeJson(res, 200, {
+        conversation: {
+          ...conversation,
+          otherPlayerId,
+          otherProfileName: otherProfile?.profileName || "",
+          unreadCount: isPlayerA ? conversation.unreadCountA : conversation.unreadCountB,
+        },
+        messages,
+      }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && conversationReadMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const convId = decodeURIComponent(conversationReadMatch[1]);
+      const conversation = await getConversation(convId);
+      if (!conversation) {
+        writeJson(res, 404, { status: "error", error: "conversation_not_found", timestamp }, requestOrigin);
+        return;
+      }
+      const isParticipant = conversation.playerAId === authClaims.playerId || conversation.playerBId === authClaims.playerId;
+      if (!isParticipant) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+      await markConversationRead(convId, authClaims.playerId);
       writeJson(res, 200, { ok: true }, requestOrigin);
       return;
     }

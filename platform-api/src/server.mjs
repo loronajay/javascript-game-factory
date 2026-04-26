@@ -51,6 +51,15 @@ import {
   acceptChallenge,
   declineChallenge,
 } from "./db/challenges.mjs";
+import {
+  findOrCreateConversation,
+  findConversationBetween,
+  listConversations,
+  getConversation,
+  listMessages,
+  createMessage,
+  markConversationRead,
+} from "./db/messages.mjs";
 
 const { Pool } = pg;
 
@@ -135,6 +144,13 @@ async function bootstrap() {
     getChallenge: (id) => getChallenge(pool, id),
     acceptChallenge: (id) => acceptChallenge(pool, id),
     declineChallenge: (id) => declineChallenge(pool, id),
+    findOrCreateConversation: (p1, p2) => findOrCreateConversation(pool, p1, p2),
+    findConversationBetween: (p1, p2) => findConversationBetween(pool, p1, p2),
+    listConversations: (playerId) => listConversations(pool, playerId),
+    getConversation: (convId) => getConversation(pool, convId),
+    listMessages: (convId) => listMessages(pool, convId),
+    createMessage: (params) => createMessage(pool, params),
+    markConversationRead: (convId, playerId) => markConversationRead(pool, convId, playerId),
   });
   const server = createServer(app);
 

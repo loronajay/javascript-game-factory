@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Messages</title>
+  <link rel="stylesheet" href="../../css/arcade.css">
+  <link rel="stylesheet" href="../../css/search.css">
+  <link rel="stylesheet" href="../../css/notifications.css">
+  <link rel="stylesheet" href="../../css/messages.css">
+</head>
+<body class="search-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="search-stage">
+      <div class="search-stage__stars" aria-hidden="true"></div>
+      <div class="search-stage__scene" aria-hidden="true">
+        <div class="search-stage__sun"></div>
+        <div class="search-stage__skyline"></div>
+        <div class="search-stage__floor"></div>
+      </div>
+
+      <div class="search-stage__controls">
+        <nav class="search-stage__nav">
+          <a class="search-stage__back" href="../index.html">&#x276E; Messages</a>
+          <a class="search-stage__portal" href="../../me/index.html">Player Page</a>
+          <div id="threadAuthNav" class="session-nav" style="margin-left:auto;"></div>
+        </nav>
+      </div>
+
+      <div class="search-stage__header">
+        <h1 class="pixel-text pixel-text--title search-stage__title">MESSAGES</h1>
+        <p id="threadOtherName" class="search-stage__subtitle"></p>
+      </div>
+
+      <div class="search-layout msg-layout" style="display:flex; flex-direction:column; min-height:60vh;">
+        <div id="messageList" class="msg-thread-body" aria-live="polite" aria-label="Messages"></div>
+        <p id="threadFlash" class="msg-flash"></p>
+        <div class="msg-composer">
+          <textarea
+            id="msgInput"
+            class="msg-composer__input"
+            placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+            rows="2"
+            maxlength="2000"
+          ></textarea>
+          <button id="sendBtn" class="msg-composer__send" type="button">Send</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../../js/pixel-text.js"></script>
+  <script src="../../js/platform-config.js"></script>
+  <script type="module" src="../../js/arcade-messages-thread.mjs"></script>
+</body>
+</html>

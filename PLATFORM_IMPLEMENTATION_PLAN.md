@@ -769,9 +769,9 @@ Suggested shape:
 
 Notes:
 
-- `challenge` is a special kind that carries an optional `gameSlug` hint for which cabinet the challenge is for.
-- Gestures are one-directional; the recipient does not need to respond.
-- In the local-first phase, sent gestures are written into the sender's own localStorage and can be reflected locally; real cross-user delivery requires a backend push layer.
+- `challenge` is a special kind that opens a game picker instead of sending immediately; the selected game creates a `challenges` DB record and a `player_challenge` notification, not a bare gesture notification.
+- Simple gestures (Poke, Hug, Kick, Blow Kiss, Nudge) are one-directional; the recipient gets a notification but does not need to respond.
+- Gestures and challenges are now live through real backend delivery via `POST /players/:id/gesture` and `POST /challenges`; local-first scaffolding is no longer the delivery mechanism.
 - The gesture list is intended to expand with new kinds over time; `kind` should always be treated as an open enumeration, not a closed set.
 - Gestures should never auto-repeat silently; if a sender sends the same kind to the same player within a short window, the UI should acknowledge the repeat rather than silently stacking duplicates.
 
@@ -800,15 +800,18 @@ Canonical shape (live):
 
 Live notification types:
 
-- `thought_reaction` — someone reacted to your thought (payload: `thoughtId`, `reactionId`, `thoughtText`)
+- `thought_reaction` — someone reacted to your thought (payload: `thoughtId`, `reactionId`, `thoughtText`); bell renders the actual emoji, e.g. "Jay ❤️'d your thought"
 - `thought_comment` — someone commented on your thought (payload: `thoughtId`, `commentId`, `commentText`, `thoughtText`)
 - `thought_share` — someone shared your thought (payload: `thoughtId`, `thoughtText`)
-- `friend_request` — someone sent you a friend request (payload: `requestId`)
+- `friend_request` — someone sent you a friend request (payload: `requestId`); includes inline Accept/Reject buttons
 - `friend_accept` — someone accepted your friend request (payload: `requestId`)
+- `player_gesture` — someone sent you a gesture (payload: `gestureType`); bell renders verb+emoji, e.g. "Jay nudged you 👇"; fired via `POST /players/:id/gesture`
+- `player_challenge` — someone challenged you to a game (payload: `challengeId`, `gameSlug`, `gameTitle`); includes inline Accept/Decline buttons; Accept navigates to the game
+- `challenge_accepted` — someone accepted your game challenge (payload: `challengeId`, `gameSlug`, `gameTitle`)
+- `challenge_declined` — someone declined your game challenge (payload: `challengeId`, `gameSlug`, `gameTitle`)
 
 Planned future types:
 
-- `gesture` — a received Poke, Hug, Kick, Blow Kiss, Nudge, or Challenge (requires gesture UI to be built)
 - `event_invite` — an event team invitation
 
 Notes:
@@ -999,7 +1002,9 @@ Current status:
 - Initial migration/sql wiring plus backend record routes for profiles, metrics, relationships, activity items, and thought posts are now part of the active implementation path.
 - The frontend is now in an adapter-first hybrid state: shared API seams are live for profile/feed/activity/metrics reads and mirrors, while local fallback remains in place intentionally for stability.
 - Thought interactions are no longer placeholders: reactions, repost/share records, and comments now have real backend routes and shared frontend adapters, while the page layer still keeps local fallback behavior.
-- Notifications are live: `notifications` + `friend_requests` tables added; bell + dropdown in the session nav; friend requests replace direct friendship creation for authenticated users; thought reactions/comments/shares trigger notifications to the thought author.
+- Notifications are live: `notifications` + `friend_requests` + `challenges` tables added; bell + dropdown in the session nav; friend requests replace direct friendship creation for authenticated users; thought reactions/comments/shares trigger notifications to the thought author.
+- Player gestures are live: Poke, Hug, Kick, Blow Kiss, and Nudge each fire a `player_gesture` notification via `POST /players/:id/gesture`; gesture rail renders on public `/player` profiles for authenticated viewers.
+- Challenge system is live: Challenge 🎮 button opens an inline game picker (Lovers Lost, Battleshits); selecting a game calls `POST /challenges`, stores a record in the `challenges` table (migration 009), and fires a `player_challenge` notification; recipient gets Accept/Decline buttons in the bell dropdown; Accept navigates to the game and notifies the challenger; Decline notifies the challenger.
 
 This is the trigger point for:
 
@@ -1176,7 +1181,9 @@ The highest-value tests for the platform are the ones that prevent schema drift 
 - player discovery is live: `hasAccount` and `discoverable` ship on every profile API response; `GET /players/search?q=...` queries registered discoverable players by name; `/search/index.html` is the player search page; both games surface opponent profiles on results screens with Add Friend entry points for signed-in viewers; `discoverable` opt-out lives in the profile editor.
 - notification system is live: `notifications` and `friend_requests` Postgres tables added via migration 008; `platform-api/` exposes `GET /notifications`, `POST /notifications/read-all`, `POST /friend-requests`, `POST /friend-requests/:id/accept`, `POST /friend-requests/:id/reject`; `js/platform/api/notifications-api.mjs` is the shared browser client; `js/arcade-notifications.mjs` is the bell component (unread badge + dropdown) wired into the session nav on home, grid, and `/me`; friend-request notifications include inline Accept/Reject buttons; notifications mark all-read automatically 1.5 s after the dropdown opens.
 - friend requests are the canonical add-friend flow for authenticated players: Add Friend on `/player` sends `POST /friend-requests`, creating a request record and a `friend_request` notification for the recipient; Accept triggers `POST /friend-requests/:id/accept`, which creates the friendship and fires a `friend_accept` notification back to the sender; Reject silently updates the record; guest viewers fall back to the existing local direct-link path.
-- thought social actions now generate backend notifications to the thought author: `thought_reaction` (when setting, not removing), `thought_comment`, and `thought_share` notifications fire when actor ≠ author; payloads include excerpt text so the bell UI can render context without extra API calls.
+- thought social actions now generate backend notifications to the thought author: `thought_reaction` (when setting, not removing), `thought_comment`, and `thought_share` notifications fire when actor ≠ author; payloads include excerpt text so the bell UI can render context without extra API calls; `thought_reaction` notifications now display the actual emoji (e.g. "Jay ❤️'d your thought") via `THOUGHT_REACTION_GLYPHS`.
+- player gesture buttons are now live on public `/player` profiles for authenticated viewers: Poke 👈, Hug 🤗, Kick 👟, Blow Kiss 💋, Nudge 👇 each fire `POST /players/:id/gesture` and deliver a `player_gesture` notification; `VALID_GESTURE_TYPES` is enforced on the backend; actor name resolved from the profile record.
+- challenge system is now live: Challenge 🎮 in the gesture rail opens an inline game picker rather than sending immediately; game selection calls `POST /challenges`, creating a `challenges` DB record (migration 009, `platform-api/src/db/challenges.mjs`) and a `player_challenge` notification with Accept/Decline buttons; Accept calls `POST /challenges/:id/accept`, notifies the challenger with `challenge_accepted`, and navigates the acceptor to the game via `buildGameHref(slug)`; Decline calls `POST /challenges/:id/decline` and delivers `challenge_declined` to the challenger; `notifications-api.mjs` exposes `sendChallenge`, `acceptChallenge`, and `declineChallenge`.
 
 ## Scope Lock For Upcoming Profile Passes
 

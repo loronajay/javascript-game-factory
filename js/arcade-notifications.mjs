@@ -76,6 +76,8 @@ function formatNotificationText(notif) {
       const gameTitle = notif.payload?.gameTitle || notif.payload?.gameSlug || "your challenge";
       return `<strong>${escapeHtml(actor)}</strong> declined your ${escapeHtml(gameTitle)} challenge.`;
     }
+    case "new_message":
+      return `<strong>${escapeHtml(actor)}</strong> sent you a message 💬`;
     default:
       return `<strong>${escapeHtml(actor)}</strong> sent you a notification`;
   }
@@ -88,10 +90,18 @@ function buildGameHref(slug) {
   return `${prefix}games/${slug}/index.html`;
 }
 
+function buildHref(path) {
+  const pathParts = globalThis.location?.pathname?.replace(/\/[^/]*$/, "").split("/").filter(Boolean) || [];
+  const depth = pathParts.length;
+  const prefix = depth > 0 ? "../".repeat(depth) : "";
+  return `${prefix}${path.replace(/^\//, "")}`;
+}
+
 function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, onChallengeDecline) {
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";
   const isChallenge = notif.type === "player_challenge" && notif.status === "unread";
-  const preview = notif.payload?.commentText || notif.payload?.thoughtText || "";
+  const isMessage = notif.type === "new_message";
+  const preview = notif.payload?.preview || notif.payload?.commentText || notif.payload?.thoughtText || "";
   const unreadClass = notif.status === "unread" ? " notif-item--unread" : "";
 
   const li = document.createElement("li");
@@ -107,6 +117,9 @@ function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, on
         <button class="notif-item__action notif-item__action--accept" type="button" data-fr-accept="${escapeHtml(notif.payload?.requestId || notif.id)}">Accept</button>
         <button class="notif-item__action notif-item__action--reject" type="button" data-fr-reject="${escapeHtml(notif.payload?.requestId || notif.id)}">Reject</button>
       </div>
+    ` : ""}
+    ${isMessage && notif.payload?.conversationId ? `
+      <a class="notif-item__game-link" href="${escapeHtml(buildHref(`messages/conversation/index.html?id=${notif.payload.conversationId}`))}">View Message →</a>
     ` : ""}
     ${isChallenge ? `
       <div class="notif-item__actions">

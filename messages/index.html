@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Messages</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/search.css">
+  <link rel="stylesheet" href="../css/notifications.css">
+  <link rel="stylesheet" href="../css/messages.css">
+</head>
+<body class="search-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="search-stage">
+      <div class="search-stage__stars" aria-hidden="true"></div>
+      <div class="search-stage__scene" aria-hidden="true">
+        <div class="search-stage__sun"></div>
+        <div class="search-stage__skyline"></div>
+        <div class="search-stage__floor"></div>
+      </div>
+
+      <div class="search-stage__controls">
+        <nav class="search-stage__nav">
+          <a class="search-stage__back" href="#" onclick="event.preventDefault(); history.back()">&#x276E; Back</a>
+          <a class="search-stage__portal" href="../grid.html">Arcade Grid</a>
+          <a class="search-stage__portal" href="../me/index.html">Player Page</a>
+          <div id="inboxAuthNav" class="session-nav" style="margin-left:auto;"></div>
+        </nav>
+      </div>
+
+      <div class="search-stage__header">
+        <h1 class="pixel-text pixel-text--title search-stage__title">MESSAGES</h1>
+        <p class="search-stage__subtitle">Your direct message inbox.</p>
+      </div>
+
+      <div class="search-layout msg-layout">
+        <div class="msg-toolbar">
+          <span id="inboxFlash" class="msg-flash"></span>
+          <button id="newMsgBtn" class="msg-new-btn" type="button">+ New Message</button>
+        </div>
+
+        <div id="newMsgPanel" class="msg-new-panel" hidden>
+          <input
+            id="newMsgSearch"
+            class="msg-new-search"
+            type="search"
+            placeholder="Search players by name..."
+            autocomplete="off"
+            maxlength="60"
+          >
+          <ul id="newMsgResults" class="msg-new-results" aria-label="Player results"></ul>
+        </div>
+
+        <ul id="convList" class="msg-conv-list" aria-label="Conversations"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/platform-config.js"></script>
+  <script type="module" src="../js/arcade-messages-inbox.mjs"></script>
+</body>
+</html>
