@@ -8,6 +8,7 @@ import {
   buildDefaultProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
 } from "../normalize.mjs";
+import { loadPlayerMetrics, savePlayerMetrics } from "./metrics.mjs";
 
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
@@ -429,13 +430,32 @@ export async function createFriendshipBetweenPlayers(db, leftPlayerId, rightPlay
     const savedLeftRecord = await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
     const savedRightRecord = await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
 
-    // Keep player_profiles.friends in sync so the profiles table reflects the relationship
+    // Use pre-save in-memory arrays as the authoritative friend list for the profiles sync —
+    // RETURNING from savePlayerRelationships can come back null when called on a transaction client,
+    // which would overwrite the column with []. The in-memory records are always correct at this point.
+    const leftFriendIds = leftRecord.friendPlayerIds;
+    const rightFriendIds = rightRecord.friendPlayerIds;
+
     await client.query(`
       update player_profiles set friends = $2::jsonb, updated_at = now() where player_id = $1
-    `, [normalizedLeftPlayerId, JSON.stringify(savedLeftRecord.friendPlayerIds)]);
+    `, [normalizedLeftPlayerId, JSON.stringify(leftFriendIds)]);
     await client.query(`
       update player_profiles set friends = $2::jsonb, updated_at = now() where player_id = $1
-    `, [normalizedRightPlayerId, JSON.stringify(savedRightRecord.friendPlayerIds)]);
+    `, [normalizedRightPlayerId, JSON.stringify(rightFriendIds)]);
+
+    // Sync friend_count and friend_points into player_metrics for both players
+    const leftMetrics = await loadPlayerMetrics(client, normalizedLeftPlayerId);
+    await savePlayerMetrics(client, normalizedLeftPlayerId, {
+      ...leftMetrics,
+      friendCount: leftFriendIds.length,
+      friendPoints: leftRecord.friendPointsByPlayerId,
+    });
+    const rightMetrics = await loadPlayerMetrics(client, normalizedRightPlayerId);
+    await savePlayerMetrics(client, normalizedRightPlayerId, {
+      ...rightMetrics,
+      friendCount: rightFriendIds.length,
+      friendPoints: rightRecord.friendPointsByPlayerId,
+    });
 
     if (!alreadyAwarded) {
       await saveRelationshipLedgerEntry(client, {
