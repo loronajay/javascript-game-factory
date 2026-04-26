@@ -148,21 +148,25 @@ function renderHeroCard(container, model) {
     </article>
   `).join("");
 
-  const friendHtml = model.friendItems.map((item) => `
-    <article class="${item.isPlaceholder ? "player-hero-card__friend-card player-hero-card__friend-card--placeholder" : "player-hero-card__friend-card"}">
+  const friendHtml = model.friendItems.map((item) => {
+    const cardClass = item.isPlaceholder
+      ? "player-hero-card__friend-card player-hero-card__friend-card--placeholder"
+      : "player-hero-card__friend-card";
+    const inner = `
       <div class="player-hero-card__friend-avatar" aria-hidden="true">
-        ${item.avatarSrc
-          ? `<img class="player-hero-card__friend-avatar-img" src="${escapeHtml(item.avatarSrc)}" alt="" loading="lazy">`
-          : `<span class="player-hero-card__friend-avatar-text">${escapeHtml(item.avatarInitials || "??")}</span>`
-        }
+        <img class="player-hero-card__friend-avatar-img" src="${escapeHtml(item.avatarSrc || DEFAULT_PROFILE_PICTURE_SRC)}" alt="" loading="lazy">
       </div>
       <div class="player-hero-card__friend-copy">
         <p class="player-hero-card__friend-label">${escapeHtml(item.title || "Friend Slot")}</p>
         <p class="player-hero-card__friend-name">${escapeHtml(item.value)}</p>
         <p class="player-hero-card__friend-points">${escapeHtml(item.meta || "Friendship points pending")}</p>
       </div>
-    </article>
-  `).join("");
+    `;
+    if (!item.isPlaceholder && item.playerId) {
+      return `<a class="${cardClass}" href="../player/index.html?id=${encodeURIComponent(item.playerId)}">${inner}</a>`;
+    }
+    return `<article class="${cardClass}">${inner}</article>`;
+  }).join("");
 
   const statsHtml = (Array.isArray(model.heroStats) ? model.heroStats : []).map((item) => `
     <article class="player-hero-card__metrics-stat">

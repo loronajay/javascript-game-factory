@@ -20,8 +20,9 @@ export async function registerAccountService(pool, { email, password, profileNam
   let playerId;
   if (claimPlayerId && typeof claimPlayerId === "string" && claimPlayerId.trim()) {
     const existingAccount = await findAccountByPlayerId(pool, claimPlayerId.trim());
-    if (existingAccount) return { error: "player_already_claimed" };
-    playerId = claimPlayerId.trim();
+    // If the identity is already claimed, fall back to a fresh UUID so burner/secondary
+    // accounts aren't blocked just because the browser's local playerId is registered.
+    playerId = existingAccount ? randomUUID() : claimPlayerId.trim();
   } else {
     playerId = randomUUID();
   }

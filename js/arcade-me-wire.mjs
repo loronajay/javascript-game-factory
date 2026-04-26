@@ -114,11 +114,11 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   });
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
-    queueMicrotask(() => { void rerender("", true); });
+    queueMicrotask(() => { void rerender(); });
   });
 
   doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
-    queueMicrotask(() => { void rerender("", true); });
+    queueMicrotask(() => { void rerender(); });
   });
 
   doc.addEventListener("submit", async (event) => {
