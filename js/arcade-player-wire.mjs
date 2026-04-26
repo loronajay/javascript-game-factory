@@ -1,6 +1,6 @@
-import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { syncThoughtPostCountWithApi } from "./platform/metrics/metrics.mjs";
-import { createFriendshipBetweenPlayers, removeFriendBetweenPlayers } from "./platform/relationships/relationships.mjs";
+import { createFriendshipBetweenPlayers, loadProfileRelationshipsRecord, removeFriendBetweenPlayers } from "./platform/relationships/relationships.mjs";
 import { createNotificationsApiClient } from "./platform/api/notifications-api.mjs";
 import {
   buildPlayerThoughtFeed,
@@ -193,14 +193,25 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         unfriendButton.disabled = false;
       }
 
-      const result = removeFriendBetweenPlayers(currentProfile.playerId, targetPlayerId, { storage, apiClient });
+      removeFriendBetweenPlayers(currentProfile.playerId, targetPlayerId, { storage, apiClient });
+
+      const updatedProfile = loadFactoryProfile(storage);
+      const cleanedFriendsPreview = (updatedProfile.friendsPreview || []).filter(
+        (f) => f.playerId !== targetPlayerId,
+      );
+      const cleanedMainSqueeze = updatedProfile.mainSqueeze?.playerId === targetPlayerId
+        ? null
+        : (updatedProfile.mainSqueeze || null);
+      saveFactoryProfile({ ...updatedProfile, friendsPreview: cleanedFriendsPreview, mainSqueeze: cleanedMainSqueeze }, storage);
+
+      const freshViewerRel = loadProfileRelationshipsRecord(currentProfile.playerId, storage);
       currentPageData = {
         ...(currentPageData || {}),
         profile: currentPageData?.profile,
         thoughtFeed: currentPageData?.thoughtFeed || loadThoughtFeed(storage),
         metricsRecord: currentPageData?.metricsRecord,
-        relationshipsRecord: result.rightRecord,
-        viewerRelationshipsRecord: result.leftRecord,
+        relationshipsRecord: currentPageData?.relationshipsRecord,
+        viewerRelationshipsRecord: freshViewerRel,
       };
       profilePanel?.render?.("");
       renderPage(doc, {

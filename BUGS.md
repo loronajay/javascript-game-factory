@@ -10,3 +10,8 @@ FIXED: Three issues:
 FIXED: Two issues in createFriendshipBetweenPlayers (relationships.mjs):
 1. savePlayerMetrics was never called — friend_count and friend_points stayed at 0/{} permanently. Now both players get their metrics synced inside the same transaction after the relationship save.
 2. player_profiles.friends was being read from savedLeftRecord.friendPlayerIds (which can come back empty when RETURNING is called on a transaction client). Now uses leftRecord.friendPlayerIds (the pre-save in-memory record, which is always correct at that point). Needs Railway redeploy + fresh friend request to verify DB shows correct values.
+
+## Unfriend not working — Drellgor still shows in friend rail editor dropdown and Unfriend button still appears on his player page after navigating away and back
+FIXED: Two issues in arcade-player-wire.mjs:
+1. result.leftRecord from removeFriendBetweenPlayers can be null when the relationship record doesn't exist in storage — now reads fresh viewerRelationshipsRecord directly from localStorage via loadProfileRelationshipsRecord after the remove, so the viewer's relationship state is always authoritative.
+2. friendsPreview and mainSqueeze in the factory profile (localStorage) were never cleaned after unfriend — removeFriendBetweenPlayers updates the relationships record but not the profile's cached friend list. Now explicitly filters targetPlayerId out of friendsPreview and clears mainSqueeze if it matched, then saves the updated profile so the editor dropdown and friend rail reflect the removal immediately.
