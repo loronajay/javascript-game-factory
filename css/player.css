@@ -1012,6 +1012,138 @@
   text-transform: uppercase;
 }
 
+.player-hero-card__gesture-rail {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 214, 189, 0.1);
+  margin-top: 4px;
+}
+
+.player-hero-card__gesture-label {
+  margin: 0;
+  color: rgba(255, 248, 255, 0.55);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.player-hero-card__gesture-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-hero-card__gesture-btn {
+  padding: 5px 10px;
+  background: rgba(255, 214, 189, 0.06);
+  border: 1px solid rgba(255, 214, 189, 0.22);
+  border-radius: 4px;
+  color: rgba(255, 248, 255, 0.88);
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.player-hero-card__gesture-btn:hover,
+.player-hero-card__gesture-btn:focus-visible {
+  background: rgba(255, 214, 189, 0.14);
+  border-color: rgba(255, 214, 189, 0.44);
+}
+
+.player-hero-card__gesture-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.player-hero-card__gesture-flash {
+  min-height: 1.2em;
+  margin: 0;
+  color: rgba(255, 248, 255, 0.78);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-hero-card__gesture-btn--challenge {
+  border-color: rgba(255, 214, 100, 0.3);
+}
+
+.player-hero-card__gesture-btn--active {
+  background: rgba(255, 214, 100, 0.16);
+  border-color: rgba(255, 214, 100, 0.5);
+}
+
+.player-hero-card__challenge-picker {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(10, 5, 20, 0.6);
+  border: 1px solid rgba(255, 214, 100, 0.3);
+  border-radius: 6px;
+}
+
+.player-hero-card__challenge-picker-label {
+  margin: 0;
+  color: rgba(255, 248, 255, 0.7);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.player-hero-card__challenge-games {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-hero-card__challenge-game-btn {
+  padding: 6px 14px;
+  background: rgba(255, 214, 100, 0.1);
+  border: 1px solid rgba(255, 214, 100, 0.4);
+  border-radius: 4px;
+  color: rgba(255, 248, 255, 0.92);
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.player-hero-card__challenge-game-btn:hover,
+.player-hero-card__challenge-game-btn:focus-visible {
+  background: rgba(255, 214, 100, 0.22);
+  border-color: rgba(255, 214, 100, 0.7);
+}
+
+.player-hero-card__challenge-game-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.player-hero-card__challenge-cancel {
+  justify-self: start;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 214, 189, 0.18);
+  border-radius: 3px;
+  color: rgba(255, 248, 255, 0.5);
+  font-family: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.player-hero-card__challenge-cancel:hover {
+  color: rgba(255, 248, 255, 0.75);
+  border-color: rgba(255, 214, 189, 0.35);
+}
+
 .player-featured-cabinet {
   justify-items: center;
 }

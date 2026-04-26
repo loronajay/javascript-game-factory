@@ -9,6 +9,7 @@ export const MIGRATION_FILES = Object.freeze([
   "006-accounts.sql",
   "007-password-reset-tokens.sql",
   "008-notifications.sql",
+  "009-challenges.sql",
 ]);
 
 export function migrationFileUrl(name) {

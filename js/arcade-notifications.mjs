@@ -1,5 +1,6 @@
 import { createNotificationsApiClient } from "./platform/api/notifications-api.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { THOUGHT_REACTION_GLYPHS } from "./platform/thoughts/thoughts-schema.mjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -22,11 +23,33 @@ function formatRelativeTime(isoString) {
   return `${days}d ago`;
 }
 
+const GESTURE_NOTIFICATION_LABELS = Object.freeze({
+  poke: "poked",
+  hug: "hugged",
+  kick: "kicked",
+  blowkiss: "blew you a kiss",
+  nudge: "nudged",
+  challenge: "challenged",
+});
+
+const GESTURE_NOTIFICATION_EMOJIS = Object.freeze({
+  poke: "👈",
+  hug: "🤗",
+  kick: "👟",
+  blowkiss: "💋",
+  nudge: "👇",
+  challenge: "🎮",
+});
+
 function formatNotificationText(notif) {
   const actor = notif.actorDisplayName || "Someone";
   switch (notif.type) {
-    case "thought_reaction":
-      return `<strong>${escapeHtml(actor)}</strong> reacted to your thought`;
+    case "thought_reaction": {
+      const reactionId = notif.payload?.reactionId || "";
+      const glyph = THOUGHT_REACTION_GLYPHS[reactionId] || "reacted to";
+      const verb = reactionId && THOUGHT_REACTION_GLYPHS[reactionId] ? `${glyph}'d` : "reacted to";
+      return `<strong>${escapeHtml(actor)}</strong> ${verb} your thought`;
+    }
     case "thought_comment":
       return `<strong>${escapeHtml(actor)}</strong> commented on your thought`;
     case "thought_share":
@@ -35,13 +58,39 @@ function formatNotificationText(notif) {
       return `<strong>${escapeHtml(actor)}</strong> sent you a friend request`;
     case "friend_accept":
       return `<strong>${escapeHtml(actor)}</strong> accepted your friend request`;
+    case "player_gesture": {
+      const gestureType = notif.payload?.gestureType || "";
+      const verb = GESTURE_NOTIFICATION_LABELS[gestureType] || "sent a gesture to";
+      const emoji = GESTURE_NOTIFICATION_EMOJIS[gestureType] || "";
+      return `<strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} you ${emoji}`;
+    }
+    case "player_challenge": {
+      const gameTitle = notif.payload?.gameTitle || notif.payload?.gameSlug || "a game";
+      return `<strong>${escapeHtml(actor)}</strong> challenged you to ${escapeHtml(gameTitle)}! 🎮`;
+    }
+    case "challenge_accepted": {
+      const gameTitle = notif.payload?.gameTitle || notif.payload?.gameSlug || "your challenge";
+      return `<strong>${escapeHtml(actor)}</strong> accepted your ${escapeHtml(gameTitle)} challenge!`;
+    }
+    case "challenge_declined": {
+      const gameTitle = notif.payload?.gameTitle || notif.payload?.gameSlug || "your challenge";
+      return `<strong>${escapeHtml(actor)}</strong> declined your ${escapeHtml(gameTitle)} challenge.`;
+    }
     default:
       return `<strong>${escapeHtml(actor)}</strong> sent you a notification`;
   }
 }
 
-function renderNotificationItem(notif, onAccept, onReject) {
+function buildGameHref(slug) {
+  const pathParts = globalThis.location?.pathname?.replace(/\/[^/]*$/, "").split("/").filter(Boolean) || [];
+  const depth = pathParts.length;
+  const prefix = depth > 0 ? "../".repeat(depth) : "";
+  return `${prefix}games/${slug}/index.html`;
+}
+
+function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, onChallengeDecline) {
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";
+  const isChallenge = notif.type === "player_challenge" && notif.status === "unread";
   const preview = notif.payload?.commentText || notif.payload?.thoughtText || "";
   const unreadClass = notif.status === "unread" ? " notif-item--unread" : "";
 
@@ -59,6 +108,12 @@ function renderNotificationItem(notif, onAccept, onReject) {
         <button class="notif-item__action notif-item__action--reject" type="button" data-fr-reject="${escapeHtml(notif.payload?.requestId || notif.id)}">Reject</button>
       </div>
     ` : ""}
+    ${isChallenge ? `
+      <div class="notif-item__actions">
+        <button class="notif-item__action notif-item__action--accept" type="button" data-ch-accept="${escapeHtml(notif.payload?.challengeId || notif.id)}" data-ch-slug="${escapeHtml(notif.payload?.gameSlug || "")}">Accept</button>
+        <button class="notif-item__action notif-item__action--reject" type="button" data-ch-decline="${escapeHtml(notif.payload?.challengeId || notif.id)}">Decline</button>
+      </div>
+    ` : ""}
   `;
 
   if (isFriendRequest) {
@@ -73,6 +128,23 @@ function renderNotificationItem(notif, onAccept, onReject) {
       btn.disabled = true;
       btn.closest(".notif-item__actions").querySelector("[data-fr-accept]").disabled = true;
       await onReject(btn.dataset.frReject, li);
+    });
+  }
+
+  if (isChallenge) {
+    li.querySelector("[data-ch-accept]")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const challengeId = btn.dataset.chAccept;
+      const slug = btn.dataset.chSlug;
+      btn.disabled = true;
+      btn.closest(".notif-item__actions").querySelector("[data-ch-decline]").disabled = true;
+      await onChallengeAccept(challengeId, slug, li);
+    });
+    li.querySelector("[data-ch-decline]")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.closest(".notif-item__actions").querySelector("[data-ch-accept]").disabled = true;
+      await onChallengeDecline(btn.dataset.chDecline, li);
     });
   }
 
@@ -156,6 +228,28 @@ export async function initNotificationBell(containerEl, playerId) {
             itemEl.querySelector(".notif-item__actions")?.remove();
             const p = itemEl.querySelector(".notif-item__text");
             if (p) p.innerHTML = p.innerHTML.replace("sent you a friend request", "friend request declined");
+          }
+        },
+        async (challengeId, gameSlug, itemEl) => {
+          const ok = await api.acceptChallenge(challengeId);
+          itemEl.querySelector(".notif-item__actions")?.remove();
+          const p = itemEl.querySelector(".notif-item__text");
+          if (ok && gameSlug) {
+            if (p) {
+              const gameHref = buildGameHref(gameSlug);
+              p.innerHTML = `${p.innerHTML} <a class="notif-item__game-link" href="${escapeHtml(gameHref)}">Play Now →</a>`;
+            }
+            globalThis.location?.assign(buildGameHref(gameSlug));
+          } else if (p) {
+            p.textContent = p.textContent + " (could not accept)";
+          }
+        },
+        async (challengeId, itemEl) => {
+          const ok = await api.declineChallenge(challengeId);
+          if (ok) {
+            itemEl.querySelector(".notif-item__actions")?.remove();
+            const p = itemEl.querySelector(".notif-item__text");
+            if (p) p.innerHTML = p.innerHTML.replace("challenged you to", "challenge from").replace("! 🎮", " declined");
           }
         },
       );

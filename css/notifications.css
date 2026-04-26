@@ -205,3 +205,17 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.notif-item__game-link {
+  display: inline-block;
+  margin-left: 4px;
+  color: #00ff88;
+  font-size: 0.72rem;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.notif-item__game-link:hover {
+  text-decoration: underline;
+  opacity: 1;
+}

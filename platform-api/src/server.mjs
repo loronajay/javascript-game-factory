@@ -45,6 +45,12 @@ import {
   acceptFriendRequest,
   rejectFriendRequest,
 } from "./db/friend-requests.mjs";
+import {
+  createChallenge,
+  getChallenge,
+  acceptChallenge,
+  declineChallenge,
+} from "./db/challenges.mjs";
 
 const { Pool } = pg;
 
@@ -125,6 +131,10 @@ async function bootstrap() {
     getFriendRequest: (id) => getFriendRequest(pool, id),
     acceptFriendRequest: (id) => acceptFriendRequest(pool, id),
     rejectFriendRequest: (id) => rejectFriendRequest(pool, id),
+    createChallenge: (params) => createChallenge(pool, params),
+    getChallenge: (id) => getChallenge(pool, id),
+    acceptChallenge: (id) => acceptChallenge(pool, id),
+    declineChallenge: (id) => declineChallenge(pool, id),
   });
   const server = createServer(app);
 

@@ -195,6 +195,51 @@ function renderHeroCard(container, model) {
     `
     : "";
 
+  const challengePickerHtml = model.gestureAction?.challengePickerOpen
+    ? `
+      <div class="player-hero-card__challenge-picker">
+        <p class="player-hero-card__challenge-picker-label">Choose a game to challenge them to:</p>
+        <div class="player-hero-card__challenge-games">
+          ${(model.gestureAction.challengeableGames || []).map((g) => `
+            <button
+              class="player-hero-card__challenge-game-btn"
+              type="button"
+              data-challenge-game="${escapeHtml(g.slug)}"
+              data-challenge-game-title="${escapeHtml(g.title)}"
+              data-challenge-target="${escapeHtml(model.gestureAction.playerId || "")}"
+            >${escapeHtml(g.title)}</button>
+          `).join("")}
+        </div>
+        <button class="player-hero-card__challenge-cancel" type="button" data-challenge-picker-cancel>Cancel</button>
+      </div>
+    `
+    : "";
+
+  const gestureActionHtml = model.gestureAction?.enabled
+    ? `
+      <div class="player-hero-card__gesture-rail">
+        <p class="player-hero-card__gesture-label">Send a gesture</p>
+        <div class="player-hero-card__gesture-buttons">
+          ${(model.gestureAction.gestures || []).map((g) => `
+            <button
+              class="player-hero-card__gesture-btn"
+              type="button"
+              data-gesture="${escapeHtml(g.type)}"
+              data-gesture-target="${escapeHtml(model.gestureAction.playerId || "")}"
+            >${escapeHtml(g.label)}</button>
+          `).join("")}
+          <button
+            class="player-hero-card__gesture-btn player-hero-card__gesture-btn--challenge${model.gestureAction.challengePickerOpen ? " player-hero-card__gesture-btn--active" : ""}"
+            type="button"
+            data-gesture-challenge="${escapeHtml(model.gestureAction.playerId || "")}"
+          >Challenge 🎮</button>
+        </div>
+        ${challengePickerHtml}
+        <p class="player-hero-card__gesture-flash" aria-live="polite">${escapeHtml(model.gestureAction.flashMessage || "")}</p>
+      </div>
+    `
+    : "";
+
   container.innerHTML = `
     <div class="player-hero-card__backdrop" aria-hidden="true"></div>
     <section class="player-hero-card__portrait-panel">
@@ -243,6 +288,7 @@ function renderHeroCard(container, model) {
         </div>
       </div>
       ${friendActionHtml}
+      ${gestureActionHtml}
     </section>
     <section class="player-hero-card__rankings-panel">
       <div class="player-hero-card__section-topline">

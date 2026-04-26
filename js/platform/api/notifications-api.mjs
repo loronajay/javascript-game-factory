@@ -69,5 +69,48 @@ export function createNotificationsApiClient(options = {}) {
       );
       return payload?.ok === true;
     },
+
+    async sendChallenge(toPlayerId, gameSlug, gameTitle, fromDisplayName = "") {
+      const payload = await requestJson(
+        fetchImpl,
+        baseUrl,
+        "/challenges",
+        buildJsonOptions("POST", { toPlayerId, gameSlug, gameTitle, fromDisplayName }),
+      );
+      return payload?.challenge || null;
+    },
+
+    async acceptChallenge(challengeId) {
+      const encoded = encodeURIComponent(challengeId);
+      const payload = await requestJson(
+        fetchImpl,
+        baseUrl,
+        `/challenges/${encoded}/accept`,
+        buildJsonOptions("POST", {}),
+      );
+      return payload?.ok === true;
+    },
+
+    async declineChallenge(challengeId) {
+      const encoded = encodeURIComponent(challengeId);
+      const payload = await requestJson(
+        fetchImpl,
+        baseUrl,
+        `/challenges/${encoded}/decline`,
+        buildJsonOptions("POST", {}),
+      );
+      return payload?.ok === true;
+    },
+
+    async sendGesture(toPlayerId, gestureType, fromDisplayName = "") {
+      const encoded = encodeURIComponent(toPlayerId);
+      const payload = await requestJson(
+        fetchImpl,
+        baseUrl,
+        `/players/${encoded}/gesture`,
+        buildJsonOptions("POST", { gestureType, fromDisplayName }),
+      );
+      return payload?.ok === true;
+    },
   };
 }

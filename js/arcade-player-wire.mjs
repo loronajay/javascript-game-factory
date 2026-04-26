@@ -19,6 +19,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
   let openReactionThoughtId = "";
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
   let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+  let challengePickerOpen = false;
 
   const authSessionPlayerId = authSession?.playerId || "";
 
@@ -129,6 +130,84 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
   });
 
   doc.addEventListener("click", async (event) => {
+    const challengePickerToggle = event.target.closest("[data-gesture-challenge]");
+    if (challengePickerToggle) {
+      if (!authSession?.playerId) return;
+      challengePickerOpen = !challengePickerOpen;
+      renderPage(doc, {
+        ...(currentPageData || {}),
+        authSessionPlayerId,
+        challengePickerOpen,
+        disableProfileViewTracking: true,
+        sharePanelState,
+        commentPanelState,
+      });
+      return;
+    }
+
+    const challengePickerCancel = event.target.closest("[data-challenge-picker-cancel]");
+    if (challengePickerCancel) {
+      challengePickerOpen = false;
+      renderPage(doc, {
+        ...(currentPageData || {}),
+        authSessionPlayerId,
+        challengePickerOpen,
+        disableProfileViewTracking: true,
+        sharePanelState,
+        commentPanelState,
+      });
+      return;
+    }
+
+    const challengeGameBtn = event.target.closest("[data-challenge-game]");
+    if (challengeGameBtn) {
+      const gameSlug = challengeGameBtn.dataset.challengeGame;
+      const gameTitle = challengeGameBtn.dataset.challengeGameTitle || gameSlug;
+      const targetPlayerId = challengeGameBtn.dataset.challengeTarget;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!gameSlug || !targetPlayerId || !authSession?.playerId) return;
+      challengeGameBtn.disabled = true;
+      const notifApi = createNotificationsApiClient();
+      const challenge = await notifApi.sendChallenge(
+        targetPlayerId,
+        gameSlug,
+        gameTitle,
+        currentProfile.profileName || "UNNAMED PILOT",
+      );
+      challengePickerOpen = false;
+      renderPage(doc, {
+        ...(currentPageData || {}),
+        authSessionPlayerId,
+        challengePickerOpen,
+        gestureFlash: challenge ? `${gameTitle} challenge sent!` : "Could not send challenge — please try again.",
+        disableProfileViewTracking: true,
+        sharePanelState,
+        commentPanelState,
+      });
+      return;
+    }
+
+    const gestureButton = event.target.closest("[data-gesture]");
+    if (gestureButton) {
+      const gestureType = gestureButton.dataset.gesture;
+      const targetPlayerId = gestureButton.dataset.gestureTarget;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!gestureType || !targetPlayerId || !authSession?.playerId) return;
+      gestureButton.disabled = true;
+      const notifApi = createNotificationsApiClient();
+      const ok = await notifApi.sendGesture(targetPlayerId, gestureType, currentProfile.profileName || "UNNAMED PILOT");
+      gestureButton.disabled = false;
+      renderPage(doc, {
+        ...(currentPageData || {}),
+        authSessionPlayerId,
+        gestureFlash: ok ? "Gesture sent!" : "Could not send gesture — please try again.",
+        disableProfileViewTracking: true,
+        sharePanelState,
+        commentPanelState,
+      });
+      return;
+    }
+
     const addFriendButton = event.target.closest("[data-add-friend]");
     if (addFriendButton) {
       const targetPlayerId = addFriendButton.dataset.addFriend;
@@ -149,6 +228,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         profilePanel?.render?.("");
         renderPage(doc, {
           ...(currentPageData || {}),
+          authSessionPlayerId,
           relationshipFlash: request ? "Friend request sent." : "Could not send request — please try again.",
           disableProfileViewTracking: true,
           sharePanelState,

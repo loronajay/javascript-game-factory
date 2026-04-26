@@ -94,6 +94,38 @@ function buildThoughtBackedProfile(thoughtFeed = [], requestedPlayerId = "") {
   };
 }
 
+const GESTURE_DEFINITIONS = Object.freeze([
+  { type: "poke", label: "Poke 👈" },
+  { type: "hug", label: "Hug 🤗" },
+  { type: "kick", label: "Kick 👟" },
+  { type: "blowkiss", label: "Blow Kiss 💋" },
+  { type: "nudge", label: "Nudge 👇" },
+]);
+
+const CHALLENGEABLE_GAMES = Object.freeze([
+  { slug: "lovers-lost", title: "Lovers Lost" },
+  { slug: "battleshits", title: "Battleshits" },
+]);
+
+function buildGestureAction(viewerPlayerId, targetPlayerId, isOwnerView, authSessionPlayerId, flashMessage = "", challengePickerOpen = false) {
+  const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
+  const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
+  const normalizedAuthPlayerId = sanitizePlayerId(authSessionPlayerId);
+  const canRender = !isOwnerView
+    && !!normalizedAuthPlayerId
+    && !!normalizedTargetPlayerId
+    && normalizedAuthPlayerId !== normalizedTargetPlayerId;
+
+  return {
+    enabled: canRender,
+    playerId: normalizedTargetPlayerId,
+    gestures: GESTURE_DEFINITIONS,
+    challengeableGames: CHALLENGEABLE_GAMES,
+    challengePickerOpen: canRender && !!challengePickerOpen,
+    flashMessage: typeof flashMessage === "string" ? flashMessage : "",
+  };
+}
+
 function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "") {
   const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
   const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
@@ -330,6 +362,14 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     isOwnerView,
     options?.relationshipFlash || "",
   );
+  const gestureAction = buildGestureAction(
+    options?.viewerPlayerId,
+    publicView.playerId || requestedPlayerId,
+    isOwnerView,
+    options?.authSessionPlayerId || "",
+    options?.gestureFlash || "",
+    options?.challengePickerOpen || false,
+  );
 
   return {
     state: "ready",
@@ -369,6 +409,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
       flashMessage: typeof options?.thoughtComposerFlash === "string" ? options.thoughtComposerFlash : "",
     },
     friendAction,
+    gestureAction,
     aboutText: heroBio,
     badgeItems,
   };
@@ -414,6 +455,9 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
     viewerRelationshipsRecord,
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
     relationshipFlash: options?.relationshipFlash || "",
+    authSessionPlayerId: options?.authSessionPlayerId || "",
+    gestureFlash: options?.gestureFlash || "",
+    challengePickerOpen: options?.challengePickerOpen || false,
   });
 
   renderPlayerPageView(doc, model, options);

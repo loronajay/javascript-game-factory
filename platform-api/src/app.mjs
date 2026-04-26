@@ -59,6 +59,8 @@ function buildTimestamp(now) {
   return new Date().toISOString();
 }
 
+const VALID_GESTURE_TYPES = new Set(["poke", "hug", "kick", "blowkiss", "nudge"]);
+
 function isValidEmail(value) {
   if (typeof value !== "string") return false;
   const trimmed = value.trim();
@@ -162,6 +164,18 @@ export function createApp(options = {}) {
   const rejectFriendRequest = typeof options?.rejectFriendRequest === "function"
     ? options.rejectFriendRequest
     : async () => null;
+  const createChallenge = typeof options?.createChallenge === "function"
+    ? options.createChallenge
+    : async () => null;
+  const getChallenge = typeof options?.getChallenge === "function"
+    ? options.getChallenge
+    : async () => null;
+  const acceptChallenge = typeof options?.acceptChallenge === "function"
+    ? options.acceptChallenge
+    : async () => null;
+  const declineChallenge = typeof options?.declineChallenge === "function"
+    ? options.declineChallenge
+    : async () => null;
   const registerAccount = typeof options?.registerAccount === "function"
     ? options.registerAccount
     : async () => ({ error: "not_configured" });
@@ -197,7 +211,9 @@ export function createApp(options = {}) {
     const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
     const playerFriendMatch = pathname.match(/^\/players\/([^/]+)\/friends\/([^/]+)$/);
+    const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
     const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
+    const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);
 
     if (method === "OPTIONS") {
       res.statusCode = 204;
@@ -890,6 +906,139 @@ export function createApp(options = {}) {
         }
         writeJson(res, 200, { ok: true, request: rejected }, requestOrigin);
       }
+      return;
+    }
+
+    // Challenge routes (auth required)
+    const VALID_GAME_SLUGS = new Set(["lovers-lost", "battleshits"]);
+    if (method === "POST" && pathname === "/challenges") {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+      const { toPlayerId, gameSlug, gameTitle, fromDisplayName } = body.value || {};
+      const fromPlayerId = authClaims.playerId;
+      if (!toPlayerId || toPlayerId === fromPlayerId) {
+        writeJson(res, 400, { status: "error", error: "invalid_target", timestamp }, requestOrigin);
+        return;
+      }
+      if (!gameSlug || !VALID_GAME_SLUGS.has(gameSlug)) {
+        writeJson(res, 400, { status: "error", error: "invalid_game", timestamp }, requestOrigin);
+        return;
+      }
+      const actorProfile = await loadPlayerProfile(fromPlayerId).catch(() => null);
+      const actorDisplayName = actorProfile?.profileName || String(fromDisplayName || "");
+      const challenge = await createChallenge({
+        fromPlayerId,
+        toPlayerId,
+        fromDisplayName: actorDisplayName,
+        gameSlug,
+        gameTitle: String(gameTitle || gameSlug),
+      });
+      if (!challenge) {
+        writeJson(res, 500, { status: "error", error: "create_failed", timestamp }, requestOrigin);
+        return;
+      }
+      void createNotification({
+        recipientPlayerId: toPlayerId,
+        actorPlayerId: fromPlayerId,
+        actorDisplayName,
+        type: "player_challenge",
+        payload: { challengeId: challenge.id, gameSlug, gameTitle: String(gameTitle || gameSlug) },
+      });
+      writeJson(res, 201, { challenge }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && challengeActionMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const challengeId = decodeURIComponent(challengeActionMatch[1]);
+      const action = challengeActionMatch[2];
+      const challenge = await getChallenge(challengeId);
+      if (!challenge) {
+        writeJson(res, 404, { status: "error", error: "challenge_not_found", timestamp }, requestOrigin);
+        return;
+      }
+      if (challenge.toPlayerId !== authClaims.playerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+      if (action === "accept") {
+        const accepted = await acceptChallenge(challengeId);
+        if (!accepted) {
+          writeJson(res, 409, { status: "error", error: "challenge_not_pending", timestamp }, requestOrigin);
+          return;
+        }
+        const acceptorProfile = await loadPlayerProfile(authClaims.playerId).catch(() => null);
+        const acceptorName = acceptorProfile?.profileName || "A player";
+        void createNotification({
+          recipientPlayerId: accepted.fromPlayerId,
+          actorPlayerId: authClaims.playerId,
+          actorDisplayName: acceptorName,
+          type: "challenge_accepted",
+          payload: { challengeId, gameSlug: accepted.gameSlug, gameTitle: accepted.gameTitle },
+        });
+        writeJson(res, 200, { ok: true, challenge: accepted }, requestOrigin);
+      } else {
+        const declined = await declineChallenge(challengeId);
+        if (!declined) {
+          writeJson(res, 409, { status: "error", error: "challenge_not_pending", timestamp }, requestOrigin);
+          return;
+        }
+        const declinerProfile = await loadPlayerProfile(authClaims.playerId).catch(() => null);
+        const declinerName = declinerProfile?.profileName || "A player";
+        void createNotification({
+          recipientPlayerId: declined.fromPlayerId,
+          actorPlayerId: authClaims.playerId,
+          actorDisplayName: declinerName,
+          type: "challenge_declined",
+          payload: { challengeId, gameSlug: declined.gameSlug, gameTitle: declined.gameTitle },
+        });
+        writeJson(res, 200, { ok: true, challenge: declined }, requestOrigin);
+      }
+      return;
+    }
+
+    // Gesture routes (auth required)
+    if (method === "POST" && playerGestureMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const toPlayerId = decodeURIComponent(playerGestureMatch[1]);
+      const actorPlayerId = authClaims.playerId;
+      if (toPlayerId === actorPlayerId) {
+        writeJson(res, 400, { status: "error", error: "invalid_target", timestamp }, requestOrigin);
+        return;
+      }
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+      const gestureType = String(body.value?.gestureType || "").toLowerCase();
+      if (!VALID_GESTURE_TYPES.has(gestureType)) {
+        writeJson(res, 400, { status: "error", error: "invalid_gesture_type", timestamp }, requestOrigin);
+        return;
+      }
+      const actorProfile = await loadPlayerProfile(actorPlayerId).catch(() => null);
+      const actorDisplayName = actorProfile?.profileName || String(body.value?.fromDisplayName || "");
+      void createNotification({
+        recipientPlayerId: toPlayerId,
+        actorPlayerId,
+        actorDisplayName,
+        type: "player_gesture",
+        payload: { gestureType },
+      });
+      writeJson(res, 200, { ok: true }, requestOrigin);
       return;
     }
 
