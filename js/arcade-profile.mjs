@@ -30,6 +30,16 @@ const RELATIONSHIP_MODE_OPTIONS = [
   { value: "auto", label: "Automatic" },
   { value: "manual", label: "Manual" },
 ];
+export const PROFILE_UPDATED_EVENT = "arcade-profile:updated";
+
+function dispatchProfileUpdatedEvent(doc, action, profile) {
+  if (!doc?.dispatchEvent) return;
+  const detail = { action, profile };
+  const event = typeof globalThis.CustomEvent === "function"
+    ? new globalThis.CustomEvent(PROFILE_UPDATED_EVENT, { detail })
+    : { type: PROFILE_UPDATED_EVENT, detail };
+  doc.dispatchEvent(event);
+}
 
 function createEmptyLinkRow(index) {
   return {
@@ -582,7 +592,7 @@ export function initArcadeProfilePanel({
   closeButton?.addEventListener("click", closePanel);
 
   clearButton?.addEventListener("click", async () => {
-    await persistArcadeProfileDetails(storage, {
+    const clearedProfile = await persistArcadeProfileDetails(storage, {
       profileName: "",
       realName: "",
       bio: "",
@@ -601,6 +611,7 @@ export function initArcadeProfilePanel({
     pendingAvatarUrl = "";
     setAvatarStatus("");
     render("PLAYER CARD CLEARED");
+    dispatchProfileUpdatedEvent(doc, "cleared", clearedProfile);
   });
 
   form.addEventListener("submit", async (event) => {
@@ -624,7 +635,7 @@ export function initArcadeProfilePanel({
     } else if (currentProfile.avatarAssetId) {
       patch.avatarAssetId = currentProfile.avatarAssetId;
     }
-    await persistArcadeProfileDetails(storage, patch, {
+    const savedProfile = await persistArcadeProfileDetails(storage, patch, {
       ...options,
       apiClient,
     });
@@ -633,6 +644,7 @@ export function initArcadeProfilePanel({
     setAvatarStatus("");
     render("PLAYER CARD SAVED");
     closePanel();
+    dispatchProfileUpdatedEvent(doc, "saved", savedProfile);
   });
 
   mainSqueezeModeInput?.addEventListener("change", syncRelationshipInputState);

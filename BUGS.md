@@ -1,3 +1,9 @@
 # Bugs
 
-## Photo not uploading, said that it uploaded and to save to set profile picture, nothing actually changed. also photo upload on page not working either. First screenshot is after i uploaded photo, it said confirmed, save your profile, I saved, refreshed the page and went back to the editor to find this. third screenshot is the result of me trying to use the upload photo button on the page. Tried to upload a photo on thought, filled out all fields and chose a photo, everything looked green then i posted it and got screenshot number 4 as a result: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 143604.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 143617.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 143706.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 144043.png"
+## Same issue as before with profile picture not updating: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 150001.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 150009.png"
+
+## Same issue as before with using page "upload photo" feature: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 150045.png"
+
+## Same issue as before with trying to upload a photo with a thought: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 150137.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 150147.png"
+
+## Console log from page after trying some of these: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 150443.png"

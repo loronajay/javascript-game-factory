@@ -1,4 +1,4 @@
-import { hydrateArcadeProfileFromApi } from "./arcade-profile.mjs";
+import { hydrateArcadeProfileFromApi, PROFILE_UPDATED_EVENT } from "./arcade-profile.mjs";
 import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
   loadProfileMetricsRecord,
@@ -228,14 +228,9 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     window.location.href = "../index.html";
   });
 
-  doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
+  doc.addEventListener(PROFILE_UPDATED_EVENT, () => {
     cachedHydration = null;
-    queueMicrotask(() => { void rerender(); });
-  });
-
-  doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
-    cachedHydration = null;
-    queueMicrotask(() => { void rerender(); });
+    void rerender();
   });
 
   doc.addEventListener("submit", async (event) => {

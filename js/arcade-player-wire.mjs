@@ -1,3 +1,4 @@
+import { PROFILE_UPDATED_EVENT } from "./arcade-profile.mjs";
 import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { syncThoughtPostCountWithApi } from "./platform/metrics/metrics.mjs";
 import { createFriendshipBetweenPlayers, loadProfileRelationshipsRecord, removeFriendBetweenPlayers } from "./platform/relationships/relationships.mjs";
@@ -176,12 +177,8 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     if (targetId) void loadGallery(targetId).then(() => rerender("", true));
   });
 
-  doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
-    queueMicrotask(() => { void rerender(); });
-  });
-
-  doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
-    queueMicrotask(() => { void rerender(); });
+  doc.addEventListener(PROFILE_UPDATED_EVENT, () => {
+    void rerender();
   });
 
   doc.addEventListener("submit", async (event) => {
