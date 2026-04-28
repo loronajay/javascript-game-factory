@@ -2,7 +2,6 @@ import { createMessagesApiClient } from "./platform/api/messages-api.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { initSessionNav } from "./arcade-session-nav.mjs";
-import { initNotificationBell } from "./arcade-notifications.mjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -93,8 +92,6 @@ async function run() {
     if (newBtnEl) newBtnEl.hidden = true;
     return;
   }
-
-  if (navEl) initNotificationBell(navEl, authSession.playerId);
 
   const conversations = await api.listConversations();
   if (conversations === null) {

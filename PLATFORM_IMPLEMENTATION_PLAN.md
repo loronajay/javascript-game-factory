@@ -19,27 +19,27 @@ The platform is evolving from a game launcher into a multi-page arcade site with
 - favorite-game pinning
 - friends activity
 - a shared thoughts feed for user-authored status updates and repostable bulletin-style posts
-- eventual direct / private messaging
+- direct / private messaging
 - friend / affinity metrics
 - badge and reputation surfaces
 - eventual media upload
 - profile music: a player-assigned audio track that autoplays on profile page load, in the Myspace tradition
 - player gestures: lightweight expressive social interactions triggered from a player's public profile — Poke, Hug, Kick, Blow Kiss, Nudge, and Challenge to Game; each gesture generates a notification for the recipient
-- notification shell: a platform-owned notification bell and inbox that collects received gestures and later other social signals such as reactions, friend requests, and event invites
+- notification shell: a platform-owned notification bell and inbox that collects received gestures and other social signals such as reactions, friend requests, and event invites
 - doomscroll: a dedicated personalized home feed page showing thoughts from friends and groups the player has joined, with support for inline YouTube/video embedding via iframes — the primary high-engagement social surface of the platform
 - groups: Facebook-style community spaces any player can create, join, or be invited to; thoughts posted inside a group surface in members' doomscroll feed alongside friend posts
 
 Important terminology note:
 
-- `Bulletins` can continue to mean the current platform-owned announcement / noticeboard surface.
-- We also want a separate user-authored bulletin style: short status updates in a scrollable home feed, closer to old Myspace bulletins or Facebook status posts.
-- That future social surface should support feed-style interaction patterns such as comments, sharing/reposting, emoji-style reactions with visible totals, and profile-linked authorship once the platform is ready for heavier social features.
+- `Bulletins` means the current platform-owned announcement / noticeboard surface.
+- `Thoughts` is the user-authored status-update feed with doomscroll/home-feed behavior.
+- These are distinct product surfaces and must not collapse into each other.
 
 Product framing note:
 
 - Treat this project as a Facebook/Myspace-style social-media platform built around arcade identity and games, not as a generic launcher with a few profile extras.
 - Games are a major content pillar, but the long-term product is still a social platform: profiles, feeds, friends, reactions, reposting, personal identity fields, private messaging, and public/self expression all matter as first-class product goals.
-- Explicit sign-up, sign-in, and durable account ownership are part of the destination product, not optional extras. Auto-created local/browser profiles are acceptable scaffolding during early phases, but the platform is not "truly online" until players can intentionally register, own, and return to the same account across devices.
+- Explicit sign-up, sign-in, and durable account ownership are part of the destination product. Auto-created local/browser profiles are acceptable scaffolding during early phases, but the platform is not "truly online" until players can intentionally register, own, and return to the same account across devices.
 
 The platform remains the owner of long-term identity and social state.
 Games remain self-contained experiences that can read platform data and publish approved activity/results, but games must not become the permanent home for profile ownership.
@@ -53,7 +53,7 @@ Games remain self-contained experiences that can read platform data and publish 
   The platform should turn cabinet runs, event appearances, activity items, and status posts into durable memories that can resurface on player pages, profile highlights, and future seasonal-history surfaces instead of leaving meaningful moments trapped inside isolated game sessions.
 - `seasonal programming`
   Bulletins, featured cabinets, event schedules, ladder snapshots, and thought-feed prompts should eventually work together as seasonal programming so the arcade feels like a living scene with recurring beats instead of a static list of pages.
-- connected social loop
+- `connected social loop`
   Thoughts, activity, bulletins, events, and player profiles should eventually feel like parts of one shared social loop, with each surface able to reinforce the others without blurring ownership boundaries.
 
 ## Non-Negotiables
@@ -66,35 +66,20 @@ These rules are here to protect stability.
 2. Read-heavy pages come before write-heavy pages.
    We should ship stable display pages before adding many forms, mutations, uploads, or cross-user interactions.
 
-3. Local-first before backend.
-   We can prototype page structure and data contracts locally, but we should not fake a full social backend in scattered page code.
-
-4. Uploads come late.
-   Photo/avatar upload should wait until auth, storage, file validation, moderation rules, and failure handling are defined.
-
-5. Every shared rule lives in shared modules.
+3. Every shared rule lives in shared modules.
    No page should invent its own idea of what a profile, bulletin, activity item, or post looks like.
 
-6. Games publish through a contract.
+4. Games publish through a contract.
    Games may emit platform-recognized results and activity events, but only through a shared interface owned by the platform.
 
-7. Stability beats cleverness.
+5. Stability beats cleverness.
    Prefer simple modules, plain HTML pages, query-param routing where needed, and explicit tests over premature abstraction.
 
-## Current Foundation
+6. Uploads come late.
+   Photo/avatar upload should wait until auth, storage, file validation, moderation rules, and failure handling are defined.
 
-The repo already has the start of a platform layer:
-
-- `index.html` and `grid.html` establish the arcade shell.
-- `js/arcade-catalog.mjs` owns game listing and launcher metadata loading.
-- `js/platform/identity/factory-profile.mjs` defines canonical shared identity storage.
-- `js/platform/identity/match-identity.mjs` separates permanent identity from temporary per-match aliases.
-- `js/arcade-profile.mjs` already gives us a shell-level profile editor.
-- `js/platform/profile/`, `js/platform/activity/`, `js/platform/thoughts/`, `js/platform/bulletins/`, and `js/platform/events/` now formalize the first shared platform contracts.
-- owner-authored thought submission on `/me` and owner-view `/player` now exists as a local-first platform capability rather than a future-only note.
-- `games/lovers-lost/` and `games/battleshits/` already consume the shared identity/activity model.
-
-This means the platform does not need to start from zero. It needs to become more deliberate and more formal.
+7. Do not keep piling behavior into monolithic page controllers.
+   For `/me`, `/player`, `/thoughts`, and related platform surfaces, extract loader, view-model, rendering, and action modules before the next major feature pass if those concerns are converging in one file.
 
 ## Architecture Shape
 
@@ -102,112 +87,216 @@ The safest platform structure is four layers.
 
 ### 1. Page Layer
 
-Owns page-specific HTML composition and interaction flow.
-
-Examples:
-
-- home page
-- games page
-- player profile page
-- bulletins page
-- events page
-- activity page
-- thoughts page
-
-This layer should be thin. It renders shared view models and calls shared modules.
+Owns page-specific HTML composition and interaction flow. This layer should be thin — it renders shared view models and calls shared modules.
 
 ### 2. Shared Domain Layer
 
-Owns data shapes, sanitization, normalization, and core platform rules.
-
-Examples:
-
-- player profile normalization
-- link validation
-- bulletin model normalization
-- activity item formatting
-- post visibility rules
-- event metadata shape
-
-This is where stability comes from.
+Owns data shapes, sanitization, normalization, and core platform rules. This is where stability comes from.
 
 ### 3. Storage / Data Source Layer
 
-Owns where data comes from and where it is written.
-
-Early on this will be local storage plus fixture files.
-Later this will expand to backend APIs and media storage.
-
-The page layer should not care whether data came from:
-
-- local storage
-- JSON fixtures
-- mock adapters
-- a real backend
+Owns where data comes from and where it is written. The page layer should not care whether data came from local storage, JSON fixtures, or the backend API. Backend is now source of truth for authenticated users; localStorage is a write-through cache or guest-only fallback.
 
 ### 4. Game Integration Layer
 
-Owns the contract between games and the platform.
-
-Examples:
-
-- reading canonical player identity
-- reading preferences/favorites
-- publishing run results
-- publishing recent activity
-- requesting temporary match aliases
-
-Games should never write directly into random platform storage keys.
+Owns the contract between games and the platform. Games should never write directly into random platform storage keys.
 
 ## Route / Page Plan
 
 Because this repo is plain HTML/CSS/JS, the route plan should stay static-host friendly.
 
-Recommended first-class pages:
+First-class pages:
 
-- `/index.html`
-  Arcade home and entry point.
-- `/grid.html`
-  Game library / cabinet browser.
-- `/me/index.html`
-  Personal dashboard for the signed-in or local current player.
-- `/players/index.html`
-  Deferred discovery surface only if context-driven discovery eventually needs a dedicated index. Do not treat this as an immediate page requirement.
-- `/player/index.html?id=<playerId>`
-  Public player profile page.
-- `/bulletins/index.html`
-  Platform notices and curated announcements.
-- `/events/index.html`
-  Event listing page.
-- `/event/index.html?slug=<eventSlug>`
-  Event detail page.
-- `/activity/index.html`
-  Friends and platform activity.
-- `/thoughts/index.html`
-  Shared thoughts feed for user-authored status updates, social posting, and the eventual doomscroll-style home feed.
-- `/notifications/index.html`
-  Platform notification inbox. Shows received gestures (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge to Game) in the local-first phase; expands to all social signals (reactions, friend requests, event invites) once backend delivery exists.
-- `/doomscroll/index.html`
-  Personalized home feed. Shows thoughts from friends and groups the player has joined. YouTube/video links in posts render as inline iframe embeds. The page shell can be scaffolded locally but real cross-user feed content requires backend persistence. This is the primary high-engagement social surface of the platform.
-- `/groups/index.html`
-  Group discovery and listing. Shows groups the player has joined and allows browsing/searching public groups.
-- `/group/index.html?id=<groupId>`
-  Group detail page. Shows the group feed, member list, and group info. Owner view adds group management controls.
+- `/index.html` — Arcade home and entry point
+- `/grid.html` — Game library / cabinet browser
+- `/me/index.html` — Personal dashboard for the signed-in or local current player
+- `/player/index.html?id=<playerId>` — Public player profile page
+- `/search/index.html` — Player search / discovery
+- `/bulletins/index.html` — Platform notices and curated announcements
+- `/events/index.html` — Event listing page
+- `/event/index.html?slug=<eventSlug>` — Event detail page
+- `/activity/index.html` — Friends and platform activity
+- `/thoughts/index.html` — Shared thoughts feed for user-authored status updates
+- `/notifications/index.html` — Platform notification inbox (all social signals)
+- `/messages/index.html` — Direct message inbox
+- `/messages/conversation/index.html?id=<convId>` — Message thread view
+- `/sign-in/index.html` — Sign-in page
+- `/sign-up/index.html` — Account creation page
+
+Planned future pages:
+
+- `/doomscroll/index.html` — Personalized home feed (friends + group posts). Page shell can be scaffolded locally; real cross-user feed requires backend persistence and group support.
+- `/groups/index.html` — Group discovery and listing
+- `/group/index.html?id=<groupId>` — Group detail, feed, and member management
 
 Notes:
 
-- For now, prefer stable query-param detail pages over pretending we have full dynamic routing.
-- If we later move to a hosting setup that supports clean routes, the page logic can survive the URL change.
+- Prefer stable query-param detail pages over pretending we have full dynamic routing.
+- `/players/index.html` (generic player directory) is not a planned page — discovery stays context-driven.
+
+## Platform Module Map
+
+Shared platform modules live here — read the code for current API shape:
+
+- `js/platform/identity/` — canonical playerId + profileName
+- `js/platform/storage/` — local storage helpers
+- `js/platform/api/` — shared browser API clients (auth, notifications, messages, etc.)
+- `js/platform/profile/` — profile-domain normalization
+- `js/platform/bulletins/` — bulletin contracts
+- `js/platform/events/` — event contracts
+- `js/platform/activity/` — activity publishing/loading
+- `js/platform/thoughts/` — 4-layer split: `thoughts-schema.mjs` (constants), `thoughts-normalize.mjs` (sanitization), `thoughts-store.mjs` (local feed/storage/card rendering), `thoughts-api.mjs` (API sync) — barrel `thoughts.mjs` preserves all import paths
+- `js/platform/relationships/` — relationship normalization, slot resolution, relationship-write APIs
+- `js/platform/metrics/` — canonical metrics split: public/support, relationship/discovery, backend-only analytics
+- `platform-api/` — Node.js backend; Railway Postgres via `DATABASE_URL`; backend is source of truth for authenticated users
+
+## What's Live
+
+The following is the complete current state of the platform.
+
+**Auth and identity:**
+- Sign-up, sign-in, sign-out with 30-day HttpOnly JWT cookie (`arcade_session`)
+- Account creation with `claimPlayerId` to attach existing guest identity to a new account
+- `GET /auth/me`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`
+- `js/arcade-session-nav.mjs` wired into home, grid, and `/me`
+
+**Profiles:**
+- Database-backed profiles, metrics, and relationships via `platform-api/`
+- `GET /players/:id/profile`, `PUT /players/:id/profile`, `GET /players/search?q=...`
+- `/me` and `/player` hydrate through API-aware adapters with local fallback
+- Profile edit covers: profileName, realName, tagline, bio, links, favoriteGameSlug, discoverable, friend-rail slot mode
+- `hasAccount` and `discoverable` ship on every profile API response
+- `/search/index.html` for player discovery by name
+
+**Social graph:**
+- Friend requests: `POST /friend-requests`, accept/reject endpoints, `friend_request` + `friend_accept` notifications
+- Guest viewers fall back to local direct-link path
+- `js/platform/relationships/` owns canonical relationship normalization and slot resolution
+
+**Thoughts and feed:**
+- Thoughts create/delete mirror through backend; emoji reactions, share/repost, and thread comments all live via `platform-api/`
+- `Share` supports immediate repost or caption composer with original attached
+- `Comments` opens a thread panel on `/thoughts`, `/me`, and `/player`
+- Thought social actions generate backend notifications to the thought author (reaction, comment, share)
+
+**Activity:**
+- Game results from `Lovers Lost` and `Battleshits` publish through shared activity contract and mirror to backend
+- `js/platform/activity/` owns the canonical game-to-platform publishing seam
+
+**Notifications:**
+- `notifications` and `friend_requests` Postgres tables (migration 008)
+- Bell + dropdown in session nav on home, grid, `/me`
+- Full-page inbox at `/notifications/index.html`
+- Live notification types: `thought_reaction`, `thought_comment`, `thought_share`, `friend_request`, `friend_accept`, `player_gesture`, `player_challenge`, `challenge_accepted`, `challenge_declined`
+- Inline Accept/Reject for friend requests; inline Accept/Decline for challenges
+
+**Gestures and challenges:**
+- Poke, Hug, Kick, Blow Kiss, Nudge each fire `POST /players/:id/gesture` → `player_gesture` notification
+- Challenge 🎮 opens inline game picker → `POST /challenges` → `player_challenge` notification with Accept/Decline
+- Accept navigates acceptor to the game and notifies challenger; Decline notifies challenger
+- `challenges` table via migration 009
+
+**Direct messaging:**
+- `conversations` + `messages` tables via migration 010
+- `GET /messages`, `GET /messages/with/:playerId`, `POST /messages`, `GET /messages/:convId`, `POST /messages/:convId/read`
+- Inbox at `/messages/index.html`, thread view at `/messages/conversation/index.html`
+- 5-second polling for new messages; Enter-to-send
+- `new_message` bell notification type
+- Message 💬 button on `/player` profiles
+
+**Infrastructure:**
+- CSS split: shared base + per-page CSS (`home.css`, `me.css`, `player.css`, `thoughts.css`, `activity.css`, `bulletins.css`, `events.css`, `event.css`, `messages.css`)
+- `js/platform/thoughts/` 4-layer module split (schema, normalize, store, api)
+- `js/platform/metrics/` canonical metrics split
+
+## Build Queue
+
+Ordered by priority. Do not start the next item until the current one ships cleanly.
+
+### 1. Profile Music
+
+`profileMusic` contract in the profile editor, set/clear form, and a mini `<audio>` player widget that autoplays on profile page load with a visible pause/mute control.
+
+Scope:
+- Add `profileMusic` to the profile editor: one-track set-or-clear form (title, artist, URL, autoplay flag, volume)
+- Store via shared API seam, not raw localStorage
+- Render a persistent mini player widget on `/me` and `/player` when `profileMusic` is set
+- Autoplay on profile load; widget must be immediately visible so visitors can pause or mute
+- Graceful no-op when `profileMusic` is null — no broken widget
+- `embedKind: "url"` only for now; YouTube/SoundCloud embeds belong to a later pass
+
+Not in scope: playlists, YouTube embeds, SoundCloud embeds, multiple tracks.
+
+### 2. Durable Memories
+
+Surface game results, activity, and event participation as intentional memory cards on `/me` and `/player` rather than flat feed lists.
+
+Scope:
+- Define the `memoryCard` display contract: what data, what layout, what kind labels (game result, event appearance, milestone)
+- Pull from existing activity and results payloads — no new data source needed
+- Render as distinct cards or a scrollable memory rail, not as a raw activity dump
+- Owner view (`/me`) and public view (`/player`) both get this surface
+
+Not in scope: a standalone memories page, seasonal recap surfaces, cross-game leaderboard integration.
+
+### 3. Profile Polish
+
+These items are wired but incomplete:
+
+- Ladder placements beyond empty placeholder — at minimum surface top-three finishes from existing activity data
+- Badges beyond empty placeholder — define at least a small set of earnable badge conditions from platform data
+- Avatar frame and 16:9 background matte visual pass — validate fallback behavior once real images exist; ensure the frame contract is stable before uploads arrive
+- Favorite-cabinet card — verify correct rendering for most profiles, not just edge cases
+
+### 4. Seasonal Programming
+
+Make bulletins and events API-driven and content-rotated rather than fully static HTML fixtures.
+
+Scope:
+- Backend routes for admin-authored bulletins and events
+- Frontend reads from API with fixture fallback
+- Enough to rotate seasonal content without a deploy
+
+Not in scope: full CMS, rich editor, image attachments.
+
+### 5. Email / Domain
+
+- Verify `RESEND_FROM_EMAIL` + domain once a custom domain is live
+- Swap from `onboarding@resend.dev` test sender so password reset works for all users, not just the Resend account owner
+
+## Deferred
+
+These are part of the long-term product but are not being built yet.
+
+**Deferred until after profile polish and memories:**
+- Real uploads: avatar/background upload requires auth, storage, file validation, moderation rules, and failure handling — none of which are ready. Display constraints should be stabilized now so later upload work plugs into a stable frame.
+- Profile music richer embeds: YouTube, SoundCloud, playlist support
+
+**Deferred until backend is more settled:**
+- WebSocket real-time message delivery (polling is live and sufficient; push delivery is a later pass)
+- Threaded comments beyond the current flat-comment model
+- Read receipts per message
+- Group messaging
+
+**Deferred until groups are scoped properly:**
+- Group creation, membership management, invitations
+- Group-scoped feeds
+- Doomscroll personalized feed (requires groups + friends feed backend)
+- `/groups/` and `/group/` pages beyond shell scaffolding
+
+**Explicitly not planned:**
+- Generic `/players` discovery directory — discovery stays context-driven
+- Per-game custom social schemas
+- Multi-image galleries
+- Arbitrary file upload
 
 ## Long-Term Player Page Reference
 
-Use the current example profile mockup as a layout and feature-direction reference for the long-term player page.
-It is a placement / information architecture reference, not a mandate to match the exact visual treatment.
+Use the current example profile mockup as a layout and feature-direction reference for the long-term player page. It is a placement / information architecture reference, not a mandate to match the exact visual treatment.
 
 Canonical reference asset:
 
 - `images/mock-page-references/user-profile-page-reference.png`
-- Keep this file as the single in-repo visual reference for the long-term player-page target unless we intentionally replace it with a newer canonical mock.
 
 Target long-term player page sections:
 
@@ -222,71 +311,35 @@ Target long-term player page sections:
 - badges block
 - friends block with a special `main squeeze` slot
 - customizable 16:9 background image behind the page composition
-- profile music: a player-assigned audio track that autoplays on profile page load, just like Myspace song selection
-
-Important behavior notes from the reference:
-
-- The page title must be the player's `profileName`.
-  This is not optional flavor copy. The canonical profile page headline is the player's public display name.
-- The line directly underneath the page title must be the player's editable `tagline`.
-  This is a public-facing identity field, not throwaway helper copy or a dashboard subtitle.
-- The in-profile `Name` field is an optional real-name field.
-  It is separate from the arcade `profileName` / username and should only render player-supplied real-name text when the player chooses to share it.
-- Do not collapse the optional real-name field into the page title.
-  The header title remains `profileName`; the identity-panel `Name` field is a distinct profile field with different meaning.
-- Presence should eventually support at least online, offline, and similar simple states.
-  The green dot in the mockup is the reference for that presence affordance.
-- The status feed area should behave like a constrained scrollable panel rather than forcing the whole page layout to expand infinitely.
-- Favorite games should not be plain text only.
-  They should link back into the arcade grid / cabinet entry once those routes are stable.
-- Favorite game pinning should be player-controlled first.
-  We can track most-played cabinets separately and later offer a `use most played` shortcut, but the platform should not auto-overwrite a player's public favorite game without an explicit player action.
-- Ladder placement should focus on best placements, especially top-three finishes or top-ranked positions per game when available.
-- The `main squeeze` friend slot implies a future best-friend style relationship layer.
-  We are not building that yet, but it should be tracked as a future platform concept.
-- Future friend points should likely derive from shared play behavior, such as time spent playing together or a similar trust / affinity metric.
-  That system needs separate scoping later and should remain platform-owned.
-- Friend rail placement should support either manual or automatic behavior for every visible slot once that system exists.
-  `Main Squeeze` and the four standard friend slots should each be able to respect player curation or platform-owned affinity ordering without forcing one mode as the permanent default.
-- The background image should eventually be a user-uploaded asset standardized to a 16:9 presentation area.
-  Until upload systems exist, use a default background image / fallback treatment.
-- Treat that background as a static profile backdrop rather than a scrolling page layer.
-  The profile content and feed areas should scroll while the background image remains visually fixed behind the composition.
-- Backgrounds should render inside a fixed 16:9 presentation area even when the uploaded image is not 16:9.
-  Preserve the full uploaded image and handle dead space with matte / letterbox treatment rather than forcing destructive auto-cropping.
-- Dead space should default to a simple matte treatment such as black or white, with room for a future player-controlled matte color option.
-- The avatar / profile-picture area should also obey shared presentation constraints.
-  Standardize portrait cropping, sizing, and fallback behavior in platform code before real uploads exist so later media work plugs into a stable frame.
-- Social links should be modeled as a repeatable structured list, not a single freeform text blob.
-  Each link item should normalize its own label, URL, and kind so the page never renders sloppy mixed-format link copy.
-- Profile panel headers should be visually separated from panel content.
-  Use boxed section labels or a similarly explicit treatment so headers such as `Social Links` read as container labels rather than blending into player-authored link labels or other body content.
-- The profile feed should eventually support actual player-authored thought submission from the owner view.
-  Comments, reactions, and sharing belong to the same feed contract, but cross-user behavior should not force backend work into early local-first passes.
-- Empty fields need strong defaults so the page still feels intentional when a player has no links, no rankings, no favorite game, no badges, no posts, no featured friend, or no custom background.
-- The current example image can serve as the default background reference until a proper background-image system is wired.
+- profile music: a player-assigned audio track that autoplays on profile page load
 
 Canonical composition notes:
 
 - Treat `/me` and `/player` as the same public profile composition.
 - The owner view should not become a separate dashboard layout.
 - The owner-specific difference is an owner-only `Edit Profile` button and related editing controls layered onto the same public-facing page.
-- The intended composition from the reference is:
-  left rail for portrait, identity support, rankings, and friends
-  center feature for the favorite game / featured cabinet
-  right rail for the player feed, about block, and badges
-  top header for `profileName` with `tagline` directly underneath
-- New passes should move toward this composition instead of rearranging the same panels into unrelated dashboard layouts.
+- The intended composition from the reference:
+  - left rail for portrait, identity support, rankings, and friends
+  - center feature for the favorite game / featured cabinet
+  - right rail for the player feed, about block, and badges
+  - top header for `profileName` with `tagline` directly underneath
 
-Reference asset note:
+Important behavior notes:
 
-- Yes, keep a single copy of the screenshot in the repo if we want it to remain a durable design reference.
-- It should live as documentation/reference material, not as a shipped gameplay asset.
-- `images/mock-page-references/user-profile-page-reference.png` is now the canonical reference asset for this mockup.
-- We can move it to a docs/reference area later if we decide to separate runtime assets from design references more strictly.
-- Avoid scattering multiple duplicate screenshots through the repo. One canonical reference is enough.
+- The page title must be the player's `profileName`. The canonical profile page headline is the player's public display name.
+- The line directly underneath the page title must be the player's editable `tagline`.
+- The in-profile `Name` field is an optional real-name field, separate from the arcade `profileName`.
+- Presence should eventually support at least online, offline, and similar simple states.
+- Favorite games should not be plain text only — they should link back into the arcade grid.
+- Favorite game pinning should be player-controlled first. Most-played telemetry can offer a suggestion shortcut later but must not silently replace the player's stated favorite.
+- Ladder placement should focus on best placements, especially top-three finishes.
+- Profile background should render as a static backdrop while the profile content scrolls in front.
+- Non-16:9 uploads should be letterboxed or pillarboxed inside a fixed 16:9 frame instead of forcing arbitrary crop rules. Dead space defaults to a simple matte (black or white).
+- Social links should be a repeatable structured list (label, URL, kind), not a single freeform blob.
+- Profile panel headers should be visually separated from panel content — use boxed section labels so headers like `Social Links` read as container labels rather than blending into player-authored content.
+- Empty fields need strong defaults so the page still feels intentional when a player has no links, no rankings, no favorite game, no badges, no posts, or no custom background.
 
-Suggested field-length constraints for future profile systems:
+Suggested field-length constraints:
 
 - `profileName`: 24 characters max
 - `realName`: 48 characters max
@@ -294,24 +347,13 @@ Suggested field-length constraints for future profile systems:
 - `bio` / `aboutMe`: 280 characters max
 - social link label: 24 characters max
 - social link URL: 280 characters max
-- status-post title / subject if used: 80 characters max
-- status-post body for the profile feed preview: 500 characters max before longer-read handling
-
-Constraint notes:
-
-- These limits are meant to protect layout integrity first, especially in the profile header, friends panel, and scrollable feed cards.
-- We can revise exact numbers later, but the platform should treat character limits as shared contract rules, not page-by-page styling hacks.
-- Empty-state fallback copy should be designed with the same space constraints in mind so blank profiles do not break the composition.
+- status-post body: 500 characters max before longer-read handling
 
 ## Shared Data Objects
 
-These objects should be defined centrally before new pages are built.
+These objects are defined centrally. No page should invent its own version of these shapes.
 
 ### `factoryProfile`
-
-Platform-owned identity and private player state.
-
-Suggested shape:
 
 ```js
 {
@@ -334,10 +376,6 @@ Suggested shape:
 ```
 
 ### `playerProfileView`
-
-Public-facing subset of player profile data.
-
-Suggested shape:
 
 ```js
 {
@@ -362,23 +400,7 @@ Suggested shape:
 }
 ```
 
-Future-facing notes:
-
-- `presence` should stay lightweight at first and only expose simple user-facing states.
-- `favoriteGameSlug` should support linking back to the cabinet entry.
-- `ladderPlacements` should summarize a player's strongest rankings without requiring a full standings page inside the profile itself.
-- `mainSqueeze` is a future social-field concept, not an immediate implementation target.
-- `backgroundImageUrl` should resolve to a normalized 16:9 presentation asset once uploads exist.
-- profile backgrounds should render as static backdrops while the foreground profile composition scrolls independently.
-- non-16:9 uploads should be letterboxed or pillarboxed inside that 16:9 frame instead of forcing arbitrary crop rules.
-- `bio` is the canonical editable about-me field and should not drift into a second duplicated description concept.
-- `links` should support multiple normalized entries and render cleanly whether a player has zero, one, or many links.
-- `favoriteGameSlug` should represent an explicit public pin first, while most-played telemetry remains a separate metric rather than silently replacing the player's stated favorite.
-- `profileMusic` is a player-assigned audio track that autoplays on profile page load. It is `null` when unset and should never autoplay silently without a visible player widget that lets visitors pause or mute.
-
 ### `profileMetrics`
-
-Suggested shape:
 
 ```js
 {
@@ -401,22 +423,13 @@ Suggested shape:
 }
 ```
 
-Notes:
+Canonical metrics split:
 
-- Treat metrics as platform-owned support data, not as page-owned presentation state.
-- `profileViewCount` is the canonical metric behind any future page/profile views UI.
-- `thoughtPostCount` and `activityItemCount` are support metrics that help player pages summarize output without scraping view markup.
-- `receivedReactionCount`, `receivedCommentCount`, and `receivedShareCount` should reflect totals received on the player's authored public content, not raw interaction controls rendered on a single page load.
-- `mostPlayedGameSlug` and `mostPlayedWithPlayerId` should inform future UI and shortcuts without overriding explicit player profile choices.
-- `friendCount` is a first-class support metric even if friend lists later become richer objects.
-- `friendPoints` is the future affinity source for automatic friend ordering and other relationship/discovery surfaces, but visible slot placement can still be manual when the player chooses it.
-- `totalPlaySessionCount`, `totalPlayTimeMinutes`, and `uniqueGamesPlayedCount` summarize arcade participation without turning the shared metrics contract into a full game-stats dump.
-- `eventParticipationCount` matters because events are a first-class platform pillar in the long-term vision.
-- `topThreeFinishCount` is a compact competitive-social summary that reads well on a public profile without dragging cabinet-specific score tables into the shared contract.
+- **public/support** — profileViewCount, thoughtPostCount, activityItemCount, receivedReactionCount, receivedCommentCount, receivedShareCount, mostPlayedGameSlug, mostPlayedWithPlayerId, friendCount, friendPoints, totalPlaySessionCount, totalPlayTimeMinutes, uniqueGamesPlayedCount, eventParticipationCount, topThreeFinishCount
+- **relationship/discovery** — mutualFriendCount, sharedGameCount, sharedSessionCount, sharedEventCount
+- **backend-only analytics** — resultsScreenProfileOpenCount, resultsScreenAddFriendClickCount, chatProfileOpenCount, friendRequestSentCount, friendRequestAcceptedCount, thoughtImpressionCount, profileOpenSourceBreakdown
 
 ### `profileRelationships`
-
-Suggested shape:
 
 ```js
 {
@@ -440,112 +453,37 @@ Suggested shape:
 }
 ```
 
-Relationship-system notes:
-
-- `friendPoints` are platform-derived support data and should never be manually edited.
-  In other words, friendPoints are platform-derived, while visible slot placement can still be manual.
-- visible friend placement is separate from relationship strength
-- `Main Squeeze` can be either manual or automatic
-  Main Squeeze can be either manual or automatic depending on the player's chosen slot behavior.
-- the four standard friend slots can also be either manual or automatic
-- the visible profile rail should always resolve to five total slots: one `Main Squeeze` slot plus four standard friend slots
-- the system should track both affinity and recency
-- affinity signals include friend points plus shared counts
-- recency signals include last played with, recently played with, last shared session, last shared event, and last direct interaction
-
 Friend-points v1:
 
 - creating a friendship: `+100`
-- full shared session: `+10`
-  A qualifying shared session means both players started in the same lobby and reached the same results screen together.
-- shared event as a team / linked entry: `+50`
-  This bonus should only apply when two players enter an event together as a team or explicit linked entry; simply being present in the same broad event should not qualify.
+- full shared session: `+10` (both players started in the same lobby and reached results together)
+- shared event as a team / linked entry: `+50` (must enter as an explicit linked pair; not just co-present)
 - direct social interaction: `+1`
 
-Guardrails:
+Guardrails: apply each bonus once per qualifying event; cap repeated low-value interactions in a short window; no decay in v1.
 
-- apply the friendship bonus only once when the friendship is created
-- award session points only once per full shared session
-- award event points only once per qualifying team/linked event
-- cap repeated low-value interaction gains inside a short window so the system cannot be farmed through spam
-- do not decay points in v1
-- use recency later as a tiebreaker or suggestion signal rather than replacing the main affinity totals
-- Exact storage strategy can change later, but the concepts should stay centralized.
+Visible friend placement is separate from relationship strength. `Main Squeeze` and the four standard friend slots each support either manual or automatic behavior.
 
-Recommended canonical metrics split:
+### `profileMusic`
 
-- public/profile support metrics
-  `profileViewCount`, `thoughtPostCount`, `activityItemCount`, `receivedReactionCount`, `receivedCommentCount`, `receivedShareCount`, `mostPlayedGameSlug`, `mostPlayedWithPlayerId`, `friendCount`, `friendPoints`, `totalPlaySessionCount`, `totalPlayTimeMinutes`, `uniqueGamesPlayedCount`, `eventParticipationCount`, `topThreeFinishCount`
-- relationship/discovery metrics
-  `mutualFriendCount`, `sharedGameCount`, `sharedSessionCount`, `sharedEventCount`
-- backend-only analytics
-  `resultsScreenProfileOpenCount`, `resultsScreenAddFriendClickCount`, `chatProfileOpenCount`, `friendRequestSentCount`, `friendRequestAcceptedCount`, `thoughtImpressionCount`, `profileOpenSourceBreakdown`
+```js
+{
+  trackTitle: "",
+  trackArtist: "",
+  trackUrl: "",
+  embedKind: "url",
+  autoplay: true,
+  volume: 0.7,
+  setAt: ""
+}
+```
 
-Scope rules for this list:
-
-- `favoriteGameSlug` stays explicit and player-authored and must not be replaced by `mostPlayedGameSlug`.
-- the shared public/support metrics contract should remain small, legible, and support-oriented; avoid turning it into a dumping ground for every cabinet-specific stat.
-- relationship/discovery metrics can be canonical without becoming first-wave public profile counters; they exist to support friend surfacing and contextual discovery.
-- backend-only analytics should stay separate from public/shared profile metrics even when they are useful for product decisions.
-- per-game high scores, streaks, and ladder details can exist in game/platform result systems, but they should only be promoted into shared profile metrics if they support multiple surfaces cleanly.
-
-## Profile Page Contract Notes
-
-The long-term player page should be treated as a stable product target with incremental delivery underneath it.
-In practice that means we can ship simpler profile pages now, but each pass should move toward the same eventual composition instead of drifting into disconnected one-off layouts.
-
-Long-term page zones:
-
-- header identity area with display name, tagline, portrait, and presence indicator
-- identity-support area with optional real name, social links, and lightweight profile facts
-- social / links area
-- favorite game feature area with cabinet-entry link behavior
-- rankings area for strongest ladder placements
-- friends area with room for `main squeeze` plus a broader friend list
-- scrollable status-feed area
-- about-me area
-- badges / achievements area
-- background-image treatment behind the page shell
-
-Shared contract expectations:
-
-- text limits should be enforced in shared platform modules, not only in page forms
-- empty fields should render deliberate fallback copy or fallback panels, not collapsed blank boxes
-- layout-critical fields should be normalized before rendering so long names, broken links, and oversized text do not damage the page composition
-- uploaded visual assets should eventually resolve to standardized presentation shapes rather than letting each page crop differently
-- profile background imagery should stay static behind the page composition while profile panels and feed content do the scrolling
-- profile background uploads may use flexible source aspect ratios as long as the displayed profile frame remains a fixed 16:9 area with deliberate dead-space handling
-- the owner-edit surface should cover the profile picture frame, about-me text, favorite game pin, and structured social links instead of scattering those writes through unrelated pages
-- the profile page headline must render the player's `profileName`, not generic page copy such as `Player Page`
-- the public subtitle line under the headline must render the player's editable `tagline`
-- the identity-panel `Name` field must remain a separate optional real-name field rather than echoing `profileName`
-- owner-mode UI must not replace the public profile composition; it only adds owner-only controls such as `Edit Profile`
-- the profile page should be treated as a public social profile first, not as a generic account dashboard
-- the profile page should read like a social-media profile in the Facebook/Myspace family, adapted to the arcade setting
-- redundant helper copy should be removed once the surrounding panel label already communicates the section purpose
-
-Future systems that support this profile vision:
-
-- profile background image upload and moderation flow
-- static profile-background rendering with a fixed 16:9 display contract and flexible source-image aspect ratios
-- lightweight presence states
-- favorites linking back into arcade grid entries
-- per-game ladder summary data
-- friend points / affinity scoring
-- recommended canonical metrics split covering public/support metrics, relationship/discovery metrics, and backend-only analytics
-- user-authored status feed items with comments, sharing, and emoji-style reactions
-- direct / private messaging once authenticated identity and cross-user backend rules exist
-- profile music: a player-assigned audio track with a persistent mini player widget on the profile page, in the Myspace tradition; richer embed kinds (YouTube, SoundCloud) and playlist support belong to the backend phase
-
-Important scoping reminder:
-
-- This profile vision is the destination.
-- We do not need to build every section before the platform is useful.
-- The rule is that new plumbing should make this page easier to realize later, not harder.
+- `embedKind: "url"` means a direct `<audio>` src. YouTube/SoundCloud kinds belong to a later pass.
+- Autoplay must always be paired with a visible mini player widget so visitors can pause or mute immediately.
+- `profileMusic` is `null` when unset. Empty profiles must render gracefully with no broken player widget.
+- Profile editor: one-track set-or-clear form only.
 
 ### `linkItem`
-
-Suggested shape:
 
 ```js
 {
@@ -558,8 +496,6 @@ Suggested shape:
 ```
 
 ### `bulletin`
-
-Suggested shape:
 
 ```js
 {
@@ -576,8 +512,6 @@ Suggested shape:
 ```
 
 ### `eventItem`
-
-Suggested shape:
 
 ```js
 {
@@ -596,8 +530,6 @@ Suggested shape:
 
 ### `activityItem`
 
-Suggested shape:
-
 ```js
 {
   id: "activity-1",
@@ -612,8 +544,6 @@ Suggested shape:
 ```
 
 ### `thoughtPost`
-
-Suggested shape:
 
 ```js
 {
@@ -641,24 +571,13 @@ Suggested shape:
 }
 ```
 
-Notes:
-
-- Treat `thoughtPost` as the first contract for the Myspace/Facebook-style bulletin concept.
-- In other words, announcement bulletins live in the `bulletin` model, while user status-update bulletins live in the feed/post model.
-- Naming can change later, but the product distinction should stay explicit in the shared contracts.
-- `reactionTotals` is the shared contract for emoji-style reactions with visible per-emoji totals.
-- `viewerReaction` is the future field for the current viewer's chosen reaction on a given post.
-- Reaction UI should read like a Facebook-style social feed affordance rather than a generic counter-only metric.
-- `groupId` is empty/null for non-group posts. When set, the post belongs to a group and should surface in that group's feed and in members' doomscroll feed.
-- `attachments` is a list of embedded media items (YouTube links, external links, etc.) attached to the post.
-- `visibility` should eventually support `"public"`, `"friends"`, and `"group"`. Group posts use `"group"` and require `groupId`.
-- The doomscroll feed is a filtered view: friends' posts with `"public"` or `"friends"` visibility, plus `"group"` posts from groups the player has joined.
+- `visibility` supports `"public"`, `"friends"`, and `"group"`. Group posts require `groupId`.
+- `groupId` is empty/null for non-group posts.
+- `reactionTotals` is the contract for emoji-style reactions with visible per-emoji totals.
+- `viewerReaction` is the current viewer's chosen reaction on a given post.
+- `attachments` is a list of embedded media items attached to the post.
 
 ### `thoughtAttachment`
-
-A media item or link attached to a thought post.
-
-Suggested shape:
 
 ```js
 {
@@ -669,21 +588,42 @@ Suggested shape:
 }
 ```
 
-Attachment kinds:
-- `"youtube"` — YouTube video. `embedId` is extracted from the URL and rendered as a native `<iframe>` embed. No custom media player needed.
-- `"link"` — a bare external URL. Renders as a styled link card. Open Graph preview metadata belongs to the backend phase since cross-origin fetching requires a proxy.
-- (future) `"vimeo"` — same iframe embed pattern as YouTube.
+Attachment kinds: `"youtube"` (iframe embed), `"link"` (styled link card). Open Graph preview requires a backend proxy and belongs to a later pass.
 
-Notes:
-- YouTube and Vimeo embeds are handled entirely client-side via native iframes — no custom media player is required.
-- Link preview cards (title + thumbnail from Open Graph) require a backend proxy to fetch cross-origin metadata and belong to a later pass.
-- The post composer should auto-detect YouTube/Vimeo URLs pasted into the body and convert them to attachments rather than leaving them as raw text.
+### `gestureItem`
+
+```js
+{
+  id: "gesture-1",
+  kind: "poke",
+  fromPlayerId: "player-123",
+  toPlayerId: "player-456",
+  createdAt: ""
+}
+```
+
+Supported kinds: `poke`, `hug`, `kick`, `blow-kiss`, `nudge`, `challenge`. `challenge` opens a game picker and creates a `challenges` record rather than sending a bare gesture notification. Treat `kind` as an open enumeration — the list will grow.
+
+### `notificationItem`
+
+```js
+{
+  id: "notif-abc123",
+  recipientPlayerId: "player-456",
+  actorPlayerId: "player-123",
+  actorDisplayName: "Jay",
+  type: "thought_reaction",
+  status: "unread",
+  payload: {},
+  createdAt: ""
+}
+```
+
+Live types: `thought_reaction`, `thought_comment`, `thought_share`, `friend_request`, `friend_accept`, `player_gesture`, `player_challenge`, `challenge_accepted`, `challenge_declined`, `new_message`.
+
+Planned future types: `event_invite`.
 
 ### `group`
-
-A player-created community space. Any player can create a group, join a public group, or be invited by a member.
-
-Suggested shape:
 
 ```js
 {
@@ -701,10 +641,6 @@ Suggested shape:
 
 ### `groupMembership`
 
-Tracks a player's membership in a group.
-
-Suggested shape:
-
 ```js
 {
   groupId: "group-1",
@@ -714,120 +650,11 @@ Suggested shape:
 }
 ```
 
-Roles: `"owner"`, `"member"`. Owner is the player who created the group.
-
-Notes:
-- `visibility` controls discoverability: `"public"` groups can be browsed and joined by anyone; `"private"` groups require an invitation.
-- Group posts are `thoughtPost` records with a `groupId` set and `visibility: "group"`.
-- Group posts from groups a player has joined surface in that player's doomscroll feed alongside friend posts.
-- Group creation, membership management, and group-scoped feeds all require backend persistence and belong to Phase 4.
-- The page shell for `/groups/` and `/group/` can be scaffolded in a local-first pass, but real group data requires backend work.
-
-### `profileMusic`
-
-Suggested shape:
-
-```js
-{
-  trackTitle: "",
-  trackArtist: "",
-  trackUrl: "",
-  embedKind: "url",
-  autoplay: true,
-  volume: 0.7,
-  setAt: ""
-}
-```
-
-Notes:
-
-- `trackUrl` is the canonical source for playback. In the local-first phase this is a direct audio file URL or a publicly embeddable stream link the player supplies manually.
-- `embedKind` describes how the URL should be interpreted. `"url"` means a direct `<audio>` src. Other kinds such as `"youtube"` or `"soundcloud"` belong to the backend phase once embed policy is clear.
-- Autoplay must always be paired with a visible mini music player widget on the profile page so visitors can immediately pause or mute. Silent forced autoplay is not acceptable UX.
-- Volume should be normalized to a range of 0–1 and clamped before storage.
-- `profileMusic` is `null` when the player has not set a track. Empty profiles must render gracefully with no broken player widget.
-- The profile editor should treat `profileMusic` as a simple set-or-clear form: one track at a time, no playlist.
-- Multi-track playlists and richer embed integrations belong to the backend phase.
-
-### `gestureItem`
-
-A player-to-player expressive social interaction triggered from a public profile view.
-
-Supported gesture kinds: `poke`, `hug`, `kick`, `blow-kiss`, `nudge`, `challenge`.
-
-Suggested shape:
-
-```js
-{
-  id: "gesture-1",
-  kind: "poke",
-  fromPlayerId: "player-123",
-  toPlayerId: "player-456",
-  createdAt: ""
-}
-```
-
-Notes:
-
-- `challenge` is a special kind that opens a game picker instead of sending immediately; the selected game creates a `challenges` DB record and a `player_challenge` notification, not a bare gesture notification.
-- Simple gestures (Poke, Hug, Kick, Blow Kiss, Nudge) are one-directional; the recipient gets a notification but does not need to respond.
-- Gestures and challenges are now live through real backend delivery via `POST /players/:id/gesture` and `POST /challenges`; local-first scaffolding is no longer the delivery mechanism.
-- The gesture list is intended to expand with new kinds over time; `kind` should always be treated as an open enumeration, not a closed set.
-- Gestures should never auto-repeat silently; if a sender sends the same kind to the same player within a short window, the UI should acknowledge the repeat rather than silently stacking duplicates.
-
-### `notificationItem`
-
-A platform-owned notification targeting a specific player. This shape is now live in the `notifications` Postgres table.
-
-Canonical shape (live):
-
-```js
-{
-  id: "notif-abc123",
-  recipientPlayerId: "player-456",
-  actorPlayerId: "player-123",
-  actorDisplayName: "Jay",
-  type: "thought_reaction",
-  status: "unread",
-  payload: {
-    thoughtId: "thought-1",
-    reactionId: "like",
-    thoughtText: "Need one more clean goblin pass."
-  },
-  createdAt: ""
-}
-```
-
-Live notification types:
-
-- `thought_reaction` — someone reacted to your thought (payload: `thoughtId`, `reactionId`, `thoughtText`); bell renders the actual emoji, e.g. "Jay ❤️'d your thought"
-- `thought_comment` — someone commented on your thought (payload: `thoughtId`, `commentId`, `commentText`, `thoughtText`)
-- `thought_share` — someone shared your thought (payload: `thoughtId`, `thoughtText`)
-- `friend_request` — someone sent you a friend request (payload: `requestId`); includes inline Accept/Reject buttons
-- `friend_accept` — someone accepted your friend request (payload: `requestId`)
-- `player_gesture` — someone sent you a gesture (payload: `gestureType`); bell renders verb+emoji, e.g. "Jay nudged you 👇"; fired via `POST /players/:id/gesture`
-- `player_challenge` — someone challenged you to a game (payload: `challengeId`, `gameSlug`, `gameTitle`); includes inline Accept/Decline buttons; Accept navigates to the game
-- `challenge_accepted` — someone accepted your game challenge (payload: `challengeId`, `gameSlug`, `gameTitle`)
-- `challenge_declined` — someone declined your game challenge (payload: `challengeId`, `gameSlug`, `gameTitle`)
-
-Planned future types:
-
-- `event_invite` — an event team invitation
-
-Notes:
-
-- Notifications are platform-owned and live in Postgres, not browser localStorage.
-- `status` is `"unread"` or `"read"`; `"unread"` count drives the bell badge.
-- `GET /notifications` requires an authenticated session and returns `{ notifications, unreadCount }`.
-- `POST /notifications/read-all` marks all of the authenticated player's unread notifications as read.
-- The notification bell in the nav shell shows an unread badge; clicking it opens the dropdown and triggers a delayed mark-all-read.
-- The `/notifications/index.html` inbox page is planned as a dedicated full-page surface; the nav bell dropdown is the current entry point.
+Roles: `"owner"`, `"member"`. Group creation and membership management require backend work and belong to the deferred phase.
 
 ### `mediaAsset`
 
-Do not implement uploads yet, but define the future boundary now.
-
-Suggested shape:
+Do not implement uploads yet, but maintain this boundary.
 
 ```js
 {
@@ -856,238 +683,7 @@ These rules should stay true through every phase.
 - Games may read public platform profile data when necessary.
 - Games must not directly mutate profile, friends, feed, bulletin, or upload records.
 
-## Implementation Phases
-
-## Phase 0: Hardening The Foundation
-
-Goal: formalize the platform core before we add pages.
-
-Deliverables:
-
-- define central data shapes and normalization helpers
-- separate platform storage keys by feature area
-- create shared modules for profile, links, bulletins, events, activity, and thoughts
-- create fixture data strategy for non-game pages
-- document the game-to-platform integration contract
-
-Recommended code areas:
-
-- `js/platform/identity/`
-- `js/platform/profile/`
-- `js/platform/bulletins/`
-- `js/platform/events/`
-- `js/platform/activity/`
-- `js/platform/thoughts/`
-- `js/platform/storage/`
-
-Testing expectations:
-
-- unit tests for every normalizer/sanitizer
-- tests for storage adapters
-- tests for fixture loading fallbacks
-
-Exit criteria:
-
-- no new page invents its own data shape
-- shared objects have stable normalizers
-- storage access is no longer ad hoc
-
-## Phase 1: Read-Only Platform Pages
-
-Goal: add stable page structure without heavy mutation risk.
-
-Pages:
-
-- `me` dashboard shell
-- public player profile page
-- bulletins listing
-- events listing and event detail
-- activity page with fixture/mock data
-
-Rules:
-
-- pages may read from local storage and fixture data
-- pages should avoid destructive or multi-user write paths
-- visual structure should be real even if some data is mocked
-
-Testing expectations:
-
-- page smoke tests for required mounts/copy/controls
-- unit tests for page view-model builders
-
-Exit criteria:
-
-- page map exists
-- navigation model is stable
-- shared modules can support multiple pages without duplication
-
-## Phase 2: Safe Personal Editing
-
-Goal: allow the current player to edit platform-owned personal data.
-
-Writes allowed in this phase:
-
-- edit canonical profile name
-- edit optional real name
-- edit bio/tagline
-- add/remove personal links
-- set favorite game / featured cabinet
-- fix profile-picture presentation constraints and fallback behavior without introducing upload
-- set lightweight preferences
-- set or clear profile music track (title, artist, URL, autoplay flag, volume)
-
-Writes not allowed yet:
-
-- cross-user friend requests
-- media upload
-- public comments/replies
-- complex moderation-dependent content
-
-Rules:
-
-- all forms write through shared platform modules
-- page code never writes raw storage payloads directly
-- every editable field has sanitization and normalization tests
-
-Exit criteria:
-
-- `me` becomes the single edit surface for personal platform data
-- other pages read the same shared data cleanly
-
-## Phase 3: Controlled Social Surfaces
-
-Goal: add low-complexity social behavior without requiring the hardest backend work yet.
-
-Features:
-
-- shared thoughts feed
-- recent activity feed
-- game-published activity items
-- simple friends list display
-- owner-authored thought submission on the profile/feed surface
-- profile metrics groundwork for the recommended canonical metrics split across profile support, engagement, play summaries, relationship discovery, and backend analytics boundaries
-- explicit friend-points / auto-sort contract with room for later manual override
-- groundwork for user-authored status posts that can later gain comments, sharing, and emoji-style reactions
-- stronger profile identity fields so player pages feel like social-media profiles rather than launcher-side stat cards
-- UI-contract prep for contextual profile surfacing, especially profile links from results/history surfaces and future add-friend entry points on game results screens
-- player gesture contract (`gestureItem`) and gesture buttons on public profile pages — Poke, Hug, Kick, Blow Kiss, Nudge, and Challenge to Game
-- notification shell groundwork: `notificationItem` contract, platform notification storage key, nav-level notification bell with unread badge, and `/notifications/index.html` inbox page
-- in the local-first phase the notification inbox surfaces received gestures only; the bell and inbox UI should be designed to accept additional notification kinds later without structural change
-
-Guardrails:
-
-- start with append-only or simple replace flows
-- no rich replies/threads yet
-- no private messaging
-- no cross-user mutation without real backend planning
-- in-game chat and lobby surfaces may be scoped visually or contractually, but real cross-user chat behavior belongs to backend transition work
-- comment, reaction, and share UI contracts may be defined early, but true cross-user persistence belongs to backend transition work
-- treat the first thoughts feed pass as the future doomscroll/home-feed surface, not as a replacement for the platform announcement board
-
-Exit criteria:
-
-- platform can display meaningful social surfaces
-- game results can flow into a common activity model
-- page interactions stay simple and testable
-
-## Phase 4: Backend Transition
-
-Goal: move from local-first platform scaffolding to real persistent multi-user data through shared backend adapters rather than page rewrites.
-
-Current status:
-
-- This phase has now started.
-- Railway Postgres is provisioned for the project.
-- `platform-api/` now exists as the first shared backend service scaffold and reads `DATABASE_URL`.
-- Initial migration/sql wiring plus backend record routes for profiles, metrics, relationships, activity items, and thought posts are now part of the active implementation path.
-- The frontend is now in an adapter-first hybrid state: shared API seams are live for profile/feed/activity/metrics reads and mirrors, while local fallback remains in place intentionally for stability.
-- Thought interactions are no longer placeholders: reactions, repost/share records, and comments now have real backend routes and shared frontend adapters, while the page layer still keeps local fallback behavior.
-- Notifications are live: `notifications` + `friend_requests` + `challenges` tables added; bell + dropdown in the session nav; friend requests replace direct friendship creation for authenticated users; thought reactions/comments/shares trigger notifications to the thought author.
-- Player gestures are live: Poke, Hug, Kick, Blow Kiss, and Nudge each fire a `player_gesture` notification via `POST /players/:id/gesture`; gesture rail renders on public `/player` profiles for authenticated viewers.
-- Challenge system is live: Challenge 🎮 button opens an inline game picker (Lovers Lost, Battleshits); selecting a game calls `POST /challenges`, stores a record in the `challenges` table (migration 009), and fires a `player_challenge` notification; recipient gets Accept/Decline buttons in the bell dropdown; Accept navigates to the game and notifies the challenger; Decline notifies the challenger.
-
-This is the trigger point for:
-
-- authentication
-- database-backed profiles
-- friend relationships
-- add-friend entry points on game results screens
-- in-game chat and lobby surfaces that can link to public profiles
-- real shared feed data
-- doomscroll personalized feed (friends posts + group posts in one scroll)
-- group creation, membership, invitations, and group-scoped feeds
-- direct / private messaging ✓ live (polling-based; WebSocket push deferred)
-- cross-user comments, reactions, and shares
-- real cross-user gesture delivery so Poke / Hug / Kick / Blow Kiss / Nudge / Challenge actually arrives in the recipient's inbox instead of staying local
-- backend-pushed notification delivery for all notification kinds (gestures, reactions, friend requests, event invites)
-- persistent profile/page metrics
-- event publishing workflows
-- cross-device state
-
-Preconditions:
-
-- stable front-end data contracts already exist
-- page responsibilities are already separated
-- write flows are already understood locally
-
-Exit criteria:
-
-- backend replaces adapters, not page logic
-- platform pages do not need to be rewritten from scratch
-
-## Phase 5: Media Uploads
-
-Goal: add avatars/photos only after backend and moderation boundaries exist.
-
-Required before implementation:
-
-- authenticated ownership rules
-- supported mime types
-- file size caps
-- image dimension rules
-- fixed 16:9 profile background presentation with matte / dead-space handling for non-16:9 uploads
-- avatar crop / display-shape rules
-- upload failure states
-- asset replacement rules
-- moderation/safety decisions
-
-Exit criteria:
-
-- uploads are a narrow feature built onto stable profile/media contracts
-- upload logic does not leak into unrelated page code
-
-## Things We Should Explicitly Not Build Yet
-
-- real-time WebSocket message delivery (polling is live; push delivery belongs to a later pass)
-- group messaging
-- threaded comments
-- real cross-user notification delivery (local-first gesture/notification UI is in scope; server push belongs to Phase 4)
-- generalized chat
-- multi-image galleries
-- arbitrary file upload
-- per-game custom social schemas
-- backend-dependent UX before backend contracts exist
-- real group creation/membership/feeds (group data shapes and page shells can be defined locally; actual group persistence and member management require Phase 4 backend)
-- doomscroll cross-user feed content (the doomscroll page shell can be scaffolded locally; a real personalized feed of friends and group posts requires backend persistence)
-
-## Navigation Strategy
-
-Navigation should expand gradually instead of all at once.
-
-Recommended progression:
-
-1. keep current home and grid stable
-2. add `Me` and `Bulletins`
-3. add `Events`
-4. add `Activity`
-5. add `Thoughts`
-6. add profile discovery only when it has a clear purpose
-
-This keeps the shell understandable while the platform surface grows.
-
 ## Testing Strategy
-
-Because this repo is already test-oriented, the platform should follow the same discipline.
 
 Required test categories:
 
@@ -1097,158 +693,12 @@ Required test categories:
 - view-model tests
 - game integration contract tests
 
+The highest-value tests for the platform are the ones that prevent schema drift and ownership drift.
+
 Not required:
 
 - pixel-perfect rendering tests
 - full DOM/browser integration for every interaction
-
-The highest-value tests for the platform are the ones that prevent schema drift and ownership drift.
-
-## Suggested Build Order For The Next Few Passes
-
-1. Finish the current profile polish pass so the mock-aligned page stops carrying redundant or sloppy helper copy.
-   This includes things like duplicate profile-picture labeling and other presentation drift inside the shared profile composition.
-2. Separate panel headers from panel content across the shared player profile composition, using boxed section labels or similarly explicit framing so labels like `Social Links` never blend into user-authored content.
-3. Finish stabilizing favorite-cabinet presentation, profile background fallback treatment, and avatar framing so the mock-aligned profile composition feels intentional even before uploads exist.
-4. Define the recommended canonical metrics split for platform-owned support data: public/profile support metrics, relationship/discovery metrics, and backend-only analytics.
-5. Turn future discovery into context-driven discovery through shared games, events, activity, and feed participation instead of shipping a generic empty player directory.
-6. Reserve chat/lobby profile links and add-friend results-screen prompts as the primary future profile-surfacing routes once authenticated online profiles exist.
-7. Shape bulletins, events, featured cabinets, ladder snapshots, and feed prompts into the first pass of seasonal programming.
-8. Use those shared metrics/contracts to support durable memories on player pages and future home-feed/story surfaces without pretending full cross-user persistence already exists.
-9. Keep backend work concentrated inside shared adapters and the new `platform-api/` service instead of leaking ad hoc fetch/storage logic into page code.
-
-## Current Progress
-
-- `js/platform/identity/` is now the source of truth for canonical platform identity.
-- `js/platform/storage/` now owns shared platform storage keys and safe storage access helpers.
-- `js/platform/profile/` now owns shared bio/tagline/link normalization plus public profile-view building.
-- The canonical long-term profile contract now explicitly treats the page title as `profileName`, the subtitle as editable `tagline`, and the owner view as the same public composition plus an `Edit Profile` affordance.
-- `/me/index.html` now exists as the first non-game platform page and reuses the synthwave shell language rather than introducing a separate visual system.
-- `/player/index.html?id=<playerId>` now exists as a public player profile route backed by shared view models and explicit local-cache fallback behavior.
-- `js/platform/bulletins/` now owns shared bulletin normalization plus a fixture-backed public bulletin feed.
-- `/bulletins/index.html` now exists as the first read-only noticeboard surface for platform-owned announcements.
-- The future user-authored "bulletin" concept is now explicitly tracked as part of the `thoughts` / social feed roadmap rather than replacing the current announcement board.
-- `js/platform/events/` now owns shared event normalization, listing helpers, and slug-based event resolution.
-- `/events/index.html` and `/event/index.html?slug=<eventSlug>` now exist as read-only event listing/detail surfaces backed by shared event contracts.
-- `js/platform/activity/` now owns the first shared game-to-platform activity publishing contract plus the shared activity feed storage key.
-- `js/platform/thoughts/` now owns shared status-post normalization plus a fixture/storage-backed public thoughts feed.
-- `/thoughts/index.html` now exists as the first public player-status feed surface for the future social/home-feed layer.
-- `js/platform/profile/` now normalizes richer public profile fields including favorite game, ladder placements, friends preview, main squeeze, presence, badges, and background-image fallback data.
-- `/me/index.html` and `/player/index.html?id=<playerId>` now expose read-only favorite-cabinet, ranking, and friends sections with fallback content instead of only the earlier summary panels.
-- `/me/index.html` and `/player/index.html?id=<playerId>` now embed player-owned thoughts feeds directly into the profile composition instead of leaving that social lane detached from the player page.
-- owner-authored thought submission on `/me` and owner-view `/player` now exists, with new posts written locally into the shared thought-feed contract.
-- owner-view thought cards can now be deleted from `/me` and owner-view `/player`, and those removals propagate cleanly to the shared local-first feed state.
-- the public and profile-embedded thought lanes now use constrained scroll windows so cards stay at full size instead of compressing as the feed grows.
-- `/me` and `/player` now follow the canonical reference composition much more closely with a true left rail, a square featured-cabinet tile that reuses the arcade grid-card shape, and a right-side feed/about/badges lane.
-- The profile identity contract now includes a separate optional `realName` field distinct from the arcade `profileName`, and the current owner edit surface supports editing that field locally.
-- the current owner edit surface now also supports canonical `bio`, structured multi-link editing, bare-domain link normalization, local-first favorite cabinet storage, and manual/automatic visible friend-rail settings.
-- The profile presence affordance now treats the dot beside the in-panel `Name` field as the visible source of truth for online/offline state instead of rendering a redundant status row.
-- The current profile pass has also removed redundant duplicate headers and placeholder labels inside the mock-defined sections so panel titles only read once.
-- The long-term feed contract now explicitly includes emoji-style reactions with visible totals so the thoughts/feed layer does not drift away from the intended Facebook-style interaction model.
-- `games/lovers-lost/` and `games/battleshits/` now publish platform-owned result/activity payloads through that shared activity contract instead of owning their own long-term activity schema.
-- `js/platform/relationships/` now owns canonical relationship normalization, fixed-slot friend-rail resolution, local-first relationship storage, and symmetric write APIs for friendship creation, qualifying shared sessions, qualifying linked events, and capped direct interactions.
-- qualifying shared-session relationship credit now flows through `js/platform/activity/` for `Lovers Lost` and `Battleshits`, so result publishing stays cabinet-owned while affinity/recency math stays platform-owned.
-- `Battleshits` now preserves opponent `playerId` through the online match/result flow so shared-session relationship updates can bind to real platform identities.
-- Railway Postgres is now provisioned for the product as the long-term source of truth for cross-game platform data.
-- `platform-api/` now exists as a separate Node.js service scaffold for the platform backend, with `DATABASE_URL` wiring, health/readiness routes, and the first migration runner.
-- `platform-api/` now includes the first Postgres schema covering players, profiles, metrics, relationships, relationship ledger entries, activity items, and thought posts.
-- `platform-api/` now exposes the first real backend record routes for profiles, metrics, relationships, activity items, and thought posts.
-- `js/platform/api/` now owns the shared browser-side client/adapters for talking to `platform-api/` without leaking fetch logic into page code.
-- the backend transition is now adapter-first: shared frontend seams stay in place while persistence logic moves behind the new API service.
-- `/me` and `/player` now hydrate profiles, metrics, and relationships through API-aware adapters with local fallback instead of staying pure local-cache readers.
-- the owner profile-edit persistence path now mirrors through the shared API seam, and `GET /players/:id/profile` now exists so public profile reads can stay symmetric.
-- `js/platform/thoughts/` and `js/platform/activity/` now perform merge-first API-aware feed sync so remote records can appear without wiping unsynced local items.
-- owner thought create/delete flows now mirror through the backend adapter path while preserving the local-first UX contract.
-- the thoughts layer now includes real backend-backed social actions: emoji reactions, share/repost records, and thread comments through shared `js/platform/thoughts/` helpers and `platform-api/` routes.
-- `Share` now follows the intended social flow: a share sheet can either repost immediately or open a caption composer that keeps the original post attached underneath.
-- `Comments` now opens a thread panel that combines current replies with a write-comment composer on `/thoughts`, `/me`, and `/player`.
-- profile-view increments and thought-count updates now mirror through API-aware metrics helpers without blocking page flow.
-- `games/lovers-lost/` and `games/battleshits/` result activity now mirrors to the backend in the background while preserving immediate local activity publishing.
-- public `/player` pages now expose an explicit friendship-creation entry point backed by the centralized relationship seam rather than page-local friend state.
-- `/event` detail now exposes a qualifying linked-entry action backed by the centralized relationship seam so shared-event credit can be recorded from the platform surface itself.
-- `js/platform/metrics/` now exports an explicit canonical split for public/profile support metrics, relationship/discovery metrics, and backend-only analytics; `friendPoints` remains part of the public/support contract.
-- Home, grid, bulletins, events, activity, thoughts, and player pages now expose direct navigation across the growing platform surface.
-- The `/me` hero now uses a default portrait asset plus a clamped avatar frame so future uploads with mixed dimensions crop consistently.
-- The `/me` hero layout now reserves dedicated space for the portrait rail so long names and bio copy do not collide with the avatar area.
-- platform secondary pages now use consistent `Back` navigation plus normalized `Player Page` portal naming so the platform feels more like one connected shell.
-- `css/arcade.css` is now split into a shared base file plus 8 per-page CSS files (`home.css`, `me.css`, `player.css`, `thoughts.css`, `activity.css`, `bulletins.css`, `events.css`, `event.css`); each page loads only what it needs and the test infrastructure combines the relevant files to match what browsers load.
-- `js/platform/thoughts/thoughts.mjs` is now a clean 4-layer module: `thoughts-schema.mjs` (storage keys, reaction IDs, shape constants), `thoughts-normalize.mjs` (sanitization, formatting helpers), `thoughts-store.mjs` (local feed, storage, card rendering, social writes), `thoughts-api.mjs` (API sync and backend mirrors) — the barrel `thoughts.mjs` re-exports everything so all existing import paths stay unchanged; all four modules stay under 500 lines.
-- `renderMePage` now calls `syncThoughtPostCount` on every page render so the thought-post-count metric stays canonical without a separate explicit write path.
-- `arcade-me-view.mjs` now exposes `renderSupportPanel`, a generic `me-card-item__title`-based card renderer ready for future side-panel wiring (rankings/friends side panels are still hidden pending that work).
-- authentication is now fully implemented: `platform-api/` has bcryptjs password hashing, JWT signing/verification, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, and `GET /auth/me` routes backed by the `accounts` Postgres table; the 30-day HttpOnly JWT cookie is set as `arcade_session`.
-- `sign-up/index.html` and `sign-in/index.html` exist as styled synthwave auth pages with full form validation, error messaging, and redirect-on-success; sign-up supports `claimPlayerId` so existing guest local identities can be attached to a new account.
-- `js/platform/api/auth-api.mjs` exposes `register`, `login`, `logout`, and `getSession` through the shared API seam so no page invents its own fetch logic for auth.
-- `js/arcade-session-nav.mjs` is a shared session chip module that calls `GET /auth/me` on load and injects either Sign In + Create Account links or the player name + Sign Out button into any container element; it is wired into `index.html`, `grid.html`, and `/me`.
-- player discovery is live: `hasAccount` and `discoverable` ship on every profile API response; `GET /players/search?q=...` queries registered discoverable players by name; `/search/index.html` is the player search page; both games surface opponent profiles on results screens with Add Friend entry points for signed-in viewers; `discoverable` opt-out lives in the profile editor.
-- notification system is live: `notifications` and `friend_requests` Postgres tables added via migration 008; `platform-api/` exposes `GET /notifications`, `POST /notifications/read-all`, `POST /friend-requests`, `POST /friend-requests/:id/accept`, `POST /friend-requests/:id/reject`; `js/platform/api/notifications-api.mjs` is the shared browser client; `js/arcade-notifications.mjs` is the bell component (unread badge + dropdown) wired into the session nav on home, grid, and `/me`; friend-request notifications include inline Accept/Reject buttons; notifications mark all-read automatically 1.5 s after the dropdown opens.
-- friend requests are the canonical add-friend flow for authenticated players: Add Friend on `/player` sends `POST /friend-requests`, creating a request record and a `friend_request` notification for the recipient; Accept triggers `POST /friend-requests/:id/accept`, which creates the friendship and fires a `friend_accept` notification back to the sender; Reject silently updates the record; guest viewers fall back to the existing local direct-link path.
-- thought social actions now generate backend notifications to the thought author: `thought_reaction` (when setting, not removing), `thought_comment`, and `thought_share` notifications fire when actor ≠ author; payloads include excerpt text so the bell UI can render context without extra API calls; `thought_reaction` notifications now display the actual emoji (e.g. "Jay ❤️'d your thought") via `THOUGHT_REACTION_GLYPHS`.
-- player gesture buttons are now live on public `/player` profiles for authenticated viewers: Poke 👈, Hug 🤗, Kick 👟, Blow Kiss 💋, Nudge 👇 each fire `POST /players/:id/gesture` and deliver a `player_gesture` notification; `VALID_GESTURE_TYPES` is enforced on the backend; actor name resolved from the profile record.
-- challenge system is now live: Challenge 🎮 in the gesture rail opens an inline game picker rather than sending immediately; game selection calls `POST /challenges`, creating a `challenges` DB record (migration 009, `platform-api/src/db/challenges.mjs`) and a `player_challenge` notification with Accept/Decline buttons; Accept calls `POST /challenges/:id/accept`, notifies the challenger with `challenge_accepted`, and navigates the acceptor to the game via `buildGameHref(slug)`; Decline calls `POST /challenges/:id/decline` and delivers `challenge_declined` to the challenger; `notifications-api.mjs` exposes `sendChallenge`, `acceptChallenge`, and `declineChallenge`.
-- direct messaging is now live: migration 010 adds `conversations` (normalized pair via `player_a_id ≤ player_b_id`, per-player unread counts) and `messages` tables; `platform-api/src/db/messages.mjs` provides `findOrCreateConversation`, `findConversationBetween`, `listConversations` (with other player name + last message preview via lateral join), `getConversation`, `listMessages`, `createMessage` (increments recipient unread in a single SQL update), `markConversationRead`; five backend routes in `app.mjs`: `GET /messages`, `GET /messages/with/:playerId`, `POST /messages` (findOrCreate + send + `new_message` notification), `GET /messages/:convId` (participant-guarded, returns other player name), `POST /messages/:convId/read`; `js/platform/api/messages-api.mjs` is the shared browser client; `/messages/index.html` is the inbox with conversation list and inline player search for new messages; `/messages/conversation/index.html` is the thread view (magenta sent / cyan received bubbles, 5s polling for new messages, Enter-to-send, URL upgrade from `?player=` to `?id=` on first send); `css/messages.css` added; `new_message` bell notification type renders "View Message →" link via `buildHref`; Messages nav link added to `/me`.
-
-## Scope Lock For Upcoming Profile Passes
-
-Use this section as a drift guard when work moves across threads.
-
-Immediate priorities across the current local/backend boundary:
-
-- stabilize the first backend record routes inside `platform-api/` against the live Railway Postgres deployment
-- continue tightening the shared frontend adapters so `/player`, `/me`, `/thoughts`, and `/activity` keep reading shared backend data without losing local fallback behavior
-- start the first durable-memory/player-page pass so activity, posts, and results can surface more intentionally on top of the settled persistence seams
-- turn activity/posts/results into durable memories on player pages once the shared persistence path is stable
-- continue remaining presentation cleanup where the mock-aligned profile composition still carries fallback-heavy copy
-- keep context-driven discovery scoped to real profile surfacing from games, activity, events, and relationships rather than inventing a generic people directory early
-
-Player discovery build order (active next steps):
-
-1. Add `hasAccount` boolean to `GET /players/:id/profile` response — checks whether an `accounts` row exists for that `player_id`; no new endpoint needed
-2. Add `discoverable` boolean to `player_profiles.preferences` jsonb column (default true) — respected by search only, not by direct profile links
-3. Build `GET /players/search?q=...` backend endpoint — queries `profile_name` and `real_name`, filters to `discoverable: true` records, requires the player to have an account row
-4. Build `/search/index.html` search UI page — synthwave shell, search input, result cards linking to `/player?id=xxx`
-5. Wire results screen menus in both games: fetch opponent profile on results load, use `hasAccount` to conditionally render clickable username → mini menu (Add Friend if viewer is signed in, View Profile always for registered opponents)
-
-Important not-now items, even though they remain part of the product vision:
-
-- profile picture/avatar upload and profile background upload
-- profile music authoring/player UI
-- a generic `/players` discovery directory
-- player gesture buttons (Poke, Hug, Kick, Blow Kiss, Nudge, Challenge) — the notification infrastructure now exists to deliver them but the gesture UI buttons are not built yet
-- direct/private messaging (comments, reactions, and sharing are now live through the backend adapter layer)
-
-Default product calls for this scope:
-
-- favorite game is manual first; most-played data can inform later suggestions but must not silently replace the player's chosen favorite
-- social links are repeatable structured items with normalized label/url/kind fields
-- panel headers should be visually separated from panel content, preferably with boxed section labels in the shared profile composition
-- profile music is a single player-assigned track (no playlist); autoplay is paired with a visible mini player widget so visitors can pause or mute immediately; multi-track and rich embeds belong to the backend phase
-- the recommended canonical metrics split is now explicit in code: public/support metrics stay separate from relationship/discovery metrics and backend analytics, with `friendPoints` staying visible/public-support data
-- friend points should stay platform-derived while visible friend placement supports either manual or automatic behavior for `Main Squeeze` and the four standard friend slots
-- relationship ordering should be able to use both affinity (`friendPoints`, shared counts) and recency (`last played with`, `recently played with`, last shared session/event, last interaction) without forcing one permanent display mode
-- comments, emoji reactions, and sharing belong to the thoughts/feed contract, and their first real cross-user persistence is now part of the active backend transition work
-- discovery should stay context-driven instead of becoming a generic empty people directory
-- once online profiles exist, add-friend entry points on game results screens and in-game chat and lobby surfaces should be treated as first-class profile-surfacing paths; a generic directory should stay secondary
-- player pages should accumulate durable memories from platform-owned activity/posts/results rather than forcing every cabinet to invent its own legacy/history UI
-- bulletins, events, ladders, and featured cabinets should be able to support seasonal programming without requiring a separate product line
-- uploads stay late even though avatar/background display constraints should be stabilized now
-
-Deferred until later phases:
-
-- real uploads
-- profile music authoring/player UI
-- generic player-directory / broad discovery page
-- real-time WebSocket message delivery (polling is live; push delivery belongs here)
-- real shared comments/reactions/shares across devices (backend now live; cross-device state follows from auth being stable)
-- ladder ranking systems beyond current contract prep
-
-Now active (no longer deferred):
-
-- database-backed profiles, relationships, activity, thoughts, reactions, shares, comments — all live through `platform-api/`
-- authentication: sign-up, sign-in, sign-out, 30-day JWT sessions, password reset, and account deletion are all live
-- player discovery: `hasAccount` on profile API, player search, results-screen opponent menus, and `discoverable` opt-out are all live
-- notification system: bell + dropdown, friend requests, thought-action notifications — all live through `platform-api/` and `js/arcade-notifications.mjs`
-- direct messaging: `conversations` + `messages` Postgres tables (migration 010), five backend routes, shared API client (`messages-api.mjs`), inbox page, thread page with 5s polling, `new_message` bell notification type — all live; "Message 💬" button on `/player` profiles now navigates authenticated viewers directly to the thread
-- full notifications inbox: `/notifications/index.html` page with `arcade-notifications-page.mjs` reusing the bell component's `renderNotificationItem` so all inline actions (Accept/Reject friend requests, Accept/Decline challenges) work on the standalone page
 
 ## Decision Gates
 
@@ -1271,13 +721,3 @@ We are succeeding if:
 - new pages reuse shared contracts instead of inventing their own
 - games integrate through platform APIs instead of storage hacks
 - backend adoption later feels like swapping adapters, not rebuilding the product
-
-## Immediate Working Assumptions
-
-These assumptions should hold unless we explicitly change them.
-
-- The repo remains vanilla HTML/CSS/JS for now.
-- Platform pages should stay static-host friendly.
-- Query-param detail pages are acceptable early on.
-- Local storage and fixtures are valid scaffolding for early phases.
-- Real social persistence and uploads require a backend phase.
