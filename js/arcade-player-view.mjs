@@ -567,6 +567,7 @@ function renderThoughtItem(item, openReactionThoughtId = "", sharePanelState = {
           <span>${escapeHtml(item.shareLabel)}</span>
         </div>
       </div>
+      ${item.imageUrl ? `<img class="thought-card__image" src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy">` : ""}
       <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
       <div class="thought-card__actions">
         ${actionsHtml}
@@ -579,9 +580,81 @@ function renderThoughtItem(item, openReactionThoughtId = "", sharePanelState = {
   `;
 }
 
+export function renderPlayerGalleryPanel(container, title, photos = [], options = {}) {
+  if (!container) return;
+
+  const isOwner = !!options?.isOwner;
+  const uploadState = options?.uploadState || {};
+
+  const uploadHtml = isOwner
+    ? `
+      <div class="gallery-upload">
+        <input id="playerGalleryFileInput" type="file" accept="image/jpeg,image/png,image/webp" class="gallery-upload__input" aria-label="Upload a photo">
+        <label for="playerGalleryFileInput" class="gallery-upload__label">${uploadState.previewUrl ? "Choose Different Photo" : "Upload Photo"}</label>
+        <p id="playerGalleryUploadStatus" class="gallery-upload__status" aria-live="polite">${escapeHtml(uploadState.statusMessage || "")}</p>
+      </div>
+      ${uploadState.previewUrl
+        ? `
+          <form id="playerGalleryUploadForm" class="gallery-upload__composer">
+            <div class="gallery-upload__preview">
+              <img class="gallery-upload__preview-img" src="${escapeHtml(uploadState.previewUrl)}" alt="${escapeHtml(uploadState.fileName || "Selected photo preview")}">
+              <p class="gallery-upload__preview-name">${escapeHtml(uploadState.fileName || "Selected photo")}</p>
+            </div>
+            <div class="gallery-upload__fields">
+              <label class="gallery-upload__field" for="playerGalleryCaption">
+                <span class="gallery-upload__field-label">Caption</span>
+                <textarea
+                  id="playerGalleryCaption"
+                  class="gallery-upload__textarea"
+                  rows="3"
+                  maxlength="500"
+                  placeholder="Add a caption for your gallery photo."
+                >${escapeHtml(uploadState.caption || "")}</textarea>
+              </label>
+              <label class="gallery-upload__field" for="playerGalleryVisibility">
+                <span class="gallery-upload__field-label">Visibility</span>
+                <select id="playerGalleryVisibility" class="gallery-upload__select">
+                  <option value="public"${uploadState.visibility === "public" ? " selected" : ""}>Public</option>
+                  <option value="friends"${uploadState.visibility === "friends" ? " selected" : ""}>Friends</option>
+                  <option value="private"${uploadState.visibility === "private" ? " selected" : ""}>Private</option>
+                </select>
+              </label>
+              <label class="gallery-upload__toggle" for="playerGalleryPostToFeed">
+                <input id="playerGalleryPostToFeed" type="checkbox"${uploadState.postToFeed ? " checked" : ""}>
+                <span class="gallery-upload__toggle-copy">Also post this photo to my feed</span>
+              </label>
+            </div>
+            <div class="gallery-upload__actions">
+              <button class="gallery-upload__button gallery-upload__button--primary" type="submit">Save Photo</button>
+              <button class="gallery-upload__button" type="button" data-cancel-gallery-upload="player">Cancel</button>
+            </div>
+          </form>
+        `
+        : ""}
+    `
+    : "";
+
+  const gridHtml = photos.length > 0
+    ? photos.map((photo) => `
+        <div class="gallery-item" data-photo-id="${escapeHtml(photo.id)}">
+          <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+          ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
+          ${isOwner ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
+        </div>
+      `).join("")
+    : `<p class="player-panel__empty">${escapeHtml("No photos yet.")}</p>`;
+
+  container.innerHTML = `
+    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
+    ${uploadHtml}
+    <div class="gallery-grid">${gridHtml}</div>
+  `;
+}
+
 function renderThoughtsPanel(container, title, items, composer = null, options = {}) {
   if (!container) return;
 
+  const composerState = options?.composerState || {};
   const composerHtml = composer?.enabled
     ? `
       <form id="playerThoughtComposer" class="thought-composer thought-composer--owner">
@@ -601,8 +674,54 @@ function renderThoughtsPanel(container, title, items, composer = null, options =
           maxlength="500"
           placeholder="${escapeHtml(composer.textPlaceholder || "Share a thought.")}"
         ></textarea>
+        ${composerState.previewUrl
+          ? `
+            <div class="thought-composer__photo-card">
+              <div class="thought-composer__photo-preview">
+                <img
+                  class="thought-composer__photo-preview-img"
+                  src="${escapeHtml(composerState.previewUrl)}"
+                  alt="${escapeHtml(composerState.fileName || "Selected photo preview")}"
+                >
+                <div class="thought-composer__photo-preview-copy">
+                  <p class="thought-composer__photo-name">${escapeHtml(composerState.fileName || "Selected photo")}</p>
+                  <button class="thought-composer__photo-clear" type="button" data-clear-thought-photo="player">Remove Photo</button>
+                </div>
+              </div>
+              <div class="thought-composer__photo-fields">
+                <label class="thought-composer__field" for="playerThoughtPhotoCaption">
+                  <span class="thought-composer__field-label">Gallery Caption</span>
+                  <textarea
+                    id="playerThoughtPhotoCaption"
+                    class="thought-composer__field-input thought-composer__field-input--textarea"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="Optional gallery caption if you save this photo to your profile."
+                  >${escapeHtml(composerState.caption || "")}</textarea>
+                </label>
+                <label class="thought-composer__field" for="playerThoughtVisibility">
+                  <span class="thought-composer__field-label">Visibility</span>
+                  <select id="playerThoughtVisibility" class="thought-composer__field-input">
+                    <option value="public"${composerState.visibility === "public" ? " selected" : ""}>Public</option>
+                    <option value="friends"${composerState.visibility === "friends" ? " selected" : ""}>Friends</option>
+                    <option value="private"${composerState.visibility === "private" ? " selected" : ""}>Private</option>
+                  </select>
+                </label>
+                <label class="thought-composer__toggle" for="playerThoughtSaveToGallery">
+                  <input id="playerThoughtSaveToGallery" type="checkbox"${composerState.saveToGallery !== false ? " checked" : ""}>
+                  <span class="thought-composer__toggle-copy">Also save this photo to my gallery</span>
+                </label>
+              </div>
+            </div>
+          `
+          : ""}
         <div class="thought-composer__actions">
           <button class="thought-composer__submit" type="submit">${escapeHtml(composer.submitLabel || "Post Thought")}</button>
+          <label class="thought-composer__attach-label" for="playerThoughtPhotoInput" title="Attach photo">
+            <span class="thought-composer__attach-icon" aria-hidden="true">&#128247;</span>
+            <span id="playerThoughtPhotoName" class="thought-composer__attach-name">${escapeHtml(composerState.fileName || "")}</span>
+          </label>
+          <input id="playerThoughtPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" class="thought-composer__photo-input">
           <p id="playerThoughtComposerFlash" class="thought-composer__flash" aria-live="polite">${escapeHtml(composer.flashMessage || "")}</p>
         </div>
       </form>
@@ -664,6 +783,7 @@ export function renderPlayerPageView(doc, model, options = {}) {
       openReactionThoughtId: options?.openReactionThoughtId || "",
       sharePanelState: options?.sharePanelState || {},
       commentPanelState: options?.commentPanelState || {},
+      composerState: options?.thoughtComposerState || {},
     },
   );
   renderFavoritePanel(doc.getElementById("playerFavoritePanel"), "Favorite Game", model.favoriteGameItems[0]);
@@ -677,6 +797,10 @@ export function renderPlayerPageView(doc, model, options = {}) {
     friendsPanel.hidden = true;
     friendsPanel.innerHTML = "";
   }
+  renderPlayerGalleryPanel(doc.getElementById("playerGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
+    isOwner: !!options?.isOwner,
+    uploadState: options?.galleryUploadState || {},
+  });
   renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", model.aboutText);
   renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", model.badgeItems);
 }

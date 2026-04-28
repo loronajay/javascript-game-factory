@@ -257,5 +257,41 @@ export function createPlatformApiClient(options = {}) {
         return null;
       }
     },
+    async listPlayerPhotos(playerId, { visibility } = {}) {
+      if (!fetchImpl || !baseUrl || !playerId) return [];
+      const encoded = encodePathSegment(playerId);
+      if (!encoded) return [];
+      const url = `${baseUrl}/players/${encoded}/photos${visibility ? `?visibility=${encodeURIComponent(visibility)}` : ""}`;
+      try {
+        const response = await fetchImpl(url, { credentials: "include" });
+        if (!response?.ok) return [];
+        const data = await readJsonResponse(response);
+        return Array.isArray(data?.photos) ? data.photos : [];
+      } catch {
+        return [];
+      }
+    },
+    async savePlayerPhoto(playerId, photoData) {
+      if (!fetchImpl || !baseUrl || !playerId) return null;
+      const encoded = encodePathSegment(playerId);
+      if (!encoded) return null;
+      const payload = await post(`/players/${encoded}/photos`, photoData);
+      return payload?.photo ? payload : null;
+    },
+    async deletePlayerPhoto(playerId, photoId) {
+      if (!fetchImpl || !baseUrl || !playerId || !photoId) return false;
+      const encodedPlayer = encodePathSegment(playerId);
+      const encodedPhoto = encodePathSegment(photoId);
+      if (!encodedPlayer || !encodedPhoto) return false;
+      try {
+        const response = await fetchImpl(`${baseUrl}/players/${encodedPlayer}/photos/${encodedPhoto}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        return response?.ok === true;
+      } catch {
+        return false;
+      }
+    },
   };
 }

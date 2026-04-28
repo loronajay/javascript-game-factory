@@ -7,6 +7,7 @@ import {
   signToken,
   verifyToken,
 } from "./auth-helpers.mjs";
+import { normalizeThoughtPost } from "./normalize.mjs";
 
 function applyCorsHeaders(res, requestOrigin) {
   if (requestOrigin) {
@@ -251,6 +252,15 @@ export function createApp(options = {}) {
   const markConversationRead = typeof options?.markConversationRead === "function"
     ? options.markConversationRead
     : async () => {};
+  const savePlayerPhoto = typeof options?.savePlayerPhoto === "function"
+    ? options.savePlayerPhoto
+    : async () => null;
+  const listPlayerPhotos = typeof options?.listPlayerPhotos === "function"
+    ? options.listPlayerPhotos
+    : async () => [];
+  const deletePlayerPhoto = typeof options?.deletePlayerPhoto === "function"
+    ? options.deletePlayerPhoto
+    : async () => false;
   const registerAccount = typeof options?.registerAccount === "function"
     ? options.registerAccount
     : async () => ({ error: "not_configured" });
@@ -293,6 +303,8 @@ export function createApp(options = {}) {
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
     const playerFriendMatch = pathname.match(/^\/players\/([^/]+)\/friends\/([^/]+)$/);
     const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
+    const playerPhotosMatch = pathname.match(/^\/players\/([^/]+)\/photos$/);
+    const playerPhotoMatch = pathname.match(/^\/players\/([^/]+)\/photos\/([^/]+)$/);
     const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
     const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);
     const messagesWithMatch = pathname.match(/^\/messages\/with\/([^/]+)$/);
@@ -1164,6 +1176,96 @@ export function createApp(options = {}) {
         payload: { gestureType },
       });
       writeJson(res, 200, { ok: true }, requestOrigin);
+      return;
+    }
+
+    // Photo gallery routes
+    if (method === "GET" && playerPhotosMatch) {
+      const targetPlayerId = decodeURIComponent(playerPhotosMatch[1]);
+      const visibilityParam = requestUrl.searchParams.get("visibility") || null;
+      const viewerPlayerId = authClaims?.playerId || "";
+      const isOwner = viewerPlayerId === targetPlayerId;
+      const resolvedVisibility = isOwner ? visibilityParam : "public";
+      const photos = await listPlayerPhotos(targetPlayerId, { visibility: resolvedVisibility });
+      writeJson(res, 200, { photos }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && playerPhotosMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const targetPlayerId = decodeURIComponent(playerPhotosMatch[1]);
+      if (authClaims.playerId !== targetPlayerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      const { assetId, imageUrl, caption, visibility, postToFeed, subject, thoughtText } = body.value || {};
+      if (!assetId || !imageUrl) {
+        writeJson(res, 400, { status: "error", error: "missing_asset", timestamp }, requestOrigin);
+        return;
+      }
+
+      const photo = await savePlayerPhoto({
+        playerId: targetPlayerId,
+        assetId: String(assetId),
+        imageUrl: String(imageUrl),
+        caption: String(caption || ""),
+        visibility: String(visibility || "public"),
+      });
+
+      if (!photo) {
+        writeJson(res, 500, { status: "error", error: "save_failed", timestamp }, requestOrigin);
+        return;
+      }
+
+      let thought = null;
+      if (postToFeed) {
+        const ownerProfile = await loadPlayerProfile(targetPlayerId).catch(() => null);
+        const authorDisplayName = ownerProfile?.profileName || targetPlayerId;
+        const normalized = normalizeThoughtPost({
+          id: `thought-photo-${targetPlayerId.slice(0, 24)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          authorPlayerId: targetPlayerId,
+          authorDisplayName,
+          subject: String(subject || ""),
+          text: String(thoughtText || caption || ""),
+          visibility: String(visibility || "public"),
+          imageUrl: String(imageUrl),
+          commentCount: 0,
+          shareCount: 0,
+          reactionTotals: {},
+          repostOfId: "",
+          createdAt: new Date().toISOString(),
+          editedAt: "",
+        });
+        thought = await saveThought(normalized).catch(() => null);
+      }
+
+      writeJson(res, 201, { photo, thought }, requestOrigin);
+      return;
+    }
+
+    if (method === "DELETE" && playerPhotoMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const targetPlayerId = decodeURIComponent(playerPhotoMatch[1]);
+      const photoId = decodeURIComponent(playerPhotoMatch[2]);
+      if (authClaims.playerId !== targetPlayerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return;
+      }
+      const deleted = await deletePlayerPhoto(photoId, targetPlayerId);
+      writeJson(res, 200, { ok: deleted }, requestOrigin);
       return;
     }
 

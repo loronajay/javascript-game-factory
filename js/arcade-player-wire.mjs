@@ -12,6 +12,7 @@ import {
   reactToThoughtPostWithApi,
   shareThoughtPostWithApi,
   syncThoughtCommentsFromApi,
+  syncThoughtFeedFromApi,
 } from "./platform/thoughts/thoughts.mjs";
 
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession }) {
@@ -20,8 +21,74 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
   let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
   let challengePickerOpen = false;
+  let galleryPhotos = [];
+  let pendingThoughtPhoto = null;
+  let pendingGalleryPhoto = null;
+  let thoughtPhotoState = {
+    previewUrl: "",
+    fileName: "",
+    caption: "",
+    visibility: "public",
+    saveToGallery: true,
+  };
+  let galleryUploadState = {
+    previewUrl: "",
+    fileName: "",
+    caption: "",
+    visibility: "public",
+    postToFeed: false,
+    statusMessage: "",
+  };
 
   const authSessionPlayerId = authSession?.playerId || "";
+
+  function revokeGalleryPreview() {
+    if (galleryUploadState.previewUrl?.startsWith?.("blob:") && globalThis.URL?.revokeObjectURL) {
+      globalThis.URL.revokeObjectURL(galleryUploadState.previewUrl);
+    }
+  }
+
+  function closeGalleryComposer(statusMessage = "") {
+    revokeGalleryPreview();
+    pendingGalleryPhoto = null;
+    galleryUploadState = {
+      previewUrl: "",
+      fileName: "",
+      caption: "",
+      visibility: "public",
+      postToFeed: false,
+      statusMessage,
+    };
+  }
+
+  function revokeThoughtPreview() {
+    if (thoughtPhotoState.previewUrl?.startsWith?.("blob:") && globalThis.URL?.revokeObjectURL) {
+      globalThis.URL.revokeObjectURL(thoughtPhotoState.previewUrl);
+    }
+  }
+
+  function closeThoughtPhotoComposer() {
+    revokeThoughtPreview();
+    pendingThoughtPhoto = null;
+    thoughtPhotoState = {
+      previewUrl: "",
+      fileName: "",
+      caption: "",
+      visibility: "public",
+      saveToGallery: true,
+    };
+    const nameEl = doc.getElementById("playerThoughtPhotoName");
+    if (nameEl) nameEl.textContent = "";
+    const input = doc.getElementById("playerThoughtPhotoInput");
+    if (input) input.value = "";
+  }
+
+  const loadGallery = async (targetPlayerId) => {
+    if (!targetPlayerId || !apiClient?.listPlayerPhotos) return;
+    const isOwner = targetPlayerId === authSessionPlayerId;
+    const photos = await apiClient.listPlayerPhotos(targetPlayerId, isOwner ? {} : { visibility: "public" }).catch(() => []);
+    galleryPhotos = Array.isArray(photos) ? photos : [];
+  };
 
   const rerender = async (thoughtComposerFlash = "", disableProfileViewTracking = true) => {
     const pageData = await loadPageData({ storage, apiClient, authSessionPlayerId });
@@ -35,8 +102,55 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       openReactionThoughtId,
       sharePanelState,
       commentPanelState,
+      galleryPhotos,
+      thoughtComposerState: thoughtPhotoState,
+      galleryUploadState,
+      isOwner: !!(pageData?.profile?.playerId && pageData.profile.playerId === authSessionPlayerId),
     });
   };
+
+  async function uploadPendingThoughtPhoto(currentProfile, subject = "", text = "") {
+    if (!pendingThoughtPhoto || !currentProfile?.playerId || !apiClient?.uploadPhoto) {
+      return { imageUrl: "", thought: null, visibility: "public" };
+    }
+
+    const file = pendingThoughtPhoto;
+    const photoState = { ...thoughtPhotoState };
+    const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
+    closeThoughtPhotoComposer();
+
+    if (!uploadResult?.url) {
+      return { imageUrl: "", thought: null, visibility: photoState.visibility || "public" };
+    }
+
+    if (photoState.saveToGallery !== false && apiClient?.savePlayerPhoto && uploadResult.assetId) {
+      const savedPhotoRecord = await apiClient.savePlayerPhoto(currentProfile.playerId, {
+        assetId: uploadResult.assetId,
+        imageUrl: uploadResult.url,
+        caption: photoState.caption || text,
+        visibility: photoState.visibility || "public",
+        postToFeed: true,
+        subject,
+        thoughtText: text,
+      }).catch(() => null);
+
+      if (savedPhotoRecord?.photo) {
+        await loadGallery(currentProfile.playerId);
+      }
+
+      return {
+        imageUrl: uploadResult.url,
+        thought: savedPhotoRecord?.thought || null,
+        visibility: photoState.visibility || "public",
+      };
+    }
+
+    return {
+      imageUrl: uploadResult.url,
+      thought: null,
+      visibility: photoState.visibility || "public",
+    };
+  }
 
   const openCommentSheet = async (cardId, thoughtId) => {
     commentPanelState = {
@@ -57,7 +171,10 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     await rerender();
   };
 
-  void rerender("", false);
+  void rerender("", false).then(() => {
+    const targetId = currentPageData?.profile?.playerId || "";
+    if (targetId) void loadGallery(targetId).then(() => rerender("", true));
+  });
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
     queueMicrotask(() => { void rerender(); });
@@ -103,6 +220,58 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       return;
     }
 
+    if (form && typeof form === "object" && form.id === "playerGalleryUploadForm") {
+      event.preventDefault();
+      const currentProfile = loadFactoryProfile(storage);
+      if (!currentProfile?.playerId || currentProfile.playerId !== authSessionPlayerId || !apiClient?.uploadPhoto || !galleryUploadState.previewUrl) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Choose a photo first." };
+        void rerender();
+        return;
+      }
+
+      const file = pendingGalleryPhoto;
+      if (!file) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Choose a photo first." };
+        void rerender();
+        return;
+      }
+
+      galleryUploadState = { ...galleryUploadState, statusMessage: "Uploading..." };
+      await rerender();
+
+      const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
+      if (!uploadResult?.assetId || !uploadResult?.url) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Upload failed. Try again." };
+        void rerender();
+        return;
+      }
+
+      const savedPhotoRecord = await apiClient.savePlayerPhoto(currentProfile.playerId, {
+        assetId: uploadResult.assetId,
+        imageUrl: uploadResult.url,
+        caption: galleryUploadState.caption,
+        visibility: galleryUploadState.visibility,
+        postToFeed: galleryUploadState.postToFeed,
+      }).catch(() => null);
+
+      if (!savedPhotoRecord?.photo) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Could not save photo. Try again." };
+        void rerender();
+        return;
+      }
+
+      const postedToFeed = !!savedPhotoRecord.thought;
+      closeGalleryComposer(postedToFeed ? "Photo uploaded and posted." : "Photo uploaded.");
+      await loadGallery(currentProfile.playerId);
+      if (postedToFeed) {
+        await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
+        const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+        syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      }
+      void rerender();
+      return;
+    }
+
     if (!form || typeof form !== "object" || form.id !== "playerThoughtComposer") {
       return;
     }
@@ -111,13 +280,27 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     const currentProfile = loadFactoryProfile(storage);
     const subjectInput = doc.getElementById("playerThoughtSubject");
     const bodyInput = doc.getElementById("playerThoughtBody");
+    const subject = subjectInput?.value || "";
+    const text = bodyInput?.value || "";
+    const photoResult = await uploadPendingThoughtPhoto(currentProfile, subject, text);
+
+    if (photoResult.thought) {
+      const targetId = currentPageData?.profile?.playerId || currentProfile.playerId;
+      await loadGallery(targetId);
+      const updatedThoughtCount = buildPlayerThoughtFeed(await loadThoughtFeed(storage), currentProfile.playerId).length;
+      syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      void rerender("Thought posted.");
+      return;
+    }
+
     const saved = await publishThoughtPostWithApi({
       authorPlayerId: currentProfile.playerId,
       authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
-      subject: subjectInput?.value || "",
-      text: bodyInput?.value || "",
-      visibility: "public",
-    }, storage);
+      subject,
+      text,
+      visibility: photoResult.visibility || "public",
+      imageUrl: photoResult.imageUrl,
+    }, storage, { apiClient });
 
     if (!saved) {
       void rerender("Write a thought before posting.");
@@ -470,16 +653,111 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     if (!id) return;
 
     const currentProfile = loadFactoryProfile(storage);
-    await deleteThoughtPostWithApi(id, storage);
+    await deleteThoughtPostWithApi(id, storage, { apiClient });
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
     void rerender();
   });
 
+  doc.addEventListener("click", (event) => {
+    const clearThoughtPhotoButton = event.target.closest("[data-clear-thought-photo]");
+    if (clearThoughtPhotoButton) {
+      closeThoughtPhotoComposer();
+      void rerender();
+      return;
+    }
+
+    const cancelGalleryButton = event.target.closest("[data-cancel-gallery-upload]");
+    if (!cancelGalleryButton) return;
+    closeGalleryComposer("");
+    void rerender();
+  });
+
+  doc.addEventListener("change", (event) => {
+    if (event.target?.id === "playerThoughtPhotoInput") {
+      const file = event.target.files?.[0] || null;
+      if (!file) {
+        closeThoughtPhotoComposer();
+        void rerender();
+        return;
+      }
+      revokeThoughtPreview();
+      pendingThoughtPhoto = file;
+      thoughtPhotoState = {
+        previewUrl: globalThis.URL?.createObjectURL ? globalThis.URL.createObjectURL(file) : "",
+        fileName: file.name || "Selected photo",
+        caption: "",
+        visibility: "public",
+        saveToGallery: true,
+      };
+      const nameEl = doc.getElementById("playerThoughtPhotoName");
+      if (nameEl) nameEl.textContent = file ? file.name : "";
+      void rerender();
+      return;
+    }
+
+    if (event.target?.id === "playerThoughtVisibility") {
+      thoughtPhotoState = { ...thoughtPhotoState, visibility: event.target.value || "public" };
+      return;
+    }
+
+    if (event.target?.id === "playerThoughtSaveToGallery") {
+      thoughtPhotoState = { ...thoughtPhotoState, saveToGallery: !!event.target.checked };
+      return;
+    }
+
+    if (event.target?.id === "playerGalleryFileInput") {
+      const file = event.target.files?.[0] || null;
+      if (!file) return;
+      revokeGalleryPreview();
+      pendingGalleryPhoto = file;
+      galleryUploadState = {
+        previewUrl: globalThis.URL?.createObjectURL ? globalThis.URL.createObjectURL(file) : "",
+        fileName: file.name || "Selected photo",
+        caption: "",
+        visibility: "public",
+        postToFeed: false,
+        statusMessage: "",
+      };
+      void rerender();
+      return;
+    }
+
+    if (event.target?.id === "playerGalleryVisibility") {
+      galleryUploadState = { ...galleryUploadState, visibility: event.target.value || "public" };
+      return;
+    }
+
+    if (event.target?.id === "playerGalleryPostToFeed") {
+      galleryUploadState = { ...galleryUploadState, postToFeed: !!event.target.checked };
+    }
+  });
+
+  doc.addEventListener("click", (event) => {
+    const deletePhotoBtn = event.target.closest("[data-delete-photo-id]");
+    if (deletePhotoBtn) {
+      const photoId = deletePhotoBtn.dataset.deletePhotoId;
+      const targetId = currentPageData?.profile?.playerId || "";
+      if (!photoId || !targetId || !apiClient?.deletePlayerPhoto) return;
+      apiClient.deletePlayerPhoto(targetId, photoId).then(async () => {
+        await loadGallery(targetId);
+        void rerender();
+      }).catch(() => {});
+    }
+  }, true);
+
   doc.addEventListener("input", (event) => {
     const captionInput = event.target.closest("[data-share-caption-input]");
     if (captionInput) {
       sharePanelState = { ...sharePanelState, caption: captionInput.value || "" };
+      return;
+    }
+    if (event.target?.id === "playerThoughtPhotoCaption") {
+      thoughtPhotoState = { ...thoughtPhotoState, caption: event.target.value || "" };
+      return;
+    }
+    if (event.target?.id === "playerGalleryCaption") {
+      galleryUploadState = { ...galleryUploadState, caption: event.target.value || "" };
       return;
     }
     const commentInput = event.target.closest("[data-comment-input]");

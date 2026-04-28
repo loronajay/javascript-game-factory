@@ -26,6 +26,72 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
   let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
   let cachedHydration = null;
+  let galleryPhotos = [];
+  let pendingThoughtPhoto = null;
+  let pendingGalleryPhoto = null;
+  let thoughtPhotoState = {
+    previewUrl: "",
+    fileName: "",
+    caption: "",
+    visibility: "public",
+    saveToGallery: true,
+  };
+  let galleryUploadState = {
+    previewUrl: "",
+    fileName: "",
+    caption: "",
+    visibility: "public",
+    postToFeed: false,
+    statusMessage: "",
+  };
+
+  function revokeGalleryPreview() {
+    if (galleryUploadState.previewUrl?.startsWith?.("blob:") && globalThis.URL?.revokeObjectURL) {
+      globalThis.URL.revokeObjectURL(galleryUploadState.previewUrl);
+    }
+  }
+
+  function closeGalleryComposer(statusMessage = "") {
+    revokeGalleryPreview();
+    pendingGalleryPhoto = null;
+    galleryUploadState = {
+      previewUrl: "",
+      fileName: "",
+      caption: "",
+      visibility: "public",
+      postToFeed: false,
+      statusMessage,
+    };
+  }
+
+  function revokeThoughtPreview() {
+    if (thoughtPhotoState.previewUrl?.startsWith?.("blob:") && globalThis.URL?.revokeObjectURL) {
+      globalThis.URL.revokeObjectURL(thoughtPhotoState.previewUrl);
+    }
+  }
+
+  function closeThoughtPhotoComposer() {
+    revokeThoughtPreview();
+    pendingThoughtPhoto = null;
+    thoughtPhotoState = {
+      previewUrl: "",
+      fileName: "",
+      caption: "",
+      visibility: "public",
+      saveToGallery: true,
+    };
+    const nameEl = doc.getElementById("meThoughtPhotoName");
+    if (nameEl) nameEl.textContent = "";
+    const input = doc.getElementById("meThoughtPhotoInput");
+    if (input) input.value = "";
+  }
+
+  const loadGallery = async () => {
+    const currentProfile = loadFactoryProfile(storage);
+    if (!currentProfile?.playerId || !apiClient?.listPlayerPhotos) return;
+    const photos = await apiClient.listPlayerPhotos(currentProfile.playerId).catch(() => []);
+    galleryPhotos = Array.isArray(photos) ? photos : [];
+  };
 
   const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
     const currentProfile = loadFactoryProfile(storage);
@@ -77,8 +143,54 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       openReactionThoughtId,
       sharePanelState,
       commentPanelState,
+      galleryPhotos,
+      thoughtComposerState: thoughtPhotoState,
+      galleryUploadState,
     });
   };
+
+  async function uploadPendingThoughtPhoto(currentProfile, subject = "", text = "") {
+    if (!pendingThoughtPhoto || !currentProfile?.playerId || !apiClient?.uploadPhoto) {
+      return { imageUrl: "", thought: null, visibility: "public" };
+    }
+
+    const file = pendingThoughtPhoto;
+    const photoState = { ...thoughtPhotoState };
+    const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
+    closeThoughtPhotoComposer();
+
+    if (!uploadResult?.url) {
+      return { imageUrl: "", thought: null, visibility: photoState.visibility || "public" };
+    }
+
+    if (photoState.saveToGallery !== false && apiClient?.savePlayerPhoto && uploadResult.assetId) {
+      const savedPhotoRecord = await apiClient.savePlayerPhoto(currentProfile.playerId, {
+        assetId: uploadResult.assetId,
+        imageUrl: uploadResult.url,
+        caption: photoState.caption || text,
+        visibility: photoState.visibility || "public",
+        postToFeed: true,
+        subject,
+        thoughtText: text,
+      }).catch(() => null);
+
+      if (savedPhotoRecord?.photo) {
+        await loadGallery();
+      }
+
+      return {
+        imageUrl: uploadResult.url,
+        thought: savedPhotoRecord?.thought || null,
+        visibility: photoState.visibility || "public",
+      };
+    }
+
+    return {
+      imageUrl: uploadResult.url,
+      thought: null,
+      visibility: photoState.visibility || "public",
+    };
+  }
 
   const openCommentSheet = async (cardId, thoughtId) => {
     commentPanelState = {
@@ -99,7 +211,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     await rerender();
   };
 
-  void rerender("", true);
+  void loadGallery().then(() => rerender("", true));
 
   doc.getElementById("meDeleteAccountBtn")?.addEventListener("click", async () => {
     const flashEl = doc.getElementById("meDeleteAccountFlash");
@@ -172,6 +284,58 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       return;
     }
 
+    if (form && typeof form === "object" && form.id === "meGalleryUploadForm") {
+      event.preventDefault();
+      const currentProfile = loadFactoryProfile(storage);
+      if (!currentProfile?.playerId || !apiClient?.uploadPhoto || !galleryUploadState.previewUrl) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Choose a photo first." };
+        void rerender();
+        return;
+      }
+
+      const file = pendingGalleryPhoto;
+      if (!file) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Choose a photo first." };
+        void rerender();
+        return;
+      }
+
+      galleryUploadState = { ...galleryUploadState, statusMessage: "Uploading..." };
+      await rerender();
+
+      const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
+      if (!uploadResult?.assetId || !uploadResult?.url) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Upload failed. Try again." };
+        void rerender();
+        return;
+      }
+
+      const savedPhotoRecord = await apiClient.savePlayerPhoto(currentProfile.playerId, {
+        assetId: uploadResult.assetId,
+        imageUrl: uploadResult.url,
+        caption: galleryUploadState.caption,
+        visibility: galleryUploadState.visibility,
+        postToFeed: galleryUploadState.postToFeed,
+      }).catch(() => null);
+
+      if (!savedPhotoRecord?.photo) {
+        galleryUploadState = { ...galleryUploadState, statusMessage: "Could not save photo. Try again." };
+        void rerender();
+        return;
+      }
+
+      const postedToFeed = !!savedPhotoRecord.thought;
+      closeGalleryComposer(postedToFeed ? "Photo uploaded and posted." : "Photo uploaded.");
+      await loadGallery();
+      if (postedToFeed) {
+        await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
+        const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+        syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      }
+      void rerender();
+      return;
+    }
+
     if (!form || typeof form !== "object" || form.id !== "meThoughtComposer") {
       return;
     }
@@ -180,12 +344,25 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     const currentProfile = loadFactoryProfile(storage);
     const subjectInput = doc.getElementById("meThoughtSubject");
     const bodyInput = doc.getElementById("meThoughtBody");
+    const subject = subjectInput?.value || "";
+    const text = bodyInput?.value || "";
+    const photoResult = await uploadPendingThoughtPhoto(currentProfile, subject, text);
+
+    if (photoResult.thought) {
+      await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
+      const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+      syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      void rerender("Thought posted.");
+      return;
+    }
+
     const saved = await publishThoughtPostWithApi({
       authorPlayerId: currentProfile.playerId,
       authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
-      subject: subjectInput?.value || "",
-      text: bodyInput?.value || "",
-      visibility: "public",
+      subject,
+      text,
+      visibility: photoResult.visibility || "public",
+      imageUrl: photoResult.imageUrl,
     }, storage, { apiClient });
 
     if (!saved) {
@@ -328,10 +505,104 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     void rerender();
   });
 
+  doc.addEventListener("click", (event) => {
+    const clearThoughtPhotoButton = event.target.closest("[data-clear-thought-photo]");
+    if (clearThoughtPhotoButton) {
+      closeThoughtPhotoComposer();
+      void rerender();
+      return;
+    }
+
+    const cancelGalleryButton = event.target.closest("[data-cancel-gallery-upload]");
+    if (!cancelGalleryButton) return;
+    closeGalleryComposer("");
+    void rerender();
+  });
+
+  doc.addEventListener("change", async (event) => {
+    if (event.target?.id === "meThoughtPhotoInput") {
+      const file = event.target.files?.[0] || null;
+      if (!file) {
+        closeThoughtPhotoComposer();
+        void rerender();
+        return;
+      }
+      revokeThoughtPreview();
+      pendingThoughtPhoto = file;
+      thoughtPhotoState = {
+        previewUrl: globalThis.URL?.createObjectURL ? globalThis.URL.createObjectURL(file) : "",
+        fileName: file.name || "Selected photo",
+        caption: "",
+        visibility: "public",
+        saveToGallery: true,
+      };
+      const nameEl = doc.getElementById("meThoughtPhotoName");
+      if (nameEl) nameEl.textContent = file ? file.name : "";
+      void rerender();
+      return;
+    }
+
+    if (event.target?.id === "meThoughtVisibility") {
+      thoughtPhotoState = { ...thoughtPhotoState, visibility: event.target.value || "public" };
+      return;
+    }
+
+    if (event.target?.id === "meThoughtSaveToGallery") {
+      thoughtPhotoState = { ...thoughtPhotoState, saveToGallery: !!event.target.checked };
+      return;
+    }
+
+    if (event.target?.id === "meGalleryFileInput") {
+      const file = event.target.files?.[0] || null;
+      if (!file) return;
+      revokeGalleryPreview();
+      pendingGalleryPhoto = file;
+      galleryUploadState = {
+        previewUrl: globalThis.URL?.createObjectURL ? globalThis.URL.createObjectURL(file) : "",
+        fileName: file.name || "Selected photo",
+        caption: "",
+        visibility: "public",
+        postToFeed: false,
+        statusMessage: "",
+      };
+      void rerender();
+    }
+
+    if (event.target?.id === "meGalleryVisibility") {
+      galleryUploadState = { ...galleryUploadState, visibility: event.target.value || "public" };
+      return;
+    }
+
+    if (event.target?.id === "meGalleryPostToFeed") {
+      galleryUploadState = { ...galleryUploadState, postToFeed: !!event.target.checked };
+    }
+  });
+
+  doc.addEventListener("click", (event) => {
+    const deleteBtn = event.target.closest("[data-delete-photo-id]");
+    if (deleteBtn) {
+      const photoId = deleteBtn.dataset.deletePhotoId;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!photoId || !currentProfile?.playerId || !apiClient?.deletePlayerPhoto) return;
+      apiClient.deletePlayerPhoto(currentProfile.playerId, photoId).then(async () => {
+        await loadGallery();
+        void rerender();
+      }).catch(() => {});
+    }
+  }, true);
+
   doc.addEventListener("input", (event) => {
     const captionInput = event.target.closest("[data-share-caption-input]");
     if (captionInput) {
       sharePanelState = { ...sharePanelState, caption: captionInput.value || "" };
+      return;
+    }
+    if (event.target?.id === "meThoughtPhotoCaption") {
+      thoughtPhotoState = { ...thoughtPhotoState, caption: event.target.value || "" };
+      return;
+    }
+    if (event.target?.id === "meGalleryCaption") {
+      galleryUploadState = { ...galleryUploadState, caption: event.target.value || "" };
       return;
     }
     const commentInput = event.target.closest("[data-comment-input]");

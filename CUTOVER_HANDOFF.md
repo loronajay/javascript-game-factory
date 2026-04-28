@@ -1,5 +1,33 @@
 # Hybrid Cutover Handoff
 
+## Active Side Workstream - Photo Uploads (2026-04-28)
+
+This repo now has a second in-flight workstream alongside the backend cutover notes below.
+
+### Current status
+- Shared upload infrastructure is live in `platform-api/`:
+  - Cloudinary upload service: `platform-api/src/services/upload.mjs`
+  - multipart parsing in `platform-api/src/app.mjs` via `busboy`
+  - authenticated `POST /upload/avatar` and `POST /upload/photo`
+- Avatar upload flow is live in the profile editor (`js/arcade-profile.mjs`)
+- Gallery/backend photo flow is live:
+  - migrations `011-player-photos.sql` and `012-thought-image.sql`
+  - `platform-api/src/db/photos.mjs`
+  - `POST/GET/DELETE /players/:playerId/photos`
+  - thought `image_url` persistence in `platform-api/src/db/thoughts.mjs`
+- Frontend gallery flow is live on `/me` and owner-view `/player`:
+  - gallery upload composer with preview, caption, visibility, and optional feed cross-post
+  - gallery delete flow
+  - thought cards render attached images across `/me`, `/player`, and `/thoughts`
+- Direct thought composer photo posts now expose preview, gallery caption, visibility, and optional gallery-save controls; they still fall back to plain thought save if the gallery side effect cannot complete
+
+### Remaining gap before this workstream is done
+- Gallery items still do not open into a dedicated full-view or lightbox experience
+- Manual end-to-end verification against a real Cloudinary-backed deployment still needs to happen after env vars are confirmed
+
+### Source-of-truth doc
+- See `PHOTO_UPLOADS_PLAN.md` for the checklist/status view of this workstream
+
 ## Problem Summary
 
 The platform has a hybrid local/backend model where `localStorage` is still treated as a peer data

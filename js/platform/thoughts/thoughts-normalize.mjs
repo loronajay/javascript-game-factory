@@ -101,6 +101,7 @@ export function normalizeThoughtPost(post = {}, index = 0) {
     viewerReaction: sanitizeThoughtReactionId(post?.viewerReaction),
     viewerSharedThoughtId: sanitizeThoughtShareId(post?.viewerSharedThoughtId),
     repostOfId: sanitizeSingleLine(post?.repostOfId, 80),
+    imageUrl: sanitizeSingleLine(post?.imageUrl, 800),
     createdAt: sanitizeSingleLine(post?.createdAt, 40),
     editedAt: sanitizeSingleLine(post?.editedAt, 40),
   };

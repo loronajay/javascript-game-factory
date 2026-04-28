@@ -302,6 +302,7 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
           <span>${escapeHtml(item.shareLabel)}</span>
         </div>
       </div>
+      ${item.imageUrl ? `<img class="thought-card__image" src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy">` : ""}
       <p class="thought-card__summary">${escapeHtml(item.summary)}</p>
       <div class="thought-card__actions">
         ${actionsHtml}

@@ -43,6 +43,7 @@ function mapRowToThought(row = {}, options = {}) {
     viewerReaction: options.viewerReaction ?? "",
     viewerSharedThoughtId: options.viewerSharedThoughtId ?? "",
     repostOfId: row.repost_of_id,
+    imageUrl: row.image_url,
     createdAt: row.created_at,
     editedAt: row.edited_at,
   });
@@ -72,6 +73,7 @@ function buildThoughtParams(thought) {
     thought.shareCount,
     JSON.stringify(thought.reactionTotals),
     thought.repostOfId,
+    thought.imageUrl || "",
     thought.createdAt,
     thought.editedAt,
   ];
@@ -159,6 +161,7 @@ export async function listThoughts(db, options = {}) {
       share_count,
       reaction_totals,
       repost_of_id,
+      image_url,
       created_at,
       edited_at
     from thought_posts
@@ -261,10 +264,11 @@ export async function saveThought(db, thought = {}) {
       share_count,
       reaction_totals,
       repost_of_id,
+      image_url,
       created_at,
       edited_at
     ) values (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12
+      $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13
     )
     on conflict (id) do update set
       author_player_id = excluded.author_player_id,
@@ -276,6 +280,7 @@ export async function saveThought(db, thought = {}) {
       share_count = excluded.share_count,
       reaction_totals = excluded.reaction_totals,
       repost_of_id = excluded.repost_of_id,
+      image_url = excluded.image_url,
       created_at = excluded.created_at,
       edited_at = excluded.edited_at
     returning
@@ -289,6 +294,7 @@ export async function saveThought(db, thought = {}) {
       share_count,
       reaction_totals,
       repost_of_id,
+      image_url,
       created_at,
       edited_at
   `, buildThoughtParams(normalized));
@@ -331,6 +337,7 @@ export async function reactToThought(db, thoughtId, viewerPlayerId, reactionId) 
         share_count,
         reaction_totals,
         repost_of_id,
+        image_url,
         created_at,
         edited_at
       from thought_posts
@@ -434,6 +441,7 @@ export async function shareThought(db, thoughtId, viewerPlayerId, viewerAuthorDi
         share_count,
         reaction_totals,
         repost_of_id,
+        image_url,
         created_at,
         edited_at
       from thought_posts
@@ -495,10 +503,11 @@ export async function shareThought(db, thoughtId, viewerPlayerId, viewerAuthorDi
           share_count,
           reaction_totals,
           repost_of_id,
+          image_url,
           created_at,
           edited_at
         ) values (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12
+          $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13
         )
       `, buildThoughtParams(insertedSharedThought));
 
@@ -572,6 +581,7 @@ export async function commentOnThought(db, thoughtId, viewerPlayerId, viewerAuth
         share_count,
         reaction_totals,
         repost_of_id,
+        image_url,
         created_at,
         edited_at
       from thought_posts

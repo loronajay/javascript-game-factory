@@ -579,6 +579,7 @@ export function normalizeThoughtPost(post = {}, index = 0) {
     viewerReaction: sanitizeThoughtReactionId(post?.viewerReaction),
     viewerSharedThoughtId: sanitizeThoughtShareId(post?.viewerSharedThoughtId),
     repostOfId: sanitizeSingleLine(post?.repostOfId, 80),
+    imageUrl: sanitizeSingleLine(post?.imageUrl, 800),
     createdAt: normalizeTimestampField(post?.createdAt) || new Date().toISOString(),
     editedAt: sanitizeSingleLine(post?.editedAt, 40),
   };

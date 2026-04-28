@@ -794,6 +794,151 @@ button.thought-card__action {
   letter-spacing: 0.08em;
 }
 
+.thought-composer__photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.thought-composer__attach-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 197, 228, 0.3);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.thought-composer__attach-label:hover {
+  border-color: rgba(255, 197, 228, 0.6);
+  color: #fff;
+}
+
+.thought-composer__attach-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thought-composer__photo-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 197, 228, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 197, 228, 0.08), rgba(10, 8, 26, 0.92)),
+    rgba(10, 8, 26, 0.92);
+}
+
+.thought-composer__photo-preview {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.thought-composer__photo-preview-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 197, 228, 0.16);
+}
+
+.thought-composer__photo-preview-copy,
+.thought-composer__photo-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.thought-composer__photo-name,
+.thought-composer__field-label,
+.thought-composer__toggle-copy {
+  margin: 0;
+  color: #ffd2eb;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.thought-composer__photo-name {
+  color: #fff7fc;
+  overflow-wrap: anywhere;
+}
+
+.thought-composer__photo-clear {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 197, 228, 0.22);
+  background: rgba(14, 10, 30, 0.86);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.thought-composer__field {
+  display: grid;
+  gap: 6px;
+}
+
+.thought-composer__field-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 197, 228, 0.22);
+  background: rgba(6, 4, 18, 0.9);
+  color: #fff7fc;
+  font-size: 0.9rem;
+}
+
+.thought-composer__field-input--textarea {
+  min-height: 92px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.thought-composer__field-input:focus-visible,
+.thought-composer__photo-clear:hover,
+.thought-composer__photo-clear:focus-visible {
+  outline: none;
+  border-color: rgba(153, 255, 255, 0.72);
+  box-shadow: 0 0 0 2px rgba(153, 255, 255, 0.16);
+}
+
+.thought-composer__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 197, 228, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.thought-composer__toggle input {
+  margin: 0;
+}
+
+.thought-card__image {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
 .friend-code-card {
   display: grid;
   gap: 14px;
@@ -903,6 +1048,10 @@ button.thought-card__action {
     max-height: none;
     overflow: visible;
     padding-right: 0;
+  }
+
+  .thought-composer__photo-preview {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .thought-composer__actions {
