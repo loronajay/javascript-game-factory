@@ -5,10 +5,7 @@ import {
   writeStorageText,
 } from "../storage/storage.mjs";
 import { createPlatformApiClient } from "../api/platform-api.mjs";
-import {
-  recordSharedSessionBetweenPlayers,
-  saveProfileRelationshipsRecord,
-} from "../relationships/relationships.mjs";
+import { recordSharedSessionBetweenPlayers } from "../relationships/relationships.mjs";
 
 export const ACTIVITY_FEED_STORAGE_KEY = getPlatformStorageKey("activityFeed");
 export const ACTIVITY_FEED_LIMIT = 40;
@@ -92,35 +89,12 @@ function parseNormalizedStoredFeed(storage = getDefaultPlatformStorage()) {
     .map((entry, index) => normalizeActivityItem(entry, index));
 }
 
-function mergeStoredActivityFeed(primary = [], fallback = []) {
-  const merged = [];
-  const seen = new Set();
-
-  for (const entry of [...primary, ...fallback]) {
-    const normalized = normalizeActivityItem(entry, merged.length);
-    if (!normalized.id || seen.has(normalized.id)) continue;
-    seen.add(normalized.id);
-    merged.push(normalized);
-  }
-
-  return merged.sort(compareActivityDesc).slice(0, ACTIVITY_FEED_LIMIT);
-}
-
 function writeActivityFeed(storage, activityFeed = []) {
   const normalized = Array.isArray(activityFeed)
     ? activityFeed.map((entry, index) => normalizeActivityItem(entry, index))
     : [];
   writeStorageText(storage, ACTIVITY_FEED_STORAGE_KEY, JSON.stringify(normalized));
   return normalized;
-}
-
-function mergeRemoteActivityItemIntoStorage(remoteItem, storage) {
-  const normalizedRemoteItem = normalizeActivityItem(remoteItem);
-  const merged = mergeStoredActivityFeed(
-    [normalizedRemoteItem],
-    parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== normalizedRemoteItem.id),
-  );
-  writeActivityFeed(storage, merged);
 }
 
 function compareActivityDesc(left, right) {
@@ -225,42 +199,9 @@ function maybeRecordSharedSessionFromActivity(activity, storage, options = {}) {
   }
 }
 
-function syncRelationshipUpdateToStorage(result, storage) {
-  if (result?.leftRecord?.playerId) {
-    saveProfileRelationshipsRecord(result.leftRecord, storage);
-  }
-  if (result?.rightRecord?.playerId) {
-    saveProfileRelationshipsRecord(result.rightRecord, storage);
-  }
-}
 
 function queueSharedSessionRelationshipUpdate(leftPlayerId, rightPlayerId, options = {}) {
-  const storage = options.storage || getDefaultPlatformStorage();
-  const apiClient = options?.apiClient;
-
-  if (typeof apiClient?.recordSharedSessionBetweenPlayers === "function") {
-    Promise.resolve(apiClient.recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, {
-      sessionId: options.sessionId,
-      gameSlug: options.gameSlug,
-      startedTogether: options.startedTogether,
-      reachedResults: options.reachedResults,
-      occurredAt: options.occurredAt,
-    }))
-      .then((result) => {
-        if (result?.leftRecord?.playerId || result?.rightRecord?.playerId) {
-          syncRelationshipUpdateToStorage(result, storage);
-          return;
-        }
-
-        recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
-      })
-      .catch(() => {
-        recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
-      });
-    return;
-  }
-
-  recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
+  void recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
 }
 
 function actorNameFromOptions(options = {}) {
@@ -344,17 +285,13 @@ export function buildBattleshitsMatchActivity(match, options = {}) {
 export function publishLoversLostRunActivity(runSummary, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildLoversLostRunActivity(runSummary, options);
-  const saved = publishActivityItem(item, storage, options);
-  mirrorPublishedActivityItem(saved, storage, options);
-  return saved;
+  return publishActivityItemWithApi(item, storage, options);
 }
 
 export function publishBattleshitsMatchActivity(match, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildBattleshitsMatchActivity(match, options);
-  const saved = publishActivityItem(item, storage, options);
-  mirrorPublishedActivityItem(saved, storage, options);
-  return saved;
+  return publishActivityItemWithApi(item, storage, options);
 }
 
 export async function syncActivityFeedFromApi(
@@ -371,11 +308,8 @@ export async function syncActivityFeedFromApi(
     return loadActivityFeed(storage);
   }
 
-  const merged = mergeStoredActivityFeed(
-    remoteFeed.map((entry, index) => normalizeActivityItem(entry, index)),
-    parseNormalizedStoredFeed(storage),
-  );
-  writeActivityFeed(storage, merged);
+  // Auth: API response is canonical; write to local as cache (no merge with local)
+  writeActivityFeed(storage, remoteFeed.map((entry, index) => normalizeActivityItem(entry, index)));
   return loadActivityFeed(storage);
 }
 
@@ -384,24 +318,28 @@ export async function publishActivityItemWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const saved = publishActivityItem(item, storage, options);
-  await mirrorPublishedActivityItem(saved, storage, options);
-  return saved;
-}
-
-async function mirrorPublishedActivityItem(
-  saved,
-  storage = getDefaultPlatformStorage(),
-  options = {},
-) {
   const apiClient = options?.apiClient || createPlatformApiClient(options);
-  if (typeof apiClient?.saveActivityItem !== "function") {
-    return null;
+  const isAuth = typeof apiClient?.saveActivityItem === "function";
+
+  if (!isAuth) {
+    // Guest: local only
+    return publishActivityItem(item, storage, options);
   }
 
-  const remoteItem = await apiClient.saveActivityItem(saved).catch(() => null);
-  if (remoteItem) {
-    mergeRemoteActivityItemIntoStorage(remoteItem, storage);
-  }
-  return remoteItem;
+  // Auth: API first; no local pre-write
+  const normalized = normalizeActivityItem(item);
+  if (!normalized.type) return null;
+
+  const remoteItem = await apiClient.saveActivityItem(normalized).catch(() => null);
+  if (!remoteItem) return null;
+
+  const saved = normalizeActivityItem(remoteItem);
+  // Update local cache from API response
+  const current = parseNormalizedStoredFeed(storage)
+    .filter((entry) => entry.id !== saved.id)
+    .sort(compareActivityDesc);
+  writeActivityFeed(storage, [saved, ...current].slice(0, ACTIVITY_FEED_LIMIT));
+  // Trigger relationship update from the confirmed API response
+  maybeRecordSharedSessionFromActivity(saved, storage, options);
+  return saved;
 }

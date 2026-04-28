@@ -4,7 +4,6 @@ import {
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
   recordSharedEventBetweenPlayers,
-  saveProfileRelationshipsRecord,
 } from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
@@ -271,32 +270,7 @@ export function renderEventDetailPage(doc = globalThis.document, options = {}) {
   return model;
 }
 
-function syncRelationshipUpdateToStorage(result, storage) {
-  if (result?.leftRecord?.playerId) {
-    saveProfileRelationshipsRecord(result.leftRecord, storage);
-  }
-  if (result?.rightRecord?.playerId) {
-    saveProfileRelationshipsRecord(result.rightRecord, storage);
-  }
-}
-
-export async function recordLinkedEntryBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
-  const storage = options.storage || getDefaultPlatformStorage();
-  const apiClient = options?.apiClient;
-
-  if (typeof apiClient?.recordSharedEventBetweenPlayers === "function") {
-    const result = await Promise.resolve(apiClient.recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, {
-      eventId: options.eventId,
-      isLinkedEntry: options.isLinkedEntry,
-      occurredAt: options.occurredAt,
-    })).catch(() => null);
-
-    if (result?.leftRecord?.playerId || result?.rightRecord?.playerId) {
-      syncRelationshipUpdateToStorage(result, storage);
-      return result;
-    }
-  }
-
+export function recordLinkedEntryBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   return recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, options);
 }
 

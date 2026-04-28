@@ -237,9 +237,9 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         return;
       }
 
-      const result = createFriendshipBetweenPlayers(currentProfile.playerId, targetPlayerId, {
+      const result = await createFriendshipBetweenPlayers(currentProfile.playerId, targetPlayerId, {
         storage,
-        apiClient,
+        apiClient: null,
       });
       currentPageData = {
         ...(currentPageData || {}),
@@ -267,13 +267,9 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         return;
       }
 
-      if (authSession?.playerId) {
-        unfriendButton.disabled = true;
-        await apiClient.removeFriend(authSession.playerId, targetPlayerId).catch(() => null);
-        unfriendButton.disabled = false;
-      }
-
-      removeFriendBetweenPlayers(currentProfile.playerId, targetPlayerId, { storage, apiClient });
+      unfriendButton.disabled = true;
+      await removeFriendBetweenPlayers(currentProfile.playerId, targetPlayerId, { storage, apiClient });
+      unfriendButton.disabled = false;
 
       const updatedProfile = loadFactoryProfile(storage);
       const cleanedFriendsPreview = (updatedProfile.friendsPreview || []).filter(

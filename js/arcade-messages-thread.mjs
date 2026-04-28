@@ -1,6 +1,5 @@
 import { createMessagesApiClient } from "./platform/api/messages-api.mjs";
 import { initSessionNav } from "./arcade-session-nav.mjs";
-import { initNotificationBell } from "./arcade-notifications.mjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -54,10 +53,6 @@ async function run() {
   const nameParam = params.get("name") || "";
 
   const session = await initSessionNav(navEl);
-  if (session?.playerId && navEl) {
-    initNotificationBell(navEl, session.playerId);
-  }
-
   const viewerPlayerId = session?.playerId || "";
   const api = createMessagesApiClient();
 

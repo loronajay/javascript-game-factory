@@ -4,7 +4,6 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
-import { createPlatformApiClient } from "../api/platform-api.mjs";
 
 export const PROFILE_RELATIONSHIPS_STORAGE_KEY = getPlatformStorageKey("profileRelationships");
 export const PROFILE_RELATIONSHIP_LEDGER_STORAGE_KEY = getPlatformStorageKey("profileRelationshipLedger");
@@ -498,16 +497,13 @@ function savePairRecords(leftRecord, rightRecord, storage) {
   };
 }
 
-function mirrorPairRecordsToApi(leftRecord, rightRecord, options = {}) {
-  const apiClient = options?.apiClient || createPlatformApiClient(options);
-  if (typeof apiClient?.savePlayerRelationships !== "function") {
-    return null;
-  }
-
-  return Promise.resolve().then(() => Promise.allSettled([
-    leftRecord?.playerId ? apiClient.savePlayerRelationships(leftRecord.playerId, leftRecord) : null,
-    rightRecord?.playerId ? apiClient.savePlayerRelationships(rightRecord.playerId, rightRecord) : null,
-  ]));
+function applyRemoveFriendLocalMutations(pair) {
+  pair.leftRecord.friendPlayerIds = (pair.leftRecord.friendPlayerIds || []).filter((id) => id !== pair.rightPlayerId);
+  pair.rightRecord.friendPlayerIds = (pair.rightRecord.friendPlayerIds || []).filter((id) => id !== pair.leftPlayerId);
+  if (pair.leftRecord.mainSqueezePlayerId === pair.rightPlayerId) pair.leftRecord.mainSqueezePlayerId = "";
+  if (pair.rightRecord.mainSqueezePlayerId === pair.leftPlayerId) pair.rightRecord.mainSqueezePlayerId = "";
+  pair.leftRecord.manualFriendSlotPlayerIds = (pair.leftRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== pair.rightPlayerId);
+  pair.rightRecord.manualFriendSlotPlayerIds = (pair.rightRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== pair.leftPlayerId);
 }
 
 export function resolveProfileFriendSlots(profileView = {}, relationshipsRecord = {}) {
@@ -561,8 +557,26 @@ export function resolveProfileFriendSlots(profileView = {}, relationshipsRecord 
   };
 }
 
-export function createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+export async function createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
+
+  if (typeof apiClient?.createFriendshipBetweenPlayers === "function") {
+    const result = await apiClient.createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId).catch(() => null);
+    if (!result) {
+      return buildPairResult(
+        buildDefaultProfileRelationshipsRecord(""),
+        buildDefaultProfileRelationshipsRecord(""),
+        false,
+        0,
+      );
+    }
+    if (result.leftRecord?.playerId) saveProfileRelationshipsRecord(result.leftRecord, storage);
+    if (result.rightRecord?.playerId) saveProfileRelationshipsRecord(result.rightRecord, storage);
+    return result;
+  }
+
+  // Guest: local only
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
   if (!pair) {
     return buildPairResult(
@@ -589,14 +603,14 @@ export function createFriendshipBetweenPlayers(leftPlayerId, rightPlayerId, opti
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
-  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
-
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : FRIENDSHIP_CREATION_POINTS);
 }
 
-export function removeFriendBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+export async function removeFriendBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
+
   if (!pair) {
     return { removed: false, leftRecord: null, rightRecord: null };
   }
@@ -604,26 +618,52 @@ export function removeFriendBetweenPlayers(leftPlayerId, rightPlayerId, options 
   const ledger = loadProfileRelationshipLedger(storage);
   const pairKey = buildRelationshipPairKey(pair.leftPlayerId, pair.rightPlayerId);
 
-  pair.leftRecord.friendPlayerIds = (pair.leftRecord.friendPlayerIds || []).filter((id) => id !== pair.rightPlayerId);
-  pair.rightRecord.friendPlayerIds = (pair.rightRecord.friendPlayerIds || []).filter((id) => id !== pair.leftPlayerId);
+  if (typeof apiClient?.removeFriend === "function") {
+    const removed = await apiClient.removeFriend(pair.leftPlayerId, pair.rightPlayerId).catch(() => null);
+    if (!removed) {
+      return { removed: false, leftRecord: pair.leftRecord, rightRecord: pair.rightRecord };
+    }
+    applyRemoveFriendLocalMutations(pair);
+    delete ledger.friendshipCreatedAtByPairKey[pairKey];
+    const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
+    saveProfileRelationshipLedger(ledger, storage);
+    return { removed: true, leftRecord: saved.leftRecord, rightRecord: saved.rightRecord };
+  }
 
-  if (pair.leftRecord.mainSqueezePlayerId === pair.rightPlayerId) pair.leftRecord.mainSqueezePlayerId = "";
-  if (pair.rightRecord.mainSqueezePlayerId === pair.leftPlayerId) pair.rightRecord.mainSqueezePlayerId = "";
-
-  pair.leftRecord.manualFriendSlotPlayerIds = (pair.leftRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== pair.rightPlayerId);
-  pair.rightRecord.manualFriendSlotPlayerIds = (pair.rightRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== pair.leftPlayerId);
-
+  // Guest: local only
+  applyRemoveFriendLocalMutations(pair);
   delete ledger.friendshipCreatedAtByPairKey[pairKey];
-
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
-  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
-
   return { removed: true, leftRecord: saved.leftRecord, rightRecord: saved.rightRecord };
 }
 
-export function recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+export async function recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
+
+  if (typeof apiClient?.recordSharedSessionBetweenPlayers === "function") {
+    const result = await apiClient.recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, {
+      sessionId: options.sessionId,
+      gameSlug: options.gameSlug,
+      startedTogether: options.startedTogether,
+      reachedResults: options.reachedResults,
+      occurredAt: options.occurredAt,
+    }).catch(() => null);
+    if (!result) {
+      return buildPairResult(
+        buildDefaultProfileRelationshipsRecord(""),
+        buildDefaultProfileRelationshipsRecord(""),
+        false,
+        0,
+      );
+    }
+    if (result.leftRecord?.playerId) saveProfileRelationshipsRecord(result.leftRecord, storage);
+    if (result.rightRecord?.playerId) saveProfileRelationshipsRecord(result.rightRecord, storage);
+    return result;
+  }
+
+  // Guest: local only
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
   if (!pair) {
     return buildPairResult(
@@ -680,12 +720,33 @@ export function recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, o
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
-  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : SHARED_SESSION_POINTS);
 }
 
-export function recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+export async function recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
+
+  if (typeof apiClient?.recordSharedEventBetweenPlayers === "function") {
+    const result = await apiClient.recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, {
+      eventId: options.eventId,
+      isLinkedEntry: options.isLinkedEntry,
+      occurredAt: options.occurredAt,
+    }).catch(() => null);
+    if (!result) {
+      return buildPairResult(
+        buildDefaultProfileRelationshipsRecord(""),
+        buildDefaultProfileRelationshipsRecord(""),
+        false,
+        0,
+      );
+    }
+    if (result.leftRecord?.playerId) saveProfileRelationshipsRecord(result.leftRecord, storage);
+    if (result.rightRecord?.playerId) saveProfileRelationshipsRecord(result.rightRecord, storage);
+    return result;
+  }
+
+  // Guest: local only
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
   if (!pair) {
     return buildPairResult(
@@ -724,12 +785,34 @@ export function recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerId, opt
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
-  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
   return buildPairResult(saved.leftRecord, saved.rightRecord, !alreadyAwarded, alreadyAwarded ? 0 : SHARED_EVENT_POINTS);
 }
 
-export function recordDirectInteractionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
+export async function recordDirectInteractionBetweenPlayers(leftPlayerId, rightPlayerId, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options?.apiClient;
+
+  if (typeof apiClient?.recordDirectInteractionBetweenPlayers === "function") {
+    const result = await apiClient.recordDirectInteractionBetweenPlayers(leftPlayerId, rightPlayerId, {
+      occurredAt: options.occurredAt,
+      source: options.source,
+      thoughtId: options.thoughtId,
+      commentId: options.commentId,
+    }).catch(() => null);
+    if (!result) {
+      return buildPairResult(
+        buildDefaultProfileRelationshipsRecord(""),
+        buildDefaultProfileRelationshipsRecord(""),
+        false,
+        0,
+      );
+    }
+    if (result.leftRecord?.playerId) saveProfileRelationshipsRecord(result.leftRecord, storage);
+    if (result.rightRecord?.playerId) saveProfileRelationshipsRecord(result.rightRecord, storage);
+    return result;
+  }
+
+  // Guest: local only
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);
   if (!pair) {
     return buildPairResult(
@@ -764,7 +847,6 @@ export function recordDirectInteractionBetweenPlayers(leftPlayerId, rightPlayerI
 
   const saved = savePairRecords(pair.leftRecord, pair.rightRecord, storage);
   saveProfileRelationshipLedger(ledger, storage);
-  void mirrorPairRecordsToApi(saved.leftRecord, saved.rightRecord, options);
   return buildPairResult(saved.leftRecord, saved.rightRecord, canAward, canAward ? DIRECT_INTERACTION_POINTS : 0);
 }
 

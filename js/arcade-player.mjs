@@ -461,12 +461,12 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
     : loadProfileRelationshipsRecord(localProfile.playerId, storage);
 
   if (!isOwnerView && profile && !options?.disableProfileViewTracking) {
-    metricsRecord = incrementProfileViewCountWithApi(
+    void incrementProfileViewCountWithApi(
       profile.playerId,
       { source: "direct" },
       storage,
       options?.apiClient || createPlatformApiClient(options),
-    ) || metricsRecord;
+    );
   }
 
   const model = buildPlayerPageViewModel(profile, {

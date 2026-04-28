@@ -25,19 +25,22 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   let openReactionThoughtId = "";
   let sharePanelState = { cardId: "", thoughtId: "", mode: "", caption: "" };
   let commentPanelState = { cardId: "", thoughtId: "", text: "", comments: [] };
+  let cachedHydration = null;
 
   const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
     const currentProfile = loadFactoryProfile(storage);
     const thoughtFeed = shouldHydrate
       ? await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId)
       : loadThoughtFeed(storage);
-    const hydrated = shouldHydrate
-      ? await hydrateArcadeProfileFromApi(storage)
-      : {
-          profile: currentProfile,
-          metricsRecord: loadProfileMetricsRecord(currentProfile.playerId, storage),
-          relationshipsRecord: loadProfileRelationshipsRecord(currentProfile.playerId, storage),
-        };
+    if (!cachedHydration) {
+      const fetched = await hydrateArcadeProfileFromApi(storage, apiClient);
+      if (!fetched.error && fetched.profile) cachedHydration = fetched;
+    }
+    const hydrated = cachedHydration ?? {
+      profile: currentProfile,
+      metricsRecord: loadProfileMetricsRecord(currentProfile.playerId, storage),
+      relationshipsRecord: loadProfileRelationshipsRecord(currentProfile.playerId, storage),
+    };
 
     let enrichedProfile = hydrated.profile;
     if (apiClient?.loadPlayerProfile) {
@@ -114,10 +117,12 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   });
 
   doc.getElementById("playerProfileForm")?.addEventListener("submit", () => {
+    cachedHydration = null;
     queueMicrotask(() => { void rerender(); });
   });
 
   doc.getElementById("playerProfileClear")?.addEventListener("click", () => {
+    cachedHydration = null;
     queueMicrotask(() => { void rerender(); });
   });
 
@@ -181,7 +186,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       subject: subjectInput?.value || "",
       text: bodyInput?.value || "",
       visibility: "public",
-    }, storage);
+    }, storage, { apiClient });
 
     if (!saved) {
       void rerender("Write a thought before posting.");
@@ -317,7 +322,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     if (!id) return;
 
     const currentProfile = loadFactoryProfile(storage);
-    await deleteThoughtPostWithApi(id, storage);
+    await deleteThoughtPostWithApi(id, storage, { apiClient });
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
     void rerender();

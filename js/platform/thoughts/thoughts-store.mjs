@@ -61,7 +61,7 @@ export function parseNormalizedStoredComments(storage = getDefaultPlatformStorag
     .map((entry, index) => normalizeThoughtComment(entry, index));
 }
 
-export function mergeThoughtSources(primary = [], fallback = []) {
+function mergeThoughtSources(primary = [], fallback = []) {
   const merged = [];
   const seen = new Set();
 
@@ -75,7 +75,7 @@ export function mergeThoughtSources(primary = [], fallback = []) {
   return merged;
 }
 
-export function mergeThoughtComments(primary = [], fallback = []) {
+function mergeThoughtComments(primary = [], fallback = []) {
   const merged = [];
   const seen = new Set();
 
@@ -103,20 +103,6 @@ export function writeThoughtComments(storage, comments = []) {
     : [];
   writeStorageText(storage, THOUGHT_COMMENT_STORAGE_KEY, JSON.stringify(normalized));
   return normalized;
-}
-
-export function writeMergedThoughtFeed(storage, additions = [], options = {}) {
-  const removeIds = new Set((Array.isArray(options?.removeIds) ? options.removeIds : [])
-    .map((value) => sanitizeSingleLine(value, 80))
-    .filter(Boolean));
-  const current = parseNormalizedStoredFeed(storage)
-    .filter((entry) => !removeIds.has(entry.id));
-  const merged = mergeThoughtSources(
-    additions.map((entry, index) => normalizeThoughtPost(entry, index)),
-    current,
-  );
-  writeThoughtFeed(storage, merged);
-  return merged;
 }
 
 // ---------- sort ----------

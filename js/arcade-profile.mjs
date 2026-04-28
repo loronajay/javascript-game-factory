@@ -295,13 +295,17 @@ export async function hydrateArcadeProfileFromApi(
     ? seededProfileResult
     : (profileResult?.playerId === playerId ? profileResult : null);
 
-  const profile = resolvedProfileResult?.playerId === playerId
-    ? saveFactoryProfile({
-        ...currentProfile,
-        ...resolvedProfileResult,
-        playerId,
-      }, storage, options)
-    : currentProfile;
+  if (!resolvedProfileResult?.playerId) {
+    return {
+      profile: null,
+      relationshipsRecord: null,
+      metricsRecord: null,
+      usedApi: false,
+      error: "profile_load_failed",
+    };
+  }
+
+  const profile = saveFactoryProfile({ ...resolvedProfileResult, playerId }, storage, options);
   const relationshipsRecord = relationshipsResult?.playerId === playerId
     ? (saveProfileRelationshipsRecord({
         ...relationshipsResult,
@@ -319,34 +323,40 @@ export async function hydrateArcadeProfileFromApi(
     profile,
     relationshipsRecord,
     metricsRecord,
-    usedApi: !!(resolvedProfileResult || relationshipsResult || metricsResult),
+    usedApi: true,
   };
 }
 
 export async function persistArcadeProfileDetails(storage, fields = {}, options = {}) {
-  const savedProfile = saveArcadeProfileDetails(storage, fields, options);
   const apiClient = options?.apiClient || createPlatformApiClient(options);
+  const currentProfile = loadFactoryProfile(storage, options);
+  const playerId = currentProfile.playerId;
 
-  if (!savedProfile?.playerId || !apiClient) {
-    return savedProfile;
+  if (!playerId || !apiClient?.isConfigured) {
+    return saveArcadeProfileDetails(storage, fields, options);
   }
 
-  const relationshipsRecord = loadProfileRelationshipsRecord(savedProfile.playerId, storage);
-  const syncTasks = [];
+  // Write to local as a cache placeholder while the API call is in flight.
+  const localMerged = saveArcadeProfileDetails(storage, fields, options);
+  const relFields = hasRelationshipField(fields) ? loadProfileRelationshipsRecord(playerId, storage) : null;
 
-  if (typeof apiClient.savePlayerProfile === "function") {
-    syncTasks.push(apiClient.savePlayerProfile(savedProfile.playerId, savedProfile));
+  const [profileResult, relResult] = await Promise.allSettled([
+    apiClient.savePlayerProfile(playerId, localMerged),
+    relFields ? apiClient.savePlayerRelationships(playerId, relFields) : Promise.resolve(null),
+  ]);
+
+  if (profileResult.status !== "fulfilled" || !profileResult.value?.playerId) {
+    throw new Error("Profile save failed");
   }
 
-  if (typeof apiClient.savePlayerRelationships === "function") {
-    syncTasks.push(apiClient.savePlayerRelationships(savedProfile.playerId, relationshipsRecord));
+  // Update local cache from API response — API object is canonical.
+  const saved = saveFactoryProfile(profileResult.value, storage, options);
+
+  if (relResult?.status === "fulfilled" && relResult.value?.playerId) {
+    saveProfileRelationshipsRecord({ ...relResult.value, playerId }, storage);
   }
 
-  if (syncTasks.length > 0) {
-    await Promise.allSettled(syncTasks);
-  }
-
-  return savedProfile;
+  return saved;
 }
 
 export function initArcadeProfilePanel({

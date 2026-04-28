@@ -1247,7 +1247,8 @@ Now active (no longer deferred):
 - authentication: sign-up, sign-in, sign-out, 30-day JWT sessions, password reset, and account deletion are all live
 - player discovery: `hasAccount` on profile API, player search, results-screen opponent menus, and `discoverable` opt-out are all live
 - notification system: bell + dropdown, friend requests, thought-action notifications — all live through `platform-api/` and `js/arcade-notifications.mjs`
-- direct messaging: `conversations` + `messages` Postgres tables (migration 010), five backend routes, shared API client (`messages-api.mjs`), inbox page, thread page with 5s polling, `new_message` bell notification type — all live
+- direct messaging: `conversations` + `messages` Postgres tables (migration 010), five backend routes, shared API client (`messages-api.mjs`), inbox page, thread page with 5s polling, `new_message` bell notification type — all live; "Message 💬" button on `/player` profiles now navigates authenticated viewers directly to the thread
+- full notifications inbox: `/notifications/index.html` page with `arcade-notifications-page.mjs` reusing the bell component's `renderNotificationItem` so all inline actions (Accept/Reject friend requests, Accept/Decline challenges) work on the standalone page
 
 ## Decision Gates
 

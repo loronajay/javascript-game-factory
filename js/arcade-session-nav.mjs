@@ -51,4 +51,6 @@ export async function initSessionNav(containerEl, {
       <a class="session-nav__link grid-stage__portal" href="${signUpPath}">Create Account</a>
     `;
   }
+
+  return session;
 }

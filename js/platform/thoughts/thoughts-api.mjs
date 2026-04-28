@@ -13,11 +13,8 @@ import {
 import {
   parseNormalizedStoredFeed,
   parseNormalizedStoredComments,
-  mergeThoughtSources,
-  mergeThoughtComments,
   writeThoughtFeed,
   writeThoughtComments,
-  writeMergedThoughtFeed,
   loadThoughtFeed,
   loadThoughtComments,
   deleteThoughtPost,
@@ -26,6 +23,19 @@ import {
   shareThoughtPost,
   reactToThoughtPost,
 } from "./thoughts-store.mjs";
+
+function cacheThoughtPosts(storage, additions = [], options = {}) {
+  const removeIds = new Set(
+    (Array.isArray(options?.removeIds) ? options.removeIds : [])
+      .map((v) => sanitizeSingleLine(v, 80))
+      .filter(Boolean),
+  );
+  const incoming = additions.map((entry, index) => normalizeThoughtPost(entry, index));
+  const incomingIds = new Set(incoming.map((e) => e.id));
+  const current = parseNormalizedStoredFeed(storage)
+    .filter((entry) => !removeIds.has(entry.id) && !incomingIds.has(entry.id));
+  writeThoughtFeed(storage, [...incoming, ...current]);
+}
 
 export async function syncThoughtFeedFromApi(
   storage = getDefaultPlatformStorage(),
@@ -38,11 +48,8 @@ export async function syncThoughtFeedFromApi(
   const remoteFeed = await apiClient.listThoughts(viewerPlayerId).catch(() => null);
   if (!Array.isArray(remoteFeed)) return loadThoughtFeed(storage);
 
-  const merged = mergeThoughtSources(
-    remoteFeed.map((entry, index) => normalizeThoughtPost(entry, index)),
-    parseNormalizedStoredFeed(storage),
-  );
-  writeThoughtFeed(storage, merged);
+  // Auth: API response is canonical; write to local as cache (no merge with local user posts)
+  writeThoughtFeed(storage, remoteFeed.map((entry, index) => normalizeThoughtPost(entry, index)));
   return loadThoughtFeed(storage);
 }
 
@@ -58,19 +65,17 @@ export async function syncThoughtCommentsFromApi(
   const remoteComments = await apiClient.listThoughtComments(normalizedThoughtId).catch(() => null);
   if (!Array.isArray(remoteComments)) return loadThoughtComments(normalizedThoughtId, storage);
 
-  const current = parseNormalizedStoredComments(storage)
+  // Auth: API response replaces local comments for this thought
+  const normalized = remoteComments.map((entry, index) => normalizeThoughtComment(entry, index));
+  const otherComments = parseNormalizedStoredComments(storage)
     .filter((entry) => entry.thoughtId !== normalizedThoughtId);
-  const merged = mergeThoughtComments(
-    current,
-    remoteComments.map((entry, index) => normalizeThoughtComment(entry, index)),
-  );
-  writeThoughtComments(storage, merged);
+  writeThoughtComments(storage, [...otherComments, ...normalized]);
 
-  const realCount = merged.filter((c) => c.thoughtId === normalizedThoughtId).length;
+  const realCount = normalized.length;
   const storedFeed = parseNormalizedStoredFeed(storage);
   const matchingThought = storedFeed.find((t) => t.id === normalizedThoughtId);
   if (matchingThought && matchingThought.commentCount !== realCount) {
-    writeMergedThoughtFeed(storage, [normalizeThoughtPost({ ...matchingThought, commentCount: realCount })]);
+    cacheThoughtPosts(storage, [normalizeThoughtPost({ ...matchingThought, commentCount: realCount })]);
   }
 
   return loadThoughtComments(normalizedThoughtId, storage);
@@ -81,21 +86,31 @@ export async function publishThoughtPostWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const saved = publishThoughtPost(post, storage);
-  if (!saved) return null;
-
   const apiClient = options?.apiClient || createPlatformApiClient(options);
-  if (typeof apiClient?.saveThought !== "function") return saved;
+  const isAuth = typeof apiClient?.saveThought === "function";
 
-  const remoteThought = await apiClient.saveThought(saved).catch(() => null);
-  if (remoteThought) {
-    const merged = mergeThoughtSources(
-      [normalizeThoughtPost(remoteThought)],
-      parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== remoteThought.id),
-    );
-    writeThoughtFeed(storage, merged);
+  if (!isAuth) {
+    // Guest: local only
+    return publishThoughtPost(post, storage);
   }
 
+  // Auth: API first; no local pre-write
+  const candidate = normalizeThoughtPost({
+    id: `thought-tmp-${Date.now().toString(36)}`,
+    createdAt: new Date().toISOString(),
+    ...post,
+    commentCount: 0,
+    shareCount: 0,
+    reactionTotals: {},
+    repostOfId: "",
+  });
+  if (!candidate.subject && !candidate.text) return null;
+
+  const remoteThought = await apiClient.saveThought(candidate).catch(() => null);
+  if (!remoteThought) return null;
+
+  const saved = normalizeThoughtPost(remoteThought);
+  cacheThoughtPosts(storage, [saved]);
   return saved;
 }
 
@@ -104,14 +119,17 @@ export async function deleteThoughtPostWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const deleted = deleteThoughtPost(id, storage);
-  if (!deleted) return false;
-
   const apiClient = options?.apiClient || createPlatformApiClient(options);
-  if (typeof apiClient?.deleteThought === "function") {
-    await apiClient.deleteThought(id).catch(() => null);
+  const isAuth = typeof apiClient?.deleteThought === "function";
+
+  if (!isAuth) {
+    // Guest: local only
+    return deleteThoughtPost(id, storage);
   }
 
+  // Auth: API first, then update local cache
+  await apiClient.deleteThought(id).catch(() => null);
+  deleteThoughtPost(id, storage);
   return true;
 }
 
@@ -122,37 +140,36 @@ export async function commentOnThoughtPostWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const localCommentRecord = commentOnThoughtPost(thoughtId, viewerActor, text, storage);
-  if (!localCommentRecord) return null;
-
   const actor = normalizeThoughtShareActor(viewerActor);
   const normalizedText = sanitizeTextBlock(text, 500);
+  const normalizedThoughtId = sanitizeThoughtShareId(thoughtId);
   const apiClient = options?.apiClient || createPlatformApiClient(options);
-  let resolvedRecord = localCommentRecord;
+  const isAuth = typeof apiClient?.commentOnThought === "function";
 
-  if (typeof apiClient?.commentOnThought === "function") {
-    const remoteCommentRecord = await apiClient
-      .commentOnThought(
-        localCommentRecord.thought.id,
-        actor.playerId,
-        actor.authorDisplayName,
-        normalizedText,
-      )
-      .catch(() => null);
-
-    if (remoteCommentRecord?.thought && remoteCommentRecord?.comment) {
-      resolvedRecord = {
-        thought: normalizeThoughtPost(remoteCommentRecord.thought),
-        comment: normalizeThoughtComment(remoteCommentRecord.comment),
-      };
-
-      writeMergedThoughtFeed(storage, [resolvedRecord.thought]);
-      const current = parseNormalizedStoredComments(storage)
-        .filter((entry) => entry.id !== localCommentRecord.comment.id)
-        .filter((entry) => entry.id !== resolvedRecord.comment.id);
-      writeThoughtComments(storage, mergeThoughtComments(current, [resolvedRecord.comment]));
-    }
+  if (!isAuth) {
+    // Guest: local only
+    return commentOnThoughtPost(thoughtId, viewerActor, text, storage);
   }
+
+  // Auth: API first
+  if (!normalizedThoughtId || !actor.playerId || !actor.authorDisplayName || !normalizedText) return null;
+
+  const remoteCommentRecord = await apiClient
+    .commentOnThought(normalizedThoughtId, actor.playerId, actor.authorDisplayName, normalizedText)
+    .catch(() => null);
+
+  if (!remoteCommentRecord?.thought || !remoteCommentRecord?.comment) return null;
+
+  const resolvedRecord = {
+    thought: normalizeThoughtPost(remoteCommentRecord.thought),
+    comment: normalizeThoughtComment(remoteCommentRecord.comment),
+  };
+
+  // Update local cache from API response
+  cacheThoughtPosts(storage, [resolvedRecord.thought]);
+  const otherComments = parseNormalizedStoredComments(storage)
+    .filter((entry) => entry.id !== resolvedRecord.comment.id);
+  writeThoughtComments(storage, [...otherComments, resolvedRecord.comment]);
 
   const canRecordInteraction = resolvedRecord.thought.authorPlayerId
     && resolvedRecord.thought.authorPlayerId !== actor.playerId;
@@ -161,23 +178,14 @@ export async function commentOnThoughtPostWithApi(
   }
 
   const occurredAt = new Date().toISOString();
-  if (typeof apiClient?.recordDirectInteractionBetweenPlayers === "function") {
-    await apiClient.recordDirectInteractionBetweenPlayers(actor.playerId, resolvedRecord.thought.authorPlayerId, {
-      occurredAt,
-      source: "thought_comment",
-      thoughtId: resolvedRecord.thought.id,
-      commentId: resolvedRecord.comment.id,
-    }).catch(() => null);
-  } else {
-    recordDirectInteractionBetweenPlayers(actor.playerId, resolvedRecord.thought.authorPlayerId, {
-      occurredAt,
-      source: "thought_comment",
-      thoughtId: resolvedRecord.thought.id,
-      commentId: resolvedRecord.comment.id,
-      storage,
-      apiClient,
-    });
-  }
+  await recordDirectInteractionBetweenPlayers(actor.playerId, resolvedRecord.thought.authorPlayerId, {
+    occurredAt,
+    source: "thought_comment",
+    thoughtId: resolvedRecord.thought.id,
+    commentId: resolvedRecord.comment.id,
+    storage,
+    apiClient,
+  }).catch(() => null);
 
   return { ...resolvedRecord, comments: loadThoughtComments(resolvedRecord.thought.id, storage) };
 }
@@ -188,37 +196,41 @@ export async function shareThoughtPostWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const localShare = shareThoughtPost(thoughtId, viewerActor, storage, options);
-  if (!localShare) return null;
-
   const actor = normalizeThoughtShareActor(viewerActor);
   const apiClient = options?.apiClient || createPlatformApiClient(options);
-  let resolvedShare = localShare;
+  const isAuth = typeof apiClient?.shareThought === "function";
 
-  if (typeof apiClient?.shareThought === "function") {
-    const remoteShare = await apiClient
-      .shareThought(
-        localShare.originalThought.repostOfId || localShare.originalThought.id,
-        actor.playerId,
-        actor.authorDisplayName,
-        { caption: sanitizeTextBlock(options?.caption, 500) },
-      )
-      .catch(() => null);
-
-    if (remoteShare?.originalThought) {
-      resolvedShare = {
-        originalThought: normalizeThoughtPost(remoteShare.originalThought),
-        sharedThought: remoteShare.sharedThought ? normalizeThoughtPost(remoteShare.sharedThought) : null,
-        removedSharedThoughtId: sanitizeThoughtShareId(remoteShare.removedSharedThoughtId),
-      };
-
-      writeMergedThoughtFeed(
-        storage,
-        [resolvedShare.originalThought, resolvedShare.sharedThought].filter(Boolean),
-        { removeIds: [resolvedShare.removedSharedThoughtId].filter(Boolean) },
-      );
-    }
+  if (!isAuth) {
+    // Guest: local only
+    return shareThoughtPost(thoughtId, viewerActor, storage, options);
   }
+
+  // Auth: API first
+  if (!sanitizeThoughtShareId(thoughtId) || !actor.playerId || !actor.authorDisplayName) return null;
+
+  const remoteShare = await apiClient
+    .shareThought(
+      thoughtId,
+      actor.playerId,
+      actor.authorDisplayName,
+      { caption: sanitizeTextBlock(options?.caption, 500) },
+    )
+    .catch(() => null);
+
+  if (!remoteShare?.originalThought) return null;
+
+  const resolvedShare = {
+    originalThought: normalizeThoughtPost(remoteShare.originalThought),
+    sharedThought: remoteShare.sharedThought ? normalizeThoughtPost(remoteShare.sharedThought) : null,
+    removedSharedThoughtId: sanitizeThoughtShareId(remoteShare.removedSharedThoughtId),
+  };
+
+  // Update local cache from API response
+  cacheThoughtPosts(
+    storage,
+    [resolvedShare.originalThought, resolvedShare.sharedThought].filter(Boolean),
+    { removeIds: [resolvedShare.removedSharedThoughtId].filter(Boolean) },
+  );
 
   const canRecordInteraction = !!resolvedShare.sharedThought
     && resolvedShare.originalThought?.authorPlayerId
@@ -226,24 +238,14 @@ export async function shareThoughtPostWithApi(
   if (!canRecordInteraction) return resolvedShare;
 
   const occurredAt = new Date().toISOString();
-  if (typeof apiClient?.recordDirectInteractionBetweenPlayers === "function") {
-    await apiClient.recordDirectInteractionBetweenPlayers(actor.playerId, resolvedShare.originalThought.authorPlayerId, {
-      occurredAt,
-      source: "thought_share",
-      thoughtId: resolvedShare.originalThought.id,
-      sharedThoughtId: resolvedShare.sharedThought.id,
-    }).catch(() => null);
-    return resolvedShare;
-  }
-
-  recordDirectInteractionBetweenPlayers(actor.playerId, resolvedShare.originalThought.authorPlayerId, {
+  await recordDirectInteractionBetweenPlayers(actor.playerId, resolvedShare.originalThought.authorPlayerId, {
     occurredAt,
     source: "thought_share",
     thoughtId: resolvedShare.originalThought.id,
     sharedThoughtId: resolvedShare.sharedThought.id,
     storage,
     apiClient,
-  });
+  }).catch(() => null);
   return resolvedShare;
 }
 
@@ -254,50 +256,43 @@ export async function reactToThoughtPostWithApi(
   storage = getDefaultPlatformStorage(),
   options = {},
 ) {
-  const localThought = reactToThoughtPost(thoughtId, viewerPlayerId, reactionId, storage);
-  if (!localThought) return null;
-
   const apiClient = options?.apiClient || createPlatformApiClient(options);
-  let resolvedThought = localThought;
+  const isAuth = typeof apiClient?.reactToThought === "function";
 
-  if (typeof apiClient?.reactToThought === "function") {
-    const remoteThought = await apiClient
-      .reactToThought(localThought.id, sanitizeSingleLine(viewerPlayerId, 80), sanitizeThoughtReactionId(reactionId))
-      .catch(() => null);
-
-    if (remoteThought) {
-      resolvedThought = normalizeThoughtPost(remoteThought);
-      const merged = mergeThoughtSources(
-        [resolvedThought],
-        parseNormalizedStoredFeed(storage).filter((entry) => entry.id !== resolvedThought.id),
-      );
-      writeThoughtFeed(storage, merged);
-    }
+  if (!isAuth) {
+    // Guest: local only
+    return reactToThoughtPost(thoughtId, viewerPlayerId, reactionId, storage);
   }
 
+  // Auth: API first
+  const normalizedThoughtId = sanitizeThoughtShareId(thoughtId);
+  const normalizedViewerPlayerId = sanitizeSingleLine(viewerPlayerId, 80);
+  const normalizedReactionId = sanitizeThoughtReactionId(reactionId);
+  if (!normalizedThoughtId || !normalizedViewerPlayerId || !normalizedReactionId) return null;
+
+  const remoteThought = await apiClient
+    .reactToThought(normalizedThoughtId, normalizedViewerPlayerId, normalizedReactionId)
+    .catch(() => null);
+
+  if (!remoteThought) return null;
+
+  const resolvedThought = normalizeThoughtPost(remoteThought);
+  // Update local cache from API response
+  cacheThoughtPosts(storage, [resolvedThought]);
+
   const canRecordInteraction = resolvedThought.authorPlayerId
-    && resolvedThought.authorPlayerId !== sanitizeSingleLine(viewerPlayerId, 80)
+    && resolvedThought.authorPlayerId !== normalizedViewerPlayerId
     && !!resolvedThought.viewerReaction;
   if (!canRecordInteraction) return resolvedThought;
 
   const occurredAt = new Date().toISOString();
-  if (typeof apiClient?.recordDirectInteractionBetweenPlayers === "function") {
-    await apiClient.recordDirectInteractionBetweenPlayers(viewerPlayerId, resolvedThought.authorPlayerId, {
-      occurredAt,
-      source: "thought_reaction",
-      thoughtId: resolvedThought.id,
-      reactionId: resolvedThought.viewerReaction,
-    }).catch(() => null);
-    return resolvedThought;
-  }
-
-  recordDirectInteractionBetweenPlayers(viewerPlayerId, resolvedThought.authorPlayerId, {
+  await recordDirectInteractionBetweenPlayers(viewerPlayerId, resolvedThought.authorPlayerId, {
     occurredAt,
     source: "thought_reaction",
     thoughtId: resolvedThought.id,
     reactionId: resolvedThought.viewerReaction,
     storage,
     apiClient,
-  });
+  }).catch(() => null);
   return resolvedThought;
 }

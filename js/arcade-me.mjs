@@ -27,7 +27,6 @@ import {
   createFriendshipBetweenPlayers,
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
-  saveProfileRelationshipsRecord,
 } from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import {
@@ -77,24 +76,10 @@ export async function addFriendByCode(friendCode, options = {}) {
     return { ok: false, message: "That is your friend code." };
   }
 
-  let result = null;
-
-  if (typeof apiClient?.createFriendshipBetweenPlayers === "function") {
-    result = await apiClient.createFriendshipBetweenPlayers(currentProfile.playerId, targetProfile.playerId);
-    if (result?.leftRecord?.playerId) {
-      saveProfileRelationshipsRecord(result.leftRecord, storage);
-    }
-    if (result?.rightRecord?.playerId) {
-      saveProfileRelationshipsRecord(result.rightRecord, storage);
-    }
-  }
-
-  if (!result?.leftRecord?.playerId || !result?.rightRecord?.playerId) {
-    result = createFriendshipBetweenPlayers(currentProfile.playerId, targetProfile.playerId, {
-      storage,
-      apiClient,
-    });
-  }
+  const result = await createFriendshipBetweenPlayers(currentProfile.playerId, targetProfile.playerId, {
+    storage,
+    apiClient,
+  });
 
   const label = targetProfile.profileName || targetProfile.playerId || "that player";
   return {
