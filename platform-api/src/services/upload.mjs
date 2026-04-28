@@ -31,7 +31,6 @@ export function createUploadService(config = {}) {
           const stream = cloudinary.uploader.upload_stream(
             {
               folder,
-              upload_preset: "user_uploads",
               transformation: [{ width: maxWidth, crop: "limit" }],
               resource_type: "image",
             },
