@@ -493,13 +493,17 @@ const doc = globalThis.document;
 if (doc?.getElementById) {
   const storage = getDefaultPlatformStorage();
   const apiClient = createPlatformApiClient();
-  const profilePanel = initArcadeProfilePanel({ doc, storage });
-  renderPlayerPage(doc);
 
   let authSession = null;
   try {
     authSession = await createAuthApiClient().getSession();
   } catch { /* no session */ }
 
+  if (authSession?.playerId) {
+    saveFactoryProfile({ ...loadFactoryProfile(storage), playerId: authSession.playerId }, storage);
+  }
+
+  const profilePanel = initArcadeProfilePanel({ doc, storage });
+  renderPlayerPage(doc);
   wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel, authSession });
 }

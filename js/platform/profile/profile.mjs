@@ -270,6 +270,7 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
   const avatarUrlResolver = typeof options?.avatarUrlResolver === "function"
     ? options.avatarUrlResolver
     : null;
+  const providedAvatarUrl = normalizeUrl(sanitizeSingleLine(source.avatarUrl, PROFILE_BACKGROUND_URL_MAX_LENGTH));
 
   return {
     playerId: sanitizeSingleLine(source.playerId, 80),
@@ -283,7 +284,7 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
     presence: normalizedFields.presence,
     avatarUrl: normalizedFields.avatarAssetId && avatarUrlResolver
       ? String(avatarUrlResolver(normalizedFields.avatarAssetId) || "")
-      : "",
+      : providedAvatarUrl,
     links: normalizedFields.links,
     favoriteGameSlug: normalizedFields.favoriteGameSlug,
     ladderPlacements: normalizedFields.ladderPlacements,

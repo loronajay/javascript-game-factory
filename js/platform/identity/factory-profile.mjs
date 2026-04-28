@@ -14,6 +14,10 @@ function isPlainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+function sanitizeCachedUrl(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function createFallbackPlayerId() {
   return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -92,6 +96,7 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
     bio: profileFields.bio,
     tagline: profileFields.tagline,
     avatarAssetId: profileFields.avatarAssetId,
+    avatarUrl: sanitizeCachedUrl(source.avatarUrl),
     backgroundImageUrl: profileFields.backgroundImageUrl,
     presence: profileFields.presence,
     favoriteGameSlug: profileFields.favoriteGameSlug,

@@ -104,7 +104,7 @@ export async function publishThoughtPostWithApi(
     reactionTotals: {},
     repostOfId: "",
   });
-  if (!candidate.subject && !candidate.text) return null;
+  if (!candidate.subject && !candidate.text && !candidate.imageUrl) return null;
 
   const remoteThought = await apiClient.saveThought(candidate).catch(() => null);
   if (!remoteThought) return null;
