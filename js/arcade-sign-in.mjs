@@ -1,5 +1,5 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
-import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { bindFactoryProfileToSession } from "./platform/identity/factory-profile.mjs";
 
 const ERROR_MESSAGES = {
   invalid_credentials: "Email or password is incorrect.",
@@ -24,8 +24,7 @@ function setSubmitting(button, submitting) {
 }
 
 function applySessionToProfile(playerId) {
-  const profile = loadFactoryProfile();
-  saveFactoryProfile({ ...profile, playerId });
+  bindFactoryProfileToSession(playerId);
 }
 
 function getRedirectTarget() {

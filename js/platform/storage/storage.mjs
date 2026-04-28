@@ -62,3 +62,18 @@ export function removeStorageText(storage, key) {
     return false;
   }
 }
+
+export function clearPlatformStorage(storage, keys = Object.values(PLATFORM_STORAGE_KEYS)) {
+  if (!Array.isArray(keys)) return 0;
+
+  let clearedCount = 0;
+  const seen = new Set();
+  keys.forEach((key) => {
+    if (!isNonEmptyString(key) || seen.has(key)) return;
+    seen.add(key);
+    if (removeStorageText(storage, key)) {
+      clearedCount += 1;
+    }
+  });
+  return clearedCount;
+}

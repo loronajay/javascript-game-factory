@@ -1,4 +1,5 @@
 import {
+  clearPlatformStorage,
   getDefaultPlatformStorage,
   getPlatformStorageKey,
   readStorageText,
@@ -123,6 +124,35 @@ export function saveFactoryProfile(profile, storage = getDefaultStorage(), optio
   writeStorageText(storage, getStorageKey(options), JSON.stringify(normalized));
 
   return normalized;
+}
+
+export function bindFactoryProfileToSession(playerId, storage = getDefaultStorage(), options = {}) {
+  const normalizedPlayerId = typeof playerId === "string" ? playerId.trim() : "";
+  if (!normalizedPlayerId) return null;
+
+  const current = loadFactoryProfile(storage, options);
+  const isSamePlayer = current.playerId === normalizedPlayerId;
+
+  if (!isSamePlayer) {
+    clearPlatformStorage(storage);
+  }
+
+  const nextProfile = isSamePlayer
+    ? {
+        ...current,
+        playerId: normalizedPlayerId,
+        ...(typeof options.profileName === "string" && options.profileName.trim()
+          ? { profileName: options.profileName }
+          : {}),
+      }
+    : {
+        playerId: normalizedPlayerId,
+        ...(typeof options.profileName === "string" && options.profileName.trim()
+          ? { profileName: options.profileName }
+          : {}),
+      };
+
+  return saveFactoryProfile(nextProfile, storage, options);
 }
 
 export function loadFactoryProfile(storage = getDefaultStorage(), options = {}) {

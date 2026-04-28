@@ -1,5 +1,5 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
-import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { bindFactoryProfileToSession, loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import {
   incrementProfileViewCountWithApi,
@@ -500,7 +500,7 @@ if (doc?.getElementById) {
   } catch { /* no session */ }
 
   if (authSession?.playerId) {
-    saveFactoryProfile({ ...loadFactoryProfile(storage), playerId: authSession.playerId }, storage);
+    bindFactoryProfileToSession(authSession.playerId, storage);
   }
 
   const profilePanel = initArcadeProfilePanel({ doc, storage });

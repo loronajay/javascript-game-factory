@@ -1,5 +1,5 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
-import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { bindFactoryProfileToSession, loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 
 const ERROR_MESSAGES = {
   email_taken: "That email is already registered. Sign in instead?",
@@ -26,10 +26,7 @@ function setSubmitting(button, submitting) {
 }
 
 function applySessionToProfile(playerId, profileName) {
-  const profile = loadFactoryProfile();
-  const updates = { ...profile, playerId };
-  if (profileName) updates.profileName = profileName;
-  saveFactoryProfile(updates);
+  bindFactoryProfileToSession(playerId, undefined, { profileName });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

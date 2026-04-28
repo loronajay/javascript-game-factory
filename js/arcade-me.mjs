@@ -1,5 +1,5 @@
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
-import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { bindFactoryProfileToSession, loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
   loadProfileMetricsRecord,
   normalizeProfileMetricsRecord,
@@ -209,7 +209,7 @@ if (doc?.getElementById) {
     window.location.replace("../sign-in/index.html?next=/me/index.html");
   } else {
     const storage = getDefaultPlatformStorage();
-    saveFactoryProfile({ ...loadFactoryProfile(storage), playerId: session.playerId }, storage);
+    bindFactoryProfileToSession(session.playerId, storage);
     const apiClient = createPlatformApiClient();
     const authClient = createAuthApiClient();
     const profilePanel = initArcadeProfilePanel({ storage });

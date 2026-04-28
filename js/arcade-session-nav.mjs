@@ -1,5 +1,6 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { clearPlatformStorage, getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { initNotificationBell } from "./arcade-notifications.mjs";
 
 const auth = createAuthApiClient();
@@ -40,6 +41,7 @@ export async function initSessionNav(containerEl, {
 
     containerEl.querySelector(".session-nav__signout").addEventListener("click", async () => {
       await auth.logout();
+      clearPlatformStorage(getDefaultPlatformStorage());
       window.location.href = homeOnLogout;
     });
 
