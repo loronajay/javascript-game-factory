@@ -13,6 +13,9 @@ export function readConfig(options = {}) {
   const resendApiKey = typeof env.RESEND_API_KEY === "string" ? env.RESEND_API_KEY.trim() : "";
   const fromEmail = typeof env.RESEND_FROM_EMAIL === "string" ? env.RESEND_FROM_EMAIL.trim() : "";
   const appBaseUrl = typeof env.APP_BASE_URL === "string" ? env.APP_BASE_URL.trim().replace(/\/+$/, "") : "";
+  const cloudinaryCloudName = typeof env.CLOUDINARY_CLOUD_NAME === "string" ? env.CLOUDINARY_CLOUD_NAME.trim() : "";
+  const cloudinaryApiKey = typeof env.CLOUDINARY_API_KEY === "string" ? env.CLOUDINARY_API_KEY.trim() : "";
+  const cloudinaryApiSecret = typeof env.CLOUDINARY_API_SECRET === "string" ? env.CLOUDINARY_API_SECRET.trim() : "";
 
   return {
     port: parsePort(env.PORT),
@@ -24,5 +27,9 @@ export function readConfig(options = {}) {
     resendApiKey,
     fromEmail,
     appBaseUrl,
+    cloudinaryCloudName,
+    cloudinaryApiKey,
+    cloudinaryApiSecret,
+    hasCloudinary: Boolean(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret),
   };
 }

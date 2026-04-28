@@ -1,3 +1,5 @@
+import busboy from "busboy";
+
 import {
   buildClearCookieHeader,
   buildSetCookieHeader,
@@ -48,6 +50,58 @@ async function readJsonBody(req) {
   } catch {
     return { ok: false, error: "invalid_json" };
   }
+}
+
+function readMultipartFile(req) {
+  return new Promise((resolve) => {
+    const contentType = req.headers?.["content-type"] || "";
+    if (!contentType.startsWith("multipart/form-data")) {
+      resolve({ ok: false, error: "not_multipart" });
+      return;
+    }
+
+    let bb;
+    try {
+      bb = busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+    } catch {
+      resolve({ ok: false, error: "invalid_multipart" });
+      return;
+    }
+
+    let fileBuffer = null;
+    let mimeType = "";
+    let fileSizeLimitHit = false;
+
+    bb.on("file", (_fieldname, fileStream, info) => {
+      mimeType = info.mimeType || "";
+      const chunks = [];
+      fileStream.on("data", (chunk) => chunks.push(chunk));
+      fileStream.on("limit", () => { fileSizeLimitHit = true; fileStream.resume(); });
+      fileStream.on("end", () => {
+        if (!fileSizeLimitHit) {
+          fileBuffer = Buffer.concat(chunks);
+        }
+      });
+    });
+
+    bb.on("finish", () => {
+      if (fileSizeLimitHit) {
+        resolve({ ok: false, error: "file_too_large" });
+      } else if (!fileBuffer) {
+        resolve({ ok: false, error: "no_file" });
+      } else {
+        resolve({ ok: true, buffer: fileBuffer, mimeType });
+      }
+    });
+
+    bb.on("error", () => resolve({ ok: false, error: "multipart_parse_error" }));
+    req.pipe(bb);
+  });
+}
+
+function resolveProfileAvatarUrl(profile, resolver) {
+  if (!profile || !resolver || !profile.avatarAssetId) return profile;
+  return { ...profile, avatarUrl: resolver(profile.avatarAssetId) };
 }
 
 function buildTimestamp(now) {
@@ -212,6 +266,12 @@ export function createApp(options = {}) {
   const deleteAccount = typeof options?.deleteAccount === "function"
     ? options.deleteAccount
     : async () => ({ error: "not_configured" });
+  const uploadService = options?.uploadService && typeof options.uploadService.uploadImage === "function"
+    ? options.uploadService
+    : null;
+  const avatarUrlResolver = typeof options?.avatarUrlResolver === "function"
+    ? options.avatarUrlResolver
+    : null;
   const jwtSecret = typeof options?.jwtSecret === "string" ? options.jwtSecret : "";
   const isProduction = Boolean(options?.isProduction);
   const now = options?.now;
@@ -274,6 +334,45 @@ export function createApp(options = {}) {
         database: isDatabaseReady ? "up" : "down",
         timestamp,
       }, requestOrigin);
+      return;
+    }
+
+    // Upload routes
+    if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo")) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+        return;
+      }
+
+      if (!uploadService) {
+        writeJson(res, 503, { status: "error", error: "upload_not_configured", timestamp }, requestOrigin);
+        return;
+      }
+
+      const multipart = await readMultipartFile(req);
+      if (!multipart.ok) {
+        const statusCode = multipart.error === "file_too_large" ? 413 : 400;
+        writeJson(res, statusCode, { status: "error", error: multipart.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      const isAvatar = pathname === "/upload/avatar";
+      const folder = isAvatar ? "uploads/avatars" : "uploads/player-photos";
+      const maxWidth = isAvatar ? 800 : 1200;
+
+      const result = await uploadService.uploadImage(multipart.buffer, {
+        folder,
+        maxWidth,
+        mimeType: multipart.mimeType,
+      });
+
+      if (!result.ok) {
+        const statusCode = result.error === "unsupported_file_type" ? 415 : 500;
+        writeJson(res, statusCode, { status: "error", error: result.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      writeJson(res, 200, { assetId: result.assetId, url: result.url }, requestOrigin);
       return;
     }
 
@@ -429,7 +528,9 @@ export function createApp(options = {}) {
         return;
       }
       const players = await searchPlayers(q);
-      writeJson(res, 200, { players }, requestOrigin);
+      writeJson(res, 200, {
+        players: players.map((p) => resolveProfileAvatarUrl(p, avatarUrlResolver)),
+      }, requestOrigin);
       return;
     }
 
@@ -625,7 +726,7 @@ export function createApp(options = {}) {
       }
 
       writeJson(res, 200, {
-        player: profile,
+        player: resolveProfileAvatarUrl(profile, avatarUrlResolver),
       }, requestOrigin);
       return;
     }
@@ -643,7 +744,7 @@ export function createApp(options = {}) {
       }
 
       writeJson(res, 200, {
-        player: profile,
+        player: resolveProfileAvatarUrl(profile, avatarUrlResolver),
       }, requestOrigin);
       return;
     }

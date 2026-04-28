@@ -533,8 +533,15 @@ export function resolveProfileFriendSlots(profileView = {}, relationshipsRecord 
       preferredMainSqueezePlayerId || normalizedRelationships.mostPlayedWithPlayerId || normalizedRelationships.lastPlayedWithPlayerId,
       relationshipPoints,
     ) || takeAutomaticFriendCandidate(automaticCandidates, usedKeys, relationshipPoints);
+  } else if (preferredMainSqueezePlayerId) {
+    // manual mode with no explicit pick → fall back to the profile's pinned mainSqueeze
+    mainSqueeze = takeFriendCandidateByPlayerId(
+      candidatesByPlayerId,
+      usedKeys,
+      preferredMainSqueezePlayerId,
+      relationshipPoints,
+    );
   }
-  // manual mode with no pick selected → mainSqueeze stays null
 
   const friendSlots = [];
   if (normalizedRelationships.friendRailMode === "manual") {

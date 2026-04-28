@@ -225,5 +225,37 @@ export function createPlatformApiClient(options = {}) {
       const encoded = encodePathSegment(thoughtId);
       return encoded ? del(`/thoughts/${encoded}`, "deleted") : Promise.resolve(null);
     },
+    async uploadAvatar(file) {
+      if (!fetchImpl || !baseUrl || !file) return null;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const response = await fetchImpl(`${baseUrl}/upload/avatar`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!response?.ok) return null;
+        return await readJsonResponse(response);
+      } catch {
+        return null;
+      }
+    },
+    async uploadPhoto(file) {
+      if (!fetchImpl || !baseUrl || !file) return null;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const response = await fetchImpl(`${baseUrl}/upload/photo`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!response?.ok) return null;
+        return await readJsonResponse(response);
+      } catch {
+        return null;
+      }
+    },
   };
 }

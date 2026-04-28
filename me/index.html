@@ -72,6 +72,19 @@
         </div>
 
         <form id="playerProfileForm" class="player-card__form">
+          <div class="player-card__avatar-upload">
+            <div class="player-card__avatar-preview-wrap">
+              <img id="playerProfileAvatarPreview" class="player-card__avatar-preview" src="" alt="Your avatar" hidden>
+              <span id="playerProfileAvatarFallback" class="player-card__avatar-fallback" aria-hidden="true"></span>
+            </div>
+            <div class="player-card__avatar-controls">
+              <label class="player-card__field">Profile Photo</label>
+              <button id="playerProfileAvatarButton" class="player-card__action player-card__action--secondary" type="button">Choose Photo</button>
+              <input id="playerProfileAvatarInput" class="player-card__avatar-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload profile photo">
+              <p id="playerProfileAvatarStatus" class="player-card__avatar-status" aria-live="polite"></p>
+            </div>
+          </div>
+
           <label class="player-card__field" for="playerProfileName">Arcade Name</label>
           <input
             id="playerProfileName"

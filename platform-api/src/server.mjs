@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import pg from "pg";
 
 import { createApp } from "./app.mjs";
+import { createUploadService } from "./services/upload.mjs";
 import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
@@ -101,8 +102,21 @@ async function bootstrap() {
     fromEmail: config.fromEmail,
   });
 
+  const uploadService = createUploadService({
+    cloudinaryCloudName: config.cloudinaryCloudName,
+    cloudinaryApiKey: config.cloudinaryApiKey,
+    cloudinaryApiSecret: config.cloudinaryApiSecret,
+  });
+
+  function avatarUrlResolver(assetId) {
+    if (!assetId) return "";
+    return `https://res.cloudinary.com/${config.cloudinaryCloudName}/image/upload/${assetId}`;
+  }
+
   const app = createApp({
     config,
+    uploadService,
+    avatarUrlResolver,
     checkDatabase: createDatabaseCheck(pool),
     searchPlayers: (q) => searchPlayers(pool, q),
     registerAccount: (params) => registerAccountService(pool, params),

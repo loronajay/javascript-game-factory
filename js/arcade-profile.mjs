@@ -379,9 +379,68 @@ export function initArcadeProfilePanel({
   const friendRailModeInput = doc?.getElementById?.("playerProfileFriendRailMode");
   const discoverableInput = doc?.getElementById?.("playerProfileDiscoverable");
   const clearButton = doc?.getElementById?.("playerProfileClear");
+  const avatarButton = doc?.getElementById?.("playerProfileAvatarButton");
+  const avatarInput = doc?.getElementById?.("playerProfileAvatarInput");
+  const avatarPreview = doc?.getElementById?.("playerProfileAvatarPreview");
+  const avatarFallback = doc?.getElementById?.("playerProfileAvatarFallback");
+  const avatarStatus = doc?.getElementById?.("playerProfileAvatarStatus");
 
   if (!button || !panel || !form || !profileNameInput) {
     return null;
+  }
+
+  let pendingAvatarAssetId = "";
+  let pendingAvatarUrl = "";
+
+  function syncAvatarPreview(src, initials = "") {
+    if (!avatarPreview) return;
+    if (src) {
+      avatarPreview.src = src;
+      avatarPreview.hidden = false;
+      if (avatarFallback) avatarFallback.hidden = true;
+    } else {
+      avatarPreview.hidden = true;
+      if (avatarFallback) {
+        avatarFallback.textContent = initials;
+        avatarFallback.hidden = false;
+      }
+    }
+  }
+
+  function setAvatarStatus(text) {
+    if (avatarStatus) avatarStatus.textContent = text;
+  }
+
+  if (avatarButton && avatarInput) {
+    avatarButton.addEventListener("click", () => avatarInput.click());
+
+    avatarInput.addEventListener("change", async () => {
+      const file = avatarInput.files?.[0];
+      if (!file) return;
+
+      const localUrl = URL.createObjectURL(file);
+      syncAvatarPreview(localUrl);
+      setAvatarStatus("Uploading...");
+
+      if (!apiClient?.isConfigured || typeof apiClient.uploadAvatar !== "function") {
+        setAvatarStatus("Upload not available — API not connected.");
+        return;
+      }
+
+      const result = await apiClient.uploadAvatar(file);
+      URL.revokeObjectURL(localUrl);
+
+      if (!result?.assetId || !result?.url) {
+        setAvatarStatus("Upload failed. Please try a different photo.");
+        syncAvatarPreview("", "");
+        return;
+      }
+
+      pendingAvatarAssetId = result.assetId;
+      pendingAvatarUrl = result.url;
+      syncAvatarPreview(result.url);
+      setAvatarStatus("Photo ready — save your profile to apply it.");
+    });
   }
 
   const summary = doc.getElementById("playerProfileSummary");
@@ -413,6 +472,10 @@ export function initArcadeProfilePanel({
     const profile = loadFactoryProfile(storage, options);
     const relationshipsRecord = loadProfileRelationshipsRecord(profile.playerId, storage);
     const model = buildArcadeProfileViewModel(profile, { flashMessage, relationshipsRecord });
+
+    const displayAvatarSrc = pendingAvatarUrl || profile.avatarUrl || "";
+    const displayInitials = (profile.profileName || "?").slice(0, 2).toUpperCase();
+    syncAvatarPreview(displayAvatarSrc, displayInitials);
 
     if (summary) summary.textContent = model.summaryName;
     if (defaultName) defaultName.textContent = model.summaryName;
@@ -531,12 +594,16 @@ export function initArcadeProfilePanel({
       ...options,
       apiClient,
     });
+    pendingAvatarAssetId = "";
+    pendingAvatarUrl = "";
+    setAvatarStatus("");
     render("PLAYER CARD CLEARED");
   });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await persistArcadeProfileDetails(storage, {
+    const currentProfile = loadFactoryProfile(storage, options);
+    const patch = {
       profileName: profileNameInput.value,
       realName: realNameInput?.value || "",
       bio: bioInput?.value || "",
@@ -548,10 +615,19 @@ export function initArcadeProfilePanel({
       mainSqueezePlayerId: mainSqueezePlayerIdInput?.value || "",
       friendRailMode: friendRailModeInput?.value || "auto",
       manualFriendSlotPlayerIds: collectFriendSlotPlayerIds(doc),
-    }, {
+    };
+    if (pendingAvatarAssetId) {
+      patch.avatarAssetId = pendingAvatarAssetId;
+    } else if (currentProfile.avatarAssetId) {
+      patch.avatarAssetId = currentProfile.avatarAssetId;
+    }
+    await persistArcadeProfileDetails(storage, patch, {
       ...options,
       apiClient,
     });
+    pendingAvatarAssetId = "";
+    pendingAvatarUrl = "";
+    setAvatarStatus("");
     render("PLAYER CARD SAVED");
     closePanel();
   });

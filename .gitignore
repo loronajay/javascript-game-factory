@@ -2,6 +2,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+.env
+.env.local
+.claude/
 
 # Agent-facing local workflow docs
 AGENTS.md

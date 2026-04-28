@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "busboy": "^1.6.0",
+    "cloudinary": "^2.10.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.3"
   }
