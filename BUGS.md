@@ -1,7 +1,11 @@
 # Bugs
 
-## Friend's rail showing loronajay's picture correctly, but still not showing bigjuicycawk's picture: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195213.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195206.png"
+## Open
 
-## This Error persisted: Error on activity screen, not grabbing activies: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195246.png"
+- GitHub Pages still requests `/favicon.ico` and gets a `404` because the site does not currently publish a favicon at the host root. This is cosmetic and does not block sign-in or page loads.
 
-## This bug persisted. Got an error when trying to friend Drellgor, not sure if it's because i had sent an earlier request or not, if there is already a friend request out (which there is because i verified via the database) then i need it to display here "Request Sent" or something like that: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195403.png"
+## Recently Fixed
+
+- Sign-in redirect on GitHub Pages project deployments no longer falls out of the app root after login. `/me` was sending unauthenticated users to `/sign-in` with `next=/me/index.html`, and the sign-in page treated that as an origin-root path, which produced a `404` on project-site deployments. Auth redirects now resolve against the app root instead of the domain root.
+
+

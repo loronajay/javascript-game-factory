@@ -136,6 +136,10 @@ Notes:
 
 ## Platform Module Map
 
+Status update:
+- `js/platform/activity/` is now split into `activity-schema.mjs`, `activity-normalize.mjs`, `activity-store.mjs`, `activity-builders.mjs`, and `activity-api.mjs`, with `activity.mjs` acting as the barrel.
+- `js/platform/relationships/` is now split into `relationships-schema.mjs`, `relationships-normalize.mjs`, `relationships-store.mjs`, `relationships-slots.mjs`, and `relationships-mutations.mjs`, with `relationships.mjs` acting as the barrel.
+
 Shared platform modules live here — read the code for current API shape:
 
 - `js/platform/identity/` — canonical playerId + profileName
@@ -159,6 +163,7 @@ The following is the complete current state of the platform.
 - Account creation with `claimPlayerId` to attach existing guest identity to a new account
 - `GET /auth/me`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`
 - `js/arcade-session-nav.mjs` wired into home, grid, and `/me`
+- GitHub Pages-safe auth redirects now resolve app-root-relative `next` targets through `js/arcade-paths.mjs` so project-site deployments return to `/me` correctly after login
 
 **Profiles:**
 - Database-backed profiles, metrics, and relationships via `platform-api/`
@@ -167,11 +172,13 @@ The following is the complete current state of the platform.
 - Profile edit covers: profileName, realName, tagline, bio, links, favoriteGameSlug, discoverable, friend-rail slot mode
 - `hasAccount` and `discoverable` ship on every profile API response
 - `/search/index.html` for player discovery by name
+- Shared friend-preview enrichment now refreshes stale existing friend slots and `mainSqueeze` avatar data instead of only appending missing previews
 
 **Social graph:**
 - Friend requests: `POST /friend-requests`, accept/reject endpoints, `friend_request` + `friend_accept` notifications
 - Guest viewers fall back to local direct-link path
 - `js/platform/relationships/` owns canonical relationship normalization and slot resolution
+- Pending-request conflicts now surface a friendly sent-state message in the UI instead of collapsing to a generic retry error
 
 **Thoughts and feed:**
 - Thoughts create/delete mirror through backend; emoji reactions, share/repost, and thread comments all live via `platform-api/`
@@ -182,6 +189,8 @@ The following is the complete current state of the platform.
 **Activity:**
 - Game results from `Lovers Lost` and `Battleshits` publish through shared activity contract and mirror to backend
 - `js/platform/activity/` owns the canonical game-to-platform publishing seam
+- Activity DB access now includes a legacy-schema fallback for older deployments missing newer columns like `actor_display_name`
+- Internal architecture status: `js/platform/activity/` now ships as schema/normalize/store/builders/api modules behind a thin `activity.mjs` barrel
 
 **Notifications:**
 - `notifications` and `friend_requests` Postgres tables (migration 008)
@@ -208,6 +217,8 @@ The following is the complete current state of the platform.
 - CSS split: shared base + per-page CSS (`home.css`, `me.css`, `player.css`, `thoughts.css`, `activity.css`, `bulletins.css`, `events.css`, `event.css`, `messages.css`)
 - `js/platform/thoughts/` 4-layer module split (schema, normalize, store, api)
 - `js/platform/metrics/` canonical metrics split
+- `js/platform/activity/` 5-layer module split (schema, normalize, store, builders, api)
+- `js/platform/relationships/` 5-layer module split (schema, normalize, store, slots, mutations)
 
 ## Build Queue
 

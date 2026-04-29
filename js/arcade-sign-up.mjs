@@ -1,5 +1,6 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { bindFactoryProfileToSession, loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { buildAppUrl } from "./arcade-paths.mjs";
 
 const ERROR_MESSAGES = {
   email_taken: "That email is already registered. Sign in instead?",
@@ -71,6 +72,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     applySessionToProfile(result.playerId, result.profileName);
-    window.location.href = "../me/index.html";
+    window.location.href = buildAppUrl("me/index.html");
   });
 });

@@ -1,5 +1,6 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { bindFactoryProfileToSession } from "./platform/identity/factory-profile.mjs";
+import { resolveAppRedirectTarget } from "./arcade-paths.mjs";
 
 const ERROR_MESSAGES = {
   invalid_credentials: "Email or password is incorrect.",
@@ -29,9 +30,9 @@ function applySessionToProfile(playerId) {
 
 function getRedirectTarget() {
   const params = new URLSearchParams(window.location.search);
-  const next = params.get("next");
-  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  return "../me/index.html";
+  return resolveAppRedirectTarget(params.get("next"), {
+    currentHref: window.location.href,
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

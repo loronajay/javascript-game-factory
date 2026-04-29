@@ -38,6 +38,7 @@ import { renderMePageView } from "./arcade-me-view.mjs";
 import { wireMePage } from "./arcade-me-wire.mjs";
 import { initSessionNav } from "./arcade-session-nav.mjs";
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
+import { buildAppUrl } from "./arcade-paths.mjs";
 
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 
@@ -206,7 +207,9 @@ if (doc?.getElementById) {
   try { session = await createAuthApiClient().getSession(); } catch { /* network down */ }
 
   if (!session?.ok || !session?.playerId) {
-    window.location.replace("../sign-in/index.html?next=/me/index.html");
+    const signInUrl = new URL(buildAppUrl("sign-in/index.html"));
+    signInUrl.searchParams.set("next", "/me/index.html");
+    window.location.replace(signInUrl.toString());
   } else {
     const storage = getDefaultPlatformStorage();
     bindFactoryProfileToSession(session.playerId, storage);
