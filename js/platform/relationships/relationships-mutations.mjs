@@ -340,12 +340,11 @@ export async function recordSharedEventBetweenPlayers(leftPlayerId, rightPlayerI
       isLinkedEntry: options.isLinkedEntry,
       occurredAt: options.occurredAt,
     }).catch(() => null);
-    if (!result) {
-      return buildEmptyPairResult();
+    if (result) {
+      if (result.leftRecord?.playerId) saveProfileRelationshipsRecord(result.leftRecord, storage);
+      if (result.rightRecord?.playerId) saveProfileRelationshipsRecord(result.rightRecord, storage);
+      return result;
     }
-    if (result.leftRecord?.playerId) saveProfileRelationshipsRecord(result.leftRecord, storage);
-    if (result.rightRecord?.playerId) saveProfileRelationshipsRecord(result.rightRecord, storage);
-    return result;
   }
 
   const pair = loadPairRecords(leftPlayerId, rightPlayerId, storage);

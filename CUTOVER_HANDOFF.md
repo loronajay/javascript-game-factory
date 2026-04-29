@@ -1,5 +1,11 @@
 # Hybrid Cutover Handoff
 
+## Companion Handoff Docs
+
+- `ARCHITECTURE_HANDOFF.md` now tracks the post-cutover frontend/module cleanup order, folderization plan, and current verification baseline.
+- `PLATFORM_IMPLEMENTATION_PLAN.md` is the source of truth for product and architecture direction.
+- This cutover doc remains focused on the backend-source-of-truth migration history rather than the ongoing page/module cleanup.
+
 ## Active Side Workstream - Photo Uploads (2026-04-28)
 
 This repo now has a second in-flight workstream alongside the backend cutover notes below.

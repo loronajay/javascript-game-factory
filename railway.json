@@ -1,10 +1,10 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "buildCommand": "npm install"
+    "buildCommand": "cd platform-api && npm install"
   },
   "deploy": {
-    "startCommand": "node src/server.mjs",
+    "startCommand": "cd platform-api && npm start",
     "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10

@@ -56,6 +56,65 @@ Games remain self-contained experiences that can read platform data and publish 
 - `connected social loop`
   Thoughts, activity, bulletins, events, and player profiles should eventually feel like parts of one shared social loop, with each surface able to reinforce the others without blurring ownership boundaries.
 
+## Canonical Product Contracts
+
+- The page title must be the player's `profileName`, and the line underneath should be the editable `tagline`.
+- The profile editor keeps an optional real-name field separate from the canonical arcade username.
+- Owner and viewer pages should keep the same public profile composition, with an owner-only `Edit Profile` affordance layered on top.
+- Favorite game pinning should be player-controlled first. `favoriteGameSlug` stays explicit and player-authored even when telemetry later suggests likely favorites.
+- Social links should be modeled as a repeatable structured list rather than a single freeform blob.
+- Profile panel headers should be visually separated from panel content and rendered as boxed section labels whenever possible.
+- Public reactions should use emoji-style reactions with visible totals, and the shared thought contract should preserve both `reactionTotals` and `viewerReaction`.
+- The current local-first platform state already includes owner-authored thought submission on `/me` and owner-view `/player`.
+
+## Current vs Later Social Scope
+
+- Actual owner-authored thought submission is current-state scope and remains local-first where needed.
+- cross-user comments, reactions, and shares belong to the authenticated backend phase and should not be treated as guest/local-first behavior.
+- Direct / private messaging is part of the long-term product and remains a backend-authenticated surface.
+- avatar crop / display-shape rules should be stabilized before broader media work so later upload flows target a consistent frame.
+
+## Profile Background Contract
+
+- A player's custom background should render as a static profile backdrop rather than a scrolling content layer.
+- Backgrounds should display inside a fixed 16:9 presentation area.
+- Preserve the full uploaded image whenever possible instead of destructive auto-cropping.
+- Dead space should default to a simple matte treatment.
+- The profile panels and feed content do the scrolling while the background stays visually fixed.
+
+## Discovery and Memory Direction
+
+- Discovery remains context-driven discovery, not a cold people directory.
+- Add-friend entry points on game results screens should be a first-class discovery path.
+- In-game chat and lobby surfaces should become profile-surfacing discovery paths once that layer is live.
+- The platform should turn runs, events, and social posts into durable memories.
+- Seasonal programming should connect bulletins, featured cabinets, events, and prompts into recurring beats.
+
+## Recommended Canonical Metrics Split
+
+- Recommended canonical metrics split remains the source of truth for what belongs in public/support metrics, relationship/discovery metrics, and backend-only analytics.
+- Public/support metrics: `profileViewCount`, `thoughtPostCount`, `activityItemCount`, `receivedReactionCount`, `receivedCommentCount`, `receivedShareCount`, `mostPlayedGameSlug`, `totalPlaySessionCount`, `totalPlayTimeMinutes`, `uniqueGamesPlayedCount`, `eventParticipationCount`, `topThreeFinishCount`.
+- Relationship/discovery metrics: `mostPlayedWithPlayerId`, `friendCount`, `friendPoints`, `mutualFriendCount`, `sharedGameCount`, `sharedSessionCount`, `sharedEventCount`.
+- Backend-only analytics: `resultsScreenProfileOpenCount`, `profileOpenSourceBreakdown`.
+
+## Relationship System Contract
+
+- `profileRelationships` remains the canonical relationship record.
+- Track one `Main Squeeze` slot plus four standard friend slots.
+- `mainSqueezeMode` and `friendRailMode` define manual-vs-auto behavior, and `manualFriendSlotPlayerIds` stores manual picks.
+- Main Squeeze can be either manual or automatic.
+- four standard friend slots can also be either manual or automatic.
+- Track both affinity and recency with `lastPlayedWithPlayerId`, `recentlyPlayedWithPlayerIds`, `lastSharedSessionAtByPlayerId`, `lastSharedEventAtByPlayerId`, and `lastInteractionAtByPlayerId`.
+- friendPoints are platform-derived.
+- Point rules in v1:
+  - creating a friendship: `+100`
+  - full shared session: `+10`
+  - shared event as a team / linked entry: `+50`
+  - direct social interaction: `+1`
+- A qualifying shared session means both players were in the same lobby and reached the same results screen together.
+- A qualifying shared event means players enter an event together as a team or explicit linked entry.
+- do not decay points in v1.
+
 ## Non-Negotiables
 
 These rules are here to protect stability.
@@ -139,6 +198,10 @@ Notes:
 Status update:
 - `js/platform/activity/` is now split into `activity-schema.mjs`, `activity-normalize.mjs`, `activity-store.mjs`, `activity-builders.mjs`, and `activity-api.mjs`, with `activity.mjs` acting as the barrel.
 - `js/platform/relationships/` is now split into `relationships-schema.mjs`, `relationships-normalize.mjs`, `relationships-store.mjs`, `relationships-slots.mjs`, and `relationships-mutations.mjs`, with `relationships.mjs` acting as the barrel.
+- `js/profile-social/` now owns shared profile-feed rendering, social actions, and media-composer state; root shims remain only where compatibility still matters.
+- `js/profile-editor/` now owns profile-editor constants, form-field collection, view-model shaping, persistence, and panel control; `js/arcade-profile.mjs` is now a thin compatibility barrel.
+- `js/player-page/` now owns the player page loader, action view-model shaping, page view-model shaping, hero/media/thought-composer controllers, and their seam tests; `js/arcade-player.mjs` and `js/arcade-player-wire.mjs` are both substantially thinner.
+- Root browser test entrypoints now live in `js/tests/`, with subsystem tests in `js/profile-editor/tests/` and `js/profile-social/tests/`.
 
 Shared platform modules live here — read the code for current API shape:
 
@@ -219,6 +282,33 @@ The following is the complete current state of the platform.
 - `js/platform/metrics/` canonical metrics split
 - `js/platform/activity/` 5-layer module split (schema, normalize, store, builders, api)
 - `js/platform/relationships/` 5-layer module split (schema, normalize, store, slots, mutations)
+- `js/profile-social/` subsystem split (shared social view, actions, composer state)
+- `js/profile-editor/` subsystem split (constants, form fields, view-model, persistence, panel)
+- `js/player-page/` subsystem split (loader, action view-model, page view-model, hero/media/thought-composer controllers)
+- browser test layout cleaned up into dedicated `tests/` folders instead of mixed root/source placement
+
+## Architecture Cleanup Status
+
+Completed cleanup:
+- `activity` and `relationships` no longer live as monolithic shared-platform files.
+- `arcade-profile` no longer owns form parsing, persistence, panel control, and view-model shaping in one file.
+- shared `/me` + `/player` social rendering and actions now live in dedicated subsystems instead of duplicated page files.
+- `arcade-player-wire` no longer acts as one giant mixed controller; hero actions, media actions, and thought-composer submission now live in dedicated `js/player-page/` modules.
+- `arcade-player` no longer owns route/data loading and action helper shaping directly; those concerns now live in dedicated `js/player-page/` modules, and its main page view-model now has its own module seam.
+- test files are no longer mixed directly into the root `js/` source folder.
+
+Remaining high-priority cleanup before the broader page-folder reorg:
+1. `js/arcade-thoughts.mjs`
+   Still mixes page data loading, thought rendering, share/comment sheet rendering, and page interaction flow.
+2. `js/platform/thoughts/thoughts-store.mjs`
+   Still mixes storage/CRUD with `buildThoughtCardItems`, which should move into a thought-card/view-model seam.
+3. broader page-folder and path cleanup
+   `js/player-page/` is now a real subsystem; the next folderization pass should happen only after the thoughts-page seams are similarly stable.
+
+Proposed next cleanup order:
+1. split `arcade-thoughts.mjs`
+2. pull card/view-model shaping out of `thoughts-store.mjs`
+3. then do the broader page-folder reorganization and path updates
 
 ## Build Queue
 
@@ -237,6 +327,9 @@ Scope:
 - `embedKind: "url"` only for now; YouTube/SoundCloud embeds belong to a later pass
 
 Not in scope: playlists, YouTube embeds, SoundCloud embeds, multiple tracks.
+
+Architecture prerequisite:
+- Do not start the broader folder move until the remaining high-priority cleanup files listed in `Architecture Cleanup Status` are split enough that the new folders represent stable ownership boundaries rather than temporary dumping grounds.
 
 ### 2. Durable Memories
 
