@@ -200,7 +200,8 @@ Status update:
 - `js/platform/relationships/` is now split into `relationships-schema.mjs`, `relationships-normalize.mjs`, `relationships-store.mjs`, `relationships-slots.mjs`, and `relationships-mutations.mjs`, with `relationships.mjs` acting as the barrel.
 - `js/profile-social/` now owns shared profile-feed rendering, social actions, and media-composer state; root shims remain only where compatibility still matters.
 - `js/profile-editor/` now owns profile-editor constants, form-field collection, view-model shaping, persistence, and panel control; `js/arcade-profile.mjs` is now a thin compatibility barrel.
-- `js/player-page/` now owns the player page loader, action view-model shaping, page view-model shaping, hero/media/thought-composer controllers, and their seam tests; `js/arcade-player.mjs` and `js/arcade-player-wire.mjs` are both substantially thinner.
+- `js/player-page/` now owns the player page entry module, render module, wire module, loader, action view-model shaping, page view-model shaping, hero/media/thought-composer controllers, and their seam tests; `js/arcade-player.mjs`, `js/arcade-player-wire.mjs`, and `js/arcade-player-view.mjs` are compatibility shims.
+- `js/thoughts-page/` now owns the thoughts page entry module, view-model, render module, actions module, and seam tests; `js/arcade-thoughts.mjs` is a compatibility shim.
 - Root browser test entrypoints now live in `js/tests/`, with subsystem tests in `js/profile-editor/tests/` and `js/profile-social/tests/`.
 
 Shared platform modules live here — read the code for current API shape:
@@ -212,7 +213,7 @@ Shared platform modules live here — read the code for current API shape:
 - `js/platform/bulletins/` — bulletin contracts
 - `js/platform/events/` — event contracts
 - `js/platform/activity/` — activity publishing/loading
-- `js/platform/thoughts/` — 4-layer split: `thoughts-schema.mjs` (constants), `thoughts-normalize.mjs` (sanitization), `thoughts-store.mjs` (local feed/storage/card rendering), `thoughts-api.mjs` (API sync) — barrel `thoughts.mjs` preserves all import paths
+- `js/platform/thoughts/` — layered split: `thoughts-schema.mjs` (constants), `thoughts-normalize.mjs` (sanitization), `thoughts-store.mjs` (local feed/storage/CRUD), `thoughts-cards.mjs` (card/view-model shaping), `thoughts-api.mjs` (API sync) — barrel `thoughts.mjs` preserves all import paths
 - `js/platform/relationships/` — relationship normalization, slot resolution, relationship-write APIs
 - `js/platform/metrics/` — canonical metrics split: public/support, relationship/discovery, backend-only analytics
 - `platform-api/` — Node.js backend; Railway Postgres via `DATABASE_URL`; backend is source of truth for authenticated users
@@ -278,13 +279,15 @@ The following is the complete current state of the platform.
 
 **Infrastructure:**
 - CSS split: shared base + per-page CSS (`home.css`, `me.css`, `player.css`, `thoughts.css`, `activity.css`, `bulletins.css`, `events.css`, `event.css`, `messages.css`)
-- `js/platform/thoughts/` 4-layer module split (schema, normalize, store, api)
+- `js/platform/thoughts/` layered module split (schema, normalize, store, cards, api)
 - `js/platform/metrics/` canonical metrics split
 - `js/platform/activity/` 5-layer module split (schema, normalize, store, builders, api)
 - `js/platform/relationships/` 5-layer module split (schema, normalize, store, slots, mutations)
 - `js/profile-social/` subsystem split (shared social view, actions, composer state)
 - `js/profile-editor/` subsystem split (constants, form fields, view-model, persistence, panel)
-- `js/player-page/` subsystem split (loader, action view-model, page view-model, hero/media/thought-composer controllers)
+- `js/player-page/` subsystem split (page entry, render, wire, loader, action view-model, page view-model, hero/media/thought-composer controllers)
+- `js/thoughts-page/` subsystem split (page entry, view-model, render, actions)
+- `/player/index.html` and `/thoughts/index.html` now point at their subsystem entry modules
 - browser test layout cleaned up into dedicated `tests/` folders instead of mixed root/source placement
 
 ## Architecture Cleanup Status
@@ -295,20 +298,19 @@ Completed cleanup:
 - shared `/me` + `/player` social rendering and actions now live in dedicated subsystems instead of duplicated page files.
 - `arcade-player-wire` no longer acts as one giant mixed controller; hero actions, media actions, and thought-composer submission now live in dedicated `js/player-page/` modules.
 - `arcade-player` no longer owns route/data loading and action helper shaping directly; those concerns now live in dedicated `js/player-page/` modules, and its main page view-model now has its own module seam.
+- `arcade-player-view` no longer owns player-page rendering at the root; the real renderer now lives in `js/player-page/render.mjs`.
+- `arcade-thoughts` no longer owns page loading, rendering, and controller flow in one root file; the real page ownership now lives in `js/thoughts-page/`.
+- `thoughts-store` no longer mixes storage/CRUD with `buildThoughtCardItems`; card/view-model shaping now lives in `js/platform/thoughts/thoughts-cards.mjs`.
+- `/player/index.html` and `/thoughts/index.html` now load their subsystem entry modules directly, with root `js/` files left as compatibility shims.
 - test files are no longer mixed directly into the root `js/` source folder.
 
-Remaining high-priority cleanup before the broader page-folder reorg:
-1. `js/arcade-thoughts.mjs`
-   Still mixes page data loading, thought rendering, share/comment sheet rendering, and page interaction flow.
-2. `js/platform/thoughts/thoughts-store.mjs`
-   Still mixes storage/CRUD with `buildThoughtCardItems`, which should move into a thought-card/view-model seam.
-3. broader page-folder and path cleanup
-   `js/player-page/` is now a real subsystem; the next folderization pass should happen only after the thoughts-page seams are similarly stable.
-
-Proposed next cleanup order:
-1. split `arcade-thoughts.mjs`
-2. pull card/view-model shaping out of `thoughts-store.mjs`
-3. then do the broader page-folder reorganization and path updates
+Next cleanup after the current folder move:
+1. broader page-folder cleanup for remaining root-owned page files
+   `js/player-page/` and `js/thoughts-page/` are now stable ownership folders. The next folderization target should be `/me` only if we can establish similarly clear `js/me-page/` boundaries instead of creating another dumping ground.
+2. root CSS breakup
+   The shared `css/` folder still has oversized page stylesheets and should follow the same “stable ownership before growth” rule.
+3. large game-module audit
+   `Lovers Lost`, `Battleshits`, and other game-local monoliths should be split with the same standards once platform-page folderization is stable.
 
 ## Build Queue
 
@@ -329,7 +331,7 @@ Scope:
 Not in scope: playlists, YouTube embeds, SoundCloud embeds, multiple tracks.
 
 Architecture prerequisite:
-- Do not start the broader folder move until the remaining high-priority cleanup files listed in `Architecture Cleanup Status` are split enough that the new folders represent stable ownership boundaries rather than temporary dumping grounds.
+- Do not start another broad folder move unless the destination folder already reflects a stable ownership boundary rather than a temporary dumping ground.
 
 ### 2. Durable Memories
 

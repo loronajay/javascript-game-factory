@@ -16,9 +16,12 @@ export {
 } from "./thoughts-normalize.mjs";
 
 export {
+  buildThoughtCardItems,
+} from "./thoughts-cards.mjs";
+
+export {
   buildPublicThoughtFeed,
   buildPlayerThoughtFeed,
-  buildThoughtCardItems,
   loadThoughtFeed,
   loadThoughtComments,
   deleteThoughtPost,
