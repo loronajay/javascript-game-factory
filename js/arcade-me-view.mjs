@@ -228,14 +228,19 @@ function renderFavoritePanel(container, title, item) {
   const favorite = item || {};
   const cardHtml = favorite.isPlaceholder
     ? `
-      <article class="game-card featured me-featured-cabinet__card game-card--placeholder" aria-disabled="true">
+      <button
+        class="game-card featured me-featured-cabinet__card me-featured-cabinet__card--placeholder game-card--placeholder"
+        type="button"
+        data-open-favorite-picker
+      >
         <div class="game-card-preview">
           <div class="game-thumb me-featured-cabinet__thumb me-featured-cabinet__thumb--placeholder"></div>
           <div class="game-card-copy game-card-copy--placeholder">
             <h3 class="game-title">PIN A FAVORITE</h3>
+            <p class="me-featured-cabinet__placeholder-hint">Click to pin from your player card.</p>
           </div>
         </div>
-      </article>
+      </button>
     `
     : `
       <a class="game-card featured me-featured-cabinet__card" href="${escapeHtml(favorite.href)}">
@@ -254,6 +259,76 @@ function renderFavoritePanel(container, title, item) {
     <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-featured-cabinet">
       ${cardHtml}
+    </div>
+  `;
+}
+
+function renderFriendNavigatorPanel(container, title, navigator, options = {}) {
+  if (!container) return;
+
+  const items = Array.isArray(navigator?.items) ? navigator.items : [];
+  const isExpanded = !!options.expanded;
+  const searchValue = typeof options.searchQuery === "string" ? options.searchQuery : "";
+  const hasItems = items.length > 0;
+  const listHtml = items.map((item) => {
+    const avatarHtml = item.avatarSrc
+      ? `<img class="me-friends-navigator__avatar-img" src="${escapeHtml(item.avatarSrc)}" alt="" loading="lazy">`
+      : `<span class="me-friends-navigator__avatar-text" aria-hidden="true">${escapeHtml(item.avatarInitials || "??")}</span>`;
+    const cardBody = `
+      <div class="me-friends-navigator__avatar" aria-hidden="true">
+        ${avatarHtml}
+      </div>
+      <div class="me-friends-navigator__copy">
+        <p class="me-friends-navigator__label">${escapeHtml(item.label || "Friend")}</p>
+        <p class="me-friends-navigator__name">${escapeHtml(item.profileName || item.value || item.playerId || "Arcade Pilot")}</p>
+        <p class="me-friends-navigator__meta">${escapeHtml(item.playerIdLabel || "NO-ID")}</p>
+        <p class="me-friends-navigator__points">${escapeHtml(item.meta || "0 friendship points")}</p>
+      </div>
+    `;
+
+    const attrs = `class="me-friends-navigator__item" data-friend-navigator-item data-friend-search-text="${escapeHtml(item.searchText || "")}"`;
+    if (item.profileHref) {
+      return `<a ${attrs} href="${escapeHtml(item.profileHref)}">${cardBody}</a>`;
+    }
+    return `<article ${attrs}>${cardBody}</article>`;
+  }).join("");
+
+  container.hidden = false;
+  container.innerHTML = `
+    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="me-friends-navigator">
+      <button
+        id="meFriendsToggle"
+        class="me-friends-navigator__toggle"
+        type="button"
+        aria-controls="meFriendsDropdown"
+        aria-expanded="${isExpanded ? "true" : "false"}"
+      >
+        <span class="me-friends-navigator__toggle-label">${escapeHtml(navigator?.triggerLabel || "Friends")}</span>
+        <span class="me-friends-navigator__toggle-helper">${escapeHtml(navigator?.helperText || "")}</span>
+      </button>
+      <div id="meFriendsDropdown" class="me-friends-navigator__dropdown"${isExpanded ? "" : " hidden"}>
+        ${hasItems ? `
+          <label class="me-friends-navigator__search" for="meFriendsSearchInput">
+            <span class="me-friends-navigator__search-label">Search Friends</span>
+            <input
+              id="meFriendsSearchInput"
+              class="me-friends-navigator__search-input"
+              type="search"
+              placeholder="${escapeHtml(navigator?.searchPlaceholder || "Search friends")}"
+              value="${escapeHtml(searchValue)}"
+              spellcheck="false"
+              autocomplete="off"
+            >
+          </label>
+          <p id="meFriendsSearchEmpty" class="me-friends-navigator__empty" hidden>No friends match your search.</p>
+          <div id="meFriendsList" class="me-friends-navigator__list">
+            ${listHtml}
+          </div>
+        ` : `
+          <p class="me-friends-navigator__empty">${escapeHtml(navigator?.emptyText || "No linked friends yet.")}</p>
+        `}
+      </div>
     </div>
   `;
 }
@@ -324,11 +399,10 @@ export function renderMePageView(doc, model, options = {}) {
     rankingsPanel.hidden = true;
     rankingsPanel.innerHTML = "";
   }
-  const friendsPanel = doc.getElementById("meFriendsPanel");
-  if (friendsPanel) {
-    friendsPanel.hidden = true;
-    friendsPanel.innerHTML = "";
-  }
+  renderFriendNavigatorPanel(doc.getElementById("meFriendsPanel"), "Friends", model.friendNavigator, {
+    expanded: !!options?.friendNavigatorExpanded,
+    searchQuery: options?.friendNavigatorSearchQuery || "",
+  });
   socialView.renderGalleryPanel(doc.getElementById("meGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
     isOwner: true,
     uploadState: options?.galleryUploadState || {},

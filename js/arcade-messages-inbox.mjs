@@ -1,7 +1,7 @@
 import { createMessagesApiClient } from "./platform/api/messages-api.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
-import { initSessionNav } from "./arcade-session-nav.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -66,6 +66,13 @@ function renderConversationItem(conv) {
 }
 
 async function run() {
+  renderPrimaryAppNav(document.getElementById("inboxPrimaryNav"), {
+    basePath: "../",
+    currentPage: "messages",
+    linkClass: "search-stage__portal",
+    sessionNavId: "inboxAuthNav",
+  });
+
   const navEl = document.getElementById("inboxAuthNav");
   const listEl = document.getElementById("convList");
   const flashEl = document.getElementById("inboxFlash");
@@ -74,7 +81,11 @@ async function run() {
   const newSearchEl = document.getElementById("newMsgSearch");
   const newResultsEl = document.getElementById("newMsgResults");
 
-  await initSessionNav(navEl);
+  await initSessionNav(navEl, {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
 
   const api = createMessagesApiClient();
   if (!api.isConfigured) {

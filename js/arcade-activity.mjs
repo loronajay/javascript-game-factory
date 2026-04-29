@@ -1,6 +1,7 @@
 import { loadActivityFeed, syncActivityFeedFromApi } from "./platform/activity/activity.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -135,6 +136,18 @@ export function renderActivityPage(doc = globalThis.document, activityFeed = loa
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  renderPrimaryAppNav(doc.getElementById("activityPrimaryNav"), {
+    basePath: "../",
+    currentPage: "",
+    linkClass: "activity-stage__portal",
+    sessionNavId: "activityAuthNav",
+  });
+  void initSessionNav(doc.getElementById("activityAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
+
   renderActivityPage(doc);
   void loadActivityPageData().then(({ activityFeed }) => {
     renderActivityPage(doc, activityFeed);

@@ -2,6 +2,7 @@ import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { createThoughtsPageActions } from "./actions.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import {
   buildThoughtsPageViewModel,
   loadThoughtsPageData,
@@ -14,6 +15,18 @@ export { renderThoughtsPage } from "./render.mjs";
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  renderPrimaryAppNav(doc.getElementById("thoughtsPrimaryNav"), {
+    basePath: "../",
+    currentPage: "",
+    linkClass: "thoughts-stage__portal",
+    sessionNavId: "thoughtsAuthNav",
+  });
+  void initSessionNav(doc.getElementById("thoughtsAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
+
   const storage = getDefaultPlatformStorage();
   const apiClient = createPlatformApiClient();
 

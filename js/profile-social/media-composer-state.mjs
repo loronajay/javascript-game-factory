@@ -18,6 +18,7 @@ function createInitialGalleryUploadState(statusMessage = "") {
     visibility: "public",
     postToFeed: false,
     statusMessage,
+    isUploading: false,
   };
 }
 

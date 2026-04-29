@@ -1,14 +1,25 @@
 import { createNotificationsApiClient } from "./platform/api/notifications-api.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
-import { initSessionNav } from "./arcade-session-nav.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 import { renderNotificationItem } from "./arcade-notifications.mjs";
 
 async function run() {
+  renderPrimaryAppNav(document.getElementById("notifPrimaryNav"), {
+    basePath: "../",
+    currentPage: "notifications",
+    linkClass: "search-stage__portal",
+    sessionNavId: "notifPageNav",
+  });
+
   const navEl = document.getElementById("notifPageNav");
   const listEl = document.getElementById("notifPageList");
   const flashEl = document.getElementById("notifPageFlash");
 
-  const session = await initSessionNav(navEl);
+  const session = await initSessionNav(navEl, {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
 
   const api = createNotificationsApiClient();
   if (!api.isConfigured) {

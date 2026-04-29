@@ -17,6 +17,7 @@ import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { loadThoughtFeed } from "../platform/thoughts/thoughts.mjs";
 import { renderPlayerPageView } from "./render.mjs";
 import { wirePlayerPage } from "./wire.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 
 export { loadPlayerPageData, loadRequestedPlayerProfile } from "./loader.mjs";
 export { buildPlayerPageViewModel } from "./view-model.mjs";
@@ -84,6 +85,23 @@ if (doc?.getElementById) {
   if (authSession?.playerId) {
     bindFactoryProfileToSession(authSession.playerId, storage);
   }
+
+  const requestedPlayerId = sanitizePlayerId(new URLSearchParams(globalThis.location?.search || "").get("id"));
+  const currentPage = authSession?.playerId && (!requestedPlayerId || requestedPlayerId === authSession.playerId)
+    ? "me"
+    : "";
+  renderPrimaryAppNav(doc.getElementById("playerPrimaryNav"), {
+    basePath: "../",
+    currentPage,
+    linkClass: "player-stage__portal",
+    sessionNavId: "playerAuthNav",
+  });
+  void initSessionNav(doc.getElementById("playerAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+    preloadedSession: authSession,
+  });
 
   const profilePanel = initArcadeProfilePanel({ doc, storage });
   renderPlayerPage(doc);

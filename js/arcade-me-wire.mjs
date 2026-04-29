@@ -24,9 +24,37 @@ import {
 import { createMediaComposerState } from "./profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "./profile-social/social-actions.mjs";
 
+function normalizeFriendNavigatorQuery(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function applyFriendNavigatorFilter(doc, query = "") {
+  const normalizedQuery = normalizeFriendNavigatorQuery(query);
+  const searchInput = doc?.getElementById?.("meFriendsSearchInput");
+  if (searchInput && searchInput.value !== query) {
+    searchInput.value = query;
+  }
+
+  const items = Array.from(doc?.querySelectorAll?.("[data-friend-navigator-item]") || []);
+  let visibleCount = 0;
+  items.forEach((item) => {
+    const searchText = String(item?.dataset?.friendSearchText || "").toLowerCase();
+    const isMatch = !normalizedQuery || searchText.includes(normalizedQuery);
+    item.hidden = !isMatch;
+    if (isMatch) visibleCount += 1;
+  });
+
+  const emptyState = doc?.getElementById?.("meFriendsSearchEmpty");
+  if (emptyState) {
+    emptyState.hidden = items.length === 0 || visibleCount > 0;
+  }
+}
+
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
   let cachedHydration = null;
   let galleryPhotos = [];
+  let friendNavigatorExpanded = false;
+  let friendNavigatorSearchQuery = "";
   const mediaComposer = createMediaComposerState({
     doc,
     thoughtPhotoNameId: "meThoughtPhotoName",
@@ -82,7 +110,10 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       galleryPhotos,
       thoughtComposerState: mediaComposer.getThoughtPhotoState(),
       galleryUploadState: mediaComposer.getGalleryUploadState(),
+      friendNavigatorExpanded,
+      friendNavigatorSearchQuery,
     });
+    applyFriendNavigatorFilter(doc, friendNavigatorSearchQuery);
   };
 
   const socialActions = createProfileSocialActions({
@@ -213,6 +244,9 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       event.preventDefault();
       const currentProfile = loadFactoryProfile(storage);
       const galleryUploadState = mediaComposer.getGalleryUploadState();
+      if (galleryUploadState?.isUploading) {
+        return;
+      }
       if (!currentProfile?.playerId || !apiClient?.uploadPhoto || !galleryUploadState.previewUrl) {
         mediaComposer.setGalleryUploadField("statusMessage", "Choose a photo first.");
         void rerender();
@@ -226,11 +260,13 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
         return;
       }
 
+      mediaComposer.setGalleryUploadField("isUploading", true);
       mediaComposer.setGalleryUploadField("statusMessage", "Uploading...");
       await rerender();
 
       const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
       if (!uploadResult?.assetId || !uploadResult?.url) {
+        mediaComposer.setGalleryUploadField("isUploading", false);
         mediaComposer.setGalleryUploadField("statusMessage", "Upload failed. Try again.");
         void rerender();
         return;
@@ -246,6 +282,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       }).catch(() => null);
 
       if (!savedPhotoRecord?.photo) {
+        mediaComposer.setGalleryUploadField("isUploading", false);
         mediaComposer.setGalleryUploadField("statusMessage", "Could not save photo. Try again.");
         void rerender();
         return;
@@ -308,6 +345,21 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   });
 
   doc.addEventListener("click", async (event) => {
+    const toggleFriendsButton = event.target.closest("#meFriendsToggle");
+    if (toggleFriendsButton) {
+      friendNavigatorExpanded = !friendNavigatorExpanded;
+      void rerender();
+      return;
+    }
+
+    const openFavoritePickerButton = event.target.closest("[data-open-favorite-picker]");
+    if (openFavoritePickerButton) {
+      profilePanel?.openPanel?.();
+      const favoriteInput = doc.getElementById("playerProfileFavoriteGame");
+      favoriteInput?.focus?.();
+      return;
+    }
+
     if (await socialActions.handleClick(event)) {
       return;
     }
@@ -381,6 +433,12 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   }, true);
 
   doc.addEventListener("input", (event) => {
+    if (event.target?.id === "meFriendsSearchInput") {
+      friendNavigatorSearchQuery = event.target.value || "";
+      applyFriendNavigatorFilter(doc, friendNavigatorSearchQuery);
+      return;
+    }
+
     if (socialActions.handleInput(event)) return;
     if (event.target?.id === "meThoughtPhotoCaption") {
       mediaComposer.setThoughtPhotoField("caption", event.target.value || "");

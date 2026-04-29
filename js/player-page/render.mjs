@@ -129,7 +129,7 @@ function renderHeroCard(container, model) {
           type="button"
           data-message="${escapeHtml(model.messageAction.playerId || "")}"
           data-message-name="${escapeHtml(model.messageAction.profileName || "")}"
-        >Message ðŸ’¬</button>
+        >Message 💬</button>
       </div>
     `
     : "";
@@ -151,7 +151,7 @@ function renderHeroCard(container, model) {
             class="player-hero-card__gesture-btn player-hero-card__gesture-btn--challenge${model.gestureAction.challengePickerOpen ? " player-hero-card__gesture-btn--active" : ""}"
             type="button"
             data-gesture-challenge="${escapeHtml(model.gestureAction.playerId || "")}"
-          >Challenge ðŸŽ®</button>
+          >Challenge 🎮</button>
         </div>
         ${challengePickerHtml}
         <p class="player-hero-card__gesture-flash" aria-live="polite">${escapeHtml(model.gestureAction.flashMessage || "")}</p>

@@ -51,7 +51,7 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
         actionItems: [
           { id: "comment", label: "Comments" },
           { id: "share", label: normalized.viewerSharedThoughtId ? "Shared" : "Share", isActive: !!normalized.viewerSharedThoughtId },
-          { id: "react", label: "React" },
+          { id: "react", label: normalized.viewerReaction ? "Reacted" : "React", isActive: !!normalized.viewerReaction },
         ],
         canDelete: isOwner,
         isPlaceholder: false,

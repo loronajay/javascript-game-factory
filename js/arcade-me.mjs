@@ -15,6 +15,7 @@ import {
   buildBadgeItems,
   buildFavoriteGameItems,
   buildFriendItems,
+  buildFriendNavigatorItems,
   buildHeroStats,
   buildIdentityLinkItems,
   buildPresenceToneClass,
@@ -36,7 +37,7 @@ import {
 } from "./platform/thoughts/thoughts.mjs";
 import { renderMePageView } from "./arcade-me-view.mjs";
 import { wireMePage } from "./arcade-me-wire.mjs";
-import { initSessionNav } from "./arcade-session-nav.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { buildAppUrl } from "./arcade-paths.mjs";
 
@@ -118,6 +119,7 @@ export function buildMePageViewModel(profile, options = {}) {
     emptyValue: "Rank snapshots will appear here once shared standings come online.",
   });
   const friendItems = buildFriendItems(publicView, relationshipsRecord);
+  const friendNavigatorItems = buildFriendNavigatorItems(publicView, relationshipsRecord);
 
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroRealName = publicView.realName || "";
@@ -161,6 +163,15 @@ export function buildMePageViewModel(profile, options = {}) {
     favoriteGameItems,
     rankingItems,
     friendItems,
+    friendNavigator: {
+      triggerLabel: `Friends (${friendNavigatorItems.length})`,
+      helperText: friendNavigatorItems.length > 0
+        ? "Open your full friend list, then search by name or player id."
+        : "Add a friend by code to start building your linked player list.",
+      emptyText: "No linked friends yet. Use your friend code panel to add someone first.",
+      searchPlaceholder: "Search your friends",
+      items: friendNavigatorItems,
+    },
     thoughtItems,
     thoughtComposer: {
       enabled: true,
@@ -203,6 +214,13 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  renderPrimaryAppNav(doc.getElementById("mePrimaryNav"), {
+    basePath: "../",
+    currentPage: "me",
+    linkClass: "grid-stage__portal",
+    sessionNavId: "meAuthNav",
+  });
+
   let session = null;
   try { session = await createAuthApiClient().getSession(); } catch { /* network down */ }
 

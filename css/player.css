@@ -1392,6 +1392,8 @@
   place-items: center;
   width: 52px;
   height: 52px;
+  flex-shrink: 0;
+  overflow: hidden;
   border: 1px solid rgba(255, 214, 189, 0.18);
   background:
     linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(16, 12, 35, 0.92)),

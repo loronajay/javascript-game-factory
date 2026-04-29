@@ -154,7 +154,7 @@ export function createProfileSocialViewRenderer({
       if (action.id === "react") {
         return `
           <button
-            class="${isReactionPickerOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
+            class="${action.isActive || isReactionPickerOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
             type="button"
             data-toggle-thought-reactions="${escapeHtml(item.id)}"
             aria-expanded="${isReactionPickerOpen ? "true" : "false"}"
@@ -263,11 +263,16 @@ export function createProfileSocialViewRenderer({
 
     const isOwner = !!options?.isOwner;
     const uploadState = options?.uploadState || {};
+    const isUploading = !!uploadState.isUploading;
+    const uploadLabel = isUploading
+      ? "Upload In Progress"
+      : (uploadState.previewUrl ? "Choose Different Photo" : "Upload Photo");
+    const submitLabel = isUploading ? "Uploading..." : "Save Photo";
     const uploadHtml = isOwner
       ? `
         <div class="gallery-upload">
-          <input id="${pageKey}GalleryFileInput" type="file" accept="image/jpeg,image/png,image/webp" class="gallery-upload__input" aria-label="Upload a photo">
-          <label for="${pageKey}GalleryFileInput" class="gallery-upload__label">${uploadState.previewUrl ? "Choose Different Photo" : "Upload Photo"}</label>
+          <input id="${pageKey}GalleryFileInput" type="file" accept="image/jpeg,image/png,image/webp" class="gallery-upload__input" aria-label="Upload a photo"${isUploading ? " disabled" : ""}>
+          <label for="${pageKey}GalleryFileInput" class="gallery-upload__label"${isUploading ? ' aria-disabled="true"' : ""}>${uploadLabel}</label>
           <p id="${pageKey}GalleryUploadStatus" class="gallery-upload__status" aria-live="polite">${escapeHtml(uploadState.statusMessage || "")}</p>
         </div>
         ${uploadState.previewUrl
@@ -286,24 +291,25 @@ export function createProfileSocialViewRenderer({
                     rows="3"
                     maxlength="500"
                     placeholder="Add a caption for your gallery photo."
+                    ${isUploading ? "disabled" : ""}
                   >${escapeHtml(uploadState.caption || "")}</textarea>
                 </label>
                 <label class="gallery-upload__field" for="${pageKey}GalleryVisibility">
                   <span class="gallery-upload__field-label">Visibility</span>
-                  <select id="${pageKey}GalleryVisibility" class="gallery-upload__select">
+                  <select id="${pageKey}GalleryVisibility" class="gallery-upload__select"${isUploading ? " disabled" : ""}>
                     <option value="public"${uploadState.visibility === "public" ? " selected" : ""}>Public</option>
                     <option value="friends"${uploadState.visibility === "friends" ? " selected" : ""}>Friends</option>
                     <option value="private"${uploadState.visibility === "private" ? " selected" : ""}>Private</option>
                   </select>
                 </label>
                 <label class="gallery-upload__toggle" for="${pageKey}GalleryPostToFeed">
-                  <input id="${pageKey}GalleryPostToFeed" type="checkbox"${uploadState.postToFeed ? " checked" : ""}>
+                  <input id="${pageKey}GalleryPostToFeed" type="checkbox"${uploadState.postToFeed ? " checked" : ""}${isUploading ? " disabled" : ""}>
                   <span class="gallery-upload__toggle-copy">Also post this photo to my feed</span>
                 </label>
               </div>
               <div class="gallery-upload__actions">
-                <button class="gallery-upload__button gallery-upload__button--primary" type="submit">Save Photo</button>
-                <button class="gallery-upload__button" type="button" data-cancel-gallery-upload="${pageKey}">Cancel</button>
+                <button class="gallery-upload__button gallery-upload__button--primary" type="submit"${isUploading ? " disabled" : ""}>${submitLabel}</button>
+                <button class="gallery-upload__button" type="button" data-cancel-gallery-upload="${pageKey}"${isUploading ? " disabled" : ""}>Cancel</button>
               </div>
             </form>
           `

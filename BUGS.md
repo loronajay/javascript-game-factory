@@ -1,18 +1,22 @@
 # Bugs
 
-## You broke my gesture emojis, now it's just nonsense instead of the emojis: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 100751.png"
+## Progress update (2026-04-29)
 
-## need profile pics on friends rail to clamp to default box size: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 204916.png"
+Completed in current pass:
+- Fixed broken gesture/message emoji mojibake on the player page.
+- Fixed friends rail profile pictures so they clamp to the intended avatar box size.
+- Fixed gallery double-submit behavior by adding an in-progress upload state and disabling owner gallery controls while upload/save is running.
+- Fixed direct Home navigation from the messages inbox and message thread pages.
+- Fixed reaction-state clarity so already-reacted posts render as reacted across shared thought-card surfaces while still allowing reaction changes.
+- Fixed the empty owner favorite card so it now performs the expected click behavior and opens the favorite picker instead of only looking clickable.
+- Fixed the `/me` page panel layout so the photo gallery grows inside its own column stack instead of pushing the lower right-side panels down the page.
 
-## I reacted to his photo from his page, but when i view this post from the "thoughts" feed i still have the option to react and i shouldn't: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 205236.png"
+Partially addressed:
+- Navigation UI/UX still needs a broader cleanup pass, but the specific "can't get home from messages" issue is fixed now.
 
-## Need to improve the GUI: Drellgor got a double upload because he clicked the button twice, button needs to be replaced with a sign that it's currently loading, and not allow users to click while an upload is in progress.
-
-## Pin a Favorite box while empty still has effect on hover making it seem clickable if you are the owner of the page you might think you can click there and pin your favorite, however it's not clickable unless the game's been set in the profile editor. i think users should be able to pin the favorite from the page as well only if there's no game pinned there already. this will lead to less user confusion on first profile creation.
+## Remaining bugs
 
 ## need to seriously improve the ui/ux for navigation. it just seems like there is a huge number of boxes on some pages, and navigating to the homepage is not possible from the messages page. navigation across the board just feels a little sloppy.
-
-## Uploading 3 photos has pushed my lower panels all the way down, need to improve the ui so that nothing is getting pushed down on photo upload. possibly move the delete profile panel, and have the badges panel not rely on the bottom of the photo gallery panel: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 210736.png"
 
 ## Lovers Lost has two huge files game.js and renderer.js, i think those need to be broken up into modules too. Bad architectural practice.
 

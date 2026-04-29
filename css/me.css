@@ -685,43 +685,22 @@
   align-items: start;
 }
 
+.me-layout__main,
+.me-layout__side {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  min-width: 0;
+}
+
+.me-layout__main {
+  min-width: 0;
+}
+
 .me-hero-card {
-  grid-column: 1 / 2;
-  grid-row: 1;
   grid-template-columns: minmax(140px, var(--profile-portrait-rail-width)) minmax(0, 1fr);
   gap: 18px;
   min-height: 0;
-}
-
-.me-panel--favorite {
-  grid-column: 2 / 3;
-  grid-row: 1 / span 2;
-  min-height: 420px;
-}
-
-.me-panel--thoughts {
-  grid-column: 3 / 4;
-  grid-row: 1 / span 2;
-}
-
-#meRankingsPanel {
-  grid-column: 1 / 2;
-  grid-row: 2;
-}
-
-#meFriendsPanel {
-  grid-column: 1 / 2;
-  grid-row: 3;
-}
-
-#meAboutPanel {
-  grid-column: 3 / 4;
-  grid-row: 3;
-}
-
-#meBadgesPanel {
-  grid-column: 3 / 4;
-  grid-row: 4;
 }
 
 .me-hero-card__copy {
@@ -915,6 +894,12 @@
   width: min(100%, 288px);
 }
 
+.me-featured-cabinet__card--placeholder {
+  padding: 0;
+  width: min(100%, 288px);
+  text-align: left;
+}
+
 .me-featured-cabinet__thumb {
   width: 100%;
   height: 100%;
@@ -924,6 +909,15 @@
   background:
     radial-gradient(circle at 50% 30%, rgba(255, 214, 189, 0.16), transparent 26%),
     linear-gradient(180deg, rgba(28, 22, 54, 0.86), rgba(8, 8, 22, 0.96));
+}
+
+.me-featured-cabinet__placeholder-hint {
+  margin: 8px 0 0;
+  color: rgba(255, 248, 255, 0.84);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0.03em;
 }
 
 .me-layout {
@@ -1132,6 +1126,8 @@
   place-items: center;
   width: 52px;
   height: 52px;
+  flex-shrink: 0;
+  overflow: hidden;
   border: 1px solid rgba(255, 214, 189, 0.18);
   background:
     linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(16, 12, 35, 0.92)),
@@ -1200,15 +1196,161 @@
   overflow-wrap: anywhere;
 }
 
-#meRankingsPanel,
-#meFriendsPanel {
+#meRankingsPanel {
   display: none;
 }
 
 .me-panel--favorite {
-  grid-column: 2 / 3;
-  grid-row: 1;
   min-height: 360px;
+}
+
+.me-friends-navigator {
+  display: grid;
+  gap: 12px;
+}
+
+.me-friends-navigator__toggle {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 214, 189, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(255, 121, 183, 0.08)),
+    rgba(9, 8, 22, 0.92);
+  color: #fff8ff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 10px 20px rgba(0, 0, 0, 0.16);
+}
+
+.me-friends-navigator__toggle:hover,
+.me-friends-navigator__toggle:focus-visible {
+  border-color: rgba(153, 255, 255, 0.34);
+  transform: translateY(-1px);
+}
+
+.me-friends-navigator__toggle-label,
+.me-friends-navigator__search-label,
+.me-friends-navigator__label,
+.me-friends-navigator__meta,
+.me-friends-navigator__points {
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.me-friends-navigator__toggle-label {
+  color: #fff8ff;
+  font-size: 0.88rem;
+  letter-spacing: 0.12em;
+}
+
+.me-friends-navigator__toggle-helper,
+.me-friends-navigator__empty {
+  margin: 0;
+  color: rgba(255, 248, 255, 0.82);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.me-friends-navigator__dropdown {
+  display: grid;
+  gap: 12px;
+}
+
+.me-friends-navigator__search {
+  display: grid;
+  gap: 6px;
+}
+
+.me-friends-navigator__search-label,
+.me-friends-navigator__label,
+.me-friends-navigator__meta,
+.me-friends-navigator__points {
+  color: #ffd7b9;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+.me-friends-navigator__search-input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(255, 214, 189, 0.22);
+  background: rgba(9, 8, 22, 0.92);
+  color: #fff8ff;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 4px;
+}
+
+.me-friends-navigator__list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.me-friends-navigator__item {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+}
+
+.me-friends-navigator__item:hover,
+.me-friends-navigator__item:focus-visible {
+  border-color: rgba(153, 255, 255, 0.26);
+  background:
+    linear-gradient(180deg, rgba(153, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.me-friends-navigator__avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 214, 189, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(16, 12, 35, 0.92)),
+    rgba(10, 8, 24, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.me-friends-navigator__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.me-friends-navigator__avatar-text {
+  color: #fff8ff;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.me-friends-navigator__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.me-friends-navigator__name {
+  margin: 0;
+  color: #fff8ff;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 980px) {
@@ -1216,28 +1358,22 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .me-hero-card,
-  .me-panel--thoughts,
-  #meAboutPanel,
-  #meBadgesPanel {
+  .me-layout__main,
+  .me-layout__side {
+    grid-column: auto;
+  }
+
+  .me-layout__main,
+  .me-layout__side--right {
     grid-column: 1 / -1;
   }
 
-  .me-hero-card {
-    grid-row: auto;
-  }
-
-  .me-panel--thoughts {
-    grid-row: auto;
+  .me-layout__side--middle {
+    grid-column: 1 / -1;
   }
 
   .me-stage__sun {
     width: min(42vw, 260px);
-  }
-
-  .me-panel--favorite {
-    grid-column: 1 / -1;
-    grid-row: auto;
   }
 }
 
@@ -1258,6 +1394,11 @@
 
   .me-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .me-layout__main,
+  .me-layout__side {
+    grid-column: 1 / -1;
   }
 
   .me-hero-card {

@@ -26,6 +26,9 @@ export function createPlayerMediaActions({
 
     const currentProfile = loadCurrentProfile?.();
     const galleryUploadState = mediaComposer.getGalleryUploadState();
+    if (galleryUploadState?.isUploading) {
+      return true;
+    }
     if (!currentProfile?.playerId || currentProfile.playerId !== authSessionPlayerId || !apiClient?.uploadPhoto || !galleryUploadState.previewUrl) {
       mediaComposer.setGalleryUploadField("statusMessage", "Choose a photo first.");
       void rerender?.();
@@ -39,11 +42,13 @@ export function createPlayerMediaActions({
       return true;
     }
 
+    mediaComposer.setGalleryUploadField("isUploading", true);
     mediaComposer.setGalleryUploadField("statusMessage", "Uploading...");
     await Promise.resolve(rerender?.());
 
     const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
     if (!uploadResult?.assetId || !uploadResult?.url) {
+      mediaComposer.setGalleryUploadField("isUploading", false);
       mediaComposer.setGalleryUploadField("statusMessage", "Upload failed. Try again.");
       void rerender?.();
       return true;
@@ -59,6 +64,7 @@ export function createPlayerMediaActions({
     }).catch(() => null);
 
     if (!savedPhotoRecord?.photo) {
+      mediaComposer.setGalleryUploadField("isUploading", false);
       mediaComposer.setGalleryUploadField("statusMessage", "Could not save photo. Try again.");
       void rerender?.();
       return true;

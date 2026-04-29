@@ -5,6 +5,13 @@ import { initNotificationBell } from "./arcade-notifications.mjs";
 
 const auth = createAuthApiClient();
 const SIGNED_OUT_QUERY_KEY = "signedOut";
+const PRIMARY_APP_NAV_ITEMS = [
+  { key: "me", label: "Me", path: "me/index.html" },
+  { key: "arcade", label: "Arcade", path: "grid.html" },
+  { key: "search", label: "Search", path: "search/index.html" },
+  { key: "messages", label: "Messages", path: "messages/index.html" },
+  { key: "notifications", label: "Notifications", path: "notifications/index.html" },
+];
 
 function escapeHtml(str) {
   return String(str)
@@ -12,6 +19,45 @@ function escapeHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+export function buildPrimaryAppNavItems(basePath = "") {
+  const normalizedBasePath = String(basePath || "");
+  return PRIMARY_APP_NAV_ITEMS.map((item) => ({
+    ...item,
+    href: `${normalizedBasePath}${item.path}`,
+  }));
+}
+
+export function buildPrimaryAppNavMarkup({
+  basePath = "",
+  currentPage = "",
+  linkClass = "grid-stage__portal",
+  sessionNavId = "",
+  includeSessionNav = true,
+} = {}) {
+  const currentPageKey = String(currentPage || "").trim().toLowerCase();
+  const linksMarkup = buildPrimaryAppNavItems(basePath).map((item) => {
+    const isCurrent = item.key === currentPageKey;
+    const classes = isCurrent
+      ? `${linkClass} app-shell-nav__link--current`
+      : linkClass;
+    const currentAttr = isCurrent ? ' aria-current="page"' : "";
+    return `<a class="${escapeHtml(classes)}" href="${escapeHtml(item.href)}"${currentAttr}>${escapeHtml(item.label)}</a>`;
+  }).join("");
+
+  const sessionMarkup = includeSessionNav && sessionNavId
+    ? `<div class="app-shell-nav__session-slot"><div id="${escapeHtml(sessionNavId)}" class="session-nav"></div></div>`
+    : "";
+
+  return `${linksMarkup}${sessionMarkup}`;
+}
+
+export function renderPrimaryAppNav(containerEl, options = {}) {
+  if (!containerEl) return null;
+  containerEl.innerHTML = buildPrimaryAppNavMarkup(options);
+  const sessionNavId = typeof options?.sessionNavId === "string" ? options.sessionNavId.trim() : "";
+  return sessionNavId ? containerEl.querySelector(`#${sessionNavId}`) : null;
 }
 
 export function shouldSkipSessionCheck(locationRef = globalThis.location) {

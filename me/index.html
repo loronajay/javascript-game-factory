@@ -23,18 +23,7 @@
       </div>
 
       <div class="me-stage__controls">
-        <div class="me-stage__nav">
-          <a class="grid-stage__back" href="../index.html">&#x276E; Home</a>
-          <a class="grid-stage__portal" href="../grid.html">Arcade Grid</a>
-          <a class="grid-stage__portal" href="../activity/index.html">Activity</a>
-          <a class="grid-stage__portal" href="../thoughts/index.html">Thoughts</a>
-          <a class="grid-stage__portal" href="../bulletins/index.html">Bulletins</a>
-          <a class="grid-stage__portal" href="../events/index.html">Events</a>
-          <a class="grid-stage__portal" href="../search/index.html">Find Players</a>
-          <a class="grid-stage__portal" href="../messages/index.html">Messages</a>
-          <a class="grid-stage__portal" href="../notifications/index.html">Notifications</a>
-          <div id="meAuthNav" class="session-nav"></div>
-        </div>
+        <div id="mePrimaryNav" class="me-stage__nav"></div>
         <button
           id="playerProfileButton"
           class="profile-chip"
@@ -292,21 +281,27 @@
       </aside>
 
       <div class="me-layout">
-        <section id="meHeroCard" class="me-hero-card"></section>
-        <section id="meThoughtsPanel" class="me-panel me-panel--thoughts"></section>
-        <section id="meFriendCodePanel" class="me-panel me-panel--friend-code"></section>
-        <section id="meFavoriteGamePanel" class="me-panel me-panel--favorite"></section>
-        <section id="meRankingsPanel" class="me-panel me-panel--rankings"></section>
-        <section id="meFriendsPanel" class="me-panel me-panel--friends"></section>
-        <section id="meGalleryPanel" class="me-panel me-panel--gallery"></section>
-        <section id="meAboutPanel" class="me-panel me-panel--about"></section>
-        <section id="meBadgesPanel" class="me-panel me-panel--badges"></section>
-        <section class="me-panel me-panel--danger">
-          <h3 class="me-panel__label">DANGER ZONE</h3>
-          <p class="me-panel__empty">Permanently delete your account and all associated data. This cannot be undone.</p>
-          <button id="meDeleteAccountBtn" class="me-danger-btn" type="button">Delete Account</button>
-          <p id="meDeleteAccountFlash" class="player-card__flash" aria-live="polite"></p>
-        </section>
+        <div class="me-layout__main">
+          <section id="meHeroCard" class="me-hero-card"></section>
+          <section id="meRankingsPanel" class="me-panel me-panel--rankings"></section>
+          <section id="meFriendsPanel" class="me-panel me-panel--friends"></section>
+        </div>
+        <div class="me-layout__side me-layout__side--middle">
+          <section id="meFriendCodePanel" class="me-panel me-panel--friend-code"></section>
+          <section id="meFavoriteGamePanel" class="me-panel me-panel--favorite"></section>
+          <section id="meGalleryPanel" class="me-panel me-panel--gallery"></section>
+          <section class="me-panel me-panel--danger">
+            <h3 class="me-panel__label">DANGER ZONE</h3>
+            <p class="me-panel__empty">Permanently delete your account and all associated data. This cannot be undone.</p>
+            <button id="meDeleteAccountBtn" class="me-danger-btn" type="button">Delete Account</button>
+            <p id="meDeleteAccountFlash" class="player-card__flash" aria-live="polite"></p>
+          </section>
+        </div>
+        <div class="me-layout__side me-layout__side--right">
+          <section id="meThoughtsPanel" class="me-panel me-panel--thoughts"></section>
+          <section id="meAboutPanel" class="me-panel me-panel--about"></section>
+          <section id="meBadgesPanel" class="me-panel me-panel--badges"></section>
+        </div>
       </div>
     </section>
   </main>

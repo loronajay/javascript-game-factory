@@ -163,7 +163,7 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
     if (action.id === "react" && !item.isPlaceholder) {
       return `
         <button
-          class="${isReactionPickerOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
+          class="${action.isActive || isReactionPickerOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
           type="button"
           data-toggle-thought-reactions="${escapeHtml(item.id)}"
           aria-expanded="${isReactionPickerOpen ? "true" : "false"}"

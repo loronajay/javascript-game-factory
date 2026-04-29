@@ -5,11 +5,11 @@ function sanitizePlayerId(value) {
 }
 
 const GESTURE_DEFINITIONS = Object.freeze([
-  { type: "poke", label: "Poke ðŸ‘ˆ" },
-  { type: "hug", label: "Hug ðŸ¤—" },
-  { type: "kick", label: "Kick ðŸ‘Ÿ" },
-  { type: "blowkiss", label: "Blow Kiss ðŸ’‹" },
-  { type: "nudge", label: "Nudge ðŸ‘‡" },
+  { type: "poke", label: "Poke 👈" },
+  { type: "hug", label: "Hug 🤗" },
+  { type: "kick", label: "Kick 👟" },
+  { type: "blowkiss", label: "Blow Kiss 😋" },
+  { type: "nudge", label: "Nudge 👇" },
 ]);
 
 const CHALLENGEABLE_GAMES = Object.freeze([

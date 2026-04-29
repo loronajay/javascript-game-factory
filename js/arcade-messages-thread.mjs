@@ -1,5 +1,5 @@
 import { createMessagesApiClient } from "./platform/api/messages-api.mjs";
-import { initSessionNav } from "./arcade-session-nav.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -40,6 +40,13 @@ function scrollToBottom(el) {
 }
 
 async function run() {
+  renderPrimaryAppNav(document.getElementById("threadPrimaryNav"), {
+    basePath: "../../",
+    currentPage: "messages",
+    linkClass: "search-stage__portal",
+    sessionNavId: "threadAuthNav",
+  });
+
   const navEl = document.getElementById("threadAuthNav");
   const otherNameEl = document.getElementById("threadOtherName");
   const bodyEl = document.getElementById("messageList");
@@ -52,7 +59,11 @@ async function run() {
   const playerParam = params.get("player") || "";
   const nameParam = params.get("name") || "";
 
-  const session = await initSessionNav(navEl);
+  const session = await initSessionNav(navEl, {
+    signInPath: "../../sign-in/index.html",
+    signUpPath: "../../sign-up/index.html",
+    homeOnLogout: "../../index.html",
+  });
   const viewerPlayerId = session?.playerId || "";
   const api = createMessagesApiClient();
 

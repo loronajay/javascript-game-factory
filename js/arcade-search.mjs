@@ -1,4 +1,5 @@
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 const api = createPlatformApiClient();
 
@@ -79,6 +80,18 @@ async function runSearch(query) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  renderPrimaryAppNav(document.getElementById("searchPrimaryNav"), {
+    basePath: "../",
+    currentPage: "search",
+    linkClass: "search-stage__portal",
+    sessionNavId: "searchAuthNav",
+  });
+  void initSessionNav(document.getElementById("searchAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
+
   const input = document.getElementById("searchInput");
   const btn = document.getElementById("searchBtn");
 
