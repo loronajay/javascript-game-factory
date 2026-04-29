@@ -422,7 +422,8 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
             request: null,
           };
         const request = requestResult.ok ? requestResult.request : null;
-        globalThis.__JGF_LAST_FRIEND_REQUEST_ERROR__ = request ? "" : (requestResult.error || "");
+        const requestError = request ? "" : String(requestResult.error || "").trim().toLowerCase();
+        globalThis.__JGF_LAST_FRIEND_REQUEST_ERROR__ = requestError;
         addFriendButton.disabled = false;
         profilePanel?.render?.("");
         renderPage(doc, {

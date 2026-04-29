@@ -1,11 +1,7 @@
 # Bugs
 
-## Clicking this link returns a 404 page: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 171626.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 171642.png"
+## Friend's rail showing loronajay's picture correctly, but still not showing bigjuicycawk's picture: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195213.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195206.png"
 
-## Friends rail still not displaying friend's profile picture: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 170501.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 170453.png"
+## This Error persisted: Error on activity screen, not grabbing activies: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195246.png"
 
-## Error on activity screen, not grabbing activities: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 172043.png"
-
-## got this console error when i signed out: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 172323.png"
-
-## Got an error when trying to friend Drellgor, not sure if it's because i had sent an earlier request or not, need clarity as to why it's returning an error: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 172434.png"
+## This bug persisted. Got an error when trying to friend Drellgor, not sure if it's because i had sent an earlier request or not, if there is already a friend request out (which there is because i verified via the database) then i need it to display here "Request Sent" or something like that: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 195403.png"

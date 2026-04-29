@@ -8,6 +8,7 @@ import {
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
 } from "./platform/relationships/relationships.mjs";
+import { enrichProfileFriendPreviewsFromApi } from "./platform/profile/friend-preview-enrichment.mjs";
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
@@ -112,29 +113,16 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       relationshipsRecord: loadProfileRelationshipsRecord(currentProfile.playerId, storage),
     };
 
-    let enrichedProfile = hydrated.profile;
-    if (apiClient?.loadPlayerProfile) {
-      const normalizedRel = normalizeProfileRelationshipsRecord(
-        hydrated.relationshipsRecord?.playerId
-          ? hydrated.relationshipsRecord
-          : { playerId: currentProfile.playerId },
-      );
-      const knownIds = new Set((enrichedProfile?.friendsPreview || []).map((f) => f.playerId).filter(Boolean));
-      const missingIds = normalizedRel.friendPlayerIds.filter((id) => !knownIds.has(id)).slice(0, 8);
-      if (missingIds.length > 0) {
-        const fetched = await Promise.all(missingIds.map((id) => apiClient.loadPlayerProfile(id).catch(() => null)));
-        const extra = fetched.filter((p) => p?.playerId).map((p) => ({
-          playerId: p.playerId,
-          profileName: p.profileName || "Arcade Pilot",
-          presence: p.presence || "offline",
-          friendPoints: normalizedRel.friendPointsByPlayerId[p.playerId] || 0,
-          avatarAssetId: p.avatarAssetId || "",
-          avatarUrl: p.avatarUrl || "",
-        }));
-        if (extra.length > 0) {
-          enrichedProfile = { ...enrichedProfile, friendsPreview: [...(enrichedProfile?.friendsPreview || []), ...extra] };
-          saveFactoryProfile(enrichedProfile, storage);
-        }
+    const normalizedRel = normalizeProfileRelationshipsRecord(
+      hydrated.relationshipsRecord?.playerId
+        ? hydrated.relationshipsRecord
+        : { playerId: currentProfile.playerId },
+    );
+    const enrichedProfile = await enrichProfileFriendPreviewsFromApi(hydrated.profile, normalizedRel, apiClient);
+    if (enrichedProfile !== hydrated.profile) {
+      saveFactoryProfile(enrichedProfile, storage);
+      if (cachedHydration) {
+        cachedHydration = { ...cachedHydration, profile: enrichedProfile };
       }
     }
 
