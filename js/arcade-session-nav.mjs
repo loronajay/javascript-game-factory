@@ -4,6 +4,7 @@ import { clearPlatformStorage, getDefaultPlatformStorage } from "./platform/stor
 import { initNotificationBell } from "./arcade-notifications.mjs";
 
 const auth = createAuthApiClient();
+const SIGNED_OUT_QUERY_KEY = "signedOut";
 
 function escapeHtml(str) {
   return String(str)
@@ -13,20 +14,53 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+export function shouldSkipSessionCheck(locationRef = globalThis.location) {
+  try {
+    const params = new URLSearchParams(locationRef?.search || "");
+    return params.get(SIGNED_OUT_QUERY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function buildLogoutRedirectUrl(homeOnLogout = "index.html", currentHref = globalThis.location?.href || "") {
+  try {
+    const nextUrl = new URL(homeOnLogout, currentHref || "http://localhost/");
+    nextUrl.searchParams.set(SIGNED_OUT_QUERY_KEY, "1");
+    return nextUrl.toString();
+  } catch {
+    const separator = String(homeOnLogout || "").includes("?") ? "&" : "?";
+    return `${homeOnLogout}${separator}${SIGNED_OUT_QUERY_KEY}=1`;
+  }
+}
+
 export async function initSessionNav(containerEl, {
   signInPath = "sign-in/index.html",
   signUpPath = "sign-up/index.html",
   homeOnLogout = "index.html",
   preloadedSession = null,
+  locationRef = globalThis.location,
+  historyRef = globalThis.history,
 } = {}) {
   if (!containerEl) return;
 
   let session = preloadedSession || null;
-  if (!session) {
+  const skipSessionCheck = !session && shouldSkipSessionCheck(locationRef);
+  if (!session && !skipSessionCheck) {
     try {
       session = await auth.getSession();
     } catch {
-      // network down — treat as logged out
+      // Network-down path should still render the signed-out shell.
+    }
+  }
+
+  if (skipSessionCheck) {
+    try {
+      const nextUrl = new URL(locationRef?.href || "", "http://localhost/");
+      nextUrl.searchParams.delete(SIGNED_OUT_QUERY_KEY);
+      historyRef?.replaceState?.(null, "", nextUrl.toString());
+    } catch {
+      // Best-effort cleanup only.
     }
   }
 
@@ -42,10 +76,9 @@ export async function initSessionNav(containerEl, {
     containerEl.querySelector(".session-nav__signout").addEventListener("click", async () => {
       await auth.logout();
       clearPlatformStorage(getDefaultPlatformStorage());
-      window.location.href = homeOnLogout;
+      window.location.href = buildLogoutRedirectUrl(homeOnLogout, globalThis.location?.href || "");
     });
 
-    // attach notification bell before the name
     void initNotificationBell(containerEl, session.playerId);
   } else {
     containerEl.innerHTML = `

@@ -1,7 +1,11 @@
 # Bugs
 
-## Photo upload on upload panel on player profile still not uploading my photo, here's the page view and the console logs: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 154429.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 154441.png"
+## Clicking this link returns a 404 page: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 171626.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 171642.png"
 
-## Same bug not allowing me to post a thought with a photo, it's telling me to write a thought first and i did: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 154627.png"
+## Friends rail still not displaying friend's profile picture: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 170501.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 170453.png"
 
-## Signed out of my account loronajay, then signed into my other account bigjuicycawk, was greeted with loronajay page. then went back home and refreshed and the profile page was a broken page that didn't have all of the elements. shortly after i was redirected to the login page, tried logging in and it wouldn't let me (screenshots 2 and 3): "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 155018.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 155129.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 155237.png"
+## Error on activity screen, not grabbing activities: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 172043.png"
+
+## got this console error when i signed out: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 172323.png"
+
+## Got an error when trying to friend Drellgor, not sure if it's because i had sent an earlier request or not, need clarity as to why it's returning an error: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-28 172434.png"

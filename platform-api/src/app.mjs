@@ -306,29 +306,30 @@ export function createApp(options = {}) {
   const now = options?.now;
 
   return async function app(req, res) {
-    const method = typeof req?.method === "string" ? req.method.toUpperCase() : "GET";
-    const requestUrl = new URL(req?.url || "/", "http://localhost");
-    const pathname = requestUrl.pathname;
     const requestOrigin = req?.headers?.origin || "";
     const timestamp = buildTimestamp(now);
+    try {
+      const method = typeof req?.method === "string" ? req.method.toUpperCase() : "GET";
+      const requestUrl = new URL(req?.url || "/", "http://localhost");
+      const pathname = requestUrl.pathname;
 
-    const rawToken = extractTokenFromRequest(req);
-    const authClaims = rawToken && jwtSecret ? verifyToken(rawToken, jwtSecret) : null;
+      const rawToken = extractTokenFromRequest(req);
+      const authClaims = rawToken && jwtSecret ? verifyToken(rawToken, jwtSecret) : null;
 
-    const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
-    const friendCodeMatch = pathname.match(/^\/players\/by-friend-code\/([^/]+)$/);
-    const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
-    const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
-    const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
-    const playerFriendMatch = pathname.match(/^\/players\/([^/]+)\/friends\/([^/]+)$/);
-    const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
-    const playerPhotosMatch = pathname.match(/^\/players\/([^/]+)\/photos$/);
-    const playerPhotoMatch = pathname.match(/^\/players\/([^/]+)\/photos\/([^/]+)$/);
-    const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
-    const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);
-    const messagesWithMatch = pathname.match(/^\/messages\/with\/([^/]+)$/);
-    const conversationMatch = pathname.match(/^\/messages\/([^/]+)$/);
-    const conversationReadMatch = pathname.match(/^\/messages\/([^/]+)\/read$/);
+      const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
+      const friendCodeMatch = pathname.match(/^\/players\/by-friend-code\/([^/]+)$/);
+      const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
+      const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
+      const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
+      const playerFriendMatch = pathname.match(/^\/players\/([^/]+)\/friends\/([^/]+)$/);
+      const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
+      const playerPhotosMatch = pathname.match(/^\/players\/([^/]+)\/photos$/);
+      const playerPhotoMatch = pathname.match(/^\/players\/([^/]+)\/photos\/([^/]+)$/);
+      const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
+      const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);
+      const messagesWithMatch = pathname.match(/^\/messages\/with\/([^/]+)$/);
+      const conversationMatch = pathname.match(/^\/messages\/([^/]+)$/);
+      const conversationReadMatch = pathname.match(/^\/messages\/([^/]+)\/read$/);
 
     if (method === "OPTIONS") {
       res.statusCode = 204;
@@ -1408,11 +1409,20 @@ export function createApp(options = {}) {
       return;
     }
 
-    writeJson(res, 404, {
-      status: "error",
-      service: "platform-api",
-      error: "not_found",
-      timestamp,
-    }, requestOrigin);
+      writeJson(res, 404, {
+        status: "error",
+        service: "platform-api",
+        error: "not_found",
+        timestamp,
+      }, requestOrigin);
+    } catch (error) {
+      process.stderr.write(`[platform-api] unhandled request error: ${error?.stack || error?.message || error}\n`);
+      writeJson(res, 500, {
+        status: "error",
+        service: "platform-api",
+        error: "internal_error",
+        timestamp,
+      }, requestOrigin);
+    }
   };
 }

@@ -47,21 +47,79 @@ async function enrichProfileFriendsFromApi(profile, relationshipsRecord, apiClie
   const normalized = normalizeProfileRelationshipsRecord(
     relationshipsRecord?.playerId ? relationshipsRecord : { playerId: profile?.playerId || "" },
   );
-  if (normalized.friendPlayerIds.length === 0) return profile;
-  const knownIds = new Set((profile?.friendsPreview || []).map((f) => f.playerId).filter(Boolean));
-  const missingIds = normalized.friendPlayerIds.filter((id) => !knownIds.has(id)).slice(0, 8);
-  if (missingIds.length === 0) return profile;
-  const fetched = await Promise.all(missingIds.map((id) => apiClient.loadPlayerProfile(id).catch(() => null)));
-  const enriched = fetched.filter((p) => p?.playerId).map((p) => ({
-    playerId: p.playerId,
-    profileName: p.profileName || "Arcade Pilot",
-    presence: p.presence || "offline",
-    friendPoints: normalized.friendPointsByPlayerId[p.playerId] || 0,
-    avatarAssetId: p.avatarAssetId || "",
-    avatarUrl: p.avatarUrl || "",
-  }));
-  if (enriched.length === 0) return profile;
-  return { ...profile, friendsPreview: [...(profile?.friendsPreview || []), ...enriched] };
+  const existingPreview = Array.isArray(profile?.friendsPreview) ? profile.friendsPreview : [];
+  const previewById = new Map(existingPreview.map((friend) => [sanitizePlayerId(friend?.playerId), friend]));
+  const candidateIds = new Set(normalized.friendPlayerIds);
+  const mainSqueezeId = sanitizePlayerId(profile?.mainSqueeze?.playerId || normalized.mainSqueezePlayerId);
+
+  if (mainSqueezeId) {
+    candidateIds.add(mainSqueezeId);
+  }
+  if (candidateIds.size === 0) return profile;
+
+  const staleIds = Array.from(candidateIds)
+    .filter(Boolean)
+    .filter((id) => {
+      const friend = previewById.get(id);
+      if (!friend) return true;
+      return !sanitizePlayerId(friend.avatarAssetId) && !sanitizePlayerId(friend.avatarUrl);
+    })
+    .slice(0, 8);
+  if (staleIds.length === 0) return profile;
+
+  const fetched = await Promise.all(staleIds.map((id) => apiClient.loadPlayerProfile(id).catch(() => null)));
+  const fetchedById = new Map(
+    fetched
+      .filter((entry) => entry?.playerId)
+      .map((entry) => [entry.playerId, entry]),
+  );
+  if (fetchedById.size === 0) return profile;
+
+  const mergedPreview = existingPreview.map((friend) => {
+    const playerId = sanitizePlayerId(friend?.playerId);
+    const fetchedFriend = fetchedById.get(playerId);
+    if (!fetchedFriend) return friend;
+    return {
+      ...friend,
+      profileName: fetchedFriend.profileName || friend.profileName || "Arcade Pilot",
+      presence: fetchedFriend.presence || friend.presence || "offline",
+      friendPoints: normalized.friendPointsByPlayerId[playerId] || friend.friendPoints || 0,
+      avatarAssetId: fetchedFriend.avatarAssetId || friend.avatarAssetId || "",
+      avatarUrl: fetchedFriend.avatarUrl || friend.avatarUrl || "",
+    };
+  });
+
+  const appendedPreview = Array.from(fetchedById.values())
+    .filter((friend) => !previewById.has(friend.playerId))
+    .map((friend) => ({
+      playerId: friend.playerId,
+      profileName: friend.profileName || "Arcade Pilot",
+      presence: friend.presence || "offline",
+      friendPoints: normalized.friendPointsByPlayerId[friend.playerId] || 0,
+      avatarAssetId: friend.avatarAssetId || "",
+      avatarUrl: friend.avatarUrl || "",
+    }));
+
+  const mainSqueeze = sanitizePlayerId(profile?.mainSqueeze?.playerId)
+    ? (() => {
+        const fetchedMainSqueeze = fetchedById.get(sanitizePlayerId(profile.mainSqueeze.playerId));
+        if (!fetchedMainSqueeze) return profile.mainSqueeze;
+        return {
+          ...profile.mainSqueeze,
+          profileName: fetchedMainSqueeze.profileName || profile.mainSqueeze.profileName || "Arcade Pilot",
+          presence: fetchedMainSqueeze.presence || profile.mainSqueeze.presence || "offline",
+          friendPoints: normalized.friendPointsByPlayerId[fetchedMainSqueeze.playerId] || profile.mainSqueeze.friendPoints || 0,
+          avatarAssetId: fetchedMainSqueeze.avatarAssetId || profile.mainSqueeze.avatarAssetId || "",
+          avatarUrl: fetchedMainSqueeze.avatarUrl || profile.mainSqueeze.avatarUrl || "",
+        };
+      })()
+    : (profile?.mainSqueeze || null);
+
+  return {
+    ...profile,
+    friendsPreview: [...mergedPreview, ...appendedPreview],
+    mainSqueeze,
+  };
 }
 
 function resolveProfilePresence(presence, isOwnerView) {
@@ -142,6 +200,28 @@ function buildMessageAction(viewerPlayerId, targetPlayerId, targetProfileName, i
   };
 }
 
+function resolveRelationshipFlashMessage(flashMessage = "") {
+  if (typeof flashMessage !== "string") return "";
+  const normalized = flashMessage.trim();
+  const legacyGenericMessage = "Could not send request â€” please try again.";
+  if (normalized !== legacyGenericMessage) {
+    return normalized;
+  }
+
+  switch (String(globalThis.__JGF_LAST_FRIEND_REQUEST_ERROR__ || "").trim().toLowerCase()) {
+    case "request_already_pending":
+      return "Friend request already pending.";
+    case "invalid_target":
+      return "You can't send a request to this player.";
+    case "not_authenticated":
+      return "Sign in to add friends.";
+    case "network_error":
+      return "Could not reach the friend-request service.";
+    default:
+      return normalized;
+  }
+}
+
 function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "") {
   const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
   const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
@@ -170,7 +250,7 @@ function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRe
     disabled: false,
     mode: alreadyFriends ? "unfriend" : "add-friend",
     label: alreadyFriends ? "Unfriend" : "Add Friend",
-    flashMessage: typeof flashMessage === "string" ? flashMessage : "",
+    flashMessage: resolveRelationshipFlashMessage(flashMessage),
     playerId: normalizedTargetPlayerId,
   };
 }

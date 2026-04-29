@@ -735,7 +735,7 @@ button.thought-card__action {
   font-family: var(--font-display);
   font-size: 0.96rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .thought-composer__body {

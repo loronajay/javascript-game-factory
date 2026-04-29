@@ -83,21 +83,28 @@ function formatNotificationText(notif) {
   }
 }
 
-function buildGameHref(slug) {
-  const pathParts = globalThis.location?.pathname?.replace(/\/[^/]*$/, "").split("/").filter(Boolean) || [];
-  const depth = pathParts.length;
-  const prefix = depth > 0 ? "../".repeat(depth) : "";
-  return `${prefix}games/${slug}/index.html`;
+function buildRootUrl(moduleUrl = import.meta.url) {
+  try {
+    return new URL("../", moduleUrl);
+  } catch {
+    return null;
+  }
 }
 
-function buildHref(path) {
-  const pathParts = globalThis.location?.pathname?.replace(/\/[^/]*$/, "").split("/").filter(Boolean) || [];
-  const depth = pathParts.length;
-  const prefix = depth > 0 ? "../".repeat(depth) : "";
-  return `${prefix}${path.replace(/^\//, "")}`;
+export function buildGameHref(slug, options = {}) {
+  const rootUrl = buildRootUrl(options?.moduleUrl || import.meta.url);
+  if (!rootUrl) return `games/${slug}/index.html`;
+  return new URL(`games/${encodeURIComponent(slug)}/index.html`, rootUrl).toString();
 }
 
-export { formatNotificationText, buildHref };
+export function buildHref(path, options = {}) {
+  const rootUrl = buildRootUrl(options?.moduleUrl || import.meta.url);
+  const normalizedPath = String(path || "").replace(/^\//, "");
+  if (!rootUrl) return normalizedPath;
+  return new URL(normalizedPath, rootUrl).toString();
+}
+
+export { formatNotificationText };
 
 export function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, onChallengeDecline) {
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";

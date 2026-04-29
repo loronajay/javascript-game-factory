@@ -9,15 +9,53 @@ function buildJsonOptions(method, value) {
   };
 }
 
-async function requestJson(fetchImpl, baseUrl, path, options = {}) {
-  if (typeof fetchImpl !== "function" || !baseUrl) return null;
+async function requestEnvelope(fetchImpl, baseUrl, path, options = {}) {
+  if (typeof fetchImpl !== "function" || !baseUrl) {
+    return {
+      ok: false,
+      status: 0,
+      error: "not_configured",
+      body: null,
+    };
+  }
   try {
     const response = await fetchImpl(`${baseUrl}${path}`, options);
-    if (!response?.ok) return null;
-    return await response.json();
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    if (response?.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        error: "",
+        body,
+      };
+    }
+    return {
+      ok: false,
+      status: response?.status || 0,
+      error: body?.error || "request_failed",
+      body,
+    };
   } catch {
+    return {
+      ok: false,
+      status: 0,
+      error: "network_error",
+      body: null,
+    };
+  }
+}
+
+async function requestJson(fetchImpl, baseUrl, path, options = {}) {
+  const response = await requestEnvelope(fetchImpl, baseUrl, path, options);
+  if (!response.ok) {
     return null;
   }
+  return response.body;
 }
 
 export function createNotificationsApiClient(options = {}) {
@@ -39,13 +77,23 @@ export function createNotificationsApiClient(options = {}) {
     },
 
     async sendFriendRequest(toPlayerId, fromDisplayName = "") {
-      const payload = await requestJson(
+      const result = await this.sendFriendRequestDetailed(toPlayerId, fromDisplayName);
+      return result.ok ? result.request : null;
+    },
+
+    async sendFriendRequestDetailed(toPlayerId, fromDisplayName = "") {
+      const result = await requestEnvelope(
         fetchImpl,
         baseUrl,
         "/friend-requests",
         buildJsonOptions("POST", { toPlayerId, fromDisplayName }),
       );
-      return payload?.request || null;
+      return {
+        ok: result.ok,
+        status: result.status,
+        error: result.error,
+        request: result.body?.request || null,
+      };
     },
 
     async acceptFriendRequest(requestId, acceptorDisplayName = "") {

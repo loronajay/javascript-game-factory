@@ -408,10 +408,21 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       if (authSession?.playerId) {
         addFriendButton.disabled = true;
         const notifApi = createNotificationsApiClient();
-        const request = await notifApi.sendFriendRequest(
-          targetPlayerId,
-          currentProfile.profileName || "UNNAMED PILOT",
-        );
+        const requestResult = typeof notifApi.sendFriendRequestDetailed === "function"
+          ? await notifApi.sendFriendRequestDetailed(
+            targetPlayerId,
+            currentProfile.profileName || "UNNAMED PILOT",
+          )
+          : {
+            ok: !!(await notifApi.sendFriendRequest(
+              targetPlayerId,
+              currentProfile.profileName || "UNNAMED PILOT",
+            )),
+            error: "",
+            request: null,
+          };
+        const request = requestResult.ok ? requestResult.request : null;
+        globalThis.__JGF_LAST_FRIEND_REQUEST_ERROR__ = request ? "" : (requestResult.error || "");
         addFriendButton.disabled = false;
         profilePanel?.render?.("");
         renderPage(doc, {
