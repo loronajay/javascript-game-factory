@@ -301,8 +301,18 @@ function normalizeFriendPreviewEntry(entry, options = {}) {
   const playerId = sanitizeSingleLine(entry.playerId, 80);
   const friendPoints = Math.max(0, Math.floor(Number(entry.friendPoints) || 0));
   const isMainSqueeze = !!options.isMainSqueeze || !!entry.isMainSqueeze;
+  const avatarAssetId = sanitizeSingleLine(entry.avatarAssetId, 120);
+  const avatarUrl = normalizeUrl(sanitizeSingleLine(entry.avatarUrl, PROFILE_BACKGROUND_URL_MAX_LENGTH));
   if (!profileName && !playerId) return null;
-  return { playerId, profileName: profileName || "Arcade Pilot", presence: normalizePresence(entry.presence), friendPoints, isMainSqueeze };
+  return {
+    playerId,
+    profileName: profileName || "Arcade Pilot",
+    presence: normalizePresence(entry.presence),
+    friendPoints,
+    isMainSqueeze,
+    avatarAssetId,
+    avatarUrl,
+  };
 }
 
 function normalizeFriendsPreview(value) {

@@ -665,6 +665,7 @@ function renderThoughtsPanel(container, title, items, composer = null, options =
           type="text"
           maxlength="80"
           placeholder="${escapeHtml(composer.subjectPlaceholder || "Optional headline")}"
+          value="${escapeHtml(composerState.subject || "")}"
         >
         <textarea
           id="playerThoughtBody"
@@ -673,7 +674,7 @@ function renderThoughtsPanel(container, title, items, composer = null, options =
           rows="4"
           maxlength="500"
           placeholder="${escapeHtml(composer.textPlaceholder || "Share a thought.")}"
-        ></textarea>
+        >${escapeHtml(composerState.text || "")}</textarea>
         ${composerState.previewUrl
           ? `
             <div class="thought-composer__photo-card">

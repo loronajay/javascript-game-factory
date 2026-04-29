@@ -101,8 +101,27 @@ function readMultipartFile(req) {
 }
 
 function resolveProfileAvatarUrl(profile, resolver) {
-  if (!profile || !resolver || !profile.avatarAssetId) return profile;
-  return { ...profile, avatarUrl: resolver(profile.avatarAssetId) };
+  if (!profile || !resolver) return profile;
+
+  const resolveFriendAvatar = (entry) => {
+    if (!entry) return entry;
+    const resolvedAvatarUrl = entry.avatarAssetId
+      ? resolver(entry.avatarAssetId)
+      : (entry.avatarUrl || "");
+    return {
+      ...entry,
+      avatarUrl: resolvedAvatarUrl || "",
+    };
+  };
+
+  return {
+    ...profile,
+    avatarUrl: profile.avatarAssetId ? resolver(profile.avatarAssetId) : (profile.avatarUrl || ""),
+    friendsPreview: Array.isArray(profile.friendsPreview)
+      ? profile.friendsPreview.map(resolveFriendAvatar)
+      : profile.friendsPreview,
+    mainSqueeze: resolveFriendAvatar(profile.mainSqueeze),
+  };
 }
 
 function buildTimestamp(now) {

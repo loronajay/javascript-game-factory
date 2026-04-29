@@ -30,6 +30,8 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   let pendingThoughtPhoto = null;
   let pendingGalleryPhoto = null;
   let thoughtPhotoState = {
+    subject: "",
+    text: "",
     previewUrl: "",
     fileName: "",
     caption: "",
@@ -74,6 +76,8 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     revokeThoughtPreview();
     pendingThoughtPhoto = null;
     thoughtPhotoState = {
+      subject: thoughtPhotoState.subject || "",
+      text: thoughtPhotoState.text || "",
       previewUrl: "",
       fileName: "",
       caption: "",
@@ -124,6 +128,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
           profileName: p.profileName || "Arcade Pilot",
           presence: p.presence || "offline",
           friendPoints: normalizedRel.friendPointsByPlayerId[p.playerId] || 0,
+          avatarAssetId: p.avatarAssetId || "",
           avatarUrl: p.avatarUrl || "",
         }));
         if (extra.length > 0) {
@@ -339,14 +344,16 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     const currentProfile = loadFactoryProfile(storage);
     const subjectInput = doc.getElementById("meThoughtSubject");
     const bodyInput = doc.getElementById("meThoughtBody");
-    const subject = subjectInput?.value || "";
-    const text = bodyInput?.value || "";
+    const subject = subjectInput?.value ?? thoughtPhotoState.subject ?? "";
+    const text = bodyInput?.value ?? thoughtPhotoState.text ?? "";
     const photoResult = await uploadPendingThoughtPhoto(currentProfile, subject, text);
 
     if (photoResult.thought) {
       await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
       const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
       syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      closeThoughtPhotoComposer();
+      thoughtPhotoState = { ...thoughtPhotoState, subject: "", text: "" };
       void rerender("Thought posted.");
       return;
     }
@@ -367,6 +374,8 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
 
     const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
     syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+    closeThoughtPhotoComposer();
+    thoughtPhotoState = { ...thoughtPhotoState, subject: "", text: "" };
     void rerender("Thought posted.");
   });
 
@@ -525,6 +534,8 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       revokeThoughtPreview();
       pendingThoughtPhoto = file;
       thoughtPhotoState = {
+        subject: thoughtPhotoState.subject || "",
+        text: thoughtPhotoState.text || "",
         previewUrl: globalThis.URL?.createObjectURL ? globalThis.URL.createObjectURL(file) : "",
         fileName: file.name || "Selected photo",
         caption: "",
@@ -594,6 +605,14 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     }
     if (event.target?.id === "meThoughtPhotoCaption") {
       thoughtPhotoState = { ...thoughtPhotoState, caption: event.target.value || "" };
+      return;
+    }
+    if (event.target?.id === "meThoughtSubject") {
+      thoughtPhotoState = { ...thoughtPhotoState, subject: event.target.value || "" };
+      return;
+    }
+    if (event.target?.id === "meThoughtBody") {
+      thoughtPhotoState = { ...thoughtPhotoState, text: event.target.value || "" };
       return;
     }
     if (event.target?.id === "meGalleryCaption") {

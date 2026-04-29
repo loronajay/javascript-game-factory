@@ -57,6 +57,7 @@ async function enrichProfileFriendsFromApi(profile, relationshipsRecord, apiClie
     profileName: p.profileName || "Arcade Pilot",
     presence: p.presence || "offline",
     friendPoints: normalized.friendPointsByPlayerId[p.playerId] || 0,
+    avatarAssetId: p.avatarAssetId || "",
     avatarUrl: p.avatarUrl || "",
   }));
   if (enriched.length === 0) return profile;

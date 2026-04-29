@@ -129,6 +129,8 @@ function normalizeFriendPreviewEntry(entry, options = {}) {
   const playerId = sanitizeSingleLine(entry.playerId, 80);
   const friendPoints = Math.max(0, Math.floor(Number(entry.friendPoints) || 0));
   const isMainSqueeze = !!options.isMainSqueeze || !!entry.isMainSqueeze;
+  const avatarAssetId = sanitizeAssetId(entry.avatarAssetId);
+  const avatarUrl = normalizeUrl(sanitizeSingleLine(entry.avatarUrl || "", PROFILE_BACKGROUND_URL_MAX_LENGTH));
 
   if (!profileName && !playerId) return null;
 
@@ -138,7 +140,8 @@ function normalizeFriendPreviewEntry(entry, options = {}) {
     presence: normalizePresence(entry.presence),
     friendPoints,
     isMainSqueeze,
-    avatarUrl: sanitizeSingleLine(entry.avatarUrl || "", 500),
+    avatarAssetId,
+    avatarUrl,
   };
 }
 
@@ -271,6 +274,16 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
     ? options.avatarUrlResolver
     : null;
   const providedAvatarUrl = normalizeUrl(sanitizeSingleLine(source.avatarUrl, PROFILE_BACKGROUND_URL_MAX_LENGTH));
+  const resolveNestedAvatar = (entry) => {
+    if (!entry) return entry;
+    const resolvedAvatarUrl = entry.avatarAssetId && avatarUrlResolver
+      ? String(avatarUrlResolver(entry.avatarAssetId) || "")
+      : entry.avatarUrl;
+    return {
+      ...entry,
+      avatarUrl: resolvedAvatarUrl || "",
+    };
+  };
 
   return {
     playerId: sanitizeSingleLine(source.playerId, 80),
@@ -288,8 +301,8 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
     links: normalizedFields.links,
     favoriteGameSlug: normalizedFields.favoriteGameSlug,
     ladderPlacements: normalizedFields.ladderPlacements,
-    friendsPreview: normalizedFields.friendsPreview,
-    mainSqueeze: normalizedFields.mainSqueeze,
+    friendsPreview: normalizedFields.friendsPreview.map(resolveNestedAvatar),
+    mainSqueeze: resolveNestedAvatar(normalizedFields.mainSqueeze),
     badgeIds: normalizedFields.badgeIds,
     featuredGames: normalizePublicStringList(source.featuredGames).length > 0
       ? normalizePublicStringList(source.featuredGames)
