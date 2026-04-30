@@ -1,0 +1,28 @@
+/* ---------- THOUGHTS PAGE FEED RAIL ---------- */
+
+.thoughts-feed {
+  max-height: min(70vh, 760px);
+  padding-right: 8px;
+  overflow-y: auto;
+}
+
+.thoughts-feed::-webkit-scrollbar {
+  width: 10px;
+}
+
+.thoughts-feed::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 197, 228, 0.78), rgba(255, 124, 190, 0.54));
+  border: 2px solid rgba(18, 9, 31, 0.9);
+}
+
+.thoughts-feed::-webkit-scrollbar-track {
+  background: rgba(12, 8, 30, 0.42);
+}
+
+@media (max-width: 640px) {
+  .thoughts-feed {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+}
