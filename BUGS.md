@@ -2,8 +2,6 @@
 
 ## We need to switch to percentages in general across the board instead of hardcoding page element positions, to account for different monitor sizes/mobile web viewers etc. 
 
-## Profile panels still squished on the right ever since we added the new friends panel. Not an issue on profiles where the generic friends panel exists: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 220318.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 220335.png"
-
 ## The root `css/` folder still has oversized files and should keep following the seam-first split.
 
 

@@ -238,6 +238,7 @@ The following is the complete current state of the platform.
 - `/search/index.html` for player discovery by name
 - Shared friend-preview enrichment now refreshes stale existing friend slots and `mainSqueeze` avatar data instead of only appending missing previews
 - `/me` now exposes an expandable/searchable friend navigator so the owner can browse the full linked-friend list without leaving the profile page
+- `/me` now uses explicit owner-panel placement rather than leaving feed/about/badges to compete inside underspecified wrapper columns; the owner feed keeps a dedicated desktop lane and then expands to a full-width row at mid-desktop widths
 
 **Social graph:**
 - Friend requests: `POST /friend-requests`, accept/reject endpoints, `friend_request` + `friend_accept` notifications
@@ -305,6 +306,7 @@ The following is the complete current state of the platform.
 
 Completed cleanup:
 - the current platform/UI bug pass is functionally complete in code: nav shell consistency, friend navigator, reaction clarity, upload double-submit protection, empty favorite behavior, notification styling, and `/me` layout regressions are all addressed and ready for manual verification
+- future `/me` changes should preserve direct panel ownership and intentional panel placement rather than drifting back toward wrapper-column ambiguity, since that was the root cause of the owner-profile squeeze bug
 - `activity` and `relationships` no longer live as monolithic shared-platform files.
 - `arcade-profile` no longer owns form parsing, persistence, panel control, and view-model shaping in one file.
 - shared `/me` + `/player` social rendering and actions now live in dedicated subsystems instead of duplicated page files.

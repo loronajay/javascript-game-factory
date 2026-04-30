@@ -110,7 +110,7 @@
   z-index: 4;
   display: grid;
   gap: clamp(20px, 5vh, 56px);
-  width: min(1160px, 100%);
+  width: min(94vw, 1160px);
   padding-top: clamp(6px, 2vh, 18px);
 }
 
@@ -165,14 +165,14 @@
 }
 
 .home-page .pixel-text--title {
-  width: min(1120px, 92vw);
+  width: min(94vw, 1120px);
   margin-left: auto;
   margin-right: auto;
   filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.42));
 }
 
 .home-page .pixel-text--subtitle {
-  width: min(760px, 84vw);
+  width: min(84vw, 760px);
   margin-left: auto;
   margin-right: auto;
   filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.28));
@@ -321,9 +321,9 @@
   align-items: center;
   justify-content: center;
   gap: 14px;
-  width: min(100%, 980px);
+  width: min(94vw, 980px);
   flex-wrap: wrap;
-  padding: 0 24px;
+  padding: 0 clamp(12px, 3vw, 24px);
 }
 
 .hero-cta {

@@ -22,12 +22,14 @@ Completed:
 - `js/thoughts-page/` established for thoughts page page/view-model/render/actions modules and seam tests
 - `js/arcade-session-nav.mjs` now owns the shared signed-in primary navigation shell instead of repeating different nav clusters across each social page
 - signed-in page chrome is now more consistent: shared shell, direct `Home` route, fixed notification bell contract, and unified mastheads on the utility/feed pages
+- owner `/me` layout now uses explicit panel placement and a deliberate mid-desktop reflow instead of leaving the feed/about/badges stack to fight inside ambiguous wrapper columns
 - `js/platform/thoughts/thoughts-cards.mjs` now owns thought-card/view-model shaping
 - `js/arcade-profile.mjs` reduced to a thin compatibility barrel
 - `js/arcade-player.mjs`, `js/arcade-player-wire.mjs`, and `js/arcade-player-view.mjs` reduced to thin compatibility shims over `js/player-page/`
 - `js/arcade-thoughts.mjs` reduced to a thin compatibility shim over `js/thoughts-page/`
 - `/player/index.html` and `/thoughts/index.html` now point at their subsystem entry modules
 - `/me` now includes an owner-only expandable/searchable friend navigator rather than relying only on the visible hero rail
+- `/me` composition now more closely matches the public-profile intent: left hero rail, center owner-utility lane, dedicated feed lane on desktop, then a full-width feed row before tablet/mobile collapse
 - shared profile CSS seam extraction is underway with:
   - `css/session-nav.css`
   - `css/profile-social.css`

@@ -52,8 +52,8 @@
 .search-stage__controls {
   position: relative;
   z-index: 20;
-  width: 100%;
-  max-width: 760px;
+  width: min(82vw, 760px);
+  max-width: none;
 }
 
 .search-stage__masthead {
@@ -61,8 +61,8 @@
   z-index: 20;
   display: grid;
   gap: 16px;
-  width: 100%;
-  max-width: 860px;
+  width: min(92vw, 860px);
+  max-width: none;
   padding: 16px 18px 18px;
   background:
     linear-gradient(180deg, rgba(14, 32, 58, 0.88), rgba(7, 18, 34, 0.92)),
@@ -116,8 +116,8 @@
   position: relative;
   z-index: 10;
   text-align: center;
-  width: 100%;
-  max-width: 760px;
+  width: min(82vw, 760px);
+  max-width: none;
   margin: 0 auto;
 }
 
@@ -140,8 +140,8 @@
 .search-layout {
   position: relative;
   z-index: 10;
-  width: 100%;
-  max-width: 620px;
+  width: min(88vw, 620px);
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 16px;

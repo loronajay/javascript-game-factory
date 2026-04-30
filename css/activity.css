@@ -171,7 +171,7 @@
 .activity-stage__masthead {
   display: grid;
   gap: 16px;
-  width: min(1100px, 100%);
+  width: min(92vw, 1100px);
   padding: 16px 18px 18px;
   background:
     linear-gradient(180deg, rgba(16, 43, 71, 0.88), rgba(10, 22, 40, 0.94)),
@@ -203,7 +203,7 @@
   display: grid;
   justify-items: center;
   gap: 4px;
-  width: min(760px, 100%);
+  width: min(82vw, 760px);
   margin: 0 auto;
   text-align: center;
 }
@@ -265,7 +265,7 @@
 .activity-layout {
   display: grid;
   gap: 18px;
-  width: min(1100px, 100%);
+  width: min(92vw, 1100px);
 }
 
 .activity-hero-card,

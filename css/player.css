@@ -174,7 +174,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: min(1100px, 100%);
+  width: min(94vw, 1100px);
   padding-top: 8px;
 }
 
@@ -188,7 +188,7 @@
   display: grid;
   justify-items: center;
   gap: 4px;
-  width: min(760px, 100%);
+  width: min(82vw, 760px);
   text-align: center;
   padding-top: 4px;
 }
@@ -262,7 +262,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(260px, 0.82fr) minmax(320px, 1fr);
   gap: 18px;
-  width: min(1100px, 100%);
+  width: min(94vw, 1100px);
 }
 
 .player-panel {
