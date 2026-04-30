@@ -1,0 +1,57 @@
+.me-hero-card__identity-panel,
+.player-hero-card__identity-panel {
+  gap: 10px;
+  min-width: 0;
+}
+
+.me-hero-card__identity-field,
+.player-hero-card__identity-field {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.me-hero-card__identity-field--stack,
+.player-hero-card__identity-field--stack {
+  align-content: start;
+}
+
+.me-hero-card__identity-field-label,
+.player-hero-card__identity-field-label {
+  margin: 0;
+  color: #ffd7b9;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.me-hero-card__identity-field-value-row,
+.player-hero-card__identity-field-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.me-hero-card__identity-field-value,
+.player-hero-card__identity-field-value {
+  color: #fff8ff;
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.me-hero-card__identity-field-value--mono,
+.player-hero-card__identity-field-value--mono {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.me-hero-card__identity-field .me-hero-card__identity-field-label,
+.player-hero-card__identity-field .player-hero-card__identity-field-label {
+  width: 100%;
+  justify-content: center;
+}

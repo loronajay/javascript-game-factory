@@ -5,67 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jay's Javascript Arcade | Notifications</title>
   <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
   <link rel="stylesheet" href="../css/search.css">
   <link rel="stylesheet" href="../css/notifications.css">
-  <style>
-    .notif-page-layout {
-      position: relative;
-      z-index: 10;
-      width: 100%;
-      max-width: 620px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .notif-page__empty {
-      padding: 40px 0;
-      text-align: center;
-      color: rgba(200, 180, 255, 0.35);
-      font-family: var(--font-display);
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-    }
-
-    .notif-page__flash {
-      min-height: 1em;
-      color: #88aacc;
-      font-size: 0.82rem;
-      font-family: var(--font-display);
-      letter-spacing: 0.06em;
-      padding: 12px 0;
-    }
-
-    /* Expand the bell dropdown item styles for full-width page use */
-    #notifPageList .notif-item {
-      background: rgba(10, 0, 21, 0.75);
-      border: 1px solid rgba(255, 0, 255, 0.1);
-      border-radius: 0;
-      padding: 14px 18px;
-    }
-
-    #notifPageList .notif-item--unread {
-      background: rgba(255, 0, 255, 0.04);
-      border-left: 3px solid rgba(255, 0, 255, 0.5);
-    }
-
-    #notifPageList .notif-item:hover {
-      background: rgba(255, 0, 255, 0.06);
-    }
-
-    #notifPageList .notif-item__text {
-      font-size: 0.84rem;
-    }
-
-    #notifPageList .notif-item__preview {
-      font-size: 0.76rem;
-    }
-
-    #notifPageList .notif-item__time {
-      font-size: 0.68rem;
-      margin-top: 6px;
-    }
-  </style>
 </head>
 <body class="search-page-shell">
   <div class="scanlines"></div>
@@ -80,14 +22,16 @@
         <div class="search-stage__floor"></div>
       </div>
 
-      <div class="search-stage__controls">
-        <nav id="notifPrimaryNav" class="search-stage__nav"></nav>
-      </div>
+      <header class="search-stage__masthead">
+        <div class="search-stage__controls">
+          <nav id="notifPrimaryNav" class="search-stage__nav"></nav>
+        </div>
 
-      <div class="search-stage__header">
-        <h1 class="pixel-text pixel-text--title search-stage__title">NOTIFICATIONS</h1>
-        <p class="search-stage__subtitle">Everything that's happened while you were away.</p>
-      </div>
+        <div class="search-stage__header">
+          <h1 class="pixel-text pixel-text--title search-stage__title">NOTIFICATIONS</h1>
+          <p class="search-stage__subtitle">Everything that's happened while you were away.</p>
+        </div>
+      </header>
 
       <div class="notif-page-layout">
         <p id="notifPageFlash" class="notif-page__flash"></p>

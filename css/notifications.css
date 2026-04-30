@@ -11,22 +11,44 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: 1px solid rgba(255, 0, 255, 0.3);
-  border-radius: 4px;
-  color: #ff00ff;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff8ff;
   cursor: pointer;
-  font-size: 1rem;
-  padding: 4px 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   line-height: 1;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: transform 0.15s, border-color 0.15s, color 0.15s, background 0.15s;
   font-family: inherit;
 }
 
-.notif-bell:hover {
-  border-color: #ff00ff;
-  background: rgba(255, 0, 255, 0.1);
+.notif-bell:hover,
+.notif-bell:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.09);
   color: #fff;
+}
+
+.notif-bell--current {
+  border-color: rgba(153, 255, 255, 0.56);
+  background: rgba(153, 255, 255, 0.12);
+  color: #dffff8;
+  box-shadow:
+    0 0 0 1px rgba(153, 255, 255, 0.12) inset,
+    0 0 18px rgba(153, 255, 255, 0.08);
+}
+
+.notif-bell__icon {
+  font-size: 0.9rem;
+}
+
+.notif-bell__label {
+  display: inline-block;
 }
 
 .notif-bell__badge {
@@ -74,6 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 10px 14px 8px;
   border-bottom: 1px solid rgba(255, 0, 255, 0.2);
 }
@@ -100,6 +123,77 @@
 
 .notif-dropdown__mark-read:hover {
   color: #ff00ff;
+}
+
+.notif-dropdown__page-link {
+  color: #9fe5ff;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+}
+
+.notif-dropdown__page-link:hover,
+.notif-dropdown__page-link:focus-visible {
+  color: #ffffff;
+}
+
+.notif-page-layout {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notif-page__empty {
+  padding: 40px 0;
+  text-align: center;
+  color: rgba(200, 180, 255, 0.35);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+.notif-page__flash {
+  min-height: 1em;
+  color: #88aacc;
+  font-size: 0.82rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  padding: 12px 0;
+}
+
+/* Expand the bell dropdown item styles for full-width page use */
+#notifPageList .notif-item {
+  background: rgba(10, 0, 21, 0.75);
+  border: 1px solid rgba(255, 0, 255, 0.1);
+  border-radius: 0;
+  padding: 14px 18px;
+}
+
+#notifPageList .notif-item--unread {
+  background: rgba(255, 0, 255, 0.04);
+  border-left: 3px solid rgba(255, 0, 255, 0.5);
+}
+
+#notifPageList .notif-item:hover {
+  background: rgba(255, 0, 255, 0.06);
+}
+
+#notifPageList .notif-item__text {
+  font-size: 0.84rem;
+}
+
+#notifPageList .notif-item__preview {
+  font-size: 0.76rem;
+}
+
+#notifPageList .notif-item__time {
+  font-size: 0.68rem;
+  margin-top: 6px;
 }
 
 .notif-dropdown__list {

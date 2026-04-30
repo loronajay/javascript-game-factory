@@ -1,0 +1,196 @@
+/* ---------- PROFILE HERO SHARED SUPPORT RAIL ---------- */
+
+.me-panel--favorite,
+.player-panel--favorite {
+  min-height: 360px;
+}
+
+.me-hero-card__section-title,
+.me-hero-card__identity-field-label,
+.player-hero-card__section-title,
+.player-hero-card__identity-field-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 214, 189, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.14), rgba(255, 121, 183, 0.08)),
+    rgba(9, 8, 22, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.me-hero-card__section-topline,
+.player-hero-card__section-topline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.me-hero-card__metrics-grid,
+.player-hero-card__metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.me-hero-card__metrics-stat,
+.player-hero-card__metrics-stat {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.me-hero-card__metrics-stat-value,
+.player-hero-card__metrics-stat-value {
+  color: #fff8ff;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+
+.me-hero-card__rail-list,
+.player-hero-card__rail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.me-hero-card__rail-item,
+.player-hero-card__rail-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.me-hero-card__rail-item--placeholder,
+.player-hero-card__rail-item--placeholder {
+  background:
+    linear-gradient(180deg, rgba(140, 246, 212, 0.05), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.me-hero-card__friend-card,
+.player-hero-card__friend-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.me-hero-card__friend-card--placeholder,
+.player-hero-card__friend-card--placeholder {
+  background:
+    linear-gradient(180deg, rgba(140, 246, 212, 0.05), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.me-hero-card__friend-avatar,
+.player-hero-card__friend-avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 214, 189, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(16, 12, 35, 0.92)),
+    rgba(10, 8, 24, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.me-hero-card__friend-avatar-text,
+.me-hero-card__friend-label,
+.player-hero-card__friend-avatar-text,
+.player-hero-card__friend-label {
+  margin: 0;
+  color: #ffd7b9;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.me-hero-card__friend-avatar-text,
+.player-hero-card__friend-avatar-text {
+  font-size: 0.82rem;
+}
+
+.me-hero-card__friend-avatar-img,
+.player-hero-card__friend-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.me-hero-card__friend-copy,
+.player-hero-card__friend-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.me-hero-card__friend-name,
+.me-hero-card__friend-points,
+.player-hero-card__friend-name,
+.player-hero-card__friend-points {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.me-hero-card__friend-name,
+.player-hero-card__friend-name {
+  color: #fff8ff;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+}
+
+.me-hero-card__friend-points,
+.player-hero-card__friend-points {
+  color: rgba(255, 248, 255, 0.76);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.me-hero-card__rail-value-row,
+.player-hero-card__rail-value-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.me-hero-card__rail-value,
+.player-hero-card__rail-value {
+  margin: 0;
+  color: #fff8ff;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  #meThoughtsPanel .thoughts-feed,
+  #playerThoughtsPanel .thoughts-feed {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .me-hero-card__metrics-grid,
+  .player-hero-card__metrics-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

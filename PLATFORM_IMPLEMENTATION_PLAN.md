@@ -226,7 +226,7 @@ The following is the complete current state of the platform.
 - Sign-up, sign-in, sign-out with 30-day HttpOnly JWT cookie (`arcade_session`)
 - Account creation with `claimPlayerId` to attach existing guest identity to a new account
 - `GET /auth/me`, `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`
-- `js/arcade-session-nav.mjs` wired into home, grid, and `/me`
+- `js/arcade-session-nav.mjs` now owns the shared signed-in shell and session slot across home, grid, `/me`, `/player`, `/thoughts`, `/activity`, `/search`, `/messages`, and `/notifications`
 - GitHub Pages-safe auth redirects now resolve app-root-relative `next` targets through `js/arcade-paths.mjs` so project-site deployments return to `/me` correctly after login
 
 **Profiles:**
@@ -237,6 +237,7 @@ The following is the complete current state of the platform.
 - `hasAccount` and `discoverable` ship on every profile API response
 - `/search/index.html` for player discovery by name
 - Shared friend-preview enrichment now refreshes stale existing friend slots and `mainSqueeze` avatar data instead of only appending missing previews
+- `/me` now exposes an expandable/searchable friend navigator so the owner can browse the full linked-friend list without leaving the profile page
 
 **Social graph:**
 - Friend requests: `POST /friend-requests`, accept/reject endpoints, `friend_request` + `friend_accept` notifications
@@ -279,6 +280,15 @@ The following is the complete current state of the platform.
 
 **Infrastructure:**
 - CSS split: shared base + per-page CSS (`home.css`, `me.css`, `player.css`, `thoughts.css`, `activity.css`, `bulletins.css`, `events.css`, `event.css`, `messages.css`)
+- shared signed-in shell and shared `/me` + `/player` profile seams are now being extracted into dedicated CSS files:
+  - `css/session-nav.css`
+  - `css/profile-social.css`
+  - `css/profile-page.css`
+  - `css/profile-hero.css`
+  - `css/profile-hero-card.css`
+  - `css/profile-featured-cabinet.css`
+  - `css/profile-identity.css`
+  - `css/profile-rail.css`
 - `js/platform/thoughts/` layered module split (schema, normalize, store, cards, api)
 - `js/platform/metrics/` canonical metrics split
 - `js/platform/activity/` 5-layer module split (schema, normalize, store, builders, api)
@@ -287,12 +297,14 @@ The following is the complete current state of the platform.
 - `js/profile-editor/` subsystem split (constants, form fields, view-model, persistence, panel)
 - `js/player-page/` subsystem split (page entry, render, wire, loader, action view-model, page view-model, hero/media/thought-composer controllers)
 - `js/thoughts-page/` subsystem split (page entry, view-model, render, actions)
+- shared signed-in nav shell extracted into `js/arcade-session-nav.mjs` helpers so major social pages no longer hand-author separate primary nav clusters
 - `/player/index.html` and `/thoughts/index.html` now point at their subsystem entry modules
 - browser test layout cleaned up into dedicated `tests/` folders instead of mixed root/source placement
 
 ## Architecture Cleanup Status
 
 Completed cleanup:
+- the current platform/UI bug pass is functionally complete in code: nav shell consistency, friend navigator, reaction clarity, upload double-submit protection, empty favorite behavior, notification styling, and `/me` layout regressions are all addressed and ready for manual verification
 - `activity` and `relationships` no longer live as monolithic shared-platform files.
 - `arcade-profile` no longer owns form parsing, persistence, panel control, and view-model shaping in one file.
 - shared `/me` + `/player` social rendering and actions now live in dedicated subsystems instead of duplicated page files.

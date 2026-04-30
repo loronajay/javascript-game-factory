@@ -1,0 +1,154 @@
+/* ---------- SESSION NAV ---------- */
+
+.app-shell-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.app-shell-nav__tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 10, 20, 0.42);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  backdrop-filter: blur(10px);
+}
+
+.app-shell-nav__tabs .app-shell-nav__link {
+  position: relative;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  margin-left: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff8ff;
+  text-decoration: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.9;
+  box-shadow: none;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.app-shell-nav__tabs .app-shell-nav__link + .app-shell-nav__link {
+  margin-left: 0;
+}
+
+.app-shell-nav__tabs .app-shell-nav__link::after {
+  display: none;
+}
+
+.app-shell-nav__tabs .app-shell-nav__link:hover,
+.app-shell-nav__tabs .app-shell-nav__link:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.session-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.session-nav__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.session-nav__eyebrow {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.session-nav__name {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0;
+  align-self: center;
+}
+
+.app-shell-nav__utility-link {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff8ff;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.app-shell-nav__utility-link:hover,
+.app-shell-nav__utility-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.app-shell-nav__session-slot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 10, 20, 0.42);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  backdrop-filter: blur(10px);
+}
+
+.app-shell-nav__link--current {
+  border-color: rgba(153, 255, 255, 0.56) !important;
+  background: rgba(153, 255, 255, 0.12) !important;
+  color: #dffff8 !important;
+  box-shadow:
+    0 0 0 1px rgba(153, 255, 255, 0.12) inset,
+    0 0 18px rgba(153, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+  .app-shell-nav,
+  .app-shell-nav__session-slot,
+  .session-nav {
+    width: 100%;
+  }
+
+  .app-shell-nav__session-slot,
+  .session-nav {
+    justify-content: flex-start;
+  }
+}

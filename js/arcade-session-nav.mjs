@@ -6,11 +6,11 @@ import { initNotificationBell } from "./arcade-notifications.mjs";
 const auth = createAuthApiClient();
 const SIGNED_OUT_QUERY_KEY = "signedOut";
 const PRIMARY_APP_NAV_ITEMS = [
+  { key: "home", label: "Home", path: "index.html" },
   { key: "me", label: "Me", path: "me/index.html" },
   { key: "arcade", label: "Arcade", path: "grid.html" },
   { key: "search", label: "Search", path: "search/index.html" },
   { key: "messages", label: "Messages", path: "messages/index.html" },
-  { key: "notifications", label: "Notifications", path: "notifications/index.html" },
 ];
 
 function escapeHtml(str) {
@@ -39,9 +39,11 @@ export function buildPrimaryAppNavMarkup({
   const currentPageKey = String(currentPage || "").trim().toLowerCase();
   const linksMarkup = buildPrimaryAppNavItems(basePath).map((item) => {
     const isCurrent = item.key === currentPageKey;
-    const classes = isCurrent
-      ? `${linkClass} app-shell-nav__link--current`
-      : linkClass;
+    const classes = [
+      "app-shell-nav__link",
+      linkClass,
+      isCurrent ? "app-shell-nav__link--current" : "",
+    ].filter(Boolean).join(" ");
     const currentAttr = isCurrent ? ' aria-current="page"' : "";
     return `<a class="${escapeHtml(classes)}" href="${escapeHtml(item.href)}"${currentAttr}>${escapeHtml(item.label)}</a>`;
   }).join("");
@@ -50,7 +52,7 @@ export function buildPrimaryAppNavMarkup({
     ? `<div class="app-shell-nav__session-slot"><div id="${escapeHtml(sessionNavId)}" class="session-nav"></div></div>`
     : "";
 
-  return `${linksMarkup}${sessionMarkup}`;
+  return `<div class="app-shell-nav"><div class="app-shell-nav__tabs">${linksMarkup}</div>${sessionMarkup}</div>`;
 }
 
 export function renderPrimaryAppNav(containerEl, options = {}) {
@@ -115,8 +117,11 @@ export async function initSessionNav(containerEl, {
     const displayName = profile?.profileName || "Pilot";
 
     containerEl.innerHTML = `
-      <span class="session-nav__name">${escapeHtml(displayName)}</span>
-      <button class="session-nav__signout grid-stage__portal" type="button">Sign Out</button>
+      <div class="session-nav__identity">
+        <span class="session-nav__eyebrow">Signed in as</span>
+        <span class="session-nav__name">${escapeHtml(displayName)}</span>
+      </div>
+      <button class="session-nav__signout app-shell-nav__utility-link" type="button">Sign Out</button>
     `;
 
     containerEl.querySelector(".session-nav__signout").addEventListener("click", async () => {
@@ -128,8 +133,8 @@ export async function initSessionNav(containerEl, {
     void initNotificationBell(containerEl, session.playerId);
   } else {
     containerEl.innerHTML = `
-      <a class="session-nav__link grid-stage__portal" href="${signInPath}">Sign In</a>
-      <a class="session-nav__link grid-stage__portal" href="${signUpPath}">Create Account</a>
+      <a class="session-nav__link app-shell-nav__utility-link" href="${signInPath}">Sign In</a>
+      <a class="session-nav__link app-shell-nav__utility-link" href="${signUpPath}">Create Account</a>
     `;
   }
 

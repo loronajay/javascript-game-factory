@@ -104,6 +104,28 @@ export function buildHref(path, options = {}) {
   return new URL(normalizedPath, rootUrl).toString();
 }
 
+export function buildNotificationsPageHref(options = {}) {
+  return buildHref("notifications/index.html", options);
+}
+
+export function shouldHighlightNotificationBell(locationRef = globalThis.location) {
+  const pathname = String(locationRef?.pathname || "");
+  return /\/notifications(?:\/index\.html)?\/?$/.test(pathname);
+}
+
+export function buildNotificationDropdownMarkup({ pageHref = "" } = {}) {
+  const pageLink = pageHref
+    ? `<a class="notif-dropdown__page-link" href="${escapeHtml(pageHref)}">View all</a>`
+    : "";
+  return `
+    <div class="notif-dropdown__header">
+      <span class="notif-dropdown__title">Notifications</span>
+      ${pageLink}
+    </div>
+    <ul class="notif-dropdown__list" role="list"></ul>
+  `;
+}
+
 export { formatNotificationText };
 
 export function renderNotificationItem(notif, onAccept, onReject, onChallengeAccept, onChallengeDecline) {
@@ -184,23 +206,23 @@ export async function initNotificationBell(containerEl, playerId) {
   wrap.className = "notif-bell-wrap";
 
   const bell = document.createElement("button");
-  bell.className = "notif-bell";
+  bell.className = shouldHighlightNotificationBell(globalThis.location)
+    ? "notif-bell notif-bell--current"
+    : "notif-bell";
   bell.type = "button";
   bell.setAttribute("aria-label", "Notifications");
   bell.innerHTML = `
-    &#x1F514;
+    <span class="notif-bell__icon" aria-hidden="true">&#x1F514;</span>
+    <span class="notif-bell__label">Alerts</span>
     <span class="notif-bell__badge" hidden>0</span>
   `;
 
   const dropdown = document.createElement("div");
   dropdown.className = "notif-dropdown";
   dropdown.hidden = true;
-  dropdown.innerHTML = `
-    <div class="notif-dropdown__header">
-      <span class="notif-dropdown__title">Notifications</span>
-    </div>
-    <ul class="notif-dropdown__list" role="list"></ul>
-  `;
+  dropdown.innerHTML = buildNotificationDropdownMarkup({
+    pageHref: buildNotificationsPageHref(),
+  });
 
   wrap.appendChild(bell);
   wrap.appendChild(dropdown);

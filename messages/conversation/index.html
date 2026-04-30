@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jay's Javascript Arcade | Messages</title>
   <link rel="stylesheet" href="../../css/arcade.css">
+  <link rel="stylesheet" href="../../css/session-nav.css">
   <link rel="stylesheet" href="../../css/search.css">
   <link rel="stylesheet" href="../../css/notifications.css">
   <link rel="stylesheet" href="../../css/messages.css">
@@ -22,14 +23,16 @@
         <div class="search-stage__floor"></div>
       </div>
 
-      <div class="search-stage__controls">
-        <nav id="threadPrimaryNav" class="search-stage__nav"></nav>
-      </div>
+      <header class="search-stage__masthead">
+        <div class="search-stage__controls">
+          <nav id="threadPrimaryNav" class="search-stage__nav"></nav>
+        </div>
 
-      <div class="search-stage__header">
-        <h1 class="pixel-text pixel-text--title search-stage__title">MESSAGES</h1>
-        <p id="threadOtherName" class="search-stage__subtitle"></p>
-      </div>
+        <div class="search-stage__header">
+          <h1 class="pixel-text pixel-text--title search-stage__title">MESSAGES</h1>
+          <p id="threadOtherName" class="search-stage__subtitle"></p>
+        </div>
+      </header>
 
       <div class="search-layout msg-layout" style="display:flex; flex-direction:column; min-height:60vh;">
         <div id="messageList" class="msg-thread-body" aria-live="polite" aria-label="Messages"></div>

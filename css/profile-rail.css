@@ -1,0 +1,127 @@
+.me-hero-card__portrait-panel,
+.me-hero-card__metrics-panel,
+.me-hero-card__identity-panel,
+.me-hero-card__rankings-panel,
+.me-hero-card__friends-panel,
+.player-hero-card__portrait-panel,
+.player-hero-card__metrics-panel,
+.player-hero-card__identity-panel,
+.player-hero-card__rankings-panel,
+.player-hero-card__friends-panel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 214, 189, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.08), rgba(11, 8, 28, 0.94) 34%, rgba(7, 6, 20, 0.98)),
+    rgba(9, 8, 22, 0.94);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+.me-hero-card__portrait-panel,
+.player-hero-card__portrait-panel {
+  grid-column: 1 / 2;
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  padding: 18px 12px;
+}
+
+.me-hero-card__metrics-panel,
+.player-hero-card__metrics-panel {
+  grid-column: 1 / 2;
+  grid-row: 2;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 12px;
+}
+
+.me-hero-card__identity-panel,
+.player-hero-card__identity-panel {
+  grid-column: 2 / 3;
+  grid-row: 1 / span 2;
+  display: grid;
+  align-self: stretch;
+  align-content: start;
+  padding: 16px 18px;
+}
+
+.me-hero-card__rankings-panel,
+.me-hero-card__friends-panel,
+.player-hero-card__rankings-panel,
+.player-hero-card__friends-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.me-hero-card__rankings-panel,
+.player-hero-card__rankings-panel {
+  grid-row: 3;
+}
+
+.me-hero-card__friends-panel,
+.player-hero-card__friends-panel {
+  grid-row: 4;
+}
+
+.me-hero-card__portrait,
+.player-hero-card__portrait {
+  justify-self: center;
+  width: 100%;
+  padding: 0;
+}
+
+.me-hero-card__status-line,
+.me-hero-card__section-title,
+.me-hero-card__metrics-stat-label,
+.me-hero-card__rail-title,
+.me-hero-card__rail-meta,
+.player-hero-card__status-line,
+.player-hero-card__section-title,
+.player-hero-card__metrics-stat-label,
+.player-hero-card__rail-title,
+.player-hero-card__rail-meta {
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.me-hero-card__status-line,
+.me-hero-card__metrics-stat-label,
+.me-hero-card__rail-title,
+.me-hero-card__rail-meta,
+.player-hero-card__status-line,
+.player-hero-card__metrics-stat-label,
+.player-hero-card__rail-title,
+.player-hero-card__rail-meta {
+  color: #ffd7b9;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+
+.me-hero-card__status-line,
+.player-hero-card__status-line {
+  color: rgba(255, 248, 255, 0.78);
+}
+
+@media (max-width: 640px) {
+  .me-hero-card__portrait-panel,
+  .me-hero-card__metrics-panel,
+  .me-hero-card__identity-panel,
+  .me-hero-card__rankings-panel,
+  .me-hero-card__friends-panel,
+  .me-hero-card__portrait,
+  .player-hero-card__portrait-panel,
+  .player-hero-card__metrics-panel,
+  .player-hero-card__identity-panel,
+  .player-hero-card__rankings-panel,
+  .player-hero-card__friends-panel,
+  .player-hero-card__portrait {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}

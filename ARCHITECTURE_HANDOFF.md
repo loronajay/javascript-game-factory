@@ -20,11 +20,23 @@ Completed:
 - `js/profile-editor/` established for profile editor constants / form fields / view-model / persistence / panel
 - `js/player-page/` established for player-page page/render/wire modules, loader, action view-model, page view-model, and page controllers
 - `js/thoughts-page/` established for thoughts page page/view-model/render/actions modules and seam tests
+- `js/arcade-session-nav.mjs` now owns the shared signed-in primary navigation shell instead of repeating different nav clusters across each social page
+- signed-in page chrome is now more consistent: shared shell, direct `Home` route, fixed notification bell contract, and unified mastheads on the utility/feed pages
 - `js/platform/thoughts/thoughts-cards.mjs` now owns thought-card/view-model shaping
 - `js/arcade-profile.mjs` reduced to a thin compatibility barrel
 - `js/arcade-player.mjs`, `js/arcade-player-wire.mjs`, and `js/arcade-player-view.mjs` reduced to thin compatibility shims over `js/player-page/`
 - `js/arcade-thoughts.mjs` reduced to a thin compatibility shim over `js/thoughts-page/`
 - `/player/index.html` and `/thoughts/index.html` now point at their subsystem entry modules
+- `/me` now includes an owner-only expandable/searchable friend navigator rather than relying only on the visible hero rail
+- shared profile CSS seam extraction is underway with:
+  - `css/session-nav.css`
+  - `css/profile-social.css`
+  - `css/profile-page.css`
+  - `css/profile-hero.css`
+  - `css/profile-hero-card.css`
+  - `css/profile-featured-cabinet.css`
+  - `css/profile-identity.css`
+  - `css/profile-rail.css`
 - root test files moved from `js/*.test.mjs` into `js/tests/`
 - subsystem tests moved into `js/profile-editor/tests/` and `js/profile-social/tests/`
 - previously failing baseline tests cleaned back to green:
@@ -45,6 +57,9 @@ Completed:
 2. CSS folder breakup
    Why it matters:
    - the root `css/` folder still contains oversized page stylesheets that cost context and blur ownership.
+
+   New note:
+   - the shared signed-in shell now reduces markup duplication, and the `/me` + `/player` shared profile seams are actively moving into dedicated CSS files, but the remaining root page stylesheets are still larger than they should be.
 
 3. large game-local monoliths
    Why they matter:
@@ -79,8 +94,13 @@ node .\js\tests\arcade-player.test.mjs
 node .\js\tests\arcade-playerpage.test.mjs
 node .\js\tests\arcade-me.test.mjs
 node .\js\tests\arcade-mepage.test.mjs
+node .\js\tests\arcade-session-nav.test.mjs
+node .\js\tests\arcade-searchpage.test.mjs
 node .\js\tests\arcade-thoughts.test.mjs
 node .\js\tests\arcade-thoughtspage.test.mjs
+node .\js\tests\arcade-activitypage.test.mjs
+node .\js\tests\arcade-messagespage.test.mjs
+node .\js\tests\arcade-notificationspage.test.mjs
 node .\js\profile-editor\tests\view-model.test.mjs
 node .\js\profile-editor\tests\persistence.test.mjs
 node .\js\profile-editor\tests\panel.test.mjs
@@ -102,4 +122,6 @@ node .\js\tests\platform-plan.test.mjs
 - Do not revert the new test-folder layout.
 - Prefer thin compatibility barrels when moving ownership into a new subsystem folder.
 - Keep TDD strict: add seam tests first for each new split.
+- Keep the signed-in shell centralized in `js/arcade-session-nav.mjs`; do not go back to hand-editing bespoke nav link clusters per page unless a page truly needs a contextual exception.
+- Treat `BUGS.md` as split between manual-QA-ready platform bug fixes and longer-term architecture backlog.
 - If a module is large but cohesive, move it later; prioritize mixed-responsibility files first.

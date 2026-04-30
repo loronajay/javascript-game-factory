@@ -1,0 +1,208 @@
+/* ---------- PROFILE PAGE SHARED CHROME ---------- */
+
+.me-panel,
+.player-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 20px;
+  min-height: 240px;
+}
+
+.me-panel--thoughts,
+.player-panel--thoughts {
+  grid-column: 3 / 4;
+  grid-row: 1 / span 2;
+  min-height: 0;
+}
+
+.me-panel__topline,
+.player-panel__topline {
+  display: grid;
+  gap: 6px;
+}
+
+.me-panel__header,
+.player-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.me-panel__title,
+.player-panel__title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 214, 189, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.16), rgba(255, 121, 183, 0.08)),
+    rgba(9, 8, 22, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 6px 12px rgba(0, 0, 0, 0.14);
+  color: #fff8ff;
+  font-size: 1.08rem;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.me-link,
+.me-card-item,
+.player-link,
+.player-card-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(255, 214, 189, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.me-link--placeholder,
+.me-card-item--placeholder,
+.player-link--placeholder,
+.player-card-item--placeholder {
+  background:
+    linear-gradient(180deg, rgba(140, 246, 212, 0.05), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.me-link__topline,
+.player-link__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.me-link__url,
+.me-card-item__value,
+.player-link__url,
+.player-card-item__value {
+  margin: 0;
+  color: #fff8ff;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.me-link__url,
+.me-card-item__link,
+.player-link__url,
+.player-card-item__link {
+  text-decoration: none;
+}
+
+.me-link__url:hover,
+.me-link__url:focus-visible,
+.me-card-item__link:hover,
+.me-card-item__link:focus-visible,
+.player-link__url:hover,
+.player-link__url:focus-visible,
+.player-card-item__link:hover,
+.player-card-item__link:focus-visible {
+  color: #99ffff;
+}
+
+.me-card-item__title,
+.player-card-item__title {
+  margin: 0;
+  color: #ffd7b9;
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.me-card-item__link,
+.me-card-item__meta,
+.player-card-item__link,
+.player-card-item__meta {
+  margin: 0;
+  color: #fff8ff;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.me-card-item__meta,
+.player-card-item__meta {
+  color: rgba(255, 248, 255, 0.68);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#meThoughtsPanel .thoughts-feed,
+#playerThoughtsPanel .thoughts-feed {
+  grid-auto-rows: max-content;
+  align-content: start;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.me-about-copy,
+.me-badge-empty,
+.player-about-copy,
+.player-badge-empty {
+  margin: 0;
+  color: rgba(255, 248, 255, 0.84);
+  line-height: 1.7;
+}
+
+.me-badge-list,
+.player-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.me-badge-chip,
+.player-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 214, 189, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.1), rgba(255, 121, 183, 0.08)),
+    rgba(255, 255, 255, 0.04);
+  color: #fff8ff;
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.me-stage__header,
+.player-stage__header {
+  gap: 10px;
+  width: min(980px, 100%);
+}
+
+.me-stage__title,
+.me-stage__subtitle,
+.player-stage__title,
+.player-stage__subtitle {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: min(760px, 100%);
+  padding: 16px 18px;
+  border: 2px solid rgba(255, 214, 189, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(12, 9, 30, 0.92) 34%, rgba(7, 6, 20, 0.96)),
+    rgba(9, 8, 22, 0.92);
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.24),
+    0 0 18px rgba(255, 121, 183, 0.14);
+}
+
+.me-stage__subtitle,
+.player-stage__subtitle {
+  width: min(560px, 92%);
+  color: #fff8ff;
+  font-size: clamp(0.95rem, 1.8vw, 1.2rem);
+  line-height: 1.3;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.34);
+}
