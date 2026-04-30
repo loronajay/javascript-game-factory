@@ -248,7 +248,7 @@
 .bulletins-layout {
   display: grid;
   gap: 18px;
-  width: min(1100px, 100%);
+  width: min(92vw, 1100px);
 }
 
 .bulletins-hero-card,

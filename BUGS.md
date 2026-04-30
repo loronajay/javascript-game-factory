@@ -1,7 +1,5 @@
 # Bugs
 
-## We need to switch to percentages in general across the board (all pages) instead of hardcoding page element positions, to account for different monitor sizes/mobile web viewers etc. The friend-profile mobile collapse is fixed, but the broader all-pages responsiveness pass is still ongoing.
-
 ## The root `css/` folder still has oversized files and should keep following the seam-first split.
 
 

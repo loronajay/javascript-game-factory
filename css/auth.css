@@ -243,7 +243,7 @@
 /* ---------- Auth layout + card ---------- */
 
 .auth-layout {
-  width: min(480px, 100%);
+  width: min(92vw, 480px);
 }
 
 .auth-card {

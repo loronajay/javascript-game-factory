@@ -418,7 +418,7 @@ body::before {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: min(980px, 100%);
+  width: min(92vw, 980px);
   padding-top: 8px;
 }
 
@@ -434,7 +434,7 @@ body::before {
   display: grid;
   justify-items: center;
   gap: 4px;
-  width: min(760px, 100%);
+  width: min(82vw, 760px);
   text-align: center;
   padding-top: 4px;
 }
@@ -563,7 +563,7 @@ body::before {
 }
 
 .player-card {
-  width: min(980px, 100%);
+  width: min(92vw, 980px);
   padding: 20px 22px 22px;
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.1), transparent 24%),
