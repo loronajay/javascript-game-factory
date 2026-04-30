@@ -632,10 +632,28 @@
 
   .player-layout {
     grid-template-columns: minmax(0, 1fr);
+    width: min(96vw, 680px);
+    gap: 14px;
   }
 
   .player-stage__title,
   .player-stage__subtitle {
     width: 100%;
+  }
+
+  .player-panel--favorite,
+  .player-panel--thoughts,
+  .player-panel--gallery,
+  #playerAboutPanel,
+  #playerBadgesPanel {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    min-width: 0;
+  }
+
+  .player-panel,
+  .player-hero-card {
+    width: 100%;
+    min-width: 0;
   }
 }
