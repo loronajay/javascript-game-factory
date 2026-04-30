@@ -1,10 +1,8 @@
 # Bugs
 
-## Sign In/Create Account buttons destroyed, where did they go? "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200114.png"
+## Title is too close to the buttons on top, we can bring the title down a bit. we need to switch to percentages in general across the board instead of hardcoding page element positions, to account for different monitor sizes/mobile web viewers etc.: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 201717.png"
 
-## Friends panel still displaying friends without me clicking the button. i don't want a giant list of friends to start building up on my account, i need to only be able to see them after clicking that button that currently does nothing: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200150.png"
-
-## Navigation box and button to sign out are broken like the first listed bug: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200228.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200259.png"
+## Events page seemed to miss a lot of change passes as far as navigation goes: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 202025.png" 
 
 ## Profile panels still squished on the right ever since we added the new friends panel: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200414.png"
 

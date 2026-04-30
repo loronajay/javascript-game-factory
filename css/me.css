@@ -421,6 +421,17 @@
   overflow-wrap: anywhere;
 }
 
+@media (max-width: 1280px) {
+  .me-layout {
+    width: min(1120px, 100%);
+    grid-template-columns: minmax(340px, 1.08fr) minmax(300px, 0.92fr);
+  }
+
+  .me-layout__side--right {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 980px) {
   .me-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));

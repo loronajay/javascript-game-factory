@@ -1,4 +1,5 @@
 import { buildPublicEventFeed } from "./platform/events/events.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -111,5 +112,17 @@ export function renderEventsPage(doc = globalThis.document, events = buildPublic
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  renderPrimaryAppNav(doc.getElementById("eventsPrimaryNav"), {
+    basePath: "../",
+    currentPage: "",
+    linkClass: "events-stage__portal",
+    sessionNavId: "eventsAuthNav",
+  });
+  void initSessionNav(doc.getElementById("eventsAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
+
   renderEventsPage(doc);
 }

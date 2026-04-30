@@ -160,6 +160,7 @@
 
 .events-stage__controls,
 .events-stage__header,
+.events-stage__masthead,
 .events-layout,
 .events-hero-card,
 .events-feed {
@@ -167,19 +168,23 @@
   z-index: 4;
 }
 
+.events-stage__masthead {
+  display: grid;
+  gap: 12px;
+  width: min(1100px, 100%);
+}
+
 .events-stage__controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: stretch;
   gap: 16px;
-  width: min(1100px, 100%);
+  width: 100%;
   padding-top: 8px;
 }
 
 .events-stage__nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  width: 100%;
 }
 
 .events-stage__header {

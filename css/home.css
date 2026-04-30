@@ -105,6 +105,24 @@
   z-index: 4;
 }
 
+.home-stage__masthead {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  gap: clamp(20px, 5vh, 56px);
+  width: min(1160px, 100%);
+  padding-top: clamp(6px, 2vh, 18px);
+}
+
+.home-stage__header {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: 100%;
+  padding-top: clamp(20px, 7vh, 72px);
+  text-align: center;
+}
+
 .home-page .hero h1 {
   margin: 0 0 2px;
 }
@@ -421,6 +439,15 @@
   .home-stage {
     padding-top: 8px;
     min-height: 100vh;
+  }
+
+  .home-stage__masthead {
+    gap: 16px;
+    padding-top: 0;
+  }
+
+  .home-stage__header {
+    padding-top: clamp(12px, 6vw, 28px);
   }
 
   .home-page .hero-actions {

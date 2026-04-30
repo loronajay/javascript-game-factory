@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jay's Javascript Arcade | Arcade Events</title>
   <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
   <link rel="stylesheet" href="../css/events.css">
+  <link rel="stylesheet" href="../css/notifications.css">
 </head>
 <body class="events-page-shell">
   <div class="scanlines"></div>
@@ -20,20 +22,16 @@
         <div class="events-stage__floor"></div>
       </div>
 
-      <div class="events-stage__controls">
-        <div class="events-stage__nav">
-          <a class="events-stage__back" href="#" onclick="event.preventDefault(); history.back()">&#x276E; Back</a>
-          <a class="events-stage__portal" href="../grid.html">Arcade Grid</a>
-          <a class="events-stage__portal" href="../activity/index.html">Activity</a>
-          <a class="events-stage__portal" href="../thoughts/index.html">Thoughts</a>
-          <a class="events-stage__portal" href="../bulletins/index.html">Bulletins</a>
+      <header class="events-stage__masthead">
+        <div class="events-stage__controls">
+          <nav id="eventsPrimaryNav" class="events-stage__nav"></nav>
         </div>
-      </div>
 
-      <div class="events-stage__header">
-        <h1 class="pixel-text pixel-text--title events-stage__title">ARCADE EVENTS</h1>
-        <p class="events-stage__subtitle">Upcoming runs and special floor sessions across the arcade.</p>
-      </div>
+        <div class="events-stage__header">
+          <h1 class="pixel-text pixel-text--title events-stage__title">ARCADE EVENTS</h1>
+          <p class="events-stage__subtitle">Upcoming runs and special floor sessions across the arcade.</p>
+        </div>
+      </header>
 
       <div class="events-layout">
         <section id="eventsHeroCard" class="events-hero-card"></section>
@@ -44,6 +42,7 @@
 
   <script src="../js/pixel-text.js"></script>
   <script src="../js/arcade-input.js"></script>
+  <script src="../js/platform-config.js"></script>
   <script type="module" src="../js/arcade-events.mjs"></script>
 </body>
 </html>
