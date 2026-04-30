@@ -69,6 +69,11 @@ Completed:
    Why they matter:
    - `Lovers Lost`, `Battleshits`, and similar game files still violate the same architecture rules we just enforced in platform code.
 
+   Lovers Lost cleanup complete (2026-04-30):
+   - `renderer.js` split into `renderer-obstacles.js`, `renderer-characters.js`, `renderer-debug.js` (was ~2089 lines, now ~1002)
+   - `handleSideInput` extracted from `init-game.js` into `lane-input.js` via `createLaneInputHandler` factory
+   - `Battleshits` `renderer.js`/`game.js` remain as the next game-local monolith target.
+
 ## Cleanup Order
 
 Do this in order:

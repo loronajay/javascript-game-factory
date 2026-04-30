@@ -1,10 +1,10 @@
 import {
   createGameState, tickFrame, advancePhaseState,
-  nextActionForSide, shouldHandleMappedKeyLocally,
-  startJump, processAction, resolveContactAction, summarizeObstacleOutcome,
+  shouldHandleMappedKeyLocally,
 } from './game-tick.js';
 import { buildDebugCollisionSnapshot } from './collision.js';
-import { buildLaneSnapshot, applyLaneSnapshot, sanitizeResolvedOutcome } from './lane-snapshot.js';
+import { buildLaneSnapshot } from './lane-snapshot.js';
+import { createLaneInputHandler } from './lane-input.js';
 import {
   sanitizeOnlineDisplayName, isValidOnlineDisplayName,
   buildOnlineIdentity, deriveOnlineRunOverrideName,
@@ -12,6 +12,8 @@ import {
 } from './online-identity.js';
 import { getOnlineSideSelectRects, getOnlineNameEntryButtonRects, getOnlineLobbyButtonRects } from './lobby-ui.js';
 import { debugEnabledFromSearch, debugObstacleTypeFromSearch, toggleDebugHotkey, DEBUG_OBSTACLE_LABELS } from './debug-flags.js';
+import { loadGameAssets } from './game-assets.js';
+import { applyRemoteSnapshot } from './remote-snapshot.js';
 import { createRenderer } from './renderer.js';
 import { createInput, keyToAction } from './input.js';
 import { createSounds } from './sounds.js';
@@ -20,8 +22,7 @@ import { evaluateRun } from './scoring.js';
 import { publishLoversLostRunActivity } from '../../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile } from '../../../js/platform/identity/factory-profile.mjs';
 import { createOnlineIdentityPayload } from '../../../js/platform/identity/match-identity.mjs';
-import { createPlatformApiClient } from '../../../js/platform/api/platform-api.mjs';
-import { createAuthApiClient } from '../../../js/platform/api/auth-api.mjs';
+import { updateScoreOverlay } from './score-overlay.js';
 import {
   getDefaultPlatformStorage,
   getPlatformStorageKey,
@@ -40,35 +41,10 @@ const EMOTE_BINDINGS = {
 const EMOTE_COOLDOWN_MS = 1000;
 
 function initGame() {
-  // ── Image loading ────────────────────────────────────────────────────────────
-  const boyImg   = new Image();  boyImg.src   = 'images/boy.png';
-  const girlImg  = new Image();  girlImg.src  = 'images/girl.png';
-  const swordImg = new Image();  swordImg.src = 'images/SHORT SWORD.png';
-  const bird1    = new Image();  bird1.src    = 'images/red1.png';
-  const bird2    = new Image();  bird2.src    = 'images/red2.png';
-  const bird3    = new Image();  bird3.src    = 'images/red3.png';
-  const goblinIdle    = new Image(); goblinIdle.src    = 'images/goblin-idle.png';
-  const goblinAttack  = new Image(); goblinAttack.src  = 'images/goblin-attack.png';
-  const goblinTakeHit = new Image(); goblinTakeHit.src = 'images/goblin-take-hit.png';
-  const goblinDeath   = new Image(); goblinDeath.src   = 'images/goblin-death.png';
-  const arrowsImg     = new Image(); arrowsImg.src     = 'images/arrows.png';
+  loadGameAssets((images, emoteImages) => _initWithAssets(images, emoteImages));
+}
 
-  const emoteHeart  = new Image(); emoteHeart.src  = 'images/emojis/heart.png';
-  const emoteMf     = new Image(); emoteMf.src     = 'images/emojis/middle-finger.png';
-  const emoteSmile  = new Image(); emoteSmile.src  = 'images/emojis/smile.png';
-  const emoteCrying = new Image(); emoteCrying.src = 'images/emojis/crying.png';
-
-  const images = {
-    boy: boyImg, girl: girlImg, sword: swordImg,
-    birds: [bird1, bird2, bird3],
-    goblinIdle, goblinAttack, goblinTakeHit, goblinDeath,
-    arrows: arrowsImg,
-  };
-
-  const emoteImages = {
-    heart: emoteHeart, 'middle-finger': emoteMf, smile: emoteSmile, crying: emoteCrying,
-  };
-
+function _initWithAssets(images, emoteImages) {
   // ── Sounds ───────────────────────────────────────────────────────────────────
   const sounds = createSounds();
 
@@ -352,45 +328,12 @@ function initGame() {
 
   let boyAnim  = { state: 'running', actionTick: 0 };
   let girlAnim = { state: 'running', actionTick: 0 };
-  const ACTION_DURATION = 18;
-  const HIT_DURATION    = 30;
-
-  function applyRemoteResolvedVisuals(side, resolved, consumedObstacles, playerBeforeDistance) {
-    for (let i = 0; i < resolved.length; i++) {
-      const outcome  = resolved[i];
-      const obstacle = consumedObstacles[i] || null;
-      if (outcome.feedback)                     renderer.addOutcomeEffect(side, outcome.feedback, outcome.effectType);
-      if (outcome.linger && obstacle)            renderer.addTrailObstacle(side, obstacle);
-      if (outcome.goblinDeath && obstacle)       renderer.addDyingGoblin(side, obstacle, playerBeforeDistance);
-    }
-  }
-
-  function applyRemoteSnapshot(side, snapshot) {
-    if (gs.mode !== 'online' || gs.phase !== 'playing') return;
-    const currentLane = side === 'boy'
-      ? { player: gs.boy,  obstacles: gs.boyObstacles,  anim: boyAnim }
-      : { player: gs.girl, obstacles: gs.girlObstacles, anim: girlAnim };
-    const applied = applyLaneSnapshot(currentLane, snapshot, remoteLaneSeq[side]);
-    if (!applied.applied) return;
-
-    remoteLaneSeq[side] = applied.lastSeq;
-    applyRemoteResolvedVisuals(side, applied.resolved, applied.consumedObstacles, currentLane.player.distance);
-
-    if (side === 'boy') {
-      gs = { ...gs, boy: applied.player, boyObstacles: applied.obstacles, boyResolved: [] };
-      boyAnim = { ...applied.anim };
-    } else {
-      gs = { ...gs, girl: applied.player, girlObstacles: applied.obstacles, girlResolved: [] };
-      girlAnim = { ...applied.anim };
-    }
-    if (currentLane.player.state !== 'finished' && applied.player.state === 'finished') {
-      renderer.clearSideObstacleVisuals(side);
-    }
-  }
+  const handleSideInput = createLaneInputHandler(inp, renderer, sounds);
 
   onlineClient.cb.onRemoteSnapshot = (snapshot) => {
     if (!onlineRemoteSide || !snapshot) return;
-    applyRemoteSnapshot(onlineRemoteSide, snapshot);
+    const result = applyRemoteSnapshot({ gs, boyAnim, girlAnim, remoteLaneSeq }, renderer, onlineRemoteSide, snapshot);
+    if (result) { gs = result.gs; boyAnim = result.boyAnim; girlAnim = result.girlAnim; }
   };
 
   // ── State machine ────────────────────────────────────────────────────────────
@@ -424,89 +367,6 @@ function initGame() {
     boyAnim = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
     inp.tick();
-  }
-
-  // ── Input per side ───────────────────────────────────────────────────────────
-  function handleSideInput(side) {
-    const getPlayer    = () => (side === 'boy' ? gs.boy  : gs.girl);
-    const getObstacles = () => (side === 'boy' ? gs.boyObstacles : gs.girlObstacles);
-    if (getPlayer().state === 'finished') return [];
-    const anim = side === 'boy' ? boyAnim : girlAnim;
-    let interacted = false;
-    const frameResolved = [];
-
-    function applyResolvedResult(playerBefore, result, frontObs) {
-      const outcome = summarizeObstacleOutcome(playerBefore, result, frontObs);
-      if (side === 'boy') gs = { ...gs, boy: result.player,  boyObstacles: result.obstacles };
-      else                gs = { ...gs, girl: result.player, girlObstacles: result.obstacles };
-
-      if (outcome.feedback)    renderer.addOutcomeEffect(side, outcome.feedback, outcome.effectType);
-      if (outcome.linger)      renderer.addTrailObstacle(side, frontObs);
-      if (outcome.goblinDeath) {
-        renderer.addDyingGoblin(side, frontObs, playerBefore.distance);
-        sounds.play('sword-success'); sounds.play('goblin-death');
-      }
-      if (outcome.feedback === 'good' || outcome.feedback === 'perfect') {
-        if (frontObs && frontObs.type === 'bird')      sounds.play('bird');
-        if (frontObs && frontObs.type === 'arrowwall') sounds.play('shield-success');
-      }
-      if (outcome.hit) { anim.state = 'hit'; anim.actionTick = 0; sounds.play('player-hit'); }
-      if (outcome.consumed) frameResolved.push(sanitizeResolvedOutcome(outcome));
-      return outcome;
-    }
-
-    const crouchHeld = inp.isHeld(side, 'crouch');
-    const enteringHeldCrouch = crouchHeld && anim.state !== 'crouch';
-    if (crouchHeld && anim.state !== 'hit') {
-      anim.state = 'crouch';
-      if (enteringHeldCrouch) { anim.actionTick = 0; sounds.play('crouch'); }
-    }
-
-    if (side === 'boy') {
-      const wasJumping = crouchHeld && gs.boy.state === 'jumping';
-      gs = { ...gs, boy: { ...gs.boy, state: crouchHeld ? 'crouching' : (gs.boy.state === 'crouching' ? 'running' : gs.boy.state), ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null } : {}) } };
-    } else {
-      const wasJumping = crouchHeld && gs.girl.state === 'jumping';
-      gs = { ...gs, girl: { ...gs.girl, state: crouchHeld ? 'crouching' : (gs.girl.state === 'crouching' ? 'running' : gs.girl.state), ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null } : {}) } };
-    }
-
-    const action = crouchHeld ? null : nextActionForSide(inp, side);
-    if (action) {
-      if (action === 'jump'   && inp.isPressed(side, 'jump'))   sounds.play('jump');
-      if (action === 'attack' && inp.isPressed(side, 'attack')) sounds.play('sword');
-      if (action === 'block'  && inp.isPressed(side, 'block'))  sounds.play('shield');
-
-      const player    = getPlayer();
-      const obstacles = getObstacles();
-      const frontObs  = obstacles[0];
-      const result    = processAction(player, obstacles, action);
-      const outcome   = applyResolvedResult(player, result, frontObs);
-      interacted = interacted || outcome.consumed;
-
-      if (!outcome.hit && action !== 'jump') { anim.state = action; anim.actionTick = 0; }
-      if (action === 'jump') {
-        const updated = startJump(side === 'boy' ? gs.boy : gs.girl);
-        if (side === 'boy') gs = { ...gs, boy: updated };
-        else                gs = { ...gs, girl: updated };
-      }
-    }
-
-    if (!interacted) {
-      const player    = getPlayer();
-      const obstacles = getObstacles();
-      const frontObs  = obstacles[0];
-      const contactResult = resolveContactAction(player, obstacles, anim);
-      if (contactResult.action) applyResolvedResult(player, contactResult, frontObs);
-    }
-
-    if (anim.state === 'crouch' && !crouchHeld) { anim.state = 'running'; anim.actionTick = 0; }
-
-    if (anim.state === 'attack' || anim.state === 'hit' || anim.state === 'block') {
-      anim.actionTick++;
-      const dur = anim.state === 'hit' ? HIT_DURATION : ACTION_DURATION;
-      if (anim.actionTick >= dur) { anim.state = 'running'; anim.actionTick = 0; }
-    }
-    return frameResolved;
   }
 
   // ── Main loop ────────────────────────────────────────────────────────────────
@@ -545,10 +405,10 @@ function initGame() {
       if (gs.phase === 'playing') {
         let localResolvedForSnapshot = [];
         if (gs.mode === 'online') {
-          localResolvedForSnapshot = handleSideInput(onlineSide);
+          ({ gs, boyAnim, girlAnim, frameResolved: localResolvedForSnapshot } = handleSideInput(onlineSide, gs, boyAnim, girlAnim));
         } else {
-          handleSideInput('boy');
-          handleSideInput('girl');
+          ({ gs, boyAnim, girlAnim } = handleSideInput('boy',  gs, boyAnim, girlAnim));
+          ({ gs, boyAnim, girlAnim } = handleSideInput('girl', gs, boyAnim, girlAnim));
         }
 
         const phaseBefore        = gs.phase;
@@ -644,53 +504,13 @@ function initGame() {
     else if (gs.phase === 'gameover')     renderer.renderGameOver(gs.boy, gs.girl, gs.runSummary);
     else if (gs.phase === 'score_screen') renderer.renderScore(gs.boy, gs.girl, gs.runSummary);
 
-    if (gs.phase !== prevPhase) {
-      const overlay = document.getElementById('score-overlay');
-      if (overlay) {
-        if (gs.phase === 'score_screen') {
-          overlay.classList.add('hidden');
-          const remoteSideKey = onlineSide === 'boy' ? 'girlIdentity' : 'boyIdentity';
-          const oppPlayerId   = gs.runSummary?.[remoteSideKey]?.playerId;
-          if (oppPlayerId) {
-            const apiClient  = createPlatformApiClient();
-            const authClient = createAuthApiClient();
-            Promise.all([apiClient.loadPlayerProfile(oppPlayerId), authClient.getSession()])
-              .then(([oppProfile, session]) => {
-                if (!oppProfile?.hasAccount) return;
-                const profileUrl  = `../../player/index.html?id=${encodeURIComponent(oppPlayerId)}`;
-                const isSignedIn  = Boolean(session?.ok && session?.playerId);
-                const addFriendBtn = isSignedIn
-                  ? `<a class="score-overlay__action" href="${profileUrl}">Add Friend &rsaquo;</a>` : '';
-                overlay.innerHTML = `
-                  <span class="score-overlay__label">Opponent:</span>
-                  <a class="score-overlay__name" href="${profileUrl}">${oppProfile.profileName || oppPlayerId}</a>
-                  ${addFriendBtn}
-                `;
-                overlay.classList.remove('hidden');
-              }).catch(() => {});
-          }
-        } else {
-          overlay.classList.add('hidden');
-          overlay.innerHTML = '';
-        }
-      }
-      prevPhase = gs.phase;
-    }
+    updateScoreOverlay(gs.phase, prevPhase, gs.runSummary, onlineSide);
+    if (gs.phase !== prevPhase) prevPhase = gs.phase;
 
     requestAnimationFrame(loop);
   }
 
-  // Start when images load
-  const allImages = [
-    boyImg, girlImg, swordImg,
-    bird1, bird2, bird3,
-    goblinIdle, goblinAttack, goblinTakeHit, goblinDeath,
-    arrowsImg,
-    ...Object.values(emoteImages),
-  ];
-  let loaded = 0;
-  function onLoad() { if (++loaded >= allImages.length) loop(); }
-  allImages.forEach(img => { img.onload = onLoad; img.onerror = onLoad; });
+  loop();
 }
 
 export { initGame };
