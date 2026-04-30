@@ -421,14 +421,30 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1480px) {
   .me-layout {
-    width: min(1120px, 100%);
-    grid-template-columns: minmax(340px, 1.08fr) minmax(300px, 0.92fr);
+    width: min(1280px, 100%);
+    grid-template-columns: minmax(380px, 1.08fr) minmax(300px, 0.92fr);
   }
 
   .me-layout__side--right {
     grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  }
+
+  #meThoughtsPanel {
+    grid-column: 1 / 2;
+    grid-row: 1 / span 2;
+  }
+
+  #meAboutPanel {
+    grid-column: 2 / 3;
+    grid-row: 1;
+  }
+
+  #meBadgesPanel {
+    grid-column: 2 / 3;
+    grid-row: 2;
   }
 }
 
