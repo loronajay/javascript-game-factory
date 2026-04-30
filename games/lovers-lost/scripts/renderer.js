@@ -1,5 +1,6 @@
 import { buildHudModel, createHudRenderer } from './renderer-hud.js';
 import { createOnlineRenderer } from './renderer-online.js';
+import { createSceneRenderer } from './renderer-scenes.js';
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 const CANVAS_W     = 960;
@@ -416,9 +417,17 @@ function createRenderer(canvas, images, emoteImages = {}) {
   ctx.imageSmoothingEnabled = false;
   canvas.width  = CANVAS_W;
   canvas.height = CANVAS_H;
-
-  // Night sky star fields
-  const boyStars  = _genStars(30, 1337);
+  const { drawBackground: drawSceneBackground } = createSceneRenderer(ctx, {
+    HALF_W,
+    CANVAS_H,
+    GROUND_TOP,
+    TILE,
+    PPU,
+    BOY_LOCAL_X,
+    GIRL_LOCAL_X,
+  });
+  // Legacy scene helpers below still exist while the renderer split lands in stages.
+  const boyStars = _genStars(30, 1337);
   const girlStars = _genStars(30, 4242);
 
   // Pre-generated scene element positions (deterministic, seed per scene)
@@ -835,7 +844,7 @@ function createRenderer(canvas, images, emoteImages = {}) {
     ctx.beginPath();
     ctx.rect(offsetX, 0, HALF_W, CANVAS_H);
     ctx.clip();
-    _drawBackground(offsetX, side, player.distance);
+    drawSceneBackground(offsetX, side, player.distance);
     _drawTrailObstacles(offsetX, player, facing, trail, nowMs);
     _drawFieldObstacles(offsetX, player, facing, obstacles, nowMs);
     _drawFieldBoosts(offsetX, player, facing, boosts, side);
@@ -1958,8 +1967,8 @@ default:          return GROUND_TOP - 28;
     const girlX = GIRL_START_X + (GIRL_END_X - GIRL_START_X) * ease;
 
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    _drawBackground(0,      'boy',  boyPlayer.distance);
-    _drawBackground(HALF_W, 'girl', girlPlayer.distance);
+    drawSceneBackground(0,      'boy',  boyPlayer.distance);
+    drawSceneBackground(HALF_W, 'girl', girlPlayer.distance);
 
     // Divider fades out as characters walk together
     const dividerAlpha = 0.3 * (1 - ease);

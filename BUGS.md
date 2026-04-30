@@ -1,9 +1,5 @@
 # Bugs
 
-## The root `css/` folder still has oversized files and should keep following the seam-first split.
-
-
-
 ## Remaining architecture / polish backlog
 
 - `Lovers Lost` still has oversized files (`game.js`, `renderer.js`) that should be broken into modules.
@@ -37,7 +33,6 @@ Completed:
 
 Still needs cleanup after the current folder move:
 - `/me` still needs a decision on whether it has stable enough boundaries for a real `js/me-page/` subsystem
-- the root `css/` folder still has giant files that need the same seam-first cleanup
 - large game-local monoliths like `Lovers Lost` and `Battleshits` still need architecture cleanup
 
 Folderization follow-up:
