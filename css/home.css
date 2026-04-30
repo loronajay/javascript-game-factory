@@ -107,7 +107,7 @@
 
 .home-stage__masthead {
   position: relative;
-  z-index: 4;
+  z-index: 6;
   display: grid;
   gap: clamp(20px, 5vh, 56px);
   width: min(94vw, 1160px);

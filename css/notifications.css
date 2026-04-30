@@ -2,6 +2,7 @@
 
 .notif-bell-wrap {
   position: relative;
+  z-index: 20;
   display: inline-flex;
   align-items: center;
 }

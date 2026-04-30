@@ -1,5 +1,7 @@
 # Bugs
 
+## Alerts dropdown is rendering behind the buttons, needs to not be the case, notifications need to display in front of everything else: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 235008.png"
+
 ## The root `css/` folder still has oversized files and should keep following the seam-first split.
 
 
