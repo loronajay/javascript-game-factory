@@ -177,7 +177,7 @@
 .me-stage__header,
 .player-stage__header {
   gap: 10px;
-  width: min(980px, 100%);
+  width: min(92vw, 980px);
 }
 
 .me-stage__title,
@@ -187,7 +187,7 @@
   position: relative;
   display: grid;
   justify-items: center;
-  width: min(760px, 100%);
+  width: min(82vw, 760px);
   padding: 16px 18px;
   border: 2px solid rgba(255, 214, 189, 0.28);
   background:
@@ -200,7 +200,7 @@
 
 .me-stage__subtitle,
 .player-stage__subtitle {
-  width: min(560px, 92%);
+  width: min(76vw, 560px);
   color: #fff8ff;
   font-size: clamp(0.95rem, 1.8vw, 1.2rem);
   line-height: 1.3;

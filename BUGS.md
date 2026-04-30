@@ -1,6 +1,6 @@
 # Bugs
 
-## We need to switch to percentages in general across the board (all pages) instead of hardcoding page element positions, to account for different monitor sizes/mobile web viewers etc. viewing a friend's profile on mobile is completely broken, panels are merging into each other, and panels are so thin i can't see the contents. only the gallery and title really survive.
+## We need to switch to percentages in general across the board (all pages) instead of hardcoding page element positions, to account for different monitor sizes/mobile web viewers etc. The friend-profile mobile collapse is fixed, but the broader all-pages responsiveness pass is still ongoing.
 
 ## The root `css/` folder still has oversized files and should keep following the seam-first split.
 

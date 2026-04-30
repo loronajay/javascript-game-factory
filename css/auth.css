@@ -170,7 +170,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: min(1100px, 100%);
+  width: min(92vw, 1100px);
   padding-top: 8px;
 }
 
@@ -214,7 +214,7 @@
   display: grid;
   justify-items: center;
   gap: 4px;
-  width: min(760px, 100%);
+  width: min(82vw, 760px);
   text-align: center;
   padding-top: 4px;
 }

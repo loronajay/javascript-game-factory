@@ -79,8 +79,8 @@
   top: calc(100% + 8px);
   right: 0;
   z-index: 9000;
-  width: 320px;
-  max-width: 92vw;
+  width: min(92vw, 320px);
+  max-width: none;
   background: #0a0015;
   border: 1px solid rgba(255, 0, 255, 0.35);
   border-radius: 6px;
@@ -141,8 +141,8 @@
 .notif-page-layout {
   position: relative;
   z-index: 10;
-  width: 100%;
-  max-width: 620px;
+  width: min(90vw, 620px);
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
