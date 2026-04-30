@@ -246,15 +246,12 @@
 }
 
 .me-layout {
-  grid-template-columns: minmax(430px, 1fr) minmax(250px, 290px) minmax(360px, 1fr);
+  width: min(1240px, 100%);
+  grid-template-columns: minmax(340px, 1.08fr) minmax(280px, 0.92fr) minmax(320px, 1fr);
 }
 
 .me-hero-card {
   grid-template-columns: 196px minmax(0, 1fr);
-}
-
-.me-layout {
-  grid-template-columns: minmax(430px, 1fr) minmax(250px, 290px) minmax(360px, 1fr);
 }
 
 .me-hero-card {
@@ -325,6 +322,10 @@
 .me-friends-navigator__dropdown {
   display: grid;
   gap: 12px;
+}
+
+.me-friends-navigator__dropdown[hidden] {
+  display: none;
 }
 
 .me-friends-navigator__search {

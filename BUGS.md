@@ -1,59 +1,22 @@
 # Bugs
 
-## Status snapshot (2026-04-29)
+## Sign In/Create Account buttons destroyed, where did they go? "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200114.png"
 
-Tracked platform/UI bugs from this pass are fixed in code and ready for manual verification.
+## Friends panel still displaying friends without me clicking the button. i don't want a giant list of friends to start building up on my account, i need to only be able to see them after clicking that button that currently does nothing: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200150.png"
 
-## Resolved in code
+## Navigation box and button to sign out are broken like the first listed bug: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200228.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200259.png"
 
-- Fixed broken gesture/message emoji mojibake on the player page.
-- Fixed friends rail profile pictures so they clamp to the intended avatar box size.
-- Fixed gallery double-submit behavior by adding an in-progress upload state and disabling owner gallery controls while upload/save is running.
-- Fixed direct `Home` navigation from the messages inbox and message thread pages.
-- Fixed reaction-state clarity so already-reacted posts render as reacted across shared thought-card surfaces while still allowing reaction changes.
-- Fixed the empty owner favorite card so it now performs the expected click behavior and opens the favorite picker instead of only looking clickable.
-- Fixed the `/me` page panel layout so the photo gallery grows inside its own column stack instead of pushing the lower right-side panels down the page.
-- Fixed the `/me` friend navigator so friends stay hidden until the owner opens the panel, the button actually opens the list, and the in-panel search filters the full linked-friend list.
-- Replaced page-specific signed-in nav clusters with a shared primary shell across `/me`, `/player`, `/thoughts`, `/activity`, `/search`, `/messages`, and `/notifications`.
-- Restored a direct `Home` route inside the shared signed-in shell so the public homepage is reachable from the major signed-in pages.
-- Fixed the shared notification bell styling contract on `/search`, `/thoughts`, `/activity`, and `/player` so the bell and dropdown no longer render as broken unstyled boxes on those pages.
-- Reduced shared-nav clutter by removing the duplicate `Notifications` tab, grouping the shell into a dedicated tab row plus utility cluster, and making the bell the primary notifications entry with a `View all` path.
-- Reduced stacked chrome on `/search`, `/messages`, `/notifications`, `/thoughts`, and `/activity` by collapsing the nav and page title areas into unified masthead surfaces instead of separate top boxes.
-- Moved the notifications page's one-off inline styles back into `css/notifications.css` so that surface uses shared stylesheet ownership again.
-- Continued the root CSS seam cleanup with these extracted shared files:
-  - `css/session-nav.css`
-  - `css/profile-social.css`
-  - `css/profile-page.css`
-  - `css/profile-hero.css`
-  - `css/profile-hero-card.css`
-  - `css/profile-featured-cabinet.css`
-  - `css/profile-identity.css`
-  - `css/profile-rail.css`
+## Profile panels still squished on the right ever since we added the new friends panel: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-04-29 200414.png"
 
-## Manual verification checklist
+## The root `css/` folder still has oversized files and should keep following the seam-first split.
 
-Use this before starting game architecture work:
 
-- `/player`: confirm gesture labels render correctly and message/challenge controls still work.
-- `/me` and owner-view `/player`: confirm reacting to an already-reacted thought is clearly presented and reaction changes still work.
-- `/me`: open the Friends toggle, confirm the dropdown opens, scrolls, filters by search text, and links through to player pages.
-- `/me`: try the empty favorite card and confirm clicking it opens the favorite picker instead of doing nothing.
-- `/me`: start a gallery upload and confirm duplicate submit is blocked while the upload is in flight.
-- `/me`: confirm the gallery grows inside its own column without shoving lower right-rail panels down the page.
-- `/messages` and `/messages/conversation`: confirm the shared signed-in shell renders and the direct `Home` route works.
-- `/search`, `/thoughts`, `/activity`, `/player`, `/notifications`: confirm the notification bell/dropdown is styled correctly and the full notifications page still works.
-- Signed-in pages generally: confirm the shared shell order, active-state styling, and unified masthead layout feel consistent.
-
-## No open reproducible platform bugs currently tracked
-
-What remains before game work is architecture and polish, not a known unresolved functional bug on the platform pages.
 
 ## Remaining architecture / polish backlog
 
-- Navigation UI/UX can still be polished further, but it is no longer tracked here as a known broken route/interaction bug.
 - `Lovers Lost` still has oversized files (`game.js`, `renderer.js`) that should be broken into modules.
 - `Battleshits` still has oversized files (`game.js`, `style.css`) that should be broken into modules.
-- The root `css/` folder still has oversized files and should keep following the seam-first split.
+- Navigation UI/UX can still be polished further
 
 ## Architecture cleanup status (2026-04-29)
 
