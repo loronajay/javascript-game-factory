@@ -68,7 +68,7 @@ const GOBLIN_DEATH_BOXES = [
 
 // Bird visual approach speed multiplier — bird swoops in faster than other obstacles.
 // Purely cosmetic: timing window is still game-logic based.
-const BIRD_SPEED_MULT = 1.75;
+const BIRD_SPEED_MULT = 2;
 
 // Arrow wall — single 48×44 image
 const AR_W = 48;  const AR_H = 44;
