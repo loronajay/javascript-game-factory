@@ -1,0 +1,62 @@
+@media (max-width: 1180px) {
+  .screen-battle #fleet-ships-status {
+    display: none;
+  }
+
+  #game-root {
+    padding-top: 64px;
+  }
+
+  .placement-scene,
+  .battle-boards {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .battle-center-col {
+    padding-top: 0;
+    order: 2;
+  }
+
+  .battle-announcement {
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .placement-scene {
+    gap: 20px;
+  }
+
+  .placement-sidebar {
+    width: min(680px, 100%);
+  }
+}
+
+@media (max-width: 900px) {
+  #game-root {
+    padding-bottom: 36px;
+  }
+
+  .battle-header {
+    grid-template-columns: 1fr;
+  }
+
+  .board-grid {
+    --cell: clamp(24px, 5.3vw, 36px);
+    --label-cell: 20px;
+  }
+
+  .menu-title-frame {
+    padding-inline: 16px;
+  }
+
+  .menu-stage {
+    gap: 12px;
+    max-height: none;
+  }
+
+  .menu-throne {
+    width: min(220px, 42vw);
+  }
+}

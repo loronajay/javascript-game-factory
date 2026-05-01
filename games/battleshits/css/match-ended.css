@@ -1,0 +1,97 @@
+.victory-placard {
+  width: 100%;
+  padding: 18px 22px;
+  text-align: center;
+}
+
+.ended-title {
+  font-size: clamp(2rem, 6vw, 4rem);
+  text-transform: uppercase;
+}
+
+/* Results stats and opponent profile chip */
+
+.ended-match-stats {
+  margin: 12px 0 6px;
+}
+
+.ended-stats {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+}
+
+.ended-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(160, 200, 255, 0.15);
+  border-radius: 4px;
+  padding: 6px 14px;
+  min-width: 72px;
+}
+
+.ended-stat dt {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8899aa;
+  margin-bottom: 2px;
+}
+
+.ended-stat dd {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #a0d0ff;
+  margin: 0;
+}
+
+.ended-opponent-profile {
+  min-height: 28px;
+  margin: 4px 0;
+}
+
+.ended-profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ended-profile-label {
+  color: #8899aa;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ended-profile-name {
+  color: #a0d0ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.ended-profile-name:hover { text-decoration: underline; }
+
+.ended-profile-action {
+  color: #60c060;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  border: 1px solid rgba(80, 180, 80, 0.4);
+  padding: 2px 8px;
+}
+
+.ended-profile-action:hover {
+  border-color: rgba(80, 180, 80, 0.8);
+  color: #80e080;
+}

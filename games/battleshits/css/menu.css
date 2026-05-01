@@ -1,0 +1,100 @@
+.menu-stage {
+  width: min(1040px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-block: 12px 0;
+  max-height: calc(100vh - 72px);
+}
+
+.menu-title-frame {
+  width: 100%;
+  max-width: 860px;
+  padding: 14px 24px;
+  border: 4px solid rgba(0, 0, 0, 0.78);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 14px 30px rgba(7, 31, 52, 0.18);
+  overflow: hidden;
+}
+
+.game-title {
+  text-align: center;
+  font-family: var(--font-stencil);
+  font-size: clamp(2.8rem, 7vw, 5.6rem);
+  line-height: 0.9;
+  letter-spacing: 0.03em;
+  color: #080808;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.18);
+}
+
+.menu-throne {
+  position: relative;
+  width: min(250px, 30vw, 40vh);
+  aspect-ratio: 0.82;
+  margin-top: -2px;
+  flex: 0 0 auto;
+}
+
+.menu-throne-tank,
+.menu-throne-seat,
+.menu-throne-water {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.menu-throne-tank {
+  top: 0;
+  width: 86%;
+  height: 29%;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #efefef 62%, #d8d8d8 100%);
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 255, 255, 0.95),
+    inset 0 -8px 14px rgba(150, 160, 172, 0.42),
+    0 18px 26px rgba(44, 73, 99, 0.22);
+}
+
+.menu-throne-seat {
+  top: 20%;
+  width: 72%;
+  height: 58%;
+  border-radius: 45% 45% 42% 42% / 30% 30% 58% 58%;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f6f6 50%, #d7d9dc 100%);
+  box-shadow:
+    inset 0 0 0 8px rgba(255, 255, 255, 0.92),
+    inset 0 -15px 18px rgba(117, 132, 149, 0.32),
+    0 26px 32px rgba(34, 69, 99, 0.2);
+}
+
+.menu-throne-water {
+  top: 33%;
+  width: 42%;
+  height: 38%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 45% 28%, rgba(255, 255, 255, 0.56), transparent 18%),
+    radial-gradient(circle at 52% 58%, rgba(7, 74, 124, 0.4), transparent 34%),
+    radial-gradient(circle at 50% 50%, #47b8ef 0%, #2398d7 46%, #0d5d98 82%, #083453 100%);
+  box-shadow:
+    inset 0 0 20px rgba(255, 255, 255, 0.35),
+    inset 0 -18px 28px rgba(9, 46, 78, 0.36);
+}
+
+.game-tagline {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(6, 33, 56, 0.72);
+  text-align: center;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(540px, 100%);
+}

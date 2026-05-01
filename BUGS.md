@@ -2,8 +2,7 @@
 
 ## Remaining architecture / polish backlog
 
-- `Lovers Lost` still has oversized files (`game.js`, `renderer.js`) that should be broken into modules.
-- `Battleshits` still has oversized files (`game.js`, `style.css`) that should be broken into modules.
+- `Battleshits` still has an oversized `game.js` that should be broken into modules (`style.css` split into `css/` modules complete).
 - Navigation UI/UX can still be polished further
 
 ## Architecture cleanup status (2026-04-29)
@@ -33,9 +32,8 @@ Completed:
 
 Still needs cleanup after the current folder move:
 - `/me` still needs a decision on whether it has stable enough boundaries for a real `js/me-page/` subsystem
-- large game-local monoliths like `Lovers Lost` and `Battleshits` still need architecture cleanup
+- `Battleshits` CSS split into `css/` modules complete; `game.js` and `renderer.js` still need architecture cleanup
 
 Folderization follow-up:
 - `js/player-page/` and `js/thoughts-page/` are now real subsystems; preserve them as the canonical homes for those page concerns
 - only introduce `js/me-page/` if we can move stable ownership boundaries there instead of creating another dump folder
-- later audit `Lovers Lost`, `Battleshits`, and the root CSS files with the same architecture rules

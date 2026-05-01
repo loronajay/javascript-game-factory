@@ -1,0 +1,52 @@
+:root {
+  --tile-blue-dark: #4f8fd0;
+  --tile-blue: #72ade2;
+  --tile-blue-light: #a8d5ff;
+  --water-core: #2ea5e8;
+  --water-deep: #0e5f9d;
+  --water-ripple: rgba(215, 244, 255, 0.7);
+  --porcelain: #faf8f6;
+  --porcelain-shadow: #d9d6d2;
+  --porcelain-deep-shadow: #a8b2bc;
+  --ink: #101113;
+  --ink-soft: rgba(16, 17, 19, 0.72);
+  --sign-top: #4e4f51;
+  --sign-bottom: #111214;
+  --error: #af1e16;
+  --label: rgba(10, 31, 46, 0.72);
+  --font-stencil: "Stardos Stencil", "Stencil Std", "Stencil", "Copperplate", "Copperplate Gothic Bold", serif;
+  --font-ui: "Trebuchet MS", Arial, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, #bfe2fb 0%, #8fc2ef 34%, #76a7d2 100%);
+}
+
+/* Base font-family for UI text elements across all screens */
+.game-tagline,
+.status-text,
+.placement-hint,
+.rematch-status,
+.opponent-name,
+.opponent-display,
+.turn-indicator {
+  font-family: var(--font-ui);
+}

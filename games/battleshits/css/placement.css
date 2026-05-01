@@ -1,0 +1,86 @@
+.screen-placement {
+  --bowl-size: min(68vw, 56vh, 620px);
+}
+
+.placement-scene {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 1.8vw, 26px);
+  padding-top: clamp(20px, 4vh, 34px);
+}
+
+.placement-hint {
+  margin-top: 8px;
+  max-width: 520px;
+  color: rgba(7, 35, 55, 0.82);
+  line-height: 1.35;
+  font-size: clamp(0.92rem, 1.7vh, 1rem);
+}
+
+.placement-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.placement-sidebar {
+  width: min(240px, 22vw);
+  min-width: 200px;
+  padding: 14px 14px 16px;
+  border-radius: 30px;
+}
+
+.sidebar-heading {
+  margin: 8px 0 12px;
+  font: 800 0.8rem var(--font-ui);
+  color: rgba(9, 34, 55, 0.8);
+}
+
+.ship-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roster-ship {
+  padding: 10px;
+  border-radius: 18px;
+  border: 2px solid rgba(13, 41, 64, 0.18);
+  background: rgba(255, 255, 255, 0.62);
+  transition: transform 100ms ease, border-color 100ms ease, background 100ms ease;
+  cursor: pointer;
+}
+
+.roster-ship:hover {
+  transform: translateY(-1px);
+  border-color: rgba(13, 41, 64, 0.4);
+}
+
+.roster-ship--selected {
+  background: rgba(126, 203, 255, 0.24);
+  border-color: rgba(10, 86, 129, 0.65);
+}
+
+.roster-ship--placed {
+  opacity: 0.72;
+}
+
+.roster-ship-name {
+  margin-bottom: 6px;
+  font: 700 clamp(0.8rem, 1.6vh, 0.92rem) var(--font-ui);
+  color: rgba(7, 35, 55, 0.84);
+}
+
+.roster-ship-length {
+  display: flex;
+  gap: 3px;
+}
+
+.roster-ship-cell {
+  width: 13px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #8b5935, #63331e);
+}

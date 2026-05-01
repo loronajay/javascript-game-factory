@@ -1,0 +1,191 @@
+.screen-battle {
+  --bowl-size: min(42vw, 48vh, 520px);
+}
+
+.battle-header {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.status-placard--turn,
+.status-placard--opponent {
+  min-height: 70px;
+  min-width: clamp(180px, 28vw, 380px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turn-indicator,
+.opponent-display,
+.opponent-name,
+.rematch-status {
+  font-size: 0.98rem;
+  text-align: center;
+  color: rgba(8, 34, 54, 0.84);
+}
+
+.battle-boards {
+  display: grid;
+  grid-template-columns: 1fr clamp(100px, 9vw, 140px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.battle-center-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: clamp(60px, 12vh, 100px);
+}
+
+.battle-announcement {
+  display: none;
+  width: 100%;
+  padding: clamp(10px, 1.4vh, 14px) clamp(8px, 1vw, 12px);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 2px solid rgba(186, 196, 210, 0.6);
+  box-shadow: 0 8px 24px rgba(8, 40, 64, 0.18);
+  font: 700 clamp(0.78rem, 1.4vh, 0.9rem) var(--font-ui);
+  text-align: center;
+  color: rgba(8, 34, 54, 0.88);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.battle-announcement.is-visible {
+  display: block;
+  animation: announcement-pop 2.6s ease forwards;
+}
+
+@keyframes announcement-pop {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.9); }
+  12%  { opacity: 1; transform: translateY(0) scale(1); }
+  72%  { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(4px) scale(0.96); }
+}
+
+.screen-battle .board-column {
+  justify-content: flex-start;
+}
+
+.battle-emote-hint {
+  text-align: center;
+  font: 700 clamp(0.72rem, 1.35vh, 0.84rem) var(--font-ui);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(8, 34, 54, 0.74);
+}
+
+/* Emote bubbles */
+
+.emote-bubble {
+  min-width: 82px;
+  min-height: 82px;
+  padding: 10px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 3px solid rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 0 0 2px rgba(186, 196, 206, 0.55),
+    0 12px 24px rgba(8, 40, 64, 0.16);
+}
+
+.emote-bubble.hidden {
+  visibility: hidden;
+}
+
+.emote-bubble-image {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* Battle screen overrides for the bowl */
+
+.screen-battle .board-bowl-water .board-grid {
+  top: calc(15% - 8px);
+}
+
+/* Lock tank height so bowl position never moves when label text changes */
+.screen-battle .board-bowl-tank {
+  height: 72px;
+  overflow: hidden;
+  justify-content: center;
+}
+
+.screen-battle .board-label--tank {
+  white-space: nowrap;
+}
+
+/* Target bowl glow when it's your turn to shoot */
+
+.board-bowl--target.bowl--your-turn .board-bowl-seat {
+  box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.9),
+    inset 0 -20px 24px rgba(131, 145, 158, 0.26),
+    0 20px 36px rgba(8, 40, 64, 0.18),
+    0 0 0 3px rgba(210, 30, 30, 0.65),
+    0 0 28px 6px rgba(210, 30, 30, 0.3);
+  animation: target-bowl-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes target-bowl-pulse {
+  0%, 100% { box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.9),
+    inset 0 -20px 24px rgba(131, 145, 158, 0.26),
+    0 20px 36px rgba(8, 40, 64, 0.18),
+    0 0 0 3px rgba(210, 30, 30, 0.65),
+    0 0 28px 6px rgba(210, 30, 30, 0.3); }
+  50% { box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.9),
+    inset 0 -20px 24px rgba(131, 145, 158, 0.26),
+    0 20px 36px rgba(8, 40, 64, 0.18),
+    0 0 0 3px rgba(210, 30, 30, 0.85),
+    0 0 44px 14px rgba(210, 30, 30, 0.5); }
+}
+
+/* Ships status panel */
+
+.ships-status {
+  width: min(100%, 430px);
+  padding: 10px 14px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 24px rgba(9, 39, 62, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Fleet status: absolute left rail, lives outside the bowl layout flow */
+.screen-battle #fleet-ships-status {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 130px;
+}
+
+.screen-battle #fleet-ships-status .ship-status-row {
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.ship-status-row {
+  font: 700 clamp(0.76rem, 1.45vh, 0.86rem) var(--font-ui);
+  letter-spacing: 0.04em;
+}
+
+.ship-status--afloat {
+  color: rgba(71, 44, 23, 0.92);
+}
+
+.ship-status--sunk {
+  color: rgba(54, 56, 63, 0.64);
+  text-decoration: line-through;
+}
