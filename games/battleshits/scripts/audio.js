@@ -7,7 +7,17 @@ export const AUDIO_ASSET_PATHS = Object.freeze({
 });
 
 export const BG_MUSIC_PATHS = Object.freeze({
-  menu: 'sounds/bg-music/menu.mp3',
+  menu:             'sounds/bg-music/menu.mp3',
+  matchmaking:      'sounds/bg-music/menu.mp3',
+  'room-create':    'sounds/bg-music/menu.mp3',
+  'room-join':      'sounds/bg-music/menu.mp3',
+  placement:        'sounds/bg-music/preparation.mp3',
+  waiting:          'sounds/bg-music/preparation.mp3',
+  battle: Object.freeze([
+    'sounds/bg-music/battle-1.mp3',
+    'sounds/bg-music/battle-2.mp3',
+    'sounds/bg-music/battle-3.mp3',
+  ]),
 });
 
 export function getResolutionSoundId(hit) {
@@ -43,38 +53,49 @@ export function createAudioController(AudioCtor = globalThis.Audio) {
 
 export function createBgMusicController(AudioCtor = globalThis.Audio) {
   const cache = new Map();
-  let currentTrackId = null;
+  let currentSrc = null;
+  let pickedBattleSrc = null;
 
-  function getAudio(trackId) {
-    const src = BG_MUSIC_PATHS[trackId];
+  function getAudio(src) {
     if (!src || typeof AudioCtor !== 'function') return null;
-    if (!cache.has(trackId)) {
+    if (!cache.has(src)) {
       const audio = new AudioCtor(src);
       audio.preload = 'auto';
       audio.loop = true;
-      cache.set(trackId, audio);
+      cache.set(src, audio);
     }
-    return cache.get(trackId);
+    return cache.get(src);
+  }
+
+  function _pauseCurrent() {
+    if (!currentSrc) return;
+    const audio = cache.get(currentSrc);
+    if (audio) { audio.pause(); audio.currentTime = 0; }
+    currentSrc = null;
   }
 
   function stop() {
-    if (!currentTrackId) return;
-    const audio = cache.get(currentTrackId);
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-    currentTrackId = null;
+    _pauseCurrent();
+    pickedBattleSrc = null;
   }
 
   function transition(screenId) {
-    const trackId = BG_MUSIC_PATHS[screenId] ? screenId : null;
-    if (trackId === currentTrackId) return;
-    stop();
-    if (!trackId) return;
-    const audio = getAudio(trackId);
+    const entry = BG_MUSIC_PATHS[screenId] ?? null;
+    let newSrc;
+    if (Array.isArray(entry)) {
+      if (!pickedBattleSrc) {
+        pickedBattleSrc = entry[Math.floor(Math.random() * entry.length)];
+      }
+      newSrc = pickedBattleSrc;
+    } else {
+      newSrc = entry;
+    }
+    if (newSrc === currentSrc) return;
+    _pauseCurrent();
+    if (!newSrc) return;
+    const audio = getAudio(newSrc);
     if (!audio) return;
-    currentTrackId = trackId;
+    currentSrc = newSrc;
     const playPromise = audio.play?.();
     if (playPromise && typeof playPromise.catch === 'function') {
       playPromise.catch(() => {});

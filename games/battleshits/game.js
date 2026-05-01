@@ -77,10 +77,13 @@ function lockIn() {
   gs.phase = 'waiting_opponent';
   net.sendPlacementReady();
   goToScreen('waiting');
-  if (gs.opponentReady) transitionToBattle(gs, {
-    clearAll,
-    handleTargetClick: (c, r) => handleTargetClick(gs, net, c, r),
-  });
+  if (gs.opponentReady) {
+    transitionToBattle(gs, {
+      clearAll,
+      handleTargetClick: (c, r) => handleTargetClick(gs, net, c, r),
+    });
+    bgMusic.transition('battle');
+  }
 }
 
 // ─── Match flow ───────────────────────────────────────────────────────────────
@@ -155,10 +158,13 @@ function wireOnlineCallbacks() {
 
   net.cb.onOpponentReady = () => {
     gs.opponentReady = true;
-    if (gs.phase === 'waiting_opponent') transitionToBattle(gs, {
-      clearAll,
-      handleTargetClick: (c, r) => handleTargetClick(gs, net, c, r),
-    });
+    if (gs.phase === 'waiting_opponent') {
+      transitionToBattle(gs, {
+        clearAll,
+        handleTargetClick: (c, r) => handleTargetClick(gs, net, c, r),
+      });
+      bgMusic.transition('battle');
+    }
   };
 
   net.cb.onOpponentShot = ({ col, row }) => {
@@ -220,7 +226,6 @@ function wireOnlineCallbacks() {
 
 function wireButtons() {
   document.getElementById('btn-find-match')?.addEventListener('click', () => {
-    bgMusic.stop();
     net = createOnlineClient('battleshits');
     wireOnlineCallbacks();
     startPublicMatch(gs, net);
@@ -245,7 +250,6 @@ function wireButtons() {
       return;
     }
     if (errEl) errEl.classList.add('hidden');
-    bgMusic.stop();
     net = createOnlineClient('battleshits');
     wireOnlineCallbacks();
     startPrivateJoin(gs, net, code);
