@@ -15,6 +15,11 @@
   --profile-avatar-frame-size: clamp(144px, 16vw, 164px);
   --profile-avatar-image-size: clamp(112px, 13vw, 132px);
   --profile-avatar-frame-padding: clamp(8px, 1vw, 10px);
+  --profile-radius-xs: 8px;
+  --profile-radius-sm: 12px;
+  --profile-radius-md: 16px;
+  --profile-radius-lg: 22px;
+  --profile-radius-pill: 999px;
 }
 
 * {

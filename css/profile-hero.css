@@ -1,12 +1,5 @@
 /* ---------- PROFILE HERO SHARED SUPPORT RAIL ---------- */
 
-:root {
-  --profile-radius-xs: 8px;
-  --profile-radius-sm: 12px;
-  --profile-radius-md: 16px;
-  --profile-radius-lg: 22px;
-  --profile-radius-pill: 999px;
-}
 
 .me-panel--favorite,
 .player-panel--favorite {

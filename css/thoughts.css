@@ -12,6 +12,7 @@
   gap: 12px;
   padding: 20px;
   overflow: hidden;
+  border-radius: var(--profile-radius-md);
   border: 2px solid rgba(255, 197, 228, 0.22);
   background:
     linear-gradient(135deg, rgba(255, 197, 228, 0.08), transparent 28%),
@@ -129,6 +130,7 @@
   justify-content: center;
   min-height: 34px;
   padding: 0 10px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 197, 228, 0.22);
   background:
     linear-gradient(180deg, rgba(255, 197, 228, 0.1), rgba(19, 10, 35, 0.9)),
@@ -193,6 +195,7 @@ button.thought-card__action {
 }
 
 .thought-card__comment-dismiss {
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(146, 240, 255, 0.24);
   background: rgba(14, 10, 30, 0.92);
   color: #dffbff;
@@ -212,6 +215,7 @@ button.thought-card__action {
   display: grid;
   gap: 6px;
   padding: 10px 12px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(146, 240, 255, 0.18);
   background: rgba(10, 12, 28, 0.84);
 }
@@ -247,6 +251,7 @@ button.thought-card__action {
 .thought-card__share-button {
   min-height: 34px;
   padding: 0 12px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 197, 228, 0.28);
   background:
     linear-gradient(180deg, rgba(255, 197, 228, 0.12), rgba(19, 10, 35, 0.92)),
@@ -282,6 +287,7 @@ button.thought-card__action {
   width: 100%;
   min-height: 110px;
   padding: 12px;
+  border-radius: var(--profile-radius-xs);
   border: 2px solid rgba(255, 197, 228, 0.24);
   background: rgba(6, 4, 18, 0.9);
   color: #fff7fc;
@@ -331,6 +337,7 @@ button.thought-card__action {
   display: grid;
   gap: 6px;
   padding: 12px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(146, 240, 255, 0.24);
   background:
     linear-gradient(180deg, rgba(146, 240, 255, 0.08), rgba(19, 10, 35, 0.92)),
@@ -376,7 +383,7 @@ button.thought-card__action {
   margin-left: auto;
   padding: 2px 8px;
   border: 1px solid rgba(255, 80, 120, 0.35);
-  border-radius: 3px;
+  border-radius: var(--profile-radius-xs);
   background: transparent;
   color: rgba(255, 100, 130, 0.7);
   font-size: 0.68rem;
@@ -396,6 +403,7 @@ button.thought-card__action {
   display: grid;
   gap: 12px;
   padding: 18px;
+  border-radius: var(--profile-radius-md);
   border: 1px solid rgba(255, 197, 228, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 197, 228, 0.08), rgba(19, 10, 35, 0.92)),
@@ -405,6 +413,7 @@ button.thought-card__action {
 .thought-composer__subject,
 .thought-composer__body {
   width: 100%;
+  border-radius: var(--profile-radius-xs);
   border: 2px solid rgba(255, 197, 228, 0.22);
   background: rgba(6, 4, 18, 0.9);
   color: #fff7fc;
@@ -449,6 +458,7 @@ button.thought-card__action {
   justify-content: center;
   min-height: 38px;
   padding: 0 16px;
+  border-radius: var(--profile-radius-pill);
   border: 1px solid rgba(255, 197, 228, 0.28);
   background:
     linear-gradient(180deg, rgba(255, 197, 228, 0.16), rgba(255, 121, 183, 0.12)),
@@ -490,7 +500,7 @@ button.thought-card__action {
   cursor: pointer;
   padding: 4px 8px;
   border: 1px solid rgba(255, 197, 228, 0.3);
-  border-radius: 4px;
+  border-radius: var(--profile-radius-xs);
   font-size: 0.78rem;
   color: rgba(255, 255, 255, 0.7);
   letter-spacing: 0.06em;
@@ -512,6 +522,7 @@ button.thought-card__action {
   display: grid;
   gap: 14px;
   padding: 14px;
+  border-radius: var(--profile-radius-sm);
   border: 1px solid rgba(255, 197, 228, 0.18);
   background:
     linear-gradient(180deg, rgba(255, 197, 228, 0.08), rgba(10, 8, 26, 0.92)),
@@ -530,7 +541,7 @@ button.thought-card__action {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 197, 228, 0.16);
 }
 
@@ -559,6 +570,7 @@ button.thought-card__action {
   justify-self: start;
   min-height: 34px;
   padding: 0 12px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 197, 228, 0.22);
   background: rgba(14, 10, 30, 0.86);
   color: rgba(255, 255, 255, 0.82);
@@ -577,6 +589,7 @@ button.thought-card__action {
   width: 100%;
   min-height: 38px;
   padding: 0 12px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 197, 228, 0.22);
   background: rgba(6, 4, 18, 0.9);
   color: #fff7fc;
@@ -603,6 +616,7 @@ button.thought-card__action {
   gap: 8px;
   min-height: 36px;
   padding: 0 12px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 197, 228, 0.16);
   background: rgba(255, 255, 255, 0.03);
 }
@@ -616,7 +630,7 @@ button.thought-card__action {
   width: 100%;
   max-height: 480px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--profile-radius-xs);
   margin-bottom: 10px;
 }
 
@@ -666,6 +680,7 @@ button.thought-card__action {
   flex: 1 1 180px;
   min-height: 44px;
   padding: 0 14px;
+  border-radius: var(--profile-radius-xs);
   border: 2px solid rgba(255, 197, 228, 0.22);
   background: rgba(6, 4, 18, 0.9);
   color: #fff7fc;
@@ -687,6 +702,7 @@ button.thought-card__action {
   justify-content: center;
   min-height: 44px;
   padding: 0 16px;
+  border-radius: var(--profile-radius-pill);
   border: 1px solid rgba(255, 197, 228, 0.28);
   background:
     linear-gradient(180deg, rgba(255, 197, 228, 0.16), rgba(255, 121, 183, 0.12)),
