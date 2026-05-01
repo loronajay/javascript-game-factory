@@ -134,10 +134,7 @@ These rules are here to protect stability.
 5. Stability beats cleverness.
    Prefer simple modules, plain HTML pages, query-param routing where needed, and explicit tests over premature abstraction.
 
-6. Uploads come late.
-   Photo/avatar upload should wait until auth, storage, file validation, moderation rules, and failure handling are defined.
-
-7. Do not keep piling behavior into monolithic page controllers.
+6. Do not keep piling behavior into monolithic page controllers.
    For `/me`, `/player`, `/thoughts`, and related platform surfaces, extract loader, view-model, rendering, and action modules before the next major feature pass if those concerns are converging in one file.
 
 ## Architecture Shape
@@ -831,8 +828,6 @@ Before starting a feature, ask:
 - Does this belong to the platform or to a game?
 - Can this ship locally first without lying about multi-user behavior?
 - Will this feature force backend decisions we have not made yet?
-
-If the answer to the last question is yes, the feature probably belongs in a later phase.
 
 ## Definition Of Success
 

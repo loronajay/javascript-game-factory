@@ -65,25 +65,12 @@ Completed:
    New note:
    - the shared signed-in shell now reduces markup duplication, and the `/me` + `/player` shared profile seams are actively moving into dedicated CSS files, but the remaining root page stylesheets are still larger than they should be.
 
-3. large game-local monoliths
-   Why they matter:
-   - `Lovers Lost`, `Battleshits`, and similar game files still violate the same architecture rules we just enforced in platform code.
-
-   Lovers Lost cleanup complete (2026-04-30):
-   - `renderer.js` split into `renderer-obstacles.js`, `renderer-characters.js`, `renderer-debug.js` (was ~2089 lines, now ~1002)
-   - `handleSideInput` extracted from `init-game.js` into `lane-input.js` via `createLaneInputHandler` factory
-   - `game-assets.js` extracted — image loading with onReady callback; init-game.js no longer owns asset management
-   - `remote-snapshot.js` extracted — `applyRemoteSnapshot` / `applyRemoteResolvedVisuals`; pure state-in/state-out pattern
-   - `score-overlay.js` extracted — DOM score-overlay + opponent profile API calls; platform API imports moved here
-   - `init-game.js` reduced from ~613 to ~510 lines; remaining complexity is intrinsic orchestration (online session state shared across callbacks, loop, and event handlers — no clean extraction boundary without a larger redesign)
-   - `Battleshits` `renderer.js`/`game.js` remain as the next game-local monolith target.
 
 ## Cleanup Order
 
 Do this in order:
 1. decide whether `/me` has stable enough seams for `js/me-page/`
 2. continue the broader page-folder/path cleanup only where ownership is already clear
-3. split oversized CSS and game-local monoliths with the same seam-first rule
 
 ## Folder Reorg Goal
 

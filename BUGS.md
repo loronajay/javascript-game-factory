@@ -1,8 +1,9 @@
 # Bugs
 
+## My page view (loronajay) vs Drellgor's page view. Mine is these screenshots: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091558.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091612.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091629.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091640.png". Drellgor's is these screenshots: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091516.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091532.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 091545.png"
+
 ## Remaining architecture / polish backlog
 
-- `Battleshits` still has an oversized `game.js` that should be broken into modules (`style.css` split into `css/` modules complete).
 - Navigation UI/UX can still be polished further
 
 ## Architecture cleanup status (2026-04-29)
@@ -32,7 +33,6 @@ Completed:
 
 Still needs cleanup after the current folder move:
 - `/me` still needs a decision on whether it has stable enough boundaries for a real `js/me-page/` subsystem
-- `Battleshits` CSS split into `css/` modules complete; `game.js` and `renderer.js` still need architecture cleanup
 
 Folderization follow-up:
 - `js/player-page/` and `js/thoughts-page/` are now real subsystems; preserve them as the canonical homes for those page concerns
