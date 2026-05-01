@@ -17,6 +17,7 @@
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--profile-radius-lg, 22px);
   background: rgba(6, 10, 20, 0.42);
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.18),
@@ -33,6 +34,7 @@
   padding: 7px 12px;
   margin-left: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--profile-radius-sm, 12px);
   background: rgba(255, 255, 255, 0.04);
   color: #fff8ff;
   text-decoration: none;
@@ -97,6 +99,7 @@
   justify-content: center;
   padding: 7px 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--profile-radius-sm, 12px);
   background: rgba(255, 255, 255, 0.05);
   color: #fff8ff;
   text-decoration: none;
@@ -124,6 +127,7 @@
   flex-wrap: wrap;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--profile-radius-lg, 22px);
   background: rgba(6, 10, 20, 0.42);
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.18),

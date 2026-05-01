@@ -2,6 +2,7 @@
 .player-hero-card {
   overflow: hidden;
   border: 2px solid rgba(255, 214, 189, 0.2);
+  border-radius: var(--profile-radius-lg, 22px);
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.08), transparent 28%),
     linear-gradient(180deg, rgba(21, 14, 55, 0.96), rgba(7, 7, 22, 0.96));
@@ -205,6 +206,7 @@
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid rgba(255, 214, 189, 0.12);
+  border-radius: var(--profile-radius-sm, 12px);
   background: rgba(255, 255, 255, 0.04);
 }
 

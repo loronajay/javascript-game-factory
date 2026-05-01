@@ -15,6 +15,7 @@
   min-height: 280px;
   overflow: hidden;
   border: 1px solid rgba(255, 214, 189, 0.18);
+  border-radius: var(--profile-radius-md, 16px);
   background:
     linear-gradient(180deg, rgba(255, 220, 187, 0.06), rgba(10, 9, 24, 0.94)),
     rgba(255, 255, 255, 0.04);
@@ -46,6 +47,7 @@
   padding: 10px 12px;
   background: rgba(9, 8, 22, 0.82);
   border: 1px solid rgba(255, 214, 189, 0.18);
+  border-radius: var(--profile-radius-sm, 12px);
   color: #fff8ff;
   font-size: 0.78rem;
   letter-spacing: 0.12em;

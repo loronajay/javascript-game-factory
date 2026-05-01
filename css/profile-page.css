@@ -37,6 +37,7 @@
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid rgba(255, 214, 189, 0.22);
+  border-radius: var(--profile-radius-pill, 999px);
   background:
     linear-gradient(180deg, rgba(255, 220, 187, 0.16), rgba(255, 121, 183, 0.08)),
     rgba(9, 8, 22, 0.92);
@@ -58,6 +59,7 @@
   gap: 8px;
   padding: 14px;
   border: 1px solid rgba(255, 214, 189, 0.12);
+  border-radius: var(--profile-radius-sm, 12px);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -181,6 +183,7 @@
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid rgba(255, 214, 189, 0.18);
+  border-radius: var(--profile-radius-pill, 999px);
   background:
     linear-gradient(180deg, rgba(255, 220, 187, 0.1), rgba(255, 121, 183, 0.08)),
     rgba(255, 255, 255, 0.04);
@@ -206,6 +209,7 @@
   width: min(82vw, 760px);
   padding: 16px 18px;
   border: 2px solid rgba(255, 214, 189, 0.28);
+  border-radius: var(--profile-radius-md, 16px);
   background:
     linear-gradient(180deg, rgba(255, 220, 187, 0.12), rgba(12, 9, 30, 0.92) 34%, rgba(7, 6, 20, 0.96)),
     rgba(9, 8, 22, 0.92);

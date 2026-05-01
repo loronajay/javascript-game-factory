@@ -29,7 +29,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--profile-radius-pill, 999px);
 }
 
 .gallery-upload__label:hover {
@@ -58,7 +58,7 @@
   width: min(100%, 240px);
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--profile-radius-sm, 12px);
   border: 1px solid rgba(255, 197, 228, 0.18);
 }
 
@@ -94,7 +94,7 @@
   color: #fff8ff;
   font: inherit;
   padding: 10px 12px;
-  border-radius: 4px;
+  border-radius: var(--profile-radius-sm, 12px);
 }
 
 .gallery-upload__textarea {
@@ -129,7 +129,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--profile-radius-sm, 12px);
 }
 
 .gallery-upload__button--primary {
@@ -155,7 +155,7 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--profile-radius-sm, 12px);
   border: 1px solid rgba(255, 197, 228, 0.12);
 }
 
@@ -181,7 +181,7 @@
   color: rgba(255, 80, 80, 0.9);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
-  border-radius: 3px;
+  border-radius: var(--profile-radius-xs, 8px);
   cursor: pointer;
   opacity: 0;
   transition: opacity 120ms ease;
