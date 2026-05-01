@@ -1,6 +1,6 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 
@@ -72,6 +72,10 @@ Completed:
    Lovers Lost cleanup complete (2026-04-30):
    - `renderer.js` split into `renderer-obstacles.js`, `renderer-characters.js`, `renderer-debug.js` (was ~2089 lines, now ~1002)
    - `handleSideInput` extracted from `init-game.js` into `lane-input.js` via `createLaneInputHandler` factory
+   - `game-assets.js` extracted — image loading with onReady callback; init-game.js no longer owns asset management
+   - `remote-snapshot.js` extracted — `applyRemoteSnapshot` / `applyRemoteResolvedVisuals`; pure state-in/state-out pattern
+   - `score-overlay.js` extracted — DOM score-overlay + opponent profile API calls; platform API imports moved here
+   - `init-game.js` reduced from ~613 to ~510 lines; remaining complexity is intrinsic orchestration (online session state shared across callbacks, loop, and event handlers — no clean extraction boundary without a larger redesign)
    - `Battleshits` `renderer.js`/`game.js` remain as the next game-local monolith target.
 
 ## Cleanup Order
