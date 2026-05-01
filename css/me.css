@@ -102,24 +102,24 @@
   grid-row: 5;
 }
 
-#meFriendCodePanel {
+#meFavoriteGamePanel {
   grid-column: 2 / 3;
   grid-row: 1;
 }
 
-#meFavoriteGamePanel {
+#meFriendCodePanel {
   grid-column: 2 / 3;
   grid-row: 2;
 }
 
 #meGalleryPanel {
   grid-column: 2 / 3;
-  grid-row: 6;
+  grid-row: 3;
 }
 
 .me-panel--danger {
   grid-column: 2 / 3;
-  grid-row: 5;
+  grid-row: 4;
 }
 
 #meThoughtsPanel {

@@ -2,6 +2,8 @@
 
 ## Big gap on friends page between favorite game panel and photo gallery panel. need the photo gallery panel to utilize that space instead of leaving a huge gap: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 094034.png"
 
+## Same issue on me page, photo gallery and danger zone need to be brought up to fill in massive gap: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 120947.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 120958.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 121012.png"
+
 ## Remaining architecture / polish backlog
 
 - Navigation UI/UX can still be polished further
