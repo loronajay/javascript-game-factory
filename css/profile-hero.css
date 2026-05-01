@@ -54,6 +54,8 @@
   border: 1px solid rgba(255, 214, 189, 0.12);
   border-radius: var(--profile-radius-sm);
   background: rgba(255, 255, 255, 0.03);
+  justify-items: center;
+  text-align: center;
 }
 
 .me-hero-card__metrics-stat-value,

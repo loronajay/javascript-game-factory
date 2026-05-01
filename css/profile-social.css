@@ -4,6 +4,7 @@
 .gallery-upload {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   padding: 14px 18px;
   flex-wrap: wrap;
