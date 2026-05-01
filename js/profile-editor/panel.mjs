@@ -56,6 +56,11 @@ export function initProfileEditorPanel({
   const avatarPreview = doc?.getElementById?.("playerProfileAvatarPreview");
   const avatarFallback = doc?.getElementById?.("playerProfileAvatarFallback");
   const avatarStatus = doc?.getElementById?.("playerProfileAvatarStatus");
+  const bgButton = doc?.getElementById?.("playerProfileBgButton");
+  const bgInput = doc?.getElementById?.("playerProfileBgInput");
+  const bgPreview = doc?.getElementById?.("playerProfileBgPreview");
+  const bgFallback = doc?.getElementById?.("playerProfileBgFallback");
+  const bgStatus = doc?.getElementById?.("playerProfileBgStatus");
 
   if (!button || !panel || !form || !profileNameInput) {
     return null;
@@ -63,6 +68,7 @@ export function initProfileEditorPanel({
 
   let pendingAvatarAssetId = "";
   let pendingAvatarUrl = "";
+  let pendingBackgroundImageUrl = "";
 
   function syncAvatarPreview(src, initials = "") {
     if (!avatarPreview) return;
@@ -81,6 +87,22 @@ export function initProfileEditorPanel({
 
   function setAvatarStatus(text) {
     if (avatarStatus) avatarStatus.textContent = text;
+  }
+
+  function syncBgPreview(src) {
+    if (!bgPreview) return;
+    if (src) {
+      bgPreview.src = src;
+      bgPreview.hidden = false;
+      if (bgFallback) bgFallback.hidden = true;
+    } else {
+      bgPreview.hidden = true;
+      if (bgFallback) bgFallback.hidden = false;
+    }
+  }
+
+  function setBgStatus(text) {
+    if (bgStatus) bgStatus.textContent = text;
   }
 
   if (avatarButton && avatarInput) {
@@ -112,6 +134,37 @@ export function initProfileEditorPanel({
       pendingAvatarUrl = result.url;
       syncAvatarPreview(result.url);
       setAvatarStatus("Photo ready - save your profile to apply it.");
+    });
+  }
+
+  if (bgButton && bgInput) {
+    bgButton.addEventListener("click", () => bgInput.click());
+
+    bgInput.addEventListener("change", async () => {
+      const file = bgInput.files?.[0];
+      if (!file) return;
+
+      const localUrl = URL.createObjectURL(file);
+      syncBgPreview(localUrl);
+      setBgStatus("Uploading...");
+
+      if (!apiClient?.isConfigured || typeof apiClient.uploadBackground !== "function") {
+        setBgStatus("Upload not available - API not connected.");
+        return;
+      }
+
+      const result = await apiClient.uploadBackground(file);
+      URL.revokeObjectURL(localUrl);
+
+      if (!result?.url) {
+        setBgStatus("Upload failed. Please try a different image.");
+        syncBgPreview("");
+        return;
+      }
+
+      pendingBackgroundImageUrl = result.url;
+      syncBgPreview(result.url);
+      setBgStatus("Background ready - save your profile to apply it.");
     });
   }
 
@@ -148,6 +201,7 @@ export function initProfileEditorPanel({
     const displayAvatarSrc = pendingAvatarUrl || profile.avatarUrl || "";
     const displayInitials = (profile.profileName || "?").slice(0, 2).toUpperCase();
     syncAvatarPreview(displayAvatarSrc, displayInitials);
+    syncBgPreview(pendingBackgroundImageUrl || profile.backgroundImageUrl || "");
 
     if (summary) summary.textContent = model.summaryName;
     if (defaultName) defaultName.textContent = model.summaryName;
@@ -257,6 +311,7 @@ export function initProfileEditorPanel({
       bio: "",
       tagline: "",
       favoriteGameSlug: "",
+      backgroundImageUrl: "",
       links: [],
       mainSqueezeMode: "manual",
       mainSqueezePlayerId: "",
@@ -269,6 +324,8 @@ export function initProfileEditorPanel({
     pendingAvatarAssetId = "";
     pendingAvatarUrl = "";
     setAvatarStatus("");
+    pendingBackgroundImageUrl = "";
+    setBgStatus("");
     render("PLAYER CARD CLEARED");
     dispatchProfileUpdatedEvent(doc, "cleared", clearedProfile);
   });
@@ -294,6 +351,7 @@ export function initProfileEditorPanel({
     } else if (currentProfile.avatarAssetId) {
       patch.avatarAssetId = currentProfile.avatarAssetId;
     }
+    patch.backgroundImageUrl = pendingBackgroundImageUrl || currentProfile.backgroundImageUrl || "";
     const savedProfile = await persistArcadeProfileDetails(storage, patch, {
       ...options,
       apiClient,
@@ -301,6 +359,8 @@ export function initProfileEditorPanel({
     pendingAvatarAssetId = "";
     pendingAvatarUrl = "";
     setAvatarStatus("");
+    pendingBackgroundImageUrl = "";
+    setBgStatus("");
     render("PLAYER CARD SAVED");
     closePanel();
     dispatchProfileUpdatedEvent(doc, "saved", savedProfile);

@@ -241,6 +241,22 @@ export function createPlatformApiClient(options = {}) {
         return null;
       }
     },
+    async uploadBackground(file) {
+      if (!fetchImpl || !baseUrl || !file) return null;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const response = await fetchImpl(`${baseUrl}/upload/background`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!response?.ok) return null;
+        return await readJsonResponse(response);
+      } catch {
+        return null;
+      }
+    },
     async uploadPhoto(file) {
       if (!fetchImpl || !baseUrl || !file) return null;
       const formData = new FormData();

@@ -370,7 +370,7 @@ export function createApp(options = {}) {
     }
 
     // Upload routes
-    if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo")) {
+    if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background")) {
       if (!authClaims?.playerId) {
         writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
         return;
@@ -389,8 +389,9 @@ export function createApp(options = {}) {
       }
 
       const isAvatar = pathname === "/upload/avatar";
-      const folder = isAvatar ? "uploads/avatars" : "uploads/player-photos";
-      const maxWidth = isAvatar ? 800 : 1200;
+      const isBackground = pathname === "/upload/background";
+      const folder = isAvatar ? "uploads/avatars" : isBackground ? "uploads/backgrounds" : "uploads/player-photos";
+      const maxWidth = isAvatar ? 800 : isBackground ? 1920 : 1200;
 
       const result = await uploadService.uploadImage(multipart.buffer, {
         folder,

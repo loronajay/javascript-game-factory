@@ -50,19 +50,23 @@
 
 .me-hero-card--custom-backdrop .me-hero-card__backdrop {
   opacity: 0.34;
+  background-color: rgb(7, 6, 20);
   background-image:
     linear-gradient(180deg, rgba(7, 6, 20, 0.18), rgba(7, 6, 20, 0.76)),
     var(--me-profile-backdrop-image);
-  background-size: cover, cover;
+  background-size: cover, contain;
+  background-repeat: no-repeat, no-repeat;
   filter: saturate(1) contrast(1.05);
 }
 
 .player-hero-card--custom-backdrop .player-hero-card__backdrop {
   opacity: 0.34;
+  background-color: rgb(7, 6, 20);
   background-image:
     linear-gradient(180deg, rgba(7, 6, 20, 0.18), rgba(7, 6, 20, 0.76)),
     var(--player-profile-backdrop-image);
-  background-size: cover, cover;
+  background-size: cover, contain;
+  background-repeat: no-repeat, no-repeat;
   filter: saturate(1) contrast(1.05);
 }
 

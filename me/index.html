@@ -84,6 +84,19 @@
             </div>
           </div>
 
+          <div class="player-card__avatar-upload player-card__avatar-upload--bg">
+            <div class="player-card__avatar-preview-wrap player-card__avatar-preview-wrap--bg">
+              <img id="playerProfileBgPreview" class="player-card__bg-preview" src="" alt="Your profile background" hidden>
+              <span id="playerProfileBgFallback" class="player-card__avatar-fallback" aria-hidden="true">No background set</span>
+            </div>
+            <div class="player-card__avatar-controls">
+              <label class="player-card__field">Profile Background</label>
+              <button id="playerProfileBgButton" class="player-card__action player-card__action--secondary" type="button">Choose Background</button>
+              <input id="playerProfileBgInput" class="player-card__avatar-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload profile background">
+              <p id="playerProfileBgStatus" class="player-card__avatar-status" aria-live="polite"></p>
+            </div>
+          </div>
+
           <label class="player-card__field" for="playerProfileName">Arcade Name</label>
           <input
             id="playerProfileName"
