@@ -35,6 +35,15 @@
   filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.42));
 }
 
+/* ---------- MAIN LAYOUT ---------- */
+
+/*
+  Important:
+  This layout uses real column wrappers instead of display: contents.
+  That lets each column stack independently, so a tall panel in column 2
+  does not push down panels in column 1 or column 3.
+*/
+
 .me-layout {
   display: grid;
   width: min(94vw, 1380px);
@@ -42,6 +51,96 @@
   gap: 18px;
   align-items: start;
 }
+
+.me-layout__main,
+.me-layout__side {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  min-width: 0;
+}
+
+.me-layout__main {
+  grid-column: 1 / 2;
+}
+
+.me-layout__side--middle {
+  grid-column: 2 / 3;
+}
+
+.me-layout__side--right {
+  grid-column: 3 / 4;
+}
+
+/* Reset old parent-grid row placement behavior. */
+#meHeroCard,
+#meIdentityPanel,
+#meRankingsPanel,
+#meTopFriendsPanel,
+#meFriendsPanel,
+#meFavoriteGamePanel,
+#meFriendCodePanel,
+#meGalleryPanel,
+.me-panel--danger,
+#meThoughtsPanel,
+#meAboutPanel,
+#meBadgesPanel {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+/* Left column order */
+#meHeroCard {
+  order: 1;
+}
+
+#meIdentityPanel {
+  order: 2;
+}
+
+#meRankingsPanel {
+  order: 3;
+}
+
+#meTopFriendsPanel {
+  order: 4;
+}
+
+#meFriendsPanel {
+  order: 5;
+}
+
+/* Middle column order */
+#meFavoriteGamePanel {
+  order: 1;
+}
+
+#meFriendCodePanel {
+  order: 2;
+}
+
+#meGalleryPanel {
+  order: 3;
+}
+
+.me-panel--danger {
+  order: 4;
+}
+
+/* Right column order */
+#meThoughtsPanel {
+  order: 1;
+}
+
+#meAboutPanel {
+  order: 2;
+}
+
+#meBadgesPanel {
+  order: 3;
+}
+
+/* ---------- PANEL BASE ---------- */
 
 .me-panel {
   overflow: hidden;
@@ -55,14 +154,7 @@
     0 0 24px rgba(255, 121, 183, 0.08);
 }
 
-.me-layout__main,
-.me-layout__side {
-  display: contents;
-}
-
 .me-hero-card {
-  grid-column: 1 / 2;
-  grid-row: 1;
   grid-template-columns: 1fr;
   grid-auto-rows: min-content;
   gap: 12px;
@@ -71,71 +163,37 @@
 }
 
 #meIdentityPanel {
-  grid-column: 1 / 2;
-  grid-row: 2;
   display: grid;
   gap: 10px;
   align-content: start;
   padding: 16px 18px;
 }
 
-#meRankingsPanel {
-  grid-column: 1 / 2;
-  grid-row: 3;
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  padding: 12px 14px 14px;
-}
-
+#meRankingsPanel,
 #meTopFriendsPanel {
-  grid-column: 1 / 2;
-  grid-row: 4;
   display: grid;
   gap: 10px;
   align-content: start;
   padding: 12px 14px 14px;
 }
 
-#meFriendsPanel {
-  grid-column: 1 / 2;
-  grid-row: 5;
+.me-panel__label {
+  margin: 0 0 6px;
+  color: #ffd7b9;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-#meFavoriteGamePanel {
-  grid-column: 2 / 3;
-  grid-row: 1;
+.me-panel__empty {
+  margin: 0;
+  color: #8888aa;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
-#meFriendCodePanel {
-  grid-column: 2 / 3;
-  grid-row: 2;
-}
-
-#meGalleryPanel {
-  grid-column: 2 / 3;
-  grid-row: 3;
-}
-
-.me-panel--danger {
-  grid-column: 2 / 3;
-  grid-row: 4;
-}
-
-#meThoughtsPanel {
-  grid-column: 3 / 4;
-  grid-row: 1 / span 2;
-}
-
-#meAboutPanel {
-  grid-column: 3 / 4;
-  grid-row: 3;
-}
-
-#meBadgesPanel {
-  grid-column: 3 / 4;
-  grid-row: 4;
-}
+/* ---------- FRIENDS NAVIGATOR ---------- */
 
 .me-friends-navigator {
   display: grid;
@@ -290,135 +348,7 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 1480px) {
-  .me-layout {
-    width: min(1260px, 100%);
-    grid-template-columns: minmax(360px, 1fr) minmax(300px, 1fr);
-  }
-
-  #meHeroCard {
-    grid-column: 1 / 2;
-    grid-row: 1;
-  }
-
-  #meIdentityPanel {
-    grid-column: 1 / 2;
-    grid-row: 2;
-  }
-
-  #meRankingsPanel {
-    grid-column: 1 / 2;
-    grid-row: 3;
-  }
-
-  #meTopFriendsPanel {
-    grid-column: 1 / 2;
-    grid-row: 4;
-  }
-
-  #meFriendCodePanel {
-    grid-column: 2 / 3;
-    grid-row: 1;
-  }
-
-  #meFavoriteGamePanel {
-    grid-column: 2 / 3;
-    grid-row: 2;
-  }
-
-  #meGalleryPanel {
-    grid-column: 2 / 3;
-    grid-row: 8;
-  }
-
-  #meFriendsPanel {
-    grid-column: 1 / 2;
-    grid-row: 5;
-  }
-
-  .me-panel--danger {
-    grid-column: 2 / 3;
-    grid-row: 5;
-  }
-
-  #meThoughtsPanel {
-    grid-column: 1 / -1;
-    grid-row: 6;
-  }
-
-  #meAboutPanel {
-    grid-column: 1 / 2;
-    grid-row: 7;
-  }
-
-  #meBadgesPanel {
-    grid-column: 2 / 3;
-    grid-row: 7;
-  }
-}
-
-@media (max-width: 980px) {
-  .me-layout {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .me-layout__main,
-  .me-layout__side {
-    display: grid;
-    gap: 18px;
-    align-content: start;
-    min-width: 0;
-  }
-
-  .me-layout__main,
-  .me-layout__side--right,
-  .me-layout__side--middle {
-    grid-column: 1 / -1;
-  }
-
-  #meHeroCard,
-  #meIdentityPanel,
-  #meRankingsPanel,
-  #meTopFriendsPanel,
-  #meFriendsPanel,
-  #meFriendCodePanel,
-  #meFavoriteGamePanel,
-  #meGalleryPanel,
-  .me-panel--danger,
-  #meThoughtsPanel,
-  #meAboutPanel,
-  #meBadgesPanel {
-    grid-column: auto;
-    grid-row: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .me-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .me-layout__main,
-  .me-layout__side {
-    grid-column: 1 / -1;
-  }
-}
-
-.me-panel__label {
-  margin: 0 0 6px;
-  color: #ffd7b9;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.me-panel__empty {
-  margin: 0;
-  color: #8888aa;
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
+/* ---------- DANGER PANEL ---------- */
 
 .me-panel--danger {
   border-color: rgba(255, 80, 80, 0.3);
@@ -458,4 +388,74 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ---------- RESPONSIVE ---------- */
+
+@media (max-width: 1480px) {
+  .me-layout {
+    width: min(1260px, 100%);
+    grid-template-columns: minmax(360px, 1fr) minmax(300px, 1fr);
+  }
+
+  .me-layout__main {
+    grid-column: 1 / 2;
+  }
+
+  .me-layout__side--middle {
+    grid-column: 2 / 3;
+  }
+
+  .me-layout__side--right {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  #meThoughtsPanel {
+    grid-column: 1 / -1;
+    order: 1;
+  }
+
+  #meAboutPanel {
+    grid-column: 1 / 2;
+    order: 2;
+  }
+
+  #meBadgesPanel {
+    grid-column: 2 / 3;
+    order: 3;
+  }
+}
+
+@media (max-width: 980px) {
+  .me-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .me-layout__main,
+  .me-layout__side--middle,
+  .me-layout__side--right {
+    grid-column: 1 / -1;
+  }
+
+  .me-layout__side--right {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #meThoughtsPanel,
+  #meAboutPanel,
+  #meBadgesPanel {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .me-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .me-layout__main,
+  .me-layout__side {
+    grid-column: 1 / -1;
+  }
 }
