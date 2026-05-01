@@ -4,6 +4,11 @@
   min-width: 0;
 }
 
+.player-identity-panel__fields {
+  display: grid;
+  gap: 10px;
+}
+
 .me-hero-card__identity-field,
 .player-hero-card__identity-field {
   display: grid;
