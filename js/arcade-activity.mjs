@@ -50,25 +50,14 @@ export function buildActivityPageViewModel(activityFeed = loadActivityFeed()) {
     heroKicker: "FLOOR AFTERGLOW",
     heroSummary: "Platform-owned activity keeps game results and shared floor signals in one feed without letting individual cabinets invent their own long-term social history.",
     heroCountLabel: formatCountLabel(items.length),
-    items: items.length > 0
-      ? items.map((item) => ({
-          id: item.id,
-          title: item.actorDisplayName || "ARCADE SIGNAL",
-          summary: item.summary || "Fresh cabinet afterglow incoming.",
-          gameLabel: titleFromSlug(item.gameSlug) || "Arcade Floor",
-          visibilityLabel: formatVisibilityLabel(item.visibility),
-          publishedLabel: formatActivityDate(item.createdAt),
-          isPlaceholder: false,
-        }))
-      : [{
-          id: "activity-placeholder",
-          title: "Feed Warming Up",
-          summary: "The activity board is still warming up. Shared game results and platform-floor signals will appear here once more cabinets publish into the common feed.",
-          gameLabel: "Arcade Floor",
-          visibilityLabel: "Standby",
-          publishedLabel: "Soon",
-          isPlaceholder: true,
-        }],
+    items: items.map((item) => ({
+      id: item.id,
+      title: item.actorDisplayName || "ARCADE SIGNAL",
+      summary: item.summary || "Fresh cabinet afterglow incoming.",
+      gameLabel: titleFromSlug(item.gameSlug) || "Arcade Floor",
+      visibilityLabel: formatVisibilityLabel(item.visibility),
+      publishedLabel: formatActivityDate(item.createdAt),
+    })),
   };
 }
 
@@ -104,10 +93,8 @@ function renderHeroCard(container, model) {
 }
 
 function renderActivityCard(item) {
-  const cardClass = item.isPlaceholder ? "activity-card activity-card--placeholder" : "activity-card";
-
   return `
-    <article class="${cardClass}">
+    <article class="activity-card">
       <div class="activity-card__topline">
         <span class="activity-card__visibility">${escapeHtml(item.visibilityLabel)}</span>
         <span class="activity-card__date">${escapeHtml(item.publishedLabel)}</span>
