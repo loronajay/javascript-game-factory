@@ -192,6 +192,7 @@
   justify-items: center;
   gap: 4px;
   width: min(82vw, 760px);
+  margin: 0 auto;
   text-align: center;
   padding-top: 4px;
 }
