@@ -81,7 +81,7 @@
 
 #meGalleryPanel {
   grid-column: 2 / 3;
-  grid-row: 3;
+  grid-row: 5;
 }
 
 .me-panel--danger {
@@ -280,7 +280,7 @@
 
   #meGalleryPanel {
     grid-column: 2 / 3;
-    grid-row: 3;
+    grid-row: 7;
   }
 
   #meFriendsPanel {
