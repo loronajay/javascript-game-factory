@@ -114,12 +114,12 @@
 
 #meGalleryPanel {
   grid-column: 2 / 3;
-  grid-row: 6;
+  grid-row: 3;
 }
 
 .me-panel--danger {
   grid-column: 2 / 3;
-  grid-row: 5;
+  grid-row: 4;
 }
 
 #meThoughtsPanel {
