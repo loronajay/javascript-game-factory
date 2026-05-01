@@ -333,6 +333,7 @@
   min-height: 84px;
   min-width: min(100%, 440px);
   padding: 0 34px;
+  border-radius: var(--profile-radius-md);
   color: #fff8ff;
   text-decoration: none;
   text-transform: uppercase;

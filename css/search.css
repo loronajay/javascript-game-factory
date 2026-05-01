@@ -64,6 +64,7 @@
   width: min(92vw, 860px);
   max-width: none;
   padding: 16px 18px 18px;
+  border-radius: var(--profile-radius-lg);
   background:
     linear-gradient(180deg, rgba(14, 32, 58, 0.88), rgba(7, 18, 34, 0.92)),
     rgba(6, 12, 24, 0.9);
@@ -158,6 +159,7 @@
   flex: 1;
   min-height: 44px;
   padding: 0 14px;
+  border-radius: var(--profile-radius-xs);
   background: rgba(10, 20, 40, 0.8);
   border: 1.5px solid rgba(100, 180, 255, 0.3);
   color: #e0f0ff;
@@ -177,6 +179,7 @@
 .search-bar__btn {
   min-height: 44px;
   padding: 0 20px;
+  border-radius: var(--profile-radius-xs);
   border: 1.5px solid rgba(100, 180, 255, 0.4);
   background: linear-gradient(180deg, rgba(60, 140, 220, 0.2), rgba(8, 16, 36, 0.9) 40%, rgba(6, 12, 28, 0.96));
   color: #c0e0ff;
@@ -227,6 +230,7 @@
   align-items: center;
   gap: 14px;
   padding: 12px 16px;
+  border-radius: var(--profile-radius-xs);
   background: rgba(10, 22, 44, 0.85);
   border: 1px solid rgba(80, 140, 200, 0.2);
   text-decoration: none;
@@ -242,7 +246,7 @@
 .search-result-card__avatar {
   width: 40px;
   height: 40px;
-  border-radius: 0;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(80, 140, 200, 0.3);
   background: rgba(20, 40, 80, 0.6);
   display: flex;

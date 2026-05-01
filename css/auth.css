@@ -188,6 +188,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 8px 10px;
+  border-radius: var(--profile-radius-xs);
   background: rgba(10, 10, 18, 0.3);
   border: 2px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
@@ -249,6 +250,7 @@
 .auth-card {
   overflow: hidden;
   padding: 24px 26px 28px;
+  border-radius: var(--profile-radius-lg);
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.1), transparent 24%),
     linear-gradient(180deg, rgba(18, 12, 49, 0.96), rgba(8, 7, 24, 0.96));
@@ -298,6 +300,7 @@
 .auth-card__submit {
   min-height: 44px;
   padding: 0 22px;
+  border-radius: var(--profile-radius-pill);
   border: 2px solid rgba(255, 214, 189, 0.42);
   background:
     linear-gradient(180deg, rgba(255, 178, 140, 0.22), rgba(12, 8, 38, 0.9) 40%, rgba(8, 7, 24, 0.96));

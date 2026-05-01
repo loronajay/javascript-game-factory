@@ -220,6 +220,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 8px 10px;
+  border-radius: var(--profile-radius-xs);
   background: rgba(10, 10, 18, 0.3);
   border: 2px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
@@ -252,6 +253,7 @@
 .event-hero-card,
 .event-panel {
   overflow: hidden;
+  border-radius: var(--profile-radius-md);
   border: 2px solid rgba(255, 214, 189, 0.2);
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.08), transparent 28%),
@@ -279,6 +281,7 @@
   gap: 10px;
   margin-top: 8px;
   padding: 14px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 214, 189, 0.12);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -328,6 +331,7 @@
 .event-hero-card__entry-select,
 .event-hero-card__entry-submit {
   min-height: 42px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 214, 189, 0.18);
   background: rgba(7, 6, 20, 0.74);
   color: #fff8ff;
@@ -386,6 +390,7 @@
   display: grid;
   gap: 8px;
   padding: 14px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 214, 189, 0.12);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -421,6 +426,7 @@
   display: grid;
   gap: 8px;
   padding: 14px;
+  border-radius: var(--profile-radius-xs);
   border: 1px solid rgba(255, 214, 189, 0.12);
   background: rgba(255, 255, 255, 0.04);
 }
