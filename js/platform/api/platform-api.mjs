@@ -235,7 +235,10 @@ export function createPlatformApiClient(options = {}) {
           credentials: "include",
           body: formData,
         });
-        if (!response?.ok) return null;
+        if (!response?.ok) {
+          const body = await readJsonResponse(response);
+          return { uploadError: body?.error || String(response.status) };
+        }
         return await readJsonResponse(response);
       } catch {
         return null;
@@ -251,7 +254,10 @@ export function createPlatformApiClient(options = {}) {
           credentials: "include",
           body: formData,
         });
-        if (!response?.ok) return null;
+        if (!response?.ok) {
+          const body = await readJsonResponse(response);
+          return { uploadError: body?.error || String(response.status) };
+        }
         return await readJsonResponse(response);
       } catch {
         return null;

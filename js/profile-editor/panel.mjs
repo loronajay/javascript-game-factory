@@ -13,6 +13,15 @@ import {
 import { buildArcadeProfileViewModel } from "./view-model.mjs";
 import { persistArcadeProfileDetails } from "./persistence.mjs";
 
+function uploadErrorMessage(errorCode, fileLabel) {
+  if (errorCode === "unauthorized") return `Upload failed: sign in first.`;
+  if (errorCode === "upload_not_configured") return `Upload failed: service unavailable.`;
+  if (errorCode === "file_too_large") return `Upload failed: ${fileLabel} is too large (max 10 MB).`;
+  if (errorCode === "unsupported_file_type") return `Upload failed: use JPEG, PNG, or WebP.`;
+  if (errorCode) return `Upload failed (${errorCode}).`;
+  return `Upload failed. Please try a different ${fileLabel}.`;
+}
+
 function dispatchProfileUpdatedEvent(doc, action, profile) {
   if (!doc?.dispatchEvent) return;
   const detail = { action, profile };
@@ -125,7 +134,8 @@ export function initProfileEditorPanel({
       URL.revokeObjectURL(localUrl);
 
       if (!result?.assetId || !result?.url) {
-        setAvatarStatus("Upload failed. Please try a different photo.");
+        const msg = uploadErrorMessage(result?.uploadError, "photo");
+        setAvatarStatus(msg);
         syncAvatarPreview("", "");
         return;
       }
@@ -157,7 +167,8 @@ export function initProfileEditorPanel({
       URL.revokeObjectURL(localUrl);
 
       if (!result?.url) {
-        setBgStatus("Upload failed. Please try a different image.");
+        const msg = uploadErrorMessage(result?.uploadError, "image");
+        setBgStatus(msg);
         syncBgPreview("");
         return;
       }
