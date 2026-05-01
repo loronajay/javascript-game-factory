@@ -24,6 +24,17 @@ function renderPageHeader(doc, model) {
     doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
   }
   globalThis.PixelText?.render?.(title);
+
+  const stage = doc.querySelector?.(".player-stage");
+  if (stage) {
+    if (model.backgroundImageUrl) {
+      stage.style.setProperty("--player-stage-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+      stage.classList.add("player-stage--custom-bg");
+    } else {
+      stage.style.removeProperty("--player-stage-bg-image");
+      stage.classList.remove("player-stage--custom-bg");
+    }
+  }
 }
 
 function renderHeroCard(container, model) {

@@ -15,6 +15,16 @@
     linear-gradient(180deg, rgba(58, 48, 141, 0) 0%, #322f84 34%, #28256f 68%, #1d1b5b 100%);
 }
 
+.player-stage--custom-bg {
+  background-image:
+    linear-gradient(180deg, rgba(31, 20, 88, 0.72) 0%, rgba(53, 33, 104, 0.66) 18%, rgba(117, 65, 148, 0.58) 54%, rgba(69, 47, 130, 0.66) 74%, rgba(35, 35, 95, 0.72) 100%),
+    var(--player-stage-bg-image);
+  background-size: cover, contain;
+  background-position: center, top center;
+  background-repeat: no-repeat, no-repeat;
+  background-color: rgb(7, 6, 20);
+}
+
 .player-stage__controls {
   position: relative;
   z-index: 10;
