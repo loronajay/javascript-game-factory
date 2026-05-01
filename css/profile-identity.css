@@ -4,6 +4,7 @@
   min-width: 0;
 }
 
+.me-identity-panel__fields,
 .player-identity-panel__fields {
   display: grid;
   gap: 10px;
