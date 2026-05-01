@@ -109,49 +109,32 @@
 }
 
 
-.player-hero-card {
-  grid-column: 1 / 2;
-  grid-row: 1;
-  grid-template-columns: minmax(140px, var(--profile-portrait-rail-width)) minmax(0, 1fr);
+.player-layout__main,
+.player-layout__side {
+  display: grid;
   gap: 18px;
-  min-height: 0;
+  align-content: start;
+  min-width: 0;
+}
+
+.player-layout__main {
+  grid-column: 1 / 2;
+}
+
+.player-layout__side--middle {
+  grid-column: 2 / 3;
+}
+
+.player-layout__side--right {
+  grid-column: 3 / 4;
 }
 
 .player-panel--favorite {
-  grid-column: 2 / 3;
-  grid-row: 1 / span 2;
   min-height: 420px;
 }
 
-.player-panel--thoughts {
-  grid-column: 3 / 4;
-  grid-row: 1 / span 2;
-}
-
 .player-panel--gallery {
-  grid-column: 2 / 3;
-  grid-row: 4;
   min-height: 0;
-}
-
-#playerRankingsPanel {
-  grid-column: 1 / 2;
-  grid-row: 2;
-}
-
-#playerFriendsPanel {
-  grid-column: 1 / 2;
-  grid-row: 2;
-}
-
-#playerAboutPanel {
-  grid-column: 3 / 4;
-  grid-row: 3;
-}
-
-#playerBadgesPanel {
-  grid-column: 3 / 4;
-  grid-row: 4;
 }
 
 .player-hero-card {
@@ -369,8 +352,6 @@
 }
 
 .player-hero-card {
-  grid-column: 1 / 2;
-  grid-row: 1;
   grid-template-columns: 1fr;
   grid-auto-rows: min-content;
   gap: 12px;
@@ -379,35 +360,18 @@
 }
 
 #playerIdentityPanel {
-  grid-column: 1 / 2;
-  grid-row: 2;
   display: grid;
   gap: 10px;
   align-content: start;
   padding: 16px 18px;
 }
 
-#playerRankingsPanel {
-  grid-column: 1 / 2;
-  grid-row: 3;
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  padding: 12px 14px 14px;
-}
-
+#playerRankingsPanel,
 #playerFriendsPanel {
-  grid-column: 1 / 2;
-  grid-row: 4;
   display: grid;
   gap: 10px;
   align-content: start;
   padding: 12px 14px 14px;
-}
-
-.player-panel--favorite {
-  grid-column: 2 / 3;
-  grid-row: 1;
 }
 
 .player-card__rail-grid {
@@ -427,27 +391,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .player-hero-card,
-  .player-panel--thoughts,
-  #playerIdentityPanel,
-  #playerRankingsPanel,
-  #playerFriendsPanel,
-  #playerAboutPanel,
-  #playerBadgesPanel {
+  .player-layout__main,
+  .player-layout__side--middle,
+  .player-layout__side--right {
     grid-column: 1 / -1;
-  }
-
-  .player-panel--thoughts {
-    grid-row: auto;
-  }
-
-  .player-panel--favorite {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
-
-  .player-hero-card {
-    grid-row: auto;
   }
 }
 
@@ -463,17 +410,10 @@
     gap: 14px;
   }
 
-  .player-panel--favorite,
-  .player-panel--thoughts,
-  .player-panel--gallery,
-  #playerIdentityPanel,
-  #playerRankingsPanel,
-  #playerFriendsPanel,
-  #playerAboutPanel,
-  #playerBadgesPanel {
+  .player-layout__main,
+  .player-layout__side--middle,
+  .player-layout__side--right {
     grid-column: 1 / -1;
-    grid-row: auto;
-    min-width: 0;
   }
 
   .player-panel,
