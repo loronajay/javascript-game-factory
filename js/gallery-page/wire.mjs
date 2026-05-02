@@ -4,6 +4,7 @@ import { createMediaComposerState } from "../profile-social/media-composer-state
 import { renderGalleryPageView } from "./render.mjs";
 import { loadGalleryPageData, sanitizeGalleryPlayerId } from "./loader.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
+import { createPhotoViewer } from "./viewer.mjs";
 
 async function initGalleryPage(doc = globalThis.document) {
   if (!doc?.getElementById) return;
@@ -31,6 +32,7 @@ async function initGalleryPage(doc = globalThis.document) {
   const apiClient = createPlatformApiClient();
   const authClient = createAuthApiClient();
   const mediaComposer = createMediaComposerState({ doc });
+  const viewer = createPhotoViewer({ doc });
 
   let pageState = await loadGalleryPageData(playerId, { apiClient, authClient });
 
@@ -51,7 +53,27 @@ async function initGalleryPage(doc = globalThis.document) {
     pageState = { ...pageState, photos: Array.isArray(photos) ? photos : [] };
   };
 
+  const syncViewer = () => {
+    viewer.setPhotos(pageState.photos, {
+      isOwner: pageState.isOwner,
+      onDelete: handleViewerDelete,
+    });
+  };
+
+  async function handleViewerDelete(photoId) {
+    if (!pageState.isOwner || !apiClient?.deletePlayerPhoto) return;
+    viewer.close();
+    await apiClient.deletePlayerPhoto(playerId, photoId).catch(() => {});
+    await reloadPhotos();
+    rerender();
+    syncViewer();
+  }
+
   rerender();
+  syncViewer();
+
+  const initialPhotoId = params.get("photo");
+  if (initialPhotoId) viewer.open(initialPhotoId);
 
   doc.addEventListener("submit", async (event) => {
     const form = event.target;
@@ -105,6 +127,7 @@ async function initGalleryPage(doc = globalThis.document) {
     mediaComposer.closeGalleryComposer(postedToFeed ? "Photo uploaded and posted." : "Photo uploaded.");
     await reloadPhotos();
     rerender();
+    syncViewer();
   });
 
   doc.addEventListener("click", async (event) => {
@@ -122,6 +145,14 @@ async function initGalleryPage(doc = globalThis.document) {
       await apiClient.deletePlayerPhoto(playerId, photoId).catch(() => {});
       await reloadPhotos();
       rerender();
+      syncViewer();
+      return;
+    }
+
+    const galleryItem = event.target.closest("[data-photo-id]");
+    if (galleryItem) {
+      viewer.open(galleryItem.dataset.photoId);
+      return;
     }
   });
 

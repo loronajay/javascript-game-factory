@@ -408,6 +408,7 @@ export function renderPlayerPageView(doc, model, options = {}) {
     isOwner: !!options?.isOwner,
     previewCap: 5,
     viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
+    previewLinkHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
   renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", model.aboutText);
   renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", model.badgeItems);
