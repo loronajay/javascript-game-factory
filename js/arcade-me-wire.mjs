@@ -23,6 +23,7 @@ import {
 } from "./platform/thoughts/thoughts.mjs";
 import { createMediaComposerState } from "./profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "./profile-social/social-actions.mjs";
+import { initPageGalleryViewer } from "./gallery-page/viewer.mjs";
 
 function normalizeFriendNavigatorQuery(value) {
   return String(value || "").trim().toLowerCase();
@@ -51,6 +52,7 @@ function applyFriendNavigatorFilter(doc, query = "") {
 }
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
+  initPageGalleryViewer({ doc });
   let cachedHydration = null;
   let galleryPhotos = [];
   let friendNavigatorExpanded = false;

@@ -164,20 +164,20 @@ Pass 5: albums.
 
 ## What to ship in each pass
 
-### Pass 0
+### Pass 0 - COMPLETE
 
 - Fix friend-rail avatar clamping. The likely issue is missing clipping on the avatar frame even though the image is set to `width:100%; height:100%; object-fit:cover` in `css/me.css` and `css/player.css`. Add hard clipping and make the frame own the crop.
 - ~~Prevent double-submit on gallery upload.~~ **Already done.** `arcade-me-wire.mjs` and `js/player-page/media-actions.mjs` both check `galleryUploadState?.isUploading` and early-return. `social-view.mjs` renders all gallery form inputs with `disabled` and swaps the label to “Uploading...” when that flag is set.
 - Stop the gallery panel from vertically bulldozing lower panels. This is partly a layout containment fix and partly resolved naturally once the full grid moves off-profile in Pass 1.
 
-### Pass 1
+### Pass 1 - COMPLETE
 
 - Add a shared gallery page at `/gallery/index.html?id=<playerId>` as a new `js/gallery-page/` subsystem with its own loader, render, and wire modules. The loader owns `isOwner` detection independently (see above).
 - On `/me` and `/player`, replace the current full grid with a 5-photo preview strip/grid plus a “View All” link pointing to `/gallery/index.html?id=<playerId>`. The cleanest seam is adding a `previewCap` option to `renderGalleryPanel` in `social-view.mjs` — both profile pages pick it up automatically since they share that renderer.
 - Upload composer moves to the owner gallery page only. Profile page preview becomes read-only (no upload UI on `/me` or `/player` in preview mode; optionally keep a small “Add Photo” CTA that routes to the gallery page).
 - Do not duplicate upload/delete wiring into the already-large `/me` and `/player` files; the gallery page’s own wire owns it.
 
-### Pass 2
+### Pass 2 - COMPLETE
 
 Add a viewer overlay or dedicated viewer panel with:
 - full image

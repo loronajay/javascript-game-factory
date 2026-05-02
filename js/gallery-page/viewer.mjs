@@ -1,8 +1,9 @@
-export function createPhotoViewer({ doc = globalThis.document } = {}) {
+export function createPhotoViewer({ doc = globalThis.document, lightweight = false } = {}) {
   let photos = [];
   let currentIndex = -1;
   let isOwner = false;
   let onDeleteFn = null;
+  let galleryLinkHref = "";
 
   const overlay = doc.createElement("div");
   overlay.className = "photo-viewer photo-viewer--hidden";
@@ -15,16 +16,21 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
     <div class="photo-viewer__dialog">
       <button class="photo-viewer__close" type="button" aria-label="Close photo viewer">&times;</button>
       <div class="photo-viewer__viewer-row">
-        <button class="photo-viewer__nav photo-viewer__nav--prev" type="button" aria-label="Previous photo">&#8592;</button>
+        ${!lightweight ? `<button class="photo-viewer__nav photo-viewer__nav--prev" type="button" aria-label="Previous photo">&#8592;</button>` : ""}
         <div class="photo-viewer__image-wrap">
           <img class="photo-viewer__img" src="" alt="">
         </div>
-        <button class="photo-viewer__nav photo-viewer__nav--next" type="button" aria-label="Next photo">&#8594;</button>
+        ${!lightweight ? `<button class="photo-viewer__nav photo-viewer__nav--next" type="button" aria-label="Next photo">&#8594;</button>` : ""}
       </div>
       <div class="photo-viewer__meta">
         <p class="photo-viewer__caption"></p>
         <p class="photo-viewer__timestamp"></p>
-        <button class="photo-viewer__delete" type="button">Remove Photo</button>
+        <div class="photo-viewer__actions">
+          ${lightweight
+            ? `<a class="photo-viewer__gallery-link" href="#" target="_self">View Gallery &rarr;</a>`
+            : `<button class="photo-viewer__delete" type="button">Remove Photo</button>`
+          }
+        </div>
       </div>
     </div>
   `;
@@ -34,6 +40,7 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
   const captionEl = overlay.querySelector(".photo-viewer__caption");
   const timestampEl = overlay.querySelector(".photo-viewer__timestamp");
   const deleteBtn = overlay.querySelector(".photo-viewer__delete");
+  const galleryLinkEl = overlay.querySelector(".photo-viewer__gallery-link");
   const prevBtn = overlay.querySelector(".photo-viewer__nav--prev");
   const nextBtn = overlay.querySelector(".photo-viewer__nav--next");
 
@@ -49,7 +56,7 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
   }
 
   function updateUrl(photoId) {
-    if (!globalThis.history?.replaceState) return;
+    if (lightweight || !globalThis.history?.replaceState) return;
     const url = new URL(globalThis.location.href);
     if (photoId) {
       url.searchParams.set("photo", photoId);
@@ -66,13 +73,22 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
     imgEl.alt = photo.caption || "";
     captionEl.textContent = photo.caption || "";
     timestampEl.textContent = formatDate(photo.createdAt || photo.created_at);
-    deleteBtn.dataset.photoId = photo.id;
-    deleteBtn.style.display = isOwner ? "" : "none";
-    const hasSiblings = photos.length > 1;
-    prevBtn.disabled = currentIndex <= 0;
-    nextBtn.disabled = currentIndex >= photos.length - 1;
-    prevBtn.style.visibility = hasSiblings ? "" : "hidden";
-    nextBtn.style.visibility = hasSiblings ? "" : "hidden";
+
+    if (lightweight) {
+      if (galleryLinkEl) galleryLinkEl.href = galleryLinkHref || "#";
+    } else {
+      if (deleteBtn) {
+        deleteBtn.dataset.photoId = photo.id;
+        deleteBtn.style.display = isOwner ? "" : "none";
+      }
+      if (prevBtn && nextBtn) {
+        const hasSiblings = photos.length > 1;
+        prevBtn.disabled = currentIndex <= 0;
+        nextBtn.disabled = currentIndex >= photos.length - 1;
+        prevBtn.style.visibility = hasSiblings ? "" : "hidden";
+        nextBtn.style.visibility = hasSiblings ? "" : "hidden";
+      }
+    }
   }
 
   function show() {
@@ -96,25 +112,27 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
       api.close();
       return;
     }
-    if (e.target.closest(".photo-viewer__nav--prev")) {
-      if (currentIndex > 0) {
-        currentIndex--;
-        paint();
-        updateUrl(photos[currentIndex]?.id);
+    if (!lightweight) {
+      if (e.target.closest(".photo-viewer__nav--prev")) {
+        if (currentIndex > 0) {
+          currentIndex--;
+          paint();
+          updateUrl(photos[currentIndex]?.id);
+        }
+        return;
       }
-      return;
-    }
-    if (e.target.closest(".photo-viewer__nav--next")) {
-      if (currentIndex < photos.length - 1) {
-        currentIndex++;
-        paint();
-        updateUrl(photos[currentIndex]?.id);
+      if (e.target.closest(".photo-viewer__nav--next")) {
+        if (currentIndex < photos.length - 1) {
+          currentIndex++;
+          paint();
+          updateUrl(photos[currentIndex]?.id);
+        }
+        return;
       }
-      return;
-    }
-    if (e.target.closest(".photo-viewer__delete")) {
-      const photoId = e.target.closest(".photo-viewer__delete").dataset.photoId;
-      if (photoId && onDeleteFn) onDeleteFn(photoId);
+      if (e.target.closest(".photo-viewer__delete")) {
+        const photoId = e.target.closest(".photo-viewer__delete").dataset.photoId;
+        if (photoId && onDeleteFn) onDeleteFn(photoId);
+      }
     }
   });
 
@@ -122,14 +140,16 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
     if (overlay.classList.contains("photo-viewer--hidden")) return;
     if (e.key === "Escape") {
       api.close();
-    } else if (e.key === "ArrowLeft" && currentIndex > 0) {
-      currentIndex--;
-      paint();
-      updateUrl(photos[currentIndex]?.id);
-    } else if (e.key === "ArrowRight" && currentIndex < photos.length - 1) {
-      currentIndex++;
-      paint();
-      updateUrl(photos[currentIndex]?.id);
+    } else if (!lightweight) {
+      if (e.key === "ArrowLeft" && currentIndex > 0) {
+        currentIndex--;
+        paint();
+        updateUrl(photos[currentIndex]?.id);
+      } else if (e.key === "ArrowRight" && currentIndex < photos.length - 1) {
+        currentIndex++;
+        paint();
+        updateUrl(photos[currentIndex]?.id);
+      }
     }
   });
 
@@ -138,6 +158,7 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
       photos = Array.isArray(newPhotos) ? newPhotos : [];
       isOwner = !!opts.isOwner;
       onDeleteFn = opts.onDelete || null;
+      galleryLinkHref = opts.galleryLinkHref || "";
       if (api.isOpen() && currentIndex >= 0) paint();
     },
     open(photoId) {
@@ -158,4 +179,38 @@ export function createPhotoViewer({ doc = globalThis.document } = {}) {
     },
   };
   return api;
+}
+
+export function initPageGalleryViewer({ doc = globalThis.document } = {}) {
+  const viewer = createPhotoViewer({ doc, lightweight: true });
+
+  doc.addEventListener("click", (e) => {
+    if (e.target.closest(".photo-viewer")) return;
+    if (e.target.closest("button")) return;
+
+    const item = e.target.closest("[data-photo-id]");
+    if (!item) return;
+
+    const img = item.querySelector(".gallery-item__img");
+    if (!img) return;
+
+    const photo = {
+      id: item.dataset.photoId,
+      imageUrl: img.src,
+      caption: img.alt || "",
+    };
+
+    // Read gallery page href from the "View All Photos" link already rendered in the panel
+    const panel = item.closest(".gallery-panel, [id$='GalleryPanel']");
+    const viewAllLink = panel?.querySelector(".gallery-view-all");
+    const galleryHref = viewAllLink?.href || "";
+    const galleryLinkHref = galleryHref
+      ? `${galleryHref}&photo=${encodeURIComponent(photo.id)}`
+      : "";
+
+    viewer.setPhotos([photo], { galleryLinkHref });
+    viewer.open(photo.id);
+  });
+
+  return viewer;
 }

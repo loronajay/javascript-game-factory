@@ -264,7 +264,6 @@ export function createProfileSocialViewRenderer({
     const isOwner = !!options?.isOwner;
     const previewCap = options?.previewCap ? Number(options.previewCap) : 0;
     const viewAllHref = options?.viewAllHref || "";
-    const previewLinkHref = options?.previewLinkHref || "";
     const isPreview = previewCap > 0;
     const visiblePhotos = isPreview ? photos.slice(0, previewCap) : photos;
     const uploadState = options?.uploadState || {};
@@ -324,20 +323,13 @@ export function createProfileSocialViewRenderer({
 
     const emptyText = isOwner ? ownerGalleryEmptyText : viewerGalleryEmptyText;
     const gridHtml = visiblePhotos.length > 0
-      ? visiblePhotos.map((photo) => {
-          const useLink = isPreview && previewLinkHref;
-          const tag = useLink ? "a" : "div";
-          const hrefAttr = useLink
-            ? ` href="${escapeHtml(previewLinkHref + "&photo=" + encodeURIComponent(photo.id))}"`
-            : "";
-          return `
-            <${tag} class="gallery-item"${hrefAttr} data-photo-id="${escapeHtml(photo.id)}">
-              <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
-              ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
-              ${isOwner && !isPreview ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
-            </${tag}>
-          `;
-        }).join("")
+      ? visiblePhotos.map((photo) => `
+          <div class="gallery-item" data-photo-id="${escapeHtml(photo.id)}">
+            <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+            ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
+            ${isOwner && !isPreview ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
+          </div>
+        `).join("")
       : `<p class="${panelPrefix}-panel__empty">${escapeHtml(emptyText)}</p>`;
 
     const viewAllHtml = viewAllHref

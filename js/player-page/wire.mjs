@@ -15,8 +15,10 @@ import { createPlayerMediaActions } from "./media-actions.mjs";
 import { createPlayerThoughtComposerActions } from "./thought-composer-actions.mjs";
 import { createMediaComposerState } from "../profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
+import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession }) {
+  initPageGalleryViewer({ doc });
   let currentPageData = null;
   let galleryPhotos = [];
   let heroActions = null;

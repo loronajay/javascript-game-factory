@@ -112,6 +112,13 @@
   margin: 0 0 0.6rem;
 }
 
+.photo-viewer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .photo-viewer__delete {
   background: none;
   border: 1px solid rgba(200, 60, 60, 0.6);
@@ -127,6 +134,29 @@
   background: rgba(200, 60, 60, 0.12);
   color: #e55;
   border-color: #e55;
+}
+
+.photo-viewer__gallery-link {
+  display: inline-block;
+  color: #ff79b7;
+  font-size: 0.82rem;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.5rem;
+}
+
+.photo-viewer__gallery-link:hover {
+  color: #ffb3d9;
+  text-decoration: underline;
+}
+
+.gallery-item {
+  cursor: pointer;
+}
+
+.gallery-item:hover .gallery-item__img {
+  opacity: 0.88;
+  transition: opacity 120ms ease;
 }
 
 @media (max-width: 600px) {

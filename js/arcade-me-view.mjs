@@ -426,7 +426,6 @@ export function renderMePageView(doc, model, options = {}) {
     isOwner: true,
     previewCap: 5,
     viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
-    previewLinkHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
   renderAboutPanel(doc.getElementById("meAboutPanel"), "About Me", model.aboutText);
   renderBadgesPanel(doc.getElementById("meBadgesPanel"), "Badges", model.badgeItems);
