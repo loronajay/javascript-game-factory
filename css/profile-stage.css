@@ -178,15 +178,7 @@
   z-index: 4;
 }
 
-.me-stage__controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: min(94vw, 1100px);
-  padding-top: 8px;
-}
-
+.me-stage__controls,
 .player-stage__controls {
   display: flex;
   align-items: center;
@@ -194,6 +186,13 @@
   gap: 16px;
   width: min(92vw, 980px);
   padding-top: 8px;
+}
+
+.me-stage__edit-chip {
+  position: absolute;
+  top: 18px;
+  right: clamp(16px, 4vw, 36px);
+  z-index: 10;
 }
 
 .me-stage__header,
