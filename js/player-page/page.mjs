@@ -67,7 +67,8 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
     challengePickerOpen: options?.challengePickerOpen || false,
   });
 
-  renderPlayerPageView(doc, model, options);
+  const galleryPlayerId = requestedPlayerId || profile?.playerId || "";
+  renderPlayerPageView(doc, model, { ...options, galleryPlayerId });
   return model;
 }
 

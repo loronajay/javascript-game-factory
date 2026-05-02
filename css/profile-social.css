@@ -191,3 +191,17 @@
 .gallery-item:hover .gallery-item__delete {
   opacity: 1;
 }
+
+.gallery-view-all {
+  display: inline-block;
+  margin-top: 12px;
+  color: #ff79b7;
+  font-size: 0.85rem;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+
+.gallery-view-all:hover {
+  color: #ffb3d9;
+  text-decoration: underline;
+}

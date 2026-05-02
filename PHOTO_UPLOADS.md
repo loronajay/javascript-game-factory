@@ -8,28 +8,36 @@ Three related but distinct flows, built in order:
 
 ---
 
-## Current Repo Status (2026-04-28)
+## Current Repo Status (2026-05-01)
 
-This plan started as a blank implementation checklist. The repo is now partway through the work.
+This plan started as a blank implementation checklist. All infrastructure, avatar, gallery, and feed photo passes are shipped. The gallery page and preview cap are now live.
 
 ### Shipped in repo
-- Pass 1 shared upload infrastructure is implemented:
-  - Cloudinary upload service lives in `platform-api/src/services/upload.mjs`
-  - multipart parsing is handled in `platform-api/src/app.mjs` via `busboy`
-  - authenticated `POST /upload/avatar` and `POST /upload/photo` routes are live
-  - `avatarUrlResolver` is wired in `platform-api/src/server.mjs`
-- Pass 2 avatar UI is implemented:
+- Pass 1 shared upload infrastructure:
+  - Cloudinary upload service: `platform-api/src/services/upload.mjs`
+  - multipart parsing via `busboy` in `platform-api/src/app.mjs`
+  - authenticated `POST /upload/avatar` and `POST /upload/photo` routes
+  - `avatarUrlResolver` wired in `platform-api/src/server.mjs`
+- Pass 2 avatar UI:
   - profile editor exposes avatar upload + preview in `js/arcade-profile.mjs`
-  - uploaded `avatarAssetId` is persisted through the existing profile save flow
-- Most of Pass 3 is implemented:
-  - migrations `011-player-photos.sql` and `012-thought-image.sql` exist
-  - `platform-api/src/db/photos.mjs` and thought `image_url` persistence are live
-  - `/me` and owner-view `/player` now have gallery upload composers with preview, caption, visibility, and optional cross-post toggle
+  - `avatarAssetId` persisted through the profile save flow
+- Pass 3 gallery + feed photo post:
+  - migrations `011-player-photos.sql` and `012-thought-image.sql`
+  - `platform-api/src/db/photos.mjs` and thought `image_url` persistence
   - thought cards render `imageUrl` across `/me`, `/player`, and `/thoughts`
-  - direct thought composer photo posts now expose preview, gallery caption, visibility, and gallery cross-post controls, and still fall back cleanly to plain thought save if the gallery side effect cannot complete
+  - direct thought composer photo posts with preview, gallery caption, visibility, and gallery cross-post controls
+- Pass 0 (gallery UX stabilization): friend-rail avatar clamping and gallery bulldoze fixes done externally
+- **Pass 1 (gallery page) — complete (2026-05-01)**:
+  - `renderGalleryPanel` in `js/profile-social/social-view.mjs` now accepts `previewCap` (caps visible photos, suppresses upload composer) and `viewAllHref` (renders "View All Photos →" link)
+  - Profile pages (`/me`, `/player`) now show a 5-photo read-only preview strip with a "View All" link; upload composer removed from both
+  - Shared gallery page at `gallery/index.html?id=<playerId>` — new `js/gallery-page/` subsystem: `loader.mjs` (isOwner detection), `render.mjs`, `wire.mjs` (upload/delete wiring)
+  - `css/gallery.css` added for gallery page layout; `gallery-panel__*` selectors added to `profile-page.css`; `gallery-view-all` link style added to `profile-social.css`
 
 ### Still open
-- Gallery items do not yet open into a dedicated full-view or lightbox experience
+- Pass 2: photo viewer overlay (next/prev, caption, owner delete, deep-link via `?photo=`)
+- Pass 3: photo-native reactions/comments (separate from thought social objects)
+- Pass 4: reaction/comment counts on grid cards
+- Pass 5: albums
 ---
 
 ---

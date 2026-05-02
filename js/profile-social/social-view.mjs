@@ -262,13 +262,17 @@ export function createProfileSocialViewRenderer({
     if (!container) return;
 
     const isOwner = !!options?.isOwner;
+    const previewCap = options?.previewCap ? Number(options.previewCap) : 0;
+    const viewAllHref = options?.viewAllHref || "";
+    const isPreview = previewCap > 0;
+    const visiblePhotos = isPreview ? photos.slice(0, previewCap) : photos;
     const uploadState = options?.uploadState || {};
     const isUploading = !!uploadState.isUploading;
     const uploadLabel = isUploading
       ? "Upload In Progress"
       : (uploadState.previewUrl ? "Choose Different Photo" : "Upload Photo");
     const submitLabel = isUploading ? "Uploading..." : "Save Photo";
-    const uploadHtml = isOwner
+    const uploadHtml = isOwner && !isPreview
       ? `
         <div class="gallery-upload">
           <input id="${pageKey}GalleryFileInput" type="file" accept="image/jpeg,image/png,image/webp" class="gallery-upload__input" aria-label="Upload a photo"${isUploading ? " disabled" : ""}>
@@ -318,20 +322,25 @@ export function createProfileSocialViewRenderer({
       : "";
 
     const emptyText = isOwner ? ownerGalleryEmptyText : viewerGalleryEmptyText;
-    const gridHtml = photos.length > 0
-      ? photos.map((photo) => `
+    const gridHtml = visiblePhotos.length > 0
+      ? visiblePhotos.map((photo) => `
           <div class="gallery-item" data-photo-id="${escapeHtml(photo.id)}">
             <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
             ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
-            ${isOwner ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
+            ${isOwner && !isPreview ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
           </div>
         `).join("")
       : `<p class="${panelPrefix}-panel__empty">${escapeHtml(emptyText)}</p>`;
+
+    const viewAllHtml = viewAllHref
+      ? `<a class="gallery-view-all" href="${escapeHtml(viewAllHref)}">View All Photos &rarr;</a>`
+      : "";
 
     container.innerHTML = `
       <div class="${panelPrefix}-panel__header"><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
       ${uploadHtml}
       <div class="gallery-grid">${gridHtml}</div>
+      ${viewAllHtml}
     `;
   }
 

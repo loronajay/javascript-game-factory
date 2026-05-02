@@ -207,7 +207,7 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
     friendCodeFlash: options?.friendCodeFlash || "",
   });
-  renderMePageView(doc, model, options);
+  renderMePageView(doc, model, { ...options, galleryPlayerId: profile?.playerId || "" });
   return model;
 }
 

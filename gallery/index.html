@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Photo Gallery</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
+  <link rel="stylesheet" href="../css/profile-page.css">
+  <link rel="stylesheet" href="../css/profile-social.css">
+  <link rel="stylesheet" href="../css/gallery.css">
+  <link rel="stylesheet" href="../css/notifications.css">
+</head>
+<body class="gallery-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="gallery-stage">
+      <div class="gallery-stage__stars" aria-hidden="true"></div>
+
+      <div class="gallery-stage__controls">
+        <div id="galleryPrimaryNav" class="gallery-stage__nav"></div>
+      </div>
+
+      <div class="gallery-stage__header">
+        <h1 id="galleryPageTitle" class="gallery-stage__title">Photo Gallery</h1>
+        <p id="galleryPageSubtitle" class="gallery-stage__subtitle"></p>
+      </div>
+
+      <div class="gallery-layout">
+        <section id="galleryPanel" class="gallery-panel" aria-label="Photo Gallery"></section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/pixel-text.js"></script>
+  <script src="../js/platform-config.js"></script>
+  <script type="module" src="../js/gallery-page/wire.mjs"></script>
+</body>
+</html>

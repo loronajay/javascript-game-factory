@@ -23,14 +23,16 @@
 }
 
 .me-panel__header,
-.player-panel__header {
+.player-panel__header,
+.gallery-panel__header {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .me-panel__title,
-.player-panel__title {
+.player-panel__title,
+.gallery-panel__title {
   margin: 0;
   display: inline-flex;
   align-items: center;

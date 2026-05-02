@@ -406,7 +406,8 @@ export function renderPlayerPageView(doc, model, options = {}) {
   );
   socialView.renderGalleryPanel(doc.getElementById("playerGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
     isOwner: !!options?.isOwner,
-    uploadState: options?.galleryUploadState || {},
+    previewCap: 5,
+    viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
   renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", model.aboutText);
   renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", model.badgeItems);

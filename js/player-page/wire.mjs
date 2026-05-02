@@ -49,6 +49,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       thoughtComposerState: mediaComposer.getThoughtPhotoState(),
       galleryUploadState: mediaComposer.getGalleryUploadState(),
       isOwner: !!(pageData?.profile?.playerId && pageData.profile.playerId === authSessionPlayerId),
+      galleryPlayerId: pageData?.profile?.playerId || "",
       ...overrides,
     };
   };

@@ -424,7 +424,8 @@ export function renderMePageView(doc, model, options = {}) {
   });
   socialView.renderGalleryPanel(doc.getElementById("meGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
     isOwner: true,
-    uploadState: options?.galleryUploadState || {},
+    previewCap: 5,
+    viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
   renderAboutPanel(doc.getElementById("meAboutPanel"), "About Me", model.aboutText);
   renderBadgesPanel(doc.getElementById("meBadgesPanel"), "Badges", model.badgeItems);
