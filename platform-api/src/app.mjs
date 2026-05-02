@@ -18,7 +18,7 @@ function applyCorsHeaders(res, requestOrigin) {
     res.setHeader("access-control-allow-origin", "*");
   }
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-allow-headers", "content-type, authorization");
 }
 
 function writeJson(res, statusCode, payload, requestOrigin) {
@@ -444,7 +444,7 @@ export function createApp(options = {}) {
 
       const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
       res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
-      writeJson(res, 201, { playerId: result.playerId, profileName: result.profileName, email: result.email }, requestOrigin);
+      writeJson(res, 201, { token, playerId: result.playerId, profileName: result.profileName, email: result.email }, requestOrigin);
       return;
     }
 
@@ -476,7 +476,7 @@ export function createApp(options = {}) {
 
       const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
       res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
-      writeJson(res, 200, { playerId: result.playerId, email: result.email }, requestOrigin);
+      writeJson(res, 200, { token, playerId: result.playerId, email: result.email }, requestOrigin);
       return;
     }
 

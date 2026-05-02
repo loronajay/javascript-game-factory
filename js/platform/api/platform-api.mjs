@@ -1,4 +1,5 @@
 import { sanitizeProfileFriendCode } from "../profile/profile.mjs";
+import { getStoredAuthToken } from "./auth-token.mjs";
 
 function sanitizeSingleLine(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -36,6 +37,11 @@ async function readJsonResponse(response) {
   }
 }
 
+function buildAuthHeaders() {
+  const token = getStoredAuthToken();
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
 async function requestJson(fetchImpl, baseUrl, path, options = {}) {
   if (typeof fetchImpl !== "function" || !baseUrl) {
     return null;
@@ -58,6 +64,7 @@ function buildJsonRequestOptions(method, value) {
     credentials: "include",
     headers: {
       "content-type": "application/json; charset=utf-8",
+      ...buildAuthHeaders(),
     },
     body: JSON.stringify(value ?? {}),
   };
@@ -92,7 +99,10 @@ export function createPlatformApiClient(options = {}) {
   const baseUrl = resolvePlatformApiBaseUrl(options);
 
   async function get(path, responseKey) {
-    const payload = await requestJson(fetchImpl, baseUrl, path);
+    const payload = await requestJson(fetchImpl, baseUrl, path, {
+      credentials: "include",
+      headers: buildAuthHeaders(),
+    });
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
 
@@ -117,7 +127,11 @@ export function createPlatformApiClient(options = {}) {
   }
 
   async function del(path, responseKey) {
-    const payload = await requestJson(fetchImpl, baseUrl, path, { method: "DELETE" });
+    const payload = await requestJson(fetchImpl, baseUrl, path, {
+      method: "DELETE",
+      credentials: "include",
+      headers: buildAuthHeaders(),
+    });
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
 
@@ -233,6 +247,7 @@ export function createPlatformApiClient(options = {}) {
         const response = await fetchImpl(`${baseUrl}/upload/avatar`, {
           method: "POST",
           credentials: "include",
+          headers: buildAuthHeaders(),
           body: formData,
         });
         if (!response?.ok) {
@@ -252,6 +267,7 @@ export function createPlatformApiClient(options = {}) {
         const response = await fetchImpl(`${baseUrl}/upload/background`, {
           method: "POST",
           credentials: "include",
+          headers: buildAuthHeaders(),
           body: formData,
         });
         if (!response?.ok) {
@@ -271,6 +287,7 @@ export function createPlatformApiClient(options = {}) {
         const response = await fetchImpl(`${baseUrl}/upload/photo`, {
           method: "POST",
           credentials: "include",
+          headers: buildAuthHeaders(),
           body: formData,
         });
         if (!response?.ok) return null;
@@ -285,7 +302,7 @@ export function createPlatformApiClient(options = {}) {
       if (!encoded) return [];
       const url = `${baseUrl}/players/${encoded}/photos${visibility ? `?visibility=${encodeURIComponent(visibility)}` : ""}`;
       try {
-        const response = await fetchImpl(url, { credentials: "include" });
+        const response = await fetchImpl(url, { credentials: "include", headers: buildAuthHeaders() });
         if (!response?.ok) return [];
         const data = await readJsonResponse(response);
         return Array.isArray(data?.photos) ? data.photos : [];
@@ -309,6 +326,7 @@ export function createPlatformApiClient(options = {}) {
         const response = await fetchImpl(`${baseUrl}/players/${encodedPlayer}/photos/${encodedPhoto}`, {
           method: "DELETE",
           credentials: "include",
+          headers: buildAuthHeaders(),
         });
         return response?.ok === true;
       } catch {

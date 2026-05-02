@@ -29,6 +29,11 @@ export function parseCookieHeader(cookieHeader) {
 }
 
 export function extractTokenFromRequest(req) {
+  const authHeader = String(req?.headers?.authorization || "");
+  if (authHeader.startsWith("Bearer ")) {
+    const headerToken = authHeader.slice(7).trim();
+    if (headerToken) return headerToken;
+  }
   const cookies = parseCookieHeader(req?.headers?.cookie || "");
   return cookies[COOKIE_NAME] || "";
 }

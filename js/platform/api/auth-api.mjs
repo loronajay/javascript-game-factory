@@ -1,14 +1,20 @@
 import { resolvePlatformApiBaseUrl } from "./platform-api.mjs";
+import { clearAuthToken, getStoredAuthToken, storeAuthToken } from "./auth-token.mjs";
 
 async function authRequest(fetchImpl, baseUrl, path, options = {}) {
   if (typeof fetchImpl !== "function" || !baseUrl) {
     return { ok: false, error: "not_configured" };
   }
   try {
+    const token = getStoredAuthToken();
     const response = await fetchImpl(`${baseUrl}${path}`, {
       ...options,
       credentials: "include",
-      headers: { "content-type": "application/json; charset=utf-8", ...(options.headers || {}) },
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
     });
     let body = null;
     try { body = await response.json(); } catch { /* ignore */ }
@@ -31,6 +37,9 @@ export function createAuthApiClient(options = {}) {
       return authRequest(fetchImpl, baseUrl, "/auth/register", {
         method: "POST",
         body: JSON.stringify({ email, password, profileName, claimPlayerId }),
+      }).then(result => {
+        if (result?.ok && result?.token) storeAuthToken(result.token);
+        return result;
       });
     },
 
@@ -38,11 +47,17 @@ export function createAuthApiClient(options = {}) {
       return authRequest(fetchImpl, baseUrl, "/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
+      }).then(result => {
+        if (result?.ok && result?.token) storeAuthToken(result.token);
+        return result;
       });
     },
 
     logout() {
-      return authRequest(fetchImpl, baseUrl, "/auth/logout", { method: "POST" });
+      return authRequest(fetchImpl, baseUrl, "/auth/logout", { method: "POST" }).then(result => {
+        clearAuthToken();
+        return result;
+      });
     },
 
     getSession() {

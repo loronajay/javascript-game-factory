@@ -1,6 +1,6 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 
@@ -41,6 +41,8 @@ Completed:
   - `css/profile-featured-cabinet.css`
   - `css/profile-identity.css`
   - `css/profile-rail.css`
+- primary nav rail is now uniform across all non-home pages; Bulletins, Thoughts, Activity added to `PRIMARY_APP_NAV_ITEMS` in `arcade-session-nav.mjs`; `bulletins/index.html` and `grid.html` migrated from bespoke nav markup to the standard `renderPrimaryAppNav` + `initSessionNav` wiring
+- `js/platform/api/auth-token.mjs` added as a thin localStorage token store; login/register now return `token` in the response body; `auth-api.mjs` stores and sends the token as `Authorization: Bearer`; `platform-api.mjs` attaches the header on all requests including uploads; backend `extractTokenFromRequest` checks Bearer header first, falls back to cookie — resolves cross-origin cookie blocking in Edge, Safari, and strict-privacy browsers
 - root test files moved from `js/*.test.mjs` into `js/tests/`
 - subsystem tests moved into `js/profile-editor/tests/` and `js/profile-social/tests/`
 - previously failing baseline tests cleaned back to green:
