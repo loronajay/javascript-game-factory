@@ -10,7 +10,7 @@
     radial-gradient(circle at 86% 12%, rgba(255, 121, 183, 0.12), transparent 18%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
   --profile-stage-background:
-    linear-gradient(180deg, #1f1458 0%, #352168 18%, #754194 54%, #452f82 74%, #23235f 100%);
+    linear-gradient(180deg, #1f1458 0%, #352168 9%, #754194 27%, #452f82 54%, #23235f 100%);
   --profile-stage-floor-fade:
     linear-gradient(180deg, rgba(58, 48, 141, 0) 0%, #322f84 34%, #28256f 68%, #1d1b5b 100%);
 }

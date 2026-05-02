@@ -17,7 +17,7 @@
 
 .me-stage--custom-bg {
   background-image:
-    linear-gradient(180deg, rgba(34, 22, 95, 0.72) 0%, rgba(59, 34, 112, 0.66) 18%, rgba(127, 67, 156, 0.58) 54%, rgba(74, 49, 141, 0.66) 74%, rgba(36, 36, 102, 0.72) 100%),
+    linear-gradient(180deg, rgba(34, 22, 95, 0.72) 0%, rgba(59, 34, 112, 0.66) 9%, rgba(127, 67, 156, 0.58) 27%, rgba(74, 49, 141, 0.66) 57%, rgba(36, 36, 102, 0.72) 100%),
     var(--me-stage-bg-image);
   background-size: cover, contain;
   background-position: center, top center;
