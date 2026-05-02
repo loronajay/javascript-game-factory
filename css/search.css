@@ -52,7 +52,7 @@
 .search-stage__controls {
   position: relative;
   z-index: 20;
-  width: 100%;
+  width: min(92vw, 980px);
 }
 
 .search-stage__masthead {

@@ -178,13 +178,21 @@
   z-index: 4;
 }
 
-.me-stage__controls,
+.me-stage__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(94vw, 1100px);
+  padding-top: 8px;
+}
+
 .player-stage__controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: 100%;
+  width: min(92vw, 980px);
   padding-top: 8px;
 }
 
