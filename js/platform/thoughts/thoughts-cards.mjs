@@ -38,6 +38,7 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
         shareTargetId: normalized.repostOfId || normalized.id,
         commentTargetId: normalized.repostOfId || normalized.id,
         imageUrl: normalized.imageUrl || "",
+        posterPlayerId: normalized.authorPlayerId || "",
         quotedThought: quotedThought
           ? {
               id: quotedThought.id,

@@ -181,35 +181,55 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   return api;
 }
 
-export function initPageGalleryViewer({ doc = globalThis.document } = {}) {
+export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHref = "../gallery/index.html" } = {}) {
   const viewer = createPhotoViewer({ doc, lightweight: true });
 
   doc.addEventListener("click", (e) => {
     if (e.target.closest(".photo-viewer")) return;
     if (e.target.closest("button")) return;
 
-    const item = e.target.closest("[data-photo-id]");
-    if (!item) return;
+    // Gallery panel thumbnail click (profile pages)
+    const galleryItem = e.target.closest("[data-photo-id]");
+    if (galleryItem) {
+      const img = galleryItem.querySelector(".gallery-item__img");
+      if (!img) return;
 
-    const img = item.querySelector(".gallery-item__img");
-    if (!img) return;
+      const photo = {
+        id: galleryItem.dataset.photoId,
+        imageUrl: img.src,
+        caption: img.alt || "",
+      };
 
-    const photo = {
-      id: item.dataset.photoId,
-      imageUrl: img.src,
-      caption: img.alt || "",
-    };
+      const panel = galleryItem.closest(".gallery-panel, [id$='GalleryPanel']");
+      const viewAllLink = panel?.querySelector(".gallery-view-all");
+      const galleryHref = viewAllLink?.href || "";
+      const galleryLinkHref = galleryHref
+        ? `${galleryHref}&photo=${encodeURIComponent(photo.id)}`
+        : "";
 
-    // Read gallery page href from the "View All Photos" link already rendered in the panel
-    const panel = item.closest(".gallery-panel, [id$='GalleryPanel']");
-    const viewAllLink = panel?.querySelector(".gallery-view-all");
-    const galleryHref = viewAllLink?.href || "";
-    const galleryLinkHref = galleryHref
-      ? `${galleryHref}&photo=${encodeURIComponent(photo.id)}`
-      : "";
+      viewer.setPhotos([photo], { galleryLinkHref });
+      viewer.open(photo.id);
+      return;
+    }
 
-    viewer.setPhotos([photo], { galleryLinkHref });
-    viewer.open(photo.id);
+    // Thought card image click (any feed page)
+    const thoughtImg = e.target.closest(".thought-card__image");
+    if (thoughtImg) {
+      const article = thoughtImg.closest("article[data-poster-id]");
+      const posterId = article?.dataset.posterId || "";
+      const galleryLinkHref = posterId
+        ? `${galleryPageHref}?id=${encodeURIComponent(posterId)}`
+        : "";
+
+      const photo = {
+        id: `thought-img-${Date.now()}`,
+        imageUrl: thoughtImg.src,
+        caption: thoughtImg.alt || "",
+      };
+
+      viewer.setPhotos([photo], { galleryLinkHref });
+      viewer.open(photo.id);
+    }
   });
 
   return viewer;

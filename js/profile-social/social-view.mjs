@@ -228,7 +228,7 @@ export function createProfileSocialViewRenderer({
     const quotedThoughtHtml = item.quotedThought ? renderQuotedThought(item.quotedThought) : "";
 
     return `
-      <article class="thought-card">
+      <article class="thought-card"${item.posterPlayerId ? ` data-poster-id="${escapeHtml(item.posterPlayerId)}"` : ""}>
         <div class="thought-card__signal-line">
           <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
           <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>

@@ -3,6 +3,7 @@ import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { createThoughtsPageActions } from "./actions.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
+import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 import {
   buildThoughtsPageViewModel,
   loadThoughtsPageData,
@@ -15,6 +16,8 @@ export { renderThoughtsPage } from "./render.mjs";
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  initPageGalleryViewer({ doc });
+
   renderPrimaryAppNav(doc.getElementById("thoughtsPrimaryNav"), {
     basePath: "../",
     currentPage: "thoughts",

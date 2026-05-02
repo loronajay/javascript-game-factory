@@ -632,6 +632,12 @@ button.thought-card__action {
   object-fit: cover;
   border-radius: var(--profile-radius-xs);
   margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.thought-card__image:hover {
+  opacity: 0.88;
+  transition: opacity 120ms ease;
 }
 
 .friend-code-card {
