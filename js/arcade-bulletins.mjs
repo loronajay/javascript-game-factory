@@ -1,4 +1,5 @@
 import { buildPublicBulletinFeed } from "./platform/bulletins/bulletins.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 function escapeHtml(value) {
   return String(value)
@@ -108,5 +109,17 @@ export function renderBulletinsPage(doc = globalThis.document, bulletins = build
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
+  renderPrimaryAppNav(doc.getElementById("bulletinsPrimaryNav"), {
+    basePath: "../",
+    currentPage: "bulletins",
+    linkClass: "bulletins-stage__portal",
+    sessionNavId: "bulletinsAuthNav",
+  });
+  void initSessionNav(doc.getElementById("bulletinsAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
+
   renderBulletinsPage(doc);
 }

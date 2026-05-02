@@ -9,6 +9,9 @@ const PRIMARY_APP_NAV_ITEMS = [
   { key: "home", label: "Home", path: "index.html" },
   { key: "me", label: "Me", path: "me/index.html" },
   { key: "arcade", label: "Arcade", path: "grid.html" },
+  { key: "bulletins", label: "Bulletins", path: "bulletins/index.html" },
+  { key: "thoughts", label: "Thoughts", path: "thoughts/index.html" },
+  { key: "activity", label: "Activity", path: "activity/index.html" },
   { key: "search", label: "Search", path: "search/index.html" },
   { key: "messages", label: "Messages", path: "messages/index.html" },
 ];

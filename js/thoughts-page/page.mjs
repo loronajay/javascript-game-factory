@@ -17,7 +17,7 @@ const doc = globalThis.document;
 if (doc?.getElementById) {
   renderPrimaryAppNav(doc.getElementById("thoughtsPrimaryNav"), {
     basePath: "../",
-    currentPage: "",
+    currentPage: "thoughts",
     linkClass: "thoughts-stage__portal",
     sessionNavId: "thoughtsAuthNav",
   });

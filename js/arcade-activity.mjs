@@ -125,7 +125,7 @@ const doc = globalThis.document;
 if (doc?.getElementById) {
   renderPrimaryAppNav(doc.getElementById("activityPrimaryNav"), {
     basePath: "../",
-    currentPage: "",
+    currentPage: "activity",
     linkClass: "activity-stage__portal",
     sessionNavId: "activityAuthNav",
   });

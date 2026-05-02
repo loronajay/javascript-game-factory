@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jay's Javascript Arcade | Arcade Bulletins</title>
   <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
+  <link rel="stylesheet" href="../css/notifications.css">
   <link rel="stylesheet" href="../css/bulletins.css">
 </head>
 <body class="bulletins-page-shell">
@@ -21,14 +23,7 @@
       </div>
 
       <div class="bulletins-stage__controls">
-        <div class="bulletins-stage__nav">
-          <a class="bulletins-stage__back" href="#" onclick="event.preventDefault(); history.back()">&#x276E; Back</a>
-          <a class="bulletins-stage__portal" href="../grid.html">Arcade Grid</a>
-          <a class="bulletins-stage__portal" href="../me/index.html">Player Page</a>
-          <a class="bulletins-stage__portal" href="../activity/index.html">Activity</a>
-          <a class="bulletins-stage__portal" href="../thoughts/index.html">Thoughts</a>
-          <a class="bulletins-stage__portal" href="../events/index.html">Events</a>
-        </div>
+        <div id="bulletinsPrimaryNav" class="bulletins-stage__nav"></div>
       </div>
 
       <div class="bulletins-stage__header">
