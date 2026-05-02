@@ -209,10 +209,7 @@ export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHr
 
       const panel = galleryItem.closest(".gallery-panel, [id$='GalleryPanel']");
       const viewAllLink = panel?.querySelector(".gallery-view-all");
-      const galleryHref = viewAllLink?.href || "";
-      const galleryLinkHref = galleryHref
-        ? `${galleryHref}&photo=${encodeURIComponent(photo.id)}`
-        : "";
+      const galleryLinkHref = viewAllLink?.href || "";
 
       viewer.setPhotos([photo], { galleryLinkHref });
       viewer.open(photo.id);
