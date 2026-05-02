@@ -112,6 +112,13 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       api.close();
       return;
     }
+    if (lightweight) {
+      if (e.target.closest(".photo-viewer__gallery-link")) {
+        api.close();
+        // browser follows the <a> href naturally after close cleanup
+      }
+      return;
+    }
     if (!lightweight) {
       if (e.target.closest(".photo-viewer__nav--prev")) {
         if (currentIndex > 0) {
