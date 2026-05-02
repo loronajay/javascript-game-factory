@@ -248,6 +248,11 @@
     align-items: stretch;
   }
 
+  .me-stage__edit-chip {
+    position: static;
+    align-self: center;
+  }
+
   .me-stage__header,
   .player-stage__header {
     width: 100%;
