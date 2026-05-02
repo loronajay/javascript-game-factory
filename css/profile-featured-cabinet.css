@@ -96,7 +96,23 @@
 .player-featured-cabinet__card--placeholder {
   padding: 0;
   width: min(100%, 288px);
-  text-align: left;
+  text-align: center;
+}
+
+.player-featured-cabinet__card--placeholder:hover {
+  transform: none;
+  border-color: #060608;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  cursor: default;
+}
+
+.player-featured-cabinet__empty-label {
+  font-size: 0.8rem;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  color: rgba(255, 248, 255, 0.55);
 }
 
 .me-featured-cabinet__thumb,

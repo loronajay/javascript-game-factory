@@ -293,7 +293,7 @@ function renderFavoritePanel(container, title, item) {
         <div class="game-card-preview">
           <div class="game-thumb player-featured-cabinet__thumb player-featured-cabinet__thumb--placeholder"></div>
           <div class="game-card-copy game-card-copy--placeholder">
-            <h3 class="game-title">PIN A FAVORITE</h3>
+            <h3 class="game-title player-featured-cabinet__empty-label">This player hasn't pinned a favorite yet.</h3>
           </div>
         </div>
       </article>

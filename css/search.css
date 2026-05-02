@@ -52,8 +52,7 @@
 .search-stage__controls {
   position: relative;
   z-index: 20;
-  width: min(82vw, 760px);
-  max-width: none;
+  width: 100%;
 }
 
 .search-stage__masthead {
