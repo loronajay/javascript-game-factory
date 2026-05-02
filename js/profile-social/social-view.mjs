@@ -11,6 +11,18 @@ export function escapeCssUrl(value) {
   return String(value || "").replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
+function buildGalleryItemCounts(photo) {
+  const totals = photo?.reactionTotals;
+  const reactionCount = totals && typeof totals === "object"
+    ? Object.values(totals).reduce((sum, n) => sum + (Math.floor(Number(n)) || 0), 0)
+    : 0;
+  const commentCount = Math.max(0, Math.floor(Number(photo?.commentCount)) || 0);
+  if (reactionCount === 0 && commentCount === 0) return "";
+  const reactionBadge = reactionCount > 0 ? `<span class="gallery-item__count">❤️ ${reactionCount}</span>` : "";
+  const commentBadge = commentCount > 0 ? `<span class="gallery-item__count">💬 ${commentCount}</span>` : "";
+  return `<div class="gallery-item__counts">${reactionBadge}${commentBadge}</div>`;
+}
+
 // Shared feed/gallery renderer used by both /me and /player profile surfaces.
 export function createProfileSocialViewRenderer({
   pageKey = "me",
@@ -325,7 +337,10 @@ export function createProfileSocialViewRenderer({
     const gridHtml = visiblePhotos.length > 0
       ? visiblePhotos.map((photo) => `
           <div class="gallery-item" data-photo-id="${escapeHtml(photo.id)}">
-            <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+            <div class="gallery-item__img-frame">
+              <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+              ${buildGalleryItemCounts(photo)}
+            </div>
             ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
             ${isOwner && !isPreview ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
           </div>

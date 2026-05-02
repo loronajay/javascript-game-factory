@@ -57,8 +57,29 @@ async function initGalleryPage(doc = globalThis.document) {
     viewer.setPhotos(pageState.photos, {
       isOwner: pageState.isOwner,
       onDelete: handleViewerDelete,
+      onReact: handleViewerReact,
+      onComment: handleViewerComment,
+      viewerPlayerId: pageState.authSessionPlayerId,
+      viewerAuthorDisplayName: pageState.authSessionDisplayName,
     });
   };
+
+  async function loadViewerSocialState(photoId) {
+    const [comments, photo] = await Promise.all([
+      apiClient.listPhotoComments(photoId).catch(() => []),
+      apiClient.getPlayerPhoto(playerId, photoId).catch(() => null),
+    ]);
+    viewer.setSocialState(photoId, {
+      reactionTotals: photo?.reactionTotals || {},
+      viewerReaction: photo?.viewerReaction || "",
+      comments: Array.isArray(comments) ? comments : [],
+    });
+  }
+
+  async function openViewer(photoId) {
+    viewer.open(photoId);
+    void loadViewerSocialState(photoId);
+  }
 
   async function handleViewerDelete(photoId) {
     if (!pageState.isOwner || !apiClient?.deletePlayerPhoto) return;
@@ -69,11 +90,41 @@ async function initGalleryPage(doc = globalThis.document) {
     syncViewer();
   }
 
+  async function handleViewerReact(photoId, reactionId) {
+    const viewerPlayerId = pageState.authSessionPlayerId;
+    if (!viewerPlayerId) return;
+    const photo = await apiClient.reactToPhoto(photoId, viewerPlayerId, reactionId).catch(() => null);
+    if (!photo) return;
+    const comments = await apiClient.listPhotoComments(photoId).catch(() => []);
+    viewer.setSocialState(photoId, {
+      reactionTotals: photo.reactionTotals || {},
+      viewerReaction: photo.viewerReaction || "",
+      comments: Array.isArray(comments) ? comments : [],
+    });
+  }
+
+  async function handleViewerComment(photoId, text) {
+    const viewerPlayerId = pageState.authSessionPlayerId;
+    const viewerAuthorDisplayName = pageState.authSessionDisplayName;
+    if (!viewerPlayerId || !viewerAuthorDisplayName || !text?.trim()) return;
+    const commentRecord = await apiClient
+      .commentOnPhoto(photoId, viewerPlayerId, viewerAuthorDisplayName, text)
+      .catch(() => null);
+    if (!commentRecord) return;
+    const comments = await apiClient.listPhotoComments(photoId).catch(() => []);
+    const photo = commentRecord.photo;
+    viewer.setSocialState(photoId, {
+      reactionTotals: photo?.reactionTotals || {},
+      viewerReaction: "",
+      comments: Array.isArray(comments) ? comments : [],
+    });
+  }
+
   rerender();
   syncViewer();
 
   const initialPhotoId = params.get("photo");
-  if (initialPhotoId) viewer.open(initialPhotoId);
+  if (initialPhotoId) void openViewer(initialPhotoId);
 
   doc.addEventListener("submit", async (event) => {
     const form = event.target;
@@ -149,9 +200,11 @@ async function initGalleryPage(doc = globalThis.document) {
       return;
     }
 
+    if (event.target.closest(".photo-viewer")) return;
+
     const galleryItem = event.target.closest("[data-photo-id]");
     if (galleryItem) {
-      viewer.open(galleryItem.dataset.photoId);
+      void openViewer(galleryItem.dataset.photoId);
       return;
     }
   });

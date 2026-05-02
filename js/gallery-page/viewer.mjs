@@ -1,9 +1,46 @@
+const PHOTO_REACTION_IDS = ["like", "love", "laugh", "wow", "fire", "sad", "angry", "poop"];
+const PHOTO_REACTION_GLYPHS = {
+  like: "👍", love: "❤️", laugh: "😂", wow: "😮",
+  fire: "🔥", sad: "😢", angry: "😡", poop: "💩",
+};
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatViewerDate(ts) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleDateString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function buildReactionPickerHtml() {
+  return PHOTO_REACTION_IDS.map(id =>
+    `<button class="photo-viewer__reaction-option" type="button" data-reaction-id="${id}" title="${id}">${PHOTO_REACTION_GLYPHS[id]}</button>`
+  ).join("");
+}
+
 export function createPhotoViewer({ doc = globalThis.document, lightweight = false } = {}) {
   let photos = [];
   let currentIndex = -1;
   let isOwner = false;
   let onDeleteFn = null;
   let galleryLinkHref = "";
+  let onReactFn = null;
+  let onCommentFn = null;
+  let viewerPlayerId = "";
+  let viewerAuthorDisplayName = "";
+  let reactionPickerOpen = false;
+  const socialStateMap = new Map();
 
   const overlay = doc.createElement("div");
   overlay.className = "photo-viewer photo-viewer--hidden";
@@ -32,6 +69,26 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
           }
         </div>
       </div>
+      ${!lightweight ? `
+      <div class="photo-viewer__social">
+        <div class="photo-viewer__reactions-row">
+          <div class="photo-viewer__reaction-chips"></div>
+          <button class="photo-viewer__react-btn" type="button" aria-label="React to photo">React</button>
+          <div class="photo-viewer__reaction-picker photo-viewer__reaction-picker--hidden" aria-label="Choose a reaction">
+            ${buildReactionPickerHtml()}
+          </div>
+        </div>
+        <div class="photo-viewer__comments-section">
+          <div class="photo-viewer__comment-list"></div>
+          <form class="photo-viewer__comment-form" autocomplete="off">
+            <textarea class="photo-viewer__comment-input" maxlength="500" placeholder="Add a comment..." rows="2"></textarea>
+            <div class="photo-viewer__comment-form-row">
+              <button class="photo-viewer__comment-submit" type="submit">Post</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      ` : ""}
     </div>
   `;
   doc.body.appendChild(overlay);
@@ -43,17 +100,12 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   const galleryLinkEl = overlay.querySelector(".photo-viewer__gallery-link");
   const prevBtn = overlay.querySelector(".photo-viewer__nav--prev");
   const nextBtn = overlay.querySelector(".photo-viewer__nav--next");
-
-  function formatDate(ts) {
-    if (!ts) return "";
-    try {
-      return new Date(ts).toLocaleDateString(undefined, {
-        year: "numeric", month: "long", day: "numeric",
-      });
-    } catch {
-      return "";
-    }
-  }
+  const reactionChipsEl = !lightweight ? overlay.querySelector(".photo-viewer__reaction-chips") : null;
+  const reactionPickerEl = !lightweight ? overlay.querySelector(".photo-viewer__reaction-picker") : null;
+  const reactBtnEl = !lightweight ? overlay.querySelector(".photo-viewer__react-btn") : null;
+  const commentListEl = !lightweight ? overlay.querySelector(".photo-viewer__comment-list") : null;
+  const commentFormEl = !lightweight ? overlay.querySelector(".photo-viewer__comment-form") : null;
+  const commentInputEl = !lightweight ? overlay.querySelector(".photo-viewer__comment-input") : null;
 
   function updateUrl(photoId) {
     if (lightweight || !globalThis.history?.replaceState) return;
@@ -66,13 +118,66 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
     globalThis.history.replaceState(null, "", url.toString());
   }
 
+  function paintSocial() {
+    if (lightweight) return;
+    const photo = photos[currentIndex];
+    if (!photo) return;
+
+    const state = socialStateMap.get(photo.id);
+
+    if (reactionChipsEl) {
+      const totals = state?.reactionTotals || {};
+      const viewerReaction = state?.viewerReaction || "";
+      const activeIds = PHOTO_REACTION_IDS.filter(id => (totals[id] > 0) || id === viewerReaction);
+      const chipsHtml = activeIds.map(id =>
+        `<button
+          class="photo-viewer__reaction-chip${id === viewerReaction ? " photo-viewer__reaction-chip--selected" : ""}"
+          type="button" data-reaction-id="${id}" title="${id}"
+        >${PHOTO_REACTION_GLYPHS[id]} <span>${totals[id] || 0}</span></button>`
+      ).join("");
+      reactionChipsEl.innerHTML = chipsHtml;
+    }
+
+    if (commentListEl) {
+      const comments = state?.comments;
+      if (!comments) {
+        commentListEl.innerHTML = `<p class="photo-viewer__comments-loading">Loading comments...</p>`;
+      } else if (comments.length === 0) {
+        commentListEl.innerHTML = `<p class="photo-viewer__comments-empty">No comments yet.</p>`;
+      } else {
+        commentListEl.innerHTML = comments.map(c =>
+          `<div class="photo-viewer__comment">
+            <span class="photo-viewer__comment-author">${escapeHtml(c.authorDisplayName)}</span>
+            <span class="photo-viewer__comment-text">${escapeHtml(c.text)}</span>
+            <span class="photo-viewer__comment-time">${formatViewerDate(c.createdAt)}</span>
+          </div>`
+        ).join("");
+        commentListEl.scrollTop = commentListEl.scrollHeight;
+      }
+    }
+
+    if (commentFormEl) {
+      commentFormEl.style.display = viewerPlayerId ? "" : "none";
+    }
+  }
+
+  function setReactionPickerOpen(open) {
+    reactionPickerOpen = open;
+    if (!reactionPickerEl) return;
+    if (open) {
+      reactionPickerEl.classList.remove("photo-viewer__reaction-picker--hidden");
+    } else {
+      reactionPickerEl.classList.add("photo-viewer__reaction-picker--hidden");
+    }
+  }
+
   function paint() {
     const photo = photos[currentIndex];
     if (!photo) return;
     imgEl.src = photo.imageUrl || "";
     imgEl.alt = photo.caption || "";
     captionEl.textContent = photo.caption || "";
-    timestampEl.textContent = formatDate(photo.createdAt || photo.created_at);
+    timestampEl.textContent = formatViewerDate(photo.createdAt || photo.created_at);
 
     if (lightweight) {
       if (galleryLinkEl) galleryLinkEl.href = galleryLinkHref || "#";
@@ -88,6 +193,8 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
         prevBtn.style.visibility = hasSiblings ? "" : "hidden";
         nextBtn.style.visibility = hasSiblings ? "" : "hidden";
       }
+      setReactionPickerOpen(false);
+      paintSocial();
     }
   }
 
@@ -115,37 +222,73 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
     if (lightweight) {
       if (e.target.closest(".photo-viewer__gallery-link")) {
         api.close();
-        // browser follows the <a> href naturally after close cleanup
       }
       return;
     }
-    if (!lightweight) {
-      if (e.target.closest(".photo-viewer__nav--prev")) {
-        if (currentIndex > 0) {
-          currentIndex--;
-          paint();
-          updateUrl(photos[currentIndex]?.id);
-        }
-        return;
+    if (e.target.closest(".photo-viewer__nav--prev")) {
+      if (currentIndex > 0) {
+        currentIndex--;
+        paint();
+        updateUrl(photos[currentIndex]?.id);
       }
-      if (e.target.closest(".photo-viewer__nav--next")) {
-        if (currentIndex < photos.length - 1) {
-          currentIndex++;
-          paint();
-          updateUrl(photos[currentIndex]?.id);
-        }
-        return;
+      return;
+    }
+    if (e.target.closest(".photo-viewer__nav--next")) {
+      if (currentIndex < photos.length - 1) {
+        currentIndex++;
+        paint();
+        updateUrl(photos[currentIndex]?.id);
       }
-      if (e.target.closest(".photo-viewer__delete")) {
-        const photoId = e.target.closest(".photo-viewer__delete").dataset.photoId;
-        if (photoId && onDeleteFn) onDeleteFn(photoId);
+      return;
+    }
+    if (e.target.closest(".photo-viewer__delete")) {
+      const photoId = e.target.closest(".photo-viewer__delete").dataset.photoId;
+      if (photoId && onDeleteFn) onDeleteFn(photoId);
+      return;
+    }
+    if (e.target.closest(".photo-viewer__react-btn")) {
+      setReactionPickerOpen(!reactionPickerOpen);
+      return;
+    }
+    const reactionOptionBtn = e.target.closest(".photo-viewer__reaction-option");
+    if (reactionOptionBtn) {
+      const reactionId = reactionOptionBtn.dataset.reactionId;
+      const photo = photos[currentIndex];
+      if (reactionId && photo && onReactFn) {
+        setReactionPickerOpen(false);
+        onReactFn(photo.id, reactionId);
       }
+      return;
+    }
+    const reactionChipBtn = e.target.closest(".photo-viewer__reaction-chip");
+    if (reactionChipBtn) {
+      const reactionId = reactionChipBtn.dataset.reactionId;
+      const photo = photos[currentIndex];
+      if (reactionId && photo && onReactFn) {
+        onReactFn(photo.id, reactionId);
+      }
+    }
+  });
+
+  overlay.addEventListener("submit", (e) => {
+    const form = e.target.closest(".photo-viewer__comment-form");
+    if (!form) return;
+    e.preventDefault();
+    const text = commentInputEl?.value?.trim() || "";
+    const photo = photos[currentIndex];
+    if (text && photo && onCommentFn) {
+      onCommentFn(photo.id, text);
+      if (commentInputEl) commentInputEl.value = "";
     }
   });
 
   doc.addEventListener("keydown", (e) => {
     if (overlay.classList.contains("photo-viewer--hidden")) return;
     if (e.key === "Escape") {
+      if (reactionPickerOpen) {
+        setReactionPickerOpen(false);
+        return;
+      }
       api.close();
     } else if (!lightweight) {
       if (e.key === "ArrowLeft" && currentIndex > 0) {
@@ -165,8 +308,17 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       photos = Array.isArray(newPhotos) ? newPhotos : [];
       isOwner = !!opts.isOwner;
       onDeleteFn = opts.onDelete || null;
+      onReactFn = opts.onReact || null;
+      onCommentFn = opts.onComment || null;
+      viewerPlayerId = opts.viewerPlayerId || "";
+      viewerAuthorDisplayName = opts.viewerAuthorDisplayName || "";
       galleryLinkHref = opts.galleryLinkHref || "";
       if (api.isOpen() && currentIndex >= 0) paint();
+    },
+    setSocialState(photoId, state) {
+      socialStateMap.set(photoId, state);
+      const currentPhoto = photos[currentIndex];
+      if (api.isOpen() && currentPhoto?.id === photoId) paintSocial();
     },
     open(photoId) {
       const idx = photos.findIndex((p) => p.id === photoId);
@@ -180,6 +332,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       hide();
       updateUrl(null);
       currentIndex = -1;
+      setReactionPickerOpen(false);
     },
     isOpen() {
       return !overlay.classList.contains("photo-viewer--hidden");

@@ -333,5 +333,52 @@ export function createPlatformApiClient(options = {}) {
         return false;
       }
     },
+    async getPlayerPhoto(playerId, photoId) {
+      if (!fetchImpl || !baseUrl || !playerId || !photoId) return null;
+      const encodedPlayer = encodePathSegment(playerId);
+      const encodedPhoto = encodePathSegment(photoId);
+      if (!encodedPlayer || !encodedPhoto) return null;
+      try {
+        const response = await fetchImpl(`${baseUrl}/players/${encodedPlayer}/photos/${encodedPhoto}`, {
+          credentials: "include",
+          headers: buildAuthHeaders(),
+        });
+        if (!response?.ok) return null;
+        const data = await readJsonResponse(response);
+        return data?.photo || null;
+      } catch {
+        return null;
+      }
+    },
+    async listPhotoComments(photoId) {
+      if (!fetchImpl || !baseUrl || !photoId) return [];
+      const encoded = encodePathSegment(photoId);
+      if (!encoded) return [];
+      try {
+        const response = await fetchImpl(`${baseUrl}/photos/${encoded}/comments`, {
+          credentials: "include",
+          headers: buildAuthHeaders(),
+        });
+        if (!response?.ok) return [];
+        const data = await readJsonResponse(response);
+        return Array.isArray(data?.comments) ? data.comments : [];
+      } catch {
+        return [];
+      }
+    },
+    async reactToPhoto(photoId, viewerPlayerId, reactionId) {
+      if (!fetchImpl || !baseUrl || !photoId) return null;
+      const encoded = encodePathSegment(photoId);
+      if (!encoded) return null;
+      const payload = await post(`/photos/${encoded}/reactions`, { viewerPlayerId, reactionId });
+      return payload?.photo || null;
+    },
+    async commentOnPhoto(photoId, viewerPlayerId, viewerAuthorDisplayName, text) {
+      if (!fetchImpl || !baseUrl || !photoId) return null;
+      const encoded = encodePathSegment(photoId);
+      if (!encoded) return null;
+      const payload = await post(`/photos/${encoded}/comments`, { viewerPlayerId, viewerAuthorDisplayName, text });
+      return payload?.commentRecord || null;
+    },
   };
 }

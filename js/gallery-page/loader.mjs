@@ -7,15 +7,23 @@ export async function loadGalleryPageData(playerId, { apiClient, authClient } = 
   const authSessionPlayerId = authSession?.playerId || "";
   const isOwner = !!authSessionPlayerId && playerId === authSessionPlayerId;
 
-  const [photos, profile] = await Promise.all([
+  const [photos, profile, viewerProfile] = await Promise.all([
     apiClient?.listPlayerPhotos?.(playerId, isOwner ? {} : { visibility: "public" }).catch(() => []),
     apiClient?.loadPlayerProfile?.(playerId).catch(() => null),
+    !isOwner && authSessionPlayerId
+      ? apiClient?.loadPlayerProfile?.(authSessionPlayerId).catch(() => null)
+      : Promise.resolve(null),
   ]);
+
+  const authSessionDisplayName = isOwner
+    ? (profile?.profileName || "")
+    : (viewerProfile?.profileName || "");
 
   return {
     playerId,
     isOwner,
     authSessionPlayerId,
+    authSessionDisplayName,
     photos: Array.isArray(photos) ? photos : [],
     profile: profile || null,
   };

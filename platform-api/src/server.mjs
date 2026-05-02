@@ -61,7 +61,15 @@ import {
   createMessage,
   markConversationRead,
 } from "./db/messages.mjs";
-import { savePlayerPhoto, listPlayerPhotos, deletePlayerPhoto } from "./db/photos.mjs";
+import {
+  savePlayerPhoto,
+  listPlayerPhotos,
+  getPlayerPhoto,
+  deletePlayerPhoto,
+  reactToPhoto,
+  commentOnPhoto,
+  listPhotoComments,
+} from "./db/photos.mjs";
 
 const { Pool } = pg;
 
@@ -168,7 +176,11 @@ async function bootstrap() {
     markConversationRead: (convId, playerId) => markConversationRead(pool, convId, playerId),
     savePlayerPhoto: (params) => savePlayerPhoto(pool, params),
     listPlayerPhotos: (playerId, opts) => listPlayerPhotos(pool, playerId, opts),
+    getPlayerPhoto: (photoId, opts) => getPlayerPhoto(pool, photoId, opts),
     deletePlayerPhoto: (photoId, playerId) => deletePlayerPhoto(pool, photoId, playerId),
+    reactToPhoto: (photoId, viewerPlayerId, reactionId) => reactToPhoto(pool, photoId, viewerPlayerId, reactionId),
+    commentOnPhoto: (photoId, viewerPlayerId, displayName, text) => commentOnPhoto(pool, photoId, viewerPlayerId, displayName, text),
+    listPhotoComments: (photoId) => listPhotoComments(pool, photoId),
   });
   const server = createServer(app);
 

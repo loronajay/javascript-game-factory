@@ -277,9 +277,21 @@ export function createApp(options = {}) {
   const listPlayerPhotos = typeof options?.listPlayerPhotos === "function"
     ? options.listPlayerPhotos
     : async () => [];
+  const getPlayerPhoto = typeof options?.getPlayerPhoto === "function"
+    ? options.getPlayerPhoto
+    : async () => null;
   const deletePlayerPhoto = typeof options?.deletePlayerPhoto === "function"
     ? options.deletePlayerPhoto
     : async () => false;
+  const reactToPhoto = typeof options?.reactToPhoto === "function"
+    ? options.reactToPhoto
+    : async () => null;
+  const commentOnPhoto = typeof options?.commentOnPhoto === "function"
+    ? options.commentOnPhoto
+    : async () => null;
+  const listPhotoComments = typeof options?.listPhotoComments === "function"
+    ? options.listPhotoComments
+    : async () => [];
   const registerAccount = typeof options?.registerAccount === "function"
     ? options.registerAccount
     : async () => ({ error: "not_configured" });
@@ -325,6 +337,8 @@ export function createApp(options = {}) {
       const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
       const playerPhotosMatch = pathname.match(/^\/players\/([^/]+)\/photos$/);
       const playerPhotoMatch = pathname.match(/^\/players\/([^/]+)\/photos\/([^/]+)$/);
+      const photoReactionsMatch = pathname.match(/^\/photos\/([^/]+)\/reactions$/);
+      const photoCommentsMatch = pathname.match(/^\/photos\/([^/]+)\/comments$/);
       const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
       const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);
       const messagesWithMatch = pathname.match(/^\/messages\/with\/([^/]+)$/);
@@ -1274,6 +1288,18 @@ export function createApp(options = {}) {
       return;
     }
 
+    if (method === "GET" && playerPhotoMatch) {
+      const photoId = decodeURIComponent(playerPhotoMatch[2]);
+      const viewerPlayerId = authClaims?.playerId || "";
+      const photo = await getPlayerPhoto(photoId, { viewerPlayerId });
+      if (!photo) {
+        writeJson(res, 404, { status: "error", error: "not_found", timestamp }, requestOrigin);
+        return;
+      }
+      writeJson(res, 200, { photo }, requestOrigin);
+      return;
+    }
+
     if (method === "DELETE" && playerPhotoMatch) {
       if (!authClaims?.playerId) {
         writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
@@ -1287,6 +1313,83 @@ export function createApp(options = {}) {
       }
       const deleted = await deletePlayerPhoto(photoId, targetPlayerId);
       writeJson(res, 200, { ok: deleted }, requestOrigin);
+      return;
+    }
+
+    // Photo social routes
+    if (method === "GET" && photoCommentsMatch) {
+      const photoId = decodeURIComponent(photoCommentsMatch[1]);
+      const comments = await listPhotoComments(photoId);
+      writeJson(res, 200, { comments }, requestOrigin);
+      return;
+    }
+
+    if (method === "POST" && photoCommentsMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const photoId = decodeURIComponent(photoCommentsMatch[1]);
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+      const actorPlayerId = String(body.value?.viewerPlayerId || "");
+      const actorDisplayName = String(body.value?.viewerAuthorDisplayName || "");
+      const commentRecord = await commentOnPhoto(photoId, actorPlayerId, actorDisplayName, body.value?.text);
+      if (!commentRecord) {
+        writeJson(res, 400, { status: "error", error: "comment_failed", timestamp }, requestOrigin);
+        return;
+      }
+      writeJson(res, 200, { commentRecord }, requestOrigin);
+      if (commentRecord.photo?.playerId && actorPlayerId && commentRecord.photo.playerId !== actorPlayerId) {
+        void createNotification({
+          recipientPlayerId: commentRecord.photo.playerId,
+          actorPlayerId,
+          actorDisplayName,
+          type: "photo_comment",
+          payload: {
+            photoId: commentRecord.photo.id,
+            commentId: commentRecord.comment?.id || "",
+            commentText: String(commentRecord.comment?.text || "").slice(0, 80),
+          },
+        });
+      }
+      return;
+    }
+
+    if (method === "POST" && photoReactionsMatch) {
+      if (!authClaims?.playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+        return;
+      }
+      const photoId = decodeURIComponent(photoReactionsMatch[1]);
+      const body = await readJsonBody(req);
+      if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return;
+      }
+      const actorPlayerId = String(body.value?.viewerPlayerId || "");
+      const actorDisplayName = String(body.value?.actorDisplayName || "");
+      const photo = await reactToPhoto(photoId, actorPlayerId, body.value?.reactionId);
+      if (!photo) {
+        writeJson(res, 400, { status: "error", error: "reaction_failed", timestamp }, requestOrigin);
+        return;
+      }
+      writeJson(res, 200, { photo }, requestOrigin);
+      if (photo.playerId && actorPlayerId && photo.playerId !== actorPlayerId && photo.viewerReaction) {
+        void createNotification({
+          recipientPlayerId: photo.playerId,
+          actorPlayerId,
+          actorDisplayName,
+          type: "photo_reaction",
+          payload: {
+            photoId: photo.id,
+            reactionId: photo.viewerReaction,
+          },
+        });
+      }
       return;
     }
 

@@ -34,9 +34,8 @@ This plan started as a blank implementation checklist. All infrastructure, avata
   - `css/gallery.css` added for gallery page layout; `gallery-panel__*` selectors added to `profile-page.css`; `gallery-view-all` link style added to `profile-social.css`
 
 ### Still open
-- Pass 2: photo viewer overlay (next/prev, caption, owner delete, deep-link via `?photo=`)
-- Pass 3: photo-native reactions/comments (separate from thought social objects)
-- Pass 4: reaction/comment counts on grid cards
+- Pass 3: photo-native reactions/comments + counters in viewer — **complete (2026-05-02)**
+- Pass 4: reaction/comment counts on grid cards + viewer selected-reaction state polish
 - Pass 5: albums
 ---
 
@@ -190,7 +189,7 @@ Add a viewer overlay or dedicated viewer panel with:
 
 The existing `renderGalleryPanel` already emits `data-photo-id` on each `.gallery-item`. Wire a click delegation on `[data-photo-id]` — the same pattern as `openReactionThoughtId` in the thought panel. Clicking a preview image on the profile-page strip or the gallery page both open the same viewer state.
 
-### Pass 3
+### Pass 3 - COMPLETE
 
 Extend the photo model to support social state, mirroring the thought contract:
 - `comment_count`
@@ -225,6 +224,8 @@ Future shape:
 - default “All Photos” view always present even when albums exist
 
 That keeps today’s gallery work forward-compatible without forcing album UX now.
+
+We'll need to scope out the album UX before we get to it.
 
 ## Testing
 
