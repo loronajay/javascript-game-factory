@@ -357,7 +357,12 @@ export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHr
     try {
       const session = await createAuthApiClient().getSession().catch(() => null);
       if (session?.playerId) {
-        sessionCache = { playerId: session.playerId, displayName: session.displayName || session.profileName || "" };
+        let displayName = session.displayName || session.profileName || "";
+        if (!displayName && apiClient) {
+          const profile = await apiClient.loadPlayerProfile(session.playerId).catch(() => null);
+          displayName = profile?.profileName || "";
+        }
+        sessionCache = { playerId: session.playerId, displayName };
       }
     } catch {}
     return sessionCache;
