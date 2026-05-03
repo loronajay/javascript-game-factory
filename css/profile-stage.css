@@ -175,7 +175,6 @@
 .player-panel,
 .player-hero-card {
   position: relative;
-  z-index: 4;
 }
 
 .me-stage__controls,

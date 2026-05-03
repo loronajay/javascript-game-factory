@@ -27,7 +27,6 @@
 
 .player-stage__controls {
   position: relative;
-  z-index: 10;
 }
 
 .player-stage__nav {

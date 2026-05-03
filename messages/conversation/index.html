@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../../css/search.css">
   <link rel="stylesheet" href="../../css/notifications.css">
   <link rel="stylesheet" href="../../css/messages.css">
+  <link rel="stylesheet" href="../../css/page-stage.css">
 </head>
 <body class="search-page-shell">
   <div class="scanlines"></div>
@@ -23,17 +24,17 @@
         <div class="search-stage__floor"></div>
       </div>
 
-      <div class="search-stage__controls">
-        <nav id="threadPrimaryNav" class="search-stage__nav"></nav>
+      <div class="search-stage__controls page-stage__controls">
+        <nav id="threadPrimaryNav" class="search-stage__nav page-stage__nav"></nav>
       </div>
 
-      <header class="search-stage__masthead">
-        <div class="search-stage__header">
+      <header class="search-stage__masthead page-stage__masthead">
+        <div class="search-stage__header page-stage__header">
           <h1 class="pixel-text pixel-text--title search-stage__title">MESSAGES</h1>
         </div>
       </header>
 
-      <div class="search-layout msg-layout" style="display:flex; flex-direction:column; min-height:60vh;">
+      <div class="search-layout msg-layout page-stage__layout" style="display:flex; flex-direction:column; min-height:60vh;">
         <div id="messageList" class="msg-thread-body" aria-live="polite" aria-label="Messages"></div>
         <p id="threadFlash" class="msg-flash"></p>
         <div class="msg-composer">

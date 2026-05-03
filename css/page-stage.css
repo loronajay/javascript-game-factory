@@ -1,0 +1,40 @@
+/* ---------- SHARED STAGE STACKING CONTRACT ---------- */
+
+/*
+  All page families (*-stage) share this z-index ladder.
+  Apply these classes alongside the page-specific class on the same element.
+
+  Ladder (within the stage's isolation context):
+    Background scene elements:  z-index 0–3  (defined per page-stage file)
+    Layout / feed / content:    z-index  10
+    Masthead panel:             z-index  20
+    Controls bar (holds nav +
+      notification dropdown):   z-index 200
+
+  Controls must sit above masthead and content so the notification dropdown,
+  which is a positioned child of controls, always paints above later siblings.
+*/
+
+.page-stage__controls {
+  position: relative;
+  z-index: 200;
+  overflow: visible;
+}
+
+.page-stage__nav {
+  position: relative;
+  z-index: 201;
+  overflow: visible;
+}
+
+.page-stage__masthead {
+  position: relative;
+  z-index: 20;
+}
+
+.page-stage__layout,
+.page-stage__header,
+.page-stage__feed {
+  position: relative;
+  z-index: 10;
+}

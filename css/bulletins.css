@@ -164,7 +164,6 @@
 .bulletins-hero-card,
 .bulletins-feed {
   position: relative;
-  z-index: 4;
 }
 
 .bulletins-stage__controls {

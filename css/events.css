@@ -165,7 +165,6 @@
 .events-hero-card,
 .events-feed {
   position: relative;
-  z-index: 4;
 }
 
 .events-stage__masthead {

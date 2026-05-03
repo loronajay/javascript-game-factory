@@ -51,13 +51,11 @@
 
 .search-stage__controls {
   position: relative;
-  z-index: 20;
   width: min(92vw, 980px);
 }
 
 .search-stage__masthead {
   position: relative;
-  z-index: 20;
   display: grid;
   gap: 16px;
   width: min(92vw, 860px);

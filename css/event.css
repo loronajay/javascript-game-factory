@@ -164,7 +164,6 @@
 .event-hero-card,
 .event-panel {
   position: relative;
-  z-index: 4;
 }
 
 .event-stage__controls {

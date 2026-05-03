@@ -1,8 +1,10 @@
 # Bugs
 
-## Big gap on friends page between favorite game panel and photo gallery panel. need the photo gallery panel to utilize that space instead of leaving a huge gap: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 094034.png"
+## photos are pushing the interaction layer out of frame. we need to make sure the photos are fitting in a set viewport so that page elements are static feeling and aren't placed based on the uploaded photo's size: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-02 115334.png"
 
-## Same issue on me page, photo gallery and danger zone need to be brought up to fill in massive gap: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 120947.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 120958.png" and "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-01 121012.png"
+## upload status text is moving the "upload photos" button: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-02 103158.png"
+
+## currently can't interact (react/comment) with photos unless i'm on the gallery page. i need to be able to interact with the photos from the viewer, anywhere: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-02 115731.png"
 
 ## Remaining architecture / polish backlog
 

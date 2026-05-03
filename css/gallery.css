@@ -17,12 +17,10 @@
 
 .gallery-stage__controls {
   position: relative;
-  z-index: 10;
 }
 
 .gallery-stage__header {
   position: relative;
-  z-index: 5;
   padding: 28px 24px 12px;
   text-align: center;
 }
@@ -42,7 +40,6 @@
 
 .gallery-layout {
   position: relative;
-  z-index: 5;
   max-width: 860px;
   margin: 0 auto;
   padding: 16px 16px 40px;

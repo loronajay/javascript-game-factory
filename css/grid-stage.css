@@ -162,12 +162,10 @@
 .grid-board,
 .grid-stage__pager {
   position: relative;
-  z-index: 4;
 }
 
 .grid-stage__controls {
   position: relative;
-  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;

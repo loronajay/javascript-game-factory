@@ -165,7 +165,6 @@
 .activity-hero-card,
 .activity-feed {
   position: relative;
-  z-index: 4;
 }
 
 .activity-stage__masthead {
