@@ -1353,6 +1353,7 @@ export function createApp(options = {}) {
             photoId: commentRecord.photo.id,
             commentId: commentRecord.comment?.id || "",
             commentText: String(commentRecord.comment?.text || "").slice(0, 80),
+            photoCaption: String(commentRecord.photo.caption || "").slice(0, 80),
           },
         });
       }
@@ -1387,6 +1388,7 @@ export function createApp(options = {}) {
           payload: {
             photoId: photo.id,
             reactionId: photo.viewerReaction,
+            photoCaption: String(photo.caption || "").slice(0, 80),
           },
         });
       }

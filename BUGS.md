@@ -1,7 +1,5 @@
 # Bugs
 
-## currently can't interact (react/comment) with photos unless i'm on the gallery page. i need to be able to interact with the photos from the viewer, anywhere: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-02 115731.png"
-
 ## upload status text is moving the "upload photos" button: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-02 103158.png"
 
 ## Remaining architecture / polish backlog

@@ -52,6 +52,14 @@ function formatNotificationText(notif) {
     }
     case "thought_comment":
       return `<strong>${escapeHtml(actor)}</strong> commented on your thought`;
+    case "photo_reaction": {
+      const reactionId = notif.payload?.reactionId || "";
+      const glyph = THOUGHT_REACTION_GLYPHS[reactionId] || "reacted to";
+      const verb = reactionId && THOUGHT_REACTION_GLYPHS[reactionId] ? `${glyph}'d` : "reacted to";
+      return `<strong>${escapeHtml(actor)}</strong> ${verb} your photo`;
+    }
+    case "photo_comment":
+      return `<strong>${escapeHtml(actor)}</strong> commented on your photo`;
     case "thought_share":
       return `<strong>${escapeHtml(actor)}</strong> shared your thought`;
     case "friend_request":
@@ -132,7 +140,7 @@ export function renderNotificationItem(notif, onAccept, onReject, onChallengeAcc
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";
   const isChallenge = notif.type === "player_challenge" && notif.status === "unread";
   const isMessage = notif.type === "new_message";
-  const preview = notif.payload?.preview || notif.payload?.commentText || notif.payload?.thoughtText || "";
+  const preview = notif.payload?.preview || notif.payload?.commentText || notif.payload?.thoughtText || notif.payload?.photoCaption || "";
   const unreadClass = notif.status === "unread" ? " notif-item--unread" : "";
 
   const li = document.createElement("li");

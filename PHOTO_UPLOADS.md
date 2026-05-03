@@ -214,7 +214,7 @@ Keep photo comments/reactions separate from feed-thought comments/reactions. A c
 - Show the viewer’s selected reaction state so they can’t blind-react with no feedback.
 - Photo notification types: optional for this pass.
 
-### Pass 4.5
+### Pass 4.5 - COMPLETE
 
 - Wire notifications for photo interactions. Example: "Drellgor commented on your photo!". Same for reaction notifications on photos, they should work the way the other notifications work. Currently the notifications for this just read "loronajay sent you a notification" and if it's a comment it shows the comment, but there's not enough context.
 
