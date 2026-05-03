@@ -140,6 +140,7 @@ export function renderNotificationItem(notif, onAccept, onReject, onChallengeAcc
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";
   const isChallenge = notif.type === "player_challenge" && notif.status === "unread";
   const isMessage = notif.type === "new_message";
+  const isPhotoNotif = notif.type === "photo_comment" || notif.type === "photo_reaction";
   const preview = notif.payload?.preview || notif.payload?.commentText || notif.payload?.thoughtText || notif.payload?.photoCaption || "";
   const unreadClass = notif.status === "unread" ? " notif-item--unread" : "";
 
@@ -159,6 +160,9 @@ export function renderNotificationItem(notif, onAccept, onReject, onChallengeAcc
     ` : ""}
     ${isMessage && notif.payload?.conversationId ? `
       <a class="notif-item__game-link" href="${escapeHtml(buildHref(`messages/conversation/index.html?id=${notif.payload.conversationId}`))}">View Message →</a>
+    ` : ""}
+    ${isPhotoNotif && notif.payload?.photoId && notif.payload?.photoOwnerId ? `
+      <a class="notif-item__game-link" href="${escapeHtml(buildHref(`gallery/index.html?id=${notif.payload.photoOwnerId}&photo=${notif.payload.photoId}`))}">View Photo →</a>
     ` : ""}
     ${isChallenge ? `
       <div class="notif-item__actions">

@@ -1351,6 +1351,7 @@ export function createApp(options = {}) {
           type: "photo_comment",
           payload: {
             photoId: commentRecord.photo.id,
+            photoOwnerId: commentRecord.photo.playerId,
             commentId: commentRecord.comment?.id || "",
             commentText: String(commentRecord.comment?.text || "").slice(0, 80),
             photoCaption: String(commentRecord.photo.caption || "").slice(0, 80),
@@ -1387,6 +1388,7 @@ export function createApp(options = {}) {
           type: "photo_reaction",
           payload: {
             photoId: photo.id,
+            photoOwnerId: photo.playerId,
             reactionId: photo.viewerReaction,
             photoCaption: String(photo.caption || "").slice(0, 80),
           },

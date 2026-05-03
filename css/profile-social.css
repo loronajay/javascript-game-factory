@@ -2,11 +2,12 @@
 
 /* Shared gallery composer/grid styling used on both /me and /player. */
 .gallery-upload {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 14px 18px 28px;
   flex-wrap: wrap;
 }
 
@@ -38,10 +39,15 @@
 }
 
 .gallery-upload__status {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  right: 0;
   margin: 0;
   font-size: 0.74rem;
   color: #99ffff;
   letter-spacing: 0.08em;
+  text-align: center;
 }
 
 .gallery-upload__composer {

@@ -1,7 +1,5 @@
 # Bugs
 
-## upload status text is moving the "upload photos" button: "C:\Users\leoja\Pictures\Screenshots\Screenshot 2026-05-02 103158.png"
-
 ## Remaining architecture / polish backlog
 
 - Navigation UI/UX can still be polished further
