@@ -158,11 +158,10 @@
 }
 
 /* ---------- DESKTOP TOP RAIL CONTRACT ---------- */
-/* Keeps primary nav + auth rail on one row without crushing the auth rail. */
 
 @media (min-width: 721px) {
   .page-stage__controls {
-    width: min(94vw, 1180px);
+    width: min(96vw, 1220px);
     max-width: none;
   }
 
@@ -170,15 +169,16 @@
     width: 100%;
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
+    gap: 14px;
     flex-wrap: nowrap;
   }
 
   .app-shell-nav__tabs {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
+    width: max-content;
+    max-width: none;
     min-width: 0;
-    max-width: calc(100% - 340px);
     display: flex;
     align-items: center;
     gap: 7px;
@@ -196,8 +196,10 @@
 
   .app-shell-nav__session-slot {
     flex: 0 0 auto;
+    width: max-content;
+    max-width: none;
     align-self: flex-start;
-    margin-left: auto;
+    margin-left: 0;
     flex-wrap: nowrap;
     white-space: nowrap;
   }
