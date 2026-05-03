@@ -30,7 +30,6 @@
   justify-items: center;
   align-content: start;
   gap: 18px;
-  width: 100%;
   min-height: 100vh;
   padding: 18px clamp(16px, 4vw, 36px) 42px;
   background:
