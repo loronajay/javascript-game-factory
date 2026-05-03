@@ -156,3 +156,28 @@
     justify-content: flex-start;
   }
 }
+
+/* ---------- DESKTOP AUTH RAIL ROW FIX ---------- */
+
+@media (min-width: 721px) {
+  .app-shell-nav {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  .app-shell-nav__tabs {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .app-shell-nav__session-slot {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-self: flex-start;
+    margin-left: auto;
+  }
+
+  .session-nav {
+    flex-wrap: nowrap;
+  }
+}
