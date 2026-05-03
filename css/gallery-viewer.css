@@ -31,19 +31,23 @@
 
 .photo-viewer__close {
   position: absolute;
-  top: -2.25rem;
-  right: 0;
-  background: none;
-  border: none;
-  color: #aaa;
-  font-size: 1.75rem;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--profile-radius-xs, 6px);
+  color: #ccc;
+  font-size: 1.25rem;
   line-height: 1;
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.55rem;
   cursor: pointer;
+  transition: color 100ms, background 100ms;
 }
 
 .photo-viewer__close:hover {
   color: #fff;
+  background: rgba(0, 0, 0, 0.8);
 }
 
 .photo-viewer__viewer-row {
