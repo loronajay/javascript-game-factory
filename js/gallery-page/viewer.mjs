@@ -1,3 +1,5 @@
+import { createAuthApiClient } from "../platform/api/auth-api.mjs";
+
 const PHOTO_REACTION_IDS = ["like", "love", "laugh", "wow", "fire", "sad", "angry", "poop"];
 const PHOTO_REACTION_GLYPHS = {
   like: "👍", love: "❤️", laugh: "😂", wow: "😮",
@@ -341,8 +343,66 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   return api;
 }
 
-export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHref = "../gallery/index.html" } = {}) {
-  const viewer = createPhotoViewer({ doc, lightweight: true });
+export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHref = "../gallery/index.html", apiClient = null } = {}) {
+  const hasApi = !!apiClient;
+
+  // Full viewer for gallery panel photos; lightweight viewer for thought card images or when no API
+  const fullViewer = createPhotoViewer({ doc, lightweight: !hasApi });
+  const thoughtViewer = hasApi ? createPhotoViewer({ doc, lightweight: true }) : fullViewer;
+
+  let sessionCache = null;
+  async function loadSessionOnce() {
+    if (sessionCache !== null) return sessionCache;
+    sessionCache = { playerId: "", displayName: "" };
+    try {
+      const session = await createAuthApiClient().getSession().catch(() => null);
+      if (session?.playerId) {
+        sessionCache = { playerId: session.playerId, displayName: session.displayName || session.profileName || "" };
+      }
+    } catch {}
+    return sessionCache;
+  }
+
+  async function loadSocialState(ownerId, photoId) {
+    const [comments, photoRecord] = await Promise.all([
+      apiClient.listPhotoComments(photoId).catch(() => []),
+      ownerId ? apiClient.getPlayerPhoto(ownerId, photoId).catch(() => null) : Promise.resolve(null),
+    ]);
+    fullViewer.setSocialState(photoId, {
+      reactionTotals: photoRecord?.reactionTotals || {},
+      viewerReaction: photoRecord?.viewerReaction || "",
+      comments: Array.isArray(comments) ? comments : [],
+    });
+  }
+
+  async function handleReact(photoId, reactionId) {
+    const session = await loadSessionOnce();
+    if (!session.playerId) return;
+    const photo = await apiClient.reactToPhoto(photoId, session.playerId, reactionId).catch(() => null);
+    if (!photo) return;
+    const comments = await apiClient.listPhotoComments(photoId).catch(() => []);
+    fullViewer.setSocialState(photoId, {
+      reactionTotals: photo.reactionTotals || {},
+      viewerReaction: photo.viewerReaction || "",
+      comments: Array.isArray(comments) ? comments : [],
+    });
+  }
+
+  async function handleComment(photoId, text) {
+    const session = await loadSessionOnce();
+    if (!session.playerId || !text?.trim()) return;
+    const commentRecord = await apiClient
+      .commentOnPhoto(photoId, session.playerId, session.displayName, text)
+      .catch(() => null);
+    if (!commentRecord) return;
+    const comments = await apiClient.listPhotoComments(photoId).catch(() => []);
+    const photo = commentRecord.photo;
+    fullViewer.setSocialState(photoId, {
+      reactionTotals: photo?.reactionTotals || {},
+      viewerReaction: "",
+      comments: Array.isArray(comments) ? comments : [],
+    });
+  }
 
   doc.addEventListener("click", (e) => {
     if (e.target.closest(".photo-viewer")) return;
@@ -364,12 +424,32 @@ export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHr
       const viewAllLink = panel?.querySelector(".gallery-view-all");
       const galleryLinkHref = viewAllLink?.href || "";
 
-      viewer.setPhotos([photo], { galleryLinkHref });
-      viewer.open(photo.id);
+      if (hasApi) {
+        let ownerId = "";
+        try {
+          const url = new URL(galleryLinkHref, globalThis.location?.href);
+          ownerId = url.searchParams.get("id") || "";
+        } catch {}
+
+        loadSessionOnce().then((session) => {
+          fullViewer.setPhotos([photo], {
+            galleryLinkHref,
+            onReact: handleReact,
+            onComment: handleComment,
+            viewerPlayerId: session.playerId,
+            viewerAuthorDisplayName: session.displayName,
+          });
+          fullViewer.open(photo.id);
+          void loadSocialState(ownerId, photo.id);
+        });
+      } else {
+        fullViewer.setPhotos([photo], { galleryLinkHref });
+        fullViewer.open(photo.id);
+      }
       return;
     }
 
-    // Thought card image click (any feed page)
+    // Thought card image click (any feed page) — lightweight, no real photo ID
     const thoughtImg = e.target.closest(".thought-card__image");
     if (thoughtImg) {
       const article = thoughtImg.closest("article[data-poster-id]");
@@ -384,10 +464,10 @@ export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHr
         caption: thoughtImg.alt || "",
       };
 
-      viewer.setPhotos([photo], { galleryLinkHref });
-      viewer.open(photo.id);
+      thoughtViewer.setPhotos([photo], { galleryLinkHref });
+      thoughtViewer.open(photo.id);
     }
   });
 
-  return viewer;
+  return fullViewer;
 }

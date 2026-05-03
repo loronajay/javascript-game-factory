@@ -16,7 +16,7 @@ export { renderThoughtsPage } from "./render.mjs";
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
-  initPageGalleryViewer({ doc });
+  initPageGalleryViewer({ doc, apiClient: createPlatformApiClient() });
 
   renderPrimaryAppNav(doc.getElementById("thoughtsPrimaryNav"), {
     basePath: "../",

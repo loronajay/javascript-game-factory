@@ -52,7 +52,7 @@ function applyFriendNavigatorFilter(doc, query = "") {
 }
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
-  initPageGalleryViewer({ doc });
+  initPageGalleryViewer({ doc, apiClient });
   let cachedHydration = null;
   let galleryPhotos = [];
   let friendNavigatorExpanded = false;

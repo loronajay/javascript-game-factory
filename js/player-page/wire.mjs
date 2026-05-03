@@ -18,7 +18,7 @@ import { createProfileSocialActions } from "../profile-social/social-actions.mjs
 import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession }) {
-  initPageGalleryViewer({ doc });
+  initPageGalleryViewer({ doc, apiClient });
   let currentPageData = null;
   let galleryPhotos = [];
   let heroActions = null;

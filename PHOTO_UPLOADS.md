@@ -208,11 +208,15 @@ Reuse the same emoji reaction contract as thoughts so the UI feels consistent an
 
 Keep photo comments/reactions separate from feed-thought comments/reactions. A cross-posted thought and its gallery photo are different social objects and should stay that way.
 
-### Pass 4
+### Pass 4 - COMPLETE
 
 - Show comment/reaction counts directly on each photo card in the gallery grid.
 - Show the viewer’s selected reaction state so they can’t blind-react with no feedback.
 - Photo notification types: optional for this pass.
+
+### Pass 4.5
+
+- Wire notifications for photo interactions. Example: "Drellgor commented on your photo!". Same for reaction notifications on photos, they should work the way the other notifications work. Currently the notifications for this just read "loronajay sent you a notification" and if it's a comment it shows the comment, but there's not enough context.
 
 ### Pass 5
 
