@@ -1,0 +1,351 @@
+{
+  "schemaVersion": "battle-scene-state.v0.1",
+  "battleId": "mock-blue-forest-001",
+  "ruleset": {
+    "rulesetId": "rental-direct-level-30-dev",
+    "displayName": "Rental Direct Level 30 Dev",
+    "modeFamily": "direct_battle_dev",
+    "teamSize": 3,
+    "levelCap": 30,
+    "itemsAllowed": false,
+    "combosAllowed": true
+  },
+  "themeRef": "battle-ui-theme.default.json",
+  "assets": {
+    "backgrounds": {
+      "blueForestArena": "assets/reference/arena_background_reference.png"
+    },
+    "creatures": {
+      "aquaphant": {
+        "portrait": "assets/reference/aquaphant_reference.png",
+        "battleSprite": "assets/reference/aquaphant_reference.png",
+        "nativeFacing": "right"
+      },
+      "salamander": {
+        "portrait": "assets/reference/salamander_reference.png",
+        "battleSprite": "assets/reference/salamander_reference.png",
+        "nativeFacing": "right"
+      },
+      "pengun": {
+        "portrait": "assets/reference/pengun_reference.png",
+        "battleSprite": "assets/reference/pengun_reference.png",
+        "nativeFacing": "right"
+      }
+    },
+    "commandIcons": {
+      "attack_sword": "attack_sword",
+      "defend_shield": "defend_shield",
+      "art_diamond": "art_diamond",
+      "skill_spiral": "skill_spiral",
+      "item_potion": "item_potion"
+    }
+  },
+  "layout": {
+    "baseWidth": 1672,
+    "baseHeight": 941,
+    "slots": {
+      "player": {
+        "top": { "xPercent": 26, "yPercent": 38, "scale": 0.58, "zIndex": 20 },
+        "middle": { "xPercent": 31, "yPercent": 52, "scale": 0.74, "zIndex": 30 },
+        "bottom": { "xPercent": 25, "yPercent": 68, "scale": 0.62, "zIndex": 40 }
+      },
+      "enemy": {
+        "top": { "xPercent": 74, "yPercent": 38, "scale": 0.58, "zIndex": 20 },
+        "middle": { "xPercent": 69, "yPercent": 52, "scale": 0.74, "zIndex": 30 },
+        "bottom": { "xPercent": 75, "yPercent": 68, "scale": 0.62, "zIndex": 40 }
+      }
+    }
+  },
+  "commands": [
+    {
+      "id": "attack",
+      "label": "ATTACK",
+      "commandSource": "Attack",
+      "iconKey": "attack_sword",
+      "enabledByDefault": true
+    },
+    {
+      "id": "defend",
+      "label": "DEFEND",
+      "commandSource": "Defend",
+      "iconKey": "defend_shield",
+      "enabledByDefault": true
+    },
+    {
+      "id": "art",
+      "label": "ART",
+      "commandSource": "Art",
+      "iconKey": "art_diamond",
+      "enabledByDefault": true
+    },
+    {
+      "id": "skill",
+      "label": "SKILL",
+      "commandSource": "Skill",
+      "iconKey": "skill_spiral",
+      "enabledByDefault": true
+    },
+    {
+      "id": "item",
+      "label": "ITEM",
+      "commandSource": "Item",
+      "iconKey": "item_potion",
+      "enabledByDefault": false
+    }
+  ],
+  "uiState": {
+    "phase": "choose_command",
+    "prompt": "Choose Command",
+    "activeSide": "player",
+    "activeSlotId": "middle",
+    "selectedCommandId": "attack",
+    "targetSide": "enemy",
+    "targetSlotId": "middle"
+  },
+  "sides": {
+    "player": {
+      "displayName": "Player",
+      "slots": [
+        {
+          "slotId": "top",
+          "side": "player",
+          "occupied": true,
+          "creature": {
+            "runtimeId": "player-salamander-001",
+            "creatureId": "salamander",
+            "displayName": "Salamander",
+            "element": "Fire",
+            "level": 30,
+            "role": "Magic Art pressure",
+            "hp": { "current": 380, "max": 380 },
+            "mp": { "current": 100, "max": 100 },
+            "stats": {
+              "strength": 34,
+              "defense": 32,
+              "intelligence": 72,
+              "spirit": 50,
+              "speed": 62,
+              "accuracy": 80,
+              "evasion": 72
+            },
+            "statusEffects": [],
+            "assetKey": "salamander",
+            "teamMarker": "player-blue-shield",
+            "isKnockedOut": false,
+            "isActiveCommandUser": false,
+            "isTargetable": true,
+            "legalCommands": {
+              "attack": true,
+              "defend": true,
+              "art": true,
+              "skill": true,
+              "item": false
+            },
+            "knownArts": ["spark_flick", "heat_haze", "flare_bite", "cinder_burst"],
+            "knownSkills": []
+          }
+        },
+        {
+          "slotId": "middle",
+          "side": "player",
+          "occupied": true,
+          "creature": {
+            "runtimeId": "player-aquaphant-001",
+            "creatureId": "aquaphant",
+            "displayName": "Aquaphant",
+            "element": "Water",
+            "level": 30,
+            "role": "Sustain bruiser",
+            "hp": { "current": 420, "max": 420 },
+            "mp": { "current": 120, "max": 120 },
+            "stats": {
+              "strength": 44,
+              "defense": 62,
+              "intelligence": 56,
+              "spirit": 58,
+              "speed": 30,
+              "accuracy": 70,
+              "evasion": 58
+            },
+            "statusEffects": [],
+            "assetKey": "aquaphant",
+            "teamMarker": "player-blue-shield",
+            "isKnockedOut": false,
+            "isActiveCommandUser": true,
+            "isTargetable": true,
+            "legalCommands": {
+              "attack": true,
+              "defend": true,
+              "art": true,
+              "skill": true,
+              "item": false
+            },
+            "knownArts": ["bubble_shot", "soak_hide", "tidal_bump", "surge_crash"],
+            "knownSkills": []
+          }
+        },
+        {
+          "slotId": "bottom",
+          "side": "player",
+          "occupied": true,
+          "creature": {
+            "runtimeId": "player-pengun-001",
+            "creatureId": "pengun",
+            "displayName": "Pengun",
+            "element": "Ice",
+            "level": 30,
+            "role": "Control / debuff",
+            "hp": { "current": 360, "max": 360 },
+            "mp": { "current": 140, "max": 140 },
+            "stats": {
+              "strength": 30,
+              "defense": 38,
+              "intelligence": 62,
+              "spirit": 50,
+              "speed": 76,
+              "accuracy": 82,
+              "evasion": 78
+            },
+            "statusEffects": [],
+            "assetKey": "pengun",
+            "teamMarker": "player-blue-shield",
+            "isKnockedOut": false,
+            "isActiveCommandUser": false,
+            "isTargetable": true,
+            "legalCommands": {
+              "attack": true,
+              "defend": true,
+              "art": true,
+              "skill": true,
+              "item": false
+            },
+            "knownArts": ["ice_pebble", "cold_feet", "snow_blind", "frost_nip", "shatter_chill"],
+            "knownSkills": []
+          }
+        }
+      ]
+    },
+    "enemy": {
+      "displayName": "Enemy",
+      "slots": [
+        {
+          "slotId": "top",
+          "side": "enemy",
+          "occupied": true,
+          "creature": {
+            "runtimeId": "enemy-salamander-001",
+            "creatureId": "salamander",
+            "displayName": "Salamander",
+            "element": "Fire",
+            "level": 30,
+            "role": "Magic Art pressure",
+            "hp": { "current": 380, "max": 380 },
+            "mp": { "current": 100, "max": 100 },
+            "stats": {
+              "strength": 34,
+              "defense": 32,
+              "intelligence": 72,
+              "spirit": 50,
+              "speed": 62,
+              "accuracy": 80,
+              "evasion": 72
+            },
+            "statusEffects": [],
+            "assetKey": "salamander",
+            "teamMarker": "enemy-red-shield",
+            "isKnockedOut": false,
+            "isActiveCommandUser": false,
+            "isTargetable": true,
+            "legalCommands": {
+              "attack": true,
+              "defend": true,
+              "art": true,
+              "skill": true,
+              "item": false
+            },
+            "knownArts": ["spark_flick", "heat_haze", "flare_bite", "cinder_burst"],
+            "knownSkills": []
+          }
+        },
+        {
+          "slotId": "middle",
+          "side": "enemy",
+          "occupied": true,
+          "creature": {
+            "runtimeId": "enemy-aquaphant-001",
+            "creatureId": "aquaphant",
+            "displayName": "Aquaphant",
+            "element": "Water",
+            "level": 30,
+            "role": "Sustain bruiser",
+            "hp": { "current": 420, "max": 420 },
+            "mp": { "current": 120, "max": 120 },
+            "stats": {
+              "strength": 44,
+              "defense": 62,
+              "intelligence": 56,
+              "spirit": 58,
+              "speed": 30,
+              "accuracy": 70,
+              "evasion": 58
+            },
+            "statusEffects": [],
+            "assetKey": "aquaphant",
+            "teamMarker": "enemy-red-shield",
+            "isKnockedOut": false,
+            "isActiveCommandUser": false,
+            "isTargetable": true,
+            "legalCommands": {
+              "attack": true,
+              "defend": true,
+              "art": true,
+              "skill": true,
+              "item": false
+            },
+            "knownArts": ["bubble_shot", "soak_hide", "tidal_bump", "surge_crash"],
+            "knownSkills": []
+          }
+        },
+        {
+          "slotId": "bottom",
+          "side": "enemy",
+          "occupied": true,
+          "creature": {
+            "runtimeId": "enemy-pengun-001",
+            "creatureId": "pengun",
+            "displayName": "Pengun",
+            "element": "Ice",
+            "level": 30,
+            "role": "Control / debuff",
+            "hp": { "current": 360, "max": 360 },
+            "mp": { "current": 140, "max": 140 },
+            "stats": {
+              "strength": 30,
+              "defense": 38,
+              "intelligence": 62,
+              "spirit": 50,
+              "speed": 76,
+              "accuracy": 82,
+              "evasion": 78
+            },
+            "statusEffects": [],
+            "assetKey": "pengun",
+            "teamMarker": "enemy-red-shield",
+            "isKnockedOut": false,
+            "isActiveCommandUser": false,
+            "isTargetable": true,
+            "legalCommands": {
+              "attack": true,
+              "defend": true,
+              "art": true,
+              "skill": true,
+              "item": false
+            },
+            "knownArts": ["ice_pebble", "cold_feet", "snow_blind", "frost_nip", "shatter_chill"],
+            "knownSkills": []
+          }
+        }
+      ]
+    }
+  }
+}

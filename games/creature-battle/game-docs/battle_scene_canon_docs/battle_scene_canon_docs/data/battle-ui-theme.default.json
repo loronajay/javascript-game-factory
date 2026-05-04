@@ -1,0 +1,29 @@
+{
+  "themeId": "default-blue",
+  "displayName": "Default Blue",
+  "version": "0.1.0",
+  "colors": {
+    "primary": "#064f8f",
+    "primaryDark": "#02172f",
+    "accent": "#27caff",
+    "accentSoft": "rgba(39, 202, 255, 0.45)",
+    "panelBg": "rgba(3, 31, 68, 0.86)",
+    "panelBgSoft": "rgba(3, 70, 120, 0.62)",
+    "border": "#06182d",
+    "text": "#f2fbff",
+    "mutedText": "#a8d8ef",
+    "hp": "#35d84b",
+    "mp": "#27bfff",
+    "disabled": "rgba(145, 164, 178, 0.45)",
+    "selected": "#ffffff",
+    "playerAccent": "#27caff",
+    "enemyAccent": "#ff6a2a"
+  },
+  "panel": {
+    "opacity": 0.86,
+    "borderWidthPx": 4,
+    "cornerSizePx": 16,
+    "glowStrength": 0.45
+  },
+  "futureCustomizable": true
+}
