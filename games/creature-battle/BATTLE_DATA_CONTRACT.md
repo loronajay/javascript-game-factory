@@ -55,9 +55,11 @@ Every move should define:
 ```txt
 Move ID
 Display Name
-Damage Category
+Command Source
+Damage Type
 Element Mode
 Potency Tier
+Base Power, if damaging
 Move Power Modifier
 Base Accuracy
 Cost Type
@@ -68,7 +70,18 @@ Class Source or Species Source
 Notes
 ```
 
-Move potency should not be inferred only from display name. It needs data.
+Move potency should not be inferred only from display name. It needs data. Every damaging Art, Skill, Attack default, and combo result needs a Base Power or explicit damage basis.
+
+Damage Type controls stat scaling:
+
+```txt
+Physical = Strength vs Defense
+Magic = Intelligence vs Spirit
+Hybrid = explicit formula
+Utility / Non-damaging = no standard damage formula unless explicitly defined
+```
+
+Element Mode is separate from Damage Type. Element applies matchup behavior; it does not decide whether Strength or Intelligence is used.
 
 ## Combo Object
 
@@ -84,7 +97,8 @@ Required participating species, if any
 Required elements, if any
 Required tags, if any
 Resulting combo move
-Damage category
+Damage type
+Base Power or effect basis
 Element mode
 Cost behavior
 Targeting behavior

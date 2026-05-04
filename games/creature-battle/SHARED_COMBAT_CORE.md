@@ -58,8 +58,9 @@ A basic physical action.
 
 Default behavior:
 
-- Uses the Physical Damage formula
+- Uses the Physical damage formula
 - Uses Strength against Defense
+- Has a basic Attack Base Power defined by ruleset or creature defaults
 - Has no element by default
 - Has no MP cost by default
 
@@ -85,7 +86,9 @@ Defend may also become a combo setup tool later if specific combos require defen
 
 Magic-style commands.
 
-Arts usually consume MP and use Intelligence against Spirit. Arts may be elemental or non-elemental. Elemental Arts apply the elemental matchup table.
+Arts usually consume MP. Damaging Arts usually use Magic damage, which scales from Intelligence against Spirit. Arts may be elemental or non-elemental. Elemental Arts apply the elemental matchup table.
+
+Each damaging Art must define its own Base Power. The fact that a command is an Art does not remove the need for base damage data.
 
 Arts are the primary expression of creature element identity.
 
@@ -539,33 +542,60 @@ Absorption should be previewed clearly in the battle UI when possible. If a play
 
 Element relationships should be authored in data rather than hardcoded throughout the engine.
 
-## Damage Categories and Element Mode
+## Damage Type, Base Power, and Element Mode
 
-Damage category and element are separate fields.
+Damage type, base power, command source, and element are separate fields.
 
-This prevents the system from incorrectly assuming that all magic is elemental or all physical damage is non-elemental.
+This prevents the system from incorrectly assuming that all magic is elemental, all elemental attacks are magic, or all Arts use the same damage behavior.
 
-### Damage Categories
+### Damage Types
 
-Current damage categories:
-
-```txt
-Physical Damage
-Elemental Physical Damage
-Art Damage
-```
-
-Combo damage may define additional higher-level categories for data readability:
+Current damage types:
 
 ```txt
-Physical Combo
-Elemental Physical Combo
-Art Combo
-Hybrid Combo
-Utility Combo
+Physical
+Magic
+Hybrid
+Utility / Non-damaging
 ```
 
-Internally, combo categories should still resolve through clear damage or effect rules.
+Damage type determines stat scaling:
+
+```txt
+Physical damage = Strength vs Defense
+Magic damage    = Intelligence vs Spirit
+Hybrid damage   = explicit combo or move formula
+Utility         = no standard damage formula unless explicitly defined
+```
+
+All damaging moves must define Base Power.
+
+This includes:
+
+- Basic Attack
+- Damaging Arts
+- Damaging Skills
+- Damaging combo results
+- Elemental physical moves
+- Non-elemental magic moves
+
+Base Power is the move's starting damage value before stat pressure, level scaling, target count scaling, defensive modifiers, passive modifiers, elemental modifiers, critical modifiers, random variance, and final clamp are applied.
+
+### Command Source vs Damage Type
+
+Command source describes where the action appears in the battle menu. Damage type describes how the action scales.
+
+Examples:
+
+```txt
+Attack command -> usually Physical damage
+Art command    -> usually Magic damage
+Skill command  -> Physical, Magic, Hybrid, Utility, or custom
+Combo result   -> Physical, Magic, Hybrid, Utility, or custom
+Item command   -> fixed effect, healing, utility, or explicit damage if allowed
+```
+
+Arts are still the primary expression of creature element identity, but an Art being elemental does not decide its scaling by itself. Its damage type does.
 
 ### Element Mode
 
@@ -583,30 +613,65 @@ Light
 Dark
 ```
 
+Element mode is a matchup layer. It is not the stat-scaling layer.
+
+A move may be:
+
+```txt
+Physical / Non-elemental
+Physical / Elemental
+Magic / Non-elemental
+Magic / Elemental
+Hybrid / Elemental or Non-elemental
+Utility / Elemental or Non-elemental, if the effect needs element identity
+```
+
 ### Damage-Type Matrix
 
 ```txt
-Normal Attack:
-Physical / Non-elemental
+Basic Attack:
+Command: Attack
+Damage Type: Physical
+Element Mode: None by default
+Scaling: Strength vs Defense
+Base Power: defined by ruleset or creature default
 
 Physical Skill:
-Physical / Non-elemental
+Command: Skill
+Damage Type: Physical
+Element Mode: None
+Scaling: Strength vs Defense
+Base Power: defined by move data
 
-Elemental Skill:
-Elemental Physical / Elemental
+Elemental Physical Skill:
+Command: Skill
+Damage Type: Physical
+Element Mode: Fire / Water / Wind / Earth / Gaia / Ice / Light / Dark
+Scaling: Strength vs Defense
+Base Power: defined by move data
 
-Elemental Art:
-Art / Elemental
+Non-elemental Magic Art:
+Command: Art
+Damage Type: Magic
+Element Mode: None
+Scaling: Intelligence vs Spirit
+Base Power: defined by move data
 
-Non-elemental Art:
-Art / Non-elemental
+Elemental Magic Art:
+Command: Art
+Damage Type: Magic
+Element Mode: Fire / Water / Wind / Earth / Gaia / Ice / Light / Dark
+Scaling: Intelligence vs Spirit
+Base Power: defined by move data
 ```
 
 Current rule:
 
-- Arts are the primary elemental system.
-- Some Skills may be Elemental Physical if explicitly tagged that way.
+- Strength is factored into all Physical damaging moves.
+- Intelligence is factored into all Magic damaging moves.
+- Element is applied separately from stat scaling.
 - Basic Attack is Physical and non-elemental by default.
+- Every damaging Art and Skill needs explicit Base Power in move data.
 
 ## Damage Formula Scope
 
@@ -614,38 +679,15 @@ The system should preserve the older variable-rich philosophy while enforcing a 
 
 Complexity is acceptable if every variable has a defined job and stacking is controlled.
 
-### Physical Damage Variables
+### Shared Damaging Move Variables
 
 ```txt
-BasePhysicalPower
+BasePower
 MovePowerModifier
-AttackerStrength
-TargetDefense
-LevelModifier
-RandomDamageModifier
-CriticalModifier
-PassiveDamageModifiers
-PassiveResistanceModifiers
-DefendModifier
-TargetCountModifier
-FinalDamageCap
-```
-
-### Elemental Physical Damage Variables
-
-Elemental Physical Damage uses the Physical Damage variables plus:
-
-```txt
-ElementModifier
-```
-
-### Art Damage Variables
-
-```txt
-BaseArtPower
-MovePowerModifier
-AttackerIntelligence
-TargetSpirit
+DamageType
+ElementMode
+OffensiveStat
+DefensiveStat
 LevelModifier
 RandomDamageModifier
 CriticalModifier
@@ -657,16 +699,29 @@ TargetCountModifier
 FinalDamageCap
 ```
 
+`BasePower` is required for every damaging move.
+
+`OffensiveStat` and `DefensiveStat` are selected from DamageType:
+
+```txt
+Physical: OffensiveStat = Strength, DefensiveStat = Defense
+Magic:    OffensiveStat = Intelligence, DefensiveStat = Spirit
+Hybrid:   Uses explicit move or combo formula
+```
+
 ### Prototype Physical Formula
+
+Physical damage is used by Basic Attack, physical Skills, elemental physical Skills, physical combo results, and any other damaging move with `DamageType = Physical`.
 
 ```txt
 PhysicalDamage =
 (
-  BasePhysicalPower
+  BasePower
   + MovePowerModifier
   + ((AttackerStrength - TargetDefense) × 0.50)
   + LevelModifier
 )
+× ElementModifierIfAny
 × TargetCountModifier
 × DefendModifier
 × PassiveDamageModifiers
@@ -675,31 +730,16 @@ PhysicalDamage =
 + RandomDamageModifier
 ```
 
-### Prototype Elemental Physical Formula
+For non-elemental Physical damage, `ElementModifierIfAny = 1.0`.
+
+### Prototype Magic Formula
+
+Magic damage is used by damaging Arts, magic Skills, magic combo results, and any other damaging move with `DamageType = Magic`.
 
 ```txt
-ElementalPhysicalDamage =
+MagicDamage =
 (
-  BasePhysicalPower
-  + MovePowerModifier
-  + ((AttackerStrength - TargetDefense) × 0.50)
-  + LevelModifier
-)
-× ElementModifier
-× TargetCountModifier
-× DefendModifier
-× PassiveDamageModifiers
-× PassiveResistanceModifiers
-× CriticalModifier
-+ RandomDamageModifier
-```
-
-### Prototype Art Formula
-
-```txt
-ArtDamage =
-(
-  BaseArtPower
+  BasePower
   + MovePowerModifier
   + ((AttackerIntelligence - TargetSpirit) × 0.50)
   + LevelModifier
@@ -712,6 +752,24 @@ ArtDamage =
 × CriticalModifier
 + RandomDamageModifier
 ```
+
+For non-elemental Magic damage, `ElementModifierIfAny = 1.0`.
+
+### Hybrid and Utility Damage
+
+Hybrid damage must define its scaling explicitly in move or combo data.
+
+Examples:
+
+```txt
+Average Strength and Intelligence vs average Defense and Spirit
+Strength-weighted hybrid damage
+Intelligence-weighted hybrid damage
+Fixed base damage with no stat pressure
+Custom effect that does not use normal damage
+```
+
+Utility moves do not use standard damage unless the move data explicitly defines a damage behavior.
 
 ### Damage Clamp
 
@@ -774,9 +832,11 @@ Every move should define:
 ```txt
 Move ID
 Display Name
-Damage Category
+Command Source
+Damage Type
 Element Mode
 Potency Tier
+Base Power, if damaging
 Move Power Modifier
 Base Accuracy
 Cost Type
@@ -787,7 +847,7 @@ Class Source or Species Source
 Notes
 ```
 
-Move potency should not be inferred only from display name. It needs data.
+Move potency should not be inferred only from display name. It needs data. Damaging Arts and Skills must not rely only on stat scaling; each damaging move needs Base Power.
 
 ## Healing
 
@@ -985,7 +1045,8 @@ The preview should show:
 - Participating creatures
 - Source moves
 - Resulting effect summary
-- Damage category
+- Damage type
+- Base Power or effect basis
 - Element mode, if any
 - Targeting behavior
 - Costs
@@ -1047,21 +1108,20 @@ Balance purpose:
 
 Three-creature combos should feel like full-team synergy finishers or major swing plays, not the default best action every round.
 
-### Combo Damage Categories
+### Combo Damage Types
 
-A combo should define its damage category:
+A combo should define its damage type and Base Power or effect basis:
 
 ```txt
 Physical Combo
-Elemental Physical Combo
-Art Combo
+Magic Combo
 Hybrid Combo
 Utility Combo
 ```
 
-Physical combos may use participant Strength against target Defense.
+Physical combos use participant Strength against target Defense unless combo data overrides the formula.
 
-Art combos may use participant Intelligence against target Spirit and apply elements.
+Magic combos use participant Intelligence against target Spirit unless combo data overrides the formula.
 
 Hybrid combos may use weighted or averaged Strength and Intelligence against weighted or averaged Defense and Spirit.
 
@@ -1081,7 +1141,8 @@ Required participating species, if any
 Required elements, if any
 Required tags, if any
 Resulting combo move
-Damage category
+Damage type
+Base Power or effect basis
 Element mode
 Cost behavior
 Targeting behavior

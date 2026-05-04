@@ -75,10 +75,11 @@ Salamander’s natural Art list should stay compact. Starter rental Salamander s
 Art ID: `cinder_flick`  
 Display Name: Cinder Flick  
 Source: Species Art  
-Damage Category: Art Damage  
+Command Source: Art  
+Damage Type: Magic  
 Element Mode: Fire  
-Base Damage Tier: Minimal Damage  
-Base Damage Value: 24  
+Potency Tier: Minimal Damage  
+Base Power: 24  
 Scaling Stat: Intelligence  
 Defensive Stat: Spirit  
 MP Cost: 4  
@@ -95,10 +96,11 @@ It should be stronger than Flor’s basic chip Art, but still clearly below seri
 Art ID: `flare_bite`  
 Display Name: Flare Bite  
 Source: Species Art  
-Damage Category: Art Damage  
+Command Source: Art  
+Damage Type: Magic  
 Element Mode: Fire  
-Base Damage Tier: Moderate Damage  
-Base Damage Value: 36  
+Potency Tier: Moderate Damage  
+Base Power: 36  
 Scaling Stat: Intelligence  
 Defensive Stat: Spirit  
 MP Cost: 7  
@@ -108,17 +110,18 @@ Combo Tags: Fire, Fang, Flare, Pressure
 
 Flare Bite is Salamander’s primary offensive Art.
 
-Despite the name, this should still resolve as Art Damage unless explicitly changed later. The name gives flavor, not physical scaling. This keeps Salamander separate from Emberjaw.
+Despite the name, this should still resolve as Magic damage unless explicitly changed later. The name gives flavor, not physical scaling. This keeps Salamander separate from Emberjaw.
 
 ### Heat Haze
 
 Art ID: `heat_haze`  
 Display Name: Heat Haze  
 Source: Species Art  
-Damage Category: None  
+Command Source: Art  
+Damage Type: Utility / Non-damaging  
 Element Mode: Fire  
 Effect Tier: Offensive Utility  
-Base Damage Value: None  
+Base Power: None  
 MP Cost: 6  
 Base Accuracy: Guaranteed  
 Target Pattern: Self  
@@ -142,10 +145,11 @@ If that is too much for one move, keep only the Accuracy bonus first.
 Art ID: `ember_surge`  
 Display Name: Ember Surge  
 Source: Species Art  
-Damage Category: Art Damage  
+Command Source: Art  
+Damage Type: Magic  
 Element Mode: Fire  
-Base Damage Tier: Heavy Damage  
-Base Damage Value: 52  
+Potency Tier: Heavy Damage  
+Base Power: 52  
 Scaling Stat: Intelligence  
 Defensive Stat: Spirit  
 MP Cost: 12  
@@ -357,7 +361,7 @@ Mitigation:
 Mitigation:
 
 - Salamander uses Intelligence vs Spirit.
-- Emberjaw should use Strength vs Defense through Elemental Physical damage.
+- Emberjaw should use Strength vs Defense through Physical damage with Fire Element Mode.
 - Salamander’s flavor can include claws, bites, and flame body language, but its battle data should remain Art-focused.
 
 ### Risk: Heat Haze creates annoying evasion loops
@@ -375,9 +379,10 @@ Salamander should use the shared combat core without special-case rules.
 Damaging Arts should use:
 
 ```txt
-Art Damage
-Intelligence vs Spirit
-Base Damage Value
+Command Source: Art
+Damage Type: Magic
+Scaling: Intelligence vs Spirit
+Base Power
 Element Mode: Fire
 ```
 

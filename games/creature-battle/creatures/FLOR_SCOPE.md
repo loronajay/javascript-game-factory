@@ -75,10 +75,11 @@ Flor’s natural Art list should stay compact. Starter rental Flor should use 4 
 Art ID: `sprout_tap`  
 Display Name: Sprout Tap  
 Source: Species Art  
-Damage Category: Art Damage  
+Command Source: Art  
+Damage Type: Magic  
 Element Mode: Gaia  
-Base Damage Tier: Minimal Damage  
-Base Damage Value: 22  
+Potency Tier: Minimal Damage  
+Base Power: 22  
 Scaling Stat: Intelligence  
 Defensive Stat: Spirit  
 MP Cost: 4  
@@ -95,10 +96,11 @@ It should exist so Flor always has a useful action when healing or support is no
 Art ID: `root_snare`  
 Display Name: Root Snare  
 Source: Species Art  
-Damage Category: Art Damage  
+Command Source: Art  
+Damage Type: Magic  
 Element Mode: Gaia  
-Base Damage Tier: Minimal Damage  
-Base Damage Value: 18  
+Potency Tier: Minimal Damage  
+Base Power: 18  
 Scaling Stat: Intelligence  
 Defensive Stat: Spirit  
 MP Cost: 6  
@@ -118,7 +120,8 @@ Root Snare should be useful against fast enemies but not reliable enough to comp
 Art ID: `petal_mend`  
 Display Name: Petal Mend  
 Source: Species Art  
-Damage Category: None  
+Command Source: Art  
+Damage Type: Utility / Non-damaging  
 Element Mode: Gaia  
 Healing Tier: Moderate Heal  
 Base Heal Value: 34  
@@ -139,10 +142,11 @@ Petal Mend should be stronger when Flor is built or tuned around Spirit, but the
 Art ID: `verdant_guard`  
 Display Name: Verdant Guard  
 Source: Species Art  
-Damage Category: None  
+Command Source: Art  
+Damage Type: Utility / Non-damaging  
 Element Mode: Gaia  
 Effect Tier: Defensive Utility  
-Base Damage Value: None  
+Base Power: None  
 MP Cost: 10  
 Base Accuracy: Guaranteed  
 Target Pattern: One ally  
@@ -379,9 +383,10 @@ Flor should use the shared combat core without special-case rules.
 Damaging Arts should use:
 
 ```txt
-Art Damage
-Intelligence vs Spirit
-Base Damage Value
+Command Source: Art
+Damage Type: Magic
+Scaling: Intelligence vs Spirit
+Base Power
 Element Mode: Gaia
 ```
 
