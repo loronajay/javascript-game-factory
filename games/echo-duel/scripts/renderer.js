@@ -217,15 +217,116 @@ function renderInputMode(state) {
 }
 
 
-function roleLabel(state, player, owner) {
-  if (owner?.id === player.id) return 'Driver';
-  const progress = state.copyProgress?.[player.id];
-  if (state.phase === PHASES.CHALLENGER_COPY && progress) {
-    if (progress.status === 'safe') return 'Safe';
-    if (progress.status === 'fail') return 'Failed';
-    return `Copying ${progress.index}/${state.activeSequence.length}`;
+function playerPhaseProgress(state, player, owner) {
+  const ownerId = owner?.id;
+  const isOwner = ownerId === player.id;
+  const activeLength = Number(state.activeSequence?.length || 0);
+
+  if (player.eliminated) {
+    return { label: 'ELIMINATED', current: 0, total: 0, status: 'eliminated', showBoxes: false };
   }
-  return 'Challenger';
+
+  if (state.phase === PHASES.OWNER_CREATE_INITIAL) {
+    if (isOwner) {
+      return {
+        label: 'DRIVING',
+        current: Number(state.ownerDraft?.length || 0),
+        total: Number(state.settings?.startingPatternLength || 4),
+        status: 'driving',
+        showBoxes: true,
+      };
+    }
+    return { label: 'WATCHING', current: 0, total: 0, status: 'watching', showBoxes: false };
+  }
+
+  if (state.phase === PHASES.OWNER_REPLAY) {
+    if (isOwner) {
+      return {
+        label: 'REPLAYING',
+        current: Number(state.ownerReplayIndex || 0),
+        total: activeLength,
+        status: 'driving',
+        showBoxes: true,
+      };
+    }
+    return { label: 'WATCHING', current: 0, total: 0, status: 'watching', showBoxes: false };
+  }
+
+  if (state.phase === PHASES.OWNER_APPEND) {
+    if (isOwner) {
+      const target = Math.min(
+        Number(state.settings?.maxPatternLength || 10),
+        Number(state.appendTargetLength || (activeLength + Number(state.settings?.patternAppendCount || 1)))
+      );
+      return {
+        label: 'ADDING',
+        current: activeLength,
+        total: target,
+        status: 'driving',
+        showBoxes: true,
+      };
+    }
+    return { label: 'WATCHING', current: 0, total: 0, status: 'watching', showBoxes: false };
+  }
+
+  if (state.phase === PHASES.SIGNAL_PLAYBACK) {
+    const current = progressCountForPhase(state);
+    return {
+      label: isOwner ? 'PLAYING SIGNAL' : 'MEMORIZE',
+      current,
+      total: activeLength,
+      status: 'playback',
+      showBoxes: true,
+    };
+  }
+
+  if (state.phase === PHASES.CHALLENGER_COPY) {
+    if (isOwner) {
+      return { label: 'WATCHING', current: 0, total: 0, status: 'watching', showBoxes: false };
+    }
+
+    const progress = state.copyProgress?.[player.id];
+    if (!progress) {
+      return { label: 'WAITING', current: 0, total: activeLength, status: 'waiting', showBoxes: true };
+    }
+
+    const current = Math.max(0, Math.min(activeLength, Number(progress.index || 0)));
+    if (progress.status === 'safe') {
+      return { label: 'DONE', current: activeLength, total: activeLength, status: 'safe', showBoxes: true };
+    }
+    if (progress.status === 'fail') {
+      return { label: 'FAILED', current, total: activeLength, status: 'fail', showBoxes: true };
+    }
+    return { label: `COPYING ${current}/${activeLength}`, current, total: activeLength, status: 'copying', showBoxes: true };
+  }
+
+  if (state.phase === PHASES.MATCH_OVER) {
+    if (state.winnerId && state.winnerId === player.id) return { label: 'WINNER', current: 0, total: 0, status: 'safe', showBoxes: false };
+    return { label: 'FINISHED', current: 0, total: 0, status: 'waiting', showBoxes: false };
+  }
+
+  return { label: isOwner ? 'DRIVER' : 'CHALLENGER', current: 0, total: 0, status: isOwner ? 'driving' : 'waiting', showBoxes: false };
+}
+
+function renderPlayerPhaseTrack(phaseProgress) {
+  if (!phaseProgress?.showBoxes || !phaseProgress.total) return '';
+  const total = Math.max(0, Math.min(10, Number(phaseProgress.total || 0)));
+  const current = Math.max(0, Math.min(total, Number(phaseProgress.current || 0)));
+  const boxes = Array.from({ length: total }, (_, index) => {
+    const filled = index < current;
+    const next = index === current && current < total && phaseProgress.status !== 'safe' && phaseProgress.status !== 'fail';
+    return `<span class="phase-dot${filled ? ' is-filled' : ''}${next ? ' is-next' : ''}" aria-hidden="true"></span>`;
+  }).join('');
+
+  return `
+    <div class="player-phase-track" data-progress-status="${phaseProgress.status}">
+      <div class="player-phase-track__topline">
+        <span>${phaseProgress.label}</span>
+        <span>${current}/${total}</span>
+      </div>
+      <div class="phase-dots" aria-label="${phaseProgress.label} progress ${current} of ${total}">${boxes}</div>
+    </div>
+  `;
 }
 
 function renderPlayers(state) {
@@ -235,10 +336,12 @@ function renderPlayers(state) {
   const owner = getOwner(state);
 
   state.players.forEach((player, index) => {
+    const phaseProgress = playerPhaseProgress(state, player, owner);
     const card = document.createElement('article');
     card.className = 'player-card';
     if (index === state.ownerIndex && !player.eliminated) card.classList.add('is-owner');
     if (state.phase === PHASES.CHALLENGER_COPY && state.copyProgress?.[player.id]?.status === 'copying') card.classList.add('is-active');
+    if (phaseProgress.status) card.dataset.phaseStatus = phaseProgress.status;
     if (player.eliminated) card.classList.add('is-eliminated');
     if (player.lastResult) card.dataset.result = player.lastResult;
 
@@ -249,8 +352,9 @@ function renderPlayers(state) {
 
     card.innerHTML = `
       <div class="player-name">${player.name}</div>
-      <div class="player-role">${player.eliminated ? 'Eliminated' : roleLabel(state, player, owner)}</div>
+      <div class="player-role">${phaseProgress.label}</div>
       <div class="letter-track">${safeLetters}</div>
+      ${renderPlayerPhaseTrack(phaseProgress)}
     `;
     strip.appendChild(card);
   });
