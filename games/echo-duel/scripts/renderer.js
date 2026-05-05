@@ -1,4 +1,4 @@
-import { INPUT_META, PHASES } from './config.js';
+import { PHASES } from './config.js';
 import { getOwner } from './state.js';
 
 const screenMap = {
@@ -22,13 +22,13 @@ function phaseCopy(state) {
   const owner = getOwner(state);
   switch (state.phase) {
     case PHASES.OWNER_CREATE_INITIAL:
-      return ['Owner Create', `${owner?.name || 'Owner'} creates a 4-input pattern.`, 'The starting pattern is public as it is entered.'];
+      return ['Owner Create', `${owner?.name || 'Owner'} creates a 4-input pattern.`, 'Watch the pad flashes and tones. The sequence is not shown as text.'];
     case PHASES.OWNER_REPLAY:
       return ['Owner Replay', `${owner?.name || 'Owner'} must replay their own pattern.`, 'Failing here only passes control. No letter is awarded.'];
     case PHASES.OWNER_APPEND:
       return ['Owner Append', `${owner?.name || 'Owner'} adds one input.`, 'The updated sequence becomes the challenge.'];
     case PHASES.CHALLENGER_COPY:
-      return ['Copy Phase', `Challengers copy the pattern.`, 'All non-owner players copy at the same time in online matches.'];
+      return ['Copy Phase', `Challengers copy the pattern.`, 'No sequence readout. Memory only.'];
     case PHASES.MATCH_OVER:
       return ['Finished', 'Match over.', ''];
     default:
@@ -36,21 +36,34 @@ function phaseCopy(state) {
   }
 }
 
+function progressCountForPhase(state) {
+  if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.ownerDraft.length;
+  if (state.phase === PHASES.OWNER_REPLAY) return state.ownerReplayIndex || 0;
+  if (state.phase === PHASES.OWNER_APPEND) return state.activeSequence.length;
+  if (state.phase === PHASES.CHALLENGER_COPY) {
+    const progressValues = Object.values(state.copyProgress || {});
+    if (!progressValues.length) return 0;
+    return Math.max(...progressValues.map(progress => Number(progress.index) || 0));
+  }
+  return 0;
+}
+
 function renderSequence(state) {
   const slots = qs('sequence-slots');
   if (!slots) return;
   slots.innerHTML = '';
 
-  const visible = state.phase === PHASES.OWNER_CREATE_INITIAL
-    ? state.ownerDraft
-    : state.activeSequence;
+  const baseLength = state.phase === PHASES.OWNER_CREATE_INITIAL
+    ? state.settings.startingPatternLength
+    : Math.max(state.activeSequence.length, state.settings.startingPatternLength);
+  const count = Math.max(0, baseLength);
+  const progress = progressCountForPhase(state);
 
-  const count = Math.max(visible.length, state.settings.startingPatternLength);
   for (let i = 0; i < count; i++) {
-    const key = visible[i];
     const slot = document.createElement('div');
-    slot.className = `sequence-slot ${key ? INPUT_META[key]?.cssClass || '' : ''}`;
-    slot.textContent = key || '·';
+    slot.className = 'sequence-slot sequence-slot--hidden';
+    if (i < progress) slot.classList.add('is-complete');
+    slot.textContent = i < progress ? '•' : '·';
     slots.appendChild(slot);
   }
 }
@@ -142,7 +155,7 @@ export function renderMatch(state) {
   qs('phase-title').textContent = title;
   qs('phase-detail').textContent = detail;
   qs('penalty-word').textContent = state.settings.penaltyWord;
-  qs('sequence-label').textContent = state.phase === PHASES.OWNER_CREATE_INITIAL ? 'Draft Pattern' : 'Active Sequence';
+  qs('sequence-label').textContent = state.phase === PHASES.OWNER_CREATE_INITIAL ? 'Draft Progress' : 'Memory Progress';
   qs('status-line').textContent = state.status || '';
   renderPlayers(state);
   renderSequence(state);

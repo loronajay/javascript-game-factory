@@ -4,8 +4,7 @@ import { handleInput, tick } from './engine.js';
 import { createInputController } from './input.js';
 import { playFailureTone, playInputTone } from './audio.js';
 import { flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
-import { openLobby, wireLobby, wireOnlineConfig } from './lobby.js';
-import { createLocalAdapter } from './local-adapter.js';
+import { wireOnlineConfig } from './lobby.js';
 import { createOnlineClient } from './online.js';
 import { loadArcadeIdentity } from './identity.js';
 
@@ -13,7 +12,6 @@ let state = null;
 let adapter = null;
 let inputController = null;
 let rafId = null;
-let onlineModeIntent = 'public';
 
 const online = {
   net: null,
@@ -239,18 +237,6 @@ function stopLoop() {
   rafId = null;
 }
 
-function startLocalMatch(settings) {
-  setMenuNotice('');
-  disconnectOnline();
-  adapter?.disconnect();
-  adapter = createLocalAdapter();
-  adapter.cb.onMatchStart = matchSettings => {
-    setState(createMatchState(matchSettings));
-    startLoop();
-  };
-  adapter.startMatch(settings);
-}
-
 function resetToMenu() {
   setMenuNotice('');
   stopLoop();
@@ -447,11 +433,21 @@ function wireOnlineCallbacks(net) {
   };
 }
 
-async function startPublicOnline(settings) {
+async function startCreatePublicOnline(settings) {
   setMenuNotice('');
   disconnectOnline();
   const net = await ensureOnlineClient();
-  online.pendingAction = () => net.findLobby(settings);
+  online.pendingAction = () => net.createLobby({ ...settings, isPrivate: false });
+  if (net.clientId) online.pendingAction();
+  showScreen('onlineLobby');
+}
+
+async function findPublicOnline() {
+  setMenuNotice('');
+  disconnectOnline();
+  const net = await ensureOnlineClient();
+  const defaults = { minPlayers: 2, maxPlayers: 6, penaltyWord: 'STATIC' };
+  online.pendingAction = () => net.findLobby(defaults);
   if (net.clientId) online.pendingAction();
   showScreen('onlineLobby');
 }
@@ -475,24 +471,17 @@ async function joinPrivateOnline(code) {
 }
 
 function wireButtons() {
-  qs('btn-local')?.addEventListener('click', () => openLobby());
-  qs('btn-public')?.addEventListener('click', () => { onlineModeIntent = 'public'; showScreen('onlineConfig'); });
-  qs('btn-private')?.addEventListener('click', () => { onlineModeIntent = 'private'; showScreen('onlineConfig'); });
-  qs('btn-join-private')?.addEventListener('click', () => showScreen('joinRoom'));
-
-  wireLobby({
-    onStart: startLocalMatch,
-    onBack: () => showScreen('menu'),
-  });
-
-  wireOnlineConfig({
-    onPublic: settings => startPublicOnline(settings),
+  const onlineConfig = wireOnlineConfig({
+    onCreatePublic: settings => startCreatePublicOnline(settings),
+    onFindPublic: () => findPublicOnline(),
     onPrivate: settings => startPrivateOnline(settings),
     onBack: () => showScreen('menu'),
   });
 
-  qs('btn-online-public-start')?.addEventListener('click', () => { onlineModeIntent = 'public'; });
-  qs('btn-online-private-start')?.addEventListener('click', () => { onlineModeIntent = 'private'; });
+  qs('btn-create-public')?.addEventListener('click', () => onlineConfig.configure('create-public'));
+  qs('btn-public')?.addEventListener('click', () => onlineConfig.findPublic());
+  qs('btn-private')?.addEventListener('click', () => onlineConfig.configure('private'));
+  qs('btn-join-private')?.addEventListener('click', () => showScreen('joinRoom'));
 
   qs('btn-submit-private-join')?.addEventListener('click', () => {
     const code = qs('join-room-code')?.value?.trim().toUpperCase();
@@ -524,8 +513,7 @@ function wireButtons() {
       }
       return;
     }
-    const settings = { playerCount: state.settings.playerCount, penaltyWord: state.settings.penaltyWord };
-    startLocalMatch(settings);
+    resetToMenu();
   });
 
   qs('btn-exit')?.addEventListener('click', resetToMenu);
@@ -545,8 +533,7 @@ function wireButtons() {
       }
       return;
     }
-    const settings = { playerCount: state.settings.playerCount, penaltyWord: state.settings.penaltyWord };
-    startLocalMatch(settings);
+    resetToMenu();
   });
 }
 
