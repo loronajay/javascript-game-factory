@@ -117,7 +117,7 @@ function localCopyProgress(state) {
 
 function expectedSlotCount(state) {
   if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.settings.startingPatternLength;
-  if (state.phase === PHASES.OWNER_APPEND) return Math.min(state.settings.maxPatternLength, state.activeSequence.length + 1);
+  if (state.phase === PHASES.OWNER_APPEND) return Math.min(state.settings.maxPatternLength, state.appendTargetLength || (state.activeSequence.length + (state.settings.patternAppendCount || 1))); 
   if (state.phase === PHASES.OWNER_REPLAY || state.phase === PHASES.CHALLENGER_COPY || state.phase === PHASES.SIGNAL_PLAYBACK) return state.activeSequence.length;
   return Math.max(state.activeSequence.length, state.settings.startingPatternLength);
 }
@@ -175,9 +175,12 @@ function inputModeForState(state) {
   }
 
   if (state.phase === PHASES.OWNER_APPEND) {
+    const target = Math.min(state.settings.maxPatternLength, state.appendTargetLength || (state.activeSequence.length + (state.settings.patternAppendCount || 1)));
+    const remaining = Math.max(1, target - state.activeSequence.length);
+    const label = remaining === 1 ? 'ADD 1 NEW INPUT' : `ADD ${remaining} NEW INPUTS`;
     return ownerLocal
-      ? { label: 'ADD 1 NEW INPUT', detail: `${state.activeSequence.length}/${Math.min(state.settings.maxPatternLength, state.activeSequence.length + 1)}`, className: 'mode-owner-append', locked: false }
-      : { label: `WATCH ${ownerName}`, detail: 'New input incoming', className: 'mode-watch', locked: true };
+      ? { label, detail: `${state.activeSequence.length}/${target}`, className: 'mode-owner-append', locked: false }
+      : { label: `WATCH ${ownerName}`, detail: `${remaining} new input${remaining === 1 ? '' : 's'} incoming`, className: 'mode-watch', locked: true };
   }
 
   if (state.phase === PHASES.SIGNAL_PLAYBACK) {

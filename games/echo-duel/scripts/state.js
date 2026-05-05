@@ -36,6 +36,7 @@ export function createInitialState() {
     activeSequence: [],
     ownerReplayIndex: 0,
     ownerDraft: [],
+    appendTargetLength: 0,
     copyProgress: {},
     roundResults: [],
     winnerId: null,
@@ -74,6 +75,7 @@ export function createMatchState({
     ownerIndex,
     activeSequence: [],
     ownerDraft: [],
+    appendTargetLength: 0,
     copyProgress: {},
     status: `${normalizedPlayers[ownerIndex]?.name || 'Owner'} starts control. Create a 4-input pattern.`,
   };
@@ -111,6 +113,7 @@ export function cloneState(state) {
     players: state.players.map(player => ({ ...player })),
     activeSequence: [...state.activeSequence],
     ownerDraft: [...state.ownerDraft],
+    appendTargetLength: Number(state.appendTargetLength || 0),
     copyProgress: Object.fromEntries(Object.entries(state.copyProgress || {}).map(([id, progress]) => [id, { ...progress }])),
     roundResults: state.roundResults.map(result => ({ ...result })),
     timer: state.timer ? { ...state.timer } : null,

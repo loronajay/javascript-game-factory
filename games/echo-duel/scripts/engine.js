@@ -14,6 +14,17 @@ function phaseTimer(length, now = performance.now(), settings) {
   };
 }
 
+function appendTargetLengthFor(state) {
+  const current = Number(state.activeSequence?.length || 0);
+  const appendCount = Math.max(1, Number(state.settings?.patternAppendCount || 1));
+  const maxLength = Math.max(current, Number(state.settings?.maxPatternLength || current));
+  return Math.min(maxLength, current + appendCount);
+}
+
+function remainingAppendInputs(state) {
+  return Math.max(0, Number(state.appendTargetLength || appendTargetLengthFor(state)) - Number(state.activeSequence?.length || 0));
+}
+
 function beginSignalPlayback(state, status = '') {
   const next = cloneState(state);
   const now = performance.now();
@@ -77,6 +88,7 @@ function beginControl(state, ownerIndex, status = '') {
   next.activeSequence = [];
   next.ownerDraft = [];
   next.ownerReplayIndex = 0;
+  next.appendTargetLength = 0;
   next.copyProgress = {};
   next.roundResults = [];
   next.timer = null;
@@ -91,6 +103,7 @@ function beginOwnerReplay(state) {
   next.phase = PHASES.OWNER_REPLAY;
   next.ownerReplayIndex = 0;
   next.ownerDraft = [];
+  next.appendTargetLength = 0;
   next.copyProgress = {};
   next.timer = phaseTimer(next.activeSequence.length, performance.now(), next.settings);
   next.playback = null;
@@ -220,8 +233,10 @@ export function handleInput(state, rawInput, actorId = null) {
     next.ownerReplayIndex += 1;
     if (next.ownerReplayIndex >= next.activeSequence.length) {
       next.phase = PHASES.OWNER_APPEND;
-      next.timer = phaseTimer(1, performance.now(), next.settings);
-      next.status = `${owner?.name || 'Owner'} replayed it. Add one new input.`;
+      next.appendTargetLength = appendTargetLengthFor(next);
+      const needed = remainingAppendInputs(next);
+      next.timer = phaseTimer(Math.max(1, needed), performance.now(), next.settings);
+      next.status = `${owner?.name || 'Owner'} replayed it. Add ${needed} new input${needed === 1 ? '' : 's'}.`;
     } else {
       next.status = `${owner?.name || 'Owner'} replaying: ${next.ownerReplayIndex}/${next.activeSequence.length}.`;
     }
@@ -230,8 +245,17 @@ export function handleInput(state, rawInput, actorId = null) {
 
   if (next.phase === PHASES.OWNER_APPEND) {
     if (actor.id !== owner?.id && actor.clientId !== owner?.clientId) return state;
+    if (!next.appendTargetLength || next.appendTargetLength <= next.activeSequence.length) {
+      next.appendTargetLength = appendTargetLengthFor(next);
+    }
     next.activeSequence.push(input);
+    const remaining = remainingAppendInputs(next);
+    if (remaining > 0) {
+      next.status = `${owner?.name || 'Owner'} adding inputs: ${next.activeSequence.length}/${next.appendTargetLength}.`;
+      return next;
+    }
     next.status = `${owner?.name || 'Owner'} extended the pattern to ${next.activeSequence.length}.`;
+    next.appendTargetLength = 0;
     return beginSignalPlayback(next, `${owner?.name || 'Owner'} extended the signal to ${next.activeSequence.length}. Memorize it.`);
   }
 

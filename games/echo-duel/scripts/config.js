@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   playerCount: 4,
   penaltyWord: 'STATIC',
   startingPatternLength: 4,
+  patternAppendCount: 2,
   maxPatternLength: 10,
   timerSecondsPerInput: 1.25,
   minTimerSeconds: 6,
