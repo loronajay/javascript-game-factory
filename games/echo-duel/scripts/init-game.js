@@ -3,7 +3,7 @@ import { activePlayers, cloneState, createMatchState, hydrateNetworkState, seria
 import { handleInput, tick } from './engine.js';
 import { createInputController } from './input.js';
 import { playFailureTone, playInputTone } from './audio.js';
-import { flashInput, renderMatch, renderOnlineLobby, revealOwnerInput, showScreen } from './renderer.js';
+import { currentPlaybackStep, flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
 import { wireOnlineConfig } from './lobby.js';
 import { createOnlineClient } from './online.js';
 import { loadArcadeIdentity } from './identity.js';
@@ -12,6 +12,7 @@ let state = null;
 let adapter = null;
 let inputController = null;
 let rafId = null;
+let lastPlaybackToneToken = '';
 
 const online = {
   net: null,
@@ -192,13 +193,13 @@ function inputIsFromCurrentOwner(senderId) {
   return !!owner && (owner.clientId === senderId || owner.id === senderId);
 }
 
-function mirrorVisibleOwnerInput(senderId, input) {
-  if (!inputIsFromCurrentOwner(senderId)) return false;
-  playInputTone(input);
-  flashInput(input);
-  revealOwnerInput(input);
-  return true;
+function mirrorVisibleOwnerInput() {
+  // Owner inputs are now presented through the formal SIGNAL_PLAYBACK phase.
+  // Do not use raw live network input as the memory source; network timing and fast
+  // button presses make that unreadable.
+  return false;
 }
+
 
 function submitOnlineInput(input) {
   if (!online.net || !state) return;
@@ -206,11 +207,6 @@ function submitOnlineInput(input) {
   flashInput(input);
 
   if (online.isHost) {
-    if (inputIsFromCurrentOwner(online.net.clientId)) {
-      // Host-owned pattern inputs must be broadcast immediately so challengers can memorize
-      // the live flashes/tones. State snapshots alone are too late for this game.
-      online.net.lobbyMessage('input', { input, clientTime: Date.now() });
-    }
     applyAuthoritativeInput(online.net.clientId, input);
   } else {
     online.net.sendInput(input);
@@ -233,6 +229,20 @@ function applyAuthoritativeInput(senderId, input) {
   }
 }
 
+function syncPlaybackTone() {
+  if (!state || state.phase !== PHASES.SIGNAL_PLAYBACK || !state.playback) {
+    lastPlaybackToneToken = '';
+    return;
+  }
+  const step = currentPlaybackStep(state);
+  if (!step) return;
+  const token = `${state.playback.sequence.join('')}:${step.index}`;
+  if (token === lastPlaybackToneToken) return;
+  lastPlaybackToneToken = token;
+  playInputTone(step.input);
+  flashInput(step.input);
+}
+
 function startLoop() {
   if (rafId != null) cancelAnimationFrame(rafId);
   let lastBroadcastAt = 0;
@@ -245,6 +255,8 @@ function startLoop() {
         if (next !== state) setState(next, { broadcast: true });
         else renderMatch(state);
       }
+
+      syncPlaybackTone();
 
       if (state?.mode === 'online' && online.isHost) {
         const now = performance.now();

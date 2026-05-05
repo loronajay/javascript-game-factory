@@ -41,6 +41,7 @@ export function createInitialState() {
     winnerId: null,
     status: '',
     timer: null,
+    playback: null,
     network: null,
   };
 }
@@ -113,6 +114,7 @@ export function cloneState(state) {
     copyProgress: Object.fromEntries(Object.entries(state.copyProgress || {}).map(([id, progress]) => [id, { ...progress }])),
     roundResults: state.roundResults.map(result => ({ ...result })),
     timer: state.timer ? { ...state.timer } : null,
+    playback: state.playback ? { ...state.playback, sequence: [...(state.playback.sequence || [])] } : null,
     network: state.network ? { ...state.network } : null,
   };
 }
@@ -126,6 +128,15 @@ export function serializeStateForNetwork(state) {
       remainingMs: Math.max(0, copy.timer.endsAt - now),
     };
   }
+  if (copy.playback) {
+    const now = performance.now();
+    copy.playback = {
+      ...copy.playback,
+      sequence: [...(copy.playback.sequence || [])],
+      remainingMs: Math.max(0, (copy.playback.startedAt + copy.playback.totalMs) - now),
+    };
+    delete copy.playback.startedAt;
+  }
   return copy;
 }
 
@@ -138,6 +149,18 @@ export function hydrateNetworkState(snapshot) {
       startedAt: now,
       durationMs: Number(snapshot.timer.durationMs) || Number(snapshot.timer.remainingMs),
       endsAt: now + Number(snapshot.timer.remainingMs),
+    };
+  }
+  if (snapshot.playback && Number.isFinite(Number(snapshot.playback.remainingMs))) {
+    const now = performance.now();
+    const totalMs = Number(snapshot.playback.totalMs) || Number(snapshot.playback.remainingMs);
+    const remainingMs = Math.max(0, Number(snapshot.playback.remainingMs));
+    copy.playback = {
+      ...snapshot.playback,
+      sequence: Array.isArray(snapshot.playback.sequence) ? [...snapshot.playback.sequence] : [],
+      totalMs,
+      remainingMs,
+      startedAt: now - Math.max(0, totalMs - remainingMs),
     };
   }
   return copy;

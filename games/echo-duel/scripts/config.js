@@ -27,6 +27,7 @@ export const PHASES = Object.freeze({
   OWNER_CREATE_INITIAL: 'owner_create_initial',
   OWNER_REPLAY: 'owner_replay',
   OWNER_APPEND: 'owner_append',
+  SIGNAL_PLAYBACK: 'signal_playback',
   CHALLENGER_COPY: 'challenger_copy',
   RESULT_REVEAL: 'result_reveal',
   MATCH_OVER: 'match_over',

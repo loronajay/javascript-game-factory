@@ -13,46 +13,62 @@ const screenMap = {
 
 function qs(id) { return document.getElementById(id); }
 
-let liveSignalKey = '';
-
-function isOwnerPhase(state) {
-  return state.phase === PHASES.OWNER_CREATE_INITIAL
-    || state.phase === PHASES.OWNER_REPLAY
-    || state.phase === PHASES.OWNER_APPEND;
-}
-
-function liveSignalExpectedCount(state) {
-  return expectedSlotCount(state);
+function playbackIndex(state, now = performance.now()) {
+  const playback = state.playback;
+  if (!playback || !Array.isArray(playback.sequence)) return -1;
+  const elapsed = Math.max(0, now - Number(playback.startedAt || now));
+  const perInputMs = Number(playback.perInputMs || ((playback.stepMs || 450) + (playback.gapMs || 120)));
+  const stepMs = Number(playback.stepMs || 450);
+  const index = Math.floor(elapsed / perInputMs);
+  const offset = elapsed - index * perInputMs;
+  if (index < 0 || index >= playback.sequence.length) return -1;
+  return offset <= stepMs ? index : -1;
 }
 
 function renderLiveSignal(state) {
   const strip = qs('live-signal-strip');
   if (!strip) return;
 
-  if (!isOwnerPhase(state)) {
+  if (state.phase !== PHASES.SIGNAL_PLAYBACK || !state.playback) {
     strip.classList.add('hidden');
     strip.innerHTML = '';
-    liveSignalKey = '';
     return;
   }
 
-  const owner = getOwner(state);
-  const count = Math.max(0, liveSignalExpectedCount(state));
-  const key = `${state.phase}:${owner?.id || 'owner'}:${count}:${state.activeSequence.length}:${state.ownerIndex}`;
+  const sequence = Array.isArray(state.playback.sequence) ? state.playback.sequence : [];
+  const current = playbackIndex(state);
 
   strip.classList.remove('hidden');
+  strip.classList.add('is-playback');
 
-  if (key === liveSignalKey && strip.children.length === count) return;
-
-  liveSignalKey = key;
-  strip.innerHTML = '';
-  for (let i = 0; i < count; i++) {
-    const box = document.createElement('div');
-    box.className = 'live-signal-box';
-    box.textContent = '?';
-    box.setAttribute('aria-label', `Signal input ${i + 1}`);
-    strip.appendChild(box);
+  if (strip.children.length !== sequence.length) {
+    strip.innerHTML = '';
+    sequence.forEach((input, index) => {
+      const key = String(input || '').toUpperCase();
+      const box = document.createElement('div');
+      box.className = `live-signal-box is-lit key-${key.toLowerCase()}`;
+      box.textContent = key;
+      box.setAttribute('aria-label', `Signal input ${index + 1}: ${key}`);
+      strip.appendChild(box);
+    });
   }
+
+  Array.from(strip.children).forEach((box, index) => {
+    box.classList.toggle('is-current', index === current);
+    box.classList.toggle('pop', index === current);
+  });
+}
+
+export function currentPlaybackStep(state, now = performance.now()) {
+  if (state?.phase !== PHASES.SIGNAL_PLAYBACK || !state.playback) return null;
+  const index = playbackIndex(state, now);
+  if (index < 0) return null;
+  const input = String(state.playback.sequence[index] || '').toUpperCase();
+  return input ? { index, input } : null;
+}
+
+export function currentPlaybackInput(state, now = performance.now()) {
+  return currentPlaybackStep(state, now)?.input || null;
 }
 
 
@@ -65,11 +81,13 @@ function phaseCopy(state) {
   const owner = getOwner(state);
   switch (state.phase) {
     case PHASES.OWNER_CREATE_INITIAL:
-      return ['Owner Create', `${owner?.name || 'Owner'} creates a 4-input pattern.`, 'Watch the pad flashes and tones. The sequence is not shown as text.'];
+      return ['Owner Create', `${owner?.name || 'Owner'} enters a 4-input pattern.`, 'The completed signal will play back before copy mode.'];
     case PHASES.OWNER_REPLAY:
-      return ['Owner Replay', `${owner?.name || 'Owner'} must replay their own pattern.`, 'Failing here only passes control. No letter is awarded.'];
+      return ['Owner Replay', `${owner?.name || 'Owner'} must replay their own pattern.`, 'If successful, the completed signal plays back for everyone.'];
     case PHASES.OWNER_APPEND:
-      return ['Owner Append', `${owner?.name || 'Owner'} adds one input.`, 'The updated sequence becomes the challenge.'];
+      return ['Owner Append', `${owner?.name || 'Owner'} adds one input.`, 'The updated sequence will be presented before copy begins.'];
+    case PHASES.SIGNAL_PLAYBACK:
+      return ['Memorize', 'Signal playback.', 'Watch the full pattern now. It disappears before copy mode.'];
     case PHASES.CHALLENGER_COPY:
       return ['Copy Phase', `Challengers copy the pattern.`, 'No sequence readout. Memory only.'];
     case PHASES.MATCH_OVER:
@@ -100,7 +118,7 @@ function localCopyProgress(state) {
 function expectedSlotCount(state) {
   if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.settings.startingPatternLength;
   if (state.phase === PHASES.OWNER_APPEND) return Math.min(state.settings.maxPatternLength, state.activeSequence.length + 1);
-  if (state.phase === PHASES.OWNER_REPLAY || state.phase === PHASES.CHALLENGER_COPY) return state.activeSequence.length;
+  if (state.phase === PHASES.OWNER_REPLAY || state.phase === PHASES.CHALLENGER_COPY || state.phase === PHASES.SIGNAL_PLAYBACK) return state.activeSequence.length;
   return Math.max(state.activeSequence.length, state.settings.startingPatternLength);
 }
 
@@ -109,6 +127,11 @@ function progressCountForPhase(state) {
   if (state.phase === PHASES.OWNER_REPLAY) return state.ownerReplayIndex || 0;
   if (state.phase === PHASES.OWNER_APPEND) return state.activeSequence.length;
   if (state.phase === PHASES.CHALLENGER_COPY) return Number(localCopyProgress(state)?.index || 0);
+  if (state.phase === PHASES.SIGNAL_PLAYBACK && state.playback) {
+    const elapsed = Math.max(0, performance.now() - Number(state.playback.startedAt || performance.now()));
+    const perInputMs = Number(state.playback.perInputMs || 570);
+    return Math.min(state.activeSequence.length, Math.floor(elapsed / perInputMs) + 1);
+  }
   return 0;
 }
 
@@ -157,6 +180,10 @@ function inputModeForState(state) {
       : { label: `WATCH ${ownerName}`, detail: 'New input incoming', className: 'mode-watch', locked: true };
   }
 
+  if (state.phase === PHASES.SIGNAL_PLAYBACK) {
+    return { label: 'MEMORIZE', detail: `${state.activeSequence.length} inputs`, className: 'mode-playback', locked: true };
+  }
+
   if (state.phase === PHASES.CHALLENGER_COPY) {
     const progress = localCopyProgress(state);
     const isCopying = !ownerLocal && progress?.status === 'copying';
@@ -182,6 +209,7 @@ function renderInputMode(state) {
     pad.classList.toggle('pad--owner-replay', mode.className === 'mode-owner-replay');
     pad.classList.toggle('pad--owner-append', mode.className === 'mode-owner-append');
     pad.classList.toggle('pad--challenger-copy', mode.className === 'mode-challenger-copy');
+    pad.classList.toggle('pad--playback', mode.className === 'mode-playback');
   }
 }
 
@@ -250,22 +278,11 @@ export function flashInput(input) {
   button.classList.add('flash');
 }
 
-export function revealOwnerInput(input) {
-  const key = String(input || '').toUpperCase();
-  if (!key) return;
-
-  const strip = qs('live-signal-strip');
-  if (!strip || strip.classList.contains('hidden')) return;
-
-  const box = Array.from(strip.children).find(child => !child.classList.contains('is-lit'));
-  if (!box) return;
-
-  box.className = `live-signal-box is-lit key-${key.toLowerCase()}`;
-  box.textContent = key;
-  box.classList.remove('pop');
-  void box.offsetWidth;
-  box.classList.add('pop');
+export function revealOwnerInput() {
+  // Owner inputs are no longer used as the memory source. The engine runs a formal
+  // SIGNAL_PLAYBACK phase after the owner completes their entry.
 }
+
 
 export function renderLobbyPreview(count) {
   const root = qs('lobby-preview');

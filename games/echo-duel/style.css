@@ -426,3 +426,25 @@ input, select {
   from { transform: scale(0.86); filter: brightness(1.5); }
   to { transform: scale(1); filter: brightness(1); }
 }
+
+.input-mode-banner.mode-playback {
+  border-color: rgba(152, 246, 255, 0.8);
+  box-shadow: 0 0 30px rgba(104, 247, 255, 0.32);
+  animation: modePulse 720ms ease-in-out infinite alternate;
+}
+
+.pad--playback {
+  opacity: 0.76;
+  filter: none;
+}
+
+.live-signal-strip.is-playback {
+  align-items: stretch;
+}
+
+.live-signal-box.is-current {
+  transform: translateY(-4px) scale(1.08);
+  outline: 3px solid rgba(255, 255, 255, 0.78);
+  z-index: 1;
+  filter: brightness(1.35);
+}

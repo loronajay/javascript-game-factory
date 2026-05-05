@@ -14,6 +14,38 @@ function phaseTimer(length, now = performance.now(), settings) {
   };
 }
 
+function beginSignalPlayback(state, status = '') {
+  const next = cloneState(state);
+  const now = performance.now();
+  const sequence = [...next.activeSequence];
+  const stepMs = 450;
+  const gapMs = 120;
+  const holdMs = 700;
+  const perInputMs = stepMs + gapMs;
+  const totalMs = sequence.length * perInputMs + holdMs;
+  next.phase = PHASES.SIGNAL_PLAYBACK;
+  next.timer = null;
+  next.copyProgress = {};
+  next.roundResults = [];
+  next.playback = {
+    sequence,
+    startedAt: now,
+    stepMs,
+    gapMs,
+    holdMs,
+    perInputMs,
+    totalMs,
+  };
+  next.status = status || `Memorize the ${sequence.length}-input signal.`;
+  return next;
+}
+
+function finishSignalPlayback(state) {
+  const next = cloneState(state);
+  next.playback = null;
+  return beginChallengerCopy(next);
+}
+
 function setPlayerResult(players, playerId, result) {
   return players.map(player => player.id === playerId ? { ...player, lastResult: result } : player);
 }
@@ -48,6 +80,7 @@ function beginControl(state, ownerIndex, status = '') {
   next.copyProgress = {};
   next.roundResults = [];
   next.timer = null;
+  next.playback = null;
   next.players = clearPlayerResults(next.players);
   next.status = status || `${getOwner(next)?.name || 'Owner'} has control. Create a 4-input pattern.`;
   return next;
@@ -60,6 +93,7 @@ function beginOwnerReplay(state) {
   next.ownerDraft = [];
   next.copyProgress = {};
   next.timer = phaseTimer(next.activeSequence.length, performance.now(), next.settings);
+  next.playback = null;
   next.players = clearPlayerResults(next.players);
   next.status = `${getOwner(next)?.name || 'Owner'} must replay the ${next.activeSequence.length}-input sequence.`;
   return next;
@@ -77,6 +111,7 @@ function beginChallengerCopy(state) {
     }
   }
   next.timer = phaseTimer(next.activeSequence.length, performance.now(), next.settings);
+  next.playback = null;
   const count = Object.keys(next.copyProgress).length;
   next.status = count > 1
     ? `${count} challengers copy the ${next.activeSequence.length}-input pattern.`
@@ -167,7 +202,7 @@ export function handleInput(state, rawInput, actorId = null) {
       next.activeSequence = [...next.ownerDraft];
       next.ownerDraft = [];
       next.status = `${owner?.name || 'Owner'} set the starting pattern.`;
-      return beginChallengerCopy(next);
+      return beginSignalPlayback(next, `${owner?.name || 'Owner'} set the starting signal. Memorize it.`);
     }
     next.status = `${owner?.name || 'Owner'} is creating the starting pattern.`;
     return next;
@@ -197,7 +232,7 @@ export function handleInput(state, rawInput, actorId = null) {
     if (actor.id !== owner?.id && actor.clientId !== owner?.clientId) return state;
     next.activeSequence.push(input);
     next.status = `${owner?.name || 'Owner'} extended the pattern to ${next.activeSequence.length}.`;
-    return beginChallengerCopy(next);
+    return beginSignalPlayback(next, `${owner?.name || 'Owner'} extended the signal to ${next.activeSequence.length}. Memorize it.`);
   }
 
   if (next.phase === PHASES.CHALLENGER_COPY) {
@@ -246,6 +281,10 @@ export function handleTimerExpired(state) {
 }
 
 export function tick(state, now = performance.now()) {
+  if (state.phase === PHASES.SIGNAL_PLAYBACK && state.playback) {
+    if (now >= state.playback.startedAt + state.playback.totalMs) return finishSignalPlayback(state);
+    return state;
+  }
   if (!state.timer) return state;
   if (now >= state.timer.endsAt) return handleTimerExpired(state);
   return state;
