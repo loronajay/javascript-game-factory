@@ -1,0 +1,15 @@
+{
+  "version": "battle-tuning-simulator-v6-shared-core",
+  "levelModifierPerLevel": 0.75,
+  "statPressureCoefficient": 0.5,
+  "criticalModifier": 1.5,
+  "randomDamageMin": -2,
+  "randomDamageMax": 4,
+  "minimumDamage": 1,
+  "maximumDamage": 9999,
+  "defendModifier": 0.5,
+  "defaultTargetCountModifier": 1.0,
+  "defaultPassiveDamageModifier": 1.0,
+  "defaultPassiveResistanceModifier": 1.0,
+  "healingStatPressureCoefficient": 0.35
+}

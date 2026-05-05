@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Battle Tuning Simulator v6</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg0:#060812;
+  --bg1:#0d1324;
+  --panel:#141c2d;
+  --panel2:#101827;
+  --line:#2d3a52;
+  --text:#eef4ff;
+  --muted:#9aa8bd;
+  --accent:#8fd4ff;
+  --hp:#72ef9a;
+  --mp:#80c8ff;
+  --danger:#ff8f8f;
+  --gold:#ffd88a;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,sans-serif;
+  background:
+    radial-gradient(circle at 50% -10%, #1d2c50 0, transparent 42%),
+    linear-gradient(180deg, var(--bg1), var(--bg0));
+}
+header {
+  padding:16px 18px 10px;
+  border-bottom:1px solid var(--line);
+}
+h1 { margin:0 0 4px; font-size:22px; }
+h2 { margin:0 0 10px; font-size:16px; }
+p { margin:0 0 10px; color:var(--muted); line-height:1.4; }
+main {
+  display:grid;
+  grid-template-columns:340px minmax(500px,1fr) 340px;
+  gap:12px;
+  padding:12px;
+}
+.panel {
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01)), var(--panel);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 14px 34px rgba(0,0,0,.28);
+}
+.stack { display:grid; gap:12px; align-content:start; }
+label { display:grid; gap:5px; color:var(--muted); font-size:12px; }
+input, select, textarea, button {
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:8px 9px;
+  background:var(--panel2);
+  color:var(--text);
+  font:inherit;
+}
+button { cursor:pointer; background:#1b2a44; }
+button:hover { border-color:var(--accent); }
+button.primary { background:#123a5b; border-color:#2d75a8; }
+button.warn { background:#3c2520; border-color:#79513a; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.small { font-size:12px; color:var(--muted); }
+.battle-shell {
+  min-height:620px;
+  display:grid;
+  grid-template-rows:1fr auto auto;
+  gap:12px;
+}
+.battlefield {
+  position:relative;
+  overflow:hidden;
+  min-height:500px;
+  border:1px solid #30425f;
+  border-radius:18px;
+  background:
+    radial-gradient(ellipse at 50% 64%, rgba(92,152,255,.22), transparent 24%),
+    radial-gradient(circle at 17% 27%, rgba(48,112,225,.20), transparent 16%),
+    radial-gradient(circle at 83% 27%, rgba(48,112,225,.18), transparent 16%),
+    linear-gradient(180deg, rgba(24,45,84,.96), rgba(8,12,28,.98));
+}
+.battlefield::before {
+  content:"";
+  position:absolute;
+  left:50%;
+  top:62%;
+  width:76%;
+  height:52%;
+  transform:translate(-50%, -50%);
+  border-radius:50%;
+  background:
+    radial-gradient(ellipse at center, rgba(150,215,255,.14), transparent 17%),
+    repeating-radial-gradient(circle at center, rgba(118,182,255,.32) 0 2px, transparent 2px 50px),
+    radial-gradient(ellipse at center, rgba(48,85,160,.72), rgba(16,29,70,.76) 62%, transparent 67%);
+  border:2px solid rgba(110,180,255,.48);
+  box-shadow:
+    0 0 34px rgba(100,185,255,.16),
+    inset 0 0 32px rgba(100,185,255,.13);
+}
+.side {
+  position:absolute;
+  display:grid;
+  justify-items:center;
+  width:250px;
+  gap:8px;
+  z-index:3;
+}
+
+/* Corrected active-row staging:
+   units are centered on the arena and face each other.
+   HUDs are in-panel cards above each placeholder creature, not fixed to viewport. */
+.side.left {
+  left:34%;
+  top:56%;
+  transform:translate(-50%, -50%);
+}
+.side.right {
+  left:66%;
+  top:56%;
+  transform:translate(-50%, -50%);
+}
+.nameplate {
+  width:230px;
+  background:rgba(6,14,32,.92);
+  border:2px solid rgba(42,166,255,.72);
+  border-radius:10px;
+  padding:8px;
+  backdrop-filter: blur(4px);
+  box-shadow:
+    inset 0 0 0 1px rgba(144,220,255,.18),
+    0 0 18px rgba(32,150,255,.22);
+}
+.name-row { display:flex; justify-content:space-between; gap:8px; font-size:13px; }
+.bar {
+  height:10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.28);
+  border-radius:999px;
+  overflow:hidden;
+  margin-top:5px;
+}
+.fill { height:100%; width:100%; transition:width .2s ease; }
+.fill.hp { background:linear-gradient(90deg, #49d671, var(--hp)); }
+.fill.mp { background:linear-gradient(90deg, #4fa4e8, var(--mp)); }
+.sprite {
+  position:relative;
+  width:126px;
+  height:126px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  font-size:64px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,.18), transparent 24%),
+    radial-gradient(circle, rgba(143,212,255,.20), rgba(255,255,255,.04));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 0 30px rgba(143,212,255,.16);
+}
+.sprite::after {
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:-12px;
+  width:108px;
+  height:22px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:rgba(0,0,0,.34);
+  filter:blur(2px);
+  z-index:-1;
+}
+.sprite.hit { animation:hit .24s ease; }
+.sprite.attack-left { animation:lungeLeft .22s ease; }
+.sprite.attack-right { animation:lungeRight .22s ease; }
+
+@keyframes hit {
+  0%,100%{ transform:translateX(0); }
+  25%{ transform:translateX(-8px); }
+  70%{ transform:translateX(7px); }
+}
+@keyframes lungeLeft {
+  0%,100%{ transform:translateX(0); }
+  50%{ transform:translateX(24px); }
+}
+@keyframes lungeRight {
+  0%,100%{ transform:translateX(0); }
+  50%{ transform:translateX(-24px); }
+}
+.float-damage {
+  position:absolute;
+  z-index:5;
+  pointer-events:none;
+  font-weight:900;
+  color:#fff;
+  text-shadow:0 2px 0 #000, 0 0 14px rgba(255,80,80,.9);
+  animation:floatUp .85s ease forwards;
+}
+.float-heal {
+  color:#aaffbf;
+  text-shadow:0 2px 0 #000, 0 0 14px rgba(80,255,120,.9);
+}
+@keyframes floatUp {
+  from { opacity:0; transform:translateY(8px) scale(.9); }
+  18% { opacity:1; }
+  to { opacity:0; transform:translateY(-54px) scale(1.25); }
+}
+.controls {
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:8px;
+  padding:8px;
+  border:1px solid rgba(42,166,255,.55);
+  border-radius:12px;
+  background:rgba(5,14,32,.86);
+}
+.log {
+  max-height:150px;
+  overflow:auto;
+  font-size:12px;
+  color:var(--muted);
+  background:rgba(0,0,0,.22);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  padding:8px;
+}
+.log div { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.stat-table {
+  width:100%;
+  border-collapse:collapse;
+}
+.stat-table th, .stat-table td {
+  padding:5px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  text-align:left;
+  font-size:12px;
+}
+.stat-table input { padding:5px 6px; border-radius:7px; }
+.tabs { display:flex; gap:7px; margin-bottom:10px; flex-wrap:wrap; }
+.tabs button { width:auto; padding:7px 9px; }
+.hidden { display:none; }
+textarea {
+  min-height:170px;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:12px;
+}
+.metric {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:7px 8px;
+  border-radius:9px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.06);
+  margin-bottom:6px;
+}
+.metric strong { color:var(--accent); }
+.move-buttons { display:grid; gap:7px; }
+.move-buttons button { text-align:left; }
+.move-buttons .meta { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+@media (max-width:1100px) {
+  main { grid-template-columns:1fr; }
+  .battlefield { min-height:420px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Battle Tuning Simulator v6</h1>
+  <p>1v1 live sandbox using the scoped Shared Combat Core damage formula.</p>
+</header>
+
+<main>
+  <aside class="stack">
+    <section class="panel">
+      <h2>Left Unit</h2>
+      <div class="grid2">
+        <label>Creature <select id="leftCreature"></select></label>
+        <label>Level <input id="leftLevel" type="number" min="1" max="100" value="1"></label>
+      </div>
+      <p id="leftRole" class="small"></p>
+      <div class="tabs">
+        <button class="primary" data-side-tab="left-stats">Stats</button>
+        <button data-side-tab="left-growth">Growth</button>
+        <button data-side-tab="left-res">Resist</button>
+      </div>
+      <div id="left-stats"></div>
+      <div id="left-growth" class="hidden"></div>
+      <div id="left-res" class="hidden"></div>
+      <button id="leftResetHp" style="margin-top:8px">Reset Left HP/MP</button>
+    </section>
+
+    <section class="panel">
+      <h2>Left Move</h2>
+      <div id="leftMoves" class="move-buttons"></div>
+    </section>
+  </aside>
+
+  <section class="panel battle-shell">
+    <div class="grid3">
+      <label>Random Damage <select id="varianceMode"><option value="avg">Average (+1)</option><option value="roll">Roll (-2 to +4)</option><option value="min">Minimum (-2)</option><option value="max">Maximum (+4)</option></select></label>
+      <label>Crit Mode <select id="critMode"><option value="off">Off</option><option value="on">Force Crit</option></select></label>
+      <label>Turn Level Sync <select id="syncLevels"><option value="off">Separate</option><option value="on">Mirror Left Level</option></select></label>
+      <label>Left Defending <select id="leftDefending"><option value="0">No</option><option value="1">Yes</option></select></label>
+      <label>Right Defending <select id="rightDefending"><option value="0">No</option><option value="1">Yes</option></select></label>
+      <label>Target Count Mod <input id="targetCountModifier" type="number" value="1" step="0.05"></label>
+      <label>Passive Damage Mod <input id="passiveDamageModifier" type="number" value="1" step="0.05"></label>
+      <label>Passive Resist Mod <input id="passiveResistanceModifier" type="number" value="1" step="0.05"></label>
+      <label>Show Debug <select id="showDebug"><option value="1">Yes</option><option value="0">No</option></select></label>
+    </div>
+
+    <div class="battlefield" id="battlefield">
+      <div class="small" style="position:absolute;left:18px;bottom:18px;z-index:4;border:1px solid rgba(42,166,255,.6);background:rgba(4,12,28,.82);padding:8px 14px;border-radius:8px;">Choose Command</div>
+      <div class="side left">
+        <div class="nameplate">
+          <div class="name-row"><strong id="leftName">Left</strong><span id="leftLvl">Lv 1</span></div>
+          <div class="bar"><div id="leftHpFill" class="fill hp"></div></div>
+          <div class="small" id="leftHpText">HP</div>
+          <div class="bar"><div id="leftMpFill" class="fill mp"></div></div>
+          <div class="small" id="leftMpText">MP</div>
+        </div>
+        <div id="leftSprite" class="sprite">🌿</div>
+      </div>
+
+      <div class="side right">
+        <div class="nameplate">
+          <div class="name-row"><strong id="rightName">Right</strong><span id="rightLvl">Lv 1</span></div>
+          <div class="bar"><div id="rightHpFill" class="fill hp"></div></div>
+          <div class="small" id="rightHpText">HP</div>
+          <div class="bar"><div id="rightMpFill" class="fill mp"></div></div>
+          <div class="small" id="rightMpText">MP</div>
+        </div>
+        <div id="rightSprite" class="sprite">🔥</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="leftAttack">LEFT ATTACK →</button>
+      <button class="primary" id="rightAttack">← RIGHT ATTACK</button>
+      <button id="resetBattle">RESET HP/MP</button>
+      <button id="swapSides">SWAP SIDES</button>
+    </div>
+
+    <div>
+      <h2>Battle Log</h2><p class="small">Formula: BasePower + MovePowerModifier + ((OffensiveStat - DefensiveStat) × 0.50) + LevelModifier, then element/target/defend/passive/crit modifiers, then additive random damage and clamp.</p>
+      <div id="log" class="log"></div>
+    </div>
+  </section>
+
+  <aside class="stack">
+    <section class="panel">
+      <h2>Right Unit</h2>
+      <div class="grid2">
+        <label>Creature <select id="rightCreature"></select></label>
+        <label>Level <input id="rightLevel" type="number" min="1" max="100" value="1"></label>
+      </div>
+      <p id="rightRole" class="small"></p>
+      <div class="tabs">
+        <button class="primary" data-side-tab="right-stats">Stats</button>
+        <button data-side-tab="right-growth">Growth</button>
+        <button data-side-tab="right-res">Resist</button>
+      </div>
+      <div id="right-stats"></div>
+      <div id="right-growth" class="hidden"></div>
+      <div id="right-res" class="hidden"></div>
+      <button id="rightResetHp" style="margin-top:8px">Reset Right HP/MP</button>
+    </section>
+
+    <section class="panel">
+      <h2>Right Move</h2>
+      <div id="rightMoves" class="move-buttons"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Export</h2>
+      <p class="small">Exports current edited creature/move/constant values. Use this after tuning level-1 bases and growth curves.</p>
+      <div class="grid2">
+        <button class="primary" id="exportBtn">Export JSON</button>
+        <button id="copyBtn">Copy</button>
+      </div>
+      <textarea id="exportBox" spellcheck="false"></textarea>
+    </section>
+  </aside>
+</main>
+
+<script>
+const START_CREATURES = [{"id": "flor", "name": "Flor", "element": "gaia", "role": "Sustain / control", "baseStats": {"hp": 38, "mp": 28, "strength": 7, "defense": 10, "intelligence": 11, "spirit": 15, "speed": 9}, "growth": {"hp": 3.9, "mp": 3.1, "strength": 0.7, "defense": 1.15, "intelligence": 1.15, "spirit": 1.65, "speed": 0.95}, "resistances": {"neutral": 1, "fire": 1.25, "water": 0.75, "gaia": 0.5, "ice": 1, "earth": 0.75, "wind": 1, "light": 1, "dark": 1.25}}, {"id": "aquaphant", "name": "Aquaphant", "element": "water", "role": "Sustain bruiser", "baseStats": {"hp": 48, "mp": 24, "strength": 10, "defense": 14, "intelligence": 11, "spirit": 12, "speed": 6}, "growth": {"hp": 5.0, "mp": 2.55, "strength": 1.0, "defense": 1.45, "intelligence": 1.15, "spirit": 1.15, "speed": 0.6}, "resistances": {"neutral": 1, "fire": 0.75, "water": 0.5, "gaia": 1.25, "ice": 0.75, "earth": 1, "wind": 1, "light": 1, "dark": 1}}, {"id": "pengun", "name": "Pengun", "element": "ice", "role": "Control / debuff", "baseStats": {"hp": 34, "mp": 26, "strength": 6, "defense": 8, "intelligence": 13, "spirit": 11, "speed": 16}, "growth": {"hp": 3.35, "mp": 2.7, "strength": 0.65, "defense": 0.85, "intelligence": 1.45, "spirit": 1.1, "speed": 1.7}, "resistances": {"neutral": 1, "fire": 1.5, "water": 0.75, "gaia": 1, "ice": 0.5, "earth": 1, "wind": 1, "light": 1, "dark": 1}}, {"id": "salamander", "name": "Salamander", "element": "fire", "role": "Magic Art pressure", "baseStats": {"hp": 36, "mp": 27, "strength": 7, "defense": 7, "intelligence": 16, "spirit": 11, "speed": 14}, "growth": {"hp": 3.4, "mp": 2.85, "strength": 0.7, "defense": 0.75, "intelligence": 1.75, "spirit": 1.05, "speed": 1.45}, "resistances": {"neutral": 1, "fire": 0.5, "water": 1.5, "gaia": 0.75, "ice": 0.75, "earth": 1.25, "wind": 1, "light": 1, "dark": 1}}];
+const START_MOVES = [{"id": "basic_attack", "name": "Attack", "owner": "shared", "learnedAt": 1, "category": "basic", "damageClass": "physical", "element": "neutral", "basePower": 12, "offensiveScaling": 0.75, "levelScaling": 0.25, "mpCost": 0, "accuracy": 100, "canCrit": true, "description": "Basic physical command.", "movePowerModifier": 0}, {"id": "sprout_tap", "name": "Sprout Tap", "owner": "flor", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "gaia", "basePower": 14, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Gaia attack.", "movePowerModifier": 0}, {"id": "petal_mend", "name": "Petal Mend", "owner": "flor", "learnedAt": 1, "category": "heal", "damageClass": "heal", "element": "gaia", "basePower": 24, "offensiveScaling": 0.55, "levelScaling": 0.2, "mpCost": 8, "accuracy": 100, "canCrit": false, "description": "Single-target heal preview.", "movePowerModifier": 0}, {"id": "root_snare", "name": "Root Snare", "owner": "flor", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "gaia", "basePower": 12, "offensiveScaling": 0.85, "levelScaling": 0.25, "mpCost": 6, "accuracy": 90, "canCrit": true, "description": "Light control damage.", "movePowerModifier": 0}, {"id": "verdant_guard", "name": "Verdant Guard", "owner": "flor", "learnedAt": 20, "category": "utility", "damageClass": "utility", "element": "gaia", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 10, "accuracy": 100, "canCrit": false, "description": "Magic mitigation utility placeholder.", "movePowerModifier": 0}, {"id": "bubble_shot", "name": "Bubble Shot", "owner": "aquaphant", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "water", "basePower": 15, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Water Art.", "movePowerModifier": 0}, {"id": "soak_hide", "name": "Soak Hide", "owner": "aquaphant", "learnedAt": 1, "category": "utility", "damageClass": "utility", "element": "water", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 8, "accuracy": 100, "canCrit": false, "description": "Self physical mitigation placeholder.", "movePowerModifier": 0}, {"id": "tidal_bump", "name": "Tidal Bump", "owner": "aquaphant", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "water", "basePower": 24, "offensiveScaling": 1.0, "levelScaling": 0.3, "mpCost": 7, "accuracy": 92, "canCrit": true, "description": "Standard Water damage Art.", "movePowerModifier": 0}, {"id": "surge_crash", "name": "Surge Crash", "owner": "aquaphant", "learnedAt": 20, "category": "art", "damageClass": "magic", "element": "water", "basePower": 36, "offensiveScaling": 1.05, "levelScaling": 0.35, "mpCost": 12, "accuracy": 88, "canCrit": true, "description": "Heavy Water attack.", "movePowerModifier": 0}, {"id": "ice_pebble", "name": "Ice Pebble", "owner": "pengun", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "ice", "basePower": 14, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Ice Art.", "movePowerModifier": 0}, {"id": "cold_feet", "name": "Cold Feet", "owner": "pengun", "learnedAt": 1, "category": "utility", "damageClass": "utility", "element": "ice", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 6, "accuracy": 92, "canCrit": false, "description": "Speed reduction utility placeholder.", "movePowerModifier": 0}, {"id": "snow_blind", "name": "Snow Blind", "owner": "pengun", "learnedAt": 10, "category": "utility", "damageClass": "utility", "element": "ice", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 7, "accuracy": 88, "canCrit": false, "description": "Accuracy disruption utility placeholder.", "movePowerModifier": 0}, {"id": "frost_nip", "name": "Frost Nip", "owner": "pengun", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "ice", "basePower": 23, "offensiveScaling": 1.0, "levelScaling": 0.3, "mpCost": 7, "accuracy": 92, "canCrit": true, "description": "Standard Ice damage Art.", "movePowerModifier": 0}, {"id": "shatter_chill", "name": "Shatter Chill", "owner": "pengun", "learnedAt": 20, "category": "art", "damageClass": "magic", "element": "ice", "basePower": 34, "offensiveScaling": 1.05, "levelScaling": 0.35, "mpCost": 12, "accuracy": 86, "canCrit": true, "description": "Heavy Ice punish Art.", "movePowerModifier": 0}, {"id": "spark_flick", "name": "Spark Flick", "owner": "salamander", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "fire", "basePower": 15, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Fire Art.", "movePowerModifier": 0}, {"id": "heat_haze", "name": "Heat Haze", "owner": "salamander", "learnedAt": 1, "category": "utility", "damageClass": "utility", "element": "fire", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 6, "accuracy": 100, "canCrit": false, "description": "Self evasion utility placeholder.", "movePowerModifier": 0}, {"id": "flare_bite", "name": "Flare Bite", "owner": "salamander", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "fire", "basePower": 26, "offensiveScaling": 1.0, "levelScaling": 0.3, "mpCost": 7, "accuracy": 92, "canCrit": true, "description": "Standard Fire Magic Art.", "movePowerModifier": 0}, {"id": "cinder_burst", "name": "Cinder Burst", "owner": "salamander", "learnedAt": 20, "category": "art", "damageClass": "magic", "element": "fire", "basePower": 38, "offensiveScaling": 1.1, "levelScaling": 0.35, "mpCost": 12, "accuracy": 88, "canCrit": true, "description": "Heavy Fire Art.", "movePowerModifier": 0}];
+const CONSTANTS = {"version": "battle-tuning-simulator-v6-shared-core", "levelModifierPerLevel": 0.75, "statPressureCoefficient": 0.5, "criticalModifier": 1.5, "randomDamageMin": -2, "randomDamageMax": 4, "minimumDamage": 1, "maximumDamage": 9999, "defendModifier": 0.5, "defaultTargetCountModifier": 1.0, "defaultPassiveDamageModifier": 1.0, "defaultPassiveResistanceModifier": 1.0, "healingStatPressureCoefficient": 0.35};
+const STAT_KEYS = ["hp","mp","strength","defense","intelligence","spirit","speed"];
+const ELEMENTS = ["neutral","fire","water","gaia","ice","earth","wind","light","dark"];
+const ICONS = {flor:"🌿", aquaphant:"🐘", pengun:"🐧", salamander:"🔥"};
+const $ = id => document.getElementById(id);
+
+let creatures = structuredClone(START_CREATURES);
+let moves = structuredClone(START_MOVES);
+let selectedMove = { left: "basic_attack", right: "basic_attack" };
+let runtime = {
+  left: { hp: 1, mp: 1 },
+  right: { hp: 1, mp: 1 }
+};
+
+function clone(x){ return JSON.parse(JSON.stringify(x)); }
+function getCreature(id){ return creatures.find(c => c.id === id); }
+function getMove(id){ return moves.find(m => m.id === id); }
+function sideCreature(side){ return getCreature($(side+"Creature").value); }
+function sideLevel(side){ return Math.max(1, Math.min(100, Number($(side+"Level").value)||1)); }
+
+function statAtLevel(creature, level) {
+  const out = {};
+  for (const k of STAT_KEYS) out[k] = Math.max(1, Math.floor((Number(creature.baseStats[k])||0) + (Number(creature.growth[k])||0) * (level - 1)));
+  return out;
+}
+
+function legalMoves(creature, level) {
+  return moves.filter(m => m.owner === "shared" || (m.owner === creature.id && Number(m.learnedAt) <= level));
+}
+
+function initSelects() {
+  ["leftCreature","rightCreature"].forEach(id => {
+    const current = $(id).value;
+    $(id).innerHTML = creatures.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+    if (current && getCreature(current)) $(id).value = current;
+  });
+  if (!$("leftCreature").value) $("leftCreature").value = "flor";
+  if (!$("rightCreature").value) $("rightCreature").value = "salamander";
+}
+
+function drawEditor(side) {
+  const creature = sideCreature(side);
+  const level = sideLevel(side);
+  const stats = statAtLevel(creature, level);
+  $(side+"Role").textContent = `${creature.element.toUpperCase()} · ${creature.role}`;
+
+  const statRows = STAT_KEYS.map(k => `
+    <tr>
+      <td>${k}</td>
+      <td><input data-side="${side}" data-kind="baseStats" data-key="${k}" type="number" step="1" value="${creature.baseStats[k]}"></td>
+      <td>${stats[k]}</td>
+    </tr>
+  `).join("");
+  $(side+"-stats").innerHTML = `<table class="stat-table"><tr><th>Stat</th><th>Base Lv1</th><th>Now</th></tr>${statRows}</table>`;
+
+  const growthRows = STAT_KEYS.map(k => `
+    <tr>
+      <td>${k}</td>
+      <td><input data-side="${side}" data-kind="growth" data-key="${k}" type="number" step="0.05" value="${creature.growth[k]}"></td>
+      <td>${stats[k]}</td>
+    </tr>
+  `).join("");
+  $(side+"-growth").innerHTML = `<table class="stat-table"><tr><th>Stat</th><th>Growth/Lv</th><th>Now</th></tr>${growthRows}</table>`;
+
+  const resRows = ELEMENTS.map(k => `
+    <tr>
+      <td>${k}</td>
+      <td><input data-side="${side}" data-kind="resistances" data-key="${k}" type="number" step="0.05" value="${creature.resistances[k] ?? 1}"></td>
+    </tr>
+  `).join("");
+  $(side+"-res").innerHTML = `<table class="stat-table"><tr><th>Element</th><th>Damage Taken</th></tr>${resRows}</table>`;
+
+  document.querySelectorAll(`[data-side="${side}"]`).forEach(input => {
+    input.addEventListener("input", () => {
+      const c = sideCreature(side);
+      const kind = input.dataset.kind;
+      const key = input.dataset.key;
+      c[kind][key] = Number(input.value);
+      clampRuntime(side);
+      redrawAll();
+    });
+  });
+}
+
+function drawMoves(side) {
+  const creature = sideCreature(side);
+  const level = sideLevel(side);
+  const list = legalMoves(creature, level);
+  if (!list.some(m => m.id === selectedMove[side])) selectedMove[side] = "basic_attack";
+  $(side+"Moves").innerHTML = list.map(m => `
+    <button class="${selectedMove[side] === m.id ? "primary" : ""}" data-move-side="${side}" data-move-id="${m.id}">
+      ${m.name}
+      <span class="meta">${m.damageClass}/${m.element} · Pow ${m.basePower} · MP ${m.mpCost} · Lv ${m.learnedAt}</span>
+    </button>
+  `).join("");
+  document.querySelectorAll(`[data-move-side="${side}"]`).forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedMove[side] = btn.dataset.moveId;
+      drawMoves(side);
+      preview();
+    });
+  });
+}
+
+function clampRuntime(side) {
+  const c = sideCreature(side);
+  const s = statAtLevel(c, sideLevel(side));
+  runtime[side].hp = Math.min(Math.max(0, runtime[side].hp || s.hp), s.hp);
+  runtime[side].mp = Math.min(Math.max(0, runtime[side].mp || s.mp), s.mp);
+}
+
+function resetSide(side) {
+  const s = statAtLevel(sideCreature(side), sideLevel(side));
+  runtime[side] = { hp: s.hp, mp: s.mp };
+  redrawBattle();
+}
+
+function resetBattle() { resetSide("left"); resetSide("right"); log("Battle reset."); }
+
+function redrawBattle() {
+  for (const side of ["left","right"]) {
+    const c = sideCreature(side);
+    const s = statAtLevel(c, sideLevel(side));
+    clampRuntime(side);
+    $(side+"Name").textContent = c.name;
+    $(side+"Lvl").textContent = "Lv " + sideLevel(side);
+    $(side+"Sprite").textContent = ICONS[c.id] || "◆";
+    $(side+"Sprite").style.transform = side === "right" ? "scaleX(-1)" : "scaleX(1)";
+    $(side+"HpFill").style.width = `${Math.max(0, runtime[side].hp / s.hp * 100)}%`;
+    $(side+"MpFill").style.width = `${Math.max(0, runtime[side].mp / s.mp * 100)}%`;
+    $(side+"HpText").textContent = `HP ${runtime[side].hp} / ${s.hp}`;
+    $(side+"MpText").textContent = `MP ${runtime[side].mp} / ${s.mp}`;
+  }
+}
+
+function redrawAll() {
+  if ($("syncLevels").value === "on") $("rightLevel").value = $("leftLevel").value;
+  initSelects();
+  drawEditor("left");
+  drawEditor("right");
+  drawMoves("left");
+  drawMoves("right");
+  redrawBattle();
+  preview();
+}
+
+function randomDamageModifier() {
+  const mode = $("varianceMode").value;
+  const min = CONSTANTS.randomDamageMin;
+  const max = CONSTANTS.randomDamageMax;
+
+  if (mode === "min") return min;
+  if (mode === "max") return max;
+  if (mode === "avg") return Math.round((min + max) / 2);
+
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function calcMove(attackerSide, defenderSide) {
+  const attacker = sideCreature(attackerSide);
+  const defender = sideCreature(defenderSide);
+  const attackerLevel = sideLevel(attackerSide);
+  const defenderLevel = sideLevel(defenderSide);
+  const aStats = statAtLevel(attacker, attackerLevel);
+  const dStats = statAtLevel(defender, defenderLevel);
+  const move = getMove(selectedMove[attackerSide]);
+
+  const randomMod = randomDamageModifier();
+  const criticalModifier = $("critMode").value === "on" && move.canCrit ? CONSTANTS.criticalModifier : 1;
+  const elementModifier = defender.resistances[move.element] ?? 1;
+  const targetCountModifier = Number($("targetCountModifier").value) || CONSTANTS.defaultTargetCountModifier;
+  const passiveDamageModifier = Number($("passiveDamageModifier").value) || CONSTANTS.defaultPassiveDamageModifier;
+  const passiveResistanceModifier = Number($("passiveResistanceModifier").value) || CONSTANTS.defaultPassiveResistanceModifier;
+  const defenderIsDefending = $(defenderSide + "Defending")?.value === "1";
+  const defendModifier = defenderIsDefending ? CONSTANTS.defendModifier : 1;
+
+  if (move.damageClass === "utility") {
+    return {
+      type:"utility",
+      move,
+      text:`${move.name} is utility. Effect hooks are not implemented yet.`
+    };
+  }
+
+  if (move.damageClass === "heal") {
+    const relevantStat = aStats.spirit;
+    const baseHealPower = Number(move.basePower || 0);
+    const movePowerModifier = Number(move.movePowerModifier ?? 0);
+    const relevantStatPressure = relevantStat * CONSTANTS.healingStatPressureCoefficient;
+    const levelModifier = attackerLevel * CONSTANTS.levelModifierPerLevel;
+    const healingBeforeClamp =
+      baseHealPower +
+      movePowerModifier +
+      relevantStatPressure +
+      levelModifier;
+
+    const value = Math.max(0, Math.floor(healingBeforeClamp));
+    return {
+      type:"heal",
+      move,
+      value,
+      raw: healingBeforeClamp,
+      baseHealPower,
+      movePowerModifier,
+      relevantStat,
+      relevantStatPressure,
+      levelModifier,
+      randomMod: 0,
+      aStats,
+      dStats
+    };
+  }
+
+  let offensiveStat;
+  let defensiveStat;
+
+  if (move.damageClass === "physical") {
+    offensiveStat = aStats.strength;
+    defensiveStat = dStats.defense;
+  } else if (move.damageClass === "magic") {
+    offensiveStat = aStats.intelligence;
+    defensiveStat = dStats.spirit;
+  } else {
+    return {
+      type:"utility",
+      move,
+      text:`${move.name} has unsupported damage class '${move.damageClass}'.`
+    };
+  }
+
+  const basePower = Number(move.basePower || 0);
+  const movePowerModifier = Number(move.movePowerModifier ?? 0);
+  const statPressure =
+    (offensiveStat - defensiveStat) * CONSTANTS.statPressureCoefficient;
+  const levelModifier =
+    attackerLevel * CONSTANTS.levelModifierPerLevel;
+
+  const preMultiplierDamage =
+    basePower +
+    movePowerModifier +
+    statPressure +
+    levelModifier;
+
+  const damageBeforeClamp =
+    (
+      preMultiplierDamage *
+      elementModifier *
+      targetCountModifier *
+      defendModifier *
+      passiveDamageModifier *
+      passiveResistanceModifier *
+      criticalModifier
+    ) + randomMod;
+
+  const absorbed =
+    elementModifier === "absorb" ||
+    elementModifier < 0;
+
+  let value;
+  if (absorbed) {
+    value = Math.max(0, Math.floor(Math.abs(damageBeforeClamp)));
+  } else {
+    value = Math.max(
+      CONSTANTS.minimumDamage,
+      Math.min(CONSTANTS.maximumDamage, Math.floor(damageBeforeClamp))
+    );
+  }
+
+  return {
+    type: absorbed ? "absorb" : "damage",
+    move,
+    value,
+    raw: preMultiplierDamage,
+    damageBeforeClamp,
+    basePower,
+    movePowerModifier,
+    statPressure,
+    levelModifier,
+    randomMod,
+    criticalModifier,
+    elementModifier,
+    targetCountModifier,
+    defendModifier,
+    passiveDamageModifier,
+    passiveResistanceModifier,
+    offensiveStat,
+    defensiveStat,
+    aStats,
+    dStats,
+    hpPct: value / dStats.hp
+  };
+}
+
+function spendMp(side, move) {
+  runtime[side].mp = Math.max(0, runtime[side].mp - (Number(move.mpCost)||0));
+}
+
+function doAttack(attackerSide) {
+  const defenderSide = attackerSide === "left" ? "right" : "left";
+  const result = calcMove(attackerSide, defenderSide);
+  const move = result.move;
+
+  const aSprite = $(attackerSide+"Sprite");
+  const dSprite = $(defenderSide+"Sprite");
+  aSprite.classList.remove("attack-left","attack-right");
+  dSprite.classList.remove("hit");
+  void aSprite.offsetWidth;
+  aSprite.classList.add(attackerSide === "left" ? "attack-left" : "attack-right");
+
+  if (result.type === "utility") {
+    spendMp(attackerSide, move);
+    log(`${sideCreature(attackerSide).name} used ${move.name}. ${result.text}`);
+    redrawBattle();
+    return;
+  }
+
+  if (runtime[attackerSide].mp < move.mpCost) {
+    log(`${sideCreature(attackerSide).name} tried ${move.name}, but did not have enough MP.`);
+    return;
+  }
+
+  spendMp(attackerSide, move);
+
+  if (result.type === "heal") {
+    runtime[attackerSide].hp = Math.min(result.aStats.hp, runtime[attackerSide].hp + result.value);
+    floatText(attackerSide, "+" + result.value, true);
+    const healDebug = $("showDebug")?.value === "1"
+      ? ` BaseHeal ${result.baseHealPower}, moveMod ${result.movePowerModifier}, spiritPressure ${result.relevantStatPressure.toFixed(1)}, levelMod ${result.levelModifier.toFixed(1)}, beforeClamp ${result.raw.toFixed(1)}.`
+      : "";
+    log(`${sideCreature(attackerSide).name} used ${move.name} and healed ${result.value} HP.${healDebug}`);
+    redrawBattle();
+    return;
+  }
+
+  if (result.type === "absorb") {
+    runtime[defenderSide].hp = Math.min(result.dStats.hp, runtime[defenderSide].hp + result.value);
+    floatText(defenderSide, "+" + result.value, true);
+    log(`${sideCreature(attackerSide).name} used ${move.name}, but ${sideCreature(defenderSide).name} absorbed it for ${result.value} HP.`);
+    redrawBattle();
+    return;
+  }
+
+  runtime[defenderSide].hp = Math.max(0, runtime[defenderSide].hp - result.value);
+  dSprite.classList.add("hit");
+  floatText(defenderSide, "-" + result.value, false);
+
+  const debugText = $("showDebug")?.value === "1"
+    ? ` Base ${result.basePower}, moveMod ${result.movePowerModifier}, statPressure ${result.statPressure.toFixed(1)}, levelMod ${result.levelModifier.toFixed(1)}, element ${Number(result.elementModifier).toFixed(2)}, targetMod ${result.targetCountModifier.toFixed(2)}, defend ${result.defendModifier.toFixed(2)}, passiveDmg ${result.passiveDamageModifier.toFixed(2)}, passiveRes ${result.passiveResistanceModifier.toFixed(2)}, crit ${result.criticalModifier.toFixed(2)}, random ${result.randomMod}, beforeClamp ${result.damageBeforeClamp.toFixed(1)}.`
+    : "";
+
+  log(`${sideCreature(attackerSide).name} used ${move.name}: ${result.value} damage (${(result.hpPct*100).toFixed(1)}% HP).${debugText}`);
+  redrawBattle();
+}
+
+function floatText(side, text, heal) {
+  const field = $("battlefield");
+  const sprite = $(side+"Sprite");
+  const fieldRect = field.getBoundingClientRect();
+  const spriteRect = sprite.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = "float-damage" + (heal ? " float-heal" : "");
+  el.textContent = text;
+  el.style.left = (spriteRect.left - fieldRect.left + spriteRect.width/2 - 18) + "px";
+  el.style.top = (spriteRect.top - fieldRect.top + 8) + "px";
+  field.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+function log(text) {
+  const row = document.createElement("div");
+  row.textContent = text;
+  $("log").prepend(row);
+}
+
+function preview() {
+  const left = calcMove("left", "right");
+  const right = calcMove("right", "left");
+  // Battle log is intentionally not polluted by previews.
+}
+
+function exportData() {
+  const payload = {
+    version: "battle-tuning-export-v6-shared-core",
+    exportedAt: new Date().toISOString(),
+    creatures,
+    moves,
+    constants: CONSTANTS
+  };
+  $("exportBox").value = JSON.stringify(payload, null, 2);
+}
+
+function swapSides() {
+  const lc = $("leftCreature").value, rc = $("rightCreature").value;
+  const ll = $("leftLevel").value, rl = $("rightLevel").value;
+  $("leftCreature").value = rc; $("rightCreature").value = lc;
+  $("leftLevel").value = rl; $("rightLevel").value = ll;
+  const lm = selectedMove.left; selectedMove.left = selectedMove.right; selectedMove.right = lm;
+  resetBattle();
+  redrawAll();
+}
+
+document.querySelectorAll("[data-side-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const id = btn.dataset.sideTab;
+    const side = id.split("-")[0];
+    document.querySelectorAll(`[data-side-tab^="${side}-"]`).forEach(b => b.classList.remove("primary"));
+    btn.classList.add("primary");
+    [`${side}-stats`, `${side}-growth`, `${side}-res`].forEach(tab => $(tab).classList.add("hidden"));
+    $(id).classList.remove("hidden");
+  });
+});
+
+["leftCreature","rightCreature","leftLevel","rightLevel","varianceMode","critMode","syncLevels","leftDefending","rightDefending","targetCountModifier","passiveDamageModifier","passiveResistanceModifier","showDebug"].forEach(id => {
+  $(id).addEventListener("change", () => {
+    if (id.includes("Creature") || id.includes("Level") || id === "syncLevels") {
+      resetSide(id.startsWith("right") ? "right" : "left");
+    }
+    redrawAll();
+  });
+  $(id).addEventListener("input", redrawAll);
+});
+
+$("leftAttack").addEventListener("click", () => doAttack("left"));
+$("rightAttack").addEventListener("click", () => doAttack("right"));
+$("resetBattle").addEventListener("click", resetBattle);
+$("swapSides").addEventListener("click", swapSides);
+$("leftResetHp").addEventListener("click", () => resetSide("left"));
+$("rightResetHp").addEventListener("click", () => resetSide("right"));
+$("exportBtn").addEventListener("click", exportData);
+$("copyBtn").addEventListener("click", async () => {
+  exportData();
+  await navigator.clipboard.writeText($("exportBox").value);
+  log("Export JSON copied to clipboard.");
+});
+
+initSelects();
+$("leftCreature").value = "flor";
+$("rightCreature").value = "salamander";
+resetBattle();
+redrawAll();
+log("Simulator ready. Tune Level 1 first, then raise levels to test growth.");
+</script>
+</body>
+</html>
+
+<!-- v5: restored in-panel HUD cards to prevent clipping while keeping center-row creature placement. -->
