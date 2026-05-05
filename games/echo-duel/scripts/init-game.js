@@ -1,4 +1,5 @@
 import { PHASES, timerSecondsForLength } from './config.js';
+import { applyAuthoritativeMatchMessage, isAuthoritativeMatchMessageType } from './authority-sync.js';
 import { activePlayers, cloneState, createMatchState, hydrateNetworkState, serializeStateForNetwork } from './state.js';
 import { handleInput, resolveCopyPhase, tick } from './engine.js';
 import { createInputController } from './input.js';
@@ -20,6 +21,7 @@ const online = {
   profiles: {},
   identity: null,
   isHost: false,
+  authorityMode: null,
   started: false,
   startRequested: false,
   outboundStateSeq: 0,
@@ -28,6 +30,10 @@ const online = {
 };
 
 function qs(id) { return document.getElementById(id); }
+
+function onlineUsesServerAuthority() {
+  return online.authorityMode === 'server';
+}
 
 function setMenuNotice(message = '') {
   const el = qs('menu-notice');
@@ -56,6 +62,7 @@ function goMenuWithNotice(message) {
   online.lobby = null;
   online.profiles = {};
   online.isHost = false;
+  online.authorityMode = null;
   online.started = false;
   online.startRequested = false;
   online.outboundStateSeq = 0;
@@ -159,13 +166,13 @@ function setState(nextState, { broadcast = true } = {}) {
 
   renderMatch(state);
 
-  if (broadcast && state.mode === 'online' && online.isHost) {
+  if (broadcast && state.mode === 'online' && online.isHost && !onlineUsesServerAuthority()) {
     broadcastState();
   }
 }
 
 function broadcastState() {
-  if (!state || !online.net || !online.isHost) return;
+  if (!state || !online.net || !online.isHost || onlineUsesServerAuthority()) return;
   const snapshot = serializeStateForNetwork(state);
   snapshot.network = {
     ...(snapshot.network || {}),
@@ -225,7 +232,7 @@ function submitOnlineInput(input) {
   playInputTone(input);
   flashInput(input);
 
-  if (online.isHost) {
+  if (online.isHost && !onlineUsesServerAuthority()) {
     applyAuthoritativeInput(online.net.clientId, input);
   } else {
     online.net.sendInput(input, { phaseId: state.phaseId, turnId: state.turnId });
@@ -275,7 +282,7 @@ function startLoop() {
   let lastBroadcastAt = 0;
   const frame = () => {
     if (state && state.phase !== PHASES.MATCH_OVER) {
-      if (state.mode === 'online' && !online.isHost) {
+      if (state.mode === 'online' && (!online.isHost || onlineUsesServerAuthority())) {
         renderMatch(state);
       } else {
         const next = tick(state);
@@ -285,7 +292,7 @@ function startLoop() {
 
       syncPlaybackTone();
 
-      if (state?.mode === 'online' && online.isHost) {
+      if (state?.mode === 'online' && online.isHost && !onlineUsesServerAuthority()) {
         const now = performance.now();
         if (now - lastBroadcastAt > 1000) {
           lastBroadcastAt = now;
@@ -321,6 +328,7 @@ function disconnectOnline() {
   online.lobby = null;
   online.profiles = {};
   online.isHost = false;
+  online.authorityMode = null;
   online.started = false;
   online.startRequested = false;
   online.outboundStateSeq = 0;
@@ -379,6 +387,25 @@ function updateLobbyView(status = '') {
   });
 }
 
+function applyServerAuthoritativeState(messageType, value) {
+  const next = applyAuthoritativeMatchMessage(state, messageType, value, {
+    myClientId: online.net?.clientId || null,
+    lobbyOwnerId: online.lobby?.ownerId || null,
+    hostId: online.lobby?.ownerId || null,
+  });
+
+  if (!next) return false;
+
+  stopLobbyCountdownTicker();
+  online.authorityMode = 'server';
+  online.started = true;
+  state = next;
+  showScreen('match');
+  renderMatch(state);
+  if (!rafId) startLoop();
+  return true;
+}
+
 function cacheMyProfile() {
   if (!online.net?.clientId || !online.identity) return;
   online.profiles[online.net.clientId] = { ...online.identity };
@@ -431,6 +458,22 @@ function wireOnlineCallbacks(net) {
     const leavingHost = state?.network?.hostId && payload.clientId === state.network.hostId;
 
     if (state?.mode === 'online' && online.started && state.phase !== PHASES.MATCH_OVER) {
+      if (onlineUsesServerAuthority()) {
+        if (online.lobby) {
+          online.lobby = {
+            ...online.lobby,
+            playerCount: payload.playerCount,
+            ownerId: payload.ownerId,
+            members: Array.isArray(online.lobby.members)
+              ? online.lobby.members.filter(memberId => memberId !== payload.clientId)
+              : online.lobby.members,
+          };
+          online.isHost = payload.ownerId === net.clientId;
+        }
+        updateLobbyView('A player left.');
+        return;
+      }
+
       if (leavingHost && !online.isHost) {
         goMenuWithNotice('The lobby host disconnected. The online match was closed.');
         return;
@@ -473,6 +516,19 @@ function wireOnlineCallbacks(net) {
     online.lobby.members = members;
     const start = () => {
       stopLobbyCountdownTicker();
+      if (payload.authorityMode === 'server' || payload.matchState || payload.snapshot) {
+        online.authorityMode = 'server';
+        if (payload.matchState) {
+          applyServerAuthoritativeState('match_state', JSON.stringify(payload.matchState));
+        } else if (payload.snapshot) {
+          applyServerAuthoritativeState('match_state', JSON.stringify(payload.snapshot));
+        } else {
+          showScreen('match');
+        }
+        return;
+      }
+
+      online.authorityMode = 'host-client';
       if (online.isHost) {
         const players = makePlayersFromLobby(online.lobby);
         const matchState = createMatchState({
@@ -506,6 +562,11 @@ function wireOnlineCallbacks(net) {
       return;
     }
 
+    if (isAuthoritativeMatchMessageType(messageType)) {
+      applyServerAuthoritativeState(messageType, value);
+      return;
+    }
+
     if (messageType === 'input') {
       const msg = safeParse(value);
       const input = String(msg?.input || '').toUpperCase();
@@ -515,13 +576,14 @@ function wireOnlineCallbacks(net) {
       // The sequence itself remains hidden; only the pad flash/tone is mirrored.
       mirrorVisibleOwnerInput(senderId, input);
 
-      if (online.isHost) {
+      if (online.isHost && !onlineUsesServerAuthority()) {
         applyAuthoritativeInput(senderId, input, { phaseId: msg?.phaseId, turnId: msg?.turnId });
       }
       return;
     }
 
     if (messageType === 'state_sync') {
+      if (onlineUsesServerAuthority()) return;
       if (online.isHost) return;
       const snapshot = safeParse(value);
       const syncSeq = Number(snapshot?.network?.syncSeq || 0);
