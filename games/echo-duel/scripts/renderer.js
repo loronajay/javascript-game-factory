@@ -385,7 +385,7 @@ export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, sta
   if (codeEl) codeEl.textContent = lobby?.roomCode || '-----';
   if (statusEl) {
     const dynamicStatus = lobbyStatusText(lobby);
-    statusEl.textContent = lobby?.status === 'countdown' ? dynamicStatus : (status || dynamicStatus);
+    statusEl.textContent = (lobby?.status === 'countdown' || lobby?.status === 'started') ? dynamicStatus : (status || dynamicStatus);
   }
   if (settingsEl && lobby) {
     settingsEl.textContent = `${lobby.playerCount || 0}/${lobby.maxPlayers} players · min ${lobby.minPlayers} · word ${lobby.settings?.penaltyWord || 'ECHO'}`;
@@ -406,15 +406,21 @@ export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, sta
   if (startBtn) {
     const isOwner = lobby?.ownerId === myClientId;
     const ready = Number(lobby?.playerCount || 0) >= Number(lobby?.minPlayers || 2);
-    const starting = startRequested || lobby?.status === 'countdown' || lobby?.status === 'started';
+    const status = lobby?.status || 'open';
+    const startAt = Number(lobby?.startAt || 0);
+    const hasVisibleStartCountdown = (status === 'countdown' || status === 'started') && startAt > Date.now();
+    const starting = startRequested || status === 'countdown' || status === 'started';
+
     startBtn.hidden = !isOwner;
     startBtn.disabled = !ready || starting;
-    if (lobby?.status === 'countdown' && lobby.startAt) {
-      const seconds = Math.max(0, Math.ceil((Number(lobby.startAt) - Date.now()) / 1000));
+
+    if (hasVisibleStartCountdown) {
+      const seconds = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
       startBtn.textContent = `Starting in ${seconds}s...`;
     } else {
       startBtn.textContent = starting ? 'Starting Match...' : 'Start Now';
     }
+
     startBtn.setAttribute('aria-busy', starting ? 'true' : 'false');
   }
 }
@@ -426,10 +432,17 @@ function shortClientId(value) {
 
 function lobbyStatusText(lobby) {
   if (!lobby) return 'Connecting...';
-  if (lobby.status === 'countdown' && lobby.startAt) {
-    const seconds = Math.max(0, Math.ceil((lobby.startAt - Date.now()) / 1000));
-    return `Minimum reached. Match starts in ${seconds}s...`;
+
+  const status = lobby.status || 'open';
+  const startAt = Number(lobby.startAt || 0);
+  if ((status === 'countdown' || status === 'started') && startAt > 0) {
+    const seconds = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
+    if (status === 'started') {
+      return seconds > 0 ? `Match starts in ${seconds}s...` : 'Starting match...';
+    }
+    return seconds > 0 ? `Minimum reached. Match starts in ${seconds}s...` : 'Starting match...';
   }
+
   if ((lobby.playerCount || 0) < lobby.minPlayers) {
     return `Waiting for ${lobby.minPlayers - lobby.playerCount} more player${lobby.minPlayers - lobby.playerCount === 1 ? '' : 's'}...`;
   }

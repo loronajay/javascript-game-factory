@@ -349,7 +349,10 @@ function stopLobbyCountdownTicker() {
 }
 
 function shouldTickLobbyCountdown() {
-  return !!online.lobby && online.lobby.status === 'countdown' && Number(online.lobby.startAt || 0) > 0 && !online.started;
+  if (!online.lobby) return false;
+  const status = online.lobby.status;
+  const startAt = Number(online.lobby.startAt || 0);
+  return (status === 'countdown' || status === 'started') && startAt > Date.now();
 }
 
 function startLobbyCountdownTicker() {
@@ -460,14 +463,16 @@ function wireOnlineCallbacks(net) {
   };
 
   net.cb.onLobbyStarted = payload => {
-    stopLobbyCountdownTicker();
     online.lobby = { ...(online.lobby || {}), ...payload, status: 'started' };
     online.isHost = payload.ownerId === net.clientId;
     online.started = true;
     online.startRequested = true;
     const members = payload.members || online.lobby.members || [];
+    startLobbyCountdownTicker();
+    updateLobbyView('Match starting...');
     online.lobby.members = members;
     const start = () => {
+      stopLobbyCountdownTicker();
       if (online.isHost) {
         const players = makePlayersFromLobby(online.lobby);
         const matchState = createMatchState({
