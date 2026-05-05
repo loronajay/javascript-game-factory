@@ -36,15 +36,36 @@ function phaseCopy(state) {
   }
 }
 
+function localPlayerId(state) {
+  return state?.network?.myClientId || null;
+}
+
+function isLocalOwner(state) {
+  const localId = localPlayerId(state);
+  const owner = getOwner(state);
+  if (!localId) return state.mode !== 'online';
+  return owner?.id === localId || owner?.clientId === localId;
+}
+
+function localCopyProgress(state) {
+  const localId = localPlayerId(state);
+  if (localId && state.copyProgress?.[localId]) return state.copyProgress[localId];
+  const firstCopying = Object.values(state.copyProgress || {}).find(progress => progress.status === 'copying');
+  return firstCopying || null;
+}
+
+function expectedSlotCount(state) {
+  if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.settings.startingPatternLength;
+  if (state.phase === PHASES.OWNER_APPEND) return Math.min(state.settings.maxPatternLength, state.activeSequence.length + 1);
+  if (state.phase === PHASES.OWNER_REPLAY || state.phase === PHASES.CHALLENGER_COPY) return state.activeSequence.length;
+  return Math.max(state.activeSequence.length, state.settings.startingPatternLength);
+}
+
 function progressCountForPhase(state) {
   if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.ownerDraft.length;
   if (state.phase === PHASES.OWNER_REPLAY) return state.ownerReplayIndex || 0;
   if (state.phase === PHASES.OWNER_APPEND) return state.activeSequence.length;
-  if (state.phase === PHASES.CHALLENGER_COPY) {
-    const progressValues = Object.values(state.copyProgress || {});
-    if (!progressValues.length) return 0;
-    return Math.max(...progressValues.map(progress => Number(progress.index) || 0));
-  }
+  if (state.phase === PHASES.CHALLENGER_COPY) return Number(localCopyProgress(state)?.index || 0);
   return 0;
 }
 
@@ -53,18 +74,71 @@ function renderSequence(state) {
   if (!slots) return;
   slots.innerHTML = '';
 
-  const baseLength = state.phase === PHASES.OWNER_CREATE_INITIAL
-    ? state.settings.startingPatternLength
-    : Math.max(state.activeSequence.length, state.settings.startingPatternLength);
-  const count = Math.max(0, baseLength);
-  const progress = progressCountForPhase(state);
+  const count = Math.max(0, expectedSlotCount(state));
+  const progress = Math.max(0, Math.min(count, progressCountForPhase(state)));
 
   for (let i = 0; i < count; i++) {
     const slot = document.createElement('div');
     slot.className = 'sequence-slot sequence-slot--hidden';
-    if (i < progress) slot.classList.add('is-complete');
-    slot.textContent = i < progress ? '•' : '·';
+    if (i < progress) {
+      slot.classList.add('is-complete');
+      slot.textContent = '•';
+    } else {
+      slot.textContent = String(i + 1);
+    }
+    if (i === progress && progress < count) slot.classList.add('is-next');
     slots.appendChild(slot);
+  }
+}
+
+function inputModeForState(state) {
+  const owner = getOwner(state);
+  const ownerName = owner?.name || 'Owner';
+  const ownerLocal = isLocalOwner(state);
+
+  if (state.phase === PHASES.OWNER_CREATE_INITIAL) {
+    return ownerLocal
+      ? { label: 'CREATE STARTING SIGNAL', detail: `${state.ownerDraft.length}/${state.settings.startingPatternLength}`, className: 'mode-owner-append', locked: false }
+      : { label: `WATCH ${ownerName}`, detail: 'Memorize the signal', className: 'mode-watch', locked: true };
+  }
+
+  if (state.phase === PHASES.OWNER_REPLAY) {
+    return ownerLocal
+      ? { label: 'REPLAY YOUR SIGNAL', detail: `${state.ownerReplayIndex || 0}/${state.activeSequence.length}`, className: 'mode-owner-replay', locked: false }
+      : { label: `WATCH ${ownerName}`, detail: 'Control can drop here', className: 'mode-watch', locked: true };
+  }
+
+  if (state.phase === PHASES.OWNER_APPEND) {
+    return ownerLocal
+      ? { label: 'ADD 1 NEW INPUT', detail: `${state.activeSequence.length}/${Math.min(state.settings.maxPatternLength, state.activeSequence.length + 1)}`, className: 'mode-owner-append', locked: false }
+      : { label: `WATCH ${ownerName}`, detail: 'New input incoming', className: 'mode-watch', locked: true };
+  }
+
+  if (state.phase === PHASES.CHALLENGER_COPY) {
+    const progress = localCopyProgress(state);
+    const isCopying = !ownerLocal && progress?.status === 'copying';
+    return isCopying
+      ? { label: 'COPY THE SIGNAL', detail: `${progress.index || 0}/${state.activeSequence.length}`, className: 'mode-challenger-copy', locked: false }
+      : { label: 'WATCH RESULTS', detail: 'Input locked', className: 'mode-watch', locked: true };
+  }
+
+  return { label: 'WATCH', detail: '', className: 'mode-watch', locked: true };
+}
+
+function renderInputMode(state) {
+  const mode = inputModeForState(state);
+  const banner = qs('input-mode-banner');
+  const pad = qs('input-pad') || document.querySelector('.pad');
+  if (banner) {
+    banner.innerHTML = `<strong>${mode.label}</strong><span>${mode.detail || ''}</span>`;
+    banner.className = `input-mode-banner ${mode.className}`;
+  }
+  if (pad) {
+    pad.classList.toggle('pad--locked', mode.locked);
+    pad.classList.toggle('pad--watch', mode.className === 'mode-watch');
+    pad.classList.toggle('pad--owner-replay', mode.className === 'mode-owner-replay');
+    pad.classList.toggle('pad--owner-append', mode.className === 'mode-owner-append');
+    pad.classList.toggle('pad--challenger-copy', mode.className === 'mode-challenger-copy');
   }
 }
 
@@ -159,6 +233,7 @@ export function renderMatch(state) {
   qs('status-line').textContent = state.status || '';
   renderPlayers(state);
   renderSequence(state);
+  renderInputMode(state);
   renderTimer(state);
 }
 

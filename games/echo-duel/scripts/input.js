@@ -1,5 +1,11 @@
 import { INPUTS } from './config.js';
 
+function isTypingTarget(target) {
+  if (!target) return false;
+  const tag = target.tagName ? target.tagName.toLowerCase() : '';
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable === true;
+}
+
 export function createInputController({ onInput }) {
   const keysDown = new Set();
 
@@ -10,6 +16,7 @@ export function createInputController({ onInput }) {
   }
 
   function onKeyDown(event) {
+    if (isTypingTarget(event.target)) return;
     const input = String(event.key || '').toUpperCase();
     if (!INPUTS.includes(input)) return;
     if (keysDown.has(input)) return;
@@ -19,6 +26,7 @@ export function createInputController({ onInput }) {
   }
 
   function onKeyUp(event) {
+    if (isTypingTarget(event.target)) return;
     keysDown.delete(String(event.key || '').toUpperCase());
   }
 

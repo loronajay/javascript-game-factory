@@ -410,6 +410,7 @@ function wireOnlineCallbacks(net) {
       const snapshot = safeParse(value);
       const hydrated = hydrateNetworkState(snapshot);
       if (hydrated) {
+        hydrated.network = { ...(hydrated.network || {}), myClientId: online.net?.clientId || net.clientId };
         state = hydrated;
         renderMatch(state);
         if (!rafId) startLoop();
