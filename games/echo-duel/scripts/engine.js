@@ -143,15 +143,27 @@ function finishCopyPhase(state) {
     return next;
   }
 
+  const owner = getOwner(next);
+  const challengerIds = Object.keys(next.copyProgress || {});
   const successful = next.roundResults.filter(result => result.result === 'safe');
+  const allChallengersSucceeded = challengerIds.length > 0 && successful.length === challengerIds.length;
   const reachedMax = next.activeSequence.length >= next.settings.maxPatternLength;
 
-  if (reachedMax && successful.length > 0) {
+  if (!allChallengersSucceeded) {
+    const ownerIndex = next.players.findIndex(player => player.id === owner?.id);
+    return beginControl(
+      next,
+      ownerIndex >= 0 ? ownerIndex : next.ownerIndex,
+      `${owner?.name || 'Owner'} keeps control. Not everyone copied it, so the signal resets.`
+    );
+  }
+
+  if (reachedMax) {
     const winnerIndex = next.players.findIndex(player => player.id === successful[0].playerId);
     return beginControl(next, winnerIndex, `${next.players[winnerIndex].name} survived the 10-input chain and takes control.`);
   }
 
-  next.status = `${getOwner(next)?.name || 'Owner'} keeps control.`;
+  next.status = `${owner?.name || 'Owner'} keeps control. Everyone copied it, so the signal can grow.`;
   return beginOwnerReplay(next);
 }
 
@@ -248,7 +260,20 @@ export function handleInput(state, rawInput, actorId = null) {
     if (!next.appendTargetLength || next.appendTargetLength <= next.activeSequence.length) {
       next.appendTargetLength = appendTargetLengthFor(next);
     }
+
+    const maxLength = Number(next.settings?.maxPatternLength || next.appendTargetLength || next.activeSequence.length);
+    next.appendTargetLength = Math.min(next.appendTargetLength, maxLength);
+    if (next.activeSequence.length >= next.appendTargetLength || next.activeSequence.length >= maxLength) {
+      next.status = `${owner?.name || 'Owner'} hit the ${maxLength}-input cap. Memorize it.`;
+      next.appendTargetLength = 0;
+      return beginSignalPlayback(next, `${owner?.name || 'Owner'} hit the ${maxLength}-input cap. Memorize it.`);
+    }
+
     next.activeSequence.push(input);
+    if (next.activeSequence.length > maxLength) {
+      next.activeSequence = next.activeSequence.slice(0, maxLength);
+    }
+
     const remaining = remainingAppendInputs(next);
     if (remaining > 0) {
       next.status = `${owner?.name || 'Owner'} adding inputs: ${next.activeSequence.length}/${next.appendTargetLength}.`;
