@@ -1,4 +1,4 @@
-import { INPUTS, PHASES, timerSecondsForLength } from './config.js';
+import { INPUTS, PHASES, PLAYBACK_TIMING, timerSecondsForLength } from './config.js';
 import { activePlayers, cloneState, findPlayerIndexById, firstActiveIndex, getOwner, nextActiveIndex } from './state.js';
 
 function isValidInput(input) {
@@ -12,6 +12,14 @@ function phaseTimer(length, now = performance.now(), settings) {
     durationMs: seconds * 1000,
     endsAt: now + seconds * 1000,
   };
+}
+
+
+function advancePhaseMarker(next, phase, { newTurn = false } = {}) {
+  next.phase = phase;
+  next.phaseId = Number(next.phaseId || 0) + 1;
+  if (newTurn) next.turnId = Number(next.turnId || 0) + 1;
+  return next;
 }
 
 function appendTargetLengthFor(state) {
@@ -28,19 +36,22 @@ function remainingAppendInputs(state) {
 function beginSignalPlayback(state, status = '') {
   const next = cloneState(state);
   const now = performance.now();
-  const sequence = [...next.activeSequence];
-  const stepMs = 450;
-  const gapMs = 120;
-  const holdMs = 700;
+  const sequence = [...next.activeSequence].slice(0, Number(next.settings?.maxPatternLength || 10));
+  const stepMs = Number(PLAYBACK_TIMING.stepMs || 450);
+  const gapMs = Number(PLAYBACK_TIMING.gapMs || 120);
+  const holdMs = Number(PLAYBACK_TIMING.holdMs || 700);
   const perInputMs = stepMs + gapMs;
   const totalMs = sequence.length * perInputMs + holdMs;
-  next.phase = PHASES.SIGNAL_PLAYBACK;
+  advancePhaseMarker(next, PHASES.SIGNAL_PLAYBACK);
+  next.activeSequence = sequence;
   next.timer = null;
   next.copyProgress = {};
   next.roundResults = [];
   next.playback = {
+    id: `${next.turnId}:${next.phaseId}:${sequence.join('')}`,
     sequence,
     startedAt: now,
+    createdAtEpochMs: Date.now(),
     stepMs,
     gapMs,
     holdMs,
@@ -83,7 +94,7 @@ function awardLetter(state, playerIndex) {
 function beginControl(state, ownerIndex, status = '') {
   const next = cloneState(state);
   const safeOwner = ownerIndex >= 0 ? ownerIndex : firstActiveIndex(next);
-  next.phase = PHASES.OWNER_CREATE_INITIAL;
+  advancePhaseMarker(next, PHASES.OWNER_CREATE_INITIAL, { newTurn: true });
   next.ownerIndex = safeOwner >= 0 ? safeOwner : 0;
   next.activeSequence = [];
   next.ownerDraft = [];
@@ -100,7 +111,7 @@ function beginControl(state, ownerIndex, status = '') {
 
 function beginOwnerReplay(state) {
   const next = cloneState(state);
-  next.phase = PHASES.OWNER_REPLAY;
+  advancePhaseMarker(next, PHASES.OWNER_REPLAY);
   next.ownerReplayIndex = 0;
   next.ownerDraft = [];
   next.appendTargetLength = 0;
@@ -114,7 +125,7 @@ function beginOwnerReplay(state) {
 
 function beginChallengerCopy(state) {
   const next = cloneState(state);
-  next.phase = PHASES.CHALLENGER_COPY;
+  advancePhaseMarker(next, PHASES.CHALLENGER_COPY);
   next.copyProgress = {};
   next.roundResults = [];
   next.players = clearPlayerResults(next.players);
@@ -132,11 +143,15 @@ function beginChallengerCopy(state) {
   return next;
 }
 
+export function resolveCopyPhase(state) {
+  return finishCopyPhase(state);
+}
+
 function finishCopyPhase(state) {
   let next = cloneState(state);
   const active = activePlayers(next);
   if (active.length <= 1) {
-    next.phase = PHASES.MATCH_OVER;
+    advancePhaseMarker(next, PHASES.MATCH_OVER);
     next.winnerId = active[0]?.id || null;
     next.status = `${active[0]?.name || 'No one'} wins.`;
     next.timer = null;
@@ -159,8 +174,10 @@ function finishCopyPhase(state) {
   }
 
   if (reachedMax) {
-    const winnerIndex = next.players.findIndex(player => player.id === successful[0].playerId);
-    return beginControl(next, winnerIndex, `${next.players[winnerIndex].name} survived the 10-input chain and takes control.`);
+    const fastest = [...successful].sort((a, b) => Number(a.finishedAt || 0) - Number(b.finishedAt || 0))[0];
+    const winnerIndex = next.players.findIndex(player => player.id === fastest?.playerId);
+    const safeIndex = winnerIndex >= 0 ? winnerIndex : nextActiveIndex(next, next.ownerIndex);
+    return beginControl(next, safeIndex, `${next.players[safeIndex]?.name || 'Next player'} survived the 10-input chain and takes control.`);
   }
 
   next.status = `${owner?.name || 'Owner'} keeps control. Everyone copied it, so the signal can grow.`;
@@ -185,7 +202,7 @@ function markChallengerResult(state, playerId, result) {
 
   const active = activePlayers(next);
   if (active.length <= 1) {
-    next.phase = PHASES.MATCH_OVER;
+    advancePhaseMarker(next, PHASES.MATCH_OVER);
     next.winnerId = active[0]?.id || null;
     next.status = `${active[0]?.name || 'No one'} wins.`;
     next.timer = null;
@@ -244,7 +261,7 @@ export function handleInput(state, rawInput, actorId = null) {
 
     next.ownerReplayIndex += 1;
     if (next.ownerReplayIndex >= next.activeSequence.length) {
-      next.phase = PHASES.OWNER_APPEND;
+      advancePhaseMarker(next, PHASES.OWNER_APPEND);
       next.appendTargetLength = appendTargetLengthFor(next);
       const needed = remainingAppendInputs(next);
       next.timer = phaseTimer(Math.max(1, needed), performance.now(), next.settings);
@@ -323,7 +340,7 @@ export function handleTimerExpired(state) {
       next = markChallengerResult(next, playerId, 'fail');
       if (next.phase === PHASES.MATCH_OVER) return next;
     }
-    return finishCopyPhase(next);
+    return next;
   }
 
   return next;

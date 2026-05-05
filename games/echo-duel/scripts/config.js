@@ -22,6 +22,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
   maxTimerSeconds: 13,
 });
 
+
+export const PLAYBACK_TIMING = Object.freeze({
+  stepMs: 450,
+  gapMs: 120,
+  holdMs: 700,
+});
+
 export const PHASES = Object.freeze({
   MENU: 'menu',
   LOBBY: 'lobby',

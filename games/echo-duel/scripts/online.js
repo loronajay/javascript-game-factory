@@ -186,8 +186,13 @@ export function createOnlineClient(gameId = 'echo-duel') {
     lobbyMessage('profile', identity);
   }
 
-  function sendInput(input) {
-    lobbyMessage('input', { input, clientTime: Date.now() });
+  function sendInput(input, meta = {}) {
+    lobbyMessage('input', {
+      input,
+      phaseId: Number(meta.phaseId),
+      turnId: Number(meta.turnId),
+      clientTime: Date.now(),
+    });
   }
 
   function sendState(stateSnapshot) {

@@ -81,11 +81,11 @@ function phaseCopy(state) {
   const owner = getOwner(state);
   switch (state.phase) {
     case PHASES.OWNER_CREATE_INITIAL:
-      return ['Owner Create', `${owner?.name || 'Owner'} enters a 4-input pattern.`, 'The completed signal will play back before copy mode.'];
+      return ['Driver Create', `${owner?.name || 'Driver'} enters a 4-input pattern.`, 'The completed signal will play back before copy mode.'];
     case PHASES.OWNER_REPLAY:
-      return ['Owner Replay', `${owner?.name || 'Owner'} must replay their own pattern.`, 'If successful, the completed signal plays back for everyone.'];
+      return ['Driver Replay', `${owner?.name || 'Driver'} must replay their own pattern.`, 'If successful, the completed signal plays back for everyone.'];
     case PHASES.OWNER_APPEND:
-      return ['Owner Append', `${owner?.name || 'Owner'} adds one input.`, 'The updated sequence will be presented before copy begins.'];
+      return ['Driver Append', `${owner?.name || 'Driver'} adds ${state.settings?.patternAppendCount || 2} inputs.`, 'The updated sequence will be presented before copy begins.'];
     case PHASES.SIGNAL_PLAYBACK:
       return ['Memorize', 'Signal playback.', 'Watch the full pattern now. It disappears before copy mode.'];
     case PHASES.CHALLENGER_COPY:
@@ -159,7 +159,7 @@ function renderSequence(state) {
 
 function inputModeForState(state) {
   const owner = getOwner(state);
-  const ownerName = owner?.name || 'Owner';
+  const ownerName = owner?.name || 'Driver';
   const ownerLocal = isLocalOwner(state);
 
   if (state.phase === PHASES.OWNER_CREATE_INITIAL) {
@@ -171,7 +171,7 @@ function inputModeForState(state) {
   if (state.phase === PHASES.OWNER_REPLAY) {
     return ownerLocal
       ? { label: 'REPLAY YOUR SIGNAL', detail: `${state.ownerReplayIndex || 0}/${state.activeSequence.length}`, className: 'mode-owner-replay', locked: false }
-      : { label: `WATCH ${ownerName}`, detail: 'Control can drop here', className: 'mode-watch', locked: true };
+      : { label: `WATCH ${ownerName}`, detail: 'Driver can drop control here', className: 'mode-watch', locked: true };
   }
 
   if (state.phase === PHASES.OWNER_APPEND) {
@@ -218,7 +218,7 @@ function renderInputMode(state) {
 
 
 function roleLabel(state, player, owner) {
-  if (owner?.id === player.id) return 'Owner';
+  if (owner?.id === player.id) return 'Driver';
   const progress = state.copyProgress?.[player.id];
   if (state.phase === PHASES.CHALLENGER_COPY && progress) {
     if (progress.status === 'safe') return 'Safe';

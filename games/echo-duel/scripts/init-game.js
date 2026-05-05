@@ -1,6 +1,6 @@
 import { PHASES, timerSecondsForLength } from './config.js';
 import { activePlayers, cloneState, createMatchState, hydrateNetworkState, serializeStateForNetwork } from './state.js';
-import { handleInput, tick } from './engine.js';
+import { handleInput, resolveCopyPhase, tick } from './engine.js';
 import { createInputController } from './input.js';
 import { playFailureTone, playInputTone } from './audio.js';
 import { currentPlaybackStep, flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
@@ -22,6 +22,8 @@ const online = {
   isHost: false,
   started: false,
   startRequested: false,
+  outboundStateSeq: 0,
+  inboundStateSeq: 0,
 };
 
 function qs(id) { return document.getElementById(id); }
@@ -54,6 +56,8 @@ function goMenuWithNotice(message) {
   online.isHost = false;
   online.started = false;
   online.startRequested = false;
+  online.outboundStateSeq = 0;
+  online.inboundStateSeq = 0;
   showScreen('menu');
   setMenuNotice(message);
 }
@@ -62,6 +66,12 @@ function makePhaseTimer(length, settings) {
   const now = performance.now();
   const seconds = timerSecondsForLength(length, settings);
   return { startedAt: now, durationMs: seconds * 1000, endsAt: now + seconds * 1000 };
+}
+
+function bumpNetworkPhase(next, { newTurn = false } = {}) {
+  next.phaseId = Number(next.phaseId || 0) + 1;
+  if (newTurn) next.turnId = Number(next.turnId || 0) + 1;
+  return next;
 }
 
 function continueAfterDisconnectedPlayer(clientId, reason = 'disconnect') {
@@ -102,13 +112,16 @@ function continueAfterDisconnectedPlayer(clientId, reason = 'disconnect') {
   if (leavingWasOwner) {
     const nextOwnerIndex = next.players.findIndex(player => !player.eliminated);
     next.ownerIndex = nextOwnerIndex >= 0 ? nextOwnerIndex : 0;
+    bumpNetworkPhase(next, { newTurn: true });
     next.phase = PHASES.OWNER_CREATE_INITIAL;
     next.activeSequence = [];
     next.ownerDraft = [];
     next.ownerReplayIndex = 0;
+    next.appendTargetLength = 0;
     next.copyProgress = {};
     next.roundResults = [];
     next.timer = null;
+    next.playback = null;
     next.status = `${leavingPlayer.name} disconnected. ${next.players[next.ownerIndex]?.name || 'Next player'} takes control.`;
     setState(next, { broadcast: true });
     return true;
@@ -117,11 +130,10 @@ function continueAfterDisconnectedPlayer(clientId, reason = 'disconnect') {
   if (next.phase === PHASES.CHALLENGER_COPY) {
     const unresolved = Object.values(next.copyProgress || {}).some(progress => progress.status === 'copying');
     if (!unresolved) {
-      next.phase = PHASES.OWNER_REPLAY;
-      next.ownerReplayIndex = 0;
-      next.ownerDraft = [];
-      next.roundResults = [];
-      next.timer = makePhaseTimer(next.activeSequence.length, next.settings);
+      next = resolveCopyPhase(next);
+      next.status = `${leavingPlayer.name} disconnected and was removed from the match.`;
+      setState(next, { broadcast: true });
+      return true;
     }
   }
 
@@ -152,7 +164,12 @@ function setState(nextState, { broadcast = true } = {}) {
 
 function broadcastState() {
   if (!state || !online.net || !online.isHost) return;
-  online.net.sendState(serializeStateForNetwork(state));
+  const snapshot = serializeStateForNetwork(state);
+  snapshot.network = {
+    ...(snapshot.network || {}),
+    syncSeq: ++online.outboundStateSeq,
+  };
+  online.net.sendState(snapshot);
 }
 
 function playerIdForClientId(clientId) {
@@ -209,7 +226,7 @@ function submitOnlineInput(input) {
   if (online.isHost) {
     applyAuthoritativeInput(online.net.clientId, input);
   } else {
-    online.net.sendInput(input);
+    online.net.sendInput(input, { phaseId: state.phaseId, turnId: state.turnId });
   }
 }
 
@@ -218,8 +235,16 @@ function submitInput(input) {
   else submitLocalInput(input);
 }
 
-function applyAuthoritativeInput(senderId, input) {
+function applyAuthoritativeInput(senderId, input, meta = null) {
   if (!state || !online.isHost) return;
+
+  if (meta) {
+    const phaseId = Number(meta.phaseId);
+    const turnId = Number(meta.turnId);
+    if (!Number.isFinite(phaseId) || !Number.isFinite(turnId)) return;
+    if (phaseId !== Number(state.phaseId || 0) || turnId !== Number(state.turnId || 0)) return;
+  }
+
   const before = state;
   const after = handleInput(state, input, playerIdForClientId(senderId));
   if (after !== before) {
@@ -295,6 +320,8 @@ function disconnectOnline() {
   online.isHost = false;
   online.started = false;
   online.startRequested = false;
+  online.outboundStateSeq = 0;
+  online.inboundStateSeq = 0;
 }
 
 async function ensureOnlineClient() {
@@ -416,7 +443,7 @@ function wireOnlineCallbacks(net) {
           playerCount: players.length,
           players,
           penaltyWord: payload.settings?.penaltyWord || online.lobby.settings?.penaltyWord || 'ECHO',
-          network: { roomCode: payload.roomCode, hostId: payload.ownerId, myClientId: net.clientId },
+          network: { roomCode: payload.roomCode, hostId: payload.ownerId, lobbyOwnerId: payload.ownerId, myClientId: net.clientId },
         });
         setState(matchState, { broadcast: true });
         startLoop();
@@ -451,7 +478,7 @@ function wireOnlineCallbacks(net) {
       mirrorVisibleOwnerInput(senderId, input);
 
       if (online.isHost) {
-        applyAuthoritativeInput(senderId, input);
+        applyAuthoritativeInput(senderId, input, { phaseId: msg?.phaseId, turnId: msg?.turnId });
       }
       return;
     }
@@ -459,9 +486,17 @@ function wireOnlineCallbacks(net) {
     if (messageType === 'state_sync') {
       if (online.isHost) return;
       const snapshot = safeParse(value);
+      const syncSeq = Number(snapshot?.network?.syncSeq || 0);
+      if (Number.isFinite(syncSeq) && syncSeq > 0 && syncSeq <= online.inboundStateSeq) return;
       const hydrated = hydrateNetworkState(snapshot);
       if (hydrated) {
-        hydrated.network = { ...(hydrated.network || {}), myClientId: online.net?.clientId || net.clientId };
+        if (Number.isFinite(syncSeq) && syncSeq > 0) online.inboundStateSeq = syncSeq;
+        hydrated.network = {
+          ...(hydrated.network || {}),
+          hostId: hydrated.network?.hostId || online.lobby?.ownerId || null,
+          lobbyOwnerId: hydrated.network?.lobbyOwnerId || online.lobby?.ownerId || null,
+          myClientId: online.net?.clientId || net.clientId,
+        };
         state = hydrated;
         renderMatch(state);
         if (!rafId) startLoop();
