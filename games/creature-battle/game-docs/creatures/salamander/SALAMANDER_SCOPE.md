@@ -1,5 +1,7 @@
 # Salamander Scope Document
 
+Patched canon note: this version includes the current simulator canon base stats, natural growth values, and elemental resistance multipliers.
+
 ## Creature Identity
 
 Creature ID: `salamander`  
@@ -43,6 +45,42 @@ Salamander’s natural growth should prioritize Intelligence and Speed while kee
 | Intelligence | High | Core damage stat. Fire Arts should matter. |
 | Spirit | Medium | Avoids being deleted by enemy Arts, but not a dedicated Magic wall. |
 | Speed | Medium-High | Lets Salamander pressure before slower supports and bruisers. |
+
+## Canonical Simulator Stat Package
+
+The following numeric stat package is canon for the current simulator baseline. These values supersede earlier qualitative-only tuning notes when implementing runtime creature data.
+
+### Canon Base Stats and Growth
+
+| Stat | Base Value | Natural Growth Per Level |
+|---|---:|---:|
+| HP | 36 | 3.4 |
+| MP | 27 | 2.85 |
+| Strength | 7 | 0.7 |
+| Defense | 7 | 0.75 |
+| Intelligence | 16 | 1.75 |
+| Spirit | 11 | 1.05 |
+| Speed | 14 | 1.45 |
+
+Base stats are the Level 1 simulator values before manual allocation, battle modifiers, equipment-like systems, or future rare variant overrides.
+
+Natural growth values are the species growth amounts applied per level before any manual stat allocation and before the per-level random variance layer, if that variance layer is enabled by the progression simulator.
+
+### Canon Elemental Resistance Multipliers
+
+| Element | Damage Multiplier |
+|---|---:|
+| Neutral | 1x |
+| Fire | 0.5x |
+| Water | 1.5x |
+| Gaia | 0.75x |
+| Ice | 0.75x |
+| Earth | 1.25x |
+| Wind | 1x |
+| Light | 1x |
+| Dark | 1x |
+
+Resistance multipliers use incoming damage scaling. A value below `1.0x` means reduced incoming damage. A value above `1.0x` means increased incoming damage.
 
 ## Stat Package Summary
 
@@ -374,7 +412,7 @@ Display Name
 Element
 Role
 Level
-Resolved runtime stats
+Resolved runtime stats derived from canon base stats, natural growth, selected level cap, manual allocation profile, and enabled variance rules
 Natural Arts available at that level cap
 Class-tree Skills available from the rental stat allocation profile
 Class-tree Passives available from the rental stat allocation profile
@@ -466,6 +504,7 @@ Rental validation should check:
 
 ```txt
 Selected ruleset level cap
+Canon base stats, natural growth values, and elemental resistance multipliers from this document
 Allowed natural Arts by `Learned At <= selected level cap`
 Allowed class-tree Skills by level and rental stat profile
 Allowed class-tree Passives by level and rental stat profile

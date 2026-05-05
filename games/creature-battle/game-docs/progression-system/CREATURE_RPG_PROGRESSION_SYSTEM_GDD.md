@@ -1,5 +1,7 @@
 # Creature RPG Progression System GDD
 
+Patched canon note: this version locks the diminishing manual stat allocation curve, per-level single-stat allocation caps, and 3-way/4-way class stat tie resolution rules.
+
 ## 1. Document Purpose
 
 This document defines the long-term creature growth and RPG progression systems that sit beside the shared creature battle system.
@@ -236,13 +238,9 @@ The intended design is:
 
 When a creature levels up under player ownership, the player receives manual stat points.
 
-Current scoped value:
+Manual stat points are earned after Level 1. Level 1 creatures have no earned manual allocation points unless a future special rule explicitly grants them.
 
-```txt
-8 stat points per level
-```
-
-These points may be distributed across:
+Manual stat points may be distributed across:
 
 - Strength
 - Defense
@@ -250,19 +248,89 @@ These points may be distributed across:
 - Spirit
 - Speed
 
-### 8.1 Stat Allocation Limits
+HP and MP are not direct manual allocation targets. They are affected indirectly through species growth, variant growth, and any derived resource formulas tied to primary stats.
 
-Stats have hard per-level or per-band limits.
+### 8.1 Manual Allocation Point Curve
 
-A player cannot stack one stat indefinitely without restriction.
+Manual allocation points decrease as level increases.
 
-The exact cap formula is not finalized.
+This is a locked progression rule.
+
+```txt
+Level 2–20: 8 points gained per level-up
+Level 21–35: 6 points gained per level-up
+Level 36–50: 4 points gained per level-up
+Level 51–69: 2 points gained per level-up
+Level 70+: 1 point gained per level-up
+```
+
+Design intent:
+
+- Early levels give players enough control to shape a creature's build.
+- Mid levels continue build expression without letting manual allocation dominate species identity.
+- High levels preserve progression while preventing late-game stat inflation.
+- Manual allocation should bend a creature's natural profile, not overwrite it.
+
+### 8.2 Manual Points Available by Level
+
+Manual points available at a given level are the sum of all points earned from each level-up after Level 1.
+
+```txt
+ManualStatPointsAvailable(level) =
+sum of AllocationPointsGained for each level-up from Level 2 through current Level
+```
+
+Examples:
+
+```txt
+Level 1: 0 total manual points
+Level 2: 8 total manual points
+Level 10: 72 total manual points
+Level 20: 152 total manual points
+Level 21: 158 total manual points
+Level 35: 242 total manual points
+Level 50: 302 total manual points
+Level 69: 340 total manual points
+Level 70: 341 total manual points
+Level 100: 371 total manual points
+```
+
+This replaces the older flat rule:
+
+```txt
+ManualStatPointsAvailable = (Level - 1) × 8
+```
+
+That older rule is discarded.
+
+### 8.3 Per-Level Single-Stat Allocation Cap
+
+Each level-up has a hard cap on how many of that level's newly earned points can be placed into one stat.
+
+```txt
+If 8 points are gained: max 3 points into one stat
+If 6 points are gained: max 3 points into one stat
+If 4 points are gained: max 2 points into one stat
+If 2 points are gained: max 1 point into one stat
+If 1 point is gained: max 1 point into one stat
+```
+
+This cap applies to points earned on that specific level-up, not to the creature's lifetime total in that stat.
+
+The system must track enough allocation history to validate this rule. A creature should not only store lifetime totals; it should also store per-level allocation events or an equivalent audit-safe structure.
+
+### 8.4 Locked Allocation Constraints
+
+Players can specialize, but cannot dump every earned point into one stat forever.
 
 Locked rule:
 
-- Players can specialize.
-- Players cannot ignore the entire stat system without consequence.
-- Degenerate all-in stat dumping should be constrained.
+- Manual allocation only applies to Strength, Defense, Intelligence, Spirit, and Speed.
+- Allocation points are earned only from level-ups after capture.
+- Allocation points follow the diminishing point curve.
+- Each level-up's earned points follow the single-stat cap table.
+- Spending even one manual point permanently breaks no-allocation prestige eligibility.
+- Degenerate all-in stat dumping is not legal.
 
 ## 9. Wild Capture and Manual Build Potential
 
@@ -296,9 +364,14 @@ Creature data should track:
 captureLevel
 manualStatPointsEarnedAfterCapture
 manualStatPointsSpent
+manualStatPointsUnspent
+manualAllocationByStat
+manualAllocationEventsByLevel
 naturalGrowthOnly
 daredevilEligible
 ```
+
+The `manualAllocationEventsByLevel` data is required because the allocation cap is based on how many points are assigned during each individual level-up. Lifetime stat totals alone are not enough to prove that a build is legal.
 
 ## 10. Rare Creature Variants
 
@@ -422,7 +495,61 @@ With five primary stats, this creates ten two-stat hybrid routes:
 - Intelligence / Speed
 - Spirit / Speed
 
-### 14.3 Route Count
+### 14.3 Three-Way and Four-Way Stat Tie Resolution
+
+Class routes only support single-stat routes, two-stat hybrid routes, and the no-allocation prestige route. The class checker must never create a three-stat or four-stat class route.
+
+When three or four primary stats are tied for highest at a class check, the class checker resolves the tie into either one primary stat route or one two-stat hybrid route.
+
+If the creature already has an active class route, the checker favors class continuity when possible.
+
+Locked tie rules:
+
+- If the creature is currently in a single-stat route and that stat is included in the tied highest stats, that stat is favored as the primary stat.
+- If the creature is currently in a two-stat hybrid route and both route stats are included in the tied highest stats, that hybrid route is preserved.
+- If the creature is currently in a two-stat hybrid route and only one route stat is included in the tied highest stats, that included route stat is favored as the primary stat, and the secondary stat is randomly selected from the remaining tied highest stats.
+- If the creature is currently in a single-stat route and that stat is not included in the tied highest stats, the checker treats the tie as having no matching current route and resolves randomly.
+- If the creature has no current class route, the checker randomly selects a primary and secondary stat from the tied highest stats.
+- If the creature is in the no-allocation prestige route and remains eligible for that route, the no-allocation route overrides normal stat tie resolution.
+
+Example:
+
+```txt
+Current class route: Strength
+Tied highest stats at class check: Strength, Defense, Intelligence
+Resolved route: Strength primary
+Secondary route stat, if needed by implementation: randomly selected between Defense and Intelligence
+```
+
+Example:
+
+```txt
+Current class route: Strength / Defense
+Tied highest stats at class check: Strength, Defense, Intelligence
+Resolved route: Strength / Defense
+```
+
+Example:
+
+```txt
+Current class route: Strength / Speed
+Tied highest stats at class check: Strength, Defense, Intelligence
+Resolved route: Strength primary, with secondary randomly selected between Defense and Intelligence
+```
+
+Example:
+
+```txt
+Current class route: none
+Tied highest stats at class check: Strength, Defense, Intelligence, Spirit
+Resolved route: randomly selected two-stat hybrid route using two of the tied stats
+```
+
+The random tie resolver must only select from the stats tied for highest. It must not include lower stats.
+
+Random tie resolution should be deterministic once committed to creature data. The result may be random at check time, but it should be saved so the same class check does not reroll every time the game reloads.
+
+### 14.4 Route Count
 
 Current route structure:
 
@@ -654,12 +781,14 @@ The following systems are currently locked in progression scope:
 - HP growth based on species, Strength, Defense, and variants
 - MP growth based on species, Intelligence, Spirit, and variants
 - Accuracy/Evasion influenced by Speed, Intelligence, species, and variants
-- 8 manual stat points per level
-- Per-level or per-band stat allocation limits
+- Manual stat points use the locked diminishing level-up curve: 8, 6, 4, 2, then 1 point per level-up by level band
+- Per-level single-stat allocation caps are locked: max 3 from 8 or 6 gained points, max 2 from 4 gained points, max 1 from 2 or 1 gained points
 - Wild creatures do not retroactively gain missed manual stat points
 - Low-level captures have more long-term build potential
 - Rare variants with alternate palettes and growth tendencies
 - Class checks every 10 levels
+- Three-way and four-way class stat ties resolve through current-route continuity first, then random selection from tied highest stats only
+- Random class tie resolution is committed to creature data and must not reroll on reload
 - 5 single-stat class routes
 - 10 two-stat hybrid class routes
 - 1 no-allocation prestige route
@@ -679,7 +808,6 @@ The following progression systems are intentionally not finalized yet:
 
 - RPG title
 - Exact XP curve
-- Exact stat cap formula
 - Exact natural species growth formula
 - Exact rare variant generation rules
 - Exact rare variant spawn rates

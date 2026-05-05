@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Battle Tuning Simulator v6</title>
+<title>Battle Tuning Simulator v10</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
@@ -262,6 +262,47 @@ textarea {
 .move-buttons { display:grid; gap:7px; }
 .move-buttons button { text-align:left; }
 .move-buttons .meta { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+
+.alloc-row {
+  display:grid;
+  grid-template-columns: 1fr 30px 52px 30px;
+  gap:5px;
+  align-items:center;
+  padding:4px 0;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.alloc-row button {
+  padding:4px 0;
+  border-radius:7px;
+}
+.alloc-value {
+  text-align:center;
+  color:var(--gold);
+  font-weight:700;
+}
+.points-pill {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:4px 8px;
+  border:1px solid rgba(255,216,138,.45);
+  border-radius:999px;
+  background:rgba(255,216,138,.08);
+  color:var(--gold);
+  font-weight:700;
+}
+.points-pill.bad {
+  color:var(--danger);
+  border-color:rgba(255,143,143,.55);
+  background:rgba(255,143,143,.08);
+}
+.variance-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+}
+
 @media (max-width:1100px) {
   main { grid-template-columns:1fr; }
   .battlefield { min-height:420px; }
@@ -270,8 +311,8 @@ textarea {
 </head>
 <body>
 <header>
-  <h1>Battle Tuning Simulator v6</h1>
-  <p>1v1 live sandbox using the scoped Shared Combat Core damage formula.</p>
+  <h1>Battle Tuning Simulator v10</h1>
+  <p>1v1 live sandbox using Shared Combat Core damage, natural level-up variance, diminishing manual allocation points, and canon per-level allocation caps.</p>
 </header>
 
 <main>
@@ -287,10 +328,14 @@ textarea {
         <button class="primary" data-side-tab="left-stats">Stats</button>
         <button data-side-tab="left-growth">Growth</button>
         <button data-side-tab="left-res">Resist</button>
+        <button data-side-tab="left-alloc">Allocation</button>
+        <button data-side-tab="left-var">Variance</button>
       </div>
       <div id="left-stats"></div>
       <div id="left-growth" class="hidden"></div>
       <div id="left-res" class="hidden"></div>
+      <div id="left-alloc" class="hidden"></div>
+      <div id="left-var" class="hidden"></div>
       <button id="leftResetHp" style="margin-top:8px">Reset Left HP/MP</button>
     </section>
 
@@ -302,7 +347,7 @@ textarea {
 
   <section class="panel battle-shell">
     <div class="grid3">
-      <label>Random Damage <select id="varianceMode"><option value="avg">Average (+1)</option><option value="roll">Roll (-2 to +4)</option><option value="min">Minimum (-2)</option><option value="max">Maximum (+4)</option></select></label>
+      <label>Random Damage <select id="varianceMode"><option value="roll">Roll (-2 to +4)</option><option value="avg">Average (+1)</option><option value="min">Minimum (-2)</option><option value="max">Maximum (+4)</option></select></label>
       <label>Crit Mode <select id="critMode"><option value="off">Off</option><option value="on">Force Crit</option></select></label>
       <label>Turn Level Sync <select id="syncLevels"><option value="off">Separate</option><option value="on">Mirror Left Level</option></select></label>
       <label>Left Defending <select id="leftDefending"><option value="0">No</option><option value="1">Yes</option></select></label>
@@ -311,6 +356,8 @@ textarea {
       <label>Passive Damage Mod <input id="passiveDamageModifier" type="number" value="1" step="0.05"></label>
       <label>Passive Resist Mod <input id="passiveResistanceModifier" type="number" value="1" step="0.05"></label>
       <label>Show Debug <select id="showDebug"><option value="1">Yes</option><option value="0">No</option></select></label>
+      <label>Natural Variance <input value="+0.25 to +1.25 per stat per level" disabled></label>
+      <label>Allocation Curve <input id="allocationCurveSummary" value="Lv2-20 +8, Lv21-35 +6, Lv36-50 +4, Lv51-69 +2, Lv70+ +1" disabled></label>
     </div>
 
     <div class="battlefield" id="battlefield">
@@ -363,10 +410,14 @@ textarea {
         <button class="primary" data-side-tab="right-stats">Stats</button>
         <button data-side-tab="right-growth">Growth</button>
         <button data-side-tab="right-res">Resist</button>
+        <button data-side-tab="right-alloc">Allocation</button>
+        <button data-side-tab="right-var">Variance</button>
       </div>
       <div id="right-stats"></div>
       <div id="right-growth" class="hidden"></div>
       <div id="right-res" class="hidden"></div>
+      <div id="right-alloc" class="hidden"></div>
+      <div id="right-var" class="hidden"></div>
       <button id="rightResetHp" style="margin-top:8px">Reset Right HP/MP</button>
     </section>
 
@@ -381,6 +432,8 @@ textarea {
       <div class="grid2">
         <button class="primary" id="exportBtn">Export JSON</button>
         <button id="copyBtn">Copy</button>
+        <button id="exportRaisedBtn">Export Raised Snapshot</button>
+        <button id="clearBuildsBtn">Clear Builds</button>
       </div>
       <textarea id="exportBox" spellcheck="false"></textarea>
     </section>
@@ -392,6 +445,18 @@ const START_CREATURES = [{"id": "flor", "name": "Flor", "element": "gaia", "role
 const START_MOVES = [{"id": "basic_attack", "name": "Attack", "owner": "shared", "learnedAt": 1, "category": "basic", "damageClass": "physical", "element": "neutral", "basePower": 12, "offensiveScaling": 0.75, "levelScaling": 0.25, "mpCost": 0, "accuracy": 100, "canCrit": true, "description": "Basic physical command.", "movePowerModifier": 0}, {"id": "sprout_tap", "name": "Sprout Tap", "owner": "flor", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "gaia", "basePower": 14, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Gaia attack.", "movePowerModifier": 0}, {"id": "petal_mend", "name": "Petal Mend", "owner": "flor", "learnedAt": 1, "category": "heal", "damageClass": "heal", "element": "gaia", "basePower": 24, "offensiveScaling": 0.55, "levelScaling": 0.2, "mpCost": 8, "accuracy": 100, "canCrit": false, "description": "Single-target heal preview.", "movePowerModifier": 0}, {"id": "root_snare", "name": "Root Snare", "owner": "flor", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "gaia", "basePower": 12, "offensiveScaling": 0.85, "levelScaling": 0.25, "mpCost": 6, "accuracy": 90, "canCrit": true, "description": "Light control damage.", "movePowerModifier": 0}, {"id": "verdant_guard", "name": "Verdant Guard", "owner": "flor", "learnedAt": 20, "category": "utility", "damageClass": "utility", "element": "gaia", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 10, "accuracy": 100, "canCrit": false, "description": "Magic mitigation utility placeholder.", "movePowerModifier": 0}, {"id": "bubble_shot", "name": "Bubble Shot", "owner": "aquaphant", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "water", "basePower": 15, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Water Art.", "movePowerModifier": 0}, {"id": "soak_hide", "name": "Soak Hide", "owner": "aquaphant", "learnedAt": 1, "category": "utility", "damageClass": "utility", "element": "water", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 8, "accuracy": 100, "canCrit": false, "description": "Self physical mitigation placeholder.", "movePowerModifier": 0}, {"id": "tidal_bump", "name": "Tidal Bump", "owner": "aquaphant", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "water", "basePower": 24, "offensiveScaling": 1.0, "levelScaling": 0.3, "mpCost": 7, "accuracy": 92, "canCrit": true, "description": "Standard Water damage Art.", "movePowerModifier": 0}, {"id": "surge_crash", "name": "Surge Crash", "owner": "aquaphant", "learnedAt": 20, "category": "art", "damageClass": "magic", "element": "water", "basePower": 36, "offensiveScaling": 1.05, "levelScaling": 0.35, "mpCost": 12, "accuracy": 88, "canCrit": true, "description": "Heavy Water attack.", "movePowerModifier": 0}, {"id": "ice_pebble", "name": "Ice Pebble", "owner": "pengun", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "ice", "basePower": 14, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Ice Art.", "movePowerModifier": 0}, {"id": "cold_feet", "name": "Cold Feet", "owner": "pengun", "learnedAt": 1, "category": "utility", "damageClass": "utility", "element": "ice", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 6, "accuracy": 92, "canCrit": false, "description": "Speed reduction utility placeholder.", "movePowerModifier": 0}, {"id": "snow_blind", "name": "Snow Blind", "owner": "pengun", "learnedAt": 10, "category": "utility", "damageClass": "utility", "element": "ice", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 7, "accuracy": 88, "canCrit": false, "description": "Accuracy disruption utility placeholder.", "movePowerModifier": 0}, {"id": "frost_nip", "name": "Frost Nip", "owner": "pengun", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "ice", "basePower": 23, "offensiveScaling": 1.0, "levelScaling": 0.3, "mpCost": 7, "accuracy": 92, "canCrit": true, "description": "Standard Ice damage Art.", "movePowerModifier": 0}, {"id": "shatter_chill", "name": "Shatter Chill", "owner": "pengun", "learnedAt": 20, "category": "art", "damageClass": "magic", "element": "ice", "basePower": 34, "offensiveScaling": 1.05, "levelScaling": 0.35, "mpCost": 12, "accuracy": 86, "canCrit": true, "description": "Heavy Ice punish Art.", "movePowerModifier": 0}, {"id": "spark_flick", "name": "Spark Flick", "owner": "salamander", "learnedAt": 1, "category": "art", "damageClass": "magic", "element": "fire", "basePower": 15, "offensiveScaling": 0.95, "levelScaling": 0.25, "mpCost": 4, "accuracy": 96, "canCrit": true, "description": "Reliable basic Fire Art.", "movePowerModifier": 0}, {"id": "heat_haze", "name": "Heat Haze", "owner": "salamander", "learnedAt": 1, "category": "utility", "damageClass": "utility", "element": "fire", "basePower": 0, "offensiveScaling": 0, "levelScaling": 0, "mpCost": 6, "accuracy": 100, "canCrit": false, "description": "Self evasion utility placeholder.", "movePowerModifier": 0}, {"id": "flare_bite", "name": "Flare Bite", "owner": "salamander", "learnedAt": 10, "category": "art", "damageClass": "magic", "element": "fire", "basePower": 26, "offensiveScaling": 1.0, "levelScaling": 0.3, "mpCost": 7, "accuracy": 92, "canCrit": true, "description": "Standard Fire Magic Art.", "movePowerModifier": 0}, {"id": "cinder_burst", "name": "Cinder Burst", "owner": "salamander", "learnedAt": 20, "category": "art", "damageClass": "magic", "element": "fire", "basePower": 38, "offensiveScaling": 1.1, "levelScaling": 0.35, "mpCost": 12, "accuracy": 88, "canCrit": true, "description": "Heavy Fire Art.", "movePowerModifier": 0}];
 const CONSTANTS = {"version": "battle-tuning-simulator-v6-shared-core", "levelModifierPerLevel": 0.75, "statPressureCoefficient": 0.5, "criticalModifier": 1.5, "randomDamageMin": -2, "randomDamageMax": 4, "minimumDamage": 1, "maximumDamage": 9999, "defendModifier": 0.5, "defaultTargetCountModifier": 1.0, "defaultPassiveDamageModifier": 1.0, "defaultPassiveResistanceModifier": 1.0, "healingStatPressureCoefficient": 0.35};
 const STAT_KEYS = ["hp","mp","strength","defense","intelligence","spirit","speed"];
+const ALLOC_KEYS = ["strength","defense","intelligence","spirit","speed"];
+const MAX_LEVEL = 100;
+const ALLOCATION_POINT_RULES = [
+  { minLevel: 2, maxLevel: 20, pointsPerLevel: 8, maxPointsIntoOneStat: 3 },
+  { minLevel: 21, maxLevel: 35, pointsPerLevel: 6, maxPointsIntoOneStat: 3 },
+  { minLevel: 36, maxLevel: 50, pointsPerLevel: 4, maxPointsIntoOneStat: 2 },
+  { minLevel: 51, maxLevel: 69, pointsPerLevel: 2, maxPointsIntoOneStat: 1 },
+  { minLevel: 70, maxLevel: MAX_LEVEL, pointsPerLevel: 1, maxPointsIntoOneStat: 1 }
+];
+const ALLOCATION_CURVE_LABEL = "Lv2-20 +8, Lv21-35 +6, Lv36-50 +4, Lv51-69 +2, Lv70+ +1";
+const NATURAL_VARIANCE_MIN = 0.25;
+const NATURAL_VARIANCE_MAX = 1.25;
 const ELEMENTS = ["neutral","fire","water","gaia","ice","earth","wind","light","dark"];
 const ICONS = {flor:"🌿", aquaphant:"🐘", pengun:"🐧", salamander:"🔥"};
 const $ = id => document.getElementById(id);
@@ -404,15 +469,76 @@ let runtime = {
   right: { hp: 1, mp: 1 }
 };
 
+let raisedBuilds = {
+  left: makeEmptyRaisedBuild(),
+  right: makeEmptyRaisedBuild()
+};
+
+function makeEmptyRaisedBuild() {
+  return {
+    manualAllocation: {
+      strength: 0,
+      defense: 0,
+      intelligence: 0,
+      spirit: 0,
+      speed: 0
+    },
+    naturalVarianceRolls: makeNaturalVarianceRolls(),
+    manualStatPointsSpent: 0,
+    daredevilEligible: true,
+    naturalGrowthOnly: true
+  };
+}
+
+function makeNaturalVarianceRolls() {
+  const rolls = {};
+  for (const stat of STAT_KEYS) {
+    rolls[stat] = [];
+    for (let level = 2; level <= MAX_LEVEL; level++) {
+      rolls[stat].push(Number(randFloat(NATURAL_VARIANCE_MIN, NATURAL_VARIANCE_MAX).toFixed(2)));
+    }
+  }
+  return rolls;
+}
+
+function getNaturalVarianceBonus(build, stat, level) {
+  if (!build || !build.naturalVarianceRolls || !build.naturalVarianceRolls[stat]) return 0;
+  const count = Math.max(0, Math.min(MAX_LEVEL, level) - 1);
+  let total = 0;
+  for (let i = 0; i < count; i++) {
+    total += Number(build.naturalVarianceRolls[stat][i] || 0);
+  }
+  return total;
+}
+
 function clone(x){ return JSON.parse(JSON.stringify(x)); }
 function getCreature(id){ return creatures.find(c => c.id === id); }
 function getMove(id){ return moves.find(m => m.id === id); }
 function sideCreature(side){ return getCreature($(side+"Creature").value); }
 function sideLevel(side){ return Math.max(1, Math.min(100, Number($(side+"Level").value)||1)); }
 
-function statAtLevel(creature, level) {
+function statAtLevel(creature, level, side = null) {
   const out = {};
-  for (const k of STAT_KEYS) out[k] = Math.max(1, Math.floor((Number(creature.baseStats[k])||0) + (Number(creature.growth[k])||0) * (level - 1)));
+  const build = side ? raisedBuilds[side] : null;
+
+  for (const k of STAT_KEYS) {
+    const naturalVarianceBonus = build ? getNaturalVarianceBonus(build, k, level) : 0;
+    const base = Number(creature.baseStats[k] || 0);
+    const growth = Number(creature.growth[k] || 0);
+
+    out[k] = Math.max(1, Math.floor(base + growth * (level - 1) + naturalVarianceBonus));
+  }
+
+  if (build) {
+    for (const k of ALLOC_KEYS) {
+      out[k] = Math.max(1, out[k] + Number(build.manualAllocation[k] || 0));
+    }
+
+    // Manual primary stats influence resources for raised-creature simulation.
+    out.hp += Math.floor((Number(build.manualAllocation.strength || 0) * 0.60) + (Number(build.manualAllocation.defense || 0) * 0.90));
+    out.mp += Math.floor((Number(build.manualAllocation.intelligence || 0) * 0.70) + (Number(build.manualAllocation.spirit || 0) * 0.70));
+  }
+
   return out;
 }
 
@@ -430,29 +556,210 @@ function initSelects() {
   if (!$("rightCreature").value) $("rightCreature").value = "salamander";
 }
 
+
+function getSpentPoints(side) {
+  return ALLOC_KEYS.reduce((sum, k) => sum + Math.max(0, Number(raisedBuilds[side].manualAllocation[k] || 0)), 0);
+}
+
+function getAllocationRuleForLevel(level) {
+  return ALLOCATION_POINT_RULES.find(rule => level >= rule.minLevel && level <= rule.maxLevel) || null;
+}
+
+function getManualPointsEarnedForLevel(level) {
+  const rule = getAllocationRuleForLevel(level);
+  return rule ? rule.pointsPerLevel : 0;
+}
+
+function getManualStatCapEarnedForLevel(level) {
+  const rule = getAllocationRuleForLevel(level);
+  return rule ? rule.maxPointsIntoOneStat : 0;
+}
+
+function getAvailablePointsAtLevel(level) {
+  const cappedLevel = Math.max(1, Math.min(MAX_LEVEL, Number(level) || 1));
+  let total = 0;
+  for (let currentLevel = 2; currentLevel <= cappedLevel; currentLevel++) {
+    total += getManualPointsEarnedForLevel(currentLevel);
+  }
+  return total;
+}
+
+function getManualStatCapAtLevel(level) {
+  const cappedLevel = Math.max(1, Math.min(MAX_LEVEL, Number(level) || 1));
+  let total = 0;
+  for (let currentLevel = 2; currentLevel <= cappedLevel; currentLevel++) {
+    total += getManualStatCapEarnedForLevel(currentLevel);
+  }
+  return total;
+}
+
+function getAvailablePoints(side) {
+  return getAvailablePointsAtLevel(sideLevel(side));
+}
+
+function getManualStatCap(side) {
+  return getManualStatCapAtLevel(sideLevel(side));
+}
+
+function getAllocationCurveExport(level = MAX_LEVEL) {
+  return {
+    rules: clone(ALLOCATION_POINT_RULES),
+    totalManualPointsAtLevel: getAvailablePointsAtLevel(level),
+    manualStatCapPerStatAtLevel: getManualStatCapAtLevel(level),
+    allocatableStats: clone(ALLOC_KEYS),
+    manualAllocationStartsAfterLevelOne: true
+  };
+}
+
+function clampAllocationToCaps(side) {
+  const build = raisedBuilds[side];
+  const cap = getManualStatCap(side);
+  for (const key of ALLOC_KEYS) {
+    build.manualAllocation[key] = Math.max(0, Math.min(cap, Number(build.manualAllocation[key] || 0)));
+  }
+
+  // If the level was lowered and the total is still over budget after per-stat caps,
+  // trim from the currently largest allocations until legal.
+  let available = getAvailablePoints(side);
+  while (getSpentPoints(side) > available) {
+    let bestKey = ALLOC_KEYS[0];
+    for (const key of ALLOC_KEYS) {
+      if ((build.manualAllocation[key] || 0) > (build.manualAllocation[bestKey] || 0)) {
+        bestKey = key;
+      }
+    }
+    if ((build.manualAllocation[bestKey] || 0) <= 0) break;
+    build.manualAllocation[bestKey]--;
+  }
+
+  const spent = getSpentPoints(side);
+  build.manualStatPointsSpent = spent;
+  build.daredevilEligible = spent === 0;
+  build.naturalGrowthOnly = spent === 0;
+}
+
+
+function changeAllocation(side, key, delta) {
+  const build = raisedBuilds[side];
+  const current = Number(build.manualAllocation[key] || 0);
+  const spent = getSpentPoints(side);
+  const available = getAvailablePoints(side);
+  const perStatCap = getManualStatCap(side);
+
+  if (delta > 0 && spent >= available) return;
+  if (delta > 0 && current >= perStatCap) return;
+
+  build.manualAllocation[key] = Math.max(0, Math.min(perStatCap, current + delta));
+
+  const newSpent = getSpentPoints(side);
+  build.manualStatPointsSpent = newSpent;
+  build.daredevilEligible = newSpent === 0;
+  build.naturalGrowthOnly = newSpent === 0;
+
+  clampRuntime(side);
+  redrawAll();
+}
+
+function autoAllocateForRole(side) {
+  const c = sideCreature(side);
+  const available = getAvailablePoints(side);
+  const perStatCap = getManualStatCap(side);
+  raisedBuilds[side].manualAllocation = { strength:0, defense:0, intelligence:0, spirit:0, speed:0 };
+
+  let priority;
+  if (c.id === "flor") {
+    priority = ["spirit", "intelligence", "defense", "speed", "strength"];
+  } else if (c.id === "aquaphant") {
+    priority = ["defense", "spirit", "intelligence", "strength", "speed"];
+  } else if (c.id === "pengun") {
+    priority = ["speed", "intelligence", "spirit", "defense", "strength"];
+  } else if (c.id === "salamander") {
+    priority = ["intelligence", "speed", "spirit", "defense", "strength"];
+  } else {
+    priority = ["strength", "defense", "intelligence", "spirit", "speed"];
+  }
+
+  for (let p = 0; p < available; p++) {
+    let placed = false;
+    for (const key of priority) {
+      if (raisedBuilds[side].manualAllocation[key] < perStatCap) {
+        raisedBuilds[side].manualAllocation[key]++;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) break;
+  }
+
+  clampAllocationToCaps(side);
+
+  clampRuntime(side);
+  redrawAll();
+}
+
+function getClassRoute(side) {
+  const build = raisedBuilds[side];
+  if (getSpentPoints(side) === 0) return "No Allocation / Daredevil Eligible";
+
+  const values = ALLOC_KEYS.map(k => [k, Number(build.manualAllocation[k] || 0)]);
+  const max = Math.max(...values.map(([,v]) => v));
+  if (max <= 0) return "No Allocation / Daredevil Eligible";
+
+  const top = values.filter(([,v]) => v === max).map(([k]) => k);
+  if (top.length === 1) return titleCase(top[0]);
+  if (top.length === 2) return `${titleCase(top[0])} / ${titleCase(top[1])}`;
+  return `Multi-way tie (${top.map(titleCase).join(" / ")})`;
+}
+
+function titleCase(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function randInt(min, max) {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function randFloat(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+
+
 function drawEditor(side) {
   const creature = sideCreature(side);
   const level = sideLevel(side);
-  const stats = statAtLevel(creature, level);
+  const stats = statAtLevel(creature, level, side);
+  const build = raisedBuilds[side];
+  clampAllocationToCaps(side);
+  const totalAllowed = getAvailablePoints(side);
+  const perStatCap = getManualStatCap(side);
+  const spent = getSpentPoints(side);
+  const remaining = totalAllowed - spent;
+  build.manualStatPointsSpent = spent;
+  build.daredevilEligible = spent === 0;
+  build.naturalGrowthOnly = spent === 0;
+
   $(side+"Role").textContent = `${creature.element.toUpperCase()} · ${creature.role}`;
 
   const statRows = STAT_KEYS.map(k => `
-    <tr>
-      <td>${k}</td>
-      <td><input data-side="${side}" data-kind="baseStats" data-key="${k}" type="number" step="1" value="${creature.baseStats[k]}"></td>
-      <td>${stats[k]}</td>
-    </tr>
+      <tr>
+        <td>${k}</td>
+        <td><input data-side="${side}" data-kind="baseStats" data-key="${k}" type="number" step="1" value="${creature.baseStats[k]}"></td>
+        <td>${getNaturalVarianceBonus(build, k, level).toFixed(2)}</td>
+        <td>${stats[k]}</td>
+      </tr>
   `).join("");
-  $(side+"-stats").innerHTML = `<table class="stat-table"><tr><th>Stat</th><th>Base Lv1</th><th>Now</th></tr>${statRows}</table>`;
+  $(side+"-stats").innerHTML = `<table class="stat-table"><tr><th>Stat</th><th>Base Lv1</th><th>Natural Var</th><th>Now</th></tr>${statRows}</table>`;
 
   const growthRows = STAT_KEYS.map(k => `
-    <tr>
-      <td>${k}</td>
-      <td><input data-side="${side}" data-kind="growth" data-key="${k}" type="number" step="0.05" value="${creature.growth[k]}"></td>
-      <td>${stats[k]}</td>
-    </tr>
+      <tr>
+        <td>${k}</td>
+        <td><input data-side="${side}" data-kind="growth" data-key="${k}" type="number" step="0.05" value="${creature.growth[k]}"></td>
+        <td>+${getNaturalVarianceBonus(build, k, level).toFixed(2)}</td>
+        <td>${stats[k]}</td>
+      </tr>
   `).join("");
-  $(side+"-growth").innerHTML = `<table class="stat-table"><tr><th>Stat</th><th>Growth/Lv</th><th>Now</th></tr>${growthRows}</table>`;
+  $(side+"-growth").innerHTML = `<table class="stat-table"><tr><th>Stat</th><th>Species Growth/Lv</th><th>Rolled Bonus</th><th>Now</th></tr>${growthRows}</table>`;
 
   const resRows = ELEMENTS.map(k => `
     <tr>
@@ -462,7 +769,53 @@ function drawEditor(side) {
   `).join("");
   $(side+"-res").innerHTML = `<table class="stat-table"><tr><th>Element</th><th>Damage Taken</th></tr>${resRows}</table>`;
 
-  document.querySelectorAll(`[data-side="${side}"]`).forEach(input => {
+  const allocRows = ALLOC_KEYS.map(k => `
+    <div class="alloc-row">
+      <span>${k}</span>
+      <button data-alloc-side="${side}" data-alloc-key="${k}" data-alloc-delta="-1">−</button>
+      <span class="alloc-value">${build.manualAllocation[k] || 0}${(build.manualAllocation[k] || 0) >= perStatCap && perStatCap > 0 ? " / CAP" : ""}</span>
+      <button data-alloc-side="${side}" data-alloc-key="${k}" data-alloc-delta="1">+</button>
+    </div>
+  `).join("");
+
+  const route = getClassRoute(side);
+  $(side+"-alloc").innerHTML = `
+    <p class="small">Manual stat points are earned after Level 1 using the canon diminishing curve: ${ALLOCATION_CURVE_LABEL}. The single-stat cap also scales by level band.</p>
+    <div class="metric"><span>Available</span><strong>${totalAllowed}</strong></div>
+    <div class="metric"><span>This Level Earns</span><strong>${getManualPointsEarnedForLevel(level)}</strong></div>
+    <div class="metric"><span>Per-Stat Cap</span><strong>${perStatCap}</strong></div>
+    <div class="metric"><span>Spent</span><strong>${spent}</strong></div>
+    <div class="metric"><span>Remaining</span><strong class="${remaining < 0 ? "warn" : ""}">${remaining}</strong></div>
+    <div class="metric"><span>Current Route</span><strong>${route}</strong></div>
+    <div class="metric"><span>Daredevil Eligible</span><strong>${build.daredevilEligible ? "Yes" : "No"}</strong></div>
+    ${allocRows}
+    <div class="grid2" style="margin-top:8px">
+      <button data-alloc-reset="${side}">Reset Allocation</button>
+      <button data-alloc-auto="${side}">Auto Role Build</button>
+    </div>
+  `;
+
+  const varianceRows = STAT_KEYS.map(k => `
+    <tr>
+      <td>${k}</td>
+      <td>+${getNaturalVarianceBonus(build, k, level).toFixed(2)}</td>
+      <td>${level > 1 ? (getNaturalVarianceBonus(build, k, level) / (level - 1)).toFixed(2) : "0.00"}</td>
+    </tr>
+  `).join("");
+
+  $(side+"-var").innerHTML = `
+    <p class="small">Natural variance is rolled automatically per stat on every level-up. Range: +${NATURAL_VARIANCE_MIN} to +${NATURAL_VARIANCE_MAX} per stat per level.</p>
+    <table class="stat-table">
+      <tr><th>Stat</th><th>Total Rolled Bonus</th><th>Average / Level</th></tr>
+      ${varianceRows}
+    </table>
+    <div class="grid2" style="margin-top:8px">
+      <button data-reroll-natural-var="${side}">Reroll Natural Variance</button>
+      <button data-match-natural-var="${side}">Copy Variance to Other Side</button>
+    </div>
+  `;
+
+  document.querySelectorAll(`[data-side="${side}"][data-kind]`).forEach(input => {
     input.addEventListener("input", () => {
       const c = sideCreature(side);
       const kind = input.dataset.kind;
@@ -471,6 +824,41 @@ function drawEditor(side) {
       clampRuntime(side);
       redrawAll();
     });
+  });
+
+  document.querySelectorAll(`[data-alloc-side="${side}"]`).forEach(btn => {
+    btn.addEventListener("click", () => {
+      changeAllocation(side, btn.dataset.allocKey, Number(btn.dataset.allocDelta));
+    });
+  });
+
+  const resetBtn = document.querySelector(`[data-alloc-reset="${side}"]`);
+  if (resetBtn) resetBtn.addEventListener("click", () => {
+    raisedBuilds[side].manualAllocation = { strength:0, defense:0, intelligence:0, spirit:0, speed:0 };
+    clampRuntime(side);
+    redrawAll();
+  });
+
+  const autoBtn = document.querySelector(`[data-alloc-auto="${side}"]`);
+  if (autoBtn) autoBtn.addEventListener("click", () => {
+    autoAllocateForRole(side);
+  });
+
+  const rerollVarBtn = document.querySelector(`[data-reroll-natural-var="${side}"]`);
+  if (rerollVarBtn) rerollVarBtn.addEventListener("click", () => {
+    raisedBuilds[side].naturalVarianceRolls = makeNaturalVarianceRolls();
+    clampRuntime(side);
+    redrawAll();
+    log(`${sideCreature(side).name}'s natural variance rolls were rerolled.`);
+  });
+
+  const matchVarBtn = document.querySelector(`[data-match-natural-var="${side}"]`);
+  if (matchVarBtn) matchVarBtn.addEventListener("click", () => {
+    const other = side === "left" ? "right" : "left";
+    raisedBuilds[other].naturalVarianceRolls = clone(raisedBuilds[side].naturalVarianceRolls);
+    clampRuntime(other);
+    redrawAll();
+    log(`${sideCreature(other).name}'s natural variance rolls were matched to ${sideCreature(side).name}.`);
   });
 }
 
@@ -496,13 +884,13 @@ function drawMoves(side) {
 
 function clampRuntime(side) {
   const c = sideCreature(side);
-  const s = statAtLevel(c, sideLevel(side));
+  const s = statAtLevel(c, sideLevel(side), side);
   runtime[side].hp = Math.min(Math.max(0, runtime[side].hp || s.hp), s.hp);
   runtime[side].mp = Math.min(Math.max(0, runtime[side].mp || s.mp), s.mp);
 }
 
 function resetSide(side) {
-  const s = statAtLevel(sideCreature(side), sideLevel(side));
+  const s = statAtLevel(sideCreature(side), sideLevel(side), side);
   runtime[side] = { hp: s.hp, mp: s.mp };
   redrawBattle();
 }
@@ -512,7 +900,7 @@ function resetBattle() { resetSide("left"); resetSide("right"); log("Battle rese
 function redrawBattle() {
   for (const side of ["left","right"]) {
     const c = sideCreature(side);
-    const s = statAtLevel(c, sideLevel(side));
+    const s = statAtLevel(c, sideLevel(side), side);
     clampRuntime(side);
     $(side+"Name").textContent = c.name;
     $(side+"Lvl").textContent = "Lv " + sideLevel(side);
@@ -527,7 +915,59 @@ function redrawBattle() {
 
 function redrawAll() {
   if ($("syncLevels").value === "on") $("rightLevel").value = $("leftLevel").value;
-  initSelects();
+  
+function exportRaisedSnapshot() {
+  const snapshot = {
+    version: "raised-creature-snapshot-v2",
+    exportedAt: new Date().toISOString(),
+    left: getRaisedSnapshotForSide("left"),
+    right: getRaisedSnapshotForSide("right"),
+    progression: getAllocationCurveExport(Math.max(sideLevel("left"), sideLevel("right")))
+  };
+  $("exportBox").value = JSON.stringify(snapshot, null, 2);
+}
+
+function getRaisedSnapshotForSide(side) {
+  const creature = sideCreature(side);
+  const level = sideLevel(side);
+  const stats = statAtLevel(creature, level, side);
+  const build = raisedBuilds[side];
+  return {
+    side,
+    creatureId: creature.id,
+    name: creature.name,
+    element: creature.element,
+    level,
+    resolvedStats: stats,
+    baseStats: creature.baseStats,
+    growth: creature.growth,
+    naturalVariance: {
+      minPerLevel: NATURAL_VARIANCE_MIN,
+      maxPerLevel: NATURAL_VARIANCE_MAX,
+      rolls: build.naturalVarianceRolls,
+      totalBonusAtLevel: Object.fromEntries(STAT_KEYS.map(k => [k, Number(getNaturalVarianceBonus(build, k, level).toFixed(2))]))
+    },
+    manualAllocation: build.manualAllocation,
+    manualStatPointsAvailable: getAvailablePoints(side),
+    manualStatPointsSpent: getSpentPoints(side),
+    manualStatPointsRemaining: getAvailablePoints(side) - getSpentPoints(side),
+    manualStatCapPerStat: getManualStatCap(side),
+    allocationPointsEarnedAtCurrentLevel: getManualPointsEarnedForLevel(level),
+    classRoutePreview: getClassRoute(side),
+    daredevilEligible: getSpentPoints(side) === 0,
+    naturalGrowthOnly: getSpentPoints(side) === 0
+  };
+}
+
+function clearBuilds() {
+  raisedBuilds.left = makeEmptyRaisedBuild();
+  raisedBuilds.right = makeEmptyRaisedBuild();
+  resetBattle();
+  redrawAll();
+  log("Manual allocation and variance cleared for both sides.");
+}
+
+initSelects();
   drawEditor("left");
   drawEditor("right");
   drawMoves("left");
@@ -553,8 +993,8 @@ function calcMove(attackerSide, defenderSide) {
   const defender = sideCreature(defenderSide);
   const attackerLevel = sideLevel(attackerSide);
   const defenderLevel = sideLevel(defenderSide);
-  const aStats = statAtLevel(attacker, attackerLevel);
-  const dStats = statAtLevel(defender, defenderLevel);
+  const aStats = statAtLevel(attacker, attackerLevel, attackerSide);
+  const dStats = statAtLevel(defender, defenderLevel, defenderSide);
   const move = getMove(selectedMove[attackerSide]);
 
   const randomMod = randomDamageModifier();
@@ -772,10 +1212,15 @@ function preview() {
 
 function exportData() {
   const payload = {
-    version: "battle-tuning-export-v6-shared-core",
+    version: "battle-tuning-export-v10-diminishing-allocation",
     exportedAt: new Date().toISOString(),
     creatures,
     moves,
+    raisedBuilds,
+    progression: {
+      ...getAllocationCurveExport(MAX_LEVEL),
+      baseStatsAreLevelOne: true
+    },
     constants: CONSTANTS
   };
   $("exportBox").value = JSON.stringify(payload, null, 2);
@@ -797,15 +1242,21 @@ document.querySelectorAll("[data-side-tab]").forEach(btn => {
     const side = id.split("-")[0];
     document.querySelectorAll(`[data-side-tab^="${side}-"]`).forEach(b => b.classList.remove("primary"));
     btn.classList.add("primary");
-    [`${side}-stats`, `${side}-growth`, `${side}-res`].forEach(tab => $(tab).classList.add("hidden"));
+    [`${side}-stats`, `${side}-growth`, `${side}-res`, `${side}-alloc`, `${side}-var`].forEach(tab => $(tab).classList.add("hidden"));
     $(id).classList.remove("hidden");
   });
 });
 
 ["leftCreature","rightCreature","leftLevel","rightLevel","varianceMode","critMode","syncLevels","leftDefending","rightDefending","targetCountModifier","passiveDamageModifier","passiveResistanceModifier","showDebug"].forEach(id => {
   $(id).addEventListener("change", () => {
-    if (id.includes("Creature") || id.includes("Level") || id === "syncLevels") {
-      resetSide(id.startsWith("right") ? "right" : "left");
+    if (id.includes("Creature")) {
+      const side = id.startsWith("right") ? "right" : "left";
+      raisedBuilds[side] = makeEmptyRaisedBuild();
+      resetSide(side);
+    } else if (id.includes("Level") || id === "syncLevels") {
+      const side = id.startsWith("right") ? "right" : "left";
+      clampAllocationToCaps(side);
+      resetSide(side);
     }
     redrawAll();
   });
@@ -819,20 +1270,74 @@ $("swapSides").addEventListener("click", swapSides);
 $("leftResetHp").addEventListener("click", () => resetSide("left"));
 $("rightResetHp").addEventListener("click", () => resetSide("right"));
 $("exportBtn").addEventListener("click", exportData);
+$("exportRaisedBtn").addEventListener("click", exportRaisedSnapshot);
+$("clearBuildsBtn").addEventListener("click", clearBuilds);
 $("copyBtn").addEventListener("click", async () => {
   exportData();
   await navigator.clipboard.writeText($("exportBox").value);
   log("Export JSON copied to clipboard.");
 });
 
+
+function exportRaisedSnapshot() {
+  const snapshot = {
+    version: "raised-creature-snapshot-v2",
+    exportedAt: new Date().toISOString(),
+    left: getRaisedSnapshotForSide("left"),
+    right: getRaisedSnapshotForSide("right"),
+    progression: getAllocationCurveExport(Math.max(sideLevel("left"), sideLevel("right")))
+  };
+  $("exportBox").value = JSON.stringify(snapshot, null, 2);
+}
+
+function getRaisedSnapshotForSide(side) {
+  const creature = sideCreature(side);
+  const level = sideLevel(side);
+  const stats = statAtLevel(creature, level, side);
+  const build = raisedBuilds[side];
+  return {
+    side,
+    creatureId: creature.id,
+    name: creature.name,
+    element: creature.element,
+    level,
+    resolvedStats: stats,
+    baseStats: creature.baseStats,
+    growth: creature.growth,
+    naturalVariance: {
+      minPerLevel: NATURAL_VARIANCE_MIN,
+      maxPerLevel: NATURAL_VARIANCE_MAX,
+      rolls: build.naturalVarianceRolls,
+      totalBonusAtLevel: Object.fromEntries(STAT_KEYS.map(k => [k, Number(getNaturalVarianceBonus(build, k, level).toFixed(2))]))
+    },
+    manualAllocation: build.manualAllocation,
+    manualStatPointsAvailable: getAvailablePoints(side),
+    manualStatPointsSpent: getSpentPoints(side),
+    manualStatPointsRemaining: getAvailablePoints(side) - getSpentPoints(side),
+    manualStatCapPerStat: getManualStatCap(side),
+    allocationPointsEarnedAtCurrentLevel: getManualPointsEarnedForLevel(level),
+    classRoutePreview: getClassRoute(side),
+    daredevilEligible: getSpentPoints(side) === 0,
+    naturalGrowthOnly: getSpentPoints(side) === 0
+  };
+}
+
+function clearBuilds() {
+  raisedBuilds.left = makeEmptyRaisedBuild();
+  raisedBuilds.right = makeEmptyRaisedBuild();
+  resetBattle();
+  redrawAll();
+  log("Manual allocation and variance cleared for both sides.");
+}
+
 initSelects();
 $("leftCreature").value = "flor";
 $("rightCreature").value = "salamander";
 resetBattle();
 redrawAll();
-log("Simulator ready. Tune Level 1 first, then raise levels to test growth.");
+log("Simulator ready. Tune Level 1 bases, roll variance, then raise levels and allocate diminishing manual stat points by level band.");
 </script>
 </body>
 </html>
 
-<!-- v5: restored in-panel HUD cards to prevent clipping while keeping center-row creature placement. -->
+<!-- v10: replaced flat 8-point manual allocation with canon diminishing level-band allocation and hard per-level single-stat caps. -->
