@@ -24,6 +24,7 @@ const online = {
   startRequested: false,
   outboundStateSeq: 0,
   inboundStateSeq: 0,
+  lobbyCountdownTimer: null,
 };
 
 function qs(id) { return document.getElementById(id); }
@@ -41,6 +42,7 @@ function setMenuNotice(message = '') {
 }
 
 function goMenuWithNotice(message) {
+  stopLobbyCountdownTicker();
   stopLoop();
   state = null;
   adapter?.disconnect();
@@ -312,6 +314,7 @@ function resetToMenu() {
 }
 
 function disconnectOnline() {
+  stopLobbyCountdownTicker();
   online.net?.leaveLobby?.();
   online.net?.disconnect?.();
   online.net = null;
@@ -322,6 +325,7 @@ function disconnectOnline() {
   online.startRequested = false;
   online.outboundStateSeq = 0;
   online.inboundStateSeq = 0;
+  online.lobbyCountdownTimer = null;
 }
 
 async function ensureOnlineClient() {
@@ -334,6 +338,31 @@ async function ensureOnlineClient() {
   online.net = net;
   net.connect();
   return net;
+}
+
+
+function stopLobbyCountdownTicker() {
+  if (online.lobbyCountdownTimer !== null) {
+    window.clearInterval(online.lobbyCountdownTimer);
+    online.lobbyCountdownTimer = null;
+  }
+}
+
+function shouldTickLobbyCountdown() {
+  return !!online.lobby && online.lobby.status === 'countdown' && Number(online.lobby.startAt || 0) > 0 && !online.started;
+}
+
+function startLobbyCountdownTicker() {
+  stopLobbyCountdownTicker();
+  if (!shouldTickLobbyCountdown()) return;
+
+  online.lobbyCountdownTimer = window.setInterval(() => {
+    if (!shouldTickLobbyCountdown()) {
+      stopLobbyCountdownTicker();
+      return;
+    }
+    updateLobbyView();
+  }, 250);
 }
 
 function updateLobbyView(status = '') {
@@ -377,6 +406,8 @@ function wireOnlineCallbacks(net) {
   net.cb.onLobbyUpdated = payload => {
     online.lobby = { ...(online.lobby || {}), ...payload };
     online.isHost = payload.ownerId === net.clientId;
+    if (shouldTickLobbyCountdown()) startLobbyCountdownTicker();
+    else stopLobbyCountdownTicker();
     updateLobbyView();
     broadcastProfileSoon();
   };
@@ -385,7 +416,8 @@ function wireOnlineCallbacks(net) {
     online.lobby = { ...(online.lobby || {}), ...payload };
     online.isHost = payload.ownerId === net.clientId;
     online.startRequested = true;
-    updateLobbyView('Starting match...');
+    startLobbyCountdownTicker();
+    updateLobbyView();
   };
 
   net.cb.onPlayerJoined = () => {
@@ -428,6 +460,7 @@ function wireOnlineCallbacks(net) {
   };
 
   net.cb.onLobbyStarted = payload => {
+    stopLobbyCountdownTicker();
     online.lobby = { ...(online.lobby || {}), ...payload, status: 'started' };
     online.isHost = payload.ownerId === net.clientId;
     online.started = true;
@@ -593,7 +626,7 @@ function wireButtons() {
     if (!ready) return;
 
     online.startRequested = true;
-    updateLobbyView('Starting match...');
+    updateLobbyView('Requesting match start...');
     online.net.startLobby();
   });
 
