@@ -3,7 +3,7 @@ import { activePlayers, cloneState, createMatchState, hydrateNetworkState, seria
 import { handleInput, tick } from './engine.js';
 import { createInputController } from './input.js';
 import { playFailureTone, playInputTone } from './audio.js';
-import { flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
+import { flashInput, renderMatch, renderOnlineLobby, revealOwnerInput, showScreen } from './renderer.js';
 import { wireOnlineConfig } from './lobby.js';
 import { createOnlineClient } from './online.js';
 import { loadArcadeIdentity } from './identity.js';
@@ -196,6 +196,7 @@ function mirrorVisibleOwnerInput(senderId, input) {
   if (!inputIsFromCurrentOwner(senderId)) return false;
   playInputTone(input);
   flashInput(input);
+  revealOwnerInput(input);
   return true;
 }
 

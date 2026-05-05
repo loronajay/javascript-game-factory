@@ -13,6 +13,49 @@ const screenMap = {
 
 function qs(id) { return document.getElementById(id); }
 
+let liveSignalKey = '';
+
+function isOwnerPhase(state) {
+  return state.phase === PHASES.OWNER_CREATE_INITIAL
+    || state.phase === PHASES.OWNER_REPLAY
+    || state.phase === PHASES.OWNER_APPEND;
+}
+
+function liveSignalExpectedCount(state) {
+  return expectedSlotCount(state);
+}
+
+function renderLiveSignal(state) {
+  const strip = qs('live-signal-strip');
+  if (!strip) return;
+
+  if (!isOwnerPhase(state)) {
+    strip.classList.add('hidden');
+    strip.innerHTML = '';
+    liveSignalKey = '';
+    return;
+  }
+
+  const owner = getOwner(state);
+  const count = Math.max(0, liveSignalExpectedCount(state));
+  const key = `${state.phase}:${owner?.id || 'owner'}:${count}:${state.activeSequence.length}:${state.ownerIndex}`;
+
+  strip.classList.remove('hidden');
+
+  if (key === liveSignalKey && strip.children.length === count) return;
+
+  liveSignalKey = key;
+  strip.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const box = document.createElement('div');
+    box.className = 'live-signal-box';
+    box.textContent = '?';
+    box.setAttribute('aria-label', `Signal input ${i + 1}`);
+    strip.appendChild(box);
+  }
+}
+
+
 export function showScreen(name) {
   Object.values(screenMap).forEach(id => qs(id)?.classList.add('hidden'));
   qs(screenMap[name])?.classList.remove('hidden');
@@ -199,11 +242,29 @@ function renderTimer(state) {
 }
 
 export function flashInput(input) {
-  const button = document.querySelector(`[data-echo-key="${input}"]`);
+  const key = String(input || '').toUpperCase();
+  const button = document.querySelector(`[data-echo-key="${key}"]`);
   if (!button) return;
   button.classList.remove('flash');
   void button.offsetWidth;
   button.classList.add('flash');
+}
+
+export function revealOwnerInput(input) {
+  const key = String(input || '').toUpperCase();
+  if (!key) return;
+
+  const strip = qs('live-signal-strip');
+  if (!strip || strip.classList.contains('hidden')) return;
+
+  const box = Array.from(strip.children).find(child => !child.classList.contains('is-lit'));
+  if (!box) return;
+
+  box.className = `live-signal-box is-lit key-${key.toLowerCase()}`;
+  box.textContent = key;
+  box.classList.remove('pop');
+  void box.offsetWidth;
+  box.classList.add('pop');
 }
 
 export function renderLobbyPreview(count) {
@@ -233,6 +294,7 @@ export function renderMatch(state) {
   qs('status-line').textContent = state.status || '';
   renderPlayers(state);
   renderSequence(state);
+  renderLiveSignal(state);
   renderInputMode(state);
   renderTimer(state);
 }
