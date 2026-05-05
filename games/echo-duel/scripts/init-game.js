@@ -8,6 +8,7 @@ import { currentPlaybackStep, flashInput, renderMatch, renderOnlineLobby, showSc
 import { wireOnlineConfig } from './lobby.js';
 import { createOnlineClient } from './online.js';
 import { loadArcadeIdentity } from './identity.js';
+import { shouldCloseMatchToMenuOnPlayerLeft, shouldPreserveResultsScreen, shouldResetStartRequest } from './online-session-state.js';
 
 let state = null;
 let adapter = null;
@@ -399,6 +400,16 @@ function applyServerAuthoritativeState(messageType, value) {
   stopLobbyCountdownTicker();
   online.authorityMode = 'server';
   online.started = true;
+  if (shouldResetStartRequest({ lobbyStatus: online.lobby?.status || '', state: next })) {
+    online.startRequested = false;
+  }
+  if (online.lobby && next.phase === PHASES.MATCH_OVER) {
+    online.lobby = {
+      ...online.lobby,
+      status: 'ended',
+      startAt: null,
+    };
+  }
   state = next;
   showScreen('match');
   renderMatch(state);
@@ -436,8 +447,12 @@ function wireOnlineCallbacks(net) {
   net.cb.onLobbyUpdated = payload => {
     online.lobby = { ...(online.lobby || {}), ...payload };
     online.isHost = payload.ownerId === net.clientId;
+    if (shouldResetStartRequest({ lobbyStatus: online.lobby?.status || '', state })) {
+      online.startRequested = false;
+    }
     if (shouldTickLobbyCountdown()) startLobbyCountdownTicker();
     else stopLobbyCountdownTicker();
+    if (shouldPreserveResultsScreen({ authorityMode: online.authorityMode, state })) return;
     updateLobbyView();
     broadcastProfileSoon();
   };
@@ -459,6 +474,16 @@ function wireOnlineCallbacks(net) {
 
     if (state?.mode === 'online' && online.started && state.phase !== PHASES.MATCH_OVER) {
       if (onlineUsesServerAuthority()) {
+        if (shouldCloseMatchToMenuOnPlayerLeft({
+          authorityMode: online.authorityMode,
+          onlineStarted: online.started,
+          payload,
+          state,
+        })) {
+          goMenuWithNotice('Your partner disconnected. The match was closed.');
+          return;
+        }
+
         if (online.lobby) {
           online.lobby = {
             ...online.lobby,
@@ -502,6 +527,7 @@ function wireOnlineCallbacks(net) {
       return;
     }
 
+    if (shouldPreserveResultsScreen({ authorityMode: online.authorityMode, state })) return;
     updateLobbyView('A player left.');
   };
 
@@ -695,24 +721,6 @@ function wireButtons() {
     online.startRequested = true;
     updateLobbyView('Requesting match start...');
     online.net.startLobby();
-  });
-
-  qs('btn-reset-match')?.addEventListener('click', () => {
-    if (!state) return;
-    if (state.mode === 'online') {
-      if (online.isHost) {
-        const players = state.players.map(p => ({ id: p.id, clientId: p.clientId, name: p.name }));
-        setState(createMatchState({
-          mode: 'online',
-          players,
-          playerCount: players.length,
-          penaltyWord: state.settings.penaltyWord,
-          network: state.network,
-        }), { broadcast: true });
-      }
-      return;
-    }
-    resetToMenu();
   });
 
   qs('btn-exit')?.addEventListener('click', resetToMenu);
