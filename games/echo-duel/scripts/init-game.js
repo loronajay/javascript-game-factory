@@ -180,12 +180,36 @@ function submitLocalInput(input) {
   }
 }
 
+function isOwnerInputPhase(phase) {
+  return phase === PHASES.OWNER_CREATE_INITIAL
+    || phase === PHASES.OWNER_REPLAY
+    || phase === PHASES.OWNER_APPEND;
+}
+
+function inputIsFromCurrentOwner(senderId) {
+  if (!state || !senderId || !isOwnerInputPhase(state.phase)) return false;
+  const owner = state.players[state.ownerIndex];
+  return !!owner && (owner.clientId === senderId || owner.id === senderId);
+}
+
+function mirrorVisibleOwnerInput(senderId, input) {
+  if (!inputIsFromCurrentOwner(senderId)) return false;
+  playInputTone(input);
+  flashInput(input);
+  return true;
+}
+
 function submitOnlineInput(input) {
   if (!online.net || !state) return;
   playInputTone(input);
   flashInput(input);
 
   if (online.isHost) {
+    if (inputIsFromCurrentOwner(online.net.clientId)) {
+      // Host-owned pattern inputs must be broadcast immediately so challengers can memorize
+      // the live flashes/tones. State snapshots alone are too late for this game.
+      online.net.lobbyMessage('input', { input, clientTime: Date.now() });
+    }
     applyAuthoritativeInput(online.net.clientId, input);
   } else {
     online.net.sendInput(input);
@@ -405,9 +429,17 @@ function wireOnlineCallbacks(net) {
     }
 
     if (messageType === 'input') {
-      if (!online.isHost) return;
       const msg = safeParse(value);
-      if (msg?.input) applyAuthoritativeInput(senderId, msg.input);
+      const input = String(msg?.input || '').toUpperCase();
+      if (!input) return;
+
+      // Every client must see the pattern owner build/replay/append the signal live.
+      // The sequence itself remains hidden; only the pad flash/tone is mirrored.
+      mirrorVisibleOwnerInput(senderId, input);
+
+      if (online.isHost) {
+        applyAuthoritativeInput(senderId, input);
+      }
       return;
     }
 
