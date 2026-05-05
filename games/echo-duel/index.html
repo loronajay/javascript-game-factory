@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Echo Duel | Javascript Game Factory</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="../../js/platform-config.js"></script>
+</head>
+<body>
+  <a href="../../grid.html" class="back-btn">&larr; Arcade</a>
+  <main class="game-shell">
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div id="game-root">
+      <section id="screen-menu" class="screen screen-menu">
+        <div class="title-card">
+          <p class="eyebrow">Javascript Game Factory</p>
+          <h1>Echo Duel</h1>
+          <p class="tagline">Build the pattern. Remember your own signal. Break everyone else.</p>
+        </div>
+        <div class="menu-buttons">
+          <button id="btn-local" class="btn btn-primary">Local Test Match</button>
+          <button id="btn-public" class="btn">Find Public Lobby</button>
+          <button id="btn-private" class="btn">Create Private Room</button>
+          <button id="btn-join-private" class="btn">Join Private Room</button>
+        </div>
+        <p id="menu-notice" class="status-line menu-notice hidden"></p>
+        <p class="muted note">Online play uses the variable-size lobby protocol. The lobby owner coordinates match state.</p>
+      </section>
+
+      <section id="screen-lobby" class="screen screen-panel hidden">
+        <div class="panel lobby-panel">
+          <p class="eyebrow">Lobby</p>
+          <h2>Configure Match</h2>
+          <div class="form-grid">
+            <label>
+              Players
+              <select id="lobby-player-count">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </label>
+            <label>
+              Penalty Word
+              <input id="lobby-word" type="text" value="STATIC" maxlength="10" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <p id="lobby-error" class="error-text hidden"></p>
+          <div id="lobby-preview" class="player-preview"></div>
+          <div class="row-buttons">
+            <button id="btn-start-local" class="btn btn-primary">Start Match</button>
+            <button id="btn-lobby-back" class="btn">Back</button>
+          </div>
+        </div>
+      </section>
+
+
+      <section id="screen-online-config" class="screen screen-panel hidden">
+        <div class="panel lobby-panel">
+          <p class="eyebrow">Online Lobby</p>
+          <h2>Configure Online Match</h2>
+          <div class="form-grid">
+            <label>
+              Min Players
+              <select id="online-min-players">
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </label>
+            <label>
+              Max Players
+              <select id="online-max-players">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6" selected>6</option>
+              </select>
+            </label>
+            <label class="form-wide">
+              Penalty Word
+              <input id="online-word" type="text" value="STATIC" maxlength="10" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+          <p id="online-error" class="error-text hidden"></p>
+          <div class="row-buttons">
+            <button id="btn-online-public-start" class="btn btn-primary">Find / Create Public</button>
+            <button id="btn-online-private-start" class="btn btn-primary">Create Private</button>
+            <button id="btn-online-config-back" class="btn">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-room-join" class="screen screen-panel hidden">
+        <div class="panel lobby-panel">
+          <p class="eyebrow">Private Room</p>
+          <h2>Join Room</h2>
+          <label>
+            Room Code
+            <input id="join-room-code" type="text" maxlength="8" autocomplete="off" spellcheck="false" placeholder="ABCDE">
+          </label>
+          <p id="join-room-error" class="error-text hidden"></p>
+          <div class="row-buttons">
+            <button id="btn-submit-private-join" class="btn btn-primary">Join</button>
+            <button id="btn-cancel-private-join" class="btn">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-online-lobby" class="screen screen-panel hidden">
+        <div class="panel lobby-panel">
+          <p class="eyebrow">Room Code</p>
+          <h2 id="online-room-code" class="room-code-display">-----</h2>
+          <p id="online-lobby-settings" class="phase-detail"></p>
+          <p id="online-lobby-status" class="status-line">Connecting...</p>
+          <div id="online-members" class="online-members"></div>
+          <div class="row-buttons">
+            <button id="btn-online-start-now" class="btn btn-primary" hidden>Start Now</button>
+            <button id="btn-online-leave" class="btn">Leave</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-match" class="screen screen-match hidden">
+        <header class="match-header">
+          <div>
+            <p class="eyebrow" id="phase-kicker">Phase</p>
+            <h2 id="phase-title">Waiting</h2>
+            <p id="phase-detail" class="phase-detail"></p>
+          </div>
+          <div class="word-card">
+            <span>Penalty Word</span>
+            <strong id="penalty-word">STATIC</strong>
+          </div>
+        </header>
+
+        <div id="players-strip" class="players-strip"></div>
+
+        <section class="sequence-stage">
+          <div class="sequence-readout">
+            <span id="sequence-label">Active Sequence</span>
+            <div id="sequence-slots" class="sequence-slots"></div>
+          </div>
+          <div id="timer-wrap" class="timer-wrap hidden">
+            <div id="timer-bar" class="timer-bar"></div>
+          </div>
+          <p id="status-line" class="status-line"></p>
+        </section>
+
+        <section class="pad" aria-label="Echo Duel input pad">
+          <button class="pad-key key-w" data-echo-key="W"><span>W</span></button>
+          <button class="pad-key key-a" data-echo-key="A"><span>A</span></button>
+          <button class="pad-key key-s" data-echo-key="S"><span>S</span></button>
+          <button class="pad-key key-d" data-echo-key="D"><span>D</span></button>
+        </section>
+
+        <div class="match-controls">
+          <button id="btn-reset-match" class="btn">Reset Match</button>
+          <button id="btn-exit" class="btn">Exit</button>
+        </div>
+      </section>
+
+      <section id="screen-ended" class="screen screen-panel hidden">
+        <div class="panel end-panel">
+          <p class="eyebrow">Match Over</p>
+          <h2 id="ended-title">Winner</h2>
+          <p id="ended-message" class="phase-detail"></p>
+          <div id="ended-standings" class="standings"></div>
+          <div class="row-buttons">
+            <button id="btn-rematch" class="btn btn-primary">Rematch</button>
+            <button id="btn-ended-menu" class="btn">Menu</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initGame } from './game.js';
+    initGame();
+  </script>
+</body>
+</html>

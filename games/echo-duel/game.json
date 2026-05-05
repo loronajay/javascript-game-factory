@@ -1,0 +1,11 @@
+{
+  "title": "Echo Duel",
+  "tagline": "Build the pattern. Survive the echo.",
+  "description": "A 2-6 player online memory duel where players copy, extend, and survive color-tone patterns.",
+  "players": "2-6",
+  "status": "Prototype",
+  "order": 3,
+  "featured": false,
+  "theme": "signal",
+  "accentColor": "#66f7ff"
+}
