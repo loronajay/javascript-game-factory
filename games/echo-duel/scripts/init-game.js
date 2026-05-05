@@ -725,23 +725,6 @@ function wireButtons() {
 
   qs('btn-exit')?.addEventListener('click', resetToMenu);
   qs('btn-ended-menu')?.addEventListener('click', resetToMenu);
-  qs('btn-rematch')?.addEventListener('click', () => {
-    if (!state) return;
-    if (state.mode === 'online') {
-      if (online.isHost) {
-        const players = state.players.map(p => ({ id: p.id, clientId: p.clientId, name: p.name }));
-        setState(createMatchState({
-          mode: 'online',
-          players,
-          playerCount: players.length,
-          penaltyWord: state.settings.penaltyWord,
-          network: state.network,
-        }), { broadcast: true });
-      }
-      return;
-    }
-    resetToMenu();
-  });
 }
 
 export function initGame() {

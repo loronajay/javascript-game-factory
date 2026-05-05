@@ -1,5 +1,6 @@
 import { PHASES } from './config.js';
 import { getOwner } from './state.js';
+import { buildLobbyStartButtonState, getLobbyStatusText } from './online-lobby-view-state.js';
 
 const screenMap = {
   menu: 'screen-menu',
@@ -384,7 +385,7 @@ export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, sta
   const settingsEl = qs('online-lobby-settings');
   if (codeEl) codeEl.textContent = lobby?.roomCode || '-----';
   if (statusEl) {
-    const dynamicStatus = lobbyStatusText(lobby);
+    const dynamicStatus = getLobbyStatusText(lobby);
     statusEl.textContent = (lobby?.status === 'countdown' || lobby?.status === 'started') ? dynamicStatus : (status || dynamicStatus);
   }
   if (settingsEl && lobby) {
@@ -404,47 +405,15 @@ export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, sta
     }
   }
   if (startBtn) {
-    const isOwner = lobby?.ownerId === myClientId;
-    const ready = Number(lobby?.playerCount || 0) >= Number(lobby?.minPlayers || 2);
-    const status = lobby?.status || 'open';
-    const startAt = Number(lobby?.startAt || 0);
-    const hasVisibleStartCountdown = (status === 'countdown' || status === 'started') && startAt > Date.now();
-    const starting = startRequested || status === 'countdown' || status === 'started';
-
-    startBtn.hidden = !isOwner;
-    startBtn.disabled = !ready || starting;
-
-    if (hasVisibleStartCountdown) {
-      const seconds = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
-      startBtn.textContent = `Starting in ${seconds}s...`;
-    } else {
-      startBtn.textContent = starting ? 'Starting Match...' : 'Start Now';
-    }
-
-    startBtn.setAttribute('aria-busy', starting ? 'true' : 'false');
+    const buttonState = buildLobbyStartButtonState({ lobby, myClientId, startRequested, now: Date.now() });
+    startBtn.hidden = buttonState.hidden;
+    startBtn.disabled = buttonState.disabled;
+    startBtn.textContent = buttonState.text;
+    startBtn.setAttribute('aria-busy', buttonState.ariaBusy);
   }
 }
 
 function shortClientId(value) {
   const text = String(value || 'Player');
   return text.length > 8 ? `Player ${text.slice(-4).toUpperCase()}` : text;
-}
-
-function lobbyStatusText(lobby) {
-  if (!lobby) return 'Connecting...';
-
-  const status = lobby.status || 'open';
-  const startAt = Number(lobby.startAt || 0);
-  if ((status === 'countdown' || status === 'started') && startAt > 0) {
-    const seconds = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
-    if (status === 'started') {
-      return seconds > 0 ? `Match starts in ${seconds}s...` : 'Starting match...';
-    }
-    return seconds > 0 ? `Minimum reached. Match starts in ${seconds}s...` : 'Starting match...';
-  }
-
-  if ((lobby.playerCount || 0) < lobby.minPlayers) {
-    return `Waiting for ${lobby.minPlayers - lobby.playerCount} more player${lobby.minPlayers - lobby.playerCount === 1 ? '' : 's'}...`;
-  }
-  return 'Ready to start.';
 }

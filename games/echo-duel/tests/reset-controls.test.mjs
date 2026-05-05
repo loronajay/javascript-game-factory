@@ -33,9 +33,19 @@ test("match html no longer exposes a reset-match button", () => {
   assert(!html.includes("btn-reset-match"), "expected reset-match button to be removed from index.html");
 });
 
+test("ended screen no longer exposes an online rematch button", () => {
+  const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+  assert(!html.includes("btn-rematch"), "expected rematch button to be removed from index.html");
+});
+
 test("init-game no longer wires a reset-match click handler", () => {
   const script = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
   assert(!script.includes("btn-reset-match"), "expected reset-match handler to be removed from init-game.js");
+});
+
+test("init-game no longer wires a rematch click handler", () => {
+  const script = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
+  assert(!script.includes("btn-rematch"), "expected rematch handler to be removed from init-game.js");
 });
 
 if (failed > 0) {
