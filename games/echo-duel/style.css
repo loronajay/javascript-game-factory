@@ -448,3 +448,64 @@ input, select {
   z-index: 1;
   filter: brightness(1.35);
 }
+
+
+.loser-callout {
+  position: relative;
+  z-index: 2;
+  margin: 18px auto 20px;
+  width: fit-content;
+  max-width: min(720px, 92vw);
+  padding: 14px 22px;
+  border: 2px solid rgba(255, 92, 124, 0.82);
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 92, 124, 0.34), rgba(15, 10, 28, 0.92));
+  color: #fff4f8;
+  font-size: clamp(1.45rem, 4vw, 3.2rem);
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  line-height: 1.02;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(255, 80, 124, 0.95), 0 3px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 34px rgba(255, 80, 124, 0.32), inset 0 0 18px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.loser-callout--play {
+  animation: loserCalloutPop 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes loserCalloutPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.42) rotate(-3deg);
+    filter: blur(2px);
+  }
+  16% {
+    opacity: 1;
+    transform: scale(1.12) rotate(1deg);
+    filter: blur(0);
+  }
+  34% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+  74% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.42);
+    filter: blur(2px);
+  }
+}
+
+.standing-row.is-loser strong {
+  color: #ff6f91;
+}
+
+.standing-row.is-winner strong {
+  color: #7dffb5;
+}

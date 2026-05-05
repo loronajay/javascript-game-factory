@@ -319,6 +319,24 @@ export function renderMatch(state) {
   renderTimer(state);
 }
 
+function localPlayer(state) {
+  const localId = localPlayerId(state);
+  if (!localId) return null;
+  return state.players.find(player => player.id === localId || player.clientId === localId) || null;
+}
+
+function shouldShowLoserCallout(state) {
+  const winner = state.players.find(player => player.id === state.winnerId);
+  const local = localPlayer(state);
+
+  if (local) {
+    return !winner || (local.id !== winner.id && local.clientId !== winner.clientId);
+  }
+
+  // Local/hotseat mode has no single client identity. Show the payoff once if anyone lost.
+  return state.mode !== 'online' && state.players.some(player => player.eliminated);
+}
+
 export function renderEnded(state) {
   showScreen('ended');
   const winner = state.players.find(player => player.id === state.winnerId);
@@ -327,12 +345,30 @@ export function renderEnded(state) {
     ? `${winner.name} is the last active player.`
     : 'The match ended without an active player.';
 
+  const callout = qs('loser-callout');
+  if (callout) {
+    const penaltyWord = String(state.settings?.penaltyWord || 'LOSER').toUpperCase();
+    if (shouldShowLoserCallout(state)) {
+      callout.textContent = `YOU ARE A ${penaltyWord}!`;
+      callout.classList.remove('hidden');
+      callout.classList.remove('loser-callout--play');
+      void callout.offsetWidth;
+      callout.classList.add('loser-callout--play');
+    } else {
+      callout.textContent = '';
+      callout.classList.add('hidden');
+      callout.classList.remove('loser-callout--play');
+    }
+  }
+
   const standings = qs('ended-standings');
   if (!standings) return;
   standings.innerHTML = '';
   state.players.forEach(player => {
     const row = document.createElement('div');
     row.className = 'standing-row';
+    if (player.id === state.winnerId) row.classList.add('is-winner');
+    if (player.eliminated) row.classList.add('is-loser');
     row.innerHTML = `<span>${player.name}</span><strong>${player.letters || '—'}</strong>`;
     standings.appendChild(row);
   });
