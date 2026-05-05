@@ -257,7 +257,7 @@ export function renderEnded(state) {
 }
 
 
-export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, status = '' }) {
+export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, status = '', startRequested = false }) {
   showScreen('onlineLobby');
   const codeEl = qs('online-room-code');
   const statusEl = qs('online-lobby-status');
@@ -285,8 +285,11 @@ export function renderOnlineLobby({ lobby, profiles = {}, myClientId = null, sta
   if (startBtn) {
     const isOwner = lobby?.ownerId === myClientId;
     const ready = Number(lobby?.playerCount || 0) >= Number(lobby?.minPlayers || 2);
+    const starting = startRequested || lobby?.status === 'countdown' || lobby?.status === 'started';
     startBtn.hidden = !isOwner;
-    startBtn.disabled = !ready;
+    startBtn.disabled = !ready || starting;
+    startBtn.textContent = starting ? 'Starting Match...' : 'Start Now';
+    startBtn.setAttribute('aria-busy', starting ? 'true' : 'false');
   }
 }
 

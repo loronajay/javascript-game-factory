@@ -20,6 +20,7 @@ const online = {
   identity: null,
   isHost: false,
   started: false,
+  startRequested: false,
 };
 
 function qs(id) { return document.getElementById(id); }
@@ -51,6 +52,7 @@ function goMenuWithNotice(message) {
   online.profiles = {};
   online.isHost = false;
   online.started = false;
+  online.startRequested = false;
   showScreen('menu');
   setMenuNotice(message);
 }
@@ -255,6 +257,7 @@ function disconnectOnline() {
   online.profiles = {};
   online.isHost = false;
   online.started = false;
+  online.startRequested = false;
 }
 
 async function ensureOnlineClient() {
@@ -276,6 +279,7 @@ function updateLobbyView(status = '') {
     profiles: online.profiles,
     myClientId: online.net?.clientId,
     status,
+    startRequested: online.startRequested,
   });
 }
 
@@ -316,7 +320,8 @@ function wireOnlineCallbacks(net) {
   net.cb.onLobbyCountdownStarted = payload => {
     online.lobby = { ...(online.lobby || {}), ...payload };
     online.isHost = payload.ownerId === net.clientId;
-    updateLobbyView();
+    online.startRequested = true;
+    updateLobbyView('Starting match...');
   };
 
   net.cb.onPlayerJoined = () => {
@@ -362,6 +367,7 @@ function wireOnlineCallbacks(net) {
     online.lobby = { ...(online.lobby || {}), ...payload, status: 'started' };
     online.isHost = payload.ownerId === net.clientId;
     online.started = true;
+    online.startRequested = true;
     const members = payload.members || online.lobby.members || [];
     online.lobby.members = members;
     const start = () => {
@@ -421,6 +427,8 @@ function wireOnlineCallbacks(net) {
   net.cb.onError = (code, message) => {
     console.warn('Echo Duel network error:', code, message);
     const err = qs('join-room-error') || qs('online-error');
+    online.startRequested = false;
+    if (online.lobby && online.lobby.status !== 'started') updateLobbyView('Unable to start match. Try again.');
     if (err) {
       err.textContent = message || code || 'Network error';
       err.classList.remove('hidden');
@@ -497,7 +505,17 @@ function wireButtons() {
 
   qs('btn-cancel-private-join')?.addEventListener('click', () => showScreen('menu'));
   qs('btn-online-leave')?.addEventListener('click', resetToMenu);
-  qs('btn-online-start-now')?.addEventListener('click', () => online.net?.startLobby());
+  qs('btn-online-start-now')?.addEventListener('click', () => {
+    if (online.startRequested || online.started) return;
+    if (!online.net || !online.lobby) return;
+    if (online.lobby.ownerId !== online.net.clientId) return;
+    const ready = Number(online.lobby.playerCount || 0) >= Number(online.lobby.minPlayers || 2);
+    if (!ready) return;
+
+    online.startRequested = true;
+    updateLobbyView('Starting match...');
+    online.net.startLobby();
+  });
 
   qs('btn-reset-match')?.addEventListener('click', () => {
     if (!state) return;
