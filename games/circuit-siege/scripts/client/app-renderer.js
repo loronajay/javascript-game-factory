@@ -187,6 +187,7 @@ export function createAppRenderer(root = document) {
     roomCode: root.querySelector("#room-code"),
     heldPiece: root.querySelector("#held-piece"),
     heldCursor: root.querySelector("#held-cursor"),
+    toolDock: root.querySelector("#tool-dock"),
     scoreBlue: root.querySelector("#score-blue"),
     scoreRed: root.querySelector("#score-red"),
     timer: root.querySelector("#match-timer"),
@@ -229,12 +230,15 @@ export function createAppRenderer(root = document) {
       els.startButton.disabled = viewModel.lobbyStartAction.disabled;
       els.startButton.textContent = viewModel.lobbyStartAction.text;
     }
+    if (els.toolDock) {
+      els.toolDock.classList.toggle("tool-dock--hidden", viewModel.screen !== "match");
+    }
     for (const button of els.toolButtons) {
       button.innerHTML = renderToolPreview(button.dataset.tool || "");
       button.classList.toggle("tool--active", button.dataset.tool === viewModel.heldMask);
     }
     if (els.heldCursor) {
-      const visible = !!viewModel.heldCursor?.visible && !!viewModel.heldCursor?.mask;
+      const visible = viewModel.screen === "match" && !!viewModel.heldCursor?.visible && !!viewModel.heldCursor?.mask;
       els.heldCursor.classList.toggle("held-cursor--hidden", !visible);
       if (visible) {
         els.heldCursor.innerHTML = renderHeldCursor(viewModel.heldCursor.mask, viewModel.heldCursor.side || "blue");
