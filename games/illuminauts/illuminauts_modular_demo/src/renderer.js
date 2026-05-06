@@ -128,7 +128,7 @@ function getPlayerSprite(player) {
   }[player.dir] || 'playerDown';
 }
 
-function getBeaconBounds(map) {
+function getBeaconCenter(map) {
   if (!map.goals.length) return null;
   let minX = Infinity;
   let minY = Infinity;
@@ -140,64 +140,30 @@ function getBeaconBounds(map) {
     maxX = Math.max(maxX, goal.x);
     maxY = Math.max(maxY, goal.y);
   }
-  return { minX, minY, maxX, maxY };
+  return {
+    x: Math.floor((minX + maxX) / 2),
+    y: Math.floor((minY + maxY) / 2)
+  };
 }
 
-function getBeaconPieceName(map, x, y) {
-  const bounds = getBeaconBounds(map);
-  if (!bounds) return null;
+function drawBeaconIfCenter(ctx, map, x, y, sx, sy, size) {
+  const center = getBeaconCenter(map);
+  if (!center || center.x !== x || center.y !== y) return;
 
-  const centerX = Math.floor((bounds.minX + bounds.maxX) / 2);
-  const centerY = Math.floor((bounds.minY + bounds.maxY) / 2);
-  const localX = x - (centerX - 1);
-  const localY = y - (centerY - 1);
-
-  if (localX < 0 || localX > 2 || localY < 0 || localY > 2) return null;
-  return `beacon${localY}${localX}`;
-}
-
-function drawBeaconPiece(ctx, map, x, y, sx, sy, size) {
-  const piece = getBeaconPieceName(map, x, y);
-  if (!piece) return;
-
-  const drew = drawSprite(ctx, piece, sx, sy, size, size);
+  const drew = drawSpriteContain(ctx, 'beaconCore', sx + size / 2, sy + size / 2, size * 3.35, size * 3.35);
   if (!drew) drawGlyph(ctx, 'B', sx, sy, size, '#00130b');
 }
 
 function drawLaserDoor(ctx, door, sx, sy, size) {
   if (door.open) {
-    const leftDrew = drawSpriteContain(
-      ctx,
-      'laserDoorDisabledLeft',
-      sx - size / 2,
-      sy + size / 2,
-      size * 0.72,
-      size * 1.2
-    );
-    const rightDrew = drawSpriteContain(
-      ctx,
-      'laserDoorDisabledRight',
-      sx + size * 1.5,
-      sy + size / 2,
-      size * 0.72,
-      size * 1.2
-    );
-    if (!leftDrew || !rightDrew) strokeTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.doorOpen);
-    return;
-  }
-
-  const drew = drawSpriteContain(
-    ctx,
-    'laserDoorActiveWide',
-    sx + size / 2,
-    sy + size / 2,
-    size * 3.15,
-    size * 1.38
-  );
-
-  if (!drew) {
-    fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.door);
-    drawGlyph(ctx, 'D', sx, sy, size, '#100014');
+    const drew = drawSpriteContain(ctx, 'laserDoorDisabled', sx + size / 2, sy + size / 2, size * 2.2, size * 1.25);
+    if (!drew) strokeTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.doorOpen);
+  } else {
+    const drew = drawSpriteContain(ctx, 'laserDoorActive', sx + size / 2, sy + size / 2, size * 2.65, size * 1.35);
+    if (!drew) {
+      fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.door);
+      drawGlyph(ctx, 'D', sx, sy, size, '#100014');
+    }
   }
 }
 
@@ -205,7 +171,7 @@ function drawWorldEntity(ctx, state, x, y, sx, sy, size, now) {
   const { map, player, hazards } = state;
 
   if (isGoalAt(map, x, y)) {
-    drawBeaconPiece(ctx, map, x, y, sx, sy, size);
+    drawBeaconIfCenter(ctx, map, x, y, sx, sy, size);
   }
 
   const door = getDoorAt(map, x, y);
@@ -292,6 +258,15 @@ function drawViewportWorld(ctx, state, now, size, offsetX, offsetY, startX, star
       const sx = offsetX + vx * size;
       const sy = offsetY + vy * size;
       drawTileBase(ctx, state.map, x, y, sx, sy, size);
+    }
+  }
+
+  for (let vy = 0; vy < VIEW_TILES_Y; vy++) {
+    for (let vx = 0; vx < VIEW_TILES_X; vx++) {
+      const x = startX + vx;
+      const y = startY + vy;
+      const sx = offsetX + vx * size;
+      const sy = offsetY + vy * size;
       drawWorldEntity(ctx, state, x, y, sx, sy, size, now);
     }
   }
@@ -366,6 +341,13 @@ export function renderDebugView(canvas, state, now) {
       const sx = offsetX + x * size;
       const sy = offsetY + y * size;
       drawTileBase(ctx, state.map, x, y, sx, sy, size);
+    }
+  }
+
+  for (let y = 0; y < state.map.height; y++) {
+    for (let x = 0; x < state.map.width; x++) {
+      const sx = offsetX + x * size;
+      const sy = offsetY + y * size;
       drawWorldEntity(ctx, state, x, y, sx, sy, size, now);
     }
   }
