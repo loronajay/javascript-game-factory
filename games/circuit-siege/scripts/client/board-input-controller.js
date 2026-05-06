@@ -1,4 +1,8 @@
 function toolToPiecePlacement(toolId) {
+  if (toolId === "straight") {
+    return { pieceType: "straight", rotation: 0 };
+  }
+
   if (toolId === "straight-h") {
     return { pieceType: "straight", rotation: 0 };
   }
@@ -16,7 +20,7 @@ function toolToPiecePlacement(toolId) {
 
 export function createBoardInputState() {
   return {
-    selectedTool: "straight-h",
+    selectedTool: "straight",
     selectedSlotId: null
   };
 }
@@ -64,6 +68,13 @@ export function buildIntentFromCell({
   const placement = toolToPiecePlacement(inputState?.selectedTool);
   if (!placement) {
     return { ok: false, reason: "unknown-tool" };
+  }
+
+  if (cell.placedMask) {
+    const currentFamily = cell.placedMask === "EW" || cell.placedMask === "NS" ? "straight" : "corner";
+    if (placement.pieceType === currentFamily) {
+      return { ok: false, reason: "selection-only" };
+    }
   }
 
   return {

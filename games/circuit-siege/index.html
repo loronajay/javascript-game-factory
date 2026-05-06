@@ -90,18 +90,14 @@
             <p class="eyebrow">Shared Circuit Floor</p>
             <p class="status-line">Click an editable slot to target it. Press <strong>R</strong> to rotate the selected piece. Use the toolkit only when switching between straight and corner parts.</p>
             <div class="tool-palette" aria-label="Repair tools">
-              <button class="tool" data-tool="straight-h">Straight H</button>
-              <button class="tool" data-tool="straight-v">Straight V</button>
+              <button class="tool" data-tool="straight">Straight</button>
               <button class="tool" data-tool="corner">Corner</button>
-              <button class="tool" data-tool="rotate">Rotate</button>
             </div>
             <div id="board-grid" class="board-grid" aria-label="Circuit board"></div>
+            <div class="board-actions">
+              <button data-leave class="action action--ghost">Exit To Menu</button>
+            </div>
           </section>
-          <aside class="route-panel">
-            <p class="eyebrow">Route Ledger</p>
-            <ul id="route-summary" class="route-summary-list"></ul>
-            <button data-leave class="action action--ghost action--wide">Exit To Menu</button>
-          </aside>
         </div>
       </div>
     </section>

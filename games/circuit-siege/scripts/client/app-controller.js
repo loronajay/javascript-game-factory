@@ -165,7 +165,13 @@ export function createCircuitSiegeAppController({
       inputState
     });
 
+    if (!built.ok && built.reason === "selection-only") {
+      rerender();
+      return true;
+    }
+
     if (!built.ok) {
+      rerender();
       return false;
     }
 

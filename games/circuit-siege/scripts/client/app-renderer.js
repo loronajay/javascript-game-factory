@@ -4,46 +4,104 @@ function setActiveScreen(root, screenId) {
   }
 }
 
+import {
+  BOARD_PAD_X,
+  BOARD_PAD_Y,
+  BOARD_TILE,
+  cellCenter,
+  getBoardPixelSize,
+  maskSegmentLines,
+  polylinePointsAttr
+} from "./board-svg-layout.js";
+
 function renderBoardGrid(container, boardViewModel) {
   if (!container || !boardViewModel) return;
 
-  const markup = boardViewModel.cells.map((cell) => {
-    const classes = [
-      "board-cell",
-      `board-cell--${cell.owner}`,
-      cell.isWall ? "board-cell--wall" : "",
-      cell.hasRoute ? "board-cell--route" : "",
-      cell.slotId ? "board-cell--slot" : "",
-      cell.selected ? "board-cell--selected" : "",
-      cell.locked ? "board-cell--locked" : "",
-      cell.terminalId ? `board-cell--terminal-${cell.terminalType}` : "",
-      cell.terminalCompleted ? "board-cell--terminal-completed" : "",
-      cell.sourceId ? "board-cell--source" : ""
-    ].filter(Boolean).join(" ");
+  const size = getBoardPixelSize(boardViewModel.board);
+  const routeMarkup = boardViewModel.routeVisuals.map((route) => `
+    <polyline points="${polylinePointsAttr(route.points)}" class="route-outline"></polyline>
+    <polyline
+      points="${polylinePointsAttr(route.points)}"
+      class="route-line route-line--${route.owner} ${route.completed ? `route-line--completed-${route.terminalType}` : ""}"
+    ></polyline>
+  `).join("");
 
-    let label = "";
-    if (cell.isWall) label = "||";
-    else if (cell.sourceId) label = `S${cell.sourceIndex}`;
-    else if (cell.terminalId) label = cell.terminalType === "damage" ? "DMG" : "DUD";
-    else if (cell.slotId && cell.placedMask) label = cell.placedMask;
-    else if (cell.slotId) label = cell.slotType === "hole" ? "HOLE" : "EDIT";
-
-    const slotAttr = cell.slotId ? ` data-slot-id="${cell.slotId}"` : "";
-    return `<div class="${classes}" title="${cell.key}"${slotAttr}>${label}</div>`;
+  const sourceMarkup = boardViewModel.sourceVisuals.map((source) => {
+    const [cx] = cellCenter(source.x, source.y);
+    return `
+      <rect x="${cx - 8}" y="${BOARD_PAD_Y - 24}" width="16" height="24" rx="3" class="source-plug source-plug--${source.owner}"></rect>
+      <text x="${cx}" y="${BOARD_PAD_Y - 30}" text-anchor="middle" class="board-svg__tiny">${source.sourceIndex}</text>
+    `;
   }).join("");
 
-  container.style.setProperty("--board-cols", String(boardViewModel.board.cols));
-  container.innerHTML = markup;
-}
+  const terminalMarkup = boardViewModel.terminalVisuals.map((terminal) => {
+    const [cx] = cellCenter(terminal.x, terminal.y);
+    const boardBottomY = BOARD_PAD_Y + boardViewModel.board.rows * BOARD_TILE;
+    return `
+      <rect
+        x="${cx - 13}"
+        y="${boardBottomY + 12}"
+        width="26"
+        height="26"
+        rx="4"
+        class="terminal-rect terminal-rect--${terminal.owner} terminal-rect--${terminal.terminalType} ${terminal.completed ? `terminal-rect--completed-${terminal.terminalType}` : ""}"
+      ></rect>
+      <text x="${cx}" y="${boardBottomY + 29}" text-anchor="middle" class="terminal-text">${terminal.terminalType === "damage" ? "DMG" : "DUD"}</text>
+    `;
+  }).join("");
 
-function renderRouteSummary(container, boardViewModel) {
-  if (!container || !boardViewModel) return;
-  container.innerHTML = boardViewModel.routeSummaries.map((route) => `
-    <li class="route-summary route-summary--${route.owner} ${route.completed ? "route-summary--done" : ""}">
-      <span>${route.routeId}</span>
-      <strong>${route.terminalType.toUpperCase()}</strong>
-    </li>
-  `).join("");
+  const cellMarkup = boardViewModel.cells.map((cell) => {
+    const x = BOARD_PAD_X + cell.x * BOARD_TILE;
+    const y = BOARD_PAD_Y + cell.y * BOARD_TILE;
+    const classes = [
+      "board-cell-rect",
+      cell.isWall ? "board-cell-rect--wall" : "board-cell-rect--floor"
+    ].join(" ");
+    return `<rect x="${x}" y="${y}" width="${BOARD_TILE}" height="${BOARD_TILE}" class="${classes}"></rect>`;
+  }).join("");
+
+  const slotMarkup = boardViewModel.cells
+    .filter((cell) => cell.slotId)
+    .map((cell) => {
+      const [cx, cy] = cellCenter(cell.x, cell.y);
+      const slotClass = [
+        "slot-group",
+        `slot-group--${cell.slotType}`,
+        `slot-group--${cell.owner}`,
+        cell.editableByLocalPlayer ? "slot-group--editable" : "slot-group--blocked",
+        cell.selected ? "slot-group--selected" : "",
+        cell.locked ? "slot-group--locked" : ""
+      ].filter(Boolean).join(" ");
+      const pieceMarkup = cell.placedMask
+        ? maskSegmentLines(cell.placedMask, cx, cy).map((segment) => `
+          <line
+            x1="${segment.x1}"
+            y1="${segment.y1}"
+            x2="${segment.x2}"
+            y2="${segment.y2}"
+            class="piece-path piece-path--${cell.owner}"
+          ></line>
+        `).join("")
+        : "";
+      const slotLabel = cell.slotType === "hole" && !cell.placedMask ? "H" : cell.slotType === "refactor" ? "R" : "";
+      return `
+        <g class="${slotClass}" data-slot-id="${cell.slotId}">
+          <rect x="${cx - 11}" y="${cy - 11}" width="22" height="22" rx="3" class="slot-base"></rect>
+          ${pieceMarkup}
+          ${slotLabel ? `<text x="${cx}" y="${cy + 4}" text-anchor="middle" class="slot-label">${slotLabel}</text>` : ""}
+        </g>
+      `;
+    }).join("");
+
+  container.innerHTML = `
+    <svg class="board-svg" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}" aria-label="Circuit board">
+      ${cellMarkup}
+      ${sourceMarkup}
+      ${routeMarkup}
+      ${slotMarkup}
+      ${terminalMarkup}
+    </svg>
+  `;
 }
 
 export function createAppRenderer(root = document) {
@@ -61,7 +119,6 @@ export function createAppRenderer(root = document) {
     timer: root.querySelector("#match-timer"),
     status: root.querySelector("#match-status"),
     boardGrid: root.querySelector("#board-grid"),
-    routeSummary: root.querySelector("#route-summary"),
     startButton: root.querySelector("#btn-start-match"),
     toolButtons: Array.from(root.querySelectorAll("[data-tool]"))
   };
@@ -99,6 +156,5 @@ export function createAppRenderer(root = document) {
     }
 
     renderBoardGrid(els.boardGrid, viewModel.board);
-    renderRouteSummary(els.routeSummary, viewModel.board);
   };
 }

@@ -54,6 +54,9 @@ export function buildBoardViewModel({
   const terminalByCell = new Map();
   const sourceByCell = new Map();
   const routeKeys = new Set();
+  const routeVisuals = [];
+  const sourceVisuals = [];
+  const terminalVisuals = [];
 
   for (const route of board.routes) {
     const firstCell = route.cells[0];
@@ -63,12 +66,35 @@ export function buildBoardViewModel({
       sourceIndex: route.sourceIndex,
       owner: route.owner
     });
+    sourceVisuals.push({
+      sourceId: route.sourceId,
+      sourceIndex: route.sourceIndex,
+      owner: route.owner,
+      x: firstCell[0],
+      y: firstCell[1]
+    });
     terminalByCell.set(getCellKey(lastCell[0], lastCell[1]), {
       terminalId: route.terminalId,
       terminalIndex: route.terminalIndex,
       terminalType: route.terminalType,
       owner: route.owner,
       completed: !!snapshot?.terminals?.[route.terminalId]?.completed
+    });
+    terminalVisuals.push({
+      terminalId: route.terminalId,
+      terminalIndex: route.terminalIndex,
+      terminalType: route.terminalType,
+      owner: route.owner,
+      x: lastCell[0],
+      y: lastCell[1],
+      completed: !!snapshot?.terminals?.[route.terminalId]?.completed
+    });
+    routeVisuals.push({
+      routeId: route.routeId,
+      owner: route.owner,
+      terminalType: route.terminalType,
+      completed: !!snapshot?.routes?.[route.routeId]?.completed,
+      points: Array.isArray(route.points) ? route.points : route.cells
     });
 
     for (const [x, y] of route.cells) {
@@ -121,7 +147,8 @@ export function buildBoardViewModel({
   return {
     board: {
       cols: board.cols,
-      rows: board.rows
+      rows: board.rows,
+      centerWallColumn: board.centerWallColumn
     },
     scoreText: {
       blue: `${scoreBlue} / 5`,
@@ -132,6 +159,9 @@ export function buildBoardViewModel({
     resultTone: deriveResultTone(snapshot, selectedSide),
     cells,
     wallCells,
+    routeVisuals,
+    sourceVisuals,
+    terminalVisuals,
     routeSummaries: board.routes.map((route) => ({
       routeId: route.routeId,
       owner: route.owner,
