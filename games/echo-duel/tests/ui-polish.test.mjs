@@ -31,7 +31,7 @@ console.log("\necho-duel ui-polish");
 test("menu copy stays player-facing and does not include internal design notes", () => {
   const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
   assert(!html.includes("social standoff, not a form flow"), "expected internal design note copy to be removed");
-  assert(html.includes("Trade patterns, read the room"), "expected menu note to speak to players");
+  assert(html.includes("Create or join a room. The host sets the penalty word and starts the match."), "expected menu note to stay straightforward and player-facing");
 });
 
 test("match screen includes richer framing containers for the play experience", () => {
