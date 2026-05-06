@@ -1,34 +1,46 @@
-function toolToPiecePlacement(toolId) {
-  if (toolId === "straight") {
-    return { pieceType: "straight", rotation: 0 };
-  }
+const ROTATE_MASK = {
+  EW: "NS",
+  NS: "EW",
+  NE: "ES",
+  ES: "SW",
+  SW: "NW",
+  NW: "NE"
+};
 
-  if (toolId === "straight-h") {
-    return { pieceType: "straight", rotation: 0 };
-  }
+const PLACEMENT_BY_MASK = {
+  EW: { pieceType: "straight", rotation: 0 },
+  NS: { pieceType: "straight", rotation: 90 },
+  NE: { pieceType: "corner", rotation: 0 },
+  ES: { pieceType: "corner", rotation: 90 },
+  SW: { pieceType: "corner", rotation: 180 },
+  NW: { pieceType: "corner", rotation: 270 }
+};
 
-  if (toolId === "straight-v") {
-    return { pieceType: "straight", rotation: 90 };
-  }
+function isKnownMask(mask) {
+  return typeof mask === "string" && Object.prototype.hasOwnProperty.call(PLACEMENT_BY_MASK, mask);
+}
 
-  if (toolId === "corner") {
-    return { pieceType: "corner", rotation: 0 };
-  }
-
-  return null;
+export function getNextRotationMask(mask) {
+  return ROTATE_MASK[mask] || null;
 }
 
 export function createBoardInputState() {
   return {
-    selectedTool: "straight",
-    selectedSlotId: null
+    heldMask: null,
+    selectedSlotId: null,
+    liftedFromSlotId: null
   };
 }
 
-export function selectTool(inputState, selectedTool) {
+export function selectTool(inputState, selectedMask) {
+  if (!isKnownMask(selectedMask)) {
+    return inputState;
+  }
+
   return {
     ...inputState,
-    selectedTool
+    heldMask: selectedMask,
+    liftedFromSlotId: null
   };
 }
 
@@ -39,10 +51,42 @@ export function selectBoardSlot(inputState, selectedSlotId) {
   };
 }
 
-export function buildIntentFromCell({
-  cell,
-  inputState
-} = {}) {
+export function rotateHeldMask(inputState) {
+  if (!isKnownMask(inputState?.heldMask)) {
+    return inputState;
+  }
+
+  return {
+    ...inputState,
+    heldMask: getNextRotationMask(inputState.heldMask) || inputState.heldMask
+  };
+}
+
+export function liftHeldMaskFromCell({ inputState, cell } = {}) {
+  if (!cell?.slotId || !cell.editableByLocalPlayer) {
+    return { ok: false, reason: "not-editable", inputState };
+  }
+
+  if (cell.locked) {
+    return { ok: false, reason: "locked", inputState };
+  }
+
+  if (!isKnownMask(cell.placedMask)) {
+    return { ok: false, reason: "no-tile", inputState };
+  }
+
+  return {
+    ok: true,
+    inputState: {
+      ...inputState,
+      heldMask: cell.placedMask,
+      selectedSlotId: cell.slotId,
+      liftedFromSlotId: cell.slotId
+    }
+  };
+}
+
+export function buildHeldPlacementIntent({ cell, inputState } = {}) {
   if (!cell?.slotId || !cell.editableByLocalPlayer) {
     return { ok: false, reason: "not-editable" };
   }
@@ -51,31 +95,11 @@ export function buildIntentFromCell({
     return { ok: false, reason: "locked" };
   }
 
-  if (inputState?.selectedTool === "rotate") {
-    if (!cell.placedMask) {
-      return { ok: false, reason: "no-tile" };
-    }
-
-    return {
-      ok: true,
-      intent: {
-        intentType: "ROTATE_TILE",
-        slotId: cell.slotId
-      }
-    };
+  if (!isKnownMask(inputState?.heldMask)) {
+    return { ok: false, reason: "no-held-mask" };
   }
 
-  const placement = toolToPiecePlacement(inputState?.selectedTool);
-  if (!placement) {
-    return { ok: false, reason: "unknown-tool" };
-  }
-
-  if (cell.placedMask) {
-    const currentFamily = cell.placedMask === "EW" || cell.placedMask === "NS" ? "straight" : "corner";
-    if (placement.pieceType === currentFamily) {
-      return { ok: false, reason: "selection-only" };
-    }
-  }
+  const placement = PLACEMENT_BY_MASK[inputState.heldMask];
 
   return {
     ok: true,
@@ -84,28 +108,6 @@ export function buildIntentFromCell({
       slotId: cell.slotId,
       pieceType: placement.pieceType,
       rotation: placement.rotation
-    }
-  };
-}
-
-export function buildRotateIntentFromSelection({ cell } = {}) {
-  if (!cell?.slotId || !cell.editableByLocalPlayer) {
-    return { ok: false, reason: "not-editable" };
-  }
-
-  if (cell.locked) {
-    return { ok: false, reason: "locked" };
-  }
-
-  if (!cell.placedMask) {
-    return { ok: false, reason: "no-tile" };
-  }
-
-  return {
-    ok: true,
-    intent: {
-      intentType: "ROTATE_TILE",
-      slotId: cell.slotId
     }
   };
 }

@@ -6,9 +6,10 @@ import {
 } from "./lobby-view-state.js";
 import { buildBoardViewModel } from "./board-view-model.js";
 import {
-  buildRotateIntentFromSelection,
-  buildIntentFromCell,
+  buildHeldPlacementIntent,
   createBoardInputState,
+  liftHeldMaskFromCell,
+  rotateHeldMask,
   selectBoardSlot,
   selectTool
 } from "./board-input-controller.js";
@@ -67,7 +68,7 @@ export function createCircuitSiegeAppController({
       }),
       roomCode: runtime.lobby?.roomCode || "-----",
       selectedSide: runtime.selectedSide || "blue",
-      selectedTool: inputState.selectedTool,
+      heldMask: inputState.heldMask,
       board: buildBoardViewModel({
         board,
         snapshot: runtime.snapshot,
@@ -160,19 +161,32 @@ export function createCircuitSiegeAppController({
     });
     const cell = boardViewModel.cells.find((entry) => entry.slotId === slotId) || null;
     inputState = selectBoardSlot(inputState, cell?.slotId || null);
-    const built = buildIntentFromCell({
+
+    if (!cell?.editableByLocalPlayer || cell.locked) {
+      rerender();
+      return false;
+    }
+
+    if (!inputState.heldMask && cell.placedMask) {
+      const lifted = liftHeldMaskFromCell({
+        inputState,
+        cell
+      });
+      if (lifted.ok) {
+        inputState = lifted.inputState;
+        rerender();
+        return true;
+      }
+    }
+
+    const built = buildHeldPlacementIntent({
       cell,
       inputState
     });
 
-    if (!built.ok && built.reason === "selection-only") {
-      rerender();
-      return true;
-    }
-
     if (!built.ok) {
       rerender();
-      return false;
+      return true;
     }
 
     const handled = sessionController.submitIntent?.(built.intent) || false;
@@ -180,29 +194,14 @@ export function createCircuitSiegeAppController({
     return handled;
   }
 
-  function rotateSelectedSlot() {
-    const selectedSlotId = inputState.selectedSlotId;
-    if (!selectedSlotId) {
+  function rotateHeldPiece() {
+    if (!inputState.heldMask) {
       return false;
     }
 
-    const boardViewModel = buildBoardViewModel({
-      board,
-      snapshot: runtime.snapshot,
-      selectedSide: runtime.selectedSide || "blue",
-      selectedSlotId
-    });
-    const cell = boardViewModel.cells.find((entry) => entry.slotId === selectedSlotId) || null;
-    const built = buildRotateIntentFromSelection({ cell });
-
-    if (!built.ok) {
-      rerender();
-      return false;
-    }
-
-    const handled = sessionController.submitIntent?.(built.intent) || false;
+    inputState = rotateHeldMask(inputState);
     rerender();
-    return handled;
+    return true;
   }
 
   function handleRuntimeChanged() {
@@ -222,7 +221,8 @@ export function createCircuitSiegeAppController({
     leaveMatchmaking,
     selectTool: selectActiveTool,
     handleBoardSlot,
-    rotateSelectedSlot,
+    rotateHeldPiece,
+    rotateSelectedSlot: rotateHeldPiece,
     handleRuntimeChanged
   };
 }

@@ -14,6 +14,43 @@ import {
   polylinePointsAttr
 } from "./board-svg-layout.js";
 
+function toolMaskSegments(mask) {
+  const centerX = 22;
+  const centerY = 15;
+  const ends = {
+    N: [22, 3],
+    E: [40, 15],
+    S: [22, 27],
+    W: [4, 15]
+  };
+
+  return [...String(mask || "")]
+    .filter((direction) => ends[direction])
+    .map((direction) => {
+      const [x2, y2] = ends[direction];
+      return { x1: centerX, y1: centerY, x2, y2 };
+    });
+}
+
+function renderToolPreview(mask) {
+  const lines = toolMaskSegments(mask).map((segment) => `
+    <line
+      x1="${segment.x1}"
+      y1="${segment.y1}"
+      x2="${segment.x2}"
+      y2="${segment.y2}"
+      class="tool-preview__path"
+    ></line>
+  `).join("");
+
+  return `
+    <svg viewBox="0 0 44 30" class="tool-preview" aria-hidden="true">
+      ${lines}
+    </svg>
+    <strong>${mask}</strong>
+  `;
+}
+
 function renderBoardGrid(container, boardViewModel) {
   if (!container || !boardViewModel) return;
 
@@ -114,6 +151,7 @@ export function createAppRenderer(root = document) {
     lobbyStatus: root.querySelector("#lobby-status"),
     lobbyHint: root.querySelector("#lobby-hint"),
     roomCode: root.querySelector("#room-code"),
+    heldPiece: root.querySelector("#held-piece"),
     scoreBlue: root.querySelector("#score-blue"),
     scoreRed: root.querySelector("#score-red"),
     timer: root.querySelector("#match-timer"),
@@ -139,6 +177,7 @@ export function createAppRenderer(root = document) {
     if (els.lobbyStatus) els.lobbyStatus.textContent = viewModel.lobbyStatusText;
     if (els.lobbyHint) els.lobbyHint.textContent = viewModel.lobbyActionHint;
     if (els.roomCode) els.roomCode.textContent = viewModel.roomCode;
+    if (els.heldPiece) els.heldPiece.textContent = viewModel.heldMask ? `Holding: ${viewModel.heldMask}` : "Holding: none";
     if (els.scoreBlue) els.scoreBlue.textContent = viewModel.board.scoreText.blue;
     if (els.scoreRed) els.scoreRed.textContent = viewModel.board.scoreText.red;
     if (els.timer) els.timer.textContent = viewModel.board.timerText;
@@ -152,7 +191,8 @@ export function createAppRenderer(root = document) {
       els.startButton.textContent = viewModel.lobbyStartAction.text;
     }
     for (const button of els.toolButtons) {
-      button.classList.toggle("tool--active", button.dataset.tool === viewModel.selectedTool);
+      button.innerHTML = renderToolPreview(button.dataset.tool || "");
+      button.classList.toggle("tool--active", button.dataset.tool === viewModel.heldMask);
     }
 
     renderBoardGrid(els.boardGrid, viewModel.board);

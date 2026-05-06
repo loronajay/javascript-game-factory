@@ -88,11 +88,16 @@
         <div class="match-grid">
           <section class="board-panel">
             <p class="eyebrow">Shared Circuit Floor</p>
-            <p class="status-line">Click an editable slot to target it. Press <strong>R</strong> to rotate the selected piece. Use the toolkit only when switching between straight and corner parts.</p>
+            <p class="status-line">Click any tool icon to pick up that exact wire shape. Click editable placed tiles to lift them into your hand. Press <strong>R</strong> to rotate the piece you are holding before you place it.</p>
             <div class="tool-palette" aria-label="Repair tools">
-              <button class="tool" data-tool="straight">Straight</button>
-              <button class="tool" data-tool="corner">Corner</button>
+              <button class="tool tool--icon" data-tool="EW" aria-label="Straight horizontal tool"></button>
+              <button class="tool tool--icon" data-tool="NS" aria-label="Straight vertical tool"></button>
+              <button class="tool tool--icon" data-tool="NE" aria-label="Corner northeast tool"></button>
+              <button class="tool tool--icon" data-tool="ES" aria-label="Corner southeast tool"></button>
+              <button class="tool tool--icon" data-tool="SW" aria-label="Corner southwest tool"></button>
+              <button class="tool tool--icon" data-tool="NW" aria-label="Corner northwest tool"></button>
             </div>
+            <p id="held-piece" class="status-line">Holding: none</p>
             <div id="board-grid" class="board-grid" aria-label="Circuit board"></div>
             <div class="board-actions">
               <button data-leave class="action action--ghost">Exit To Menu</button>
