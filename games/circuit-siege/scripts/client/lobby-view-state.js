@@ -35,7 +35,7 @@ export function getLobbyStatusText({
   const opponentSide = getOpponentSide(selectedSide);
 
   if (lobbyPhase === "main") {
-    return `${selectedSide === "blue" ? "Blue" : "Red"} chair locked.`;
+    return `${selectedSide === "blue" ? "Blue" : "Red"} side selected.`;
   }
 
   if (lobbyPhase === "searching") {
@@ -60,7 +60,7 @@ export function getLobbyStatusText({
   }
 
   if (Number(lobby.playerCount || 0) < 2) {
-    return "Waiting for opponent to lock in...";
+    return "Waiting for opponent to join...";
   }
 
   return "Ready to start.";
@@ -100,14 +100,14 @@ export function buildLobbyActionHint({
   }
 
   if (Number(lobby.playerCount || 0) < 2) {
-    return "Your opponent still needs to lock in and join this room.";
+    return "Your opponent still needs to join this room.";
   }
 
   if (isHost) {
-    return "Both players must Ready Up. Once both are locked, the host can start the match.";
+    return "Both players must Ready Up. The host can start once both players are ready.";
   }
 
-  return "Both players must Ready Up. The host can start once both players are locked.";
+  return "Both players must Ready Up. Wait for the host to start once both players are ready.";
 }
 
 export function buildLobbyStartActionState({

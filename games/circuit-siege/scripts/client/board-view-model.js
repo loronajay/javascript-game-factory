@@ -62,7 +62,8 @@ export function buildBoardViewModel({
   board,
   snapshot = null,
   selectedSide = "blue",
-  selectedSlotId = null
+  selectedSlotId = null,
+  highlightedRouteId = null
 } = {}) {
   const slotByCell = new Map(board.repairSlots.map((slot) => [getCellKey(slot.x, slot.y), slot]));
   const terminalByCell = new Map();
@@ -108,6 +109,7 @@ export function buildBoardViewModel({
       owner: route.owner,
       terminalType: route.terminalType,
       completed: !!snapshot?.routes?.[route.routeId]?.completed,
+      active: route.routeId === highlightedRouteId,
       points: Array.isArray(route.points) ? route.points : route.cells
     });
 
@@ -160,6 +162,12 @@ export function buildBoardViewModel({
 
   const scoreBlue = Number(snapshot?.scores?.blue || 0);
   const scoreRed = Number(snapshot?.scores?.red || 0);
+  const highlightedRoute = highlightedRouteId
+    ? board.routesById?.[highlightedRouteId] || null
+    : null;
+  const selectionText = highlightedRoute
+    ? `Source ${highlightedRoute.sourceIndex} -> Terminal ${highlightedRoute.terminalIndex} (${String(highlightedRoute.terminalType || "").toUpperCase()})`
+    : "";
 
   return {
     board: {
@@ -173,6 +181,7 @@ export function buildBoardViewModel({
     },
     timerText: formatTimer(snapshot?.timerMsRemaining ?? 300000),
     statusText: deriveStatusText(snapshot),
+    selectionText,
     resultTone: deriveResultTone(snapshot, selectedSide),
     cells,
     wallCells,

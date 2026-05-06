@@ -86,13 +86,13 @@ export function buildQueueSetupViewModel({ setupState = createQueueSetupState() 
     publicSide,
     joinRoomCode: sanitizeRoomCode(setupState.joinRoomCode),
     publicSelectionText: publicSide
-      ? `${sideLabel} side locked.`
+      ? `${sideLabel} side selected.`
       : "Choose Blue or Red to continue.",
     sideSelectionText: publicSide
-      ? `${sideLabel} side locked.`
+      ? `${sideLabel} side selected.`
       : "Choose Blue or Red to continue.",
     sideHeadingText: publicSide
-      ? `${sideLabel} Chair Locked`
+      ? `${sideLabel} Side`
       : "Choose Your Side",
     joinDisabled: sanitizeRoomCode(setupState.joinRoomCode).length < 4
   };
