@@ -61,6 +61,26 @@ function renderToolPreview(mask) {
   `;
 }
 
+function renderHeldCursor(mask, side) {
+  const lines = toolMaskSegments(mask).map((segment) => `
+    <line
+      x1="${segment.x1}"
+      y1="${segment.y1}"
+      x2="${segment.x2}"
+      y2="${segment.y2}"
+      class="held-cursor__path held-cursor__path--${side}"
+    ></line>
+  `).join("");
+
+  return `
+    <div class="held-cursor__tile held-cursor__tile--${side}">
+      <svg viewBox="0 0 44 30" class="held-cursor__preview" aria-hidden="true">
+        ${lines}
+      </svg>
+    </div>
+  `;
+}
+
 function renderBoardGrid(container, boardViewModel) {
   if (!container || !boardViewModel) return;
 
@@ -166,6 +186,7 @@ export function createAppRenderer(root = document) {
     lobbyHint: root.querySelector("#lobby-hint"),
     roomCode: root.querySelector("#room-code"),
     heldPiece: root.querySelector("#held-piece"),
+    heldCursor: root.querySelector("#held-cursor"),
     scoreBlue: root.querySelector("#score-blue"),
     scoreRed: root.querySelector("#score-red"),
     timer: root.querySelector("#match-timer"),
@@ -191,7 +212,11 @@ export function createAppRenderer(root = document) {
     if (els.lobbyStatus) els.lobbyStatus.textContent = viewModel.lobbyStatusText;
     if (els.lobbyHint) els.lobbyHint.textContent = viewModel.lobbyActionHint;
     if (els.roomCode) els.roomCode.textContent = viewModel.roomCode;
-    if (els.heldPiece) els.heldPiece.textContent = viewModel.heldMask ? `Holding: ${viewModel.heldMask}` : "Holding: none";
+    if (els.heldPiece) {
+      els.heldPiece.textContent = viewModel.heldMask
+        ? `Holding: ${TOOL_LABELS[viewModel.heldMask] || viewModel.heldMask} (${viewModel.heldMask})`
+        : "Holding: none";
+    }
     if (els.scoreBlue) els.scoreBlue.textContent = viewModel.board.scoreText.blue;
     if (els.scoreRed) els.scoreRed.textContent = viewModel.board.scoreText.red;
     if (els.timer) els.timer.textContent = viewModel.board.timerText;
@@ -207,6 +232,17 @@ export function createAppRenderer(root = document) {
     for (const button of els.toolButtons) {
       button.innerHTML = renderToolPreview(button.dataset.tool || "");
       button.classList.toggle("tool--active", button.dataset.tool === viewModel.heldMask);
+    }
+    if (els.heldCursor) {
+      const visible = !!viewModel.heldCursor?.visible && !!viewModel.heldCursor?.mask;
+      els.heldCursor.classList.toggle("held-cursor--hidden", !visible);
+      if (visible) {
+        els.heldCursor.innerHTML = renderHeldCursor(viewModel.heldCursor.mask, viewModel.heldCursor.side || "blue");
+        els.heldCursor.style.left = `${viewModel.heldCursor.x}px`;
+        els.heldCursor.style.top = `${viewModel.heldCursor.y}px`;
+      } else {
+        els.heldCursor.innerHTML = "";
+      }
     }
 
     renderBoardGrid(els.boardGrid, viewModel.board);

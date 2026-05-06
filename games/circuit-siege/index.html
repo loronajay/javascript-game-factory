@@ -88,16 +88,7 @@
         <div class="match-grid">
           <section class="board-panel">
             <p class="eyebrow">Shared Circuit Floor</p>
-            <p class="status-line">Click any tool icon to pick up that exact wire shape. Click editable placed tiles to lift them into your hand. Press <strong>R</strong> to rotate the piece you are holding before you place it.</p>
-            <div class="tool-palette" aria-label="Repair tools">
-              <button class="tool tool--icon" data-tool="EW" aria-label="Straight horizontal tool"></button>
-              <button class="tool tool--icon" data-tool="NS" aria-label="Straight vertical tool"></button>
-              <button class="tool tool--icon" data-tool="NE" aria-label="Corner northeast tool"></button>
-              <button class="tool tool--icon" data-tool="ES" aria-label="Corner southeast tool"></button>
-              <button class="tool tool--icon" data-tool="SW" aria-label="Corner southwest tool"></button>
-              <button class="tool tool--icon" data-tool="NW" aria-label="Corner northwest tool"></button>
-            </div>
-            <p id="held-piece" class="status-line">Holding: none</p>
+            <p class="status-line">Pick exact wire pieces from the dock, click your own editable tiles to lift them, press <strong>R</strong> to rotate the held piece, and press <strong>F</strong> to swap between straight and corner families.</p>
             <div id="board-grid" class="board-grid" aria-label="Circuit board"></div>
             <div class="board-actions">
               <button data-leave class="action action--ghost">Exit To Menu</button>
@@ -107,6 +98,19 @@
       </div>
     </section>
   </main>
+
+  <div class="tool-dock" aria-label="Repair tools">
+    <div class="tool-palette">
+      <button class="tool tool--icon" data-tool="EW" aria-label="Straight horizontal tool"></button>
+      <button class="tool tool--icon" data-tool="NS" aria-label="Straight vertical tool"></button>
+      <button class="tool tool--icon" data-tool="NE" aria-label="Corner northeast tool"></button>
+      <button class="tool tool--icon" data-tool="ES" aria-label="Corner southeast tool"></button>
+      <button class="tool tool--icon" data-tool="SW" aria-label="Corner southwest tool"></button>
+      <button class="tool tool--icon" data-tool="NW" aria-label="Corner northwest tool"></button>
+    </div>
+    <p id="held-piece" class="status-line">Holding: none</p>
+  </div>
+  <div id="held-cursor" class="held-cursor held-cursor--hidden" aria-hidden="true"></div>
 
   <script type="module">
     import { initGame } from "./game.js";

@@ -11,7 +11,8 @@ import {
   liftHeldMaskFromCell,
   rotateHeldMask,
   selectBoardSlot,
-  selectTool
+  selectTool,
+  toggleHeldPieceFamily
 } from "./board-input-controller.js";
 import {
   buildQueueSetupViewModel,
@@ -39,6 +40,11 @@ export function createCircuitSiegeAppController({
 } = {}) {
   let inputState = createBoardInputState();
   let queueSetupState = createQueueSetupState();
+  let pointerState = {
+    x: 0,
+    y: 0,
+    active: false
+  };
 
   function buildViewModel() {
     return {
@@ -69,6 +75,13 @@ export function createCircuitSiegeAppController({
       roomCode: runtime.lobby?.roomCode || "-----",
       selectedSide: runtime.selectedSide || "blue",
       heldMask: inputState.heldMask,
+      heldCursor: {
+        visible: !!inputState.heldMask && pointerState.active,
+        x: pointerState.x,
+        y: pointerState.y,
+        mask: inputState.heldMask,
+        side: runtime.selectedSide || "blue"
+      },
       board: buildBoardViewModel({
         board,
         snapshot: runtime.snapshot,
@@ -205,6 +218,33 @@ export function createCircuitSiegeAppController({
     return true;
   }
 
+  function switchHeldPieceFamily() {
+    if (!inputState.heldMask) {
+      return false;
+    }
+
+    inputState = toggleHeldPieceFamily(inputState);
+    rerender();
+    return true;
+  }
+
+  function updatePointer(x, y) {
+    pointerState = {
+      x: Number(x) || 0,
+      y: Number(y) || 0,
+      active: true
+    };
+    rerender();
+  }
+
+  function clearPointer() {
+    pointerState = {
+      ...pointerState,
+      active: false
+    };
+    rerender();
+  }
+
   function handleRuntimeChanged() {
     rerender();
   }
@@ -223,6 +263,9 @@ export function createCircuitSiegeAppController({
     selectTool: selectActiveTool,
     handleBoardSlot,
     rotateHeldPiece,
+    switchHeldPieceFamily,
+    updatePointer,
+    clearPointer,
     rotateSelectedSlot: rotateHeldPiece,
     handleRuntimeChanged
   };

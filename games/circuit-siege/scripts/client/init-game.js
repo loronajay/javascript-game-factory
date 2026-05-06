@@ -64,13 +64,23 @@ function bindButtons(app, root = document) {
     if (!slotId) return;
     app.handleBoardSlot(slotId);
   });
+  root.addEventListener("mousemove", (event) => {
+    app.updatePointer?.(event.clientX, event.clientY);
+  });
+  root.addEventListener("mouseleave", () => {
+    app.clearPointer?.();
+  });
   root.addEventListener("keydown", (event) => {
     if (event.defaultPrevented) return;
     const target = event.target;
     const tagName = typeof target?.tagName === "string" ? target.tagName.toUpperCase() : "";
     if (tagName === "INPUT" || tagName === "TEXTAREA") return;
-    if (String(event.key || "").toLowerCase() !== "r") return;
-    if (app.rotateSelectedSlot()) {
+    const key = String(event.key || "").toLowerCase();
+    if (key === "r" && app.rotateSelectedSlot()) {
+      event.preventDefault();
+      return;
+    }
+    if (key === "f" && app.switchHeldPieceFamily?.()) {
       event.preventDefault();
     }
   });

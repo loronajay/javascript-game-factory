@@ -257,6 +257,7 @@ input {
 
 .match-shell {
   padding: 24px;
+  padding-bottom: 168px;
 }
 
 .match-header {
@@ -317,12 +318,27 @@ input {
   padding: 18px;
 }
 
+.tool-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px));
+  z-index: 30;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: rgba(7, 12, 20, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+}
+
 .tool-palette {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 12px;
-  margin-bottom: 12px;
+  margin: 0 0 8px;
+  justify-content: center;
 }
 
 .tool {
@@ -375,6 +391,54 @@ input {
 .tool--active {
   background: linear-gradient(135deg, rgba(60, 134, 255, 0.28), rgba(255, 91, 77, 0.22));
   border-color: rgba(248, 217, 122, 0.4);
+}
+
+.held-cursor {
+  position: fixed;
+  z-index: 40;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.held-cursor--hidden {
+  display: none;
+}
+
+.held-cursor__tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 15, 25, 0.94);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.38);
+}
+
+.held-cursor__tile--blue {
+  border-color: rgba(147, 197, 253, 0.72);
+}
+
+.held-cursor__tile--red {
+  border-color: rgba(254, 202, 202, 0.72);
+}
+
+.held-cursor__preview {
+  width: 34px;
+  height: 24px;
+}
+
+.held-cursor__path {
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.held-cursor__path--blue {
+  stroke: #93c5fd;
+}
+
+.held-cursor__path--red {
+  stroke: #fecaca;
 }
 
 .board-grid {
@@ -596,6 +660,10 @@ input {
   .status-block {
     min-width: 0;
   }
+
+  .tool-dock {
+    width: min(680px, calc(100vw - 18px));
+  }
 }
 
 @media (max-width: 760px) {
@@ -605,5 +673,23 @@ input {
 
   .join-row {
     grid-template-columns: 1fr;
+  }
+
+  .match-shell {
+    padding-bottom: 212px;
+  }
+
+  .tool-dock {
+    bottom: 10px;
+    padding: 10px;
+  }
+
+  .tool-palette {
+    gap: 8px;
+  }
+
+  .tool--icon {
+    min-width: 78px;
+    min-height: 66px;
   }
 }

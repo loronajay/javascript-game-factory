@@ -20,6 +20,10 @@ function isKnownMask(mask) {
   return typeof mask === "string" && Object.prototype.hasOwnProperty.call(PLACEMENT_BY_MASK, mask);
 }
 
+function isStraightMask(mask) {
+  return mask === "EW" || mask === "NS";
+}
+
 export function getNextRotationMask(mask) {
   return ROTATE_MASK[mask] || null;
 }
@@ -59,6 +63,17 @@ export function rotateHeldMask(inputState) {
   return {
     ...inputState,
     heldMask: getNextRotationMask(inputState.heldMask) || inputState.heldMask
+  };
+}
+
+export function toggleHeldPieceFamily(inputState) {
+  if (!isKnownMask(inputState?.heldMask)) {
+    return inputState;
+  }
+
+  return {
+    ...inputState,
+    heldMask: isStraightMask(inputState.heldMask) ? "NE" : "EW"
   };
 }
 
