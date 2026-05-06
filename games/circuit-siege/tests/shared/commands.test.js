@@ -50,24 +50,26 @@ test("buildFindMatchPayload includes the game id, side, and sanitized identity",
 });
 
 test("buildCreateRoomPayload creates the expected private-room payload", () => {
-  const payload = buildCreateRoomPayload("red", {
+  const payload = buildCreateRoomPayload("red", "circuit-siege", {
     playerId: "p2",
     displayName: "Riley"
   });
 
   assertEqual(payload.type, "create_room");
+  assertEqual(payload.gameId, "circuit-siege");
   assertEqual(payload.side, "red");
   assertEqual(payload.playerId, "p2");
   assertEqual(payload.displayName, "Riley");
 });
 
 test("buildJoinRoomPayload normalizes the room code to uppercase", () => {
-  const payload = buildJoinRoomPayload("red", " ab12 ", {
+  const payload = buildJoinRoomPayload("red", " ab12 ", "circuit-siege", {
     playerId: "p9",
     displayName: "Jordan"
   });
 
   assertEqual(payload.type, "join_room");
+  assertEqual(payload.gameId, "circuit-siege");
   assertEqual(payload.side, "red");
   assertEqual(payload.roomCode, "AB12");
 });

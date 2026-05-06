@@ -303,6 +303,14 @@ export function createCircuitSiegeServerBridge({
     store.removeClientFromRoom(clientId);
     room.memberClientIds.delete(clientId);
 
+    if (result.ok && result.snapshot.phase !== "ended" && room.memberClientIds.size > 0) {
+      emitToRoom(room, {
+        event: "player_left",
+        roomCode: room.roomCode,
+        playerCount: room.memberClientIds.size
+      });
+    }
+
     if (result.ok) {
       broadcastSnapshot(room, result.snapshot);
       if (result.snapshot.phase === "ended" || room.memberClientIds.size === 0) {

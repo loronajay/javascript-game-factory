@@ -256,6 +256,40 @@ test("disconnecting an active player broadcasts the ended snapshot to the remain
   assertEqual(payload.result.reason, "disconnect");
 });
 
+test("disconnecting from a lobby emits player_left and keeps the room open for the remaining host", () => {
+  const { bridge, outbox } = createBridge();
+
+  bridge.handleClientMessage("c1", {
+    type: "create_room",
+    side: "blue",
+    playerId: "p1",
+    displayName: "Blue Host"
+  });
+  bridge.handleClientMessage("c2", {
+    type: "join_room",
+    roomCode: "CS01",
+    side: "red",
+    playerId: "p2",
+    displayName: "Red Guest"
+  });
+
+  bridge.handleClientDisconnect("c2");
+
+  const playerLeft = findEvents(outbox, "c1", "player_left").at(-1);
+  assert(playerLeft, "expected player_left for remaining host");
+  assertEqual(playerLeft.payload.playerCount, 1);
+
+  bridge.handleClientMessage("c3", {
+    type: "join_room",
+    roomCode: "CS01",
+    side: "red",
+    playerId: "p3",
+    displayName: "New Red Guest"
+  });
+
+  assert(findEvents(outbox, "c3", "room_joined").length === 1, "expected replacement guest to join");
+});
+
 if (failed > 0) {
   console.error(`\n${failed} test(s) failed.`);
   process.exit(1);

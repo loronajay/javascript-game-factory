@@ -97,7 +97,9 @@ test("adapter sends find_match/create_room/join_room payloads through the socket
   assertEqual(socket.sent[0].type, "find_match");
   assertEqual(socket.sent[0].side, "blue");
   assertEqual(socket.sent[1].type, "create_room");
+  assertEqual(socket.sent[1].gameId, "circuit-siege");
   assertEqual(socket.sent[2].type, "join_room");
+  assertEqual(socket.sent[2].gameId, "circuit-siege");
   assertEqual(socket.sent[2].roomCode, "AB12");
 });
 
@@ -115,6 +117,7 @@ test("adapter dispatches connected, queue counts, room creation, match ready, an
   adapter.cb.onConnected = ({ clientId }) => seen.push(["connected", clientId]);
   adapter.cb.onQueueCounts = ({ blue, red }) => seen.push(["queue", blue, red]);
   adapter.cb.onRoomCreated = (roomCode) => seen.push(["created", roomCode]);
+  adapter.cb.onRoomPresenceChanged = ({ playerCount }) => seen.push(["presence", playerCount]);
   adapter.cb.onMatchReady = ({ seed, remoteSide }) => seen.push(["ready", seed, remoteSide]);
   adapter.cb.onSnapshot = (snapshot) => seen.push(["snapshot", snapshot.phase]);
   adapter.cb.onRemoteProfile = (profile) => seen.push(["profile", profile.displayName, profile.side]);
@@ -124,6 +127,7 @@ test("adapter dispatches connected, queue counts, room creation, match ready, an
 
   socket.emit("message", { event: "connected", clientId: "c1", blueWaiting: 1, redWaiting: 3 });
   socket.emit("message", { event: "room_joined", roomCode: "ROOM1", created: true });
+  socket.emit("message", { event: "player_joined", roomCode: "ROOM1", playerCount: 2 });
   socket.emit("message", { event: "match_ready", seed: 77, remoteSide: "red", serverNow: 1000, startAt: 1500 });
   socket.emit("message", { event: "message", senderId: "other", messageType: "profile", value: JSON.stringify({ displayName: "Rin", side: "red", playerId: "p2" }) });
   socket.emit("message", { event: "message", senderId: "other", messageType: "match_snapshot", value: JSON.stringify({ matchId: "m1", phase: "live", timerMsRemaining: 1000, players: {}, slots: {} }) });
@@ -131,9 +135,11 @@ test("adapter dispatches connected, queue counts, room creation, match ready, an
   assertEqual(seen[0][0], "queue");
   assertEqual(seen[1][0], "connected");
   assertEqual(seen[2][0], "created");
-  assertEqual(seen[3][0], "ready");
-  assertEqual(seen[4][0], "profile");
-  assertEqual(seen[5][0], "snapshot");
+  assertEqual(seen[3][0], "presence");
+  assertEqual(seen[3][1], 2);
+  assertEqual(seen[4][0], "ready");
+  assertEqual(seen[5][0], "profile");
+  assertEqual(seen[6][0], "snapshot");
 });
 
 test("adapter sends room_message payloads for profile, intent, snapshot, and match events", () => {

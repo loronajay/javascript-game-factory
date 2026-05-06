@@ -34,17 +34,19 @@ export function buildFindMatchPayload(side, gameId = CIRCUIT_SIEGE_GAME_ID, iden
   };
 }
 
-export function buildCreateRoomPayload(side, identity = null) {
+export function buildCreateRoomPayload(side, gameId = CIRCUIT_SIEGE_GAME_ID, identity = null) {
   return {
     type: "create_room",
+    gameId,
     side,
     ...sanitizeIdentityPayload(identity)
   };
 }
 
-export function buildJoinRoomPayload(side, code, identity = null) {
+export function buildJoinRoomPayload(side, code, gameId = CIRCUIT_SIEGE_GAME_ID, identity = null) {
   return {
     type: "join_room",
+    gameId,
     roomCode: sanitizeText(code, 16).toUpperCase(),
     side,
     ...sanitizeIdentityPayload(identity)

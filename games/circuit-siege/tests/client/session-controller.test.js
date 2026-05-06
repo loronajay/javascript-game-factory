@@ -152,10 +152,12 @@ await test("room and queue callbacks update runtime state without mutating rende
   harness.adapter.cb.onConnected?.({ clientId: "c1" });
   harness.adapter.cb.onQueueCounts?.({ blue: 2, red: 1 });
   harness.adapter.cb.onRoomJoined?.({ roomCode: "CS01", created: true });
+  harness.adapter.cb.onRoomPresenceChanged?.({ roomCode: "CS01", playerCount: 2 });
 
   assertEqual(harness.runtime.queueCounts.blue, 2);
   assertEqual(harness.runtime.queueCounts.red, 1);
   assertEqual(harness.runtime.lobby.roomCode, "CS01");
+  assertEqual(harness.runtime.lobby.playerCount, 2);
   assertEqual(harness.runtime.isHost, true);
   assertEqual(harness.adapter.sendProfileCalls.at(-1), harness.runtime.selectedSide);
 });
@@ -187,13 +189,30 @@ await test("requestReady and requestStartNow use explicit adapter methods instea
   await harness.controller.startPrivateCreate({ side: "blue" });
   harness.adapter.cb.onConnected?.({ clientId: "c1" });
   harness.adapter.cb.onRoomJoined?.({ roomCode: "CS01", created: true });
-  harness.runtime.lobby.playerCount = 2;
+  harness.adapter.cb.onRoomPresenceChanged?.({ roomCode: "CS01", playerCount: 2 });
 
   assertEqual(harness.controller.requestReady(true), true);
   assertEqual(harness.adapter.sendPlayerReadyCalls.at(-1), true);
 
   assertEqual(harness.controller.requestStartNow(), true);
   assertEqual(harness.adapter.requestStartCalls, 1);
+});
+
+await test("room presence changes keep the host in lobby sync when an opponent leaves before match start", async () => {
+  const harness = createHarness();
+
+  await harness.controller.startPrivateCreate({ side: "blue" });
+  harness.adapter.cb.onConnected?.({ clientId: "c1" });
+  harness.adapter.cb.onRoomJoined?.({ roomCode: "CS01", created: true });
+  harness.adapter.cb.onRoomPresenceChanged?.({ roomCode: "CS01", playerCount: 2 });
+
+  assertEqual(harness.runtime.lobby.playerCount, 2);
+
+  harness.adapter.cb.onRoomPresenceChanged?.({ roomCode: "CS01", playerCount: 1 });
+
+  assertEqual(harness.runtime.lobby.playerCount, 1);
+  assertEqual(harness.runtime.lobby.roomCode, "CS01");
+  assertEqual(harness.screens.at(-1), "matchmaking");
 });
 
 await test("partner disconnects become notices and clear the active lobby session", async () => {

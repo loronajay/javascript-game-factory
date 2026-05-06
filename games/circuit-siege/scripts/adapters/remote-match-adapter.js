@@ -89,6 +89,7 @@ export function createRemoteMatchAdapter({
     onSearchCancelled: null,
     onRoomCreated: null,
     onRoomJoined: null,
+    onRoomPresenceChanged: null,
     onMatchReady: null,
     onRemoteProfile: null,
     onIntent: null,
@@ -179,6 +180,10 @@ export function createRemoteMatchAdapter({
 
     if (data.event === "player_joined" && Number(data.playerCount) >= 2) {
       inRoom = true;
+      cb.onRoomPresenceChanged?.({
+        roomCode,
+        playerCount: Number(data.playerCount)
+      });
       return;
     }
 
@@ -195,6 +200,15 @@ export function createRemoteMatchAdapter({
     }
 
     if (data.event === "player_left") {
+      if (Number.isFinite(Number(data.playerCount))) {
+        inRoom = Number(data.playerCount) >= 2;
+        cb.onRoomPresenceChanged?.({
+          roomCode,
+          playerCount: Number(data.playerCount)
+        });
+        return;
+      }
+
       if (inRoom) {
         cb.onPartnerLeft?.();
       }
@@ -257,12 +271,12 @@ export function createRemoteMatchAdapter({
 
   function createRoom(side) {
     mySide = side;
-    send(buildCreateRoomPayload(side, identity));
+    send(buildCreateRoomPayload(side, gameId, identity));
   }
 
   function joinRoom(side, code) {
     mySide = side;
-    send(buildJoinRoomPayload(side, code, identity));
+    send(buildJoinRoomPayload(side, code, gameId, identity));
   }
 
   function requestQueueStatus() {

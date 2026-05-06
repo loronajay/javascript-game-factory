@@ -70,6 +70,21 @@ export function createCircuitSiegeSessionController({
       emitLobbyState();
     };
 
+    net.cb.onRoomPresenceChanged = ({ roomCode, playerCount } = {}) => {
+      runtime.lobby = {
+        roomCode: roomCode || runtime.lobby?.roomCode || null,
+        playerCount: Number.isFinite(Number(playerCount))
+          ? Number(playerCount)
+          : Number(runtime.lobby?.playerCount || 0)
+      };
+
+      if (!runtime.snapshot && Number(runtime.lobby.playerCount || 0) < 2) {
+        runtime.matchReady = null;
+      }
+
+      emitLobbyState();
+    };
+
     net.cb.onRemoteProfile = (profile) => {
       if (!profile?.displayName) return;
       runtime.profiles[profile.playerId || profile.displayName] = { ...profile };

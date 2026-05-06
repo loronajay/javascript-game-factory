@@ -2,6 +2,7 @@ export const ARCADE_GAME_SLUGS = Object.freeze([
   "lovers-lost",
   "battleshits",
   "echo-duel",
+  "circuit-siege",
 ]);
 
 export const GRID_PAGE_SIZE = 9;
