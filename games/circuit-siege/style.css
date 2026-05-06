@@ -244,7 +244,6 @@ input {
 
 .match-shell {
   padding: 24px;
-  padding-bottom: 168px;
 }
 
 .room-code {
@@ -306,8 +305,9 @@ input {
 
 .match-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 220px;
   gap: 20px;
+  align-items: start;
 }
 
 .board-panel {
@@ -318,13 +318,11 @@ input {
 }
 
 .tool-dock {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  width: min(720px, calc(100vw - 24px));
-  z-index: 30;
-  padding: 12px 14px;
+  position: sticky;
+  top: 24px;
+  width: 220px;
+  z-index: 2;
+  padding: 14px 12px;
   border-radius: 22px;
   background: rgba(7, 12, 20, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -337,11 +335,10 @@ input {
 }
 
 .tool-palette {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
   margin: 0 0 8px;
-  justify-content: center;
 }
 
 .tool {
@@ -356,14 +353,18 @@ input {
 }
 
 .tool--icon {
-  min-width: 88px;
-  min-height: 72px;
-  border-radius: 18px;
-  display: flex;
-  flex-direction: column;
+  width: 100%;
+  min-height: 62px;
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "icon label"
+    "icon code";
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  justify-items: start;
+  column-gap: 10px;
+  row-gap: 2px;
   padding: 8px 10px;
 }
 
@@ -371,6 +372,7 @@ input {
   width: 44px;
   height: 30px;
   display: block;
+  grid-area: icon;
 }
 
 .tool-preview__path {
@@ -380,11 +382,13 @@ input {
 }
 
 .tool--icon strong {
+  grid-area: label;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
 }
 
 .tool--icon small {
+  grid-area: code;
   color: var(--muted);
   font-size: 0.7rem;
   letter-spacing: 0.12em;
@@ -661,7 +665,8 @@ input {
   }
 
   .tool-dock {
-    width: min(680px, calc(100vw - 18px));
+    position: static;
+    width: 100%;
   }
 }
 
@@ -674,21 +679,11 @@ input {
     grid-template-columns: 1fr;
   }
 
-  .match-shell {
-    padding-bottom: 212px;
-  }
-
-  .tool-dock {
-    bottom: 10px;
-    padding: 10px;
-  }
-
   .tool-palette {
     gap: 8px;
   }
 
   .tool--icon {
-    min-width: 78px;
-    min-height: 66px;
+    min-height: 58px;
   }
 }
