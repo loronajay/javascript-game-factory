@@ -10,6 +10,13 @@ This folder contains the shared frontend JavaScript for the arcade shell.
 - `tests/`: shared frontend tests
 - `platform-config.js` and utility files such as `arcade-paths.mjs` and `pixel-text.js`: shell-wide helpers and configuration
 
+## Current architecture notes
+
+- `/me` is still composed from top-level entry files, but its heavier seams now live in helpers like `arcade-me-page-data.mjs`, `arcade-me-media-actions.mjs`, `arcade-me-friend-navigator.mjs`, and `arcade-me-view-sections.mjs`.
+- `gallery-page/` now has explicit viewer seams: `viewer-state.mjs`, `viewer-social.mjs`, `viewer-page-actions.mjs`, and `viewer-page-controller.mjs`.
+- `profile-social/` now keeps shared thought-card rendering in `social-view-thoughts.mjs`, with shared escape/date helpers in `social-view-shared.mjs`.
+- New shared frontend work should usually land in these subsystem folders instead of pushing more mixed behavior back into a top-level `arcade-*.mjs` file.
+
 ## Working guidance
 
 - Route folders like `me/` or `player/` usually provide the HTML entry point.

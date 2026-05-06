@@ -1,4 +1,10 @@
-import { createAuthApiClient } from "../platform/api/auth-api.mjs";
+import {
+  buildCommentListHtml,
+  buildReactionChipsHtml,
+} from "./viewer-social.mjs";
+import { createPageGalleryViewerActions } from "./viewer-page-actions.mjs";
+import { createPageGalleryViewerClickHandler } from "./viewer-page-controller.mjs";
+import { createPhotoViewerState } from "./viewer-state.mjs";
 
 const PHOTO_REACTION_IDS = ["like", "love", "laugh", "wow", "fire", "sad", "angry", "poop"];
 const PHOTO_REACTION_GLYPHS = {
@@ -32,17 +38,10 @@ function buildReactionPickerHtml() {
 }
 
 export function createPhotoViewer({ doc = globalThis.document, lightweight = false } = {}) {
-  let photos = [];
-  let currentIndex = -1;
-  let isOwner = false;
   let onDeleteFn = null;
-  let galleryLinkHref = "";
   let onReactFn = null;
   let onCommentFn = null;
-  let viewerPlayerId = "";
-  let viewerAuthorDisplayName = "";
-  let reactionPickerOpen = false;
-  const socialStateMap = new Map();
+  const viewerState = createPhotoViewerState();
 
   const overlay = doc.createElement("div");
   overlay.className = "photo-viewer photo-viewer--hidden";
@@ -122,38 +121,20 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
 
   function paintSocial() {
     if (lightweight) return;
-    const photo = photos[currentIndex];
+    const photo = viewerState.getCurrentPhoto();
     if (!photo) return;
 
-    const state = socialStateMap.get(photo.id);
+    const state = viewerState.getCurrentSocialState();
+    const { viewerPlayerId } = viewerState.getViewState();
 
     if (reactionChipsEl) {
-      const totals = state?.reactionTotals || {};
-      const viewerReaction = state?.viewerReaction || "";
-      const activeIds = PHOTO_REACTION_IDS.filter(id => (totals[id] > 0) || id === viewerReaction);
-      const chipsHtml = activeIds.map(id =>
-        `<button
-          class="photo-viewer__reaction-chip${id === viewerReaction ? " photo-viewer__reaction-chip--selected" : ""}"
-          type="button" data-reaction-id="${id}" title="${id}"
-        >${PHOTO_REACTION_GLYPHS[id]} <span>${totals[id] || 0}</span></button>`
-      ).join("");
-      reactionChipsEl.innerHTML = chipsHtml;
+      reactionChipsEl.innerHTML = buildReactionChipsHtml(state);
     }
 
     if (commentListEl) {
       const comments = state?.comments;
-      if (!comments) {
-        commentListEl.innerHTML = `<p class="photo-viewer__comments-loading">Loading comments...</p>`;
-      } else if (comments.length === 0) {
-        commentListEl.innerHTML = `<p class="photo-viewer__comments-empty">No comments yet.</p>`;
-      } else {
-        commentListEl.innerHTML = comments.map(c =>
-          `<div class="photo-viewer__comment">
-            <span class="photo-viewer__comment-author">${escapeHtml(c.authorDisplayName)}</span>
-            <span class="photo-viewer__comment-text">${escapeHtml(c.text)}</span>
-            <span class="photo-viewer__comment-time">${formatViewerDate(c.createdAt)}</span>
-          </div>`
-        ).join("");
+      commentListEl.innerHTML = buildCommentListHtml(comments);
+      if (Array.isArray(comments) && comments.length > 0) {
         commentListEl.scrollTop = commentListEl.scrollHeight;
       }
     }
@@ -164,7 +145,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   }
 
   function setReactionPickerOpen(open) {
-    reactionPickerOpen = open;
+    viewerState.setReactionPickerOpen(open);
     if (!reactionPickerEl) return;
     if (open) {
       reactionPickerEl.classList.remove("photo-viewer__reaction-picker--hidden");
@@ -174,8 +155,9 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   }
 
   function paint() {
-    const photo = photos[currentIndex];
+    const photo = viewerState.getCurrentPhoto();
     if (!photo) return;
+    const { galleryLinkHref, isOwner } = viewerState.getViewState();
     imgEl.src = photo.imageUrl || "";
     imgEl.alt = photo.caption || "";
     captionEl.textContent = photo.caption || "";
@@ -189,9 +171,9 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
         deleteBtn.style.display = isOwner ? "" : "none";
       }
       if (prevBtn && nextBtn) {
-        const hasSiblings = photos.length > 1;
-        prevBtn.disabled = currentIndex <= 0;
-        nextBtn.disabled = currentIndex >= photos.length - 1;
+        const hasSiblings = viewerState.getViewState().photos.length > 1;
+        prevBtn.disabled = !viewerState.canGoPrev();
+        nextBtn.disabled = !viewerState.canGoNext();
         prevBtn.style.visibility = hasSiblings ? "" : "hidden";
         nextBtn.style.visibility = hasSiblings ? "" : "hidden";
       }
@@ -228,18 +210,16 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       return;
     }
     if (e.target.closest(".photo-viewer__nav--prev")) {
-      if (currentIndex > 0) {
-        currentIndex--;
+      if (viewerState.goPrev()) {
         paint();
-        updateUrl(photos[currentIndex]?.id);
+        updateUrl(viewerState.getCurrentPhoto()?.id);
       }
       return;
     }
     if (e.target.closest(".photo-viewer__nav--next")) {
-      if (currentIndex < photos.length - 1) {
-        currentIndex++;
+      if (viewerState.goNext()) {
         paint();
-        updateUrl(photos[currentIndex]?.id);
+        updateUrl(viewerState.getCurrentPhoto()?.id);
       }
       return;
     }
@@ -249,13 +229,13 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       return;
     }
     if (e.target.closest(".photo-viewer__react-btn")) {
-      setReactionPickerOpen(!reactionPickerOpen);
+      setReactionPickerOpen(viewerState.toggleReactionPicker());
       return;
     }
     const reactionOptionBtn = e.target.closest(".photo-viewer__reaction-option");
     if (reactionOptionBtn) {
       const reactionId = reactionOptionBtn.dataset.reactionId;
-      const photo = photos[currentIndex];
+      const photo = viewerState.getCurrentPhoto();
       if (reactionId && photo && onReactFn) {
         setReactionPickerOpen(false);
         onReactFn(photo.id, reactionId);
@@ -265,7 +245,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
     const reactionChipBtn = e.target.closest(".photo-viewer__reaction-chip");
     if (reactionChipBtn) {
       const reactionId = reactionChipBtn.dataset.reactionId;
-      const photo = photos[currentIndex];
+      const photo = viewerState.getCurrentPhoto();
       if (reactionId && photo && onReactFn) {
         onReactFn(photo.id, reactionId);
       }
@@ -277,7 +257,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
     if (!form) return;
     e.preventDefault();
     const text = commentInputEl?.value?.trim() || "";
-    const photo = photos[currentIndex];
+    const photo = viewerState.getCurrentPhoto();
     if (text && photo && onCommentFn) {
       onCommentFn(photo.id, text);
       if (commentInputEl) commentInputEl.value = "";
@@ -287,53 +267,45 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   doc.addEventListener("keydown", (e) => {
     if (overlay.classList.contains("photo-viewer--hidden")) return;
     if (e.key === "Escape") {
-      if (reactionPickerOpen) {
+      if (viewerState.getViewState().reactionPickerOpen) {
         setReactionPickerOpen(false);
         return;
       }
       api.close();
     } else if (!lightweight) {
-      if (e.key === "ArrowLeft" && currentIndex > 0) {
-        currentIndex--;
+      if (e.key === "ArrowLeft" && viewerState.goPrev()) {
         paint();
-        updateUrl(photos[currentIndex]?.id);
-      } else if (e.key === "ArrowRight" && currentIndex < photos.length - 1) {
-        currentIndex++;
+        updateUrl(viewerState.getCurrentPhoto()?.id);
+      } else if (e.key === "ArrowRight" && viewerState.goNext()) {
         paint();
-        updateUrl(photos[currentIndex]?.id);
+        updateUrl(viewerState.getCurrentPhoto()?.id);
       }
     }
   });
 
   const api = {
     setPhotos(newPhotos, opts = {}) {
-      photos = Array.isArray(newPhotos) ? newPhotos : [];
-      isOwner = !!opts.isOwner;
+      viewerState.setPhotos(newPhotos, opts);
       onDeleteFn = opts.onDelete || null;
       onReactFn = opts.onReact || null;
       onCommentFn = opts.onComment || null;
-      viewerPlayerId = opts.viewerPlayerId || "";
-      viewerAuthorDisplayName = opts.viewerAuthorDisplayName || "";
-      galleryLinkHref = opts.galleryLinkHref || "";
-      if (api.isOpen() && currentIndex >= 0) paint();
+      if (api.isOpen() && viewerState.getCurrentPhoto()) paint();
     },
     setSocialState(photoId, state) {
-      socialStateMap.set(photoId, state);
-      const currentPhoto = photos[currentIndex];
+      viewerState.setSocialState(photoId, state);
+      const currentPhoto = viewerState.getCurrentPhoto();
       if (api.isOpen() && currentPhoto?.id === photoId) paintSocial();
     },
     open(photoId) {
-      const idx = photos.findIndex((p) => p.id === photoId);
-      if (idx < 0) return;
-      currentIndex = idx;
+      if (!viewerState.open(photoId)) return;
       paint();
       show();
-      updateUrl(photos[currentIndex]?.id);
+      updateUrl(viewerState.getCurrentPhoto()?.id);
     },
     close() {
       hide();
       updateUrl(null);
-      currentIndex = -1;
+      viewerState.close();
       setReactionPickerOpen(false);
     },
     isOpen() {
@@ -349,69 +321,20 @@ export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHr
   // Full viewer for gallery panel photos; lightweight viewer for thought card images or when no API
   const fullViewer = createPhotoViewer({ doc, lightweight: !hasApi });
   const thoughtViewer = hasApi ? createPhotoViewer({ doc, lightweight: true }) : fullViewer;
-
-  let sessionCache = null;
-  async function loadSessionOnce() {
-    if (sessionCache !== null) return sessionCache;
-    sessionCache = { playerId: "", displayName: "" };
-    try {
-      const session = await createAuthApiClient().getSession().catch(() => null);
-      if (session?.playerId) {
-        let displayName = session.displayName || session.profileName || "";
-        if (!displayName && apiClient) {
-          const profile = await apiClient.loadPlayerProfile(session.playerId).catch(() => null);
-          displayName = profile?.profileName || "";
-        }
-        sessionCache = { playerId: session.playerId, displayName };
-      }
-    } catch {}
-    return sessionCache;
-  }
-
-  async function loadSocialState(ownerId, photoId) {
-    const [comments, photoRecord] = await Promise.all([
-      apiClient.listPhotoComments(photoId).catch(() => []),
-      ownerId ? apiClient.getPlayerPhoto(ownerId, photoId).catch(() => null) : Promise.resolve(null),
-    ]);
-    fullViewer.setSocialState(photoId, {
-      reactionTotals: photoRecord?.reactionTotals || {},
-      viewerReaction: photoRecord?.viewerReaction || "",
-      comments: Array.isArray(comments) ? comments : [],
-    });
-  }
-
-  async function handleReact(photoId, reactionId) {
-    const session = await loadSessionOnce();
-    if (!session.playerId) return;
-    const photo = await apiClient.reactToPhoto(photoId, session.playerId, reactionId).catch(() => null);
-    if (!photo) return;
-    const comments = await apiClient.listPhotoComments(photoId).catch(() => []);
-    fullViewer.setSocialState(photoId, {
-      reactionTotals: photo.reactionTotals || {},
-      viewerReaction: photo.viewerReaction || "",
-      comments: Array.isArray(comments) ? comments : [],
-    });
-  }
-
-  async function handleComment(photoId, text) {
-    const session = await loadSessionOnce();
-    if (!session.playerId || !text?.trim()) return;
-    const commentRecord = await apiClient
-      .commentOnPhoto(photoId, session.playerId, session.displayName, text)
-      .catch(() => null);
-    if (!commentRecord) return;
-    const comments = await apiClient.listPhotoComments(photoId).catch(() => []);
-    const photo = commentRecord.photo;
-    fullViewer.setSocialState(photoId, {
-      reactionTotals: photo?.reactionTotals || {},
-      viewerReaction: "",
-      comments: Array.isArray(comments) ? comments : [],
-    });
-  }
+  const viewerActions = hasApi
+    ? createPageGalleryViewerActions({ apiClient, fullViewer })
+    : null;
+  const handlePageClick = createPageGalleryViewerClickHandler({
+    fullViewer,
+    thoughtViewer,
+    viewerActions,
+    galleryPageHref,
+    hasApi,
+  });
 
   doc.addEventListener("click", (e) => {
-    if (e.target.closest(".photo-viewer")) return;
-    if (e.target.closest("button")) return;
+    void handlePageClick(e);
+    return;
 
     // Gallery panel thumbnail click (profile pages)
     const galleryItem = e.target.closest("[data-photo-id]");
@@ -436,16 +359,16 @@ export function initPageGalleryViewer({ doc = globalThis.document, galleryPageHr
           ownerId = url.searchParams.get("id") || "";
         } catch {}
 
-        loadSessionOnce().then((session) => {
+        viewerActions.loadSessionOnce().then((session) => {
           fullViewer.setPhotos([photo], {
             galleryLinkHref,
-            onReact: handleReact,
-            onComment: handleComment,
+            onReact: viewerActions.handleReact,
+            onComment: viewerActions.handleComment,
             viewerPlayerId: session.playerId,
             viewerAuthorDisplayName: session.displayName,
           });
           fullViewer.open(photo.id);
-          void loadSocialState(ownerId, photo.id);
+          void viewerActions.loadSocialState(ownerId, photo.id);
         });
       } else {
         fullViewer.setPhotos([photo], { galleryLinkHref });

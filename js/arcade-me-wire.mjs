@@ -1,14 +1,8 @@
-import { hydrateArcadeProfileFromApi, PROFILE_UPDATED_EVENT } from "./arcade-profile.mjs";
-import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { PROFILE_UPDATED_EVENT } from "./arcade-profile.mjs";
+import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
-  loadProfileMetricsRecord,
   syncThoughtPostCountWithApi,
 } from "./platform/metrics/metrics.mjs";
-import {
-  loadProfileRelationshipsRecord,
-  normalizeProfileRelationshipsRecord,
-} from "./platform/relationships/relationships.mjs";
-import { enrichProfileFriendPreviewsFromApi } from "./platform/profile/friend-preview-enrichment.mjs";
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
@@ -24,98 +18,44 @@ import {
 import { createMediaComposerState } from "./profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "./profile-social/social-actions.mjs";
 import { initPageGalleryViewer } from "./gallery-page/viewer.mjs";
-
-function normalizeFriendNavigatorQuery(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function applyFriendNavigatorFilter(doc, query = "") {
-  const normalizedQuery = normalizeFriendNavigatorQuery(query);
-  const searchInput = doc?.getElementById?.("meFriendsSearchInput");
-  if (searchInput && searchInput.value !== query) {
-    searchInput.value = query;
-  }
-
-  const items = Array.from(doc?.querySelectorAll?.("[data-friend-navigator-item]") || []);
-  let visibleCount = 0;
-  items.forEach((item) => {
-    const searchText = String(item?.dataset?.friendSearchText || "").toLowerCase();
-    const isMatch = !normalizedQuery || searchText.includes(normalizedQuery);
-    item.hidden = !isMatch;
-    if (isMatch) visibleCount += 1;
-  });
-
-  const emptyState = doc?.getElementById?.("meFriendsSearchEmpty");
-  if (emptyState) {
-    emptyState.hidden = items.length === 0 || visibleCount > 0;
-  }
-}
+import { createFriendNavigatorController } from "./arcade-me-friend-navigator.mjs";
+import { createMePageDataController } from "./arcade-me-page-data.mjs";
+import {
+  submitGalleryUpload,
+  uploadPendingThoughtPhoto,
+} from "./arcade-me-media-actions.mjs";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
   initPageGalleryViewer({ doc, apiClient });
-  let cachedHydration = null;
-  let galleryPhotos = [];
-  let friendNavigatorExpanded = false;
-  let friendNavigatorSearchQuery = "";
+  const friendNavigator = createFriendNavigatorController();
+  const pageData = createMePageDataController({ storage, apiClient });
   const mediaComposer = createMediaComposerState({
     doc,
     thoughtPhotoNameId: "meThoughtPhotoName",
     thoughtPhotoInputId: "meThoughtPhotoInput",
   });
 
-  const loadGallery = async () => {
-    const currentProfile = loadFactoryProfile(storage);
-    if (!currentProfile?.playerId || !apiClient?.listPlayerPhotos) return;
-    const photos = await apiClient.listPlayerPhotos(currentProfile.playerId).catch(() => []);
-    galleryPhotos = Array.isArray(photos) ? photos : [];
-  };
-
   const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
-    const currentProfile = loadFactoryProfile(storage);
-    const thoughtFeed = shouldHydrate
-      ? await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId)
-      : loadThoughtFeed(storage);
-    if (!cachedHydration) {
-      const fetched = await hydrateArcadeProfileFromApi(storage, apiClient);
-      if (!fetched.error && fetched.profile) cachedHydration = fetched;
-    }
-    const hydrated = cachedHydration ?? {
-      profile: currentProfile,
-      metricsRecord: loadProfileMetricsRecord(currentProfile.playerId, storage),
-      relationshipsRecord: loadProfileRelationshipsRecord(currentProfile.playerId, storage),
-    };
-
-    const normalizedRel = normalizeProfileRelationshipsRecord(
-      hydrated.relationshipsRecord?.playerId
-        ? hydrated.relationshipsRecord
-        : { playerId: currentProfile.playerId },
-    );
-    const enrichedProfile = await enrichProfileFriendPreviewsFromApi(hydrated.profile, normalizedRel, apiClient);
-    if (enrichedProfile !== hydrated.profile) {
-      saveFactoryProfile(enrichedProfile, storage);
-      if (cachedHydration) {
-        cachedHydration = { ...cachedHydration, profile: enrichedProfile };
-      }
-    }
+    const renderState = await pageData.loadRenderState({ shouldHydrate });
 
     const socialViewState = socialActions.getViewState();
     profilePanel?.render?.("");
-    renderPage(doc, enrichedProfile, {
-      thoughtFeed,
+    renderPage(doc, renderState.profile, {
+      thoughtFeed: renderState.thoughtFeed,
       thoughtComposerFlash,
       friendCodeFlash,
-      metricsRecord: hydrated.metricsRecord,
-      relationshipsRecord: hydrated.relationshipsRecord,
+      metricsRecord: renderState.metricsRecord,
+      relationshipsRecord: renderState.relationshipsRecord,
       openReactionThoughtId: socialViewState.openReactionThoughtId,
       sharePanelState: socialViewState.sharePanelState,
       commentPanelState: socialViewState.commentPanelState,
-      galleryPhotos,
+      galleryPhotos: renderState.galleryPhotos,
       thoughtComposerState: mediaComposer.getThoughtPhotoState(),
       galleryUploadState: mediaComposer.getGalleryUploadState(),
-      friendNavigatorExpanded,
-      friendNavigatorSearchQuery,
+      friendNavigatorExpanded: friendNavigator.getViewState().expanded,
+      friendNavigatorSearchQuery: friendNavigator.getViewState().searchQuery,
     });
-    applyFriendNavigatorFilter(doc, friendNavigatorSearchQuery);
+    friendNavigator.applyFilter(doc);
   };
 
   const socialActions = createProfileSocialActions({
@@ -158,51 +98,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     },
   });
 
-  async function uploadPendingThoughtPhoto(currentProfile, subject = "", text = "") {
-    const pendingThoughtPhoto = mediaComposer.getPendingThoughtPhoto();
-    if (!pendingThoughtPhoto || !currentProfile?.playerId || !apiClient?.uploadPhoto) {
-      return { imageUrl: "", thought: null, visibility: "public" };
-    }
-
-    const file = pendingThoughtPhoto;
-    const photoState = { ...mediaComposer.getThoughtPhotoState() };
-    const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
-    mediaComposer.closeThoughtPhotoComposer();
-
-    if (!uploadResult?.url) {
-      return { imageUrl: "", thought: null, visibility: photoState.visibility || "public" };
-    }
-
-    if (photoState.saveToGallery !== false && apiClient?.savePlayerPhoto && uploadResult.assetId) {
-      const savedPhotoRecord = await apiClient.savePlayerPhoto(currentProfile.playerId, {
-        assetId: uploadResult.assetId,
-        imageUrl: uploadResult.url,
-        caption: photoState.caption || text,
-        visibility: photoState.visibility || "public",
-        postToFeed: true,
-        subject,
-        thoughtText: text,
-      }).catch(() => null);
-
-      if (savedPhotoRecord?.photo) {
-        await loadGallery();
-      }
-
-      return {
-        imageUrl: uploadResult.url,
-        thought: savedPhotoRecord?.thought || null,
-        visibility: photoState.visibility || "public",
-      };
-    }
-
-    return {
-      imageUrl: uploadResult.url,
-      thought: null,
-      visibility: photoState.visibility || "public",
-    };
-  }
-
-  void loadGallery().then(() => rerender("", true));
+  void pageData.loadGallery().then(() => rerender("", true));
 
   doc.getElementById("meDeleteAccountBtn")?.addEventListener("click", async () => {
     const flashEl = doc.getElementById("meDeleteAccountFlash");
@@ -220,7 +116,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   });
 
   doc.addEventListener(PROFILE_UPDATED_EVENT, () => {
-    cachedHydration = null;
+    pageData.clearCachedHydration();
     void rerender();
   });
 
@@ -246,53 +142,25 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       event.preventDefault();
       const currentProfile = loadFactoryProfile(storage);
       const galleryUploadState = mediaComposer.getGalleryUploadState();
-      if (galleryUploadState?.isUploading) {
-        return;
-      }
-      if (!currentProfile?.playerId || !apiClient?.uploadPhoto || !galleryUploadState.previewUrl) {
-        mediaComposer.setGalleryUploadField("statusMessage", "Choose a photo first.");
-        void rerender();
-        return;
-      }
-
-      const file = mediaComposer.getPendingGalleryPhoto();
-      if (!file) {
-        mediaComposer.setGalleryUploadField("statusMessage", "Choose a photo first.");
-        void rerender();
-        return;
-      }
-
-      mediaComposer.setGalleryUploadField("isUploading", true);
-      mediaComposer.setGalleryUploadField("statusMessage", "Uploading...");
+      if (galleryUploadState?.isUploading) return;
       await rerender();
-
-      const uploadResult = await apiClient.uploadPhoto(file).catch(() => null);
-      if (!uploadResult?.assetId || !uploadResult?.url) {
-        mediaComposer.setGalleryUploadField("isUploading", false);
-        mediaComposer.setGalleryUploadField("statusMessage", "Upload failed. Try again.");
-        void rerender();
+      const galleryUploadResult = await submitGalleryUpload({
+        currentProfile,
+        mediaComposer,
+        apiClient,
+        loadGallery: () => pageData.loadGallery(),
+        async onUploadStart() {
+          await rerender();
+        },
+      });
+      if (!galleryUploadResult.ok) {
+        if (!galleryUploadResult.skipped) {
+          void rerender();
+        }
         return;
       }
 
-      const savedGalleryState = mediaComposer.getGalleryUploadState();
-      const savedPhotoRecord = await apiClient.savePlayerPhoto(currentProfile.playerId, {
-        assetId: uploadResult.assetId,
-        imageUrl: uploadResult.url,
-        caption: savedGalleryState.caption,
-        visibility: savedGalleryState.visibility,
-        postToFeed: savedGalleryState.postToFeed,
-      }).catch(() => null);
-
-      if (!savedPhotoRecord?.photo) {
-        mediaComposer.setGalleryUploadField("isUploading", false);
-        mediaComposer.setGalleryUploadField("statusMessage", "Could not save photo. Try again.");
-        void rerender();
-        return;
-      }
-
-      const postedToFeed = !!savedPhotoRecord.thought;
-      mediaComposer.closeGalleryComposer(postedToFeed ? "Photo uploaded and posted." : "Photo uploaded.");
-      await loadGallery();
+      const postedToFeed = !!galleryUploadResult.thought;
       if (postedToFeed) {
         await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
         const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
@@ -313,7 +181,14 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     const thoughtPhotoState = mediaComposer.getThoughtPhotoState();
     const subject = subjectInput?.value ?? thoughtPhotoState.subject ?? "";
     const text = bodyInput?.value ?? thoughtPhotoState.text ?? "";
-    const photoResult = await uploadPendingThoughtPhoto(currentProfile, subject, text);
+    const photoResult = await uploadPendingThoughtPhoto({
+      currentProfile,
+      mediaComposer,
+      apiClient,
+      loadGallery: () => pageData.loadGallery(),
+      subject,
+      text,
+    });
 
     if (photoResult.thought) {
       await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
@@ -349,7 +224,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   doc.addEventListener("click", async (event) => {
     const toggleFriendsButton = event.target.closest("#meFriendsToggle");
     if (toggleFriendsButton) {
-      friendNavigatorExpanded = !friendNavigatorExpanded;
+      friendNavigator.toggleExpanded();
       void rerender();
       return;
     }
@@ -428,7 +303,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       const currentProfile = loadFactoryProfile(storage);
       if (!photoId || !currentProfile?.playerId || !apiClient?.deletePlayerPhoto) return;
       apiClient.deletePlayerPhoto(currentProfile.playerId, photoId).then(async () => {
-        await loadGallery();
+        await pageData.loadGallery();
         void rerender();
       }).catch(() => {});
     }
@@ -436,8 +311,8 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
 
   doc.addEventListener("input", (event) => {
     if (event.target?.id === "meFriendsSearchInput") {
-      friendNavigatorSearchQuery = event.target.value || "";
-      applyFriendNavigatorFilter(doc, friendNavigatorSearchQuery);
+      friendNavigator.setSearchQuery(event.target.value || "");
+      friendNavigator.applyFilter(doc);
       return;
     }
 

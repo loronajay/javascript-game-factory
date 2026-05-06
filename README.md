@@ -24,6 +24,7 @@ There is no global frontend build step by default. Most surfaces are plain `inde
 - Games can derive match-local or session-local names, but they should not become the home for durable profile ownership.
 - Game logic and tests stay with each game when practical.
 - Shared social and profile behavior should usually land in `js/platform/`, route-level page modules, or `platform-api/src/`.
+- Architecture cleanup still comes before any repo-wide TypeScript migration. The current shared frontend/backend seams are documented in `planning-docs/ARCHITECTURE_HANDOFF.md`.
 
 ## Testing
 

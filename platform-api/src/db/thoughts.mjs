@@ -1,149 +1,22 @@
+import { normalizeThoughtPost } from "../normalize.mjs";
 import {
-  normalizeThoughtComment,
-  THOUGHT_REACTION_IDS,
-  normalizeThoughtPost,
-} from "../normalize.mjs";
-
-function sanitizeThoughtId(value) {
-  return typeof value === "string" ? value.trim().slice(0, 80) : "";
-}
-
-function ensureJsonObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function sanitizeViewerPlayerId(value) {
-  return typeof value === "string" ? value.trim().slice(0, 80) : "";
-}
-
-function sanitizeViewerAuthorDisplayName(value) {
-  return typeof value === "string" ? value.trim().slice(0, 60) : "";
-}
-
-function sanitizeCommentText(value) {
-  return typeof value === "string" ? value.replace(/\r\n?/g, "\n").trim().slice(0, 500) : "";
-}
-
-function sanitizeReactionId(value) {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase().slice(0, 24) : "";
-  return THOUGHT_REACTION_IDS.includes(normalized) ? normalized : "";
-}
-
-function mapRowToThought(row = {}, options = {}) {
-  return normalizeThoughtPost({
-    id: row.id,
-    authorPlayerId: row.author_player_id,
-    authorDisplayName: row.author_display_name,
-    subject: row.subject,
-    text: row.text,
-    visibility: row.visibility,
-    commentCount: row.comment_count,
-    shareCount: row.share_count,
-    reactionTotals: options.reactionTotals ?? ensureJsonObject(row.reaction_totals),
-    viewerReaction: options.viewerReaction ?? "",
-    viewerSharedThoughtId: options.viewerSharedThoughtId ?? "",
-    repostOfId: row.repost_of_id,
-    imageUrl: row.image_url,
-    createdAt: row.created_at,
-    editedAt: row.edited_at,
-  });
-}
-
-function mapRowToComment(row = {}) {
-  return normalizeThoughtComment({
-    id: row.id,
-    thoughtId: row.thought_id,
-    authorPlayerId: row.author_player_id,
-    authorDisplayName: row.author_display_name,
-    text: row.text,
-    createdAt: row.created_at,
-    editedAt: row.edited_at,
-  });
-}
-
-function buildThoughtParams(thought) {
-  return [
-    thought.id,
-    thought.authorPlayerId,
-    thought.authorDisplayName,
-    thought.subject,
-    thought.text,
-    thought.visibility,
-    thought.commentCount,
-    thought.shareCount,
-    JSON.stringify(thought.reactionTotals),
-    thought.repostOfId,
-    thought.imageUrl || "",
-    thought.createdAt,
-    thought.editedAt,
-  ];
-}
-
-function mapReactionTotalsByThoughtId(reactionRows = [], fallbackRows = []) {
-  const totalsByThoughtId = new Map();
-
-  for (const fallbackRow of fallbackRows) {
-    if (!fallbackRow?.thought_id) continue;
-    totalsByThoughtId.set(
-      fallbackRow.thought_id,
-      {
-        ...ensureJsonObject(totalsByThoughtId.get(fallbackRow.thought_id)),
-        ...normalizeThoughtPost({ reactionTotals: fallbackRow.reaction_totals }).reactionTotals,
-      },
-    );
-  }
-
-  for (const reactionRow of reactionRows) {
-    const thoughtId = sanitizeThoughtId(reactionRow?.thought_id);
-    const reactionId = sanitizeReactionId(reactionRow?.reaction_id);
-    if (!thoughtId || !reactionId) continue;
-
-    totalsByThoughtId.set(thoughtId, {
-      ...ensureJsonObject(totalsByThoughtId.get(thoughtId)),
-      [reactionId]: Math.max(0, Math.floor(Number(reactionRow?.reaction_count) || 0)),
-    });
-  }
-
-  return totalsByThoughtId;
-}
-
-function mapViewerReactionByThoughtId(rows = []) {
-  const viewerReactionByThoughtId = new Map();
-
-  for (const row of rows) {
-    const thoughtId = sanitizeThoughtId(row?.thought_id);
-    const reactionId = sanitizeReactionId(row?.reaction_id);
-    if (!thoughtId) continue;
-    viewerReactionByThoughtId.set(thoughtId, reactionId);
-  }
-
-  return viewerReactionByThoughtId;
-}
-
-function mapViewerShareByOriginalThoughtId(rows = []) {
-  const viewerShareByOriginalThoughtId = new Map();
-
-  for (const row of rows) {
-    const originalThoughtId = sanitizeThoughtId(row?.original_thought_id);
-    const sharedThoughtId = sanitizeThoughtId(row?.shared_thought_id);
-    if (!originalThoughtId || !sharedThoughtId) continue;
-    viewerShareByOriginalThoughtId.set(originalThoughtId, sharedThoughtId);
-  }
-
-  return viewerShareByOriginalThoughtId;
-}
-
-function createSharedThoughtId(originalThoughtId, viewerPlayerId) {
-  return sanitizeThoughtId(
-    `thought-share-${sanitizeThoughtId(viewerPlayerId).slice(0, 24)}-${sanitizeThoughtId(originalThoughtId).slice(0, 24)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-  );
-}
-
-function createCommentId(thoughtId, viewerPlayerId) {
-  return sanitizeThoughtId(
-    `comment-${sanitizeThoughtId(viewerPlayerId).slice(0, 24)}-${sanitizeThoughtId(thoughtId).slice(0, 24)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-  );
-}
+  buildCommentRecord,
+  buildCommentResult,
+  buildReactedThought,
+  buildShareResult,
+  buildThoughtParams,
+  createSharedThought,
+  deriveNextViewerReaction,
+  mapReactionTotalsByThoughtId,
+  mapRowToComment,
+  mapRowToThought,
+  mapViewerReactionByThoughtId,
+  mapViewerShareByOriginalThoughtId,
+  sanitizeReactionId,
+  sanitizeThoughtId,
+  sanitizeViewerAuthorDisplayName,
+  sanitizeViewerPlayerId,
+} from "./thoughts-domain.mjs";
 
 export async function listThoughts(db, options = {}) {
   const limit = Math.max(1, Math.min(Number(options.limit) || 40, 100));
@@ -359,7 +232,7 @@ export async function reactToThought(db, thoughtId, viewerPlayerId, reactionId) 
         and player_id = $2
     `, [normalizedThoughtId, normalizedViewerPlayerId]);
     const existingReactionId = sanitizeReactionId(existingReactionResult?.rows?.[0]?.reaction_id);
-    const nextViewerReaction = existingReactionId === normalizedReactionId ? "" : normalizedReactionId;
+    const nextViewerReaction = deriveNextViewerReaction(existingReactionId, normalizedReactionId);
 
     if (!nextViewerReaction) {
       await db.query(`
@@ -402,13 +275,7 @@ export async function reactToThought(db, thoughtId, viewerPlayerId, reactionId) 
     `, [normalizedThoughtId, JSON.stringify(reactionTotals)]);
 
     await db.query("commit");
-    return mapRowToThought({
-      ...thoughtRow,
-      reaction_totals: reactionTotals,
-    }, {
-      reactionTotals,
-      viewerReaction: nextViewerReaction,
-    });
+    return buildReactedThought(thoughtRow, reactionTotals, nextViewerReaction);
   } catch (error) {
     await db.query("rollback");
     throw error;
@@ -418,9 +285,6 @@ export async function reactToThought(db, thoughtId, viewerPlayerId, reactionId) 
 export async function shareThought(db, thoughtId, viewerPlayerId, viewerAuthorDisplayName = "", options = {}) {
   const normalizedThoughtId = sanitizeThoughtId(thoughtId);
   const normalizedViewerPlayerId = sanitizeViewerPlayerId(viewerPlayerId);
-  const caption = typeof options?.caption === "string"
-    ? options.caption.replace(/\r\n?/g, "\n").trim().slice(0, 500)
-    : "";
   if (!normalizedThoughtId || !normalizedViewerPlayerId) {
     return null;
   }
@@ -476,20 +340,15 @@ export async function shareThought(db, thoughtId, viewerPlayerId, viewerAuthorDi
       `, [existingShareRow.shared_thought_id]);
     } else {
       const normalizedViewerDisplayName = sanitizeViewerAuthorDisplayName(viewerAuthorDisplayName);
-      insertedSharedThought = normalizeThoughtPost({
-        id: createSharedThoughtId(normalizedThoughtId, normalizedViewerPlayerId),
-        authorPlayerId: normalizedViewerPlayerId,
-        authorDisplayName: normalizedViewerDisplayName || normalizedViewerPlayerId,
-        subject: "",
-        text: caption,
-        visibility: originalThoughtRow.visibility,
-        commentCount: 0,
-        shareCount: 0,
-        reactionTotals: {},
-        repostOfId: normalizedThoughtId,
-        createdAt: new Date().toISOString(),
-        editedAt: "",
-      });
+      insertedSharedThought = createSharedThought(
+        originalThoughtRow,
+        normalizedViewerPlayerId,
+        normalizedViewerDisplayName || normalizedViewerPlayerId,
+        {
+          caption: options?.caption,
+          createdAt: new Date().toISOString(),
+        },
+      );
 
       await db.query(`
         insert into thought_posts (
@@ -535,22 +394,12 @@ export async function shareThought(db, thoughtId, viewerPlayerId, viewerAuthorDi
       where id = $1
     `, [normalizedThoughtId, shareCount]);
 
-    const updatedOriginalThought = mapRowToThought({
-      ...originalThoughtRow,
-      share_count: shareCount,
-    }, {
-      viewerSharedThoughtId: existingShareRow?.shared_thought_id ? "" : insertedSharedThought?.id || "",
-    });
-
     await db.query("commit");
-    return {
-      originalThought: normalizeThoughtPost({
-        ...updatedOriginalThought,
-        viewerSharedThoughtId: insertedSharedThought?.id || "",
-      }),
+    return buildShareResult(originalThoughtRow, shareCount, {
+      viewerSharedThoughtId: existingShareRow?.shared_thought_id ? "" : insertedSharedThought?.id || "",
       sharedThought: insertedSharedThought,
       removedSharedThoughtId: existingShareRow?.shared_thought_id || "",
-    };
+    });
   } catch (error) {
     await db.query("rollback");
     throw error;
@@ -561,8 +410,21 @@ export async function commentOnThought(db, thoughtId, viewerPlayerId, viewerAuth
   const normalizedThoughtId = sanitizeThoughtId(thoughtId);
   const normalizedViewerPlayerId = sanitizeViewerPlayerId(viewerPlayerId);
   const normalizedViewerDisplayName = sanitizeViewerAuthorDisplayName(viewerAuthorDisplayName);
-  const normalizedText = sanitizeCommentText(text);
-  if (!normalizedThoughtId || !normalizedViewerPlayerId || !normalizedViewerDisplayName || !normalizedText) {
+  const insertedComment = buildCommentRecord(
+    normalizedThoughtId,
+    normalizedViewerPlayerId,
+    normalizedViewerDisplayName,
+    text,
+    {
+      createdAt: new Date().toISOString(),
+    },
+  );
+  if (
+    !normalizedThoughtId
+    || !normalizedViewerPlayerId
+    || !normalizedViewerDisplayName
+    || !insertedComment.text
+  ) {
     return null;
   }
 
@@ -613,14 +475,14 @@ export async function commentOnThought(db, thoughtId, viewerPlayerId, viewerAuth
         created_at,
         edited_at
     `, [
-      createCommentId(normalizedThoughtId, normalizedViewerPlayerId),
-      normalizedThoughtId,
-      normalizedViewerPlayerId,
-      normalizedViewerDisplayName,
-      normalizedText,
-      new Date().toISOString(),
+      insertedComment.id,
+      insertedComment.thoughtId,
+      insertedComment.authorPlayerId,
+      insertedComment.authorDisplayName,
+      insertedComment.text,
+      insertedComment.createdAt,
     ]);
-    const insertedComment = mapRowToComment(insertedCommentResult?.rows?.[0] || {});
+    const savedComment = mapRowToComment(insertedCommentResult?.rows?.[0] || {});
 
     const commentCountResult = await db.query(`
       select count(*)::int as comment_count
@@ -636,13 +498,7 @@ export async function commentOnThought(db, thoughtId, viewerPlayerId, viewerAuth
     `, [normalizedThoughtId, commentCount]);
 
     await db.query("commit");
-    return {
-      thought: mapRowToThought({
-        ...thoughtRow,
-        comment_count: commentCount,
-      }),
-      comment: insertedComment,
-    };
+    return buildCommentResult(thoughtRow, commentCount, savedComment);
   } catch (error) {
     await db.query("rollback");
     throw error;

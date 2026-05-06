@@ -1,5 +1,4 @@
 import {
-  DIRECT_INTERACTION_POINTS,
   DIRECT_INTERACTION_WINDOW_LIMIT,
   DIRECT_INTERACTION_WINDOW_MS,
   FRIENDSHIP_CREATION_POINTS,
@@ -9,6 +8,19 @@ import {
   normalizeProfileRelationshipsRecord,
 } from "../normalize.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./metrics.mjs";
+import {
+  applyDirectInteractionState,
+  applyFriendRemovalState,
+  applyFriendshipState,
+  applySharedEventState,
+  applySharedSessionState,
+  buildFriendshipResult,
+  buildRelationshipPairKey,
+  buildRelationshipsParams,
+  createEmptyRelationshipResult,
+  createTimestamp,
+  mapRowToRelationshipsRecord,
+} from "./relationships-domain.mjs";
 
 function sanitizePlayerId(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
@@ -25,184 +37,6 @@ function sanitizeTimestamp(value) {
 
 function sanitizeGameSlug(value) {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
-}
-
-function ensureJsonArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function ensureJsonObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function mapRowToRelationshipsRecord(row = {}, fallbackPlayerId = "") {
-  return normalizeProfileRelationshipsRecord({
-    playerId: row.player_id || fallbackPlayerId,
-    mainSqueezeMode: row.main_squeeze_mode,
-    mainSqueezePlayerId: row.main_squeeze_player_id,
-    friendRailMode: row.friend_rail_mode,
-    manualFriendSlotPlayerIds: ensureJsonArray(row.manual_friend_slot_player_ids),
-    mostPlayedWithPlayerId: row.most_played_with_player_id,
-    lastPlayedWithPlayerId: row.last_played_with_player_id,
-    recentlyPlayedWithPlayerIds: ensureJsonArray(row.recently_played_with_player_ids),
-    friendPlayerIds: ensureJsonArray(row.friend_player_ids),
-    friendPointsByPlayerId: ensureJsonObject(row.friend_points_by_player_id),
-    mutualFriendCountByPlayerId: ensureJsonObject(row.mutual_friend_count_by_player_id),
-    sharedGameCountByPlayerId: ensureJsonObject(row.shared_game_count_by_player_id),
-    sharedSessionCountByPlayerId: ensureJsonObject(row.shared_session_count_by_player_id),
-    sharedEventCountByPlayerId: ensureJsonObject(row.shared_event_count_by_player_id),
-    lastSharedSessionAtByPlayerId: ensureJsonObject(row.last_shared_session_at_by_player_id),
-    lastSharedEventAtByPlayerId: ensureJsonObject(row.last_shared_event_at_by_player_id),
-    lastInteractionAtByPlayerId: ensureJsonObject(row.last_interaction_at_by_player_id),
-  });
-}
-
-function buildRelationshipsParams(playerId, relationships) {
-  return [
-    playerId,
-    relationships.mainSqueezeMode,
-    relationships.mainSqueezePlayerId,
-    relationships.friendRailMode,
-    JSON.stringify(relationships.manualFriendSlotPlayerIds),
-    relationships.mostPlayedWithPlayerId,
-    relationships.lastPlayedWithPlayerId,
-    JSON.stringify(relationships.recentlyPlayedWithPlayerIds),
-    JSON.stringify(relationships.friendPlayerIds),
-    JSON.stringify(relationships.friendPointsByPlayerId),
-    JSON.stringify(relationships.mutualFriendCountByPlayerId),
-    JSON.stringify(relationships.sharedGameCountByPlayerId),
-    JSON.stringify(relationships.sharedSessionCountByPlayerId),
-    JSON.stringify(relationships.sharedEventCountByPlayerId),
-    JSON.stringify(relationships.lastSharedSessionAtByPlayerId),
-    JSON.stringify(relationships.lastSharedEventAtByPlayerId),
-    JSON.stringify(relationships.lastInteractionAtByPlayerId),
-  ];
-}
-
-function createTimestamp(value) {
-  return sanitizeTimestamp(value) || new Date().toISOString();
-}
-
-function buildRelationshipPairKey(leftPlayerId, rightPlayerId) {
-  const left = sanitizePlayerId(leftPlayerId);
-  const right = sanitizePlayerId(rightPlayerId);
-  if (!left || !right || left === right) return "";
-  return [left, right].sort((a, b) => a.localeCompare(b)).join("::");
-}
-
-function incrementRecordMapCount(record, field, playerId, amount) {
-  const key = sanitizePlayerId(playerId);
-  const increment = sanitizeCount(amount);
-  if (!key || increment <= 0) return;
-
-  const current = sanitizeCount(record[field]?.[key]);
-  record[field] = {
-    ...(record[field] || {}),
-    [key]: current + increment,
-  };
-}
-
-function setRecordMapTimestamp(record, field, playerId, timestamp) {
-  const key = sanitizePlayerId(playerId);
-  const value = sanitizeTimestamp(timestamp);
-  if (!key || !value) return;
-
-  record[field] = {
-    ...(record[field] || {}),
-    [key]: value,
-  };
-}
-
-function parseTimestamp(value) {
-  const parsed = Date.parse(sanitizeTimestamp(value));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function pushRecentlyPlayedWith(record, playerId) {
-  const key = sanitizePlayerId(playerId);
-  if (!key) return;
-
-  const current = Array.isArray(record.recentlyPlayedWithPlayerIds)
-    ? record.recentlyPlayedWithPlayerIds
-    : [];
-  record.recentlyPlayedWithPlayerIds = [
-    key,
-    ...current.filter((entry) => entry !== key),
-  ].slice(0, 8);
-}
-
-function compareRelationshipPriority(record, leftPlayerId, rightPlayerId) {
-  const leftPoints = sanitizeCount(record.friendPointsByPlayerId?.[leftPlayerId]);
-  const rightPoints = sanitizeCount(record.friendPointsByPlayerId?.[rightPlayerId]);
-  if (leftPoints !== rightPoints) return rightPoints - leftPoints;
-
-  const leftSessions = sanitizeCount(record.sharedSessionCountByPlayerId?.[leftPlayerId]);
-  const rightSessions = sanitizeCount(record.sharedSessionCountByPlayerId?.[rightPlayerId]);
-  if (leftSessions !== rightSessions) return rightSessions - leftSessions;
-
-  const leftEvents = sanitizeCount(record.sharedEventCountByPlayerId?.[leftPlayerId]);
-  const rightEvents = sanitizeCount(record.sharedEventCountByPlayerId?.[rightPlayerId]);
-  if (leftEvents !== rightEvents) return rightEvents - leftEvents;
-
-  const leftRecent = Math.max(
-    parseTimestamp(record.lastSharedSessionAtByPlayerId?.[leftPlayerId]),
-    parseTimestamp(record.lastSharedEventAtByPlayerId?.[leftPlayerId]),
-    parseTimestamp(record.lastInteractionAtByPlayerId?.[leftPlayerId]),
-  );
-  const rightRecent = Math.max(
-    parseTimestamp(record.lastSharedSessionAtByPlayerId?.[rightPlayerId]),
-    parseTimestamp(record.lastSharedEventAtByPlayerId?.[rightPlayerId]),
-    parseTimestamp(record.lastInteractionAtByPlayerId?.[rightPlayerId]),
-  );
-  if (leftRecent !== rightRecent) return rightRecent - leftRecent;
-
-  return leftPlayerId.localeCompare(rightPlayerId);
-}
-
-function reorderFriendPlayerIds(record) {
-  const current = Array.isArray(record.friendPlayerIds) ? record.friendPlayerIds : [];
-  record.friendPlayerIds = [...current].sort((leftPlayerId, rightPlayerId) => (
-    compareRelationshipPriority(record, leftPlayerId, rightPlayerId)
-  ));
-}
-
-function deriveMostPlayedWithPlayerId(record) {
-  return Object.keys(record.sharedSessionCountByPlayerId || {})
-    .sort((leftPlayerId, rightPlayerId) => {
-      const leftSessions = sanitizeCount(record.sharedSessionCountByPlayerId?.[leftPlayerId]);
-      const rightSessions = sanitizeCount(record.sharedSessionCountByPlayerId?.[rightPlayerId]);
-      if (leftSessions !== rightSessions) return rightSessions - leftSessions;
-
-      const leftRecent = parseTimestamp(record.lastSharedSessionAtByPlayerId?.[leftPlayerId]);
-      const rightRecent = parseTimestamp(record.lastSharedSessionAtByPlayerId?.[rightPlayerId]);
-      if (leftRecent !== rightRecent) return rightRecent - leftRecent;
-
-      return compareRelationshipPriority(record, leftPlayerId, rightPlayerId);
-    })[0] || "";
-}
-
-function ensureFriendPlayer(record, otherPlayerId) {
-  const key = sanitizePlayerId(otherPlayerId);
-  if (!key) return;
-
-  const current = Array.isArray(record.friendPlayerIds) ? record.friendPlayerIds : [];
-  if (!current.includes(key)) {
-    record.friendPlayerIds = [...current, key];
-  }
-  reorderFriendPlayerIds(record);
-}
-
-function awardFriendPoints(record, otherPlayerId, points) {
-  incrementRecordMapCount(record, "friendPointsByPlayerId", otherPlayerId, points);
-}
-
-function buildFriendshipResult(leftRecord, rightRecord, awarded, awardedPoints) {
-  return {
-    awarded,
-    awardedPoints,
-    leftRecord: normalizeProfileRelationshipsRecord(leftRecord),
-    rightRecord: normalizeProfileRelationshipsRecord(rightRecord),
-  };
 }
 
 async function loadRelationshipLedgerEntry(db, ledgerKey) {
@@ -399,12 +233,7 @@ export async function createFriendshipBetweenPlayers(db, leftPlayerId, rightPlay
   const pairKey = buildRelationshipPairKey(normalizedLeftPlayerId, normalizedRightPlayerId);
 
   if (!pairKey) {
-    return buildFriendshipResult(
-      buildDefaultProfileRelationshipsRecord(""),
-      buildDefaultProfileRelationshipsRecord(""),
-      false,
-      0,
-    );
+    return createEmptyRelationshipResult("", "");
   }
 
   const ledgerKey = `friendship:${pairKey}`;
@@ -418,23 +247,27 @@ export async function createFriendshipBetweenPlayers(db, leftPlayerId, rightPlay
     const rightRecord = await loadPlayerRelationships(client, normalizedRightPlayerId);
     const existingLedgerEntry = await loadRelationshipLedgerEntry(client, ledgerKey);
     const alreadyAwarded = !!existingLedgerEntry;
-
-    ensureFriendPlayer(leftRecord, normalizedRightPlayerId);
-    ensureFriendPlayer(rightRecord, normalizedLeftPlayerId);
-
-    if (!alreadyAwarded) {
-      awardFriendPoints(leftRecord, normalizedRightPlayerId, FRIENDSHIP_CREATION_POINTS);
-      awardFriendPoints(rightRecord, normalizedLeftPlayerId, FRIENDSHIP_CREATION_POINTS);
-    }
-
-    const savedLeftRecord = await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
-    const savedRightRecord = await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
+    const stateResult = applyFriendshipState(leftRecord, rightRecord, {
+      leftPlayerId: normalizedLeftPlayerId,
+      rightPlayerId: normalizedRightPlayerId,
+      alreadyAwarded,
+    });
+    const savedLeftRecord = await savePlayerRelationships(
+      client,
+      normalizedLeftPlayerId,
+      stateResult.leftRecord,
+    );
+    const savedRightRecord = await savePlayerRelationships(
+      client,
+      normalizedRightPlayerId,
+      stateResult.rightRecord,
+    );
 
     // Use pre-save in-memory arrays as the authoritative friend list for the profiles sync —
     // RETURNING from savePlayerRelationships can come back null when called on a transaction client,
     // which would overwrite the column with []. The in-memory records are always correct at this point.
-    const leftFriendIds = leftRecord.friendPlayerIds;
-    const rightFriendIds = rightRecord.friendPlayerIds;
+    const leftFriendIds = stateResult.leftRecord.friendPlayerIds;
+    const rightFriendIds = stateResult.rightRecord.friendPlayerIds;
 
     await client.query(`
       update player_profiles set friends = $2::jsonb, updated_at = now() where player_id = $1
@@ -448,13 +281,13 @@ export async function createFriendshipBetweenPlayers(db, leftPlayerId, rightPlay
     await savePlayerMetrics(client, normalizedLeftPlayerId, {
       ...leftMetrics,
       friendCount: leftFriendIds.length,
-      friendPoints: leftRecord.friendPointsByPlayerId,
+      friendPoints: stateResult.leftRecord.friendPointsByPlayerId,
     });
     const rightMetrics = await loadPlayerMetrics(client, normalizedRightPlayerId);
     await savePlayerMetrics(client, normalizedRightPlayerId, {
       ...rightMetrics,
       friendCount: rightFriendIds.length,
-      friendPoints: rightRecord.friendPointsByPlayerId,
+      friendPoints: stateResult.rightRecord.friendPointsByPlayerId,
     });
 
     if (!alreadyAwarded) {
@@ -473,8 +306,8 @@ export async function createFriendshipBetweenPlayers(db, leftPlayerId, rightPlay
     return buildFriendshipResult(
       savedLeftRecord,
       savedRightRecord,
-      !alreadyAwarded,
-      alreadyAwarded ? 0 : FRIENDSHIP_CREATION_POINTS,
+      stateResult.awarded,
+      stateResult.awardedPoints,
     );
   } catch (error) {
     await client.query("rollback");
@@ -494,12 +327,7 @@ export async function recordSharedSessionBetweenPlayers(db, leftPlayerId, rightP
   const reachedResults = !!options.reachedResults;
 
   if (!pairKey || !sessionId || !startedTogether || !reachedResults) {
-    return buildFriendshipResult(
-      buildDefaultProfileRelationshipsRecord(normalizedLeftPlayerId),
-      buildDefaultProfileRelationshipsRecord(normalizedRightPlayerId),
-      false,
-      0,
-    );
+    return createEmptyRelationshipResult(normalizedLeftPlayerId, normalizedRightPlayerId);
   }
 
   const ledgerKey = `shared-session:${pairKey}::${sessionId}`;
@@ -518,33 +346,24 @@ export async function recordSharedSessionBetweenPlayers(db, leftPlayerId, rightP
       : null;
     const alreadyAwarded = !!existingLedgerEntry;
     const alreadyCountedGame = !!existingSharedGameLedgerEntry;
-
-    leftRecord.lastPlayedWithPlayerId = normalizedRightPlayerId;
-    rightRecord.lastPlayedWithPlayerId = normalizedLeftPlayerId;
-    pushRecentlyPlayedWith(leftRecord, normalizedRightPlayerId);
-    pushRecentlyPlayedWith(rightRecord, normalizedLeftPlayerId);
-    setRecordMapTimestamp(leftRecord, "lastSharedSessionAtByPlayerId", normalizedRightPlayerId, occurredAt);
-    setRecordMapTimestamp(rightRecord, "lastSharedSessionAtByPlayerId", normalizedLeftPlayerId, occurredAt);
-
-    if (!alreadyAwarded) {
-      incrementRecordMapCount(leftRecord, "sharedSessionCountByPlayerId", normalizedRightPlayerId, 1);
-      incrementRecordMapCount(rightRecord, "sharedSessionCountByPlayerId", normalizedLeftPlayerId, 1);
-      awardFriendPoints(leftRecord, normalizedRightPlayerId, SHARED_SESSION_POINTS);
-      awardFriendPoints(rightRecord, normalizedLeftPlayerId, SHARED_SESSION_POINTS);
-
-      if (gameSlug && !alreadyCountedGame) {
-        incrementRecordMapCount(leftRecord, "sharedGameCountByPlayerId", normalizedRightPlayerId, 1);
-        incrementRecordMapCount(rightRecord, "sharedGameCountByPlayerId", normalizedLeftPlayerId, 1);
-      }
-    }
-
-    leftRecord.mostPlayedWithPlayerId = deriveMostPlayedWithPlayerId(leftRecord);
-    rightRecord.mostPlayedWithPlayerId = deriveMostPlayedWithPlayerId(rightRecord);
-    reorderFriendPlayerIds(leftRecord);
-    reorderFriendPlayerIds(rightRecord);
-
-    const savedLeftRecord = await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
-    const savedRightRecord = await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
+    const stateResult = applySharedSessionState(leftRecord, rightRecord, {
+      leftPlayerId: normalizedLeftPlayerId,
+      rightPlayerId: normalizedRightPlayerId,
+      occurredAt,
+      gameSlug,
+      alreadyAwarded,
+      alreadyCountedGame,
+    });
+    const savedLeftRecord = await savePlayerRelationships(
+      client,
+      normalizedLeftPlayerId,
+      stateResult.leftRecord,
+    );
+    const savedRightRecord = await savePlayerRelationships(
+      client,
+      normalizedRightPlayerId,
+      stateResult.rightRecord,
+    );
 
     if (!alreadyAwarded) {
       await saveRelationshipLedgerEntry(client, {
@@ -580,8 +399,8 @@ export async function recordSharedSessionBetweenPlayers(db, leftPlayerId, rightP
     return buildFriendshipResult(
       savedLeftRecord,
       savedRightRecord,
-      !alreadyAwarded,
-      alreadyAwarded ? 0 : SHARED_SESSION_POINTS,
+      stateResult.awarded,
+      stateResult.awardedPoints,
     );
   } catch (error) {
     await client.query("rollback");
@@ -599,12 +418,7 @@ export async function recordSharedEventBetweenPlayers(db, leftPlayerId, rightPla
   const isLinkedEntry = !!options.isLinkedEntry;
 
   if (!pairKey || !eventId || !isLinkedEntry) {
-    return buildFriendshipResult(
-      buildDefaultProfileRelationshipsRecord(normalizedLeftPlayerId),
-      buildDefaultProfileRelationshipsRecord(normalizedRightPlayerId),
-      false,
-      0,
-    );
+    return createEmptyRelationshipResult(normalizedLeftPlayerId, normalizedRightPlayerId);
   }
 
   const ledgerKey = `shared-event:${pairKey}::${eventId}`;
@@ -618,22 +432,22 @@ export async function recordSharedEventBetweenPlayers(db, leftPlayerId, rightPla
     const rightRecord = await loadPlayerRelationships(client, normalizedRightPlayerId);
     const existingLedgerEntry = await loadRelationshipLedgerEntry(client, ledgerKey);
     const alreadyAwarded = !!existingLedgerEntry;
-
-    setRecordMapTimestamp(leftRecord, "lastSharedEventAtByPlayerId", normalizedRightPlayerId, occurredAt);
-    setRecordMapTimestamp(rightRecord, "lastSharedEventAtByPlayerId", normalizedLeftPlayerId, occurredAt);
-
-    if (!alreadyAwarded) {
-      incrementRecordMapCount(leftRecord, "sharedEventCountByPlayerId", normalizedRightPlayerId, 1);
-      incrementRecordMapCount(rightRecord, "sharedEventCountByPlayerId", normalizedLeftPlayerId, 1);
-      awardFriendPoints(leftRecord, normalizedRightPlayerId, SHARED_EVENT_POINTS);
-      awardFriendPoints(rightRecord, normalizedLeftPlayerId, SHARED_EVENT_POINTS);
-    }
-
-    reorderFriendPlayerIds(leftRecord);
-    reorderFriendPlayerIds(rightRecord);
-
-    const savedLeftRecord = await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
-    const savedRightRecord = await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
+    const stateResult = applySharedEventState(leftRecord, rightRecord, {
+      leftPlayerId: normalizedLeftPlayerId,
+      rightPlayerId: normalizedRightPlayerId,
+      occurredAt,
+      alreadyAwarded,
+    });
+    const savedLeftRecord = await savePlayerRelationships(
+      client,
+      normalizedLeftPlayerId,
+      stateResult.leftRecord,
+    );
+    const savedRightRecord = await savePlayerRelationships(
+      client,
+      normalizedRightPlayerId,
+      stateResult.rightRecord,
+    );
 
     if (!alreadyAwarded) {
       await saveRelationshipLedgerEntry(client, {
@@ -653,8 +467,8 @@ export async function recordSharedEventBetweenPlayers(db, leftPlayerId, rightPla
     return buildFriendshipResult(
       savedLeftRecord,
       savedRightRecord,
-      !alreadyAwarded,
-      alreadyAwarded ? 0 : SHARED_EVENT_POINTS,
+      stateResult.awarded,
+      stateResult.awardedPoints,
     );
   } catch (error) {
     await client.query("rollback");
@@ -679,22 +493,17 @@ export async function removeFriendBetweenPlayers(db, leftPlayerId, rightPlayerId
   try {
     const leftRecord = await loadPlayerRelationships(client, normalizedLeftPlayerId);
     const rightRecord = await loadPlayerRelationships(client, normalizedRightPlayerId);
+    const stateResult = applyFriendRemovalState(leftRecord, rightRecord, {
+      leftPlayerId: normalizedLeftPlayerId,
+      rightPlayerId: normalizedRightPlayerId,
+    });
 
-    leftRecord.friendPlayerIds = (leftRecord.friendPlayerIds || []).filter((id) => id !== normalizedRightPlayerId);
-    rightRecord.friendPlayerIds = (rightRecord.friendPlayerIds || []).filter((id) => id !== normalizedLeftPlayerId);
-
-    if (leftRecord.mainSqueezePlayerId === normalizedRightPlayerId) leftRecord.mainSqueezePlayerId = "";
-    if (rightRecord.mainSqueezePlayerId === normalizedLeftPlayerId) rightRecord.mainSqueezePlayerId = "";
-
-    leftRecord.manualFriendSlotPlayerIds = (leftRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== normalizedRightPlayerId);
-    rightRecord.manualFriendSlotPlayerIds = (rightRecord.manualFriendSlotPlayerIds || []).filter((id) => id !== normalizedLeftPlayerId);
-
-    await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
-    await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
+    await savePlayerRelationships(client, normalizedLeftPlayerId, stateResult.leftRecord);
+    await savePlayerRelationships(client, normalizedRightPlayerId, stateResult.rightRecord);
 
     // Sync friends column and remove the unfriended player from friends_preview for both sides
-    const leftFriendIds = leftRecord.friendPlayerIds;
-    const rightFriendIds = rightRecord.friendPlayerIds;
+    const leftFriendIds = stateResult.leftRecord.friendPlayerIds;
+    const rightFriendIds = stateResult.rightRecord.friendPlayerIds;
 
     await client.query(`
       update player_profiles
@@ -750,18 +559,13 @@ export async function recordDirectInteractionBetweenPlayers(db, leftPlayerId, ri
   const pairKey = buildRelationshipPairKey(normalizedLeftPlayerId, normalizedRightPlayerId);
 
   if (!pairKey) {
-    return buildFriendshipResult(
-      buildDefaultProfileRelationshipsRecord(normalizedLeftPlayerId),
-      buildDefaultProfileRelationshipsRecord(normalizedRightPlayerId),
-      false,
-      0,
-    );
+    return createEmptyRelationshipResult(normalizedLeftPlayerId, normalizedRightPlayerId);
   }
 
   const occurredAt = createTimestamp(options.occurredAt);
   const windowMs = Math.max(1, sanitizeCount(options.windowMs) || DIRECT_INTERACTION_WINDOW_MS);
   const windowLimit = Math.max(1, sanitizeCount(options.windowLimit) || DIRECT_INTERACTION_WINDOW_LIMIT);
-  const bucket = Math.floor((parseTimestamp(occurredAt) || 0) / windowMs);
+  const bucket = Math.floor((Date.parse(occurredAt) || 0) / windowMs);
   const ledgerKey = `direct-interaction:${pairKey}::${bucket}`;
   const client = typeof db?.connect === "function" ? await db.connect() : db;
 
@@ -773,20 +577,22 @@ export async function recordDirectInteractionBetweenPlayers(db, leftPlayerId, ri
     const existingLedgerEntry = await loadRelationshipLedgerEntry(client, ledgerKey);
     const windowCount = sanitizeCount(existingLedgerEntry?.value_count);
     const canAward = windowCount < windowLimit;
-
-    setRecordMapTimestamp(leftRecord, "lastInteractionAtByPlayerId", normalizedRightPlayerId, occurredAt);
-    setRecordMapTimestamp(rightRecord, "lastInteractionAtByPlayerId", normalizedLeftPlayerId, occurredAt);
-
-    if (canAward) {
-      awardFriendPoints(leftRecord, normalizedRightPlayerId, DIRECT_INTERACTION_POINTS);
-      awardFriendPoints(rightRecord, normalizedLeftPlayerId, DIRECT_INTERACTION_POINTS);
-    }
-
-    reorderFriendPlayerIds(leftRecord);
-    reorderFriendPlayerIds(rightRecord);
-
-    const savedLeftRecord = await savePlayerRelationships(client, normalizedLeftPlayerId, leftRecord);
-    const savedRightRecord = await savePlayerRelationships(client, normalizedRightPlayerId, rightRecord);
+    const stateResult = applyDirectInteractionState(leftRecord, rightRecord, {
+      leftPlayerId: normalizedLeftPlayerId,
+      rightPlayerId: normalizedRightPlayerId,
+      occurredAt,
+      canAward,
+    });
+    const savedLeftRecord = await savePlayerRelationships(
+      client,
+      normalizedLeftPlayerId,
+      stateResult.leftRecord,
+    );
+    const savedRightRecord = await savePlayerRelationships(
+      client,
+      normalizedRightPlayerId,
+      stateResult.rightRecord,
+    );
 
     if (canAward) {
       await saveRelationshipLedgerEntry(client, {
@@ -807,8 +613,8 @@ export async function recordDirectInteractionBetweenPlayers(db, leftPlayerId, ri
     return buildFriendshipResult(
       savedLeftRecord,
       savedRightRecord,
-      canAward,
-      canAward ? DIRECT_INTERACTION_POINTS : 0,
+      stateResult.awarded,
+      stateResult.awardedPoints,
     );
   } catch (error) {
     await client.query("rollback");

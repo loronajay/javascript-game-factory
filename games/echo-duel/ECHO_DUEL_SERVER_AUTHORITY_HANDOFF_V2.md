@@ -50,9 +50,9 @@ What remains from this doc is optional Phase 3 cleanup only unless future featur
 - At the 10-input cap, if all challengers succeed, the fastest successful challenger takes control next.
 - Penalty word behavior is intentionally correct and out of scope.
 
-## Current Reality
+## Historical Context
 
-The live Echo Duel client still works like this:
+The original Echo Duel online prototype worked like this:
 
 - Generic lobby messages create/join/start the room.
 - One client acts as host authority.
@@ -61,11 +61,11 @@ The live Echo Duel client still works like this:
 - The host broadcasts `state_sync` snapshots to everyone else.
 - Non-host clients mostly render snapshots and submit inputs.
 
-That means the migration target is not just "server authority" in the abstract. It is a very specific replacement of the host-owned match engine and snapshot broadcaster.
+That made the migration target very specific: replace the host-owned match engine and snapshot broadcaster with a server-owned authority path while preserving game feel.
 
-## Main Problem
+## Migration Goal
 
-The host-authoritative model still creates predictable structural risk:
+The host-authoritative model created predictable structural risk:
 
 - host disconnect can end or corrupt the match
 - host lag or tab throttling can delay authoritative phase changes
@@ -73,9 +73,9 @@ The host-authoritative model still creates predictable structural risk:
 - stale or delayed messages can mutate the wrong turn if client/server guards diverge
 - disconnect handling is harder because one player owns match truth
 
-For prototype play this was acceptable. For a stable online arcade game, the server should own match truth.
+For prototype play this was acceptable. For a stable online arcade game, the server needed to own match truth. That goal is now met in the current local client/server pair.
 
-## Scope Strategy
+## Delivery Strategy
 
 Do not implement this as one giant rewrite.
 
@@ -85,7 +85,7 @@ This work should be delivered in phased passes:
 2. Phase 2: harden lobby lifecycle and joinability rules
 3. Phase 3: optionally rename protocol messages and reorganize the server code once the behavior is stable
 
-Protocol renaming and server folder cleanup are explicitly not on the critical path for Phase 1.
+Protocol renaming and server folder cleanup were never on the critical path for Phase 1, and they remain optional now.
 
 ## Non-Goals
 
@@ -118,6 +118,10 @@ syncSeq        = monotonic authoritative state sequence
 Avoid ambiguous names like `ownerId` without context.
 
 ## Phase 1
+
+### Status
+
+Completed.
 
 ### Goal
 
@@ -249,6 +253,8 @@ This preserves current intent while still making disconnect behavior determinist
 
 ### Phase 1 Acceptance Criteria
 
+These criteria are now satisfied in the current local Echo Duel client and `factory-network-server` implementation.
+
 Phase 1 is done when:
 
 - the host client no longer decides authoritative match truth
@@ -259,6 +265,10 @@ Phase 1 is done when:
 - current game rules still behave the same from the player point of view
 
 ## Phase 2
+
+### Status
+
+Completed.
 
 ### Goal
 
@@ -287,9 +297,11 @@ Because of that, Phase 2 must choose one of these explicitly:
 2. Remove the visible countdown intentionally.
    If this path is chosen, update the client UX and remove all countdown-specific assumptions in one deliberate pass.
 
-Do not silently replace `countdown` with `starting` unless the client mapping is spelled out and updated everywhere.
+The implemented path preserved visible `startAt` countdown semantics for the client instead of silently replacing them.
 
 ### Phase 2 Acceptance Criteria
+
+These criteria are now satisfied in the current local Echo Duel client and `factory-network-server` implementation.
 
 Phase 2 is done when:
 
@@ -301,6 +313,10 @@ Phase 2 is done when:
 - empty lobbies are cleaned up from all paths
 
 ## Phase 3
+
+### Status
+
+Optional. Not required for release.
 
 ### Goal
 
@@ -356,6 +372,8 @@ Echo Duel should not force a redesign of the older 1v1 protocol.
 
 ## Testing Matrix
 
+The items below represent the acceptance matrix used to verify the migration. The local `factory-network-server/server.test.js` and Echo Duel client regression scripts now cover the implemented behavior.
+
 ### Match Authority
 
 - driver creates initial 4-input pattern
@@ -399,12 +417,10 @@ Echo Duel should not force a redesign of the older 1v1 protocol.
 
 ## Short Version
 
-Implement this in phases.
+Phase 1 and Phase 2 are done.
 
-First, replace host-owned match authority with server-owned match authority while keeping the current lobby contract as stable as possible.
+Server-owned match authority is in place, and the lobby lifecycle hardening work is in place.
 
-Second, harden lobby lifecycle and joinability behavior.
+What remains is optional Phase 3 cleanup only if you later want cleaner protocol names or a more modular server layout.
 
-Third, clean up protocol names and server structure if still desired.
-
-Preserve the current 10-cap control-pass rule and preserve the current 1v1 disconnect behavior that closes the match instead of awarding a cheap win.
+The preserved gameplay rules still include the current 10-cap control-pass rule and the 1v1 disconnect behavior that closes the match instead of awarding a cheap win.
