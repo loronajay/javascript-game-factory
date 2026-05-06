@@ -6,13 +6,15 @@
   padding: 0.7rem 1rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(9, 11, 22, 0.58);
+  background:
+    linear-gradient(180deg, rgba(210, 255, 127, 0.08), transparent 32%),
+    rgba(7, 13, 8, 0.76);
   color: var(--text);
   text-decoration: none;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   backdrop-filter: blur(12px);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.3), 0 0 18px rgba(184, 255, 100, 0.1);
 }
 
 .game-shell {
@@ -32,21 +34,21 @@
 }
 
 .bg-grid {
-  opacity: 0.28;
+  opacity: 0.16;
   background-image:
-    linear-gradient(rgba(255, 219, 163, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(123, 230, 255, 0.08) 1px, transparent 1px);
-  background-size: 54px 54px;
+    linear-gradient(rgba(184, 255, 100, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184, 255, 100, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
   mask-image: radial-gradient(circle at 50% 44%, black 0%, transparent 76%);
 }
 
 .scene-noise {
-  opacity: 0.1;
+  opacity: 0.18;
   background-image:
-    linear-gradient(transparent 0, rgba(255, 255, 255, 0.06) 50%, transparent 100%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 40%, rgba(255, 255, 255, 0.03));
-  background-size: 100% 3px, 180px 100%;
-  mix-blend-mode: screen;
+    linear-gradient(transparent 0, rgba(184, 255, 100, 0.06) 50%, transparent 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 42%, rgba(255, 255, 255, 0.025));
+  background-size: 100% 3px, 220px 100%;
+  mix-blend-mode: plus-lighter;
 }
 
 .scene-orb {
@@ -58,14 +60,14 @@
   inset: 10% auto auto 6%;
   width: 22rem;
   height: 22rem;
-  background: radial-gradient(circle, rgba(124, 236, 255, 0.42), transparent 68%);
+  background: radial-gradient(circle, rgba(184, 255, 100, 0.24), transparent 68%);
 }
 
 .scene-orb--amber {
   inset: auto 4% 8% auto;
   width: 26rem;
   height: 26rem;
-  background: radial-gradient(circle, rgba(255, 174, 92, 0.34), transparent 66%);
+  background: radial-gradient(circle, rgba(116, 255, 200, 0.18), transparent 66%);
 }
 
 #game-root {
@@ -80,12 +82,24 @@
   position: absolute;
   inset: 0;
   border-radius: 2rem;
-  border: 1px solid rgba(255, 231, 186, 0.12);
+  border: 1px solid rgba(168, 220, 102, 0.14);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 22%),
-    linear-gradient(135deg, rgba(12, 15, 27, 0.68), rgba(10, 11, 18, 0.24));
+    linear-gradient(180deg, rgba(184, 255, 100, 0.04), transparent 20%),
+    linear-gradient(135deg, rgba(9, 16, 10, 0.9), rgba(7, 12, 8, 0.88));
   box-shadow: var(--shadow);
   z-index: 0;
+}
+
+#game-root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2rem;
+  box-shadow:
+    inset 0 0 0 1px rgba(228, 255, 161, 0.04),
+    inset 0 0 64px rgba(184, 255, 100, 0.05),
+    inset 0 0 140px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
 }
 
 .screen {
@@ -136,15 +150,15 @@
   z-index: 1;
   width: min(760px, 100%);
   padding: 2rem;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(168, 220, 102, 0.16);
   border-radius: 1.8rem;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 24%),
-    linear-gradient(160deg, rgba(22, 25, 44, 0.94), rgba(14, 16, 28, 0.92));
+    linear-gradient(180deg, rgba(202, 255, 123, 0.05), transparent 24%),
+    linear-gradient(160deg, rgba(15, 24, 15, 0.96), rgba(8, 14, 9, 0.94));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 0 40px rgba(124, 236, 255, 0.04),
-    0 28px 80px rgba(0, 0, 0, 0.34);
+    inset 0 1px 0 rgba(240, 255, 152, 0.05),
+    inset 0 0 56px rgba(184, 255, 100, 0.05),
+    0 28px 80px rgba(0, 0, 0, 0.42);
   overflow: hidden;
 }
 
@@ -155,7 +169,7 @@
   inset: auto -15% -40% auto;
   width: 16rem;
   height: 16rem;
-  background: radial-gradient(circle, rgba(255, 174, 92, 0.14), transparent 70%);
+  background: radial-gradient(circle, rgba(184, 255, 100, 0.12), transparent 70%);
   pointer-events: none;
 }
 

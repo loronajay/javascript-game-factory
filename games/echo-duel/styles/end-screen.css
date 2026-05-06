@@ -9,19 +9,19 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 1rem;
-  border: 1px solid rgba(255, 231, 186, 0.12);
+  border: 1px solid rgba(168, 220, 102, 0.14);
   border-radius: 1rem;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 30%),
-    rgba(255, 255, 255, 0.05);
+    linear-gradient(180deg, rgba(216, 233, 125, 0.05), transparent 30%),
+    rgba(255, 255, 255, 0.035);
 }
 
 .standing-row.is-loser strong {
-  color: #ff8ea0;
+  color: #ff9d6d;
 }
 
 .standing-row.is-winner strong {
-  color: #8ef2bd;
+  color: var(--phosphor);
 }
 
 .loser-callout {
@@ -31,19 +31,19 @@
   max-width: min(720px, 92vw);
   margin: 1.1rem auto 1.2rem;
   padding: 0.95rem 1.3rem;
-  border: 2px solid rgba(255, 124, 131, 0.78);
+  border: 2px solid rgba(255, 152, 88, 0.74);
   border-radius: 1.2rem;
-  background: radial-gradient(circle at 50% 40%, rgba(255, 124, 131, 0.28), rgba(15, 10, 28, 0.92));
-  color: #fff3ef;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 152, 88, 0.26), rgba(12, 15, 14, 0.94));
+  color: #fff8ed;
   font-size: clamp(1.45rem, 4vw, 3.1rem);
   font-weight: 1000;
   letter-spacing: 0.08em;
   line-height: 1.02;
   text-align: center;
   text-transform: uppercase;
-  text-shadow: 0 0 10px rgba(255, 80, 124, 0.95), 0 3px 0 rgba(0, 0, 0, 0.35);
+  text-shadow: 0 0 10px rgba(255, 152, 88, 0.85), 0 3px 0 rgba(0, 0, 0, 0.35);
   box-shadow:
-    0 0 34px rgba(255, 80, 124, 0.24),
+    0 0 34px rgba(255, 152, 88, 0.2),
     inset 0 0 18px rgba(255, 255, 255, 0.08);
   pointer-events: none;
 }
