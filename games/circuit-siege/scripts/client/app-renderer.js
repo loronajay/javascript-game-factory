@@ -162,6 +162,7 @@ function renderBoardGrid(container, boardViewModel) {
         : "";
       return `
         <g class="${slotClass}">
+          <rect x="${cx - 14}" y="${cy - 14}" width="28" height="28" rx="8" class="slot-gap"></rect>
           <rect x="${cx - 15}" y="${cy - 15}" width="30" height="30" rx="6" class="slot-hitbox" ${slotAttr}></rect>
           <rect x="${cx - 11}" y="${cy - 11}" width="22" height="22" rx="3" class="slot-base" ${slotAttr}></rect>
           ${pieceMarkup}

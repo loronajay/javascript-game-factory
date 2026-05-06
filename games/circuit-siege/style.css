@@ -40,7 +40,7 @@ body {
 
 .shell {
   position: relative;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 80px 24px 32px;
 }
@@ -305,7 +305,7 @@ input {
 
 .match-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 200px;
   gap: 20px;
   align-items: start;
 }
@@ -320,7 +320,7 @@ input {
 .tool-dock {
   position: sticky;
   top: 24px;
-  width: 220px;
+  width: 200px;
   z-index: 2;
   padding: 14px 12px;
   border-radius: 22px;
@@ -539,6 +539,11 @@ input {
 
 .slot-base {
   stroke-width: 2.2;
+  pointer-events: none;
+}
+
+.slot-gap {
+  fill: #242b35;
   pointer-events: none;
 }
 
