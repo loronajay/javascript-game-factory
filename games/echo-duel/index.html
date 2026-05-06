@@ -33,7 +33,7 @@
           <button id="btn-join-private" class="btn">Join Private Room</button>
         </div>
         <p id="menu-notice" class="status-line menu-notice hidden"></p>
-        <p class="muted note">Gather a room, set the word, and pass the pressure around. Echo Duel should feel like a social standoff, not a form flow.</p>
+        <p class="muted note">Trade patterns, read the room, and try not to be the first one who breaks under the lights.</p>
       </section>
 
       <section id="screen-online-config" class="screen screen-panel">
@@ -117,28 +117,38 @@
           </div>
         </header>
 
-        <div id="players-strip" class="players-strip"></div>
-
-        <section class="sequence-stage">
-          <div class="sequence-readout">
-            <span id="sequence-label">Memory Track</span>
-            <div id="sequence-slots" class="sequence-slots" aria-label="Hidden sequence progress"></div>
-          </div>
-          <div id="live-signal-strip" class="live-signal-strip hidden" aria-label="Visible live signal"></div>
-          <div id="timer-wrap" class="timer-wrap hidden">
-            <div id="timer-bar" class="timer-bar"></div>
-          </div>
-          <p id="status-line" class="status-line"></p>
+        <section class="players-strip-frame">
+          <p class="section-kicker">Players In The Room</p>
+          <div id="players-strip" class="players-strip"></div>
         </section>
 
-        <div id="input-mode-banner" class="input-mode-banner mode-watch" aria-live="polite">WATCH</div>
+        <div class="match-stage-shell">
+          <section class="sequence-stage">
+            <p class="section-kicker">Signal Board</p>
+            <div class="sequence-readout">
+              <span id="sequence-label">Memory Track</span>
+              <div id="sequence-slots" class="sequence-slots" aria-label="Hidden sequence progress"></div>
+            </div>
+            <div id="live-signal-strip" class="live-signal-strip hidden" aria-label="Visible live signal"></div>
+            <div id="timer-wrap" class="timer-wrap hidden">
+              <div id="timer-bar" class="timer-bar"></div>
+            </div>
+            <p id="status-line" class="status-line"></p>
+          </section>
 
-        <section id="input-pad" class="pad pad--watch" aria-label="Echo Duel input pad">
-          <button class="pad-key key-w" data-echo-key="W"><span>W</span></button>
-          <button class="pad-key key-a" data-echo-key="A"><span>A</span></button>
-          <button class="pad-key key-s" data-echo-key="S"><span>S</span></button>
-          <button class="pad-key key-d" data-echo-key="D"><span>D</span></button>
-        </section>
+          <section class="input-deck">
+            <p class="section-kicker">Control Pad</p>
+            <div id="input-mode-banner" class="input-mode-banner mode-watch" aria-live="polite">WATCH</div>
+
+            <section id="input-pad" class="pad pad--watch" aria-label="Echo Duel input pad">
+              <button class="pad-key key-w" data-echo-key="W"><span>W</span></button>
+              <button class="pad-key key-a" data-echo-key="A"><span>A</span></button>
+              <button class="pad-key key-s" data-echo-key="S"><span>S</span></button>
+              <button class="pad-key key-d" data-echo-key="D"><span>D</span></button>
+            </section>
+            <p class="pad-caption">Four tones. One mistake. Everybody sees it.</p>
+          </section>
+        </div>
 
         <div class="match-controls">
           <button id="btn-exit" class="btn">Exit</button>

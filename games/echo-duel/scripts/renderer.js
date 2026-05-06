@@ -147,10 +147,21 @@ function renderPlayers(state) {
       const earned = letterIndex < player.letters.length;
       return `<span class="letter ${earned ? 'earned' : ''}">${earned ? letter : '_'}</span>`;
     }).join('');
+    const initials = String(player.name || 'P')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase() || '')
+      .join('') || 'P';
 
     card.innerHTML = `
-      <div class="player-name">${player.name}</div>
-      <div class="player-role">${player.eliminated ? 'Eliminated' : getRoleLabel(state, player)}</div>
+      <div class="player-card__identity">
+        <div class="player-card__badge" aria-hidden="true">${initials}</div>
+        <div class="player-card__meta">
+          <div class="player-name">${player.name}</div>
+          <div class="player-role">${player.eliminated ? 'Eliminated' : getRoleLabel(state, player)}</div>
+        </div>
+      </div>
       <div class="letter-track">${safeLetters}</div>
     `;
     strip.appendChild(card);
