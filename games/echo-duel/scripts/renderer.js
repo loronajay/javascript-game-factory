@@ -130,6 +130,80 @@ function renderInputMode(state) {
   }
 }
 
+
+function progressStateForPlayer(state, player) {
+  const owner = state.players[state.ownerIndex] || null;
+  const isOwner = owner?.id === player.id || owner?.clientId === player.clientId;
+  const sequenceLength = Number(state.activeSequence?.length || 0);
+
+  if (player.eliminated) {
+    return { label: 'ELIMINATED', current: 0, total: 0, status: 'eliminated' };
+  }
+
+  if (state.phase === PHASES.OWNER_CREATE_INITIAL) {
+    const total = Number(state.settings?.startingPatternLength || 4);
+    return isOwner
+      ? { label: 'DRIVING', current: Number(state.ownerDraft?.length || 0), total, status: 'driver' }
+      : { label: 'WATCHING DRIVER', current: 0, total, status: 'watching' };
+  }
+
+  if (state.phase === PHASES.OWNER_REPLAY) {
+    return isOwner
+      ? { label: 'REPLAYING', current: Number(state.ownerReplayIndex || 0), total: sequenceLength, status: 'driver' }
+      : { label: 'WATCHING DRIVER', current: 0, total: sequenceLength, status: 'watching' };
+  }
+
+  if (state.phase === PHASES.OWNER_APPEND) {
+    const target = Math.max(sequenceLength, Number(state.appendTargetLength || sequenceLength));
+    return isOwner
+      ? { label: 'ADDING INPUTS', current: sequenceLength, total: target, status: 'driver' }
+      : { label: 'WATCHING DRIVER', current: 0, total: target, status: 'watching' };
+  }
+
+  if (state.phase === PHASES.SIGNAL_PLAYBACK) {
+    const current = Math.max(0, Math.min(sequenceLength, getProgressCountForPhase(state)));
+    return isOwner
+      ? { label: 'PLAYING SIGNAL', current, total: sequenceLength, status: 'playback' }
+      : { label: 'MEMORIZE', current, total: sequenceLength, status: 'playback' };
+  }
+
+  if (state.phase === PHASES.CHALLENGER_COPY) {
+    if (isOwner) return { label: 'WATCHING', current: 0, total: sequenceLength, status: 'watching' };
+    const progress = state.copyProgress?.[player.id] || state.copyProgress?.[player.clientId] || null;
+    if (!progress) return { label: 'WAITING', current: 0, total: sequenceLength, status: 'watching' };
+    const current = Math.max(0, Math.min(sequenceLength, Number(progress.index || 0)));
+    if (progress.status === 'safe') return { label: 'DONE', current: sequenceLength, total: sequenceLength, status: 'safe' };
+    if (progress.status === 'fail') return { label: 'FAILED', current, total: sequenceLength, status: 'fail' };
+    return { label: 'COPYING', current, total: sequenceLength, status: 'copying' };
+  }
+
+  if (player.lastResult === 'safe') return { label: 'SAFE', current: sequenceLength, total: sequenceLength, status: 'safe' };
+  if (player.lastResult === 'fail') return { label: 'LETTER +1', current: 0, total: sequenceLength, status: 'fail' };
+  if (player.lastResult === 'owner-fail') return { label: 'DROPPED SIGNAL', current: 0, total: sequenceLength, status: 'fail' };
+  return isOwner
+    ? { label: 'DRIVER', current: 0, total: sequenceLength, status: 'driver' }
+    : { label: 'CHALLENGER', current: 0, total: sequenceLength, status: 'watching' };
+}
+
+function renderPlayerProgress(state, player) {
+  const progress = progressStateForPlayer(state, player);
+  const total = Math.max(0, Number(progress.total || 0));
+  const current = Math.max(0, Math.min(total, Number(progress.current || 0)));
+  const dots = total > 0
+    ? Array.from({ length: total }, (_, index) => `<span class="player-progress__dot${index < current ? ' is-filled' : ''}"></span>`).join('')
+    : '';
+  const count = total > 0 ? `<span class="player-progress__count">${current}/${total}</span>` : '';
+  return `
+    <div class="player-progress player-progress--${progress.status}">
+      <div class="player-progress__topline">
+        <span class="player-progress__label">${progress.label}</span>
+        ${count}
+      </div>
+      ${dots ? `<div class="player-progress__dots" aria-hidden="true">${dots}</div>` : ''}
+    </div>
+  `;
+}
+
 function renderPlayers(state) {
   const strip = qs('players-strip');
   if (!strip) return;
@@ -163,6 +237,7 @@ function renderPlayers(state) {
         </div>
       </div>
       <div class="letter-track">${safeLetters}</div>
+      ${renderPlayerProgress(state, player)}
     `;
     strip.appendChild(card);
   });

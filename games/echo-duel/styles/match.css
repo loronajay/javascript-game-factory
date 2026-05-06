@@ -211,6 +211,96 @@
   border: 1px solid rgba(184, 255, 100, 0.28);
 }
 
+
+.player-progress {
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(168, 220, 102, 0.12);
+  border-radius: 0.85rem;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.player-progress__topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.42rem;
+}
+
+.player-progress__label,
+.player-progress__count {
+  color: var(--muted-strong);
+  font-size: 0.68rem;
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.player-progress__count {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.player-progress__dots {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(7px, 1fr));
+  gap: 0.22rem;
+}
+
+.player-progress__dot {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.player-progress__dot.is-filled {
+  background: rgba(184, 255, 100, 0.72);
+  border-color: rgba(184, 255, 100, 0.22);
+  box-shadow: 0 0 10px rgba(184, 255, 100, 0.18);
+}
+
+.player-progress--copying {
+  border-color: rgba(240, 255, 152, 0.3);
+}
+
+.player-progress--copying .player-progress__dot.is-filled {
+  background: rgba(240, 255, 152, 0.82);
+}
+
+.player-progress--safe {
+  border-color: rgba(116, 245, 193, 0.34);
+}
+
+.player-progress--safe .player-progress__label,
+.player-progress--safe .player-progress__count {
+  color: rgba(143, 255, 224, 0.98);
+}
+
+.player-progress--fail {
+  border-color: rgba(255, 108, 120, 0.36);
+}
+
+.player-progress--fail .player-progress__label,
+.player-progress--fail .player-progress__count {
+  color: rgba(255, 150, 160, 0.98);
+}
+
+.player-progress--driver {
+  border-color: rgba(184, 255, 100, 0.34);
+  box-shadow: inset 0 0 18px rgba(184, 255, 100, 0.05);
+}
+
+.player-progress--playback {
+  border-color: rgba(116, 255, 200, 0.28);
+}
+
+.player-progress--watching,
+.player-progress--eliminated {
+  opacity: 0.72;
+}
+
 .sequence-stage {
   position: relative;
   padding: 1.2rem;
