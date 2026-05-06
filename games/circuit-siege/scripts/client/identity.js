@@ -1,3 +1,6 @@
+export const FACTORY_PROFILE_MODULE_SPECIFIER = "../../../../js/factory-profile.mjs";
+export const MATCH_IDENTITY_MODULE_SPECIFIER = "../../../../js/match-identity.mjs";
+
 function fallbackIdentity() {
   const storedName = localStorage.getItem("circuit-siege-name") || "";
   const storedPlayerId = localStorage.getItem("circuit-siege-player-id") || "";
@@ -13,8 +16,8 @@ function fallbackIdentity() {
 export async function loadCircuitSiegeIdentity() {
   try {
     const [profileMod, matchMod] = await Promise.all([
-      import("../../../js/platform/identity/factory-profile.mjs"),
-      import("../../../js/platform/identity/match-identity.mjs")
+      import(FACTORY_PROFILE_MODULE_SPECIFIER),
+      import(MATCH_IDENTITY_MODULE_SPECIFIER)
     ]);
 
     const profile = profileMod.loadFactoryProfile?.();
