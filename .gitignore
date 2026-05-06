@@ -26,3 +26,7 @@ dev/
 !games/*/*.test.mjs
 !games/*/tests/
 !games/*/tests/**
+
+# Echo Duel keeps its local regression tests out of shipped game builds.
+games/echo-duel/tests/
+games/echo-duel/tests/**

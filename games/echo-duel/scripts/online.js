@@ -37,6 +37,7 @@ export function createOnlineClient(gameId = 'echo-duel') {
   let ws = null;
   let clientId = null;
   let identity = sanitizeIdentity(null);
+  let inputId = 0;
 
   const cb = {
     onConnected: null,
@@ -67,6 +68,7 @@ export function createOnlineClient(gameId = 'echo-duel') {
   function handleEvent(data) {
     if (data.event === 'connected') {
       clientId = data.clientId;
+      inputId = 0;
       cb.onConnected?.({ clientId });
       return;
     }
@@ -189,6 +191,7 @@ export function createOnlineClient(gameId = 'echo-duel') {
   function sendInput(input, meta = {}) {
     lobbyMessage('input', {
       input,
+      inputId: ++inputId,
       phaseId: Number(meta.phaseId),
       turnId: Number(meta.turnId),
       clientTime: Date.now(),
@@ -203,6 +206,7 @@ export function createOnlineClient(gameId = 'echo-duel') {
     ws?.close();
     ws = null;
     clientId = null;
+    inputId = 0;
   }
 
   return {

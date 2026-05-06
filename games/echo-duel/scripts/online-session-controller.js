@@ -19,6 +19,7 @@ export function createOnlineSessionController({
   createMatchState,
   hydrateNetworkState,
   applyAuthoritativeMatchMessage,
+  getAuthoritativeSyncSeq = () => null,
   isAuthoritativeMatchMessageType,
   mergeLobbySnapshot,
   applyPlayerLeftToLobby,
@@ -48,6 +49,13 @@ export function createOnlineSessionController({
     if (online.lobbyCountdownTimer !== null) {
       windowLike.clearInterval(online.lobbyCountdownTimer);
       online.lobbyCountdownTimer = null;
+    }
+  }
+
+  function stopPendingMatchStart() {
+    if (online.pendingMatchStartTimer !== null) {
+      windowLike.clearTimeout?.(online.pendingMatchStartTimer);
+      online.pendingMatchStartTimer = null;
     }
   }
 
@@ -86,6 +94,11 @@ export function createOnlineSessionController({
   }
 
   function applyServerAuthoritativeState(messageType, value) {
+    const syncSeq = getAuthoritativeSyncSeq(value);
+    if (Number.isFinite(syncSeq) && syncSeq > 0 && syncSeq <= online.inboundStateSeq) {
+      return false;
+    }
+
     const next = applyAuthoritativeMatchMessage(getState(), messageType, value, {
       myClientId: online.net?.clientId || null,
       lobbyOwnerId: online.lobby?.ownerId || null,
@@ -95,9 +108,17 @@ export function createOnlineSessionController({
     if (!next) return false;
 
     stopLobbyCountdownTicker();
+    stopPendingMatchStart();
     online.authorityMode = "server";
     online.started = true;
-    if (shouldResetStartRequest({ lobbyStatus: online.lobby?.status || "", state: next })) {
+    if (Number.isFinite(syncSeq) && syncSeq > 0) {
+      online.inboundStateSeq = syncSeq;
+    }
+    if (shouldResetStartRequest({
+      lobbyStatus: online.lobby?.status || "",
+      lobbyStartAt: online.lobby?.startAt || null,
+      state: next,
+    })) {
       online.startRequested = false;
     }
     if (online.lobby && next.phase === PHASES.MATCH_OVER) {
@@ -135,8 +156,16 @@ export function createOnlineSessionController({
     net.cb.onLobbyUpdated = (payload) => {
       online.lobby = mergeLobbySnapshot(online.lobby, payload);
       online.isHost = payload.ownerId === net.clientId;
-      if (shouldResetStartRequest({ lobbyStatus: online.lobby?.status || "", state: getState() })) {
+      if (shouldResetStartRequest({
+        lobbyStatus: online.lobby?.status || "",
+        lobbyStartAt: online.lobby?.startAt || null,
+        state: getState(),
+      })) {
         online.startRequested = false;
+      }
+      if (online.lobby?.status === "open") {
+        online.started = false;
+        stopPendingMatchStart();
       }
       if (shouldTickLobbyCountdown(online.lobby)) startLobbyCountdownTicker();
       else stopLobbyCountdownTicker();
@@ -198,6 +227,7 @@ export function createOnlineSessionController({
       }
 
       if (!online.started && Number(payload.playerCount) < 2) {
+        stopPendingMatchStart();
         goMenuWithNotice("Your partner disconnected. The lobby was closed.");
         return;
       }
@@ -217,6 +247,10 @@ export function createOnlineSessionController({
       online.lobby.members = members;
 
       const start = () => {
+        online.pendingMatchStartTimer = null;
+        if (online.lobby?.roomCode !== payload.roomCode || online.lobby?.status !== "started") {
+          return;
+        }
         stopLobbyCountdownTicker();
         onMatchStarting?.();
         if (payload.authorityMode === "server" || payload.matchState || payload.snapshot) {
@@ -263,7 +297,8 @@ export function createOnlineSessionController({
       };
 
       const delay = Math.max(0, Number(payload.startAt || 0) - Date.now());
-      windowLike.setTimeout(start, delay);
+      stopPendingMatchStart();
+      online.pendingMatchStartTimer = windowLike.setTimeout(start, delay);
     };
 
     net.cb.onLobbyMessage = ({ messageType, value, senderId }) => {
@@ -352,6 +387,7 @@ export function createOnlineSessionController({
 
   function disconnectOnline() {
     stopLobbyCountdownTicker();
+    stopPendingMatchStart();
     online.net?.leaveLobby?.();
     online.net?.disconnect?.();
     resetOnlineRuntimeState(online);

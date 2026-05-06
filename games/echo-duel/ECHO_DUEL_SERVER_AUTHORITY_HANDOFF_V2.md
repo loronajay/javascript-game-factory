@@ -6,7 +6,31 @@ This is the implementation-ready v2 handoff for moving Echo Duel from a host-aut
 
 The original handoff diagnosed the right problem, but it bundled too many migrations together at once. This v2 keeps the same strategic direction while tightening scope, preserving current gameplay rules, and sequencing the work into safer passes.
 
-This doc should be treated as the working source of truth for the authority migration.
+This doc now serves as the implementation record for that migration plus the checklist for any optional cleanup that still remains.
+
+## Current Status
+
+Phase 1 is implemented across the Echo Duel client and the local `factory-network-server` repo:
+
+- authoritative match state lives on the server
+- Echo Duel clients consume authoritative `match_state` / playback / ended payloads
+- stale authoritative sync sequences are rejected client-side
+- duplicate authoritative inputs are deduped with per-input ids
+- pre-start input requests are ignored until the scheduled start time
+- live-match disconnect consequences are server-owned
+
+Phase 2 lobby hardening is also implemented in the current local server/client pair:
+
+- minimum players enable start instead of auto-starting
+- only the lobby owner can start
+- full or started lobbies reject joins
+- public search filters non-joinable lobbies
+- settings lock once startup begins
+- lobby ownership transfers before kickoff
+- pre-start countdowns can cancel cleanly back to an open lobby
+- empty lobbies clean up
+
+What remains from this doc is optional Phase 3 cleanup only unless future feature work reopens the protocol.
 
 ## Rules To Preserve
 

@@ -1,5 +1,5 @@
 import { PHASES } from './config.js';
-import { applyAuthoritativeMatchMessage, isAuthoritativeMatchMessageType } from './authority-sync.js';
+import { applyAuthoritativeMatchMessage, getAuthoritativeSyncSeq, isAuthoritativeMatchMessageType } from './authority-sync.js';
 import { activePlayers, cloneState, createMatchState, hydrateNetworkState, serializeStateForNetwork } from './state.js';
 import { handleInput, resolveCopyPhase, tick } from './engine.js';
 import { createInputController } from './input.js';
@@ -293,6 +293,7 @@ export function initGame() {
     createMatchState,
     hydrateNetworkState,
     applyAuthoritativeMatchMessage,
+    getAuthoritativeSyncSeq,
     isAuthoritativeMatchMessageType,
     mergeLobbySnapshot,
     applyPlayerLeftToLobby,

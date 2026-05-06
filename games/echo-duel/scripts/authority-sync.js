@@ -23,16 +23,19 @@ function isPlainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function mergeSnapshot(baseState, payload) {
+function getSnapshotSource(payload) {
   if (!isPlainObject(payload)) return null;
-
-  const embeddedState = isPlainObject(payload.state)
+  return isPlainObject(payload.state)
     ? payload.state
     : isPlainObject(payload.snapshot)
       ? payload.snapshot
-      : null;
+      : payload;
+}
 
-  const source = embeddedState || payload;
+function mergeSnapshot(baseState, payload) {
+  if (!isPlainObject(payload)) return null;
+
+  const source = getSnapshotSource(payload);
   const base = baseState ? cloneState(baseState) : createInitialState();
 
   const merged = {
@@ -93,6 +96,13 @@ function stampAuthorityNetworkMeta(state, context = {}) {
 
 export function isAuthoritativeMatchMessageType(messageType) {
   return AUTHORITATIVE_MATCH_MESSAGE_TYPES.includes(String(messageType || ""));
+}
+
+export function getAuthoritativeSyncSeq(value) {
+  const payload = safeParse(value);
+  const source = getSnapshotSource(payload);
+  const syncSeq = Number(source?.network?.syncSeq || 0);
+  return Number.isFinite(syncSeq) && syncSeq > 0 ? syncSeq : null;
 }
 
 export function applyAuthoritativeMatchMessage(currentState, messageType, value, context = {}) {

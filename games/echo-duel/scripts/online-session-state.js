@@ -6,8 +6,11 @@ export function shouldPreserveResultsScreen({ authorityMode = null, state = null
     && state?.phase === PHASES.MATCH_OVER;
 }
 
-export function shouldResetStartRequest({ lobbyStatus = "", state = null } = {}) {
-  return lobbyStatus === "ended" || state?.phase === PHASES.MATCH_OVER;
+export function shouldResetStartRequest({ lobbyStatus = "", lobbyStartAt = null, state = null } = {}) {
+  return lobbyStatus === "open"
+    || lobbyStatus === "ended"
+    || (!lobbyStartAt && lobbyStatus !== "started")
+    || state?.phase === PHASES.MATCH_OVER;
 }
 
 export function shouldCloseMatchToMenuOnPlayerLeft({

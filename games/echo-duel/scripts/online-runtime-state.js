@@ -11,6 +11,7 @@ function defaultOnlineRuntimeState() {
     outboundStateSeq: 0,
     inboundStateSeq: 0,
     lobbyCountdownTimer: null,
+    pendingMatchStartTimer: null,
     pendingAction: null,
   };
 }
