@@ -128,7 +128,7 @@ function getPlayerSprite(player) {
   }[player.dir] || 'playerDown';
 }
 
-function getBeaconCenter(map) {
+function getBeaconBounds(map) {
   if (!map.goals.length) return null;
   let minX = Infinity;
   let minY = Infinity;
@@ -140,42 +140,101 @@ function getBeaconCenter(map) {
     maxX = Math.max(maxX, goal.x);
     maxY = Math.max(maxY, goal.y);
   }
-  return {
-    x: Math.floor((minX + maxX) / 2),
-    y: Math.floor((minY + maxY) / 2)
-  };
+  return { minX, minY, maxX, maxY };
 }
 
-function drawBeaconIfCenter(ctx, map, x, y, sx, sy, size) {
-  const center = getBeaconCenter(map);
-  if (!center || center.x !== x || center.y !== y) return;
+function getBeaconPieceName(map, x, y) {
+  const bounds = getBeaconBounds(map);
+  if (!bounds) return null;
 
-  const drew = drawSpriteContain(ctx, 'beaconCore', sx + size / 2, sy + size / 2, size * 3.35, size * 3.35);
+  const centerX = Math.floor((bounds.minX + bounds.maxX) / 2);
+  const centerY = Math.floor((bounds.minY + bounds.maxY) / 2);
+  const localX = x - (centerX - 1);
+  const localY = y - (centerY - 1);
+
+  if (localX < 0 || localX > 2 || localY < 0 || localY > 2) return null;
+  return `beacon${localY}${localX}`;
+}
+
+function drawBeaconPiece(ctx, map, x, y, sx, sy, size) {
+  const piece = getBeaconPieceName(map, x, y);
+  if (!piece) return;
+
+  const drew = drawSprite(ctx, piece, sx, sy, size, size);
   if (!drew) drawGlyph(ctx, 'B', sx, sy, size, '#00130b');
 }
 
 function drawLaserDoor(ctx, door, sx, sy, size) {
   if (door.open) {
-    const drew = drawSpriteContain(ctx, 'laserDoorDisabled', sx + size / 2, sy + size / 2, size * 2.2, size * 1.25);
-    if (!drew) strokeTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.doorOpen);
-  } else {
-    const drew = drawSpriteContain(ctx, 'laserDoorActive', sx + size / 2, sy + size / 2, size * 2.65, size * 1.35);
-    if (!drew) {
-      fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.door);
-      drawGlyph(ctx, 'D', sx, sy, size, '#100014');
+    const leftDrew = drawSpriteContain(
+      ctx,
+      'laserDoorDisabledLeft',
+      sx - size / 2,
+      sy + size / 2,
+      size * 0.72,
+      size * 1.2
+    );
+    const rightDrew = drawSpriteContain(
+      ctx,
+      'laserDoorDisabledRight',
+      sx + size * 1.5,
+      sy + size / 2,
+      size * 0.72,
+      size * 1.2
+    );
+    if (!leftDrew || !rightDrew) strokeTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.doorOpen);
+    return;
+  }
+
+  const drew = drawSpriteContain(
+    ctx,
+    'laserDoorActiveWide',
+    sx + size / 2,
+    sy + size / 2,
+    size * 3.15,
+    size * 1.38
+  );
+
+  if (!drew) {
+    fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.door);
+    drawGlyph(ctx, 'D', sx, sy, size, '#100014');
+  }
+}
+
+
+function drawWorldObjects(ctx, state, size, offsetX, offsetY, startX, startY, tilesX, tilesY) {
+  const { map } = state;
+
+  for (let vy = 0; vy < tilesY; vy++) {
+    for (let vx = 0; vx < tilesX; vx++) {
+      const x = startX + vx;
+      const y = startY + vy;
+      const sx = offsetX + vx * size;
+      const sy = offsetY + vy * size;
+
+      if (isGoalAt(map, x, y)) {
+        drawBeaconPiece(ctx, map, x, y, sx, sy, size);
+      }
     }
+  }
+
+  for (const door of map.doors) {
+    const vx = door.x - startX;
+    const vy = door.y - startY;
+
+    // The active Laser Door is wider than one tile. Draw it when the door tile is near
+    // the current view so both side pillars can extend over neighboring floor tiles
+    // without being covered by later base-tile draws.
+    if (vx < -2 || vx > tilesX + 1 || vy < -1 || vy > tilesY) continue;
+
+    const sx = offsetX + vx * size;
+    const sy = offsetY + vy * size;
+    drawLaserDoor(ctx, door, sx, sy, size);
   }
 }
 
 function drawWorldEntity(ctx, state, x, y, sx, sy, size, now) {
   const { map, player, hazards } = state;
-
-  if (isGoalAt(map, x, y)) {
-    drawBeaconIfCenter(ctx, map, x, y, sx, sy, size);
-  }
-
-  const door = getDoorAt(map, x, y);
-  if (door) drawLaserDoor(ctx, door, sx, sy, size);
 
   const pickup = getPickupAt(map, x, y);
   if (pickup?.type === 'chip') {
@@ -261,6 +320,8 @@ function drawViewportWorld(ctx, state, now, size, offsetX, offsetY, startX, star
     }
   }
 
+  drawWorldObjects(ctx, state, size, offsetX, offsetY, startX, startY, VIEW_TILES_X, VIEW_TILES_Y);
+
   for (let vy = 0; vy < VIEW_TILES_Y; vy++) {
     for (let vx = 0; vx < VIEW_TILES_X; vx++) {
       const x = startX + vx;
@@ -343,6 +404,8 @@ export function renderDebugView(canvas, state, now) {
       drawTileBase(ctx, state.map, x, y, sx, sy, size);
     }
   }
+
+  drawWorldObjects(ctx, state, size, offsetX, offsetY, 0, 0, state.map.width, state.map.height);
 
   for (let y = 0; y < state.map.height; y++) {
     for (let x = 0; x < state.map.width; x++) {

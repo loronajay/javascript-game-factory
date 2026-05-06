@@ -531,14 +531,13 @@ Players interact with the grid as a constrained editor.
 
 V1 player actions:
 
-- select straight horizontal tile
-- select straight vertical tile
-- select corner tile family
-- rotate selected/refactorable tile
+- select exact wire tile from the tool HUD
+- rotate the held tile
+- lift an editable pre-placed tile into hand
 - replace a refactorable tile
 - insert a tile into an empty hole
 
-The player selects a corner family, then rotates it into one of the four valid corner orientations.
+The player may rotate the held tile until it matches the desired orientation before placing it.
 
 The game should not support freeform drawing.
 
@@ -552,9 +551,9 @@ The tool HUD should include:
 
 - straight horizontal piece
 - straight vertical piece
-- corner piece
-- rotate action
-- replace action
+- all four corner orientations as direct piece picks
+- a visible held-piece state
+- keyboard rotation of the held piece via `R`
 
 The HUD should be color-themed:
 

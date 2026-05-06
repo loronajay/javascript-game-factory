@@ -1,5 +1,15 @@
 import { getCellKey } from "../shared/circuit-board.js";
 
+function wrongMaskFromExpected(expectedMask) {
+  if (expectedMask === "EW") return "NS";
+  if (expectedMask === "NS") return "EW";
+  if (expectedMask === "NE") return "ES";
+  if (expectedMask === "ES") return "SW";
+  if (expectedMask === "SW") return "NW";
+  if (expectedMask === "NW") return "NE";
+  return null;
+}
+
 function formatTimer(totalMs = 0) {
   const clamped = Math.max(0, Math.floor(Number(totalMs) || 0));
   const totalSeconds = Math.ceil(clamped / 1000);
@@ -110,6 +120,9 @@ export function buildBoardViewModel({
       const key = getCellKey(x, y);
       const slot = slotByCell.get(key) || null;
       const slotState = slot ? snapshot?.slots?.[slot.slotId] || null : null;
+      const fallbackPlacedMask = slot?.slotType === "refactor"
+        ? wrongMaskFromExpected(slot.expectedMask)
+        : null;
       const terminal = terminalByCell.get(key) || null;
       const source = sourceByCell.get(key) || null;
       const isWall = x === board.centerWallColumn;
@@ -125,7 +138,7 @@ export function buildBoardViewModel({
         slotId: slot?.slotId || null,
         slotType: slot?.slotType || null,
         expectedMask: slot?.expectedMask || null,
-        placedMask: slotState?.placedMask ?? null,
+        placedMask: slotState?.placedMask ?? fallbackPlacedMask,
         locked: !!slotState?.locked,
         editableByLocalPlayer: !!slot && slot.owner === selectedSide,
         selected: !!slot && slot.slotId === selectedSlotId,

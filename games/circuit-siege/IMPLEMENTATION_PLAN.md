@@ -139,24 +139,22 @@ The existing debug demo gives us a useful starting seam, but it diverges from ca
 - route-hover cheat exists
 - route table exposes hidden debug structure
 - event log is debug-facing rather than player-facing
-- toolbar exposes exact masks directly instead of the final player tool model
 - no online phases, countdown, or disconnect handling
 - no platform room flow
 - no authoritative timer/win-state pipeline
 
 ### Important product mismatch
 
-The demo currently lets the player choose exact piece masks (`EW`, `NS`, `NE`, `ES`, `SW`, `NW`) directly.
+The clarified V1 interaction model should follow the demo more closely than this earlier plan assumed.
 
-The GDD describes a simpler player-facing model:
+The current intended player-facing model is:
 
-- straight horizontal
-- straight vertical
-- corner family
-- rotate
-- replace
+- exact piece picks for `EW`, `NS`, `NE`, `ES`, `SW`, and `NW`
+- `R` rotates the piece currently being held
+- clicking an editable pre-placed tile lifts that exact piece into hand
+- clicking an editable hole or editable refactor slot places the held piece if the slot belongs to the local player
 
-That means the demo's interaction code should be treated as a prototype seam, not the final UX contract.
+So the demo's piece-palette and held-piece flow are valid product references, while its debug cheats and local authority are not.
 
 ## 7. Architecture Rule
 
