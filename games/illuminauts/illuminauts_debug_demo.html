@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Illuminauts Debug Demo</title>
+  <style>
+    :root {
+      --bg: #050711;
+      --panel: #0b1020;
+      --panel-2: #111a31;
+      --line: #27324f;
+      --text: #dbe7ff;
+      --muted: #7f8da8;
+      --cyan: #7df9ff;
+      --blue: #4aa3ff;
+      --red: #ff5570;
+      --yellow: #ffd166;
+      --green: #83f28f;
+      --violet: #b78cff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at center, #101832 0%, var(--bg) 72%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+      padding: 12px;
+    }
+
+    header, footer {
+      border: 1px solid var(--line);
+      background: rgba(11, 16, 32, 0.86);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 0 22px rgba(74, 163, 255, 0.08);
+    }
+
+    .title {
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      text-shadow: 0 0 10px rgba(125, 249, 255, 0.45);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hud {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .hud-item {
+      border: 1px solid var(--line);
+      background: rgba(17, 26, 49, 0.9);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      min-width: 84px;
+      text-align: center;
+    }
+
+    .hearts { color: var(--red); }
+    .chips { color: var(--yellow); }
+    .power { color: var(--cyan); }
+    .stamina { color: var(--green); }
+
+    .views {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .view-card {
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(6, 10, 24, 0.92);
+      padding: 10px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 8px;
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .view-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      padding: 0 2px;
+    }
+
+    .view-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .view-note {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 10px;
+      background: #02040a;
+      image-rendering: pixelated;
+    }
+
+    footer {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .kbd {
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      background: rgba(255,255,255,0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <div class="title">Illuminauts Debug Demo</div>
+        <div class="hint">Left: canon limited-vision game view. Right: full debug map.</div>
+      </div>
+      <div class="hud" aria-label="placeholder HUD">
+        <div class="hud-item hearts" id="hudHearts">♥ ♥ ♥</div>
+        <div class="hud-item chips" id="hudChips">Chips: 0</div>
+        <div class="hud-item stamina" id="hudStamina">Stamina: 100%</div>
+        <div class="hud-item power" id="hudPower">Power: Off</div>
+      </div>
+    </header>
+
+    <main class="views">
+      <section class="view-card">
+        <div class="view-head">
+          <div class="view-title">Game View</div>
+          <div class="view-note">Zoomed camera + suit light radius</div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+      </section>
+
+      <section class="view-card">
+        <div class="view-head">
+          <div class="view-title">Debug View</div>
+          <div class="view-note">Full map, player, pickups, doors, hazards</div>
+        </div>
+        <canvas id="debugCanvas"></canvas>
+      </section>
+    </main>
+
+    <footer>
+      <div>
+        Move with <span class="kbd">WASD</span> or <span class="kbd">Arrow Keys</span>. Hold <span class="kbd">Shift</span> to sprint. Press <span class="kbd">E</span> on a Power Cell to trigger temporary expanded vision. This demo intentionally focuses on movement, wall collision, narrow corridors, and rendering split-view debug support.
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const TILE = 32;
+      const GAME_TILE = 64;
+      const PLAYER_STEP_MS = 130;
+      const SPRINT_STEP_MS = 75;
+      const BASE_LIGHT_RADIUS = 2.35;
+      const POWER_LIGHT_RADIUS = 4.75;
+      const POWER_DURATION_MS = 15000;
+      const STAMINA_MAX = 100;
+      const STAMINA_DRAIN_PER_STEP = 7;
+      const STAMINA_RECOVER_PER_SEC = 22;
+
+      const gameCanvas = document.getElementById('gameCanvas');
+      const debugCanvas = document.getElementById('debugCanvas');
+      const gameCtx = gameCanvas.getContext('2d');
+      const debugCtx = debugCanvas.getContext('2d');
+
+      const hudHearts = document.getElementById('hudHearts');
+      const hudChips = document.getElementById('hudChips');
+      const hudStamina = document.getElementById('hudStamina');
+      const hudPower = document.getElementById('hudPower');
+
+      // Legend:
+      // # wall, . floor, S start, C access chip, P power cell, D laser door, G beacon core,
+      // A alien patrol placeholder, T laser turret placeholder, L laser gate placeholder.
+      const RAW_MAP = [
+        '#########################',
+        '#S..#.....#.......#.....#',
+        '###.#.###.#.#####.#.###.#',
+        '#...#...#.#.....#.#...#.#',
+        '#.#####.#.#####.#.###.#.#',
+        '#.....#.#.....#.#...#.#.#',
+        '#.###.#.#####.#.###.#.#.#',
+        '#.#...#.....#.#.#...#...#',
+        '#.#.#######.#.#.#.#####.#',
+        '#.#.....#...#...#.....#.#',
+        '#.#####.#.#######.###.#.#',
+        '#.....#.#.....C...#...#.#',
+        '#####.#.#####D#####.###.#',
+        '#.....#.....#.....#...#.#',
+        '#.#########.#.###.###.#.#',
+        '#.....P...#.#.#G#.....#.#',
+        '#.#######.#.#.#.#######.#',
+        '#.......#...#.#.........#',
+        '#.#####.#####.#.#######.#',
+        '#.#...#.....#.#.....#...#',
+        '#.#.#.#####.#.#####.#.###',
+        '#...#.....#...P.....#...#',
+        '#########################'
+      ];
+
+      const map = RAW_MAP.map(row => row.split(''));
+      const mapH = map.length;
+      const mapW = map[0].length;
+
+      const pickups = [];
+      const doors = [];
+      const markers = [];
+      let start = { x: 1, y: 1 };
+
+      for (let y = 0; y < mapH; y++) {
+        for (let x = 0; x < mapW; x++) {
+          const cell = map[y][x];
+          if (cell === 'S') {
+            start = { x, y };
+            map[y][x] = '.';
+          } else if (cell === 'C') {
+            pickups.push({ x, y, type: 'chip', active: true });
+            map[y][x] = '.';
+          } else if (cell === 'P') {
+            pickups.push({ x, y, type: 'power', active: true });
+            map[y][x] = '.';
+          } else if (cell === 'D') {
+            doors.push({ x, y, open: false });
+            map[y][x] = '.';
+          } else if (cell === 'G') {
+            markers.push({ x, y, type: 'goal' });
+            map[y][x] = '.';
+          }
+        }
+      }
+
+      const player = {
+        x: start.x,
+        y: start.y,
+        hearts: 3,
+        chips: 0,
+        stamina: STAMINA_MAX,
+        lastMoveAt: 0,
+        powerUntil: 0
+      };
+
+      const keys = new Set();
+      const pressed = new Set();
+
+      window.addEventListener('keydown', (event) => {
+        keys.add(event.code);
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(event.code)) {
+          event.preventDefault();
+        }
+        if (event.code === 'KeyE') {
+          tryActivatePowerCell();
+        }
+      });
+
+      window.addEventListener('keyup', (event) => {
+        keys.delete(event.code);
+      });
+
+      function resizeCanvasToDisplaySize(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.floor(rect.width * dpr));
+        const height = Math.max(1, Math.floor(rect.height * dpr));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { width: rect.width, height: rect.height };
+      }
+
+      function doorAt(x, y) {
+        return doors.find(door => door.x === x && door.y === y);
+      }
+
+      function isWall(x, y) {
+        if (x < 0 || y < 0 || x >= mapW || y >= mapH) return true;
+        if (map[y][x] === '#') return true;
+        const door = doorAt(x, y);
+        return !!door && !door.open;
+      }
+
+      function tryMove(dx, dy, now) {
+        const sprinting = isSprintHeld() && player.stamina >= STAMINA_DRAIN_PER_STEP;
+        const stepMs = sprinting ? SPRINT_STEP_MS : PLAYER_STEP_MS;
+        if (now - player.lastMoveAt < stepMs) return;
+
+        const nx = player.x + dx;
+        const ny = player.y + dy;
+        const door = doorAt(nx, ny);
+        if (door && !door.open) {
+          if (player.chips > 0) {
+            player.chips -= 1;
+            door.open = true;
+          }
+          player.lastMoveAt = now;
+          return;
+        }
+
+        if (!isWall(nx, ny)) {
+          player.x = nx;
+          player.y = ny;
+          player.lastMoveAt = now;
+          if (sprinting) {
+            player.stamina = Math.max(0, player.stamina - STAMINA_DRAIN_PER_STEP);
+          }
+          collectStandingPickup();
+        }
+      }
+
+      function collectStandingPickup() {
+        for (const pickup of pickups) {
+          if (!pickup.active) continue;
+          if (pickup.x === player.x && pickup.y === player.y) {
+            if (pickup.type === 'chip') {
+              pickup.active = false;
+              player.chips += 1;
+            }
+            // Power cells require E for this debug version so collection and activation can be tested separately.
+          }
+        }
+      }
+
+      function tryActivatePowerCell() {
+        for (const pickup of pickups) {
+          if (!pickup.active) continue;
+          if (pickup.type !== 'power') continue;
+          if (pickup.x === player.x && pickup.y === player.y) {
+            pickup.active = false;
+            player.powerUntil = performance.now() + POWER_DURATION_MS;
+            return;
+          }
+        }
+      }
+
+      function isSprintHeld() {
+        return keys.has('ShiftLeft') || keys.has('ShiftRight');
+      }
+
+      function getMoveDirection() {
+        if (keys.has('KeyW') || keys.has('ArrowUp')) return { dx: 0, dy: -1 };
+        if (keys.has('KeyS') || keys.has('ArrowDown')) return { dx: 0, dy: 1 };
+        if (keys.has('KeyA') || keys.has('ArrowLeft')) return { dx: -1, dy: 0 };
+        if (keys.has('KeyD') || keys.has('ArrowRight')) return { dx: 1, dy: 0 };
+        return null;
+      }
+
+      function update(now, dt) {
+        const dir = getMoveDirection();
+        if (dir) tryMove(dir.dx, dir.dy, now);
+
+        if (!isSprintHeld() || !dir || player.stamina <= 0) {
+          player.stamina = Math.min(STAMINA_MAX, player.stamina + STAMINA_RECOVER_PER_SEC * dt);
+        }
+
+        updateHud(now);
+      }
+
+      function updateHud(now) {
+        hudHearts.textContent = '♥ '.repeat(player.hearts).trim();
+        hudChips.textContent = `Chips: ${player.chips}`;
+        hudStamina.textContent = `Stamina: ${Math.round(player.stamina)}%`;
+        if (player.powerUntil > now) {
+          const remaining = Math.ceil((player.powerUntil - now) / 1000);
+          hudPower.textContent = `Power: ${remaining}s`;
+        } else {
+          hudPower.textContent = 'Power: Off';
+        }
+      }
+
+      function hasPower(now) {
+        return player.powerUntil > now;
+      }
+
+      function drawTile(ctx, x, y, px, py, size, visible = true) {
+        const cell = map[y][x];
+        if (cell === '#') {
+          ctx.fillStyle = visible ? '#1b2948' : '#070a12';
+          ctx.fillRect(px, py, size, size);
+          if (visible) {
+            ctx.strokeStyle = 'rgba(125,249,255,0.10)';
+            ctx.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
+          }
+        } else {
+          ctx.fillStyle = visible ? '#07101f' : '#02040a';
+          ctx.fillRect(px, py, size, size);
+          if (visible) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+            ctx.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
+          }
+        }
+      }
+
+      function drawEntityGlyph(ctx, label, x, y, size, color, glow = true) {
+        const cx = x + size / 2;
+        const cy = y + size / 2;
+        ctx.save();
+        if (glow) {
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 12;
+        }
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#041018';
+        ctx.font = `700 ${Math.floor(size * 0.28)}px system-ui`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, cx, cy + 1);
+        ctx.restore();
+      }
+
+      function drawGameView(now) {
+        const { width, height } = resizeCanvasToDisplaySize(gameCanvas);
+        const ctx = gameCtx;
+        ctx.clearRect(0, 0, width, height);
+
+        const radius = hasPower(now) ? POWER_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
+        const colsVisible = Math.ceil(width / GAME_TILE) + 4;
+        const rowsVisible = Math.ceil(height / GAME_TILE) + 4;
+        const startX = Math.floor(player.x - colsVisible / 2);
+        const startY = Math.floor(player.y - rowsVisible / 2);
+        const offsetX = width / 2 - (player.x + 0.5) * GAME_TILE;
+        const offsetY = height / 2 - (player.y + 0.5) * GAME_TILE;
+
+        ctx.fillStyle = '#010208';
+        ctx.fillRect(0, 0, width, height);
+
+        for (let y = startY; y < startY + rowsVisible; y++) {
+          for (let x = startX; x < startX + colsVisible; x++) {
+            if (x < 0 || y < 0 || x >= mapW || y >= mapH) continue;
+            const dx = x + 0.5 - (player.x + 0.5);
+            const dy = y + 0.5 - (player.y + 0.5);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > radius + 0.6) continue;
+            const visibleStrength = Math.max(0, 1 - dist / (radius + 0.75));
+            const px = x * GAME_TILE + offsetX;
+            const py = y * GAME_TILE + offsetY;
+            ctx.globalAlpha = 0.35 + visibleStrength * 0.65;
+            drawTile(ctx, x, y, px, py, GAME_TILE, true);
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        for (const marker of markers) {
+          drawIfVisibleInGame(ctx, marker.x, marker.y, radius, offsetX, offsetY, GAME_TILE, () => {
+            drawEntityGlyph(ctx, 'G', marker.x * GAME_TILE + offsetX, marker.y * GAME_TILE + offsetY, GAME_TILE, '#7df9ff');
+          });
+        }
+
+        for (const door of doors) {
+          if (door.open) continue;
+          drawIfVisibleInGame(ctx, door.x, door.y, radius, offsetX, offsetY, GAME_TILE, () => {
+            const px = door.x * GAME_TILE + offsetX;
+            const py = door.y * GAME_TILE + offsetY;
+            ctx.save();
+            ctx.shadowColor = '#ff5570';
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = 'rgba(255,85,112,0.55)';
+            ctx.fillRect(px + GAME_TILE * 0.18, py + GAME_TILE * 0.12, GAME_TILE * 0.64, GAME_TILE * 0.76);
+            ctx.restore();
+          });
+        }
+
+        for (const pickup of pickups) {
+          if (!pickup.active) continue;
+          drawIfVisibleInGame(ctx, pickup.x, pickup.y, radius, offsetX, offsetY, GAME_TILE, () => {
+            const label = pickup.type === 'chip' ? 'C' : 'P';
+            const color = pickup.type === 'chip' ? '#ffd166' : '#7df9ff';
+            drawEntityGlyph(ctx, label, pickup.x * GAME_TILE + offsetX, pickup.y * GAME_TILE + offsetY, GAME_TILE, color);
+          });
+        }
+
+        drawPlayer(ctx, width / 2 - GAME_TILE / 2, height / 2 - GAME_TILE / 2, GAME_TILE);
+        drawLightOverlay(ctx, width, height, radius * GAME_TILE);
+      }
+
+      function drawIfVisibleInGame(ctx, tx, ty, radius, offsetX, offsetY, size, draw) {
+        const dx = tx + 0.5 - (player.x + 0.5);
+        const dy = ty + 0.5 - (player.y + 0.5);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= radius + 0.25) draw();
+      }
+
+      function drawLightOverlay(ctx, width, height, radiusPx) {
+        ctx.save();
+        const cx = width / 2;
+        const cy = height / 2;
+        const gradient = ctx.createRadialGradient(cx, cy, radiusPx * 0.4, cx, cy, radiusPx * 1.18);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(0.68, 'rgba(0,0,0,0.08)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0.96)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+
+      function drawDebugView() {
+        const { width, height } = resizeCanvasToDisplaySize(debugCanvas);
+        const ctx = debugCtx;
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#02040a';
+        ctx.fillRect(0, 0, width, height);
+
+        const size = Math.min(width / mapW, height / mapH);
+        const ox = (width - mapW * size) / 2;
+        const oy = (height - mapH * size) / 2;
+
+        for (let y = 0; y < mapH; y++) {
+          for (let x = 0; x < mapW; x++) {
+            drawTile(ctx, x, y, ox + x * size, oy + y * size, size, true);
+          }
+        }
+
+        for (const marker of markers) {
+          drawEntityGlyph(ctx, 'G', ox + marker.x * size, oy + marker.y * size, size, '#7df9ff');
+        }
+
+        for (const door of doors) {
+          const px = ox + door.x * size;
+          const py = oy + door.y * size;
+          ctx.fillStyle = door.open ? 'rgba(100,255,150,0.4)' : 'rgba(255,85,112,0.75)';
+          ctx.fillRect(px + size * 0.15, py + size * 0.15, size * 0.7, size * 0.7);
+        }
+
+        for (const pickup of pickups) {
+          if (!pickup.active) continue;
+          const label = pickup.type === 'chip' ? 'C' : 'P';
+          const color = pickup.type === 'chip' ? '#ffd166' : '#7df9ff';
+          drawEntityGlyph(ctx, label, ox + pickup.x * size, oy + pickup.y * size, size, color, false);
+        }
+
+        drawPlayer(ctx, ox + player.x * size, oy + player.y * size, size);
+
+        ctx.strokeStyle = 'rgba(125,249,255,0.42)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ox + 0.5, oy + 0.5, mapW * size - 1, mapH * size - 1);
+      }
+
+      function drawPlayer(ctx, px, py, size) {
+        const cx = px + size / 2;
+        const cy = py + size / 2;
+        ctx.save();
+        ctx.shadowColor = '#4aa3ff';
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = '#4aa3ff';
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#eaf6ff';
+        ctx.beginPath();
+        ctx.arc(cx + size * 0.08, cy - size * 0.08, size * 0.07, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        update(now, dt);
+        drawGameView(now);
+        drawDebugView(now);
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

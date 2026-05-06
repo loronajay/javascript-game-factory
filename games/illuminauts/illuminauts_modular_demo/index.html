@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Illuminauts Modular Debug Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <div class="title">Illuminauts Debug Build</div>
+        <div class="subtitle">Left: canon limited-vision view. Right: full-map debug view.</div>
+      </div>
+      <div class="hud" aria-label="HUD">
+        <div class="hud-pill hearts">HEARTS <span id="hudHearts">3/3</span></div>
+        <div class="hud-pill chips">ACCESS CHIPS <span id="hudChips">0</span></div>
+        <div class="hud-pill stamina">STAMINA <span id="hudStamina">100%</span></div>
+        <div class="hud-pill power">POWER CELL <span id="hudPower">OFF</span></div>
+      </div>
+    </header>
+
+    <main class="views">
+      <section class="panel">
+        <div class="panel-head">
+          <span>Canon Game View</span>
+          <span class="small">limited suit light</span>
+        </div>
+        <canvas id="gameCanvas" width="720" height="540"></canvas>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span>Debug Map View</span>
+          <span class="small">full layout + hazards</span>
+        </div>
+        <canvas id="debugCanvas" width="720" height="540"></canvas>
+      </section>
+    </main>
+
+    <footer class="bottombar">
+      <span><strong>Move:</strong> WASD / Arrow Keys</span>
+      <span><strong>Sprint:</strong> Hold Shift</span>
+      <span><strong>Power Cell:</strong> Stand on cell + press E</span>
+      <span><strong>Goal:</strong> reach the Beacon Core</span>
+    </footer>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

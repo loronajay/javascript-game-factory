@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Circuit Siege | Javascript Game Factory</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="../../js/platform-config.js"></script>
+</head>
+<body>
+  <a href="../../grid.html" class="back-link">&larr; Arcade</a>
+  <main class="shell">
+    <div class="shell__glow shell__glow--blue" aria-hidden="true"></div>
+    <div class="shell__glow shell__glow--red" aria-hidden="true"></div>
+
+    <section class="screen screen--active" data-screen="menu">
+      <div class="hero">
+        <p class="eyebrow">Javascript Game Factory</p>
+        <h1>Circuit Siege</h1>
+        <p class="tagline">Trace, repair, and race to five live damage routes before the other command chair does.</p>
+        <p id="menu-notice" class="status-line"></p>
+      </div>
+      <div class="menu-actions">
+        <button id="btn-public-blue" class="action action--blue">Queue Public As Blue</button>
+        <button id="btn-public-red" class="action action--red">Queue Public As Red</button>
+        <button id="btn-private-host" class="action">Host Private Room</button>
+        <div class="join-row">
+          <input id="room-code-input" type="text" maxlength="8" placeholder="ROOM CODE">
+          <button id="btn-private-join" class="action action--ghost">Join Room</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="matchmaking">
+      <div class="panel">
+        <p class="eyebrow">Online Lobby</p>
+        <h2 id="room-code">-----</h2>
+        <p id="queue-status" class="status-line"></p>
+        <p id="lobby-status" class="status-line"></p>
+        <div class="lobby-actions">
+          <button id="btn-ready" class="action action--blue">Ready Up</button>
+          <button id="btn-start-match" class="action action--red">Start Match</button>
+          <button data-leave class="action action--ghost">Leave</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="match">
+      <div class="match-shell">
+        <header class="match-header">
+          <div class="score-block score-block--blue">
+            <span>Blue Damage</span>
+            <strong id="score-blue">0 / 5</strong>
+          </div>
+          <div class="status-block">
+            <span id="match-timer">5:00</span>
+            <p id="match-status" class="status-line" data-tone="neutral"></p>
+          </div>
+          <div class="score-block score-block--red">
+            <span>Red Damage</span>
+            <strong id="score-red">0 / 5</strong>
+          </div>
+        </header>
+
+        <div class="match-grid">
+          <section class="board-panel">
+            <p class="eyebrow">Shared Circuit Floor</p>
+            <div class="tool-palette" aria-label="Repair tools">
+              <button class="tool" data-tool="straight-h">Straight H</button>
+              <button class="tool" data-tool="straight-v">Straight V</button>
+              <button class="tool" data-tool="corner">Corner</button>
+              <button class="tool" data-tool="rotate">Rotate</button>
+            </div>
+            <div id="board-grid" class="board-grid" aria-label="Circuit board"></div>
+          </section>
+          <aside class="route-panel">
+            <p class="eyebrow">Route Ledger</p>
+            <ul id="route-summary" class="route-summary-list"></ul>
+            <button data-leave class="action action--ghost action--wide">Exit To Menu</button>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initGame } from "./game.js";
+    initGame();
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "title": "Circuit Siege",
+  "tagline": "Trace fast. Repair clean. Burn five live routes first.",
+  "description": "An online-first 1v1 circuit repair duel built around mirrored boards, authoritative route validation, and rapid source-to-terminal reads.",
+  "players": "2",
+  "status": "In development",
+  "order": 8,
+  "featured": false,
+  "theme": "circuit",
+  "accentColor": "#3c86ff"
+}
