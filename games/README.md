@@ -6,6 +6,7 @@ This folder holds the game cabinets for Javascript Game Factory. Each game shoul
 
 - `battleshits/`: implemented online Battleship-style cabinet with its own tests and assets
 - `build-buddy/`: design-only co-op platformer concept, currently documented through its GDD
+- `circuit-siege/`: active online-authoritative 1v1 route-repair cabinet with shared rules, client/server tests, and a coordinated dependency on `factory-network-server`
 - `creature-battle/`: creature battler and RPG planning workspace with deep design docs and simulators
 - `echo-duel/`: documented online memory duel prototype
 - `lovers-lost/`: implemented split-screen reunion runner with its own tests and assets

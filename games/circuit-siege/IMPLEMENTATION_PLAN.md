@@ -1,5 +1,36 @@
 # Circuit Siege - Online-First Implementation Plan
 
+## 0. Current Status
+
+As of the current implementation pass, Circuit Siege is no longer just a scope document. The game now has a working online-authoritative vertical slice in this repo plus matching authoritative handlers in `factory-network-server`.
+
+### Implemented now
+
+- shared authored board data and canonical route validation
+- authoritative match engine, room engine, and server bridge contract
+- public matchmaking and private room flow
+- browser-side session controller, board renderer, and held-piece tool flow
+- exact mask tools for `EW`, `NS`, `NE`, `ES`, `SW`, and `NW`
+- `R` rotates the held piece
+- `F` swaps held-piece family between straight and corner
+- clicking an editable pre-placed tile lifts that piece into hand
+- server-authoritative route completion, scoring, and completed-route lockout
+- browser/local regression coverage for shared rules, server flow, and client flow
+
+### Important current caveat
+
+Circuit Siege website testing is only valid when the matching Circuit Siege authoritative files in `factory-network-server` are deployed. The client and local harness can look correct while the live site still behaves incorrectly if the server repo is on an older authored-board version.
+
+### Current focus
+
+The project has moved out of architecture bootstrap and into gameplay/readability polish. The biggest remaining work is now in:
+
+- menu and lobby clarity
+- board readability and slot affordances
+- route-tracing clarity under pressure
+- final interaction polish around held pieces and toolkit behavior
+- continued validation that authored routes are readable and fair in real matches
+
 ## 1. Purpose
 
 This document scopes **Circuit Siege** for implementation in this repo using the existing planning docs as canon and the `circuit_siege_debug_demo_v0_5` prototype only as a reference.
@@ -366,16 +397,14 @@ Rendering tests should stay light. The highest-value tests are in shared rules a
 
 ## 13. Immediate Next Build Slice
 
-The safest first implementation slice is not "make the current demo prettier."
+The original bootstrap slice is complete. The next safe slice is now gameplay and readability tightening on top of the authoritative foundation:
 
-The safest first slice is:
+1. Simplify menu and lobby flow until it matches the intended online rhythm.
+2. Keep the held-piece and toolkit model aligned with the demo/GDD interaction contract.
+3. Improve board readability so editable slots, completed routes, and dud vs damage outcomes are obvious under pressure.
+4. Continue testing real authored routes in both the local harness and live deployed multiplayer flow whenever board data changes.
 
-1. Freeze one authored canonical board schema.
-2. Build pure validation around it.
-3. Wrap the current board interaction in a command/snapshot contract.
-4. Only then connect it to actual online room flow.
-
-That sequence protects the hardest invariant in the game: strict route identity and authoritative validation.
+That sequence protects the current hard invariant: the authoritative route logic is in place, so polish work should improve clarity without reintroducing rules drift.
 
 ## 14. Open Choices We Should Lock Soon
 

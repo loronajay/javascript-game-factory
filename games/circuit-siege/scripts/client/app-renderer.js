@@ -204,7 +204,6 @@ export function createAppRenderer(root = document) {
     status: root.querySelector("#match-status"),
     selectionStatus: root.querySelector("#selection-status"),
     boardGrid: root.querySelector("#board-grid"),
-    startButton: root.querySelector("#btn-start-match"),
     toolButtons: Array.from(root.querySelectorAll("[data-tool]"))
   };
 
@@ -249,11 +248,6 @@ export function createAppRenderer(root = document) {
     }
     if (els.selectionStatus) {
       els.selectionStatus.textContent = viewModel.board.selectionText || "";
-    }
-    if (els.startButton) {
-      els.startButton.hidden = viewModel.lobbyStartAction.hidden;
-      els.startButton.disabled = viewModel.lobbyStartAction.disabled;
-      els.startButton.textContent = viewModel.lobbyStartAction.text;
     }
     if (els.toolDock) {
       els.toolDock.classList.toggle("tool-dock--hidden", viewModel.screen !== "match");

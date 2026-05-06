@@ -196,26 +196,6 @@ export function createCircuitSiegeSessionController({
     return true;
   }
 
-  function requestReady(ready = true) {
-    if (!runtime.net || !runtime.lobby) {
-      return false;
-    }
-
-    runtime.net.sendPlayerReady?.(!!ready);
-    emitLobbyState();
-    return true;
-  }
-
-  function requestStartNow() {
-    if (!runtime.net || !runtime.isHost || Number(runtime.lobby?.playerCount || 0) < 2) {
-      return false;
-    }
-
-    runtime.net.requestStart?.();
-    emitLobbyState();
-    return true;
-  }
-
   function submitIntent(intent) {
     if (!runtime.net || !intent) {
       return false;
@@ -260,8 +240,6 @@ export function createCircuitSiegeSessionController({
     startPublicMatch,
     startPrivateCreate,
     startPrivateJoin,
-    requestReady,
-    requestStartNow,
     submitIntent,
     cancelSearch,
     leaveLobby,

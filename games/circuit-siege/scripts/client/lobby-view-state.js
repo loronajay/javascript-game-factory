@@ -63,12 +63,11 @@ export function getLobbyStatusText({
     return "Waiting for opponent to join...";
   }
 
-  return "Ready to start.";
+  return "Opponent connected. Starting match...";
 }
 
 export function buildLobbyActionHint({
   lobby = null,
-  isHost = false,
   matchReady = null,
   lobbyPhase = "main",
   selectedSide = "blue"
@@ -103,31 +102,5 @@ export function buildLobbyActionHint({
     return "Your opponent still needs to join this room.";
   }
 
-  if (isHost) {
-    return "Both players must Ready Up. The host can start once both players are ready.";
-  }
-
-  return "Both players must Ready Up. Wait for the host to start once both players are ready.";
-}
-
-export function buildLobbyStartActionState({
-  isHost = false,
-  lobby = null,
-  startRequested = false,
-  lobbyPhase = "main"
-} = {}) {
-  if (lobbyPhase !== "room") {
-    return {
-      hidden: true,
-      disabled: true,
-      text: "Start Match"
-    };
-  }
-
-  const ready = Number(lobby?.playerCount || 0) >= 2;
-  return {
-    hidden: !isHost,
-    disabled: !isHost || !ready || startRequested,
-    text: startRequested ? "Starting..." : "Start Match"
-  };
+  return "Match starts automatically once both players are connected.";
 }

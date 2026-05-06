@@ -1,6 +1,5 @@
 import {
   buildLobbyActionHint,
-  buildLobbyStartActionState,
   getLobbyStatusText,
   getQueueStatusText
 } from "./lobby-view-state.js";
@@ -110,16 +109,9 @@ export function createCircuitSiegeAppController({
       }),
       lobbyActionHint: buildLobbyActionHint({
         lobby: runtime.lobby,
-        isHost: runtime.isHost,
         matchReady: runtime.matchReady,
         lobbyPhase: queueSetupViewModel.lobbyPhase,
         selectedSide
-      }),
-      lobbyStartAction: buildLobbyStartActionState({
-        isHost: runtime.isHost,
-        lobby: runtime.lobby,
-        startRequested: !!runtime.matchReady,
-        lobbyPhase: queueSetupViewModel.lobbyPhase
       }),
       joinRoomCode: queueSetupViewModel.joinRoomCode,
       roomCode: runtime.lobby?.roomCode || "-----",
@@ -224,18 +216,6 @@ export function createCircuitSiegeAppController({
     }
 
     return joinPrivateRoom(queueSetupState.joinRoomCode);
-  }
-
-  function requestReady(ready = true) {
-    const handled = sessionController.requestReady(ready);
-    rerender();
-    return handled;
-  }
-
-  function requestStartNow() {
-    const handled = sessionController.requestStartNow();
-    rerender();
-    return handled;
   }
 
   function leaveMatchmaking() {
@@ -417,8 +397,6 @@ export function createCircuitSiegeAppController({
     submitJoinRoom,
     startPrivateHost,
     joinPrivateRoom,
-    requestReady,
-    requestStartNow,
     leaveMatchmaking,
     goBack,
     selectTool: selectActiveTool,

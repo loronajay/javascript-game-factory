@@ -69,12 +69,6 @@ function bindButtons(app, root = document) {
   root.querySelector("#btn-join-back")?.addEventListener("click", () => {
     app.goBack?.();
   });
-  root.querySelector("#btn-ready")?.addEventListener("click", () => {
-    app.requestReady(true);
-  });
-  root.querySelector("#btn-start-match")?.addEventListener("click", () => {
-    app.requestStartNow();
-  });
   root.querySelectorAll("[data-tool]").forEach((button) => {
     button.addEventListener("click", () => {
       app.selectTool(button.dataset.tool || "straight-h");
