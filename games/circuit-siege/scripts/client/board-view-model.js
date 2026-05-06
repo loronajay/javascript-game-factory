@@ -39,6 +39,10 @@ function deriveStatusText(snapshot) {
     return "Draw.";
   }
 
+  if (snapshot.result?.type === "disconnect" && snapshot.result?.winnerSide) {
+    return `${titleCase(snapshot.result.winnerSide)} wins by disconnect.`;
+  }
+
   if (snapshot.result?.winnerSide) {
     return `${titleCase(snapshot.result.winnerSide)} wins.`;
   }

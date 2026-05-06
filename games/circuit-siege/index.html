@@ -19,51 +19,78 @@
         <h1>Circuit Siege</h1>
         <p class="tagline">Trace, repair, and race to five live damage routes before the other command chair does.</p>
         <p id="menu-notice" class="status-line"></p>
-      </div>
-      <div class="menu-grid">
-        <section class="menu-panel">
-          <p class="eyebrow">Public Match</p>
-          <h2>Lock Your Command Chair</h2>
-          <p id="public-queue-status" class="status-line">Choose Blue or Red, then lock that chair before public queue starts.</p>
-          <div class="seat-locks">
-            <button class="seat-lock seat-lock--blue" data-public-side="blue">
-              <span>Blue Chair</span>
-              <strong>Frontline repair pressure</strong>
-            </button>
-            <button class="seat-lock seat-lock--red" data-public-side="red">
-              <span>Red Chair</span>
-              <strong>Counter-trace from the mirrored side</strong>
-            </button>
-          </div>
-          <button id="btn-confirm-public" class="action action--blue action--wide" disabled>Choose A Chair To Queue</button>
-        </section>
-
-        <section class="menu-panel">
-          <p class="eyebrow">Private Room</p>
-          <h2>Bring Your Opponent</h2>
-          <p class="status-line">Host locks Blue. Guests join as Red with a room code. Both players still need to Ready Up before the host can launch the match.</p>
-          <div class="menu-actions">
-            <button id="btn-private-host" class="action">Lock Blue Chair &amp; Host Private Room</button>
-            <div class="join-row">
-              <input id="room-code-input" type="text" maxlength="8" placeholder="ROOM CODE">
-              <button id="btn-private-join" class="action action--ghost">Lock Red Chair &amp; Join</button>
+        <div class="menu-stack">
+          <section class="menu-phase menu-phase--active" data-menu-phase="root">
+            <div class="menu-actions">
+              <button id="btn-play-online" class="action action--blue action--wide">Play Online</button>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section class="menu-phase" data-menu-phase="side_select">
+            <p class="eyebrow">Choose Your Side</p>
+            <h2 id="public-queue-heading">Choose Your Side</h2>
+            <p id="public-queue-status" class="status-line">Choose Blue or Red to continue.</p>
+            <div class="seat-locks">
+              <button class="seat-lock seat-lock--blue" data-public-side="blue">
+                <strong>Blue</strong>
+              </button>
+              <button class="seat-lock seat-lock--red" data-public-side="red">
+                <strong>Red</strong>
+              </button>
+            </div>
+            <div class="menu-actions">
+              <button id="btn-back-to-root" class="action action--ghost action--wide">Back</button>
+            </div>
+          </section>
+        </div>
       </div>
     </section>
 
     <section class="screen" data-screen="matchmaking">
       <div class="panel">
         <p class="eyebrow">Online Lobby</p>
-        <h2 id="room-code">-----</h2>
+        <h2 id="lobby-heading">Blue Chair Locked</h2>
         <p id="queue-status" class="status-line"></p>
         <p id="lobby-status" class="status-line"></p>
         <p id="lobby-hint" class="status-line"></p>
-        <div class="lobby-actions">
-          <button id="btn-ready" class="action action--blue">Ready Up</button>
-          <button id="btn-start-match" class="action action--red">Start Match</button>
-          <button data-leave class="action action--ghost">Leave</button>
+        <p id="room-code" class="room-code">-----</p>
+
+        <div class="lobby-phase lobby-phase--active" data-lobby-phase="main">
+          <div class="lobby-actions">
+            <button id="btn-find-match" class="action action--blue">Find Match</button>
+            <button id="btn-play-friend" class="action">Play With Friend</button>
+            <button id="btn-change-side" class="action action--ghost">Change Side</button>
+          </div>
+        </div>
+
+        <div class="lobby-phase" data-lobby-phase="searching">
+          <div class="lobby-actions">
+            <button id="btn-cancel-search" class="action action--ghost">Cancel</button>
+          </div>
+        </div>
+
+        <div class="lobby-phase" data-lobby-phase="friend_options">
+          <div class="lobby-actions">
+            <button id="btn-private-host" class="action action--blue">Create Room</button>
+            <button id="btn-open-join" class="action">Enter Code</button>
+            <button id="btn-friend-back" class="action action--ghost">Back</button>
+          </div>
+        </div>
+
+        <div class="lobby-phase" data-lobby-phase="join">
+          <div class="menu-actions">
+            <input id="room-code-input" type="text" maxlength="8" placeholder="ROOM CODE">
+            <button id="btn-private-join" class="action action--blue action--wide">Join</button>
+            <button id="btn-join-back" class="action action--ghost action--wide">Back</button>
+          </div>
+        </div>
+
+        <div class="lobby-phase" data-lobby-phase="room">
+          <div class="lobby-actions">
+            <button id="btn-ready" class="action action--blue">Ready Up</button>
+            <button id="btn-start-match" class="action action--red">Start Match</button>
+            <button data-leave class="action action--ghost">Leave</button>
+          </div>
         </div>
       </div>
     </section>

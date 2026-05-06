@@ -28,20 +28,46 @@ export function findSlotIdFromEventTarget(target) {
 }
 
 function bindButtons(app, root = document) {
+  root.querySelector("#btn-play-online")?.addEventListener("click", () => {
+    app.openSideSelect?.();
+  });
+  root.querySelector("#btn-back-to-root")?.addEventListener("click", () => {
+    app.goBack?.();
+  });
   root.querySelectorAll("[data-public-side]").forEach((button) => {
     button.addEventListener("click", () => {
-      app.selectPublicSide(button.dataset.publicSide || "blue");
+      app.selectSide(button.dataset.publicSide || "blue");
     });
   });
-  root.querySelector("#btn-confirm-public")?.addEventListener("click", () => {
-    app.confirmPublicQueue();
+  root.querySelector("#btn-find-match")?.addEventListener("click", () => {
+    app.findMatch?.();
+  });
+  root.querySelector("#btn-cancel-search")?.addEventListener("click", () => {
+    app.leaveMatchmaking?.();
+  });
+  root.querySelector("#btn-play-friend")?.addEventListener("click", () => {
+    app.openFriendOptions?.();
+  });
+  root.querySelector("#btn-change-side")?.addEventListener("click", () => {
+    app.goBack?.();
+  });
+  root.querySelector("#btn-friend-back")?.addEventListener("click", () => {
+    app.goBack?.();
+  });
+  root.querySelector("#btn-open-join")?.addEventListener("click", () => {
+    app.openJoinRoomEntry?.();
   });
   root.querySelector("#btn-private-host")?.addEventListener("click", () => {
     app.startPrivateHost();
   });
+  root.querySelector("#room-code-input")?.addEventListener("input", (event) => {
+    app.updateJoinRoomCode?.(event.target?.value || "");
+  });
   root.querySelector("#btn-private-join")?.addEventListener("click", () => {
-    const roomCode = root.querySelector("#room-code-input")?.value || "";
-    app.joinPrivateRoom(roomCode);
+    app.submitJoinRoom?.();
+  });
+  root.querySelector("#btn-join-back")?.addEventListener("click", () => {
+    app.goBack?.();
   });
   root.querySelector("#btn-ready")?.addEventListener("click", () => {
     app.requestReady(true);

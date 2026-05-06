@@ -126,26 +126,24 @@ body {
   margin-top: 28px;
 }
 
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  max-width: 1080px;
+.menu-stack {
+  max-width: 760px;
   margin: 24px auto 0;
 }
 
-.menu-panel {
-  position: relative;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 28px;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
-  padding: 28px;
+.menu-phase,
+.lobby-phase {
+  display: none;
 }
 
-.menu-panel h2 {
+.menu-phase--active,
+.lobby-phase--active {
+  display: block;
+}
+
+.menu-phase h2 {
   margin: 0 0 10px;
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
 }
 
 .seat-locks {
@@ -158,30 +156,19 @@ body {
 .seat-lock {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 22px;
-  padding: 18px;
+  padding: 28px 18px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
-.seat-lock span,
 .seat-lock strong {
   display: block;
-}
-
-.seat-lock span {
-  color: var(--gold);
+  font-size: 1.35rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 0.76rem;
-}
-
-.seat-lock strong {
-  margin-top: 10px;
-  font-size: 1rem;
-  line-height: 1.45;
 }
 
 .seat-lock:hover {
@@ -258,6 +245,18 @@ input {
 .match-shell {
   padding: 24px;
   padding-bottom: 168px;
+}
+
+.room-code {
+  margin: 16px 0 0;
+  text-align: center;
+  font: 700 2.8rem/1 monospace;
+  letter-spacing: 0.16em;
+  color: var(--text);
+}
+
+.room-code--hidden {
+  display: none;
 }
 
 .match-header {
@@ -649,10 +648,6 @@ input {
 }
 
 @media (max-width: 1080px) {
-  .menu-grid {
-    grid-template-columns: 1fr;
-  }
-
   .match-grid {
     grid-template-columns: 1fr;
   }

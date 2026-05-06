@@ -3,6 +3,9 @@ import { createSessionRuntimeState } from "./session-runtime-state.js";
 function defaultNoticeHandler() {}
 function defaultShowScreen() {}
 function defaultStateHandler() {}
+function getOtherSide(side) {
+  return side === "red" ? "blue" : "red";
+}
 
 export function createCircuitSiegeSessionController({
   runtime = createSessionRuntimeState(),
@@ -116,9 +119,26 @@ export function createCircuitSiegeSessionController({
     };
 
     net.cb.onPartnerLeft = () => {
+      if (runtime.snapshot) {
+        runtime.snapshot = {
+          ...runtime.snapshot,
+          phase: "ended",
+          result: {
+            type: "disconnect",
+            winnerSide: runtime.selectedSide || getOtherSide(runtime.selectedSide),
+            loserSide: getOtherSide(runtime.selectedSide)
+          }
+        };
+        runtime.matchReady = null;
+        announce("Opponent disconnected. You win.");
+        showScreen("match");
+        emitMatchState();
+        return;
+      }
+
       clearRoomState();
       announce("Opponent disconnected.");
-      showScreen("menu");
+      showScreen("matchmaking");
       emitLobbyState();
     };
 
@@ -213,6 +233,28 @@ export function createCircuitSiegeSessionController({
     emitLobbyState();
   }
 
+  function cancelSearch() {
+    if (!runtime.net || !runtime.searching) {
+      return false;
+    }
+
+    runtime.net.cancelSearch?.();
+    runtime.searching = false;
+    emitLobbyState();
+    return true;
+  }
+
+  function leaveLobby() {
+    if (!runtime.net || !runtime.lobby) {
+      return false;
+    }
+
+    runtime.net.leaveRoom?.();
+    clearRoomState();
+    emitLobbyState();
+    return true;
+  }
+
   return {
     ensureClient,
     startPublicMatch,
@@ -221,6 +263,8 @@ export function createCircuitSiegeSessionController({
     requestReady,
     requestStartNow,
     submitIntent,
+    cancelSearch,
+    leaveLobby,
     disconnect
   };
 }

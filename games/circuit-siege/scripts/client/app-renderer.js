@@ -4,6 +4,12 @@ function setActiveScreen(root, screenId) {
   }
 }
 
+function setActivePhase(root, selector, phaseKey, activeValue, activeClassName) {
+  for (const section of root.querySelectorAll(selector)) {
+    section.classList.toggle(activeClassName, section.dataset[phaseKey] === activeValue);
+  }
+}
+
 import {
   BOARD_PAD_X,
   BOARD_PAD_Y,
@@ -178,13 +184,16 @@ function renderBoardGrid(container, boardViewModel) {
 export function createAppRenderer(root = document) {
   const els = {
     menuNotice: root.querySelector("#menu-notice"),
+    publicQueueHeading: root.querySelector("#public-queue-heading"),
     publicQueueStatus: root.querySelector("#public-queue-status"),
-    publicConfirmButton: root.querySelector("#btn-confirm-public"),
     publicSideButtons: Array.from(root.querySelectorAll("[data-public-side]")),
+    lobbyHeading: root.querySelector("#lobby-heading"),
     queueStatus: root.querySelector("#queue-status"),
     lobbyStatus: root.querySelector("#lobby-status"),
     lobbyHint: root.querySelector("#lobby-hint"),
     roomCode: root.querySelector("#room-code"),
+    joinButton: root.querySelector("#btn-private-join"),
+    joinInput: root.querySelector("#room-code-input"),
     heldPiece: root.querySelector("#held-piece"),
     heldCursor: root.querySelector("#held-cursor"),
     toolDock: root.querySelector("#tool-dock"),
@@ -199,20 +208,31 @@ export function createAppRenderer(root = document) {
 
   return function renderApp(viewModel) {
     setActiveScreen(root, viewModel.screen);
+    setActivePhase(root, "[data-menu-phase]", "menuPhase", viewModel.menuPhase, "menu-phase--active");
+    setActivePhase(root, "[data-lobby-phase]", "lobbyPhase", viewModel.lobbyPhase, "lobby-phase--active");
 
     if (els.menuNotice) els.menuNotice.textContent = viewModel.menuNotice;
+    if (els.publicQueueHeading) els.publicQueueHeading.textContent = viewModel.queueSetup.sideHeadingText;
     if (els.publicQueueStatus) els.publicQueueStatus.textContent = viewModel.queueSetup.publicSelectionText;
-    if (els.publicConfirmButton) {
-      els.publicConfirmButton.disabled = viewModel.queueSetup.publicConfirmDisabled;
-      els.publicConfirmButton.textContent = viewModel.queueSetup.publicConfirmText;
-    }
     for (const button of els.publicSideButtons) {
       button.classList.toggle("seat-lock--active", button.dataset.publicSide === viewModel.queueSetup.publicSide);
+    }
+    if (els.lobbyHeading) {
+      els.lobbyHeading.textContent = viewModel.queueSetup.sideHeadingText;
     }
     if (els.queueStatus) els.queueStatus.textContent = viewModel.queueStatusText;
     if (els.lobbyStatus) els.lobbyStatus.textContent = viewModel.lobbyStatusText;
     if (els.lobbyHint) els.lobbyHint.textContent = viewModel.lobbyActionHint;
-    if (els.roomCode) els.roomCode.textContent = viewModel.roomCode;
+    if (els.roomCode) {
+      els.roomCode.textContent = viewModel.roomCode;
+      els.roomCode.classList.toggle("room-code--hidden", viewModel.lobbyPhase !== "room");
+    }
+    if (els.joinButton) {
+      els.joinButton.disabled = !!viewModel.queueSetup.joinDisabled;
+    }
+    if (els.joinInput && els.joinInput.value !== viewModel.queueSetup.joinRoomCode) {
+      els.joinInput.value = viewModel.queueSetup.joinRoomCode;
+    }
     if (els.heldPiece) {
       els.heldPiece.textContent = viewModel.heldMask
         ? `Holding: ${TOOL_LABELS[viewModel.heldMask] || viewModel.heldMask} (${viewModel.heldMask})`

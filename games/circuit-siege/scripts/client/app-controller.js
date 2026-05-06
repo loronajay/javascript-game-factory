@@ -17,7 +17,12 @@ import {
 import {
   buildQueueSetupViewModel,
   createQueueSetupState,
-  selectPublicQueueSide
+  openOnlineMenu,
+  returnToRootMenu,
+  returnToSideSelect,
+  selectPublicQueueSide,
+  setLobbyPhase,
+  updateJoinRoomCode
 } from "./queue-setup-state.js";
 
 function deriveScreen(runtime) {
@@ -25,7 +30,15 @@ function deriveScreen(runtime) {
     return "match";
   }
 
-  if (runtime.lobby || runtime.searching || runtime.matchmakingMode) {
+  return "menu";
+}
+
+function deriveScreenFromUi(runtime, queueSetupState) {
+  if (runtime.snapshot || runtime.matchReady) {
+    return "match";
+  }
+
+  if (queueSetupState.menuPhase === "hidden") {
     return "matchmaking";
   }
 
@@ -46,46 +59,83 @@ export function createCircuitSiegeAppController({
     active: false
   };
 
+  function syncFlowFromRuntime() {
+    if (runtime.snapshot || runtime.matchReady) {
+      return;
+    }
+
+    if (runtime.lobby) {
+      queueSetupState = setLobbyPhase(queueSetupState, "room");
+      return;
+    }
+
+    if (runtime.searching) {
+      queueSetupState = setLobbyPhase(queueSetupState, "searching");
+      return;
+    }
+
+    if (queueSetupState.menuPhase === "hidden" && queueSetupState.lobbyPhase === "room") {
+      queueSetupState = setLobbyPhase(queueSetupState, "main");
+      return;
+    }
+
+    if (queueSetupState.menuPhase === "hidden" && queueSetupState.lobbyPhase === "searching") {
+      queueSetupState = setLobbyPhase(queueSetupState, "main");
+    }
+  }
+
   function buildViewModel() {
+    const queueSetupViewModel = buildQueueSetupViewModel({
+      setupState: queueSetupState
+    });
+    const selectedSide = runtime.selectedSide || queueSetupViewModel.publicSide || "blue";
+
     return {
-      screen: deriveScreen(runtime),
+      screen: deriveScreenFromUi(runtime, queueSetupState),
+      menuPhase: queueSetupViewModel.menuPhase,
+      lobbyPhase: queueSetupViewModel.lobbyPhase,
       menuNotice: runtime.lastNotice || "",
-      queueSetup: buildQueueSetupViewModel({
-        setupState: queueSetupState
-      }),
+      queueSetup: queueSetupViewModel,
       queueStatusText: getQueueStatusText({
         matchmakingMode: runtime.matchmakingMode,
-        selectedSide: runtime.selectedSide,
-        queueCounts: runtime.queueCounts
+        selectedSide,
+        queueCounts: runtime.queueCounts,
+        lobbyPhase: queueSetupViewModel.lobbyPhase
       }),
       lobbyStatusText: getLobbyStatusText({
         lobby: runtime.lobby,
-        matchReady: runtime.matchReady
+        matchReady: runtime.matchReady,
+        lobbyPhase: queueSetupViewModel.lobbyPhase,
+        selectedSide
       }),
       lobbyActionHint: buildLobbyActionHint({
         lobby: runtime.lobby,
         isHost: runtime.isHost,
-        matchReady: runtime.matchReady
+        matchReady: runtime.matchReady,
+        lobbyPhase: queueSetupViewModel.lobbyPhase,
+        selectedSide
       }),
       lobbyStartAction: buildLobbyStartActionState({
         isHost: runtime.isHost,
         lobby: runtime.lobby,
-        startRequested: !!runtime.matchReady
+        startRequested: !!runtime.matchReady,
+        lobbyPhase: queueSetupViewModel.lobbyPhase
       }),
+      joinRoomCode: queueSetupViewModel.joinRoomCode,
       roomCode: runtime.lobby?.roomCode || "-----",
-      selectedSide: runtime.selectedSide || "blue",
+      selectedSide,
       heldMask: inputState.heldMask,
       heldCursor: {
         visible: !!inputState.heldMask && pointerState.active,
         x: pointerState.x,
         y: pointerState.y,
         mask: inputState.heldMask,
-        side: runtime.selectedSide || "blue"
+        side: selectedSide
       },
       board: buildBoardViewModel({
         board,
         snapshot: runtime.snapshot,
-        selectedSide: runtime.selectedSide || "blue",
+        selectedSide,
         selectedSlotId: inputState.selectedSlotId
       })
     };
@@ -100,21 +150,27 @@ export function createCircuitSiegeAppController({
   }
 
   async function startPublicBlue() {
-    queueSetupState = selectPublicQueueSide(queueSetupState, "blue");
-    return confirmPublicQueue();
+    selectSide("blue");
+    return findMatch();
   }
 
   async function startPublicRed() {
-    queueSetupState = selectPublicQueueSide(queueSetupState, "red");
-    return confirmPublicQueue();
+    selectSide("red");
+    return findMatch();
   }
 
-  function selectPublicSide(side) {
-    queueSetupState = selectPublicQueueSide(queueSetupState, side);
+  function openSideSelect() {
+    queueSetupState = openOnlineMenu(queueSetupState);
     rerender();
   }
 
-  async function confirmPublicQueue() {
+  function selectSide(side) {
+    queueSetupState = selectPublicQueueSide(queueSetupState, side);
+    runtime.selectedSide = queueSetupState.publicSide;
+    rerender();
+  }
+
+  async function findMatch() {
     const side = queueSetupState.publicSide;
     if (!side) {
       rerender();
@@ -123,23 +179,51 @@ export function createCircuitSiegeAppController({
 
     runtime.matchmakingMode = "public";
     runtime.selectedSide = side;
+    queueSetupState = setLobbyPhase(queueSetupState, "searching");
     await sessionController.startPublicMatch({ side });
     rerender();
     return true;
   }
 
-  async function startPrivateHost() {
-    runtime.matchmakingMode = "private_create";
-    runtime.selectedSide = "blue";
-    await sessionController.startPrivateCreate({ side: "blue" });
+  function openFriendOptions() {
+    queueSetupState = setLobbyPhase(queueSetupState, "friend_options");
     rerender();
   }
 
-  async function joinPrivateRoom(roomCode) {
-    runtime.matchmakingMode = "private_join";
-    runtime.selectedSide = "red";
-    await sessionController.startPrivateJoin({ side: "red", roomCode });
+  function openJoinRoomEntry() {
+    queueSetupState = setLobbyPhase(queueSetupState, "join");
     rerender();
+  }
+
+  function updateJoinCode(nextCode) {
+    queueSetupState = updateJoinRoomCode(queueSetupState, nextCode);
+    rerender();
+  }
+
+  async function startPrivateHost() {
+    const side = queueSetupState.publicSide || runtime.selectedSide || "blue";
+    runtime.matchmakingMode = "private_create";
+    runtime.selectedSide = side;
+    queueSetupState = setLobbyPhase(queueSetupState, "room");
+    await sessionController.startPrivateCreate({ side });
+    rerender();
+  }
+
+  async function joinPrivateRoom(roomCode = queueSetupState.joinRoomCode) {
+    const side = queueSetupState.publicSide || runtime.selectedSide || "red";
+    runtime.matchmakingMode = "private_join";
+    runtime.selectedSide = side;
+    await sessionController.startPrivateJoin({ side, roomCode });
+    rerender();
+  }
+
+  async function submitJoinRoom() {
+    if (!queueSetupState.joinRoomCode) {
+      rerender();
+      return false;
+    }
+
+    return joinPrivateRoom(queueSetupState.joinRoomCode);
   }
 
   function requestReady(ready = true) {
@@ -155,9 +239,79 @@ export function createCircuitSiegeAppController({
   }
 
   function leaveMatchmaking() {
+    const screen = deriveScreenFromUi(runtime, queueSetupState);
+
+    if (screen === "match") {
+      sessionController.disconnect();
+      runtime.matchmakingMode = null;
+      queueSetupState = returnToRootMenu(queueSetupState);
+      rerender();
+      return true;
+    }
+
+    if (runtime.lobby) {
+      sessionController.leaveLobby?.();
+      runtime.matchmakingMode = null;
+      queueSetupState = returnToSideSelect(queueSetupState);
+      rerender();
+      return true;
+    }
+
+    if (runtime.searching) {
+      sessionController.cancelSearch?.();
+      runtime.matchmakingMode = null;
+      queueSetupState = setLobbyPhase(queueSetupState, "main");
+      rerender();
+      return true;
+    }
+
     sessionController.disconnect();
     runtime.matchmakingMode = null;
+    queueSetupState = returnToRootMenu(queueSetupState);
     rerender();
+    return true;
+  }
+
+  function goBack() {
+    const screen = deriveScreenFromUi(runtime, queueSetupState);
+
+    if (screen === "menu" && queueSetupState.menuPhase === "side_select") {
+      queueSetupState = returnToRootMenu(queueSetupState);
+      rerender();
+      return true;
+    }
+
+    if (screen === "matchmaking") {
+      if (runtime.lobby) {
+        return leaveMatchmaking();
+      }
+
+      if (runtime.searching) {
+        sessionController.cancelSearch?.();
+        runtime.matchmakingMode = null;
+        queueSetupState = setLobbyPhase(queueSetupState, "main");
+        rerender();
+        return true;
+      }
+
+      if (queueSetupState.lobbyPhase === "friend_options") {
+        queueSetupState = setLobbyPhase(queueSetupState, "main");
+        rerender();
+        return true;
+      }
+
+      if (queueSetupState.lobbyPhase === "join") {
+        queueSetupState = setLobbyPhase(queueSetupState, "friend_options");
+        rerender();
+        return true;
+      }
+
+      queueSetupState = returnToSideSelect(queueSetupState);
+      rerender();
+      return true;
+    }
+
+    return false;
   }
 
   function selectActiveTool(toolId) {
@@ -246,20 +400,27 @@ export function createCircuitSiegeAppController({
   }
 
   function handleRuntimeChanged() {
+    syncFlowFromRuntime();
     rerender();
   }
 
   return {
     boot,
+    openSideSelect,
     startPublicBlue,
     startPublicRed,
-    selectPublicSide,
-    confirmPublicQueue,
+    selectSide,
+    findMatch,
+    openFriendOptions,
+    openJoinRoomEntry,
+    updateJoinRoomCode: updateJoinCode,
+    submitJoinRoom,
     startPrivateHost,
     joinPrivateRoom,
     requestReady,
     requestStartNow,
     leaveMatchmaking,
+    goBack,
     selectTool: selectActiveTool,
     handleBoardSlot,
     rotateHeldPiece,
