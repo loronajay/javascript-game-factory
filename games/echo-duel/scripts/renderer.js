@@ -1,6 +1,13 @@
 import { PHASES } from './config.js';
-import { getOwner } from './state.js';
 import { buildLobbyStartButtonState, getLobbyStatusText } from './online-lobby-view-state.js';
+import {
+  buildInputModeState,
+  getExpectedSlotCount,
+  getPhaseCopy,
+  getProgressCountForPhase,
+  getRoleLabel,
+  shouldShowLoserCallout,
+} from './match-view-state.js';
 
 const screenMap = {
   menu: 'screen-menu',
@@ -78,71 +85,13 @@ export function showScreen(name) {
   qs(screenMap[name])?.classList.remove('hidden');
 }
 
-function phaseCopy(state) {
-  const owner = getOwner(state);
-  switch (state.phase) {
-    case PHASES.OWNER_CREATE_INITIAL:
-      return ['Driver Create', `${owner?.name || 'Driver'} enters a 4-input pattern.`, 'The completed signal will play back before copy mode.'];
-    case PHASES.OWNER_REPLAY:
-      return ['Driver Replay', `${owner?.name || 'Driver'} must replay their own pattern.`, 'If successful, the completed signal plays back for everyone.'];
-    case PHASES.OWNER_APPEND:
-      return ['Driver Append', `${owner?.name || 'Driver'} adds ${state.settings?.patternAppendCount || 2} inputs.`, 'The updated sequence will be presented before copy begins.'];
-    case PHASES.SIGNAL_PLAYBACK:
-      return ['Memorize', 'Signal playback.', 'Watch the full pattern now. It disappears before copy mode.'];
-    case PHASES.CHALLENGER_COPY:
-      return ['Copy Phase', `Challengers copy the pattern.`, 'No sequence readout. Memory only.'];
-    case PHASES.MATCH_OVER:
-      return ['Finished', 'Match over.', ''];
-    default:
-      return ['Match', 'Waiting.', ''];
-  }
-}
-
-function localPlayerId(state) {
-  return state?.network?.myClientId || null;
-}
-
-function isLocalOwner(state) {
-  const localId = localPlayerId(state);
-  const owner = getOwner(state);
-  if (!localId) return state.mode !== 'online';
-  return owner?.id === localId || owner?.clientId === localId;
-}
-
-function localCopyProgress(state) {
-  const localId = localPlayerId(state);
-  if (localId && state.copyProgress?.[localId]) return state.copyProgress[localId];
-  const firstCopying = Object.values(state.copyProgress || {}).find(progress => progress.status === 'copying');
-  return firstCopying || null;
-}
-
-function expectedSlotCount(state) {
-  if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.settings.startingPatternLength;
-  if (state.phase === PHASES.OWNER_APPEND) return Math.min(state.settings.maxPatternLength, state.appendTargetLength || (state.activeSequence.length + (state.settings.patternAppendCount || 1))); 
-  if (state.phase === PHASES.OWNER_REPLAY || state.phase === PHASES.CHALLENGER_COPY || state.phase === PHASES.SIGNAL_PLAYBACK) return state.activeSequence.length;
-  return Math.max(state.activeSequence.length, state.settings.startingPatternLength);
-}
-
-function progressCountForPhase(state) {
-  if (state.phase === PHASES.OWNER_CREATE_INITIAL) return state.ownerDraft.length;
-  if (state.phase === PHASES.OWNER_REPLAY) return state.ownerReplayIndex || 0;
-  if (state.phase === PHASES.OWNER_APPEND) return state.activeSequence.length;
-  if (state.phase === PHASES.CHALLENGER_COPY) return Number(localCopyProgress(state)?.index || 0);
-  if (state.phase === PHASES.SIGNAL_PLAYBACK && state.playback) {
-    const elapsed = Math.max(0, performance.now() - Number(state.playback.startedAt || performance.now()));
-    const perInputMs = Number(state.playback.perInputMs || 570);
-    return Math.min(state.activeSequence.length, Math.floor(elapsed / perInputMs) + 1);
-  }
-  return 0;
-}
-
 function renderSequence(state) {
   const slots = qs('sequence-slots');
   if (!slots) return;
   slots.innerHTML = '';
 
-  const count = Math.max(0, expectedSlotCount(state));
-  const progress = Math.max(0, Math.min(count, progressCountForPhase(state)));
+  const count = Math.max(0, getExpectedSlotCount(state));
+  const progress = Math.max(0, Math.min(count, getProgressCountForPhase(state)));
 
   for (let i = 0; i < count; i++) {
     const slot = document.createElement('div');
@@ -158,49 +107,8 @@ function renderSequence(state) {
   }
 }
 
-function inputModeForState(state) {
-  const owner = getOwner(state);
-  const ownerName = owner?.name || 'Driver';
-  const ownerLocal = isLocalOwner(state);
-
-  if (state.phase === PHASES.OWNER_CREATE_INITIAL) {
-    return ownerLocal
-      ? { label: 'CREATE STARTING SIGNAL', detail: `${state.ownerDraft.length}/${state.settings.startingPatternLength}`, className: 'mode-owner-append', locked: false }
-      : { label: `WATCH ${ownerName}`, detail: 'Memorize the signal', className: 'mode-watch', locked: true };
-  }
-
-  if (state.phase === PHASES.OWNER_REPLAY) {
-    return ownerLocal
-      ? { label: 'REPLAY YOUR SIGNAL', detail: `${state.ownerReplayIndex || 0}/${state.activeSequence.length}`, className: 'mode-owner-replay', locked: false }
-      : { label: `WATCH ${ownerName}`, detail: 'Driver can drop control here', className: 'mode-watch', locked: true };
-  }
-
-  if (state.phase === PHASES.OWNER_APPEND) {
-    const target = Math.min(state.settings.maxPatternLength, state.appendTargetLength || (state.activeSequence.length + (state.settings.patternAppendCount || 1)));
-    const remaining = Math.max(1, target - state.activeSequence.length);
-    const label = remaining === 1 ? 'ADD 1 NEW INPUT' : `ADD ${remaining} NEW INPUTS`;
-    return ownerLocal
-      ? { label, detail: `${state.activeSequence.length}/${target}`, className: 'mode-owner-append', locked: false }
-      : { label: `WATCH ${ownerName}`, detail: `${remaining} new input${remaining === 1 ? '' : 's'} incoming`, className: 'mode-watch', locked: true };
-  }
-
-  if (state.phase === PHASES.SIGNAL_PLAYBACK) {
-    return { label: 'MEMORIZE', detail: `${state.activeSequence.length} inputs`, className: 'mode-playback', locked: true };
-  }
-
-  if (state.phase === PHASES.CHALLENGER_COPY) {
-    const progress = localCopyProgress(state);
-    const isCopying = !ownerLocal && progress?.status === 'copying';
-    return isCopying
-      ? { label: 'COPY THE SIGNAL', detail: `${progress.index || 0}/${state.activeSequence.length}`, className: 'mode-challenger-copy', locked: false }
-      : { label: 'WATCH RESULTS', detail: 'Input locked', className: 'mode-watch', locked: true };
-  }
-
-  return { label: 'WATCH', detail: '', className: 'mode-watch', locked: true };
-}
-
 function renderInputMode(state) {
-  const mode = inputModeForState(state);
+  const mode = buildInputModeState(state);
   const banner = qs('input-mode-banner');
   const pad = qs('input-pad') || document.querySelector('.pad');
   if (banner) {
@@ -217,23 +125,10 @@ function renderInputMode(state) {
   }
 }
 
-
-function roleLabel(state, player, owner) {
-  if (owner?.id === player.id) return 'Driver';
-  const progress = state.copyProgress?.[player.id];
-  if (state.phase === PHASES.CHALLENGER_COPY && progress) {
-    if (progress.status === 'safe') return 'Safe';
-    if (progress.status === 'fail') return 'Failed';
-    return `Copying ${progress.index}/${state.activeSequence.length}`;
-  }
-  return 'Challenger';
-}
-
 function renderPlayers(state) {
   const strip = qs('players-strip');
   if (!strip) return;
   strip.innerHTML = '';
-  const owner = getOwner(state);
 
   state.players.forEach((player, index) => {
     const card = document.createElement('article');
@@ -250,7 +145,7 @@ function renderPlayers(state) {
 
     card.innerHTML = `
       <div class="player-name">${player.name}</div>
-      <div class="player-role">${player.eliminated ? 'Eliminated' : roleLabel(state, player, owner)}</div>
+      <div class="player-role">${player.eliminated ? 'Eliminated' : getRoleLabel(state, player)}</div>
       <div class="letter-track">${safeLetters}</div>
     `;
     strip.appendChild(card);
@@ -306,7 +201,7 @@ export function renderMatch(state) {
   }
 
   showScreen('match');
-  const [kicker, title, detail] = phaseCopy(state);
+  const [kicker, title, detail] = getPhaseCopy(state);
   qs('phase-kicker').textContent = kicker;
   qs('phase-title').textContent = title;
   qs('phase-detail').textContent = detail;
@@ -318,24 +213,6 @@ export function renderMatch(state) {
   renderLiveSignal(state);
   renderInputMode(state);
   renderTimer(state);
-}
-
-function localPlayer(state) {
-  const localId = localPlayerId(state);
-  if (!localId) return null;
-  return state.players.find(player => player.id === localId || player.clientId === localId) || null;
-}
-
-function shouldShowLoserCallout(state) {
-  const winner = state.players.find(player => player.id === state.winnerId);
-  const local = localPlayer(state);
-
-  if (local) {
-    return !winner || (local.id !== winner.id && local.clientId !== winner.clientId);
-  }
-
-  // Local/hotseat mode has no single client identity. Show the payoff once if anyone lost.
-  return state.mode !== 'online' && state.players.some(player => player.eliminated);
 }
 
 export function renderEnded(state) {
