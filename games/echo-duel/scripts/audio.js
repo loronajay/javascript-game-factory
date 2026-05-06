@@ -1,6 +1,11 @@
 import { INPUT_META } from './config.js';
 
 let ctx = null;
+let menuMusic = null;
+let menuMusicWanted = false;
+
+const MENU_MUSIC_SRC = 'assets/sounds/menu.mp3';
+const MENU_MUSIC_VOLUME = 0.34;
 
 function getContext() {
   if (!ctx) {
@@ -10,6 +15,51 @@ function getContext() {
   }
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   return ctx;
+}
+
+function ensureMenuMusic() {
+  if (menuMusic) return menuMusic;
+  menuMusic = new Audio(MENU_MUSIC_SRC);
+  menuMusic.loop = true;
+  menuMusic.preload = 'auto';
+  menuMusic.volume = MENU_MUSIC_VOLUME;
+  return menuMusic;
+}
+
+export async function unlockAudio() {
+  const audio = getContext();
+  if (audio && audio.state === 'suspended') {
+    try { await audio.resume(); } catch { /* browser may still require a gesture */ }
+  }
+}
+
+export async function startMenuMusic() {
+  menuMusicWanted = true;
+  const music = ensureMenuMusic();
+  try {
+    await unlockAudio();
+    if (music.paused) await music.play();
+  } catch {
+    // Autoplay may be blocked until the next user gesture. Keep the desired state
+    // so a later button click can start the loop without changing callers.
+  }
+}
+
+export function stopMenuMusic() {
+  menuMusicWanted = false;
+  if (!menuMusic) return;
+  menuMusic.pause();
+  menuMusic.currentTime = 0;
+}
+
+export function pauseMenuMusic() {
+  menuMusicWanted = false;
+  if (!menuMusic) return;
+  menuMusic.pause();
+}
+
+export function isMenuMusicWanted() {
+  return menuMusicWanted;
 }
 
 export function playInputTone(input) {

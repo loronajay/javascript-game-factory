@@ -3,7 +3,7 @@ import { applyAuthoritativeMatchMessage, isAuthoritativeMatchMessageType } from 
 import { activePlayers, cloneState, createMatchState, hydrateNetworkState, serializeStateForNetwork } from './state.js';
 import { handleInput, resolveCopyPhase, tick } from './engine.js';
 import { createInputController } from './input.js';
-import { playFailureTone, playInputTone } from './audio.js';
+import { playFailureTone, playInputTone, startMenuMusic, stopMenuMusic, unlockAudio } from './audio.js';
 import { currentPlaybackStep, flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
 import { createOnlineClient } from './online.js';
 import { loadArcadeIdentity } from './identity.js';
@@ -50,6 +50,7 @@ function goMenuWithNotice(message) {
   onlineController?.disconnectOnline();
   showScreen('menu');
   setMenuNotice(message);
+  startMenuMusic();
 }
 
 function bumpNetworkPhase(next, { newTurn = false } = {}) {
@@ -125,9 +126,22 @@ function continueAfterDisconnectedPlayer(clientId, reason = 'disconnect') {
   setState(next, { broadcast: true });
   return true;
 }
+
+function isActiveMatchPhase(phase) {
+  return phase === PHASES.OWNER_CREATE_INITIAL
+    || phase === PHASES.OWNER_REPLAY
+    || phase === PHASES.OWNER_APPEND
+    || phase === PHASES.SIGNAL_PLAYBACK
+    || phase === PHASES.CHALLENGER_COPY;
+}
+
 function setState(nextState, { broadcast = true } = {}) {
   const previous = state;
   state = nextState;
+
+  if (isActiveMatchPhase(state.phase)) {
+    stopMenuMusic();
+  }
 
   if (state.phase === PHASES.MATCH_OVER && previous?.phase !== PHASES.MATCH_OVER) {
     playFailureTone();
@@ -264,6 +278,7 @@ function resetToMenu() {
   state = null;
   onlineController?.disconnectOnline();
   showScreen('menu');
+  startMenuMusic();
 }
 
 export function initGame() {
@@ -297,6 +312,7 @@ export function initGame() {
     applyAuthoritativeInput,
     mirrorVisibleOwnerInput,
     onlineUsesServerAuthority,
+    onMatchStarting: stopMenuMusic,
     playerIdForClientId,
     queryElementById: qs,
     logWarn: (...args) => console.warn(...args),
@@ -304,22 +320,33 @@ export function initGame() {
 
   wireGameButtons({
     onCreatePublic: async settings => {
+      await unlockAudio();
+      await startMenuMusic();
       setMenuNotice('');
       onlineController.disconnectOnline();
       await onlineController.startCreatePublic(settings);
     },
     onFindPublic: async () => {
+      await unlockAudio();
+      await startMenuMusic();
       setMenuNotice('');
       onlineController.disconnectOnline();
       await onlineController.findPublic();
     },
     onPrivate: async settings => {
+      await unlockAudio();
+      await startMenuMusic();
       setMenuNotice('');
       onlineController.disconnectOnline();
       await onlineController.startPrivate(settings);
     },
-    onShowMenu: screen => showScreen(screen || 'menu'),
+    onShowMenu: screen => {
+      showScreen(screen || 'menu');
+      if (!screen || screen === 'menu' || screen === 'onlineConfig' || screen === 'joinRoom') startMenuMusic();
+    },
     onJoinPrivate: async code => {
+      await unlockAudio();
+      await startMenuMusic();
       setMenuNotice('');
       onlineController.disconnectOnline();
       await onlineController.joinPrivate(code);
@@ -330,4 +357,5 @@ export function initGame() {
   inputController = createInputController({ onInput: submitInput });
   inputController.connect();
   showScreen('menu');
+  startMenuMusic();
 }

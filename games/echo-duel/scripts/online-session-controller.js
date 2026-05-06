@@ -38,6 +38,7 @@ export function createOnlineSessionController({
   applyAuthoritativeInput,
   mirrorVisibleOwnerInput,
   onlineUsesServerAuthority,
+  onMatchStarting = null,
   playerIdForClientId,
   queryElementById = () => null,
   logWarn = console.warn,
@@ -106,6 +107,7 @@ export function createOnlineSessionController({
         startAt: null,
       };
     }
+    onMatchStarting?.();
     setRawState(next);
     showScreen("match");
     renderMatch(next);
@@ -216,6 +218,7 @@ export function createOnlineSessionController({
 
       const start = () => {
         stopLobbyCountdownTicker();
+        onMatchStarting?.();
         if (payload.authorityMode === "server" || payload.matchState || payload.snapshot) {
           online.authorityMode = "server";
           if (payload.matchState) {
