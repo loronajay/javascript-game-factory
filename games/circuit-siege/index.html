@@ -20,14 +20,36 @@
         <p class="tagline">Trace, repair, and race to five live damage routes before the other command chair does.</p>
         <p id="menu-notice" class="status-line"></p>
       </div>
-      <div class="menu-actions">
-        <button id="btn-public-blue" class="action action--blue">Queue Public As Blue</button>
-        <button id="btn-public-red" class="action action--red">Queue Public As Red</button>
-        <button id="btn-private-host" class="action">Host Private Room</button>
-        <div class="join-row">
-          <input id="room-code-input" type="text" maxlength="8" placeholder="ROOM CODE">
-          <button id="btn-private-join" class="action action--ghost">Join Room</button>
-        </div>
+      <div class="menu-grid">
+        <section class="menu-panel">
+          <p class="eyebrow">Public Match</p>
+          <h2>Lock Your Command Chair</h2>
+          <p id="public-queue-status" class="status-line">Choose Blue or Red, then lock that chair before public queue starts.</p>
+          <div class="seat-locks">
+            <button class="seat-lock seat-lock--blue" data-public-side="blue">
+              <span>Blue Chair</span>
+              <strong>Frontline repair pressure</strong>
+            </button>
+            <button class="seat-lock seat-lock--red" data-public-side="red">
+              <span>Red Chair</span>
+              <strong>Counter-trace from the mirrored side</strong>
+            </button>
+          </div>
+          <button id="btn-confirm-public" class="action action--blue action--wide" disabled>Choose A Chair To Queue</button>
+        </section>
+
+        <section class="menu-panel">
+          <p class="eyebrow">Private Room</p>
+          <h2>Bring Your Opponent</h2>
+          <p class="status-line">Host locks Blue. Guests join as Red with a room code. Both players still need to Ready Up before the host can launch the match.</p>
+          <div class="menu-actions">
+            <button id="btn-private-host" class="action">Lock Blue Chair &amp; Host Private Room</button>
+            <div class="join-row">
+              <input id="room-code-input" type="text" maxlength="8" placeholder="ROOM CODE">
+              <button id="btn-private-join" class="action action--ghost">Lock Red Chair &amp; Join</button>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -37,6 +59,7 @@
         <h2 id="room-code">-----</h2>
         <p id="queue-status" class="status-line"></p>
         <p id="lobby-status" class="status-line"></p>
+        <p id="lobby-hint" class="status-line"></p>
         <div class="lobby-actions">
           <button id="btn-ready" class="action action--blue">Ready Up</button>
           <button id="btn-start-match" class="action action--red">Start Match</button>
@@ -65,6 +88,7 @@
         <div class="match-grid">
           <section class="board-panel">
             <p class="eyebrow">Shared Circuit Floor</p>
+            <p class="status-line">Click an editable slot to target it. Press <strong>R</strong> to rotate the selected piece. Use the toolkit only when switching between straight and corner parts.</p>
             <div class="tool-palette" aria-label="Repair tools">
               <button class="tool" data-tool="straight-h">Straight H</button>
               <button class="tool" data-tool="straight-v">Straight V</button>

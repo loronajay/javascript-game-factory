@@ -7,11 +7,13 @@ import { createAppRenderer } from "./app-renderer.js";
 import { loadCircuitSiegeIdentity } from "./identity.js";
 
 function bindButtons(app, root = document) {
-  root.querySelector("#btn-public-blue")?.addEventListener("click", () => {
-    app.startPublicBlue();
+  root.querySelectorAll("[data-public-side]").forEach((button) => {
+    button.addEventListener("click", () => {
+      app.selectPublicSide(button.dataset.publicSide || "blue");
+    });
   });
-  root.querySelector("#btn-public-red")?.addEventListener("click", () => {
-    app.startPublicRed();
+  root.querySelector("#btn-confirm-public")?.addEventListener("click", () => {
+    app.confirmPublicQueue();
   });
   root.querySelector("#btn-private-host")?.addEventListener("click", () => {
     app.startPrivateHost();
@@ -40,6 +42,16 @@ function bindButtons(app, root = document) {
     const slotEl = event.target.closest("[data-slot-id]");
     if (!slotEl) return;
     app.handleBoardSlot(slotEl.dataset.slotId);
+  });
+  root.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented) return;
+    const target = event.target;
+    const tagName = typeof target?.tagName === "string" ? target.tagName.toUpperCase() : "";
+    if (tagName === "INPUT" || tagName === "TEXTAREA") return;
+    if (String(event.key || "").toLowerCase() !== "r") return;
+    if (app.rotateSelectedSlot()) {
+      event.preventDefault();
+    }
   });
 }
 

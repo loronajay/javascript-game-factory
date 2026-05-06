@@ -14,6 +14,7 @@ function renderBoardGrid(container, boardViewModel) {
       cell.isWall ? "board-cell--wall" : "",
       cell.hasRoute ? "board-cell--route" : "",
       cell.slotId ? "board-cell--slot" : "",
+      cell.selected ? "board-cell--selected" : "",
       cell.locked ? "board-cell--locked" : "",
       cell.terminalId ? `board-cell--terminal-${cell.terminalType}` : "",
       cell.terminalCompleted ? "board-cell--terminal-completed" : "",
@@ -48,8 +49,12 @@ function renderRouteSummary(container, boardViewModel) {
 export function createAppRenderer(root = document) {
   const els = {
     menuNotice: root.querySelector("#menu-notice"),
+    publicQueueStatus: root.querySelector("#public-queue-status"),
+    publicConfirmButton: root.querySelector("#btn-confirm-public"),
+    publicSideButtons: Array.from(root.querySelectorAll("[data-public-side]")),
     queueStatus: root.querySelector("#queue-status"),
     lobbyStatus: root.querySelector("#lobby-status"),
+    lobbyHint: root.querySelector("#lobby-hint"),
     roomCode: root.querySelector("#room-code"),
     scoreBlue: root.querySelector("#score-blue"),
     scoreRed: root.querySelector("#score-red"),
@@ -65,8 +70,17 @@ export function createAppRenderer(root = document) {
     setActiveScreen(root, viewModel.screen);
 
     if (els.menuNotice) els.menuNotice.textContent = viewModel.menuNotice;
+    if (els.publicQueueStatus) els.publicQueueStatus.textContent = viewModel.queueSetup.publicSelectionText;
+    if (els.publicConfirmButton) {
+      els.publicConfirmButton.disabled = viewModel.queueSetup.publicConfirmDisabled;
+      els.publicConfirmButton.textContent = viewModel.queueSetup.publicConfirmText;
+    }
+    for (const button of els.publicSideButtons) {
+      button.classList.toggle("seat-lock--active", button.dataset.publicSide === viewModel.queueSetup.publicSide);
+    }
     if (els.queueStatus) els.queueStatus.textContent = viewModel.queueStatusText;
     if (els.lobbyStatus) els.lobbyStatus.textContent = viewModel.lobbyStatusText;
+    if (els.lobbyHint) els.lobbyHint.textContent = viewModel.lobbyActionHint;
     if (els.roomCode) els.roomCode.textContent = viewModel.roomCode;
     if (els.scoreBlue) els.scoreBlue.textContent = viewModel.board.scoreText.blue;
     if (els.scoreRed) els.scoreRed.textContent = viewModel.board.scoreText.red;

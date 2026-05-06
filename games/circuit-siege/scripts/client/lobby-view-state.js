@@ -27,10 +27,30 @@ export function getLobbyStatusText({ lobby = null, matchReady = null, now = () =
   }
 
   if (Number(lobby.playerCount || 0) < 2) {
-    return "Waiting for opponent...";
+    return "Waiting for opponent to lock in...";
   }
 
   return "Ready to start.";
+}
+
+export function buildLobbyActionHint({ lobby = null, isHost = false, matchReady = null } = {}) {
+  if (!lobby) {
+    return "Connecting to the match room...";
+  }
+
+  if (matchReady?.startAt) {
+    return "Authoritative sync is live. Stand by for board reveal.";
+  }
+
+  if (Number(lobby.playerCount || 0) < 2) {
+    return "Your opponent still needs to lock in and join this room.";
+  }
+
+  if (isHost) {
+    return "Both players must Ready Up. Once both are locked, the host can start the match.";
+  }
+
+  return "Both players must Ready Up. The host can start once both players are locked.";
 }
 
 export function buildLobbyStartActionState({

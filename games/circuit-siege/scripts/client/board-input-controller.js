@@ -16,7 +16,8 @@ function toolToPiecePlacement(toolId) {
 
 export function createBoardInputState() {
   return {
-    selectedTool: "straight-h"
+    selectedTool: "straight-h",
+    selectedSlotId: null
   };
 }
 
@@ -24,6 +25,13 @@ export function selectTool(inputState, selectedTool) {
   return {
     ...inputState,
     selectedTool
+  };
+}
+
+export function selectBoardSlot(inputState, selectedSlotId) {
+  return {
+    ...inputState,
+    selectedSlotId: selectedSlotId || null
   };
 }
 
@@ -65,6 +73,28 @@ export function buildIntentFromCell({
       slotId: cell.slotId,
       pieceType: placement.pieceType,
       rotation: placement.rotation
+    }
+  };
+}
+
+export function buildRotateIntentFromSelection({ cell } = {}) {
+  if (!cell?.slotId || !cell.editableByLocalPlayer) {
+    return { ok: false, reason: "not-editable" };
+  }
+
+  if (cell.locked) {
+    return { ok: false, reason: "locked" };
+  }
+
+  if (!cell.placedMask) {
+    return { ok: false, reason: "no-tile" };
+  }
+
+  return {
+    ok: true,
+    intent: {
+      intentType: "ROTATE_TILE",
+      slotId: cell.slotId
     }
   };
 }

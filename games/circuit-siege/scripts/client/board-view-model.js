@@ -47,7 +47,8 @@ function deriveStatusText(snapshot) {
 export function buildBoardViewModel({
   board,
   snapshot = null,
-  selectedSide = "blue"
+  selectedSide = "blue",
+  selectedSlotId = null
 } = {}) {
   const slotByCell = new Map(board.repairSlots.map((slot) => [getCellKey(slot.x, slot.y), slot]));
   const terminalByCell = new Map();
@@ -101,6 +102,7 @@ export function buildBoardViewModel({
         placedMask: slotState?.placedMask ?? null,
         locked: !!slotState?.locked,
         editableByLocalPlayer: !!slot && slot.owner === selectedSide,
+        selected: !!slot && slot.slotId === selectedSlotId,
         terminalId: terminal?.terminalId || null,
         terminalType: terminal?.terminalType || null,
         terminalCompleted: !!terminal?.completed,

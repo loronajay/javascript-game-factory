@@ -30,3 +30,9 @@ dev/
 # Echo Duel keeps its local regression tests out of shipped game builds.
 games/echo-duel/tests/
 games/echo-duel/tests/**
+
+# Circuit Siege ships without its local TDD suite or debug demo folder.
+games/circuit-siege/tests/
+games/circuit-siege/tests/**
+games/circuit-siege/circuit_siege_debug_demo_v0_5/
+games/circuit-siege/circuit_siege_debug_demo_v0_5/**

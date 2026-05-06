@@ -108,6 +108,13 @@ export function createCircuitSiegeSessionController({
       emitMatchState();
     };
 
+    net.cb.onError = (_code, message) => {
+      if (typeof message === "string" && message.trim().length > 0) {
+        announce(message);
+        emitLobbyState();
+      }
+    };
+
     net.cb.onPartnerLeft = () => {
       clearRoomState();
       announce("Opponent disconnected.");

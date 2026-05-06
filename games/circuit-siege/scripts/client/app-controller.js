@@ -1,14 +1,22 @@
 import {
+  buildLobbyActionHint,
   buildLobbyStartActionState,
   getLobbyStatusText,
   getQueueStatusText
 } from "./lobby-view-state.js";
 import { buildBoardViewModel } from "./board-view-model.js";
 import {
+  buildRotateIntentFromSelection,
   buildIntentFromCell,
   createBoardInputState,
+  selectBoardSlot,
   selectTool
 } from "./board-input-controller.js";
+import {
+  buildQueueSetupViewModel,
+  createQueueSetupState,
+  selectPublicQueueSide
+} from "./queue-setup-state.js";
 
 function deriveScreen(runtime) {
   if (runtime.snapshot || runtime.matchReady) {
@@ -29,11 +37,15 @@ export function createCircuitSiegeAppController({
   renderApp
 } = {}) {
   let inputState = createBoardInputState();
+  let queueSetupState = createQueueSetupState();
 
   function buildViewModel() {
     return {
       screen: deriveScreen(runtime),
       menuNotice: runtime.lastNotice || "",
+      queueSetup: buildQueueSetupViewModel({
+        setupState: queueSetupState
+      }),
       queueStatusText: getQueueStatusText({
         matchmakingMode: runtime.matchmakingMode,
         selectedSide: runtime.selectedSide,
@@ -41,6 +53,11 @@ export function createCircuitSiegeAppController({
       }),
       lobbyStatusText: getLobbyStatusText({
         lobby: runtime.lobby,
+        matchReady: runtime.matchReady
+      }),
+      lobbyActionHint: buildLobbyActionHint({
+        lobby: runtime.lobby,
+        isHost: runtime.isHost,
         matchReady: runtime.matchReady
       }),
       lobbyStartAction: buildLobbyStartActionState({
@@ -54,7 +71,8 @@ export function createCircuitSiegeAppController({
       board: buildBoardViewModel({
         board,
         snapshot: runtime.snapshot,
-        selectedSide: runtime.selectedSide || "blue"
+        selectedSide: runtime.selectedSide || "blue",
+        selectedSlotId: inputState.selectedSlotId
       })
     };
   }
@@ -68,17 +86,32 @@ export function createCircuitSiegeAppController({
   }
 
   async function startPublicBlue() {
-    runtime.matchmakingMode = "public";
-    runtime.selectedSide = "blue";
-    await sessionController.startPublicMatch({ side: "blue" });
-    rerender();
+    queueSetupState = selectPublicQueueSide(queueSetupState, "blue");
+    return confirmPublicQueue();
   }
 
   async function startPublicRed() {
-    runtime.matchmakingMode = "public";
-    runtime.selectedSide = "red";
-    await sessionController.startPublicMatch({ side: "red" });
+    queueSetupState = selectPublicQueueSide(queueSetupState, "red");
+    return confirmPublicQueue();
+  }
+
+  function selectPublicSide(side) {
+    queueSetupState = selectPublicQueueSide(queueSetupState, side);
     rerender();
+  }
+
+  async function confirmPublicQueue() {
+    const side = queueSetupState.publicSide;
+    if (!side) {
+      rerender();
+      return false;
+    }
+
+    runtime.matchmakingMode = "public";
+    runtime.selectedSide = side;
+    await sessionController.startPublicMatch({ side });
+    rerender();
+    return true;
   }
 
   async function startPrivateHost() {
@@ -122,15 +155,42 @@ export function createCircuitSiegeAppController({
     const boardViewModel = buildBoardViewModel({
       board,
       snapshot: runtime.snapshot,
-      selectedSide: runtime.selectedSide || "blue"
+      selectedSide: runtime.selectedSide || "blue",
+      selectedSlotId: inputState.selectedSlotId
     });
     const cell = boardViewModel.cells.find((entry) => entry.slotId === slotId) || null;
+    inputState = selectBoardSlot(inputState, cell?.slotId || null);
     const built = buildIntentFromCell({
       cell,
       inputState
     });
 
     if (!built.ok) {
+      return false;
+    }
+
+    const handled = sessionController.submitIntent?.(built.intent) || false;
+    rerender();
+    return handled;
+  }
+
+  function rotateSelectedSlot() {
+    const selectedSlotId = inputState.selectedSlotId;
+    if (!selectedSlotId) {
+      return false;
+    }
+
+    const boardViewModel = buildBoardViewModel({
+      board,
+      snapshot: runtime.snapshot,
+      selectedSide: runtime.selectedSide || "blue",
+      selectedSlotId
+    });
+    const cell = boardViewModel.cells.find((entry) => entry.slotId === selectedSlotId) || null;
+    const built = buildRotateIntentFromSelection({ cell });
+
+    if (!built.ok) {
+      rerender();
       return false;
     }
 
@@ -147,6 +207,8 @@ export function createCircuitSiegeAppController({
     boot,
     startPublicBlue,
     startPublicRed,
+    selectPublicSide,
+    confirmPublicQueue,
     startPrivateHost,
     joinPrivateRoom,
     requestReady,
@@ -154,6 +216,7 @@ export function createCircuitSiegeAppController({
     leaveMatchmaking,
     selectTool: selectActiveTool,
     handleBoardSlot,
+    rotateSelectedSlot,
     handleRuntimeChanged
   };
 }
