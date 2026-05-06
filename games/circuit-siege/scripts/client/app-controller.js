@@ -160,12 +160,13 @@ export function createCircuitSiegeAppController({
       selectedSlotId: inputState.selectedSlotId
     });
     const cell = boardViewModel.cells.find((entry) => entry.slotId === slotId) || null;
-    inputState = selectBoardSlot(inputState, cell?.slotId || null);
 
     if (!cell?.editableByLocalPlayer || cell.locked) {
       rerender();
       return false;
     }
+
+    inputState = selectBoardSlot(inputState, cell.slotId);
 
     if (!inputState.heldMask && cell.placedMask) {
       const lifted = liftHeldMaskFromCell({

@@ -14,6 +14,15 @@ import {
   polylinePointsAttr
 } from "./board-svg-layout.js";
 
+const TOOL_LABELS = {
+  EW: "Straight H",
+  NS: "Straight V",
+  NE: "Corner NE",
+  ES: "Corner ES",
+  SW: "Corner SW",
+  NW: "Corner NW"
+};
+
 function toolMaskSegments(mask) {
   const centerX = 22;
   const centerY = 15;
@@ -47,7 +56,8 @@ function renderToolPreview(mask) {
     <svg viewBox="0 0 44 30" class="tool-preview" aria-hidden="true">
       ${lines}
     </svg>
-    <strong>${mask}</strong>
+    <strong>${TOOL_LABELS[mask] || mask}</strong>
+    <small>${mask}</small>
   `;
 }
 
@@ -109,6 +119,7 @@ function renderBoardGrid(container, boardViewModel) {
         cell.selected ? "slot-group--selected" : "",
         cell.locked ? "slot-group--locked" : ""
       ].filter(Boolean).join(" ");
+      const slotAttr = cell.editableByLocalPlayer && !cell.locked ? `data-slot-id="${cell.slotId}"` : "";
       const pieceMarkup = cell.placedMask
         ? maskSegmentLines(cell.placedMask, cx, cy).map((segment) => `
           <line
@@ -120,12 +131,15 @@ function renderBoardGrid(container, boardViewModel) {
           ></line>
         `).join("")
         : "";
-      const slotLabel = cell.slotType === "hole" && !cell.placedMask ? "H" : cell.slotType === "refactor" ? "R" : "";
+      const emptyHoleMarkup = !cell.placedMask
+        ? `<circle cx="${cx}" cy="${cy}" r="4" class="slot-hole-marker"></circle>`
+        : "";
       return `
-        <g class="${slotClass}" data-slot-id="${cell.slotId}">
-          <rect x="${cx - 11}" y="${cy - 11}" width="22" height="22" rx="3" class="slot-base"></rect>
+        <g class="${slotClass}">
+          <rect x="${cx - 15}" y="${cy - 15}" width="30" height="30" rx="6" class="slot-hitbox" ${slotAttr}></rect>
+          <rect x="${cx - 11}" y="${cy - 11}" width="22" height="22" rx="3" class="slot-base" ${slotAttr}></rect>
           ${pieceMarkup}
-          ${slotLabel ? `<text x="${cx}" y="${cy + 4}" text-anchor="middle" class="slot-label">${slotLabel}</text>` : ""}
+          ${emptyHoleMarkup}
         </g>
       `;
     }).join("");

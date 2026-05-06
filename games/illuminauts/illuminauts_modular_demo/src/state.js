@@ -11,6 +11,7 @@ export function createGameState() {
       y: map.start.y,
       spawnX: map.start.x,
       spawnY: map.start.y,
+      dir: 'down',
       hearts: HEARTS_MAX,
       chips: 0,
       stamina: STAMINA_MAX,

@@ -365,6 +365,13 @@ input {
   letter-spacing: 0.08em;
 }
 
+.tool--icon small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .tool--active {
   background: linear-gradient(135deg, rgba(60, 134, 255, 0.28), rgba(255, 91, 77, 0.22));
   border-color: rgba(248, 217, 122, 0.4);
@@ -461,6 +468,12 @@ input {
 
 .slot-base {
   stroke-width: 2.2;
+  pointer-events: none;
+}
+
+.slot-hitbox {
+  fill: transparent;
+  stroke: none;
 }
 
 .slot-group--hole .slot-base {
@@ -482,12 +495,14 @@ input {
   cursor: pointer;
 }
 
-.slot-group--editable:hover .slot-base {
+.slot-group--editable:hover .slot-base,
+.slot-group--editable:hover .slot-hitbox {
   filter: drop-shadow(0 0 7px #67e8f9);
 }
 
 .slot-group--blocked {
   opacity: 0.72;
+  pointer-events: none;
 }
 
 .slot-group--selected .slot-base {
@@ -495,10 +510,8 @@ input {
   stroke: #fef08a;
 }
 
-.slot-label {
-  font-size: 9px;
-  font-weight: 900;
-  fill: #e5e7eb;
+.slot-hole-marker {
+  fill: rgba(103, 232, 249, 0.7);
   pointer-events: none;
 }
 

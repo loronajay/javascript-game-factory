@@ -1,0 +1,115 @@
+export const SPRITE_SHEET_PATH = './assets/sprite-sheet.png';
+
+// Atlas for assets/sprite-sheet.png.
+// Coordinates are centralized here so renderer code can use named assets only.
+// This atlas targets the revised grid-friendly sheet with 4 player directions,
+// a 3x3 Beacon Core kit, and separated disabled Laser Door pillars.
+export const sprites = {
+  playerDown: { x: 76, y: 96, w: 119, h: 154 },
+  playerUp: { x: 280, y: 96, w: 115, h: 154 },
+  playerLeft: { x: 454, y: 104, w: 100, h: 152 },
+  playerRight: { x: 588, y: 104, w: 103, h: 152 },
+
+  alienPatrol: { x: 767, y: 87, w: 183, h: 182 },
+  powerCell: { x: 1042, y: 90, w: 83, h: 174 },
+  accessChip: { x: 1191, y: 127, w: 183, h: 117 },
+
+  turretUp: { x: 106, y: 342, w: 137, h: 197 },
+  turretDown: { x: 370, y: 380, w: 120, h: 171 },
+  turretLeft: { x: 562, y: 380, w: 205, h: 140 },
+  turretRight: { x: 884, y: 380, w: 212, h: 140 },
+
+  // Active Laser Door is intentionally a wide composite for the current prototype.
+  // The renderer draws it centered across the door tile so both pillars are visible.
+  laserDoorActiveWide: { x: 100, y: 645, w: 421, h: 200 },
+  laserDoorDisabledLeft: { x: 663, y: 660, w: 64, h: 182 },
+  laserDoorDisabledRight: { x: 783, y: 659, w: 63, h: 183 },
+
+  beacon00: { x: 943, y: 564, w: 121, h: 122 },
+  beacon01: { x: 1077, y: 564, w: 144, h: 122 },
+  beacon02: { x: 1233, y: 564, w: 122, h: 122 },
+  beacon10: { x: 942, y: 699, w: 119, h: 144 },
+  beacon11: { x: 1074, y: 699, w: 147, h: 144 },
+  beacon12: { x: 1234, y: 699, w: 120, h: 144 },
+  beacon20: { x: 943, y: 856, w: 121, h: 123 },
+  beacon21: { x: 1077, y: 856, w: 144, h: 123 },
+  beacon22: { x: 1233, y: 856, w: 120, h: 122 }
+};
+
+let spriteSheet = null;
+
+export function loadAssets() {
+  return new Promise((resolve, reject) => {
+    const source = new Image();
+    source.src = SPRITE_SHEET_PATH;
+    source.onload = () => {
+      spriteSheet = buildTransparentSheet(source);
+      resolve();
+    };
+    source.onerror = () => reject(new Error(`[Illuminauts assets] Failed to load ${SPRITE_SHEET_PATH}`));
+  });
+}
+
+// Some prototype sheets have a checkerboard presentation background instead of true alpha.
+// This strips high-value neutral checker pixels while leaving the darker sprites intact.
+// If a future sheet already has real transparency, this pass is harmless.
+function buildTransparentSheet(source) {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(source, 0, 0);
+
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+
+    if (min >= 226 && max - min <= 16) {
+      data[i + 3] = 0;
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+export function getSpriteFrame(name) {
+  return sprites[name] || null;
+}
+
+export function drawSprite(ctx, name, x, y, w, h) {
+  const frame = getSpriteFrame(name);
+  if (!spriteSheet || !frame) return false;
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    spriteSheet,
+    frame.x,
+    frame.y,
+    frame.w,
+    frame.h,
+    x,
+    y,
+    w,
+    h
+  );
+
+  return true;
+}
+
+export function drawSpriteContain(ctx, name, cx, cy, maxW, maxH) {
+  const frame = getSpriteFrame(name);
+  if (!frame) return false;
+
+  const scale = Math.min(maxW / frame.w, maxH / frame.h);
+  const w = frame.w * scale;
+  const h = frame.h * scale;
+  return drawSprite(ctx, name, cx - w / 2, cy - h / 2, w, h);
+}

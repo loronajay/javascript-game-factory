@@ -6,6 +6,27 @@ import { createCircuitSiegeAppController } from "./app-controller.js";
 import { createAppRenderer } from "./app-renderer.js";
 import { loadCircuitSiegeIdentity } from "./identity.js";
 
+export function findSlotIdFromEventTarget(target) {
+  let current = target || null;
+
+  while (current) {
+    if (typeof current.dataset?.slotId === "string" && current.dataset.slotId.length > 0) {
+      return current.dataset.slotId;
+    }
+
+    if (typeof current.getAttribute === "function") {
+      const slotId = current.getAttribute("data-slot-id");
+      if (typeof slotId === "string" && slotId.length > 0) {
+        return slotId;
+      }
+    }
+
+    current = current.parentElement || current.parentNode || null;
+  }
+
+  return null;
+}
+
 function bindButtons(app, root = document) {
   root.querySelectorAll("[data-public-side]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -39,9 +60,9 @@ function bindButtons(app, root = document) {
     });
   });
   root.querySelector("#board-grid")?.addEventListener("click", (event) => {
-    const slotEl = event.target.closest("[data-slot-id]");
-    if (!slotEl) return;
-    app.handleBoardSlot(slotEl.dataset.slotId);
+    const slotId = findSlotIdFromEventTarget(event.target);
+    if (!slotId) return;
+    app.handleBoardSlot(slotId);
   });
   root.addEventListener("keydown", (event) => {
     if (event.defaultPrevented) return;

@@ -4,6 +4,7 @@ import { updateAliens } from './hazards.js';
 import { updatePlayer } from './player.js';
 import { createHud, updateHud } from './hud.js';
 import { renderDebugView, renderGameView } from './renderer.js';
+import { loadAssets } from './assets.js';
 
 const gameCanvas = document.getElementById('gameCanvas');
 const debugCanvas = document.getElementById('debugCanvas');
@@ -29,4 +30,15 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+async function boot() {
+  await loadAssets();
+  state.lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+
+boot().catch((error) => {
+  console.error(error);
+  state.message = 'Asset load failed. Falling back to debug glyphs.';
+  state.lastTime = performance.now();
+  requestAnimationFrame(loop);
+});

@@ -77,16 +77,25 @@ function damagePlayer(state, now) {
   }
 }
 
+function clampStamina(player) {
+  player.stamina = Math.max(0, Math.min(STAMINA_MAX, player.stamina));
+}
+
 function updateStamina(player, dtMs, sprintingThisStep) {
-  if (sprintingThisStep) return;
-  player.stamina = Math.min(
-    STAMINA_MAX,
-    player.stamina + STAMINA_RECOVER_PER_SECOND * (dtMs / 1000)
-  );
+  clampStamina(player);
+
+  if (sprintingThisStep) {
+    clampStamina(player);
+    return;
+  }
+
+  player.stamina += STAMINA_RECOVER_PER_SECOND * (dtMs / 1000);
+  clampStamina(player);
 }
 
 export function updatePlayer(state, now, dtMs) {
   const { player, input } = state;
+  clampStamina(player);
 
   tryActivatePowerCell(state, now);
 
@@ -94,6 +103,11 @@ export function updatePlayer(state, now, dtMs) {
   let sprintingThisStep = false;
 
   if (intent.dx || intent.dy) {
+    if (intent.dx > 0) player.dir = 'right';
+    if (intent.dx < 0) player.dir = 'left';
+    if (intent.dy > 0) player.dir = 'down';
+    if (intent.dy < 0) player.dir = 'up';
+
     const sprintRequested = wantsSprint(input) && player.stamina >= STAMINA_DRAIN_PER_STEP;
     const stepMs = sprintRequested ? SPRINT_STEP_MS : NORMAL_STEP_MS;
 
@@ -109,7 +123,8 @@ export function updatePlayer(state, now, dtMs) {
 
         if (sprintRequested) {
           sprintingThisStep = true;
-          player.stamina = Math.max(0, player.stamina - STAMINA_DRAIN_PER_STEP);
+          player.stamina -= STAMINA_DRAIN_PER_STEP;
+          clampStamina(player);
         }
       }
     }

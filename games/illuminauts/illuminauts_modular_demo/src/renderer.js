@@ -12,6 +12,7 @@ import {
   getTurretBeamTiles,
   getTurretPhase
 } from './hazards.js';
+import { drawSprite, drawSpriteContain } from './assets.js';
 
 function resizeCanvasToDisplaySize(canvas) {
   const rect = canvas.getBoundingClientRect();
@@ -47,6 +48,12 @@ function drawTileBase(ctx, map, x, y, sx, sy, size) {
   if (tile === '#') {
     fillTile(ctx, sx, sy, size, COLORS.wall);
     strokeTile(ctx, sx, sy, size, COLORS.wallEdge);
+  } else if (isGoalAt(map, x, y)) {
+    fillTile(ctx, sx, sy, size, COLORS.goal);
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, '#baffc8');
+    ctx.restore();
   } else {
     fillTile(ctx, sx, sy, size, (x + y) % 2 === 0 ? COLORS.floor : COLORS.floorAlt);
   }
@@ -83,9 +90,19 @@ function drawLaserSegment(ctx, sx, sy, size, phase, orientation = 'horizontal') 
   ctx.restore();
 }
 
+function getTurretSprite(turret) {
+  if (turret.dx > 0) return 'turretRight';
+  if (turret.dx < 0) return 'turretLeft';
+  if (turret.dy > 0) return 'turretDown';
+  return 'turretUp';
+}
+
 function drawTurretCharge(ctx, turret, sx, sy, size, phase, now) {
-  fillTile(ctx, sx + size * 0.14, sy + size * 0.14, size * 0.72, COLORS.turret);
-  drawGlyph(ctx, 'T', sx, sy, size, '#190900');
+  const drew = drawSpriteContain(ctx, getTurretSprite(turret), sx + size / 2, sy + size / 2, size * 1.24, size * 1.24);
+  if (!drew) {
+    fillTile(ctx, sx + size * 0.14, sy + size * 0.14, size * 0.72, COLORS.turret);
+    drawGlyph(ctx, 'T', sx, sy, size, '#190900');
+  }
 
   if (phase === 'cooldown') return;
 
@@ -102,44 +119,127 @@ function drawTurretCharge(ctx, turret, sx, sy, size, phase, now) {
   ctx.restore();
 }
 
+function getPlayerSprite(player) {
+  return {
+    up: 'playerUp',
+    down: 'playerDown',
+    left: 'playerLeft',
+    right: 'playerRight'
+  }[player.dir] || 'playerDown';
+}
+
+function getBeaconBounds(map) {
+  if (!map.goals.length) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const goal of map.goals) {
+    minX = Math.min(minX, goal.x);
+    minY = Math.min(minY, goal.y);
+    maxX = Math.max(maxX, goal.x);
+    maxY = Math.max(maxY, goal.y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function getBeaconPieceName(map, x, y) {
+  const bounds = getBeaconBounds(map);
+  if (!bounds) return null;
+
+  const centerX = Math.floor((bounds.minX + bounds.maxX) / 2);
+  const centerY = Math.floor((bounds.minY + bounds.maxY) / 2);
+  const localX = x - (centerX - 1);
+  const localY = y - (centerY - 1);
+
+  if (localX < 0 || localX > 2 || localY < 0 || localY > 2) return null;
+  return `beacon${localY}${localX}`;
+}
+
+function drawBeaconPiece(ctx, map, x, y, sx, sy, size) {
+  const piece = getBeaconPieceName(map, x, y);
+  if (!piece) return;
+
+  const drew = drawSprite(ctx, piece, sx, sy, size, size);
+  if (!drew) drawGlyph(ctx, 'B', sx, sy, size, '#00130b');
+}
+
+function drawLaserDoor(ctx, door, sx, sy, size) {
+  if (door.open) {
+    const leftDrew = drawSpriteContain(
+      ctx,
+      'laserDoorDisabledLeft',
+      sx - size / 2,
+      sy + size / 2,
+      size * 0.72,
+      size * 1.2
+    );
+    const rightDrew = drawSpriteContain(
+      ctx,
+      'laserDoorDisabledRight',
+      sx + size * 1.5,
+      sy + size / 2,
+      size * 0.72,
+      size * 1.2
+    );
+    if (!leftDrew || !rightDrew) strokeTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.doorOpen);
+    return;
+  }
+
+  const drew = drawSpriteContain(
+    ctx,
+    'laserDoorActiveWide',
+    sx + size / 2,
+    sy + size / 2,
+    size * 3.15,
+    size * 1.38
+  );
+
+  if (!drew) {
+    fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.door);
+    drawGlyph(ctx, 'D', sx, sy, size, '#100014');
+  }
+}
+
 function drawWorldEntity(ctx, state, x, y, sx, sy, size, now) {
   const { map, player, hazards } = state;
 
   if (isGoalAt(map, x, y)) {
-    fillTile(ctx, sx + size * 0.04, sy + size * 0.04, size * 0.92, COLORS.goal);
-    drawGlyph(ctx, 'B', sx, sy, size, '#00130b');
+    drawBeaconPiece(ctx, map, x, y, sx, sy, size);
   }
 
   const door = getDoorAt(map, x, y);
-  if (door) {
-    if (door.open) {
-      strokeTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.doorOpen);
-    } else {
-      fillTile(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, COLORS.door);
-      drawGlyph(ctx, 'D', sx, sy, size, '#100014');
-    }
-  }
+  if (door) drawLaserDoor(ctx, door, sx, sy, size);
 
   const pickup = getPickupAt(map, x, y);
   if (pickup?.type === 'chip') {
-    fillTile(ctx, sx + size * 0.28, sy + size * 0.28, size * 0.44, COLORS.chip);
-    drawGlyph(ctx, 'A', sx, sy, size, '#241800');
+    const drew = drawSpriteContain(ctx, 'accessChip', sx + size / 2, sy + size / 2, size * 0.82, size * 0.82);
+    if (!drew) {
+      fillTile(ctx, sx + size * 0.28, sy + size * 0.28, size * 0.44, COLORS.chip);
+      drawGlyph(ctx, 'A', sx, sy, size, '#241800');
+    }
   } else if (pickup?.type === 'powerCell') {
-    ctx.beginPath();
-    ctx.fillStyle = COLORS.power;
-    ctx.arc(sx + size / 2, sy + size / 2, size * 0.24, 0, Math.PI * 2);
-    ctx.fill();
-    drawGlyph(ctx, 'P', sx, sy, size, '#001c20');
+    const drew = drawSpriteContain(ctx, 'powerCell', sx + size / 2, sy + size / 2, size * 0.82, size * 0.92);
+    if (!drew) {
+      ctx.beginPath();
+      ctx.fillStyle = COLORS.power;
+      ctx.arc(sx + size / 2, sy + size / 2, size * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+      drawGlyph(ctx, 'P', sx, sy, size, '#001c20');
+    }
   }
 
   for (const alien of hazards.aliens) {
     const pos = getAlienPosition(alien);
     if (pos.x === x && pos.y === y) {
-      ctx.beginPath();
-      ctx.fillStyle = COLORS.alien;
-      ctx.arc(sx + size / 2, sy + size / 2, size * 0.33, 0, Math.PI * 2);
-      ctx.fill();
-      drawGlyph(ctx, 'X', sx, sy, size, '#120019');
+      const drew = drawSpriteContain(ctx, 'alienPatrol', sx + size / 2, sy + size / 2, size * 1.08, size * 1.08);
+      if (!drew) {
+        ctx.beginPath();
+        ctx.fillStyle = COLORS.alien;
+        ctx.arc(sx + size / 2, sy + size / 2, size * 0.33, 0, Math.PI * 2);
+        ctx.fill();
+        drawGlyph(ctx, 'X', sx, sy, size, '#120019');
+      }
     }
   }
 
@@ -165,11 +265,18 @@ function drawWorldEntity(ctx, state, x, y, sx, sy, size, now) {
 
   if (player.x === x && player.y === y) {
     const invuln = now < player.invulnerableUntil;
-    ctx.beginPath();
-    ctx.fillStyle = invuln ? COLORS.playerInvuln : COLORS.player;
-    ctx.arc(sx + size / 2, sy + size / 2, size * 0.32, 0, Math.PI * 2);
-    ctx.fill();
-    drawGlyph(ctx, 'I', sx, sy, size, '#001318');
+    ctx.save();
+    if (invuln) ctx.globalAlpha = 0.68 + Math.sin(now / 50) * 0.22;
+    const drew = drawSpriteContain(ctx, getPlayerSprite(player), sx + size / 2, sy + size / 2, size * 0.9, size * 0.96);
+    ctx.restore();
+
+    if (!drew) {
+      ctx.beginPath();
+      ctx.fillStyle = invuln ? COLORS.playerInvuln : COLORS.player;
+      ctx.arc(sx + size / 2, sy + size / 2, size * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      drawGlyph(ctx, 'I', sx, sy, size, '#001318');
+    }
   }
 }
 
@@ -263,7 +370,6 @@ export function renderDebugView(canvas, state, now) {
     }
   }
 
-  // Debug-only suit light radius overlay. This is now a true circle, matching the canon view.
   const lightRadius = getLightRadius(state, now);
   ctx.strokeStyle = 'rgba(118, 244, 255, 0.48)';
   ctx.lineWidth = Math.max(1, size * 0.08);
