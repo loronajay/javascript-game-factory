@@ -11,12 +11,20 @@
   <a href="../../grid.html" class="back-btn">&larr; Arcade</a>
   <main class="game-shell">
     <div class="bg-grid" aria-hidden="true"></div>
+    <div class="scene-noise" aria-hidden="true"></div>
+    <div class="scene-orb scene-orb--cyan" aria-hidden="true"></div>
+    <div class="scene-orb scene-orb--amber" aria-hidden="true"></div>
     <div id="game-root">
-      <section id="screen-menu" class="screen screen-menu">
+      <section id="screen-menu" class="screen screen-menu screen--active">
         <div class="title-card">
           <p class="eyebrow">Javascript Game Factory</p>
           <h1>Echo Duel</h1>
-          <p class="tagline">Build the pattern. Remember your own signal. Break everyone else.</p>
+          <p class="tagline">A late-night memory showdown for friends, bluffers, and the person who swears they totally had the sequence.</p>
+          <div class="title-meta" aria-label="Game highlights">
+            <span>2-6 Players</span>
+            <span>Signal Memory</span>
+            <span>Private Rooms</span>
+          </div>
         </div>
         <div class="menu-buttons">
           <button id="btn-create-public" class="btn btn-primary">Create Public Lobby</button>
@@ -25,10 +33,10 @@
           <button id="btn-join-private" class="btn">Join Private Room</button>
         </div>
         <p id="menu-notice" class="status-line menu-notice hidden"></p>
-        <p class="muted note">Online play uses variable-size lobbies. The lobby owner sets the penalty word and coordinates match state.</p>
+        <p class="muted note">Gather a room, set the word, and pass the pressure around. Echo Duel should feel like a social standoff, not a form flow.</p>
       </section>
 
-      <section id="screen-online-config" class="screen screen-panel hidden">
+      <section id="screen-online-config" class="screen screen-panel">
         <div class="panel lobby-panel">
           <p class="eyebrow">Online Lobby</p>
           <h2 id="online-config-title">Configure Online Match</h2>
@@ -66,7 +74,7 @@
         </div>
       </section>
 
-      <section id="screen-room-join" class="screen screen-panel hidden">
+      <section id="screen-room-join" class="screen screen-panel">
         <div class="panel lobby-panel">
           <p class="eyebrow">Private Room</p>
           <h2>Join Room</h2>
@@ -82,7 +90,7 @@
         </div>
       </section>
 
-      <section id="screen-online-lobby" class="screen screen-panel hidden">
+      <section id="screen-online-lobby" class="screen screen-panel">
         <div class="panel lobby-panel">
           <p class="eyebrow">Room Code</p>
           <h2 id="online-room-code" class="room-code-display">-----</h2>
@@ -96,7 +104,7 @@
         </div>
       </section>
 
-      <section id="screen-match" class="screen screen-match hidden">
+      <section id="screen-match" class="screen screen-match">
         <header class="match-header">
           <div>
             <p class="eyebrow" id="phase-kicker">Phase</p>
@@ -137,7 +145,7 @@
         </div>
       </section>
 
-      <section id="screen-ended" class="screen screen-panel hidden">
+      <section id="screen-ended" class="screen screen-panel">
         <div class="panel end-panel">
           <p class="eyebrow">Match Over</p>
           <h2 id="ended-title">Winner</h2>

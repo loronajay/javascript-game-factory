@@ -81,8 +81,13 @@ export function currentPlaybackInput(state, now = performance.now()) {
 
 
 export function showScreen(name) {
-  Object.values(screenMap).forEach(id => qs(id)?.classList.add('hidden'));
-  qs(screenMap[name])?.classList.remove('hidden');
+  Object.values(screenMap).forEach(id => {
+    const screen = qs(id);
+    if (!screen) return;
+    const isActive = id === screenMap[name];
+    screen.classList.toggle('screen--active', isActive);
+    screen.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+  });
 }
 
 function renderSequence(state) {

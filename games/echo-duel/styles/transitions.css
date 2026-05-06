@@ -1,0 +1,115 @@
+.btn,
+.back-btn,
+.player-card,
+.online-member,
+.pad-key,
+.sequence-slot,
+.title-meta span {
+  transition:
+    transform var(--micro-shift),
+    border-color var(--micro-shift),
+    box-shadow var(--micro-shift),
+    background-color var(--micro-shift),
+    opacity var(--micro-shift),
+    filter var(--micro-shift);
+}
+
+.btn:hover:not(:disabled),
+.back-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.18),
+    0 22px 42px rgba(0, 0, 0, 0.34);
+}
+
+@keyframes modePulse {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes keyPromptPulse {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes slotPulse {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes liveSignalPop {
+  from {
+    transform: scale(0.86);
+    filter: brightness(1.5);
+  }
+
+  to {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes loserCalloutPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.42) rotate(-3deg);
+    filter: blur(2px);
+  }
+
+  16% {
+    opacity: 1;
+    transform: scale(1.12) rotate(1deg);
+    filter: blur(0);
+  }
+
+  34% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+
+  74% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.42);
+    filter: blur(2px);
+  }
+}
+
+.loser-callout--play {
+  animation: loserCalloutPop 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .btn,
+  .back-btn,
+  .player-card,
+  .online-member,
+  .pad-key,
+  .sequence-slot,
+  .title-meta span {
+    animation: none !important;
+    transition: none !important;
+  }
+}

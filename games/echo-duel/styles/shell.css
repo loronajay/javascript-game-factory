@@ -1,0 +1,176 @@
+.back-btn {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(9, 11, 22, 0.58);
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+}
+
+.game-shell {
+  position: relative;
+  min-height: 100vh;
+  padding: 4.75rem 1.25rem 2rem;
+  display: grid;
+  place-items: center;
+}
+
+.bg-grid,
+.scene-noise,
+.scene-orb {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bg-grid {
+  opacity: 0.28;
+  background-image:
+    linear-gradient(rgba(255, 219, 163, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(123, 230, 255, 0.08) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: radial-gradient(circle at 50% 44%, black 0%, transparent 76%);
+}
+
+.scene-noise {
+  opacity: 0.1;
+  background-image:
+    linear-gradient(transparent 0, rgba(255, 255, 255, 0.06) 50%, transparent 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 40%, rgba(255, 255, 255, 0.03));
+  background-size: 100% 3px, 180px 100%;
+  mix-blend-mode: screen;
+}
+
+.scene-orb {
+  filter: blur(42px);
+  opacity: 0.56;
+}
+
+.scene-orb--cyan {
+  inset: 10% auto auto 6%;
+  width: 22rem;
+  height: 22rem;
+  background: radial-gradient(circle, rgba(124, 236, 255, 0.42), transparent 68%);
+}
+
+.scene-orb--amber {
+  inset: auto 4% 8% auto;
+  width: 26rem;
+  height: 26rem;
+  background: radial-gradient(circle, rgba(255, 174, 92, 0.34), transparent 66%);
+}
+
+#game-root {
+  position: relative;
+  width: min(1120px, 100%);
+  min-height: min(78vh, 980px);
+  isolation: isolate;
+}
+
+#game-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 231, 186, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 22%),
+    linear-gradient(135deg, rgba(12, 15, 27, 0.68), rgba(10, 11, 18, 0.24));
+  box-shadow: var(--shadow);
+  z-index: 0;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-height: 72vh;
+  padding: 1rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2rem) scale(0.985);
+  transition:
+    opacity var(--screen-shift),
+    transform var(--screen-shift),
+    visibility 0s linear var(--screen-shift);
+}
+
+.screen--active {
+  position: relative;
+  z-index: 1;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--screen-shift),
+    transform var(--screen-shift),
+    visibility 0s linear 0s;
+}
+
+.screen-menu,
+.screen-panel {
+  display: grid;
+  place-items: center;
+  gap: 1.5rem;
+}
+
+.screen-match {
+  display: grid;
+  gap: 1.15rem;
+  align-content: start;
+}
+
+.title-card,
+.panel {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  padding: 2rem;
+  border: 1px solid var(--line);
+  border-radius: 1.8rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 24%),
+    linear-gradient(160deg, rgba(22, 25, 44, 0.94), rgba(14, 16, 28, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 40px rgba(124, 236, 255, 0.04),
+    0 28px 80px rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+}
+
+.title-card::after,
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: auto -15% -40% auto;
+  width: 16rem;
+  height: 16rem;
+  background: radial-gradient(circle, rgba(255, 174, 92, 0.14), transparent 70%);
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .game-shell {
+    padding-top: 4.2rem;
+  }
+
+  #game-root {
+    min-height: 82vh;
+  }
+
+  .title-card,
+  .panel {
+    padding: 1.35rem;
+    border-radius: 1.4rem;
+  }
+}

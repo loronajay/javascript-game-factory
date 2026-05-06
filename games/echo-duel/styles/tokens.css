@@ -1,0 +1,28 @@
+:root {
+  --font-display: "Arial Black", Impact, Haettenschweiler, sans-serif;
+  --font-ui: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+  --bg-0: #070812;
+  --bg-1: #101426;
+  --bg-2: #161227;
+  --panel: rgba(18, 20, 36, 0.8);
+  --panel-strong: rgba(22, 24, 46, 0.92);
+  --panel-soft: rgba(15, 18, 34, 0.68);
+  --text: #f8f4ea;
+  --muted: #c7c0b3;
+  --muted-strong: #f2cda5;
+  --line: rgba(255, 231, 186, 0.18);
+  --line-strong: rgba(255, 231, 186, 0.42);
+  --shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+  --danger: #ff6c78;
+  --ok: #74f5c1;
+  --blue: #76c8ff;
+  --yellow: #ffd36a;
+  --red: #ff7b83;
+  --green: #85f5a7;
+  --cyan: #7cecff;
+  --amber: #ffae5c;
+  --peach: #ffcfaa;
+  --ink: #08101f;
+  --screen-shift: 480ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  --micro-shift: 180ms ease;
+}
