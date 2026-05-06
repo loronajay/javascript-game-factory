@@ -608,25 +608,25 @@
 .live-signal-box.key-w {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #8fffe0, #1ed8a3);
+    linear-gradient(180deg, #8fffe0, #1e40d8);
 }
 
 .live-signal-box.key-a {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #f3ff92, #a9ea34);
+    linear-gradient(180deg, #f3ff92, #e5ff00);
 }
 
 .live-signal-box.key-s {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #ffd07f, #ff8a41);
+    linear-gradient(180deg, #ffd07f, #ff0000);
 }
 
 .live-signal-box.key-d {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #dcff90, #63dd41);
+    linear-gradient(180deg, #dcff90, #37ff00);
 }
 
 .live-signal-strip.is-playback {
