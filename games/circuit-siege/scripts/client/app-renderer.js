@@ -47,8 +47,6 @@ function renderToolPreview(mask, side) {
         className: "tool-preview__image"
       }) : ""}
     </span>
-    <strong>${TOOL_LABELS[mask] || mask}</strong>
-    <small>${mask}</small>
   `;
 }
 
