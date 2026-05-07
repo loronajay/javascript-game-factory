@@ -141,7 +141,7 @@ body {
 .hero-title-art {
   width: min(100%, 1080px);
   margin: 10px auto 0;
-  aspect-ratio: 1416 / 263;
+  aspect-ratio: 1320 / 225;
   background-image: url("images/ui/menu-title-plate.png");
   background-repeat: no-repeat;
   background-size: contain;
@@ -150,9 +150,9 @@ body {
 }
 
 .menu-circuit-banner {
-  width: min(100%, 820px);
+  width: min(100%, 980px);
   margin: 22px auto 6px;
-  aspect-ratio: 813 / 134;
+  aspect-ratio: 1370 / 150;
   background-image: url("images/ui/menu-circuit-banner.png");
   background-repeat: no-repeat;
   background-size: contain;
@@ -199,7 +199,7 @@ body {
   position: relative;
   border: 0;
   border-radius: 32px;
-  aspect-ratio: 693 / 268;
+  aspect-ratio: 830 / 190;
   padding: 0;
   background: transparent;
   color: var(--text);
@@ -211,9 +211,9 @@ body {
 
 .seat-lock strong {
   position: absolute;
-  inset: auto 0 34px;
+  inset: auto 0 18px;
   z-index: 1;
-  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-size: clamp(1.15rem, 2.4vw, 1.65rem);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   text-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
@@ -351,13 +351,12 @@ input {
 }
 
 #btn-play-online,
-#btn-private-host,
-#btn-open-join {
-  aspect-ratio: 286 / 126;
+#btn-private-host {
+  aspect-ratio: 345 / 150;
 }
 
 #btn-play-online {
-  max-width: 360px;
+  max-width: 380px;
   justify-self: center;
   background-image: url("images/ui/menu-button-play-online.png");
 }
@@ -367,6 +366,7 @@ input {
 }
 
 #btn-open-join {
+  aspect-ratio: 334 / 150;
   background-image: url("images/ui/menu-button-enter-code.png");
 }
 
@@ -374,19 +374,19 @@ input {
 #btn-friend-back,
 #btn-join-back,
 #btn-cancel-search {
-  aspect-ratio: 196 / 132;
+  aspect-ratio: 345 / 132;
 }
 
 #btn-back-to-root,
 #btn-friend-back,
 #btn-join-back {
-  max-width: 312px;
+  max-width: 340px;
   justify-self: center;
   background-image: url("images/ui/menu-button-back.png");
 }
 
 #btn-cancel-search {
-  max-width: 312px;
+  max-width: 340px;
   justify-self: center;
   background-image: url("images/ui/menu-button-cancel.png");
 }
@@ -407,12 +407,12 @@ input {
 
 .room-code-shell {
   position: relative;
-  width: min(100%, 520px);
+  width: min(100%, 640px);
   margin: 18px auto 0;
-  aspect-ratio: 535 / 133;
+  aspect-ratio: 735 / 205;
   display: grid;
   place-items: center;
-  padding: 0 88px;
+  padding: 0 112px;
   background-image: url("images/ui/menu-room-code-shell.png");
   background-repeat: no-repeat;
   background-size: contain;
