@@ -4,10 +4,11 @@ export const VIEW_TILES_Y = 11;
 
 export const HEARTS_MAX = 3;
 export const STAMINA_MAX = 100;
-export const STAMINA_DRAIN_PER_STEP = 11;
-export const STAMINA_RECOVER_PER_SECOND = 28;
-export const NORMAL_STEP_MS = 155;
-export const SPRINT_STEP_MS = 92;
+export const WALK_SPEED = 4.5;              // tiles per second
+export const SPRINT_SPEED = 7.5;            // tiles per second
+export const PLAYER_RADIUS = 0.3;           // tile units, collision half-width
+export const STAMINA_DRAIN_PER_SECOND = 35;
+export const STAMINA_RECOVER_PER_SECOND = 25;
 export const INVULN_MS = 1050;
 export const POWER_CELL_MS = 15000;
 export const BASE_LIGHT_RADIUS = 3.1;

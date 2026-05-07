@@ -1,61 +1,102 @@
 import {
   HEARTS_MAX,
   INVULN_MS,
-  NORMAL_STEP_MS,
+  PLAYER_RADIUS,
   POWER_CELL_MS,
-  SPRINT_STEP_MS,
-  STAMINA_DRAIN_PER_STEP,
+  SPRINT_SPEED,
+  STAMINA_DRAIN_PER_SECOND,
   STAMINA_MAX,
-  STAMINA_RECOVER_PER_SECOND
+  STAMINA_RECOVER_PER_SECOND,
+  WALK_SPEED
 } from './config.js';
-import { getDoorAt, getPickupAt, isBlocked, isGoalAt } from './map.js';
-import { consumeJustPressed, getMoveIntent, wantsSprint } from './input.js';
+import { getDoorAt, isGoalAt, isWall } from './map.js';
+import { getMoveIntent, wantsSprint } from './input.js';
 import { isHazardAt } from './hazards.js';
 
-function canMoveInto(state, nx, ny) {
-  const door = getDoorAt(state.map, nx, ny);
-  if (door && !door.open) {
-    if (state.player.chips <= 0) {
-      state.message = 'Laser Door requires an Access Chip.';
-      return false;
-    }
+const PICKUP_RANGE_SQ = 0.45 * 0.45; // tile units squared
+
+const PLAYER_HITBOX = {
+  left: PLAYER_RADIUS,
+  right: PLAYER_RADIUS,
+  top: PLAYER_RADIUS * 0.80,
+  bottom: PLAYER_RADIUS * 1.65
+};
+
+function distSq(ax, ay, bx, by) {
+  return (ax - bx) ** 2 + (ay - by) ** 2;
+}
+
+// Returns true if the player can enter this tile. Opens doors automatically when possible.
+function canPass(state, tx, ty) {
+  if (isWall(state.map, tx, ty)) return false;
+  const door = getDoorAt(state.map, tx, ty);
+  if (!door) return true;
+  if (door.open) return true;
+  if (state.player.chips > 0) {
     state.player.chips -= 1;
     door.open = true;
     state.message = 'Laser Door disabled.';
     return true;
   }
-  return !isBlocked(state.map, nx, ny);
+  state.message = 'Laser Door requires an Access Chip.';
+  return false;
 }
 
-function collectTilePickup(state) {
-  const { player, map } = state;
+// Move along one axis, resolve AABB collision against solid tiles.
+// Gives wall-sliding behavior when the other axis is free.
+function moveAxis(state, axis, delta) {
+  const { player } = state;
+  const npx = axis === 'x' ? player.px + delta : player.px;
+  const npy = axis === 'x' ? player.py : player.py + delta;
 
-  const chip = getPickupAt(map, player.x, player.y, 'chip');
-  if (chip) {
-    chip.active = false;
-    player.chips += 1;
-    state.message = 'Access Chip collected.';
-    return;
+  const left  = Math.floor(npx - PLAYER_HITBOX.left + 0.001);
+  const right = Math.floor(npx + PLAYER_HITBOX.right - 0.001);
+  const top   = Math.floor(npy - PLAYER_HITBOX.top + 0.001);
+  const bot   = Math.floor(npy + PLAYER_HITBOX.bottom - 0.001);
+
+  let resolved = axis === 'x' ? npx : npy;
+
+  for (let ty = top; ty <= bot; ty++) {
+    for (let tx = left; tx <= right; tx++) {
+      if (canPass(state, tx, ty)) continue;
+      if (axis === 'x') {
+        resolved = delta > 0
+          ? Math.min(resolved, tx - PLAYER_HITBOX.right)
+          : Math.max(resolved, tx + 1 + PLAYER_HITBOX.left);
+      } else {
+        resolved = delta > 0
+          ? Math.min(resolved, ty - PLAYER_HITBOX.bottom)
+          : Math.max(resolved, ty + 1 + PLAYER_HITBOX.top);
+      }
+    }
   }
 
-  if (isGoalAt(map, player.x, player.y)) {
+  if (axis === 'x') player.px = resolved;
+  else              player.py = resolved;
+}
+
+function collectPickups(state, now) {
+  const { player, map } = state;
+
+  for (const pickup of map.pickups) {
+    if (!pickup.active) continue;
+    if (distSq(player.px, player.py, pickup.x + 0.5, pickup.y + 0.5) > PICKUP_RANGE_SQ) continue;
+
+    if (pickup.type === 'chip') {
+      pickup.active = false;
+      player.chips += 1;
+      state.message = 'Access Chip collected.';
+    } else if (pickup.type === 'powerCell') {
+      pickup.active = false;
+      player.powerUntil = now + POWER_CELL_MS;
+      state.message = 'Suit light overcharged.';
+    }
+  }
+
+  if (isGoalAt(map, Math.floor(player.px), Math.floor(player.py))) {
     player.won = true;
     state.message = 'Beacon Core reached.';
   }
-}
-
-function tryActivatePowerCell(state, now) {
-  if (!consumeJustPressed(state.input, 'KeyE')) return;
-
-  const powerCell = getPickupAt(state.map, state.player.x, state.player.y, 'powerCell');
-  if (!powerCell) {
-    state.message = 'No Power Cell underfoot.';
-    return;
-  }
-
-  state.player.powerUntil = now + POWER_CELL_MS;
-  powerCell.active = false;
-  state.message = 'Suit light overcharged.';
 }
 
 function damagePlayer(state, now) {
@@ -67,8 +108,8 @@ function damagePlayer(state, now) {
   state.message = 'Suit damaged.';
 
   if (player.hearts <= 0) {
-    player.x = player.spawnX;
-    player.y = player.spawnY;
+    player.px = player.spawnPx;
+    player.py = player.spawnPy;
     player.hearts = HEARTS_MAX;
     player.powerUntil = 0;
     player.invulnerableUntil = now + INVULN_MS;
@@ -76,53 +117,46 @@ function damagePlayer(state, now) {
   }
 }
 
-function clampStamina(player) {
-  player.stamina = Math.max(0, Math.min(STAMINA_MAX, player.stamina));
-}
-
 export function updatePlayer(state, now, dtMs) {
   const { player, input } = state;
-  clampStamina(player);
-
-  tryActivatePowerCell(state, now);
+  const dt = dtMs / 1000;
 
   const intent = getMoveIntent(input);
-  let sprintingThisStep = false;
+  const moving = intent.dx !== 0 || intent.dy !== 0;
 
-  if (intent.dx || intent.dy) {
-    if (intent.dx > 0) player.dir = 'right';
-    if (intent.dx < 0) player.dir = 'left';
-    if (intent.dy > 0) player.dir = 'down';
-    if (intent.dy < 0) player.dir = 'up';
-
-    const sprintRequested = wantsSprint(input) && player.stamina >= STAMINA_DRAIN_PER_STEP;
-    const stepMs = sprintRequested ? SPRINT_STEP_MS : NORMAL_STEP_MS;
-
-    if (now - player.lastMoveAt >= stepMs) {
-      player.lastMoveAt = now;
-      const nx = player.x + intent.dx;
-      const ny = player.y + intent.dy;
-
-      if (canMoveInto(state, nx, ny)) {
-        player.x = nx;
-        player.y = ny;
-        collectTilePickup(state);
-
-        if (sprintRequested) {
-          sprintingThisStep = true;
-          player.stamina -= STAMINA_DRAIN_PER_STEP;
-          clampStamina(player);
-        }
-      }
-    }
+  // Normalize diagonal so diagonal speed matches cardinal speed
+  let nx = intent.dx;
+  let ny = intent.dy;
+  if (nx !== 0 && ny !== 0) {
+    nx *= Math.SQRT1_2;
+    ny *= Math.SQRT1_2;
   }
 
-  if (!sprintingThisStep) {
-    player.stamina += STAMINA_RECOVER_PER_SECOND * (dtMs / 1000);
-    clampStamina(player);
+  const sprinting = moving && wantsSprint(input) && player.stamina > 0;
+  const speed = sprinting ? SPRINT_SPEED : WALK_SPEED;
+
+  // Stamina
+  if (sprinting) {
+    player.stamina = Math.max(0, player.stamina - STAMINA_DRAIN_PER_SECOND * dt);
+  } else {
+    player.stamina = Math.min(STAMINA_MAX, player.stamina + STAMINA_RECOVER_PER_SECOND * dt);
   }
 
-  if (isHazardAt(state.hazards, player.x, player.y, now)) {
+  // Direction (only update while moving, so the sprite holds last direction at rest)
+  if (intent.dx > 0) player.dir = 'right';
+  else if (intent.dx < 0) player.dir = 'left';
+  else if (intent.dy > 0) player.dir = 'down';
+  else if (intent.dy < 0) player.dir = 'up';
+
+  // Separate X and Y resolution for wall sliding
+  if (nx !== 0) moveAxis(state, 'x', nx * speed * dt);
+  if (ny !== 0) moveAxis(state, 'y', ny * speed * dt);
+
+  collectPickups(state, now);
+
+  const tx = Math.floor(player.px);
+  const ty = Math.floor(player.py);
+  if (isHazardAt(state.hazards, tx, ty, now)) {
     damagePlayer(state, now);
   }
 }

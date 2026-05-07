@@ -1,4 +1,5 @@
 import { HEARTS_MAX, STAMINA_MAX } from './config.js';
+
 import { createWorldMap } from './map.js';
 
 export function createGameState() {
@@ -7,15 +8,14 @@ export function createGameState() {
   return {
     map,
     player: {
-      x: map.start.x,
-      y: map.start.y,
-      spawnX: map.start.x,
-      spawnY: map.start.y,
+      px: map.start.x + 0.5,       // continuous tile-space position (center)
+      py: map.start.y + 0.5,
+      spawnPx: map.start.x + 0.5,
+      spawnPy: map.start.y + 0.5,
       dir: 'down',
       hearts: HEARTS_MAX,
       chips: 0,
       stamina: STAMINA_MAX,
-      lastMoveAt: 0,
       invulnerableUntil: 0,
       powerUntil: 0,
       won: false
