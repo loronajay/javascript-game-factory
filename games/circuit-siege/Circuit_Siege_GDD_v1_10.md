@@ -86,7 +86,7 @@ Baseline private flow:
 1. Player creates private room.
 2. Server creates a room code or invite link.
 3. Second player joins the room.
-4. Both players ready up, or the match starts when both are present depending on final platform flow.
+4. The match starts automatically once both players are present.
 5. Server assigns blue/red sides.
 6. Server loads the board.
 7. Match countdown begins.
@@ -114,8 +114,8 @@ There is no reconnect flow.
 If either player disconnects during a match:
 
 - the active match ends
-- the remaining connected player is returned to the game menu
-- the menu displays a clear disconnect message
+- the remaining connected player sees a result-state message that their opponent disconnected
+- the remaining connected player can then return to the game menu from the result screen
 - the match does not continue in the background
 - the disconnected player cannot rejoin the same active match state
 
@@ -143,9 +143,9 @@ Standard matches use a 5-minute timer.
 
 The primary win condition is first player to complete 5 damage routes.
 
-If the timer expires before either player completes 5 damage routes, the match ends in a draw.
+If the timer expires before either player completes 5 damage routes, the player with more completed damage routes wins.
 
-V1 does not need additional timer tiebreak logic.
+If both players have the same completed damage total when the timer expires, the match ends in a draw.
 
 ### 7.3 Win Condition
 
@@ -908,7 +908,6 @@ Server match state owns:
 - match ID
 - room type
 - player slots
-- player ready states
 - countdown state
 - match phase
 - authoritative tick/time
@@ -942,7 +941,6 @@ Server-owned player fields:
 - committed cursor/grid target if needed
 - valid action cooldowns
 - connection status
-- ready status
 
 Client-owned presentation fields:
 
@@ -1140,7 +1138,7 @@ The MVP should include:
 - dud feedback
 - damage feedback
 - 5-minute match timer
-- timer-runout draw result
+- timer-runout win-or-draw result based on completed damage totals
 - win screen
 
 The MVP board must satisfy:
@@ -1277,11 +1275,12 @@ Circuit Siege canon:
 - Completed dud routes stay visibly resolved in a weaker false/failed state.
 - Dud routes are intentional time traps.
 - Standard matches use a 5-minute timer.
-- If the timer expires before either player completes 5 damage routes, the match ends in a draw.
+- If the timer expires before either player completes 5 damage routes, the player with more completed damage routes wins.
+- If both players have the same completed damage total when the timer expires, the match ends in a draw.
 - The first player to complete 5 damage routes wins.
 - The server owns match state, accepted edits, route validation, terminal truth, scoring, and results.
 - Clients send player action intents.
 - The renderer displays state; it does not own route logic.
-- Disconnect behavior follows the shared platform rule: the remaining player returns to the menu with a disconnect message.
+- Disconnect behavior follows the shared platform rule: the remaining player sees a disconnect result message and can return to the menu from there.
 - There is no reconnect flow.
 - The challenge is fast visual route tracing under online pressure, not mechanical complexity.

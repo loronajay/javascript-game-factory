@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="224" height="144" viewBox="0 0 224 144" shape-rendering="crispEdges">
+  <rect width="224" height="144" fill="#05080b"/>
+  <text x="16" y="16" fill="#d5e3ea" font-family="monospace" font-size="10">Circuit Siege Tile Grid</text>
+  <g transform="translate(16 28)">
+    <image href="floor-tile.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">floor</text>
+  </g>
+  <g transform="translate(64 28)">
+    <image href="circuit-hole-tile.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">hole</text>
+  </g>
+  <g transform="translate(112 28)">
+    <image href="blue-straight-tile.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue straight</text>
+  </g>
+  <g transform="translate(16 82)">
+    <image href="blue-corner-tile.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue corner</text>
+  </g>
+  <g transform="translate(64 82)">
+    <image href="red-straight-tile.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red straight</text>
+  </g>
+  <g transform="translate(112 82)">
+    <image href="red-corner-tile.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red corner</text>
+  </g>
+</svg>

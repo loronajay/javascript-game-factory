@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="448" height="144" viewBox="0 0 448 144" shape-rendering="crispEdges">
+  <rect width="448" height="144" fill="#05080b"/>
+  <text x="16" y="16" fill="#d5e3ea" font-family="monospace" font-size="10">Circuit Siege Complete Wire States</text>
+  <g transform="translate(16 28)">
+    <image href="blue-straight-damage-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue straight dmg</text>
+  </g>
+  <g transform="translate(72 28)">
+    <image href="blue-corner-damage-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue corner dmg</text>
+  </g>
+  <g transform="translate(128 28)">
+    <image href="blue-straight-dud-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue straight dud</text>
+  </g>
+  <g transform="translate(184 28)">
+    <image href="blue-corner-dud-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue corner dud</text>
+  </g>
+  <g transform="translate(240 28)">
+    <image href="red-straight-damage-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red straight dmg</text>
+  </g>
+  <g transform="translate(296 28)">
+    <image href="red-corner-damage-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red corner dmg</text>
+  </g>
+  <g transform="translate(352 28)">
+    <image href="red-straight-dud-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red straight dud</text>
+  </g>
+  <g transform="translate(408 28)">
+    <image href="red-corner-dud-complete.svg" width="32" height="32"/>
+    <text x="-4" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red corner dud</text>
+  </g>
+</svg>

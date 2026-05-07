@@ -9,12 +9,15 @@ As of the current implementation pass, Circuit Siege is no longer just a scope d
 - shared authored board data and canonical route validation
 - authoritative match engine, room engine, and server bridge contract
 - public matchmaking and private room flow
+- automatic match start once both players are present
 - browser-side session controller, board renderer, and held-piece tool flow
 - exact mask tools for `EW`, `NS`, `NE`, `ES`, `SW`, and `NW`
 - `R` rotates the held piece
 - `F` swaps held-piece family between straight and corner
 - clicking an editable pre-placed tile lifts that piece into hand
 - server-authoritative route completion, scoring, and completed-route lockout
+- live countdown timer presentation plus authoritative timer-expiry resolution
+- results overlay with per-side circuit totals, disconnect messaging, and visible player usernames
 - browser/local regression coverage for shared rules, server flow, and client flow
 
 ### Important current caveat
@@ -29,6 +32,7 @@ The project has moved out of architecture bootstrap and into gameplay/readabilit
 - board readability and slot affordances
 - route-tracing clarity under pressure
 - final interaction polish around held pieces and toolkit behavior
+- richer match-end presentation polish
 - continued validation that authored routes are readable and fair in real matches
 
 ## 1. Purpose
@@ -68,7 +72,7 @@ Each side has:
 
 Players race to determine which source wires lead to damage terminals and complete those routes before the opponent does.
 
-The first player to complete 5 damage routes wins. If the 5-minute timer expires first, the match ends in a draw.
+The first player to complete 5 damage routes wins. If the 5-minute timer expires first, the player with more completed damage routes wins; equal damage totals result in a draw.
 
 ## 3. Hard Canon Rules
 
@@ -105,7 +109,7 @@ V1 should ship one complete online mode, not a partial sandbox.
 - Automatic route validation and completion
 - Damage scoring and dud resolution
 - 5-minute match timer
-- Draw on timer expiry
+- timer-expiry win by higher damage total, or draw on equal damage totals
 - Public matchmaking
 - Private room creation/join flow
 - Server-authoritative match state
@@ -135,7 +139,7 @@ The planning docs imply a clear online game flow:
 2. Player chooses public match or private room flow.
 3. Matchmaking/room system assigns blue or red side.
 4. Both clients load the same authored board snapshot from the server.
-5. Countdown begins.
+5. Countdown begins automatically once both players are present.
 6. Live match starts.
 7. Players edit their own route slots simultaneously.
 8. Server resolves completed routes immediately after accepted edits.
@@ -284,7 +288,6 @@ The client should send intents. The server should validate them and broadcast st
 { type: "QUEUE_PUBLIC", playerId: "p1" }
 { type: "CREATE_PRIVATE_ROOM", playerId: "p1" }
 { type: "JOIN_PRIVATE_ROOM", playerId: "p2", roomCode: "A8Q2" }
-{ type: "SET_READY", playerId: "p1", ready: true }
 { type: "PLACE_TILE", playerId: "p1", slotId: "blue_slot_03", pieceType: "straight", rotation: 90 }
 { type: "ROTATE_TILE", playerId: "p1", slotId: "blue_slot_07" }
 { type: "REPLACE_TILE", playerId: "p1", slotId: "blue_slot_09", pieceType: "corner", rotation: 180 }
@@ -341,7 +344,7 @@ The first tests should cover:
 - damage vs dud scoring behavior
 - completed route lockout
 - fifth-damage win detection
-- timer-expiry draw behavior
+- timer-expiry winner-or-draw behavior based on damage totals
 - disconnect handling by match phase
 - mirror-board data invariants
 

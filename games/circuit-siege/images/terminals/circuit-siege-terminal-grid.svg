@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="336" height="144" viewBox="0 0 336 144" shape-rendering="crispEdges">
+  <rect width="336" height="144" fill="#05080b"/>
+  <text x="16" y="16" fill="#d5e3ea" font-family="monospace" font-size="10">Circuit Siege Terminal Grid</text>
+  <g transform="translate(16 28)">
+    <image href="blue-damage-terminal.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue live</text>
+  </g>
+  <g transform="translate(72 28)">
+    <image href="blue-dud-terminal.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue dud</text>
+  </g>
+  <g transform="translate(128 28)">
+    <image href="red-damage-terminal.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red live</text>
+  </g>
+  <g transform="translate(184 28)">
+    <image href="red-dud-terminal.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red dud</text>
+  </g>
+  <g transform="translate(16 82)">
+    <image href="blue-damage-terminal-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue live done</text>
+  </g>
+  <g transform="translate(72 82)">
+    <image href="blue-dud-terminal-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">blue dud done</text>
+  </g>
+  <g transform="translate(128 82)">
+    <image href="red-damage-terminal-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red live done</text>
+  </g>
+  <g transform="translate(184 82)">
+    <image href="red-dud-terminal-complete.svg" width="32" height="32"/>
+    <text x="0" y="46" fill="#b8c7cf" font-family="monospace" font-size="8">red dud done</text>
+  </g>
+</svg>
