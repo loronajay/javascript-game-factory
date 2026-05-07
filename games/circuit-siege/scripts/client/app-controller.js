@@ -94,6 +94,7 @@ export function createCircuitSiegeAppController({
   let inputState = createBoardInputState();
   let queueSetupState = createQueueSetupState();
   let presentationNow = Date.now();
+  let lastViewModel = null;
   let pointerState = {
     x: 0,
     y: 0,
@@ -183,8 +184,16 @@ export function createCircuitSiegeAppController({
     };
   }
 
+  function getSelectedSide() {
+    const queueSetupViewModel = buildQueueSetupViewModel({
+      setupState: queueSetupState
+    });
+    return runtime.selectedSide || queueSetupViewModel.publicSide || "blue";
+  }
+
   function rerender() {
-    renderApp(buildViewModel());
+    lastViewModel = buildViewModel();
+    renderApp(lastViewModel);
   }
 
   async function boot() {
@@ -353,7 +362,7 @@ export function createCircuitSiegeAppController({
     const boardViewModel = buildBoardViewModel({
       board,
       snapshot: runtime.snapshot,
-      selectedSide: runtime.selectedSide || "blue",
+      selectedSide: getSelectedSide(),
       selectedSlotId: inputState.selectedSlotId
     });
     const cell = boardViewModel.cells.find((entry) => entry.slotId === slotId) || null;
@@ -413,20 +422,30 @@ export function createCircuitSiegeAppController({
   }
 
   function updatePointer(x, y) {
+    if (!inputState.heldMask) {
+      return false;
+    }
+
     pointerState = {
       x: Number(x) || 0,
       y: Number(y) || 0,
       active: true
     };
     rerender();
+    return true;
   }
 
   function clearPointer() {
+    if (!pointerState.active) {
+      return false;
+    }
+
     pointerState = {
       ...pointerState,
       active: false
     };
     rerender();
+    return true;
   }
 
   function handleRuntimeChanged() {
