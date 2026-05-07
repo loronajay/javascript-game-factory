@@ -370,21 +370,22 @@ input {
 
 .tool {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
+  border-radius: 18px;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)), rgba(255, 255, 255, 0.04);
   color: var(--text);
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .tool--icon {
   width: 100%;
-  min-height: 62px;
+  min-height: 74px;
   border-radius: 16px;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   grid-template-areas:
     "icon label"
     "icon code";
@@ -397,15 +398,19 @@ input {
 
 .tool-preview {
   width: 44px;
-  height: 30px;
-  display: block;
+  height: 44px;
+  display: grid;
+  place-items: center;
   grid-area: icon;
+  border-radius: 12px;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 70%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.tool-preview__path {
-  stroke: #e5e7eb;
-  stroke-width: 5;
-  stroke-linecap: round;
+.tool-preview__image {
+  width: 44px;
+  height: 44px;
+  display: block;
 }
 
 .tool--icon strong {
@@ -425,6 +430,7 @@ input {
 .tool--active {
   background: linear-gradient(135deg, rgba(60, 134, 255, 0.28), rgba(255, 91, 77, 0.22));
   border-color: rgba(248, 217, 122, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(248, 217, 122, 0.2), 0 0 22px rgba(248, 217, 122, 0.12);
 }
 
 .held-cursor {
@@ -458,21 +464,35 @@ input {
 }
 
 .held-cursor__preview {
-  width: 22px;
-  height: 16px;
+  width: 30px;
+  height: 30px;
+  display: block;
 }
 
-.held-cursor__path {
-  stroke-width: 4;
-  stroke-linecap: round;
+.held-piece__content {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.held-cursor__path--blue {
-  stroke: #93c5fd;
+.held-piece__sprite {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.held-cursor__path--red {
-  stroke: #fecaca;
+.held-piece__image {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.held-piece__text {
+  display: inline-block;
 }
 
 .board-grid {
@@ -676,6 +696,15 @@ input {
 
 .slot-gap {
   fill: #242b35;
+  pointer-events: none;
+}
+
+.slot-hole-image,
+.slot-tile-image,
+.board-cell-floor,
+.board-cell-wire,
+.board-cell-hole,
+.terminal-sprite {
   pointer-events: none;
 }
 

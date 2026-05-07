@@ -16,9 +16,9 @@ import {
   BOARD_TILE,
   cellCenter,
   getBoardPixelSize,
-  maskSegmentLines,
   polylinePointsAttr
 } from "./board-svg-layout.js";
+import { getWireTileDescriptor } from "./board-asset-resolver.js";
 
 const TOOL_LABELS = {
   EW: "Straight H",
@@ -29,61 +29,75 @@ const TOOL_LABELS = {
   NW: "Corner NW"
 };
 
-function toolMaskSegments(mask) {
-  const centerX = 22;
-  const centerY = 15;
-  const ends = {
-    N: [22, 3],
-    E: [40, 15],
-    S: [22, 27],
-    W: [4, 15]
-  };
-
-  return [...String(mask || "")]
-    .filter((direction) => ends[direction])
-    .map((direction) => {
-      const [x2, y2] = ends[direction];
-      return { x1: centerX, y1: centerY, x2, y2 };
-    });
-}
-
-function renderToolPreview(mask) {
-  const lines = toolMaskSegments(mask).map((segment) => `
-    <line
-      x1="${segment.x1}"
-      y1="${segment.y1}"
-      x2="${segment.x2}"
-      y2="${segment.y2}"
-      class="tool-preview__path"
-    ></line>
-  `).join("");
+function renderToolPreview(mask, side) {
+  const tile = getWireTileDescriptor({
+    owner: side,
+    mask,
+    completed: false,
+    terminalType: "damage"
+  });
 
   return `
-    <svg viewBox="0 0 44 30" class="tool-preview" aria-hidden="true">
-      ${lines}
-    </svg>
+    <span class="tool-preview" aria-hidden="true">
+      ${tile ? renderSpriteImage({
+        href: tile.href,
+        width: 44,
+        height: 44,
+        rotation: tile.rotation,
+        className: "tool-preview__image"
+      }) : ""}
+    </span>
     <strong>${TOOL_LABELS[mask] || mask}</strong>
     <small>${mask}</small>
   `;
 }
 
 function renderHeldCursor(mask, side) {
-  const lines = toolMaskSegments(mask).map((segment) => `
-    <line
-      x1="${segment.x1}"
-      y1="${segment.y1}"
-      x2="${segment.x2}"
-      y2="${segment.y2}"
-      class="held-cursor__path held-cursor__path--${side}"
-    ></line>
-  `).join("");
+  const tile = getWireTileDescriptor({
+    owner: side,
+    mask,
+    completed: false,
+    terminalType: "damage"
+  });
 
   return `
     <div class="held-cursor__tile held-cursor__tile--${side}">
-      <svg viewBox="0 0 44 30" class="held-cursor__preview" aria-hidden="true">
-        ${lines}
-      </svg>
+      ${tile ? renderSpriteImage({
+        href: tile.href,
+        width: 30,
+        height: 30,
+        rotation: tile.rotation,
+        className: "held-cursor__preview"
+      }) : ""}
     </div>
+  `;
+}
+
+function renderHeldPiece(mask, side) {
+  if (!mask) {
+    return "Holding: none";
+  }
+
+  const tile = getWireTileDescriptor({
+    owner: side,
+    mask,
+    completed: false,
+    terminalType: "damage"
+  });
+
+  return `
+    <span class="held-piece__content">
+      <span class="held-piece__sprite" aria-hidden="true">
+        ${tile ? renderSpriteImage({
+          href: tile.href,
+          width: 28,
+          height: 28,
+          rotation: tile.rotation,
+          className: "held-piece__image"
+        }) : ""}
+      </span>
+      <span class="held-piece__text">Holding: ${TOOL_LABELS[mask] || mask} (${mask})</span>
+    </span>
   `;
 }
 
@@ -122,6 +136,18 @@ function renderBoardGrid(container, boardViewModel) {
   const terminalMarkup = boardViewModel.terminalVisuals.map((terminal) => {
     const [cx] = cellCenter(terminal.x, terminal.y);
     const boardBottomY = BOARD_PAD_Y + boardViewModel.board.rows * BOARD_TILE;
+    if (terminal.assetHref) {
+      return `
+        <image
+          href="${terminal.assetHref}"
+          x="${cx - 16}"
+          y="${boardBottomY + 9}"
+          width="32"
+          height="32"
+          class="terminal-sprite"
+        ></image>
+      `;
+    }
     return `
       <rect
         x="${cx - 13}"
@@ -142,7 +168,22 @@ function renderBoardGrid(container, boardViewModel) {
       "board-cell-rect",
       cell.isWall ? "board-cell-rect--wall" : "board-cell-rect--floor"
     ].join(" ");
-    return `<rect x="${x}" y="${y}" width="${BOARD_TILE}" height="${BOARD_TILE}" class="${classes}"></rect>`;
+    const floorImage = cell.floorAssetHref
+      ? `<image href="${cell.floorAssetHref}" x="${x}" y="${y}" width="${BOARD_TILE}" height="${BOARD_TILE}" class="board-cell-floor"></image>`
+      : "";
+    const wireImage = cell.wireAssetHref
+      ? renderTileImage({
+        href: cell.wireAssetHref,
+        x,
+        y,
+        rotation: cell.wireRotation,
+        className: "board-cell-wire"
+      })
+      : "";
+    const holeImage = cell.holeAssetHref
+      ? `<image href="${cell.holeAssetHref}" x="${x}" y="${y}" width="${BOARD_TILE}" height="${BOARD_TILE}" class="board-cell-hole"></image>`
+      : "";
+    return `<g class="${classes}"><rect x="${x}" y="${y}" width="${BOARD_TILE}" height="${BOARD_TILE}" class="${classes}"></rect>${floorImage}${wireImage}${holeImage}</g>`;
   }).join("");
 
   const slotMarkup = boardViewModel.cells
@@ -159,18 +200,16 @@ function renderBoardGrid(container, boardViewModel) {
       ].filter(Boolean).join(" ");
       const slotAttr = cell.editableByLocalPlayer && !cell.locked ? `data-slot-id="${cell.slotId}"` : "";
       const pieceMarkup = cell.placedMask
-        ? maskSegmentLines(cell.placedMask, cx, cy).map((segment) => `
-          <line
-            x1="${segment.x1}"
-            y1="${segment.y1}"
-            x2="${segment.x2}"
-            y2="${segment.y2}"
-            class="piece-path piece-path--${cell.owner}"
-          ></line>
-        `).join("")
+        ? renderTileImage({
+          href: cell.wireAssetHref,
+          x: cx - 14,
+          y: cy - 14,
+          rotation: cell.wireRotation,
+          className: `slot-tile-image slot-tile-image--${cell.owner}`
+        })
         : "";
       const emptyHoleMarkup = !cell.placedMask
-        ? `<circle cx="${cx}" cy="${cy}" r="4" class="slot-hole-marker"></circle>`
+        ? `<image href="${cell.holeAssetHref}" x="${cx - 14}" y="${cy - 14}" width="28" height="28" class="slot-hole-image"></image>`
         : "";
       return `
         <g class="${slotClass}" ${slotAttr}>
@@ -190,6 +229,26 @@ function renderBoardGrid(container, boardViewModel) {
       ${routeMarkup}
       ${slotMarkup}
       ${terminalMarkup}
+    </svg>
+  `;
+}
+
+function renderTileImage({ href, x, y, rotation = 0, className = "" } = {}) {
+  if (!href) return "";
+  const centerX = x + BOARD_TILE / 2;
+  const centerY = y + BOARD_TILE / 2;
+  const transform = rotation ? ` transform="rotate(${rotation} ${centerX} ${centerY})"` : "";
+  return `<image href="${href}" x="${x}" y="${y}" width="${BOARD_TILE}" height="${BOARD_TILE}" class="${className}"${transform}></image>`;
+}
+
+function renderSpriteImage({ href, width, height, rotation = 0, className = "" } = {}) {
+  if (!href) return "";
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const transform = rotation ? ` transform="rotate(${rotation} ${centerX} ${centerY})"` : "";
+  return `
+    <svg viewBox="0 0 ${width} ${height}" class="${className}" aria-hidden="true">
+      <image href="${href}" x="0" y="0" width="${width}" height="${height}"${transform}></image>
     </svg>
   `;
 }
@@ -261,9 +320,7 @@ export function createAppRenderer(root = document) {
       els.joinInput.value = viewModel.queueSetup.joinRoomCode;
     }
     if (els.heldPiece) {
-      els.heldPiece.textContent = viewModel.heldMask
-        ? `Holding: ${TOOL_LABELS[viewModel.heldMask] || viewModel.heldMask} (${viewModel.heldMask})`
-        : "Holding: none";
+      els.heldPiece.innerHTML = renderHeldPiece(viewModel.heldMask, viewModel.heldCursor?.side || "blue");
     }
     if (els.scoreBlue) els.scoreBlue.textContent = viewModel.board.scoreText.blue;
     if (els.scoreRed) els.scoreRed.textContent = viewModel.board.scoreText.red;
@@ -296,7 +353,7 @@ export function createAppRenderer(root = document) {
       els.toolDock.classList.toggle("tool-dock--hidden", viewModel.screen !== "match");
     }
     for (const button of els.toolButtons) {
-      button.innerHTML = renderToolPreview(button.dataset.tool || "");
+      button.innerHTML = renderToolPreview(button.dataset.tool || "", viewModel.selectedSide || "blue");
       button.classList.toggle("tool--active", button.dataset.tool === viewModel.heldMask);
     }
     if (els.heldCursor) {

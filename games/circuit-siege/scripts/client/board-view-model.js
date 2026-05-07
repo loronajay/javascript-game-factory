@@ -1,4 +1,9 @@
 import { getCellKey } from "../shared/circuit-board.js";
+import {
+  getMaskFromNeighbors,
+  getTerminalAssetHref,
+  getWireTileDescriptor
+} from "./board-asset-resolver.js";
 
 function wrongMaskFromExpected(expectedMask) {
   if (expectedMask === "EW") return "NS";
@@ -179,6 +184,7 @@ export function buildBoardViewModel({
   const terminalByCell = new Map();
   const sourceByCell = new Map();
   const routeKeys = new Set();
+  const routeMetaByCell = new Map();
   const routeVisuals = [];
   const sourceVisuals = [];
   const terminalVisuals = [];
@@ -212,7 +218,12 @@ export function buildBoardViewModel({
       owner: route.owner,
       x: lastCell[0],
       y: lastCell[1],
-      completed: !!snapshot?.terminals?.[route.terminalId]?.completed
+      completed: !!snapshot?.terminals?.[route.terminalId]?.completed,
+      assetHref: getTerminalAssetHref({
+        owner: route.owner,
+        terminalType: route.terminalType,
+        completed: !!snapshot?.terminals?.[route.terminalId]?.completed
+      })
     });
     routeVisuals.push({
       routeId: route.routeId,
@@ -225,6 +236,24 @@ export function buildBoardViewModel({
 
     for (const [x, y] of route.cells) {
       routeKeys.add(getCellKey(x, y));
+    }
+
+    for (let index = 0; index < route.cells.length; index += 1) {
+      const [x, y] = route.cells[index];
+      const key = getCellKey(x, y);
+      if (!routeMetaByCell.has(key)) {
+        routeMetaByCell.set(key, []);
+      }
+      routeMetaByCell.get(key).push({
+        routeId: route.routeId,
+        owner: route.owner,
+        terminalType: route.terminalType,
+        completed: !!snapshot?.routes?.[route.routeId]?.completed,
+        index,
+        previousCell: route.cells[index - 1] || null,
+        currentCell: route.cells[index],
+        nextCell: route.cells[index + 1] || null
+      });
     }
   }
 
@@ -243,6 +272,27 @@ export function buildBoardViewModel({
       const source = sourceByCell.get(key) || null;
       const isWall = x === board.centerWallColumn;
       const owner = x < board.centerWallColumn ? "blue" : x > board.centerWallColumn ? "red" : "neutral";
+      const routeEntries = routeMetaByCell.get(key) || [];
+      const primaryRoute = routeEntries.length === 1 ? routeEntries[0] : null;
+      const routeMask = primaryRoute
+        ? getMaskFromNeighbors(primaryRoute.previousCell, primaryRoute.currentCell, primaryRoute.nextCell)
+        : null;
+      const slotWire = slot && cellShouldShowPlacedWire(slotState, slot)
+        ? getWireTileDescriptor({
+          owner: slot.owner,
+          mask: slotState?.placedMask ?? fallbackPlacedMask,
+          completed: !!snapshot?.routes?.[slot.routeId]?.completed,
+          terminalType: board.routesById?.[slot.routeId]?.terminalType || "damage"
+        })
+        : null;
+      const routeWire = !slot && primaryRoute && !terminal && !source && routeMask
+        ? getWireTileDescriptor({
+          owner: primaryRoute.owner,
+          mask: routeMask,
+          completed: primaryRoute.completed,
+          terminalType: primaryRoute.terminalType
+        })
+        : null;
 
       const cell = {
         key,
@@ -262,7 +312,12 @@ export function buildBoardViewModel({
         terminalType: terminal?.terminalType || null,
         terminalCompleted: !!terminal?.completed,
         sourceId: source?.sourceId || null,
-        sourceIndex: source?.sourceIndex || null
+        sourceIndex: source?.sourceIndex || null,
+        floorAssetHref: isWall ? null : "images/tiles/floor-tile.svg",
+        holeAssetHref: slot && !cellShouldShowPlacedWire(slotState, slot) ? "images/tiles/circuit-hole-tile.svg" : null,
+        wireAssetHref: slotWire?.href || routeWire?.href || null,
+        wireRotation: slotWire?.rotation ?? routeWire?.rotation ?? 0,
+        hasRouteOverlap: routeEntries.length > 1
       };
 
       cells.push(cell);
@@ -306,4 +361,9 @@ export function buildBoardViewModel({
       completed: !!snapshot?.routes?.[route.routeId]?.completed
     }))
   };
+}
+
+function cellShouldShowPlacedWire(slotState, slot) {
+  if (!slot) return false;
+  return Boolean(slotState?.placedMask ?? (slot.slotType === "refactor"));
 }
