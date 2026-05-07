@@ -30,6 +30,9 @@ export function createCircuitSiegeSessionController({
     runtime.matchReady = null;
     runtime.snapshot = null;
     runtime.searching = false;
+    runtime.pendingAction = null;
+    runtime.profiles = {};
+    runtime.matchEvents = [];
   }
 
   function announce(message) {
@@ -144,12 +147,18 @@ export function createCircuitSiegeSessionController({
 
     net.cb.onClosed = () => {
       runtime.connected = false;
+      runtime.clientId = null;
+      runtime.net = null;
+      runtime.pendingAction = null;
       emitLobbyState();
     };
   }
 
   async function ensureClient() {
     if (runtime.net) {
+      if (!runtime.connected) {
+        runtime.net.connect?.();
+      }
       return runtime.net;
     }
 
@@ -165,12 +174,22 @@ export function createCircuitSiegeSessionController({
     return net;
   }
 
+  function runOrQueueAction(net, action) {
+    if (runtime.connected) {
+      runtime.pendingAction = null;
+      action();
+      return;
+    }
+
+    runtime.pendingAction = action;
+  }
+
   async function startPublicMatch({ side }) {
     const net = await ensureClient();
     runtime.matchmakingMode = "public";
     runtime.selectedSide = side;
     runtime.searching = true;
-    runtime.pendingAction = () => net.findMatch(side);
+    runOrQueueAction(net, () => net.findMatch(side));
     showScreen("matchmaking");
     emitLobbyState();
     return true;
@@ -180,7 +199,7 @@ export function createCircuitSiegeSessionController({
     const net = await ensureClient();
     runtime.matchmakingMode = "private_create";
     runtime.selectedSide = side;
-    runtime.pendingAction = () => net.createRoom(side);
+    runOrQueueAction(net, () => net.createRoom(side));
     showScreen("matchmaking");
     emitLobbyState();
     return true;
@@ -190,7 +209,7 @@ export function createCircuitSiegeSessionController({
     const net = await ensureClient();
     runtime.matchmakingMode = "private_join";
     runtime.selectedSide = side;
-    runtime.pendingAction = () => net.joinRoom(side, roomCode);
+    runOrQueueAction(net, () => net.joinRoom(side, roomCode));
     showScreen("matchmaking");
     emitLobbyState();
     return true;
@@ -208,6 +227,9 @@ export function createCircuitSiegeSessionController({
 
   function disconnect() {
     runtime.net?.disconnect?.();
+    runtime.net?.reset?.();
+    runtime.net = null;
+    runtime.clientId = null;
     clearRoomState();
     runtime.connected = false;
     emitLobbyState();

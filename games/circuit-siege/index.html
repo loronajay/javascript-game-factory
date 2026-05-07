@@ -54,6 +54,10 @@
         <p id="lobby-status" class="status-line"></p>
         <p id="lobby-hint" class="status-line"></p>
         <p id="room-code" class="room-code">-----</p>
+        <div class="identity-bar">
+          <p data-player-you class="identity-line">YOU: Connecting</p>
+          <p data-player-opponent class="identity-line">OPPONENT: Connecting</p>
+        </div>
 
         <div class="lobby-phase lobby-phase--active" data-lobby-phase="main">
           <div class="lobby-actions">
@@ -86,10 +90,6 @@
         </div>
 
         <div class="lobby-phase" data-lobby-phase="room">
-          <div class="identity-bar">
-            <p data-player-you class="identity-line">YOU: Connecting</p>
-            <p data-player-opponent class="identity-line">OPPONENT: Connecting</p>
-          </div>
           <div class="lobby-actions">
             <button data-leave class="action action--ghost">Leave</button>
           </div>
@@ -147,6 +147,10 @@
           <div class="result-card">
             <p class="eyebrow">Match Result</p>
             <h2 id="result-title">Victory</h2>
+            <div class="identity-bar identity-bar--result">
+              <p data-player-you class="identity-line">YOU: Connecting</p>
+              <p data-player-opponent class="identity-line">OPPONENT: Connecting</p>
+            </div>
             <p id="result-body" class="result-copy"></p>
             <p id="result-footer" class="result-copy result-copy--muted"></p>
             <div class="result-actions">

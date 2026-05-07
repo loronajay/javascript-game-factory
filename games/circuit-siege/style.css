@@ -310,6 +310,10 @@ input {
   margin-bottom: 18px;
 }
 
+.panel .identity-bar {
+  margin-top: 18px;
+}
+
 .identity-line {
   margin: 0;
   padding: 12px 14px;
@@ -319,6 +323,11 @@ input {
   color: var(--muted);
   font: 700 0.82rem/1.4 monospace;
   letter-spacing: 0.03em;
+}
+
+.identity-bar--result {
+  margin: 18px 0 14px;
+  text-align: left;
 }
 
 .match-grid {
