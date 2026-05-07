@@ -36,12 +36,12 @@ function resolveLiveTimerMs(snapshot, now) {
 }
 
 function formatResultPlayer(player, side) {
-  const playerId = String(player?.playerId || "").trim();
   const displayName = String(player?.displayName || "").trim();
+  const playerId = String(player?.playerId || "").trim();
   return {
     side,
     label: `${titleCase(side)} Side`,
-    playerLabel: playerId || displayName || "Connecting"
+    playerLabel: displayName || playerId || "Connecting"
   };
 }
 

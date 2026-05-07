@@ -80,9 +80,9 @@ function formatPlayerLabel(prefix, profile, fallbackText) {
     return `${prefix}: ${fallbackText}`;
   }
 
-  const playerId = String(profile.playerId || "").trim();
   const displayName = String(profile.displayName || "").trim();
-  return `${prefix}: ${playerId || displayName || fallbackText}`;
+  const playerId = String(profile.playerId || "").trim();
+  return `${prefix}: ${displayName || playerId || fallbackText}`;
 }
 
 export function createCircuitSiegeAppController({
