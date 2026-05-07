@@ -8,6 +8,24 @@ import { loadCircuitSiegeIdentity } from "./identity.js";
 
 const PRESENTATION_TICK_MS = 1000 / 30;
 
+export function resolvePresentationNow(timestamp, performanceLike = globalThis.performance, nowFn = () => Date.now()) {
+  const numericTimestamp = Number(timestamp);
+  if (!Number.isFinite(numericTimestamp)) {
+    return Number(nowFn()) || Date.now();
+  }
+
+  if (numericTimestamp >= 1_000_000_000_000) {
+    return numericTimestamp;
+  }
+
+  const timeOrigin = Number(performanceLike?.timeOrigin);
+  if (Number.isFinite(timeOrigin) && timeOrigin > 0) {
+    return Math.floor(timeOrigin + numericTimestamp);
+  }
+
+  return Number(nowFn()) || Date.now();
+}
+
 export function findSlotIdFromEventTarget(target) {
   let current = target || null;
 
@@ -144,7 +162,7 @@ export async function initGame({
     let accumulator = 0;
 
     function loop(timestamp) {
-      const now = Number(timestamp) || Date.now();
+      const now = resolvePresentationNow(timestamp);
       if (lastTime === null) {
         lastTime = now;
       }
