@@ -87,6 +87,18 @@ function renderHeldCursor(mask, side) {
   `;
 }
 
+function renderResultStats(stats = []) {
+  return stats.map((stat) => `
+    <div class="result-stat result-stat--${stat.side || "neutral"}">
+      <div class="result-stat__heading">
+        <strong>${stat.label || ""}</strong>
+        <span>${stat.playerLabel || ""}</span>
+      </div>
+      <div class="result-stat__value">${stat.damageText || ""}</div>
+    </div>
+  `).join("");
+}
+
 function renderBoardGrid(container, boardViewModel) {
   if (!container || !boardViewModel) return;
 
@@ -209,6 +221,7 @@ export function createAppRenderer(root = document) {
     resultTitle: root.querySelector("#result-title"),
     resultBody: root.querySelector("#result-body"),
     resultFooter: root.querySelector("#result-footer"),
+    resultStats: root.querySelector("#result-stats"),
     boardGrid: root.querySelector("#board-grid"),
     toolButtons: Array.from(root.querySelectorAll("[data-tool]"))
   };
@@ -274,6 +287,9 @@ export function createAppRenderer(root = document) {
     }
     if (els.resultFooter) {
       els.resultFooter.textContent = viewModel.board.resultSummary?.footer || "";
+    }
+    if (els.resultStats) {
+      els.resultStats.innerHTML = renderResultStats(viewModel.board.resultSummary?.stats || []);
     }
     if (els.toolDock) {
       els.toolDock.classList.toggle("tool-dock--hidden", viewModel.screen !== "match");

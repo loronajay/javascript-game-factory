@@ -6,6 +6,8 @@ import { createCircuitSiegeAppController } from "./app-controller.js";
 import { createAppRenderer } from "./app-renderer.js";
 import { loadCircuitSiegeIdentity } from "./identity.js";
 
+const PRESENTATION_TICK_MS = 1000 / 30;
+
 export function findSlotIdFromEventTarget(target) {
   let current = target || null;
 
@@ -136,5 +138,30 @@ export async function initGame({
 
   bindButtons(app, root);
   await app.boot();
+
+  if (typeof globalThis.requestAnimationFrame === "function") {
+    let lastTime = null;
+    let accumulator = 0;
+
+    function loop(timestamp) {
+      const now = Number(timestamp) || Date.now();
+      if (lastTime === null) {
+        lastTime = now;
+      }
+
+      accumulator += Math.min(now - lastTime, 100);
+      lastTime = now;
+
+      while (accumulator >= PRESENTATION_TICK_MS) {
+        accumulator -= PRESENTATION_TICK_MS;
+        app.tickPresentation?.(now);
+      }
+
+      globalThis.requestAnimationFrame(loop);
+    }
+
+    globalThis.requestAnimationFrame(loop);
+  }
+
   return app;
 }

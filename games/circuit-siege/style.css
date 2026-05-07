@@ -538,6 +538,52 @@ input {
   color: var(--muted);
 }
 
+.result-stats {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.result-stat {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.result-stat--blue {
+  box-shadow: inset 0 0 0 1px rgba(60, 134, 255, 0.18);
+}
+
+.result-stat--red {
+  box-shadow: inset 0 0 0 1px rgba(255, 91, 77, 0.18);
+}
+
+.result-stat__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.result-stat__heading strong {
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.result-stat__heading span {
+  color: var(--muted);
+  font: 700 0.8rem/1.4 monospace;
+}
+
+.result-stat__value {
+  margin-top: 6px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .result-actions {
   margin-top: 22px;
 }

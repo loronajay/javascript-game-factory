@@ -80,11 +80,9 @@ function formatPlayerLabel(prefix, profile, fallbackText) {
     return `${prefix}: ${fallbackText}`;
   }
 
-  const displayName = String(profile.displayName || "").trim() || fallbackText;
   const playerId = String(profile.playerId || "").trim();
-  return playerId
-    ? `${prefix}: ${displayName} [${playerId}]`
-    : `${prefix}: ${displayName}`;
+  const displayName = String(profile.displayName || "").trim();
+  return `${prefix}: ${playerId || displayName || fallbackText}`;
 }
 
 export function createCircuitSiegeAppController({
@@ -95,6 +93,7 @@ export function createCircuitSiegeAppController({
 } = {}) {
   let inputState = createBoardInputState();
   let queueSetupState = createQueueSetupState();
+  let presentationNow = Date.now();
   let pointerState = {
     x: 0,
     y: 0,
@@ -178,7 +177,8 @@ export function createCircuitSiegeAppController({
         board,
         snapshot: runtime.snapshot,
         selectedSide,
-        selectedSlotId: inputState.selectedSlotId
+        selectedSlotId: inputState.selectedSlotId,
+        now: presentationNow
       })
     };
   }
@@ -434,6 +434,13 @@ export function createCircuitSiegeAppController({
     rerender();
   }
 
+  function tickPresentation(now = Date.now()) {
+    presentationNow = Number(now) || Date.now();
+    if (runtime.snapshot?.phase === "live") {
+      rerender();
+    }
+  }
+
   return {
     boot,
     openSideSelect,
@@ -456,6 +463,7 @@ export function createCircuitSiegeAppController({
     updatePointer,
     clearPointer,
     rotateSelectedSlot: rotateHeldPiece,
-    handleRuntimeChanged
+    handleRuntimeChanged,
+    tickPresentation
   };
 }

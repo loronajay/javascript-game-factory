@@ -23,6 +23,28 @@ function titleCase(value = "") {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function resolveLiveTimerMs(snapshot, now) {
+  if (!snapshot) {
+    return 300000;
+  }
+
+  if (snapshot.phase === "live" && Number.isFinite(Number(snapshot.endsAt)) && Number.isFinite(Number(now))) {
+    return Math.max(0, Math.floor(Number(snapshot.endsAt) - Number(now)));
+  }
+
+  return snapshot.timerMsRemaining ?? 300000;
+}
+
+function formatResultPlayer(player, side) {
+  const playerId = String(player?.playerId || "").trim();
+  const displayName = String(player?.displayName || "").trim();
+  return {
+    side,
+    label: `${titleCase(side)} Side`,
+    playerLabel: playerId || displayName || "Connecting"
+  };
+}
+
 function deriveResultTone(snapshot, selectedSide) {
   const result = snapshot?.result;
   if (!result) return "neutral";
@@ -37,6 +59,10 @@ function deriveStatusText(snapshot) {
 
   if (snapshot.result?.type === "draw") {
     return "Draw.";
+  }
+
+  if (snapshot.result?.reason === "timer" && snapshot.result?.winnerSide) {
+    return `${titleCase(snapshot.result.winnerSide)} wins on time.`;
   }
 
   if (snapshot.result?.type === "disconnect" && snapshot.result?.winnerSide) {
@@ -58,22 +84,62 @@ function deriveStatusText(snapshot) {
   return "Waiting for match start.";
 }
 
+function buildResultStats(snapshot) {
+  const blueScore = Number(snapshot?.scores?.blue || 0);
+  const redScore = Number(snapshot?.scores?.red || 0);
+  const bluePlayer = formatResultPlayer(snapshot?.players?.blue, "blue");
+  const redPlayer = formatResultPlayer(snapshot?.players?.red, "red");
+
+  return [
+    {
+      side: "blue",
+      label: bluePlayer.label,
+      playerLabel: bluePlayer.playerLabel,
+      damageText: `${blueScore} damage circuits`
+    },
+    {
+      side: "red",
+      label: redPlayer.label,
+      playerLabel: redPlayer.playerLabel,
+      damageText: `${redScore} damage circuits`
+    }
+  ];
+}
+
 function deriveResultSummary(snapshot, selectedSide) {
   if (!snapshot?.result || snapshot.phase !== "ended") {
     return {
       visible: false,
       title: "",
       body: "",
-      footer: ""
+      footer: "",
+      stats: []
     };
   }
 
+  const blueScore = Number(snapshot?.scores?.blue || 0);
+  const redScore = Number(snapshot?.scores?.red || 0);
+  const stats = buildResultStats(snapshot);
+
   if (snapshot.result.type === "draw" || snapshot.result.reason === "timer") {
+    if (snapshot.result.winnerSide) {
+      const won = snapshot.result.winnerSide === selectedSide;
+      const winnerSide = titleCase(snapshot.result.winnerSide);
+      return {
+        visible: true,
+        title: won ? "Victory" : "Defeat",
+        body: `Time expired. ${winnerSide} finished with more completed damage circuits.`,
+        footer: `Blue ${blueScore} · Red ${redScore}`,
+        stats
+      };
+    }
+
     return {
       visible: true,
       title: "Draw",
       body: "Time expired before either side reached five damage routes.",
-      footer: "Return to menu when you're ready."
+      footer: `Blue ${blueScore} · Red ${redScore}`,
+      stats
     };
   }
 
@@ -85,7 +151,8 @@ function deriveResultSummary(snapshot, selectedSide) {
       visible: true,
       title,
       body: "Opponent disconnected.",
-      footer: "Return to menu to queue for another match."
+      footer: `Blue ${blueScore} · Red ${redScore}`,
+      stats
     };
   }
 
@@ -95,7 +162,8 @@ function deriveResultSummary(snapshot, selectedSide) {
     body: won
       ? "You completed five damage routes first."
       : `${titleCase(snapshot.result.winnerSide || "Opponent")} completed five damage routes first.`,
-    footer: "Return to menu when you're ready."
+    footer: `Blue ${blueScore} · Red ${redScore}`,
+    stats
   };
 }
 
@@ -104,7 +172,8 @@ export function buildBoardViewModel({
   snapshot = null,
   selectedSide = "blue",
   selectedSlotId = null,
-  highlightedRouteId = null
+  highlightedRouteId = null,
+  now = Date.now()
 } = {}) {
   const slotByCell = new Map(board.repairSlots.map((slot) => [getCellKey(slot.x, slot.y), slot]));
   const terminalByCell = new Map();
@@ -220,7 +289,7 @@ export function buildBoardViewModel({
       blue: `${scoreBlue} / 5`,
       red: `${scoreRed} / 5`
     },
-    timerText: formatTimer(snapshot?.timerMsRemaining ?? 300000),
+    timerText: formatTimer(resolveLiveTimerMs(snapshot, now)),
     statusText: deriveStatusText(snapshot),
     selectionText,
     resultSummary: deriveResultSummary(snapshot, selectedSide),
