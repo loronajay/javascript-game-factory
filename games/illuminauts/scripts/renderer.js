@@ -182,15 +182,15 @@ function drawPlayer(ctx, player, now, cx, cy, size) {
 // Screen position for world tile (wx, wy): offsetX + (wx - startX) * size
 // Player is always at viewport center (offsetX + VIEW_TILES_X/2 * size).
 
-function drawWorld(ctx, map, hazards, now, startX, startY, size, offX, offY) {
+function drawWorld(ctx, map, hazards, now, startX, startY, size, offX, offY, viewW = VIEW_TILES_X, viewH = VIEW_TILES_Y) {
   function sx(wx) { return offX + (wx - startX) * size; }
   function sy(wy) { return offY + (wy - startY) * size; }
 
   // Tile range — one tile wider on each edge to prevent pop-in at border
   const tL = Math.floor(startX) - 1;
-  const tR = Math.ceil(startX + VIEW_TILES_X) + 1;
+  const tR = Math.ceil(startX + viewW) + 1;
   const tT = Math.floor(startY) - 1;
-  const tB = Math.ceil(startY + VIEW_TILES_Y) + 1;
+  const tB = Math.ceil(startY + viewH) + 1;
 
   // Pass 1: base tiles
   for (let wy = tT; wy <= tB; wy++) {
@@ -491,7 +491,7 @@ export function renderDebugView(canvas, state, now) {
   const offY  = Math.floor((height - size * state.map.height) / 2);
 
   // Draw full map (startX=0, startY=0 means world coords == screen coords)
-  drawWorld(ctx, state.map, state.hazards, now, 0, 0, size, offX, offY);
+  drawWorld(ctx, state.map, state.hazards, now, 0, 0, size, offX, offY, state.map.width, state.map.height);
 
   const { player } = state;
   const pcx = offX + player.px * size;
