@@ -92,6 +92,11 @@ body {
   padding: 32px;
 }
 
+.hero,
+.panel {
+  overflow: hidden;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--gold);
@@ -101,22 +106,50 @@ body {
 }
 
 .hero h1 {
-  margin: 0;
+  position: relative;
+  z-index: 1;
+  margin: -158px 0 0;
   font-size: clamp(2.8rem, 8vw, 5.8rem);
   line-height: 0.95;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
 }
 
 .tagline {
   max-width: 620px;
-  margin: 18px 0 0;
+  margin: 26px auto 0;
   color: var(--muted);
   font-size: 1.05rem;
   line-height: 1.6;
+  text-align: center;
 }
 
 .status-line {
   color: var(--muted);
   min-height: 1.4em;
+}
+
+.hero-title-art {
+  position: relative;
+  z-index: 0;
+  width: min(100%, 760px);
+  margin: 6px auto 0;
+}
+
+.hero-title-art img,
+.menu-circuit-banner img,
+.room-code-shell__frame {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.menu-circuit-banner {
+  width: min(100%, 680px);
+  margin: 22px auto 10px;
+  opacity: 0.92;
 }
 
 .menu-actions,
@@ -154,21 +187,28 @@ body {
 }
 
 .seat-lock {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 22px;
-  padding: 28px 18px;
-  background: rgba(255, 255, 255, 0.04);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  padding: 34px 18px 120px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.04);
   color: var(--text);
   text-align: center;
   cursor: pointer;
+  overflow: hidden;
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
 .seat-lock strong {
   display: block;
-  font-size: 1.35rem;
-  letter-spacing: 0.12em;
+  position: relative;
+  z-index: 1;
+  font-size: 1.8rem;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.34);
 }
 
 .seat-lock:hover {
@@ -183,9 +223,29 @@ body {
   box-shadow: inset 0 0 0 1px rgba(255, 91, 77, 0.14);
 }
 
+.seat-lock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.92;
+}
+
+.seat-lock--blue::before {
+  background-image: url("images/ui/side-blue-card.svg");
+}
+
+.seat-lock--red::before {
+  background-image: url("images/ui/side-red-card.svg");
+}
+
 .seat-lock--active {
   border-color: rgba(248, 217, 122, 0.45);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 0 0 1px rgba(248, 217, 122, 0.24),
+    0 0 28px rgba(248, 217, 122, 0.18);
 }
 
 .join-row {
@@ -206,14 +266,21 @@ input {
 }
 
 .action {
-  border: 0;
-  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
   padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.05);
   color: var(--text);
   font: inherit;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 18px 26px rgba(0, 0, 0, 0.22);
 }
 
 .action:hover {
@@ -221,15 +288,23 @@ input {
 }
 
 .action--blue {
-  background: linear-gradient(135deg, #1d5fd8, #4e98ff);
+  background:
+    linear-gradient(180deg, rgba(190, 226, 255, 0.2), rgba(34, 96, 194, 0.14)),
+    linear-gradient(135deg, #163e84, #2f73e0 72%, #7ec6ff);
+  border-color: rgba(142, 212, 255, 0.34);
 }
 
 .action--red {
-  background: linear-gradient(135deg, #ca4135, #ff6b5e);
+  background:
+    linear-gradient(180deg, rgba(255, 216, 210, 0.16), rgba(176, 43, 32, 0.14)),
+    linear-gradient(135deg, #7c1f22, #d14a3e 70%, #ff9b8e);
+  border-color: rgba(255, 156, 144, 0.34);
 }
 
 .action--ghost {
-  background: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.03);
 }
 
 .action--wide {
@@ -246,12 +321,26 @@ input {
   padding: 24px;
 }
 
+.room-code-shell {
+  position: relative;
+  width: min(100%, 520px);
+  margin: 18px auto 0;
+}
+
+.room-code-shell__frame {
+  opacity: 0.96;
+}
+
 .room-code {
-  margin: 16px 0 0;
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
   text-align: center;
   font: 700 2.8rem/1 monospace;
   letter-spacing: 0.16em;
   color: var(--text);
+  text-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
 }
 
 .room-code--hidden {

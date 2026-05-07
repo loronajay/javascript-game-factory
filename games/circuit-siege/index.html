@@ -16,8 +16,14 @@
     <section class="screen screen--active" data-screen="menu">
       <div class="hero">
         <p class="eyebrow">Javascript Game Factory</p>
+        <div class="hero-title-art" aria-hidden="true">
+          <img src="images/ui/hero-title-crest.svg" alt="">
+        </div>
         <h1>Circuit Siege</h1>
         <p class="tagline">Trace, repair, and race to five live damage routes before the other command chair does.</p>
+        <div class="menu-circuit-banner" aria-hidden="true">
+          <img src="images/ui/menu-circuit-banner.svg" alt="">
+        </div>
         <p id="menu-notice" class="status-line"></p>
         <div class="menu-stack">
           <section class="menu-phase menu-phase--active" data-menu-phase="root">
@@ -53,7 +59,10 @@
         <p id="queue-status" class="status-line"></p>
         <p id="lobby-status" class="status-line"></p>
         <p id="lobby-hint" class="status-line"></p>
-        <p id="room-code" class="room-code">-----</p>
+        <div class="room-code-shell">
+          <img class="room-code-shell__frame" src="images/ui/room-code-shell.svg" alt="" aria-hidden="true">
+          <p id="room-code" class="room-code">-----</p>
+        </div>
         <div class="identity-bar">
           <p data-player-you class="identity-line">YOU: Connecting</p>
           <p data-player-opponent class="identity-line">OPPONENT: Connecting</p>
