@@ -195,6 +195,7 @@ function renderBoardGrid(container, boardViewModel) {
 }
 
 export function createAppRenderer(root = document) {
+  let lastBoardRef = null;
   const els = {
     menuNotice: root.querySelector("#menu-notice"),
     publicQueueHeading: root.querySelector("#public-queue-heading"),
@@ -310,6 +311,9 @@ export function createAppRenderer(root = document) {
       }
     }
 
-    renderBoardGrid(els.boardGrid, viewModel.board);
+    if (viewModel.board !== lastBoardRef) {
+      renderBoardGrid(els.boardGrid, viewModel.board);
+      lastBoardRef = viewModel.board;
+    }
   };
 }

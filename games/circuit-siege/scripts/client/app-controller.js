@@ -95,6 +95,8 @@ export function createCircuitSiegeAppController({
   let queueSetupState = createQueueSetupState();
   let presentationNow = Date.now();
   let lastViewModel = null;
+  let lastBoardViewModel = null;
+  let lastBoardViewModelDeps = null;
   let pointerState = {
     x: 0,
     y: 0,
@@ -174,13 +176,7 @@ export function createCircuitSiegeAppController({
         mask: inputState.heldMask,
         side: selectedSide
       },
-      board: buildBoardViewModel({
-        board,
-        snapshot: runtime.snapshot,
-        selectedSide,
-        selectedSlotId: inputState.selectedSlotId,
-        now: presentationNow
-      })
+      board: getBoardViewModel(selectedSide)
     };
   }
 
@@ -189,6 +185,36 @@ export function createCircuitSiegeAppController({
       setupState: queueSetupState
     });
     return runtime.selectedSide || queueSetupViewModel.publicSide || "blue";
+  }
+
+  function getBoardViewModel(selectedSide) {
+    const deps = {
+      snapshot: runtime.snapshot,
+      selectedSide,
+      selectedSlotId: inputState.selectedSlotId,
+      now: presentationNow
+    };
+
+    if (
+      lastBoardViewModel
+      && lastBoardViewModelDeps
+      && lastBoardViewModelDeps.snapshot === deps.snapshot
+      && lastBoardViewModelDeps.selectedSide === deps.selectedSide
+      && lastBoardViewModelDeps.selectedSlotId === deps.selectedSlotId
+      && lastBoardViewModelDeps.now === deps.now
+    ) {
+      return lastBoardViewModel;
+    }
+
+    lastBoardViewModel = buildBoardViewModel({
+      board,
+      snapshot: runtime.snapshot,
+      selectedSide,
+      selectedSlotId: inputState.selectedSlotId,
+      now: presentationNow
+    });
+    lastBoardViewModelDeps = deps;
+    return lastBoardViewModel;
   }
 
   function rerender() {
@@ -359,12 +385,7 @@ export function createCircuitSiegeAppController({
   }
 
   function handleBoardSlot(slotId) {
-    const boardViewModel = buildBoardViewModel({
-      board,
-      snapshot: runtime.snapshot,
-      selectedSide: getSelectedSide(),
-      selectedSlotId: inputState.selectedSlotId
-    });
+    const boardViewModel = getBoardViewModel(getSelectedSide());
     const cell = boardViewModel.cells.find((entry) => entry.slotId === slotId) || null;
 
     if (!cell?.editableByLocalPlayer || cell.locked) {
