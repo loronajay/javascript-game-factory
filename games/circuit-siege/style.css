@@ -12,7 +12,6 @@
   --wall: #162338;
   --route: rgba(255, 255, 255, 0.08);
   --surface: rgba(255, 255, 255, 0.03);
-  --ui-sheet: url("images/ui/menu-approved-sheet.png");
 }
 
 * {
@@ -143,10 +142,10 @@ body {
   width: min(100%, 1080px);
   margin: 10px auto 0;
   aspect-ratio: 1416 / 263;
-  background-image: var(--ui-sheet);
+  background-image: url("images/ui/menu-title-plate.png");
   background-repeat: no-repeat;
-  background-size: 108.5% auto;
-  background-position: 50.8% 4.3%;
+  background-size: contain;
+  background-position: center;
   filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.32));
 }
 
@@ -154,10 +153,10 @@ body {
   width: min(100%, 820px);
   margin: 22px auto 6px;
   aspect-ratio: 813 / 134;
-  background-image: var(--ui-sheet);
+  background-image: url("images/ui/menu-circuit-banner.png");
   background-repeat: no-repeat;
-  background-size: 188.9% auto;
-  background-position: 7.3% 40%;
+  background-size: contain;
+  background-position: center;
   opacity: 0.98;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
 }
@@ -201,7 +200,7 @@ body {
   border: 0;
   border-radius: 32px;
   aspect-ratio: 693 / 268;
-  padding: 28px 18px 36px;
+  padding: 0;
   background: transparent;
   color: var(--text);
   text-align: center;
@@ -211,11 +210,9 @@ body {
 }
 
 .seat-lock strong {
-  display: block;
-  position: relative;
+  position: absolute;
+  inset: auto 0 34px;
   z-index: 1;
-  margin-top: auto;
-  padding-top: 152px;
   font-size: clamp(1.4rem, 3vw, 2rem);
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -246,16 +243,17 @@ body {
 
 .seat-lock--blue::before,
 .seat-lock--red::before {
-  background-image: var(--ui-sheet);
+  background-position: center;
   background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .seat-lock--blue::before {
-  background-position: 6.3% 73%;
+  background-image: url("images/ui/menu-side-blue.png");
 }
 
 .seat-lock--red::before {
-  background-position: 93.8% 73%;
+  background-image: url("images/ui/menu-side-red.png");
 }
 
 .seat-lock--active {
@@ -332,12 +330,15 @@ input {
   padding: 0;
   color: transparent;
   background-color: transparent;
-  background-image: var(--ui-sheet);
   background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
   box-shadow: none;
   text-shadow: none;
   overflow: hidden;
-  min-height: clamp(72px, 10vw, 108px);
+  min-height: 0;
+  font-size: 0;
+  line-height: 0;
 }
 
 .action--asset:hover {
@@ -353,29 +354,27 @@ input {
 #btn-private-host,
 #btn-open-join {
   aspect-ratio: 286 / 126;
-  background-size: 537.1% auto;
 }
 
 #btn-play-online {
   max-width: 360px;
   justify-self: center;
-  background-position: 4.2% 97%;
+  background-image: url("images/ui/menu-button-play-online.png");
 }
 
 #btn-private-host {
-  background-position: 29% 97%;
+  background-image: url("images/ui/menu-button-create-room.png");
 }
 
 #btn-open-join {
-  background-position: 53.7% 97%;
+  background-image: url("images/ui/menu-button-enter-code.png");
 }
 
 #btn-back-to-root,
 #btn-friend-back,
 #btn-join-back,
 #btn-cancel-search {
-  aspect-ratio: 245 / 126;
-  background-size: 627% auto;
+  aspect-ratio: 196 / 132;
 }
 
 #btn-back-to-root,
@@ -383,13 +382,13 @@ input {
 #btn-join-back {
   max-width: 312px;
   justify-self: center;
-  background-position: 75.9% 97%;
+  background-image: url("images/ui/menu-button-back.png");
 }
 
 #btn-cancel-search {
   max-width: 312px;
   justify-self: center;
-  background-position: 96.1% 97%;
+  background-image: url("images/ui/menu-button-cancel.png");
 }
 
 .action--wide {
@@ -414,10 +413,10 @@ input {
   display: grid;
   place-items: center;
   padding: 0 88px;
-  background-image: var(--ui-sheet);
+  background-image: url("images/ui/menu-room-code-shell.png");
   background-repeat: no-repeat;
-  background-size: 287.1% auto;
-  background-position: 100% 40%;
+  background-size: contain;
+  background-position: center;
   filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.28));
 }
 
