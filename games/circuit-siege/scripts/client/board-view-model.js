@@ -58,6 +58,47 @@ function deriveStatusText(snapshot) {
   return "Waiting for match start.";
 }
 
+function deriveResultSummary(snapshot, selectedSide) {
+  if (!snapshot?.result || snapshot.phase !== "ended") {
+    return {
+      visible: false,
+      title: "",
+      body: "",
+      footer: ""
+    };
+  }
+
+  if (snapshot.result.type === "draw" || snapshot.result.reason === "timer") {
+    return {
+      visible: true,
+      title: "Draw",
+      body: "Time expired before either side reached five damage routes.",
+      footer: "Return to menu when you're ready."
+    };
+  }
+
+  const won = snapshot.result.winnerSide === selectedSide;
+  const title = won ? "Victory" : "Defeat";
+
+  if (snapshot.result.reason === "disconnect") {
+    return {
+      visible: true,
+      title,
+      body: "Opponent disconnected.",
+      footer: "Return to menu to queue for another match."
+    };
+  }
+
+  return {
+    visible: true,
+    title,
+    body: won
+      ? "You completed five damage routes first."
+      : `${titleCase(snapshot.result.winnerSide || "Opponent")} completed five damage routes first.`,
+    footer: "Return to menu when you're ready."
+  };
+}
+
 export function buildBoardViewModel({
   board,
   snapshot = null,
@@ -182,6 +223,7 @@ export function buildBoardViewModel({
     timerText: formatTimer(snapshot?.timerMsRemaining ?? 300000),
     statusText: deriveStatusText(snapshot),
     selectionText,
+    resultSummary: deriveResultSummary(snapshot, selectedSide),
     resultTone: deriveResultTone(snapshot, selectedSide),
     cells,
     wallCells,

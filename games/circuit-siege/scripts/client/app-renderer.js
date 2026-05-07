@@ -193,6 +193,8 @@ export function createAppRenderer(root = document) {
     lobbyStatus: root.querySelector("#lobby-status"),
     lobbyHint: root.querySelector("#lobby-hint"),
     roomCode: root.querySelector("#room-code"),
+    playerYouTargets: Array.from(root.querySelectorAll("[data-player-you]")),
+    playerOpponentTargets: Array.from(root.querySelectorAll("[data-player-opponent]")),
     joinButton: root.querySelector("#btn-private-join"),
     joinInput: root.querySelector("#room-code-input"),
     heldPiece: root.querySelector("#held-piece"),
@@ -203,6 +205,10 @@ export function createAppRenderer(root = document) {
     timer: root.querySelector("#match-timer"),
     status: root.querySelector("#match-status"),
     selectionStatus: root.querySelector("#selection-status"),
+    resultOverlay: root.querySelector("#result-overlay"),
+    resultTitle: root.querySelector("#result-title"),
+    resultBody: root.querySelector("#result-body"),
+    resultFooter: root.querySelector("#result-footer"),
     boardGrid: root.querySelector("#board-grid"),
     toolButtons: Array.from(root.querySelectorAll("[data-tool]"))
   };
@@ -228,6 +234,12 @@ export function createAppRenderer(root = document) {
       els.roomCode.textContent = viewModel.roomCode;
       els.roomCode.classList.toggle("room-code--hidden", viewModel.lobbyPhase !== "room");
     }
+    for (const target of els.playerYouTargets) {
+      target.textContent = viewModel.playerLabels?.you || "";
+    }
+    for (const target of els.playerOpponentTargets) {
+      target.textContent = viewModel.playerLabels?.opponent || "";
+    }
     if (els.joinButton) {
       els.joinButton.disabled = !!viewModel.queueSetup.joinDisabled;
     }
@@ -248,6 +260,20 @@ export function createAppRenderer(root = document) {
     }
     if (els.selectionStatus) {
       els.selectionStatus.textContent = viewModel.board.selectionText || "";
+    }
+    if (els.resultOverlay) {
+      const resultVisible = !!viewModel.board.resultSummary?.visible;
+      els.resultOverlay.classList.toggle("result-overlay--hidden", !resultVisible);
+      els.resultOverlay.dataset.tone = viewModel.board.resultTone || "neutral";
+    }
+    if (els.resultTitle) {
+      els.resultTitle.textContent = viewModel.board.resultSummary?.title || "";
+    }
+    if (els.resultBody) {
+      els.resultBody.textContent = viewModel.board.resultSummary?.body || "";
+    }
+    if (els.resultFooter) {
+      els.resultFooter.textContent = viewModel.board.resultSummary?.footer || "";
     }
     if (els.toolDock) {
       els.toolDock.classList.toggle("tool-dock--hidden", viewModel.screen !== "match");

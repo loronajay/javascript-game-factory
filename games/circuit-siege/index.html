@@ -86,6 +86,10 @@
         </div>
 
         <div class="lobby-phase" data-lobby-phase="room">
+          <div class="identity-bar">
+            <p data-player-you class="identity-line">YOU: Connecting</p>
+            <p data-player-opponent class="identity-line">OPPONENT: Connecting</p>
+          </div>
           <div class="lobby-actions">
             <button data-leave class="action action--ghost">Leave</button>
           </div>
@@ -110,6 +114,11 @@
           </div>
         </header>
 
+        <div class="identity-bar">
+          <p data-player-you class="identity-line">YOU: Connecting</p>
+          <p data-player-opponent class="identity-line">OPPONENT: Connecting</p>
+        </div>
+
         <div class="match-grid">
           <section class="board-panel">
             <p class="eyebrow">Shared Circuit Floor</p>
@@ -132,6 +141,18 @@
             </div>
             <p id="held-piece" class="status-line">Holding: none</p>
           </aside>
+        </div>
+
+        <div id="result-overlay" class="result-overlay result-overlay--hidden" data-tone="neutral">
+          <div class="result-card">
+            <p class="eyebrow">Match Result</p>
+            <h2 id="result-title">Victory</h2>
+            <p id="result-body" class="result-copy"></p>
+            <p id="result-footer" class="result-copy result-copy--muted"></p>
+            <div class="result-actions">
+              <button data-leave class="action action--wide">Return To Menu</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

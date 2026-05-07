@@ -303,6 +303,24 @@ input {
   min-width: 220px;
 }
 
+.identity-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.identity-line {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font: 700 0.82rem/1.4 monospace;
+  letter-spacing: 0.03em;
+}
+
 .match-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 200px;
@@ -466,6 +484,65 @@ input {
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+.result-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
+  border-radius: 28px;
+  z-index: 5;
+}
+
+.result-overlay--hidden {
+  display: none;
+}
+
+.result-card {
+  width: min(100%, 520px);
+  padding: 28px 28px 24px;
+  border-radius: 24px;
+  background: rgba(8, 14, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.42);
+  text-align: center;
+}
+
+.result-card h2 {
+  margin: 0 0 14px;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.result-copy {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.result-copy--muted {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.result-actions {
+  margin-top: 22px;
+}
+
+.result-overlay[data-tone="win"] .result-card {
+  box-shadow: 0 0 0 1px rgba(138, 243, 177, 0.25), 0 30px 60px rgba(0, 0, 0, 0.42);
+}
+
+.result-overlay[data-tone="loss"] .result-card {
+  box-shadow: 0 0 0 1px rgba(255, 156, 147, 0.25), 0 30px 60px rgba(0, 0, 0, 0.42);
+}
+
+.result-overlay[data-tone="draw"] .result-card {
+  box-shadow: 0 0 0 1px rgba(248, 217, 122, 0.25), 0 30px 60px rgba(0, 0, 0, 0.42);
 }
 
 .board-cell-rect--floor {
@@ -667,6 +744,10 @@ input {
 
   .status-block {
     min-width: 0;
+  }
+
+  .identity-bar {
+    grid-template-columns: 1fr;
   }
 
   .tool-dock {

@@ -44,6 +44,49 @@ function deriveScreenFromUi(runtime, queueSetupState) {
   return "menu";
 }
 
+function getOpponentSide(side) {
+  return side === "red" ? "blue" : "red";
+}
+
+function getProfileForSide(runtime, side) {
+  const snapshotPlayer = runtime.snapshot?.players?.[side];
+  if (snapshotPlayer?.displayName || snapshotPlayer?.playerId) {
+    return {
+      displayName: snapshotPlayer.displayName || "",
+      playerId: snapshotPlayer.playerId || "",
+      side
+    };
+  }
+
+  if (runtime.identity && side === runtime.selectedSide) {
+    return {
+      displayName: runtime.identity.displayName || "",
+      playerId: runtime.identity.playerId || "",
+      side
+    };
+  }
+
+  const profiles = Object.values(runtime.profiles || {});
+  const matchingProfile = profiles.find((profile) => profile?.side === side);
+  if (matchingProfile) {
+    return matchingProfile;
+  }
+
+  return null;
+}
+
+function formatPlayerLabel(prefix, profile, fallbackText) {
+  if (!profile) {
+    return `${prefix}: ${fallbackText}`;
+  }
+
+  const displayName = String(profile.displayName || "").trim() || fallbackText;
+  const playerId = String(profile.playerId || "").trim();
+  return playerId
+    ? `${prefix}: ${displayName} [${playerId}]`
+    : `${prefix}: ${displayName}`;
+}
+
 export function createCircuitSiegeAppController({
   board,
   runtime,
@@ -88,6 +131,9 @@ export function createCircuitSiegeAppController({
       setupState: queueSetupState
     });
     const selectedSide = runtime.selectedSide || queueSetupViewModel.publicSide || "blue";
+    const opponentSide = getOpponentSide(selectedSide);
+    const localProfile = getProfileForSide(runtime, selectedSide);
+    const opponentProfile = getProfileForSide(runtime, opponentSide);
 
     return {
       screen: deriveScreenFromUi(runtime, queueSetupState),
@@ -115,6 +161,10 @@ export function createCircuitSiegeAppController({
       }),
       joinRoomCode: queueSetupViewModel.joinRoomCode,
       roomCode: runtime.lobby?.roomCode || "-----",
+      playerLabels: {
+        you: formatPlayerLabel("YOU", localProfile, "Connecting"),
+        opponent: formatPlayerLabel("OPPONENT", opponentProfile, "Connecting")
+      },
       selectedSide,
       heldMask: inputState.heldMask,
       heldCursor: {
