@@ -85,6 +85,22 @@ function formatPlayerLabel(prefix, profile, fallbackText) {
   return `${prefix}: ${displayName || playerId || fallbackText}`;
 }
 
+function formatTimerText(snapshot, now) {
+  let totalMs = 300000;
+
+  if (snapshot?.phase === "live" && Number.isFinite(Number(snapshot.endsAt)) && Number.isFinite(Number(now))) {
+    totalMs = Math.max(0, Math.floor(Number(snapshot.endsAt) - Number(now)));
+  } else if (snapshot?.timerMsRemaining != null) {
+    totalMs = Number(snapshot.timerMsRemaining) || 0;
+  }
+
+  const clamped = Math.max(0, Math.floor(totalMs));
+  const totalSeconds = Math.ceil(clamped / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function createCircuitSiegeAppController({
   board,
   runtime,
@@ -191,8 +207,7 @@ export function createCircuitSiegeAppController({
     const deps = {
       snapshot: runtime.snapshot,
       selectedSide,
-      selectedSlotId: inputState.selectedSlotId,
-      now: presentationNow
+      selectedSlotId: inputState.selectedSlotId
     };
 
     if (
@@ -201,8 +216,8 @@ export function createCircuitSiegeAppController({
       && lastBoardViewModelDeps.snapshot === deps.snapshot
       && lastBoardViewModelDeps.selectedSide === deps.selectedSide
       && lastBoardViewModelDeps.selectedSlotId === deps.selectedSlotId
-      && lastBoardViewModelDeps.now === deps.now
     ) {
+      lastBoardViewModel.timerText = formatTimerText(runtime.snapshot, presentationNow);
       return lastBoardViewModel;
     }
 
