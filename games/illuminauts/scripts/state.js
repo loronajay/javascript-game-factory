@@ -8,10 +8,17 @@ export function createGameState() {
   return {
     map,
     player: {
-      px: map.start.x + 0.5,       // continuous tile-space position (center)
+      tx: map.start.x,              // logical tile position (integer)
+      ty: map.start.y,
+      prevTx: map.start.x,          // tile position at start of current move
+      prevTy: map.start.y,
+      px: map.start.x + 0.5,        // visual position (lerped, used by renderer)
       py: map.start.y + 0.5,
-      spawnPx: map.start.x + 0.5,
-      spawnPy: map.start.y + 0.5,
+      spawnTx: map.start.x,
+      spawnTy: map.start.y,
+      moveStartAt: 0,               // wall-clock time when current move began
+      stepMs: 0,                    // 0 = no active move animation
+      isSprinting: false,
       dir: 'down',
       hearts: HEARTS_MAX,
       chips: 0,
