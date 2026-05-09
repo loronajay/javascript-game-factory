@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Illuminauts Map Editor</title>
+  <style>
+    :root {
+      --bg: #080b12;
+      --panel: #101827;
+      --text: #dbeafe;
+      --muted: #93a4bd;
+      --line: #263247;
+      --accent: #67e8f9;
+      --danger: #fb7185;
+      --ts: 22px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #172033 0%, #080b12 60%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .app {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 1fr 370px;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+    }
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    h1 { font-size: 20px; }
+    .subhead { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .map-id-wrap { display: flex; align-items: center; gap: 6px; }
+    .map-id-wrap label { font-size: 11px; color: var(--muted); }
+    .map-id-wrap input {
+      background: #0a1020; border: 1px solid var(--line); border-radius: 7px;
+      color: var(--text); font-size: 12px; padding: 5px 9px; width: 110px;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(16,24,39,0.98), rgba(13,19,32,0.98));
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.28);
+    }
+    .editor-panel { padding: 12px; overflow: auto; }
+    .side-panel {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      max-height: calc(100vh - 80px);
+    }
+    button {
+      border: 1px solid var(--line);
+      background: #0b1220;
+      color: var(--text);
+      border-radius: 7px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+      transition: border-color 0.1s;
+    }
+    button:hover { border-color: #4b5f7c; background: #0e1828; }
+    button.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px rgba(103,232,249,0.25); }
+    button.tab-active { border-color: var(--accent); color: var(--accent); }
+    button.sm { padding: 3px 7px; font-size: 11px; }
+    button.danger { border-color: rgba(251,113,133,0.4); color: #fecdd3; }
+    button:disabled { opacity: 0.35; cursor: default; }
+    .grid-wrap {
+      position: relative;
+      width: max-content;
+      padding: 10px;
+      background: #050812;
+      border: 1px solid #1d2840;
+      border-radius: 11px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(35, var(--ts));
+      grid-template-rows: repeat(27, var(--ts));
+      gap: 1px;
+      user-select: none;
+    }
+    #overlay {
+      position: absolute;
+      top: 10px; left: 10px;
+      pointer-events: none;
+    }
+    .tile {
+      width: var(--ts); height: var(--ts);
+      display: grid; place-items: center;
+      font-size: 9px; font-weight: 800; line-height: 1;
+      border: 1px solid rgba(255,255,255,0.03);
+      cursor: crosshair;
+    }
+    .tile.locked { cursor: not-allowed; }
+    .tile-floor   { background: #121826; color: #43536f; }
+    .tile-wall    { background: #3a4358; color: #b9c5d9; }
+    .tile-start-a { background: #1e3a8a; color: #bfdbfe; }
+    .tile-start-b { background: #7f1d1d; color: #fecaca; }
+    .tile-power   { background: #164e63; color: #a5f3fc; }
+    .tile-chip    { background: #713f12; color: #fde68a; }
+    .tile-door    { background: #581c87; color: #e9d5ff; }
+    .tile-beacon  { background: #facc15; color: #111827; }
+    .sec-label {
+      font-size: 10px; font-weight: 700;
+      color: #8899bb; text-transform: uppercase; letter-spacing: 0.07em;
+      margin-bottom: 5px;
+    }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+    .stat { background: #0a1020; border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; }
+    .stat-label { color: var(--muted); font-size: 10px; }
+    .stat-value { font-size: 14px; font-weight: 800; margin-top: 1px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 5px; }
+    .hlist { display: flex; flex-direction: column; gap: 3px; max-height: 130px; overflow-y: auto; }
+    .hitem {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 7px; border: 1px solid var(--line);
+      border-radius: 7px; background: #0a1020; cursor: pointer; font-size: 11px;
+    }
+    .hitem.selected { border-color: var(--accent); }
+    .hitem:hover { border-color: #4b5f7c; }
+    .hdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .hname { flex: 1; }
+    .hinfo { color: var(--muted); font-size: 10px; }
+    .sform { display: flex; flex-direction: column; gap: 5px; }
+    .field { display: flex; align-items: center; gap: 7px; }
+    .field label { font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; }
+    .field input[type="number"] {
+      flex: 1; background: #0a1020; border: 1px solid var(--line);
+      border-radius: 5px; color: var(--text); font-size: 12px; padding: 3px 7px;
+    }
+    .dir-pad { display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: repeat(3, 26px); gap: 2px; }
+    .dir-pad button { padding: 0; text-align: center; font-size: 13px; }
+    .dir-pad button.dir-active { border-color: var(--accent); color: var(--accent); }
+    textarea {
+      width: 100%; min-height: 180px; resize: vertical;
+      background: #050812; color: #dbeafe; border: 1px solid var(--line);
+      border-radius: 9px; padding: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px; line-height: 1.5; tab-size: 2;
+    }
+    .status { font-size: 11px; min-height: 16px; color: var(--accent); }
+    .hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    hr { border: none; border-top: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Illuminauts Map Editor</h1>
+      <p class="subhead">35×27 · drag to paint · right-click erases · Ctrl+Z/Y undo/redo</p>
+    </div>
+    <div class="header-right">
+      <div class="map-id-wrap">
+        <label for="mapIdInput">Map ID</label>
+        <input type="text" id="mapIdInput" value="map-01" placeholder="map-01" />
+      </div>
+      <div class="toolbar">
+        <button id="tabTiles" class="tab-active">Tiles</button>
+        <button id="tabHazards">Hazards</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="panel editor-panel">
+    <div class="grid-wrap" id="gridWrap">
+      <div class="grid" id="grid"></div>
+      <canvas id="overlay"></canvas>
+    </div>
+  </main>
+
+  <aside class="panel side-panel" id="sidePanel"></aside>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────────
+const W = 35, H = 27, TS = 22, GAP = 1, CELL = TS + GAP;
+const BX = Math.floor((W - 5) / 2); // 15
+const BY = Math.floor((H - 5) / 2); // 11
+
+const TILE_TOOLS = [
+  { key: '.', label: 'Floor',    cls: 'tile-floor'   },
+  { key: '#', label: 'Wall',     cls: 'tile-wall'     },
+  { key: 'S', label: 'P1 Start', cls: 'tile-start-a', unique: true },
+  { key: 'T', label: 'P2 Start', cls: 'tile-start-b', unique: true },
+  { key: 'A', label: 'Chip',     cls: 'tile-chip'     },
+  { key: 'P', label: 'Power',    cls: 'tile-power'    },
+  { key: 'D', label: 'Door',     cls: 'tile-door'     },
+];
+const TILE_CLS = Object.fromEntries(TILE_TOOLS.map(t => [t.key, t.cls]));
+TILE_CLS['B'] = 'tile-beacon';
+const VALID_TILE_KEYS = new Set([...TILE_TOOLS.map(t => t.key), 'B']);
+
+const ALIEN_COLORS = ['#f97316','#a855f7','#22c55e','#f43f5e','#3b82f6','#eab308','#ec4899'];
+const GATE_COLORS  = ['#14b8a6','#6366f1','#f59e0b','#10b981','#e879f9'];
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let map = createDefaultMap();
+let hazards = { aliens: [], laserGates: [], turrets: [] };
+let history = [];
+let histIdx = -1;
+let editorMode = 'tiles';
+let tileTool = '#';
+let hazardTool = 'alien';
+let selAlienId = null;
+let selGateId = null;
+let selTurretId = null;
+let isDragging = false;
+let dragValue = null;
+let lastDragCoord = null;
+let _uid = 1;
+
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+const gridEl    = document.getElementById('grid');
+const gridWrap  = document.getElementById('gridWrap');
+const overlayEl = document.getElementById('overlay');
+const sideEl    = document.getElementById('sidePanel');
+const mapIdInput = document.getElementById('mapIdInput');
+const octx = overlayEl.getContext('2d');
+
+// ── History ────────────────────────────────────────────────────────────────────
+function snap() {
+  return { map: map.map(r => [...r]), hazards: JSON.parse(JSON.stringify(hazards)) };
+}
+function pushHistory() {
+  history = history.slice(0, histIdx + 1);
+  history.push(snap());
+  if (history.length > 80) history.shift();
+  histIdx = history.length - 1;
+}
+function restoreSnap(s) {
+  map = s.map.map(r => [...r]);
+  hazards = JSON.parse(JSON.stringify(s.hazards));
+}
+function undo() {
+  if (histIdx <= 0) return;
+  histIdx--;
+  restoreSnap(history[histIdx]);
+  syncAll();
+  setStatus('Undone.');
+}
+function redo() {
+  if (histIdx >= history.length - 1) return;
+  histIdx++;
+  restoreSnap(history[histIdx]);
+  syncAll();
+  setStatus('Redone.');
+}
+
+// ── Map helpers ────────────────────────────────────────────────────────────────
+function isOuter(x, y)  { return x === 0 || y === 0 || x === W - 1 || y === H - 1; }
+function isBeacon(x, y) { return x >= BX && x < BX + 5 && y >= BY && y < BY + 5; }
+function isLocked(x, y) { return isOuter(x, y) || isBeacon(x, y); }
+
+function createDefaultMap() {
+  const m = [];
+  for (let y = 0; y < H; y++) {
+    const row = [];
+    for (let x = 0; x < W; x++) row.push(isOuter(x, y) ? '#' : isBeacon(x, y) ? 'B' : '.');
+    m.push(row);
+  }
+  m[1][1] = 'S';
+  m[1][W - 2] = 'T';
+  return m;
+}
+
+function enforceLockedTiles() {
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (isOuter(x, y))  map[y][x] = '#';
+      if (isBeacon(x, y)) map[y][x] = 'B';
+    }
+}
+
+// ── Tile painting ──────────────────────────────────────────────────────────────
+function paintTile(x, y, value) {
+  if (x < 0 || y < 0 || x >= W || y >= H || isLocked(x, y)) return;
+  const tool = TILE_TOOLS.find(t => t.key === value);
+  if (tool?.unique) removeUnique(value);
+  map[y][x] = value;
+}
+
+function removeUnique(value) {
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (map[y][x] === value && !isLocked(x, y)) map[y][x] = '.';
+}
+
+function updateTileEl(x, y) {
+  const tileEl = gridEl.children[y * W + x];
+  if (!tileEl) return;
+  const val = map[y][x];
+  tileEl.className = `tile ${TILE_CLS[val] || 'tile-floor'}${isLocked(x, y) ? ' locked' : ''}`;
+  tileEl.textContent = val === '.' ? '' : val;
+}
+
+// ── Hazard helpers ─────────────────────────────────────────────────────────────
+function uid(pfx) { return `${pfx}${_uid++}`; }
+
+function addAlien() {
+  const id = uid('alien');
+  hazards.aliens.push({ id, route: [], index: 0, lastStepAt: 0, stepMs: 620 });
+  selAlienId = id;
+  pushHistory(); syncAll();
+}
+function deleteAlien(id) {
+  hazards.aliens = hazards.aliens.filter(a => a.id !== id);
+  if (selAlienId === id) selAlienId = hazards.aliens[0]?.id ?? null;
+  pushHistory(); syncAll();
+}
+function addWaypoint(x, y) {
+  const alien = hazards.aliens.find(a => a.id === selAlienId);
+  if (!alien) return;
+  const last = alien.route[alien.route.length - 1];
+  if (last && last.x === x && last.y === y) return;
+  alien.route.push({ x, y });
+  renderOverlay(); renderSidePanel();
+}
+function removeLastWaypoint() {
+  const alien = hazards.aliens.find(a => a.id === selAlienId);
+  if (alien?.route.length) { alien.route.pop(); pushHistory(); syncAll(); }
+}
+function clearAlienRoute() {
+  const alien = hazards.aliens.find(a => a.id === selAlienId);
+  if (alien) { alien.route = []; pushHistory(); syncAll(); }
+}
+
+function addGate() {
+  const id = uid('gate');
+  hazards.laserGates.push({ id, tiles: [], cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0 });
+  selGateId = id;
+  pushHistory(); syncAll();
+}
+function deleteGate(id) {
+  hazards.laserGates = hazards.laserGates.filter(g => g.id !== id);
+  if (selGateId === id) selGateId = hazards.laserGates[0]?.id ?? null;
+  pushHistory(); syncAll();
+}
+function toggleGateTile(x, y) {
+  const gate = hazards.laserGates.find(g => g.id === selGateId);
+  if (!gate) return;
+  const i = gate.tiles.findIndex(t => t.x === x && t.y === y);
+  if (i >= 0) gate.tiles.splice(i, 1);
+  else gate.tiles.push({ x, y });
+  renderOverlay(); renderSidePanel();
+}
+
+function addTurret(x, y) {
+  const id = uid('turret');
+  hazards.turrets.push({ id, x, y, dx: 1, dy: 0, range: 3, cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0 });
+  selTurretId = id;
+  pushHistory(); syncAll();
+}
+function deleteTurret(id) {
+  hazards.turrets = hazards.turrets.filter(t => t.id !== id);
+  if (selTurretId === id) selTurretId = hazards.turrets[0]?.id ?? null;
+  pushHistory(); syncAll();
+}
+function moveTurret(x, y) {
+  const t = hazards.turrets.find(t => t.id === selTurretId);
+  if (t) { t.x = x; t.y = y; renderOverlay(); renderSidePanel(); }
+}
+
+// ── Canvas overlay ─────────────────────────────────────────────────────────────
+function tcx(tx) { return tx * CELL + TS / 2; }
+function tcy(ty) { return ty * CELL + TS / 2; }
+
+function sizeOverlay() {
+  overlayEl.width  = W * CELL - GAP;
+  overlayEl.height = H * CELL - GAP;
+}
+
+function renderOverlay() {
+  octx.clearRect(0, 0, overlayEl.width, overlayEl.height);
+
+  // Laser gates
+  hazards.laserGates.forEach((gate, gi) => {
+    const col = GATE_COLORS[gi % GATE_COLORS.length];
+    const isSel = gate.id === selGateId && editorMode === 'hazards' && hazardTool === 'laserGate';
+    octx.fillStyle = col + (isSel ? 'bb' : '55');
+    for (const t of gate.tiles) octx.fillRect(t.x * CELL, t.y * CELL, TS, TS);
+    if (gate.tiles.length) {
+      octx.fillStyle = col;
+      octx.font = 'bold 8px ui-monospace, monospace';
+      octx.textAlign = 'left'; octx.textBaseline = 'top';
+      octx.fillText(`G${gi + 1}`, gate.tiles[0].x * CELL + 1, gate.tiles[0].y * CELL + 1);
+    }
+  });
+
+  // Turrets
+  hazards.turrets.forEach((t, ti) => {
+    const isSel = t.id === selTurretId && editorMode === 'hazards' && hazardTool === 'turret';
+    const cx = tcx(t.x), cy = tcy(t.y);
+    // Beam range line
+    octx.strokeStyle = isSel ? 'rgba(251,191,36,0.6)' : 'rgba(251,191,36,0.25)';
+    octx.lineWidth = 2.5;
+    octx.setLineDash([3, 3]);
+    octx.beginPath();
+    octx.moveTo(cx, cy);
+    octx.lineTo(tcx(t.x + t.dx * t.range), tcy(t.y + t.dy * t.range));
+    octx.stroke();
+    octx.setLineDash([]);
+    // Dot
+    octx.fillStyle = isSel ? '#fbbf24' : '#a16207';
+    octx.beginPath(); octx.arc(cx, cy, isSel ? 7 : 5, 0, Math.PI * 2); octx.fill();
+    // Arrow
+    const arrow = t.dx > 0 ? '→' : t.dx < 0 ? '←' : t.dy > 0 ? '↓' : '↑';
+    octx.fillStyle = '#111';
+    octx.font = `bold ${isSel ? 9 : 8}px system-ui`;
+    octx.textAlign = 'center'; octx.textBaseline = 'middle';
+    octx.fillText(arrow, cx, cy);
+  });
+
+  // Alien routes
+  hazards.aliens.forEach((alien, ai) => {
+    const col = ALIEN_COLORS[ai % ALIEN_COLORS.length];
+    const isSel = alien.id === selAlienId && editorMode === 'hazards' && hazardTool === 'alien';
+    if (!alien.route.length) return;
+    // Route line
+    octx.strokeStyle = col + (isSel ? 'cc' : '55');
+    octx.lineWidth = isSel ? 2 : 1.5;
+    octx.setLineDash([4, 3]);
+    octx.beginPath();
+    octx.moveTo(tcx(alien.route[0].x), tcy(alien.route[0].y));
+    for (let i = 1; i < alien.route.length; i++)
+      octx.lineTo(tcx(alien.route[i].x), tcy(alien.route[i].y));
+    octx.stroke();
+    octx.setLineDash([]);
+    // Waypoint dots
+    alien.route.forEach((wp, wi) => {
+      const r = isSel ? 5 : 3.5;
+      octx.fillStyle = col;
+      octx.beginPath(); octx.arc(tcx(wp.x), tcy(wp.y), r, 0, Math.PI * 2); octx.fill();
+      if (wi === 0) {
+        octx.fillStyle = '#000';
+        octx.font = `bold ${isSel ? 8 : 7}px ui-monospace, monospace`;
+        octx.textAlign = 'center'; octx.textBaseline = 'middle';
+        octx.fillText(String(ai + 1), tcx(wp.x), tcy(wp.y));
+      }
+    });
+  });
+}
+
+// ── Grid rendering ─────────────────────────────────────────────────────────────
+function renderGrid() {
+  gridEl.innerHTML = '';
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const val = map[y][x];
+      const div = document.createElement('div');
+      div.className = `tile ${TILE_CLS[val] || 'tile-floor'}${isLocked(x, y) ? ' locked' : ''}`;
+      div.textContent = val === '.' ? '' : val;
+      div.dataset.x = x; div.dataset.y = y;
+      gridEl.appendChild(div);
+    }
+  }
+}
+
+// ── Export / Import ────────────────────────────────────────────────────────────
+function toRows() { return map.map(r => r.join('')); }
+
+function toMapsEntry() {
+  return {
+    id: mapIdInput.value.trim() || 'map-01',
+    raw: toRows(),
+    hazards: JSON.parse(JSON.stringify(hazards))
+  };
+}
+
+function formatEntry(entry) {
+  const rawLines = entry.raw.map(r => `      '${r}'`).join(',\n');
+  const h = entry.hazards;
+
+  function fmtRoute(route) {
+    if (!route.length) return '[]';
+    const pts = route.map(p => `{ x: ${p.x}, y: ${p.y} }`).join(', ');
+    return `[${pts}]`;
+  }
+
+  const alienLines = h.aliens.map(a =>
+    `        {\n          id: '${a.id}', route: ${fmtRoute(a.route)},\n          index: 0, lastStepAt: 0, stepMs: ${a.stepMs}\n        }`
+  ).join(',\n');
+
+  const gateLines = h.laserGates.map(g => {
+    const tiles = g.tiles.map(t => `{ x: ${t.x}, y: ${t.y} }`).join(', ');
+    return `        {\n          id: '${g.id}', tiles: [${tiles}],\n          cycleMs: ${g.cycleMs}, warningMs: ${g.warningMs}, activeMs: ${g.activeMs}, offsetMs: ${g.offsetMs}\n        }`;
+  }).join(',\n');
+
+  const turretLines = h.turrets.map(t =>
+    `        {\n          id: '${t.id}', x: ${t.x}, y: ${t.y}, dx: ${t.dx}, dy: ${t.dy}, range: ${t.range},\n          cycleMs: ${t.cycleMs}, warningMs: ${t.warningMs}, activeMs: ${t.activeMs}, offsetMs: ${t.offsetMs}\n        }`
+  ).join(',\n');
+
+  return [
+    `  {`,
+    `    id: '${entry.id}',`,
+    `    raw: [`,
+    rawLines,
+    `    ],`,
+    `    hazards: {`,
+    `      aliens: [`,
+    alienLines ? alienLines : '',
+    `      ],`,
+    `      laserGates: [`,
+    gateLines ? gateLines : '',
+    `      ],`,
+    `      turrets: [`,
+    turretLines ? turretLines : '',
+    `      ]`,
+    `    }`,
+    `  }`
+  ].join('\n');
+}
+
+function parseRawArray(text) {
+  const matches = [...text.matchAll(/'([^']+)'|"([^"]+)"/g)];
+  // Filter to strings of exactly map width so this works whether the input is
+  // a plain row array or a full JS entry object (which contains other quoted strings).
+  const rows = matches.map(m => m[1] || m[2]).filter(s => s.length === W);
+  if (rows.length !== H) throw new Error(`Expected ${H} rows of width ${W}, found ${rows.length}.`);
+  for (const row of rows) {
+    for (const ch of row) if (!VALID_TILE_KEYS.has(ch)) throw new Error(`Unknown tile char: '${ch}'`);
+  }
+  return rows;
+}
+
+function importFromText(text) {
+  text = text.trim();
+  // Try JSON full entry (exported by another tool or hand-written as JSON)
+  if (text.startsWith('{')) {
+    try {
+      const entry = JSON.parse(text);
+      if (!Array.isArray(entry.raw)) throw new Error('Missing raw array.');
+      const rows = parseRawArray(entry.raw.join('\n'));
+      map = rows.map(r => r.split(''));
+      enforceLockedTiles();
+      if (entry.hazards) hazards = JSON.parse(JSON.stringify(entry.hazards));
+      if (entry.id) mapIdInput.value = entry.id;
+      syncIds();
+      pushHistory(); syncAll();
+      return { ok: true, msg: 'Loaded map entry with hazards.' };
+    } catch (_) {
+      // JSON parse failed — likely a JS object literal (single quotes, unquoted keys).
+      // Fall through to the raw-row extractor below which handles any text that
+      // contains W-wide quoted strings, including the full formatEntry() output.
+    }
+  }
+  // Extract map rows from anything: plain array, JS object literal, or txt file.
+  try {
+    const rows = parseRawArray(text);
+    map = rows.map(r => r.split(''));
+    enforceLockedTiles();
+    pushHistory(); syncAll();
+    return { ok: true, msg: 'Imported tile map. Hazards unchanged.' };
+  } catch (e) { return { ok: false, msg: e.message }; }
+}
+
+function syncIds() {
+  const all = [
+    ...(hazards.aliens || []).map(a => a.id),
+    ...(hazards.laserGates || []).map(g => g.id),
+    ...(hazards.turrets || []).map(t => t.id)
+  ];
+  const max = all.reduce((m, id) => Math.max(m, parseInt(id.replace(/\D/g, '')) || 0), 0);
+  _uid = max + 1;
+  selAlienId = hazards.aliens[0]?.id ?? null;
+  selGateId  = hazards.laserGates[0]?.id ?? null;
+  selTurretId = hazards.turrets[0]?.id ?? null;
+}
+
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus(`Copied ${label}.`);
+  } catch {
+    setStatus('Clipboard blocked — text is in the output area, select all and copy.', true);
+  }
+}
+
+// ── Beacon seal ────────────────────────────────────────────────────────────────
+function sealBeaconShell() {
+  const minX = BX - 1, maxX = BX + 5, minY = BY - 1, maxY = BY + 5;
+  const entX = BX + 2, entY = maxY;
+  for (let y = minY; y <= maxY; y++)
+    for (let x = minX; x <= maxX; x++) {
+      if (x <= 0 || y <= 0 || x >= W - 1 || y >= H - 1 || isBeacon(x, y)) continue;
+      if (y === minY || y === maxY || x === minX || x === maxX) map[y][x] = '#';
+    }
+  map[entY][entX] = '.';
+  pushHistory(); syncAll();
+  setStatus('Beacon shell sealed.');
+}
+
+// ── Status ─────────────────────────────────────────────────────────────────────
+let _statusTimer;
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('editorStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--accent)';
+  clearTimeout(_statusTimer);
+  _statusTimer = setTimeout(() => { if (el) el.textContent = ''; }, 4000);
+}
+
+// ── Sync ───────────────────────────────────────────────────────────────────────
+function syncAll() {
+  enforceLockedTiles();
+  renderGrid();
+  renderOverlay();
+  renderSidePanel();
+}
+
+// ── Side panel ─────────────────────────────────────────────────────────────────
+function el(tag, cls) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+
+function mkBtn(text, cls, onClick) {
+  const b = el('button', cls);
+  b.textContent = text;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function renderSidePanel() {
+  sideEl.innerHTML = '';
+
+  // Stats
+  const statsWrap = el('section');
+  statsWrap.innerHTML = `<div class="sec-label">Map Stats</div>`;
+  const statsGrid = el('div', 'stats');
+  const counts = {};
+  for (const row of map) for (const t of row) counts[t] = (counts[t] || 0) + 1;
+  for (const [label, val] of [
+    ['Size', `${W}×${H}`], ['#', counts['#']??0], ['A', counts['A']??0],
+    ['P', counts['P']??0], ['D', counts['D']??0], ['Aliens', hazards.aliens.length],
+    ['Gates', hazards.laserGates.length], ['Turrets', hazards.turrets.length]
+  ]) {
+    const s = el('div', 'stat');
+    s.innerHTML = `<div class="stat-label">${label}</div><div class="stat-value">${val}</div>`;
+    statsGrid.appendChild(s);
+  }
+  statsWrap.appendChild(statsGrid);
+  sideEl.appendChild(statsWrap);
+
+  const statusEl = el('div', 'status');
+  statusEl.id = 'editorStatus';
+  sideEl.appendChild(statusEl);
+
+  sideEl.appendChild(el('hr'));
+
+  if (editorMode === 'tiles') renderTilesSide();
+  else renderHazardsSide();
+}
+
+function renderTilesSide() {
+  // Tile toolbar
+  const toolWrap = el('section');
+  toolWrap.innerHTML = `<div class="sec-label">Tile Tool</div>`;
+  const toolbar = el('div', 'toolbar');
+  for (const t of TILE_TOOLS) {
+    const btn = mkBtn(t.label, t.key === tileTool ? 'active' : '', () => {
+      tileTool = t.key; renderSidePanel();
+    });
+    toolbar.appendChild(btn);
+  }
+  toolWrap.appendChild(toolbar);
+  sideEl.appendChild(toolWrap);
+
+  sideEl.appendChild(el('hr'));
+
+  // Actions
+  const actWrap = el('section');
+  actWrap.innerHTML = `<div class="sec-label">Actions</div>`;
+  const actRow = el('div', 'toolbar');
+  actRow.appendChild(mkBtn('Seal Beacon Shell', '', sealBeaconShell));
+  actRow.appendChild(mkBtn('Reset Map', 'danger', () => {
+    if (!confirm('Reset tile map to all walls? Hazards are kept.')) return;
+    map = createDefaultMap();
+    pushHistory(); syncAll(); setStatus('Map reset.');
+  }));
+  actWrap.appendChild(actRow);
+  sideEl.appendChild(actWrap);
+
+  sideEl.appendChild(el('hr'));
+
+  // Export / Import
+  const expWrap = el('section');
+  expWrap.innerHTML = `<div class="sec-label">Export / Import</div>`;
+
+  const expRow = el('div', 'toolbar');
+  expRow.appendChild(mkBtn('Copy maps.js Entry', '', () => {
+    const text = formatEntry(toMapsEntry());
+    document.getElementById('rawOutput').value = text;
+    copyText(text, 'maps.js entry');
+  }));
+  expRow.appendChild(mkBtn('Copy Raw Array', '', () => {
+    const text = '[\n' + toRows().map(r => `  '${r}'`).join(',\n') + '\n]';
+    document.getElementById('rawOutput').value = text;
+    copyText(text, 'raw array');
+  }));
+  expRow.appendChild(mkBtn('Import', '', () => {
+    const result = importFromText(document.getElementById('rawOutput').value);
+    setStatus(result.msg, !result.ok);
+  }));
+  expWrap.appendChild(expRow);
+
+  const ta = el('textarea');
+  ta.id = 'rawOutput';
+  ta.spellcheck = false;
+  ta.placeholder = 'Output appears here.\nPaste a maps.js entry or raw array to import.';
+  expWrap.appendChild(ta);
+
+  const hint = el('p', 'hint');
+  hint.textContent = '"Copy maps.js Entry" outputs the full { id, raw, hazards } block — paste it into the MAPS array in scripts/maps.js.';
+  expWrap.appendChild(hint);
+
+  sideEl.appendChild(expWrap);
+}
+
+function renderHazardsSide() {
+  // Sub-tool tabs
+  const tabWrap = el('section');
+  tabWrap.innerHTML = `<div class="sec-label">Hazard Type</div>`;
+  const tabRow = el('div', 'toolbar');
+  for (const [key, label] of [['alien','Alien Patrols'],['laserGate','Laser Gates'],['turret','Turrets']]) {
+    const btn = mkBtn(label, hazardTool === key ? 'active' : '', () => {
+      hazardTool = key; renderSidePanel(); renderOverlay();
+    });
+    tabRow.appendChild(btn);
+  }
+  tabWrap.appendChild(tabRow);
+  sideEl.appendChild(tabWrap);
+
+  sideEl.appendChild(el('hr'));
+
+  if (hazardTool === 'alien') renderAlienPanel();
+  else if (hazardTool === 'laserGate') renderGatePanel();
+  else renderTurretPanel();
+
+  sideEl.appendChild(el('hr'));
+
+  // Export button always available in hazards mode
+  const expWrap = el('section');
+  expWrap.innerHTML = `<div class="sec-label">Export</div>`;
+  const expRow = el('div', 'toolbar');
+  expRow.appendChild(mkBtn('Copy maps.js Entry', '', async () => {
+    const text = formatEntry(toMapsEntry());
+    await copyText(text, 'maps.js entry (tiles + hazards)');
+  }));
+  expWrap.appendChild(expRow);
+
+  const hint = el('p', 'hint');
+  hint.textContent = 'Copies the full { id, raw, hazards } entry. Switch to Tiles tab to also view it in the output box.';
+  expWrap.appendChild(hint);
+  sideEl.appendChild(expWrap);
+}
+
+function renderAlienPanel() {
+  const sec = el('section');
+  const hdr = el('div', 'toolbar');
+  const lbl = el('span', 'sec-label');
+  lbl.textContent = 'Alien Patrols';
+  lbl.style.flex = '1';
+  hdr.appendChild(lbl);
+  hdr.appendChild(mkBtn('+ Add Alien', 'sm', addAlien));
+  sec.appendChild(hdr);
+
+  const list = el('div', 'hlist');
+  if (!hazards.aliens.length) {
+    list.innerHTML = `<p class="hint">No aliens yet. Click "+ Add Alien" then click map tiles to build a route.</p>`;
+  }
+  hazards.aliens.forEach((alien, ai) => {
+    const col = ALIEN_COLORS[ai % ALIEN_COLORS.length];
+    const item = el('div', `hitem${alien.id === selAlienId ? ' selected' : ''}`);
+    const dot = el('div', 'hdot'); dot.style.background = col;
+    const name = el('span', 'hname'); name.textContent = alien.id;
+    const info = el('span', 'hinfo'); info.textContent = `${alien.route.length} pts · ${alien.stepMs}ms`;
+    const del = mkBtn('×', 'sm danger', (e) => { e.stopPropagation(); deleteAlien(alien.id); });
+    item.append(dot, name, info, del);
+    item.addEventListener('click', () => { selAlienId = alien.id; renderSidePanel(); renderOverlay(); });
+    list.appendChild(item);
+  });
+  sec.appendChild(list);
+
+  const alien = hazards.aliens.find(a => a.id === selAlienId);
+  if (alien) {
+    sec.appendChild(el('hr'));
+    const form = el('div', 'sform');
+
+    const speedRow = el('div', 'field');
+    speedRow.innerHTML = `<label>Speed (ms)</label>`;
+    const speedIn = Object.assign(document.createElement('input'), { type: 'number', min: 80, max: 3000, step: 10, value: alien.stepMs });
+    speedIn.addEventListener('change', () => { alien.stepMs = parseInt(speedIn.value) || 620; pushHistory(); renderSidePanel(); });
+    speedRow.appendChild(speedIn);
+    form.appendChild(speedRow);
+
+    const routeHint = el('p', 'hint');
+    routeHint.textContent = `${alien.route.length} waypoints. Click map tiles to append. Right-click map or use buttons to remove.`;
+    form.appendChild(routeHint);
+
+    const routeRow = el('div', 'toolbar');
+    routeRow.appendChild(mkBtn('← Remove Last', 'sm', removeLastWaypoint));
+    routeRow.appendChild(mkBtn('Clear Route', 'sm danger', clearAlienRoute));
+    form.appendChild(routeRow);
+    sec.appendChild(form);
+  }
+  sideEl.appendChild(sec);
+}
+
+function renderGatePanel() {
+  const sec = el('section');
+  const hdr = el('div', 'toolbar');
+  const lbl = el('span', 'sec-label'); lbl.textContent = 'Laser Gates'; lbl.style.flex = '1';
+  hdr.append(lbl, mkBtn('+ Add Gate', 'sm', addGate));
+  sec.appendChild(hdr);
+
+  const list = el('div', 'hlist');
+  if (!hazards.laserGates.length) {
+    list.innerHTML = `<p class="hint">No gates yet. Click "+ Add Gate" then click map tiles to mark the laser zone.</p>`;
+  }
+  hazards.laserGates.forEach((gate, gi) => {
+    const col = GATE_COLORS[gi % GATE_COLORS.length];
+    const item = el('div', `hitem${gate.id === selGateId ? ' selected' : ''}`);
+    const dot = el('div', 'hdot'); dot.style.background = col; dot.style.borderRadius = '2px';
+    const name = el('span', 'hname'); name.textContent = gate.id;
+    const info = el('span', 'hinfo'); info.textContent = `${gate.tiles.length} tiles`;
+    const del = mkBtn('×', 'sm danger', (e) => { e.stopPropagation(); deleteGate(gate.id); });
+    item.append(dot, name, info, del);
+    item.addEventListener('click', () => { selGateId = gate.id; renderSidePanel(); renderOverlay(); });
+    list.appendChild(item);
+  });
+  sec.appendChild(list);
+
+  const gate = hazards.laserGates.find(g => g.id === selGateId);
+  if (gate) {
+    sec.appendChild(el('hr'));
+    const form = el('div', 'sform');
+    for (const [prop, label, min, max, step] of [
+      ['cycleMs',   'Cycle (ms)',   500, 10000, 100],
+      ['warningMs', 'Warning (ms)', 100,  5000,  50],
+      ['activeMs',  'Active (ms)',  100,  5000,  50],
+      ['offsetMs',  'Offset (ms)',    0, 10000, 100],
+    ]) {
+      const row = el('div', 'field');
+      row.innerHTML = `<label>${label}</label>`;
+      const inp = Object.assign(document.createElement('input'), { type: 'number', min, max, step, value: gate[prop] });
+      inp.addEventListener('change', () => { gate[prop] = parseInt(inp.value) || 0; pushHistory(); renderSidePanel(); });
+      row.appendChild(inp); form.appendChild(row);
+    }
+    const hint = el('p', 'hint');
+    hint.textContent = `${gate.tiles.length} tiles selected. Click floor tiles on the map to toggle them in/out.`;
+    form.appendChild(hint);
+    form.appendChild(mkBtn('Clear Tiles', 'sm danger', () => { gate.tiles = []; pushHistory(); syncAll(); }));
+    sec.appendChild(form);
+  }
+  sideEl.appendChild(sec);
+}
+
+function renderTurretPanel() {
+  const sec = el('section');
+  const hdr = el('div', 'toolbar');
+  const lbl = el('span', 'sec-label'); lbl.textContent = 'Turrets'; lbl.style.flex = '1';
+  hdr.appendChild(lbl);
+  sec.appendChild(hdr);
+
+  const list = el('div', 'hlist');
+  if (!hazards.turrets.length) {
+    list.innerHTML = `<p class="hint">Click any tile on the map to place a turret there.</p>`;
+  }
+  hazards.turrets.forEach(t => {
+    const item = el('div', `hitem${t.id === selTurretId ? ' selected' : ''}`);
+    const dot = el('div', 'hdot'); dot.style.background = '#fbbf24'; dot.style.borderRadius = '2px';
+    const name = el('span', 'hname'); name.textContent = t.id;
+    const dir = t.dx > 0 ? '→' : t.dx < 0 ? '←' : t.dy > 0 ? '↓' : '↑';
+    const info = el('span', 'hinfo'); info.textContent = `${dir} (${t.x},${t.y}) r:${t.range}`;
+    const del = mkBtn('×', 'sm danger', (e) => { e.stopPropagation(); deleteTurret(t.id); });
+    item.append(dot, name, info, del);
+    item.addEventListener('click', () => { selTurretId = t.id; renderSidePanel(); renderOverlay(); });
+    list.appendChild(item);
+  });
+  sec.appendChild(list);
+
+  const turret = hazards.turrets.find(t => t.id === selTurretId);
+  if (turret) {
+    sec.appendChild(el('hr'));
+    const form = el('div', 'sform');
+
+    // Direction pad
+    const dirRow = el('div', 'field');
+    dirRow.innerHTML = `<label>Direction</label>`;
+    const pad = el('div', 'dir-pad');
+    // 3x3: [null, up, null, left, null, right, null, down, null]
+    const dirs = [[null,null],[[0,-1],'↑'],[null,null],[[-1,0],'←'],[null,null],[[1,0],'→'],[null,null],[[0,1],'↓'],[null,null]];
+    for (const [vec, arrow] of dirs) {
+      const btn = el('button');
+      if (!vec) { btn.disabled = true; btn.style.visibility = 'hidden'; }
+      else {
+        btn.textContent = arrow;
+        const isActive = vec[0] === turret.dx && vec[1] === turret.dy;
+        if (isActive) btn.classList.add('dir-active');
+        btn.addEventListener('click', () => {
+          turret.dx = vec[0]; turret.dy = vec[1];
+          pushHistory(); renderOverlay(); renderSidePanel();
+        });
+      }
+      pad.appendChild(btn);
+    }
+    dirRow.appendChild(pad);
+    form.appendChild(dirRow);
+
+    for (const [prop, label, min, max, step] of [
+      ['range',     'Range (tiles)',  1, 20,    1],
+      ['cycleMs',   'Cycle (ms)',   500, 10000, 100],
+      ['warningMs', 'Warning (ms)', 100,  5000,  50],
+      ['activeMs',  'Active (ms)',  100,  5000,  50],
+      ['offsetMs',  'Offset (ms)',    0, 10000, 100],
+    ]) {
+      const row = el('div', 'field');
+      row.innerHTML = `<label>${label}</label>`;
+      const inp = Object.assign(document.createElement('input'), { type: 'number', min, max, step, value: turret[prop] });
+      inp.addEventListener('change', () => { turret[prop] = parseInt(inp.value) || 0; pushHistory(); renderOverlay(); renderSidePanel(); });
+      row.appendChild(inp); form.appendChild(row);
+    }
+
+    const posHint = el('p', 'hint');
+    posHint.textContent = `Position: (${turret.x}, ${turret.y}). Click any tile to reposition. Click another turret in the list to switch selection.`;
+    form.appendChild(posHint);
+    sec.appendChild(form);
+  } else if (hazards.turrets.length > 0) {
+    const hint = el('p', 'hint');
+    hint.textContent = 'Click a turret in the list above to select and edit it. Click a map tile to place a new turret.';
+    sec.appendChild(hint);
+  }
+  sideEl.appendChild(sec);
+}
+
+// ── Mouse interaction ──────────────────────────────────────────────────────────
+function tileFromEvent(e) {
+  const rect = gridEl.getBoundingClientRect();
+  const tx = Math.floor((e.clientX - rect.left) / CELL);
+  const ty = Math.floor((e.clientY - rect.top)  / CELL);
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
+  return { x: tx, y: ty };
+}
+
+gridWrap.addEventListener('mousedown', (e) => {
+  if (e.button === 2) { e.preventDefault(); return; }
+  const tile = tileFromEvent(e);
+  if (!tile) return;
+  e.preventDefault();
+
+  if (editorMode === 'tiles') {
+    pushHistory();
+    dragValue = e.button === 0 ? tileTool : '.';
+    isDragging = true;
+    lastDragCoord = tile;
+    paintTile(tile.x, tile.y, dragValue);
+    updateTileEl(tile.x, tile.y);
+    renderOverlay();
+  } else {
+    handleHazardClick(tile.x, tile.y, e.button);
+  }
+});
+
+gridWrap.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (editorMode !== 'tiles') return;
+  const tile = tileFromEvent(e);
+  if (!tile) return;
+  pushHistory();
+  paintTile(tile.x, tile.y, '.');
+  updateTileEl(tile.x, tile.y);
+  renderOverlay();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging || editorMode !== 'tiles') return;
+  const tile = tileFromEvent(e);
+  if (!tile) return;
+  if (tile.x === lastDragCoord?.x && tile.y === lastDragCoord?.y) return;
+  lastDragCoord = tile;
+  paintTile(tile.x, tile.y, dragValue);
+  updateTileEl(tile.x, tile.y);
+  renderOverlay();
+});
+
+document.addEventListener('mouseup', () => {
+  if (isDragging) {
+    isDragging = false;
+    renderSidePanel(); // refresh stats
+  }
+});
+
+function handleHazardClick(x, y, button) {
+  if (hazardTool === 'alien') {
+    if (button === 2) { removeLastWaypoint(); return; }
+    if (!selAlienId) { setStatus('Select or add an alien first.', true); return; }
+    addWaypoint(x, y);
+  } else if (hazardTool === 'laserGate') {
+    if (!selGateId) { setStatus('Select or add a gate first.', true); return; }
+    toggleGateTile(x, y);
+  } else if (hazardTool === 'turret') {
+    if (isLocked(x, y)) { setStatus('Cannot place turret on a locked tile.', true); return; }
+    // Clicking an existing turret's tile selects it instead of placing a new one
+    const existing = hazards.turrets.find(t => t.x === x && t.y === y);
+    if (existing) {
+      selTurretId = existing.id;
+      renderSidePanel(); renderOverlay();
+      return;
+    }
+    if (selTurretId) {
+      moveTurret(x, y);
+      pushHistory();
+    } else {
+      addTurret(x, y);
+    }
+  }
+}
+
+// ── Mode tab buttons ───────────────────────────────────────────────────────────
+document.getElementById('tabTiles').addEventListener('click', () => {
+  editorMode = 'tiles';
+  document.getElementById('tabTiles').classList.add('tab-active');
+  document.getElementById('tabHazards').classList.remove('tab-active');
+  renderSidePanel(); renderOverlay();
+});
+document.getElementById('tabHazards').addEventListener('click', () => {
+  editorMode = 'hazards';
+  document.getElementById('tabHazards').classList.add('tab-active');
+  document.getElementById('tabTiles').classList.remove('tab-active');
+  renderSidePanel(); renderOverlay();
+});
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if (mod && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+sizeOverlay();
+pushHistory();
+sealBeaconShell(); // sets up default locked shell + initial history snapshot
+</script>
+</body>
+</html>

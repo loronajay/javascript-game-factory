@@ -22,6 +22,7 @@ function canPass(state, tx, ty) {
     state.player.chips -= 1;
     door.open = true;
     state.message = 'Laser Door disabled.';
+    state.online.outbox.push({ type: 'door_opened', doorId: door.id });
     return true;
   }
   state.message = 'Laser Door requires an Access Chip.';
@@ -37,15 +38,18 @@ function collectPickups(state, now) {
       pickup.active = false;
       player.chips += 1;
       state.message = 'Access Chip collected.';
+      state.online.outbox.push({ type: 'pickup_taken', pickupId: pickup.id });
     } else if (pickup.type === 'powerCell') {
       pickup.active = false;
       player.powerUntil = now + POWER_CELL_MS;
       state.message = 'Suit light overcharged.';
+      state.online.outbox.push({ type: 'pickup_taken', pickupId: pickup.id });
     }
   }
   if (isGoalAt(map, player.tx, player.ty)) {
     player.won = true;
     state.message = 'Beacon Core reached.';
+    state.online.outbox.push({ type: 'won', playerId: state.online.localPlayerId });
   }
 }
 
@@ -71,12 +75,14 @@ function damagePlayer(state, now) {
     player.powerUntil = 0;
     player.invulnerableUntil = now + INVULN_MS;
     state.message = 'Emergency recall: returned to start.';
+    state.online.outbox.push({ type: 'player_died', playerId: state.online.localPlayerId });
   }
 }
 
 export function updatePlayer(state, now, dtMs) {
   const { player, input } = state;
   const dt = dtMs / 1000;
+  const elapsed = now - (state.gameStartAt || 0);
 
   // Compute lerp progress (0→1 over stepMs). stepMs=0 means already at tile.
   const progress = player.stepMs > 0
@@ -96,7 +102,7 @@ export function updatePlayer(state, now, dtMs) {
   }
 
   // Arrived at tile — check hazards every tick (invulnerability rate-limits damage)
-  if (isHazardAt(state.hazards, player.tx, player.ty, now)) {
+  if (isHazardAt(state.hazards, player.tx, player.ty, elapsed)) {
     damagePlayer(state, now);
   }
 

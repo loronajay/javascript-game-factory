@@ -1,0 +1,11 @@
+{
+  "title": "Illuminauts",
+  "tagline": "Navigate the dark. Race to the light.",
+  "description": "A 2-player online maze race set in a dark alien facility. Navigate using only your suit-generated light, collect Access Chips to disable Laser Doors, dodge alien patrols and laser hazards, and race your opponent to the Beacon Core.",
+  "players": "2",
+  "status": "Beta",
+  "order": 5,
+  "featured": false,
+  "theme": "void",
+  "accentColor": "#76f4ff"
+}

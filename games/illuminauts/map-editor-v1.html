@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Illuminauts Lightweight Map Editor</title>
+  <style>
+    :root {
+      --bg: #080b12;
+      --panel: #101827;
+      --panel-2: #0d1320;
+      --text: #dbeafe;
+      --muted: #93a4bd;
+      --line: #263247;
+      --accent: #67e8f9;
+      --danger: #fb7185;
+      --tile-size: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #172033 0%, #080b12 60%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 16px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 0.03em;
+    }
+
+    .subhead {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(16, 24, 39, 0.98), rgba(13, 19, 32, 0.98));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    }
+
+    .editor-panel {
+      padding: 14px;
+      overflow: auto;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .tool-button,
+    .action-button {
+      border: 1px solid var(--line);
+      background: #0b1220;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      min-width: 46px;
+    }
+
+    .tool-button.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(103, 232, 249, 0.4), 0 0 18px rgba(103, 232, 249, 0.18);
+    }
+
+    .action-button:hover,
+    .tool-button:hover {
+      border-color: #4b5f7c;
+    }
+
+    .danger {
+      border-color: rgba(251, 113, 133, 0.45);
+      color: #fecdd3;
+    }
+
+    .grid-wrap {
+      width: max-content;
+      padding: 10px;
+      background: #050812;
+      border: 1px solid #1d2840;
+      border-radius: 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(35, var(--tile-size));
+      grid-template-rows: repeat(27, var(--tile-size));
+      gap: 1px;
+      user-select: none;
+    }
+
+    .tile {
+      width: var(--tile-size);
+      height: var(--tile-size);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      line-height: 1;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      cursor: crosshair;
+    }
+
+    .tile.locked {
+      cursor: not-allowed;
+      outline: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tile-floor { background: #121826; color: #43536f; }
+    .tile-wall { background: #3a4358; color: #b9c5d9; }
+    .tile-start-a { background: #1e3a8a; color: #bfdbfe; font-weight: 800; }
+    .tile-start-b { background: #7f1d1d; color: #fecaca; font-weight: 800; }
+    .tile-power { background: #164e63; color: #a5f3fc; font-weight: 800; }
+    .tile-chip { background: #713f12; color: #fde68a; font-weight: 800; }
+    .tile-door { background: #581c87; color: #e9d5ff; font-weight: 800; }
+    .tile-beacon { background: #facc15; color: #111827; font-weight: 900; }
+
+    .side-panel {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #c7d2fe;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 420px;
+      resize: vertical;
+      background: #050812;
+      color: #dbeafe;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .stat {
+      background: #0a1020;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      min-width: 0;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .stat-value {
+      margin-top: 2px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--accent);
+      font-size: 12px;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Illuminauts Map Editor</h1>
+        <p class="subhead">35×27 raw map editor. Outer ring and canonical 5×5 Beacon are locked by default.</p>
+      </div>
+      <div class="hint">Drag to paint. Right-click paints floor.</div>
+    </header>
+
+    <main class="panel editor-panel">
+      <div class="toolbar" id="toolbar"></div>
+      <div class="grid-wrap">
+        <div class="grid" id="grid"></div>
+      </div>
+    </main>
+
+    <aside class="panel side-panel">
+      <div>
+        <div class="section-title">Map Stats</div>
+        <div class="stats" id="stats"></div>
+      </div>
+
+      <div>
+        <div class="section-title">Actions</div>
+        <div class="toolbar">
+          <button class="action-button" id="copyRaw">Copy RAW_MAP</button>
+          <button class="action-button" id="copyArray">Copy Array Only</button>
+          <button class="action-button" id="importRaw">Import From Text</button>
+          <button class="action-button" id="sealBeacon">Seal Beacon Shell</button>
+          <button class="action-button danger" id="resetMap">Reset</button>
+        </div>
+        <div class="status" id="status"></div>
+        <p class="hint">
+          “Seal Beacon Shell” draws walls around the 5×5 Beacon and leaves one entrance under the center tile. The Beacon itself stays locked as 25 B tiles.
+        </p>
+      </div>
+
+      <div>
+        <div class="section-title">Raw Output</div>
+        <textarea id="rawOutput" spellcheck="false"></textarea>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const WIDTH = 35;
+    const HEIGHT = 27;
+    const BEACON_SIZE = 5;
+    const BEACON_X = Math.floor((WIDTH - BEACON_SIZE) / 2);
+    const BEACON_Y = Math.floor((HEIGHT - BEACON_SIZE) / 2);
+
+    const TOOLS = [
+      { key: '.', label: 'Floor', className: 'tile-floor' },
+      { key: '#', label: 'Wall', className: 'tile-wall' },
+      { key: 'S', label: 'Start S', className: 'tile-start-a', unique: true },
+      { key: 'T', label: 'Start T', className: 'tile-start-b', unique: true },
+      { key: 'P', label: 'Power P', className: 'tile-power' },
+      { key: 'C', label: 'Chip C', className: 'tile-chip' },
+      { key: 'D', label: 'Door D', className: 'tile-door' },
+      { key: 'B', label: 'Beacon B', className: 'tile-beacon', locked: true }
+    ];
+
+    const TILE_CLASS = Object.fromEntries(TOOLS.map(tool => [tool.key, tool.className]));
+    const VALID_TILES = new Set(TOOLS.map(tool => tool.key));
+
+    let currentTool = '#';
+    let mouseDown = false;
+    let map = createDefaultMap();
+
+    const gridEl = document.getElementById('grid');
+    const toolbarEl = document.getElementById('toolbar');
+    const rawOutputEl = document.getElementById('rawOutput');
+    const statsEl = document.getElementById('stats');
+    const statusEl = document.getElementById('status');
+
+    function createDefaultMap() {
+      const next = [];
+
+      for (let y = 0; y < HEIGHT; y++) {
+        const row = [];
+        for (let x = 0; x < WIDTH; x++) {
+          if (isOuterRing(x, y)) {
+            row.push('#');
+          } else if (isBeaconTile(x, y)) {
+            row.push('B');
+          } else {
+            row.push('.');
+          }
+        }
+        next.push(row);
+      }
+
+      next[1][1] = 'S';
+      next[1][WIDTH - 2] = 'T';
+      return next;
+    }
+
+    function isOuterRing(x, y) {
+      return x === 0 || y === 0 || x === WIDTH - 1 || y === HEIGHT - 1;
+    }
+
+    function isBeaconTile(x, y) {
+      return x >= BEACON_X && x < BEACON_X + BEACON_SIZE && y >= BEACON_Y && y < BEACON_Y + BEACON_SIZE;
+    }
+
+    function isLockedTile(x, y) {
+      return isOuterRing(x, y) || isBeaconTile(x, y);
+    }
+
+    function buildToolbar() {
+      toolbarEl.innerHTML = '';
+
+      for (const tool of TOOLS) {
+        if (tool.locked) continue;
+
+        const button = document.createElement('button');
+        button.className = 'tool-button';
+        button.type = 'button';
+        button.textContent = `${tool.key} ${tool.label}`;
+        button.dataset.tool = tool.key;
+        button.addEventListener('click', () => {
+          currentTool = tool.key;
+          updateToolbar();
+        });
+        toolbarEl.appendChild(button);
+      }
+
+      updateToolbar();
+    }
+
+    function updateToolbar() {
+      document.querySelectorAll('.tool-button').forEach(button => {
+        button.classList.toggle('active', button.dataset.tool === currentTool);
+      });
+    }
+
+    function renderGrid() {
+      gridEl.innerHTML = '';
+
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const tile = document.createElement('div');
+          const value = map[y][x];
+          tile.className = `tile ${TILE_CLASS[value] || 'tile-floor'}`;
+          tile.textContent = value === '.' ? '' : value;
+          tile.dataset.x = String(x);
+          tile.dataset.y = String(y);
+
+          if (isLockedTile(x, y)) {
+            tile.classList.add('locked');
+            tile.title = isBeaconTile(x, y) ? 'Locked Beacon tile' : 'Locked outer wall';
+          }
+
+          tile.addEventListener('pointerdown', event => {
+            event.preventDefault();
+            mouseDown = true;
+            paintFromEvent(event, tile);
+          });
+
+          tile.addEventListener('pointerenter', event => {
+            if (!mouseDown) return;
+            paintFromEvent(event, tile);
+          });
+
+          tile.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            paintTile(x, y, '.');
+          });
+
+          gridEl.appendChild(tile);
+        }
+      }
+    }
+
+    function paintFromEvent(event, tile) {
+      const x = Number(tile.dataset.x);
+      const y = Number(tile.dataset.y);
+      const value = event.button === 2 ? '.' : currentTool;
+      paintTile(x, y, value);
+    }
+
+    function paintTile(x, y, value) {
+      if (isLockedTile(x, y)) return;
+      if (!VALID_TILES.has(value)) return;
+      if (value === 'B') return;
+
+      if (value === 'S' || value === 'T') {
+        removeExistingUniqueTile(value);
+      }
+
+      map[y][x] = value;
+      syncAll();
+    }
+
+    function removeExistingUniqueTile(value) {
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          if (map[y][x] === value && !isLockedTile(x, y)) {
+            map[y][x] = '.';
+          }
+        }
+      }
+    }
+
+    function toRows() {
+      return map.map(row => row.join(''));
+    }
+
+    function toRawMapConst() {
+      const rows = toRows();
+      return 'const RAW_MAP = [\n' + rows.map(row => `  '${row}'`).join(',\n') + '\n];';
+    }
+
+    function toArrayOnly() {
+      const rows = toRows();
+      return '[\n' + rows.map(row => `  '${row}'`).join(',\n') + '\n]';
+    }
+
+    function updateOutput() {
+      rawOutputEl.value = toRawMapConst();
+    }
+
+    function countTiles() {
+      const counts = Object.fromEntries(TOOLS.map(tool => [tool.key, 0]));
+      for (const row of map) {
+        for (const tile of row) {
+          counts[tile] = (counts[tile] || 0) + 1;
+        }
+      }
+      return counts;
+    }
+
+    function updateStats() {
+      const counts = countTiles();
+      const statItems = [
+        ['Size', `${WIDTH}×${HEIGHT}`],
+        ['B', counts.B],
+        ['S', counts.S],
+        ['T', counts.T],
+        ['P', counts.P],
+        ['C', counts.C],
+        ['D', counts.D],
+        ['#', counts['#']]
+      ];
+
+      statsEl.innerHTML = '';
+      for (const [label, value] of statItems) {
+        const stat = document.createElement('div');
+        stat.className = 'stat';
+        stat.innerHTML = `<div class="stat-label">${label}</div><div class="stat-value">${value}</div>`;
+        statsEl.appendChild(stat);
+      }
+    }
+
+    function syncAll() {
+      enforceLockedTiles();
+      renderGrid();
+      updateStats();
+      updateOutput();
+    }
+
+    function enforceLockedTiles() {
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          if (isOuterRing(x, y)) map[y][x] = '#';
+          if (isBeaconTile(x, y)) map[y][x] = 'B';
+        }
+      }
+    }
+
+    function sealBeaconShell() {
+      const minX = BEACON_X - 1;
+      const maxX = BEACON_X + BEACON_SIZE;
+      const minY = BEACON_Y - 1;
+      const maxY = BEACON_Y + BEACON_SIZE;
+      const entranceX = BEACON_X + Math.floor(BEACON_SIZE / 2);
+      const entranceY = maxY;
+
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (x <= 0 || y <= 0 || x >= WIDTH - 1 || y >= HEIGHT - 1) continue;
+          if (isBeaconTile(x, y)) continue;
+          const isShell = y === minY || y === maxY || x === minX || x === maxX;
+          if (isShell) map[y][x] = '#';
+        }
+      }
+
+      map[entranceY][entranceX] = '.';
+      syncAll();
+      setStatus('Beacon shell sealed with one lower-center entrance.');
+    }
+
+    function parseRawMapText(text) {
+      const matches = [...text.matchAll(/'([^']+)'|"([^"]+)"/g)];
+      const rows = matches.map(match => match[1] || match[2]);
+
+      if (rows.length !== HEIGHT) {
+        throw new Error(`Expected ${HEIGHT} rows, found ${rows.length}.`);
+      }
+
+      for (const row of rows) {
+        if (row.length !== WIDTH) {
+          throw new Error(`Expected row width ${WIDTH}, found ${row.length}: ${row}`);
+        }
+        for (const char of row) {
+          if (!VALID_TILES.has(char)) {
+            throw new Error(`Invalid tile character: ${char}`);
+          }
+        }
+      }
+
+      return rows.map(row => row.split(''));
+    }
+
+    function importFromTextarea() {
+      try {
+        map = parseRawMapText(rawOutputEl.value);
+        enforceLockedTiles();
+        syncAll();
+        setStatus('Imported map text. Locked tiles were re-applied.');
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    async function copyText(text, label) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus(`Copied ${label}.`);
+      } catch (error) {
+        rawOutputEl.focus();
+        rawOutputEl.select();
+        setStatus('Clipboard blocked by browser. Text is selected for manual copy.', true);
+      }
+    }
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? 'var(--danger)' : 'var(--accent)';
+    }
+
+    window.addEventListener('pointerup', () => {
+      mouseDown = false;
+    });
+
+    document.getElementById('copyRaw').addEventListener('click', () => copyText(toRawMapConst(), 'RAW_MAP const'));
+    document.getElementById('copyArray').addEventListener('click', () => copyText(toArrayOnly(), 'array only'));
+    document.getElementById('importRaw').addEventListener('click', importFromTextarea);
+    document.getElementById('sealBeacon').addEventListener('click', sealBeaconShell);
+    document.getElementById('resetMap').addEventListener('click', () => {
+      map = createDefaultMap();
+      syncAll();
+      setStatus('Map reset to default floor, outer walls, starts, and Beacon.');
+    });
+
+    buildToolbar();
+    syncAll();
+    sealBeaconShell();
+  </script>
+</body>
+</html>

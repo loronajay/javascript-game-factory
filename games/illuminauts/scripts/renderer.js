@@ -47,6 +47,26 @@ function glyph(ctx, text, sx, sy, size, color) {
   ctx.fillText(text, sx + size / 2, sy + size / 2);
 }
 
+// ─── UI button helper ─────────────────────────────────────────────────────────
+
+function drawButton(ctx, label, x, y, w, h, registerButton, id) {
+  ctx.fillStyle = 'rgba(14, 30, 50, 0.92)';
+  ctx.strokeStyle = '#76f4ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#c8eeff';
+  ctx.font = `${Math.floor(h * 0.4)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, y + h / 2);
+
+  if (registerButton) registerButton(id, x, y, w, h);
+}
+
 // ─── Individual entity drawers ────────────────────────────────────────────────
 
 function drawTileBase(ctx, map, wx, wy, sx, sy, size) {
@@ -101,14 +121,14 @@ function turretSprite(turret) {
   return 'turretUp';
 }
 
-function drawTurretCharge(ctx, turret, sx, sy, size, phase, now) {
+function drawTurretCharge(ctx, turret, sx, sy, size, phase, elapsed) {
   if (!drawSpriteContain(ctx, turretSprite(turret), sx + size / 2, sy + size / 2, size * 1.24, size * 1.24)) {
     fillRect(ctx, sx + size * 0.14, sy + size * 0.14, size * 0.72, COLORS.turret);
     glyph(ctx, 'T', sx, sy, size, '#190900');
   }
 
   if (phase === 'cooldown') return;
-  const pulse = phase === 'active' ? 1 : 0.55 + Math.sin(now / 70) * 0.22;
+  const pulse = phase === 'active' ? 1 : 0.55 + Math.sin(elapsed / 70) * 0.22;
   ctx.save();
   ctx.globalAlpha = Math.max(0.35, pulse);
   ctx.fillStyle = phase === 'active' ? COLORS.laserActive : COLORS.laserWarn;
@@ -164,29 +184,28 @@ function drawLaserDoor(ctx, door, sx, sy, size) {
 }
 
 function drawPlayer(ctx, player, now, cx, cy, size) {
-  const invuln = now < player.invulnerableUntil;
+  const invuln = now < (player.invulnerableUntil || 0);
   const spriteKey = { up: 'playerUp', down: 'playerDown', left: 'playerLeft', right: 'playerRight' }[player.dir] || 'playerDown';
   ctx.save();
   if (invuln) ctx.globalAlpha = 0.65 + Math.sin(now / 50) * 0.35;
   if (!drawSpriteContain(ctx, spriteKey, cx, cy, size * 0.9, size * 0.96)) {
     ctx.beginPath();
-    ctx.fillStyle = invuln ? COLORS.playerInvuln : COLORS.player;
+    // Remote player uses a distinct orange so the two can be told apart.
+    ctx.fillStyle = player.isRemote ? '#ff8c42' : (invuln ? COLORS.playerInvuln : COLORS.player);
     ctx.arc(cx, cy, size * 0.32, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-// ─── World draw (smooth float-position camera) ────────────────────────────────
+// ─── World draw ───────────────────────────────────────────────────────────────
+// elapsed = ms since game start (used for hazard phase sync).
 // startX/startY are float tile-space coords of the viewport top-left corner.
-// Screen position for world tile (wx, wy): offsetX + (wx - startX) * size
-// Player is always at viewport center (offsetX + VIEW_TILES_X/2 * size).
 
-function drawWorld(ctx, map, hazards, now, startX, startY, size, offX, offY, viewW = VIEW_TILES_X, viewH = VIEW_TILES_Y) {
+function drawWorld(ctx, map, hazards, elapsed, startX, startY, size, offX, offY, viewW = VIEW_TILES_X, viewH = VIEW_TILES_Y) {
   function sx(wx) { return offX + (wx - startX) * size; }
   function sy(wy) { return offY + (wy - startY) * size; }
 
-  // Tile range — one tile wider on each edge to prevent pop-in at border
   const tL = Math.floor(startX) - 1;
   const tR = Math.ceil(startX + viewW) + 1;
   const tT = Math.floor(startY) - 1;
@@ -199,12 +218,12 @@ function drawWorld(ctx, map, hazards, now, startX, startY, size, offX, offY, vie
     }
   }
 
-  // Pass 2: beacon core pieces (on top of floor, behind entities)
+  // Pass 2: beacon core pieces
   for (const goal of map.goals) {
     drawBeaconPiece(ctx, map, goal.x, goal.y, sx(goal.x), sy(goal.y), size);
   }
 
-  // Pass 3: laser doors (wide sprite extends into adjacent tiles)
+  // Pass 3: laser doors
   for (const door of map.doors) {
     drawLaserDoor(ctx, door, sx(door.x), sy(door.y), size);
   }
@@ -246,7 +265,7 @@ function drawWorld(ctx, map, hazards, now, startX, startY, size, offX, offY, vie
 
   // Pass 6: laser gates
   for (const gate of hazards.laserGates) {
-    const phase = getLaserGatePhase(gate, now);
+    const phase = getLaserGatePhase(gate, elapsed);
     if (phase === 'cooldown') continue;
     for (const tile of gate.tiles) {
       drawLaserSegment(ctx, sx(tile.x), sy(tile.y), size, phase, 'horizontal');
@@ -255,8 +274,8 @@ function drawWorld(ctx, map, hazards, now, startX, startY, size, offX, offY, vie
 
   // Pass 7: turrets + beams
   for (const turret of hazards.turrets) {
-    const phase = getTurretPhase(turret, now);
-    drawTurretCharge(ctx, turret, sx(turret.x), sy(turret.y), size, phase, now);
+    const phase = getTurretPhase(turret, elapsed);
+    drawTurretCharge(ctx, turret, sx(turret.x), sy(turret.y), size, phase, elapsed);
     if (phase !== 'cooldown') {
       const orientation = turret.dy !== 0 ? 'vertical' : 'horizontal';
       for (const tile of getTurretBeamTiles(turret)) {
@@ -295,7 +314,15 @@ function drawHud(ctx, state, now, width, height) {
   ctx.textAlign = 'center';
   ctx.fillText(`[A] × ${player.chips}`, width / 2, barH / 2);
 
-  // Power cell
+  // Remote player name (online only)
+  if (state.online?.enabled && state.remote?.displayName) {
+    ctx.fillStyle = '#ff8c42';
+    ctx.font = `${Math.floor(fontSize * 0.72)}px system-ui, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(`vs ${state.remote.displayName}`, width - pad - Math.max(80, width * 0.14), barH / 2);
+  }
+
+  // Power cell timer
   const powerRemaining = Math.max(0, player.powerUntil - now);
   ctx.fillStyle = powerRemaining > 0 ? COLORS.power : '#2a4a55';
   ctx.font = `${monoSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
@@ -332,25 +359,33 @@ function drawMessage(ctx, state, width, height) {
   ctx.fillText(state.message, pad, height - msgH / 2);
 }
 
+// ─── Shared background ────────────────────────────────────────────────────────
+
+function drawDarkBg(ctx, width, height, glowColor = 'rgba(118, 244, 255, 0.07)') {
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, width, height);
+  const cx = width / 2;
+  const cy = height / 2;
+  const glow = ctx.createRadialGradient(cx, cy * 0.85, 0, cx, cy * 0.85, Math.min(width, height) * 0.55);
+  glow.addColorStop(0, glowColor);
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
+}
+
 // ─── Exported render functions ────────────────────────────────────────────────
 
-export function renderMenu(canvas, now) {
+export function renderMenu(canvas, now, registerButton) {
   resizeCanvasToDisplaySize(canvas);
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
 
-  ctx.fillStyle = COLORS.bg;
-  ctx.fillRect(0, 0, width, height);
+  drawDarkBg(ctx, width, height);
 
   const cx = width / 2;
   const cy = height / 2;
-  const glow = ctx.createRadialGradient(cx, cy * 0.85, 0, cx, cy * 0.85, Math.min(width, height) * 0.55);
-  glow.addColorStop(0, 'rgba(118, 244, 255, 0.07)');
-  glow.addColorStop(1, 'rgba(118, 244, 255, 0.00)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, width, height);
-
   const titleSize = Math.max(32, Math.floor(Math.min(width, height) * 0.1));
+
   ctx.save();
   ctx.shadowColor = 'rgba(118, 244, 255, 0.55)';
   ctx.shadowBlur = Math.floor(titleSize * 0.85);
@@ -358,28 +393,201 @@ export function renderMenu(canvas, now) {
   ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('ILLUMINAUTS', cx, cy * 0.72);
+  ctx.fillText('ILLUMINAUTS', cx, cy * 0.56);
   ctx.restore();
 
   ctx.fillStyle = '#4a6a7a';
   ctx.font = `${Math.max(13, Math.floor(titleSize * 0.3))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('2-Player Online Maze Race', cx, cy * 0.72 + titleSize * 0.84);
+  ctx.fillText('2-Player Online Maze Race', cx, cy * 0.56 + titleSize * 0.84);
 
-  const pulse = 0.5 + Math.sin(now / 620) * 0.5;
-  ctx.globalAlpha = Math.max(0.08, pulse);
-  ctx.fillStyle = '#a8d4e0';
-  ctx.font = `${Math.max(13, Math.floor(titleSize * 0.27))}px system-ui, sans-serif`;
-  ctx.fillText('Press any key to begin', cx, cy * 1.38);
-  ctx.globalAlpha = 1;
+  const btnW = Math.min(300, width * 0.44);
+  const btnH = Math.max(44, Math.floor(Math.min(width, height) * 0.065));
+  const btnX = cx - btnW / 2;
+  const gap  = Math.floor(btnH * 0.38);
+  const btnStartY = cy * 0.86;
+
+  drawButton(ctx, 'Find Match',   btnX, btnStartY,                    btnW, btnH, registerButton, 'btn_find_match');
+  drawButton(ctx, 'Create Room',  btnX, btnStartY + (btnH + gap),     btnW, btnH, registerButton, 'btn_create_room');
+  drawButton(ctx, 'Join Room',    btnX, btnStartY + (btnH + gap) * 2, btnW, btnH, registerButton, 'btn_join_room');
 
   ctx.fillStyle = '#1e2e38';
   ctx.font = `${Math.max(10, Math.floor(titleSize * 0.18))}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillText('WASD / Arrows — move  |  Shift — sprint  |  F3 — debug', cx, height - Math.max(18, height * 0.035));
 }
 
-export function renderWinScreen(canvas, state, now) {
+export function renderSearching(canvas, now, registerButton) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const titleSize = Math.max(22, Math.floor(Math.min(width, height) * 0.06));
+  const dots = '.'.repeat(1 + Math.floor(now / 500) % 3);
+
+  ctx.fillStyle = '#76f4ff';
+  ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Searching for opponent' + dots, cx, cy * 0.82);
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(12, Math.floor(titleSize * 0.55))}px system-ui, sans-serif`;
+  ctx.fillText('Waiting in public queue', cx, cy * 0.82 + titleSize * 1.1);
+
+  const btnW = Math.min(200, width * 0.3);
+  const btnH = Math.max(40, Math.floor(Math.min(width, height) * 0.058));
+  drawButton(ctx, 'Cancel', cx - btnW / 2, cy * 1.3, btnW, btnH, registerButton, 'btn_back_to_menu');
+}
+
+export function renderRoomHost(canvas, code, now, registerButton) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const titleSize = Math.max(18, Math.floor(Math.min(width, height) * 0.048));
+  const codeSize  = Math.max(36, Math.floor(Math.min(width, height) * 0.1));
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${titleSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Share this code with your partner:', cx, cy * 0.6);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(118, 244, 255, 0.5)';
+  ctx.shadowBlur = codeSize * 0.6;
+  ctx.fillStyle = '#76f4ff';
+  ctx.font = `bold ${codeSize}px ui-monospace, Consolas, monospace`;
+  ctx.fillText(code || '···', cx, cy * 0.88);
+  ctx.restore();
+
+  const dots = '.'.repeat(1 + Math.floor(now / 600) % 3);
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(12, Math.floor(titleSize * 0.82))}px system-ui, sans-serif`;
+  ctx.fillText('Waiting for partner' + dots, cx, cy * 1.08);
+
+  const btnW = Math.min(200, width * 0.3);
+  const btnH = Math.max(40, Math.floor(Math.min(width, height) * 0.058));
+  drawButton(ctx, 'Cancel', cx - btnW / 2, cy * 1.32, btnW, btnH, registerButton, 'btn_back_to_menu');
+}
+
+export function renderRoomJoin(canvas, code, now, registerButton) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const labelSize = Math.max(16, Math.floor(Math.min(width, height) * 0.042));
+  const codeSize  = Math.max(28, Math.floor(Math.min(width, height) * 0.072));
+
+  ctx.fillStyle = '#a8c8d8';
+  ctx.font = `${labelSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Enter room code:', cx, cy * 0.6);
+
+  // Input box
+  const boxW = Math.min(320, width * 0.52);
+  const boxH = Math.max(52, codeSize * 1.5);
+  const boxX = cx - boxW / 2;
+  const boxY = cy * 0.74;
+
+  ctx.fillStyle = 'rgba(10, 24, 40, 0.9)';
+  ctx.strokeStyle = '#76f4ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  // Blinking cursor
+  const cursorChar = Math.floor(now / 500) % 2 === 0 ? '|' : '';
+  ctx.fillStyle = '#76f4ff';
+  ctx.font = `bold ${codeSize}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText((code || '') + cursorChar, cx, boxY + boxH / 2);
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(11, Math.floor(labelSize * 0.7))}px system-ui, sans-serif`;
+  ctx.fillText('Type code, then press Enter or click Join', cx, boxY + boxH + labelSize * 0.9);
+
+  const btnW = Math.min(180, width * 0.28);
+  const btnH = Math.max(40, Math.floor(Math.min(width, height) * 0.058));
+  const btnY  = cy * 1.3;
+
+  drawButton(ctx, 'Join',   cx - btnW - 8,  btnY, btnW, btnH, registerButton, 'btn_join_submit');
+  drawButton(ctx, 'Back',   cx + 8,          btnY, btnW, btnH, registerButton, 'btn_back_to_menu');
+}
+
+export function renderCountdown(canvas, seconds, now) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height, 'rgba(118, 244, 255, 0.05)');
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const numSize = Math.max(72, Math.floor(Math.min(width, height) * 0.22));
+  const labelSize = Math.max(14, Math.floor(numSize * 0.22));
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${labelSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Match starting in…', cx, cy * 0.68);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(118, 244, 255, 0.7)';
+  ctx.shadowBlur = numSize * 0.5;
+  ctx.fillStyle = '#76f4ff';
+  ctx.font = `bold ${numSize}px system-ui, sans-serif`;
+  ctx.fillText(seconds > 0 ? String(seconds) : 'GO!', cx, cy * 1.0);
+  ctx.restore();
+}
+
+export function renderDisconnected(canvas, now, registerButton) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height, 'rgba(255, 80, 80, 0.05)');
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const titleSize = Math.max(22, Math.floor(Math.min(width, height) * 0.06));
+
+  ctx.fillStyle = '#ff8080';
+  ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Opponent disconnected', cx, cy * 0.8);
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(12, Math.floor(titleSize * 0.55))}px system-ui, sans-serif`;
+  ctx.fillText('The match has ended.', cx, cy * 0.8 + titleSize * 1.1);
+
+  const btnW = Math.min(220, width * 0.34);
+  const btnH = Math.max(42, Math.floor(Math.min(width, height) * 0.062));
+  drawButton(ctx, 'Return to Menu', cx - btnW / 2, cy * 1.2, btnW, btnH, registerButton, 'btn_back_to_menu');
+}
+
+export function renderWinScreen(canvas, state, now, winnerIsLocal = true, winnerName = '') {
   resizeCanvasToDisplaySize(canvas);
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -389,36 +597,51 @@ export function renderWinScreen(canvas, state, now) {
 
   const cx = width / 2;
   const cy = height / 2;
+  const isOnline = state?.online?.enabled;
+
+  const glowColor = winnerIsLocal ? 'rgba(125, 242, 154, 0.2)' : 'rgba(255, 100, 100, 0.15)';
   const glow = ctx.createRadialGradient(cx, cy * 0.82, 0, cx, cy * 0.82, Math.min(width, height) * 0.52);
-  glow.addColorStop(0, 'rgba(125, 242, 154, 0.2)');
-  glow.addColorStop(1, 'rgba(125, 242, 154, 0.00)');
+  glow.addColorStop(0, glowColor);
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
 
   const titleSize = Math.max(26, Math.floor(Math.min(width, height) * 0.08));
+  const titleColor = winnerIsLocal ? '#7df29a' : '#ff8080';
+  const shadowColor = winnerIsLocal ? 'rgba(125, 242, 154, 0.65)' : 'rgba(255, 100, 100, 0.5)';
+
   ctx.save();
-  ctx.shadowColor = 'rgba(125, 242, 154, 0.65)';
+  ctx.shadowColor = shadowColor;
   ctx.shadowBlur = Math.floor(titleSize * 0.9);
-  ctx.fillStyle = '#7df29a';
+  ctx.fillStyle = titleColor;
   ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('BEACON CORE REACHED', cx, cy * 0.8);
+
+  const headline = isOnline
+    ? (winnerIsLocal ? 'BEACON CORE REACHED' : `${winnerName || 'OPPONENT'} WINS`)
+    : 'BEACON CORE REACHED';
+  ctx.fillText(headline, cx, cy * 0.8);
   ctx.restore();
 
+  const subText = isOnline
+    ? (winnerIsLocal ? 'You reached the core first!' : 'They found a faster route.')
+    : 'Suit navigation successful.';
   ctx.fillStyle = '#7da8b0';
   ctx.font = `${Math.max(13, Math.floor(titleSize * 0.36))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Suit navigation successful.', cx, cy * 0.8 + titleSize * 0.9);
+  ctx.fillText(subText, cx, cy * 0.8 + titleSize * 0.9);
 
-  const doorsDisabled = state.map.doors.filter((d) => d.open).length;
-  ctx.fillStyle = COLORS.chip;
-  ctx.font = `${Math.max(11, Math.floor(titleSize * 0.28))}px ui-monospace, Consolas, monospace`;
-  ctx.fillText(
-    `Laser Doors disabled: ${doorsDisabled}  |  Chips remaining: ${state.player.chips}`,
-    cx, cy * 0.8 + titleSize * 1.8
-  );
+  if (state) {
+    const doorsDisabled = state.map.doors.filter((d) => d.open).length;
+    ctx.fillStyle = COLORS.chip;
+    ctx.font = `${Math.max(11, Math.floor(titleSize * 0.28))}px ui-monospace, Consolas, monospace`;
+    ctx.fillText(
+      `Laser Doors disabled: ${doorsDisabled}  |  Chips remaining: ${state.player.chips}`,
+      cx, cy * 0.8 + titleSize * 1.8
+    );
+  }
 
   const pulse = 0.5 + Math.sin(now / 620) * 0.5;
   ctx.globalAlpha = Math.max(0.08, pulse);
@@ -441,22 +664,34 @@ export function renderGameView(canvas, state, now) {
   const offY  = Math.floor((height - size * VIEW_TILES_Y) / 2);
 
   const { player } = state;
+  const elapsed = now - (state.gameStartAt || 0);
 
-  // Camera centered exactly on player's continuous position
   const startX = player.px - VIEW_TILES_X / 2;
   const startY = player.py - VIEW_TILES_Y / 2;
 
-  // Player is always at the center of the viewport in screen space
   const lightX = offX + VIEW_TILES_X / 2 * size;
   const lightY = offY + VIEW_TILES_Y / 2 * size;
-  const radiusPx = (now < player.powerUntil ? POWER_LIGHT_RADIUS : BASE_LIGHT_RADIUS) * size;
+  const lightRadiusTiles = now < player.powerUntil ? POWER_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
+  const radiusPx = lightRadiusTiles * size;
 
   ctx.save();
   ctx.beginPath();
   ctx.arc(lightX, lightY, radiusPx, 0, Math.PI * 2);
   ctx.clip();
-  drawWorld(ctx, state.map, state.hazards, now, startX, startY, size, offX, offY);
+
+  drawWorld(ctx, state.map, state.hazards, elapsed, startX, startY, size, offX, offY);
   drawPlayer(ctx, player, now, lightX, lightY, size);
+
+  // Remote player — only visible when within suit light radius.
+  if (state.online?.enabled && state.remote?.active) {
+    const distTiles = Math.hypot(state.remote.px - player.px, state.remote.py - player.py);
+    if (distTiles <= lightRadiusTiles) {
+      const rrx = offX + (state.remote.px - startX) * size;
+      const rry = offY + (state.remote.py - startY) * size;
+      drawPlayer(ctx, state.remote, now, rrx, rry, size);
+    }
+  }
+
   ctx.restore();
 
   // Glow ring at light boundary
@@ -486,34 +721,46 @@ export function renderDebugView(canvas, state, now) {
   ctx.fillStyle = COLORS.bg;
   ctx.fillRect(0, 0, width, height);
 
-  const size = Math.floor(Math.min(width / state.map.width, height / state.map.height));
-  const offX  = Math.floor((width  - size * state.map.width)  / 2);
-  const offY  = Math.floor((height - size * state.map.height) / 2);
+  const { map, hazards } = state;
+  const size = Math.floor(Math.min(width / map.width, height / map.height));
+  const offX  = Math.floor((width  - size * map.width)  / 2);
+  const offY  = Math.floor((height - size * map.height) / 2);
+  const elapsed = now - (state.gameStartAt || 0);
 
-  // Draw full map (startX=0, startY=0 means world coords == screen coords)
-  drawWorld(ctx, state.map, state.hazards, now, 0, 0, size, offX, offY, state.map.width, state.map.height);
+  drawWorld(ctx, map, hazards, elapsed, 0, 0, size, offX, offY, map.width, map.height);
 
   const { player } = state;
   const pcx = offX + player.px * size;
   const pcy = offY + player.py * size;
 
-  // Player dot
   drawPlayer(ctx, player, now, pcx, pcy, size);
 
-  // Light radius overlay
-  const lightRadius = (now < player.powerUntil ? POWER_LIGHT_RADIUS : BASE_LIGHT_RADIUS);
+  const lightRadius = now < player.powerUntil ? POWER_LIGHT_RADIUS : BASE_LIGHT_RADIUS;
   ctx.strokeStyle = 'rgba(118, 244, 255, 0.48)';
   ctx.lineWidth = Math.max(1, size * 0.08);
   ctx.beginPath();
   ctx.arc(pcx, pcy, lightRadius * size, 0, Math.PI * 2);
   ctx.stroke();
 
+  // Show remote player spawn in debug too
+  if (state.remote) {
+    const rcx = offX + state.remote.px * size;
+    const rcy = offY + state.remote.py * size;
+    ctx.strokeStyle = 'rgba(255, 140, 66, 0.5)';
+    ctx.lineWidth = Math.max(1, size * 0.06);
+    ctx.beginPath();
+    ctx.arc(rcx, rcy, size * 0.38, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  const fontSize = Math.max(11, Math.floor(width * 0.016));
   ctx.fillStyle = '#76f4ff';
-  ctx.font = `${Math.max(11, Math.floor(width * 0.016))}px ui-monospace, Consolas, monospace`;
+  ctx.font = `${fontSize}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('DEBUG — F3 to toggle', 8, 8);
+  ctx.fillText(`DEBUG — ${state.mapId ?? 'map'}  [${(state.mapIndex ?? 0) + 1}]`, 8, 8);
 
-  drawHud(ctx, state, now, width, height);
-  drawMessage(ctx, state, width, height);
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(10, Math.floor(fontSize * 0.82))}px ui-monospace, Consolas, monospace`;
+  ctx.fillText('F3 toggle  |  [ ] cycle maps (resets player)', 8, 8 + fontSize + 3);
 }
