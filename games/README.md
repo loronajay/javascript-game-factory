@@ -9,6 +9,7 @@ This folder holds the game cabinets for Javascript Game Factory. Each game shoul
 - `circuit-siege/`: active online-authoritative 1v1 route-repair cabinet with shared rules, client/server tests, and a coordinated dependency on `factory-network-server`
 - `creature-battle/`: creature battler and RPG planning workspace with deep design docs and simulators
 - `echo-duel/`: documented online memory duel prototype
+- `illuminauts/`: 2-player online maze race; suit-light fog, Access Chips, Laser Doors, alien patrols, laser hazards; Phase 4 (online via Factory Network) complete
 - `lovers-lost/`: implemented split-screen reunion runner with its own tests and assets
 - `questionable-decisions/`: trivia plus penalty mini-game design workspace
 

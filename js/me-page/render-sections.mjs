@@ -1,4 +1,4 @@
-import { escapeHtml } from "./profile-social/social-view.mjs";
+import { escapeHtml } from "../profile-social/social-view.mjs";
 
 export function renderRailPanel(container, title, items, renderItem) {
   if (!container) return;

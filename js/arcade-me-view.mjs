@@ -10,7 +10,7 @@ import {
   renderFriendCodePanel,
   renderFriendNavigatorPanel,
   renderRailPanel,
-} from "./arcade-me-view-sections.mjs";
+} from "./me-page/render-sections.mjs";
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 const socialView = createProfileSocialViewRenderer({
   pageKey: "me",

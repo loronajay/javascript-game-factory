@@ -1,15 +1,15 @@
-import { hydrateArcadeProfileFromApi } from "./arcade-profile.mjs";
-import { loadFactoryProfile, saveFactoryProfile } from "./platform/identity/factory-profile.mjs";
-import { loadProfileMetricsRecord } from "./platform/metrics/metrics.mjs";
+import { hydrateArcadeProfileFromApi } from "../arcade-profile.mjs";
+import { loadFactoryProfile, saveFactoryProfile } from "../platform/identity/factory-profile.mjs";
+import { loadProfileMetricsRecord } from "../platform/metrics/metrics.mjs";
 import {
   loadProfileRelationshipsRecord,
   normalizeProfileRelationshipsRecord,
-} from "./platform/relationships/relationships.mjs";
-import { enrichProfileFriendPreviewsFromApi } from "./platform/profile/friend-preview-enrichment.mjs";
+} from "../platform/relationships/relationships.mjs";
+import { enrichProfileFriendPreviewsFromApi } from "../platform/profile/friend-preview-enrichment.mjs";
 import {
   loadThoughtFeed,
   syncThoughtFeedFromApi,
-} from "./platform/thoughts/thoughts.mjs";
+} from "../platform/thoughts/thoughts.mjs";
 
 export function createMePageDataController(options = {}) {
   const storage = options.storage;

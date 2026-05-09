@@ -1,8 +1,8 @@
-import { PROFILE_UPDATED_EVENT } from "./arcade-profile.mjs";
-import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { PROFILE_UPDATED_EVENT } from "../arcade-profile.mjs";
+import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import {
   syncThoughtPostCountWithApi,
-} from "./platform/metrics/metrics.mjs";
+} from "../platform/metrics/metrics.mjs";
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
@@ -14,16 +14,16 @@ import {
   shareThoughtPostWithApi,
   syncThoughtCommentsFromApi,
   syncThoughtFeedFromApi,
-} from "./platform/thoughts/thoughts.mjs";
-import { createMediaComposerState } from "./profile-social/media-composer-state.mjs";
-import { createProfileSocialActions } from "./profile-social/social-actions.mjs";
-import { initPageGalleryViewer } from "./gallery-page/viewer.mjs";
-import { createFriendNavigatorController } from "./arcade-me-friend-navigator.mjs";
-import { createMePageDataController } from "./arcade-me-page-data.mjs";
+} from "../platform/thoughts/thoughts.mjs";
+import { createMediaComposerState } from "../profile-social/media-composer-state.mjs";
+import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
+import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
+import { createFriendNavigatorController } from "./friend-navigator.mjs";
+import { createMePageDataController } from "./page-data.mjs";
 import {
   submitGalleryUpload,
   uploadPendingThoughtPhoto,
-} from "./arcade-me-media-actions.mjs";
+} from "./media-actions.mjs";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
   initPageGalleryViewer({ doc, apiClient });
