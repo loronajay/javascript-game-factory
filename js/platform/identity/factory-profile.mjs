@@ -5,7 +5,7 @@ import {
   readStorageText,
   writeStorageText,
 } from "../storage/storage.mjs";
-import { buildDefaultFriendCode, normalizeProfileFields } from "../profile/profile.mjs";
+import { buildDefaultFriendCode, normalizeProfileFields, normalizeProfileMusicPlaylist } from "../profile/profile.mjs";
 
 export const FACTORY_PROFILE_VERSION = 1;
 export const FACTORY_PROFILE_STORAGE_KEY = getPlatformStorageKey("factoryProfile");
@@ -110,6 +110,7 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
     recentPartners: normalizeStringList(source.recentPartners),
     links: profileFields.links,
     preferences: isPlainObject(source.preferences) ? { ...source.preferences } : {},
+    profileMusicPlaylist: normalizeProfileMusicPlaylist(source.profileMusicPlaylist),
   };
 }
 

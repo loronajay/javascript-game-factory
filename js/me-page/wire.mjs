@@ -24,9 +24,11 @@ import {
   submitGalleryUpload,
   uploadPendingThoughtPhoto,
 } from "./media-actions.mjs";
+import { initProfileMusicPlayer } from "./music-player.mjs";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
   initPageGalleryViewer({ doc, apiClient });
+  let musicPlayer = null;
   const friendNavigator = createFriendNavigatorController();
   const pageData = createMePageDataController({ storage, apiClient });
   const mediaComposer = createMediaComposerState({
@@ -98,7 +100,10 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     },
   });
 
-  void pageData.loadGallery().then(() => rerender("", true));
+  void pageData.loadGallery().then(() => rerender("", true)).then(() => {
+    const profile = loadFactoryProfile(storage);
+    musicPlayer = initProfileMusicPlayer("meMusicPanel", profile?.profileMusicPlaylist || [], { doc });
+  });
 
   doc.getElementById("meDeleteAccountBtn")?.addEventListener("click", async () => {
     const flashEl = doc.getElementById("meDeleteAccountFlash");
@@ -115,9 +120,14 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     window.location.href = "../index.html";
   });
 
-  doc.addEventListener(PROFILE_UPDATED_EVENT, () => {
+  doc.addEventListener(PROFILE_UPDATED_EVENT, (event) => {
     pageData.clearCachedHydration();
     void rerender();
+    const updatedPlaylist = event?.detail?.profile?.profileMusicPlaylist;
+    if (updatedPlaylist !== undefined) {
+      musicPlayer?.destroy?.();
+      musicPlayer = initProfileMusicPlayer("meMusicPanel", updatedPlaylist, { doc });
+    }
   });
 
   doc.addEventListener("submit", async (event) => {

@@ -279,6 +279,26 @@ export function createPlatformApiClient(options = {}) {
         return null;
       }
     },
+    async uploadMusic(file) {
+      if (!fetchImpl || !baseUrl || !file) return null;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const response = await fetchImpl(`${baseUrl}/upload/music`, {
+          method: "POST",
+          credentials: "include",
+          headers: buildAuthHeaders(),
+          body: formData,
+        });
+        if (!response?.ok) {
+          const body = await readJsonResponse(response);
+          return { uploadError: body?.error || String(response.status) };
+        }
+        return await readJsonResponse(response);
+      } catch {
+        return null;
+      }
+    },
     async uploadPhoto(file) {
       if (!fetchImpl || !baseUrl || !file) return null;
       const formData = new FormData();

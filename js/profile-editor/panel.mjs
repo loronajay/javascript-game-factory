@@ -12,6 +12,7 @@ import {
 } from "./form-fields.mjs";
 import { buildArcadeProfileViewModel } from "./view-model.mjs";
 import { persistArcadeProfileDetails } from "./persistence.mjs";
+import { createMusicEditor } from "./music-editor.mjs";
 
 function uploadErrorMessage(errorCode, fileLabel) {
   if (errorCode === "unauthorized") return `Upload failed: sign in first.`;
@@ -74,6 +75,9 @@ export function initProfileEditorPanel({
   if (!button || !panel || !form || !profileNameInput) {
     return null;
   }
+
+  const musicEditor = createMusicEditor({ doc, apiClient });
+  musicEditor.mount(doc?.getElementById?.("playerProfileMusicSlots"));
 
   let pendingAvatarAssetId = "";
   let pendingAvatarUrl = "";
@@ -213,6 +217,7 @@ export function initProfileEditorPanel({
     const displayInitials = (profile.profileName || "?").slice(0, 2).toUpperCase();
     syncAvatarPreview(displayAvatarSrc, displayInitials);
     syncBgPreview(pendingBackgroundImageUrl || profile.backgroundImageUrl || "");
+    musicEditor.seedFromProfile(profile.profileMusicPlaylist || []);
 
     if (summary) summary.textContent = model.summaryName;
     if (defaultName) defaultName.textContent = model.summaryName;
@@ -324,6 +329,7 @@ export function initProfileEditorPanel({
       favoriteGameSlug: "",
       backgroundImageUrl: "",
       links: [],
+      profileMusicPlaylist: [],
       mainSqueezeMode: "manual",
       mainSqueezePlayerId: "",
       friendRailMode: "auto",
@@ -337,6 +343,7 @@ export function initProfileEditorPanel({
     setAvatarStatus("");
     pendingBackgroundImageUrl = "";
     setBgStatus("");
+    musicEditor.reset();
     render("PLAYER CARD CLEARED");
     dispatchProfileUpdatedEvent(doc, "cleared", clearedProfile);
   });
@@ -352,6 +359,7 @@ export function initProfileEditorPanel({
       favoriteGameSlug: favoriteGameInput?.value || "",
       discoverable: discoverableInput ? discoverableInput.checked : true,
       links: collectLinkRows(doc),
+      profileMusicPlaylist: musicEditor.getPendingPlaylist(),
       mainSqueezeMode: mainSqueezeModeInput?.value || "manual",
       mainSqueezePlayerId: mainSqueezePlayerIdInput?.value || "",
       friendRailMode: friendRailModeInput?.value || "auto",

@@ -15,6 +15,9 @@ const PROFILE_LINK_LABEL_MAX_LENGTH = 24;
 const PROFILE_BACKGROUND_URL_MAX_LENGTH = 280;
 const FACTORY_PROFILE_NAME_MAX_LENGTH = 12;
 const FACTORY_PROFILE_VERSION = 1;
+const MUSIC_TRACK_TITLE_MAX = 80;
+const MUSIC_TRACK_ARTIST_MAX = 60;
+const MUSIC_PLAYLIST_MAX = 5;
 
 const PROFILE_LINK_KINDS = new Set(["external", "social", "support", "portfolio"]);
 const PROFILE_PRESENCES = new Set(["online", "away", "busy", "offline"]);
@@ -168,6 +171,28 @@ function normalizeProfileLinks(links) {
   return normalized;
 }
 
+function normalizeMusicTrack(entry) {
+  if (!isPlainObject(entry)) return null;
+  const url = normalizeUrl(sanitizeSingleLine(entry.url, PROFILE_BACKGROUND_URL_MAX_LENGTH));
+  if (!url) return null;
+  return {
+    url,
+    title: sanitizeSingleLine(entry.title, MUSIC_TRACK_TITLE_MAX),
+    artist: sanitizeSingleLine(entry.artist, MUSIC_TRACK_ARTIST_MAX),
+  };
+}
+
+function normalizeProfileMusicPlaylist(value) {
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  for (const entry of value) {
+    if (normalized.length >= MUSIC_PLAYLIST_MAX) break;
+    const track = normalizeMusicTrack(entry);
+    if (track) normalized.push(track);
+  }
+  return normalized;
+}
+
 function normalizeProfileFields(profile = {}) {
   const source = isPlainObject(profile) ? profile : {};
   return {
@@ -184,6 +209,7 @@ function normalizeProfileFields(profile = {}) {
     mainSqueeze: normalizeFriendPreviewEntry(source.mainSqueeze, { isMainSqueeze: true }),
     badgeIds: normalizePublicStringList(source.badgeIds),
     links: normalizeProfileLinks(source.links),
+    profileMusicPlaylist: normalizeProfileMusicPlaylist(source.profileMusicPlaylist),
   };
 }
 
@@ -232,5 +258,6 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
     recentPartners: normalizeSimpleStringList(source.recentPartners),
     links: profileFields.links,
     preferences: isPlainObject(source.preferences) ? { ...source.preferences } : {},
+    profileMusicPlaylist: profileFields.profileMusicPlaylist,
   };
 }

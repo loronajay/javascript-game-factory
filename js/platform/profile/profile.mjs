@@ -4,6 +4,9 @@ export const PROFILE_REAL_NAME_MAX_LENGTH = 48;
 export const PROFILE_LINK_LABEL_MAX_LENGTH = 24;
 export const PROFILE_BACKGROUND_URL_MAX_LENGTH = 280;
 export const FRIEND_CODE_LENGTH = 8;
+export const MUSIC_TRACK_TITLE_MAX = 80;
+export const MUSIC_TRACK_ARTIST_MAX = 60;
+export const MUSIC_PLAYLIST_MAX = 5;
 
 const PROFILE_LINK_KINDS = new Set([
   "external",
@@ -247,6 +250,28 @@ export function normalizeProfileLinks(links) {
   return normalized;
 }
 
+function normalizeMusicTrack(entry) {
+  if (!isPlainObject(entry)) return null;
+  const url = normalizeUrl(sanitizeSingleLine(entry.url, PROFILE_BACKGROUND_URL_MAX_LENGTH));
+  if (!url) return null;
+  return {
+    url,
+    title: sanitizeSingleLine(entry.title, MUSIC_TRACK_TITLE_MAX),
+    artist: sanitizeSingleLine(entry.artist, MUSIC_TRACK_ARTIST_MAX),
+  };
+}
+
+export function normalizeProfileMusicPlaylist(value) {
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  for (const entry of value) {
+    if (normalized.length >= MUSIC_PLAYLIST_MAX) break;
+    const track = normalizeMusicTrack(entry);
+    if (track) normalized.push(track);
+  }
+  return normalized;
+}
+
 export function normalizeProfileFields(profile = {}) {
   const source = isPlainObject(profile) ? profile : {};
 
@@ -264,6 +289,7 @@ export function normalizeProfileFields(profile = {}) {
     mainSqueeze: normalizeMainSqueeze(source.mainSqueeze),
     badgeIds: normalizeBadgeIds(source.badgeIds),
     links: normalizeProfileLinks(source.links),
+    profileMusicPlaylist: normalizeProfileMusicPlaylist(source.profileMusicPlaylist),
   };
 }
 
@@ -311,5 +337,6 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
       ? source.recentActivity.filter((entry) => isPlainObject(entry))
       : [],
     thoughtCount: Math.max(0, Math.floor(Number(source.thoughtCount) || 0)),
+    profileMusicPlaylist: normalizeProfileMusicPlaylist(source.profileMusicPlaylist),
   };
 }

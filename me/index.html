@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="../css/profile-rail.css">
   <link rel="stylesheet" href="../css/profile-page.css">
   <link rel="stylesheet" href="../css/profile-social.css">
+  <link rel="stylesheet" href="../css/profile-music.css">
   <link rel="stylesheet" href="../css/me.css">
   <link rel="stylesheet" href="../css/thoughts.css">
   <link rel="stylesheet" href="../css/gallery-viewer.css">
@@ -86,6 +87,12 @@
               <p id="playerProfileAvatarStatus" class="player-card__avatar-status" aria-live="polite"></p>
             </div>
           </div>
+
+          <fieldset class="player-card__field player-card__field-group">
+            <legend class="player-card__field-legend">Profile Music</legend>
+            <p class="player-card__hint" style="margin-bottom:0.5rem">Add up to 5 tracks. Drag to reorder.</p>
+            <div id="playerProfileMusicSlots" class="music-editor-slots"></div>
+          </fieldset>
 
           <div class="player-card__avatar-upload player-card__avatar-upload--bg">
             <div class="player-card__avatar-preview-wrap player-card__avatar-preview-wrap--bg">
@@ -309,6 +316,7 @@
       <div class="me-layout page-stage__layout">
         <div class="me-layout__main">
           <section id="meHeroCard" class="me-hero-card"></section>
+          <section id="meMusicPanel" class="me-panel me-panel--music" hidden></section>
           <section id="meIdentityPanel" class="me-panel me-panel--identity"></section>
           <section id="meRankingsPanel" class="me-panel me-panel--rankings"></section>
           <section id="meTopFriendsPanel" class="me-panel me-panel--top-friends"></section>

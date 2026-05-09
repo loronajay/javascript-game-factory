@@ -332,7 +332,7 @@ export function createApp(options = {}) {
     }
 
     // Upload routes
-    if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background")) {
+    if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background" || pathname === "/upload/music")) {
       if (!authClaims?.playerId) {
         writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
         return;
@@ -347,6 +347,17 @@ export function createApp(options = {}) {
       if (!multipart.ok) {
         const statusCode = multipart.error === "file_too_large" ? 413 : 400;
         writeJson(res, statusCode, { status: "error", error: multipart.error, timestamp }, requestOrigin);
+        return;
+      }
+
+      if (pathname === "/upload/music") {
+        const result = await uploadService.uploadAudio(multipart.buffer, { mimeType: multipart.mimeType });
+        if (!result.ok) {
+          const statusCode = result.error === "unsupported_file_type" ? 415 : result.error === "file_too_large" ? 413 : 500;
+          writeJson(res, statusCode, { status: "error", error: result.error, timestamp }, requestOrigin);
+          return;
+        }
+        writeJson(res, 200, { url: result.url }, requestOrigin);
         return;
       }
 

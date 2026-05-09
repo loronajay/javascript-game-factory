@@ -10,6 +10,7 @@ import {
   shareThoughtPostWithApi,
   syncThoughtCommentsFromApi,
 } from "../platform/thoughts/thoughts.mjs";
+import { initProfileMusicPlayer } from "../me-page/music-player.mjs";
 import { createPlayerHeroActions } from "./hero-actions.mjs";
 import { createPlayerMediaActions } from "./media-actions.mjs";
 import { createPlayerThoughtComposerActions } from "./thought-composer-actions.mjs";
@@ -20,6 +21,7 @@ import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession }) {
   initPageGalleryViewer({ doc, apiClient });
   let currentPageData = null;
+  let musicPlayer = null;
   let galleryPhotos = [];
   let heroActions = null;
   const mediaComposer = createMediaComposerState({
@@ -164,12 +166,18 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
   });
 
   void rerender("", false).then(() => {
+    musicPlayer = initProfileMusicPlayer("playerMusicPanel", currentPageData?.profile?.profileMusicPlaylist || [], { doc });
     const targetId = currentPageData?.profile?.playerId || "";
     if (targetId) void loadGallery(targetId).then(() => rerender("", true));
   });
 
-  doc.addEventListener(PROFILE_UPDATED_EVENT, () => {
+  doc.addEventListener(PROFILE_UPDATED_EVENT, (event) => {
     void rerender();
+    const updatedPlaylist = event?.detail?.profile?.profileMusicPlaylist;
+    if (updatedPlaylist !== undefined) {
+      musicPlayer?.destroy?.();
+      musicPlayer = initProfileMusicPlayer("playerMusicPanel", updatedPlaylist, { doc });
+    }
   });
 
   doc.addEventListener("submit", async (event) => {

@@ -82,6 +82,7 @@ function mapRowToFactoryProfile(row = {}) {
     featuredGames: ensureJsonArray(row.featured_games),
     recentActivity: ensureJsonArray(row.recent_activity),
     thoughtCount: Number(row.thought_count) || 0,
+    profileMusicPlaylist: ensureJsonArray(row.profile_music_playlist),
   });
 
   profile.hasAccount = Boolean(row.has_account);
@@ -113,6 +114,7 @@ function buildProfileParams(playerId, profile) {
     JSON.stringify(profile.featuredGames || []),
     JSON.stringify(profile.recentActivity || []),
     Number(profile.thoughtCount) || 0,
+    JSON.stringify(profile.profileMusicPlaylist || []),
   ];
 }
 
@@ -201,6 +203,7 @@ export async function loadPlayerProfile(db, playerId) {
       pp.featured_games,
       pp.recent_activity,
       pp.thought_count,
+      pp.profile_music_playlist,
       (a.player_id is not null) as has_account
     from players p
     left join player_profiles pp on pp.player_id = p.player_id
@@ -241,6 +244,7 @@ export async function loadPlayerProfileByFriendCode(db, friendCode) {
       pp.featured_games,
       pp.recent_activity,
       pp.thought_count,
+      pp.profile_music_playlist,
       (a.player_id is not null) as has_account
     from players p
     join player_profiles pp on pp.player_id = p.player_id
@@ -339,11 +343,12 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       preferences,
       featured_games,
       recent_activity,
-      thought_count
+      thought_count,
+      profile_music_playlist
     ) values (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
       $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb,
-      $17::jsonb, $18::jsonb, $19::jsonb, $20::jsonb, $21::jsonb, $22
+      $17::jsonb, $18::jsonb, $19::jsonb, $20::jsonb, $21::jsonb, $22, $23::jsonb
     )
     on conflict (player_id) do update set
       profile_name = excluded.profile_name,
@@ -367,6 +372,7 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       featured_games = excluded.featured_games,
       recent_activity = excluded.recent_activity,
       thought_count = excluded.thought_count,
+      profile_music_playlist = excluded.profile_music_playlist,
       updated_at = now()
     returning
       player_id,
@@ -390,7 +396,8 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       preferences,
       featured_games,
       recent_activity,
-      thought_count
+      thought_count,
+      profile_music_playlist
   `, buildProfileParams(normalizedPlayerId, normalizedProfile));
 
   return mapRowToFactoryProfile(result?.rows?.[0] || null);
