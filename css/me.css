@@ -73,12 +73,16 @@
   order: 3;
 }
 
-#meTopFriendsPanel {
+#meMusicPanel {
   order: 4;
 }
 
-#meFriendsPanel {
+#meTopFriendsPanel {
   order: 5;
+}
+
+#meFriendsPanel {
+  order: 6;
 }
 
 /* Middle column order */
