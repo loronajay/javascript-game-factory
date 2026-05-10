@@ -8,6 +8,7 @@ import {
 import {
   createBotFleet, createBotState, getBotDelay, botPickShot, updateBotState,
 } from './bot.js';
+import { SHOT_ANIMATION_MS } from './presentation.js';
 
 let botThinkTimeout = null;
 
@@ -48,13 +49,21 @@ export function createBotClient(gs) {
 
     // Called by handleTargetClick when the player fires.
     // Resolves the shot against the bot fleet and returns the result via cb.onShotResult.
+    // Also schedules the bot's first return shot after the player's animation completes.
     sendShot(col, row) {
       const { valid, board, hit, shipId, sunk } = resolveIncomingShot(gs.botFleet, col, row);
       if (!valid) return;
       gs.botFleet = board;
       const fleetDestroyed = isFleetDestroyed(gs.botFleet);
-      // Call synchronously — handleShotResult's animation timer handles the display delay.
+      // Synchronous — handleShotResult's own timer handles the 1200ms display delay.
       cb.onShotResult?.({ col, row, hit, sunk, shipId, fleetDestroyed });
+      // Schedule the bot's reply after the player's animation finishes + thinking delay.
+      // Without this the cycle never starts — sendShotResult is only reached after the
+      // bot has already fired once, so the first shot would never be scheduled.
+      if (!fleetDestroyed) {
+        clearBotBattleTimers();
+        botThinkTimeout = setTimeout(fireBotShot, SHOT_ANIMATION_MS + getBotDelay(gs.botDifficulty));
+      }
     },
 
     // Called by handleIncomingShot after the bot's shot resolves against the player fleet.
