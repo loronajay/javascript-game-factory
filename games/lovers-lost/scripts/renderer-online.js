@@ -380,10 +380,79 @@ export function createOnlineRenderer(ctx, images, {
     drawRedButton(400, 390, 160, 40, 'CANCEL', hov.cancel,     15);
   }
 
+  function renderSoloSideSelect(boyHovered, girlHovered) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawSpaceBackground();
+    drawOnlineLabel('SINGLE PLAYER', CANVAS_W / 2, 26, {
+      bg:        'rgba(28,18,56,0.86)',
+      stroke:    'rgba(165,120,255,0.50)',
+      textColor: 'rgba(232,220,255,0.95)',
+    });
+
+    ctx.save();
+    ctx.textAlign   = 'center';
+    ctx.font        = 'bold 40px "Cinzel Decorative", serif';
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.55)';
+    ctx.shadowBlur  = 22;
+    ctx.fillText('CHOOSE YOUR SIDE', CANVAS_W / 2, 94);
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font      = '13px monospace';
+    ctx.fillStyle = 'rgba(255,210,120,0.88)';
+    ctx.fillText('YOUR LOVER WAITS AT THE REUNION ZONE', CANVAS_W / 2, 392);
+    ctx.restore();
+    _drawSideCard(240, 130, 220, 240, images.boy,  false, 'BOY',  'LEFT SIDE',  'W  A  S  D', boyHovered,  menuWalkFrame());
+    _drawSideCard(500, 130, 220, 240, images.girl, true,  'GIRL', 'RIGHT SIDE', '←  ↑  ↓  →', girlHovered, menuWalkFrame());
+
+    _onlineEscHint('ESC · BACK TO MENU');
+  }
+
+  function renderSoloCountdown(side, secondsRemaining) {
+    const img    = side === 'boy' ? images.boy : images.girl;
+    const flipH  = side === 'girl';
+    const label  = side === 'boy' ? 'BOY' : 'GIRL';
+
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawSpaceBackground();
+    drawOnlineLabel('SINGLE PLAYER', CANVAS_W / 2, 26, {
+      bg:        'rgba(28,18,56,0.86)',
+      stroke:    'rgba(165,120,255,0.50)',
+      textColor: 'rgba(232,220,255,0.95)',
+    });
+
+    ctx.save();
+    ctx.textAlign = 'center';
+
+    blit(img, menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - SPRITE_W / 2, 160, SPRITE_W, SPRITE_H, flipH, 1);
+
+    ctx.font        = 'bold 22px "Cinzel Decorative", serif';
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.40)';
+    ctx.shadowBlur  = 10;
+    ctx.fillText(`PLAYING AS ${label}`, CANVAS_W / 2, 240);
+
+    ctx.font        = 'bold 104px monospace';
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.18)';
+    ctx.shadowBlur  = 22;
+    ctx.fillText(secondsRemaining > 0 ? String(secondsRemaining) : 'GO', CANVAS_W / 2, 372);
+
+    ctx.shadowBlur  = 0;
+    ctx.font        = '15px "Cinzel Decorative", serif';
+    ctx.fillStyle   = 'rgba(190,205,255,0.70)';
+    ctx.fillText('Get ready to run', CANVAS_W / 2, 420);
+    ctx.restore();
+  }
+
   return {
     renderOnlineSideSelect,
     renderOnlineNameEntry,
     renderOnlineLobby,
     renderOnlineCountdown,
+    renderSoloSideSelect,
+    renderSoloCountdown,
   };
 }

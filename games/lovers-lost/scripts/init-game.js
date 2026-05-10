@@ -2,6 +2,7 @@ import {
   createGameState, tickFrame, advancePhaseState,
   shouldHandleMappedKeyLocally,
 } from './game-tick.js';
+import { RUN_DISTANCE } from './player.js';
 import { buildDebugCollisionSnapshot } from './collision.js';
 import { buildLaneSnapshot } from './lane-snapshot.js';
 import { createLaneInputHandler } from './lane-input.js';
@@ -125,6 +126,14 @@ function _initWithAssets(images, emoteImages) {
     if (gs.phase === 'menu_help') {
       gs = { ...gs, phase: 'menu' }; inp.tick(); return;
     }
+    if (gs.phase === 'solo_side_select') {
+      if (e.key === 'Escape') { gs = { ...gs, phase: 'menu' }; }
+      return;
+    }
+    if (gs.phase === 'solo_countdown') {
+      if (e.key === 'Escape') { soloMode = false; gs = { ...gs, phase: 'menu' }; }
+      return;
+    }
     if (gs.phase === 'online_side_select') {
       if (e.key === 'Escape') { onlineClient.disconnect(); onlineQueueCounts = null; gs = { ...gs, phase: 'menu' }; }
       return;
@@ -193,15 +202,25 @@ function _initWithAssets(images, emoteImages) {
   });
 
   // Menu button bounds (canvas space)
-  const MENU_BTN_X  = 300, MENU_BTN_Y  = 210, MENU_BTN_W  = 360, MENU_BTN_H  = 56; // LOCAL MULTIPLAYER
-  const MENU_BTN2_X = 300, MENU_BTN2_Y = 286, MENU_BTN2_W = 360, MENU_BTN2_H = 56; // ONLINE MULTIPLAYER
-  const MENU_BTN3_X = 360, MENU_BTN3_Y = 362, MENU_BTN3_W = 240, MENU_BTN3_H = 44; // HOW TO PLAY
+  const MENU_BTN0_X = 300, MENU_BTN0_Y = 148, MENU_BTN0_W = 360, MENU_BTN0_H = 56; // SINGLE PLAYER
+  const MENU_BTN_X  = 300, MENU_BTN_Y  = 216, MENU_BTN_W  = 360, MENU_BTN_H  = 56; // LOCAL MULTIPLAYER
+  const MENU_BTN2_X = 300, MENU_BTN2_Y = 284, MENU_BTN2_W = 360, MENU_BTN2_H = 56; // ONLINE MULTIPLAYER
+  const MENU_BTN3_X = 360, MENU_BTN3_Y = 360, MENU_BTN3_W = 240, MENU_BTN3_H = 44; // HOW TO PLAY
+  let menuBtn0Hovered = false;
   let menuBtnHovered  = false;
   let menuBtn2Hovered = false;
   let menuBtn3Hovered = false;
 
   function _inBtn(cx, cy, bx, by, bw, bh) { return cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh; }
   function _inRect(cx, cy, rect) { return !!rect && _inBtn(cx, cy, rect.x, rect.y, rect.w, rect.h); }
+
+  // ── Solo state ───────────────────────────────────────────────────────────────
+  let soloMode          = false;
+  let soloSide          = 'boy';
+  let soloCountdownTick = 0;
+  let soloSideBoyHov    = false;
+  let soloSideGirlHov   = false;
+  const SOLO_COUNTDOWN_TICKS = 180;
 
   // ── Online UI state ──────────────────────────────────────────────────────────
   let lastEmoteSentAt      = 0;
@@ -245,10 +264,17 @@ function _initWithAssets(images, emoteImages) {
     const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
 
     if (gs.phase === 'menu') {
+      menuBtn0Hovered = _inBtn(cx, cy, MENU_BTN0_X, MENU_BTN0_Y, MENU_BTN0_W, MENU_BTN0_H);
       menuBtnHovered  = _inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H);
       menuBtn2Hovered = _inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H);
       menuBtn3Hovered = _inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H);
-    } else { menuBtnHovered = menuBtn2Hovered = menuBtn3Hovered = false; }
+    } else { menuBtn0Hovered = menuBtnHovered = menuBtn2Hovered = menuBtn3Hovered = false; }
+
+    if (gs.phase === 'solo_side_select') {
+      const r = getOnlineSideSelectRects();
+      soloSideBoyHov  = _inRect(cx, cy, r.boy);
+      soloSideGirlHov = _inRect(cx, cy, r.girl);
+    } else { soloSideBoyHov = soloSideGirlHov = false; }
 
     if (gs.phase === 'online_side_select') {
       const r = getOnlineSideSelectRects();
@@ -282,9 +308,16 @@ function _initWithAssets(images, emoteImages) {
     const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
 
     if (gs.phase === 'menu') {
-      if      (_inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H))  startPlaying();
+      if      (_inBtn(cx, cy, MENU_BTN0_X, MENU_BTN0_Y, MENU_BTN0_W, MENU_BTN0_H)) { soloCountdownTick = 0; gs = { ...gs, phase: 'solo_side_select' }; }
+      else if (_inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H))  startPlaying();
       else if (_inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H)) { onlineSide = 'boy'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_side_select' }; }
       else if (_inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H)) gs = { ...gs, phase: 'menu_help' };
+      return;
+    }
+    if (gs.phase === 'solo_side_select') {
+      const r = getOnlineSideSelectRects();
+      if (_inRect(cx, cy, r.boy))  { soloSide = 'boy';  soloCountdownTick = 0; gs = { ...gs, phase: 'solo_countdown' }; }
+      if (_inRect(cx, cy, r.girl)) { soloSide = 'girl'; soloCountdownTick = 0; gs = { ...gs, phase: 'solo_countdown' }; }
       return;
     }
     if (gs.phase === 'online_side_select') {
@@ -345,6 +378,25 @@ function _initWithAssets(images, emoteImages) {
     inp.tick();
   }
 
+  function startPlayingSolo(side) {
+    sounds.stop('run-success'); sounds.stop('run-failed');
+    const newGs      = { ...createGameState('single', Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
+    const partnerKey = side === 'boy' ? 'girl' : 'boy';
+    const obsKey     = partnerKey === 'boy' ? 'boyObstacles' : 'girlObstacles';
+    const boostKey   = partnerKey === 'boy' ? 'boyBoosts'    : 'girlBoosts';
+    gs = {
+      ...newGs,
+      [partnerKey]: { ...newGs[partnerKey], distance: RUN_DISTANCE },
+      [obsKey]:     [],
+      [boostKey]:   [],
+    };
+    soloMode = true;
+    soloSide = side;
+    boyAnim  = { state: 'running', actionTick: 0 };
+    girlAnim = { state: 'running', actionTick: 0 };
+    inp.tick();
+  }
+
   function startPlayingOnline(seed) {
     sounds.stop('run-success'); sounds.stop('run-failed');
     onlineCountdown = null; onlineSnapshotSeq = 0;
@@ -357,6 +409,7 @@ function _initWithAssets(images, emoteImages) {
 
   function returnToMenu() {
     sounds.stop('run-success'); sounds.stop('run-failed');
+    soloMode = false;
     if (gs.mode === 'online' || gs.phase === 'online_countdown') {
       onlineClient.disconnect(); onlineClient.reset();
       onlineRemoteSide = null; onlineRemoteIdentity = null; onlineCountdown = null;
@@ -380,7 +433,7 @@ function _initWithAssets(images, emoteImages) {
     while (loopAccumulator >= TICK_MS) {
       loopAccumulator -= TICK_MS;
 
-      const musicPhase = gs.phase === 'menu_help' ? 'menu' : gs.phase;
+      const musicPhase = (gs.phase === 'menu_help' || gs.phase === 'solo_side_select' || gs.phase === 'solo_countdown') ? 'menu' : gs.phase;
       if (musicPhase !== lastMusicPhase) {
         if (musicPhase === 'menu')                                    sounds.playMusic('bg-music-menu');
         else if (musicPhase === 'playing')                            sounds.playMusic('bg-music-game');
@@ -397,6 +450,11 @@ function _initWithAssets(images, emoteImages) {
         if (anyPressed) returnToMenu();
       }
 
+      if (gs.phase === 'solo_countdown') {
+        soloCountdownTick++;
+        if (soloCountdownTick >= SOLO_COUNTDOWN_TICKS) startPlayingSolo(soloSide);
+      }
+
       if (gs.phase === 'online_countdown' && onlineCountdown &&
           hasCountdownStarted(onlineCountdown.startAt, onlineCountdown.clockOffsetMs)) {
         startPlayingOnline(onlineCountdown.seed);
@@ -406,6 +464,8 @@ function _initWithAssets(images, emoteImages) {
         let localResolvedForSnapshot = [];
         if (gs.mode === 'online') {
           ({ gs, boyAnim, girlAnim, frameResolved: localResolvedForSnapshot } = handleSideInput(onlineSide, gs, boyAnim, girlAnim));
+        } else if (soloMode) {
+          ({ gs, boyAnim, girlAnim } = handleSideInput(soloSide, gs, boyAnim, girlAnim));
         } else {
           ({ gs, boyAnim, girlAnim } = handleSideInput('boy',  gs, boyAnim, girlAnim));
           ({ gs, boyAnim, girlAnim } = handleSideInput('girl', gs, boyAnim, girlAnim));
@@ -481,7 +541,9 @@ function _initWithAssets(images, emoteImages) {
 
     const elapsed = gs.elapsed / 60;
 
-    if      (gs.phase === 'menu')              renderer.renderMenu(debugState, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
+    if      (gs.phase === 'menu')              renderer.renderMenu(debugState, menuBtn0Hovered, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
+    else if (gs.phase === 'solo_side_select')  renderer.renderSoloSideSelect(soloSideBoyHov, soloSideGirlHov);
+    else if (gs.phase === 'solo_countdown')    renderer.renderSoloCountdown(soloSide, Math.ceil((SOLO_COUNTDOWN_TICKS - soloCountdownTick) / 60));
     else if (gs.phase === 'online_side_select') renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov, onlineSide);
     else if (gs.phase === 'online_name_entry')  renderer.renderOnlineNameEntry(onlineSide, onlineNameInput, onlineNameError, { continue: onlineNameContinueHov });
     else if (gs.phase === 'online_lobby') {
@@ -498,11 +560,12 @@ function _initWithAssets(images, emoteImages) {
     else if (gs.phase === 'menu_help')    renderer.renderMenuHelp(debugState);
     else if (gs.phase === 'playing') {
       renderer.renderPlay(boyPlayer, girlPlayer, gs.boyObstacles, gs.girlObstacles,
-        gs.boyBoosts, gs.girlBoosts, elapsed, debugState, { online: gs.mode === 'online' }, gs.elapsed);
+        gs.boyBoosts, gs.girlBoosts, elapsed, debugState,
+        { online: gs.mode === 'online', soloSide: soloMode ? soloSide : null }, gs.elapsed);
     }
     else if (gs.phase === 'reunion')      renderer.renderReunion(boyPlayer, girlPlayer, gs.phaseFrames);
-    else if (gs.phase === 'gameover')     renderer.renderGameOver(gs.boy, gs.girl, gs.runSummary);
-    else if (gs.phase === 'score_screen') renderer.renderScore(gs.boy, gs.girl, gs.runSummary);
+    else if (gs.phase === 'gameover')     renderer.renderGameOver(gs.boy, gs.girl, gs.runSummary, soloMode ? soloSide : null);
+    else if (gs.phase === 'score_screen') renderer.renderScore(gs.boy, gs.girl, gs.runSummary, soloMode ? soloSide : null);
 
     updateScoreOverlay(gs.phase, prevPhase, gs.runSummary, onlineSide);
     if (gs.phase !== prevPhase) prevPhase = gs.phase;

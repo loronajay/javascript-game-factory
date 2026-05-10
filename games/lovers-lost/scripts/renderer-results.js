@@ -71,7 +71,18 @@ export function createResultsRenderer(ctx, images, {
     ctx.restore();
   }
 
-  function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer) {
+  function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide = null) {
+    if (soloSide) {
+      const score = soloSide === 'boy'
+        ? (runSummary ? (runSummary.boyFinished  ? runSummary.boyScore  : boyPlayer.score)  : boyPlayer.score)
+        : (runSummary ? (runSummary.girlFinished ? runSummary.girlScore : girlPlayer.score) : girlPlayer.score);
+      _drawOverlayPanel(title, [
+        runSummary ? `Time: ${_formatRunTime(runSummary.elapsedFrames)}` : null,
+        `Score: ${score}`,
+      ].filter(Boolean), footer);
+      return;
+    }
+
     const boyScore  = runSummary ? (runSummary.boyFinished  ? runSummary.boyScore  : boyPlayer.score)  : boyPlayer.score;
     const girlScore = runSummary ? (runSummary.girlFinished ? runSummary.girlScore : girlPlayer.score) : girlPlayer.score;
     const boyTrophy  = boyScore  >= girlScore ? ' 🏆' : '';
@@ -94,23 +105,23 @@ export function createResultsRenderer(ctx, images, {
     ].filter(Boolean), footer);
   }
 
-  function renderGameOver(boyPlayer, girlPlayer, runSummary) {
+  function renderGameOver(boyPlayer, girlPlayer, runSummary, soloSide = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
-    const title  = runSummary?.outcome === 'partial' ? 'One Lover Made It' : 'Time Up';
+    const title  = soloSide ? 'Time Up' : (runSummary?.outcome === 'partial' ? 'One Lover Made It' : 'Time Up');
     const footer = runSummary?.disconnectNote
       ? 'Partner disconnected  ·  Score screen incoming...'
       : 'Score screen incoming...';
-    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer);
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide);
   }
 
-  function renderScore(boyPlayer, girlPlayer, runSummary) {
+  function renderScore(boyPlayer, girlPlayer, runSummary, soloSide = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
-    let title = 'Lovers Reunited';
-    if (runSummary?.outcome === 'partial')   title = 'Partial Finish';
-    if (runSummary?.outcome === 'game_over') title = 'Run Over';
-    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to return to menu');
+    let title = soloSide ? 'Lovers Reunited' : 'Lovers Reunited';
+    if (!soloSide && runSummary?.outcome === 'partial')   title = 'Partial Finish';
+    if (!soloSide && runSummary?.outcome === 'game_over') title = 'Run Over';
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to return to menu', soloSide);
   }
 
   function renderReunion(boyPlayer, girlPlayer, phaseFrames) {

@@ -90,7 +90,7 @@ export function createMenuRenderer(ctx, images, { characterRenderer, obstacleRen
     ctx.restore();
   }
 
-  function renderMenu(debugState, btnHovered, btn2Hovered, btn3Hovered) {
+  function renderMenu(debugState, btn0Hovered, btnHovered, btn2Hovered, btn3Hovered) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
 
@@ -104,10 +104,11 @@ export function createMenuRenderer(ctx, images, { characterRenderer, obstacleRen
     ctx.restore();
 
     const btnW = 360, btnH = 56;
-    drawRedButton(CANVAS_W / 2 - btnW / 2, 210, btnW, btnH, 'LOCAL MULTIPLAYER',  btnHovered,  20);
-    drawRedButton(CANVAS_W / 2 - btnW / 2, 286, btnW, btnH, 'ONLINE MULTIPLAYER', btn2Hovered, 20);
+    drawRedButton(CANVAS_W / 2 - btnW / 2, 148, btnW, btnH, 'SINGLE PLAYER',      btn0Hovered, 20);
+    drawRedButton(CANVAS_W / 2 - btnW / 2, 216, btnW, btnH, 'LOCAL MULTIPLAYER',   btnHovered,  20);
+    drawRedButton(CANVAS_W / 2 - btnW / 2, 284, btnW, btnH, 'ONLINE MULTIPLAYER',  btn2Hovered, 20);
     const btn3W = 240, btn3H = 44;
-    drawRedButton(CANVAS_W / 2 - btn3W / 2, 362, btn3W, btn3H, 'HOW TO PLAY', btn3Hovered, 16);
+    drawRedButton(CANVAS_W / 2 - btn3W / 2, 360, btn3W, btn3H, 'HOW TO PLAY', btn3Hovered, 16);
 
     characterRenderer.blit(images.boy,  menuWalkFrame(), FRAME_W, FRAME_H, 90,                       PLAYER_Y, SPRITE_W, SPRITE_H, false, 1);
     characterRenderer.blit(images.girl, menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W - 90 - SPRITE_W, PLAYER_Y, SPRITE_W, SPRITE_H, true,  1);

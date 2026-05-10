@@ -266,11 +266,12 @@ export function createHudRenderer(ctx, { drawOnlineLabel }) {
   }
 
   function drawHUD(boyPlayer, girlPlayer, elapsed, uiState = {}) {
-    const hud = buildHudModel(boyPlayer, girlPlayer, elapsed, uiState);
+    const hud      = buildHudModel(boyPlayer, girlPlayer, elapsed, uiState);
+    const soloSide = uiState.soloSide || null;
 
     _drawHudClock(hud.clock);
-    _drawHudSide(hud.boy,  10,          'left');
-    _drawHudSide(hud.girl, CANVAS_W - 10, 'right');
+    if (!soloSide || soloSide === 'boy')  _drawHudSide(hud.boy,  10,            'left');
+    if (!soloSide || soloSide === 'girl') _drawHudSide(hud.girl, CANVAS_W - 10, 'right');
 
     if (hud.clock.online) {
       drawOnlineLabel('ONLINE', CANVAS_W / 2, 80, {
@@ -282,8 +283,8 @@ export function createHudRenderer(ctx, { drawOnlineLabel }) {
       });
     }
 
-    _drawProgressBar(10,           CANVAS_H - 18, HALF_W - 20, hud.boy,  _hudPalette('boy'),  false);
-    _drawProgressBar(HALF_W + 10,  CANVAS_H - 18, HALF_W - 20, hud.girl, _hudPalette('girl'), true);
+    if (!soloSide || soloSide === 'boy')  _drawProgressBar(10,          CANVAS_H - 18, HALF_W - 20, hud.boy,  _hudPalette('boy'),  false);
+    if (!soloSide || soloSide === 'girl') _drawProgressBar(HALF_W + 10, CANVAS_H - 18, HALF_W - 20, hud.girl, _hudPalette('girl'), true);
   }
 
   function _drawProgressBar(x, y, w, player, color, rtl) {
