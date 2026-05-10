@@ -6,8 +6,8 @@ Thumbs.db
 .env.local
 .claude/
 
-planning-docs/*
-!planning-docs/README.md
+# planning-docs/*
+# !planning-docs/README.md
 
 # Agent-facing local workflow docs
 AGENTS.md
