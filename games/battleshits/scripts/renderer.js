@@ -15,7 +15,7 @@ export const SPRITES = {
 };
 
 const ALL_SCREENS = [
-  'menu', 'matchmaking', 'room-create', 'room-join',
+  'menu', 'difficulty', 'matchmaking', 'room-create', 'room-join',
   'placement', 'waiting', 'battle', 'ended',
 ];
 
@@ -249,7 +249,14 @@ export function renderBattleStatus(gs) {
   if (turnEl) turnEl.textContent = getBattleStatusCopy(gs.turn);
 
   if (oppEl) {
-    oppEl.textContent = gs.opponentProfile?.displayName ? `vs. ${gs.opponentProfile.displayName}` : '';
+    if (gs.isSoloMode) {
+      const label = gs.botDifficulty
+        ? gs.botDifficulty.charAt(0).toUpperCase() + gs.botDifficulty.slice(1)
+        : 'CPU';
+      oppEl.textContent = `vs. CPU (${label})`;
+    } else {
+      oppEl.textContent = gs.opponentProfile?.displayName ? `vs. ${gs.opponentProfile.displayName}` : '';
+    }
   }
 
   if (labelEl) labelEl.textContent = getTargetLabelCopy();

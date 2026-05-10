@@ -26,6 +26,11 @@ export function buildMatchStats(myTarget, myFleet) {
   return { shots, hits, shipsSunk, shipsLost };
 }
 
+function pct(hits, shots) {
+  if (shots === 0) return '—';
+  return `${Math.round((hits / shots) * 100)}%`;
+}
+
 // deps: { clearAll, handleTargetClick }
 export function transitionToBattle(gs, { clearAll, handleTargetClick }) {
   clearAll();
@@ -54,6 +59,67 @@ export function transitionToMatchEnded(gs, result, { clearAll }) {
   clearAll();
   gs.phase = 'match_ended';
   gs.matchResult = result;
+
+  if (gs.isSoloMode) {
+    transitionToSoloEnded(gs, result);
+  } else {
+    transitionToOnlineEnded(gs, result);
+  }
+}
+
+function transitionToSoloEnded(gs, result) {
+  const titleEl   = document.getElementById('ended-title');
+  const messageEl = document.getElementById('ended-message');
+  const statsEl   = document.getElementById('ended-match-stats');
+  const statusEl  = document.getElementById('rematch-status');
+  const oppEl     = document.getElementById('ended-opponent-profile');
+
+  const endedCopy = getEndedScreenCopy(result);
+  if (titleEl)   titleEl.textContent   = endedCopy.title;
+  if (messageEl) messageEl.textContent = endedCopy.message;
+  if (statusEl)  statusEl.textContent  = '';
+  if (oppEl)     oppEl.innerHTML       = '';
+
+  const diffLabel = gs.botDifficulty
+    ? gs.botDifficulty.charAt(0).toUpperCase() + gs.botDifficulty.slice(1)
+    : '—';
+
+  const player  = buildMatchStats(gs.myTarget, gs.myFleet);
+  const botShots    = (gs.botTarget ?? []).filter(c => c !== null).length;
+  const botHits     = (gs.botTarget ?? []).filter(c => c && (c.result === 'hit' || c.result === 'sunk')).length;
+  const botSunkIds  = new Set((gs.botTarget ?? []).filter(c => c?.result === 'sunk' && c.shipId).map(c => c.shipId));
+  const totalTurns  = player.shots + botShots;
+
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <dl class="ended-stats">
+        <div class="ended-stat"><dt>Difficulty</dt><dd>${diffLabel}</dd></div>
+        <div class="ended-stat"><dt>Total Turns</dt><dd>${totalTurns}</dd></div>
+      </dl>
+      <p class="ended-stats-heading">Your stats</p>
+      <dl class="ended-stats">
+        <div class="ended-stat"><dt>Shots</dt><dd>${player.shots}</dd></div>
+        <div class="ended-stat"><dt>Hits</dt><dd>${player.hits}</dd></div>
+        <div class="ended-stat"><dt>Accuracy</dt><dd>${pct(player.hits, player.shots)}</dd></div>
+        <div class="ended-stat"><dt>Sunk</dt><dd>${player.shipsSunk}</dd></div>
+      </dl>
+      <p class="ended-stats-heading">Bot stats</p>
+      <dl class="ended-stats">
+        <div class="ended-stat"><dt>Shots</dt><dd>${botShots}</dd></div>
+        <div class="ended-stat"><dt>Hits</dt><dd>${botHits}</dd></div>
+        <div class="ended-stat"><dt>Accuracy</dt><dd>${pct(botHits, botShots)}</dd></div>
+        <div class="ended-stat"><dt>Sunk</dt><dd>${botSunkIds.size}</dd></div>
+      </dl>
+    `;
+  }
+
+  // Show Change Difficulty button; hide rematch-status (not needed in solo)
+  document.getElementById('btn-change-difficulty')?.classList.remove('hidden');
+
+  showScreen('ended');
+}
+
+function transitionToOnlineEnded(gs, result) {
   publishBattleshitsMatchActivity({
     result,
     myProfile: gs.myProfile,
@@ -70,10 +136,12 @@ export function transitionToMatchEnded(gs, result, { clearAll }) {
   const oppProfileEl = document.getElementById('ended-opponent-profile');
 
   const endedCopy = getEndedScreenCopy(result);
-  if (titleEl) titleEl.textContent = endedCopy.title;
+  if (titleEl)   titleEl.textContent   = endedCopy.title;
   if (messageEl) messageEl.textContent = endedCopy.message;
-  if (statusEl) statusEl.textContent = '';
+  if (statusEl)  statusEl.textContent  = '';
   if (oppProfileEl) oppProfileEl.innerHTML = '';
+
+  document.getElementById('btn-change-difficulty')?.classList.add('hidden');
 
   if (statsEl) {
     const { shots, hits, shipsSunk, shipsLost } = buildMatchStats(gs.myTarget, gs.myFleet);

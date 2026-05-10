@@ -3,8 +3,9 @@ import { createWorldMap } from './map.js';
 import { MAPS } from './maps.js';
 
 // role: 'A' spawns at the S tile, 'B' spawns at the T tile.
-export function createGameState(mapIndex = 0, role = 'A') {
-  const mapDef = MAPS[mapIndex % MAPS.length];
+// mapEntry overrides MAPS lookup when provided (used by playtest mode).
+export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
+  const mapDef = mapEntry ?? MAPS[mapIndex % MAPS.length];
   const map = createWorldMap(mapDef.raw);
   const hazards = JSON.parse(JSON.stringify(mapDef.hazards));
   // Turrets don't move — precompute beam tiles once so getTurretBeamTiles() never allocates.

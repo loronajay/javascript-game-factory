@@ -10,7 +10,6 @@ import {
   renderDisconnected,
   renderGameView,
   renderWinScreen,
-  renderDebugView,
 } from './scripts/renderer.js';
 import { loadAssets } from './scripts/assets.js';
 import { MAPS } from './scripts/maps.js';
@@ -102,22 +101,6 @@ let winnerIsLocal    = true;
 let winnerName       = '';
 let lastSentTx       = -1;
 let lastSentTy       = -1;
-
-// ─── Debug map browser ────────────────────────────────────────────────────────
-
-let debugMode    = false;
-let debugMapIndex = 0;
-
-function hotSwapMap(index) {
-  debugMapIndex = ((index % MAPS.length) + MAPS.length) % MAPS.length;
-  state = createGameState(debugMapIndex);
-  state.input = input;
-  input.held.clear();
-  input.justPressed.clear();
-  accumulator = 0;
-  state.lastTime = performance.now();
-  if (phase !== 'playing') phase = 'playing';
-}
 
 // ─── Online client callbacks ──────────────────────────────────────────────────
 
@@ -263,17 +246,6 @@ function doJoinRoom() {
 // ─── Keyboard handler ─────────────────────────────────────────────────────────
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'F3') {
-    e.preventDefault();
-    debugMode = !debugMode;
-    return;
-  }
-  if (debugMode) {
-    if (e.code === 'BracketLeft')  { e.preventDefault(); hotSwapMap(debugMapIndex - 1); }
-    if (e.code === 'BracketRight') { e.preventDefault(); hotSwapMap(debugMapIndex + 1); }
-    return;
-  }
-
   if (phase === 'side_select') {
     if (e.key === 'Escape') { phase = 'menu'; }
     return;
@@ -345,6 +317,21 @@ function handleButtonClick(id) {
       else leaveLobby();
       break;
   }
+}
+
+// ─── Playtest entry point ─────────────────────────────────────────────────────
+// Called on boot when sessionStorage holds a test map from the map editor.
+
+function startTestGame(mapEntry, side) {
+  const role = side === 'beta' ? 'B' : 'A';
+  state = createGameState(0, role, mapEntry);
+  state.input = input;
+  state.gameStartAt = performance.now();
+  state.lastTime = performance.now();
+  input.held.clear();
+  input.justPressed.clear();
+  accumulator = 0;
+  phase = 'playing';
 }
 
 // ─── Online game start ────────────────────────────────────────────────────────
@@ -457,11 +444,7 @@ function loop(now) {
     }
 
     case 'playing':
-      if (debugMode) {
-        renderDebugView(canvas, state, now);
-      } else {
-        renderGameView(canvas, state, now);
-      }
+      renderGameView(canvas, state, now);
       break;
 
     case 'win':
@@ -485,7 +468,15 @@ function loop(now) {
 
 async function boot() {
   await loadAssets();
-  state.lastTime = performance.now();
+  const testMapJSON = sessionStorage.getItem('illuminauts_test_map');
+  const testSide    = sessionStorage.getItem('illuminauts_test_side') || 'alpha';
+  if (testMapJSON) {
+    sessionStorage.removeItem('illuminauts_test_map');
+    sessionStorage.removeItem('illuminauts_test_side');
+    try { startTestGame(JSON.parse(testMapJSON), testSide); } catch (_) { /* malformed — fall through to menu */ }
+  } else {
+    state.lastTime = performance.now();
+  }
   requestAnimationFrame(loop);
 }
 

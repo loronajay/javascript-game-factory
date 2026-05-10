@@ -50,6 +50,15 @@
   margin: 0;
 }
 
+.ended-stats-heading {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8899aa;
+  text-align: center;
+  margin: 8px 0 4px;
+}
+
 .ended-opponent-profile {
   min-height: 28px;
   margin: 4px 0;

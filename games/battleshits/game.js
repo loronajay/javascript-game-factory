@@ -20,6 +20,7 @@ import {
   clearPublicMatchRetry, schedulePublicMatchRetry,
   startPublicMatch, startPrivateCreate, startPrivateJoin,
 } from './scripts/matchmaking.js';
+import { createBotClient, clearBotBattleTimers } from './scripts/bot-battle.js';
 
 const bgMusic = createBgMusicController();
 
@@ -32,7 +33,7 @@ function goToScreen(screenId) {
 
 function createInitialState() {
   return {
-    phase: 'menu',        // 'menu'|'matchmaking'|'placement'|'waiting_opponent'|'battle'|'match_ended'
+    phase: 'menu',        // 'menu'|'difficulty'|'matchmaking'|'placement'|'waiting_opponent'|'battle'|'match_ended'
     matchmakingMode: null,// null|'public'|'private_create'|'private_join'
     turn: null,           // 'mine'|'theirs'|'awaiting_result'  (battle only)
     mySide: null,         // 'alpha'|'beta'
@@ -58,6 +59,11 @@ function createInitialState() {
       mine: null,
       theirs: null,
     },
+    // Solo mode fields
+    isSoloMode: false,
+    botDifficulty: null,  // 'easy'|'medium'|'hard'
+    botFleet: null,       // FleetBoard for bot ships (hidden)
+    botTarget: null,      // TargetBoard tracking bot's shots (for stats + AI)
   };
 }
 
@@ -67,13 +73,34 @@ let net = null;
 function clearAll() {
   clearPublicMatchRetry();
   clearBattleTimers();
+  if (gs.isSoloMode) clearBotBattleTimers();
   bgMusic.stop();
 }
 
-// ─── Placement logic ──────────────────────────────────────────────────────────
+// ─── Placement helpers (shared by online and solo) ────────────────────────────
+
+function enterPlacementScreen() {
+  gs.phase = 'placement';
+  goToScreen('placement');
+  buildBoardGrid(
+    document.getElementById('fleet-board'),
+    (c, r) => handlePlacementClick(gs, c, r),
+    (c, r) => handlePlacementHover(gs, c, r),
+  );
+  renderPlacementBoard(gs);
+  renderShipRoster(gs, (id) => selectShip(gs, id));
+}
+
+// ─── Lock-in ──────────────────────────────────────────────────────────────────
 
 function lockIn() {
   if (!FLEET_DEFS.every(d => gs.placedShips[d.id])) return;
+
+  if (gs.isSoloMode) {
+    lockInSolo();
+    return;
+  }
+
   gs.phase = 'waiting_opponent';
   net.sendPlacementReady();
   goToScreen('waiting');
@@ -84,6 +111,49 @@ function lockIn() {
     });
     bgMusic.transition('battle');
   }
+}
+
+function lockInSolo() {
+  net.startSolo(); // populates gs.botFleet and gs.botTarget
+  gs.seed   = 0;   // even → alpha goes first
+  gs.mySide = 'alpha'; // player is always alpha in solo (goes first)
+  transitionToBattle(gs, {
+    clearAll,
+    handleTargetClick: (c, r) => handleTargetClick(gs, net, c, r),
+  });
+  bgMusic.transition('battle');
+}
+
+// ─── Solo mode ────────────────────────────────────────────────────────────────
+
+function startSoloMatch(difficulty) {
+  gs.isSoloMode     = true;
+  gs.botDifficulty  = difficulty;
+
+  net = createBotClient(gs);
+
+  net.cb.onShotResult = (result) => {
+    if (gs.phase !== 'battle') return;
+    handleShotResult(gs, result, { clearAll });
+  };
+
+  net.cb.onOpponentShot = ({ col, row }) => {
+    if (gs.phase !== 'battle') return;
+    handleIncomingShot(gs, net, col, row, { clearAll });
+  };
+
+  enterPlacementScreen();
+}
+
+function resetForSoloBattle() {
+  clearAll();
+  const difficulty = gs.botDifficulty;
+  const myProf     = gs.myProfile;
+
+  gs = createInitialState();
+  gs.myProfile = myProf;
+
+  startSoloMatch(difficulty);
 }
 
 // ─── Match flow ───────────────────────────────────────────────────────────────
@@ -100,16 +170,8 @@ function resetForRematch() {
   gs.seed             = seed;
   gs.myProfile        = myProf;
   gs.opponentProfile  = oppProf;
-  gs.phase            = 'placement';
 
-  goToScreen('placement');
-  buildBoardGrid(
-    document.getElementById('fleet-board'),
-    (c, r) => handlePlacementClick(gs, c, r),
-    (c, r) => handlePlacementHover(gs, c, r),
-  );
-  renderPlacementBoard(gs);
-  renderShipRoster(gs, (id) => selectShip(gs, id));
+  enterPlacementScreen();
 }
 
 // ─── Online callbacks ─────────────────────────────────────────────────────────
@@ -139,15 +201,7 @@ function wireOnlineCallbacks() {
   net.cb.onMatchReady = ({ seed }) => {
     clearPublicMatchRetry();
     gs.seed = seed;
-    gs.phase = 'placement';
-    goToScreen('placement');
-    buildBoardGrid(
-      document.getElementById('fleet-board'),
-      (c, r) => handlePlacementClick(gs, c, r),
-      (c, r) => handlePlacementHover(gs, c, r),
-    );
-    renderPlacementBoard(gs);
-    renderShipRoster(gs, (id) => selectShip(gs, id));
+    enterPlacementScreen();
   };
 
   net.cb.onRemoteProfile = ({ playerId, displayName }) => {
@@ -225,6 +279,32 @@ function wireOnlineCallbacks() {
 // ─── Button wiring ────────────────────────────────────────────────────────────
 
 function wireButtons() {
+  // ── Solo Battle ────────────────────────────────────────────────────────────
+
+  document.getElementById('btn-solo-battle')?.addEventListener('click', () => {
+    gs.phase = 'difficulty';
+    goToScreen('difficulty');
+  });
+
+  document.getElementById('btn-difficulty-easy')?.addEventListener('click', () => {
+    startSoloMatch('easy');
+  });
+
+  document.getElementById('btn-difficulty-medium')?.addEventListener('click', () => {
+    startSoloMatch('medium');
+  });
+
+  document.getElementById('btn-difficulty-hard')?.addEventListener('click', () => {
+    startSoloMatch('hard');
+  });
+
+  document.getElementById('btn-cancel-difficulty')?.addEventListener('click', () => {
+    gs = createInitialState();
+    goToScreen('menu');
+  });
+
+  // ── Online Battle ──────────────────────────────────────────────────────────
+
   document.getElementById('btn-find-match')?.addEventListener('click', () => {
     net = createOnlineClient('battleshits');
     wireOnlineCallbacks();
@@ -277,16 +357,31 @@ function wireButtons() {
     goToScreen('menu');
   });
 
-  document.getElementById('btn-rotate')?.addEventListener('click', () => rotateShip(gs));
+  // ── Placement ──────────────────────────────────────────────────────────────
 
+  document.getElementById('btn-rotate')?.addEventListener('click', () => rotateShip(gs));
   document.getElementById('btn-lock-in')?.addEventListener('click', lockIn);
 
+  // ── Match ended ────────────────────────────────────────────────────────────
+
   document.getElementById('btn-rematch')?.addEventListener('click', () => {
+    if (gs.isSoloMode) {
+      resetForSoloBattle();
+      return;
+    }
     gs.rematchPending = true;
     net.sendRematch('request');
     const statusEl = document.getElementById('rematch-status');
     if (statusEl) statusEl.textContent = gs.opponentWantsRematch ? 'Starting rematch...' : 'Waiting for opponent...';
     if (gs.opponentWantsRematch) resetForRematch();
+  });
+
+  document.getElementById('btn-change-difficulty')?.addEventListener('click', () => {
+    clearAll();
+    net?.disconnect();
+    net = null;
+    gs = createInitialState();
+    goToScreen('difficulty');
   });
 
   document.getElementById('btn-exit-to-menu')?.addEventListener('click', () => {
@@ -296,6 +391,8 @@ function wireButtons() {
     gs = createInitialState();
     goToScreen('menu');
   });
+
+  // ── Global keyboard ────────────────────────────────────────────────────────
 
   window.addEventListener('keydown', (e) => {
     const emoteType = keyToEmoteType(e.key);

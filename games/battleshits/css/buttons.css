@@ -57,3 +57,26 @@
   justify-content: center;
   gap: 12px;
 }
+
+.btn-ghost {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+  font-size: 0.82rem;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.8);
+  filter: none;
+  box-shadow: none;
+}
+
+.difficulty-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}

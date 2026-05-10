@@ -582,6 +582,13 @@ function syncIds() {
   selTurretId = hazards.turrets[0]?.id ?? null;
 }
 
+function launchPlaytest(side) {
+  const entry = toMapsEntry();
+  sessionStorage.setItem('illuminauts_test_map', JSON.stringify(entry));
+  sessionStorage.setItem('illuminauts_test_side', side);
+  window.open('index.html', '_blank');
+}
+
 async function copyText(text, label) {
   try {
     await navigator.clipboard.writeText(text);
@@ -662,6 +669,17 @@ function renderSidePanel() {
   const statusEl = el('div', 'status');
   statusEl.id = 'editorStatus';
   sideEl.appendChild(statusEl);
+
+  sideEl.appendChild(el('hr'));
+
+  // Playtest — always visible regardless of tab
+  const ptWrap = el('section');
+  ptWrap.innerHTML = `<div class="sec-label">Playtest</div>`;
+  const ptRow = el('div', 'toolbar');
+  ptRow.appendChild(mkBtn('▶ Play as Alpha', '', () => launchPlaytest('alpha')));
+  ptRow.appendChild(mkBtn('▶ Play as Beta',  '', () => launchPlaytest('beta')));
+  ptWrap.appendChild(ptRow);
+  sideEl.appendChild(ptWrap);
 
   sideEl.appendChild(el('hr'));
 
