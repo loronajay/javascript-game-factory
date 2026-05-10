@@ -39,7 +39,7 @@ export function renderMenu(canvas, hoveredButtonId, registerButton) {
   ctx.font = `${Math.max(10, Math.floor(titleSize * 0.18))}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('WASD / Arrows — move  |  Shift — sprint  |  F3 — debug', cx, height - Math.max(18, height * 0.035));
+  ctx.fillText('WASD / Arrows — move  |  Shift — sprint', cx, height - Math.max(18, height * 0.035));
 }
 
 export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
@@ -79,8 +79,8 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   const alphaHov = hoveredButtonId === 'btn_side_alpha';
   const betaHov  = hoveredButtonId === 'btn_side_beta';
 
-  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', 'Suit Alpha', 'West entrance / Spawn A', '#76f4ff', alphaHov);
-  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA',  'Suit Beta', 'East entrance / Spawn B', '#ff8c42', betaHov);
+  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', 'Suit Alpha', 'West entrance', '#76f4ff', alphaHov);
+  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA',  'Suit Beta', 'East entrance', '#ff8c42', betaHov);
 
   registerButton('btn_side_alpha', alphaX, cardY, cardW, cardH);
   registerButton('btn_side_beta',  betaX,  cardY, cardW, cardH);
