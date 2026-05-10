@@ -67,11 +67,12 @@ export function createBotClient(gs) {
     },
 
     // Called by handleIncomingShot after the bot's shot resolves against the player fleet.
-    // Records the result in gs.botTarget, updates AI state, then schedules next bot shot.
+    // Records the result in gs.botTarget and updates AI state only — does NOT schedule
+    // the next bot shot. The schedule lives entirely in sendShot so the bot fires exactly
+    // once per player turn.
     sendShotResult(col, row, hit, sunk, shipId, fleetDestroyed) {
       gs.botTarget = recordShotResult(gs.botTarget, col, row, hit, sunk, shipId);
       updateBotState(botState, col, row, hit, sunk, shipId);
-      if (!fleetDestroyed) scheduleBotShot();
     },
 
     // No-ops for methods battle.js / game.js may call on net in solo mode.

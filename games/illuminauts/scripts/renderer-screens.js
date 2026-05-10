@@ -60,14 +60,14 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('CHOOSE YOUR SUIT', cx, cy * 0.46);
+  ctx.fillText('CHOOSE YOUR SIDE', cx, cy * 0.46);
   ctx.restore();
 
   ctx.fillStyle = '#4a6a7a';
   ctx.font = `${Math.max(11, Math.floor(titleSize * 0.35))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Your suit determines your starting position — queue joins your preferred side', cx, cy * 0.46 + titleSize * 0.9);
+  ctx.fillText('Your side determines your starting position', cx, cy * 0.46 + titleSize * 0.9);
 
   const cardW = Math.min(230, width * 0.3);
   const cardH = Math.max(190, cardW * 0.95);
@@ -79,8 +79,8 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   const alphaHov = hoveredButtonId === 'btn_side_alpha';
   const betaHov  = hoveredButtonId === 'btn_side_beta';
 
-  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', 'Suit Alpha', 'West entrance', '#76f4ff', alphaHov);
-  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA',  'Suit Beta', 'East entrance', '#ff8c42', betaHov);
+  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', 'West entrance', '#76f4ff', alphaHov);
+  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA', 'East entrance', '#ff8c42', betaHov);
 
   registerButton('btn_side_alpha', alphaX, cardY, cardW, cardH);
   registerButton('btn_side_beta',  betaX,  cardY, cardW, cardH);
