@@ -36,13 +36,19 @@ export function createOnlineClient() {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // Server may send clientId on first connect or embed it in messages.
-    if (msg.clientId && !_clientId) _clientId = msg.clientId;
-
     switch (msg.event) {
-      case 'room_created':
-        _coordinator = true;
-        cb.onRoomCreated?.(msg.code ?? msg.roomCode ?? '');
+      case 'connected':
+        // Server sends this as its first message with the assigned clientId.
+        _clientId = msg.clientId || _clientId;
+        cb.onConnected?.();
+        break;
+
+      case 'room_joined':
+        // Fired for both create_room (created:true) and join_room (created:false).
+        if (msg.created) {
+          _coordinator = true;
+          cb.onRoomCreated?.(msg.roomCode ?? msg.code ?? '');
+        }
         break;
 
       case 'searching':
@@ -57,23 +63,24 @@ export function createOnlineClient() {
         });
         break;
 
+      case 'player_left':
       case 'partner_left':
       case 'opponent_left':
-      case 'player_left':
         if (_inRoom) {
           _inRoom = false;
           cb.onPartnerLeft?.();
         }
         break;
 
-      default:
-        // In-room relay messages
-        if (msg.type === 'room_message') {
-          if (_clientId && msg.senderId === _clientId) return; // filter self-echo
+      case 'message':
+        // Server relays room_message payloads with event:'message'.
+        if (_clientId && msg.senderId === _clientId) return; // filter self-echo
+        {
           let value;
           try { value = JSON.parse(msg.value); } catch { value = msg.value; }
           cb.onRemoteMessage?.({ messageType: msg.messageType, value });
         }
+        break;
     }
   }
 
@@ -81,10 +88,6 @@ export function createOnlineClient() {
 
   function connect() {
     ws = new WebSocket(WS_URL);
-
-    ws.addEventListener('open', () => {
-      cb.onConnected?.();
-    });
 
     ws.addEventListener('message', (e) => {
       _handleMessage(e.data);
@@ -95,6 +98,7 @@ export function createOnlineClient() {
         _inRoom = false;
         cb.onPartnerLeft?.();
       }
+      ws = null;
     });
 
     ws.addEventListener('error', () => {
