@@ -31,11 +31,7 @@ export function getTurretPhase(turret, elapsed) {
 }
 
 export function getTurretBeamTiles(turret) {
-  const tiles = [];
-  for (let i = 1; i <= turret.range; i++) {
-    tiles.push({ x: turret.x + turret.dx * i, y: turret.y + turret.dy * i });
-  }
-  return tiles;
+  return turret.beamTiles; // precomputed in state.js; turrets never move
 }
 
 export function isHazardAt(hazards, x, y, elapsed) {

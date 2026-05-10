@@ -202,19 +202,18 @@ function getBeaconBounds(map) {
   return { minX, minY, maxX, maxY };
 }
 
-function beaconPieceName(map, wx, wy) {
-  const b = getBeaconBounds(map);
-  if (!b) return null;
-  const cx = Math.floor((b.minX + b.maxX) / 2);
-  const cy = Math.floor((b.minY + b.maxY) / 2);
+function beaconPieceName(bounds, wx, wy) {
+  if (!bounds) return null;
+  const cx = Math.floor((bounds.minX + bounds.maxX) / 2);
+  const cy = Math.floor((bounds.minY + bounds.maxY) / 2);
   const lx = wx - (cx - 1);
   const ly = wy - (cy - 1);
   if (lx < 0 || lx > 2 || ly < 0 || ly > 2) return null;
   return `beacon${ly}${lx}`;
 }
 
-function drawBeaconPiece(ctx, map, wx, wy, sx, sy, size) {
-  const piece = beaconPieceName(map, wx, wy);
+function drawBeaconPiece(ctx, bounds, wx, wy, sx, sy, size) {
+  const piece = beaconPieceName(bounds, wx, wy);
   if (!piece) return;
   if (!drawSprite(ctx, piece, sx, sy, size, size)) glyph(ctx, 'B', sx, sy, size, '#00130b');
 }
@@ -267,9 +266,10 @@ function drawWorld(ctx, map, hazards, elapsed, startX, startY, size, offX, offY,
     }
   }
 
-  // Pass 2: beacon core pieces
+  // Pass 2: beacon core pieces (bounds computed once, not per tile)
+  const beaconBounds = getBeaconBounds(map);
   for (const goal of map.goals) {
-    drawBeaconPiece(ctx, map, goal.x, goal.y, sx(goal.x), sy(goal.y), size);
+    drawBeaconPiece(ctx, beaconBounds, goal.x, goal.y, sx(goal.x), sy(goal.y), size);
   }
 
   // Pass 3: laser doors

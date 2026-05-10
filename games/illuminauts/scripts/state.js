@@ -7,6 +7,11 @@ export function createGameState(mapIndex = 0, role = 'A') {
   const mapDef = MAPS[mapIndex % MAPS.length];
   const map = createWorldMap(mapDef.raw);
   const hazards = JSON.parse(JSON.stringify(mapDef.hazards));
+  // Turrets don't move — precompute beam tiles once so getTurretBeamTiles() never allocates.
+  for (const t of hazards.turrets) {
+    t.beamTiles = [];
+    for (let i = 1; i <= t.range; i++) t.beamTiles.push({ x: t.x + t.dx * i, y: t.y + t.dy * i });
+  }
 
   const localStart  = role === 'B' ? map.start2 : map.start;
   const remoteStart = role === 'B' ? map.start  : map.start2;
