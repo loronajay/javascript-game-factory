@@ -49,22 +49,71 @@ function glyph(ctx, text, sx, sy, size, color) {
 
 // ─── UI button helper ─────────────────────────────────────────────────────────
 
-function drawButton(ctx, label, x, y, w, h, registerButton, id) {
-  ctx.fillStyle = 'rgba(14, 30, 50, 0.92)';
-  ctx.strokeStyle = '#76f4ff';
-  ctx.lineWidth = 1.5;
+function drawButton(ctx, label, x, y, w, h, registerButton, id, isHovered = false) {
+  ctx.save();
+  if (isHovered) {
+    ctx.shadowColor = 'rgba(118, 244, 255, 0.5)';
+    ctx.shadowBlur  = 14;
+  }
+  ctx.fillStyle   = isHovered ? 'rgba(28, 58, 82, 0.97)' : 'rgba(14, 30, 50, 0.92)';
+  ctx.strokeStyle = isHovered ? '#a8f0ff' : '#76f4ff';
+  ctx.lineWidth   = isHovered ? 2 : 1.5;
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, 6);
   ctx.fill();
   ctx.stroke();
+  ctx.restore();
 
-  ctx.fillStyle = '#c8eeff';
+  ctx.fillStyle = isHovered ? '#e8f8ff' : '#c8eeff';
   ctx.font = `${Math.floor(h * 0.4)}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x + w / 2, y + h / 2);
 
   if (registerButton) registerButton(id, x, y, w, h);
+}
+
+// ─── Role selection card ──────────────────────────────────────────────────────
+
+function drawRoleCard(ctx, x, y, w, h, title, subtitle, detail, accentColor, isHovered) {
+  ctx.save();
+  if (isHovered) {
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur  = 22;
+  }
+  ctx.fillStyle   = isHovered ? 'rgba(22, 50, 70, 0.97)' : 'rgba(14, 30, 50, 0.92)';
+  ctx.strokeStyle = isHovered ? accentColor : 'rgba(118, 244, 255, 0.35)';
+  ctx.lineWidth   = isHovered ? 2.5 : 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Large letter glyph
+  const iconSize = Math.floor(h * 0.28);
+  ctx.fillStyle = isHovered ? accentColor : 'rgba(118, 244, 255, 0.5)';
+  ctx.font = `bold ${iconSize}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title[0], x + w / 2, y + h * 0.3);
+
+  ctx.fillStyle = isHovered ? '#e0f4ff' : '#a8c8d8';
+  ctx.font = `bold ${Math.floor(h * 0.115)}px system-ui, sans-serif`;
+  ctx.fillText(title, x + w / 2, y + h * 0.54);
+
+  ctx.fillStyle = isHovered ? accentColor : '#4a6a7a';
+  ctx.font = `${Math.floor(h * 0.09)}px system-ui, sans-serif`;
+  ctx.fillText(subtitle, x + w / 2, y + h * 0.68);
+
+  ctx.fillStyle = '#3a5060';
+  ctx.font = `${Math.floor(h * 0.08)}px system-ui, sans-serif`;
+  ctx.fillText(detail, x + w / 2, y + h * 0.8);
+
+  ctx.fillStyle = isHovered ? 'rgba(200,230,255,0.75)' : 'rgba(200,230,255,0.3)';
+  ctx.font = `${Math.floor(h * 0.075)}px ui-monospace, Consolas, monospace`;
+  ctx.fillText('[ SELECT ]', x + w / 2, y + h * 0.91);
+  ctx.restore();
 }
 
 // ─── Individual entity drawers ────────────────────────────────────────────────
@@ -375,7 +424,7 @@ function drawDarkBg(ctx, width, height, glowColor = 'rgba(118, 244, 255, 0.07)')
 
 // ─── Exported render functions ────────────────────────────────────────────────
 
-export function renderMenu(canvas, now, registerButton) {
+export function renderMenu(canvas, hoveredButtonId, registerButton) {
   resizeCanvasToDisplaySize(canvas);
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -393,24 +442,20 @@ export function renderMenu(canvas, now, registerButton) {
   ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('ILLUMINAUTS', cx, cy * 0.56);
+  ctx.fillText('ILLUMINAUTS', cx, cy * 0.54);
   ctx.restore();
 
   ctx.fillStyle = '#4a6a7a';
   ctx.font = `${Math.max(13, Math.floor(titleSize * 0.3))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('2-Player Online Maze Race', cx, cy * 0.56 + titleSize * 0.84);
+  ctx.fillText('2-Player Online Maze Race', cx, cy * 0.54 + titleSize * 0.84);
 
   const btnW = Math.min(300, width * 0.44);
-  const btnH = Math.max(44, Math.floor(Math.min(width, height) * 0.065));
+  const btnH = Math.max(50, Math.floor(Math.min(width, height) * 0.072));
   const btnX = cx - btnW / 2;
-  const gap  = Math.floor(btnH * 0.38);
-  const btnStartY = cy * 0.86;
 
-  drawButton(ctx, 'Find Match',   btnX, btnStartY,                    btnW, btnH, registerButton, 'btn_find_match');
-  drawButton(ctx, 'Create Room',  btnX, btnStartY + (btnH + gap),     btnW, btnH, registerButton, 'btn_create_room');
-  drawButton(ctx, 'Join Room',    btnX, btnStartY + (btnH + gap) * 2, btnW, btnH, registerButton, 'btn_join_room');
+  drawButton(ctx, 'PLAY ONLINE', btnX, cy * 0.9, btnW, btnH, registerButton, 'btn_play_online', hoveredButtonId === 'btn_play_online');
 
   ctx.fillStyle = '#1e2e38';
   ctx.font = `${Math.max(10, Math.floor(titleSize * 0.18))}px ui-monospace, Consolas, monospace`;
@@ -419,7 +464,7 @@ export function renderMenu(canvas, now, registerButton) {
   ctx.fillText('WASD / Arrows — move  |  Shift — sprint  |  F3 — debug', cx, height - Math.max(18, height * 0.035));
 }
 
-export function renderSearching(canvas, now, registerButton) {
+export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   resizeCanvasToDisplaySize(canvas);
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -429,109 +474,203 @@ export function renderSearching(canvas, now, registerButton) {
   const cx = width / 2;
   const cy = height / 2;
   const titleSize = Math.max(22, Math.floor(Math.min(width, height) * 0.06));
-  const dots = '.'.repeat(1 + Math.floor(now / 500) % 3);
 
+  ctx.save();
+  ctx.shadowColor = 'rgba(118, 244, 255, 0.4)';
+  ctx.shadowBlur = titleSize * 0.6;
   ctx.fillStyle = '#76f4ff';
   ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Searching for opponent' + dots, cx, cy * 0.82);
-
-  ctx.fillStyle = '#4a6a7a';
-  ctx.font = `${Math.max(12, Math.floor(titleSize * 0.55))}px system-ui, sans-serif`;
-  ctx.fillText('Waiting in public queue', cx, cy * 0.82 + titleSize * 1.1);
-
-  const btnW = Math.min(200, width * 0.3);
-  const btnH = Math.max(40, Math.floor(Math.min(width, height) * 0.058));
-  drawButton(ctx, 'Cancel', cx - btnW / 2, cy * 1.3, btnW, btnH, registerButton, 'btn_back_to_menu');
-}
-
-export function renderRoomHost(canvas, code, now, registerButton) {
-  resizeCanvasToDisplaySize(canvas);
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-
-  drawDarkBg(ctx, width, height);
-
-  const cx = width / 2;
-  const cy = height / 2;
-  const titleSize = Math.max(18, Math.floor(Math.min(width, height) * 0.048));
-  const codeSize  = Math.max(36, Math.floor(Math.min(width, height) * 0.1));
-
-  ctx.fillStyle = '#4a6a7a';
-  ctx.font = `${titleSize}px system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Share this code with your partner:', cx, cy * 0.6);
-
-  ctx.save();
-  ctx.shadowColor = 'rgba(118, 244, 255, 0.5)';
-  ctx.shadowBlur = codeSize * 0.6;
-  ctx.fillStyle = '#76f4ff';
-  ctx.font = `bold ${codeSize}px ui-monospace, Consolas, monospace`;
-  ctx.fillText(code || '···', cx, cy * 0.88);
+  ctx.fillText('CHOOSE YOUR SUIT', cx, cy * 0.46);
   ctx.restore();
 
-  const dots = '.'.repeat(1 + Math.floor(now / 600) % 3);
   ctx.fillStyle = '#4a6a7a';
-  ctx.font = `${Math.max(12, Math.floor(titleSize * 0.82))}px system-ui, sans-serif`;
-  ctx.fillText('Waiting for partner' + dots, cx, cy * 1.08);
+  ctx.font = `${Math.max(11, Math.floor(titleSize * 0.35))}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Your suit determines your starting position — queue joins your preferred side', cx, cy * 0.46 + titleSize * 0.9);
 
-  const btnW = Math.min(200, width * 0.3);
-  const btnH = Math.max(40, Math.floor(Math.min(width, height) * 0.058));
-  drawButton(ctx, 'Cancel', cx - btnW / 2, cy * 1.32, btnW, btnH, registerButton, 'btn_back_to_menu');
+  const cardW = Math.min(230, width * 0.3);
+  const cardH = Math.max(190, cardW * 0.95);
+  const gap   = Math.max(24, width * 0.035);
+  const cardY = cy * 0.6;
+
+  const alphaX = cx - gap / 2 - cardW;
+  const betaX  = cx + gap / 2;
+  const alphaHov = hoveredButtonId === 'btn_side_alpha';
+  const betaHov  = hoveredButtonId === 'btn_side_beta';
+
+  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', 'Suit Alpha — Cyan', 'South entrance / Spawn A', '#76f4ff', alphaHov);
+  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA',  'Suit Beta — Orange', 'North entrance / Spawn B', '#ff8c42', betaHov);
+
+  registerButton('btn_side_alpha', alphaX, cardY, cardW, cardH);
+  registerButton('btn_side_beta',  betaX,  cardY, cardW, cardH);
+
+  ctx.fillStyle = '#1e2e38';
+  ctx.font = `${Math.max(10, Math.floor(titleSize * 0.28))}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ESC — back to menu', cx, height - Math.max(18, height * 0.038));
 }
 
-export function renderRoomJoin(canvas, code, now, registerButton) {
-  resizeCanvasToDisplaySize(canvas);
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
+// ─── Lobby sub-renderers (not exported) ──────────────────────────────────────
 
-  drawDarkBg(ctx, width, height);
+function _renderLobbyMain(ctx, cx, cy, width, height, btnH, hoveredButtonId, registerButton) {
+  const btnW = Math.min(300, width * 0.44);
+  const btnX = cx - btnW / 2;
+  const gap  = Math.floor(btnH * 0.4);
 
-  const cx = width / 2;
-  const cy = height / 2;
-  const labelSize = Math.max(16, Math.floor(Math.min(width, height) * 0.042));
-  const codeSize  = Math.max(28, Math.floor(Math.min(width, height) * 0.072));
+  drawButton(ctx, 'Find Match',       btnX, cy * 0.78,            btnW, btnH, registerButton, 'btn_find_match',  hoveredButtonId === 'btn_find_match');
+  drawButton(ctx, 'Play With Friend', btnX, cy * 0.78 + btnH + gap, btnW, btnH, registerButton, 'btn_play_friend', hoveredButtonId === 'btn_play_friend');
+}
+
+function _renderLobbySearching(ctx, cx, cy, width, height, btnH, searchTick, hoveredButtonId, registerButton) {
+  const dots = '.'.repeat(1 + Math.floor(searchTick / 35) % 3);
+  const textSize = Math.max(18, Math.floor(Math.min(width, height) * 0.046));
+
+  ctx.fillStyle = '#76f4ff';
+  ctx.font = `bold ${textSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Searching for opponent' + dots, cx, cy * 0.8);
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(11, Math.floor(textSize * 0.58))}px system-ui, sans-serif`;
+  ctx.fillText('Waiting in public queue', cx, cy * 0.8 + textSize * 1.1);
+
+  const btnW = Math.min(200, width * 0.3);
+  drawButton(ctx, 'Cancel', cx - btnW / 2, cy * 1.28, btnW, btnH, registerButton, 'btn_cancel', hoveredButtonId === 'btn_cancel');
+}
+
+function _renderLobbyFriendOptions(ctx, cx, cy, width, height, btnH, hoveredButtonId, registerButton) {
+  const labelSize = Math.max(14, Math.floor(Math.min(width, height) * 0.036));
 
   ctx.fillStyle = '#a8c8d8';
   ctx.font = `${labelSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Enter room code:', cx, cy * 0.6);
+  ctx.fillText('How would you like to connect?', cx, cy * 0.72);
 
-  // Input box
+  const btnW = Math.min(280, width * 0.42);
+  const btnX = cx - btnW / 2;
+  const gap  = Math.floor(btnH * 0.4);
+
+  drawButton(ctx, 'Create Room', btnX, cy * 0.84,            btnW, btnH, registerButton, 'btn_create_room', hoveredButtonId === 'btn_create_room');
+  drawButton(ctx, 'Enter Code',  btnX, cy * 0.84 + btnH + gap, btnW, btnH, registerButton, 'btn_enter_code',  hoveredButtonId === 'btn_enter_code');
+}
+
+function _renderLobbyCreate(ctx, cx, cy, width, height, btnH, hostCode, searchTick, hoveredButtonId, registerButton) {
+  const codeSize  = Math.max(36, Math.floor(Math.min(width, height) * 0.1));
+  const labelSize = Math.max(13, Math.floor(codeSize * 0.3));
+
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${labelSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Share this code with your partner:', cx, cy * 0.58);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(118, 244, 255, 0.5)';
+  ctx.shadowBlur = codeSize * 0.5;
+  ctx.fillStyle = '#76f4ff';
+  ctx.font = `bold ${codeSize}px ui-monospace, Consolas, monospace`;
+  ctx.fillText(hostCode || '···', cx, cy * 0.86);
+  ctx.restore();
+
+  const dots = '.'.repeat(1 + Math.floor(searchTick / 35) % 3);
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${Math.max(12, Math.floor(labelSize * 0.9))}px system-ui, sans-serif`;
+  ctx.fillText('Waiting for partner' + dots, cx, cy * 1.06);
+
+  const btnW = Math.min(200, width * 0.3);
+  drawButton(ctx, 'Cancel', cx - btnW / 2, cy * 1.28, btnW, btnH, registerButton, 'btn_cancel', hoveredButtonId === 'btn_cancel');
+}
+
+function _renderLobbyJoin(ctx, cx, cy, width, height, btnH, codeInput, now, hoveredButtonId, registerButton) {
+  const codeSize  = Math.max(28, Math.floor(Math.min(width, height) * 0.072));
+  const labelSize = Math.max(13, Math.floor(codeSize * 0.48));
+
+  ctx.fillStyle = '#a8c8d8';
+  ctx.font = `${labelSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText("Enter your partner's room code:", cx, cy * 0.58);
+
   const boxW = Math.min(320, width * 0.52);
   const boxH = Math.max(52, codeSize * 1.5);
   const boxX = cx - boxW / 2;
-  const boxY = cy * 0.74;
+  const boxY = cy * 0.7;
 
   ctx.fillStyle = 'rgba(10, 24, 40, 0.9)';
   ctx.strokeStyle = '#76f4ff';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxW, boxH, 6);
   ctx.fill();
   ctx.stroke();
 
-  // Blinking cursor
-  const cursorChar = Math.floor(now / 500) % 2 === 0 ? '|' : '';
+  const cursorOn = Math.floor(now / 500) % 2 === 0;
   ctx.fillStyle = '#76f4ff';
   ctx.font = `bold ${codeSize}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText((code || '') + cursorChar, cx, boxY + boxH / 2);
+  ctx.fillText((codeInput || '') + (cursorOn ? '|' : ' '), cx, boxY + boxH / 2);
 
   ctx.fillStyle = '#4a6a7a';
-  ctx.font = `${Math.max(11, Math.floor(labelSize * 0.7))}px system-ui, sans-serif`;
-  ctx.fillText('Type code, then press Enter or click Join', cx, boxY + boxH + labelSize * 0.9);
+  ctx.font = `${Math.max(11, Math.floor(labelSize * 0.72))}px system-ui, sans-serif`;
+  ctx.fillText('Type code — Enter or click Join', cx, boxY + boxH + labelSize * 0.9);
 
-  const btnW = Math.min(180, width * 0.28);
-  const btnH = Math.max(40, Math.floor(Math.min(width, height) * 0.058));
-  const btnY  = cy * 1.3;
+  const btnW = Math.min(180, width * 0.27);
+  const btnY  = cy * 1.28;
 
-  drawButton(ctx, 'Join',   cx - btnW - 8,  btnY, btnW, btnH, registerButton, 'btn_join_submit');
-  drawButton(ctx, 'Back',   cx + 8,          btnY, btnW, btnH, registerButton, 'btn_back_to_menu');
+  drawButton(ctx, 'Join', cx - btnW - 10, btnY, btnW, btnH, registerButton, 'btn_join_submit', hoveredButtonId === 'btn_join_submit');
+  drawButton(ctx, 'Back', cx + 10,        btnY, btnW, btnH, registerButton, 'btn_back',        hoveredButtonId === 'btn_back');
+}
+
+export function renderLobby(canvas, { lobbyPhase, side, hostCode, codeInput, searchTick }, hoveredButtonId, now, registerButton) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const titleSize = Math.max(20, Math.floor(Math.min(width, height) * 0.052));
+  const btnH = Math.max(44, Math.floor(Math.min(width, height) * 0.065));
+
+  // Header
+  const sideColor = side === 'alpha' ? '#76f4ff' : '#ff8c42';
+  const sideLabel = side === 'alpha' ? 'ALPHA' : 'BETA';
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(118, 244, 255, 0.3)';
+  ctx.shadowBlur  = titleSize * 0.5;
+  ctx.fillStyle   = '#76f4ff';
+  ctx.font        = `bold ${titleSize}px system-ui, sans-serif`;
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ILLUMINAUTS — ONLINE', cx, cy * 0.34);
+  ctx.restore();
+
+  ctx.fillStyle  = sideColor;
+  ctx.font       = `bold ${Math.max(11, Math.floor(titleSize * 0.42))}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign  = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`SUIT ${sideLabel} LOCKED`, cx, cy * 0.34 + titleSize * 0.88);
+
+  if (lobbyPhase === 'main')           _renderLobbyMain(ctx, cx, cy, width, height, btnH, hoveredButtonId, registerButton);
+  else if (lobbyPhase === 'searching') _renderLobbySearching(ctx, cx, cy, width, height, btnH, searchTick, hoveredButtonId, registerButton);
+  else if (lobbyPhase === 'friend_options') _renderLobbyFriendOptions(ctx, cx, cy, width, height, btnH, hoveredButtonId, registerButton);
+  else if (lobbyPhase === 'create')    _renderLobbyCreate(ctx, cx, cy, width, height, btnH, hostCode, searchTick, hoveredButtonId, registerButton);
+  else if (lobbyPhase === 'join')      _renderLobbyJoin(ctx, cx, cy, width, height, btnH, codeInput, now, hoveredButtonId, registerButton);
+
+  ctx.fillStyle = '#1e2e38';
+  ctx.font = `${Math.max(10, Math.floor(titleSize * 0.26))}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ESC — back', cx, height - Math.max(18, height * 0.038));
 }
 
 export function renderCountdown(canvas, seconds, now) {
@@ -561,7 +700,7 @@ export function renderCountdown(canvas, seconds, now) {
   ctx.restore();
 }
 
-export function renderDisconnected(canvas, now, registerButton) {
+export function renderDisconnected(canvas, hoveredButtonId, registerButton) {
   resizeCanvasToDisplaySize(canvas);
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -584,7 +723,7 @@ export function renderDisconnected(canvas, now, registerButton) {
 
   const btnW = Math.min(220, width * 0.34);
   const btnH = Math.max(42, Math.floor(Math.min(width, height) * 0.062));
-  drawButton(ctx, 'Return to Menu', cx - btnW / 2, cy * 1.2, btnW, btnH, registerButton, 'btn_back_to_menu');
+  drawButton(ctx, 'Return to Menu', cx - btnW / 2, cy * 1.2, btnW, btnH, registerButton, 'btn_back_to_menu', hoveredButtonId === 'btn_back_to_menu');
 }
 
 export function renderWinScreen(canvas, state, now, winnerIsLocal = true, winnerName = '') {

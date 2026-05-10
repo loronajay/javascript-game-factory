@@ -7,17 +7,17 @@ export function createOnlineClient() {
   let ws         = null;
   let _clientId  = null;
   let _inRoom    = false;
-  let _coordinator = false; // true if we created the private room
+  let _coordinator = false;
 
-  // Caller assigns callbacks after createOnlineClient().
+  // Caller assigns callbacks directly: onlineClient.cb.onConnected = () => { ... }
   const cb = {
     onConnected:    null, // ()
     onSearching:    null, // ()
     onRoomCreated:  null, // (code: string)
-    onMatchReady:   null, // ({ serverNow: number, startAt: number })
-    onRemoteMessage: null, // ({ messageType: string, value: any })
+    onMatchReady:   null, // ({ remoteSide, serverNow, startAt })
+    onRemoteMessage: null, // ({ messageType, value })
     onPartnerLeft:  null, // ()
-    onError:        null, // (code: string, message: string)
+    onError:        null, // (code, message)
   };
 
   // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -58,8 +58,9 @@ export function createOnlineClient() {
       case 'match_ready':
         _inRoom = true;
         cb.onMatchReady?.({
-          serverNow: msg.serverNow ?? Date.now(),
-          startAt:   msg.startAt   ?? (Date.now() + 3000),
+          remoteSide: msg.remoteSide ?? null,
+          serverNow:  msg.serverNow  ?? Date.now(),
+          startAt:    msg.startAt    ?? (Date.now() + 3000),
         });
         break;
 
@@ -87,6 +88,7 @@ export function createOnlineClient() {
   // ─── Public API ──────────────────────────────────────────────────────────────
 
   function connect() {
+    if (ws) return; // already connected — don't double-open
     ws = new WebSocket(WS_URL);
 
     ws.addEventListener('message', (e) => {
@@ -107,42 +109,50 @@ export function createOnlineClient() {
   }
 
   return {
-    get callbacks() { return cb; },
+    cb,
 
     connect,
 
-    findMatch(playerId, displayName) {
-      _send({ type: 'find_match', gameId: 'illuminauts', playerId, displayName });
-      cb.onSearching?.();
+    // side: 'alpha' | 'beta' — server queues alpha with beta
+    findMatch(side, playerId, displayName) {
+      _send({ type: 'find_match', gameId: 'illuminauts', side, playerId, displayName });
     },
 
-    createRoom(playerId, displayName) {
+    createRoom(side, playerId, displayName) {
       _coordinator = true;
-      _send({ type: 'create_room', playerId, displayName });
+      _send({ type: 'create_room', side, playerId, displayName });
     },
 
-    joinRoom(code, playerId, displayName) {
+    joinRoom(side, code, playerId, displayName) {
       _coordinator = false;
-      _send({ type: 'join_room', roomCode: code.trim().toUpperCase(), playerId, displayName });
+      _send({ type: 'join_room', roomCode: code.trim().toUpperCase(), side, playerId, displayName });
     },
 
-    // Send local player tile position every step.
+    cancelSearch() {
+      _send({ type: 'cancel_match' });
+    },
+
+    cancelRoom() {
+      _inRoom = false;
+      _coordinator = false;
+      _send({ type: 'leave_room' });
+    },
+
     sendPosition(x, y, dir) {
       _roomMsg('position', { x, y, dir });
     },
 
-    // Send a game event (pickup_taken, door_opened, player_died, won).
     sendEvent(type, data = {}) {
       _roomMsg('event', { type, ...data });
     },
 
-    // Relay identity for role determination.
-    sendProfile(playerId, displayName) {
-      _roomMsg('profile', { playerId, displayName });
+    sendProfile(playerId, displayName, side) {
+      _roomMsg('profile', { playerId, displayName, side });
     },
 
     disconnect() {
       _inRoom = false;
+      _coordinator = false;
       ws?.close();
       ws = null;
     },
