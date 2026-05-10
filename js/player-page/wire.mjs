@@ -10,7 +10,7 @@ import {
   shareThoughtPostWithApi,
   syncThoughtCommentsFromApi,
 } from "../platform/thoughts/thoughts.mjs";
-import { initProfileMusicPlayer } from "../me-page/music-player.mjs";
+import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { createPlayerHeroActions } from "./hero-actions.mjs";
 import { createPlayerMediaActions } from "./media-actions.mjs";
 import { createPlayerThoughtComposerActions } from "./thought-composer-actions.mjs";

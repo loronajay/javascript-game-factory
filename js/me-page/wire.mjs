@@ -24,7 +24,7 @@ import {
   submitGalleryUpload,
   uploadPendingThoughtPhoto,
 } from "./media-actions.mjs";
-import { initProfileMusicPlayer } from "./music-player.mjs";
+import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
   initPageGalleryViewer({ doc, apiClient });
