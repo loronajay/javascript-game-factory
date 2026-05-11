@@ -1,0 +1,77 @@
+.me-edit-shell {
+  background: var(--color-bg, #0a0a14);
+  min-height: 100vh;
+}
+
+.me-edit-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 0 1rem 3rem;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.me-edit-stage__nav {
+  padding: 0.75rem 0;
+}
+
+.me-edit-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.me-edit-topbar__back {
+  color: var(--color-accent, #7ec8e3);
+  text-decoration: none;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.me-edit-topbar__back:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.me-edit-topbar__title {
+  font-size: 1.1rem;
+  margin: 0;
+  flex: 1;
+}
+
+.me-edit-topbar__dirty {
+  font-size: 0.78rem;
+  color: var(--color-warn, #f0c040);
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.me-edit-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.me-edit-card .player-card__form {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (max-width: 600px) {
+  .me-edit-stage {
+    padding: 0 0.75rem 2rem;
+  }
+
+  .me-edit-card {
+    padding: 1rem;
+  }
+}

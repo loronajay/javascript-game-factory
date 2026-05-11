@@ -26,7 +26,7 @@ import {
 } from "./media-actions.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 
-export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, profilePanel, authClient }) {
+export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, authClient }) {
   initPageGalleryViewer({ doc, apiClient });
   let musicPlayer = null;
   const friendNavigator = createFriendNavigatorController();
@@ -41,7 +41,6 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     const renderState = await pageData.loadRenderState({ shouldHydrate });
 
     const socialViewState = socialActions.getViewState();
-    profilePanel?.render?.("");
     renderPage(doc, renderState.profile, {
       thoughtFeed: renderState.thoughtFeed,
       thoughtComposerFlash,
@@ -241,9 +240,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
 
     const openFavoritePickerButton = event.target.closest("[data-open-favorite-picker]");
     if (openFavoritePickerButton) {
-      profilePanel?.openPanel?.();
-      const favoriteInput = doc.getElementById("playerProfileFavoriteGame");
-      favoriteInput?.focus?.();
+      window.location.href = "edit/#playerProfileFavoriteGame";
       return;
     }
 

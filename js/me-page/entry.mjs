@@ -1,4 +1,3 @@
-import { initArcadeProfilePanel } from "../arcade-profile.mjs";
 import { bindFactoryProfileToSession } from "../platform/identity/factory-profile.mjs";
 import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
@@ -31,9 +30,8 @@ if (doc?.getElementById) {
     bindFactoryProfileToSession(session.playerId, storage);
     const apiClient = createPlatformApiClient();
     const authClient = createAuthApiClient();
-    const profilePanel = initArcadeProfilePanel({ storage });
     renderMePage(doc);
-    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, profilePanel, authClient });
+    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, authClient });
     initSessionNav(doc.getElementById("meAuthNav"), {
       signInPath: "../sign-in/index.html",
       signUpPath: "../sign-up/index.html",

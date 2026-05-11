@@ -79,8 +79,8 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   const alphaHov = hoveredButtonId === 'btn_side_alpha';
   const betaHov  = hoveredButtonId === 'btn_side_beta';
 
-  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', 'West entrance', '#76f4ff', alphaHov);
-  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA', 'East entrance', '#ff8c42', betaHov);
+  drawRoleCard(ctx, alphaX, cardY, cardW, cardH, 'ALPHA', '', 'West entrance', '#76f4ff', alphaHov);
+  drawRoleCard(ctx, betaX,  cardY, cardW, cardH, 'BETA',  '', 'East entrance', '#ff8c42', betaHov);
 
   registerButton('btn_side_alpha', alphaX, cardY, cardW, cardH);
   registerButton('btn_side_beta',  betaX,  cardY, cardW, cardH);

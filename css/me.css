@@ -357,6 +357,16 @@
   transform: none;
 }
 
+.me-danger-flash {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #99ffff;
+}
+
 /* ---------- RESPONSIVE ---------- */
 
 @media (max-width: 1480px) {

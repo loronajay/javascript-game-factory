@@ -45,6 +45,7 @@ export function initProfileEditorPanel({
   doc = globalThis.document,
   storage = getDefaultPlatformStorage(),
   options = {},
+  onSaved,
 } = {}) {
   const apiClient = options?.apiClient || createPlatformApiClient(options);
   const button = doc?.getElementById?.("playerProfileButton");
@@ -72,7 +73,7 @@ export function initProfileEditorPanel({
   const bgFallback = doc?.getElementById?.("playerProfileBgFallback");
   const bgStatus = doc?.getElementById?.("playerProfileBgStatus");
 
-  if (!button || !panel || !form || !profileNameInput) {
+  if (!form || !profileNameInput) {
     return null;
   }
 
@@ -298,22 +299,22 @@ export function initProfileEditorPanel({
   }
 
   function openPanel() {
-    panel.hidden = false;
-    button.setAttribute("aria-expanded", "true");
+    if (panel) panel.hidden = false;
+    button?.setAttribute("aria-expanded", "true");
     profileNameInput.focus();
     profileNameInput.select();
   }
 
   function closePanel() {
-    panel.hidden = true;
-    button.setAttribute("aria-expanded", "false");
-    button.focus();
+    if (panel) panel.hidden = true;
+    button?.setAttribute("aria-expanded", "false");
+    button?.focus();
   }
 
-  button.addEventListener("click", () => {
-    if (panel.hidden) {
+  button?.addEventListener("click", () => {
+    if (panel && panel.hidden) {
       openPanel();
-    } else {
+    } else if (panel) {
       closePanel();
     }
   });
@@ -381,15 +382,19 @@ export function initProfileEditorPanel({
     pendingBackgroundImageUrl = "";
     setBgStatus("");
     render("PLAYER CARD SAVED");
-    closePanel();
     dispatchProfileUpdatedEvent(doc, "saved", savedProfile);
+    if (typeof onSaved === "function") {
+      onSaved(savedProfile);
+    } else {
+      closePanel();
+    }
   });
 
   mainSqueezeModeInput?.addEventListener("change", syncRelationshipInputState);
   friendRailModeInput?.addEventListener("change", syncRelationshipInputState);
 
   doc.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !panel.hidden) {
+    if (event.key === "Escape" && panel && !panel.hidden) {
       closePanel();
     }
   });

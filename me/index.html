@@ -6,7 +6,6 @@
   <title>Jay's Javascript Arcade | Player Page</title>
   <link rel="stylesheet" href="../css/arcade.css">
   <link rel="stylesheet" href="../css/session-nav.css">
-  <link rel="stylesheet" href="../css/profile-editor-card.css">
   <link rel="stylesheet" href="../css/profile-stage.css">
   <link rel="stylesheet" href="../css/profile-hero.css">
   <link rel="stylesheet" href="../css/profile-hero-card.css">
@@ -39,279 +38,18 @@
         <div id="mePrimaryNav" class="me-stage__nav page-stage__nav"></div>
       </div>
 
-      <button
-        id="playerProfileButton"
+      <a
+        href="edit/"
         class="profile-chip me-stage__edit-chip"
-        type="button"
-        aria-controls="playerProfilePanel"
-        aria-expanded="false"
       >
         <span class="profile-chip__kicker">Owner Controls</span>
         <span class="profile-chip__name">Edit Profile</span>
-      </button>
+      </a>
 
       <div class="me-stage__header page-stage__header">
         <h1 id="meStageTitle" class="pixel-text pixel-text--title me-stage__title">UNNAMED PILOT</h1>
         <p id="meStageSubtitle" class="me-stage__subtitle">No tagline set yet.</p>
       </div>
-
-      <aside id="playerProfilePanel" class="player-card" hidden>
-        <div class="player-card__topline">
-          <p class="player-card__brand">Javascript Game Factory</p>
-          <button id="playerProfileClose" class="player-card__close" type="button">Close</button>
-        </div>
-        <h2 class="pixel-text player-card__title">PLAYER CARD</h2>
-        <p id="playerProfileStatus" class="player-card__status">EDIT YOUR PUBLIC PLAYER PROFILE</p>
-
-        <div class="player-card__meta">
-          <div class="player-card__meta-block">
-            <span class="player-card__meta-label">Factory ID</span>
-            <span id="playerProfileId" class="player-card__meta-value">PENDING-ID</span>
-          </div>
-          <div class="player-card__meta-block">
-            <span class="player-card__meta-label">Arcade Default</span>
-            <span id="playerProfileDefault" class="player-card__meta-value">UNNAMED PILOT</span>
-          </div>
-        </div>
-
-        <form id="playerProfileForm" class="player-card__form">
-          <div class="player-card__avatar-upload">
-            <div class="player-card__avatar-preview-wrap">
-              <img id="playerProfileAvatarPreview" class="player-card__avatar-preview" src="" alt="Your avatar" hidden>
-              <span id="playerProfileAvatarFallback" class="player-card__avatar-fallback" aria-hidden="true"></span>
-            </div>
-            <div class="player-card__avatar-controls">
-              <label class="player-card__field">Profile Photo</label>
-              <button id="playerProfileAvatarButton" class="player-card__action player-card__action--secondary" type="button">Choose Photo</button>
-              <input id="playerProfileAvatarInput" class="player-card__avatar-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload profile photo">
-              <p id="playerProfileAvatarStatus" class="player-card__avatar-status" aria-live="polite"></p>
-            </div>
-          </div>
-
-          <fieldset class="player-card__field player-card__field-group">
-            <legend class="player-card__field-legend">Profile Music</legend>
-            <p class="player-card__hint" style="margin-bottom:0.5rem">Add up to 5 tracks. Drag to reorder.</p>
-            <div id="playerProfileMusicSlots" class="music-editor-slots"></div>
-          </fieldset>
-
-          <div class="player-card__avatar-upload player-card__avatar-upload--bg">
-            <div class="player-card__avatar-preview-wrap player-card__avatar-preview-wrap--bg">
-              <img id="playerProfileBgPreview" class="player-card__bg-preview" src="" alt="Your profile background" hidden>
-              <span id="playerProfileBgFallback" class="player-card__avatar-fallback" aria-hidden="true">No background set</span>
-            </div>
-            <div class="player-card__avatar-controls">
-              <label class="player-card__field">Profile Background</label>
-              <button id="playerProfileBgButton" class="player-card__action player-card__action--secondary" type="button">Choose Background</button>
-              <input id="playerProfileBgInput" class="player-card__avatar-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload profile background">
-              <p id="playerProfileBgStatus" class="player-card__avatar-status" aria-live="polite"></p>
-            </div>
-          </div>
-
-          <label class="player-card__field" for="playerProfileName">Arcade Name</label>
-          <input
-            id="playerProfileName"
-            class="player-card__input"
-            name="profileName"
-            type="text"
-            autocomplete="nickname"
-            spellcheck="false"
-          >
-          <label class="player-card__field" for="playerProfileRealName">Name</label>
-          <input
-            id="playerProfileRealName"
-            class="player-card__input"
-            name="realName"
-            type="text"
-            autocomplete="name"
-            spellcheck="false"
-          >
-          <label class="player-card__field" for="playerProfileBio">About Me</label>
-          <textarea
-            id="playerProfileBio"
-            class="player-card__textarea"
-            name="bio"
-            rows="4"
-            autocomplete="off"
-            spellcheck="true"
-          ></textarea>
-          <fieldset class="player-card__field player-card__field-group">
-            <legend class="player-card__field-legend">Social Links</legend>
-            <div class="player-card__links">
-              <div class="player-card__link-row">
-                <input id="playerProfileLinkId1" name="links[0][id]" type="hidden">
-                <input
-                  id="playerProfileLinkLabel1"
-                  class="player-card__input player-card__input--plain player-card__input--compact"
-                  name="links[0][label]"
-                  type="text"
-                  placeholder="Label"
-                  spellcheck="false"
-                >
-                <input
-                  id="playerProfileLinkUrl1"
-                  class="player-card__input player-card__input--plain"
-                  name="links[0][url]"
-                  type="text"
-                  placeholder="e.g. jayarcade.com"
-                  spellcheck="false"
-                >
-                <select
-                  id="playerProfileLinkKind1"
-                  class="player-card__select"
-                  name="links[0][kind]"
-                >
-                  <option value="external">External</option>
-                  <option value="social">Social</option>
-                  <option value="support">Support</option>
-                  <option value="portfolio">Portfolio</option>
-                </select>
-              </div>
-              <div class="player-card__link-row">
-                <input id="playerProfileLinkId2" name="links[1][id]" type="hidden">
-                <input
-                  id="playerProfileLinkLabel2"
-                  class="player-card__input player-card__input--plain player-card__input--compact"
-                  name="links[1][label]"
-                  type="text"
-                  placeholder="Label"
-                  spellcheck="false"
-                >
-                <input
-                  id="playerProfileLinkUrl2"
-                  class="player-card__input player-card__input--plain"
-                  name="links[1][url]"
-                  type="text"
-                  placeholder="e.g. jayarcade.com"
-                  spellcheck="false"
-                >
-                <select
-                  id="playerProfileLinkKind2"
-                  class="player-card__select"
-                  name="links[1][kind]"
-                >
-                  <option value="external">External</option>
-                  <option value="social">Social</option>
-                  <option value="support">Support</option>
-                  <option value="portfolio">Portfolio</option>
-                </select>
-              </div>
-              <div class="player-card__link-row">
-                <input id="playerProfileLinkId3" name="links[2][id]" type="hidden">
-                <input
-                  id="playerProfileLinkLabel3"
-                  class="player-card__input player-card__input--plain player-card__input--compact"
-                  name="links[2][label]"
-                  type="text"
-                  placeholder="Label"
-                  spellcheck="false"
-                >
-                <input
-                  id="playerProfileLinkUrl3"
-                  class="player-card__input player-card__input--plain"
-                  name="links[2][url]"
-                  type="text"
-                  placeholder="e.g. jayarcade.com"
-                  spellcheck="false"
-                >
-                <select
-                  id="playerProfileLinkKind3"
-                  class="player-card__select"
-                  name="links[2][kind]"
-                >
-                  <option value="external">External</option>
-                  <option value="social">Social</option>
-                  <option value="support">Support</option>
-                  <option value="portfolio">Portfolio</option>
-                </select>
-              </div>
-            </div>
-          </fieldset>
-          <label class="player-card__field" for="playerProfileFavoriteGame">Favorite Game</label>
-          <select
-            id="playerProfileFavoriteGame"
-            class="player-card__select"
-            name="favoriteGameSlug"
-          ></select>
-          <label class="player-card__field" for="playerProfileTagline">Tagline</label>
-          <input
-            id="playerProfileTagline"
-            class="player-card__input"
-            name="tagline"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-          >
-          <fieldset class="player-card__field player-card__field-group">
-            <legend class="player-card__field-legend">Friend Rail</legend>
-            <div class="player-card__rail-grid">
-              <div class="player-card__rail-row">
-                <label class="player-card__field" for="playerProfileMainSqueezeMode">Main Squeeze Mode</label>
-                <select
-                  id="playerProfileMainSqueezeMode"
-                  class="player-card__select"
-                  name="mainSqueezeMode"
-                ></select>
-                <label class="player-card__field" for="playerProfileMainSqueezePlayerId">Main Squeeze Pick</label>
-                <select
-                  id="playerProfileMainSqueezePlayerId"
-                  class="player-card__select"
-                  name="mainSqueezePlayerId"
-                ></select>
-              </div>
-              <div class="player-card__rail-row">
-                <label class="player-card__field" for="playerProfileFriendRailMode">Friend Rail Mode</label>
-                <select
-                  id="playerProfileFriendRailMode"
-                  class="player-card__select"
-                  name="friendRailMode"
-                ></select>
-              </div>
-              <div class="player-card__rail-row">
-                <label class="player-card__field" for="playerProfileFriendSlot1">Friend Slot 1</label>
-                <select
-                  id="playerProfileFriendSlot1"
-                  class="player-card__select"
-                  name="manualFriendSlotPlayerIds[0]"
-                ></select>
-                <label class="player-card__field" for="playerProfileFriendSlot2">Friend Slot 2</label>
-                <select
-                  id="playerProfileFriendSlot2"
-                  class="player-card__select"
-                  name="manualFriendSlotPlayerIds[1]"
-                ></select>
-              </div>
-              <div class="player-card__rail-row">
-                <label class="player-card__field" for="playerProfileFriendSlot3">Friend Slot 3</label>
-                <select
-                  id="playerProfileFriendSlot3"
-                  class="player-card__select"
-                  name="manualFriendSlotPlayerIds[2]"
-                ></select>
-                <label class="player-card__field" for="playerProfileFriendSlot4">Friend Slot 4</label>
-                <select
-                  id="playerProfileFriendSlot4"
-                  class="player-card__select"
-                  name="manualFriendSlotPlayerIds[3]"
-                ></select>
-              </div>
-            </div>
-          </fieldset>
-          <label class="player-card__field player-card__field--checkbox">
-            <input id="playerProfileDiscoverable" type="checkbox" name="discoverable" checked>
-            Show my profile in player search
-          </label>
-          <p id="playerProfileHint" class="player-card__hint">
-            Update your arcade username, optional real name, and custom tagline. Games can still use temporary match aliases during a run.
-          </p>
-          <div class="player-card__actions">
-            <button class="player-card__action player-card__action--primary" type="submit">
-              <span id="playerProfileSaveLabel">STORE CARD</span>
-            </button>
-            <button id="playerProfileClear" class="player-card__action" type="button">CLEAR PROFILE</button>
-          </div>
-          <p id="playerProfileFlash" class="player-card__flash" aria-live="polite"></p>
-        </form>
-      </aside>
 
       <div class="me-layout page-stage__layout">
         <div class="me-layout__main">
@@ -330,7 +68,7 @@
             <h3 class="me-panel__label">DANGER ZONE</h3>
             <p class="me-panel__empty">Permanently delete your account and all associated data. This cannot be undone.</p>
             <button id="meDeleteAccountBtn" class="me-danger-btn" type="button">Delete Account</button>
-            <p id="meDeleteAccountFlash" class="player-card__flash" aria-live="polite"></p>
+            <p id="meDeleteAccountFlash" class="me-danger-flash" aria-live="polite"></p>
           </section>
         </div>
         <div class="me-layout__side me-layout__side--right">
