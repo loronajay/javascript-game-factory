@@ -115,37 +115,38 @@
   order: 2;
 }
 
-#meMusicPanel {
-  order: 3;
-}
-
 #meRankingsPanel {
-  order: 4;
+  order: 3;
 }
 
 #meTopFriendsPanel {
-  order: 5;
+  order: 4;
 }
 
 #meFriendsPanel {
-  order: 6;
+  order: 5;
 }
 
 /* Middle column order */
-#meFavoriteGamePanel {
+
+#meMusicPanel {
   order: 1;
 }
 
-#meFriendCodePanel {
+#meFavoriteGamePanel {
   order: 2;
 }
 
-#meGalleryPanel {
+#meFriendCodePanel {
   order: 3;
 }
 
-.me-panel--danger {
+#meGalleryPanel {
   order: 4;
+}
+
+.me-panel--danger {
+  order: 5;
 }
 
 /* Right column order */
