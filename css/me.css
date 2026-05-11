@@ -29,6 +29,52 @@
   z-index: 5;
 }
 
+/* ---------- EDIT PROFILE CHIP ---------- */
+
+.profile-chip {
+  display: inline-grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: 148px;
+  padding: 6px 12px 7px;
+  border-radius: var(--profile-radius-md);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 232, 167, 0.12), rgba(20, 11, 52, 0.88) 34%, rgba(7, 6, 20, 0.96)),
+    rgba(9, 8, 22, 0.92);
+  color: #fff8ff;
+  text-align: right;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.profile-chip:hover,
+.profile-chip:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.36);
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 214, 189, 0.22) inset,
+    0 0 18px rgba(255, 121, 183, 0.14);
+}
+
+.profile-chip__kicker {
+  color: #ffd7b9;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+}
+
+.profile-chip__name {
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
 .me-stage__title {
   width: min(560px, 90vw);
   margin: 0 auto;
