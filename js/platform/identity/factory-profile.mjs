@@ -99,6 +99,7 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
     avatarAssetId: profileFields.avatarAssetId,
     avatarUrl: sanitizeCachedUrl(source.avatarUrl),
     backgroundImageUrl: profileFields.backgroundImageUrl,
+    backgroundStyle: profileFields.backgroundStyle,
     presence: profileFields.presence,
     favoriteGameSlug: profileFields.favoriteGameSlug,
     ladderPlacements: profileFields.ladderPlacements,
