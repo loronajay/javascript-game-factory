@@ -357,11 +357,6 @@ function renderBadgesPanel(container, title, items) {
 export function renderPlayerPageView(doc, model, options = {}) {
   if (!doc?.getElementById) return;
 
-  const editButton = doc.getElementById("playerProfileButton");
-  if (editButton) {
-    editButton.hidden = !model.showEditProfileButton;
-  }
-
   renderPageHeader(doc, model);
   renderHeroCard(doc.getElementById("playerHeroCard"), model);
   renderIdentityPanel(doc.getElementById("playerIdentityPanel"), model);

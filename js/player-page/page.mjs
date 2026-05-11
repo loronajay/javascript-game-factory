@@ -1,4 +1,3 @@
-import { initArcadeProfilePanel } from "../arcade-profile.mjs";
 import { bindFactoryProfileToSession, loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
 import {
@@ -104,7 +103,6 @@ if (doc?.getElementById) {
     preloadedSession: authSession,
   });
 
-  const profilePanel = initArcadeProfilePanel({ doc, storage });
   renderPlayerPage(doc);
-  wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel, authSession });
+  wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel: null, authSession });
 }

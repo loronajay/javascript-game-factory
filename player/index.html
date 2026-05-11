@@ -37,17 +37,6 @@
 
       <div class="player-stage__controls page-stage__controls">
         <div id="playerPrimaryNav" class="player-stage__nav page-stage__nav"></div>
-        <button
-          id="playerProfileButton"
-          class="profile-chip"
-          type="button"
-          aria-controls="playerProfilePanel"
-          aria-expanded="false"
-          hidden
-        >
-          <span class="profile-chip__kicker">Owner Controls</span>
-          <span class="profile-chip__name">Edit Profile</span>
-        </button>
       </div>
 
       <div class="player-stage__header page-stage__header">
@@ -55,26 +44,7 @@
         <p id="playerStageSubtitle" class="player-stage__subtitle">No tagline set yet.</p>
       </div>
 
-      <aside id="playerProfilePanel" class="player-card" hidden>
-        <div class="player-card__topline">
-          <p class="player-card__brand">Javascript Game Factory</p>
-          <button id="playerProfileClose" class="player-card__close" type="button">Close</button>
-        </div>
-        <h2 class="pixel-text player-card__title">PLAYER CARD</h2>
-        <p id="playerProfileStatus" class="player-card__status">EDIT YOUR PUBLIC PLAYER PROFILE</p>
-
-        <div class="player-card__meta">
-          <div class="player-card__meta-block">
-            <span class="player-card__meta-label">Factory ID</span>
-            <span id="playerProfileId" class="player-card__meta-value">PENDING-ID</span>
-          </div>
-          <div class="player-card__meta-block">
-            <span class="player-card__meta-label">Arcade Default</span>
-            <span id="playerProfileDefault" class="player-card__meta-value">UNNAMED PILOT</span>
-          </div>
-        </div>
-
-        <form id="playerProfileForm" class="player-card__form">
+      <form id="playerProfileForm" hidden aria-hidden="true">
           <fieldset class="player-card__field player-card__field-group">
             <legend class="player-card__field-legend">Profile Music</legend>
             <p class="player-card__hint" style="margin-bottom:0.5rem">Add up to 5 tracks. Drag to reorder.</p>
@@ -281,7 +251,6 @@
           </div>
           <p id="playerProfileFlash" class="player-card__flash" aria-live="polite"></p>
         </form>
-      </aside>
 
       <div class="player-layout page-stage__layout">
         <div class="player-layout__main">
