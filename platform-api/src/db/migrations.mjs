@@ -16,6 +16,7 @@ export const MIGRATION_FILES = Object.freeze([
   "013-player-contract-backfill.sql",
   "014-photo-social.sql",
   "015-profile-music.sql",
+  "016-background-style.sql",
 ]);
 
 export function migrationFileUrl(name) {

@@ -196,6 +196,7 @@ export function buildPlayerPageViewModel(profile, options = {}) {
     ],
     heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord, relationshipsRecord),
     backgroundImageUrl: publicView.backgroundImageUrl,
+    backgroundStyle: publicView.backgroundStyle || 'blend',
     identityLinkItems,
     favoriteGameItems,
     rankingItems,

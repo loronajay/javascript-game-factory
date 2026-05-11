@@ -99,6 +99,7 @@ export function buildMePageViewModel(profile, options = {}) {
     heroStats: buildHeroStats(publicView, resolvedThoughtCount, metricsRecord, relationshipsRecord),
     avatarAssetId: publicView.avatarAssetId,
     backgroundImageUrl: publicView.backgroundImageUrl,
+    backgroundStyle: publicView.backgroundStyle || 'blend',
     identityLinkItems,
     favoriteGameItems,
     rankingItems,

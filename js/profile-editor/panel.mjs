@@ -72,6 +72,7 @@ export function initProfileEditorPanel({
   const bgPreview = doc?.getElementById?.("playerProfileBgPreview");
   const bgFallback = doc?.getElementById?.("playerProfileBgFallback");
   const bgStatus = doc?.getElementById?.("playerProfileBgStatus");
+  const bgStyleInput = doc?.getElementById?.("playerProfileBgStyle");
 
   if (!form || !profileNameInput) {
     return null;
@@ -218,6 +219,7 @@ export function initProfileEditorPanel({
     const displayInitials = (profile.profileName || "?").slice(0, 2).toUpperCase();
     syncAvatarPreview(displayAvatarSrc, displayInitials);
     syncBgPreview(pendingBackgroundImageUrl || profile.backgroundImageUrl || "");
+    if (bgStyleInput) bgStyleInput.value = profile.backgroundStyle || 'blend';
     musicEditor.seedFromProfile(profile.profileMusicPlaylist || []);
 
     if (summary) summary.textContent = model.summaryName;
@@ -329,6 +331,7 @@ export function initProfileEditorPanel({
       tagline: "",
       favoriteGameSlug: "",
       backgroundImageUrl: "",
+      backgroundStyle: "blend",
       links: [],
       profileMusicPlaylist: [],
       mainSqueezeMode: "manual",
@@ -372,6 +375,7 @@ export function initProfileEditorPanel({
       patch.avatarAssetId = currentProfile.avatarAssetId;
     }
     patch.backgroundImageUrl = pendingBackgroundImageUrl || currentProfile.backgroundImageUrl || "";
+    patch.backgroundStyle = bgStyleInput?.value || currentProfile.backgroundStyle || 'blend';
     const savedProfile = await persistArcadeProfileDetails(storage, patch, {
       ...options,
       apiClient,

@@ -45,6 +45,7 @@ export function saveArcadeProfileDetails(storage, fields = {}, options = {}) {
     avatarAssetId: fields.avatarAssetId ?? current.avatarAssetId,
     avatarUrl: fields.avatarUrl ?? current.avatarUrl,
     backgroundImageUrl: fields.backgroundImageUrl ?? current.backgroundImageUrl,
+    backgroundStyle: fields.backgroundStyle ?? current.backgroundStyle ?? 'blend',
     favoriteGameSlug: fields.favoriteGameSlug ?? current.favoriteGameSlug,
     links: fields.links ?? current.links,
     profileMusicPlaylist: fields.profileMusicPlaylist ?? current.profileMusicPlaylist,

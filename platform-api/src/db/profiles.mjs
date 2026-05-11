@@ -68,6 +68,7 @@ function mapRowToFactoryProfile(row = {}) {
     tagline: row.tagline,
     avatarAssetId: row.avatar_asset_id,
     backgroundImageUrl: row.background_image_url,
+    backgroundStyle: row.background_style || 'blend',
     presence: row.presence,
     favoriteGameSlug: row.favorite_game_slug,
     ladderPlacements: ensureJsonArray(row.ladder_placements),
@@ -100,6 +101,7 @@ function buildProfileParams(playerId, profile) {
     profile.tagline,
     profile.avatarAssetId,
     profile.backgroundImageUrl,
+    profile.backgroundStyle || 'blend',
     profile.presence,
     profile.favoriteGameSlug,
     JSON.stringify(profile.ladderPlacements),
@@ -189,6 +191,7 @@ export async function loadPlayerProfile(db, playerId) {
       pp.tagline,
       pp.avatar_asset_id,
       pp.background_image_url,
+      pp.background_style,
       pp.presence,
       pp.favorite_game_slug,
       pp.ladder_placements,
@@ -230,6 +233,7 @@ export async function loadPlayerProfileByFriendCode(db, friendCode) {
       pp.tagline,
       pp.avatar_asset_id,
       pp.background_image_url,
+      pp.background_style,
       pp.presence,
       pp.favorite_game_slug,
       pp.ladder_placements,
@@ -330,6 +334,7 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       tagline,
       avatar_asset_id,
       background_image_url,
+      background_style,
       presence,
       favorite_game_slug,
       ladder_placements,
@@ -346,9 +351,9 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       thought_count,
       profile_music_playlist
     ) values (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-      $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb,
-      $17::jsonb, $18::jsonb, $19::jsonb, $20::jsonb, $21::jsonb, $22, $23::jsonb
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+      $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb, $17::jsonb,
+      $18::jsonb, $19::jsonb, $20::jsonb, $21::jsonb, $22::jsonb, $23, $24::jsonb
     )
     on conflict (player_id) do update set
       profile_name = excluded.profile_name,
@@ -358,6 +363,7 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       tagline = excluded.tagline,
       avatar_asset_id = excluded.avatar_asset_id,
       background_image_url = excluded.background_image_url,
+      background_style = excluded.background_style,
       presence = excluded.presence,
       favorite_game_slug = excluded.favorite_game_slug,
       ladder_placements = excluded.ladder_placements,
@@ -383,6 +389,7 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       tagline,
       avatar_asset_id,
       background_image_url,
+      background_style,
       presence,
       favorite_game_slug,
       ladder_placements,

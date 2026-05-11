@@ -281,6 +281,7 @@ export function normalizeProfileFields(profile = {}) {
     tagline: sanitizeProfileTagline(source.tagline),
     avatarAssetId: sanitizeAssetId(source.avatarAssetId),
     backgroundImageUrl: normalizeUrl(sanitizeSingleLine(source.backgroundImageUrl, PROFILE_BACKGROUND_URL_MAX_LENGTH)),
+    backgroundStyle: source.backgroundStyle === 'static' ? 'static' : 'blend',
     friendCode: sanitizeProfileFriendCode(source.friendCode),
     presence: normalizePresence(source.presence),
     favoriteGameSlug: sanitizeGameSlug(source.favoriteGameSlug),
@@ -319,6 +320,7 @@ export function buildPlayerProfileView(profile = {}, options = {}) {
     tagline: normalizedFields.tagline,
     avatarAssetId: normalizedFields.avatarAssetId,
     backgroundImageUrl: normalizedFields.backgroundImageUrl,
+    backgroundStyle: normalizedFields.backgroundStyle,
     friendCode: normalizedFields.friendCode || buildDefaultFriendCode(source.playerId),
     presence: normalizedFields.presence,
     avatarUrl: normalizedFields.avatarAssetId && avatarUrlResolver

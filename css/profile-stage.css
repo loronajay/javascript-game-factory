@@ -265,3 +265,38 @@
     width: 100%;
   }
 }
+
+/* ---------- STATIC BACKGROUND MODE ---------- */
+
+.me-page-shell--bg-static,
+.player-page-shell--bg-static {
+  background-image: var(--profile-static-bg-image);
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+  background-color: rgb(7, 6, 20);
+}
+
+.me-page-shell--bg-static::before,
+.player-page-shell--bg-static::before {
+  display: none;
+}
+
+.me-page-shell--bg-static .me-stage,
+.player-page-shell--bg-static .player-stage {
+  background: transparent;
+}
+
+.me-page-shell--bg-static .me-stage::before,
+.me-page-shell--bg-static .me-stage::after,
+.player-page-shell--bg-static .player-stage::before,
+.player-page-shell--bg-static .player-stage::after {
+  display: none;
+}
+
+.me-page-shell--bg-static .me-stage__stars,
+.me-page-shell--bg-static .me-stage__scene,
+.player-page-shell--bg-static .player-stage__stars,
+.player-page-shell--bg-static .player-stage__scene {
+  display: none;
+}

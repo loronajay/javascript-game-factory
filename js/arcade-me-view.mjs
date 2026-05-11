@@ -34,13 +34,25 @@ function renderPageHeader(doc, model) {
   globalThis.PixelText?.render?.(title);
 
   const stage = doc.querySelector?.(".me-stage");
-  if (stage) {
-    if (model.backgroundImageUrl) {
-      stage.style.setProperty("--me-stage-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
-      stage.classList.add("me-stage--custom-bg");
-    } else {
+  const body = doc.body;
+  if (model.backgroundImageUrl && model.backgroundStyle === 'static') {
+    body?.style.setProperty("--profile-static-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+    body?.classList.add("me-page-shell--bg-static");
+    if (stage) {
       stage.style.removeProperty("--me-stage-bg-image");
       stage.classList.remove("me-stage--custom-bg");
+    }
+  } else {
+    body?.style.removeProperty("--profile-static-bg-image");
+    body?.classList.remove("me-page-shell--bg-static");
+    if (stage) {
+      if (model.backgroundImageUrl) {
+        stage.style.setProperty("--me-stage-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+        stage.classList.add("me-stage--custom-bg");
+      } else {
+        stage.style.removeProperty("--me-stage-bg-image");
+        stage.classList.remove("me-stage--custom-bg");
+      }
     }
   }
 }
