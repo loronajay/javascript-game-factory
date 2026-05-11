@@ -38,6 +38,8 @@ export function playerTemplate(uid) {
           <button type="button" class="cassette-btn cassette-btn--mute" id="${uid}-mute" aria-label="Mute">
             <span class="cassette-btn__icon" aria-hidden="true">&#128266;</span>
           </button>
+          <input type="range" class="cassette-volume" id="${uid}-volume"
+            min="0" max="1" step="0.02" value="1" aria-label="Volume">
         </div>
 
       </div>

@@ -201,6 +201,53 @@
   margin-left: auto;
 }
 
+/* ─── Volume slider ───────────────────────────────────────────────────────── */
+
+.cassette-volume {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 5rem;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.cassette-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent, #e8d44d);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.cassette-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent, #e8d44d);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.cassette-volume::-webkit-slider-runnable-track {
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cassette-volume::-moz-range-track {
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
 /* ─── Empty state ─────────────────────────────────────────────────────────── */
 
 .cassette-empty {

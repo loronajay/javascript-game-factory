@@ -17,6 +17,7 @@ export function mountPlayerController(container, tracks, uid, doc) {
   const playBtn  = doc.getElementById(`${uid}-play`);
   const nextBtn  = doc.getElementById(`${uid}-next`);
   const muteBtn  = doc.getElementById(`${uid}-mute`);
+  const volSlider = doc.getElementById(`${uid}-volume`);
 
   const reelEls  = container.querySelectorAll(".cassette-player__reel");
 
@@ -43,6 +44,10 @@ export function mountPlayerController(container, tracks, uid, doc) {
       const icon = muteBtn.querySelector(".cassette-btn__icon");
       if (icon) icon.innerHTML = audio.muted ? "&#128263;" : "&#128266;";
       muteBtn.setAttribute("aria-label", audio.muted ? "Unmute" : "Mute");
+    }
+    if (volSlider) {
+      volSlider.value = String(audio.volume);
+      volSlider.style.opacity = audio.muted ? "0.4" : "1";
     }
 
     setReelSpinning(playing);
@@ -77,6 +82,12 @@ export function mountPlayerController(container, tracks, uid, doc) {
 
   muteBtn?.addEventListener("click", () => {
     audio.muted = !audio.muted;
+    updateDisplay();
+  });
+
+  volSlider?.addEventListener("input", () => {
+    audio.volume = parseFloat(volSlider.value);
+    if (audio.volume > 0) audio.muted = false;
     updateDisplay();
   });
 
