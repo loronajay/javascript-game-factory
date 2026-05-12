@@ -540,12 +540,16 @@ function parseRawArray(text) {
 
 function importFromText(text) {
   text = text.trim();
-  // Try JSON full entry (exported by another tool or hand-written as JSON)
+  // Try to parse as a JS object literal — covers both valid JSON and the single-quoted
+  // JS syntax that formatEntry() produces. JSON.parse rejects single quotes/unquoted keys,
+  // so use Function evaluation which handles both.
   if (text.startsWith('{')) {
     try {
-      const entry = JSON.parse(text);
+      // eslint-disable-next-line no-new-func
+      const entry = Function('return (' + text + ')')();
       if (!Array.isArray(entry.raw)) throw new Error('Missing raw array.');
-      const rows = parseRawArray(entry.raw.join('\n'));
+      const rows = entry.raw; // already evaluated — no need to re-parse quoted strings
+      if (rows.length !== H) throw new Error(`Expected ${H} rows, found ${rows.length}.`);
       map = rows.map(r => r.split(''));
       enforceLockedTiles();
       if (entry.hazards) hazards = JSON.parse(JSON.stringify(entry.hazards));
@@ -553,10 +557,10 @@ function importFromText(text) {
       syncIds();
       pushHistory(); syncAll();
       return { ok: true, msg: 'Loaded map entry with hazards.' };
-    } catch (_) {
-      // JSON parse failed — likely a JS object literal (single quotes, unquoted keys).
-      // Fall through to the raw-row extractor below which handles any text that
-      // contains W-wide quoted strings, including the full formatEntry() output.
+    } catch (err) {
+      // Surface the real error so it's diagnosable, then fall through.
+      console.error('[import] JS object parse failed:', err);
+      return { ok: false, msg: 'Parse error: ' + err.message };
     }
   }
   // Extract map rows from anything: plain array, JS object literal, or txt file.
@@ -896,11 +900,15 @@ function renderTurretPanel() {
   const hdr = el('div', 'toolbar');
   const lbl = el('span', 'sec-label'); lbl.textContent = 'Turrets'; lbl.style.flex = '1';
   hdr.appendChild(lbl);
+  hdr.appendChild(mkBtn('+ Add Turret', 'sm', () => {
+    // Place at center of map as a default starting position
+    addTurret(Math.floor(W / 2), Math.floor(H / 2));
+  }));
   sec.appendChild(hdr);
 
   const list = el('div', 'hlist');
   if (!hazards.turrets.length) {
-    list.innerHTML = `<p class="hint">Click any tile on the map to place a turret there.</p>`;
+    list.innerHTML = `<p class="hint">Click "+ Add Turret" then drag it on the map to reposition.</p>`;
   }
   hazards.turrets.forEach(t => {
     const item = el('div', `hitem${t.id === selTurretId ? ' selected' : ''}`);

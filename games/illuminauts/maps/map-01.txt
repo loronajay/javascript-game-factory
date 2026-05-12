@@ -1,4 +1,4 @@
-{
+  {
     id: 'map-01',
     raw: [
       '###################################',
@@ -32,23 +32,23 @@
     hazards: {
       aliens: [
         {
-          id: 'alien3', route: [{ x: 5, y: 7 }, { x: 9, y: 7 }],
+          id: 'alien3', route: [{ x: 5, y: 7 }, { x: 9, y: 7 }, { x: 5, y: 7 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 9, y: 7 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien4', route: [{ x: 4, y: 14 }, { x: 4, y: 18 }],
+          id: 'alien4', route: [{ x: 4, y: 14 }, { x: 4, y: 18 }, { x: 4, y: 14 }, { x: 4, y: 15 }, { x: 4, y: 16 }, { x: 4, y: 17 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien5', route: [{ x: 11, y: 15 }, { x: 11, y: 23 }],
+          id: 'alien5', route: [{ x: 11, y: 15 }, { x: 11, y: 23 }, { x: 11, y: 15 }, { x: 11, y: 16 }, { x: 11, y: 17 }, { x: 11, y: 18 }, { x: 11, y: 19 }, { x: 11, y: 20 }, { x: 11, y: 21 }, { x: 11, y: 22 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 13 }],
+          id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 13 }, { x: 29, y: 9 }, { x: 29, y: 10 }, { x: 29, y: 11 }, { x: 29, y: 12 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien7', route: [{ x: 19, y: 9 }, { x: 22, y: 9 }],
+          id: 'alien7', route: [{ x: 19, y: 9 }, { x: 22, y: 9 }, { x: 19, y: 9 }, { x: 20, y: 9 }, { x: 21, y: 9 }],
           index: 0, lastStepAt: 0, stepMs: 620
         }
       ],
@@ -73,6 +73,18 @@
       turrets: [
         {
           id: 'turret1', x: 1, y: 12, dx: 1, dy: 0, range: 3,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
+        },
+        {
+          id: 'turret12', x: 26, y: 3, dx: 1, dy: 0, range: 3,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
+        },
+        {
+          id: 'turret13', x: 18, y: 4, dx: 0, dy: 1, range: 3,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
+        },
+        {
+          id: 'turret14', x: 23, y: 19, dx: 0, dy: -1, range: 3,
           cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
         }
       ]
