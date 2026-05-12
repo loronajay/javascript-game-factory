@@ -42,52 +42,48 @@ export const MAPS = [
     hazards: {
       aliens: [
         {
-          id: 'alien1',
-          route: [
-            { x: 4, y: 5 }, { x: 5, y: 5 }, { x: 6, y: 5 }, { x: 7, y: 5 },
-            { x: 8, y: 5 }, { x: 7, y: 5 }, { x: 6, y: 5 }, { x: 5, y: 5 }
-          ],
+          id: 'alien3', route: [{ x: 5, y: 7 }, { x: 9, y: 7 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien2',
-          route: [
-            { x: 21, y: 13 }, { x: 22, y: 13 }, { x: 23, y: 13 },
-            { x: 24, y: 13 }, { x: 23, y: 13 }, { x: 22, y: 13 }
-          ],
-          index: 0, lastStepAt: 0, stepMs: 540
+          id: 'alien4', route: [{ x: 4, y: 14 }, { x: 4, y: 18 }],
+          index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien3',
-          route: [
-            { x: 2, y: 18 }, { x: 3, y: 18 }, { x: 4, y: 18 },
-            { x: 5, y: 18 }, { x: 4, y: 18 }, { x: 3, y: 18 }
-          ],
-          index: 0, lastStepAt: 0, stepMs: 700
+          id: 'alien5', route: [{ x: 11, y: 15 }, { x: 11, y: 23 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 13 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien7', route: [{ x: 19, y: 9 }, { x: 22, y: 9 }],
+          index: 0, lastStepAt: 0, stepMs: 620
         }
       ],
       laserGates: [
         {
-          id: 'gate1',
-          tiles: [{ x: 7, y: 21 }, { x: 8, y: 21 }, { x: 9, y: 21 }],
-          cycleMs: 3100, warningMs: 760, activeMs: 820, offsetMs: 0
+          id: 'gate2', tiles: [{ x: 16, y: 18 }, { x: 17, y: 18 }, { x: 19, y: 18 }, { x: 18, y: 18 }, { x: 20, y: 18 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
         },
         {
-          id: 'gate2',
-          tiles: [{ x: 16, y: 18 }, { x: 17, y: 18 }, { x: 18, y: 18 }],
-          cycleMs: 3400, warningMs: 780, activeMs: 860, offsetMs: 1100
+          id: 'gate8', tiles: [{ x: 28, y: 19 }, { x: 29, y: 19 }, { x: 30, y: 19 }, { x: 31, y: 19 }, { x: 32, y: 19 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
+        },
+        {
+          id: 'gate9', tiles: [{ x: 12, y: 23 }, { x: 13, y: 23 }, { x: 14, y: 23 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
+        },
+        {
+          id: 'gate10', tiles: [{ x: 2, y: 23 }, { x: 3, y: 23 }, { x: 4, y: 23 }, { x: 1, y: 23 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
         }
       ],
       turrets: [
         {
-          id: 'turret1',
-          x: 26, y: 5, dx: 1, dy: 0, range: 2,
-          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 350
-        },
-        {
-          id: 'turret2',
-          x: 14, y: 21, dx: 1, dy: 0, range: 5,
-          cycleMs: 3600, warningMs: 850, activeMs: 560, offsetMs: 1650
+          id: 'turret1', x: 1, y: 12, dx: 1, dy: 0, range: 3,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
         }
       ]
     }
