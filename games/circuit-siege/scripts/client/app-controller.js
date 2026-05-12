@@ -107,6 +107,7 @@ export function createCircuitSiegeAppController({
   sessionController,
   renderApp
 } = {}) {
+  let currentBoard = board;
   let inputState = createBoardInputState();
   let queueSetupState = createQueueSetupState();
   let presentationNow = Date.now();
@@ -221,8 +222,8 @@ export function createCircuitSiegeAppController({
       return lastBoardViewModel;
     }
 
-    lastBoardViewModel = buildBoardViewModel({
-      board,
+      lastBoardViewModel = buildBoardViewModel({
+      board: currentBoard,
       snapshot: runtime.snapshot,
       selectedSide,
       selectedSlotId: inputState.selectedSlotId,
@@ -235,6 +236,18 @@ export function createCircuitSiegeAppController({
   function rerender() {
     lastViewModel = buildViewModel();
     renderApp(lastViewModel);
+  }
+
+  function setBoard(nextBoard) {
+    if (!nextBoard || nextBoard === currentBoard) {
+      return false;
+    }
+
+    currentBoard = nextBoard;
+    lastBoardViewModel = null;
+    lastBoardViewModelDeps = null;
+    rerender();
+    return true;
   }
 
   async function boot() {
@@ -519,6 +532,10 @@ export function createCircuitSiegeAppController({
     clearPointer,
     rotateSelectedSlot: rotateHeldPiece,
     handleRuntimeChanged,
-    tickPresentation
+    tickPresentation,
+    setBoard,
+    getBoard() {
+      return currentBoard;
+    }
   };
 }

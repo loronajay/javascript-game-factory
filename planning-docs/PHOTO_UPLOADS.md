@@ -1,5 +1,9 @@
 # Photo Uploads - Implementation Plan
 
+Status: mostly historical and manually verified as of 2026-05-12.
+
+Core avatar, gallery, feed-photo, and gallery-viewer work is already shipped. Uploads are manually confirmed working, including multiple-photo gallery usage. Keep this doc for upload-specific history rather than as an untouched future work queue.
+
 ## What this covers
 Three related but distinct flows, built in order:
 1. **Avatar upload** - profile photo, never touches the feed

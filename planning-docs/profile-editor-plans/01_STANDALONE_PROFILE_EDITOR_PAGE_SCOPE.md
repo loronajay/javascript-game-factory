@@ -1,5 +1,9 @@
 # Standalone Profile Editor Page Scope
 
+Status: largely shipped foundation as of 2026-05-12.
+
+The route and core separation described here now exist at `/me/edit`. Keep this doc for ownership rationale and remaining polish guidance, not as an unstarted feature scope.
+
 ## Purpose
 
 The first milestone is to move profile editing into a dedicated standalone page.
@@ -368,4 +372,3 @@ Do not introduce profile layout JSON during the standalone editor pass unless th
 Do not add marketplace, merchant, arcade cabinet, or game-grid concerns.
 
 Do not build a general-purpose website builder.
-

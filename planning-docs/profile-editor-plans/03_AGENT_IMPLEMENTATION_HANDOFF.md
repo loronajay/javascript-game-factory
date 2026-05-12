@@ -1,4 +1,8 @@
-# Agent Implementation Handoff — Profile Editor and Draggable Panels
+# Agent Implementation Handoff - Profile Editor and Draggable Panels
+
+Status: partial historical handoff as of 2026-05-12.
+
+The first implementation milestone in this handoff is no longer pending because `/me/edit` already shipped. The remaining relevant future scope in this folder is the constrained layout-customization pass, not the original standalone-editor bootstrap.
 
 ## Project
 
@@ -370,4 +374,3 @@ Profiles remain responsive as the browser resizes.
 Mobile profiles use a stacked layout.
 Public profiles never expose editing controls.
 ```
-

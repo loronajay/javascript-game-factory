@@ -15,6 +15,37 @@ The generator must not be treated as a random wire drawer. It should be treated 
 
 The existing prototype board can remain a canon fallback configuration and reference target. The generator should initially aim to produce maps with similar readability and challenge, not extreme visual chaos.
 
+## 1.5. Current Readiness Assessment
+
+The current live codebase is **not** yet ready to jump straight to full procedural generation.
+
+What exists now:
+
+- one validated authored board
+- shared board loading
+- compact map JSON support where route cells can be derived from route points
+- shared canonical route-completion checks
+- authoritative online match resolution
+- a local debug harness that can verify concrete route behavior
+
+What is still missing for safe procedural generation:
+
+- finalized multi-map schema/versioning
+- strict whole-board validator beyond route-local completion
+- mirror/inverse-index validation utilities
+- readability/overlap scoring
+- seed reporting and rejection diagnostics
+- offline generation inspection workflow
+
+Because of that, the recommended near-term order is:
+
+1. support a pool of approved authored maps
+2. build an internal editor/debug viewer for authoring and validating compact map JSON
+3. use the editor and validator to create several strong boards
+4. then add seeded procedural generation on top of those validated rules
+
+The editor path is not a detour. It is the safest way to harden the board schema and validator before trusting a generator.
+
 ## 2. Core Generation Rule
 
 Generate only one side of the board.
@@ -621,18 +652,20 @@ The existing debug demo can evolve into this generator viewer.
 Recommended implementation order:
 
 1. Finalize map JSON schema.
-2. Build map validator.
+2. Build strict map validator.
 3. Build mirror utility.
-4. Build source-to-terminal permutation generator.
-5. Build simple path generator.
-6. Build repair-point placer.
-7. Build terminal preset picker.
-8. Build difficulty/readability scorer.
-9. Build generator debug viewer.
-10. Generate many maps offline and inspect them.
-11. Add fallback canon map.
-12. Integrate generator into match server.
-13. Persist seed/generator version in match data.
+4. Build an editor/debug viewer that can load, inspect, validate, and save map JSON.
+5. Add support for selecting from a small pool of approved authored maps.
+6. Author and approve several boards with the editor.
+7. Build source-to-terminal permutation generator.
+8. Build simple path generator.
+9. Build repair-point placer.
+10. Build terminal preset picker.
+11. Build difficulty/readability scorer.
+12. Generate many maps offline and inspect them.
+13. Add fallback canon map and approved map pool.
+14. Integrate generator into match server.
+15. Persist seed/generator version in match data.
 
 The validator should be built before the generator becomes complex.
 

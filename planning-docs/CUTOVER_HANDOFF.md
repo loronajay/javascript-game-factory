@@ -1,16 +1,20 @@
 # Hybrid Cutover Handoff
 
+Status: historical reference as of 2026-05-12.
+
+The backend-source-of-truth cutover is no longer the active workstream. Use `ARCHITECTURE_HANDOFF.md` and `PLATFORM_IMPLEMENTATION_PLAN.md` for current implementation status.
+
 ## Companion Handoff Docs
 
 - `ARCHITECTURE_HANDOFF.md` now tracks the post-cutover frontend/module cleanup order, folderization plan, and current verification baseline.
 - `PLATFORM_IMPLEMENTATION_PLAN.md` is the source of truth for product and architecture direction.
 - This cutover doc remains focused on the backend-source-of-truth migration history rather than the ongoing page/module cleanup.
 
-## Active Side Workstream - Photo Uploads (2026-04-28)
+## Historical Side Workstream - Photo Uploads (2026-04-28)
 
-This repo now has a second in-flight workstream alongside the backend cutover notes below.
+This repo had a second upload workstream alongside the backend cutover notes below.
 
-### Current status
+### Status at the time of this handoff
 - Shared upload infrastructure is live in `platform-api/`:
   - Cloudinary upload service: `platform-api/src/services/upload.mjs`
   - multipart parsing in `platform-api/src/app.mjs` via `busboy`
@@ -27,12 +31,12 @@ This repo now has a second in-flight workstream alongside the backend cutover no
   - thought cards render attached images across `/me`, `/player`, and `/thoughts`
 - Direct thought composer photo posts now expose preview, gallery caption, visibility, and optional gallery-save controls; they still fall back to plain thought save if the gallery side effect cannot complete
 
-### Remaining gap before this workstream is done
+### Remaining gap recorded in this handoff
 - Gallery items still do not open into a dedicated full-view or lightbox experience
 - Manual end-to-end verification against a real Cloudinary-backed deployment still needs to happen after env vars are confirmed
 
-### Source-of-truth doc
-- See `PHOTO_UPLOADS_PLAN.md` for the checklist/status view of this workstream
+### Source-of-truth doc at the time
+- See `PHOTO_UPLOADS.md` for the upload checklist/history tied to this workstream
 
 ## Problem Summary
 

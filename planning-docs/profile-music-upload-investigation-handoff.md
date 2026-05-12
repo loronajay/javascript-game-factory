@@ -1,5 +1,11 @@
 # Profile Music Upload Investigation Handoff
 
+Status: resolved historical investigation as of 2026-05-12.
+
+Profile music has already shipped as an upload-backed `profileMusicPlaylist` flow with `/upload/music`, migration `015-profile-music.sql`, editor support in `js/profile-editor/`, and shared playback on `/me` and `/player`.
+
+Use `PLATFORM_IMPLEMENTATION_PLAN.md` for current status. Keep this doc only as the reasoning archive for why upload-backed profile music won over a URL-only first pass.
+
 ## Purpose
 
 Investigate whether `profileMusic` should ship as URL-only, upload-only, or a staged hybrid, based on the actual current upload/media architecture in the repo.

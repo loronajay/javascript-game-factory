@@ -1091,3 +1091,224 @@ input {
     min-height: 0;
   }
 }
+
+.map-editor-page {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(62, 108, 255, 0.16), transparent 36%),
+    linear-gradient(180deg, #0e1627 0%, #070b13 100%);
+  color: #edf4ff;
+}
+
+.map-editor {
+  width: min(1480px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.map-editor__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.map-editor__header h1,
+.map-editor__panel h2 {
+  margin: 0;
+}
+
+.map-editor__eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.76rem;
+  color: rgba(166, 196, 255, 0.72);
+}
+
+.map-editor__subhead {
+  max-width: 780px;
+  margin: 8px 0 0;
+  color: rgba(230, 238, 255, 0.82);
+}
+
+.map-editor__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(137, 172, 255, 0.3);
+  color: #edf4ff;
+  text-decoration: none;
+  background: rgba(13, 22, 38, 0.72);
+}
+
+.map-editor__workspace {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.map-editor__sidebar,
+.map-editor__preview-column {
+  display: grid;
+  gap: 20px;
+}
+
+.map-editor__panel {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(137, 172, 255, 0.16);
+  background: rgba(5, 9, 16, 0.84);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
+}
+
+.map-editor__panel--preview {
+  overflow: auto;
+}
+
+.map-editor__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.84rem;
+  color: rgba(199, 217, 255, 0.8);
+}
+
+.map-editor__select,
+.map-editor__panel input[type="file"],
+.map-editor__button-row button,
+.map-editor__json-header button {
+  width: 100%;
+}
+
+.map-editor__select,
+.map-editor__panel input[type="file"],
+.map-editor__button-row button,
+.map-editor__json-header button,
+.map-editor__back {
+  font: inherit;
+}
+
+.map-editor__select,
+.map-editor__panel input[type="file"],
+.map-editor__textarea {
+  border-radius: 12px;
+  border: 1px solid rgba(137, 172, 255, 0.22);
+  background: rgba(10, 16, 27, 0.88);
+  color: #edf4ff;
+}
+
+.map-editor__select,
+.map-editor__panel input[type="file"] {
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.map-editor__button-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.map-editor__button-row button,
+.map-editor__json-header button {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(137, 172, 255, 0.24);
+  background: linear-gradient(180deg, rgba(30, 54, 95, 0.92) 0%, rgba(18, 31, 55, 0.96) 100%);
+  color: #f6f9ff;
+  cursor: pointer;
+}
+
+.map-editor__status {
+  margin: 8px 0 0;
+  color: rgba(203, 222, 255, 0.84);
+}
+
+.map-editor__status--error {
+  color: #ff9ca8;
+}
+
+.map-editor__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 16px 0 0;
+}
+
+.map-editor__summary div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(13, 19, 31, 0.74);
+}
+
+.map-editor__summary dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(166, 196, 255, 0.72);
+}
+
+.map-editor__summary dd {
+  margin: 6px 0 0;
+  font-size: 0.96rem;
+}
+
+.map-editor__preview {
+  overflow: auto;
+}
+
+.map-editor__preview .board-svg {
+  display: block;
+  max-width: none;
+}
+
+.map-editor__json-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.map-editor__json-header button {
+  width: auto;
+  padding: 0 14px;
+}
+
+.map-editor__textarea {
+  width: 100%;
+  min-height: 520px;
+  padding: 14px;
+  resize: vertical;
+  font: 13px/1.5 "Cascadia Code", "Consolas", monospace;
+}
+
+@media (max-width: 1180px) {
+  .map-editor__workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .map-editor {
+    width: min(100vw - 24px, 1480px);
+    padding-top: 18px;
+  }
+
+  .map-editor__header,
+  .map-editor__json-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .map-editor__summary,
+  .map-editor__button-row {
+    grid-template-columns: 1fr;
+  }
+}

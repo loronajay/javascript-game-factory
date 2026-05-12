@@ -1,8 +1,8 @@
 # Profile CSS Ownership Cleanup Pass — Scoping Handoff
 
-**Status: Complete — 2026-05-09**
+**Status: Complete and manually verified — 2026-05-12**
 
-Shared layout grid, column base, panel shell visual decoration, and 980px responsive collapse are now in `profile-page.css`. `me.css` and `player.css` are now mostly page-specific. Obsolete thoughts-panel grid placement removed. No HTML or JS changes were needed. Pending manual smoke test of `/me` and `/player` at multiple widths.
+Shared layout grid, column base, panel shell visual decoration, and 980px responsive collapse are now in `profile-page.css`. `me.css` and `player.css` are now mostly page-specific. Obsolete thoughts-panel grid placement removed. No HTML or JS changes were needed. Manual smoke verification for `/me` and `/player` at multiple widths is complete.
 
 ---
 

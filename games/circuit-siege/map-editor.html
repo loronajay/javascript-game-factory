@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Circuit Siege Map Editor</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body class="map-editor-page">
+    <main class="map-editor">
+      <header class="map-editor__header">
+        <div>
+          <p class="map-editor__eyebrow">Circuit Siege</p>
+          <h1>Map Editor</h1>
+          <p class="map-editor__subhead">Load a compact map JSON from <code>maps/</code>, validate it against the live board rules, preview it, and export it back as a compact file.</p>
+        </div>
+        <a class="map-editor__back" href="./index.html">Back To Game</a>
+      </header>
+
+      <section class="map-editor__workspace">
+        <aside class="map-editor__sidebar">
+          <div class="map-editor__panel">
+            <label class="map-editor__label" for="editor-map-select">Map From Folder</label>
+            <select id="editor-map-select" class="map-editor__select"></select>
+            <div class="map-editor__button-row">
+              <button id="editor-load-map" type="button">Load Selected</button>
+              <button id="editor-validate" type="button">Validate</button>
+            </div>
+          </div>
+
+          <div class="map-editor__panel">
+            <label class="map-editor__label" for="editor-file-input">Import Local JSON</label>
+            <input id="editor-file-input" type="file" accept=".json,application/json">
+            <div class="map-editor__button-row">
+              <button id="editor-pretty" type="button">Normalize JSON</button>
+              <button id="editor-download" type="button">Download JSON</button>
+            </div>
+          </div>
+
+          <div class="map-editor__panel">
+            <h2>Validation</h2>
+            <p id="editor-status" class="map-editor__status">Loading map catalog...</p>
+            <dl id="editor-summary" class="map-editor__summary"></dl>
+          </div>
+        </aside>
+
+        <section class="map-editor__preview-column">
+          <div class="map-editor__panel map-editor__panel--preview">
+            <h2>Board Preview</h2>
+            <div id="editor-board-preview" class="map-editor__preview"></div>
+          </div>
+
+          <div class="map-editor__panel map-editor__panel--json">
+            <div class="map-editor__json-header">
+              <h2>Map JSON</h2>
+              <button id="editor-copy" type="button">Copy JSON</button>
+            </div>
+            <textarea id="editor-json" spellcheck="false" class="map-editor__textarea"></textarea>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module">
+      import { initMapEditor } from "./scripts/client/init-map-editor.js";
+
+      initMapEditor();
+    </script>
+  </body>
+</html>

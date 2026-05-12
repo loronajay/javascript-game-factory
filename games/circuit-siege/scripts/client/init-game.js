@@ -1,10 +1,10 @@
-import { loadBoardDefinition } from "../shared/circuit-board.js";
 import { createRemoteMatchAdapter } from "../adapters/remote-match-adapter.js";
 import { createSessionRuntimeState } from "./session-runtime-state.js";
 import { createCircuitSiegeSessionController } from "./session-controller.js";
 import { createCircuitSiegeAppController } from "./app-controller.js";
 import { createAppRenderer } from "./app-renderer.js";
 import { loadCircuitSiegeIdentity } from "./identity.js";
+import { createBoardCatalogLoader } from "./board-catalog.js";
 
 const PRESENTATION_TICK_MS = 1000 / 30;
 
@@ -45,6 +45,17 @@ export function findSlotIdFromEventTarget(target) {
   }
 
   return null;
+}
+
+export function getPreferredMapId(locationLike = globalThis.location) {
+  const search = String(locationLike?.search || "").trim();
+  if (!search) {
+    return null;
+  }
+
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  const mapId = String(params.get("map") || "").trim();
+  return mapId || null;
 }
 
 function bindButtons(app, root = document) {
@@ -128,19 +139,44 @@ function bindButtons(app, root = document) {
 
 export async function initGame({
   root = document,
-  fetchImpl = fetch
+  fetchImpl = fetch,
+  locationLike = globalThis.location,
+  randomFn = Math.random
 } = {}) {
-  const response = await fetchImpl("./data/authored-board.v1.json");
-  const board = loadBoardDefinition(await response.json());
+  const preferredMapId = getPreferredMapId(locationLike);
+  const boardCatalog = createBoardCatalogLoader({
+    fetchImpl,
+  });
+  const { board } = await boardCatalog.loadInitialBoard({
+    preferredMapId,
+    randomFn
+  });
   const runtime = createSessionRuntimeState();
   const renderApp = createAppRenderer(root);
 
   let app = null;
+  let boardLoadPromise = Promise.resolve();
+
+  async function ensureBoardLoaded(mapId) {
+    if (!mapId) return false;
+    if (app?.getBoard?.()?.mapId === mapId) {
+      return false;
+    }
+
+    boardLoadPromise = boardLoadPromise.then(async () => {
+      const loaded = await boardCatalog.loadBoardByMapId(mapId);
+      app?.setBoard?.(loaded.board);
+      return true;
+    });
+
+    return boardLoadPromise;
+  }
 
   const sessionController = createCircuitSiegeSessionController({
     runtime,
     createRemoteMatchAdapter,
     loadIdentity: loadCircuitSiegeIdentity,
+    ensureBoardLoaded,
     showScreen: () => {},
     onLobbyStateChanged: () => app?.handleRuntimeChanged(),
     onMatchStateChanged: () => app?.handleRuntimeChanged(),

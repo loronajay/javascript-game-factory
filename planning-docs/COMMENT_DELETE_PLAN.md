@@ -1,4 +1,6 @@
-  Delete Comment — Implementation Plan
+# Delete Comment - Implementation Plan
+
+Status: active
 
   1. DB layer — two new functions
 

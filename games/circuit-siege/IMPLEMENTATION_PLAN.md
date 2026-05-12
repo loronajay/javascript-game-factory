@@ -7,6 +7,9 @@ As of the current implementation pass, Circuit Siege is no longer just a scope d
 ### Implemented now
 
 - shared authored board data and canonical route validation
+- compact map-file loading that derives route cells from route points at load time
+- `maps/` folder support via `maps/index.json`
+- server-selected `mapId` flow so the browser swaps to the authoritative board instead of freelancing local map choice
 - authoritative match engine, room engine, and server bridge contract
 - public matchmaking and private room flow
 - automatic match start once both players are present
@@ -18,11 +21,14 @@ As of the current implementation pass, Circuit Siege is no longer just a scope d
 - server-authoritative route completion, scoring, and completed-route lockout
 - live countdown timer presentation plus authoritative timer-expiry resolution
 - results overlay with per-side circuit totals, disconnect messaging, and visible player usernames
+- internal `map-editor.html` page for loading, validating, previewing, copying, and downloading compact map JSON
 - browser/local regression coverage for shared rules, server flow, and client flow
 
 ### Important current caveat
 
 Circuit Siege website testing is only valid when the matching Circuit Siege authoritative files in `factory-network-server` are deployed. The client and local harness can look correct while the live site still behaves incorrectly if the server repo is on an older authored-board version.
+
+That now includes the `maps/` folder and `maps/index.json` manifest too. Map ids and compact map files must stay mirrored between the game repo and `factory-network-server`.
 
 ### Current focus
 
@@ -34,6 +40,30 @@ The project has moved out of architecture bootstrap and into gameplay/readabilit
 - final interaction polish around held pieces and toolkit behavior
 - richer match-end presentation polish
 - continued validation that authored routes are readable and fair in real matches
+
+### Map variety recommendation
+
+The next content-scale step should be **multiple validated maps**, not live procedural generation yet.
+
+What the current codebase is ready for:
+
+- a server-selected pool of authored board JSON files
+- a local/internal map editor or board authoring viewer that writes the compact shared board schema
+- reuse of the existing shared route validator for per-route completion checks once a board is already known-good
+
+What the current codebase is not ready for yet:
+
+- full procedural generation with confidence
+- legality scoring for generated readability/overlap quality
+- mirror correctness validation beyond a single authored board
+- offline seed inspection and rejection/fallback reporting
+
+Recommendation:
+
+1. Add support for a small approved board pool first.
+2. Build an internal editor/validator viewer against the current board schema.
+3. Use that tool to author and approve several strong maps.
+4. Only then begin the stricter procedural-generation pipeline.
 
 ## 1. Purpose
 
@@ -121,7 +151,7 @@ V1 should ship one complete online mode, not a partial sandbox.
 
 - Local product mode
 - AI opponent
-- Procedural generation
+- Live procedural generation
 - Asymmetric boards
 - Special tools or power-ups
 - Sabotage mechanics
@@ -221,6 +251,7 @@ No browser-owned match result.
 ```text
 games/circuit-siege/
   index.html
+  map-editor.html
   style.css
   game.js
   GDD.md
@@ -256,8 +287,9 @@ games/circuit-siege/
     circuit-siege-room-store.js
     circuit-siege-matchmaking.js
 
-  data/
-    authored-board.v1.json
+  maps/
+    index.json
+    canon-v1.json
 
   tests/
     shared/
@@ -407,6 +439,13 @@ The original bootstrap slice is complete. The next safe slice is now gameplay an
 3. Improve board readability so editable slots, completed routes, and dud vs damage outcomes are obvious under pressure.
 4. Continue testing real authored routes in both the local harness and live deployed multiplayer flow whenever board data changes.
 
+After those stability/readability fixes, the next content slice should be:
+
+1. Finalize the shared board schema for more than one map.
+2. Add server/client support for selecting from a pool of approved authored maps.
+3. Build an internal board editor/viewer that can load, validate, mirror-check, and save map JSON.
+4. Expand to procedural generation only after the validator and authoring workflow are proven on multiple boards.
+
 That sequence protects the current hard invariant: the authoritative route logic is in place, so polish work should improve clarity without reintroducing rules drift.
 
 ## 14. Open Choices We Should Lock Soon
@@ -424,11 +463,11 @@ My recommendation for the first pass:
 - use SVG or hybrid DOM/SVG
 - ship mouse-first with keyboard support next
 - keep a short countdown but no separate inspection phase yet
-- define one shared board JSON contract before online integration
+- define one shared compact board JSON contract before online integration
 
 ## 15. Scope Summary
 
-Circuit Siege should be treated as an online-authoritative competitive puzzle game with one strong authored board in V1.
+Circuit Siege should be treated as an online-authoritative competitive puzzle game with one strong authored board already working, followed by a near-term move to a small approved board pool.
 
 The current debug demo is a useful prototype seam for board rendering and slot interaction, but the production work is mostly about:
 
@@ -436,5 +475,11 @@ The current debug demo is a useful prototype seam for board rendering and slot i
 - online match flow
 - clean client/server separation
 - readable competitive UX
+
+For map variety, the safest order is:
+
+- board pool first
+- compact editor/validator second
+- procedural generation third
 
 If we keep the planning docs as canon and use the demo only as a technical head start, the scope is clear and manageable.

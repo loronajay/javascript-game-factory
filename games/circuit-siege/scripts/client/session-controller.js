@@ -11,6 +11,7 @@ export function createCircuitSiegeSessionController({
   runtime = createSessionRuntimeState(),
   createRemoteMatchAdapter,
   loadIdentity,
+  ensureBoardLoaded = async () => true,
   showScreen = defaultShowScreen,
   onLobbyStateChanged = defaultStateHandler,
   onMatchStateChanged = defaultStateHandler,
@@ -98,15 +99,35 @@ export function createCircuitSiegeSessionController({
     };
 
     net.cb.onMatchReady = (payload) => {
-      runtime.matchReady = { ...payload };
-      showScreen("match");
-      emitLobbyState();
+      return Promise.resolve()
+        .then(async () => {
+          if (payload?.mapId) {
+            await ensureBoardLoaded(payload.mapId);
+          }
+          runtime.matchReady = { ...payload };
+          showScreen("match");
+          emitLobbyState();
+        })
+        .catch(() => {
+          announce("Failed to load the selected match map.");
+          emitLobbyState();
+        });
     };
 
     net.cb.onSnapshot = (snapshot) => {
-      runtime.snapshot = snapshot;
-      showScreen("match");
-      emitMatchState();
+      return Promise.resolve()
+        .then(async () => {
+          if (snapshot?.boardId) {
+            await ensureBoardLoaded(snapshot.boardId);
+          }
+          runtime.snapshot = snapshot;
+          showScreen("match");
+          emitMatchState();
+        })
+        .catch(() => {
+          announce("Failed to load the selected match map.");
+          emitLobbyState();
+        });
     };
 
     net.cb.onMatchEvent = (event) => {
@@ -146,10 +167,19 @@ export function createCircuitSiegeSessionController({
     };
 
     net.cb.onClosed = () => {
+      const hadMatchState = !!runtime.snapshot || !!runtime.matchReady;
+      const hadSessionState = hadMatchState || !!runtime.lobby || !!runtime.searching;
       runtime.connected = false;
       runtime.clientId = null;
       runtime.net = null;
       runtime.pendingAction = null;
+      clearRoomState();
+      if (hadSessionState) {
+        announce("Connection lost.");
+      }
+      if (hadMatchState) {
+        emitMatchState();
+      }
       emitLobbyState();
     };
   }

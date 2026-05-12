@@ -1,5 +1,11 @@
 # JavaScript Game Factory Profile Editor + Custom Layout Scope
 
+Status snapshot: 2026-05-12
+
+- Milestone 1, the standalone editor route at `/me/edit`, is shipped.
+- Milestone 2, profile layout customization and draggable/resizable panel management, is still unimplemented.
+- Read the docs in this folder as a mix of shipped foundation history plus pending layout scope. Do not treat the original sequencing language as a statement that `/me/edit` still needs to be built.
+
 ## Purpose
 
 This document set scopes the next profile customization milestone for JavaScript Game Factory.
@@ -105,4 +111,3 @@ Implementation should be done in passes.
 Each pass should preserve working profile behavior.
 
 The agent should smoke-test after each pass before moving forward.
-

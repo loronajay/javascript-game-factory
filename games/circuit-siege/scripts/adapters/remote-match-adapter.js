@@ -192,6 +192,7 @@ export function createRemoteMatchAdapter({
       cb.onMatchReady?.({
         seed: data.seed,
         remoteSide: typeof data.remoteSide === "string" ? data.remoteSide : null,
+        mapId: typeof data.mapId === "string" ? data.mapId : null,
         serverNow: data.serverNow,
         startAt: data.startAt,
         roomCode

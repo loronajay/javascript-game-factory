@@ -111,7 +111,7 @@ function renderResultStats(stats = []) {
   `).join("");
 }
 
-function renderBoardGrid(container, boardViewModel) {
+export function renderBoardGrid(container, boardViewModel) {
   if (!container || !boardViewModel) return;
 
   const size = getBoardPixelSize(boardViewModel.board);
