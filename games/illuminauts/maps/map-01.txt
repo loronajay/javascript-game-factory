@@ -32,23 +32,23 @@
     hazards: {
       aliens: [
         {
-          id: 'alien3', route: [{ x: 5, y: 7 }, { x: 9, y: 7 }, { x: 5, y: 7 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 9, y: 7 }],
-          index: 0, lastStepAt: 0, stepMs: 620
-        },
-        {
-          id: 'alien4', route: [{ x: 4, y: 14 }, { x: 4, y: 18 }, { x: 4, y: 14 }, { x: 4, y: 15 }, { x: 4, y: 16 }, { x: 4, y: 17 }],
-          index: 0, lastStepAt: 0, stepMs: 620
-        },
-        {
-          id: 'alien5', route: [{ x: 11, y: 15 }, { x: 11, y: 23 }, { x: 11, y: 15 }, { x: 11, y: 16 }, { x: 11, y: 17 }, { x: 11, y: 18 }, { x: 11, y: 19 }, { x: 11, y: 20 }, { x: 11, y: 21 }, { x: 11, y: 22 }],
-          index: 0, lastStepAt: 0, stepMs: 620
-        },
-        {
           id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 13 }, { x: 29, y: 9 }, { x: 29, y: 10 }, { x: 29, y: 11 }, { x: 29, y: 12 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
           id: 'alien7', route: [{ x: 19, y: 9 }, { x: 22, y: 9 }, { x: 19, y: 9 }, { x: 20, y: 9 }, { x: 21, y: 9 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien15', route: [{ x: 5, y: 7 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 9, y: 7 }, { x: 8, y: 7 }, { x: 7, y: 7 }, { x: 6, y: 7 }, { x: 5, y: 7 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien16', route: [{ x: 11, y: 15 }, { x: 11, y: 16 }, { x: 11, y: 17 }, { x: 11, y: 18 }, { x: 11, y: 19 }, { x: 11, y: 20 }, { x: 11, y: 21 }, { x: 11, y: 22 }, { x: 11, y: 23 }, { x: 11, y: 24 }, { x: 11, y: 25 }, { x: 11, y: 24 }, { x: 11, y: 23 }, { x: 11, y: 22 }, { x: 11, y: 21 }, { x: 11, y: 20 }, { x: 11, y: 19 }, { x: 11, y: 18 }, { x: 11, y: 17 }, { x: 11, y: 16 }, { x: 11, y: 15 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien17', route: [{ x: 8, y: 13 }, { x: 9, y: 13 }, { x: 10, y: 13 }, { x: 11, y: 13 }, { x: 12, y: 13 }, { x: 13, y: 13 }, { x: 14, y: 13 }, { x: 13, y: 13 }, { x: 12, y: 13 }, { x: 11, y: 13 }, { x: 10, y: 13 }, { x: 9, y: 13 }, { x: 8, y: 13 }],
           index: 0, lastStepAt: 0, stepMs: 620
         }
       ],

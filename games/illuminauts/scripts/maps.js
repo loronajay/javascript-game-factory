@@ -8,7 +8,7 @@
 //   A Access Ahip  P Power Aell  D Laser Door  B Beacon Aore (must be 5x5)
 
 export const MAPS = [
-    {
+      {
     id: 'map-01',
     raw: [
       '###################################',
@@ -42,23 +42,23 @@ export const MAPS = [
     hazards: {
       aliens: [
         {
-          id: 'alien3', route: [{ x: 5, y: 7 }, { x: 9, y: 7 }, { x: 5, y: 7 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 9, y: 7 }],
-          index: 0, lastStepAt: 0, stepMs: 620
-        },
-        {
-          id: 'alien4', route: [{ x: 4, y: 14 }, { x: 4, y: 18 }, { x: 4, y: 14 }, { x: 4, y: 15 }, { x: 4, y: 16 }, { x: 4, y: 17 }],
-          index: 0, lastStepAt: 0, stepMs: 620
-        },
-        {
-          id: 'alien5', route: [{ x: 11, y: 15 }, { x: 11, y: 23 }, { x: 11, y: 15 }, { x: 11, y: 16 }, { x: 11, y: 17 }, { x: 11, y: 18 }, { x: 11, y: 19 }, { x: 11, y: 20 }, { x: 11, y: 21 }, { x: 11, y: 22 }],
-          index: 0, lastStepAt: 0, stepMs: 620
-        },
-        {
           id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 13 }, { x: 29, y: 9 }, { x: 29, y: 10 }, { x: 29, y: 11 }, { x: 29, y: 12 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
           id: 'alien7', route: [{ x: 19, y: 9 }, { x: 22, y: 9 }, { x: 19, y: 9 }, { x: 20, y: 9 }, { x: 21, y: 9 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien15', route: [{ x: 5, y: 7 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 9, y: 7 }, { x: 8, y: 7 }, { x: 7, y: 7 }, { x: 6, y: 7 }, { x: 5, y: 7 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien16', route: [{ x: 11, y: 15 }, { x: 11, y: 16 }, { x: 11, y: 17 }, { x: 11, y: 18 }, { x: 11, y: 19 }, { x: 11, y: 20 }, { x: 11, y: 21 }, { x: 11, y: 22 }, { x: 11, y: 23 }, { x: 11, y: 24 }, { x: 11, y: 25 }, { x: 11, y: 24 }, { x: 11, y: 23 }, { x: 11, y: 22 }, { x: 11, y: 21 }, { x: 11, y: 20 }, { x: 11, y: 19 }, { x: 11, y: 18 }, { x: 11, y: 17 }, { x: 11, y: 16 }, { x: 11, y: 15 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien17', route: [{ x: 8, y: 13 }, { x: 9, y: 13 }, { x: 10, y: 13 }, { x: 11, y: 13 }, { x: 12, y: 13 }, { x: 13, y: 13 }, { x: 14, y: 13 }, { x: 13, y: 13 }, { x: 12, y: 13 }, { x: 11, y: 13 }, { x: 10, y: 13 }, { x: 9, y: 13 }, { x: 8, y: 13 }],
           index: 0, lastStepAt: 0, stepMs: 620
         }
       ],
@@ -102,7 +102,7 @@ export const MAPS = [
   }
 ,
 
-  {
+    {
     id: 'map-02',
     raw: [
       '###################################',
@@ -134,9 +134,60 @@ export const MAPS = [
       '###################################'
     ],
     hazards: {
-      aliens: [],
-      laserGates: [],
-      turrets: []
+      aliens: [
+        {
+          id: 'alien3', route: [{ x: 22, y: 6 }, { x: 23, y: 6 }, { x: 24, y: 6 }, { x: 25, y: 6 }, { x: 26, y: 6 }, { x: 25, y: 6 }, { x: 24, y: 6 }, { x: 23, y: 6 }, { x: 22, y: 6 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien4', route: [{ x: 27, y: 14 }, { x: 27, y: 15 }, { x: 27, y: 16 }, { x: 27, y: 17 }, { x: 27, y: 18 }, { x: 27, y: 19 }, { x: 27, y: 18 }, { x: 27, y: 17 }, { x: 27, y: 16 }, { x: 27, y: 15 }, { x: 27, y: 14 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien5', route: [{ x: 6, y: 17 }, { x: 7, y: 17 }, { x: 8, y: 17 }, { x: 9, y: 17 }, { x: 10, y: 17 }, { x: 11, y: 17 }, { x: 12, y: 17 }, { x: 11, y: 17 }, { x: 10, y: 17 }, { x: 9, y: 17 }, { x: 8, y: 17 }, { x: 7, y: 17 }, { x: 6, y: 17 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien13', route: [{ x: 0, y: 7 }, { x: 1, y: 7 }, { x: 2, y: 7 }, { x: 3, y: 7 }, { x: 4, y: 7 }, { x: 5, y: 7 }, { x: 4, y: 7 }, { x: 3, y: 7 }, { x: 2, y: 7 }, { x: 1, y: 7 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        },
+        {
+          id: 'alien14', route: [{ x: 15, y: 1 }, { x: 15, y: 2 }, { x: 15, y: 3 }, { x: 15, y: 4 }, { x: 15, y: 5 }, { x: 15, y: 6 }, { x: 15, y: 7 }, { x: 15, y: 8 }, { x: 15, y: 7 }, { x: 15, y: 6 }, { x: 15, y: 5 }, { x: 15, y: 4 }, { x: 15, y: 3 }, { x: 15, y: 2 }, { x: 15, y: 1 }],
+          index: 0, lastStepAt: 0, stepMs: 620
+        }
+      ],
+      laserGates: [
+        {
+          id: 'gate6', tiles: [{ x: 2, y: 12 }, { x: 1, y: 12 }, { x: 3, y: 12 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
+        },
+        {
+          id: 'gate7', tiles: [{ x: 1, y: 22 }, { x: 1, y: 21 }, { x: 1, y: 20 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
+        },
+        {
+          id: 'gate8', tiles: [{ x: 29, y: 5 }, { x: 29, y: 6 }, { x: 29, y: 7 }, { x: 29, y: 8 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
+        },
+        {
+          id: 'gate9', tiles: [{ x: 29, y: 20 }, { x: 29, y: 21 }, { x: 29, y: 22 }],
+          cycleMs: 3000, warningMs: 760, activeMs: 820, offsetMs: 0
+        }
+      ],
+      turrets: [
+        {
+          id: 'turret10', x: 17, y: 4, dx: 1, dy: 0, range: 2,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
+        },
+        {
+          id: 'turret11', x: 16, y: 17, dx: 1, dy: 0, range: 3,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
+        },
+        {
+          id: 'turret12', x: 22, y: 9, dx: 1, dy: 0, range: 3,
+          cycleMs: 3000, warningMs: 820, activeMs: 520, offsetMs: 0
+        }
+      ]
     }
   }
 ];
