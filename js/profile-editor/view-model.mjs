@@ -156,7 +156,7 @@ export function buildArcadeProfileViewModel(profile, options = {}) {
     discoverableValue: normalized.preferences?.discoverable !== false,
     saveLabel: hasName ? "UPDATE CARD" : "STORE CARD",
     statusLine: "EDIT YOUR PUBLIC PLAYER PROFILE",
-    helperText: "Update your arcade username, optional real name, about-me copy, public links, custom tagline, and whether the visible friend rail is automatic or manually pinned. Games can still use temporary match aliases during a run.",
+    helperText: "Update your arcade username, optional real name, profile music, profile background image, about-me copy, public links, custom tagline, and whether the visible friend rail is automatic or manually pinned.",
     playerIdLabel: formatArcadePlayerId(normalized.playerId),
     flashMessage: typeof options.flashMessage === "string" ? options.flashMessage : "",
     inputValue: normalized.profileName,
