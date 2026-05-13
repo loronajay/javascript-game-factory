@@ -1,12 +1,11 @@
 import { serializeCompactBoardDefinition } from "../shared/board-format.js";
 import { loadBoardDefinition } from "../shared/circuit-board.js";
-import { deriveCanonicalMasksForRoute } from "../shared/route-validator.js";
 import {
   exportRouteDraft,
   getRouteAnchorCell,
   isCellOnOwnedSide,
   materializeRouteDraft,
-  normalizeRoutePaintCells
+  normalizeRoutePaintTiles
 } from "./map-editor-route-draft.js";
 
 function cloneBoardDraft(rawBoard) {
@@ -18,8 +17,12 @@ function cloneBoardDraft(rawBoard) {
     notes: Array.isArray(rawBoard.notes) ? rawBoard.notes.slice() : [],
     routes: Array.isArray(rawBoard.routes) ? rawBoard.routes.map((route) => ({
       ...route,
-      paintCells: Array.isArray(route.paintCells)
-        ? route.paintCells.map((cell) => [Number(cell[0]), Number(cell[1])])
+      paintTiles: Array.isArray(route.paintTiles)
+        ? route.paintTiles.map((tile) => ({
+          x: Number(tile.x),
+          y: Number(tile.y),
+          mask: String(tile.mask || "").toUpperCase()
+        }))
         : undefined
     })) : [],
     repairSlots: Array.isArray(rawBoard.repairSlots) ? rawBoard.repairSlots.map((slot) => ({ ...slot })) : []
@@ -29,6 +32,11 @@ function cloneBoardDraft(rawBoard) {
 function sanitizeNumber(value, fallback) {
   const next = Number(value);
   return Number.isFinite(next) ? next : fallback;
+}
+
+function sanitizeAssignedIndex(value) {
+  const next = Number(value);
+  return Number.isInteger(next) && next > 0 ? next : null;
 }
 
 function padIndex(value) {
@@ -51,13 +59,13 @@ function buildRouteDefaults(owner, routeIndex) {
     routeId: `${owner}_route_${padded}`,
     owner,
     routeIndex,
-    sourceIndex: routeIndex,
-    sourceId: `${owner}_source_${padded}`,
-    terminalIndex: routeIndex,
-    terminalId: `${owner}_terminal_${padded}`,
+    sourceIndex: null,
+    sourceId: "",
+    terminalIndex: null,
+    terminalId: "",
     terminalType: "damage",
     mirrorRouteId: `${oppositeOwner}_route_${padIndex(inverseIndex)}`,
-    paintCells: []
+    paintTiles: []
   };
 }
 
@@ -71,6 +79,9 @@ function deriveTerminalTypeLists(routes, explicitBlueDamage = [], explicitRedDam
 
   for (const route of routes) {
     const terminalIndex = Number(route.terminalIndex) || 0;
+    if (!terminalIndex) {
+      continue;
+    }
     if (route.owner === "blue") {
       if (route.terminalType === "damage") blueDamage.add(terminalIndex);
       else blueDamage.delete(terminalIndex);
@@ -89,7 +100,7 @@ function deriveTerminalTypeLists(routes, explicitBlueDamage = [], explicitRedDam
 function rebuildSourceToTerminalMap(routes) {
   const mapping = {};
   for (const route of routes) {
-    if (route.owner === "blue") {
+    if (route.owner === "blue" && Number(route.sourceIndex) > 0 && Number(route.terminalIndex) > 0) {
       mapping[String(route.sourceIndex)] = Number(route.terminalIndex);
     }
   }
@@ -100,8 +111,8 @@ function normalizeRouteDraft(boardMeta, route) {
   const routeIndex = sanitizeNumber(route.routeIndex, 1);
   const owner = route.owner || "blue";
   const defaults = buildRouteDefaults(owner, routeIndex);
-  const sourceIndex = sanitizeNumber(route.sourceIndex, routeIndex);
-  const terminalIndex = sanitizeNumber(route.terminalIndex, routeIndex);
+  const sourceIndex = sanitizeAssignedIndex(route.sourceIndex);
+  const terminalIndex = sanitizeAssignedIndex(route.terminalIndex);
 
   return {
     ...defaults,
@@ -109,11 +120,11 @@ function normalizeRouteDraft(boardMeta, route) {
     owner,
     routeIndex,
     sourceIndex,
-    sourceId: route.sourceId || `${owner}_source_${padIndex(sourceIndex)}`,
+    sourceId: sourceIndex ? (route.sourceId || `${owner}_source_${padIndex(sourceIndex)}`) : "",
     terminalIndex,
-    terminalId: route.terminalId || `${owner}_terminal_${padIndex(terminalIndex)}`,
+    terminalId: terminalIndex ? (route.terminalId || `${owner}_terminal_${padIndex(terminalIndex)}`) : "",
     terminalType: route.terminalType === "dud" ? "dud" : "damage",
-    paintCells: normalizeRoutePaintCells(boardMeta, {
+    paintTiles: normalizeRoutePaintTiles(boardMeta, {
       ...defaults,
       ...route,
       owner,
@@ -154,27 +165,23 @@ function findRoute(rawBoard, routeId) {
   return rawBoard.routes.find((entry) => entry.routeId === routeId) || null;
 }
 
-function deriveExpectedMask(rawBoard, routeId, x, y) {
-  const route = findRoute(rawBoard, routeId);
-  if (!route) {
-    return null;
-  }
-
-  const materialized = materializeRouteDraft(rawBoard, route);
-  if (!materialized.ok) {
-    return null;
-  }
-
-  const canonicalMasks = deriveCanonicalMasksForRoute({
-    ...route,
-    cells: materialized.cells
-  });
-  return canonicalMasks[`${x},${y}`] || null;
-}
-
 function nextRepairSlotId(rawBoard, routeId) {
   const count = rawBoard.repairSlots.filter((slot) => slot.routeId === routeId).length + 1;
   return `${routeId}_rp_${count}`;
+}
+
+function findRouteTile(route, x, y) {
+  return route.paintTiles.find((tile) => tile.x === Number(x) && tile.y === Number(y)) || null;
+}
+
+export function rotateMask(mask) {
+  if (mask === "EW") return "NS";
+  if (mask === "NS") return "EW";
+  if (mask === "NE") return "ES";
+  if (mask === "ES") return "SW";
+  if (mask === "SW") return "NW";
+  if (mask === "NW") return "NE";
+  return "EW";
 }
 
 export function createEmptyMapDefinition(overrides = {}) {
@@ -258,7 +265,34 @@ export function updateRouteDraft(rawBoard, routeId, patch) {
   return normalizeRawBoardDraft(board);
 }
 
-export function paintRouteCellDraft(rawBoard, routeId, x, y) {
+export function assignRouteSourceDraft(rawBoard, routeId, sourceIndex) {
+  const board = normalizeRawBoardDraft(rawBoard);
+  const route = findRoute(board, routeId);
+  if (!route) {
+    return board;
+  }
+  const nextIndex = sanitizeAssignedIndex(sourceIndex);
+  return updateRouteDraft(board, routeId, {
+    sourceIndex: nextIndex,
+    sourceId: nextIndex ? `${route.owner}_source_${padIndex(nextIndex)}` : ""
+  });
+}
+
+export function assignRouteTerminalDraft(rawBoard, routeId, terminalIndex, terminalType = "damage") {
+  const board = normalizeRawBoardDraft(rawBoard);
+  const route = findRoute(board, routeId);
+  if (!route) {
+    return board;
+  }
+  const nextIndex = sanitizeAssignedIndex(terminalIndex);
+  return updateRouteDraft(board, routeId, {
+    terminalIndex: nextIndex,
+    terminalId: nextIndex ? `${route.owner}_terminal_${padIndex(nextIndex)}` : "",
+    terminalType: terminalType === "dud" ? "dud" : "damage"
+  });
+}
+
+export function placeRouteTileDraft(rawBoard, routeId, x, y, mask) {
   const board = normalizeRawBoardDraft(rawBoard);
   const route = findRoute(board, routeId);
   if (!route) {
@@ -266,29 +300,40 @@ export function paintRouteCellDraft(rawBoard, routeId, x, y) {
   }
 
   if (!isCellOnOwnedSide(board, route.owner, x, y)) {
-    return { ok: false, board, error: "Route cells must stay on the owning side of the board." };
+    return { ok: false, board, error: "Route tiles must stay on the owning side of the board." };
   }
 
-  const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
-  const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
   const key = `${x},${y}`;
-  if (`${sourceCell[0]},${sourceCell[1]}` === key || `${terminalCell[0]},${terminalCell[1]}` === key) {
-    return { ok: true, board };
+  if (Number(route.sourceIndex) > 0) {
+    const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
+    if (`${sourceCell[0]},${sourceCell[1]}` === key) {
+      return { ok: false, board, error: "Route tiles cannot be placed on source anchors." };
+    }
+  }
+  if (Number(route.terminalIndex) > 0) {
+    const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
+    if (`${terminalCell[0]},${terminalCell[1]}` === key) {
+      return { ok: false, board, error: "Route tiles cannot be placed on terminal anchors." };
+    }
   }
 
-  route.paintCells = [...route.paintCells, [Number(x), Number(y)]];
-  const normalizedBoard = normalizeRawBoardDraft(board);
-  return { ok: true, board: normalizedBoard };
+  route.paintTiles = route.paintTiles
+    .filter((tile) => !(tile.x === Number(x) && tile.y === Number(y)))
+    .concat([{ x: Number(x), y: Number(y), mask: String(mask || "").toUpperCase() }]);
+  return {
+    ok: true,
+    board: normalizeRawBoardDraft(board)
+  };
 }
 
-export function eraseRouteCellDraft(rawBoard, routeId, x, y) {
+export function eraseRouteTileDraft(rawBoard, routeId, x, y) {
   const board = normalizeRawBoardDraft(rawBoard);
   const route = findRoute(board, routeId);
   if (!route) {
     return board;
   }
 
-  route.paintCells = route.paintCells.filter((cell) => !(cell[0] === Number(x) && cell[1] === Number(y)));
+  route.paintTiles = route.paintTiles.filter((tile) => !(tile.x === Number(x) && tile.y === Number(y)));
   board.repairSlots = board.repairSlots.filter((slot) => {
     if (slot.routeId !== routeId) {
       return true;
@@ -298,18 +343,26 @@ export function eraseRouteCellDraft(rawBoard, routeId, x, y) {
   return normalizeRawBoardDraft(board);
 }
 
+export function paintRouteCellDraft(rawBoard, routeId, x, y) {
+  return placeRouteTileDraft(rawBoard, routeId, x, y, "EW");
+}
+
+export function eraseRouteCellDraft(rawBoard, routeId, x, y) {
+  return eraseRouteTileDraft(rawBoard, routeId, x, y);
+}
+
 export function appendRoutePointDraft(rawBoard, routeId, x, y) {
-  return paintRouteCellDraft(rawBoard, routeId, x, y);
+  return placeRouteTileDraft(rawBoard, routeId, x, y, "EW");
 }
 
 export function popRoutePointDraft(rawBoard, routeId) {
   const board = normalizeRawBoardDraft(rawBoard);
   const route = findRoute(board, routeId);
-  if (!route || route.paintCells.length === 0) {
-    return { ok: false, board, error: "Route has no painted cells to remove." };
+  if (!route || route.paintTiles.length === 0) {
+    return { ok: false, board, error: "Route has no wire tiles to remove." };
   }
 
-  route.paintCells = route.paintCells.slice(0, -1);
+  route.paintTiles = route.paintTiles.slice(0, -1);
   return {
     ok: true,
     board: normalizeRawBoardDraft(board)
@@ -328,16 +381,24 @@ export function addRepairSlotDraft(rawBoard, {
     return { ok: false, board, error: "Unknown route." };
   }
 
-  const expectedMask = deriveExpectedMask(board, routeId, x, y);
+  const tile = findRouteTile(route, x, y);
+  const expectedMask = tile?.mask || null;
   if (!expectedMask) {
-    return { ok: false, board, error: "Repair slots must be placed on a completed route tile." };
+    return { ok: false, board, error: "Repair slots must be placed on an authored route tile." };
   }
 
-  const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
-  const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
   const cellKey = `${x},${y}`;
-  if (`${sourceCell[0]},${sourceCell[1]}` === cellKey || `${terminalCell[0]},${terminalCell[1]}` === cellKey) {
-    return { ok: false, board, error: "Repair slots cannot be placed on source or terminal anchors." };
+  if (Number(route.sourceIndex) > 0) {
+    const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
+    if (`${sourceCell[0]},${sourceCell[1]}` === cellKey) {
+      return { ok: false, board, error: "Repair slots cannot be placed on source anchors." };
+    }
+  }
+  if (Number(route.terminalIndex) > 0) {
+    const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
+    if (`${terminalCell[0]},${terminalCell[1]}` === cellKey) {
+      return { ok: false, board, error: "Repair slots cannot be placed on terminal anchors." };
+    }
   }
 
   const existing = board.repairSlots.find((slot) => slot.routeId === routeId && slot.x === x && slot.y === y);
@@ -464,7 +525,7 @@ export function buildEditorDraftViewModel(rawBoard, {
       terminalIndex: route.terminalIndex,
       points: materialized.points,
       cells: materialized.cells,
-      paintCells: materialized.paintCells,
+      paintTiles: materialized.paintTiles,
       pointCount: materialized.points.length
     };
   });
@@ -491,32 +552,33 @@ export function buildEditorDraftViewModel(rawBoard, {
   const routeById = new Map(routeVisuals.map((route) => [route.routeId, route]));
 
   for (const owner of ["blue", "red"]) {
-    const count = owner === "blue" ? board.sourceCountPerSide : board.sourceCountPerSide;
-    for (let index = 1; index <= count; index += 1) {
-      const route = board.routes.find((entry) => entry.owner === owner && Number(entry.sourceIndex) === index) || null;
-      const routeVisual = route ? routeById.get(route.routeId) : null;
+    for (let index = 1; index <= board.sourceCountPerSide; index += 1) {
+      const sourceRoute = board.routes.find((entry) => entry.owner === owner && Number(entry.sourceIndex) === index) || null;
+      const sourceRouteVisual = sourceRoute ? routeById.get(sourceRoute.routeId) : null;
       const [sourceX, sourceY] = getRouteAnchorCell(board, owner, index, "source");
       sourceVisuals.push({
         owner,
         index,
         x: sourceX,
         y: sourceY,
-        routeId: route?.routeId || null,
-        active: route?.routeId === highlightedRouteId,
-        selected: route?.routeId === selectedRouteId,
-        complete: !!routeVisual?.complete
+        routeId: sourceRoute?.routeId || null,
+        active: sourceRoute?.routeId === highlightedRouteId,
+        selected: sourceRoute?.routeId === selectedRouteId,
+        complete: !!sourceRouteVisual?.complete
       });
+      const terminalRoute = board.routes.find((entry) => entry.owner === owner && Number(entry.terminalIndex) === index) || null;
+      const terminalRouteVisual = terminalRoute ? routeById.get(terminalRoute.routeId) : null;
       const [terminalX, terminalY] = getRouteAnchorCell(board, owner, index, "terminal");
       terminalVisuals.push({
         owner,
         index,
         x: terminalX,
         y: terminalY,
-        routeId: route?.routeId || null,
-        terminalType: route?.terminalType || "dud",
-        active: route?.routeId === highlightedRouteId,
-        selected: route?.routeId === selectedRouteId,
-        complete: !!routeVisual?.complete
+        routeId: terminalRoute?.routeId || null,
+        terminalType: terminalRoute?.terminalType || "dud",
+        active: terminalRoute?.routeId === highlightedRouteId,
+        selected: terminalRoute?.routeId === selectedRouteId,
+        complete: !!terminalRouteVisual?.complete
       });
     }
   }

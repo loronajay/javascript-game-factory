@@ -47,6 +47,27 @@ export function findSlotIdFromEventTarget(target) {
   return null;
 }
 
+export function findToolIdFromEventTarget(target) {
+  let current = target || null;
+
+  while (current) {
+    if (typeof current.dataset?.tool === "string" && current.dataset.tool.length > 0) {
+      return current.dataset.tool;
+    }
+
+    if (typeof current.getAttribute === "function") {
+      const toolId = current.getAttribute("data-tool");
+      if (typeof toolId === "string" && toolId.length > 0) {
+        return toolId;
+      }
+    }
+
+    current = current.parentElement || current.parentNode || null;
+  }
+
+  return null;
+}
+
 export function getPreferredMapId(locationLike = globalThis.location) {
   const search = String(locationLike?.search || "").trim();
   if (!search) {
@@ -100,10 +121,10 @@ function bindButtons(app, root = document) {
   root.querySelector("#btn-join-back")?.addEventListener("click", () => {
     app.goBack?.();
   });
-  root.querySelectorAll("[data-tool]").forEach((button) => {
-    button.addEventListener("click", () => {
-      app.selectTool(button.dataset.tool || "straight-h");
-    });
+  root.querySelector("#tool-dock")?.addEventListener("click", (event) => {
+    const toolId = findToolIdFromEventTarget(event.target);
+    if (!toolId) return;
+    app.selectTool(toolId);
   });
   root.querySelectorAll("[data-leave]").forEach((button) => {
     button.addEventListener("click", () => {

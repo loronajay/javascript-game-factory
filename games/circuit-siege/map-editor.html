@@ -12,7 +12,7 @@
         <div>
           <p class="map-editor__eyebrow">Circuit Siege</p>
           <h1>Map Editor</h1>
-          <p class="map-editor__subhead">Start from a fresh anchored board, choose a route, paint the circuit tile-by-tile between the fixed source and terminal anchors, place hole/refactor puzzle tiles, and export compact JSON back into <code>maps/</code>.</p>
+          <p class="map-editor__subhead">Start from a fresh anchored board, choose a route, assign its source and terminal, click exact straight/corner wire tiles into the grid, place hole/refactor puzzle tiles, and export compact JSON back into <code>maps/</code>.</p>
         </div>
         <a class="map-editor__back" href="./index.html">Back To Game</a>
       </header>
@@ -51,16 +51,21 @@
               <button id="editor-add-red-route" type="button">Add Red Route</button>
             </div>
             <div class="map-editor__button-row">
-              <button id="editor-undo-point" type="button">Undo Point</button>
+              <button id="editor-rotate-brush" type="button">Rotate Tile</button>
               <button id="editor-remove-slot" type="button">Remove Slot</button>
             </div>
             <div id="editor-brush-palette" class="map-editor__brush-palette">
-              <button id="editor-brush-route" type="button" class="map-editor__brush-button" data-editor-brush="route">
-                <span class="map-editor__brush-preview map-editor__brush-preview--route" data-brush-preview="route" aria-hidden="true">
+              <button id="editor-brush-straight" type="button" class="map-editor__brush-button" data-editor-brush="straight">
+                <span class="map-editor__brush-preview map-editor__brush-preview--straight" data-brush-preview="straight" aria-hidden="true">
                   <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--horizontal"></span>
-                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--vertical"></span>
                 </span>
-                <span class="map-editor__brush-copy"><strong>Route Tile</strong><small>Paint circuit path</small></span>
+                <span class="map-editor__brush-copy"><strong>Straight Tile</strong><small>EW / NS via rotate</small></span>
+              </button>
+              <button id="editor-brush-corner" type="button" class="map-editor__brush-button" data-editor-brush="corner">
+                <span class="map-editor__brush-preview map-editor__brush-preview--corner" data-brush-preview="corner" aria-hidden="true">
+                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--corner-ne"></span>
+                </span>
+                <span class="map-editor__brush-copy"><strong>Corner Tile</strong><small>NE / ES / SW / NW via rotate</small></span>
               </button>
               <button id="editor-brush-erase" type="button" class="map-editor__brush-button" data-editor-brush="erase">
                 <span class="map-editor__brush-preview map-editor__brush-preview--erase" data-brush-preview="erase" aria-hidden="true">
@@ -90,18 +95,17 @@
             <div class="map-editor__current-brush">
               <span class="map-editor__label">Current Brush</span>
               <div class="map-editor__current-brush-shell">
-                <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--route" aria-hidden="true">
+                <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--straight" aria-hidden="true">
                   <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--horizontal"></span>
-                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--vertical"></span>
                 </span>
-                <p id="editor-current-brush" class="map-editor__status">Route Tile</p>
+                <p id="editor-current-brush" class="map-editor__status">Straight Tile (EW)</p>
               </div>
             </div>
             <div class="map-editor__terminal-type-bar">
               <button id="editor-terminal-damage" type="button" class="map-editor__terminal-type-button" data-terminal-type="damage">Damage Terminal</button>
               <button id="editor-terminal-dud" type="button" class="map-editor__terminal-type-button" data-terminal-type="dud">Dud Terminal</button>
             </div>
-            <p id="editor-mode-help" class="map-editor__status">Select a route, pick a brush, then paint or click anchors on the board.</p>
+            <p id="editor-mode-help" class="map-editor__status">Select a route, assign its source and terminal, then click exact wire tiles into the board.</p>
             <div id="editor-route-list" class="map-editor__route-list"></div>
           </div>
 
@@ -139,7 +143,7 @@
             </div>
             <label class="map-editor__label" for="editor-mirror-route-id">Mirror Route ID</label>
             <input id="editor-mirror-route-id" class="map-editor__text-input" type="text">
-            <p class="map-editor__hint">Use the toolbox like a tile editor: pick a brush, paint route tiles one cell at a time, click anchors to assign the source/terminal, and hover any completed route to trace the whole circuit.</p>
+            <p class="map-editor__hint">Use the toolbox like a tile editor: pick straight or corner, rotate the held tile, click cells to place it, click source/terminal anchors to pair the route, and hover any completed route to trace the whole circuit.</p>
             <div class="map-editor__button-row">
               <button id="editor-apply-route" type="button">Apply Route Fields</button>
             </div>

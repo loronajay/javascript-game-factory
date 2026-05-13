@@ -1,17 +1,19 @@
 import {
   addRepairSlotDraft,
   addRouteDraft,
+  assignRouteSourceDraft,
+  assignRouteTerminalDraft,
   buildEditorDraftViewModel,
   buildMapSummary,
   createEmptyMapDefinition,
-  eraseRouteCellDraft,
+  eraseRouteTileDraft,
   formatBoardForEditorExport,
   normalizeRawBoardDraft,
-  paintRouteCellDraft,
   parseBoardFromEditorText,
-  popRoutePointDraft,
+  placeRouteTileDraft,
   removeRepairSlotDraft,
   removeRouteDraft,
+  rotateMask,
   updateRouteDraft,
   validateDraftBoard
 } from "./map-editor-state.js";
@@ -22,13 +24,11 @@ async function fetchJson(fetchImpl, path) {
   if (!response?.ok) {
     throw new Error(`Failed to load ${path}`);
   }
-
   return response.json();
 }
 
 function renderSummary(container, summary) {
   if (!container) return;
-
   if (!summary) {
     container.innerHTML = "";
     return;
@@ -82,20 +82,15 @@ function getEditorCellFromTarget(target) {
 }
 
 function findSourceAtCell(viewModel, cell) {
-  if (!cell) return null;
-  return viewModel.sourceVisuals.find((entry) => entry.x === cell.x && entry.y === cell.y) || null;
+  return viewModel?.sourceVisuals.find((entry) => entry.x === cell?.x && entry.y === cell?.y) || null;
 }
 
 function findTerminalAtCell(viewModel, cell) {
-  if (!cell) return null;
-  return viewModel.terminalVisuals.find((entry) => entry.x === cell.x && entry.y === cell.y) || null;
+  return viewModel?.terminalVisuals.find((entry) => entry.x === cell?.x && entry.y === cell?.y) || null;
 }
 
-function findRouteAtCell(viewModel, cell, {
-  completeOnly = false,
-  preferredRouteId = null
-} = {}) {
-  if (!cell) return null;
+function findRouteAtCell(viewModel, cell, { completeOnly = false, preferredRouteId = null } = {}) {
+  if (!cell || !viewModel) return null;
 
   const matches = viewModel.routeVisuals.filter((route) => (
     (!completeOnly || route.complete)
@@ -119,49 +114,78 @@ function buildRouteStatusLabel(route) {
   return `${route.pointCount} pts | ${route.repairSlotCount} slots | ${route.terminalType} | ${route.invalidReason || "incomplete"}`;
 }
 
-function getBrushLabel(brush, terminalType, selectedRouteId) {
+function buildId(owner, type, index) {
+  return `${owner}_${type}_${String(index).padStart(2, "0")}`;
+}
+
+function maskFamily(mask) {
+  return mask === "EW" || mask === "NS" ? "straight" : "corner";
+}
+
+function defaultMaskForBrush(brush, currentMask) {
+  if (brush === "straight") {
+    return maskFamily(currentMask) === "straight" ? currentMask : "EW";
+  }
+  if (brush === "corner") {
+    return maskFamily(currentMask) === "corner" ? currentMask : "NE";
+  }
+  return currentMask;
+}
+
+function buildBrushLabel(brush, heldMask, terminalType, selectedRouteId) {
   const routeLabel = selectedRouteId ? ` for ${selectedRouteId}` : "";
-  if (brush === "route") return `Route Tile${routeLabel}`;
+  if (brush === "straight") return `Straight Tile (${heldMask})${routeLabel}`;
+  if (brush === "corner") return `Corner Tile (${heldMask})${routeLabel}`;
   if (brush === "erase") return `Erase${routeLabel}`;
   if (brush === "hole") return `Hole Tile${routeLabel}`;
   if (brush === "refactor") return `Refactor Tile${routeLabel}`;
   if (brush === "source") return `Set Source${routeLabel}`;
   if (brush === "terminal") return `Set ${terminalType === "dud" ? "Dud" : "Damage"} Terminal${routeLabel}`;
-  return "Route Tile";
+  return "Straight Tile (EW)";
 }
 
-function getBrushPreviewClass(brush) {
-  if (brush === "hole") return "map-editor__brush-preview--hole";
-  if (brush === "refactor") return "map-editor__brush-preview--refactor";
-  if (brush === "source") return "map-editor__brush-preview--source";
-  if (brush === "terminal") return "map-editor__brush-preview--terminal";
-  if (brush === "erase") return "map-editor__brush-preview--erase";
-  return "map-editor__brush-preview--route";
-}
+function buildBrushPreviewMarkup(brush, heldMask, terminalType) {
+  if (brush === "straight") {
+    return `
+      <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--straight" aria-hidden="true">
+        <span class="map-editor__brush-preview-wire ${heldMask === "NS" ? "map-editor__brush-preview-wire--vertical" : "map-editor__brush-preview-wire--horizontal"}"></span>
+      </span>
+    `;
+  }
 
-function buildBrushPreviewMarkup(brush, terminalType) {
-  const previewClass = getBrushPreviewClass(brush);
-  const terminalToneClass = brush === "terminal"
-    ? `map-editor__brush-preview--terminal-${terminalType === "dud" ? "dud" : "damage"}`
-    : "";
-
-  if (brush === "route") {
-    return `<span class="map-editor__brush-preview ${previewClass}" aria-hidden="true"><span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--horizontal"></span><span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--vertical"></span></span>`;
+  if (brush === "corner") {
+    return `
+      <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--corner" aria-hidden="true">
+        <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--corner-${heldMask.toLowerCase()}"></span>
+      </span>
+    `;
   }
 
   if (brush === "erase") {
-    return `<span class="map-editor__brush-preview ${previewClass}" aria-hidden="true"><span class="map-editor__brush-preview-eraser"></span></span>`;
+    return `
+      <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--erase" aria-hidden="true">
+        <span class="map-editor__brush-preview-eraser"></span>
+      </span>
+    `;
   }
 
   if (brush === "refactor") {
-    return `<span class="map-editor__brush-preview ${previewClass}" aria-hidden="true"><span class="map-editor__brush-preview-refactor-wire map-editor__brush-preview-refactor-wire--horizontal"></span></span>`;
+    return `
+      <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--refactor" aria-hidden="true">
+        <span class="map-editor__brush-preview-refactor-wire map-editor__brush-preview-refactor-wire--horizontal"></span>
+      </span>
+    `;
   }
 
-  return `<span class="map-editor__brush-preview ${previewClass} ${terminalToneClass}" aria-hidden="true"></span>`;
-}
+  if (brush === "hole") {
+    return `<span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--hole" aria-hidden="true"></span>`;
+  }
 
-function buildId(owner, type, index) {
-  return `${owner}_${type}_${String(index).padStart(2, "0")}`;
+  if (brush === "source") {
+    return `<span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--source" aria-hidden="true"></span>`;
+  }
+
+  return `<span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--terminal map-editor__brush-preview--terminal-${terminalType === "dud" ? "dud" : "damage"}" aria-hidden="true"></span>`;
 }
 
 export async function initMapEditor({
@@ -179,10 +203,11 @@ export async function initMapEditor({
     addBlueRoute: root.querySelector("#editor-add-blue-route"),
     addRedRoute: root.querySelector("#editor-add-red-route"),
     deleteRoute: root.querySelector("#editor-delete-route"),
-    undoPoint: root.querySelector("#editor-undo-point"),
+    rotateBrush: root.querySelector("#editor-rotate-brush"),
     removeSlot: root.querySelector("#editor-remove-slot"),
     brushButtons: Array.from(root.querySelectorAll("[data-editor-brush]")),
     currentBrush: root.querySelector("#editor-current-brush"),
+    currentBrushShell: root.querySelector(".map-editor__current-brush-shell"),
     terminalTypeButtons: Array.from(root.querySelectorAll("[data-terminal-type]")),
     modeHelp: root.querySelector("#editor-mode-help"),
     routeList: root.querySelector("#editor-route-list"),
@@ -210,12 +235,11 @@ export async function initMapEditor({
   let selectedRouteId = null;
   let selectedSlotId = null;
   let hoveredRouteId = null;
-  let brush = "route";
+  let brush = "straight";
   let terminalBrushType = "damage";
+  let heldMask = "EW";
   let currentFilename = nextFilename(rawBoard);
   let currentViewModel = null;
-  let isPainting = false;
-  let lastPaintedCellKey = null;
 
   function updateTextarea() {
     els.textarea.value = JSON.stringify(rawBoard, null, 2);
@@ -279,10 +303,12 @@ export async function initMapEditor({
 
   function renderCurrentBrush() {
     if (!els.currentBrush) return;
-    els.currentBrush.textContent = getBrushLabel(brush, terminalBrushType, selectedRouteId);
-    const preview = root.querySelector("#editor-current-brush-preview");
-    if (preview) {
-      preview.outerHTML = buildBrushPreviewMarkup(brush, terminalBrushType).replace('aria-hidden="true"', 'id="editor-current-brush-preview" aria-hidden="true"');
+    els.currentBrush.textContent = buildBrushLabel(brush, heldMask, terminalBrushType, selectedRouteId);
+    if (els.currentBrushShell) {
+      const textNode = els.currentBrush;
+      const preview = buildBrushPreviewMarkup(brush, heldMask, terminalBrushType);
+      els.currentBrushShell.innerHTML = `${preview}<p id="editor-current-brush" class="map-editor__status">${textNode.textContent}</p>`;
+      els.currentBrush = root.querySelector("#editor-current-brush");
     }
   }
 
@@ -300,31 +326,31 @@ export async function initMapEditor({
   function updateModeHelp(viewModel) {
     const selectedRoute = viewModel.selectedRoute;
     if (!selectedRoute) {
-      els.modeHelp.textContent = "Add and select a route first, then pick a brush and paint the board.";
+      els.modeHelp.textContent = "Add and select a route first, then assign its source and terminal.";
       return;
     }
 
-    if (brush === "route") {
-      els.modeHelp.textContent = "Drag to paint route tiles for the selected route. Use Set Source and Set Terminal to choose which anchors it connects.";
+    if (brush === "straight" || brush === "corner") {
+      els.modeHelp.textContent = `Click grid cells to place ${brush} wire tiles. Press R or use Rotate Tile to change orientation before placing.`;
       return;
     }
 
     if (brush === "erase") {
-      els.modeHelp.textContent = "Drag to erase route tiles. Any hole or refactor tile on an erased cell is removed too.";
+      els.modeHelp.textContent = "Click a cell to erase its route tile. Any hole or refactor tile on that cell is removed too.";
       return;
     }
 
     if (brush === "source") {
-      els.modeHelp.textContent = "Click a source anchor on this route's side to assign the selected route's source.";
+      els.modeHelp.textContent = "Click a source anchor on this route's side to bind the selected route to that source.";
       return;
     }
 
     if (brush === "terminal") {
-      els.modeHelp.textContent = `Click a terminal anchor on this route's side to assign a ${terminalBrushType} terminal.`;
+      els.modeHelp.textContent = `Click a terminal anchor on this route's side to bind a ${terminalBrushType} terminal to the selected route.`;
       return;
     }
 
-    els.modeHelp.textContent = `Click a completed route tile to place a ${brush === "hole" ? "hole" : "refactor"} puzzle tile.`;
+    els.modeHelp.textContent = `Click a placed route tile to mark it as a ${brush === "hole" ? "hole" : "refactor"} tile.`;
   }
 
   function rerender() {
@@ -372,47 +398,20 @@ export async function initMapEditor({
     if (!selectedRouteId) return;
 
     const owner = findSelectedRoute()?.owner || "blue";
-    const sourceIndex = Number(els.sourceIndex.value) || 1;
-    const terminalIndex = Number(els.terminalIndex.value) || 1;
+    const sourceIndex = Number(els.sourceIndex.value) || null;
+    const terminalIndex = Number(els.terminalIndex.value) || null;
 
     rawBoard = updateRouteDraft(rawBoard, selectedRouteId, {
       routeIndex: Number(els.routeIndex.value) || 1,
       sourceIndex,
-      sourceId: buildId(owner, "source", sourceIndex),
+      sourceId: sourceIndex ? buildId(owner, "source", sourceIndex) : "",
       terminalIndex,
-      terminalId: buildId(owner, "terminal", terminalIndex),
+      terminalId: terminalIndex ? buildId(owner, "terminal", terminalIndex) : "",
       terminalType: els.terminalType.value || terminalBrushType,
       mirrorRouteId: els.mirrorRouteId.value || ""
     });
     terminalBrushType = els.terminalType.value || terminalBrushType;
     rerender();
-  }
-
-  function assignRouteSourceFromAnchor(routeId, sourceVisual) {
-    const route = findSelectedRoute();
-    if (!route || sourceVisual.owner !== route.owner) {
-      return false;
-    }
-
-    rawBoard = updateRouteDraft(rawBoard, routeId, {
-      sourceIndex: sourceVisual.index,
-      sourceId: buildId(route.owner, "source", sourceVisual.index)
-    });
-    return true;
-  }
-
-  function assignRouteTerminalFromAnchor(routeId, terminalVisual) {
-    const route = findSelectedRoute();
-    if (!route || terminalVisual.owner !== route.owner) {
-      return false;
-    }
-
-    rawBoard = updateRouteDraft(rawBoard, routeId, {
-      terminalIndex: terminalVisual.index,
-      terminalId: buildId(route.owner, "terminal", terminalVisual.index),
-      terminalType: terminalBrushType
-    });
-    return true;
   }
 
   function applyBrushToCell(cell) {
@@ -422,21 +421,24 @@ export async function initMapEditor({
 
     const sourceVisual = findSourceAtCell(currentViewModel, cell);
     if (brush === "source" && sourceVisual) {
-      return assignRouteSourceFromAnchor(selectedRouteId, sourceVisual);
+      rawBoard = assignRouteSourceDraft(rawBoard, selectedRouteId, sourceVisual.index);
+      return true;
     }
 
     const terminalVisual = findTerminalAtCell(currentViewModel, cell);
     if (brush === "terminal" && terminalVisual) {
-      return assignRouteTerminalFromAnchor(selectedRouteId, terminalVisual);
-    }
-
-    if (brush === "route") {
-      rawBoard = paintRouteCellDraft(rawBoard, selectedRouteId, cell.x, cell.y).board;
+      rawBoard = assignRouteTerminalDraft(rawBoard, selectedRouteId, terminalVisual.index, terminalBrushType);
       return true;
     }
 
+    if (brush === "straight" || brush === "corner") {
+      const result = placeRouteTileDraft(rawBoard, selectedRouteId, cell.x, cell.y, heldMask);
+      rawBoard = result.board;
+      return result.ok;
+    }
+
     if (brush === "erase") {
-      rawBoard = eraseRouteCellDraft(rawBoard, selectedRouteId, cell.x, cell.y);
+      rawBoard = eraseRouteTileDraft(rawBoard, selectedRouteId, cell.x, cell.y);
       selectedSlotId = null;
       return true;
     }
@@ -458,48 +460,7 @@ export async function initMapEditor({
     return false;
   }
 
-  function handleBoardCellClick(cell) {
-    applyBrushToCell(cell);
-    rerender();
-  }
-
-  function handleBoardCellDrag(cell) {
-    if (!cell || !selectedRouteId) {
-      return;
-    }
-
-    const cellKey = `${cell.x},${cell.y}`;
-    if (cellKey === lastPaintedCellKey) {
-      return;
-    }
-
-    lastPaintedCellKey = cellKey;
-    if (applyBrushToCell(cell)) {
-      rerender();
-    }
-  }
-
-  function startBrushDrag(cell) {
-    if (brush !== "route" && brush !== "erase") {
-      handleBoardCellClick(cell);
-      return;
-    }
-
-    isPainting = true;
-    lastPaintedCellKey = null;
-    handleBoardCellDrag(cell);
-  }
-
-  function stopBrushDrag() {
-    isPainting = false;
-    lastPaintedCellKey = null;
-  }
-
   function updateHoveredRoute(cell) {
-    if (!currentViewModel) {
-      return;
-    }
-
     const hoveredRoute = findRouteAtCell(currentViewModel, cell, {
       completeOnly: true,
       preferredRouteId: selectedRouteId
@@ -514,13 +475,23 @@ export async function initMapEditor({
   }
 
   function setBrush(nextBrush) {
-    brush = nextBrush || "route";
+    brush = nextBrush || "straight";
+    heldMask = defaultMaskForBrush(brush, heldMask);
     rerender();
+  }
+
+  function rotateHeldBrush() {
+    if (brush !== "straight" && brush !== "corner") {
+      return false;
+    }
+    heldMask = rotateMask(heldMask);
+    rerender();
+    return true;
   }
 
   function setTerminalBrushType(nextType) {
     terminalBrushType = nextType === "dud" ? "dud" : "damage";
-    if (selectedRouteId) {
+    if (selectedRouteId && brush === "terminal") {
       rawBoard = updateRouteDraft(rawBoard, selectedRouteId, {
         terminalType: terminalBrushType
       });
@@ -528,31 +499,21 @@ export async function initMapEditor({
     rerender();
   }
 
-  els.preview?.addEventListener("mousedown", (event) => {
-    if (event.button !== 0) return;
+  els.preview?.addEventListener("click", (event) => {
     const cell = getEditorCellFromTarget(event.target);
     if (!cell) return;
-    event.preventDefault();
-    startBrushDrag(cell);
-  });
-
-  els.preview?.addEventListener("mousemove", (event) => {
-    const cell = getEditorCellFromTarget(event.target);
-    if (isPainting) {
-      handleBoardCellDrag(cell);
-    }
-    updateHoveredRoute(cell);
-  });
-
-  els.preview?.addEventListener("mouseleave", () => {
-    stopBrushDrag();
-    if (!hoveredRouteId) return;
-    hoveredRouteId = null;
+    applyBrushToCell(cell);
     rerender();
   });
 
-  document.addEventListener("mouseup", () => {
-    stopBrushDrag();
+  els.preview?.addEventListener("mousemove", (event) => {
+    updateHoveredRoute(getEditorCellFromTarget(event.target));
+  });
+
+  els.preview?.addEventListener("mouseleave", () => {
+    if (!hoveredRouteId) return;
+    hoveredRouteId = null;
+    rerender();
   });
 
   els.routeList?.addEventListener("click", (event) => {
@@ -575,8 +536,9 @@ export async function initMapEditor({
     selectedRouteId = null;
     selectedSlotId = null;
     hoveredRouteId = null;
-    brush = "route";
+    brush = "straight";
     terminalBrushType = "damage";
+    heldMask = "EW";
     rerender();
   });
 
@@ -610,11 +572,8 @@ export async function initMapEditor({
     rerender();
   });
 
-  els.undoPoint?.addEventListener("click", () => {
-    if (!selectedRouteId) return;
-    const result = popRoutePointDraft(rawBoard, selectedRouteId);
-    rawBoard = result.board;
-    rerender();
+  els.rotateBrush?.addEventListener("click", () => {
+    rotateHeldBrush();
   });
 
   els.removeSlot?.addEventListener("click", () => {
@@ -626,7 +585,7 @@ export async function initMapEditor({
 
   for (const button of els.brushButtons) {
     button.addEventListener("click", () => {
-      setBrush(button.dataset.editorBrush || "route");
+      setBrush(button.dataset.editorBrush || "straight");
     });
   }
 
@@ -733,6 +692,15 @@ export async function initMapEditor({
     selectedSlotId = null;
     hoveredRouteId = null;
     rerender();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key?.toLowerCase() !== "r") {
+      return;
+    }
+    if (rotateHeldBrush()) {
+      event.preventDefault();
+    }
   });
 
   manifest = await fetchJson(fetchImpl, "./maps/index.json");

@@ -6,7 +6,6 @@ import {
   getBoardPixelSize,
   polylinePointsAttr
 } from "./board-svg-layout.js";
-import { getMaskFromNeighbors } from "./board-asset-resolver.js";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -17,19 +16,24 @@ function escapeHtml(value = "") {
 }
 
 function renderRouteCells(route) {
-  return route.cells.map((cell, index) => {
-    const previous = route.cells[index - 1] || null;
-    const current = route.cells[index];
-    const next = route.cells[index + 1] || null;
-    const mask = getMaskFromNeighbors(previous, current, next);
-    const [cx, cy] = cellCenter(current[0], current[1]);
+  return (route.paintTiles || []).map((tile) => {
+    const mask = tile.mask;
+    const [cx, cy] = cellCenter(tile.x, tile.y);
     const horizontal = mask?.includes("E") || mask?.includes("W");
     const vertical = mask?.includes("N") || mask?.includes("S");
+    const north = mask?.includes("N");
+    const east = mask?.includes("E");
+    const south = mask?.includes("S");
+    const west = mask?.includes("W");
 
     return `
       <g class="map-editor-board__tile-group">
         ${horizontal ? `<line x1="${cx - 10}" y1="${cy}" x2="${cx + 10}" y2="${cy}" class="map-editor-board__wire map-editor-board__wire--${route.owner} ${route.complete ? "map-editor-board__wire--complete" : ""} ${route.active ? "map-editor-board__wire--active" : ""}"></line>` : ""}
         ${vertical ? `<line x1="${cx}" y1="${cy - 10}" x2="${cx}" y2="${cy + 10}" class="map-editor-board__wire map-editor-board__wire--${route.owner} ${route.complete ? "map-editor-board__wire--complete" : ""} ${route.active ? "map-editor-board__wire--active" : ""}"></line>` : ""}
+        ${north ? `<circle cx="${cx}" cy="${cy - 10}" r="2.4" class="map-editor-board__junction map-editor-board__junction--${route.owner}"></circle>` : ""}
+        ${east ? `<circle cx="${cx + 10}" cy="${cy}" r="2.4" class="map-editor-board__junction map-editor-board__junction--${route.owner}"></circle>` : ""}
+        ${south ? `<circle cx="${cx}" cy="${cy + 10}" r="2.4" class="map-editor-board__junction map-editor-board__junction--${route.owner}"></circle>` : ""}
+        ${west ? `<circle cx="${cx - 10}" cy="${cy}" r="2.4" class="map-editor-board__junction map-editor-board__junction--${route.owner}"></circle>` : ""}
       </g>
     `;
   }).join("");

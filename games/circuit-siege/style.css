@@ -1361,6 +1361,38 @@ input {
   height: 34px;
 }
 
+.map-editor__brush-preview-wire--corner-ne,
+.map-editor__brush-preview-wire--corner-es,
+.map-editor__brush-preview-wire--corner-sw,
+.map-editor__brush-preview-wire--corner-nw {
+  width: 24px;
+  height: 24px;
+}
+
+.map-editor__brush-preview-wire--corner-ne {
+  border-top: 6px solid #7db6ff;
+  border-right: 6px solid #7db6ff;
+  border-radius: 0 14px 0 0;
+}
+
+.map-editor__brush-preview-wire--corner-es {
+  border-right: 6px solid #7db6ff;
+  border-bottom: 6px solid #7db6ff;
+  border-radius: 0 0 14px 0;
+}
+
+.map-editor__brush-preview-wire--corner-sw {
+  border-bottom: 6px solid #7db6ff;
+  border-left: 6px solid #7db6ff;
+  border-radius: 0 0 0 14px;
+}
+
+.map-editor__brush-preview-wire--corner-nw {
+  border-top: 6px solid #7db6ff;
+  border-left: 6px solid #7db6ff;
+  border-radius: 14px 0 0 0;
+}
+
 .map-editor__brush-preview-eraser {
   width: 28px;
   height: 18px;
@@ -1600,6 +1632,10 @@ input {
 
 .map-editor-board__wire--active {
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.48));
+}
+
+.map-editor-board__junction {
+  fill: rgba(248, 250, 252, 0.94);
 }
 
 .map-editor-board__trace {

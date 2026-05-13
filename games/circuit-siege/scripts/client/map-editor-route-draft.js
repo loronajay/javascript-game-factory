@@ -1,34 +1,31 @@
 import { deriveRouteCells } from "../shared/board-format.js";
+import { deriveCanonicalMasksForRoute } from "../shared/route-validator.js";
+import { getMaskOpenings } from "../shared/tile-connectivity.js";
 
-function uniqueCellList(cells = []) {
-  const seen = new Set();
-  const next = [];
+function cellKey(cell) {
+  return `${cell[0]},${cell[1]}`;
+}
 
-  for (const cell of cells) {
-    const x = Number(cell?.[0]);
-    const y = Number(cell?.[1]);
-    const key = `${x},${y}`;
-    if (!Number.isFinite(x) || !Number.isFinite(y) || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    next.push([x, y]);
+function sortTiles(tiles = []) {
+  return tiles
+    .map((tile) => ({
+      x: Number(tile?.x),
+      y: Number(tile?.y),
+      mask: String(tile?.mask || "").toUpperCase()
+    }))
+    .filter((tile) => Number.isInteger(tile.x) && Number.isInteger(tile.y) && tile.mask)
+    .sort((left, right) => {
+      if (left.y !== right.y) return left.y - right.y;
+      return left.x - right.x;
+    });
+}
+
+function uniqueTiles(tiles = []) {
+  const seen = new Map();
+  for (const tile of sortTiles(tiles)) {
+    seen.set(`${tile.x},${tile.y}`, tile);
   }
-
-  return next;
-}
-
-function sortCells(cells = []) {
-  return uniqueCellList(cells).sort((left, right) => {
-    if (left[1] !== right[1]) {
-      return left[1] - right[1];
-    }
-    return left[0] - right[0];
-  });
-}
-
-function cellKey([x, y]) {
-  return `${x},${y}`;
+  return [...seen.values()];
 }
 
 function routeSideRange(board, owner) {
@@ -59,48 +56,61 @@ export function getRouteAnchorCell(board, owner, index, kind = "source") {
   return [x, y];
 }
 
-function stripAnchorCells(routeCells, sourceCell, terminalCell) {
-  const sourceKey = cellKey(sourceCell);
-  const terminalKey = cellKey(terminalCell);
-  return uniqueCellList(routeCells).filter((cell) => {
-    const key = cellKey(cell);
-    return key !== sourceKey && key !== terminalKey;
-  });
+function isAssignedIndex(value) {
+  return Number.isInteger(Number(value)) && Number(value) > 0;
 }
 
-export function normalizeRoutePaintCells(board, route) {
-  if (Array.isArray(route?.paintCells)) {
-    return sortCells(route.paintCells);
+function tileToCell(tile) {
+  return [tile.x, tile.y];
+}
+
+function deriveLegacyPaintTiles(board, route) {
+  if (!isAssignedIndex(route.sourceIndex) || !isAssignedIndex(route.terminalIndex)) {
+    return [];
   }
 
-  const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
-  const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
-
   try {
-    return sortCells(stripAnchorCells(deriveRouteCells(route), sourceCell, terminalCell));
+    const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
+    const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
+    const cells = deriveRouteCells(route);
+    const masksByCellKey = deriveCanonicalMasksForRoute({ ...route, cells });
+    return cells
+      .filter((cell) => {
+        const key = cellKey(cell);
+        return key !== cellKey(sourceCell) && key !== cellKey(terminalCell);
+      })
+      .map((cell) => ({
+        x: cell[0],
+        y: cell[1],
+        mask: masksByCellKey[cellKey(cell)]
+      }));
   } catch {
     return [];
   }
 }
 
-function orthogonalNeighbors(cell) {
-  return [
-    [cell[0], cell[1] - 1],
-    [cell[0] + 1, cell[1]],
-    [cell[0], cell[1] + 1],
-    [cell[0] - 1, cell[1]]
-  ];
-}
-
-function buildAdjacencyMap(cells) {
-  const keys = new Set(cells.map(cellKey));
-  const adjacency = new Map();
-
-  for (const cell of cells) {
-    adjacency.set(cellKey(cell), orthogonalNeighbors(cell).filter((neighbor) => keys.has(cellKey(neighbor))));
+export function normalizeRoutePaintTiles(board, route) {
+  if (Array.isArray(route?.paintTiles)) {
+    return uniqueTiles(route.paintTiles);
   }
 
-  return adjacency;
+  return uniqueTiles(deriveLegacyPaintTiles(board, route));
+}
+
+function directionVector(direction) {
+  if (direction === "N") return [0, -1];
+  if (direction === "E") return [1, 0];
+  if (direction === "S") return [0, 1];
+  if (direction === "W") return [-1, 0];
+  return [0, 0];
+}
+
+function oppositeDirection(direction) {
+  if (direction === "N") return "S";
+  if (direction === "E") return "W";
+  if (direction === "S") return "N";
+  if (direction === "W") return "E";
+  return null;
 }
 
 function compressCellsToPoints(cells) {
@@ -128,35 +138,100 @@ function compressCellsToPoints(cells) {
   return points;
 }
 
-export function materializeRouteDraft(board, route) {
-  const sourceCell = getRouteAnchorCell(board, route.owner, route.sourceIndex, "source");
-  const terminalCell = getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal");
-  const paintCells = normalizeRoutePaintCells(board, route);
-  const routeCells = uniqueCellList([sourceCell, ...paintCells, terminalCell]);
-  const adjacency = buildAdjacencyMap(routeCells);
-  const sourceNeighbors = adjacency.get(cellKey(sourceCell)) || [];
-  const terminalNeighbors = adjacency.get(cellKey(terminalCell)) || [];
+function buildTileLookup(tiles) {
+  return new Map(tiles.map((tile) => [`${tile.x},${tile.y}`, tile]));
+}
 
-  if (paintCells.length === 0) {
+function adjacencyForTile(tile, tileLookup, sourceCell, terminalCell) {
+  const neighbors = [];
+  const openings = getMaskOpenings(tile.mask);
+
+  for (const direction of openings) {
+    const [dx, dy] = directionVector(direction);
+    const neighborCell = [tile.x + dx, tile.y + dy];
+    const neighborKey = cellKey(neighborCell);
+
+    if (neighborKey === cellKey(sourceCell)) {
+      if (direction === "N" && tile.x === sourceCell[0] && tile.y === sourceCell[1] + 1) {
+        neighbors.push(sourceCell);
+      }
+      continue;
+    }
+
+    if (neighborKey === cellKey(terminalCell)) {
+      if (direction === "S" && tile.x === terminalCell[0] && tile.y === terminalCell[1] - 1) {
+        neighbors.push(terminalCell);
+      }
+      continue;
+    }
+
+    const neighborTile = tileLookup.get(neighborKey);
+    if (!neighborTile) {
+      continue;
+    }
+
+    const reciprocal = oppositeDirection(direction);
+    if (getMaskOpenings(neighborTile.mask).includes(reciprocal)) {
+      neighbors.push(neighborCell);
+    }
+  }
+
+  return neighbors;
+}
+
+export function materializeRouteDraft(board, route) {
+  const paintTiles = normalizeRoutePaintTiles(board, route);
+  const sourceAssigned = isAssignedIndex(route.sourceIndex);
+  const terminalAssigned = isAssignedIndex(route.terminalIndex);
+  const sourceCell = sourceAssigned ? getRouteAnchorCell(board, route.owner, route.sourceIndex, "source") : null;
+  const terminalCell = terminalAssigned ? getRouteAnchorCell(board, route.owner, route.terminalIndex, "terminal") : null;
+
+  if (!sourceAssigned || !terminalAssigned) {
     return {
       ok: false,
-      error: "Paint route cells between the fixed source and terminal anchors.",
+      error: "Assign both a source and a terminal before validating the route.",
       sourceCell,
       terminalCell,
-      paintCells,
-      cells: routeCells,
+      paintTiles,
+      cells: [],
+      points: []
+    };
+  }
+
+  if (paintTiles.length === 0) {
+    return {
+      ok: false,
+      error: "Place wire tiles between the chosen source and terminal.",
+      sourceCell,
+      terminalCell,
+      paintTiles,
+      cells: [sourceCell, terminalCell],
       points: [sourceCell, terminalCell]
     };
   }
 
+  const tileLookup = buildTileLookup(paintTiles);
+  const adjacency = new Map();
+  const sourceKey = cellKey(sourceCell);
+  const terminalKey = cellKey(terminalCell);
+
+  for (const tile of paintTiles) {
+    adjacency.set(cellKey(tileToCell(tile)), adjacencyForTile(tile, tileLookup, sourceCell, terminalCell));
+  }
+
+  const sourceTile = tileLookup.get(`${sourceCell[0]},${sourceCell[1] + 1}`);
+  const terminalTile = tileLookup.get(`${terminalCell[0]},${terminalCell[1] - 1}`);
+  const sourceNeighbors = sourceTile && getMaskOpenings(sourceTile.mask).includes("N") ? [tileToCell(sourceTile)] : [];
+  const terminalNeighbors = terminalTile && getMaskOpenings(terminalTile.mask).includes("S") ? [tileToCell(terminalTile)] : [];
+
   if (sourceNeighbors.length !== 1) {
     return {
       ok: false,
-      error: "Route must leave the source anchor exactly once.",
+      error: "Route must leave the chosen source anchor exactly once.",
       sourceCell,
       terminalCell,
-      paintCells,
-      cells: routeCells,
+      paintTiles,
+      cells: [sourceCell, ...paintTiles.map(tileToCell), terminalCell],
       points: [sourceCell, terminalCell]
     };
   }
@@ -164,80 +239,81 @@ export function materializeRouteDraft(board, route) {
   if (terminalNeighbors.length !== 1) {
     return {
       ok: false,
-      error: "Route must enter the terminal anchor exactly once.",
+      error: "Route must enter the chosen terminal anchor exactly once.",
       sourceCell,
       terminalCell,
-      paintCells,
-      cells: routeCells,
+      paintTiles,
+      cells: [sourceCell, ...paintTiles.map(tileToCell), terminalCell],
       points: [sourceCell, terminalCell]
     };
   }
 
-  const sourceKey = cellKey(sourceCell);
-  const terminalKey = cellKey(terminalCell);
-
-  for (const cell of paintCells) {
-    const degree = (adjacency.get(cellKey(cell)) || []).length;
+  for (const tile of paintTiles) {
+    const degree = (adjacency.get(cellKey(tileToCell(tile))) || []).length;
     if (degree !== 2) {
       return {
         ok: false,
-        error: "Painted route tiles must form one continuous non-branching circuit path.",
+        error: "Wire tiles must form one continuous non-branching path.",
         sourceCell,
         terminalCell,
-        paintCells,
-        cells: routeCells,
+        paintTiles,
+        cells: [sourceCell, ...paintTiles.map(tileToCell), terminalCell],
         points: [sourceCell, terminalCell]
       };
     }
   }
 
-  const visited = new Set([sourceKey]);
   const orderedCells = [sourceCell];
-  let previousKey = null;
-  let currentKey = sourceKey;
+  const visited = new Set([sourceKey]);
+  let previousKey = sourceKey;
+  let currentCell = sourceNeighbors[0];
+  let currentKey = cellKey(currentCell);
 
   while (currentKey !== terminalKey) {
+    if (visited.has(currentKey)) {
+      return {
+        ok: false,
+        error: "Route path loops back on itself.",
+        sourceCell,
+        terminalCell,
+        paintTiles,
+        cells: orderedCells,
+        points: [sourceCell, terminalCell]
+      };
+    }
+
+    orderedCells.push(currentCell);
+    visited.add(currentKey);
     const nextOptions = (adjacency.get(currentKey) || []).filter((neighbor) => cellKey(neighbor) !== previousKey);
+
     if (nextOptions.length !== 1) {
       return {
         ok: false,
         error: "Route path branches or breaks before reaching the terminal.",
         sourceCell,
         terminalCell,
-        paintCells,
-        cells: routeCells,
+        paintTiles,
+        cells: orderedCells,
         points: [sourceCell, terminalCell]
       };
     }
 
-    const nextCell = nextOptions[0];
-    const nextKey = cellKey(nextCell);
-    if (visited.has(nextKey)) {
-      return {
-        ok: false,
-        error: "Route path loops back on itself.",
-        sourceCell,
-        terminalCell,
-        paintCells,
-        cells: routeCells,
-        points: [sourceCell, terminalCell]
-      };
-    }
-
-    orderedCells.push(nextCell);
-    visited.add(nextKey);
     previousKey = currentKey;
-    currentKey = nextKey;
+    currentCell = nextOptions[0];
+    currentKey = cellKey(currentCell);
   }
 
-  if (visited.size !== routeCells.length) {
+  orderedCells.push(terminalCell);
+
+  const tileVisitCount = [...visited].filter((key) => key !== sourceKey).length;
+  if (tileVisitCount !== paintTiles.length) {
     return {
       ok: false,
-      error: "Route path is disconnected from one or more painted tiles.",
+      error: "Route path is disconnected from one or more placed wire tiles.",
       sourceCell,
       terminalCell,
-      paintCells,
-      cells: routeCells,
+      paintTiles,
+      cells: orderedCells,
       points: [sourceCell, terminalCell]
     };
   }
@@ -247,7 +323,7 @@ export function materializeRouteDraft(board, route) {
     error: null,
     sourceCell,
     terminalCell,
-    paintCells,
+    paintTiles,
     cells: orderedCells,
     points: compressCellsToPoints(orderedCells)
   };
