@@ -1,6 +1,6 @@
-export const SPRITE_SHEET_PATH = './assets/sprite-sheet.png';
+export const SPRITE_SHEET_PATH = '../assets/sprite-sheet.png';
 
-// Atlas for assets/sprite-sheet.png.
+// Atlas for ../assets/sprite-sheet.png.
 // Coordinates are centralized here so renderer code can use named assets only.
 // This atlas targets the revised grid-friendly sheet with 4 player directions,
 // a 3x3 Beacon Core kit, and separated disabled Laser Door pillars.

@@ -1,5 +1,5 @@
 // Paths are relative to index.html (document root), not this script file.
-const ASSET_BASE_PATH = './illuminauts_modular_demo/assets';
+const ASSET_BASE_PATH = './assets';
 
 function beaconSlice(col, row) {
   return { cols: 3, rows: 3, col, row };

@@ -74,3 +74,14 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
     lastTime: 0,
   };
 }
+
+export function selectRandomMapIndex(random = Math.random, mapCount = MAPS.length) {
+  if (mapCount <= 0) return 0;
+  return Math.min(mapCount - 1, Math.floor(random() * mapCount));
+}
+
+export function selectMatchMapIndex(matchSeed, mapCount = MAPS.length) {
+  if (mapCount <= 0) return 0;
+  const seed = Number.isFinite(matchSeed) ? Math.trunc(matchSeed) : Date.now();
+  return Math.abs(seed) % mapCount;
+}

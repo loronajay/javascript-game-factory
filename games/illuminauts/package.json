@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node tests/audio.test.js && node tests/assets.test.js",
+    "test": "node tests/state.test.js && node tests/audio.test.js && node tests/assets.test.js",
+    "test:state": "node tests/state.test.js",
     "test:audio": "node tests/audio.test.js",
     "test:assets": "node tests/assets.test.js"
   }

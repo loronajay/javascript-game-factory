@@ -6,6 +6,7 @@ import {
   consumeSoundEvents,
   createAudioController,
   createAudioState,
+  enqueueSoundEvent,
   getMusicTrackForPhase
 } from '../scripts/audio.js';
 import { updatePlayer } from '../scripts/player.js';
@@ -79,6 +80,21 @@ function testMusicTrackSelection() {
   assert.equal(getMusicTrackForPhase('countdown'), 'menu');
   assert.equal(getMusicTrackForPhase('win'), 'menu');
   assert.equal(getMusicTrackForPhase('playing'), 'game');
+}
+
+async function testAudioUsesRootAssetFolder() {
+  FakeAudio.instances.length = 0;
+  const controller = createAudioController({ AudioCtor: FakeAudio });
+  controller.unlock();
+  const state = createState();
+  enqueueSoundEvent(state, 'collect');
+  await controller.sync(state, 'playing', 0);
+
+  const srcs = FakeAudio.instances.map((instance) => instance.src);
+  assert.ok(srcs.includes('./assets/sounds/menu.mp3'));
+  assert.ok(srcs.includes('./assets/sounds/game.mp3'));
+  assert.ok(srcs.includes('./assets/sounds/collect.wav'));
+  assert.equal(srcs.some((src) => src.includes('illuminauts_modular_demo/assets')), false);
 }
 
 function testDoorUnlockQueuesSound() {
@@ -232,6 +248,7 @@ async function testControllerSwitchesLoopingMusic() {
 
 async function run() {
   testMusicTrackSelection();
+  await testAudioUsesRootAssetFolder();
   testDoorUnlockQueuesSound();
   testChipPickupQueuesCollectSound();
   testPowerCellPickupQueuesCollectAndPowerUpSounds();

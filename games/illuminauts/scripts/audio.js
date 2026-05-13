@@ -1,7 +1,7 @@
 import { BASE_LIGHT_RADIUS, POWER_LIGHT_RADIUS } from './config.js';
 import { getLaserGatePhase, getTurretPhase } from './hazards.js';
 
-const SOUND_BASE_PATH = './illuminauts_modular_demo/assets/sounds';
+const SOUND_BASE_PATH = './assets/sounds';
 
 const MUSIC_TRACKS = {
   menu: `${SOUND_BASE_PATH}/menu.mp3`,

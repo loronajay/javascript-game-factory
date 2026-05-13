@@ -1,4 +1,4 @@
-import { createGameState } from './scripts/state.js';
+import { createGameState, selectMatchMapIndex } from './scripts/state.js';
 import { bindInput, clearFrameInput, consumeAnyKey } from './scripts/input.js';
 import { updateAliens } from './scripts/hazards.js';
 import { updatePlayer } from './scripts/player.js';
@@ -13,7 +13,6 @@ import {
 } from './scripts/renderer.js';
 import { createAudioController, enqueueSoundEvent, isTileVisibleToPlayer } from './scripts/audio.js';
 import { loadAssets } from './scripts/assets.js';
-import { MAPS } from './scripts/maps.js';
 import { createOnlineClient } from './scripts/online.js';
 import { getLocalIdentity } from './scripts/online-identity.js';
 
@@ -351,7 +350,7 @@ function startTestGame(mapEntry, side) {
 // ─── Online game start ────────────────────────────────────────────────────────
 
 function startOnlineGame() {
-  state = createGameState(0, onlineLocalRole);
+  state = createGameState(selectMatchMapIndex(onlineStartAt), onlineLocalRole);
   state.input = input;
   state.gameStartAt = performance.now();
   state.online.enabled = true;

@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { createSpriteCatalog, drawSprite, spriteAssetDefs } from '../scripts/assets.js';
 
 function testSpriteAssetDefsUseIndividualPngs() {
+  assert.equal(spriteAssetDefs.playerDown.src, './assets/player-down.png');
+  assert.equal(spriteAssetDefs.accessChip.src, './assets/access-chip.png');
+  assert.equal(spriteAssetDefs.laserDoorActiveWide.src, './assets/closed-door.png');
+  assert.equal(spriteAssetDefs.beacon00.src, './assets/beacon-core.png');
   assert.equal(spriteAssetDefs.playerDown.src.endsWith('/player-down.png'), true);
   assert.equal(spriteAssetDefs.accessChip.src.endsWith('/access-chip.png'), true);
   assert.equal(spriteAssetDefs.laserDoorActiveWide.src.endsWith('/closed-door.png'), true);
