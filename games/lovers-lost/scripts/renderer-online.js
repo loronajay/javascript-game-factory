@@ -447,6 +447,40 @@ export function createOnlineRenderer(ctx, images, {
     ctx.restore();
   }
 
+  function renderLocalCountdown(secondsRemaining) {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawSpaceBackground();
+    drawOnlineLabel('LOCAL MULTIPLAYER', CANVAS_W / 2, 26, {
+      bg:        'rgba(56,22,28,0.86)',
+      stroke:    'rgba(255,140,155,0.50)',
+      textColor: 'rgba(255,232,236,0.95)',
+    });
+
+    ctx.save();
+    ctx.textAlign = 'center';
+
+    blit(images.boy, menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 - 88, 160, SPRITE_W, SPRITE_H, false, 1);
+    blit(images.girl, menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W / 2 + 40, 160, SPRITE_W, SPRITE_H, true, 1);
+
+    ctx.font        = 'bold 22px "Cinzel Decorative", serif';
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor = 'rgba(160,190,255,0.40)';
+    ctx.shadowBlur  = 10;
+    ctx.fillText('BOTH LOVERS READY', CANVAS_W / 2, 240);
+
+    ctx.font        = 'bold 104px monospace';
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.18)';
+    ctx.shadowBlur  = 22;
+    ctx.fillText(secondsRemaining > 0 ? String(secondsRemaining) : 'GO', CANVAS_W / 2, 372);
+
+    ctx.shadowBlur  = 0;
+    ctx.font        = '15px "Cinzel Decorative", serif';
+    ctx.fillStyle   = 'rgba(190,205,255,0.70)';
+    ctx.fillText('Get ready to run', CANVAS_W / 2, 420);
+    ctx.restore();
+  }
+
   return {
     renderOnlineSideSelect,
     renderOnlineNameEntry,
@@ -454,5 +488,6 @@ export function createOnlineRenderer(ctx, images, {
     renderOnlineCountdown,
     renderSoloSideSelect,
     renderSoloCountdown,
+    renderLocalCountdown,
   };
 }

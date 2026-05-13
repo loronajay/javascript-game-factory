@@ -18,6 +18,7 @@ import {
   tickFrame,
   advancePhaseState,
   nextActionForSide,
+  shouldHandleScoreScreenKeydown,
   shouldHandleMappedKeyLocally,
   sanitizeOnlineDisplayName,
   isValidOnlineDisplayName,
@@ -167,6 +168,131 @@ function createTextCaptureRenderer(options = {}) {
 function textCallY(textCalls, label) {
   const call = textCalls.find(entry => entry.text === label);
   return call ? call.y : null;
+}
+
+function bootInitGameHarness() {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalImage = globalThis.Image;
+  const originalRaf = globalThis.requestAnimationFrame;
+
+  const listeners = {};
+  const canvasListeners = {};
+  const texts = [];
+  let rafCallback = null;
+
+  const ctx = new Proxy({
+    measureText: (text = '') => ({ width: String(text).length * 8 }),
+    createLinearGradient: () => ({ addColorStop() {} }),
+    createRadialGradient: () => ({ addColorStop() {} }),
+    fillText(text) {
+      texts.push(String(text));
+    },
+  }, {
+    get(target, prop) {
+      if (!(prop in target)) target[prop] = () => {};
+      return target[prop];
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    },
+  });
+
+  const canvas = {
+    width: 0,
+    height: 0,
+    addEventListener(type, handler) {
+      canvasListeners[type] = handler;
+    },
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: canvas.width || 960, height: canvas.height || 540 };
+    },
+    getContext() {
+      return ctx;
+    },
+  };
+  const scoreOverlay = {
+    innerHTML: '',
+    classList: {
+      add() {},
+      remove() {},
+    },
+  };
+
+  class FakeImage {
+    constructor() {
+      this.complete = false;
+      this.naturalWidth = 16;
+      this.naturalHeight = 16;
+      this._src = '';
+      this._onload = null;
+    }
+
+    set src(value) {
+      this._src = value;
+    }
+
+    get src() {
+      return this._src;
+    }
+
+    set onload(fn) {
+      this._onload = fn;
+      if (this._src && typeof fn === 'function') {
+        this.complete = true;
+        fn();
+      }
+    }
+
+    get onload() {
+      return this._onload;
+    }
+
+    set onerror(fn) {
+      this._onerror = fn;
+    }
+  }
+
+  globalThis.document = {
+    getElementById(id) {
+      if (id === 'gameCanvas') return canvas;
+      if (id === 'score-overlay') return scoreOverlay;
+      throw new Error(`unexpected element lookup: ${id}`);
+    },
+  };
+  globalThis.window = {
+    location: { search: '' },
+    addEventListener(type, handler) {
+      listeners[type] = handler;
+    },
+  };
+  globalThis.Image = FakeImage;
+  globalThis.requestAnimationFrame = (callback) => {
+    rafCallback = callback;
+    return 1;
+  };
+
+  initGame();
+
+  return {
+    canvas,
+    listeners,
+    canvasListeners,
+    texts,
+    stepFrame(timestamp) {
+      if (typeof rafCallback !== 'function') throw new Error('expected a queued animation frame');
+      const callback = rafCallback;
+      rafCallback = null;
+      callback(timestamp);
+    },
+    cleanup() {
+      globalThis.document = originalDocument;
+      globalThis.window = originalWindow;
+      globalThis.Image = originalImage;
+      globalThis.requestAnimationFrame = originalRaf;
+    },
+  };
 }
 
 // ─── createGameState ──────────────────────────────────────────────────────────
@@ -1284,6 +1410,13 @@ test('online mode only accepts local physical keys for the assigned side', () =>
   assertEq(shouldHandleMappedKeyLocally('online', 'girl', 'boy'), false);
 });
 
+test('score screen continue accepts any keyboard key instead of only action buttons', () => {
+  assertEq(shouldHandleScoreScreenKeydown('score_screen', 'Enter'), true);
+  assertEq(shouldHandleScoreScreenKeydown('score_screen', 'ArrowLeft'), true);
+  assertEq(shouldHandleScoreScreenKeydown('score_screen', 'w'), true);
+  assertEq(shouldHandleScoreScreenKeydown('playing', 'Enter'), false);
+});
+
 test('online lobby button hitboxes match the shifted renderer layout', () => {
   const sideSelect = getOnlineSideSelectRects();
   assertEq(sideSelect.boy.x, 240);
@@ -1407,6 +1540,23 @@ test('getCountdownSecondsRemaining counts down against server-adjusted time', ()
 test('hasCountdownStarted flips only when the adjusted clock reaches startAt', () => {
   assertEq(hasCountdownStarted(5000, 300, 4699), false);
   assertEq(hasCountdownStarted(5000, 300, 4700), true);
+});
+
+test('initGame routes local multiplayer through a visible countdown before gameplay starts', () => {
+  const harness = bootInitGameHarness();
+
+  try {
+    harness.stepFrame(1000);
+    harness.texts.length = 0;
+
+    harness.canvasListeners.click({ clientX: 480, clientY: 244 });
+    harness.stepFrame(1017);
+
+    assert(harness.texts.includes('LOCAL MULTIPLAYER'), 'expected a local multiplayer countdown banner');
+    assert(harness.texts.includes('3'), 'expected the countdown to begin at 3');
+  } finally {
+    harness.cleanup();
+  }
 });
 
 test('initGame boots one browser frame and preloads gameplay sprites', () => {
@@ -1833,6 +1983,22 @@ test('renderer surfaces disconnect notes on result screens', () => {
   scoreCapture.renderer.renderScore(playerAt(120, 'boy'), playerAt(100, 'girl'), runSummary);
   assert(scoreCapture.texts.includes('Your partner disconnected.'), 'expected disconnect note on the score screen');
   assert(scoreCapture.texts.some(text => text.includes('Leo (Boy)')), 'expected named result labels on the score screen');
+});
+
+test('renderer tells players to press any key on the score screen', () => {
+  const { renderer, texts } = createTextCaptureRenderer();
+
+  renderer.renderScore(playerAt(120, 'boy'), playerAt(100, 'girl'), {
+    outcome: 'reunion',
+    boyFinished: true,
+    girlFinished: true,
+    boyScore: 500,
+    girlScore: 600,
+    totalScore: 1100,
+    elapsedFrames: 360,
+  });
+
+  assert(texts.includes('Press any key to return to menu'), 'expected score-screen footer to allow any key');
 });
 
 test('renderer keeps join and create prompts below the lobby status stack', () => {

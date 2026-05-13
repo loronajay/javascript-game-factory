@@ -175,6 +175,7 @@ function createRenderer(canvas, images, emoteImages = {}) {
     renderOnlineCountdown,
     renderSoloSideSelect,
     renderSoloCountdown,
+    renderLocalCountdown,
   } = createOnlineRenderer(ctx, images, {
     blit: characterRenderer.blit,
     drawSpaceBackground: _drawSpaceBackground,
@@ -378,6 +379,7 @@ default:          return GROUND_TOP - 28;
     renderOnlineCountdown,
     renderSoloSideSelect,
     renderSoloCountdown,
+    renderLocalCountdown,
     renderMenuHelp,
     renderGameOver,
     renderScore,

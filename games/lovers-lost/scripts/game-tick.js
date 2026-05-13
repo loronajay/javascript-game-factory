@@ -417,6 +417,10 @@ function shouldHandleMappedKeyLocally(mode, onlineSide, mappedSide) {
   return mappedSide === onlineSide;
 }
 
+function shouldHandleScoreScreenKeydown(phase, key) {
+  return phase === 'score_screen' && typeof key === 'string' && key.length > 0;
+}
+
 export {
   GAMEOVER_HOLD_FRAMES,
   applyGradeOutcome,
@@ -437,5 +441,6 @@ export {
   tickFrame,
   advancePhaseState,
   nextActionForSide,
+  shouldHandleScoreScreenKeydown,
   shouldHandleMappedKeyLocally,
 };

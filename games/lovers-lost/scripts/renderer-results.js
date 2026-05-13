@@ -121,7 +121,7 @@ export function createResultsRenderer(ctx, images, {
     let title = soloSide ? 'Lovers Reunited' : 'Lovers Reunited';
     if (!soloSide && runSummary?.outcome === 'partial')   title = 'Partial Finish';
     if (!soloSide && runSummary?.outcome === 'game_over') title = 'Run Over';
-    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any action key to return to menu', soloSide);
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any key to return to menu', soloSide);
   }
 
   function renderReunion(boyPlayer, girlPlayer, phaseFrames) {

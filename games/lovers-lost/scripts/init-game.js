@@ -1,5 +1,6 @@
 import {
   createGameState, tickFrame, advancePhaseState,
+  shouldHandleScoreScreenKeydown,
   shouldHandleMappedKeyLocally,
 } from './game-tick.js';
 import { RUN_DISTANCE } from './player.js';
@@ -123,6 +124,10 @@ function _initWithAssets(images, emoteImages) {
   const inp = createInput();
   window.addEventListener('keydown', e => {
     sounds.retryPendingMusic();
+    if (shouldHandleScoreScreenKeydown(gs.phase, e.key)) {
+      returnToMenu();
+      return;
+    }
     if (gs.phase === 'menu_help') {
       gs = { ...gs, phase: 'menu' }; inp.tick(); return;
     }
@@ -132,6 +137,10 @@ function _initWithAssets(images, emoteImages) {
     }
     if (gs.phase === 'solo_countdown') {
       if (e.key === 'Escape') { soloMode = false; gs = { ...gs, phase: 'menu' }; }
+      return;
+    }
+    if (gs.phase === 'local_countdown') {
+      if (e.key === 'Escape') { gs = { ...gs, phase: 'menu' }; }
       return;
     }
     if (gs.phase === 'online_side_select') {
@@ -218,9 +227,11 @@ function _initWithAssets(images, emoteImages) {
   let soloMode          = false;
   let soloSide          = 'boy';
   let soloCountdownTick = 0;
+  let localCountdownTick = 0;
   let soloSideBoyHov    = false;
   let soloSideGirlHov   = false;
   const SOLO_COUNTDOWN_TICKS = 180;
+  const LOCAL_COUNTDOWN_TICKS = 180;
 
   // ── Online UI state ──────────────────────────────────────────────────────────
   let lastEmoteSentAt      = 0;
@@ -309,7 +320,7 @@ function _initWithAssets(images, emoteImages) {
 
     if (gs.phase === 'menu') {
       if      (_inBtn(cx, cy, MENU_BTN0_X, MENU_BTN0_Y, MENU_BTN0_W, MENU_BTN0_H)) { soloCountdownTick = 0; gs = { ...gs, phase: 'solo_side_select' }; }
-      else if (_inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H))  startPlaying();
+      else if (_inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H))  { localCountdownTick = 0; gs = { ...gs, phase: 'local_countdown' }; }
       else if (_inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H)) { onlineSide = 'boy'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_side_select' }; }
       else if (_inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H)) gs = { ...gs, phase: 'menu_help' };
       return;
@@ -372,7 +383,7 @@ function _initWithAssets(images, emoteImages) {
   // ── State machine ────────────────────────────────────────────────────────────
   function startPlaying() {
     sounds.stop('run-success'); sounds.stop('run-failed');
-    gs = { ...createGameState(gs.mode, Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
+    gs = { ...createGameState('local', Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
     boyAnim = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
     inp.tick();
@@ -433,7 +444,7 @@ function _initWithAssets(images, emoteImages) {
     while (loopAccumulator >= TICK_MS) {
       loopAccumulator -= TICK_MS;
 
-      const musicPhase = (gs.phase === 'menu_help' || gs.phase === 'solo_side_select' || gs.phase === 'solo_countdown') ? 'menu' : gs.phase;
+      const musicPhase = (gs.phase === 'menu_help' || gs.phase === 'solo_side_select' || gs.phase === 'solo_countdown' || gs.phase === 'local_countdown') ? 'menu' : gs.phase;
       if (musicPhase !== lastMusicPhase) {
         if (musicPhase === 'menu')                                    sounds.playMusic('bg-music-menu');
         else if (musicPhase === 'playing')                            sounds.playMusic('bg-music-game');
@@ -441,18 +452,14 @@ function _initWithAssets(images, emoteImages) {
         lastMusicPhase = musicPhase;
       }
 
-      if (gs.phase === 'score_screen') {
-        const anyPressed =
-          inp.isPressed('boy',  'jump')  || inp.isPressed('boy',  'attack') ||
-          inp.isPressed('boy',  'block') || inp.isPressed('boy',  'crouch') ||
-          inp.isPressed('girl', 'jump')  || inp.isPressed('girl', 'attack') ||
-          inp.isPressed('girl', 'block') || inp.isPressed('girl', 'crouch');
-        if (anyPressed) returnToMenu();
-      }
-
       if (gs.phase === 'solo_countdown') {
         soloCountdownTick++;
         if (soloCountdownTick >= SOLO_COUNTDOWN_TICKS) startPlayingSolo(soloSide);
+      }
+
+      if (gs.phase === 'local_countdown') {
+        localCountdownTick++;
+        if (localCountdownTick >= LOCAL_COUNTDOWN_TICKS) startPlaying();
       }
 
       if (gs.phase === 'online_countdown' && onlineCountdown &&
@@ -544,6 +551,7 @@ function _initWithAssets(images, emoteImages) {
     if      (gs.phase === 'menu')              renderer.renderMenu(debugState, menuBtn0Hovered, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
     else if (gs.phase === 'solo_side_select')  renderer.renderSoloSideSelect(soloSideBoyHov, soloSideGirlHov);
     else if (gs.phase === 'solo_countdown')    renderer.renderSoloCountdown(soloSide, Math.ceil((SOLO_COUNTDOWN_TICKS - soloCountdownTick) / 60));
+    else if (gs.phase === 'local_countdown')   renderer.renderLocalCountdown(Math.ceil((LOCAL_COUNTDOWN_TICKS - localCountdownTick) / 60));
     else if (gs.phase === 'online_side_select') renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov, onlineSide);
     else if (gs.phase === 'online_name_entry')  renderer.renderOnlineNameEntry(onlineSide, onlineNameInput, onlineNameError, { continue: onlineNameContinueHov });
     else if (gs.phase === 'online_lobby') {
