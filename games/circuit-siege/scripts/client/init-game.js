@@ -100,20 +100,26 @@ function bindButtons(app, root = document) {
   root.querySelector("#btn-join-back")?.addEventListener("click", () => {
     app.goBack?.();
   });
-  root.querySelectorAll("[data-tool]").forEach((button) => {
-    button.addEventListener("click", () => {
-      app.selectTool(button.dataset.tool || "straight-h");
-    });
-  });
-  root.querySelectorAll("[data-leave]").forEach((button) => {
-    button.addEventListener("click", () => {
-      app.leaveMatchmaking();
-    });
-  });
-  root.querySelector("#board-grid")?.addEventListener("click", (event) => {
+  root.addEventListener("click", (event) => {
+    const toolButton = event.target?.closest?.("[data-tool]");
+    if (toolButton && root.contains(toolButton)) {
+      app.selectTool?.(toolButton.dataset.tool || "EW");
+      event.preventDefault();
+      return;
+    }
+
+    const leaveButton = event.target?.closest?.("[data-leave]");
+    if (leaveButton && root.contains(leaveButton)) {
+      app.leaveMatchmaking?.();
+      event.preventDefault();
+      return;
+    }
+
     const slotId = findSlotIdFromEventTarget(event.target);
-    if (!slotId) return;
-    app.handleBoardSlot(slotId);
+    if (slotId) {
+      app.handleBoardSlot?.(slotId);
+      event.preventDefault();
+    }
   });
   root.addEventListener("mousemove", (event) => {
     app.updatePointer?.(event.clientX, event.clientY);

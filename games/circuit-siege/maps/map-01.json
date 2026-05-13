@@ -1,6 +1,6 @@
 {
-    "title":  "Circuit Siege Readability Prototype Board",
-    "version":  "debug-demo-0.4",
+    "title":  "MAP-01",
+    "version":  "1.0.0",
     "cols":  41,
     "rows":  20,
     "sideCols":  20,
@@ -1287,5 +1287,5 @@
                             "terminalType":  "dud"
                         }
                     ],
-    "mapId":  "canon-v1"
+    "mapId":  "map-01"
 }

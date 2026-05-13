@@ -41,7 +41,7 @@ async function fetchJson(fetchImpl, path) {
 export function createBoardCatalogLoader({
   fetchImpl = fetch,
   manifestPath = "./maps/index.json",
-  fallbackMapPath = "./maps/canon-v1.json"
+  fallbackMapPath = "./maps/map-01.json"
 } = {}) {
   let manifestPromise = null;
   const boardCache = new Map();
@@ -120,7 +120,7 @@ export function createBoardCatalogLoader({
 export async function loadBoardCatalog({
   fetchImpl = fetch,
   manifestPath = "./maps/index.json",
-  fallbackMapPath = "./maps/canon-v1.json",
+  fallbackMapPath = "./maps/map-01.json",
   preferredMapId = null,
   randomFn = Math.random
 } = {}) {

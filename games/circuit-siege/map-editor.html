@@ -12,7 +12,7 @@
         <div>
           <p class="map-editor__eyebrow">Circuit Siege</p>
           <h1>Map Editor</h1>
-          <p class="map-editor__subhead">Load a compact map JSON from <code>maps/</code>, validate it against the live board rules, preview it, and export it back as a compact file.</p>
+          <p class="map-editor__subhead">Start from a fresh anchored board, choose a route, paint the circuit tile-by-tile between the fixed source and terminal anchors, place hole/refactor puzzle tiles, and export compact JSON back into <code>maps/</code>.</p>
         </div>
         <a class="map-editor__back" href="./index.html">Back To Game</a>
       </header>
@@ -20,12 +20,130 @@
       <section class="map-editor__workspace">
         <aside class="map-editor__sidebar">
           <div class="map-editor__panel">
+            <div class="map-editor__json-header">
+              <h2>Map Setup</h2>
+              <button id="editor-new-map" type="button">New Map</button>
+            </div>
+            <label class="map-editor__label" for="editor-map-title">Title</label>
+            <input id="editor-map-title" class="map-editor__text-input" type="text">
+            <label class="map-editor__label" for="editor-map-id">Map ID</label>
+            <input id="editor-map-id" class="map-editor__text-input" type="text">
+            <label class="map-editor__label" for="editor-map-version">Version</label>
+            <input id="editor-map-version" class="map-editor__text-input" type="text">
+          </div>
+
+          <div class="map-editor__panel">
             <label class="map-editor__label" for="editor-map-select">Map From Folder</label>
             <select id="editor-map-select" class="map-editor__select"></select>
             <div class="map-editor__button-row">
               <button id="editor-load-map" type="button">Load Selected</button>
               <button id="editor-validate" type="button">Validate</button>
             </div>
+          </div>
+
+          <div class="map-editor__panel">
+            <div class="map-editor__json-header">
+              <h2>Tile Toolbox</h2>
+              <button id="editor-delete-route" type="button">Delete Route</button>
+            </div>
+            <div class="map-editor__button-row">
+              <button id="editor-add-blue-route" type="button">Add Blue Route</button>
+              <button id="editor-add-red-route" type="button">Add Red Route</button>
+            </div>
+            <div class="map-editor__button-row">
+              <button id="editor-undo-point" type="button">Undo Point</button>
+              <button id="editor-remove-slot" type="button">Remove Slot</button>
+            </div>
+            <div id="editor-brush-palette" class="map-editor__brush-palette">
+              <button id="editor-brush-route" type="button" class="map-editor__brush-button" data-editor-brush="route">
+                <span class="map-editor__brush-preview map-editor__brush-preview--route" data-brush-preview="route" aria-hidden="true">
+                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--horizontal"></span>
+                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--vertical"></span>
+                </span>
+                <span class="map-editor__brush-copy"><strong>Route Tile</strong><small>Paint circuit path</small></span>
+              </button>
+              <button id="editor-brush-erase" type="button" class="map-editor__brush-button" data-editor-brush="erase">
+                <span class="map-editor__brush-preview map-editor__brush-preview--erase" data-brush-preview="erase" aria-hidden="true">
+                  <span class="map-editor__brush-preview-eraser"></span>
+                </span>
+                <span class="map-editor__brush-copy"><strong>Erase</strong><small>Remove route cells</small></span>
+              </button>
+              <button id="editor-brush-hole" type="button" class="map-editor__brush-button" data-editor-brush="hole">
+                <span class="map-editor__brush-preview map-editor__brush-preview--hole" data-brush-preview="hole" aria-hidden="true"></span>
+                <span class="map-editor__brush-copy"><strong>Hole Tile</strong><small>Place open gap</small></span>
+              </button>
+              <button id="editor-brush-refactor" type="button" class="map-editor__brush-button" data-editor-brush="refactor">
+                <span class="map-editor__brush-preview map-editor__brush-preview--refactor" data-brush-preview="refactor" aria-hidden="true">
+                  <span class="map-editor__brush-preview-refactor-wire map-editor__brush-preview-refactor-wire--horizontal"></span>
+                </span>
+                <span class="map-editor__brush-copy"><strong>Refactor Tile</strong><small>Place wrong wire</small></span>
+              </button>
+              <button id="editor-brush-source" type="button" class="map-editor__brush-button" data-editor-brush="source">
+                <span class="map-editor__brush-preview map-editor__brush-preview--source" data-brush-preview="source" aria-hidden="true"></span>
+                <span class="map-editor__brush-copy"><strong>Set Source</strong><small>Choose route start</small></span>
+              </button>
+              <button id="editor-brush-terminal" type="button" class="map-editor__brush-button" data-editor-brush="terminal">
+                <span class="map-editor__brush-preview map-editor__brush-preview--terminal map-editor__brush-preview--terminal-damage" data-brush-preview="terminal" aria-hidden="true"></span>
+                <span class="map-editor__brush-copy"><strong>Set Terminal</strong><small>Choose route goal</small></span>
+              </button>
+            </div>
+            <div class="map-editor__current-brush">
+              <span class="map-editor__label">Current Brush</span>
+              <div class="map-editor__current-brush-shell">
+                <span id="editor-current-brush-preview" class="map-editor__brush-preview map-editor__brush-preview--route" aria-hidden="true">
+                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--horizontal"></span>
+                  <span class="map-editor__brush-preview-wire map-editor__brush-preview-wire--vertical"></span>
+                </span>
+                <p id="editor-current-brush" class="map-editor__status">Route Tile</p>
+              </div>
+            </div>
+            <div class="map-editor__terminal-type-bar">
+              <button id="editor-terminal-damage" type="button" class="map-editor__terminal-type-button" data-terminal-type="damage">Damage Terminal</button>
+              <button id="editor-terminal-dud" type="button" class="map-editor__terminal-type-button" data-terminal-type="dud">Dud Terminal</button>
+            </div>
+            <p id="editor-mode-help" class="map-editor__status">Select a route, pick a brush, then paint or click anchors on the board.</p>
+            <div id="editor-route-list" class="map-editor__route-list"></div>
+          </div>
+
+          <div class="map-editor__panel">
+            <h2>Selected Route</h2>
+            <label class="map-editor__label" for="editor-route-id">Route ID</label>
+            <input id="editor-route-id" class="map-editor__text-input" type="text" readonly>
+            <label class="map-editor__label" for="editor-route-owner">Owner</label>
+            <select id="editor-route-owner" class="map-editor__select" disabled>
+              <option value="blue">Blue</option>
+              <option value="red">Red</option>
+            </select>
+            <div class="map-editor__two-column">
+              <div>
+                <label class="map-editor__label" for="editor-route-index">Route Index</label>
+                <input id="editor-route-index" class="map-editor__text-input" type="number" min="1" max="10">
+              </div>
+              <div>
+                <label class="map-editor__label" for="editor-source-index">Source Index</label>
+                <input id="editor-source-index" class="map-editor__text-input" type="number" min="1" max="10">
+              </div>
+            </div>
+            <div class="map-editor__two-column">
+              <div>
+                <label class="map-editor__label" for="editor-terminal-index">Terminal Index</label>
+                <input id="editor-terminal-index" class="map-editor__text-input" type="number" min="1" max="10">
+              </div>
+              <div>
+                <label class="map-editor__label" for="editor-terminal-type">Terminal Type</label>
+                <select id="editor-terminal-type" class="map-editor__select">
+                  <option value="damage">Damage</option>
+                  <option value="dud">Dud</option>
+                </select>
+              </div>
+            </div>
+            <label class="map-editor__label" for="editor-mirror-route-id">Mirror Route ID</label>
+            <input id="editor-mirror-route-id" class="map-editor__text-input" type="text">
+            <p class="map-editor__hint">Use the toolbox like a tile editor: pick a brush, paint route tiles one cell at a time, click anchors to assign the source/terminal, and hover any completed route to trace the whole circuit.</p>
+            <div class="map-editor__button-row">
+              <button id="editor-apply-route" type="button">Apply Route Fields</button>
+            </div>
+            <div id="editor-slot-list" class="map-editor__slot-list"></div>
           </div>
 
           <div class="map-editor__panel">
