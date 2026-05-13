@@ -371,10 +371,14 @@ input {
 }
 
 #btn-private-host {
+  max-width: 340px;
+  justify-self: center;
   background-image: url("images/ui/menu-button-create-room.png");
 }
 
 #btn-open-join {
+  max-width: 340px;
+  justify-self: center;
   aspect-ratio: 334 / 150;
   background-image: url("images/ui/menu-button-enter-code.png");
 }

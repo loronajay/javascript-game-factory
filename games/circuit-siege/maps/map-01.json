@@ -1,5 +1,6 @@
 {
     "title":  "MAP-01",
+    "mapId":  "canon-v1",
     "version":  "1.0.0",
     "cols":  41,
     "rows":  20,
@@ -1286,6 +1287,5 @@
                             "expectedPiece":  "straight",
                             "terminalType":  "dud"
                         }
-                    ],
-    "mapId":  "map-01"
+                    ]
 }
