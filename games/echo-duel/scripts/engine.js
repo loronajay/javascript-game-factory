@@ -1,8 +1,17 @@
 import { INPUTS, PHASES, PLAYBACK_TIMING, timerSecondsForLength } from './config.js';
-import { activePlayers, cloneState, findPlayerIndexById, firstActiveIndex, getOwner, nextActiveIndex } from './state.js';
+import { activePlayers, cloneState, createMatchState, findPlayerIndexById, firstActiveIndex, getOwner, nextActiveIndex } from './state.js';
 
 function isValidInput(input) {
   return INPUTS.includes(String(input || '').toUpperCase());
+}
+
+function randomInput(random = Math.random) {
+  const index = Math.max(0, Math.min(INPUTS.length - 1, Math.floor(Number(random()) * INPUTS.length)));
+  return INPUTS[index];
+}
+
+function generatePattern(length, random = Math.random) {
+  return Array.from({ length: Math.max(0, Number(length || 0)) }, () => randomInput(random));
 }
 
 function phaseTimer(length, now = performance.now(), settings) {
@@ -60,6 +69,52 @@ function beginSignalPlayback(state, status = '') {
   };
   next.status = status || `Memorize the ${sequence.length}-input signal.`;
   return next;
+}
+
+function beginSinglePlayerChallenge(state, length, status = '', random = Math.random) {
+  const next = cloneState(state);
+  const safeLength = Math.max(
+    Number(next.settings?.startingPatternLength || 4),
+    Math.min(Number(next.settings?.maxPatternLength || 10), Number(length || next.settings?.startingPatternLength || 4))
+  );
+  next.ownerIndex = 0;
+  next.activeSequence = generatePattern(safeLength, random);
+  next.ownerDraft = [];
+  next.ownerReplayIndex = 0;
+  next.appendTargetLength = 0;
+  next.copyProgress = {};
+  next.roundResults = [];
+  next.timer = null;
+  next.playback = null;
+  next.players = clearPlayerResults(next.players);
+  next.singlePlayer = {
+    score: Number(next.singlePlayer?.score || 0),
+    patternLength: safeLength,
+  };
+  return beginSignalPlayback(next, status || `Memorize the ${safeLength}-input signal.`);
+}
+
+export function startSinglePlayerMatch({ penaltyWord, playerName = 'Player', random = Math.random } = {}) {
+  const base = createMatchState({
+    penaltyWord,
+    mode: 'single',
+    firstOwnerIndex: 0,
+    players: [
+      { id: 'cpu', clientId: 'cpu', name: 'Echo CPU' },
+      { id: 'player', clientId: 'player', name: playerName },
+    ],
+    network: { myClientId: 'player' },
+  });
+  base.singlePlayer = {
+    score: 0,
+    patternLength: Number(base.settings?.startingPatternLength || 4),
+  };
+  return beginSinglePlayerChallenge(
+    base,
+    base.singlePlayer.patternLength,
+    `Memorize the ${base.singlePlayer.patternLength}-input signal.`,
+    random
+  );
 }
 
 function finishSignalPlayback(state) {
@@ -163,6 +218,29 @@ function finishCopyPhase(state) {
   const successful = next.roundResults.filter(result => result.result === 'safe');
   const allChallengersSucceeded = challengerIds.length > 0 && successful.length === challengerIds.length;
   const reachedMax = next.activeSequence.length >= next.settings.maxPatternLength;
+
+  if (next.mode === 'single') {
+    if (!allChallengersSucceeded) {
+      return beginSinglePlayerChallenge(
+        next,
+        next.settings.startingPatternLength,
+        `Missed signal. Penalty letter added. Memorize the next ${next.settings.startingPatternLength}-input signal.`
+      );
+    }
+
+    const nextScore = Number(next.singlePlayer?.score || 0) + 1;
+    const nextLength = reachedMax
+      ? Number(next.settings.startingPatternLength || 4)
+      : Math.min(
+        Number(next.settings.maxPatternLength || 10),
+        Number(next.activeSequence.length || 0) + Number(next.settings.patternAppendCount || 2)
+      );
+    next.singlePlayer = {
+      score: nextScore,
+      patternLength: nextLength,
+    };
+    return beginSinglePlayerChallenge(next, nextLength, `Score ${nextScore}. Memorize the ${nextLength}-input signal.`);
+  }
 
   if (!allChallengersSucceeded) {
     const ownerIndex = next.players.findIndex(player => player.id === owner?.id);

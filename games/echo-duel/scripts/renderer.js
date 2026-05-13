@@ -12,6 +12,7 @@ import {
 const screenMap = {
   menu: 'screen-menu',
   lobby: 'screen-lobby',
+  singlePlayerConfig: 'screen-single-player-config',
   onlineConfig: 'screen-online-config',
   onlineLobby: 'screen-online-lobby',
   joinRoom: 'screen-room-join',
@@ -295,7 +296,9 @@ export function renderMatch(state) {
   const [kicker, title, detail] = getPhaseCopy(state);
   qs('phase-kicker').textContent = kicker;
   qs('phase-title').textContent = title;
-  qs('phase-detail').textContent = detail;
+  qs('phase-detail').textContent = state.mode === 'single'
+    ? `${detail} Score: ${Number(state.singlePlayer?.score || 0)}.`
+    : detail;
   qs('penalty-word').textContent = state.settings.penaltyWord;
   qs('sequence-label').textContent = state.phase === PHASES.OWNER_CREATE_INITIAL ? 'Draft Progress' : 'Memory Progress';
   qs('status-line').textContent = state.status || '';

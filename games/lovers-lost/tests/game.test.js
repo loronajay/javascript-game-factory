@@ -2001,6 +2001,23 @@ test('renderer tells players to press any key on the score screen', () => {
   assert(texts.includes('Press any key to return to menu'), 'expected score-screen footer to allow any key');
 });
 
+test('renderer labels failed solo score screens as run over', () => {
+  const { renderer, texts } = createTextCaptureRenderer();
+
+  renderer.renderScore(playerAt(120, 'boy'), playerAt(100, 'girl'), {
+    outcome: 'game_over',
+    boyFinished: false,
+    girlFinished: false,
+    boyScore: 0,
+    girlScore: 0,
+    totalScore: 0,
+    elapsedFrames: 360,
+  }, 'boy');
+
+  assert(texts.includes('Run Over'), 'expected failed solo score title');
+  assert(!texts.includes('Lovers Reunited'), 'failed solo runs must not claim a reunion');
+});
+
 test('renderer keeps join and create prompts below the lobby status stack', () => {
   const joinCapture = createTextCaptureRenderer();
   joinCapture.renderer.renderOnlineLobby('girl', 'join', '', '', 0, {

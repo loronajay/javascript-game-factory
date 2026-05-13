@@ -1,4 +1,5 @@
 import { wireOnlineConfig } from "./lobby.js";
+import { wireSinglePlayerConfig } from "./single-player-setup.js";
 
 function qs(id) {
   return document.getElementById(id);
@@ -24,6 +25,7 @@ export function wireGameButtons({
   onJoinPrivate,
   onResetToMenu,
   onStartOnlineNow,
+  onStartSinglePlayer,
 } = {}) {
   const onlineConfig = wireOnlineConfig({
     onCreatePublic,
@@ -31,7 +33,12 @@ export function wireGameButtons({
     onPrivate,
     onBack: onShowMenu,
   });
+  wireSinglePlayerConfig({
+    onStart: onStartSinglePlayer,
+    onBack: onShowMenu,
+  });
 
+  qs("btn-single-player")?.addEventListener("click", () => onShowMenu?.("singlePlayerConfig"));
   qs("btn-create-public")?.addEventListener("click", () => onlineConfig.configure("create-public"));
   qs("btn-public")?.addEventListener("click", () => onlineConfig.findPublic());
   qs("btn-private")?.addEventListener("click", () => onlineConfig.configure("private"));

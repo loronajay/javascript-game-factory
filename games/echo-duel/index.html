@@ -15,7 +15,7 @@
     <div class="scene-orb scene-orb--cyan" aria-hidden="true"></div>
     <div class="scene-orb scene-orb--amber" aria-hidden="true"></div>
     <div id="game-root">
-      <section id="screen-menu" class="screen screen-menu screen--active">
+      <section id="screen-menu" class="screen screen-menu screen-menu--splash screen--active">
         <div class="title-card">
           <p class="eyebrow">Javascript Game Factory</p>
           <h1>Echo Duel</h1>
@@ -26,17 +26,46 @@
             <span>Private Rooms</span>
           </div>
         </div>
-        <div class="menu-buttons">
-          <button id="btn-create-public" class="btn btn-primary">Create Public Lobby</button>
-          <button id="btn-public" class="btn">Find Public Lobby</button>
-          <button id="btn-private" class="btn">Create Private Room</button>
-          <button id="btn-join-private" class="btn">Join Private Room</button>
-        </div>
+        <section class="menu-mode-group" aria-labelledby="online-menu-title">
+          <div class="menu-mode-heading">
+            <p class="eyebrow" id="online-menu-title">Online Multiplayer</p>
+          </div>
+          <div class="menu-buttons">
+            <button id="btn-create-public" class="btn btn-primary">Create Public Lobby</button>
+            <button id="btn-public" class="btn">Find Public Lobby</button>
+            <button id="btn-private" class="btn">Create Private Room</button>
+            <button id="btn-join-private" class="btn">Join Private Room</button>
+          </div>
+        </section>
+        <section class="menu-mode-group" aria-labelledby="single-player-menu-title">
+          <div class="menu-mode-heading">
+            <p class="eyebrow" id="single-player-menu-title">Single Player</p>
+          </div>
+          <div class="menu-buttons menu-buttons--single">
+            <button id="btn-single-player" class="btn btn-primary">Start Single Player</button>
+          </div>
+        </section>
         <p id="menu-notice" class="status-line menu-notice hidden"></p>
-        <p class="muted note">Create or join a room. The host sets the penalty word and starts the match.</p>
+        <p class="muted note">Create or join an online room. The host sets the penalty word and starts the match.</p>
       </section>
 
-      <section id="screen-online-config" class="screen screen-panel">
+      <section id="screen-single-player-config" class="screen screen-panel screen-panel--lobby-art">
+        <div class="panel lobby-panel">
+          <p class="eyebrow">Single Player</p>
+          <h2>Configure Solo Match</h2>
+          <label>
+            Penalty Word
+            <input id="single-player-word" type="text" value="STATIC" maxlength="10" autocomplete="off" spellcheck="false" inputmode="text">
+          </label>
+          <p id="single-player-error" class="error-text hidden"></p>
+          <div class="row-buttons">
+            <button id="btn-single-player-start" class="btn btn-primary">Start Match</button>
+            <button id="btn-single-player-back" class="btn">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-online-config" class="screen screen-panel screen-panel--lobby-art">
         <div class="panel lobby-panel">
           <p class="eyebrow">Online Lobby</p>
           <h2 id="online-config-title">Configure Online Match</h2>
@@ -74,7 +103,7 @@
         </div>
       </section>
 
-      <section id="screen-room-join" class="screen screen-panel">
+      <section id="screen-room-join" class="screen screen-panel screen-panel--lobby-art">
         <div class="panel lobby-panel">
           <p class="eyebrow">Private Room</p>
           <h2>Join Room</h2>
@@ -90,7 +119,7 @@
         </div>
       </section>
 
-      <section id="screen-online-lobby" class="screen screen-panel">
+      <section id="screen-online-lobby" class="screen screen-panel screen-panel--lobby-art">
         <div class="panel lobby-panel">
           <p class="eyebrow">Room Code</p>
           <h2 id="online-room-code" class="room-code-display">-----</h2>

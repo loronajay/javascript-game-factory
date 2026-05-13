@@ -1,7 +1,7 @@
 import { PHASES } from './config.js';
 import { applyAuthoritativeMatchMessage, getAuthoritativeSyncSeq, isAuthoritativeMatchMessageType } from './authority-sync.js';
 import { activePlayers, cloneState, createMatchState, hydrateNetworkState, serializeStateForNetwork } from './state.js';
-import { handleInput, resolveCopyPhase, tick } from './engine.js';
+import { handleInput, resolveCopyPhase, startSinglePlayerMatch, tick } from './engine.js';
 import { createInputController } from './input.js';
 import { playFailureTone, playInputTone, startMenuMusic, stopMenuMusic, unlockAudio } from './audio.js';
 import { currentPlaybackStep, flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
@@ -343,7 +343,7 @@ export function initGame() {
     },
     onShowMenu: screen => {
       showScreen(screen || 'menu');
-      if (!screen || screen === 'menu' || screen === 'onlineConfig' || screen === 'joinRoom') startMenuMusic();
+      if (!screen || screen === 'menu' || screen === 'onlineConfig' || screen === 'joinRoom' || screen === 'singlePlayerConfig') startMenuMusic();
     },
     onJoinPrivate: async code => {
       await unlockAudio();
@@ -354,6 +354,14 @@ export function initGame() {
     },
     onResetToMenu: resetToMenu,
     onStartOnlineNow: () => onlineController.requestStartNow(),
+    onStartSinglePlayer: async settings => {
+      await unlockAudio();
+      setMenuNotice('');
+      onlineController.disconnectOnline();
+      const next = startSinglePlayerMatch(settings);
+      setState(next, { broadcast: false });
+      startLoop();
+    },
   });
   inputController = createInputController({ onInput: submitInput });
   inputController.connect();

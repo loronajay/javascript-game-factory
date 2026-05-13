@@ -115,12 +115,20 @@ export function createResultsRenderer(ctx, images, {
     _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide);
   }
 
+  function _scoreTitle(runSummary, soloSide) {
+    if (runSummary?.outcome === 'game_over') return 'Run Over';
+    if (runSummary?.outcome === 'partial') {
+      if (!soloSide) return 'Partial Finish';
+      const soloFinished = soloSide === 'boy' ? runSummary.boyFinished : runSummary.girlFinished;
+      return soloFinished ? 'Run Complete' : 'Run Over';
+    }
+    return 'Lovers Reunited';
+  }
+
   function renderScore(boyPlayer, girlPlayer, runSummary, soloSide = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
-    let title = soloSide ? 'Lovers Reunited' : 'Lovers Reunited';
-    if (!soloSide && runSummary?.outcome === 'partial')   title = 'Partial Finish';
-    if (!soloSide && runSummary?.outcome === 'game_over') title = 'Run Over';
+    const title = _scoreTitle(runSummary, soloSide);
     _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any key to return to menu', soloSide);
   }
 

@@ -46,6 +46,7 @@ export function createInitialState() {
     timer: null,
     playback: null,
     network: null,
+    singlePlayer: null,
   };
 }
 
@@ -123,6 +124,7 @@ export function cloneState(state) {
     timer: state.timer ? { ...state.timer } : null,
     playback: state.playback ? { ...state.playback, sequence: [...(state.playback.sequence || [])] } : null,
     network: state.network ? { ...state.network } : null,
+    singlePlayer: state.singlePlayer ? { ...state.singlePlayer } : null,
   };
 }
 
