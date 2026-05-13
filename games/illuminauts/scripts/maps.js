@@ -42,11 +42,11 @@ export const MAPS = [
     hazards: {
       aliens: [
         {
-          id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 13 }, { x: 29, y: 9 }, { x: 29, y: 10 }, { x: 29, y: 11 }, { x: 29, y: 12 }],
+          id: 'alien6', route: [{ x: 29, y: 9 }, { x: 29, y: 10 }, { x: 29, y: 11 }, { x: 29, y: 12 }, { x: 29, y: 13 }, { x: 29, y: 12 }, { x: 29, y: 11 }, { x: 29, y: 10 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {
-          id: 'alien7', route: [{ x: 19, y: 9 }, { x: 22, y: 9 }, { x: 19, y: 9 }, { x: 20, y: 9 }, { x: 21, y: 9 }],
+          id: 'alien7', route: [{ x: 19, y: 9 }, { x: 20, y: 9 }, { x: 21, y: 9 }, { x: 22, y: 9 }, { x: 21, y: 9 }, { x: 20, y: 9 }],
           index: 0, lastStepAt: 0, stepMs: 620
         },
         {

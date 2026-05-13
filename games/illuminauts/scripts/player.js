@@ -40,11 +40,14 @@ function collectPickups(state, now) {
       pickup.active = false;
       player.chips += 1;
       state.message = 'Access Chip collected.';
+      enqueueSoundEvent(state, 'collect', { pickupId: pickup.id });
       state.online.outbox.push({ type: 'pickup_taken', pickupId: pickup.id });
     } else if (pickup.type === 'powerCell') {
       pickup.active = false;
       player.powerUntil = now + POWER_CELL_MS;
       state.message = 'Suit light overcharged.';
+      enqueueSoundEvent(state, 'collect', { pickupId: pickup.id });
+      enqueueSoundEvent(state, 'power-up', { pickupId: pickup.id });
       state.online.outbox.push({ type: 'pickup_taken', pickupId: pickup.id });
     }
   }

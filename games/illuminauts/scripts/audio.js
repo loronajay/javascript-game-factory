@@ -9,19 +9,23 @@ const MUSIC_TRACKS = {
 };
 
 const SOUND_CUES = {
+  collect: `${SOUND_BASE_PATH}/collect.wav`,
   'door-unlock': `${SOUND_BASE_PATH}/door-unlock.wav`,
   grunt: `${SOUND_BASE_PATH}/grunt.wav`,
   hit: `${SOUND_BASE_PATH}/hit.wav`,
-  laser: `${SOUND_BASE_PATH}/laser.wav`
+  laser: `${SOUND_BASE_PATH}/laser.wav`,
+  'power-up': `${SOUND_BASE_PATH}/power-up.wav`
 };
 
 const SOUND_VOLUMES = {
   menu: 0.45,
   game: 0.42,
+  collect: 0.66,
   'door-unlock': 0.68,
   grunt: 0.72,
   hit: 0.62,
-  laser: 0.54
+  laser: 0.54,
+  'power-up': 0.72
 };
 
 export function createAudioState() {

@@ -102,6 +102,46 @@ function testDoorUnlockQueuesSound() {
   );
 }
 
+function testChipPickupQueuesCollectSound() {
+  const state = createState({
+    hazards: {
+      aliens: [],
+      laserGates: [],
+      turrets: []
+    }
+  });
+
+  state.map.pickups.push({ id: 'chip-test', x: 1, y: 1, type: 'chip', active: true });
+
+  updatePlayer(state, 1000, 1000 / 60);
+
+  assert.equal(state.player.chips, 1);
+  assert.deepEqual(
+    consumeSoundEvents(state).map((event) => event.cue),
+    ['collect']
+  );
+}
+
+function testPowerCellPickupQueuesCollectAndPowerUpSounds() {
+  const state = createState({
+    hazards: {
+      aliens: [],
+      laserGates: [],
+      turrets: []
+    }
+  });
+
+  state.map.pickups.push({ id: 'power-test', x: 1, y: 1, type: 'powerCell', active: true });
+
+  updatePlayer(state, 1000, 1000 / 60);
+
+  assert.equal(state.player.powerUntil, 1000 + 15000);
+  assert.deepEqual(
+    consumeSoundEvents(state).map((event) => event.cue),
+    ['collect', 'power-up']
+  );
+}
+
 function testDamageQueuesBothHitSounds() {
   const state = createState({
     hazards: {
@@ -193,6 +233,8 @@ async function testControllerSwitchesLoopingMusic() {
 async function run() {
   testMusicTrackSelection();
   testDoorUnlockQueuesSound();
+  testChipPickupQueuesCollectSound();
+  testPowerCellPickupQueuesCollectAndPowerUpSounds();
   testDamageQueuesBothHitSounds();
   testLaserFiresOnlyForVisibleNewlyActiveSources();
   await testControllerSwitchesLoopingMusic();
