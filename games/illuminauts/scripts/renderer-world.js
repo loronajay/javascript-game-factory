@@ -122,14 +122,31 @@ function drawLaserDoor(ctx, door, sx, sy, size) {
   }
 }
 
-export function drawPlayer(ctx, player, now, cx, cy, size) {
+function drawBetaPaletteOverlay(ctx, cx, cy, size) {
+  const w = size * 0.9;
+  const h = size * 0.96;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.globalAlpha = 0.54;
+  ctx.fillStyle = '#ff8c42';
+  ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+  ctx.restore();
+}
+
+export function drawPlayer(ctx, player, now, cx, cy, size, spriteCatalog = undefined) {
   const invuln = now < (player.invulnerableUntil || 0);
+  const isBeta = player.palette === 'beta' || player.role === 'B';
   const spriteKey = { up: 'playerUp', down: 'playerDown', left: 'playerLeft', right: 'playerRight' }[player.dir] || 'playerDown';
   ctx.save();
   if (invuln) ctx.globalAlpha = 0.65 + Math.sin(now / 50) * 0.35;
-  if (!drawSpriteContain(ctx, spriteKey, cx, cy, size * 0.9, size * 0.96)) {
+  if (drawSpriteContain(ctx, spriteKey, cx, cy, size * 0.9, size * 0.96, spriteCatalog)) {
+    if (isBeta) drawBetaPaletteOverlay(ctx, cx, cy, size);
+  } else {
     ctx.beginPath();
-    ctx.fillStyle = player.isRemote ? '#ff8c42' : (invuln ? COLORS.playerInvuln : COLORS.player);
+    ctx.fillStyle = isBeta ? '#ff8c42' : (invuln ? COLORS.playerInvuln : COLORS.player);
     ctx.arc(cx, cy, size * 0.32, 0, Math.PI * 2);
     ctx.fill();
   }

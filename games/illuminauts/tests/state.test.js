@@ -27,11 +27,26 @@ function testCreateGameStateCanLoadEveryCatalogMap() {
   assert.deepEqual(ids, MAPS.map((map) => map.id));
 }
 
+function testPlayerPalettesFollowRoles() {
+  const alphaState = createGameState(0, 'A');
+  assert.equal(alphaState.player.role, 'A');
+  assert.equal(alphaState.player.palette, 'alpha');
+  assert.equal(alphaState.remote.role, 'B');
+  assert.equal(alphaState.remote.palette, 'beta');
+
+  const betaState = createGameState(0, 'B');
+  assert.equal(betaState.player.role, 'B');
+  assert.equal(betaState.player.palette, 'beta');
+  assert.equal(betaState.remote.role, 'A');
+  assert.equal(betaState.remote.palette, 'alpha');
+}
+
 function run() {
   testSelectRandomMapIndexUsesAllCatalogSlots();
   testSelectRandomMapIndexClampsHighRandomValue();
   testSelectMatchMapIndexIsSharedFromMatchSeed();
   testCreateGameStateCanLoadEveryCatalogMap();
+  testPlayerPalettesFollowRoles();
   console.log('Illuminauts state tests passed.');
 }
 

@@ -17,6 +17,7 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
 
   const localStart  = role === 'B' ? map.start2 : map.start;
   const remoteStart = role === 'B' ? map.start  : map.start2;
+  const remoteRole = role === 'B' ? 'A' : 'B';
 
   return {
     map,
@@ -25,6 +26,8 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
     gameStartAt: 0, // set to performance.now() when the match begins
 
     player: {
+      role,
+      palette: role === 'B' ? 'beta' : 'alpha',
       tx: localStart.x,
       ty: localStart.y,
       prevTx: localStart.x,
@@ -47,6 +50,8 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
 
     // Remote player — position relayed via room_message.
     remote: {
+      role: remoteRole,
+      palette: remoteRole === 'B' ? 'beta' : 'alpha',
       tx: remoteStart.x,
       ty: remoteStart.y,
       px: remoteStart.x + 0.5,
