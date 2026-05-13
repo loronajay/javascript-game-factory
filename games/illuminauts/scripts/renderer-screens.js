@@ -1,4 +1,5 @@
 import { COLORS } from './config.js';
+import { drawScreenSpriteContain, getScreenSpriteContainRect } from './assets.js';
 import { resizeCanvasToDisplaySize } from './renderer-primitives.js';
 import { drawDarkBg, drawButton, drawRoleCard } from './renderer-ui.js';
 
@@ -7,39 +8,51 @@ export function renderMenu(canvas, hoveredButtonId, registerButton) {
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
 
-  drawDarkBg(ctx, width, height);
+  const hasSplash = drawScreenSpriteContain(ctx, 'menuSplash', width, height);
+  if (hasSplash) {
+    ctx.fillStyle = 'rgba(0, 8, 14, 0.18)';
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    drawDarkBg(ctx, width, height);
+  }
 
   const cx = width / 2;
   const cy = height / 2;
   const titleSize = Math.max(32, Math.floor(Math.min(width, height) * 0.1));
+  const splashRect = hasSplash ? getScreenSpriteContainRect('menuSplash', width, height) : null;
 
-  ctx.save();
-  ctx.shadowColor = 'rgba(118, 244, 255, 0.55)';
-  ctx.shadowBlur = Math.floor(titleSize * 0.85);
-  ctx.fillStyle = '#76f4ff';
-  ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ILLUMINAUTS', cx, cy * 0.54);
-  ctx.restore();
+  if (!hasSplash) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(118, 244, 255, 0.55)';
+    ctx.shadowBlur = Math.floor(titleSize * 0.85);
+    ctx.fillStyle = '#76f4ff';
+    ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ILLUMINAUTS', cx, cy * 0.54);
+    ctx.restore();
 
-  ctx.fillStyle = '#4a6a7a';
-  ctx.font = `${Math.max(13, Math.floor(titleSize * 0.3))}px system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('2-Player Online Maze Race', cx, cy * 0.54 + titleSize * 0.84);
+    ctx.fillStyle = '#4a6a7a';
+    ctx.font = `${Math.max(13, Math.floor(titleSize * 0.3))}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('2-Player Online Maze Race', cx, cy * 0.54 + titleSize * 0.84);
+  }
 
   const btnW = Math.min(300, width * 0.44);
   const btnH = Math.max(50, Math.floor(Math.min(width, height) * 0.072));
   const btnX = cx - btnW / 2;
 
-  drawButton(ctx, 'PLAY ONLINE', btnX, cy * 0.9, btnW, btnH, registerButton, 'btn_play_online', hoveredButtonId === 'btn_play_online');
+  drawButton(ctx, 'PLAY ONLINE', btnX, hasSplash ? height * 0.79 : cy * 0.9, btnW, btnH, registerButton, 'btn_play_online', hoveredButtonId === 'btn_play_online');
 
-  ctx.fillStyle = '#1e2e38';
-  ctx.font = `${Math.max(10, Math.floor(titleSize * 0.18))}px ui-monospace, Consolas, monospace`;
+  const controlsY = splashRect && splashRect.y + splashRect.h < height - 18
+    ? splashRect.y + splashRect.h + (height - splashRect.y - splashRect.h) / 2
+    : height - Math.max(12, height * 0.018);
+  ctx.fillStyle = hasSplash ? 'rgba(168, 200, 216, 0.62)' : '#1e2e38';
+  ctx.font = `${Math.max(9, Math.floor(Math.min(width, height) * 0.018))}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('WASD / Arrows — move  |  Shift — sprint', cx, height - Math.max(18, height * 0.035));
+  ctx.fillText('WASD / Arrows - move  |  Shift - sprint', cx, controlsY);
 }
 
 export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
@@ -47,11 +60,18 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
 
-  drawDarkBg(ctx, width, height);
+  const hasSplash = drawScreenSpriteContain(ctx, 'lobbySplash', width, height);
+  if (hasSplash) {
+    ctx.fillStyle = 'rgba(0, 8, 14, 0.48)';
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    drawDarkBg(ctx, width, height);
+  }
 
   const cx = width / 2;
   const cy = height / 2;
   const titleSize = Math.max(22, Math.floor(Math.min(width, height) * 0.06));
+  const layoutOffset = hasSplash ? height * 0.12 : 0;
 
   ctx.save();
   ctx.shadowColor = 'rgba(118, 244, 255, 0.4)';
@@ -60,19 +80,19 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
   ctx.font = `bold ${titleSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('CHOOSE YOUR SIDE', cx, cy * 0.46);
+  ctx.fillText('CHOOSE YOUR SIDE', cx, cy * 0.46 + layoutOffset);
   ctx.restore();
 
   ctx.fillStyle = '#4a6a7a';
   ctx.font = `${Math.max(11, Math.floor(titleSize * 0.35))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Your side determines your starting position', cx, cy * 0.46 + titleSize * 0.9);
+  ctx.fillText('Your side determines your starting position', cx, cy * 0.46 + titleSize * 0.9 + layoutOffset);
 
   const cardW = Math.min(230, width * 0.3);
   const cardH = Math.max(190, cardW * 0.95);
   const gap   = Math.max(24, width * 0.035);
-  const cardY = cy * 0.6;
+  const cardY = cy * 0.6 + layoutOffset;
 
   const alphaX = cx - gap / 2 - cardW;
   const betaX  = cx + gap / 2;
@@ -209,7 +229,13 @@ export function renderLobby(canvas, { lobbyPhase, side, hostCode, codeInput, sea
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
 
-  drawDarkBg(ctx, width, height);
+  const hasSplash = drawScreenSpriteContain(ctx, 'lobbySplash', width, height);
+  if (hasSplash) {
+    ctx.fillStyle = 'rgba(0, 8, 14, 0.42)';
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    drawDarkBg(ctx, width, height);
+  }
 
   const cx = width / 2;
   const cy = height / 2;
@@ -219,21 +245,23 @@ export function renderLobby(canvas, { lobbyPhase, side, hostCode, codeInput, sea
   const sideColor = side === 'alpha' ? '#76f4ff' : '#ff8c42';
   const sideLabel = side === 'alpha' ? 'ALPHA' : 'BETA';
 
-  ctx.save();
-  ctx.shadowColor = 'rgba(118, 244, 255, 0.3)';
-  ctx.shadowBlur  = titleSize * 0.5;
-  ctx.fillStyle   = '#76f4ff';
-  ctx.font        = `bold ${titleSize}px system-ui, sans-serif`;
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ILLUMINAUTS — ONLINE', cx, cy * 0.34);
-  ctx.restore();
+  if (!hasSplash) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(118, 244, 255, 0.3)';
+    ctx.shadowBlur  = titleSize * 0.5;
+    ctx.fillStyle   = '#76f4ff';
+    ctx.font        = `bold ${titleSize}px system-ui, sans-serif`;
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ILLUMINAUTS — ONLINE', cx, cy * 0.34);
+    ctx.restore();
+  }
 
   ctx.fillStyle  = sideColor;
   ctx.font       = `bold ${Math.max(11, Math.floor(titleSize * 0.42))}px ui-monospace, Consolas, monospace`;
   ctx.textAlign  = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`SUIT ${sideLabel} LOCKED`, cx, cy * 0.34 + titleSize * 0.88);
+  ctx.fillText(`SUIT ${sideLabel} LOCKED`, cx, hasSplash ? height * 0.33 : cy * 0.34 + titleSize * 0.88);
 
   if (lobbyPhase === 'main')                _renderLobbyMain(ctx, cx, cy, width, height, btnH, hoveredButtonId, registerButton);
   else if (lobbyPhase === 'searching')      _renderLobbySearching(ctx, cx, cy, width, height, btnH, searchTick, hoveredButtonId, registerButton);
@@ -241,7 +269,7 @@ export function renderLobby(canvas, { lobbyPhase, side, hostCode, codeInput, sea
   else if (lobbyPhase === 'create')         _renderLobbyCreate(ctx, cx, cy, width, height, btnH, hostCode, searchTick, hoveredButtonId, registerButton);
   else if (lobbyPhase === 'join')           _renderLobbyJoin(ctx, cx, cy, width, height, btnH, codeInput, now, hoveredButtonId, registerButton);
 
-  ctx.fillStyle = '#1e2e38';
+  ctx.fillStyle = hasSplash ? 'rgba(168, 200, 216, 0.7)' : '#1e2e38';
   ctx.font = `${Math.max(10, Math.floor(titleSize * 0.26))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

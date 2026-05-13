@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 
-import { createSpriteCatalog, drawSprite, spriteAssetDefs } from '../scripts/assets.js';
+import { createSpriteCatalog, drawScreenSpriteContain, drawSprite, getScreenSpriteContainRect, loadImageSource, spriteAssetDefs } from '../scripts/assets.js';
 
 function testSpriteAssetDefsUseIndividualPngs() {
   assert.equal(spriteAssetDefs.playerDown.src, './assets/player-down.png');
   assert.equal(spriteAssetDefs.accessChip.src, './assets/access-chip.png');
   assert.equal(spriteAssetDefs.laserDoorActiveWide.src, './assets/closed-door.png');
   assert.equal(spriteAssetDefs.beacon00.src, './assets/beacon-core.png');
+  assert.equal(spriteAssetDefs.menuSplash.src, './assets/menu-splash1.png');
+  assert.equal(spriteAssetDefs.lobbySplash.src, './assets/lobby-splash.png');
   assert.equal(spriteAssetDefs.playerDown.src.endsWith('/player-down.png'), true);
   assert.equal(spriteAssetDefs.accessChip.src.endsWith('/access-chip.png'), true);
   assert.equal(spriteAssetDefs.laserDoorActiveWide.src.endsWith('/closed-door.png'), true);
@@ -77,12 +79,65 @@ function testDrawSpriteUsesBeaconSliceWhenPresent() {
   ]);
 }
 
-function run() {
+function testDrawScreenSpriteContainCentersAndShowsFullImage() {
+  const calls = [];
+  const ctx = {
+    drawImage(...args) {
+      calls.push(args);
+    }
+  };
+
+  const ok = drawScreenSpriteContain(ctx, 'menuSplash', 800, 600, {
+    menuSplash: { image: { width: 1600, height: 900 }, w: 1600, h: 900 }
+  });
+
+  assert.equal(ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0].width, 1600);
+  assert.equal(calls[0][0].height, 900);
+  assert.equal(calls[0][1], 0);
+  assert.ok(Math.abs(calls[0][2] - 75) < 0.00001);
+  assert.equal(calls[0][3], 800);
+  assert.ok(Math.abs(calls[0][4] - 450) < 0.00001);
+}
+
+function testGetScreenSpriteContainRectReportsLetterboxBounds() {
+  assert.deepEqual(
+    getScreenSpriteContainRect('menuSplash', 800, 600, {
+      menuSplash: { image: { width: 1600, height: 900 }, w: 1600, h: 900 }
+    }),
+    { x: 0, y: 75, w: 800, h: 450 }
+  );
+}
+
+async function testLoadImageSourceDoesNotMissImmediateLoad() {
+  class ImmediateImage {
+    set src(value) {
+      this._src = value;
+      this.onload();
+    }
+
+    get src() {
+      return this._src;
+    }
+  }
+
+  const image = await loadImageSource('./assets/menu-splash1.png', ImmediateImage);
+  assert.equal(image.src, './assets/menu-splash1.png');
+}
+
+async function run() {
   testSpriteAssetDefsUseIndividualPngs();
   testCreateSpriteCatalogReadsImageDimensions();
   testDrawSpriteUsesWholeImageForIndividualPngs();
   testDrawSpriteUsesBeaconSliceWhenPresent();
+  testDrawScreenSpriteContainCentersAndShowsFullImage();
+  testGetScreenSpriteContainRectReportsLetterboxBounds();
+  await testLoadImageSourceDoesNotMissImmediateLoad();
   console.log('Illuminauts asset tests passed.');
 }
 
-run();
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

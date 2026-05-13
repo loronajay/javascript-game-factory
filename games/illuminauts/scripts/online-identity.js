@@ -1,16 +1,21 @@
-import { loadFactoryProfile, sanitizeFactoryProfileName } from '../../../js/platform/identity/factory-profile.mjs';
+function createFallbackIdentity() {
+  return {
+    playerId: `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    displayName: 'Astronaut',
+  };
+}
 
-export function getLocalIdentity() {
+export async function getLocalIdentity({
+  profileModulePromise = import('../../../js/platform/identity/factory-profile.mjs')
+} = {}) {
   try {
+    const { loadFactoryProfile, sanitizeFactoryProfileName } = await profileModulePromise;
     const profile = loadFactoryProfile();
     return {
-      playerId: profile?.playerId || `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      playerId: profile?.playerId || createFallbackIdentity().playerId,
       displayName: (sanitizeFactoryProfileName(profile?.profileName || '') || 'Astronaut').slice(0, 12),
     };
   } catch {
-    return {
-      playerId: `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      displayName: 'Astronaut',
-    };
+    return createFallbackIdentity();
   }
 }

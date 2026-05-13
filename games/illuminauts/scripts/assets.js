@@ -33,7 +33,10 @@ export const spriteAssetDefs = {
   beacon12: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(2, 1) },
   beacon20: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(0, 2) },
   beacon21: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(1, 2) },
-  beacon22: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(2, 2) }
+  beacon22: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(2, 2) },
+
+  menuSplash:  { src: `${ASSET_BASE_PATH}/menu-splash1.png` },
+  lobbySplash: { src: `${ASSET_BASE_PATH}/lobby-splash.png` }
 };
 
 export let sprites = {};
@@ -76,18 +79,18 @@ export function createSpriteCatalog(imagesBySource) {
   return catalog;
 }
 
-function loadImage(src) {
+export function loadImageSource(src, ImageCtor = Image) {
   return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.src = src;
+    const image = new ImageCtor();
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error(`[Illuminauts] Failed to load ${src}`));
+    image.src = src;
   });
 }
 
 export async function loadAssets() {
   const uniqueSources = [...new Set(Object.values(spriteAssetDefs).map((def) => def.src))];
-  const loaded = await Promise.all(uniqueSources.map(async (src) => [src, await loadImage(src)]));
+  const loaded = await Promise.all(uniqueSources.map(async (src) => [src, await loadImageSource(src)]));
   sprites = createSpriteCatalog(Object.fromEntries(loaded));
 }
 
@@ -116,4 +119,25 @@ export function drawSpriteContain(ctx, name, cx, cy, maxW, maxH, catalog = sprit
     sprite.h * scale,
     catalog
   );
+}
+
+export function drawScreenSpriteContain(ctx, name, width, height, catalog = sprites) {
+  const rect = getScreenSpriteContainRect(name, width, height, catalog);
+  if (!rect) return false;
+  ctx.drawImage(catalog[name].image, rect.x, rect.y, rect.w, rect.h);
+  return true;
+}
+
+export function getScreenSpriteContainRect(name, width, height, catalog = sprites) {
+  const sprite = catalog[name];
+  if (!sprite) return null;
+  const scale = Math.min(width / sprite.w, height / sprite.h);
+  const drawW = sprite.w * scale;
+  const drawH = sprite.h * scale;
+  return {
+    x: (width - drawW) / 2,
+    y: (height - drawH) / 2,
+    w: drawW,
+    h: drawH,
+  };
 }

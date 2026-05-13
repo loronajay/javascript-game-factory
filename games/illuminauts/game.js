@@ -208,14 +208,14 @@ function handleRemoteEvent(value) {
 
 // ─── Online lobby helpers ─────────────────────────────────────────────────────
 
-function enterLobby(side) {
+async function enterLobby(side) {
   onlineSide        = side;
   onlineLocalRole   = side === 'alpha' ? 'A' : 'B';
   onlineLobbyPhase  = 'main';
   onlineHostCode    = '';
   onlineCodeInput   = '';
   onlineSearchTick  = 0;
-  localIdentity     = getLocalIdentity();
+  localIdentity     = await getLocalIdentity();
   remotePlayerId    = '';
   remoteDisplayName = '';
   onlineClient.connect(); // connect once; stays alive through the whole lobby
@@ -298,10 +298,10 @@ function handleButtonClick(id) {
       phase = 'side_select';
       break;
     case 'btn_side_alpha':
-      enterLobby('alpha');
+      void enterLobby('alpha');
       break;
     case 'btn_side_beta':
-      enterLobby('beta');
+      void enterLobby('beta');
       break;
     case 'btn_find_match':
       if (onlineLobbyPhase === 'main') doFindMatch();
@@ -482,7 +482,9 @@ function loop(now) {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
-  await loadAssets();
+  void loadAssets().catch(() => {
+    console.warn('[Illuminauts] Sprite sheet load failed — falling back to debug glyphs.');
+  });
   const testMapJSON = sessionStorage.getItem('illuminauts_test_map');
   const testSide    = sessionStorage.getItem('illuminauts_test_side') || 'alpha';
   if (testMapJSON) {
@@ -496,7 +498,6 @@ async function boot() {
 }
 
 boot().catch(() => {
-  console.warn('[Illuminauts] Sprite sheet load failed — falling back to debug glyphs.');
   state.lastTime = performance.now();
   requestAnimationFrame(loop);
 });
