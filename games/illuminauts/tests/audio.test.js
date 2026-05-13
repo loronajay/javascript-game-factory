@@ -166,6 +166,7 @@ function testLaserFiresOnlyForVisibleNewlyActiveSources() {
     ['gate:gate-visible']
   );
   assert.deepEqual(captureLaserShotEvents(state, 160), []);
+  assert.deepEqual(captureLaserShotEvents(state, 350), []);
   assert.deepEqual(
     captureLaserShotEvents(state, 1150).map((event) => event.sourceId),
     ['gate:gate-visible']

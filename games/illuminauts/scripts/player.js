@@ -8,6 +8,7 @@ import {
   STAMINA_RECOVER_PER_SECOND,
   WALK_STEP_MS
 } from './config.js';
+import { enqueueSoundEvent } from './audio.js';
 import { getDoorAt, isGoalAt, isWall } from './map.js';
 import { getMoveIntent, wantsSprint } from './input.js';
 import { isHazardAt } from './hazards.js';
@@ -22,6 +23,7 @@ function canPass(state, tx, ty) {
     state.player.chips -= 1;
     door.open = true;
     state.message = 'Laser Door disabled.';
+    enqueueSoundEvent(state, 'door-unlock', { doorId: door.id });
     state.online.outbox.push({ type: 'door_opened', doorId: door.id });
     return true;
   }
@@ -60,6 +62,8 @@ function damagePlayer(state, now) {
   player.hearts -= 1;
   player.invulnerableUntil = now + INVULN_MS;
   state.message = 'Suit damaged.';
+  enqueueSoundEvent(state, 'grunt');
+  enqueueSoundEvent(state, 'hit');
 
   if (player.hearts <= 0) {
     player.tx = player.spawnTx;

@@ -38,31 +38,16 @@ export function loadAssets() {
     const source = new Image();
     source.src = SPRITE_SHEET_PATH;
     source.onload = () => {
-      spriteSheet = buildTransparentSheet(source);
+      spriteSheet = prepareSpriteSheet(source);
       resolve();
     };
     source.onerror = () => reject(new Error(`[Illuminauts] Failed to load ${SPRITE_SHEET_PATH}`));
   });
 }
 
-// Strips high-value neutral checker pixels from prototype sheets that lack real alpha.
-function buildTransparentSheet(source) {
-  const canvas = document.createElement('canvas');
-  canvas.width = source.width;
-  canvas.height = source.height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(source, 0, 0);
-
-  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = image.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const min = Math.min(data[i], data[i + 1], data[i + 2]);
-    const max = Math.max(data[i], data[i + 1], data[i + 2]);
-    if (min >= 226 && max - min <= 16) data[i + 3] = 0;
-  }
-
-  ctx.putImageData(image, 0, 0);
-  return canvas;
+// Illuminauts now treats the sprite sheet's alpha channel as canonical.
+export function prepareSpriteSheet(source) {
+  return source;
 }
 
 export function drawSprite(ctx, name, x, y, w, h) {

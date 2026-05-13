@@ -1,4 +1,5 @@
 import { HEARTS_MAX, STAMINA_MAX } from './config.js';
+import { createAudioState } from './audio.js';
 import { createWorldMap } from './map.js';
 import { MAPS } from './maps.js';
 
@@ -66,6 +67,7 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
     },
 
     hazards,
+    audio: createAudioState(),
     // input is replaced with the stable DOM-bound object by game.js
     input: { held: new Set(), justPressed: new Set() },
     message: 'Find an Access Chip, then reach the Beacon Core.',

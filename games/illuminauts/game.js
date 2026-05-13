@@ -11,16 +11,25 @@ import {
   renderGameView,
   renderWinScreen,
 } from './scripts/renderer.js';
+import { createAudioController, enqueueSoundEvent, isTileVisibleToPlayer } from './scripts/audio.js';
 import { loadAssets } from './scripts/assets.js';
 import { MAPS } from './scripts/maps.js';
 import { createOnlineClient } from './scripts/online.js';
 import { getLocalIdentity } from './scripts/online-identity.js';
 
 const canvas = document.getElementById('gameCanvas');
+const audioController = createAudioController();
 
 // Input bound once to DOM events — survives state resets.
 const input = { held: new Set(), justPressed: new Set() };
 bindInput(input);
+
+function unlockAudio() {
+  audioController.unlock();
+}
+
+window.addEventListener('pointerdown', unlockAudio, { passive: true });
+window.addEventListener('keydown', unlockAudio, { passive: true });
 
 // ─── UI button registry ───────────────────────────────────────────────────────
 // Renderer writes button bounds here each frame; click + hover handlers read them.
@@ -179,7 +188,12 @@ function handleRemoteEvent(value) {
     if (pickup) pickup.active = false;
   } else if (type === 'door_opened' && doorId) {
     const door = state.map.doors.find((d) => d.id === doorId);
-    if (door) door.open = true;
+    if (door) {
+      door.open = true;
+      if (isTileVisibleToPlayer(state, door.x, door.y, performance.now())) {
+        enqueueSoundEvent(state, 'door-unlock', { doorId: door.id, remote: true });
+      }
+    }
   } else if (type === 'player_died') {
     const remoteSpawn = onlineLocalRole === 'A' ? state.map.start2 : state.map.start;
     state.remote.tx = remoteSpawn.x;
@@ -410,6 +424,8 @@ function loop(now) {
   if (phase === 'lobby' && (onlineLobbyPhase === 'searching' || onlineLobbyPhase === 'create')) {
     onlineSearchTick++;
   }
+
+  void audioController.sync(state, phase, now);
 
   clearButtons();
 
