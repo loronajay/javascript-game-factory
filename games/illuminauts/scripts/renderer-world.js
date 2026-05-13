@@ -9,11 +9,79 @@ import {
 import { drawSprite, drawSpriteContain } from './assets.js';
 import { fillRect, strokeRect, glyph } from './renderer-primitives.js';
 
+function tileHash(x, y) {
+  let n = x * 374761393 + y * 668265263;
+  n = (n ^ (n >>> 13)) * 1274126177;
+  return (n ^ (n >>> 16)) >>> 0;
+}
+
+function drawFloorTile(ctx, wx, wy, sx, sy, size) {
+  const hash = tileHash(wx, wy);
+  const base = (wx + wy) % 2 === 0 ? COLORS.floor : COLORS.floorAlt;
+  const cool = hash % 5 === 0 ? '#15213a' : base;
+
+  ctx.fillStyle = cool;
+  ctx.fillRect(sx, sy, size, size);
+
+  ctx.save();
+  ctx.globalAlpha = 0.34;
+  ctx.fillStyle = hash & 1 ? '#1b2a49' : '#0a1020';
+  ctx.fillRect(sx, sy, size, Math.max(1, size * 0.08));
+  ctx.fillRect(sx, sy, Math.max(1, size * 0.07), size);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.32;
+  ctx.strokeStyle = '#263d63';
+  ctx.lineWidth = Math.max(1, size * 0.035);
+  ctx.strokeRect(sx + size * 0.08, sy + size * 0.08, size * 0.84, size * 0.84);
+  ctx.restore();
+
+  if (hash % 7 === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = '#244d67';
+    ctx.fillRect(sx + size * 0.18, sy + size * 0.48, size * 0.64, Math.max(1, size * 0.04));
+    ctx.restore();
+  }
+}
+
+function drawWallTile(ctx, wx, wy, sx, sy, size) {
+  const hash = tileHash(wx, wy);
+  const shade = hash % 4;
+  ctx.fillStyle = shade === 0 ? '#263854' : shade === 1 ? '#2b3e5c' : COLORS.wall;
+  ctx.fillRect(sx, sy, size, size);
+
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = '#3f587e';
+  ctx.fillRect(sx, sy, size, Math.max(1, size * 0.12));
+  ctx.fillRect(sx, sy, Math.max(1, size * 0.1), size);
+  ctx.fillStyle = '#111a2b';
+  ctx.fillRect(sx, sy + size * 0.88, size, Math.max(1, size * 0.12));
+  ctx.fillRect(sx + size * 0.9, sy, Math.max(1, size * 0.1), size);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.65;
+  ctx.strokeStyle = COLORS.wallEdge;
+  ctx.lineWidth = Math.max(1, size * 0.045);
+  ctx.strokeRect(sx + 0.5, sy + 0.5, size - 1, size - 1);
+  ctx.restore();
+
+  if (hash % 6 === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.44;
+    ctx.fillStyle = '#76f4ff';
+    ctx.fillRect(sx + size * 0.18, sy + size * 0.18, size * 0.08, size * 0.38);
+    ctx.restore();
+  }
+}
+
 function drawTileBase(ctx, map, wx, wy, sx, sy, size) {
   const tile = getTile(map, wx, wy);
   if (tile === '#') {
-    fillRect(ctx, sx, sy, size, COLORS.wall);
-    strokeRect(ctx, sx, sy, size, COLORS.wallEdge);
+    drawWallTile(ctx, wx, wy, sx, sy, size);
   } else if (isGoalAt(map, wx, wy)) {
     fillRect(ctx, sx, sy, size, COLORS.goal);
     ctx.save();
@@ -21,7 +89,7 @@ function drawTileBase(ctx, map, wx, wy, sx, sy, size) {
     fillRect(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, '#baffc8');
     ctx.restore();
   } else {
-    fillRect(ctx, sx, sy, size, (wx + wy) % 2 === 0 ? COLORS.floor : COLORS.floorAlt);
+    drawFloorTile(ctx, wx, wy, sx, sy, size);
   }
 }
 
