@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 
-import { createSpriteCatalog, drawScreenSpriteContain, drawSprite, getScreenSpriteContainRect, loadImageSource, spriteAssetDefs } from '../scripts/assets.js';
+import {
+  createSpriteCatalog,
+  drawScreenSpriteContain,
+  drawSprite,
+  getScreenSpriteContainRect,
+  loadImageSource,
+  recolorCyanPixelToBeta,
+  spriteAssetDefs
+} from '../scripts/assets.js';
 
 function testSpriteAssetDefsUseIndividualPngs() {
   assert.equal(spriteAssetDefs.playerDown.src, './assets/player-down.png');
@@ -110,6 +118,20 @@ function testGetScreenSpriteContainRectReportsLetterboxBounds() {
   );
 }
 
+function testRecolorCyanPixelToBetaPreservesAlphaAndTurnsCyanOrange() {
+  assert.deepEqual(recolorCyanPixelToBeta(0, 0, 0, 0), [0, 0, 0, 0]);
+
+  const [r, g, b, a] = recolorCyanPixelToBeta(60, 230, 255, 255);
+  assert.equal(a, 255);
+  assert.ok(r > g, `expected red channel to lead after recolor, got ${r},${g},${b}`);
+  assert.ok(g > b, `expected blue channel to drop after recolor, got ${r},${g},${b}`);
+  assert.ok(r > 180, `expected bright orange/gold red channel, got ${r}`);
+}
+
+function testRecolorCyanPixelToBetaLeavesWarmPixelsAlone() {
+  assert.deepEqual(recolorCyanPixelToBeta(220, 120, 50, 255), [220, 120, 50, 255]);
+}
+
 async function testLoadImageSourceDoesNotMissImmediateLoad() {
   class ImmediateImage {
     set src(value) {
@@ -133,6 +155,8 @@ async function run() {
   testDrawSpriteUsesBeaconSliceWhenPresent();
   testDrawScreenSpriteContainCentersAndShowsFullImage();
   testGetScreenSpriteContainRectReportsLetterboxBounds();
+  testRecolorCyanPixelToBetaPreservesAlphaAndTurnsCyanOrange();
+  testRecolorCyanPixelToBetaLeavesWarmPixelsAlone();
   await testLoadImageSourceDoesNotMissImmediateLoad();
   console.log('Illuminauts asset tests passed.');
 }

@@ -6,8 +6,6 @@ function createFakeContext() {
   const calls = [];
   return {
     calls,
-    globalAlpha: 1,
-    globalCompositeOperation: 'source-over',
     fillStyle: '',
     save() { calls.push(['save']); },
     restore() { calls.push(['restore']); },
@@ -19,29 +17,32 @@ function createFakeContext() {
   };
 }
 
-function testBetaPlayerDrawsOrangeOverlay() {
+function testBetaPlayerDrawsPaletteSpriteWithoutOverlayBox() {
   const ctx = createFakeContext();
   drawPlayer(ctx, { dir: 'down', palette: 'beta' }, 0, 50, 60, 32, {
-    playerDown: { image: { width: 78, height: 101 }, w: 78, h: 101 }
+    playerDown: { image: { width: 78, height: 101 }, w: 78, h: 101 },
+    playerDownBeta: { image: { width: 78, height: 101, beta: true }, w: 78, h: 101 }
   });
 
-  assert.ok(ctx.calls.some((call) => call[0] === 'drawImage'));
-  assert.ok(ctx.calls.some((call) => call[0] === 'fillRect' && call[1] === '#ff8c42' && call[2] === 'source-atop'));
-}
-
-function testAlphaPlayerDoesNotDrawOrangeOverlay() {
-  const ctx = createFakeContext();
-  drawPlayer(ctx, { dir: 'down', palette: 'alpha' }, 0, 50, 60, 32, {
-    playerDown: { image: { width: 78, height: 101 }, w: 78, h: 101 }
-  });
-
-  assert.ok(ctx.calls.some((call) => call[0] === 'drawImage'));
+  const drawCall = ctx.calls.find((call) => call[0] === 'drawImage');
+  assert.equal(drawCall[1].beta, true);
   assert.equal(ctx.calls.some((call) => call[0] === 'fillRect' && call[1] === '#ff8c42'), false);
 }
 
+function testAlphaPlayerDrawsBaseSprite() {
+  const ctx = createFakeContext();
+  drawPlayer(ctx, { dir: 'down', palette: 'alpha' }, 0, 50, 60, 32, {
+    playerDown: { image: { width: 78, height: 101, alpha: true }, w: 78, h: 101 },
+    playerDownBeta: { image: { width: 78, height: 101, beta: true }, w: 78, h: 101 }
+  });
+
+  const drawCall = ctx.calls.find((call) => call[0] === 'drawImage');
+  assert.equal(drawCall[1].alpha, true);
+}
+
 function run() {
-  testBetaPlayerDrawsOrangeOverlay();
-  testAlphaPlayerDoesNotDrawOrangeOverlay();
+  testBetaPlayerDrawsPaletteSpriteWithoutOverlayBox();
+  testAlphaPlayerDrawsBaseSprite();
   console.log('Illuminauts renderer-world tests passed.');
 }
 
