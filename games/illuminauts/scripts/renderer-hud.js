@@ -94,5 +94,10 @@ export function drawMessage(ctx, state, width, height) {
   ctx.font = `${Math.max(11, Math.floor(width * 0.017))}px system-ui, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(state.message, pad, height - msgH / 2);
+  ctx.fillText(state.message, pad, height - msgH / 2, width - pad * 3 - Math.max(130, width * 0.18));
+
+  ctx.fillStyle = 'rgba(168, 200, 216, 0.72)';
+  ctx.font = `${Math.max(10, Math.floor(width * 0.011))}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'right';
+  ctx.fillText('ESC - quit match', width - pad, height - msgH / 2);
 }

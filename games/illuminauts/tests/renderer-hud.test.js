@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { drawHud } from '../scripts/renderer-hud.js';
+import { drawHud, drawMessage } from '../scripts/renderer-hud.js';
 
 function createFakeContext() {
   const calls = [];
@@ -59,9 +59,18 @@ function testHudUsesBiggerHeartText() {
   assert.ok(heartCall[2].startsWith('bold 31px'), `expected larger heart font, got ${heartCall[2]}`);
 }
 
+function testMessageShowsQuitHint() {
+  const ctx = createFakeContext();
+  drawMessage(ctx, { message: 'Find the Beacon Core.' }, 900, 600);
+
+  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === 'Find the Beacon Core.'));
+  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === 'ESC - quit match'));
+}
+
 function run() {
   testHudDrawsChipAndPowerSprites();
   testHudUsesBiggerHeartText();
+  testMessageShowsQuitHint();
   console.log('Illuminauts HUD tests passed.');
 }
 

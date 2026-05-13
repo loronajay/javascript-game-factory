@@ -15,6 +15,7 @@ import { createAudioController, enqueueSoundEvent, isTileVisibleToPlayer } from 
 import { loadAssets } from './scripts/assets.js';
 import { createOnlineClient } from './scripts/online.js';
 import { getLocalIdentity } from './scripts/online-identity.js';
+import { shouldQuitMatchOnKey } from './scripts/session-controls.js';
 
 const canvas = document.getElementById('gameCanvas');
 const audioController = createAudioController();
@@ -259,6 +260,13 @@ function doJoinRoom() {
 // ─── Keyboard handler ─────────────────────────────────────────────────────────
 
 window.addEventListener('keydown', (e) => {
+  if (shouldQuitMatchOnKey(phase, e.key)) {
+    e.preventDefault();
+    _freshClient();
+    goToMenu();
+    return;
+  }
+
   if (phase === 'side_select') {
     if (e.key === 'Escape') { phase = 'menu'; }
     return;
@@ -284,10 +292,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (phase === 'countdown') {
-    if (e.key === 'Escape') { _freshClient(); goToMenu(); }
-    return;
-  }
+  if (phase === 'countdown') return;
 });
 
 // ─── Button click dispatch ────────────────────────────────────────────────────
