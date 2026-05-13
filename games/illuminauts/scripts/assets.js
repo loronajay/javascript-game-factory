@@ -1,66 +1,119 @@
-// Path is relative to index.html (document root), not this script file.
-const SPRITE_SHEET_PATH = './illuminauts_modular_demo/assets/sprite-sheet.png';
+// Paths are relative to index.html (document root), not this script file.
+const ASSET_BASE_PATH = './illuminauts_modular_demo/assets';
 
-export const sprites = {
-  playerDown:  { x: 76,   y: 96,  w: 119, h: 154 },
-  playerUp:    { x: 280,  y: 96,  w: 115, h: 154 },
-  playerLeft:  { x: 454,  y: 104, w: 100, h: 152 },
-  playerRight: { x: 588,  y: 104, w: 103, h: 152 },
+function beaconSlice(col, row) {
+  return { cols: 3, rows: 3, col, row };
+}
 
-  alienPatrol: { x: 767,  y: 87,  w: 183, h: 182 },
-  powerCell:   { x: 1042, y: 90,  w: 83,  h: 174 },
-  accessChip:  { x: 1191, y: 127, w: 183, h: 117 },
+export const spriteAssetDefs = {
+  playerDown:  { src: `${ASSET_BASE_PATH}/player-down.png` },
+  playerUp:    { src: `${ASSET_BASE_PATH}/player-up.png` },
+  playerLeft:  { src: `${ASSET_BASE_PATH}/player-left.png` },
+  playerRight: { src: `${ASSET_BASE_PATH}/player-right.png` },
 
-  turretUp:    { x: 106,  y: 342, w: 137, h: 197 },
-  turretDown:  { x: 370,  y: 380, w: 120, h: 171 },
-  turretLeft:  { x: 562,  y: 380, w: 205, h: 140 },
-  turretRight: { x: 884,  y: 380, w: 212, h: 140 },
+  alienPatrol: { src: `${ASSET_BASE_PATH}/alien.png` },
+  powerCell:   { src: `${ASSET_BASE_PATH}/power-cell.png` },
+  accessChip:  { src: `${ASSET_BASE_PATH}/access-chip.png` },
 
-  laserDoorActiveWide:    { x: 100, y: 645, w: 421, h: 200 },
-  laserDoorDisabledLeft:  { x: 663, y: 660, w: 64,  h: 182 },
-  laserDoorDisabledRight: { x: 783, y: 659, w: 63,  h: 183 },
+  turretUp:    { src: `${ASSET_BASE_PATH}/turret-up.png` },
+  turretDown:  { src: `${ASSET_BASE_PATH}/turret-down.png` },
+  turretLeft:  { src: `${ASSET_BASE_PATH}/turret-left.png` },
+  turretRight: { src: `${ASSET_BASE_PATH}/turret-right.png` },
 
-  beacon00: { x: 943,  y: 564, w: 121, h: 122 },
-  beacon01: { x: 1077, y: 564, w: 144, h: 122 },
-  beacon02: { x: 1233, y: 564, w: 122, h: 122 },
-  beacon10: { x: 942,  y: 699, w: 119, h: 144 },
-  beacon11: { x: 1074, y: 699, w: 147, h: 144 },
-  beacon12: { x: 1234, y: 699, w: 120, h: 144 },
-  beacon20: { x: 943,  y: 856, w: 121, h: 123 },
-  beacon21: { x: 1077, y: 856, w: 144, h: 123 },
-  beacon22: { x: 1233, y: 856, w: 120, h: 122 }
+  laserDoorActiveWide:    { src: `${ASSET_BASE_PATH}/closed-door.png` },
+  laserDoorDisabledLeft:  { src: `${ASSET_BASE_PATH}/unlocked-door-left.png` },
+  laserDoorDisabledRight: { src: `${ASSET_BASE_PATH}/unlocked-door-right.png` },
+
+  // Beacon behavior stays the same as before: one art source sliced into 3x3 logical pieces.
+  beacon00: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(0, 0) },
+  beacon01: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(1, 0) },
+  beacon02: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(2, 0) },
+  beacon10: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(0, 1) },
+  beacon11: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(1, 1) },
+  beacon12: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(2, 1) },
+  beacon20: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(0, 2) },
+  beacon21: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(1, 2) },
+  beacon22: { src: `${ASSET_BASE_PATH}/beacon-core.png`, slice: beaconSlice(2, 2) }
 };
 
-let spriteSheet = null;
+export let sprites = {};
 
-export function loadAssets() {
+function sliceDimension(total, index, segments) {
+  return Math.round(index * total / segments);
+}
+
+function buildSpriteEntry(image, def) {
+  if (!def.slice) {
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    return { image, w: width, h: height };
+  }
+
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  const sx = sliceDimension(width, def.slice.col, def.slice.cols);
+  const sy = sliceDimension(height, def.slice.row, def.slice.rows);
+  const nextSx = sliceDimension(width, def.slice.col + 1, def.slice.cols);
+  const nextSy = sliceDimension(height, def.slice.row + 1, def.slice.rows);
+  return {
+    image,
+    sx,
+    sy,
+    sw: nextSx - sx,
+    sh: nextSy - sy,
+    w: nextSx - sx,
+    h: nextSy - sy
+  };
+}
+
+export function createSpriteCatalog(imagesBySource) {
+  const catalog = {};
+  for (const [name, def] of Object.entries(spriteAssetDefs)) {
+    const image = imagesBySource[def.src];
+    if (!image) continue;
+    catalog[name] = buildSpriteEntry(image, def);
+  }
+  return catalog;
+}
+
+function loadImage(src) {
   return new Promise((resolve, reject) => {
-    const source = new Image();
-    source.src = SPRITE_SHEET_PATH;
-    source.onload = () => {
-      spriteSheet = prepareSpriteSheet(source);
-      resolve();
-    };
-    source.onerror = () => reject(new Error(`[Illuminauts] Failed to load ${SPRITE_SHEET_PATH}`));
+    const image = new Image();
+    image.src = src;
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`[Illuminauts] Failed to load ${src}`));
   });
 }
 
-// Illuminauts now treats the sprite sheet's alpha channel as canonical.
-export function prepareSpriteSheet(source) {
-  return source;
+export async function loadAssets() {
+  const uniqueSources = [...new Set(Object.values(spriteAssetDefs).map((def) => def.src))];
+  const loaded = await Promise.all(uniqueSources.map(async (src) => [src, await loadImage(src)]));
+  sprites = createSpriteCatalog(Object.fromEntries(loaded));
 }
 
-export function drawSprite(ctx, name, x, y, w, h) {
-  const frame = sprites[name];
-  if (!spriteSheet || !frame) return false;
+export function drawSprite(ctx, name, x, y, w, h, catalog = sprites) {
+  const sprite = catalog[name];
+  if (!sprite) return false;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(spriteSheet, frame.x, frame.y, frame.w, frame.h, x, y, w, h);
+  if (typeof sprite.sx === 'number') {
+    ctx.drawImage(sprite.image, sprite.sx, sprite.sy, sprite.sw, sprite.sh, x, y, w, h);
+  } else {
+    ctx.drawImage(sprite.image, x, y, w, h);
+  }
   return true;
 }
 
-export function drawSpriteContain(ctx, name, cx, cy, maxW, maxH) {
-  const frame = sprites[name];
-  if (!frame) return false;
-  const scale = Math.min(maxW / frame.w, maxH / frame.h);
-  return drawSprite(ctx, name, cx - (frame.w * scale) / 2, cy - (frame.h * scale) / 2, frame.w * scale, frame.h * scale);
+export function drawSpriteContain(ctx, name, cx, cy, maxW, maxH, catalog = sprites) {
+  const sprite = catalog[name];
+  if (!sprite) return false;
+  const scale = Math.min(maxW / sprite.w, maxH / sprite.h);
+  return drawSprite(
+    ctx,
+    name,
+    cx - (sprite.w * scale) / 2,
+    cy - (sprite.h * scale) / 2,
+    sprite.w * scale,
+    sprite.h * scale,
+    catalog
+  );
 }
