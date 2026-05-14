@@ -13,6 +13,7 @@ function defaultOnlineRuntimeState() {
     lobbyCountdownTimer: null,
     pendingMatchStartTimer: null,
     pendingAction: null,
+    findingPublic: false,
   };
 }
 
