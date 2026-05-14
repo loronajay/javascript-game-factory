@@ -1,10 +1,25 @@
 @media (max-width: 1280px) {
-  .screen-battle #fleet-ships-status {
-    display: none;
-  }
-
   #game-root {
     padding-top: 64px;
+  }
+
+  .battle-playfield {
+    grid-template-columns: 1fr;
+  }
+
+  .screen-battle #fleet-ships-status,
+  .screen-battle #opponent-ships-status {
+    width: min(680px, 100%);
+    justify-self: center;
+    align-self: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .screen-battle #fleet-ships-status .ship-status-row,
+  .screen-battle #opponent-ships-status .ship-status-row {
+    font-size: 0.74rem;
   }
 
   .placement-scene,

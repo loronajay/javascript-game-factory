@@ -79,6 +79,13 @@
   color: rgba(8, 34, 54, 0.74);
 }
 
+.battle-playfield {
+  display: grid;
+  grid-template-columns: clamp(150px, 12vw, 190px) minmax(0, 1fr) clamp(150px, 12vw, 190px);
+  gap: clamp(16px, 1.6vw, 24px);
+  align-items: center;
+}
+
 /* Emote bubbles */
 
 .emote-bubble {
@@ -156,18 +163,24 @@
   gap: 6px;
 }
 
-/* Fleet status: absolute left rail, lives outside the bowl layout flow */
-.screen-battle #fleet-ships-status {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 130px;
+.screen-battle #fleet-ships-status,
+.screen-battle #opponent-ships-status {
+  position: relative;
+  width: 100%;
+  align-self: center;
 }
 
-.screen-battle #fleet-ships-status .ship-status-row {
-  font-size: 0.74rem;
-  white-space: nowrap;
+.screen-battle #fleet-ships-status {
+  justify-self: end;
+}
+
+.screen-battle #opponent-ships-status {
+  justify-self: start;
+}
+
+.screen-battle #fleet-ships-status .ship-status-row,
+.screen-battle #opponent-ships-status .ship-status-row {
+  font-size: clamp(0.68rem, 0.78vw, 0.78rem);
 }
 
 .ship-status-row {

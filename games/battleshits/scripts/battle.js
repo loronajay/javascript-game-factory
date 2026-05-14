@@ -3,7 +3,7 @@ import {
 } from './board.js';
 import {
   renderFleetBoard, renderTargetBoard, renderBattleStatus, renderFleetStatus,
-  renderEmoteBubbles, showAnnouncement,
+  renderOpponentFleetStatus, renderEmoteBubbles, showAnnouncement,
 } from './renderer.js';
 import { transitionToMatchEnded } from './match-flow.js';
 import { createAudioController, getResolutionSoundId, LAUNCH_SOUND_ID } from './audio.js';
@@ -85,6 +85,7 @@ function applyShotResult(gs, { clearAll }, { col, row, hit, sunk, shipId, fleetD
   else             showAnnouncement('💦 Splash! Missed.');
 
   renderTargetBoard(gs);
+  renderOpponentFleetStatus(gs);
 
   if (fleetDestroyed) {
     transitionToMatchEnded(gs, 'win', { clearAll });

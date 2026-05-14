@@ -125,7 +125,6 @@
 
       <section id="screen-battle" class="screen screen-battle hidden">
         <div class="battle-stage">
-          <div id="fleet-ships-status" class="ships-status"></div>
           <div class="battle-header">
             <div class="status-placard status-placard--turn">
               <div id="battle-turn-indicator" class="turn-indicator"></div>
@@ -135,42 +134,46 @@
             </div>
           </div>
           <div class="battle-emote-hint">Emotes: W heart, S middle finger, D smile, A crying</div>
-          <div class="battle-boards">
-            <div class="board-column">
-              <div id="fleet-emote-bubble" class="emote-bubble hidden">
-                <img id="fleet-emote-image" class="emote-bubble-image" alt="">
-              </div>
-              <div class="board-bowl board-bowl--fleet">
-                <div class="board-bowl-tank">
-                  <div class="board-label board-label--tank">Your Fleet</div>
+          <div class="battle-playfield">
+            <div id="fleet-ships-status" class="ships-status"></div>
+            <div class="battle-boards">
+              <div class="board-column">
+                <div id="fleet-emote-bubble" class="emote-bubble hidden">
+                  <img id="fleet-emote-image" class="emote-bubble-image" alt="">
                 </div>
-                <div class="board-bowl-seat">
-                  <div class="board-bowl-water">
-                    <div id="fleet-board-battle" class="board-grid"></div>
+                <div class="board-bowl board-bowl--fleet">
+                  <div class="board-bowl-tank">
+                    <div class="board-label board-label--tank">Your Fleet</div>
                   </div>
-                </div>
-                <div class="board-bowl-base"></div>
-              </div>
-            </div>
-            <div class="battle-center-col">
-              <div id="battle-announcement" class="battle-announcement"></div>
-            </div>
-            <div class="board-column">
-              <div id="target-emote-bubble" class="emote-bubble hidden">
-                <img id="target-emote-image" class="emote-bubble-image" alt="">
-              </div>
-              <div class="board-bowl board-bowl--target">
-                <div class="board-bowl-tank">
-                  <div class="board-label board-label--tank" id="target-label">Target Bowl</div>
-                </div>
-                <div class="board-bowl-seat">
-                  <div class="board-bowl-water">
-                    <div id="target-board-battle" class="board-grid"></div>
+                  <div class="board-bowl-seat">
+                    <div class="board-bowl-water">
+                      <div id="fleet-board-battle" class="board-grid"></div>
+                    </div>
                   </div>
+                  <div class="board-bowl-base"></div>
                 </div>
-                <div class="board-bowl-base"></div>
+              </div>
+              <div class="battle-center-col">
+                <div id="battle-announcement" class="battle-announcement"></div>
+              </div>
+              <div class="board-column">
+                <div id="target-emote-bubble" class="emote-bubble hidden">
+                  <img id="target-emote-image" class="emote-bubble-image" alt="">
+                </div>
+                <div class="board-bowl board-bowl--target">
+                  <div class="board-bowl-tank">
+                    <div class="board-label board-label--tank" id="target-label">Target Bowl</div>
+                  </div>
+                  <div class="board-bowl-seat">
+                    <div class="board-bowl-water">
+                      <div id="target-board-battle" class="board-grid"></div>
+                    </div>
+                  </div>
+                  <div class="board-bowl-base"></div>
+                </div>
               </div>
             </div>
+            <div id="opponent-ships-status" class="ships-status ships-status--opponent"></div>
           </div>
         </div>
       </section>

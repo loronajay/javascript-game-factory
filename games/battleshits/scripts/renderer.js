@@ -265,17 +265,45 @@ export function renderBattleStatus(gs) {
   if (targetBowl) targetBowl.classList.toggle('bowl--your-turn', gs.turn === 'mine');
 }
 
+export function buildOwnFleetStatusRows(myFleet) {
+  return FLEET_DEFS.map(def => ({
+    ...def,
+    sunk: myFleet.some(cell => cell.ship === def.id) && isShipSunk(myFleet, def.id),
+  }));
+}
+
+export function buildOpponentFleetStatusRows(myTarget) {
+  return FLEET_DEFS.map(def => ({
+    ...def,
+    sunk: myTarget.some(cell => cell?.result === 'sunk' && cell.shipId === def.id),
+  }));
+}
+
 export function renderFleetStatus(gs) {
   const el = document.getElementById('fleet-ships-status');
   if (!el) return;
   el.innerHTML = '';
 
-  for (const def of FLEET_DEFS) {
+  for (const def of buildOwnFleetStatusRows(gs.myFleet)) {
     const row = document.createElement('div');
     row.className = 'ship-status-row';
-    const sunk = isShipSunk(gs.myFleet, def.id);
+    const sunk = def.sunk;
     row.classList.add(sunk ? 'ship-status--sunk' : 'ship-status--afloat');
-    row.textContent = `${sunk ? '💀' : '💩'} ${def.name}`;
+    row.textContent = `${sunk ? 'Sunk' : 'Afloat'} ${def.name}`;
+    el.appendChild(row);
+  }
+}
+
+export function renderOpponentFleetStatus(gs) {
+  const el = document.getElementById('opponent-ships-status');
+  if (!el) return;
+  el.innerHTML = '';
+
+  for (const def of buildOpponentFleetStatusRows(gs.myTarget)) {
+    const row = document.createElement('div');
+    row.className = 'ship-status-row';
+    row.classList.add(def.sunk ? 'ship-status--sunk' : 'ship-status--afloat');
+    row.textContent = `${def.sunk ? 'Sunk' : 'Afloat'} ${def.name}`;
     el.appendChild(row);
   }
 }

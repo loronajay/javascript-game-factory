@@ -1,7 +1,7 @@
 import {
   buildBoardGrid, showScreen,
   renderFleetBoard, renderTargetBoard, renderBattleStatus, renderFleetStatus,
-  renderEmoteBubbles, renderPlacementBoard, renderShipRoster,
+  renderOpponentFleetStatus, renderEmoteBubbles, renderPlacementBoard, renderShipRoster,
 } from './renderer.js';
 import { selectShip, handlePlacementClick, handlePlacementHover } from './placement.js';
 import { FLEET_DEFS, isShipSunk, createFleetBoard, createTargetBoard } from './board.js';
@@ -51,6 +51,7 @@ export function transitionToBattle(gs, { clearAll, handleTargetClick }) {
   renderTargetBoard(gs);
   renderBattleStatus(gs);
   renderFleetStatus(gs);
+  renderOpponentFleetStatus(gs);
   renderEmoteBubbles(gs);
 }
 

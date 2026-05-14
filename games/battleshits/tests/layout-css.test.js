@@ -6,6 +6,7 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const root = join(__dir, '..');
 
 const files = {
+  index: readFileSync(join(root, 'index.html'), 'utf8'),
   variables: readFileSync(join(root, 'css', 'variables.css'), 'utf8'),
   shell: readFileSync(join(root, 'css', 'shell.css'), 'utf8'),
   board: readFileSync(join(root, 'css', 'board.css'), 'utf8'),
@@ -98,6 +99,39 @@ test('battle board sizing is viewport-aware and stacks before boards are crushed
     files.responsive,
     /@media\s*\(max-width:\s*900px\)\s*\{[\s\S]*\.screen-battle\s*\{[\s\S]*--bowl-size:\s*min\(92vw,\s*420px\);/,
     'Expected mobile battle bowls to use most of the viewport width.',
+  );
+});
+
+test('fleet status panel owns layout space instead of overlapping the fleet bowl', () => {
+  assertMatches(
+    files.battle,
+    /\.battle-playfield\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*clamp\(150px,\s*12vw,\s*190px\)\s+minmax\(0,\s*1fr\)\s+clamp\(150px,\s*12vw,\s*190px\);/,
+    'Expected the battle playfield to reserve columns for both fleet status panels on wide screens.',
+  );
+  assertMatches(
+    files.index,
+    /id="fleet-ships-status"[\s\S]*class="battle-boards"[\s\S]*id="opponent-ships-status"/,
+    'Expected the battle screen to render own and opponent fleet panels around the boards.',
+  );
+  assertMatches(
+    files.battle,
+    /\.screen-battle #fleet-ships-status,\s*\n\.screen-battle #opponent-ships-status\s*\{[\s\S]*position:\s*relative;/,
+    'Expected fleet status to live in normal layout flow.',
+  );
+  assertMatches(
+    files.battle,
+    /\.screen-battle #fleet-ships-status,\s*\n\.screen-battle #opponent-ships-status\s*\{[\s\S]*position:\s*relative;/,
+    'Expected opponent fleet status to live in normal layout flow.',
+  );
+  assertNotMatches(
+    files.battle,
+    /#(?:fleet-ships-status|opponent-ships-status)[\s\S]*position:\s*absolute;/,
+    'Fleet status panels must not be absolutely positioned over the bowls.',
+  );
+  assertNotMatches(
+    files.responsive,
+    /@media\s*\(max-width:\s*1280px\)\s*\{[\s\S]*\.screen-battle #(fleet-ships-status|opponent-ships-status)\s*\{[\s\S]*display:\s*none;/,
+    'Fleet status panels are important battle UI and should stay visible on narrower screens.',
   );
 });
 
