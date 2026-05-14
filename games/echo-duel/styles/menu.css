@@ -72,9 +72,12 @@
   image-rendering: auto;
 }
 
-#game-root:has(#screen-menu.screen--active)::before,
-#game-root:has(#screen-online-menu.screen--active)::before {
+#game-root:has(#screen-menu.screen--active)::before {
   background-image: url("../assets/menu-splash.png");
+}
+
+#game-root:has(#screen-online-menu.screen--active)::before {
+  background-image: url("../assets/lobby-splash.png");
 }
 
 #game-root:has(.screen-panel--lobby-art.screen--active)::before {
@@ -113,8 +116,52 @@
 }
 
 .screen-panel--lobby-art .panel {
-  width: min(560px, 100%);
-  margin-top: clamp(1.5rem, 7vh, 4rem);
+  width: min(32rem, 42vw, calc(100vw - 2rem));
+  max-height: min(74vh, 34rem);
+  margin-top: clamp(0.5rem, 3vh, 1.75rem);
+  padding: 1rem 1.25rem;
+  overflow: hidden;
+}
+
+.screen-panel--lobby-art .panel h2 {
+  font-size: 2.35rem;
+  line-height: 0.94;
+  letter-spacing: 0.03em;
+}
+
+.screen-panel--lobby-art .eyebrow {
+  margin-bottom: 0.4rem;
+  font-size: 0.68rem;
+}
+
+.screen-panel--lobby-art .form-grid {
+  gap: 0.65rem;
+  margin: 0.75rem 0;
+}
+
+.screen-panel--lobby-art label {
+  gap: 0.3rem;
+  font-size: 0.84rem;
+}
+
+.screen-panel--lobby-art input,
+.screen-panel--lobby-art select {
+  padding: 0.58rem 0.7rem;
+  border-radius: 0.72rem;
+}
+
+.screen-panel--lobby-art .row-buttons {
+  gap: 0.65rem;
+}
+
+.screen-panel--lobby-art .btn {
+  min-width: 10rem;
+  padding: 0.62rem 0.9rem;
+  border-radius: 0.85rem;
+}
+
+.screen-panel--lobby-art .error-text {
+  margin: 0.5rem 0;
 }
 
 .screen-menu--splash .menu-buttons--modes,
@@ -122,6 +169,25 @@
 .screen-menu--splash .note,
 .screen-menu--splash .menu-notice {
   transform: translateY(clamp(3rem, 14vh, 6.5rem));
+}
+
+.screen-menu--lobby-splash {
+  align-content: center;
+  padding: clamp(1rem, 2vw, 1.6rem);
+}
+
+.screen-menu--lobby-splash .menu-mode-group,
+.screen-menu--lobby-splash .note {
+  transform: none;
+}
+
+.screen-menu--lobby-splash .menu-mode-group {
+  width: min(700px, 46vw);
+  margin-top: clamp(1.5rem, 8vh, 4rem);
+}
+
+.screen-menu--lobby-splash .note {
+  width: min(700px, 46vw);
 }
 
 .title-card h1 {
@@ -198,5 +264,52 @@
 @media (max-width: 720px) {
   .menu-buttons {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px), (max-height: 720px) {
+  .screen-panel--lobby-art {
+    padding: 0.75rem;
+  }
+
+  .screen-panel--lobby-art .panel {
+    width: min(30rem, calc(100vw - 1.5rem));
+    max-height: min(78vh, 32rem);
+    margin-top: 0;
+    padding: 0.85rem;
+  }
+
+  .screen-panel--lobby-art .panel h2 {
+    font-size: 1.8rem;
+  }
+
+  .screen-panel--lobby-art .form-grid {
+    gap: 0.65rem;
+    margin: 0.75rem 0;
+  }
+
+  .screen-panel--lobby-art input,
+  .screen-panel--lobby-art select {
+    padding: 0.54rem 0.65rem;
+  }
+
+  .screen-panel--lobby-art .btn {
+    min-width: 8.75rem;
+    padding: 0.56rem 0.75rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .screen-panel--lobby-art .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .screen-panel--lobby-art .row-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .screen-panel--lobby-art .btn {
+    width: 100%;
   }
 }
