@@ -71,14 +71,16 @@ function beginSignalPlayback(state, status = '') {
   return next;
 }
 
-function beginSinglePlayerChallenge(state, length, status = '', random = Math.random) {
+function singlePlayerRandom(state, fallback = Math.random) {
+  return typeof state?.singlePlayer?.random === 'function' ? state.singlePlayer.random : fallback;
+}
+
+function prepareSinglePlayerPlayback(state, sequence, status = '') {
   const next = cloneState(state);
-  const safeLength = Math.max(
-    Number(next.settings?.startingPatternLength || 4),
-    Math.min(Number(next.settings?.maxPatternLength || 10), Number(length || next.settings?.startingPatternLength || 4))
-  );
+  const maxLength = Number(next.settings?.maxPatternLength || 10);
+  const safeSequence = [...sequence].slice(0, maxLength);
   next.ownerIndex = 0;
-  next.activeSequence = generatePattern(safeLength, random);
+  next.activeSequence = safeSequence;
   next.ownerDraft = [];
   next.ownerReplayIndex = 0;
   next.appendTargetLength = 0;
@@ -88,10 +90,33 @@ function beginSinglePlayerChallenge(state, length, status = '', random = Math.ra
   next.playback = null;
   next.players = clearPlayerResults(next.players);
   next.singlePlayer = {
+    ...(next.singlePlayer || {}),
     score: Number(next.singlePlayer?.score || 0),
-    patternLength: safeLength,
+    patternLength: safeSequence.length,
   };
-  return beginSignalPlayback(next, status || `Memorize the ${safeLength}-input signal.`);
+  return beginSignalPlayback(next, status || `Memorize the ${safeSequence.length}-input signal.`);
+}
+
+function beginSinglePlayerChallenge(state, length, status = '', random = Math.random) {
+  const next = cloneState(state);
+  const safeLength = Math.max(
+    Number(next.settings?.startingPatternLength || 4),
+    Math.min(Number(next.settings?.maxPatternLength || 10), Number(length || next.settings?.startingPatternLength || 4))
+  );
+  return prepareSinglePlayerPlayback(next, generatePattern(safeLength, random), status);
+}
+
+function extendSinglePlayerChallenge(state, targetLength, status = '', random = Math.random) {
+  const next = cloneState(state);
+  const maxLength = Number(next.settings?.maxPatternLength || 10);
+  const safeTarget = Math.max(
+    Number(next.activeSequence?.length || 0),
+    Math.min(maxLength, Number(targetLength || next.activeSequence?.length || 0))
+  );
+  const current = [...(next.activeSequence || [])].slice(0, safeTarget);
+  const needed = Math.max(0, safeTarget - current.length);
+  const extension = generatePattern(needed, random);
+  return prepareSinglePlayerPlayback(next, [...current, ...extension], status);
 }
 
 export function startSinglePlayerMatch({ penaltyWord, playerName = 'Player', random = Math.random } = {}) {
@@ -108,6 +133,7 @@ export function startSinglePlayerMatch({ penaltyWord, playerName = 'Player', ran
   base.singlePlayer = {
     score: 0,
     patternLength: Number(base.settings?.startingPatternLength || 4),
+    random,
   };
   return beginSinglePlayerChallenge(
     base,
@@ -224,7 +250,8 @@ function finishCopyPhase(state) {
       return beginSinglePlayerChallenge(
         next,
         next.settings.startingPatternLength,
-        `Missed signal. Penalty letter added. Memorize the next ${next.settings.startingPatternLength}-input signal.`
+        `Missed signal. Penalty letter added. Memorize the next ${next.settings.startingPatternLength}-input signal.`,
+        singlePlayerRandom(next)
       );
     }
 
@@ -236,10 +263,14 @@ function finishCopyPhase(state) {
         Number(next.activeSequence.length || 0) + Number(next.settings.patternAppendCount || 2)
       );
     next.singlePlayer = {
+      ...(next.singlePlayer || {}),
       score: nextScore,
       patternLength: nextLength,
     };
-    return beginSinglePlayerChallenge(next, nextLength, `Score ${nextScore}. Memorize the ${nextLength}-input signal.`);
+    const random = singlePlayerRandom(next);
+    return reachedMax
+      ? beginSinglePlayerChallenge(next, nextLength, `Score ${nextScore}. Memorize the ${nextLength}-input signal.`, random)
+      : extendSinglePlayerChallenge(next, nextLength, `Score ${nextScore}. Memorize the ${nextLength}-input signal.`, random);
   }
 
   if (!allChallengersSucceeded) {
