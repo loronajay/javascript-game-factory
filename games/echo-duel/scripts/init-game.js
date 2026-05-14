@@ -132,7 +132,8 @@ function isActiveMatchPhase(phase) {
     || phase === PHASES.OWNER_REPLAY
     || phase === PHASES.OWNER_APPEND
     || phase === PHASES.SIGNAL_PLAYBACK
-    || phase === PHASES.CHALLENGER_COPY;
+    || phase === PHASES.CHALLENGER_COPY
+    || phase === PHASES.RESULT_REVEAL;
 }
 
 function setState(nextState, { broadcast = true } = {}) {

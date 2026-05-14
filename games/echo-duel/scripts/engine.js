@@ -1,4 +1,4 @@
-import { INPUTS, PHASES, PLAYBACK_TIMING, timerSecondsForLength } from './config.js';
+import { INPUTS, PHASES, PLAYBACK_TIMING, SINGLE_PLAYER_THINKING_MS, timerSecondsForLength } from './config.js';
 import { activePlayers, cloneState, createMatchState, findPlayerIndexById, firstActiveIndex, getOwner, nextActiveIndex } from './state.js';
 
 function isValidInput(input) {
@@ -93,8 +93,49 @@ function prepareSinglePlayerPlayback(state, sequence, status = '') {
     ...(next.singlePlayer || {}),
     score: Number(next.singlePlayer?.score || 0),
     patternLength: safeSequence.length,
+    pendingSequence: null,
+    pendingStatus: '',
   };
   return beginSignalPlayback(next, status || `Memorize the ${safeSequence.length}-input signal.`);
+}
+
+function beginSinglePlayerThinking(state, sequence, status = '', playbackStatus = '') {
+  const next = cloneState(state);
+  const now = performance.now();
+  const maxLength = Number(next.settings?.maxPatternLength || 10);
+  const safeSequence = [...sequence].slice(0, maxLength);
+  advancePhaseMarker(next, PHASES.RESULT_REVEAL);
+  next.ownerIndex = 0;
+  next.activeSequence = safeSequence;
+  next.ownerDraft = [];
+  next.ownerReplayIndex = 0;
+  next.appendTargetLength = 0;
+  next.copyProgress = {};
+  next.roundResults = [];
+  next.playback = null;
+  next.timer = {
+    startedAt: now,
+    durationMs: SINGLE_PLAYER_THINKING_MS,
+    endsAt: now + SINGLE_PLAYER_THINKING_MS,
+  };
+  next.singlePlayer = {
+    ...(next.singlePlayer || {}),
+    patternLength: safeSequence.length,
+    pendingSequence: safeSequence,
+    pendingStatus: playbackStatus || `Memorize the ${safeSequence.length}-input signal.`,
+  };
+  next.status = status || `Echo is thinking up the next ${safeSequence.length}-input signal.`;
+  return next;
+}
+
+function finishSinglePlayerThinking(state) {
+  const pendingSequence = state.singlePlayer?.pendingSequence;
+  if (!Array.isArray(pendingSequence) || pendingSequence.length <= 0) return state;
+  return prepareSinglePlayerPlayback(
+    state,
+    pendingSequence,
+    state.singlePlayer?.pendingStatus || `Memorize the ${pendingSequence.length}-input signal.`
+  );
 }
 
 function beginSinglePlayerChallenge(state, length, status = '', random = Math.random) {
@@ -246,12 +287,18 @@ function finishCopyPhase(state) {
   const reachedMax = next.activeSequence.length >= next.settings.maxPatternLength;
 
   if (next.mode === 'single') {
+    const random = singlePlayerRandom(next);
     if (!allChallengersSucceeded) {
-      return beginSinglePlayerChallenge(
+      const nextLength = Number(next.settings.startingPatternLength || 4);
+      next.singlePlayer = {
+        ...(next.singlePlayer || {}),
+        patternLength: nextLength,
+      };
+      return beginSinglePlayerThinking(
         next,
-        next.settings.startingPatternLength,
-        `Missed signal. Penalty letter added. Memorize the next ${next.settings.startingPatternLength}-input signal.`,
-        singlePlayerRandom(next)
+        generatePattern(nextLength, random),
+        `Missed signal. Penalty letter added. Echo is thinking up the next ${nextLength}-input signal.`,
+        `Memorize the next ${nextLength}-input signal.`
       );
     }
 
@@ -267,10 +314,18 @@ function finishCopyPhase(state) {
       score: nextScore,
       patternLength: nextLength,
     };
-    const random = singlePlayerRandom(next);
-    return reachedMax
-      ? beginSinglePlayerChallenge(next, nextLength, `Score ${nextScore}. Memorize the ${nextLength}-input signal.`, random)
-      : extendSinglePlayerChallenge(next, nextLength, `Score ${nextScore}. Memorize the ${nextLength}-input signal.`, random);
+    const sequence = reachedMax
+      ? generatePattern(nextLength, random)
+      : [
+        ...next.activeSequence.slice(0, Number(next.settings.maxPatternLength || 10)),
+        ...generatePattern(Math.max(0, nextLength - Number(next.activeSequence.length || 0)), random),
+      ];
+    return beginSinglePlayerThinking(
+      next,
+      sequence,
+      `Score ${nextScore}. Echo is thinking up the next ${nextLength}-input signal.`,
+      `Score ${nextScore}. Memorize the ${nextLength}-input signal.`
+    );
   }
 
   if (!allChallengersSucceeded) {
@@ -434,6 +489,10 @@ export function handleInput(state, rawInput, actorId = null) {
 export function handleTimerExpired(state) {
   let next = cloneState(state);
   if (!next.timer) return next;
+
+  if (next.phase === PHASES.RESULT_REVEAL && next.mode === 'single') {
+    return finishSinglePlayerThinking(next);
+  }
 
   if (next.phase === PHASES.OWNER_REPLAY || next.phase === PHASES.OWNER_APPEND) {
     const owner = getOwner(next);

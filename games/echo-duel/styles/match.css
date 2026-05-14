@@ -571,12 +571,12 @@
 .key-d {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #7dfcff, #ff7a18);
+    linear-gradient(180deg, #9fffe0, #00c878);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
     inset 0 -14px 24px rgba(0, 0, 0, 0.24),
-    0 0 22px rgba(25, 247, 255, 0.16),
-    0 0 18px rgba(255, 122, 24, 0.14);
+    0 0 22px rgba(25, 247, 255, 0.14),
+    0 0 18px rgba(0, 200, 120, 0.18);
 }
 
 .pad--locked .pad-key {
@@ -677,7 +677,7 @@
 .live-signal-box.key-d {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, #7dfcff, #ff7a18);
+    linear-gradient(180deg, #9fffe0, #00c878);
 }
 
 .live-signal-strip.is-playback {

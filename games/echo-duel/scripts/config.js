@@ -29,6 +29,8 @@ export const PLAYBACK_TIMING = Object.freeze({
   holdMs: 700,
 });
 
+export const SINGLE_PLAYER_THINKING_MS = 2400;
+
 export const PHASES = Object.freeze({
   MENU: 'menu',
   LOBBY: 'lobby',

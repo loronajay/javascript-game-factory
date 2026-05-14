@@ -14,6 +14,8 @@ export function getPhaseCopy(state) {
       return ["Memorize", "Signal playback.", "Watch the full pattern now. It disappears before copy mode."];
     case PHASES.CHALLENGER_COPY:
       return ["Copy Phase", "Challengers copy the pattern.", "No sequence readout. Memory only."];
+    case PHASES.RESULT_REVEAL:
+      return ["Thinking", "Echo is preparing the next signal.", "Next playback starts after a short beat."];
     case PHASES.MATCH_OVER:
       return ["Finished", "Match over.", ""];
     default:
@@ -97,6 +99,10 @@ export function buildInputModeState(state) {
 
   if (state.phase === PHASES.SIGNAL_PLAYBACK) {
     return { label: "MEMORIZE", detail: `${state.activeSequence.length} inputs`, className: "mode-playback", locked: true };
+  }
+
+  if (state.phase === PHASES.RESULT_REVEAL) {
+    return { label: "ECHO THINKING", detail: `${state.activeSequence.length} inputs next`, className: "mode-watch", locked: true };
   }
 
   if (state.phase === PHASES.CHALLENGER_COPY) {
