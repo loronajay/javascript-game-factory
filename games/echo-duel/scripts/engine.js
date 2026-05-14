@@ -302,7 +302,8 @@ function finishCopyPhase(state) {
       );
     }
 
-    const nextScore = Number(next.singlePlayer?.score || 0) + 1;
+    const currentScore = Number(next.singlePlayer?.score || 0);
+    const nextScore = currentScore + (reachedMax ? 1 : 0);
     const nextLength = reachedMax
       ? Number(next.settings.startingPatternLength || 4)
       : Math.min(
@@ -320,11 +321,17 @@ function finishCopyPhase(state) {
         ...next.activeSequence.slice(0, Number(next.settings.maxPatternLength || 10)),
         ...generatePattern(Math.max(0, nextLength - Number(next.activeSequence.length || 0)), random),
       ];
+    const thinkingStatus = reachedMax
+      ? `Score ${nextScore}. Echo is thinking up the next ${nextLength}-input signal.`
+      : `Chain cleared. Echo is thinking up the next ${nextLength}-input signal.`;
+    const playbackStatus = reachedMax
+      ? `Score ${nextScore}. Memorize the ${nextLength}-input signal.`
+      : `Memorize the ${nextLength}-input signal.`;
     return beginSinglePlayerThinking(
       next,
       sequence,
-      `Score ${nextScore}. Echo is thinking up the next ${nextLength}-input signal.`,
-      `Score ${nextScore}. Memorize the ${nextLength}-input signal.`
+      thinkingStatus,
+      playbackStatus
     );
   }
 

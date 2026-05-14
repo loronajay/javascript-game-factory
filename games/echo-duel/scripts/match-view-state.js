@@ -27,6 +27,14 @@ export function getLocalPlayerId(state) {
   return state?.network?.myClientId || null;
 }
 
+export function getSinglePlayerScoreText(state) {
+  return `Score: ${Number(state?.singlePlayer?.score || 0)}`;
+}
+
+export function getSinglePlayerFinalScoreText(state) {
+  return `Final score: ${Number(state?.singlePlayer?.score || 0)}`;
+}
+
 export function isLocalOwner(state) {
   const localId = getLocalPlayerId(state);
   const owner = getOwner(state);

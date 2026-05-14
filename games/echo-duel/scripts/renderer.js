@@ -6,6 +6,8 @@ import {
   getPhaseCopy,
   getProgressCountForPhase,
   getRoleLabel,
+  getSinglePlayerFinalScoreText,
+  getSinglePlayerScoreText,
   shouldShowLoserCallout,
 } from './match-view-state.js';
 
@@ -298,7 +300,7 @@ export function renderMatch(state) {
   qs('phase-kicker').textContent = kicker;
   qs('phase-title').textContent = title;
   qs('phase-detail').textContent = state.mode === 'single'
-    ? `${detail} Score: ${Number(state.singlePlayer?.score || 0)}.`
+    ? `${detail} ${getSinglePlayerScoreText(state)}.`
     : detail;
   qs('penalty-word').textContent = state.settings.penaltyWord;
   qs('sequence-label').textContent = state.phase === PHASES.OWNER_CREATE_INITIAL ? 'Draft Progress' : 'Memory Progress';
@@ -313,10 +315,11 @@ export function renderMatch(state) {
 export function renderEnded(state) {
   showScreen('ended');
   const winner = state.players.find(player => player.id === state.winnerId);
+  const finalScore = state.mode === 'single' ? getSinglePlayerFinalScoreText(state) : '';
   qs('ended-title').textContent = winner ? `${winner.name} Wins` : 'No Winner';
   qs('ended-message').textContent = winner
-    ? `${winner.name} is the last active player.`
-    : 'The match ended without an active player.';
+    ? `${winner.name} is the last active player.${finalScore ? ` ${finalScore}.` : ''}`
+    : `The match ended without an active player.${finalScore ? ` ${finalScore}.` : ''}`;
 
   const callout = qs('loser-callout');
   if (callout) {
@@ -342,7 +345,10 @@ export function renderEnded(state) {
     row.className = 'standing-row';
     if (player.id === state.winnerId) row.classList.add('is-winner');
     if (player.eliminated) row.classList.add('is-loser');
-    row.innerHTML = `<span>${player.name}</span><strong>${player.letters || '—'}</strong>`;
+    const score = state.mode === 'single' && (player.id === 'player' || player.clientId === 'player')
+      ? `<small class="single-player-score">${getSinglePlayerScoreText(state)}</small>`
+      : '';
+    row.innerHTML = `<span>${player.name}${score}</span><strong>${player.letters || '—'}</strong>`;
     standings.appendChild(row);
   });
 }
