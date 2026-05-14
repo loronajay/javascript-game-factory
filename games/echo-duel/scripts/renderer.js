@@ -11,6 +11,7 @@ import {
 
 const screenMap = {
   menu: 'screen-menu',
+  onlineMenu: 'screen-online-menu',
   lobby: 'screen-lobby',
   singlePlayerConfig: 'screen-single-player-config',
   onlineConfig: 'screen-online-config',

@@ -4,8 +4,8 @@
 
 .screen-menu--splash,
 .screen-panel--lobby-art {
-  overflow: hidden;
-  border-radius: 2rem;
+  overflow: visible;
+  border-radius: 0;
   isolation: isolate;
 }
 
@@ -18,7 +18,7 @@
 .screen-menu--splash::before,
 .screen-panel--lobby-art::before {
   content: "";
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 0;
   background-position: center;
@@ -38,7 +38,7 @@
 .screen-menu--splash::after,
 .screen-panel--lobby-art::after {
   content: "";
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
@@ -57,10 +57,15 @@
 }
 
 .screen-menu--splash {
-  align-content: end;
+  align-content: center;
   place-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   padding: clamp(0.85rem, 1.6vw, 1.35rem);
+}
+
+.screen-menu--splash.screen--active,
+.screen-panel--lobby-art.screen--active {
+  transform: none;
 }
 
 .screen-panel--lobby-art {
@@ -155,8 +160,8 @@
   gap: 0.75rem;
 }
 
-.menu-buttons--single {
-  grid-template-columns: 1fr;
+.menu-buttons--modes {
+  width: min(560px, 100%);
 }
 
 .menu-notice {

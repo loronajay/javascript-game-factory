@@ -26,6 +26,15 @@
             <span>Private Rooms</span>
           </div>
         </div>
+        <div class="menu-buttons menu-buttons--modes" aria-label="Game modes">
+          <button id="btn-online-multiplayer" class="btn btn-primary">Online Multiplayer</button>
+          <button id="btn-single-player" class="btn">Single Player</button>
+        </div>
+        <p id="menu-notice" class="status-line menu-notice hidden"></p>
+        <p class="muted note">Choose a mode to start setting up the match.</p>
+      </section>
+
+      <section id="screen-online-menu" class="screen screen-menu screen-menu--splash">
         <section class="menu-mode-group" aria-labelledby="online-menu-title">
           <div class="menu-mode-heading">
             <p class="eyebrow" id="online-menu-title">Online Multiplayer</p>
@@ -36,16 +45,10 @@
             <button id="btn-private" class="btn">Create Private Room</button>
             <button id="btn-join-private" class="btn">Join Private Room</button>
           </div>
-        </section>
-        <section class="menu-mode-group" aria-labelledby="single-player-menu-title">
-          <div class="menu-mode-heading">
-            <p class="eyebrow" id="single-player-menu-title">Single Player</p>
-          </div>
-          <div class="menu-buttons menu-buttons--single">
-            <button id="btn-single-player" class="btn btn-primary">Start Single Player</button>
+          <div class="row-buttons">
+            <button id="btn-online-menu-back" class="btn">Back</button>
           </div>
         </section>
-        <p id="menu-notice" class="status-line menu-notice hidden"></p>
         <p class="muted note">Create or join an online room. The host sets the penalty word and starts the match.</p>
       </section>
 

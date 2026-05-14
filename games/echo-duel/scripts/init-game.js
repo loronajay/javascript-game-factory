@@ -343,7 +343,7 @@ export function initGame() {
     },
     onShowMenu: screen => {
       showScreen(screen || 'menu');
-      if (!screen || screen === 'menu' || screen === 'onlineConfig' || screen === 'joinRoom' || screen === 'singlePlayerConfig') startMenuMusic();
+      if (!screen || screen === 'menu' || screen === 'onlineMenu' || screen === 'onlineConfig' || screen === 'joinRoom' || screen === 'singlePlayerConfig') startMenuMusic();
     },
     onJoinPrivate: async code => {
       await unlockAudio();
