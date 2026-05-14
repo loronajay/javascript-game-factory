@@ -652,11 +652,16 @@
 }
 
 .live-signal-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 0.55rem;
   width: min(560px, 92vw);
   margin: 0.2rem auto 0.5rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 0.25rem 0.2rem 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(25, 247, 255, 0.42) rgba(0, 0, 0, 0.22);
 }
 
 .live-signal-strip.hidden {
@@ -664,6 +669,7 @@
 }
 
 .live-signal-box {
+  flex: 0 0 clamp(42px, 8vw, 56px);
   min-height: 46px;
   display: grid;
   place-items: center;
