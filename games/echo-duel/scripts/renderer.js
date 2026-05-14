@@ -23,6 +23,8 @@ const screenMap = {
   ended: 'screen-ended',
 };
 
+const previousPenaltyLetters = new Map();
+
 function qs(id) { return document.getElementById(id); }
 
 function playbackIndex(state, now = performance.now()) {
@@ -247,6 +249,37 @@ function renderPlayers(state) {
   });
 }
 
+function renderPenaltyLetterBursts(state) {
+  const stage = qs('screen-match');
+  if (!stage || state.phase === PHASES.MATCH_OVER) return;
+
+  const seen = new Set();
+  state.players.forEach(player => {
+    const id = player.id || player.clientId || player.name;
+    if (!id) return;
+    seen.add(id);
+    const letters = String(player.letters || '');
+    const previous = Number(previousPenaltyLetters.get(id) || 0);
+    if (letters.length > previous) {
+      const gained = letters.slice(previous);
+      Array.from(gained).forEach((letter, index) => {
+        const burst = document.createElement('div');
+        burst.className = 'penalty-letter-burst';
+        burst.textContent = letter.toUpperCase();
+        burst.setAttribute('aria-hidden', 'true');
+        burst.style.animationDelay = `${index * 90}ms`;
+        stage.appendChild(burst);
+        burst.addEventListener('animationend', () => burst.remove(), { once: true });
+      });
+    }
+    previousPenaltyLetters.set(id, letters.length);
+  });
+
+  Array.from(previousPenaltyLetters.keys()).forEach(id => {
+    if (!seen.has(id)) previousPenaltyLetters.delete(id);
+  });
+}
+
 function renderTimer(state) {
   const wrap = qs('timer-wrap');
   const bar = qs('timer-bar');
@@ -306,6 +339,7 @@ export function renderMatch(state) {
   qs('sequence-label').textContent = state.phase === PHASES.OWNER_CREATE_INITIAL ? 'Draft Progress' : 'Memory Progress';
   qs('status-line').textContent = state.status || '';
   renderPlayers(state);
+  renderPenaltyLetterBursts(state);
   renderSequence(state);
   renderLiveSignal(state);
   renderInputMode(state);

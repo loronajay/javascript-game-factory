@@ -231,6 +231,27 @@
   border: 1px solid rgba(255, 122, 24, 0.28);
 }
 
+.penalty-letter-burst {
+  position: fixed;
+  left: 50%;
+  top: 48%;
+  z-index: 30;
+  transform: translate(-50%, -50%) scale(0.55);
+  color: #fff7ee;
+  font-family: var(--font-display);
+  font-size: clamp(4.5rem, 18vw, 13rem);
+  font-weight: 1000;
+  letter-spacing: 0.02em;
+  line-height: 0.9;
+  text-shadow:
+    0 0 16px rgba(255, 122, 24, 0.92),
+    0 0 32px rgba(255, 63, 47, 0.58),
+    0 0 48px rgba(25, 247, 255, 0.3),
+    0 8px 0 rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+  animation: penaltyLetterBurst 1.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 
 .player-progress {
   margin-top: 0.75rem;
@@ -702,6 +723,31 @@
   outline: 3px solid rgba(255, 255, 255, 0.78);
   z-index: 1;
   filter: brightness(1.35);
+}
+
+@keyframes penaltyLetterBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35) rotate(-5deg);
+    filter: blur(3px) brightness(1.4);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08) rotate(1deg);
+    filter: blur(0) brightness(1.25);
+  }
+
+  42% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -56%) scale(1.7) rotate(2deg);
+    filter: blur(2px) brightness(1.1);
+  }
 }
 
 @media (max-width: 980px) {
