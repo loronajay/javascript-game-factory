@@ -23,7 +23,8 @@
   z-index: 0;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: contain;
+  background-color: #000;
   image-rendering: auto;
 }
 
@@ -45,22 +46,20 @@
 }
 
 .screen-menu--splash::after {
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.22) 58%, rgba(0, 0, 0, 0.48)),
-    radial-gradient(circle at 50% 64%, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62) 72%);
+  background: none;
 }
 
 .screen-panel--lobby-art::after {
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.24)),
-    radial-gradient(circle at 50% 52%, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.54) 78%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.1), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.1)),
+    radial-gradient(circle at 50% 52%, transparent, rgba(0, 0, 0, 0.18) 84%);
 }
 
 .screen-menu--splash {
-  align-content: center;
+  align-content: end;
   place-items: center;
   gap: 1rem;
-  padding: clamp(0.85rem, 1.6vw, 1.35rem);
+  padding: clamp(0.85rem, 1.6vw, 1.35rem) clamp(0.85rem, 1.6vw, 1.35rem) clamp(2.2rem, 7vh, 4.4rem);
 }
 
 .screen-menu--splash.screen--active,
@@ -70,6 +69,15 @@
 
 .screen-panel--lobby-art {
   padding: clamp(1.1rem, 3vw, 2.25rem);
+}
+
+#game-root:has(.screen-menu--splash.screen--active)::before,
+#game-root:has(.screen-menu--splash.screen--active)::after,
+#game-root:has(.screen-panel--lobby-art.screen--active)::before,
+#game-root:has(.screen-panel--lobby-art.screen--active)::after {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .screen-menu--splash .title-card,
@@ -99,6 +107,13 @@
 .screen-panel--lobby-art .panel {
   width: min(560px, 100%);
   margin-top: clamp(1.5rem, 7vh, 4rem);
+}
+
+.screen-menu--splash .menu-buttons--modes,
+.screen-menu--splash .menu-mode-group,
+.screen-menu--splash .note,
+.screen-menu--splash .menu-notice {
+  transform: translateY(clamp(3rem, 14vh, 6.5rem));
 }
 
 .title-card h1 {
