@@ -1,0 +1,274 @@
+/* Menu, lobby phases, side selection, inputs, and primary action buttons. */
+
+.hero-title-art {
+  width: min(100%, 1080px);
+  margin: 10px auto 0;
+  aspect-ratio: 1320 / 225;
+  background-image: url("../images/ui/menu-title-plate.png");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.32));
+}
+
+.menu-circuit-banner {
+  width: min(100%, 520px);
+  margin: 26px auto 6px;
+  aspect-ratio: 1370 / 150;
+  background-image: url("../images/ui/menu-circuit-banner.png");
+  background-repeat: no-repeat;
+  background-size: 150% auto;
+  background-position: center;
+  opacity: 0.98;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
+}
+
+.menu-actions,
+.lobby-actions {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+  justify-items: center;
+}
+
+.menu-stack {
+  max-width: 1080px;
+  width: 100%;
+  margin: 24px auto 0;
+}
+
+.menu-phase,
+.lobby-phase {
+  display: none;
+}
+
+.menu-phase--active,
+.lobby-phase--active {
+  display: block;
+}
+
+.menu-phase h2 {
+  margin: 0 0 10px;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+
+.seat-locks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 24px 0 18px;
+}
+
+.seat-lock {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 32px;
+  aspect-ratio: 830 / 235;
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+    linear-gradient(180deg, rgba(8, 14, 24, 0.92), rgba(6, 11, 20, 0.92));
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.seat-lock strong {
+  position: absolute;
+  inset: auto 0 34px;
+  z-index: 1;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+.seat-lock:hover {
+  transform: translateY(-3px);
+}
+
+.seat-lock::before {
+  content: "";
+  position: absolute;
+  inset: 14px 18px 40px;
+  background-repeat: no-repeat;
+  background-size: 122% auto;
+  background-position: center 38%;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.28));
+}
+
+.seat-lock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 32px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+.seat-lock--blue::before,
+.seat-lock--red::before {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.seat-lock--blue::before {
+  background-image: url("../images/ui/menu-side-blue.png");
+}
+
+.seat-lock--red::before {
+  background-image: url("../images/ui/menu-side-red.png");
+}
+
+.seat-lock--active {
+  border-color: rgba(248, 217, 122, 0.28);
+  filter: drop-shadow(0 0 24px rgba(248, 217, 122, 0.25));
+}
+
+.join-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+input {
+  width: 100%;
+  border: 1px solid rgba(112, 156, 218, 0.22);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(17, 27, 44, 0.96), rgba(8, 15, 26, 0.96));
+  color: var(--text);
+  padding: 16px 18px;
+  font: inherit;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 26px rgba(0, 0, 0, 0.2);
+}
+
+.action {
+  border: 1px solid rgba(110, 150, 214, 0.2);
+  border-radius: 18px;
+  padding: 16px 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(14, 24, 39, 0.96), rgba(8, 15, 26, 0.96));
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 26px rgba(0, 0, 0, 0.22);
+  transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+}
+
+.action:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.action--blue {
+  background:
+    linear-gradient(180deg, rgba(191, 229, 255, 0.12), rgba(39, 96, 194, 0.06)),
+    linear-gradient(135deg, #0b326d 0%, #1556b6 48%, #59b7ff 100%);
+  border-color: rgba(111, 189, 255, 0.34);
+}
+
+.action--red {
+  background:
+    linear-gradient(180deg, rgba(255, 216, 210, 0.16), rgba(176, 43, 32, 0.14)),
+    linear-gradient(135deg, #7c1f22, #d14a3e 70%, #ff9b8e);
+  border-color: rgba(255, 156, 144, 0.34);
+}
+
+.action--ghost {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.action--asset {
+  border: 0;
+  padding: 0;
+  color: transparent;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  box-shadow: none;
+  text-shadow: none;
+  overflow: hidden;
+  min-height: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+.action--asset:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.action--asset:disabled {
+  filter: grayscale(0.65) brightness(0.72);
+}
+
+#btn-play-online,
+#btn-private-host {
+  aspect-ratio: 345 / 150;
+}
+
+#btn-play-online {
+  max-width: 390px;
+  justify-self: center;
+  background-image: url("../images/ui/menu-button-play-online.png");
+}
+
+#btn-private-host {
+  max-width: 340px;
+  justify-self: center;
+  background-image: url("../images/ui/menu-button-create-room.png");
+}
+
+#btn-open-join {
+  max-width: 340px;
+  justify-self: center;
+  aspect-ratio: 334 / 150;
+  background-image: url("../images/ui/menu-button-enter-code.png");
+}
+
+#btn-back-to-root,
+#btn-friend-back,
+#btn-join-back,
+#btn-cancel-search {
+  aspect-ratio: 345 / 132;
+}
+
+#btn-back-to-root,
+#btn-friend-back,
+#btn-join-back {
+  max-width: 340px;
+  justify-self: center;
+  background-image: url("../images/ui/menu-button-back.png");
+}
+
+#btn-cancel-search {
+  max-width: 340px;
+  justify-self: center;
+  background-image: url("../images/ui/menu-button-cancel.png");
+}
+
+.action--wide {
+  width: 100%;
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

@@ -1,0 +1,187 @@
+/* Match frame, scoreboard, lobby room code, identity rows, and board panel layout. */
+
+.match-shell {
+  padding: 24px;
+}
+
+.room-code-shell {
+  position: relative;
+  width: min(100%, 620px);
+  margin: 24px auto 0;
+  aspect-ratio: 735 / 205;
+  display: grid;
+  place-items: center;
+  padding: 0 118px;
+  background-image: url("../images/ui/menu-room-code-shell.png");
+  background-repeat: no-repeat;
+  background-size: 112% auto;
+  background-position: center;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.28));
+}
+
+.room-code {
+  margin: 0;
+  text-align: center;
+  font: 700 clamp(1.7rem, 4vw, 2.75rem)/1 monospace;
+  letter-spacing: 0.16em;
+  color: var(--text);
+  text-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
+}
+
+.room-code--hidden {
+  display: none;
+}
+
+.match-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.score-block,
+.status-block {
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.score-block--blue {
+  box-shadow: inset 0 0 0 1px rgba(60, 134, 255, 0.18);
+}
+
+.score-block--red {
+  box-shadow: inset 0 0 0 1px rgba(255, 91, 77, 0.18);
+}
+
+.score-block span,
+.status-block span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.score-block strong,
+.status-block #match-timer {
+  display: block;
+  margin-top: 8px;
+  font-size: 2rem;
+}
+
+.status-block {
+  text-align: center;
+  min-width: 220px;
+}
+
+.identity-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.panel .identity-bar {
+  margin-top: 22px;
+}
+
+.panel {
+  padding: 34px 34px 42px;
+}
+
+.panel h2 {
+  margin: 0 0 16px;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.panel .status-line {
+  max-width: 720px;
+}
+
+.panel .lobby-actions,
+.panel .menu-actions {
+  max-width: 780px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#btn-find-match,
+#btn-private-join {
+  width: 100%;
+  padding: 20px 24px;
+  border-radius: 22px;
+  border-color: rgba(115, 196, 255, 0.36);
+  background:
+    linear-gradient(180deg, rgba(220, 241, 255, 0.14), rgba(69, 135, 230, 0.06)),
+    linear-gradient(135deg, #10346b 0%, #1d5fc0 55%, #62beff 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 18px 26px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(98, 190, 255, 0.12);
+}
+
+#btn-play-friend {
+  width: 100%;
+  padding: 20px 24px;
+  border-radius: 22px;
+  border-color: rgba(115, 237, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(217, 252, 255, 0.1), rgba(25, 99, 111, 0.04)),
+    linear-gradient(135deg, #102a35 0%, #13495e 48%, #2db8cb 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 26px rgba(0, 0, 0, 0.2);
+}
+
+#btn-change-side,
+[data-leave] {
+  width: 100%;
+  padding: 18px 24px;
+  border-radius: 22px;
+  border-color: rgba(248, 217, 122, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01)),
+    linear-gradient(180deg, rgba(18, 27, 42, 0.96), rgba(9, 15, 24, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(248, 217, 122, 0.06),
+    0 18px 26px rgba(0, 0, 0, 0.18);
+}
+
+#btn-change-side:hover,
+[data-leave]:hover {
+  filter: brightness(1.06);
+}
+
+.identity-line {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font: 700 0.82rem/1.4 monospace;
+  letter-spacing: 0.03em;
+}
+
+.identity-bar--result {
+  margin: 18px 0 14px;
+  text-align: left;
+}
+
+.match-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 20px;
+  align-items: start;
+}
+
+.board-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 18px;
+}

@@ -59,6 +59,13 @@ export function createOnlineSessionController({
     }
   }
 
+  function stopPublicSearchTicker() {
+    if (online.publicSearchTimer !== null) {
+      windowLike.clearInterval?.(online.publicSearchTimer);
+      online.publicSearchTimer = null;
+    }
+  }
+
   function updateLobbyView(status = "") {
     if (!online.lobby) return;
     renderOnlineLobby({
@@ -174,10 +181,10 @@ export function createOnlineSessionController({
         online.lobby = null;
         online.isHost = false;
         online.startRequested = false;
-        online.findingPublic = false;
-        renderPublicSearch("No open public lobbies found. Try again soon.");
+        renderPublicSearch("Searching for open public lobbies...");
         return;
       }
+      stopPublicSearchTicker();
       online.findingPublic = false;
       online.lobby = payload;
       online.isHost = payload.ownerId === net.clientId;
@@ -421,6 +428,7 @@ export function createOnlineSessionController({
   function disconnectOnline() {
     stopLobbyCountdownTicker();
     stopPendingMatchStart();
+    stopPublicSearchTicker();
     online.net?.leaveLobby?.();
     online.net?.disconnect?.();
     resetOnlineRuntimeState(online);
@@ -429,6 +437,7 @@ export function createOnlineSessionController({
   async function startCreatePublic(settings) {
     const net = await ensureOnlineClient();
     online.findingPublic = false;
+    stopPublicSearchTicker();
     online.pendingAction = () => net.createLobby({ ...settings, isPrivate: false });
     if (net.clientId) online.pendingAction();
     showScreen("onlineLobby");
@@ -438,8 +447,14 @@ export function createOnlineSessionController({
     const net = await ensureOnlineClient();
     const defaults = { minPlayers: 2, maxPlayers: 6, penaltyWord: "STATIC" };
     online.findingPublic = true;
-    online.pendingAction = () => net.findLobby(defaults);
+    const search = () => {
+      if (!online.findingPublic || !online.net?.clientId) return;
+      net.findLobby(defaults);
+    };
+    online.pendingAction = search;
     if (net.clientId) online.pendingAction();
+    stopPublicSearchTicker();
+    online.publicSearchTimer = windowLike.setInterval(search, 2500);
     showScreen("onlineLobby");
     renderPublicSearch();
   }
@@ -447,6 +462,7 @@ export function createOnlineSessionController({
   async function startPrivate(settings) {
     const net = await ensureOnlineClient();
     online.findingPublic = false;
+    stopPublicSearchTicker();
     online.pendingAction = () => net.createLobby({ ...settings, isPrivate: true });
     if (net.clientId) online.pendingAction();
     showScreen("onlineLobby");
@@ -455,6 +471,7 @@ export function createOnlineSessionController({
   async function joinPrivate(code) {
     const net = await ensureOnlineClient();
     online.findingPublic = false;
+    stopPublicSearchTicker();
     online.pendingAction = () => net.joinLobby(code);
     if (net.clientId) online.pendingAction();
     showScreen("onlineLobby");

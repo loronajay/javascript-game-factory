@@ -1,0 +1,43 @@
+/* Responsive adjustments for game screens. */
+
+@media (max-width: 1080px) {
+  .match-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .match-header {
+    grid-template-columns: 1fr;
+  }
+
+  .status-block {
+    min-width: 0;
+  }
+
+  .identity-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-dock {
+    position: static;
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .seat-locks {
+    grid-template-columns: 1fr;
+  }
+
+  .join-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-palette {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .tool--icon {
+    min-height: 0;
+  }
+}

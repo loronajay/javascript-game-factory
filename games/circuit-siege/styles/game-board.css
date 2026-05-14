@@ -1,0 +1,199 @@
+/* SVG board cells, routes, slots, terminals, and match-status tones. */
+
+.board-cell-rect--floor {
+  fill: #242b35;
+  stroke: #3c4450;
+  stroke-width: 1;
+}
+
+.board-cell-rect--wall {
+  fill: #0f172a;
+  stroke: #64748b;
+  stroke-width: 2;
+}
+
+.source-plug {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.source-plug--blue {
+  fill: #2e6dff;
+}
+
+.source-plug--red {
+  fill: #ff3b30;
+}
+
+.board-svg__tiny {
+  fill: #cbd5e1;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.route-outline {
+  stroke: #020617;
+  stroke-width: 11;
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.route-line {
+  fill: none;
+  stroke-width: 5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.32;
+}
+
+.route-line--blue {
+  stroke: #2e6dff;
+  color: #2e6dff;
+}
+
+.route-line--red {
+  stroke: #ff3b30;
+  color: #ff3b30;
+}
+
+.route-line--completed-damage {
+  opacity: 1;
+  stroke-width: 8;
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+.route-line--completed-dud {
+  opacity: 0.55;
+  stroke-width: 6;
+  stroke-dasharray: 8 6;
+}
+
+.slot-base {
+  stroke-width: 2.2;
+  pointer-events: none;
+}
+
+.slot-gap {
+  fill: #242b35;
+  pointer-events: none;
+}
+
+.slot-hole-image,
+.slot-tile-image,
+.board-cell-floor,
+.board-cell-wire,
+.board-cell-hole,
+.terminal-sprite {
+  pointer-events: none;
+}
+
+.slot-hitbox {
+  fill: rgba(255, 255, 255, 0.001);
+  stroke: none;
+  pointer-events: all;
+}
+
+.slot-group--hole .slot-base {
+  fill: #020617;
+  stroke: #67e8f9;
+}
+
+.slot-group--refactor .slot-base {
+  fill: #3f4754;
+  stroke: #facc15;
+}
+
+.slot-group--locked .slot-base {
+  fill: #111827;
+  stroke: #64748b;
+}
+
+.slot-group--editable {
+  cursor: pointer;
+}
+
+.slot-group--editable:hover .slot-base,
+.slot-group--editable:hover .slot-hitbox {
+  filter: drop-shadow(0 0 7px #67e8f9);
+}
+
+.slot-group--blocked {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.slot-group--selected .slot-base {
+  filter: drop-shadow(0 0 9px #facc15);
+  stroke: #fef08a;
+}
+
+.slot-hole-marker {
+  fill: rgba(103, 232, 249, 0.7);
+  pointer-events: none;
+}
+
+.piece-path {
+  stroke-width: 4;
+  stroke-linecap: round;
+  fill: none;
+  pointer-events: none;
+}
+
+.piece-path--blue {
+  stroke: #93c5fd;
+}
+
+.piece-path--red {
+  stroke: #fecaca;
+}
+
+.terminal-rect {
+  stroke-width: 2;
+}
+
+.terminal-rect--blue.terminal-rect--damage {
+  fill: #1d4ed8;
+  stroke: #93c5fd;
+}
+
+.terminal-rect--blue.terminal-rect--dud {
+  fill: #1f2937;
+  stroke: #60a5fa;
+}
+
+.terminal-rect--red.terminal-rect--damage {
+  fill: #b91c1c;
+  stroke: #fecaca;
+}
+
+.terminal-rect--red.terminal-rect--dud {
+  fill: #1f2937;
+  stroke: #f87171;
+}
+
+.terminal-rect--completed-damage {
+  filter: drop-shadow(0 0 10px white);
+}
+
+.terminal-rect--completed-dud {
+  opacity: 0.55;
+}
+
+.terminal-text {
+  fill: #fff;
+  font-size: 7px;
+  font-weight: 900;
+}
+
+#match-status[data-tone="win"] {
+  color: #8af3b1;
+}
+
+#match-status[data-tone="loss"] {
+  color: #ff9c93;
+}
+
+#match-status[data-tone="draw"] {
+  color: var(--gold);
+}

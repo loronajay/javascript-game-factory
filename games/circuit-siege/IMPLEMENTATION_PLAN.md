@@ -252,7 +252,9 @@ No browser-owned match result.
 games/circuit-siege/
   index.html
   map-editor.html
-  style.css
+  styles/base.css
+  styles/game.css
+  styles/editor.css
   game.js
   GDD.md
   IMPLEMENTATION_PLAN.md

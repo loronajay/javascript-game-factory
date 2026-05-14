@@ -14,6 +14,7 @@ function defaultOnlineRuntimeState() {
     pendingMatchStartTimer: null,
     pendingAction: null,
     findingPublic: false,
+    publicSearchTimer: null,
   };
 }
 

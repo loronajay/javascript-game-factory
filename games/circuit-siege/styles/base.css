@@ -1,0 +1,18 @@
+:root {
+  --bg: #07121e;
+  --panel: rgba(10, 18, 32, 0.88);
+  --panel-border: rgba(150, 190, 255, 0.15);
+  --text: #edf4ff;
+  --muted: #9eb4d4;
+  --blue: #3c86ff;
+  --blue-soft: rgba(60, 134, 255, 0.22);
+  --red: #ff5b4d;
+  --red-soft: rgba(255, 91, 77, 0.22);
+  --gold: #f8d97a;
+  --wall: #162338;
+  --route: rgba(255, 255, 255, 0.08);
+  --surface: rgba(255, 255, 255, 0.03);
+}
+
+* {
+  box-sizing: border-box;
