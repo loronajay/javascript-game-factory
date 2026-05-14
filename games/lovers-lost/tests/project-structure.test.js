@@ -76,6 +76,18 @@ test('dev-only artifacts are separated from the shipped root', () => {
   assert(exists('docs/PACING.md'), 'missing docs/PACING.md');
 });
 
+test('mobile controller is mounted with the Lovers Lost control profile', () => {
+  const indexSource = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert(
+    indexSource.includes("from '../../js/mobile-controller.mjs'"),
+    'expected index.html to import the shared mobile controller'
+  );
+  assert(
+    /mountMobileController\(\{\s*profileId:\s*['"]lovers-lost['"]\s*\}\)/.test(indexSource),
+    'expected index.html to mount the Lovers Lost mobile profile'
+  );
+});
+
 test('old root-level clutter is gone', () => {
   const oldRootFiles = [
     'input.js',

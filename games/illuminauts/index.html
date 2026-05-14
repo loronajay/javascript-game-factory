@@ -9,6 +9,10 @@
 <body>
   <a href="../../grid.html" class="back-link">&lt; Back to Arcade</a>
   <canvas id="gameCanvas"></canvas>
+  <script type="module">
+    import { mountMobileController } from '../../js/mobile-controller.mjs';
+    mountMobileController({ profileId: 'illuminauts' });
+  </script>
   <script type="module" src="game.js"></script>
 </body>
 </html>

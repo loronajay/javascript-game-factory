@@ -18,7 +18,9 @@
     </div>
   </main>
   <script type="module">
+    import { mountMobileController } from '../../js/mobile-controller.mjs';
     import { initGame } from './game.js';
+    mountMobileController({ profileId: 'lovers-lost' });
     initGame();
   </script>
 </body>
