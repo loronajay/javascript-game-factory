@@ -1,4 +1,4 @@
-@media (max-width: 1180px) {
+@media (max-width: 1280px) {
   .screen-battle #fleet-ships-status {
     display: none;
   }
@@ -34,12 +34,25 @@
 }
 
 @media (max-width: 900px) {
+  .screen-placement,
+  .screen-battle {
+    --bowl-size: min(92vw, 420px);
+  }
+
   #game-root {
     padding-bottom: 36px;
   }
 
   .battle-header {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .status-placard--turn,
+  .status-placard--opponent {
+    min-width: 0;
+    min-height: 54px;
   }
 
   .board-grid {

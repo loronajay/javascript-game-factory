@@ -8,7 +8,6 @@
 .board-scene,
 .battle-stage {
   width: 100%;
-  max-height: 100%;
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.6vh, 18px);
@@ -66,9 +65,9 @@
 
 .board-bowl-seat {
   width: 100%;
-  aspect-ratio: 1 / 1.05;
-  padding: clamp(14px, 2vh, 26px);
-  border-radius: 48% 48% 44% 44% / 36% 36% 62% 62%;
+  aspect-ratio: 1 / 1;
+  padding: clamp(10px, 1.4vh, 20px);
+  border-radius: 24px;
   background: linear-gradient(180deg, #ffffff 0%, #f3f4f5 46%, #d6dbe0 100%);
   box-shadow:
     inset 0 0 0 10px rgba(255, 255, 255, 0.9),
@@ -80,8 +79,10 @@
   position: relative;
   width: 100%;
   height: 100%;
+  display: grid;
+  place-items: center;
   padding: 0;
-  border-radius: 49% 49% 46% 46% / 36% 36% 64% 64%;
+  border-radius: 16px;
   background:
     radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.66), transparent 15%),
     radial-gradient(circle at 50% 56%, rgba(2, 51, 88, 0.42), transparent 40%),
@@ -89,14 +90,14 @@
   box-shadow:
     inset 0 0 22px rgba(255, 255, 255, 0.35),
     inset 0 -24px 28px rgba(3, 54, 91, 0.34);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .board-bowl-water::before {
   content: '';
   position: absolute;
-  inset: 8% 12%;
-  border-radius: 50%;
+  inset: 5%;
+  border-radius: inherit;
   background:
     linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent),
     radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.18), transparent 42%);
@@ -105,10 +106,7 @@
 }
 
 .board-bowl-water .board-grid {
-  position: absolute;
-  left: 50%;
-  top: 14%;
-  transform: translateX(-50%);
+  position: relative;
   background: transparent;
   border-radius: 0;
   padding: 0;
@@ -135,8 +133,8 @@
 /* Grid */
 
 .board-grid {
-  --cell: clamp(20px, 2.65vh, 36px);
-  --label-cell: clamp(16px, 1.8vh, 22px);
+  --cell: clamp(20px, calc((var(--bowl-size, 680px) - 62px) / 11), 36px);
+  --label-cell: clamp(16px, calc(var(--cell) * 0.62), 22px);
   position: relative;
   z-index: 1;
   display: grid;

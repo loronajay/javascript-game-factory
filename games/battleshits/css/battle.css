@@ -1,5 +1,5 @@
 .screen-battle {
-  --bowl-size: min(42vw, 48vh, 520px);
+  --bowl-size: clamp(280px, min(34vw, 54vh), 480px);
 }
 
 .battle-header {
@@ -29,7 +29,7 @@
 .battle-boards {
   display: grid;
   grid-template-columns: 1fr clamp(100px, 9vw, 140px) 1fr;
-  gap: 18px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -103,12 +103,6 @@
   height: 56px;
   object-fit: contain;
   image-rendering: pixelated;
-}
-
-/* Battle screen overrides for the bowl */
-
-.screen-battle .board-bowl-water .board-grid {
-  top: calc(15% - 8px);
 }
 
 /* Lock tank height so bowl position never moves when label text changes */
