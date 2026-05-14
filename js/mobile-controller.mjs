@@ -24,6 +24,7 @@ const MOBILE_CONTROL_PROFILES = {
       left: CONTROL_KEY_SPECS.KeyA,
       right: CONTROL_KEY_SPECS.KeyD,
     },
+    directionMode: 'cardinal',
     buttons: [
       { id: 'sprint', label: 'RUN', key: CONTROL_KEY_SPECS.ShiftLeft },
     ],
@@ -43,6 +44,7 @@ const MOBILE_CONTROL_PROFILES = {
           left: CONTROL_KEY_SPECS.KeyA,
           right: CONTROL_KEY_SPECS.KeyD,
         },
+        directionMode: 'cardinal',
         legends: { up: 'J', down: 'C', left: 'B', right: 'A' },
       },
       {
@@ -54,6 +56,7 @@ const MOBILE_CONTROL_PROFILES = {
           left: CONTROL_KEY_SPECS.ArrowLeft,
           right: CONTROL_KEY_SPECS.ArrowRight,
         },
+        directionMode: 'cardinal',
         legends: { up: 'J', down: 'C', left: 'A', right: 'B' },
       },
     ],
@@ -142,18 +145,109 @@ function isMobileLike(win = globalThis.window) {
     !!win.matchMedia?.('(pointer: coarse)')?.matches;
 }
 
-function directionFromPoint(x, y, rect) {
+function normalizeAngle(angle) {
+  return (angle % 360 + 360) % 360;
+}
+
+function shortestAngleDelta(a, b) {
+  let delta = normalizeAngle(a - b);
+  if (delta > 180) delta -= 360;
+  return delta;
+}
+
+function directionCenter(direction) {
+  switch (direction) {
+    case 'right': return 0;
+    case 'down-right': return 45;
+    case 'down': return 90;
+    case 'down-left': return 135;
+    case 'left': return 180;
+    case 'up-left': return 225;
+    case 'up': return 270;
+    case 'up-right': return 315;
+    default: return null;
+  }
+}
+
+function angleToDirection(angle, mode = 'eight-way') {
+  const zones = mode === 'cardinal'
+    ? [
+        ['right', 0, 44],
+        ['down', 90, 44],
+        ['left', 180, 44],
+        ['up', 270, 44],
+      ]
+    : [
+        ['right', 0, 26],
+        ['down-right', 45, 18],
+        ['down', 90, 26],
+        ['down-left', 135, 18],
+        ['left', 180, 26],
+        ['up-left', 225, 18],
+        ['up', 270, 26],
+        ['up-right', 315, 18],
+      ];
+
+  let bestDirection = null;
+  let bestDistance = Infinity;
+  for (const [direction, center, half] of zones) {
+    const distance = Math.abs(shortestAngleDelta(angle, center));
+    if (distance <= half) return direction;
+    if (distance < bestDistance) {
+      bestDirection = direction;
+      bestDistance = distance;
+    }
+  }
+  return bestDirection;
+}
+
+function directionFromPoint(x, y, rect, options = {}) {
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
   const dx = x - cx;
   const dy = y - cy;
   const distance = Math.hypot(dx, dy);
   const radius = Math.min(rect.width, rect.height) / 2;
-  if (distance < radius * 0.18) return null;
+  if (distance < radius * 0.22) return null;
+  if (distance > radius * 1.12) return options.activeDirection || null;
 
-  const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-  const index = Math.round(angle / 45) % 8;
-  return ['right', 'down-right', 'down', 'down-left', 'left', 'up-left', 'up', 'up-right'][index];
+  const angle = normalizeAngle(Math.atan2(dy, dx) * 180 / Math.PI);
+  const candidate = angleToDirection(angle, options.mode);
+  const activeCenter = directionCenter(options.activeDirection);
+  const candidateCenter = directionCenter(candidate);
+
+  if (activeCenter !== null && candidateCenter !== null && candidate !== options.activeDirection) {
+    const activeError = Math.abs(shortestAngleDelta(angle, activeCenter));
+    const candidateError = Math.abs(shortestAngleDelta(angle, candidateCenter));
+    if (candidateError + 10 >= activeError) return options.activeDirection;
+  }
+
+  return candidate;
+}
+
+function polarPoint(cx, cy, radius, angleDeg) {
+  const radians = angleDeg * Math.PI / 180;
+  return {
+    x: cx + Math.cos(radians) * radius,
+    y: cy + Math.sin(radians) * radius,
+  };
+}
+
+function ringSegmentPath(cx, cy, innerRadius, outerRadius, startDeg, endDeg) {
+  const startOuter = polarPoint(cx, cy, outerRadius, startDeg);
+  const endOuter = polarPoint(cx, cy, outerRadius, endDeg);
+  const startInner = polarPoint(cx, cy, innerRadius, endDeg);
+  const endInner = polarPoint(cx, cy, innerRadius, startDeg);
+  const sweep = normalizeAngle(endDeg - startDeg);
+  const largeArc = sweep > 180 ? 1 : 0;
+
+  return [
+    `M ${startOuter.x} ${startOuter.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${endOuter.x} ${endOuter.y}`,
+    `L ${startInner.x} ${startInner.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${endInner.x} ${endInner.y}`,
+    'Z',
+  ].join(' ');
 }
 
 function ensureStyle(doc, profile) {
@@ -194,6 +288,7 @@ function ensureStyle(doc, profile) {
       min-width: 142px;
       min-height: 142px;
       border-radius: 50%;
+      overflow: hidden;
     }
     .mobile-controller__pad::before {
       content: "";
@@ -202,6 +297,7 @@ function ensureStyle(doc, profile) {
       border-radius: 50%;
       border: 2px solid color-mix(in srgb, var(--mc-accent) 72%, transparent);
       background: rgba(0, 0, 0, 0.26);
+      z-index: 5;
     }
     .mobile-controller__pad-label {
       position: absolute;
@@ -212,6 +308,69 @@ function ensureStyle(doc, profile) {
       font-weight: 800;
       letter-spacing: 0;
       opacity: 0.76;
+      z-index: 8;
+    }
+    .mobile-controller__ring {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .mobile-controller__segment {
+      fill: var(--mc-accent);
+      opacity: 0.055;
+      transition: opacity 0.04s linear, filter 0.04s linear;
+    }
+    .mobile-controller__segment.is-active {
+      opacity: 0.48;
+      filter: drop-shadow(0 0 18px var(--mc-glow));
+    }
+    .mobile-controller__divider {
+      stroke: var(--mc-accent);
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      opacity: 0.28;
+    }
+    .mobile-controller__arrow {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      color: var(--mc-accent);
+      opacity: 0.78;
+      pointer-events: none;
+      z-index: 7;
+    }
+    .mobile-controller__arrow::before {
+      content: "";
+      width: 0;
+      height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-bottom: 13px solid currentColor;
+      filter: drop-shadow(0 0 5px var(--mc-glow));
+    }
+    .mobile-controller__thumb {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 15%;
+      height: 15%;
+      min-width: 18px;
+      min-height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--mc-accent);
+      background: color-mix(in srgb, var(--mc-glow) 18%, transparent);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--mc-glow) 58%, transparent);
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transition: opacity 0.04s linear;
+      pointer-events: none;
+      z-index: 9;
     }
     .mobile-controller__legend {
       position: absolute;
@@ -222,6 +381,7 @@ function ensureStyle(doc, profile) {
       font-size: 13px;
       font-weight: 800;
       opacity: 0.78;
+      z-index: 8;
     }
     .mobile-controller__legend--up { left: calc(50% - 14px); top: 12%; }
     .mobile-controller__legend--down { left: calc(50% - 14px); bottom: 12%; }
@@ -269,6 +429,68 @@ function createPad(doc, dispatcher, padConfig, placement) {
   pad.className = 'mobile-controller__pad';
   positionControl(pad, placement);
 
+  const ringSize = 220;
+  const center = ringSize / 2;
+  const outerRadius = ringSize * 0.485;
+  const innerRadius = ringSize * 0.20;
+  const zones = [
+    { direction: 'right', center: 0, half: 26, rotation: 90 },
+    { direction: 'down-right', center: 45, half: 18, rotation: 135 },
+    { direction: 'down', center: 90, half: 26, rotation: 180 },
+    { direction: 'down-left', center: 135, half: 18, rotation: 225 },
+    { direction: 'left', center: 180, half: 26, rotation: 270 },
+    { direction: 'up-left', center: 225, half: 18, rotation: 315 },
+    { direction: 'up', center: 270, half: 26, rotation: 0 },
+    { direction: 'up-right', center: 315, half: 18, rotation: 45 },
+  ];
+
+  const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add('mobile-controller__ring');
+  svg.setAttribute('viewBox', `0 0 ${ringSize} ${ringSize}`);
+  const segmentByDirection = new Map();
+  for (const zone of zones) {
+    const segment = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+    segment.classList.add('mobile-controller__segment');
+    segment.dataset.direction = zone.direction;
+    segment.setAttribute('d', ringSegmentPath(
+      center,
+      center,
+      innerRadius,
+      outerRadius,
+      zone.center - zone.half,
+      zone.center + zone.half,
+    ));
+    svg.appendChild(segment);
+    segmentByDirection.set(zone.direction, segment);
+
+    for (const angle of [zone.center - zone.half, zone.center + zone.half]) {
+      const p1 = polarPoint(center, center, innerRadius, angle);
+      const p2 = polarPoint(center, center, outerRadius, angle);
+      const divider = doc.createElementNS('http://www.w3.org/2000/svg', 'line');
+      divider.classList.add('mobile-controller__divider');
+      divider.setAttribute('x1', p1.x);
+      divider.setAttribute('y1', p1.y);
+      divider.setAttribute('x2', p2.x);
+      divider.setAttribute('y2', p2.y);
+      svg.appendChild(divider);
+    }
+  }
+  pad.appendChild(svg);
+
+  for (const zone of zones) {
+    const point = polarPoint(50, 50, 31, zone.center);
+    const arrow = doc.createElement('div');
+    arrow.className = 'mobile-controller__arrow';
+    arrow.style.left = `calc(${point.x}% - 9px)`;
+    arrow.style.top = `calc(${point.y}% - 9px)`;
+    arrow.style.transform = `rotate(${zone.rotation}deg)`;
+    pad.appendChild(arrow);
+  }
+
+  const thumb = doc.createElement('div');
+  thumb.className = 'mobile-controller__thumb';
+  pad.appendChild(thumb);
+
   const label = doc.createElement('div');
   label.className = 'mobile-controller__pad-label';
   label.textContent = padConfig.label || '';
@@ -287,6 +509,35 @@ function createPad(doc, dispatcher, padConfig, placement) {
   let activeDirection = null;
   let activeKeys = [];
   let pointerId = null;
+  let thumbVisible = false;
+  let thumbX = 0;
+  let thumbY = 0;
+
+  function setThumbFromEvent(event) {
+    const rect = pad.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+    const radius = Math.min(rect.width, rect.height) * 0.39;
+    const distance = Math.hypot(dx, dy);
+    const scale = distance > radius && distance > 0 ? radius / distance : 1;
+    thumbVisible = true;
+    thumbX = dx * scale;
+    thumbY = dy * scale;
+  }
+
+  function renderPadState() {
+    pad.classList.toggle('is-active', !!activeDirection);
+    for (const segment of segmentByDirection.values()) segment.classList.remove('is-active');
+    if (activeDirection) {
+      segmentByDirection.get(activeDirection)?.classList.add('is-active');
+    }
+    thumb.style.opacity = thumbVisible ? '1' : '0';
+    thumb.style.transform = thumbVisible
+      ? `translate(calc(-50% + ${thumbX}px), calc(-50% + ${thumbY}px))`
+      : 'translate(-50%, -50%)';
+  }
 
   function applyDirection(direction) {
     if (direction === activeDirection) return;
@@ -294,17 +545,24 @@ function createPad(doc, dispatcher, padConfig, placement) {
     activeDirection = direction;
     activeKeys = getDirectionKeys(direction, padConfig.dpad).filter(Boolean);
     for (const key of activeKeys) dispatcher.press(key);
-    pad.classList.toggle('is-active', !!activeDirection);
+    renderPadState();
   }
 
   function updateFromEvent(event) {
-    applyDirection(directionFromPoint(event.clientX, event.clientY, pad.getBoundingClientRect()));
+    setThumbFromEvent(event);
+    applyDirection(directionFromPoint(event.clientX, event.clientY, pad.getBoundingClientRect(), {
+      activeDirection,
+      mode: padConfig.directionMode || 'eight-way',
+    }));
+    renderPadState();
   }
 
   function clear(event) {
     if (event && event.pointerId !== pointerId) return;
     pointerId = null;
+    thumbVisible = false;
     applyDirection(null);
+    renderPadState();
   }
 
   pad.addEventListener('pointerdown', (event) => {
