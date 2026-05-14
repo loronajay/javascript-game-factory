@@ -279,6 +279,10 @@ export function buildOpponentFleetStatusRows(myTarget) {
   }));
 }
 
+export function getFleetStatusLabel(row) {
+  return `${row.sunk ? '💀' : '💩'} ${row.name}`;
+}
+
 export function renderFleetStatus(gs) {
   const el = document.getElementById('fleet-ships-status');
   if (!el) return;
@@ -289,7 +293,7 @@ export function renderFleetStatus(gs) {
     row.className = 'ship-status-row';
     const sunk = def.sunk;
     row.classList.add(sunk ? 'ship-status--sunk' : 'ship-status--afloat');
-    row.textContent = `${sunk ? 'Sunk' : 'Afloat'} ${def.name}`;
+    row.textContent = getFleetStatusLabel(def);
     el.appendChild(row);
   }
 }
@@ -303,7 +307,7 @@ export function renderOpponentFleetStatus(gs) {
     const row = document.createElement('div');
     row.className = 'ship-status-row';
     row.classList.add(def.sunk ? 'ship-status--sunk' : 'ship-status--afloat');
-    row.textContent = `${def.sunk ? 'Sunk' : 'Afloat'} ${def.name}`;
+    row.textContent = getFleetStatusLabel(def);
     el.appendChild(row);
   }
 }

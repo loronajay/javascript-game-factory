@@ -8,6 +8,7 @@ import {
 import {
   buildOwnFleetStatusRows,
   buildOpponentFleetStatusRows,
+  getFleetStatusLabel,
 } from '../scripts/renderer.js';
 
 let passed = 0;
@@ -57,6 +58,11 @@ test('opponent fleet status marks only confirmed sunk ships from the target boar
 
   assertEqual(destroyer.sunk, true);
   assertEqual(carrier.sunk, false);
+});
+
+test('fleet status labels keep poop and skull markers', () => {
+  assertEqual(getFleetStatusLabel({ name: 'Poop Chute', sunk: false }), '💩 Poop Chute');
+  assertEqual(getFleetStatusLabel({ name: 'Poop Chute', sunk: true }), '💀 Poop Chute');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
