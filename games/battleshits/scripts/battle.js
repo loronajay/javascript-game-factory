@@ -12,6 +12,7 @@ import { EMOTE_ASSET_PATHS, EMOTE_COOLDOWN_MS, EMOTE_DISPLAY_MS } from './emojis
 
 let pendingShotTimer = null;
 let pendingShotTimerResult = null; // stored so handleIncomingShot can flush it early
+let incomingShotTimer = null;
 let emoteTimers = { mine: null, theirs: null };
 let lastEmoteSentAt = 0;
 const audio = createAudioController();
@@ -22,6 +23,13 @@ function clearPendingShotTimer() {
     pendingShotTimer = null;
   }
   pendingShotTimerResult = null;
+}
+
+function clearIncomingShotTimer() {
+  if (incomingShotTimer !== null) {
+    clearTimeout(incomingShotTimer);
+    incomingShotTimer = null;
+  }
 }
 
 function clearEmoteTimers() {
@@ -35,6 +43,7 @@ function clearEmoteTimers() {
 
 export function clearBattleTimers() {
   clearPendingShotTimer();
+  clearIncomingShotTimer();
   clearEmoteTimers();
 }
 
@@ -109,22 +118,33 @@ export function handleIncomingShot(gs, net, col, row, { clearAll }) {
   const { valid, board, hit, shipId, sunk } = resolveIncomingShot(gs.myFleet, col, row);
   if (!valid) return;
 
-  gs.myFleet = board;
-  const fleetDestroyed = isFleetDestroyed(gs.myFleet);
-  audio.play(getResolutionSoundId(hit));
-
-  net.sendShotResult(col, row, hit, sunk, shipId, fleetDestroyed);
+  clearIncomingShotTimer();
+  gs.incomingShot = { col, row };
+  audio.play(LAUNCH_SOUND_ID);
 
   renderFleetBoard(gs);
-  renderFleetStatus(gs);
+  renderBattleStatus(gs);
 
-  if (fleetDestroyed) {
-    transitionToMatchEnded(gs, 'loss', { clearAll });
-  } else {
-    gs.turn = 'mine';
-    renderBattleStatus(gs);
-    renderTargetBoard(gs);
-  }
+  incomingShotTimer = setTimeout(() => {
+    incomingShotTimer = null;
+    gs.myFleet = board;
+    gs.incomingShot = null;
+    const fleetDestroyed = isFleetDestroyed(gs.myFleet);
+    audio.play(getResolutionSoundId(hit));
+
+    net.sendShotResult(col, row, hit, sunk, shipId, fleetDestroyed);
+
+    renderFleetBoard(gs);
+    renderFleetStatus(gs);
+
+    if (fleetDestroyed) {
+      transitionToMatchEnded(gs, 'loss', { clearAll });
+    } else {
+      gs.turn = 'mine';
+      renderBattleStatus(gs);
+      renderTargetBoard(gs);
+    }
+  }, SHOT_ANIMATION_MS);
 }
 
 export function handleShotResult(gs, result, { clearAll }) {

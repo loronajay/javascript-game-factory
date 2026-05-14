@@ -135,5 +135,28 @@ test('fleet status panel owns layout space instead of overlapping the fleet bowl
   );
 });
 
+test('missed shots animate as splash and ripple impacts on both boards', () => {
+  assertMatches(
+    files.board,
+    /\.board-cell\.cell-water-hit::before,\s*\n\.board-cell\.cell-target-miss::before\s*\{[\s\S]*animation:\s*miss-splash-burst/,
+    'Expected miss cells on both boards to render an animated splash burst.',
+  );
+  assertMatches(
+    files.board,
+    /\.board-cell\.cell-water-hit::after,\s*\n\.board-cell\.cell-target-miss::after\s*\{[\s\S]*animation:\s*miss-splash-ripple/,
+    'Expected miss cells on both boards to render an animated ripple ring.',
+  );
+  assertMatches(
+    files.board,
+    /@keyframes\s+miss-splash-burst\s*\{/,
+    'Expected splash burst keyframes to exist.',
+  );
+  assertMatches(
+    files.board,
+    /@keyframes\s+miss-splash-ripple\s*\{/,
+    'Expected splash ripple keyframes to exist.',
+  );
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

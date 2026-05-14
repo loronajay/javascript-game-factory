@@ -55,6 +55,13 @@ test('their turn copy indicates the opponent is aiming', () => {
   );
 });
 
+test('incoming shot copy reflects the local impact sequence', () => {
+  assertEqual(
+    getBattleStatusCopy('incoming_shot'),
+    'Incoming shot! Brace for impact...',
+  );
+});
+
 test('target label becomes actionable during my turn', () => {
   assertEqual(
     getTargetLabelCopy('mine'),

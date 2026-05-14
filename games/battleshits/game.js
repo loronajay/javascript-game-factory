@@ -55,6 +55,7 @@ function createInitialState() {
     opponentWantsRematch: false,
     pendingNetAction: null, // called inside onConnected
     pendingShot: null, // { col, row, startedAt }
+    incomingShot: null, // { col, row } while opponent shot impact animation plays
     activeEmotes: {
       mine: null,
       theirs: null,

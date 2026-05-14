@@ -1,7 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node tests/project-structure.test.js && node tests/layout-css.test.js && node tests/fleet-status.test.js && node tests/board.test.js && node tests/online.test.js",
+    "test": "node tests/project-structure.test.js && node tests/layout-css.test.js && node tests/fleet-status.test.js && node tests/combat-presentation.test.js && node tests/presentation.test.js && node tests/board.test.js && node tests/online.test.js",
     "test:structure": "node tests/project-structure.test.js",
     "test:layout": "node tests/layout-css.test.js",
     "test:fleet-status": "node tests/fleet-status.test.js",

@@ -3,10 +3,12 @@ export const SHOT_ANIMATION_MS = 1200;
 export function getBattleStatusCopy(turn) {
   if (turn === 'mine') return 'Your turn - pick a target bowl space.';
   if (turn === 'awaiting_result') return 'Missile in the air...';
+  if (turn === 'incoming_shot') return 'Incoming shot! Brace for impact...';
   return 'Opponent is lining up a shot...';
 }
 
-export function getTargetLabelCopy() {
+export function getTargetLabelCopy(turn) {
+  if (turn === 'mine') return 'Target Bowl - Click to fire';
   return 'Target Bowl';
 }
 

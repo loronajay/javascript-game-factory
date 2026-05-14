@@ -188,6 +188,7 @@ export function renderFleetBoard(gs) {
       if (!el) continue;
       el.className = 'board-cell';
       el.innerHTML = '';
+      const isIncomingShot = gs.incomingShot?.col === c && gs.incomingShot?.row === r;
 
       if (cell.ship) {
         const info = getShipPieceInfo(gs.myFleet, c, r);
@@ -202,6 +203,11 @@ export function renderFleetBoard(gs) {
         }
       } else if (cell.hit) {
         el.classList.add('cell-water-hit');
+      }
+
+      if (isIncomingShot) {
+        el.classList.add('cell-incoming-pending');
+        el.appendChild(makeSprite(SPRITES.missile, false, 'shot-marker shot-falling'));
       }
     }
   }
@@ -246,7 +252,7 @@ export function renderBattleStatus(gs) {
   const oppEl   = document.getElementById('battle-opponent-name');
   const labelEl = document.getElementById('target-label');
 
-  if (turnEl) turnEl.textContent = getBattleStatusCopy(gs.turn);
+  if (turnEl) turnEl.textContent = getBattleStatusCopy(gs.incomingShot ? 'incoming_shot' : gs.turn);
 
   if (oppEl) {
     if (gs.isSoloMode) {
@@ -259,7 +265,7 @@ export function renderBattleStatus(gs) {
     }
   }
 
-  if (labelEl) labelEl.textContent = getTargetLabelCopy();
+  if (labelEl) labelEl.textContent = getTargetLabelCopy(gs.turn);
 
   const targetBowl = document.querySelector('.board-bowl--target');
   if (targetBowl) targetBowl.classList.toggle('bowl--your-turn', gs.turn === 'mine');
