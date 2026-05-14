@@ -13,3 +13,21 @@ html, body {
   height: 100%;
   image-rendering: pixelated;
 }
+
+.back-link {
+  position: fixed;
+  top: 18px;
+  left: 20px;
+  z-index: 10;
+  color: rgba(229, 245, 255, 0.82);
+  font: 700 11px/1.2 Arial, sans-serif;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  text-transform: uppercase;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: #ffffff;
+}
