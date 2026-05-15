@@ -257,25 +257,25 @@
 
 /* Default panel grid placement — mirrors DEFAULT_PROFILE_LAYOUT so layout looks correct
    before applyProfileLayout runs. Overridden by inline grid-column/row from the JS. */
-#meHeroCard, #playerHeroCard               { grid-column: 1 / span 12; grid-row: 1 / span 3; }
+/* Left column */
+#meHeroCard, #playerHeroCard               { grid-column: 1 / span 4; grid-row: 1 / span 5; }
+#meIdentityPanel, #playerIdentityPanel     { grid-column: 1 / span 4; grid-row: 6 / span 3; }
+#meRankingsPanel, #playerRankingsPanel     { grid-column: 1 / span 4; grid-row: 9 / span 2; }
+#meTopFriendsPanel                         { grid-column: 1 / span 4; grid-row: 11 / span 2; }
+#meFriendsPanel                            { grid-column: 1 / span 4; grid-row: 13 / span 3; }
+#playerFriendsPanel                        { grid-column: 1 / span 4; grid-row: 11 / span 3; }
 
-#meIdentityPanel, #playerIdentityPanel     { grid-column: 1 / span 4; grid-row: 4 / span 3; }
-#meRankingsPanel, #playerRankingsPanel     { grid-column: 1 / span 4; grid-row: 7 / span 2; }
-#meTopFriendsPanel                         { grid-column: 1 / span 4; grid-row: 9 / span 2; }
-#meFriendsPanel                            { grid-column: 1 / span 4; grid-row: 11 / span 3; }
-#playerFriendsPanel                        { grid-column: 1 / span 4; grid-row: 9 / span 3; }
-
-#meFriendCodePanel                         { grid-column: 5 / span 4; grid-row: 4 / span 3; }
-#meFavoriteGamePanel                       { grid-column: 5 / span 4; grid-row: 7 / span 2; }
-#playerFavoritePanel                       { grid-column: 5 / span 4; grid-row: 4 / span 2; }
+/* Middle column */
+#meMusicPanel, #playerMusicPanel           { grid-column: 5 / span 4; grid-row: 1 / span 3; }
+#meFavoriteGamePanel, #playerFavoritePanel { grid-column: 5 / span 4; grid-row: 4 / span 2; }
+#meFriendCodePanel                         { grid-column: 5 / span 4; grid-row: 6 / span 3; }
 #meGalleryPanel                            { grid-column: 5 / span 4; grid-row: 9 / span 3; }
 #playerGalleryPanel                        { grid-column: 5 / span 4; grid-row: 6 / span 3; }
-#meMusicPanel                              { grid-column: 5 / span 4; grid-row: 12 / span 3; }
-#playerMusicPanel                          { grid-column: 5 / span 4; grid-row: 9 / span 3; }
 
-#meThoughtsPanel, #playerThoughtsPanel     { grid-column: 9 / span 4; grid-row: 4 / span 5; }
-#meAboutPanel, #playerAboutPanel           { grid-column: 9 / span 4; grid-row: 9 / span 2; }
-#meBadgesPanel, #playerBadgesPanel         { grid-column: 9 / span 4; grid-row: 11 / span 2; }
+/* Right column */
+#meAboutPanel, #playerAboutPanel           { grid-column: 9 / span 4; grid-row: 1 / span 2; }
+#meBadgesPanel, #playerBadgesPanel         { grid-column: 9 / span 4; grid-row: 3 / span 2; }
+#meThoughtsPanel, #playerThoughtsPanel     { grid-column: 9 / span 4; grid-row: 5 / span 5; }
 
 /* Mobile: single column, override inline grid placement from layout data. */
 @media (max-width: 640px) {
