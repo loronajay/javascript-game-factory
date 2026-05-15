@@ -13,7 +13,6 @@ export const ME_PANEL_TO_DOM = {
   badges: "meBadgesPanel",
 };
 
-// Player page omits topFriends and friendCode (those panels don't exist on /player).
 export const PLAYER_PANEL_TO_DOM = {
   hero: "playerHeroCard",
   identity: "playerIdentityPanel",
@@ -30,42 +29,81 @@ export const PLAYER_PANEL_TO_DOM = {
 const ME_REQUIRED = new Set(["hero"]);
 const PLAYER_REQUIRED = new Set(["hero"]);
 
-// Applies saved panel layout to the live profile page DOM.
-// Sets grid-column/grid-row from layout data and toggles layout-panel--hidden
-// on disabled panels. Uses a CSS class so render functions that call
-// container.hidden = false can't undo the hidden state.
+// Applies saved panel layout using the 3-column wrapper structure.
+// Panels are grouped by x value (x<4=left, x<8=middle, x>=8=right),
+// sorted by y within each column, then moved to the correct column
+// wrapper via appendChild so columns stack independently without row
+// alignment bleeding between them.
 export function applyProfileLayout(doc, layout, {
   panelToDom = ME_PANEL_TO_DOM,
   required = ME_REQUIRED,
+  layoutSelector = ".me-layout",
+  columnSelectors = {
+    left: ".me-layout__main",
+    middle: ".me-layout__side--middle",
+    right: ".me-layout__side--right",
+  },
 } = {}) {
   if (!layout?.desktop?.panels) return;
 
-  const panelMap = new Map(layout.desktop.panels.map((p) => [p.id, p]));
+  const layoutEl = doc.querySelector(layoutSelector);
+  if (!layoutEl) return;
 
-  for (const [panelId, domId] of Object.entries(panelToDom)) {
-    const el = doc.getElementById(domId);
-    if (!el) continue;
+  const leftCol = layoutEl.querySelector(columnSelectors.left);
+  const middleCol = layoutEl.querySelector(columnSelectors.middle);
+  const rightCol = layoutEl.querySelector(columnSelectors.right);
 
-    const panel = panelMap.get(panelId);
-    if (!panel) continue;
+  const groups = [[], [], []];
+  for (const panel of layout.desktop.panels) {
+    if (!panelToDom[panel.id]) continue;
+    const colIdx = panel.x < 4 ? 0 : panel.x < 8 ? 1 : 2;
+    groups[colIdx].push(panel);
+  }
+  groups.forEach((g) => g.sort((a, b) => a.y - b.y));
 
-    const enabled = panel.enabled !== false || required.has(panelId);
-    el.classList.toggle("layout-panel--hidden", !enabled);
+  const containers = [leftCol, middleCol, rightCol];
 
-    if (enabled) {
-      el.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
-      el.style.gridRow = `${panel.y + 1} / span ${panel.h}`;
-    } else {
+  for (let colIdx = 0; colIdx < 3; colIdx++) {
+    const container = containers[colIdx];
+    if (!container) continue;
+
+    for (const panel of groups[colIdx]) {
+      const el = doc.getElementById(panelToDom[panel.id]);
+      if (!el) continue;
+
+      const enabled = panel.enabled !== false || required.has(panel.id);
+      el.classList.toggle("layout-panel--hidden", !enabled);
+      // Clear any leftover inline grid styles from old flat-grid approach.
       el.style.gridColumn = "";
       el.style.gridRow = "";
+      // Move into the correct column in sorted order.
+      container.appendChild(el);
     }
   }
 }
 
 export function applyMeLayout(doc, layout) {
-  applyProfileLayout(doc, layout, { panelToDom: ME_PANEL_TO_DOM, required: ME_REQUIRED });
+  applyProfileLayout(doc, layout, {
+    panelToDom: ME_PANEL_TO_DOM,
+    required: ME_REQUIRED,
+    layoutSelector: ".me-layout",
+    columnSelectors: {
+      left: ".me-layout__main",
+      middle: ".me-layout__side--middle",
+      right: ".me-layout__side--right",
+    },
+  });
 }
 
 export function applyPlayerLayout(doc, layout) {
-  applyProfileLayout(doc, layout, { panelToDom: PLAYER_PANEL_TO_DOM, required: PLAYER_REQUIRED });
+  applyProfileLayout(doc, layout, {
+    panelToDom: PLAYER_PANEL_TO_DOM,
+    required: PLAYER_REQUIRED,
+    layoutSelector: ".player-layout",
+    columnSelectors: {
+      left: ".player-layout__main",
+      middle: ".player-layout__side--middle",
+      right: ".player-layout__side--right",
+    },
+  });
 }

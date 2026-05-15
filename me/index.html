@@ -52,18 +52,24 @@
       </div>
 
       <div class="me-layout page-stage__layout">
-        <section id="meHeroCard" class="me-hero-card"></section>
-        <section id="meIdentityPanel" class="me-panel me-panel--identity"></section>
-        <section id="meRankingsPanel" class="me-panel me-panel--rankings"></section>
-        <section id="meTopFriendsPanel" class="me-panel me-panel--top-friends"></section>
-        <section id="meFriendsPanel" class="me-panel me-panel--friends"></section>
-        <section id="meMusicPanel" class="me-panel me-panel--music" hidden></section>
-        <section id="meFriendCodePanel" class="me-panel me-panel--friend-code"></section>
-        <section id="meFavoriteGamePanel" class="me-panel me-panel--favorite"></section>
-        <section id="meGalleryPanel" class="me-panel me-panel--gallery"></section>
-        <section id="meThoughtsPanel" class="me-panel me-panel--thoughts"></section>
-        <section id="meAboutPanel" class="me-panel me-panel--about"></section>
-        <section id="meBadgesPanel" class="me-panel me-panel--badges"></section>
+        <div class="me-layout__main">
+          <section id="meHeroCard" class="me-hero-card"></section>
+          <section id="meIdentityPanel" class="me-panel me-panel--identity"></section>
+          <section id="meRankingsPanel" class="me-panel me-panel--rankings"></section>
+          <section id="meTopFriendsPanel" class="me-panel me-panel--top-friends"></section>
+          <section id="meFriendsPanel" class="me-panel me-panel--friends"></section>
+        </div>
+        <div class="me-layout__side me-layout__side--middle">
+          <section id="meMusicPanel" class="me-panel me-panel--music" hidden></section>
+          <section id="meFavoriteGamePanel" class="me-panel me-panel--favorite"></section>
+          <section id="meFriendCodePanel" class="me-panel me-panel--friend-code"></section>
+          <section id="meGalleryPanel" class="me-panel me-panel--gallery"></section>
+        </div>
+        <div class="me-layout__side me-layout__side--right">
+          <section id="meAboutPanel" class="me-panel me-panel--about"></section>
+          <section id="meBadgesPanel" class="me-panel me-panel--badges"></section>
+          <section id="meThoughtsPanel" class="me-panel me-panel--thoughts"></section>
+        </div>
       </div>
       <section class="me-panel me-panel--danger me-danger-section">
         <h3 class="me-panel__label">DANGER ZONE</h3>

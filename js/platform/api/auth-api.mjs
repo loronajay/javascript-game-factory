@@ -61,7 +61,10 @@ export function createAuthApiClient(options = {}) {
     },
 
     getSession() {
-      return authRequest(fetchImpl, baseUrl, "/auth/me", { method: "GET" });
+      return authRequest(fetchImpl, baseUrl, "/auth/me", { method: "GET" }).then((result) => {
+        if (result?.ok && result?.token) storeAuthToken(result.token);
+        return result;
+      });
     },
 
     forgotPassword({ email } = {}) {

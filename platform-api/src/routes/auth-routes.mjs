@@ -118,7 +118,15 @@ export async function handleAuthRoute(context) {
       writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
       return true;
     }
-    writeJson(res, 200, { playerId: authClaims.playerId, email: authClaims.email }, requestOrigin);
+    const freshToken = jwtSecret
+      ? signToken({ playerId: authClaims.playerId, email: authClaims.email }, jwtSecret)
+      : null;
+    writeJson(res, 200, {
+      ok: true,
+      playerId: authClaims.playerId,
+      email: authClaims.email,
+      ...(freshToken ? { token: freshToken } : {}),
+    }, requestOrigin);
     return true;
   }
 
