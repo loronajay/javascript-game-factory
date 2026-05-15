@@ -454,6 +454,14 @@
     flex-wrap: wrap;
   }
 
+  .event-stage__header {
+    width: 100%;
+  }
+
+  .event-stage__title {
+    max-width: 100%;
+  }
+
   .events-hero-card {
     grid-template-columns: minmax(0, 1fr);
     padding: 18px 16px;

@@ -352,6 +352,14 @@
     justify-content: space-between;
   }
 
+  .auth-stage__header {
+    width: 100%;
+  }
+
+  .auth-stage__title {
+    max-width: 100%;
+  }
+
   .auth-card {
     padding: 20px 16px 22px;
   }

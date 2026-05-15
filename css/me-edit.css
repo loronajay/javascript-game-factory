@@ -26,6 +26,23 @@
   flex-wrap: wrap;
 }
 
+.me-edit-topbar__action {
+  margin-left: auto;
+  color: var(--color-accent, #7ec8e3);
+  text-decoration: none;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(126, 200, 227, 0.3);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.me-edit-topbar__action:hover {
+  background: rgba(126, 200, 227, 0.08);
+}
+
 .me-edit-topbar__back {
   color: var(--color-accent, #7ec8e3);
   text-decoration: none;

@@ -328,3 +328,10 @@
   text-decoration: underline;
   opacity: 1;
 }
+
+@media (max-width: 640px) {
+  .notif-dropdown {
+    left: 0;
+    right: auto;
+  }
+}

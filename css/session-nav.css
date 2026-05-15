@@ -144,6 +144,8 @@
     0 0 18px rgba(153, 255, 255, 0.08);
 }
 
+/* ---------- MOBILE: 4-column tab grid ---------- */
+
 @media (max-width: 640px) {
   .app-shell-nav,
   .app-shell-nav__session-slot,
@@ -155,11 +157,72 @@
   .session-nav {
     justify-content: flex-start;
   }
+
+  .app-shell-nav__tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .app-shell-nav__tabs .app-shell-nav__link {
+    justify-content: center;
+    text-align: center;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    padding: 8px 4px;
+    min-height: 34px;
+  }
+}
+
+/* ---------- MEDIUM: compact flex tabs, session below ---------- */
+
+@media (min-width: 641px) and (max-width: 799px) {
+  .page-stage__controls {
+    width: min(96vw, 1220px);
+    max-width: none;
+  }
+
+  .app-shell-nav {
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .app-shell-nav__tabs {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    white-space: normal;
+  }
+
+  .app-shell-nav__tabs .app-shell-nav__link {
+    font-size: 0.62rem;
+    padding: 5px 9px;
+    min-height: 32px;
+    letter-spacing: 0.06em;
+  }
+
+  .app-shell-nav__session-slot {
+    flex: 0 0 auto;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .app-shell-nav__utility-link {
+    font-size: 0.62rem;
+    padding: 5px 9px;
+    min-height: 32px;
+  }
 }
 
 /* ---------- DESKTOP TOP RAIL CONTRACT ---------- */
 
-@media (min-width: 721px) {
+@media (min-width: 800px) {
   .page-stage__controls {
     width: min(96vw, 1220px);
     max-width: none;

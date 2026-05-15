@@ -381,5 +381,7 @@
   .events-stage { padding: 16px 12px 30px; }
   .events-stage__controls { flex-direction: column; align-items: stretch; }
   .events-stage__nav { justify-content: space-between; flex-wrap: wrap; }
+  .events-stage__header { width: 100%; }
+  .events-stage__title { max-width: 100%; }
   .events-hero-card { grid-template-columns: minmax(0, 1fr); padding: 18px 16px; }
 }

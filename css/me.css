@@ -81,87 +81,6 @@
   filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.42));
 }
 
-/* ---------- MAIN LAYOUT ---------- */
-
-/*
-  This layout uses real column wrappers instead of display: contents.
-  That lets each column stack independently, so a tall panel in column 2
-  does not push down panels in column 1 or column 3.
-*/
-
-/* Reset old parent-grid row placement behavior. */
-#meHeroCard,
-#meIdentityPanel,
-#meRankingsPanel,
-#meTopFriendsPanel,
-#meFriendsPanel,
-#meFavoriteGamePanel,
-#meFriendCodePanel,
-#meGalleryPanel,
-.me-panel--danger,
-#meThoughtsPanel,
-#meAboutPanel,
-#meBadgesPanel {
-  grid-column: auto;
-  grid-row: auto;
-}
-
-/* Left column order */
-#meHeroCard {
-  order: 1;
-}
-
-#meIdentityPanel {
-  order: 2;
-}
-
-#meRankingsPanel {
-  order: 3;
-}
-
-#meTopFriendsPanel {
-  order: 4;
-}
-
-#meFriendsPanel {
-  order: 5;
-}
-
-/* Middle column order */
-
-#meMusicPanel {
-  order: 1;
-}
-
-#meFavoriteGamePanel {
-  order: 2;
-}
-
-#meFriendCodePanel {
-  order: 3;
-}
-
-#meGalleryPanel {
-  order: 4;
-}
-
-.me-panel--danger {
-  order: 5;
-}
-
-/* Right column order */
-#meAboutPanel {
-  order: 1;
-}
-
-#meBadgesPanel {
-  order: 2;
-}
-
-#meThoughtsPanel {
-  order: 3;
-}
-
 /* ---------- PANEL BASE ---------- */
 
 .me-hero-card {
@@ -364,6 +283,7 @@
 /* ---------- DANGER PANEL ---------- */
 
 .me-panel--danger {
+  grid-column: 5 / span 4;
   border-color: rgba(255, 80, 80, 0.3);
   display: flex;
   flex-direction: column;
@@ -414,63 +334,3 @@
   color: #99ffff;
 }
 
-/* ---------- RESPONSIVE ---------- */
-
-@media (max-width: 1480px) {
-  .me-layout {
-    width: min(1260px, 100%);
-    grid-template-columns: minmax(360px, 1fr) minmax(300px, 1fr);
-  }
-
-  .me-layout__main {
-    grid-column: 1 / 2;
-  }
-
-  .me-layout__side--middle {
-    grid-column: 2 / 3;
-  }
-
-  .me-layout__side--right {
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  #meAboutPanel {
-  grid-column: 1 / 2;
-  order: 1;
-  }
-
-  #meBadgesPanel {
-    grid-column: 2 / 3;
-    order: 2;
-  }
-
-  #meThoughtsPanel {
-    grid-column: 1 / -1;
-    order: 3;
-  }
-
-}
-
-@media (max-width: 980px) {
-  .me-layout__side--right {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  #meThoughtsPanel,
-  #meAboutPanel,
-  #meBadgesPanel {
-    grid-column: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .me-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .me-layout__main,
-  .me-layout__side {
-    grid-column: 1 / -1;
-  }
-}

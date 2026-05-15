@@ -17,8 +17,10 @@ import { createPlayerThoughtComposerActions } from "./thought-composer-actions.m
 import { createMediaComposerState } from "../profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
 import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
+import { applyPlayerLayout } from "../me-page/apply-layout.mjs";
 
-export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession }) {
+export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession, savedLayout = null }) {
+  let currentLayout = savedLayout;
   initPageGalleryViewer({ doc, apiClient });
   let currentPageData = null;
   let musicPlayer = null;
@@ -66,6 +68,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       thoughtComposerFlash,
       disableProfileViewTracking,
     }));
+    if (currentLayout) applyPlayerLayout(doc, currentLayout);
   };
 
   const renderCurrentPageData = async () => {
@@ -73,6 +76,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     currentPageData = pageData;
     profilePanel?.render?.("");
     renderPage(doc, buildRenderPayload(pageData));
+    if (currentLayout) applyPlayerLayout(doc, currentLayout);
   };
 
   const socialActions = createProfileSocialActions({

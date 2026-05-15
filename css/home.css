@@ -452,15 +452,17 @@
   }
 
   .home-page .hero-actions {
-    bottom: 14%;
+    bottom: 10%;
     gap: 10px;
     padding: 0 12px;
   }
 
   .hero-cta {
-    min-height: 72px;
-    padding: 0 18px;
-    font-size: 1rem;
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+    min-height: 62px;
+    padding: 0 10px;
+    font-size: 0.9rem;
   }
 
   .home-stage__sun {

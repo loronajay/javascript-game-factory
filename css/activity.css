@@ -402,6 +402,14 @@
     justify-content: space-between;
   }
 
+  .activity-stage__header {
+    width: 100%;
+  }
+
+  .activity-stage__title {
+    max-width: 100%;
+  }
+
   .activity-hero-card {
     grid-template-columns: minmax(0, 1fr);
     padding: 18px 16px;

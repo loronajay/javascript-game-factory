@@ -25,8 +25,10 @@ import {
   uploadPendingThoughtPhoto,
 } from "./media-actions.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
+import { applyMeLayout } from "./apply-layout.mjs";
 
-export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, authClient }) {
+export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, authClient, savedLayout = null }) {
+  let currentLayout = savedLayout;
   initPageGalleryViewer({ doc, apiClient });
   let musicPlayer = null;
   const friendNavigator = createFriendNavigatorController();
@@ -56,6 +58,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       friendNavigatorExpanded: friendNavigator.getViewState().expanded,
       friendNavigatorSearchQuery: friendNavigator.getViewState().searchQuery,
     });
+    if (currentLayout) applyMeLayout(doc, currentLayout);
     friendNavigator.applyFilter(doc);
   };
 

@@ -8,7 +8,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
+import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import {
   createFriendshipBetweenPlayers,
   loadPlayerRelationships,
@@ -135,6 +135,8 @@ async function bootstrap() {
     deleteAccount: (playerId) => deleteAccountService(pool, playerId),
     jwtSecret: config.jwtSecret,
     isProduction: config.isProduction,
+    loadPlayerLayout: (playerId) => loadPlayerLayout(pool, playerId),
+    savePlayerLayout: (playerId, layout) => savePlayerLayout(pool, playerId, layout),
     loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),
     loadPlayerProfileByFriendCode: (friendCode) => loadPlayerProfileByFriendCode(pool, friendCode),
     savePlayerProfile: (playerId, patch) => savePlayerProfile(pool, playerId, patch),

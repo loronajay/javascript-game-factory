@@ -7,6 +7,8 @@ import { addFriendByCode } from "./friend-code-actions.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
 import { buildAppUrl } from "../arcade-paths.mjs";
+import { fetchLayout } from "../profile-layout/layout-storage.mjs";
+import { getDefaultLayout } from "../profile-layout/default-layout.mjs";
 
 const doc = globalThis.document;
 
@@ -30,8 +32,9 @@ if (doc?.getElementById) {
     bindFactoryProfileToSession(session.playerId, storage);
     const apiClient = createPlatformApiClient();
     const authClient = createAuthApiClient();
+    const savedLayout = (await fetchLayout(apiClient)) || getDefaultLayout();
     renderMePage(doc);
-    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, authClient });
+    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, authClient, savedLayout });
     initSessionNav(doc.getElementById("meAuthNav"), {
       signInPath: "../sign-in/index.html",
       signUpPath: "../sign-up/index.html",

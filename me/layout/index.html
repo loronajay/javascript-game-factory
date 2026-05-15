@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Customize Layout</title>
+  <link rel="stylesheet" href="../../css/arcade.css">
+  <link rel="stylesheet" href="../../css/session-nav.css">
+  <link rel="stylesheet" href="../../css/profile-layout.css">
+  <link rel="stylesheet" href="../../css/notifications.css">
+  <link rel="stylesheet" href="../../css/page-stage.css">
+</head>
+<body class="me-layout-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <div class="me-layout-stage">
+      <div id="meLayoutPrimaryNav" class="me-layout-stage__nav page-stage__nav"></div>
+
+      <div class="me-layout-topbar">
+        <a href="../" class="me-layout-topbar__back">← Back to Profile</a>
+        <h1 class="pixel-text me-layout-topbar__title">CUSTOMIZE LAYOUT</h1>
+        <a href="../edit/" class="me-layout-topbar__action">Edit Content</a>
+        <span id="meLayoutDirtyFlag" class="me-layout-topbar__dirty" hidden>Unsaved changes</span>
+        <span id="meLayoutStatus" class="me-layout-topbar__status"></span>
+        <button id="meLayoutGridToggle" class="me-layout-topbar__btn" type="button" aria-pressed="true">Grid: ON</button>
+        <button id="meLayoutResetBtn" class="me-layout-topbar__btn" type="button">Reset</button>
+        <button id="meLayoutSaveBtn" class="me-layout-topbar__btn me-layout-topbar__btn--primary" type="button">Save Layout</button>
+      </div>
+
+      <div class="me-layout-workspace">
+        <aside class="me-layout-sidebar">
+          <section class="me-layout-sidebar__section">
+            <h2 class="me-layout-sidebar__heading">Panels</h2>
+            <div id="meLayoutPanelList" class="me-layout-panel-list"></div>
+          </section>
+          <section class="me-layout-sidebar__section">
+            <h2 class="me-layout-sidebar__heading">Selected</h2>
+            <div id="meLayoutInspector" class="me-layout-inspector">
+              <p class="me-layout-inspector__empty">Click a panel to inspect it.</p>
+            </div>
+          </section>
+        </aside>
+
+        <div class="me-layout-canvas-wrap" id="meLayoutCanvasWrap">
+          <div id="meLayoutCanvas" class="profile-layout-grid profile-layout-grid--edit profile-layout-grid--overlay">
+            <p class="me-layout-loading">Loading layout…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../../js/pixel-text.js"></script>
+  <script src="../../js/platform-config.js"></script>
+  <script type="module" src="../../js/profile-layout/layout-wire.mjs"></script>
+</body>
+</html>

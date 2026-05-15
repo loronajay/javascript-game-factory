@@ -493,6 +493,10 @@
     padding-top: 0;
   }
 
+  .grid-stage__title {
+    max-width: 100%;
+  }
+
   .game-grid {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -298,6 +298,44 @@ export async function searchPlayers(db, query, { limit = 20 } = {}) {
   }));
 }
 
+export async function loadPlayerLayout(db, playerId) {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  if (!normalizedPlayerId) return null;
+
+  const result = await db.query(`
+    select profile_layout
+    from player_profiles
+    where player_id = $1
+    limit 1
+  `, [normalizedPlayerId]);
+
+  const raw = result?.rows?.[0]?.profile_layout;
+  return raw && typeof raw === "object" ? raw : null;
+}
+
+export async function savePlayerLayout(db, playerId, layout) {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  if (!normalizedPlayerId || !layout || typeof layout !== "object") return null;
+
+  await db.query(`
+    insert into players (player_id)
+    values ($1)
+    on conflict (player_id) do update set updated_at = now()
+  `, [normalizedPlayerId]);
+
+  const result = await db.query(`
+    insert into player_profiles (player_id, profile_layout)
+    values ($1, $2::jsonb)
+    on conflict (player_id) do update
+      set profile_layout = excluded.profile_layout,
+          updated_at = now()
+    returning profile_layout
+  `, [normalizedPlayerId, JSON.stringify(layout)]);
+
+  const raw = result?.rows?.[0]?.profile_layout;
+  return raw && typeof raw === "object" ? raw : null;
+}
+
 export async function savePlayerProfile(db, playerId, patch = {}) {
   const normalizedPlayerId = sanitizePlayerId(playerId);
   if (!normalizedPlayerId) return null;

@@ -87,19 +87,6 @@
 }
 
 
-/* Reset old parent-grid placement from shared CSS. */
-#playerHeroCard,
-#playerIdentityPanel,
-#playerRankingsPanel,
-#playerFriendsPanel,
-#playerFavoritePanel,
-#playerGalleryPanel,
-#playerThoughtsPanel,
-#playerAboutPanel,
-#playerBadgesPanel {
-  grid-column: auto;
-  grid-row: auto;
-}
 
 .player-panel--favorite {
   min-height: 420px;
@@ -362,23 +349,5 @@
   .player-stage__nav {
     justify-content: space-between;
     flex-wrap: wrap;
-  }
-
-  .player-layout {
-    grid-template-columns: minmax(0, 1fr);
-    width: min(96vw, 680px);
-    gap: 14px;
-  }
-
-  .player-layout__main,
-  .player-layout__side--middle,
-  .player-layout__side--right {
-    grid-column: 1 / -1;
-  }
-
-  .player-panel,
-  .player-hero-card {
-    width: 100%;
-    min-width: 0;
   }
 }
