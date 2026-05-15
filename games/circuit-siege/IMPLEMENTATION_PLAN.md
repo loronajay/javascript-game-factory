@@ -7,7 +7,7 @@ As of the current implementation pass, Circuit Siege is no longer just a scope d
 ### Implemented now
 
 - shared authored board data and canonical route validation
-- compact map-file loading that derives route cells from route points at load time
+- compact map-file format — `{grid, routes:[{src,term,type,path,slots}]}` — blue-only authored, red derived by x-mirror at load time
 - `maps/` folder support via `maps/index.json`
 - server-selected `mapId` flow so the browser swaps to the authoritative board instead of freelancing local map choice
 - authoritative match engine, room engine, and server bridge contract
@@ -21,25 +21,36 @@ As of the current implementation pass, Circuit Siege is no longer just a scope d
 - server-authoritative route completion, scoring, and completed-route lockout
 - live countdown timer presentation plus authoritative timer-expiry resolution
 - results overlay with per-side circuit totals, disconnect messaging, and visible player usernames
-- internal `map-editor.html` page for loading, validating, previewing, copying, and downloading compact map JSON
-- browser/local regression coverage for shared rules, server flow, and client flow
+- internal `map-editor.html` page for loading, validating, previewing, copying, and downloading compact map JSON — editor loads compact maps and exports them in canonical compact format
+- `expectedMask` correctly derived from route geometry in both client (`scripts/shared/board-format.js`) and server (`shared/board-format.mjs`) — required for refactor slot pre-placement and match-engine validation
+- browser/local regression coverage for shared rules, server flow, and client flow — all test suites fully green on compact map format
+
+**Phase 4a UX polish (complete):**
+- empty hole slots pulse a cyan glow to signal "insert here" — `hole-pulse` CSS animation on editable, unlocked hole slots
+- refactor (pre-placed editable) slots pulse a subtle yellow ring — `refactor-ring` CSS animation, distinguishes them from fixed tiles
+- score blocks now show 5 progress pips (filled in team color) above the "X / 5" count — `scoreCount` added to view model
+- held piece text cleaned up — removed redundant mask code abbreviation (e.g. was "Holding: Corner NE (NE)", now "Holding: Corner NE")
 
 ### Important current caveat
 
 Circuit Siege website testing is only valid when the matching Circuit Siege authoritative files in `factory-network-server` are deployed. The client and local harness can look correct while the live site still behaves incorrectly if the server repo is on an older authored-board version.
 
-That now includes the `maps/` folder and `maps/index.json` manifest too. Map ids and compact map files must stay mirrored between the game repo and `factory-network-server`.
+Map ids and compact map files must stay mirrored between the game repo and `factory-network-server`. Both repos now share the same `maps/map-01.json` compact format and both pass their full test suites against it.
+
+### Design decision: no route hover highlighting
+
+Do not add route hover/trace highlighting, scan tools, or any visual aid that lets players follow a route from source to terminal at a glance. Mental route tracing — identifying which sources lead to damage vs dud terminals — IS the core puzzle. Making it trivial via hover would defeat the game.
 
 ### Current focus
 
-The project has moved out of architecture bootstrap and into gameplay/readability polish. The biggest remaining work is now in:
+Phase 4a polish is complete. Remaining work:
 
-- menu and lobby clarity
-- board readability and slot affordances
-- route-tracing clarity under pressure
-- final interaction polish around held pieces and toolkit behavior
-- richer match-end presentation polish
+- **Phase 4b (planned, not yet implemented)** — see `PHASE4_HANDOFF.md` for exact code:
+  - Play Again button on result screen (re-queues same side without returning to menu)
+  - Number keys 1–6 for direct tool selection
+  - Escape key to drop the held piece
 - continued validation that authored routes are readable and fair in real matches
+- map pool expansion using the now-working board editor
 
 ### Map variety recommendation
 

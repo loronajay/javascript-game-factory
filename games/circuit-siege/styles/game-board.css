@@ -109,6 +109,24 @@
   stroke: #64748b;
 }
 
+@keyframes hole-pulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(103, 232, 249, 0.45)); }
+  50% { filter: drop-shadow(0 0 11px rgba(103, 232, 249, 0.9)); }
+}
+
+@keyframes refactor-ring {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(250, 204, 21, 0.3)); }
+  50% { filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.75)); }
+}
+
+.slot-group--hole.slot-group--editable:not(.slot-group--locked):not(:hover) .slot-base {
+  animation: hole-pulse 1.8s ease-in-out infinite;
+}
+
+.slot-group--refactor.slot-group--editable:not(.slot-group--locked):not(:hover) .slot-base {
+  animation: refactor-ring 2.6s ease-in-out infinite;
+}
+
 .slot-group--editable {
   cursor: pointer;
 }

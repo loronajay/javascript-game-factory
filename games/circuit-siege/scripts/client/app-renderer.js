@@ -20,6 +20,13 @@ import {
 } from "./board-svg-layout.js";
 import { getWireTileDescriptor } from "./board-asset-resolver.js";
 
+function renderScorePips(count, max, side) {
+  const pips = Array.from({ length: max }, (_, i) =>
+    `<span class="score-pip score-pip--${i < count ? `filled-${side}` : "empty"}"></span>`
+  ).join("");
+  return `<span class="score-pips" aria-hidden="true">${pips}</span><span class="score-num">${count} / ${max}</span>`;
+}
+
 const TOOL_LABELS = {
   EW: "Straight H",
   NS: "Straight V",
@@ -94,7 +101,7 @@ function renderHeldPiece(mask, side) {
           className: "held-piece__image"
         }) : ""}
       </span>
-      <span class="held-piece__text">Holding: ${TOOL_LABELS[mask] || mask} (${mask})</span>
+      <span class="held-piece__text">Holding: ${TOOL_LABELS[mask] || mask}</span>
     </span>
   `;
 }
@@ -320,8 +327,8 @@ export function createAppRenderer(root = document) {
     if (els.heldPiece) {
       els.heldPiece.innerHTML = renderHeldPiece(viewModel.heldMask, viewModel.heldCursor?.side || "blue");
     }
-    if (els.scoreBlue) els.scoreBlue.textContent = viewModel.board.scoreText.blue;
-    if (els.scoreRed) els.scoreRed.textContent = viewModel.board.scoreText.red;
+    if (els.scoreBlue) els.scoreBlue.innerHTML = renderScorePips(viewModel.board.scoreCount?.blue ?? 0, 5, "blue");
+    if (els.scoreRed) els.scoreRed.innerHTML = renderScorePips(viewModel.board.scoreCount?.red ?? 0, 5, "red");
     if (els.timer) els.timer.textContent = viewModel.board.timerText;
     if (els.status) {
       els.status.textContent = viewModel.board.statusText;

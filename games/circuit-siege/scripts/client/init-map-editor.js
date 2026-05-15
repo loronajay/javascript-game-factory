@@ -18,6 +18,16 @@ import {
   validateDraftBoard
 } from "./map-editor-state.js";
 import { renderMapEditorBoard } from "./map-editor-renderer.js";
+import { expandCompactBoard } from "../shared/board-format.js";
+
+function toEditorDraft(raw) {
+  if (!raw || typeof raw !== "object") return raw;
+  if (!raw.grid) return normalizeRawBoardDraft(raw);
+  const verbose = expandCompactBoard(raw);
+  const blueRoutes = verbose.routes.filter((route) => route.owner === "blue");
+  const blueSlots = verbose.repairSlots.filter((slot) => slot.owner === "blue");
+  return normalizeRawBoardDraft({ ...verbose, routes: blueRoutes, repairSlots: blueSlots });
+}
 
 async function fetchJson(fetchImpl, path) {
   const response = await fetchImpl(path);
@@ -377,7 +387,7 @@ export async function initMapEditor({
   }
 
   async function loadRawMap(path, filenameHint) {
-    rawBoard = normalizeRawBoardDraft(await fetchJson(fetchImpl, path));
+    rawBoard = toEditorDraft(await fetchJson(fetchImpl, path));
     selectedRouteId = rawBoard.routes[0]?.routeId || null;
     selectedSlotId = null;
     hoveredRouteId = null;
@@ -687,7 +697,7 @@ export async function initMapEditor({
     const file = event.target?.files?.[0];
     if (!file) return;
     currentFilename = file.name || currentFilename;
-    rawBoard = normalizeRawBoardDraft(JSON.parse(await file.text()));
+    rawBoard = toEditorDraft(JSON.parse(await file.text()));
     selectedRouteId = rawBoard.routes[0]?.routeId || null;
     selectedSlotId = null;
     hoveredRouteId = null;

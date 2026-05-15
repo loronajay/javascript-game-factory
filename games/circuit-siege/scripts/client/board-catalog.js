@@ -1,4 +1,5 @@
 import { loadBoardDefinition } from "../shared/circuit-board.js";
+import { expandCompactBoard } from "../shared/board-format.js";
 
 export function selectMapEntry(manifest, {
   preferredMapId = null,
@@ -55,7 +56,10 @@ export function createBoardCatalogLoader({
 
   async function loadBoardFromPath(path) {
     if (!boardCache.has(path)) {
-      boardCache.set(path, fetchJson(fetchImpl, path).then((rawBoard) => loadBoardDefinition(rawBoard)));
+      boardCache.set(path, fetchJson(fetchImpl, path).then((raw) => {
+        const verbose = raw.grid ? expandCompactBoard(raw) : raw;
+        return loadBoardDefinition(verbose);
+      }));
     }
     return boardCache.get(path);
   }

@@ -344,6 +344,10 @@ export function buildBoardViewModel({
       blue: `${scoreBlue} / 5`,
       red: `${scoreRed} / 5`
     },
+    scoreCount: {
+      blue: scoreBlue,
+      red: scoreRed
+    },
     timerText: formatTimer(resolveLiveTimerMs(snapshot, now)),
     statusText: deriveStatusText(snapshot),
     selectionText,
