@@ -251,7 +251,7 @@ if (doc?.getElementById) {
         setStatus("Layout saved.");
         refreshAll();
       } catch {
-        setStatus("Save failed — layout route not yet implemented on the server.");
+        setStatus("Save failed. Check your connection and try again.");
       } finally {
         saveBtn.disabled = false;
       }

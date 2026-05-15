@@ -36,12 +36,13 @@ export async function handleLayoutRoute(context) {
     }
 
     const incoming = body.value;
-    if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+    const layout = incoming?.layout;
+    if (!layout || typeof layout !== "object" || Array.isArray(layout)) {
       writeJson(res, 400, { status: "error", error: "invalid_layout", timestamp }, requestOrigin);
       return true;
     }
 
-    const saved = await savePlayerLayout(playerId, incoming);
+    const saved = await savePlayerLayout(playerId, layout);
     if (!saved) {
       writeJson(res, 500, { status: "error", error: "save_failed", timestamp }, requestOrigin);
       return true;

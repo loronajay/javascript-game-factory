@@ -17,7 +17,9 @@ import { loadThoughtFeed } from "../platform/thoughts/thoughts.mjs";
 import { renderPlayerPageView } from "./render.mjs";
 import { wirePlayerPage } from "./wire.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
-import { getDefaultLayout } from "../profile-layout/default-layout.mjs";
+import { getPlayerDefaultLayout } from "../profile-layout/default-layout.mjs";
+import { normalizeLayout } from "../profile-layout/normalize-layout.mjs";
+import { applyPlayerLayout } from "../me-page/apply-layout.mjs";
 
 export { loadPlayerPageData, loadRequestedPlayerProfile } from "./loader.mjs";
 export { buildPlayerPageViewModel } from "./view-model.mjs";
@@ -105,15 +107,16 @@ if (doc?.getElementById) {
   });
 
   // Fetch the target player's saved layout (or fall back to the default).
-  let savedLayout = getDefaultLayout();
+  let savedLayout = getPlayerDefaultLayout();
   try {
     const layoutPath = requestedPlayerId
       ? `/players/${encodeURIComponent(requestedPlayerId)}/layout`
       : "/profile/layout";
     const layoutRes = await apiClient.get(layoutPath);
-    if (layoutRes?.layout) savedLayout = layoutRes.layout;
+    if (layoutRes?.layout) savedLayout = normalizeLayout(layoutRes.layout);
   } catch { /* keep default */ }
 
   renderPlayerPage(doc);
+  applyPlayerLayout(doc, savedLayout);
   wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel: null, authSession, savedLayout });
 }
