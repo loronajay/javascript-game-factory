@@ -139,7 +139,9 @@ Not implemented yet:
 ### Profile editor follow-up that is still pending
 
 - `/me/layout` is shipped. The draggable panel layout editor is live with save/load wired to the DB. Three bugs patched on 2026-05-15: `saveMyLayout`/`fetchMyLayout`/`fetchPlayerLayout` added as named methods on the platform API client (the raw `post`/`get` closures were never exposed, causing all layout saves and loads to silently fail); the `hasOverlap` check in `normalize-layout.mjs` that was discarding valid user layouts and reverting to default on every load was removed (the 3-column wrapper display model makes the check incorrect).
-- Still pending: danger zone is now in `/me/edit` rather than `/me` — no further editor follow-up backlog items remain beyond the ongoing durable memories pass.
+- Profile page layout columns refactored 2026-05-15 to equal-width (`repeat(3, minmax(0, 1fr))` in `profile-page.css`). Previously the three columns used different fractional widths; now all three are even.
+- Layout editor hero card bug fixed 2026-05-15: `registry.mjs` had `minW: 8` / `defaultW: 12` for the hero panel, but the default layout places it at `w: 4`. `normalize-layout.mjs` was clamping `w: 4` up to `minW: 8`, causing the hero tile to overlap into the middle column in the editor. Fix: registry corrected to `minW: 4, defaultW: 4`; `normalize-layout.mjs` now resets any position-locked panel (`draggable: false, resizable: false`) to its default geometry on load so stale saved values cannot cause the same drift again.
+- Still pending: danger zone is now in `/me/edit` rather than `/me` — layout editor UX improvement pass (better drag feedback, panel previews, etc.) is the next planned workstream.
 
 ## Deferred Or Later
 

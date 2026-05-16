@@ -81,23 +81,6 @@
   filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.42));
 }
 
-/* Reset any panel-level grid-column/row rules so panels don't create
-   implicit sub-columns inside the column wrapper divs. */
-#meHeroCard,
-#meIdentityPanel,
-#meRankingsPanel,
-#meTopFriendsPanel,
-#meFriendsPanel,
-#meMusicPanel,
-#meFriendCodePanel,
-#meFavoriteGamePanel,
-#meGalleryPanel,
-#meThoughtsPanel,
-#meAboutPanel,
-#meBadgesPanel {
-  grid-column: auto;
-  grid-row: auto;
-}
 
 /* ---------- PANEL BASE ---------- */
 

@@ -20,6 +20,9 @@
   --profile-radius-md: 16px;
   --profile-radius-lg: 22px;
   --profile-radius-pill: 999px;
+  /* Shared layout grid tokens — used by both the live profile pages and the layout editor. */
+  --profile-layout-row-height: clamp(56px, 6vw, 88px);
+  --profile-layout-gap: clamp(8px, 1vw, 14px);
 }
 
 * {

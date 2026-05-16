@@ -1,11 +1,12 @@
 export const PROFILE_PANEL_REGISTRY = {
   hero: {
     label: "Hero Card",
-    minW: 4, minH: 2, maxW: 12, maxH: 6,
+    minW: 4, minH: 3, maxW: 4, maxH: 8,
     defaultW: 4, defaultH: 5,
     required: true,
     draggable: false,
-    resizable: false,
+    resizable: true,
+    resizableWidth: false,
   },
   identity: {
     label: "Social Links",

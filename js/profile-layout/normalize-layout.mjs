@@ -32,7 +32,7 @@ export function normalizeLayout(raw) {
 
     if (!enabled && def.required) continue; // required panels are always enabled
 
-    // Position-locked panels always use default geometry so stale saved values can't drift.
+    // Fully locked panels (not draggable AND not resizable) always use default geometry.
     if (!def.draggable && !def.resizable) {
       const dp = defaultPanelMap.get(id);
       if (dp) {
@@ -57,6 +57,16 @@ export function normalizeLayout(raw) {
     const def = PROFILE_PANEL_REGISTRY[defaultPanel.id];
     if (def.required && !seenIds.has(defaultPanel.id)) {
       normalized.push({ ...defaultPanel });
+    }
+  }
+
+  // Enforce x/w lock for panels where resizableWidth === false (e.g. hero).
+  // The general path normalizes h from saved value, but x and w must stay at defaults.
+  for (let i = 0; i < normalized.length; i++) {
+    const def = PROFILE_PANEL_REGISTRY[normalized[i].id];
+    if (def && !def.draggable && def.resizableWidth === false) {
+      const dp = defaultPanelMap.get(normalized[i].id);
+      if (dp) normalized[i] = { ...normalized[i], x: dp.x, w: dp.w };
     }
   }
 

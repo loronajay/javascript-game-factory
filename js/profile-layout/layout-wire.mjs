@@ -7,7 +7,7 @@ import { fetchLayout, saveLayout } from "./layout-storage.mjs";
 import { normalizeLayout } from "./normalize-layout.mjs";
 import { getDefaultLayout } from "./default-layout.mjs";
 import { renderLayoutGrid } from "./layout-renderer.mjs";
-import { initLayoutEditor } from "./layout-editor.mjs";
+import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
 const doc = globalThis.document;
@@ -50,6 +50,7 @@ if (doc?.getElementById) {
     let isDirty = false;
     let selectedPanelId = null;
     let gridOverlayOn = true;
+    let zoom = 1;
 
     const canvas = doc.getElementById("meLayoutCanvas");
     const canvasWrap = doc.getElementById("meLayoutCanvasWrap");
@@ -59,6 +60,9 @@ if (doc?.getElementById) {
     const saveBtn = doc.getElementById("meLayoutSaveBtn");
     const resetBtn = doc.getElementById("meLayoutResetBtn");
     const gridToggleBtn = doc.getElementById("meLayoutGridToggle");
+    const zoomFitBtn = doc.getElementById("meLayoutZoomFitBtn");
+    const zoomOutBtn = doc.getElementById("meLayoutZoomOutBtn");
+    const zoomInBtn  = doc.getElementById("meLayoutZoomInBtn");
     const statusEl = doc.getElementById("meLayoutStatus");
 
     // --- helpers ---
@@ -96,7 +100,46 @@ if (doc?.getElementById) {
       refreshAll();
     }
 
-    // --- layout editor (drag) ---
+    // --- zoom ---
+
+    function getMaxRow(layout) {
+      const panels = layout?.desktop?.panels ?? [];
+      return panels.reduce((max, p) => Math.max(max, (p.y || 0) + (p.h || 1)), 0);
+    }
+
+    function applyZoom(z) {
+      zoom = Math.max(0.25, Math.min(1, z));
+      if (canvas) {
+        if (zoom < 1) {
+          canvas.style.transform = `scale(${zoom})`;
+          canvas.style.transformOrigin = "top left";
+          // Shrink the wrap so it doesn't leave empty space below the scaled canvas.
+          if (canvas.offsetHeight) {
+            canvasWrap.style.height = `${Math.ceil(canvas.offsetHeight * zoom)}px`;
+          }
+        } else {
+          canvas.style.transform = "";
+          canvasWrap.style.height = "";
+        }
+      }
+      if (zoomFitBtn) zoomFitBtn.textContent = zoom < 1 ? `Zoom: ${Math.round(zoom * 100)}%` : "Fit";
+    }
+
+    function fitToScreen() {
+      if (!canvas || !canvasWrap) return;
+      const { rowHeight, gap } = getGridMetrics(canvas);
+      const rows = getMaxRow(currentLayout);
+      const totalHeight = rows * rowHeight + Math.max(0, rows - 1) * gap;
+      const availH = canvasWrap.clientHeight || window.innerHeight * 0.75;
+      applyZoom(Math.min(1, availH / totalHeight));
+    }
+
+    zoomFitBtn?.addEventListener("click", fitToScreen);
+    zoomOutBtn?.addEventListener("click", () => applyZoom(zoom - 0.1));
+    zoomInBtn?.addEventListener("click",  () => applyZoom(zoom + 0.1));
+    window.addEventListener("resize", () => { if (zoom < 1) fitToScreen(); });
+
+    // --- layout editor (drag + resize + swap) ---
 
     function updatePanelPosition(id, x, y) {
       const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
@@ -112,13 +155,25 @@ if (doc?.getElementById) {
       refreshAll();
     }
 
+    function swapPanels(idA, xA, yA, idB, xB, yB) {
+      const panels = currentLayout.desktop.panels;
+      const idxA = panels.findIndex((p) => p.id === idA);
+      const idxB = panels.findIndex((p) => p.id === idB);
+      if (idxA < 0 || idxB < 0) return;
+      panels[idxA] = { ...panels[idxA], x: xA, y: yA };
+      panels[idxB] = { ...panels[idxB], x: xB, y: yB };
+      refreshAll();
+    }
+
     // initLayoutEditor uses event delegation on canvas — call once, survives re-renders
     if (canvas) {
       initLayoutEditor(canvas, {
         getLayout: () => currentLayout,
         updatePanelPosition,
         updatePanelSize,
+        swapPanels,
         onDirty: markDirty,
+        getZoom: () => zoom,
       });
     }
 
@@ -269,5 +324,7 @@ if (doc?.getElementById) {
     }
 
     refreshAll();
+    // Default to zoom-to-fit so the full layout is visible without scrolling.
+    requestAnimationFrame(fitToScreen);
   }
 }

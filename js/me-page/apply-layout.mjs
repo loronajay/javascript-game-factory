@@ -29,56 +29,41 @@ export const PLAYER_PANEL_TO_DOM = {
 const ME_REQUIRED = new Set(["hero"]);
 const PLAYER_REQUIRED = new Set(["hero"]);
 
-// Applies saved panel layout using the 3-column wrapper structure.
-// Panels are grouped by x value (x<4=left, x<8=middle, x>=8=right),
-// sorted by y within each column, then moved to the correct column
-// wrapper via appendChild so columns stack independently without row
-// alignment bleeding between them.
+// Applies saved panel layout onto the 12-column CSS grid.
+// Panels are sorted by column-group (x<4=left, x<8=mid, x>=8=right) then by y within
+// each group so DOM order produces correct single-column stacking at mobile breakpoints.
+// Inline grid-column / grid-row styles drive desktop placement; the mobile CSS overrides
+// them back to auto with !important so the DOM order takes over.
 export function applyProfileLayout(doc, layout, {
   panelToDom = ME_PANEL_TO_DOM,
   required = ME_REQUIRED,
   layoutSelector = ".me-layout",
-  columnSelectors = {
-    left: ".me-layout__main",
-    middle: ".me-layout__side--middle",
-    right: ".me-layout__side--right",
-  },
 } = {}) {
   if (!layout?.desktop?.panels) return;
 
   const layoutEl = doc.querySelector(layoutSelector);
   if (!layoutEl) return;
 
-  const leftCol = layoutEl.querySelector(columnSelectors.left);
-  const middleCol = layoutEl.querySelector(columnSelectors.middle);
-  const rightCol = layoutEl.querySelector(columnSelectors.right);
+  // Sort: column bucket first (0=left, 1=mid, 2=right), then y within bucket.
+  const panels = [...layout.desktop.panels].sort((a, b) => {
+    const ga = a.x < 4 ? 0 : a.x < 8 ? 1 : 2;
+    const gb = b.x < 4 ? 0 : b.x < 8 ? 1 : 2;
+    return ga !== gb ? ga - gb : a.y - b.y;
+  });
 
-  const groups = [[], [], []];
-  for (const panel of layout.desktop.panels) {
+  for (const panel of panels) {
     if (!panelToDom[panel.id]) continue;
-    const colIdx = panel.x < 4 ? 0 : panel.x < 8 ? 1 : 2;
-    groups[colIdx].push(panel);
-  }
-  groups.forEach((g) => g.sort((a, b) => a.y - b.y));
+    const el = doc.getElementById(panelToDom[panel.id]);
+    if (!el) continue;
 
-  const containers = [leftCol, middleCol, rightCol];
+    const enabled = panel.enabled !== false || required.has(panel.id);
+    el.classList.toggle("layout-panel--hidden", !enabled);
 
-  for (let colIdx = 0; colIdx < 3; colIdx++) {
-    const container = containers[colIdx];
-    if (!container) continue;
+    el.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
+    el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;
 
-    for (const panel of groups[colIdx]) {
-      const el = doc.getElementById(panelToDom[panel.id]);
-      if (!el) continue;
-
-      const enabled = panel.enabled !== false || required.has(panel.id);
-      el.classList.toggle("layout-panel--hidden", !enabled);
-      // Clear any leftover inline grid styles from old flat-grid approach.
-      el.style.gridColumn = "";
-      el.style.gridRow = "";
-      // Move into the correct column in sorted order.
-      container.appendChild(el);
-    }
+    // Append in sort order so DOM order drives mobile stacking.
+    layoutEl.appendChild(el);
   }
 }
 
@@ -87,11 +72,6 @@ export function applyMeLayout(doc, layout) {
     panelToDom: ME_PANEL_TO_DOM,
     required: ME_REQUIRED,
     layoutSelector: ".me-layout",
-    columnSelectors: {
-      left: ".me-layout__main",
-      middle: ".me-layout__side--middle",
-      right: ".me-layout__side--right",
-    },
   });
 }
 
@@ -100,10 +80,5 @@ export function applyPlayerLayout(doc, layout) {
     panelToDom: PLAYER_PANEL_TO_DOM,
     required: PLAYER_REQUIRED,
     layoutSelector: ".player-layout",
-    columnSelectors: {
-      left: ".player-layout__main",
-      middle: ".player-layout__side--middle",
-      right: ".player-layout__side--right",
-    },
   });
 }

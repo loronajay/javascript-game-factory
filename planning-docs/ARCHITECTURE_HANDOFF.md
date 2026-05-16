@@ -184,6 +184,10 @@ Exit criteria before re-scoping TypeScript:
 1. CSS ownership — **COMPLETE**
    The profile CSS ownership cleanup pass is done. `profile-page.css` now owns all shared profile layout and panel shell primitives. `me.css` and `player.css` are now mostly page-specific. No further CSS cleanup is blocking Profile Music or the next feature pass.
 
+   Additional polish landed 2026-05-15:
+   - Profile page layout columns switched to equal-width: `grid-template-columns` in `profile-page.css` changed from `minmax(430px, 1.08fr) minmax(280px, 320px) minmax(380px, 1fr)` to `repeat(3, minmax(0, 1fr))`. Both `/me` and `/player` now use three even columns.
+   - Layout editor hero card bug fixed: `js/profile-layout/registry.mjs` had inconsistent `minW: 8 / defaultW: 12` for the hero panel (default layout uses `w: 4`). `normalize-layout.mjs` was clamping `w: 4` → `minW: 8` on every load, making the hero overlap into the middle column in the editor. Registry corrected to `minW: 4, defaultW: 4`; normalize now resets position-locked panels (`draggable: false, resizable: false`) to their default geometry so saved value drift cannot recur.
+
 
 ## Folder Reorg — Stable Shape
 

@@ -1,6 +1,8 @@
 .me-hero-card,
 .player-hero-card {
   overflow: hidden;
+  container-type: size;
+  container-name: hero;
   border: 2px solid rgba(255, 214, 189, 0.2);
   border-radius: var(--profile-radius-lg, 22px);
   background:
@@ -16,11 +18,10 @@
 .player-hero-card {
   position: relative;
   isolation: isolate;
-  grid-column: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--profile-portrait-rail-width);
   gap: 16px;
-  min-height: 360px;
+  min-height: 0;
   padding: 26px;
   align-items: start;
 }

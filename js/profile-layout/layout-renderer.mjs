@@ -78,11 +78,13 @@ export function renderLayoutGrid(container, layout, options = {}) {
 
     if (editMode && def.resizable) {
       const handle = document.createElement("button");
-      handle.className = "profile-layout-tile__resize-handle";
+      const heightOnly = def.resizableWidth === false;
+      handle.className = "profile-layout-tile__resize-handle" +
+        (heightOnly ? " profile-layout-tile__resize-handle--height-only" : "");
       handle.setAttribute("type", "button");
       handle.setAttribute("data-resize-handle", "");
       handle.setAttribute("aria-label", `Resize ${def.label} panel`);
-      handle.setAttribute("title", "Drag to resize");
+      handle.setAttribute("title", heightOnly ? "Drag to resize height" : "Drag to resize");
       handle.innerHTML = RESIZE_HANDLE_SVG;
       tile.appendChild(handle);
     }
