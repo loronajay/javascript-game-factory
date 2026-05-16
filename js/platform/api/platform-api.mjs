@@ -400,5 +400,11 @@ export function createPlatformApiClient(options = {}) {
       const payload = await post(`/photos/${encoded}/comments`, { viewerPlayerId, viewerAuthorDisplayName, text });
       return payload?.commentRecord || null;
     },
+    fetchMyLayout() {
+      return get("/profile/layout", "layout");
+    },
+    saveMyLayout(layout) {
+      return post("/profile/layout", { layout }, "layout");
+    },
   };
 }
