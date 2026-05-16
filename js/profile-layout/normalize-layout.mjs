@@ -49,28 +49,7 @@ export function normalizeLayout(raw) {
     }
   }
 
-  // Basic overlap check: if any panels overlap, fall back to default
-  if (hasOverlap(normalized)) return getDefaultLayout();
-
   return { version: LAYOUT_VERSION, desktop: { columns, panels: normalized } };
-}
-
-function hasOverlap(panels) {
-  for (let i = 0; i < panels.length; i++) {
-    for (let j = i + 1; j < panels.length; j++) {
-      const a = panels[i];
-      const b = panels[j];
-      if (!a.enabled || !b.enabled) continue;
-      const aRight = a.x + a.w;
-      const aBottom = a.y + a.h;
-      const bRight = b.x + b.w;
-      const bBottom = b.y + b.h;
-      if (a.x < bRight && aRight > b.x && a.y < bBottom && aBottom > b.y) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 function toInt(val, fallback) {
