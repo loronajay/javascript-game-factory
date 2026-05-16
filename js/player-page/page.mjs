@@ -119,5 +119,10 @@ if (doc?.getElementById) {
   renderPlayerPage(doc);
   applyPlayerLayout(doc, savedLayout);
   requestAnimationFrame(() => applyPlayerScaling(doc, savedLayout));
+  doc.querySelectorAll(".player-layout img").forEach((img) => {
+    if (!img.complete) {
+      img.addEventListener("load", () => applyPlayerScaling(doc, savedLayout), { once: true });
+    }
+  });
   wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel: null, authSession, savedLayout });
 }

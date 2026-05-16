@@ -292,6 +292,76 @@
   cursor: pointer;
 }
 
+.me-layout-style-editor {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.me-layout-style-editor__header,
+.me-layout-style-control {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.me-layout-style-editor__header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.me-layout-style-editor__title {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.me-layout-style-editor__reset {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.me-layout-style-control {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.me-layout-style-control--color {
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+}
+
+.me-layout-style-control input[type="color"] {
+  width: 42px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.me-layout-style-control input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent, #7ec8e3);
+}
+
+.me-layout-style-control output {
+  justify-self: end;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.68rem;
+}
+
 /* --- Canvas wrap --- */
 
 .me-layout-canvas-wrap {
@@ -345,6 +415,7 @@
   overflow: hidden;
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.06), transparent 28%),
+    linear-gradient(180deg, rgba(var(--layout-tile-custom-rgb, 21 14 55), var(--layout-tile-custom-opacity, 0)), rgba(var(--layout-tile-custom-rgb, 7 7 22), var(--layout-tile-custom-opacity, 0))),
     linear-gradient(180deg, rgba(21, 14, 55, 0.92), rgba(7, 7, 22, 0.92));
   border: 1.5px solid rgba(255, 214, 189, 0.18);
   box-shadow:
@@ -393,6 +464,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.5);
+  color: var(--layout-tile-label-color, rgba(255, 255, 255, 0.5));
   line-height: 1.2;
   pointer-events: none;
 }

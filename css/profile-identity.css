@@ -18,6 +18,9 @@
   border: 1px solid rgba(255, 214, 189, 0.12);
   border-radius: var(--profile-radius-sm, 12px);
   background: rgba(255, 255, 255, 0.03);
+  background:
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255 255 255), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    rgba(255, 255, 255, 0.03);
   justify-items: center;
   text-align: center;
 }

@@ -4,6 +4,7 @@ import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM } from "./apply-layout.mjs";
 const ZOOM_SHELL_CLASS = "panel-zoom-shell";
 const MAX_ZOOM = 1;
 const MIN_ZOOM = 0.05;
+const SCALE_FIT_BUFFER = 8;
 
 function getCssToken(name, fallback) {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
@@ -57,7 +58,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     const availableH = Math.max(1, el.clientHeight - elPaddingV);
     const fitZoom = (targetW, targetH) => parseFloat(Math.max(
       MIN_ZOOM,
-      Math.min(availableW / Math.max(1, targetW), availableH / Math.max(1, targetH), MAX_ZOOM),
+      Math.min(availableW / Math.max(1, targetW), availableH / Math.max(1, targetH + SCALE_FIT_BUFFER), MAX_ZOOM),
     ).toFixed(4));
 
     const shell = ensureZoomShell(el);

@@ -39,6 +39,11 @@ if (doc?.getElementById) {
     renderMePage(doc);
     applyMeLayout(doc, savedLayout);
     requestAnimationFrame(() => applyMeScaling(doc, savedLayout));
+    doc.querySelectorAll(".me-layout img").forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener("load", () => applyMeScaling(doc, savedLayout), { once: true });
+      }
+    });
     wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, savedLayout });
     initSessionNav(doc.getElementById("meAuthNav"), {
       signInPath: "../sign-in/index.html",

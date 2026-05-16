@@ -10,6 +10,15 @@ import { renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
+const DEFAULT_PANEL_STYLE = {
+  panelColor: "#150e37",
+  titleColor: "#ffdcbb",
+  elementColor: "#ffffff",
+  opacity: 0.96,
+  saturation: 1,
+  brightness: 1,
+};
+
 const doc = globalThis.document;
 
 function escapeHtml(str) {
@@ -178,6 +187,32 @@ if (doc?.getElementById) {
       refreshAll();
     }
 
+    function updatePanelStyle(id, patch) {
+      const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
+      if (idx < 0) return;
+      const currentStyle = currentLayout.desktop.panels[idx].style || {};
+      currentLayout.desktop.panels[idx] = {
+        ...currentLayout.desktop.panels[idx],
+        style: { ...currentStyle, ...patch },
+      };
+      markDirty();
+      renderLayoutGrid(canvas, currentLayout, {
+        editMode: true,
+        selectedId: selectedPanelId,
+        onSelect: selectPanel,
+      });
+      canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
+    }
+
+    function resetPanelStyle(id) {
+      const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
+      if (idx < 0) return;
+      const { style, ...panel } = currentLayout.desktop.panels[idx];
+      currentLayout.desktop.panels[idx] = panel;
+      markDirty();
+      refreshAll();
+    }
+
     function swapPanels(idA, xA, yA, idB, xB, yB) {
       const panels = currentLayout.desktop.panels;
       const idxA = panels.findIndex((p) => p.id === idA);
@@ -268,12 +303,62 @@ if (doc?.getElementById) {
           ${enableToggle}
           ${!def.draggable ? `<p class="me-layout-inspector__locked">Position locked</p>` : ""}
           ${!def.resizable ? `<p class="me-layout-inspector__locked">Size locked</p>` : ""}
+          ${renderStyleControls(panel)}
         </div>
       `;
 
       inspector.querySelector("[data-toggle-panel]")?.addEventListener("change", (e) => {
         togglePanel(panel.id, e.target.checked);
       });
+      inspector.querySelectorAll("[data-panel-style]").forEach((input) => {
+        input.addEventListener("input", () => {
+          const key = input.dataset.panelStyle;
+          const value = input.type === "range" ? parseFloat(input.value) : input.value;
+          const output = input.parentElement?.querySelector?.("output");
+          if (output && input.type === "range") output.textContent = `${Math.round(value * 100)}%`;
+          updatePanelStyle(panel.id, { [key]: value });
+        });
+      });
+      inspector.querySelector("[data-reset-panel-style]")?.addEventListener("click", () => {
+        resetPanelStyle(panel.id);
+      });
+    }
+
+    function renderStyleControls(panel) {
+      const style = { ...DEFAULT_PANEL_STYLE, ...(panel.style || {}) };
+      return `
+        <div class="me-layout-style-editor">
+          <div class="me-layout-style-editor__header">
+            <p class="me-layout-style-editor__title">Panel Style</p>
+            <button class="me-layout-style-editor__reset" type="button" data-reset-panel-style="${escapeHtml(panel.id)}">Reset</button>
+          </div>
+          ${renderColorControl("Panel Color", "panelColor", style.panelColor)}
+          ${renderColorControl("Title Bubble", "titleColor", style.titleColor)}
+          ${renderColorControl("Inner Elements", "elementColor", style.elementColor)}
+          ${renderRangeControl("Transparency", "opacity", style.opacity, 0.15, 1, 0.01, `${Math.round(style.opacity * 100)}%`)}
+          ${renderRangeControl("Saturation", "saturation", style.saturation, 0, 2, 0.01, `${Math.round(style.saturation * 100)}%`)}
+          ${renderRangeControl("Brightness", "brightness", style.brightness, 0.35, 1.8, 0.01, `${Math.round(style.brightness * 100)}%`)}
+        </div>
+      `;
+    }
+
+    function renderColorControl(label, key, value) {
+      return `
+        <label class="me-layout-style-control me-layout-style-control--color">
+          <span>${escapeHtml(label)}</span>
+          <input type="color" value="${escapeHtml(value)}" data-panel-style="${escapeHtml(key)}">
+        </label>
+      `;
+    }
+
+    function renderRangeControl(label, key, value, min, max, step, readout) {
+      return `
+        <label class="me-layout-style-control">
+          <span>${escapeHtml(label)}</span>
+          <input type="range" min="${min}" max="${max}" step="${step}" value="${escapeHtml(value)}" data-panel-style="${escapeHtml(key)}">
+          <output>${escapeHtml(readout)}</output>
+        </label>
+      `;
     }
 
     function togglePanel(id, enabled) {

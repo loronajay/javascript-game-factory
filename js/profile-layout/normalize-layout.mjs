@@ -49,14 +49,14 @@ export function normalizeLayout(raw) {
     // Clamp x so panel fits within the grid
     const clampedX = Math.min(x, columns - w);
 
-    normalized.push({ id, enabled, x: clampedX, y, w, h });
+    normalized.push({ id, enabled, x: clampedX, y, w, h, style: normalizePanelStyle(p.style) });
   }
 
   // Add any required panels that are missing
   for (const defaultPanel of defaultLayout.desktop.panels) {
     const def = PROFILE_PANEL_REGISTRY[defaultPanel.id];
     if (def.required && !seenIds.has(defaultPanel.id)) {
-      normalized.push({ ...defaultPanel });
+      normalized.push({ ...defaultPanel, style: normalizePanelStyle(defaultPanel.style) });
     }
   }
 
@@ -73,6 +73,27 @@ export function normalizeLayout(raw) {
   return { version: LAYOUT_VERSION, desktop: { columns, panels: normalized } };
 }
 
+export function normalizePanelStyle(raw) {
+  if (!raw || typeof raw !== "object") return {};
+
+  const style = {};
+  const panelColor = normalizeHexColor(raw.panelColor);
+  const titleColor = normalizeHexColor(raw.titleColor);
+  const elementColor = normalizeHexColor(raw.elementColor);
+  if (panelColor) style.panelColor = panelColor;
+  if (titleColor) style.titleColor = titleColor;
+  if (elementColor) style.elementColor = elementColor;
+
+  const opacity = clampNumber(raw.opacity, 0.15, 1);
+  const saturation = clampNumber(raw.saturation, 0, 2);
+  const brightness = clampNumber(raw.brightness, 0.35, 1.8);
+  if (opacity !== null) style.opacity = opacity;
+  if (saturation !== null) style.saturation = saturation;
+  if (brightness !== null) style.brightness = brightness;
+
+  return style;
+}
+
 function toInt(val, fallback) {
   const n = parseInt(val, 10);
   return Number.isFinite(n) ? n : fallback;
@@ -80,4 +101,19 @@ function toInt(val, fallback) {
 
 function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
+}
+
+function clampNumber(val, min, max) {
+  const n = parseFloat(val);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(Math.max(n, min), max);
+}
+
+function normalizeHexColor(value) {
+  const raw = String(value || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase();
+  }
+  return "";
 }

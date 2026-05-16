@@ -26,6 +26,12 @@ export const PLAYER_PANEL_TO_DOM = {
   badges: "playerBadgesPanel",
 };
 
+const DEFAULT_PANEL_STYLE = {
+  opacity: 0.96,
+  saturation: 1,
+  brightness: 1,
+};
+
 const ME_REQUIRED = new Set(["hero"]);
 const PLAYER_REQUIRED = new Set(["hero"]);
 
@@ -61,10 +67,69 @@ export function applyProfileLayout(doc, layout, {
 
     el.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
     el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;
+    applyPanelVisualStyle(el, panel.style);
 
     // Append in sort order so DOM order drives mobile stacking.
     layoutEl.appendChild(el);
   }
+}
+
+function applyPanelVisualStyle(el, style = {}) {
+  const panelColor = normalizeHexColor(style.panelColor);
+  const titleColor = normalizeHexColor(style.titleColor);
+  const elementColor = normalizeHexColor(style.elementColor);
+  const opacity = clampNumber(style.opacity, 0.15, 1, DEFAULT_PANEL_STYLE.opacity);
+  const saturation = clampNumber(style.saturation, 0, 2, DEFAULT_PANEL_STYLE.saturation);
+  const brightness = clampNumber(style.brightness, 0.35, 1.8, DEFAULT_PANEL_STYLE.brightness);
+
+  const panelRgb = panelColor ? adjustHexColor(panelColor, saturation, brightness) : "";
+  const titleRgb = titleColor ? hexToRgbString(titleColor) : "";
+  const elementRgb = elementColor ? hexToRgbString(elementColor) : "";
+
+  setOrClear(el, "--profile-panel-custom-rgb", panelRgb);
+  setOrClear(el, "--profile-panel-custom-opacity", panelColor ? String(opacity) : "");
+  setOrClear(el, "--profile-panel-title-rgb", titleRgb);
+  setOrClear(el, "--profile-panel-element-rgb", elementRgb);
+}
+
+function setOrClear(el, name, value) {
+  if (value) el.style.setProperty(name, value);
+  else el.style.removeProperty(name);
+}
+
+function normalizeHexColor(value) {
+  const raw = String(value || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw.toLowerCase();
+  return "";
+}
+
+function clampNumber(value, min, max, fallback) {
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(n, min), max);
+}
+
+function hexToRgb(hex) {
+  const clean = normalizeHexColor(hex).slice(1);
+  if (!clean) return null;
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function hexToRgbString(hex) {
+  const rgb = hexToRgb(hex);
+  return rgb ? `${rgb.r} ${rgb.g} ${rgb.b}` : "";
+}
+
+function adjustHexColor(hex, saturation, brightness) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return "";
+  const gray = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
+  const adjust = (channel) => Math.round(Math.min(255, Math.max(0, (gray + (channel - gray) * saturation) * brightness)));
+  return `${adjust(rgb.r)} ${adjust(rgb.g)} ${adjust(rgb.b)}`;
 }
 
 export function applyMeLayout(doc, layout) {

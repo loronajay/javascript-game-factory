@@ -44,6 +44,7 @@ export function renderLayoutGrid(container, layout, options = {}) {
     tile.dataset.density = getPanelDensity(panel);
     tile.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
     tile.style.gridRow = `${panel.y + 1} / span ${panel.h}`;
+    applyTileVisualStyle(tile, panel.style);
 
     const classes = ["profile-layout-tile"];
     if (editMode) {
@@ -109,9 +110,53 @@ export function renderLayoutGrid(container, layout, options = {}) {
   }
 }
 
+function applyTileVisualStyle(tile, style = {}) {
+  const panelColor = normalizeHexColor(style.panelColor);
+  const titleColor = normalizeHexColor(style.titleColor);
+  const opacity = clampNumber(style.opacity, 0.15, 1, 0.92);
+  const saturation = clampNumber(style.saturation, 0, 2, 1);
+  const brightness = clampNumber(style.brightness, 0.35, 1.8, 1);
+  if (panelColor) {
+    tile.style.setProperty("--layout-tile-custom-rgb", adjustHexColor(panelColor, saturation, brightness));
+    tile.style.setProperty("--layout-tile-custom-opacity", String(opacity));
+  }
+  if (titleColor) {
+    tile.style.setProperty("--layout-tile-label-color", titleColor);
+  }
+}
+
 function getPanelDensity(panel) {
   const area = panel.w * panel.h;
   if (panel.w <= 3 || panel.h <= 2) return "compact";
   if (area <= 12) return "standard";
   return "expanded";
+}
+
+function normalizeHexColor(value) {
+  const raw = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : "";
+}
+
+function clampNumber(value, min, max, fallback) {
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(n, min), max);
+}
+
+function hexToRgb(hex) {
+  const clean = normalizeHexColor(hex).slice(1);
+  if (!clean) return null;
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function adjustHexColor(hex, saturation, brightness) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return "";
+  const gray = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
+  const adjust = (channel) => Math.round(Math.min(255, Math.max(0, (gray + (channel - gray) * saturation) * brightness)));
+  return `${adjust(rgb.r)} ${adjust(rgb.g)} ${adjust(rgb.b)}`;
 }

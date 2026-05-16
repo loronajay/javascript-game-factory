@@ -72,6 +72,11 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     if (currentLayout) {
       applyPlayerLayout(doc, currentLayout);
       requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
+      doc.querySelectorAll(".player-layout img").forEach((img) => {
+        if (!img.complete) {
+          img.addEventListener("load", () => applyPlayerScaling(doc, currentLayout), { once: true });
+        }
+      });
     }
   };
 
@@ -83,6 +88,11 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     if (currentLayout) {
       applyPlayerLayout(doc, currentLayout);
       requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
+      doc.querySelectorAll(".player-layout img").forEach((img) => {
+        if (!img.complete) {
+          img.addEventListener("load", () => applyPlayerScaling(doc, currentLayout), { once: true });
+        }
+      });
     }
   };
 

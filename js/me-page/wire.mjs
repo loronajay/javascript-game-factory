@@ -62,6 +62,11 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
     if (currentLayout) {
       applyMeLayout(doc, currentLayout);
       requestAnimationFrame(() => applyMeScaling(doc, currentLayout));
+      doc.querySelectorAll(".me-layout img").forEach((img) => {
+        if (!img.complete) {
+          img.addEventListener("load", () => applyMeScaling(doc, currentLayout), { once: true });
+        }
+      });
     }
     friendNavigator.applyFilter(doc);
   };
