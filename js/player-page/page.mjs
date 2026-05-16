@@ -109,11 +109,10 @@ if (doc?.getElementById) {
   // Fetch the target player's saved layout (or fall back to the default).
   let savedLayout = getPlayerDefaultLayout();
   try {
-    const layoutPath = requestedPlayerId
-      ? `/players/${encodeURIComponent(requestedPlayerId)}/layout`
-      : "/profile/layout";
-    const layoutRes = await apiClient.get(layoutPath);
-    if (layoutRes?.layout) savedLayout = normalizeLayout(layoutRes.layout);
+    const layout = requestedPlayerId
+      ? await apiClient.fetchPlayerLayout(requestedPlayerId)
+      : await apiClient.fetchMyLayout();
+    if (layout) savedLayout = normalizeLayout(layout);
   } catch { /* keep default */ }
 
   renderPlayerPage(doc);

@@ -406,5 +406,9 @@ export function createPlatformApiClient(options = {}) {
     saveMyLayout(layout) {
       return post("/profile/layout", { layout }, "layout");
     },
+    fetchPlayerLayout(playerId) {
+      const encoded = encodePathSegment(playerId);
+      return encoded ? get(`/players/${encoded}/layout`, "layout") : Promise.resolve(null);
+    },
   };
 }
