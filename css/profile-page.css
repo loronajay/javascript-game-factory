@@ -216,7 +216,25 @@
 #playerThoughtsPanel .thoughts-feed {
   grid-auto-rows: max-content;
   align-content: start;
-  overflow: hidden;
+  max-height: calc(100cqh - 60px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+#meThoughtsPanel .thoughts-feed::-webkit-scrollbar,
+#playerThoughtsPanel .thoughts-feed::-webkit-scrollbar {
+  width: 10px;
+}
+
+#meThoughtsPanel .thoughts-feed::-webkit-scrollbar-thumb,
+#playerThoughtsPanel .thoughts-feed::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 197, 228, 0.78), rgba(255, 124, 190, 0.54));
+  border: 2px solid rgba(18, 9, 31, 0.9);
+}
+
+#meThoughtsPanel .thoughts-feed::-webkit-scrollbar-track,
+#playerThoughtsPanel .thoughts-feed::-webkit-scrollbar-track {
+  background: rgba(12, 8, 30, 0.42);
 }
 
 .me-about-copy,
