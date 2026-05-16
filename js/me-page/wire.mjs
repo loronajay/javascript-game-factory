@@ -27,7 +27,7 @@ import {
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
 
-export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, authClient, savedLayout = null }) {
+export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, savedLayout = null }) {
   let currentLayout = savedLayout;
   initPageGalleryViewer({ doc, apiClient });
   let musicPlayer = null;
@@ -105,21 +105,6 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
   void pageData.loadGallery().then(() => rerender("", true)).then(() => {
     const profile = loadFactoryProfile(storage);
     musicPlayer = initProfileMusicPlayer("meMusicPanel", profile?.profileMusicPlaylist || [], { doc });
-  });
-
-  doc.getElementById("meDeleteAccountBtn")?.addEventListener("click", async () => {
-    const flashEl = doc.getElementById("meDeleteAccountFlash");
-    const btn = doc.getElementById("meDeleteAccountBtn");
-    if (!confirm("Delete your account permanently? All your data will be removed and cannot be recovered.")) return;
-    if (btn) { btn.disabled = true; btn.textContent = "Deleting..."; }
-    const result = await authClient?.deleteAccount?.();
-    if (!result?.ok) {
-      if (flashEl) flashEl.textContent = "Could not delete account. Try again.";
-      if (btn) { btn.disabled = false; btn.textContent = "Delete Account"; }
-      return;
-    }
-    try { localStorage.clear(); } catch { /* ignore */ }
-    window.location.href = "../index.html";
   });
 
   doc.addEventListener(PROFILE_UPDATED_EVENT, (event) => {

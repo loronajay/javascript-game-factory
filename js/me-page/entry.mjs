@@ -33,12 +33,11 @@ if (doc?.getElementById) {
     const storage = getDefaultPlatformStorage();
     bindFactoryProfileToSession(session.playerId, storage);
     const apiClient = createPlatformApiClient();
-    const authClient = createAuthApiClient();
     const rawLayout = await fetchLayout(apiClient);
     const savedLayout = rawLayout ? normalizeLayout(rawLayout) : getDefaultLayout();
     renderMePage(doc);
     applyMeLayout(doc, savedLayout);
-    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, authClient, savedLayout });
+    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, savedLayout });
     initSessionNav(doc.getElementById("meAuthNav"), {
       signInPath: "../sign-in/index.html",
       signUpPath: "../sign-up/index.html",

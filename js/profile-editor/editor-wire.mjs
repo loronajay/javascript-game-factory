@@ -17,8 +17,9 @@ if (doc?.getElementById) {
     sessionNavId: "meEditAuthNav",
   });
 
+  const authClient = createAuthApiClient();
   let session = null;
-  try { session = await createAuthApiClient().getSession(); } catch { /* network down */ }
+  try { session = await authClient.getSession(); } catch { /* network down */ }
 
   if (!session?.ok || !session?.playerId) {
     const signInUrl = new URL(buildAppUrl("sign-in/index.html"));
@@ -69,6 +70,21 @@ if (doc?.getElementById) {
       if (event?.detail?.action === "cleared") {
         clearDirty();
       }
+    });
+
+    doc.getElementById("meDeleteAccountBtn")?.addEventListener("click", async () => {
+      const flashEl = doc.getElementById("meDeleteAccountFlash");
+      const btn = doc.getElementById("meDeleteAccountBtn");
+      if (!confirm("Delete your account permanently? All your data will be removed and cannot be recovered.")) return;
+      if (btn) { btn.disabled = true; btn.textContent = "Deleting..."; }
+      const result = await authClient.deleteAccount();
+      if (!result?.ok) {
+        if (flashEl) flashEl.textContent = "Could not delete account. Try again.";
+        if (btn) { btn.disabled = false; btn.textContent = "Delete Account"; }
+        return;
+      }
+      try { localStorage.clear(); } catch { /* ignore */ }
+      window.location.href = "../../index.html";
     });
   }
 }

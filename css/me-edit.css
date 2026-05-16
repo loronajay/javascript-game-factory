@@ -83,6 +83,71 @@
   overflow: visible;
 }
 
+.me-edit-danger {
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.me-edit-danger__heading {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: #ff6060;
+  font-family: var(--font-display);
+}
+
+.me-edit-danger__desc {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+}
+
+.me-edit-danger__btn {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: 0 20px;
+  border: 2px solid rgba(255, 80, 80, 0.5);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 80, 80, 0.18), rgba(12, 8, 38, 0.9) 40%, rgba(8, 7, 24, 0.96));
+  color: #fff8ff;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(255, 80, 80, 0.1);
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.me-edit-danger__btn:hover,
+.me-edit-danger__btn:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(255, 80, 80, 0.85);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22), 0 0 20px rgba(255, 80, 80, 0.2);
+}
+
+.me-edit-danger__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.me-edit-danger__flash {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #99ffff;
+}
+
 @media (max-width: 600px) {
   .me-edit-stage {
     padding: 0 0.75rem 2rem;
