@@ -7,8 +7,7 @@
   gap: 14px;
   padding: 20px;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   container-type: size;
   container-name: panel;
   border: 2px solid rgba(255, 214, 189, 0.2);

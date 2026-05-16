@@ -279,6 +279,40 @@
   color: rgba(255, 255, 255, 0.25);
 }
 
+/* ─── Compact cassette at small panel heights ────────────────────────────── */
+
+@container panel (max-height: 210px) {
+  .cassette-player__viewport {
+    display: none;
+  }
+  .cassette-player__body {
+    padding: 0.55rem 0.75rem 0.5rem;
+    gap: 0.4rem;
+  }
+  .cassette-player__label {
+    min-height: 0;
+    padding: 0.35rem 0.6rem;
+    gap: 0;
+  }
+  .cassette-player__now-playing,
+  .cassette-player__index {
+    display: none;
+  }
+}
+
+@container panel (max-height: 170px) {
+  .cassette-player {
+    padding: 0;
+  }
+  .cassette-player__label {
+    display: none;
+  }
+  .cassette-player__body {
+    padding: 0.4rem 0.6rem;
+    gap: 0.35rem;
+  }
+}
+
 /* ─── Music Editor Slots (profile editor panel — unchanged) ───────────────── */
 
 .music-editor-slots {

@@ -18,7 +18,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   music: {
     label: "Music",
-    minW: 3, minH: 2, maxW: 6, maxH: 5,
+    minW: 3, minH: 3, maxW: 6, maxH: 5,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
