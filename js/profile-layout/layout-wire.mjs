@@ -133,19 +133,34 @@ if (doc?.getElementById) {
       if (zoomFitBtn) zoomFitBtn.textContent = zoom < 1 ? `Zoom: ${Math.round(zoom * 100)}%` : "Fit";
     }
 
+    // Sets the editor canvas to match the live profile grid width so column proportions
+    // in the editor are identical to what the player sees on /me and /player.
+    function syncCanvasWidth() {
+      if (!canvas) return;
+      const liveW = Math.min(window.innerWidth * 0.94, 1380);
+      canvas.style.width = `${liveW}px`;
+    }
+
     function fitToScreen() {
       if (!canvas || !canvasWrap) return;
       const { rowHeight, gap } = getGridMetrics(canvas);
       const rows = getMaxRow(currentLayout);
       const totalHeight = rows * rowHeight + Math.max(0, rows - 1) * gap;
+      const canvasW = canvas.offsetWidth;
       const availH = canvasWrap.clientHeight || window.innerHeight * 0.75;
-      applyZoom(Math.min(1, availH / totalHeight));
+      const availW = canvasWrap.clientWidth || window.innerWidth;
+      const zH = availH / totalHeight;
+      const zW = canvasW > 0 && availW > 0 ? availW / canvasW : 1;
+      applyZoom(Math.min(1, zH, zW));
     }
 
     zoomFitBtn?.addEventListener("click", fitToScreen);
     zoomOutBtn?.addEventListener("click", () => applyZoom(zoom - 0.1));
     zoomInBtn?.addEventListener("click",  () => applyZoom(zoom + 0.1));
-    window.addEventListener("resize", () => { if (zoom < 1) fitToScreen(); });
+    window.addEventListener("resize", () => {
+      syncCanvasWidth();
+      fitToScreen();
+    });
 
     // --- layout editor (drag + resize + swap) ---
 
@@ -331,6 +346,7 @@ if (doc?.getElementById) {
       setStatus("Using default layout.");
     }
 
+    syncCanvasWidth();
     refreshAll();
     // Default to zoom-to-fit so the full layout is visible without scrolling.
     requestAnimationFrame(fitToScreen);

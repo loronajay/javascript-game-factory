@@ -23,10 +23,24 @@
   gap: 14px;
   padding: 20px;
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   container-type: size;
   container-name: panel;
   /* height is set inline by JS to actH/zoom so cqh resolves correctly */
+}
+
+.panel-zoom-shell::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-zoom-shell::-webkit-scrollbar-thumb {
+  background: rgba(255, 197, 228, 0.35);
+  border-radius: 3px;
+}
+
+.panel-zoom-shell::-webkit-scrollbar-track {
+  background: rgba(12, 8, 30, 0.3);
 }
 
 /* --- Container query compact rules — content scales before overflow occurs --- */

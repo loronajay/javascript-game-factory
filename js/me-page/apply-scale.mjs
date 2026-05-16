@@ -2,7 +2,7 @@ import { PROFILE_PANEL_REGISTRY } from "../profile-layout/registry.mjs";
 import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM } from "./apply-layout.mjs";
 
 const ZOOM_SHELL_CLASS = "panel-zoom-shell";
-const MAX_ZOOM = 1.5;
+const MAX_ZOOM = 1;
 
 function getCssToken(name, fallback) {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
