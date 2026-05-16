@@ -1,7 +1,7 @@
 export const PROFILE_PANEL_REGISTRY = {
   hero: {
     label: "Hero Card",
-    minW: 3, minH: 3, maxW: 8, maxH: 10,
+    minW: 3, minH: 3, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 5,
     required: true,
     draggable: true,
@@ -10,7 +10,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   identity: {
     label: "Player Profile",
-    minW: 2, minH: 2, maxW: 6, maxH: 5,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
@@ -18,7 +18,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   music: {
     label: "Music",
-    minW: 2, minH: 2, maxW: 6, maxH: 5,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
@@ -26,7 +26,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   rankings: {
     label: "Rankings",
-    minW: 2, minH: 2, maxW: 6, maxH: 4,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 2,
     required: false,
     draggable: true,
@@ -34,7 +34,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   topFriends: {
     label: "Top Friends",
-    minW: 2, minH: 2, maxW: 8, maxH: 6,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
@@ -42,7 +42,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   friends: {
     label: "Friends",
-    minW: 2, minH: 2, maxW: 6, maxH: 5,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
@@ -50,7 +50,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   friendCode: {
     label: "Friend Code",
-    minW: 2, minH: 2, maxW: 6, maxH: 4,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
@@ -58,7 +58,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   favoriteGame: {
     label: "Favorite Game",
-    minW: 2, minH: 2, maxW: 6, maxH: 4,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 2,
     required: false,
     draggable: true,
@@ -66,7 +66,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   gallery: {
     label: "Gallery",
-    minW: 2, minH: 2, maxW: 8, maxH: 5,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 3,
     required: false,
     draggable: true,
@@ -74,7 +74,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   thoughts: {
     label: "Thoughts",
-    minW: 2, minH: 2, maxW: 8, maxH: 8,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 5,
     required: false,
     draggable: true,
@@ -82,7 +82,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   about: {
     label: "About",
-    minW: 2, minH: 2, maxW: 6, maxH: 4,
+    minW: 2, minH: 2, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 2,
     required: false,
     draggable: true,
@@ -90,7 +90,7 @@ export const PROFILE_PANEL_REGISTRY = {
   },
   badges: {
     label: "Badges",
-    minW: 2, minH: 1, maxW: 12, maxH: 4,
+    minW: 2, minH: 1, maxW: 12, maxH: 12,
     defaultW: 4, defaultH: 2,
     required: false,
     draggable: true,

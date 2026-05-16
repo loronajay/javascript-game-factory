@@ -14,6 +14,9 @@ function ensureZoomShell(panelEl) {
   if (!shell) {
     shell = document.createElement("div");
     shell.className = ZOOM_SHELL_CLASS;
+    // Span all columns of the parent grid so the shell fills the full panel width
+    // even when the parent (e.g. the hero card) defines a multi-column grid template.
+    shell.style.gridColumn = "1 / -1";
     while (panelEl.firstChild) shell.appendChild(panelEl.firstChild);
     panelEl.appendChild(shell);
   }
@@ -52,19 +55,39 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     const z = parseFloat(Math.min(actW / refW, actH / refH, MAX_ZOOM).toFixed(4));
 
     const shell = ensureZoomShell(el);
+
+    // Read parent computed styles once for all derived measurements.
+    const cs = getComputedStyle(el);
+
+    // If the parent is a multi-column grid container (e.g. the hero card with its
+    // 2-column portrait/content layout), copy the grid template to the shell so
+    // its children maintain their original column positions. Without this the shell
+    // only occupies column 1 of the parent grid and squeezes everything into a
+    // fraction of the available width, causing excessive vertical overflow.
+    const parentTemplate = cs.gridTemplateColumns;
+    if (parentTemplate && parentTemplate !== "none") {
+      shell.style.gridTemplateColumns = parentTemplate;
+      shell.style.columnGap = cs.columnGap;
+      shell.style.rowGap = cs.rowGap;
+    } else {
+      shell.style.gridTemplateColumns = "";
+      shell.style.columnGap = "";
+      shell.style.rowGap = "";
+    }
+
+    // If the parent already has padding, remove the shell's own CSS padding to
+    // avoid double-padding (hero card has 26px padding; regular .me-panel has none).
+    const elPaddingV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const elPaddingH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    shell.style.padding = (elPaddingV > 0 || elPaddingH > 0) ? "0" : "";
+
     shell.style.zoom = String(z);
 
-    // clientHeight includes the element's own padding but not its border.
-    // We subtract the element's vertical padding to get the true content area
-    // available for the shell. This handles both regular .me-panel (padding: 0)
-    // and .me-hero-card (padding: 26px) correctly.
-    const cs = getComputedStyle(el);
-    const elPaddingV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    // availableH = the panel's content area height (clientHeight excludes border,
+    // subtracting elPaddingV gives the space inside padding where the shell lives).
     const availableH = el.clientHeight - elPaddingV;
-    // With box-sizing: border-box the shell's 'height' is its full box including
-    // its own 20px top/bottom padding. Setting it to availableH/z ensures the
-    // shell's visual layout height = availableH after CSS zoom is applied,
-    // so it fits exactly in the panel content area with no panel-level clipping.
+    // shellH / z = availableH  →  shell layout footprint after zoom = availableH,
+    // fitting exactly in the panel content area with no panel-level clipping.
     const shellH = Math.max(10, availableH / z);
     shell.style.height = `${shellH.toFixed(2)}px`;
   }

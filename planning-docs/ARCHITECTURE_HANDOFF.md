@@ -1,6 +1,6 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-05-15
+Last updated: 2026-05-16
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 
@@ -187,6 +187,17 @@ Exit criteria before re-scoping TypeScript:
    Additional polish landed 2026-05-15:
    - Profile page layout columns switched to equal-width: `grid-template-columns` in `profile-page.css` changed from `minmax(430px, 1.08fr) minmax(280px, 320px) minmax(380px, 1fr)` to `repeat(3, minmax(0, 1fr))`. Both `/me` and `/player` now use three even columns.
    - Layout editor hero card bug fixed: `js/profile-layout/registry.mjs` had inconsistent `minW: 8 / defaultW: 12` for the hero panel (default layout uses `w: 4`). `normalize-layout.mjs` was clamping `w: 4` → `minW: 8` on every load, making the hero overlap into the middle column in the editor. Registry corrected to `minW: 4, defaultW: 4`; normalize now resets position-locked panels (`draggable: false, resizable: false`) to their default geometry so saved value drift cannot recur.
+
+   Layout editor WYSIWYG + panel scaling overhaul landed 2026-05-16:
+   - **`syncCanvasWidth()` in `layout-wire.mjs`**: editor canvas is now forced to match the live profile grid width (`min(94vw, 1380px)`), called on load and on `window.resize`. Previously the canvas was narrower than the live page, making column proportions wrong.
+   - **`fitToScreen()` in `layout-wire.mjs`**: now accounts for both canvas width AND height when computing the fit zoom (`zW = availW / canvasW`), so the canvas is never wider than the available viewport.
+   - **`getGridMetrics()` in `layout-editor.mjs`**: `colWidth` now uses `canvas.offsetWidth` instead of `getBoundingClientRect().width`. `getBoundingClientRect()` returns the visual (post-CSS-transform) width; when a CSS `scale()` transform is applied at zoom < 1, `rect.width` = `offsetWidth × zoom`, which made drag/resize pointer-to-cell math double-scale the column width. `offsetWidth` is in layout coordinates, matching how `pointerToCell` corrects pointer coords back through `/zoom`.
+   - **`apply-scale.mjs` shell height formula**: corrected to subtract the panel element's own vertical padding from `clientHeight` before dividing by zoom. `el.clientHeight` includes the element's own padding (the hero card has `padding: 26px`, i.e., 52px total vertical). Without this subtraction the shell was set 52px taller than available space, overflowing into the hero card's `overflow: hidden` and clipping the bottom. Formula: `shellH = (el.clientHeight - elPaddingV) / z`. With `box-sizing: border-box` globally, the shell's own padding is already inside its declared height — no extra subtraction needed.
+   - **`MAX_ZOOM = 1` in `apply-scale.mjs`**: content is never zoomed up inside a panel, only down. Zooming in causes content overflow.
+   - **Hero card fully draggable and resizable** in `registry.mjs`: `draggable: true`, `resizableWidth: true`, `minW: 3`, `maxW: 8`. Previously locked at `draggable: false, resizableWidth: false, minW: 4, maxW: 4`.
+   - **All panels `minW: 2`** in `registry.mjs`: previously all panels had `minW: 3`, making 2-column panels impossible.
+   - **`.panel-zoom-shell` overflow** in `profile-page.css`: changed from `overflow: hidden` to `overflow-x: hidden; overflow-y: auto` with a dark pink custom scrollbar so content scrolls instead of silently clipping when a panel is resized smaller than its content.
+   - **Remaining issues**: the user reports there are still layout editor UX issues to resolve in the next session. The above changes address the most critical clipping, drag-coordinate, and hero-card-lock problems but the editor still needs further UX investigation.
 
 
 ## Folder Reorg — Stable Shape
