@@ -53,9 +53,20 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
 
     const shell = ensureZoomShell(el);
     shell.style.zoom = String(z);
-    // Fix the shell's natural (pre-zoom) height so container-type: size gets a
-    // determinate block size, making cqh units resolve correctly.
-    shell.style.height = `${(actH / z).toFixed(2)}px`;
+
+    // clientHeight includes the element's own padding but not its border.
+    // We subtract the element's vertical padding to get the true content area
+    // available for the shell. This handles both regular .me-panel (padding: 0)
+    // and .me-hero-card (padding: 26px) correctly.
+    const cs = getComputedStyle(el);
+    const elPaddingV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const availableH = el.clientHeight - elPaddingV;
+    // With box-sizing: border-box the shell's 'height' is its full box including
+    // its own 20px top/bottom padding. Setting it to availableH/z ensures the
+    // shell's visual layout height = availableH after CSS zoom is applied,
+    // so it fits exactly in the panel content area with no panel-level clipping.
+    const shellH = Math.max(10, availableH / z);
+    shell.style.height = `${shellH.toFixed(2)}px`;
   }
 }
 

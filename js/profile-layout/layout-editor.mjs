@@ -9,7 +9,7 @@ export function getGridMetrics(canvas) {
   const vw = window.innerWidth;
   const gap = Number.isFinite(computedGap) ? Math.round(computedGap) : Math.round(Math.max(8, Math.min(vw * 0.01, 14)));
   const rowHeight = Number.isFinite(computedRow) ? Math.round(computedRow) : Math.round(Math.max(56, Math.min(vw * 0.06, 88)));
-  const colWidth = (rect.width - gap * 11) / 12;
+  const colWidth = (canvas.offsetWidth - gap * 11) / 12;
   return { rect, gap, colWidth, rowHeight };
 }
 
