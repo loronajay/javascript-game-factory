@@ -19,7 +19,7 @@
   border: 1px solid rgba(255, 214, 189, 0.2);
   border-radius: var(--profile-radius-pill);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-title-rgb, 255 220 187), 0.22), rgba(var(--profile-panel-title-rgb, 255 121 183), 0.12)),
+    linear-gradient(180deg, rgba(var(--profile-panel-title-rgb, 255, 220, 187), 0.22), rgba(var(--profile-panel-title-rgb, 255, 121, 183), 0.12)),
     linear-gradient(180deg, rgba(255, 220, 187, 0.14), rgba(255, 121, 183, 0.08)),
     rgba(9, 8, 22, 0.82);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -49,7 +49,7 @@
   border-radius: var(--profile-radius-sm);
   background: rgba(255, 255, 255, 0.03);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255 255 255), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
     rgba(255, 255, 255, 0.03);
   justify-items: center;
   text-align: center;
@@ -82,7 +82,7 @@
 .me-hero-card__rail-item--placeholder,
 .player-hero-card__rail-item--placeholder {
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 140 246 212), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 140, 246, 212), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
     linear-gradient(180deg, rgba(140, 246, 212, 0.05), rgba(255, 255, 255, 0.03)),
     rgba(255, 255, 255, 0.03);
 }
@@ -98,14 +98,14 @@
   border-radius: var(--profile-radius-md);
   background: rgba(255, 255, 255, 0.03);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255 255 255), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
     rgba(255, 255, 255, 0.03);
 }
 
 .me-hero-card__friend-card--placeholder,
 .player-hero-card__friend-card--placeholder {
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 140 246 212), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 140, 246, 212), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
     linear-gradient(180deg, rgba(140, 246, 212, 0.05), rgba(255, 255, 255, 0.03)),
     rgba(255, 255, 255, 0.03);
 }

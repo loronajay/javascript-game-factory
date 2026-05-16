@@ -9,8 +9,8 @@
   border-radius: var(--profile-radius-lg, 22px);
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(var(--profile-panel-custom-rgb, 21 14 55), var(--profile-panel-custom-opacity, 0)), rgba(var(--profile-panel-custom-rgb, 7 7 22), var(--profile-panel-custom-opacity, 0))),
-    linear-gradient(180deg, rgba(21, 14, 55, 0.96), rgba(7, 7, 22, 0.96));
+    linear-gradient(180deg, rgba(var(--profile-panel-custom-rgb, 21, 14, 55), var(--profile-panel-custom-opacity, 0)), rgba(var(--profile-panel-custom-rgb, 7, 7, 22), var(--profile-panel-custom-opacity, 0))),
+    linear-gradient(180deg, rgba(var(--profile-panel-base-rgb, 21, 14, 55), var(--profile-panel-base-opacity, 0.96)), rgba(var(--profile-panel-base-rgb, 7, 7, 22), var(--profile-panel-base-opacity, 0.96)));
   box-shadow:
     0 24px 48px rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset,
@@ -117,7 +117,7 @@
   border: 1px solid rgba(255, 214, 189, 0.22);
   border-radius: var(--profile-radius-pill, 999px);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-title-rgb, 255 220 187), 0.26), rgba(var(--profile-panel-title-rgb, 255 121 183), 0.14)),
+    linear-gradient(180deg, rgba(var(--profile-panel-title-rgb, 255, 220, 187), 0.26), rgba(var(--profile-panel-title-rgb, 255, 121, 183), 0.14)),
     linear-gradient(180deg, rgba(255, 220, 187, 0.16), rgba(255, 121, 183, 0.08)),
     rgba(9, 8, 22, 0.92);
   box-shadow:
@@ -141,7 +141,7 @@
   border-radius: var(--profile-radius-sm, 12px);
   background: rgba(255, 255, 255, 0.04);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255 255 255), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
     rgba(255, 255, 255, 0.04);
 }
 
@@ -150,7 +150,7 @@
 .player-link--placeholder,
 .player-card-item--placeholder {
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 140 246 212), 0.08), rgba(var(--profile-panel-element-rgb, 255 255 255), 0.03)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 140, 246, 212), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
     linear-gradient(180deg, rgba(140, 246, 212, 0.05), rgba(255, 255, 255, 0.03)),
     rgba(255, 255, 255, 0.03);
 }
@@ -269,7 +269,7 @@
   border: 1px solid rgba(255, 214, 189, 0.18);
   border-radius: var(--profile-radius-pill, 999px);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255 220 187), 0.14), rgba(var(--profile-panel-element-rgb, 255 121 183), 0.08)),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 220, 187), 0.14), rgba(var(--profile-panel-element-rgb, 255, 121, 183), 0.08)),
     linear-gradient(180deg, rgba(255, 220, 187, 0.1), rgba(255, 121, 183, 0.08)),
     rgba(255, 255, 255, 0.04);
   color: #fff8ff;

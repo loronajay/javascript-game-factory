@@ -88,6 +88,8 @@ function applyPanelVisualStyle(el, style = {}) {
 
   setOrClear(el, "--profile-panel-custom-rgb", panelRgb);
   setOrClear(el, "--profile-panel-custom-opacity", panelColor ? String(opacity) : "");
+  setOrClear(el, "--profile-panel-base-rgb", panelRgb);
+  setOrClear(el, "--profile-panel-base-opacity", panelColor ? String(Math.max(0.55, opacity)) : "");
   setOrClear(el, "--profile-panel-title-rgb", titleRgb);
   setOrClear(el, "--profile-panel-element-rgb", elementRgb);
 }
@@ -121,7 +123,7 @@ function hexToRgb(hex) {
 
 function hexToRgbString(hex) {
   const rgb = hexToRgb(hex);
-  return rgb ? `${rgb.r} ${rgb.g} ${rgb.b}` : "";
+  return rgb ? `${rgb.r}, ${rgb.g}, ${rgb.b}` : "";
 }
 
 function adjustHexColor(hex, saturation, brightness) {
@@ -129,7 +131,7 @@ function adjustHexColor(hex, saturation, brightness) {
   if (!rgb) return "";
   const gray = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
   const adjust = (channel) => Math.round(Math.min(255, Math.max(0, (gray + (channel - gray) * saturation) * brightness)));
-  return `${adjust(rgb.r)} ${adjust(rgb.g)} ${adjust(rgb.b)}`;
+  return `${adjust(rgb.r)}, ${adjust(rgb.g)}, ${adjust(rgb.b)}`;
 }
 
 export function applyMeLayout(doc, layout) {

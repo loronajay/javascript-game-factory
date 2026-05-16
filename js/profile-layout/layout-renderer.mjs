@@ -119,6 +119,8 @@ function applyTileVisualStyle(tile, style = {}) {
   if (panelColor) {
     tile.style.setProperty("--layout-tile-custom-rgb", adjustHexColor(panelColor, saturation, brightness));
     tile.style.setProperty("--layout-tile-custom-opacity", String(opacity));
+    tile.style.setProperty("--layout-tile-base-rgb", adjustHexColor(panelColor, saturation, brightness));
+    tile.style.setProperty("--layout-tile-base-opacity", String(Math.max(0.55, opacity)));
   }
   if (titleColor) {
     tile.style.setProperty("--layout-tile-label-color", titleColor);
@@ -158,5 +160,5 @@ function adjustHexColor(hex, saturation, brightness) {
   if (!rgb) return "";
   const gray = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
   const adjust = (channel) => Math.round(Math.min(255, Math.max(0, (gray + (channel - gray) * saturation) * brightness)));
-  return `${adjust(rgb.r)} ${adjust(rgb.g)} ${adjust(rgb.b)}`;
+  return `${adjust(rgb.r)}, ${adjust(rgb.g)}, ${adjust(rgb.b)}`;
 }

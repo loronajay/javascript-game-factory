@@ -415,8 +415,8 @@
   overflow: hidden;
   background:
     linear-gradient(135deg, rgba(255, 220, 187, 0.06), transparent 28%),
-    linear-gradient(180deg, rgba(var(--layout-tile-custom-rgb, 21 14 55), var(--layout-tile-custom-opacity, 0)), rgba(var(--layout-tile-custom-rgb, 7 7 22), var(--layout-tile-custom-opacity, 0))),
-    linear-gradient(180deg, rgba(21, 14, 55, 0.92), rgba(7, 7, 22, 0.92));
+    linear-gradient(180deg, rgba(var(--layout-tile-custom-rgb, 21, 14, 55), var(--layout-tile-custom-opacity, 0)), rgba(var(--layout-tile-custom-rgb, 7, 7, 22), var(--layout-tile-custom-opacity, 0))),
+    linear-gradient(180deg, rgba(var(--layout-tile-base-rgb, 21, 14, 55), var(--layout-tile-base-opacity, 0.92)), rgba(var(--layout-tile-base-rgb, 7, 7, 22), var(--layout-tile-base-opacity, 0.92)));
   border: 1.5px solid rgba(255, 214, 189, 0.18);
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.2),
