@@ -7,7 +7,8 @@
   gap: 14px;
   padding: 20px;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   container-type: size;
   container-name: panel;
   border: 2px solid rgba(255, 214, 189, 0.2);
@@ -22,33 +23,16 @@
 }
 
 /* --- Container query compact rules — content scales before overflow occurs --- */
+/* Note: only descendant selectors work inside @container — the container itself cannot be targeted */
 
 @container panel (max-height: 220px) {
-  .me-panel,
-  .player-panel {
-    padding: 12px 16px;
-    gap: 8px;
-  }
   .me-panel__header,
   .player-panel__header {
     display: none;
   }
 }
 
-@container panel (max-height: 320px) {
-  .me-panel,
-  .player-panel {
-    padding: 14px;
-    gap: 10px;
-  }
-}
-
 @container panel (max-width: 260px) {
-  .me-panel,
-  .player-panel {
-    padding: 12px;
-    gap: 8px;
-  }
   .me-panel__title,
   .player-panel__title {
     font-size: 0.92rem;

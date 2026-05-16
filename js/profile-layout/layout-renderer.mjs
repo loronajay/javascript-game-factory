@@ -49,7 +49,7 @@ export function renderLayoutGrid(container, layout, options = {}) {
     if (editMode) {
       classes.push("profile-layout-tile--edit");
       if (panel.id === selectedId) classes.push("profile-layout-tile--selected");
-      if (!def.draggable) classes.push("profile-layout-tile--locked");
+      if (!def.draggable && !def.resizable) classes.push("profile-layout-tile--locked");
     }
     tile.className = classes.join(" ");
 
@@ -69,7 +69,7 @@ export function renderLayoutGrid(container, layout, options = {}) {
     label.textContent = def.label;
     tile.appendChild(label);
 
-    if (editMode && def.draggable) {
+    if (editMode && (def.draggable || def.resizable)) {
       const badge = document.createElement("span");
       badge.className = "profile-layout-tile__size-badge";
       badge.textContent = `${panel.w}×${panel.h}`;
