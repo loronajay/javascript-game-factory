@@ -71,6 +71,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       el.style.zoom = "";
       el.style.width = "";
       el.style.height = "";
+      shell.style.justifySelf = "center";
       shell.style.gridTemplateColumns = cs.gridTemplateColumns && cs.gridTemplateColumns !== "none"
         ? cs.gridTemplateColumns
         : "";
@@ -86,12 +87,16 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.gridAutoRows = "";
       shell.style.alignContent = "";
       shell.style.alignItems = "";
+      shell.style.justifySelf = "";
     }
 
     const z = fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0));
     shell.style.zoom = String(z);
     shell.style.overflow = "hidden";
-    shell.style.width = `${(availableW / z).toFixed(2)}px`;
+    const shellW = panel.id === "hero"
+      ? Math.min(Math.max(refW, shell.scrollWidth || 0), availableW / z)
+      : availableW / z;
+    shell.style.width = `${shellW.toFixed(2)}px`;
     shell.style.height = `${(availableH / z).toFixed(2)}px`;
   }
 }
