@@ -60,24 +60,33 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       Math.min(availableW / Math.max(1, targetW), availableH / Math.max(1, targetH), MAX_ZOOM),
     ).toFixed(4));
 
-    // Hero card children use explicit grid-column references relative to the hero
-    // card's own grid. Wrapping them in a zoom shell breaks those references.
-    // Zoom the element itself instead and inflate its pre-zoom dimensions so that
-    // after zoom the element's layout footprint exactly fills the grid cell.
-    if (panel.id === "hero") {
-      const z = fitZoom(Math.max(refW, el.scrollWidth || 0), Math.max(refH, el.scrollHeight || 0));
-      el.style.zoom = String(z);
-      el.style.width = `${(availableW / z).toFixed(2)}px`;
-      el.style.height = `${(availableH / z).toFixed(2)}px`;
-      continue;
-    }
-
     const shell = ensureZoomShell(el);
 
     // If the parent already has padding, remove the shell's own CSS padding to
     // avoid double-padding. Regular .me-panel has no padding so the shell's
     // 20px CSS padding applies normally.
     shell.style.padding = (elPaddingV > 0 || elPaddingH > 0) ? "0" : "";
+
+    if (panel.id === "hero") {
+      el.style.zoom = "";
+      el.style.width = "";
+      el.style.height = "";
+      shell.style.gridTemplateColumns = cs.gridTemplateColumns && cs.gridTemplateColumns !== "none"
+        ? cs.gridTemplateColumns
+        : "";
+      shell.style.columnGap = cs.columnGap;
+      shell.style.rowGap = cs.rowGap;
+      shell.style.gridAutoRows = cs.gridAutoRows;
+      shell.style.alignContent = cs.alignContent;
+      shell.style.alignItems = cs.alignItems;
+    } else {
+      shell.style.gridTemplateColumns = "";
+      shell.style.columnGap = "";
+      shell.style.rowGap = "";
+      shell.style.gridAutoRows = "";
+      shell.style.alignContent = "";
+      shell.style.alignItems = "";
+    }
 
     const z = fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0));
     shell.style.zoom = String(z);

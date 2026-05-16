@@ -18,6 +18,7 @@
 
 /* Inner zoom shell — wraps all panel content; zoom is set by apply-scale.mjs */
 .panel-zoom-shell {
+  position: relative;
   display: grid;
   box-sizing: border-box;
   align-content: start;
