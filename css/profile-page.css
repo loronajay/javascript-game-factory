@@ -29,6 +29,41 @@
   .player-panel__header {
     display: none;
   }
+  .me-meta-block,
+  .player-meta-block {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+  .me-meta-block__label,
+  .player-meta-block__label {
+    font-size: 0.62rem;
+  }
+  .me-meta-block__value,
+  .player-meta-block__value {
+    font-size: 0.82rem;
+  }
+  .me-card-item,
+  .me-link,
+  .player-card-item,
+  .player-link {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+}
+
+@container panel (max-height: 160px) {
+  .me-meta-block,
+  .player-meta-block {
+    padding: 4px 8px;
+    gap: 2px;
+  }
+  .me-card-item,
+  .me-link,
+  .player-card-item,
+  .player-link {
+    padding: 6px 8px;
+    gap: 2px;
+  }
 }
 
 @container panel (max-width: 260px) {

@@ -14,14 +14,14 @@ export const DEFAULT_PROFILE_LAYOUT = {
       // Left column
       { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5 },
       { id: "identity",     enabled: true, x: 0, y: 5,  w: 4, h: 3 },
-      { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 2 },
-      { id: "topFriends",   enabled: true, x: 0, y: 10, w: 4, h: 2 },
-      { id: "friends",      enabled: true, x: 0, y: 12, w: 4, h: 3 },
+      { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 3 },
+      { id: "topFriends",   enabled: true, x: 0, y: 11, w: 4, h: 3 },
+      { id: "friends",      enabled: true, x: 0, y: 14, w: 4, h: 3 },
       // Middle column
       { id: "music",        enabled: true, x: 4, y: 0,  w: 4, h: 3 },
-      { id: "favoriteGame", enabled: true, x: 4, y: 3,  w: 4, h: 2 },
-      { id: "friendCode",   enabled: true, x: 4, y: 5,  w: 4, h: 3 },
-      { id: "gallery",      enabled: true, x: 4, y: 8,  w: 4, h: 3 },
+      { id: "favoriteGame", enabled: true, x: 4, y: 3,  w: 4, h: 4 },
+      { id: "friendCode",   enabled: true, x: 4, y: 7,  w: 4, h: 3 },
+      { id: "gallery",      enabled: true, x: 4, y: 10, w: 4, h: 3 },
       // Right column
       { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2 },
       { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2 },
@@ -44,12 +44,12 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
       // Left column
       { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5 },
       { id: "identity",     enabled: true, x: 0, y: 5,  w: 4, h: 3 },
-      { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 2 },
-      { id: "friends",      enabled: true, x: 0, y: 10, w: 4, h: 3 },
+      { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 3 },
+      { id: "friends",      enabled: true, x: 0, y: 11, w: 4, h: 3 },
       // Middle column (no friendCode on player page)
       { id: "music",        enabled: true, x: 4, y: 0,  w: 4, h: 3 },
-      { id: "favoriteGame", enabled: true, x: 4, y: 3,  w: 4, h: 2 },
-      { id: "gallery",      enabled: true, x: 4, y: 5,  w: 4, h: 3 },
+      { id: "favoriteGame", enabled: true, x: 4, y: 3,  w: 4, h: 4 },
+      { id: "gallery",      enabled: true, x: 4, y: 7,  w: 4, h: 3 },
       // Right column
       { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2 },
       { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2 },
