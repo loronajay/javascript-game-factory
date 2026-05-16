@@ -26,6 +26,7 @@ import {
 } from "./media-actions.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
+import { applyMeScaling } from "./apply-scale.mjs";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, savedLayout = null }) {
   let currentLayout = savedLayout;
@@ -58,7 +59,10 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       friendNavigatorExpanded: friendNavigator.getViewState().expanded,
       friendNavigatorSearchQuery: friendNavigator.getViewState().searchQuery,
     });
-    if (currentLayout) applyMeLayout(doc, currentLayout);
+    if (currentLayout) {
+      applyMeLayout(doc, currentLayout);
+      requestAnimationFrame(() => applyMeScaling(doc, currentLayout));
+    }
     friendNavigator.applyFilter(doc);
   };
 

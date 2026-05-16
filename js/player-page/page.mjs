@@ -20,6 +20,7 @@ import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { getPlayerDefaultLayout } from "../profile-layout/default-layout.mjs";
 import { normalizeLayout } from "../profile-layout/normalize-layout.mjs";
 import { applyPlayerLayout } from "../me-page/apply-layout.mjs";
+import { applyPlayerScaling } from "../me-page/apply-scale.mjs";
 
 export { loadPlayerPageData, loadRequestedPlayerProfile } from "./loader.mjs";
 export { buildPlayerPageViewModel } from "./view-model.mjs";
@@ -117,5 +118,6 @@ if (doc?.getElementById) {
 
   renderPlayerPage(doc);
   applyPlayerLayout(doc, savedLayout);
+  requestAnimationFrame(() => applyPlayerScaling(doc, savedLayout));
   wirePlayerPage(doc, renderPlayerPage, loadPlayerPageData, { storage, apiClient, profilePanel: null, authSession, savedLayout });
 }

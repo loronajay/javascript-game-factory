@@ -18,6 +18,7 @@ import { createMediaComposerState } from "../profile-social/media-composer-state
 import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
 import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 import { applyPlayerLayout } from "../me-page/apply-layout.mjs";
+import { applyPlayerScaling } from "../me-page/apply-scale.mjs";
 
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession, savedLayout = null }) {
   let currentLayout = savedLayout;
@@ -68,7 +69,10 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       thoughtComposerFlash,
       disableProfileViewTracking,
     }));
-    if (currentLayout) applyPlayerLayout(doc, currentLayout);
+    if (currentLayout) {
+      applyPlayerLayout(doc, currentLayout);
+      requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
+    }
   };
 
   const renderCurrentPageData = async () => {
@@ -76,7 +80,10 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     currentPageData = pageData;
     profilePanel?.render?.("");
     renderPage(doc, buildRenderPayload(pageData));
-    if (currentLayout) applyPlayerLayout(doc, currentLayout);
+    if (currentLayout) {
+      applyPlayerLayout(doc, currentLayout);
+      requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
+    }
   };
 
   const socialActions = createProfileSocialActions({

@@ -111,15 +111,23 @@ if (doc?.getElementById) {
       zoom = Math.max(0.25, Math.min(1, z));
       if (canvas) {
         if (zoom < 1) {
-          canvas.style.transform = `scale(${zoom})`;
+          const scaledW = canvas.offsetWidth * zoom;
+          const wrapW = canvasWrap.clientWidth || window.innerWidth;
+          // Center the scaled canvas horizontally; fall back to left-align if it's wider than wrap.
+          const tx = Math.max(0, (wrapW - scaledW) / 2);
+          canvas.style.transform = `translateX(${tx}px) scale(${zoom})`;
           canvas.style.transformOrigin = "top left";
-          // Shrink the wrap so it doesn't leave empty space below the scaled canvas.
+          canvas.style.marginLeft = "0";
+          // Prevent the unscaled layout box from creating a horizontal scrollbar.
+          canvasWrap.style.overflowX = scaledW <= wrapW ? "hidden" : "auto";
           if (canvas.offsetHeight) {
             canvasWrap.style.height = `${Math.ceil(canvas.offsetHeight * zoom)}px`;
           }
         } else {
           canvas.style.transform = "";
+          canvas.style.transformOrigin = "";
           canvasWrap.style.height = "";
+          canvasWrap.style.overflowX = "auto";
         }
       }
       if (zoomFitBtn) zoomFitBtn.textContent = zoom < 1 ? `Zoom: ${Math.round(zoom * 100)}%` : "Fit";

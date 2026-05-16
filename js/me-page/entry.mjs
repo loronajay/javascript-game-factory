@@ -11,6 +11,7 @@ import { fetchLayout } from "../profile-layout/layout-storage.mjs";
 import { getDefaultLayout } from "../profile-layout/default-layout.mjs";
 import { normalizeLayout } from "../profile-layout/normalize-layout.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
+import { applyMeScaling } from "./apply-scale.mjs";
 
 const doc = globalThis.document;
 
@@ -37,6 +38,7 @@ if (doc?.getElementById) {
     const savedLayout = rawLayout ? normalizeLayout(rawLayout) : getDefaultLayout();
     renderMePage(doc);
     applyMeLayout(doc, savedLayout);
+    requestAnimationFrame(() => applyMeScaling(doc, savedLayout));
     wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, savedLayout });
     initSessionNav(doc.getElementById("meAuthNav"), {
       signInPath: "../sign-in/index.html",
