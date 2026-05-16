@@ -16,7 +16,7 @@
 .player-hero-card {
   position: relative;
   isolation: isolate;
-  grid-column: 1 / 3;
+  grid-column: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--profile-portrait-rail-width);
   gap: 16px;
