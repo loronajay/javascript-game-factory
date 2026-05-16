@@ -3,6 +3,7 @@ import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM } from "./apply-layout.mjs";
 
 const ZOOM_SHELL_CLASS = "panel-zoom-shell";
 const MAX_ZOOM = 1;
+const MIN_ZOOM = 0.05;
 
 function getCssToken(name, fallback) {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
@@ -43,53 +44,46 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     const def = PROFILE_PANEL_REGISTRY[panel.id];
     if (!def) continue;
 
+    el.style.overflow = "hidden";
+
     // Reference = the size this panel's content was designed for (default w × h).
     const refW = def.defaultW * colW + (def.defaultW - 1) * gap;
     const refH = def.defaultH * rowH + (def.defaultH - 1) * gap;
 
-    // Actual allocated size from the current layout.
-    const actW = panel.w * colW + (panel.w - 1) * gap;
-    const actH = panel.h * rowH + (panel.h - 1) * gap;
+    const cs = getComputedStyle(el);
+    const elPaddingV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const elPaddingH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const availableW = Math.max(1, el.clientWidth - elPaddingH);
+    const availableH = Math.max(1, el.clientHeight - elPaddingV);
+    const fitZoom = (targetW, targetH) => parseFloat(Math.max(
+      MIN_ZOOM,
+      Math.min(availableW / Math.max(1, targetW), availableH / Math.max(1, targetH), MAX_ZOOM),
+    ).toFixed(4));
 
-    // Scale so the reference-size content fits the actual panel space.
-    const z = parseFloat(Math.min(actW / refW, actH / refH, MAX_ZOOM).toFixed(4));
+    // Hero card children use explicit grid-column references relative to the hero
+    // card's own grid. Wrapping them in a zoom shell breaks those references.
+    // Zoom the element itself instead and inflate its pre-zoom dimensions so that
+    // after zoom the element's layout footprint exactly fills the grid cell.
+    if (panel.id === "hero") {
+      const z = fitZoom(Math.max(refW, el.scrollWidth || 0), Math.max(refH, el.scrollHeight || 0));
+      el.style.zoom = String(z);
+      el.style.width = `${(availableW / z).toFixed(2)}px`;
+      el.style.height = `${(availableH / z).toFixed(2)}px`;
+      continue;
+    }
 
     const shell = ensureZoomShell(el);
 
-    // Read parent computed styles once for all derived measurements.
-    const cs = getComputedStyle(el);
-
-    // If the parent is a multi-column grid container (e.g. the hero card with its
-    // 2-column portrait/content layout), copy the grid template to the shell so
-    // its children maintain their original column positions. Without this the shell
-    // only occupies column 1 of the parent grid and squeezes everything into a
-    // fraction of the available width, causing excessive vertical overflow.
-    const parentTemplate = cs.gridTemplateColumns;
-    if (parentTemplate && parentTemplate !== "none") {
-      shell.style.gridTemplateColumns = parentTemplate;
-      shell.style.columnGap = cs.columnGap;
-      shell.style.rowGap = cs.rowGap;
-    } else {
-      shell.style.gridTemplateColumns = "";
-      shell.style.columnGap = "";
-      shell.style.rowGap = "";
-    }
-
     // If the parent already has padding, remove the shell's own CSS padding to
-    // avoid double-padding (hero card has 26px padding; regular .me-panel has none).
-    const elPaddingV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const elPaddingH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    // avoid double-padding. Regular .me-panel has no padding so the shell's
+    // 20px CSS padding applies normally.
     shell.style.padding = (elPaddingV > 0 || elPaddingH > 0) ? "0" : "";
 
+    const z = fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0));
     shell.style.zoom = String(z);
-
-    // availableH = the panel's content area height (clientHeight excludes border,
-    // subtracting elPaddingV gives the space inside padding where the shell lives).
-    const availableH = el.clientHeight - elPaddingV;
-    // shellH / z = availableH  →  shell layout footprint after zoom = availableH,
-    // fitting exactly in the panel content area with no panel-level clipping.
-    const shellH = Math.max(10, availableH / z);
-    shell.style.height = `${shellH.toFixed(2)}px`;
+    shell.style.overflow = "hidden";
+    shell.style.width = `${(availableW / z).toFixed(2)}px`;
+    shell.style.height = `${(availableH / z).toFixed(2)}px`;
   }
 }
 

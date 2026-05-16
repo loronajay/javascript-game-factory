@@ -214,9 +214,7 @@
 .me-friends-navigator__list {
   display: grid;
   gap: 8px;
-  max-height: 360px;
-  overflow-y: auto;
-  padding-right: 6px;
+  overflow: hidden;
 }
 
 .me-friends-navigator__item {
@@ -280,5 +278,4 @@
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
-
 
