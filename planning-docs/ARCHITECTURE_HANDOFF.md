@@ -1,6 +1,6 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-05-09
+Last updated: 2026-05-15
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 
@@ -75,9 +75,11 @@ Completed:
   - `js/tests/deployment-config.test.mjs`
   - `js/tests/platform-plan.test.mjs`
 
-## Repo Shape As Of 2026-05-05
+## Repo Shape As Of 2026-05-15
 
-- live cabinet entries in `js/arcade-catalog.mjs` are currently `lovers-lost`, `battleshits`, and `echo-duel`
+- live cabinet entries in `js/arcade-catalog.mjs` are currently `lovers-lost`, `battleshits`, `echo-duel`, `circuit-siege`, and `illuminauts`
+- `circuit-siege` is a fully playable online 1v1 route-repair puzzle game; Phase 4a UX polish complete; see `games/circuit-siege/PHASE4_HANDOFF.md` for next steps
+- `illuminauts` is a 2-player online maze race; Phase 4 online code complete, ready for first playtest
 - `echo-duel` is an active 2-6 player online prototype with a host-authoritative lobby model; if resuming cabinet work there, start with `games/echo-duel/README.md` and `games/echo-duel/ECHO_DUEL_NEXT_AGENT_HANDOFF.md`
 - `build-buddy` is currently GDD-only in `games/build-buddy/BUILD_BUDDY_GDD.md`
 - `questionable-decisions` is currently a scoped docs-first workstream under `games/questionable-decisions/`, including a base GDD plus multiple penalty mini-game GDDs

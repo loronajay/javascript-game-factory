@@ -17,6 +17,9 @@ export function normalizeLayout(raw) {
   const seenIds = new Set();
   const normalized = [];
 
+  const defaultLayout = getDefaultLayout();
+  const defaultPanelMap = new Map(defaultLayout.desktop.panels.map((p) => [p.id, p]));
+
   for (const p of rawPanels) {
     if (!p || typeof p !== "object") continue;
     const id = p.id;
@@ -28,6 +31,15 @@ export function normalizeLayout(raw) {
     const enabled = p.enabled !== false;
 
     if (!enabled && def.required) continue; // required panels are always enabled
+
+    // Position-locked panels always use default geometry so stale saved values can't drift.
+    if (!def.draggable && !def.resizable) {
+      const dp = defaultPanelMap.get(id);
+      if (dp) {
+        normalized.push({ id, enabled, x: dp.x, y: dp.y, w: dp.w, h: dp.h });
+        continue;
+      }
+    }
 
     const w = clamp(toInt(p.w, def.defaultW), def.minW, def.maxW);
     const h = clamp(toInt(p.h, def.defaultH), def.minH, def.maxH);
@@ -41,7 +53,6 @@ export function normalizeLayout(raw) {
   }
 
   // Add any required panels that are missing
-  const defaultLayout = getDefaultLayout();
   for (const defaultPanel of defaultLayout.desktop.panels) {
     const def = PROFILE_PANEL_REGISTRY[defaultPanel.id];
     if (def.required && !seenIds.has(defaultPanel.id)) {

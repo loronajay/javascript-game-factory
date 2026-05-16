@@ -1,6 +1,6 @@
 # Javascript Game Factory Platform Status Plan
 
-Last updated: 2026-05-12
+Last updated: 2026-05-15
 
 ## Purpose
 
@@ -46,6 +46,7 @@ Live today:
 - `/grid.html`
 - `/me/index.html`
 - `/me/edit/index.html`
+- `/me/layout/index.html`
 - `/player/index.html?id=<playerId>`
 - `/thoughts/index.html`
 - `/activity/index.html`
@@ -67,7 +68,6 @@ Not implemented yet:
 - `/doomscroll/index.html`
 - `/groups/index.html`
 - `/group/index.html?id=<groupId>`
-- `/me/layout/index.html`
 
 ## Shipped And Covered By Repo Tests
 
@@ -138,7 +138,8 @@ Not implemented yet:
 
 ### Profile editor follow-up that is still pending
 
-- `/me/layout` and any draggable/resizable profile layout system
+- `/me/layout` is shipped. The draggable panel layout editor is live with save/load wired to the DB. Three bugs patched on 2026-05-15: `saveMyLayout`/`fetchMyLayout`/`fetchPlayerLayout` added as named methods on the platform API client (the raw `post`/`get` closures were never exposed, causing all layout saves and loads to silently fail); the `hasOverlap` check in `normalize-layout.mjs` that was discarding valid user layouts and reverting to default on every load was removed (the 3-column wrapper display model makes the check incorrect).
+- Still pending: danger zone is now in `/me/edit` rather than `/me` — no further editor follow-up backlog items remain beyond the ongoing durable memories pass.
 
 ## Deferred Or Later
 
