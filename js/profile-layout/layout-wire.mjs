@@ -52,6 +52,7 @@ if (doc?.getElementById) {
     window.location.replace(signInUrl.toString());
   } else {
     const storage = getDefaultPlatformStorage();
+    const apiClient = createPlatformApiClient();
     bindFactoryProfileToSession(session.playerId, storage);
 
     initSessionNav(doc.getElementById("meLayoutAuthNav"), {
@@ -432,7 +433,7 @@ if (doc?.getElementById) {
       saveBtn.disabled = true;
       setStatus("Saving…");
       try {
-        const saved = await saveLayout(currentLayout);
+        const saved = await saveLayout(currentLayout, apiClient);
         currentLayout = normalizeLayout(saved);
         clearDirty();
         setStatus("Layout saved.");
@@ -447,7 +448,7 @@ if (doc?.getElementById) {
     // --- boot ---
 
     setStatus("Loading…");
-    const saved = await fetchLayout();
+    const saved = await fetchLayout(apiClient);
     previewModels = await buildPreviewModels(session.playerId, storage, apiClient);
     if (saved) {
       currentLayout = normalizeLayout(saved);
