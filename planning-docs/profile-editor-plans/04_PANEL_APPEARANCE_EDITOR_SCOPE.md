@@ -149,7 +149,7 @@ Current shipped direction:
 
 ```txt
 Hero preview in /me/layout uses the live /me hero renderer.
-Identity, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges now use live /me renderers in /me/layout.
+Identity, music, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges now use live /me renderers/templates in /me/layout.
 The editor page loads the live owner-profile CSS needed for that hero.
 Editor tiles set both editor variables and live --profile-panel-* variables.
 Live previews use the same scale-to-fit helper as the live profile.
@@ -257,7 +257,7 @@ Favorite Game panel - shipped
 Gallery panel - shipped
 About/Badges panels - shipped
 Friends/Top Friends/Rankings/Friend Code panels - shipped
-Music panel
+Music panel - shipped
 Thoughts feed panel
 ```
 
@@ -303,9 +303,8 @@ Before adding more appearance controls, continue the live-preview foundation.
 Recommended next panel order:
 
 ```txt
-1. Music panel - important visually, but more interactive.
-2. Thoughts feed - keep internal scrolling intentional.
-3. Then begin deeper hero-panel appearance controls and sub-grid planning.
+1. Thoughts feed - keep internal scrolling intentional.
+2. Then begin deeper hero-panel appearance controls and sub-grid planning.
 ```
 
 Each panel preview should ship only when it visually matches the live `/me` panel at the same saved grid size.

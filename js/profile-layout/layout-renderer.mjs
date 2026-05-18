@@ -9,6 +9,7 @@ import {
   renderMeRankingsPanel,
   renderMeTopFriendsPanel,
 } from "../arcade-me-view.mjs";
+import { renderProfileMusicPlayerPanel } from "../profile-editor/music-player.mjs";
 import {
   renderAboutPanel,
   renderBadgesPanel,
@@ -140,6 +141,7 @@ function hasLivePreview(panelId, previewModels) {
   return [
     "hero",
     "identity",
+    "music",
     "rankings",
     "topFriends",
     "friends",
@@ -165,6 +167,10 @@ function renderLivePreview(tile, panelId, previewModels) {
     preview.id = "meLayoutIdentityPreview";
     preview.classList.add("me-panel", "me-panel--identity");
     renderMeIdentityPanel(preview, previewModels.hero);
+  } else if (panelId === "music") {
+    preview.id = "meLayoutMusicPreview";
+    preview.classList.add("me-panel", "me-panel--music");
+    renderProfileMusicPlayerPanel(preview, previewModels.hero.profileMusicPlaylist || [], "meLayoutMusicPreview");
   } else if (panelId === "rankings") {
     preview.id = "meLayoutRankingsPreview";
     preview.classList.add("me-panel", "me-panel--rankings");

@@ -101,6 +101,7 @@ export function buildMePageViewModel(profile, options = {}) {
     avatarAssetId: publicView.avatarAssetId,
     backgroundImageUrl: publicView.backgroundImageUrl,
     backgroundStyle: publicView.backgroundStyle || 'blend',
+    profileMusicPlaylist: Array.isArray(publicView.profileMusicPlaylist) ? publicView.profileMusicPlaylist : [],
     identityLinkItems,
     favoriteGameItems,
     rankingItems,

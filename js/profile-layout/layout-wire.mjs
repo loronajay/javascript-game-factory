@@ -221,6 +221,7 @@ if (doc?.getElementById) {
       applyPanelScaling(doc, currentLayout, {
         hero: "meLayoutHeroPreview",
         identity: "meLayoutIdentityPreview",
+        music: "meLayoutMusicPreview",
         rankings: "meLayoutRankingsPreview",
         topFriends: "meLayoutTopFriendsPreview",
         friends: "meLayoutFriendsPreview",
@@ -233,6 +234,7 @@ if (doc?.getElementById) {
       doc.querySelectorAll([
         "#meLayoutHeroPreview img",
         "#meLayoutIdentityPreview img",
+        "#meLayoutMusicPreview img",
         "#meLayoutRankingsPreview img",
         "#meLayoutTopFriendsPreview img",
         "#meLayoutFriendsPreview img",

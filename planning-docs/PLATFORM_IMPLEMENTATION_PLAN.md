@@ -146,10 +146,10 @@ Not implemented yet:
 - Hero rendering uses an inner zoom shell so the outer panel still respects saved grid placement; image-heavy panels rescale after images load to avoid bottom clipping.
 - Per-panel style customization is live under `panel.style` inside the existing `profile_layout` JSON: panel surface color, second gradient color, title bubble color, inner element color, transparency, saturation, brightness, and gradient angle. No backend migration was needed for this visual customization because it rides inside the existing layout JSONB field.
 - The 2026-05-18 layout-editor pass made the editor grid overlay real instead of decorative: overlay cells now sit on the same CSS Grid tracks as panels, and drag/resize metrics read from the editor canvas itself.
-- The editor tiles in `/me/layout` now use live `/me` renderers, live profile CSS stack, live panel style variables, and the same scale-to-fit path for hero, identity, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges. The editor no longer uses fake placeholders for those panels.
+- The editor tiles in `/me/layout` now use live `/me` renderers/templates, live profile CSS stack, live panel style variables, and the same scale-to-fit path for hero, identity, music, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges. The editor no longer uses fake placeholders for those panels.
 - Hero centering was hardened after the live preview exposed the recurring left-alignment regression: the hero scaling shell now uses an explicit centered single-column layout rather than trying to recreate the outer hero grid inside the scaling wrapper.
-- Next scoped customization work is to finish the live-preview pattern for music and thoughts, one panel family at a time. The rule: editor previews must reuse live renderers/CSS variables or they are not trustworthy. See `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md`.
-- Still pending: danger zone is now in `/me/edit` rather than `/me`; do a manual post-deploy browser pass for tiny-panel scaling, hero resize/drag behavior, gradients, music/thoughts previews, and public `/player` pages with real relationship data.
+- Next scoped customization work is to finish the live-preview pattern for thoughts. The rule: editor previews must reuse live renderers/CSS variables or they are not trustworthy. See `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md`.
+- Still pending: danger zone is now in `/me/edit` rather than `/me`; do a manual post-deploy browser pass for tiny-panel scaling, hero resize/drag behavior, gradients, thoughts preview/feed scrolling, and public `/player` pages with real relationship data.
 
 ## Deferred Or Later
 
