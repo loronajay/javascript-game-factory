@@ -46,16 +46,21 @@ function applyHeroChildScaling(heroEl) {
     shell.style.width = "max-content";
     shell.style.height = "max-content";
 
-    const availableW = Math.max(1, childEl.clientWidth);
-    const availableH = Math.max(1, childEl.clientHeight);
+    const childStyle = getComputedStyle(childEl);
+    const childPaddingX = parseFloat(childStyle.paddingLeft) + parseFloat(childStyle.paddingRight);
+    const childPaddingY = parseFloat(childStyle.paddingTop) + parseFloat(childStyle.paddingBottom);
+    const childBorderX = parseFloat(childStyle.borderLeftWidth) + parseFloat(childStyle.borderRightWidth);
+    const childBorderY = parseFloat(childStyle.borderTopWidth) + parseFloat(childStyle.borderBottomWidth);
+    const availableW = Math.max(1, childEl.clientWidth - childPaddingX - childBorderX);
+    const availableH = Math.max(1, childEl.clientHeight - childPaddingY - childBorderY);
     const naturalSize = getNaturalShellSize(shell);
-    const naturalW = Math.max(1, naturalSize.width || shell.scrollWidth || availableW);
-    const naturalH = Math.max(1, naturalSize.height || shell.scrollHeight || availableH);
+    const naturalW = Math.max(1, naturalSize.width, shell.scrollWidth, shell.offsetWidth, availableW);
+    const naturalH = Math.max(1, naturalSize.height, shell.scrollHeight, shell.offsetHeight, availableH);
     const z = parseFloat(Math.max(
       MIN_ZOOM,
       Math.min(
         Math.max(1, availableW - CHILD_SCALE_FIT_BUFFER) / naturalW,
-        Math.max(1, availableH - CHILD_SCALE_FIT_BUFFER) / naturalH,
+        Math.max(1, availableH - CHILD_SCALE_FIT_BUFFER * 2) / naturalH,
         MAX_ZOOM,
       ),
     ).toFixed(4));

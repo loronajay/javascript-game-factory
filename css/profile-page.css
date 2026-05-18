@@ -57,6 +57,8 @@
   grid-column: auto !important;
   grid-row: auto !important;
   padding: 0 !important;
+  container-type: size;
+  container-name: profile-child;
 }
 
 .me-hero-card > .panel-zoom-shell > [data-profile-child-id="portrait"] > .profile-child-zoom-shell,
@@ -71,6 +73,31 @@
   align-content: start;
   gap: 10px;
   padding: 12px;
+}
+
+@container profile-child (max-height: 130px) {
+  [data-profile-child-id="metrics"] > .profile-child-zoom-shell {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  [data-profile-child-id="metrics"] .me-hero-card__metrics-grid,
+  [data-profile-child-id="metrics"] .player-hero-card__metrics-grid {
+    gap: 5px;
+  }
+
+  [data-profile-child-id="metrics"] .me-hero-card__metrics-stat,
+  [data-profile-child-id="metrics"] .player-hero-card__metrics-stat {
+    gap: 2px;
+    padding: 6px 8px;
+  }
+}
+
+@container profile-child (max-height: 92px) {
+  [data-profile-child-id="metrics"] .me-hero-card__section-topline,
+  [data-profile-child-id="metrics"] .player-hero-card__section-topline {
+    display: none;
+  }
 }
 
 /* --- Container query compact rules — content scales before overflow occurs --- */
