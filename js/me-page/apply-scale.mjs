@@ -6,6 +6,7 @@ const CHILD_ZOOM_SHELL_CLASS = "profile-child-zoom-shell";
 const MAX_ZOOM = 1;
 const MIN_ZOOM = 0.05;
 const SCALE_FIT_BUFFER = 8;
+const CHILD_SCALE_FIT_BUFFER = 6;
 
 function getCssToken(name, fallback) {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
@@ -47,18 +48,47 @@ function applyHeroChildScaling(heroEl) {
 
     const availableW = Math.max(1, childEl.clientWidth);
     const availableH = Math.max(1, childEl.clientHeight);
-    const naturalRect = shell.getBoundingClientRect();
-    const naturalW = Math.max(1, naturalRect.width || shell.scrollWidth || availableW);
-    const naturalH = Math.max(1, naturalRect.height || shell.scrollHeight || availableH);
+    const naturalSize = getNaturalShellSize(shell);
+    const naturalW = Math.max(1, naturalSize.width || shell.scrollWidth || availableW);
+    const naturalH = Math.max(1, naturalSize.height || shell.scrollHeight || availableH);
     const z = parseFloat(Math.max(
       MIN_ZOOM,
-      Math.min(availableW / naturalW, availableH / naturalH, MAX_ZOOM),
+      Math.min(
+        Math.max(1, availableW - CHILD_SCALE_FIT_BUFFER) / naturalW,
+        Math.max(1, availableH - CHILD_SCALE_FIT_BUFFER) / naturalH,
+        MAX_ZOOM,
+      ),
     ).toFixed(4));
 
     shell.style.zoom = String(z);
     shell.style.width = `${(availableW / z).toFixed(2)}px`;
     shell.style.height = `${(availableH / z).toFixed(2)}px`;
   });
+}
+
+function getNaturalShellSize(shell) {
+  const rects = [shell.getBoundingClientRect()];
+  shell.querySelectorAll("*").forEach((el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) rects.push(rect);
+  });
+
+  const bounds = rects.reduce((acc, rect) => ({
+    left: Math.min(acc.left, rect.left),
+    top: Math.min(acc.top, rect.top),
+    right: Math.max(acc.right, rect.right),
+    bottom: Math.max(acc.bottom, rect.bottom),
+  }), {
+    left: Infinity,
+    top: Infinity,
+    right: -Infinity,
+    bottom: -Infinity,
+  });
+
+  return {
+    width: Math.max(0, bounds.right - bounds.left),
+    height: Math.max(0, bounds.bottom - bounds.top),
+  };
 }
 
 export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
