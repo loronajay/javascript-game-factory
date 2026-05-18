@@ -116,8 +116,9 @@ export function normalizePanelChildren(panelId, rawChildren) {
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
   if (!registry) return undefined;
 
+  const migratedChildren = migratePanelChildren(panelId, rawChildren);
   const rawById = new Map(
-    (Array.isArray(rawChildren) ? rawChildren : [])
+    (Array.isArray(migratedChildren) ? migratedChildren : [])
       .filter((child) => child && typeof child === "object")
       .map((child) => [child.id, child]),
   );
@@ -138,6 +139,23 @@ export function normalizePanelChildren(panelId, rawChildren) {
       h,
       style: normalizePanelStyle(raw.style),
     };
+  });
+}
+
+function migratePanelChildren(panelId, rawChildren) {
+  if (panelId !== "hero" || !Array.isArray(rawChildren)) return rawChildren;
+
+  const portrait = rawChildren.find((child) => child?.id === "portrait");
+  const metrics = rawChildren.find((child) => child?.id === "metrics");
+  const isCrampedOldDefault =
+    portrait?.x === 0 && portrait?.y === 0 && portrait?.w === 4 && portrait?.h === 2 &&
+    metrics?.x === 0 && metrics?.y === 2 && metrics?.w === 4 && metrics?.h === 2;
+  if (!isCrampedOldDefault) return rawChildren;
+
+  return rawChildren.map((child) => {
+    if (child?.id === "portrait") return { ...child, h: 3 };
+    if (child?.id === "metrics") return { ...child, y: 3, h: 2 };
+    return child;
   });
 }
 

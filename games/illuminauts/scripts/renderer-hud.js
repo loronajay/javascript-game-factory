@@ -66,7 +66,7 @@ export function drawHud(ctx, state, now, width, height, spriteCatalog = undefine
       const allDone = state.solo.dataCoresCollected >= state.solo.dataCoreTotal;
       const coreColor = allDone ? COLORS.dataCore : '#2a7a4a';
       const coreStr = `${state.solo.dataCoresCollected}/${state.solo.dataCoreTotal}`;
-      const coreGroupX = width / 2 + Math.floor(chipIconSize * 1.2);
+      const coreGroupX = width / 2 + Math.floor(chipIconSize * 2.5);
       ctx.save();
       ctx.filter = 'hue-rotate(80deg)';
       const coreIconOk = drawHudIcon(ctx, 'accessChip', coreGroupX, barH / 2, chipIconSize, spriteCatalog);

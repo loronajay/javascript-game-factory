@@ -2,9 +2,16 @@
 """
 import_maps.py — syncs .txt files from maps/ into scripts/maps.js.
 
-Slug rule: map_01.txt  →  id 'map-01'  (underscores become hyphens, no extension)
+Slug rule: map_04.txt  →  id 'map-04'  (underscores become hyphens, no extension)
 Dedup:     skips any file whose derived id already appears in maps.js.
 Run from the illuminauts directory:  python import_maps.py
+
+Metadata header (optional, place before the tile rows):
+  name: Sector 04
+  sprint_par: 120000
+  sweep_par: 270000
+
+Defaults if omitted:  name = map id,  sprint_par = 120000,  sweep_par = 270000
 """
 
 import re
@@ -17,30 +24,37 @@ MAPS_JS  = HERE / 'scripts' / 'maps.js'
 
 MAP_W = 35
 MAP_H = 27
-VALID_CHARS = set('.#SABPDTB')  # ., #, S, A, B, P, D, T (player-B start)
+VALID_CHARS = set('.#SABPDTKB')
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def slug(path: Path) -> str:
-    """map-01.txt  →  'map-01'"""
     return path.stem
 
 
 def existing_ids(js_text: str) -> set:
-    """Pull every id: '...' value already in maps.js."""
     return set(re.findall(r"id:\s*'([^']+)'", js_text))
 
 
-def parse_txt(path: Path) -> list[str]:
+def parse_txt(path: Path) -> tuple[list[str], dict]:
     """
-    Return the 27 tile rows from a txt file.
+    Return (rows, meta) where rows is the 27 tile strings and meta holds
+    name/sprint_par/sweep_par parsed from optional header lines.
+
     Accepts:
       - plain unquoted rows (one row per line)
       - quoted rows: 'row...' or "row..."
       - full maps.js entry pasted in (extra quoted strings filtered by width)
     """
     text = path.read_text(encoding='utf-8')
+
+    # Parse metadata from key: value lines (won't be MAP_W chars wide)
+    meta = {}
+    for line in text.splitlines():
+        m = re.match(r'^\s*(name|sprint_par|sweep_par)\s*:\s*(.+)', line)
+        if m:
+            meta[m.group(1).strip()] = m.group(2).strip()
 
     # Try quoted strings first (handles editor export and raw-array copy)
     pattern = r"'([^']{" + str(MAP_W) + r"})'|\"([^\"]{" + str(MAP_W) + r"})\""
@@ -59,14 +73,23 @@ def parse_txt(path: Path) -> list[str]:
         if bad:
             raise ValueError(f"row {i}: unknown char(s) {bad!r}")
 
-    return rows
+    return rows, meta
 
 
-def format_entry(map_id: str, rows: list[str]) -> str:
+def format_entry(map_id: str, rows: list[str], meta: dict) -> str:
+    name       = meta.get('name', map_id)
+    sprint_par = int(meta.get('sprint_par', 120000))
+    sweep_par  = int(meta.get('sweep_par',  270000))
+
     raw_lines = ',\n'.join(f"      '{r}'" for r in rows)
     return (
         f"  {{\n"
         f"    id: '{map_id}',\n"
+        f"    soloConfig: {{\n"
+        f"      name: '{name}',\n"
+        f"      sprint: {{ parMs: {sprint_par} }},\n"
+        f"      sweep:  {{ parMs: {sweep_par} }},\n"
+        f"    }},\n"
         f"    raw: [\n"
         f"{raw_lines}\n"
         f"    ],\n"
@@ -83,7 +106,7 @@ def insert_entry(js_text: str, entry: str) -> str:
     """Append an entry before the closing ]; of the MAPS array."""
     stripped = js_text.rstrip()
     if not stripped.endswith('];'):
-        raise RuntimeError("maps.js does not end with '};' — check the file manually.")
+        raise RuntimeError("maps.js does not end with '];' — check the file manually.")
     return stripped[:-2] + ',\n\n' + entry + '\n];\n'
 
 
@@ -112,8 +135,8 @@ def main():
             continue
 
         try:
-            rows = parse_txt(path)
-            entry = format_entry(map_id, rows)
+            rows, meta = parse_txt(path)
+            entry = format_entry(map_id, rows, meta)
             js_text = insert_entry(js_text, entry)
             ids.add(map_id)
             added.append(map_id)

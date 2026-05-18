@@ -549,15 +549,21 @@
   background: rgba(7, 6, 18, 0.5);
 }
 
+.profile-layout-tile--child-editing .profile-layout-tile__drag-handle,
+.profile-layout-tile--child-editing .profile-layout-tile__resize-handle,
+.profile-layout-tile--child-editing .profile-layout-tile__size-badge {
+  display: none;
+}
+
 .profile-layout-child-grid {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 8;
   display: grid;
   grid-template-columns: repeat(var(--profile-child-columns, 4), minmax(0, 1fr));
   grid-template-rows: repeat(var(--profile-child-rows, 5), minmax(0, 1fr));
-  gap: 6px;
-  padding: 10px;
+  gap: inherit;
+  padding: 0;
   pointer-events: none;
 }
 

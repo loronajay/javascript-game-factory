@@ -78,12 +78,13 @@ export function renderLayoutGrid(container, layout, options = {}) {
       if (panel.id === selectedId) classes.push("profile-layout-tile--selected");
       if (!def.draggable && !def.resizable) classes.push("profile-layout-tile--locked");
       if (hasLivePreview(panel.id, previewModels)) classes.push("profile-layout-tile--live-preview");
+      if (childEditPanelId === panel.id) classes.push("profile-layout-tile--child-editing");
     }
     tile.className = classes.join(" ");
 
-    renderLivePreview(tile, panel, previewModels);
+    const livePreview = renderLivePreview(tile, panel, previewModels);
     if (editMode && childEditPanelId === panel.id) {
-      renderChildEditorOverlay(tile, panel, selectedChildId);
+      renderChildEditorOverlay(livePreview || tile, panel, selectedChildId);
     }
 
     if (editMode && def.draggable) {
@@ -130,9 +131,10 @@ export function renderLayoutGrid(container, layout, options = {}) {
       tile.setAttribute("aria-label", `Select ${def.label} panel`);
       tile.addEventListener("click", (e) => {
         // Don't fire selection when clicking a handle
-        if (!e.target.closest("[data-drag-handle],[data-resize-handle]")) onSelect(panel.id);
+        if (!e.target.closest("[data-drag-handle],[data-resize-handle],[data-child-id]")) onSelect(panel.id);
       });
       tile.addEventListener("keydown", (e) => {
+        if (e.target.closest("[data-child-id]")) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect(panel.id);
@@ -163,7 +165,7 @@ function hasLivePreview(panelId, previewModels) {
 
 function renderLivePreview(tile, panel, previewModels) {
   const panelId = panel?.id;
-  if (!hasLivePreview(panelId, previewModels)) return;
+  if (!hasLivePreview(panelId, previewModels)) return null;
 
   const preview = document.createElement("div");
   preview.className = "profile-layout-tile__live-panel";
@@ -222,6 +224,7 @@ function renderLivePreview(tile, panel, previewModels) {
 
   applyPreviewChildLayout(preview, panel);
   tile.appendChild(preview);
+  return preview;
 }
 
 function applyPreviewChildLayout(preview, panel) {
@@ -236,7 +239,7 @@ function applyPreviewChildLayout(preview, panel) {
   }
 }
 
-function renderChildEditorOverlay(tile, panel, selectedChildId) {
+function renderChildEditorOverlay(container, panel, selectedChildId) {
   const grid = getPanelChildGrid(panel.id);
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panel.id];
   if (!grid || !registry || !Array.isArray(panel.children)) return;
@@ -275,7 +278,7 @@ function renderChildEditorOverlay(tile, panel, selectedChildId) {
     overlay.appendChild(box);
   }
 
-  tile.appendChild(overlay);
+  container.appendChild(overlay);
 }
 
 function renderGridOverlay(container, panels) {
