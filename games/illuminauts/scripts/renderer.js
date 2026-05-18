@@ -6,6 +6,7 @@ import { drawHud, drawMessage } from './renderer-hud.js';
 export {
   renderMenu,
   renderSideSelect,
+  renderMapSelect,
   renderLobby,
   renderCountdown,
   renderDisconnected,

@@ -1,4 +1,10 @@
 import { COLORS, HEARTS_MAX, STAMINA_MAX } from './config.js';
+
+function fmtRunTime(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
 import { drawSpriteContain } from './assets.js';
 
 function drawHudIcon(ctx, name, x, y, size, catalog) {
@@ -47,6 +53,25 @@ export function drawHud(ctx, state, now, width, height, spriteCatalog = undefine
     ctx.font = `${Math.floor(fontSize * 0.72)}px system-ui, sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillText(`vs ${state.remote.displayName}`, width - pad - Math.max(88, width * 0.15), barH / 2);
+  }
+
+  if (state.solo?.enabled) {
+    const elapsed = now - (state.gameStartAt || 0);
+    ctx.fillStyle = '#76f4ff';
+    ctx.font = `${Math.floor(monoSize * 1.05)}px ui-monospace, Consolas, monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText(fmtRunTime(elapsed), width - pad - Math.max(88, width * 0.15), barH / 2);
+
+    if (state.solo.mode === 'sweep') {
+      const allDone = state.solo.dataCoresCollected >= state.solo.dataCoreTotal;
+      const coreColor = allDone ? COLORS.dataCore : '#2a7a4a';
+      const coreStr = `${state.solo.dataCoresCollected}/${state.solo.dataCoreTotal}`;
+      const coreGroupX = width / 2 + Math.floor(chipIconSize * 1.2);
+      ctx.fillStyle = coreColor;
+      ctx.font = `bold ${fontSize}px ui-monospace, Consolas, monospace`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`[K] ${coreStr}`, coreGroupX, barH / 2);
+    }
   }
 
   const powerRemaining = Math.max(0, player.powerUntil - now);

@@ -9,6 +9,7 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
   const mapDef = mapEntry ?? MAPS[mapIndex % MAPS.length];
   const map = createWorldMap(mapDef.raw);
   const hazards = JSON.parse(JSON.stringify(mapDef.hazards));
+  const dataCoreTotal = map.pickups.filter((p) => p.type === 'dataCore').length;
   // Turrets don't move — precompute beam tiles once so getTurretBeamTiles() never allocates.
   for (const t of hazards.turrets) {
     t.beamTiles = [];
@@ -69,6 +70,15 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
       enabled: false,
       outbox: [],       // game events queued for sending (flushed each tick)
       localPlayerId: '',
+    },
+
+    // Solo state — enabled when playing a single-player run.
+    solo: {
+      enabled: false,
+      mode: 'sprint',          // 'sprint' | 'sweep'
+      dataCoresCollected: 0,
+      dataCoreTotal,
+      beaconLocked: false,     // true in sweep mode until all cores collected; startSoloGame sets this
     },
 
     hazards,

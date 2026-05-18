@@ -27,6 +27,9 @@ export function createWorldMap(raw) {
       } else if (cell === 'B') {
         goals.push({ x, y, type: 'beaconCore' });
         tiles[y][x] = '.';
+      } else if (cell === 'K') {
+        pickups.push({ id: `dc-${x}-${y}`, x, y, type: 'dataCore', active: true });
+        tiles[y][x] = '.';
       }
     }
   }

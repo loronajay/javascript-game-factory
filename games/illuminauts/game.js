@@ -1,10 +1,12 @@
 import { createGameState, selectMatchMapIndex } from './scripts/state.js';
+import { MAPS } from './scripts/maps.js';
 import { bindInput, clearFrameInput, consumeAnyKey } from './scripts/input.js';
 import { updateAliens } from './scripts/hazards.js';
 import { updatePlayer } from './scripts/player.js';
 import {
   renderMenu,
   renderSideSelect,
+  renderMapSelect,
   renderLobby,
   renderCountdown,
   renderDisconnected,
@@ -83,7 +85,7 @@ canvas.addEventListener('click', (e) => {
 });
 
 // ─── Phase & state ────────────────────────────────────────────────────────────
-// Phases: 'menu' | 'side_select' | 'lobby' | 'countdown' | 'playing' | 'win' | 'disconnected'
+// Phases: 'menu' | 'side_select' | 'map_select' | 'lobby' | 'countdown' | 'playing' | 'win' | 'disconnected'
 
 let phase = 'menu';
 let state = createGameState(0);
@@ -91,6 +93,14 @@ state.input = input;
 
 let accumulator = 0;
 const TICK_MS = 1000 / 60;
+
+// ─── Solo session state ───────────────────────────────────────────────────────
+
+let soloMode = 'sprint';   // 'sprint' | 'sweep'
+let soloSide = 'alpha';    // 'alpha' | 'beta'
+let soloTimeMs = 0;
+let soloPbMs = 0;
+let soloIsNewPb = false;
 
 // ─── Online session state ─────────────────────────────────────────────────────
 
@@ -267,7 +277,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (phase === 'side_select') {
+  if (phase === 'side_select' || phase === 'map_select') {
     if (e.key === 'Escape') { phase = 'menu'; }
     return;
   }
@@ -301,6 +311,30 @@ function handleButtonClick(id) {
   switch (id) {
     case 'btn_play_online':
       phase = 'side_select';
+      break;
+    case 'btn_solo':
+      phase = 'map_select';
+      break;
+    case 'btn_mode_sprint':
+      soloMode = 'sprint';
+      break;
+    case 'btn_mode_sweep':
+      soloMode = 'sweep';
+      break;
+    case 'btn_solo_alpha':
+      soloSide = 'alpha';
+      break;
+    case 'btn_solo_beta':
+      soloSide = 'beta';
+      break;
+    case 'btn_map_0':
+      startSoloGame(0);
+      break;
+    case 'btn_map_1':
+      startSoloGame(1);
+      break;
+    case 'btn_map_2':
+      startSoloGame(2);
       break;
     case 'btn_side_alpha':
       void enterLobby('alpha');
@@ -343,9 +377,40 @@ function handleButtonClick(id) {
 function startTestGame(mapEntry, side) {
   const role = side === 'beta' ? 'B' : 'A';
   state = createGameState(0, role, mapEntry);
+  for (const p of state.map.pickups) {
+    if (p.type === 'dataCore') p.active = false;
+  }
   state.input = input;
   state.gameStartAt = performance.now();
   state.lastTime = performance.now();
+  input.held.clear();
+  input.justPressed.clear();
+  accumulator = 0;
+  phase = 'playing';
+}
+
+// ─── Solo game start ──────────────────────────────────────────────────────────
+
+function startSoloGame(mapIndex) {
+  const role = soloSide === 'beta' ? 'B' : 'A';
+  state = createGameState(mapIndex, role);
+  state.input = input;
+  state.gameStartAt = performance.now();
+  state.lastTime    = performance.now();
+  state.solo.enabled = true;
+  state.solo.mode    = soloMode;
+  if (soloMode === 'sprint') {
+    for (const p of state.map.pickups) {
+      if (p.type === 'dataCore') p.active = false;
+    }
+  }
+  if (soloMode === 'sweep' && state.solo.dataCoreTotal > 0) {
+    state.solo.beaconLocked = true;
+    state.map.beaconLocked  = true;
+  }
+  state.message = soloMode === 'sweep'
+    ? `Collect all Data Cores (0/${state.solo.dataCoreTotal}), then reach the Beacon Core.`
+    : 'Race to the Beacon Core.';
   input.held.clear();
   input.justPressed.clear();
   accumulator = 0;
@@ -356,6 +421,9 @@ function startTestGame(mapEntry, side) {
 
 function startOnlineGame() {
   state = createGameState(selectMatchMapIndex(onlineStartAt), onlineLocalRole);
+  for (const p of state.map.pickups) {
+    if (p.type === 'dataCore') p.active = false;
+  }
   state.input = input;
   state.gameStartAt = performance.now();
   state.online.enabled = true;
@@ -409,6 +477,14 @@ function gameTick(now) {
   if (state.player.won) {
     winnerIsLocal = true;
     winnerName    = localIdentity?.displayName || 'You';
+    if (state.solo?.enabled) {
+      soloTimeMs = performance.now() - (state.gameStartAt || 0);
+      const pbKey  = `illuminauts_pb_${state.solo.mode}_${state.mapId}`;
+      const stored = parseInt(localStorage.getItem(pbKey) || '0', 10) || 0;
+      soloIsNewPb = !stored || soloTimeMs < stored;
+      if (soloIsNewPb) localStorage.setItem(pbKey, String(Math.round(soloTimeMs)));
+      soloPbMs = soloIsNewPb ? soloTimeMs : stored;
+    }
     phase = 'win';
   }
 }
@@ -442,6 +518,24 @@ function loop(now) {
       renderSideSelect(canvas, hoveredButtonId, registerButton);
       break;
 
+    case 'map_select': {
+      const mapConfigs = MAPS.map((m) => ({
+        id:          m.id,
+        name:        m.soloConfig?.name ?? m.id,
+        sprintParMs: m.soloConfig?.sprint?.parMs ?? 0,
+        sweepParMs:  m.soloConfig?.sweep?.parMs  ?? 0,
+      }));
+      const personalBests = {};
+      for (const m of MAPS) {
+        const sp = parseInt(localStorage.getItem(`illuminauts_pb_sprint_${m.id}`) || '0', 10) || 0;
+        const sw = parseInt(localStorage.getItem(`illuminauts_pb_sweep_${m.id}`)  || '0', 10) || 0;
+        personalBests[`sprint_${m.id}`] = sp || null;
+        personalBests[`sweep_${m.id}`]  = sw || null;
+      }
+      renderMapSelect(canvas, { mode: soloMode, side: soloSide, hoveredButtonId, personalBests, mapConfigs }, registerButton);
+      break;
+    }
+
     case 'lobby':
       renderLobby(canvas, {
         lobbyPhase: onlineLobbyPhase,
@@ -467,13 +561,17 @@ function loop(now) {
       renderGameView(canvas, state, now);
       break;
 
-    case 'win':
-      renderWinScreen(canvas, state, now, winnerIsLocal, winnerName);
+    case 'win': {
+      const soloInfo = state.solo?.enabled
+        ? { timeMs: soloTimeMs, pbMs: soloPbMs, isNewPb: soloIsNewPb, mode: soloMode }
+        : null;
+      renderWinScreen(canvas, state, now, winnerIsLocal, winnerName, soloInfo);
       if (consumeAnyKey(state.input)) {
-        _freshClient();
+        if (!state.solo?.enabled) _freshClient();
         goToMenu();
       }
       break;
+    }
 
     case 'disconnected':
       renderDisconnected(canvas, hoveredButtonId, registerButton);

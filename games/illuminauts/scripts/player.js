@@ -49,12 +49,31 @@ function collectPickups(state, now) {
       enqueueSoundEvent(state, 'collect', { pickupId: pickup.id });
       enqueueSoundEvent(state, 'power-up', { pickupId: pickup.id });
       state.online.outbox.push({ type: 'pickup_taken', pickupId: pickup.id });
+    } else if (pickup.type === 'dataCore') {
+      pickup.active = false;
+      state.solo.dataCoresCollected += 1;
+      enqueueSoundEvent(state, 'collect', { pickupId: pickup.id });
+      const remaining = state.solo.dataCoreTotal - state.solo.dataCoresCollected;
+      if (state.solo.mode === 'sweep' && remaining <= 0) {
+        state.solo.beaconLocked = false;
+        state.map.beaconLocked = false;
+        state.message = 'All Data Cores secured — Beacon Core unlocked.';
+        enqueueSoundEvent(state, 'power-up', { pickupId: pickup.id });
+      } else {
+        state.message = `Data Core secured. ${remaining} remaining.`;
+      }
     }
   }
   if (isGoalAt(map, player.tx, player.ty)) {
-    player.won = true;
-    state.message = 'Beacon Core reached.';
-    state.online.outbox.push({ type: 'won', playerId: state.online.localPlayerId });
+    if (state.solo?.beaconLocked) {
+      state.message = `Beacon Core locked — collect all Data Cores first. (${state.solo.dataCoresCollected}/${state.solo.dataCoreTotal})`;
+    } else {
+      player.won = true;
+      state.message = 'Beacon Core reached.';
+      if (state.online.enabled) {
+        state.online.outbox.push({ type: 'won', playerId: state.online.localPlayerId });
+      }
+    }
   }
 }
 

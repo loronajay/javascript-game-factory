@@ -115,7 +115,8 @@
     .tile-power   { background: #164e63; color: #a5f3fc; }
     .tile-chip    { background: #713f12; color: #fde68a; }
     .tile-door    { background: #581c87; color: #e9d5ff; }
-    .tile-beacon  { background: #facc15; color: #111827; }
+    .tile-beacon   { background: #facc15; color: #111827; }
+    .tile-datacore { background: #14532d; color: #86efac; }
     .sec-label {
       font-size: 10px; font-weight: 700;
       color: #8899bb; text-transform: uppercase; letter-spacing: 0.07em;
@@ -201,6 +202,7 @@ const TILE_TOOLS = [
   { key: 'A', label: 'Chip',     cls: 'tile-chip'     },
   { key: 'P', label: 'Power',    cls: 'tile-power'    },
   { key: 'D', label: 'Door',     cls: 'tile-door'     },
+  { key: 'K', label: 'DataCore', cls: 'tile-datacore'  },
 ];
 const TILE_CLS = Object.fromEntries(TILE_TOOLS.map(t => [t.key, t.cls]));
 TILE_CLS['B'] = 'tile-beacon';
@@ -660,7 +662,7 @@ function renderSidePanel() {
   for (const row of map) for (const t of row) counts[t] = (counts[t] || 0) + 1;
   for (const [label, val] of [
     ['Size', `${W}×${H}`], ['#', counts['#']??0], ['A', counts['A']??0],
-    ['P', counts['P']??0], ['D', counts['D']??0], ['Aliens', hazards.aliens.length],
+    ['P', counts['P']??0], ['D', counts['D']??0], ['K', counts['K']??0], ['Aliens', hazards.aliens.length],
     ['Gates', hazards.laserGates.length], ['Turrets', hazards.turrets.length]
   ]) {
     const s = el('div', 'stat');

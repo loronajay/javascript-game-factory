@@ -83,11 +83,16 @@ function drawTileBase(ctx, map, wx, wy, sx, sy, size) {
   if (tile === '#') {
     drawWallTile(ctx, wx, wy, sx, sy, size);
   } else if (isGoalAt(map, wx, wy)) {
-    fillRect(ctx, sx, sy, size, COLORS.goal);
-    ctx.save();
-    ctx.globalAlpha = 0.22;
-    fillRect(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, '#baffc8');
-    ctx.restore();
+    if (map.beaconLocked) {
+      ctx.fillStyle = '#0c0c1a';
+      ctx.fillRect(sx, sy, size, size);
+    } else {
+      fillRect(ctx, sx, sy, size, COLORS.goal);
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      fillRect(ctx, sx + size * 0.08, sy + size * 0.08, size * 0.84, '#baffc8');
+      ctx.restore();
+    }
   } else {
     drawFloorTile(ctx, wx, wy, sx, sy, size);
   }
@@ -227,8 +232,10 @@ export function drawWorld(ctx, map, hazards, elapsed, startX, startY, size, offX
   }
 
   const beaconBounds = getBeaconBounds(map);
-  for (const goal of map.goals) {
-    drawBeaconPiece(ctx, beaconBounds, goal.x, goal.y, sx(goal.x), sy(goal.y), size);
+  if (!map.beaconLocked) {
+    for (const goal of map.goals) {
+      drawBeaconPiece(ctx, beaconBounds, goal.x, goal.y, sx(goal.x), sy(goal.y), size);
+    }
   }
 
   for (const door of map.doors) {
@@ -252,6 +259,16 @@ export function drawWorld(ctx, map, hazards, elapsed, startX, startY, size, offX
         ctx.arc(cx, cy, size * 0.24, 0, Math.PI * 2);
         ctx.fill();
         glyph(ctx, 'P', sx(pickup.x), sy(pickup.y), size, '#001c20');
+      }
+    } else if (pickup.type === 'dataCore') {
+      ctx.save();
+      ctx.filter = 'hue-rotate(80deg)';
+      const ok = drawSpriteContain(ctx, 'accessChip', cx, cy, size * 0.82, size * 0.82);
+      ctx.restore();
+      if (!ok) {
+        ctx.fillStyle = COLORS.dataCore;
+        ctx.fillRect(sx(pickup.x) + size * 0.28, sy(pickup.y) + size * 0.28, size * 0.44, size * 0.44);
+        glyph(ctx, 'K', sx(pickup.x), sy(pickup.y), size, '#001800');
       }
     }
   }

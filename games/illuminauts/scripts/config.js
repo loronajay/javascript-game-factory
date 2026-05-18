@@ -22,6 +22,7 @@ export const COLORS = {
   player: '#76f4ff',
   playerInvuln: '#ffffff',
   chip: '#ffd166',
+  dataCore: '#4dff91',
   power: '#76f4ff',
   door: '#ff4fd8',
   doorOpen: '#263353',

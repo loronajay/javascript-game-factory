@@ -43,7 +43,10 @@ export function renderMenu(canvas, hoveredButtonId, registerButton) {
   const btnH = Math.max(50, Math.floor(Math.min(width, height) * 0.072));
   const btnX = cx - btnW / 2;
 
-  drawButton(ctx, 'PLAY ONLINE', btnX, hasSplash ? height * 0.79 : cy * 0.9, btnW, btnH, registerButton, 'btn_play_online', hoveredButtonId === 'btn_play_online');
+  const onlineY = hasSplash ? height * 0.76 : cy * 0.88;
+  const soloY   = onlineY + btnH + Math.floor(btnH * 0.38);
+  drawButton(ctx, 'PLAY ONLINE', btnX, onlineY, btnW, btnH, registerButton, 'btn_play_online', hoveredButtonId === 'btn_play_online');
+  drawButton(ctx, 'SOLO RUN',    btnX, soloY,   btnW, btnH, registerButton, 'btn_solo',        hoveredButtonId === 'btn_solo');
 
   const controlsY = splashRect && splashRect.y + splashRect.h < height - 18
     ? splashRect.y + splashRect.h + (height - splashRect.y - splashRect.h) / 2
@@ -107,6 +110,160 @@ export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
 
   ctx.fillStyle = '#1e2e38';
   ctx.font = `${Math.max(10, Math.floor(titleSize * 0.28))}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ESC — back to menu', cx, height - Math.max(18, height * 0.038));
+}
+
+function _fmtMs(ms) {
+  if (!ms) return '--:--';
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function _fmtMsDetailed(ms) {
+  if (!ms) return '--:--.--';
+  const s = Math.floor(ms / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+
+function _drawToggleBtn(ctx, label, x, y, w, h, active, hovered, registerButton, id) {
+  ctx.save();
+  if (active) {
+    ctx.shadowColor = 'rgba(118, 244, 255, 0.55)';
+    ctx.shadowBlur = 12;
+  } else if (hovered) {
+    ctx.shadowColor = 'rgba(118, 244, 255, 0.3)';
+    ctx.shadowBlur = 8;
+  }
+  ctx.fillStyle = active ? 'rgba(20, 60, 85, 0.97)' : 'rgba(10, 22, 38, 0.88)';
+  ctx.strokeStyle = active ? '#76f4ff' : (hovered ? '#5ab0c8' : '#2a4a5e');
+  ctx.lineWidth = active ? 2 : 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = active ? '#e8f8ff' : (hovered ? '#a8d8ef' : '#4a7a8a');
+  ctx.font = `${Math.floor(h * 0.4)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, y + h / 2);
+  if (registerButton) registerButton(id, x, y, w, h);
+}
+
+export function renderMapSelect(canvas, { mode, side, hoveredButtonId, personalBests = {}, mapConfigs = [] }, registerButton) {
+  resizeCanvasToDisplaySize(canvas);
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  drawDarkBg(ctx, width, height);
+
+  const cx = width / 2;
+  const titleSize = Math.max(22, Math.floor(Math.min(width, height) * 0.062));
+  const subSize   = Math.max(11, Math.floor(titleSize * 0.36));
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(118, 244, 255, 0.4)';
+  ctx.shadowBlur  = titleSize * 0.6;
+  ctx.fillStyle   = '#76f4ff';
+  ctx.font        = `bold ${titleSize}px system-ui, sans-serif`;
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('SOLO RUN', cx, height * 0.1);
+  ctx.restore();
+
+  // Mode toggle
+  const toggleH = Math.max(30, Math.floor(Math.min(width, height) * 0.048));
+  const toggleW = Math.min(130, width * 0.17);
+  const toggleGap = 10;
+  const toggleY   = height * 0.19;
+  _drawToggleBtn(ctx, 'SPRINT', cx - toggleW - toggleGap / 2, toggleY, toggleW, toggleH,
+    mode === 'sprint', hoveredButtonId === 'btn_mode_sprint', registerButton, 'btn_mode_sprint');
+  _drawToggleBtn(ctx, 'SWEEP',  cx + toggleGap / 2,           toggleY, toggleW, toggleH,
+    mode === 'sweep',  hoveredButtonId === 'btn_mode_sweep',  registerButton, 'btn_mode_sweep');
+
+  // Mode description
+  const modeDesc = mode === 'sweep'
+    ? 'Collect all Data Cores, then reach the Beacon Core'
+    : 'Race to the Beacon Core as fast as possible';
+  ctx.fillStyle = '#4a6a7a';
+  ctx.font = `${subSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(modeDesc, cx, toggleY + toggleH + Math.floor(toggleH * 0.6));
+
+  // Side toggle
+  const sideH  = Math.max(26, Math.floor(toggleH * 0.8));
+  const sideW  = Math.min(100, width * 0.13);
+  const sideY  = height * 0.32;
+  ctx.fillStyle = '#3a5060';
+  ctx.font = `${subSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('START SIDE', cx, sideY - sideH * 0.7);
+  _drawToggleBtn(ctx, 'ALPHA', cx - sideW - toggleGap / 2, sideY, sideW, sideH,
+    side === 'alpha', hoveredButtonId === 'btn_solo_alpha', registerButton, 'btn_solo_alpha');
+  _drawToggleBtn(ctx, 'BETA',  cx + toggleGap / 2,         sideY, sideW, sideH,
+    side === 'beta',  hoveredButtonId === 'btn_solo_beta',  registerButton, 'btn_solo_beta');
+
+  // Map cards
+  const cardCount = mapConfigs.length;
+  const cardW = Math.min(200, Math.floor((width - 80) / Math.max(cardCount, 1)));
+  const cardH = Math.max(130, Math.floor(Math.min(width, height) * 0.22));
+  const cardGap = Math.max(12, Math.floor(width * 0.018));
+  const totalW  = cardCount * cardW + (cardCount - 1) * cardGap;
+  const cardStartX = cx - totalW / 2;
+  const cardY = height * 0.44;
+
+  for (let i = 0; i < cardCount; i++) {
+    const cfg = mapConfigs[i];
+    const cx_c = cardStartX + i * (cardW + cardGap);
+    const btnId = `btn_map_${i}`;
+    const isHov = hoveredButtonId === btnId;
+    const parMs = mode === 'sprint' ? cfg.sprintParMs : cfg.sweepParMs;
+    const pbKey = `${mode}_${cfg.id}`;
+    const pbMs  = personalBests[pbKey] || 0;
+
+    ctx.save();
+    if (isHov) { ctx.shadowColor = 'rgba(118, 244, 255, 0.45)'; ctx.shadowBlur = 18; }
+    ctx.fillStyle   = isHov ? 'rgba(20, 52, 74, 0.97)' : 'rgba(12, 26, 42, 0.92)';
+    ctx.strokeStyle = isHov ? '#76f4ff' : 'rgba(118, 244, 255, 0.3)';
+    ctx.lineWidth   = isHov ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.roundRect(cx_c, cardY, cardW, cardH, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const nameSize  = Math.max(13, Math.floor(cardH * 0.13));
+    const metaSize  = Math.max(10, Math.floor(cardH * 0.09));
+
+    ctx.fillStyle = isHov ? '#e8f8ff' : '#a8c8d8';
+    ctx.font = `bold ${nameSize}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cfg.name, cx_c + cardW / 2, cardY + cardH * 0.25);
+
+    ctx.fillStyle = '#4a6a7a';
+    ctx.font = `${metaSize}px ui-monospace, Consolas, monospace`;
+    ctx.fillText(`Par  ${_fmtMs(parMs)}`, cx_c + cardW / 2, cardY + cardH * 0.48);
+
+    const pbColor = pbMs && pbMs <= parMs ? '#4dff91' : (pbMs ? '#ffd166' : '#2a4a5e');
+    ctx.fillStyle = pbColor;
+    ctx.fillText(pbMs ? `Best ${_fmtMs(pbMs)}` : 'Best --:--', cx_c + cardW / 2, cardY + cardH * 0.63);
+
+    ctx.fillStyle = isHov ? 'rgba(200,230,255,0.75)' : 'rgba(200,230,255,0.28)';
+    ctx.font = `${metaSize}px ui-monospace, Consolas, monospace`;
+    ctx.fillText('[ SELECT ]', cx_c + cardW / 2, cardY + cardH * 0.83);
+
+    registerButton(btnId, cx_c, cardY, cardW, cardH);
+  }
+
+  // Back hint
+  ctx.fillStyle = '#1e2e38';
+  ctx.font = `${Math.max(10, Math.floor(titleSize * 0.26))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('ESC — back to menu', cx, height - Math.max(18, height * 0.038));
@@ -329,7 +486,7 @@ export function renderDisconnected(canvas, hoveredButtonId, registerButton) {
   drawButton(ctx, 'Return to Menu', cx - btnW / 2, cy * 1.2, btnW, btnH, registerButton, 'btn_back_to_menu', hoveredButtonId === 'btn_back_to_menu');
 }
 
-export function renderWinScreen(canvas, state, now, winnerIsLocal = true, winnerName = '') {
+export function renderWinScreen(canvas, state, now, winnerIsLocal = true, winnerName = '', soloInfo = null) {
   resizeCanvasToDisplaySize(canvas);
   const ctx = canvas.getContext('2d');
   const { width, height } = canvas;
@@ -368,14 +525,37 @@ export function renderWinScreen(canvas, state, now, winnerIsLocal = true, winner
 
   const subText = isOnline
     ? (winnerIsLocal ? 'You reached the core first!' : 'They found a faster route.')
-    : 'Suit navigation successful.';
+    : (soloInfo ? (soloInfo.mode === 'sweep' ? 'All cores secured. Extraction complete.' : 'Suit navigation successful.') : 'Suit navigation successful.');
   ctx.fillStyle = '#7da8b0';
   ctx.font = `${Math.max(13, Math.floor(titleSize * 0.36))}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(subText, cx, cy * 0.8 + titleSize * 0.9);
 
-  if (state) {
+  if (soloInfo) {
+    const timeStr = _fmtMsDetailed(soloInfo.timeMs);
+    const timeSize = Math.max(20, Math.floor(titleSize * 0.6));
+    ctx.save();
+    ctx.shadowColor = 'rgba(118, 244, 255, 0.4)';
+    ctx.shadowBlur = timeSize * 0.5;
+    ctx.fillStyle = '#76f4ff';
+    ctx.font = `bold ${timeSize}px ui-monospace, Consolas, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(timeStr, cx, cy * 0.8 + titleSize * 1.9);
+    ctx.restore();
+
+    const pbSize = Math.max(12, Math.floor(titleSize * 0.3));
+    if (soloInfo.isNewPb) {
+      ctx.fillStyle = '#4dff91';
+      ctx.font = `bold ${pbSize}px system-ui, sans-serif`;
+      ctx.fillText('NEW PERSONAL BEST!', cx, cy * 0.8 + titleSize * 1.9 + timeSize * 1.1);
+    } else if (soloInfo.pbMs) {
+      ctx.fillStyle = '#4a6a7a';
+      ctx.font = `${pbSize}px ui-monospace, Consolas, monospace`;
+      ctx.fillText(`Best  ${_fmtMsDetailed(soloInfo.pbMs)}`, cx, cy * 0.8 + titleSize * 1.9 + timeSize * 1.1);
+    }
+  } else if (state) {
     const doorsDisabled = state.map.doors.filter((d) => d.open).length;
     ctx.fillStyle = COLORS.chip;
     ctx.font = `${Math.max(11, Math.floor(titleSize * 0.28))}px ui-monospace, Consolas, monospace`;
