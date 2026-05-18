@@ -73,6 +73,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       el.style.width = "";
       el.style.height = "";
       shell.style.justifySelf = "center";
+      shell.style.justifyItems = "center";
       shell.style.gridTemplateColumns = cs.gridTemplateColumns && cs.gridTemplateColumns !== "none"
         ? cs.gridTemplateColumns
         : "";
@@ -89,6 +90,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.alignContent = "";
       shell.style.alignItems = "";
       shell.style.justifySelf = "";
+      shell.style.justifyItems = "";
     }
 
     const z = fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0));
