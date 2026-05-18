@@ -167,9 +167,21 @@ function applyTileVisualStyle(tile, style = {}) {
     tile.style.setProperty("--layout-tile-base-rgb-2", rgb2);
     tile.style.setProperty("--layout-tile-base-opacity", String(Math.max(0.55, opacity)));
     tile.style.setProperty("--layout-tile-gradient-angle", `${gradientAngle}deg`);
+    tile.style.setProperty("--profile-panel-custom-rgb", rgb);
+    tile.style.setProperty("--profile-panel-custom-rgb-2", rgb2);
+    tile.style.setProperty("--profile-panel-custom-opacity", String(opacity));
+    tile.style.setProperty("--profile-panel-base-rgb", rgb);
+    tile.style.setProperty("--profile-panel-base-rgb-2", rgb2);
+    tile.style.setProperty("--profile-panel-base-opacity", String(Math.max(0.55, opacity)));
+    tile.style.setProperty("--profile-panel-gradient-angle", `${gradientAngle}deg`);
   }
   if (titleColor) {
     tile.style.setProperty("--layout-tile-label-color", titleColor);
+    tile.style.setProperty("--profile-panel-title-rgb", hexToRgbString(titleColor));
+  }
+  const elementColor = normalizeHexColor(style.elementColor);
+  if (elementColor) {
+    tile.style.setProperty("--profile-panel-element-rgb", hexToRgbString(elementColor));
   }
 }
 
@@ -207,4 +219,9 @@ function adjustHexColor(hex, saturation, brightness) {
   const gray = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
   const adjust = (channel) => Math.round(Math.min(255, Math.max(0, (gray + (channel - gray) * saturation) * brightness)));
   return `${adjust(rgb.r)}, ${adjust(rgb.g)}, ${adjust(rgb.b)}`;
+}
+
+function hexToRgbString(hex) {
+  const rgb = hexToRgb(hex);
+  return rgb ? `${rgb.r}, ${rgb.g}, ${rgb.b}` : "";
 }
