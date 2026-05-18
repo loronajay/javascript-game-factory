@@ -575,6 +575,8 @@
 
 .profile-layout-child-grid__box {
   position: absolute;
+  top: 0;
+  left: 0;
   display: grid;
   place-items: center;
   min-width: 0;
