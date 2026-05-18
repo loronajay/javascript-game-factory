@@ -4,7 +4,7 @@ Status snapshot: 2026-05-18
 
 This scopes the next customization pass after the first `/me/layout` visual controls. The goal is a smoother appearance-editing experience where users can tune one panel while seeing the real live panel as it currently appears on their profile, before saving.
 
-The first live-preview slice has moved past the hero card into most non-composer panels. Do not roll the deeper appearance controls across every panel until the hero flow feels solid, debuggable, and pleasant.
+The first live-preview foundation now covers all current profile panels. Do not roll the deeper appearance controls across every panel until the hero flow feels solid, debuggable, and pleasant.
 
 Important 2026-05-18 lesson: a preview is only useful if it uses the same renderer, CSS stack, scaling path, and CSS variables as the real profile page. Fake editor-only tiles drift too easily.
 
@@ -149,7 +149,7 @@ Current shipped direction:
 
 ```txt
 Hero preview in /me/layout uses the live /me hero renderer.
-Identity, music, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges now use live /me renderers/templates in /me/layout.
+Identity, music, thoughts, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges now use live /me renderers/templates in /me/layout.
 The editor page loads the live owner-profile CSS needed for that hero.
 Editor tiles set both editor variables and live --profile-panel-* variables.
 Live previews use the same scale-to-fit helper as the live profile.
@@ -258,7 +258,7 @@ Gallery panel - shipped
 About/Badges panels - shipped
 Friends/Top Friends/Rankings/Friend Code panels - shipped
 Music panel - shipped
-Thoughts feed panel
+Thoughts feed panel - shipped
 ```
 
 For each panel, first reuse the live renderer/CSS and verify it matches `/me`; only then add deeper appearance controls for that panel.
@@ -298,13 +298,13 @@ The implementation creates a pattern that can be repeated for the next panel.
 
 ## Next Panel Preview Scope
 
-Before adding more appearance controls, continue the live-preview foundation.
+The live-preview foundation is in place for every current profile panel. Before deeper appearance controls, manually QA the previews against `/me` at the same saved grid sizes.
 
 Recommended next panel order:
 
 ```txt
-1. Thoughts feed - keep internal scrolling intentional.
-2. Then begin deeper hero-panel appearance controls and sub-grid planning.
+1. Manual browser pass for tiny panel sizes, gradients, image-loading panels, and thoughts internal scrolling.
+2. Begin deeper hero-panel appearance controls and sub-grid planning.
 ```
 
 Each panel preview should ship only when it visually matches the live `/me` panel at the same saved grid size.

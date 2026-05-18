@@ -192,6 +192,21 @@ export function renderMeGalleryPanel(container, photos = [], options = {}) {
   });
 }
 
+export function renderMeThoughtsPanel(container, model, options = {}) {
+  socialView.renderThoughtsPanel(
+    container,
+    "Player Feed",
+    model.thoughtItems,
+    model.thoughtComposer,
+    {
+      openReactionThoughtId: options?.openReactionThoughtId || "",
+      sharePanelState: options?.sharePanelState || {},
+      commentPanelState: options?.commentPanelState || {},
+      composerState: options?.thoughtComposerState || {},
+    },
+  );
+}
+
 export function renderMeRankingsPanel(container, model) {
   renderRailPanel(
     container,
@@ -253,18 +268,7 @@ export function renderMePageView(doc, model, options = {}) {
   renderPageHeader(doc, model);
   renderMeHeroCard(doc.getElementById("meHeroCard"), model);
   renderMeIdentityPanel(doc.getElementById("meIdentityPanel"), model);
-  socialView.renderThoughtsPanel(
-    doc.getElementById("meThoughtsPanel"),
-    "Player Feed",
-    model.thoughtItems,
-    model.thoughtComposer,
-    {
-      openReactionThoughtId: options?.openReactionThoughtId || "",
-      sharePanelState: options?.sharePanelState || {},
-      commentPanelState: options?.commentPanelState || {},
-      composerState: options?.thoughtComposerState || {},
-    },
-  );
+  renderMeThoughtsPanel(doc.getElementById("meThoughtsPanel"), model, options);
   renderMeFriendCodePanel(doc.getElementById("meFriendCodePanel"), model);
   renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
   renderMeRankingsPanel(doc.getElementById("meRankingsPanel"), model);

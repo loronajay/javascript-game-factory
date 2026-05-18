@@ -4,6 +4,7 @@ import { bindFactoryProfileToSession, loadFactoryProfile } from "../platform/ide
 import { loadProfileMetricsRecord } from "../platform/metrics/metrics.mjs";
 import { loadProfileRelationshipsRecord } from "../platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
+import { syncThoughtFeedFromApi } from "../platform/thoughts/thoughts.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { buildAppUrl } from "../arcade-paths.mjs";
 import { fetchLayout, saveLayout } from "./layout-storage.mjs";
@@ -222,6 +223,7 @@ if (doc?.getElementById) {
         hero: "meLayoutHeroPreview",
         identity: "meLayoutIdentityPreview",
         music: "meLayoutMusicPreview",
+        thoughts: "meLayoutThoughtsPreview",
         rankings: "meLayoutRankingsPreview",
         topFriends: "meLayoutTopFriendsPreview",
         friends: "meLayoutFriendsPreview",
@@ -235,6 +237,7 @@ if (doc?.getElementById) {
         "#meLayoutHeroPreview img",
         "#meLayoutIdentityPreview img",
         "#meLayoutMusicPreview img",
+        "#meLayoutThoughtsPreview img",
         "#meLayoutRankingsPreview img",
         "#meLayoutTopFriendsPreview img",
         "#meLayoutFriendsPreview img",
@@ -502,6 +505,7 @@ async function buildPreviewModels(playerId, storage, apiClient) {
 
   const metricsRecord = loadProfileMetricsRecord(playerId || profile?.playerId, storage);
   const relationshipsRecord = loadProfileRelationshipsRecord(playerId || profile?.playerId, storage);
+  const thoughtFeed = await syncThoughtFeedFromApi(storage, apiClient, playerId || profile?.playerId || "");
   let galleryPhotos = [];
   if ((playerId || profile?.playerId) && apiClient?.listPlayerPhotos) {
     try {
@@ -513,7 +517,7 @@ async function buildPreviewModels(playerId, storage, apiClient) {
   }
 
   return {
-    hero: resolvePreviewAssetUrls(buildMePageViewModel(profile, { metricsRecord, relationshipsRecord })),
+    hero: resolvePreviewAssetUrls(buildMePageViewModel(profile, { metricsRecord, relationshipsRecord, thoughtFeed })),
     galleryPhotos,
   };
 }
