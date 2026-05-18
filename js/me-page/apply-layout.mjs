@@ -68,9 +68,23 @@ export function applyProfileLayout(doc, layout, {
     el.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
     el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;
     applyPanelVisualStyle(el, panel.style);
+    applyPanelChildLayout(el, panel);
 
     // Append in sort order so DOM order drives mobile stacking.
     layoutEl.appendChild(el);
+  }
+}
+
+function applyPanelChildLayout(panelEl, panel) {
+  if (!Array.isArray(panel?.children)) return;
+
+  for (const child of panel.children) {
+    if (!child?.id || child.enabled === false) continue;
+    const childEl = panelEl.querySelector(`[data-profile-child-id="${child.id}"]`);
+    if (!childEl) continue;
+    childEl.style.gridColumn = `${child.x + 1} / span ${child.w}`;
+    childEl.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    applyPanelVisualStyle(childEl, child.style);
   }
 }
 

@@ -1,6 +1,11 @@
 export const LAYOUT_COLUMNS = 12;
 export const LAYOUT_VERSION = 1;
 
+const DEFAULT_HERO_CHILDREN = [
+  { id: "portrait", enabled: true, x: 0, y: 0, w: 4, h: 2 },
+  { id: "metrics", enabled: true, x: 0, y: 2, w: 4, h: 2 },
+];
+
 // Maps the classic 3-column profile structure onto a 12-column grid.
 // Left col = x 0–3 (w4), Middle col = x 4–7 (w4), Right col = x 8–11 (w4).
 // Music sits at the bottom of the middle column (enabled:true so initProfileMusicPlayer
@@ -12,7 +17,7 @@ export const DEFAULT_PROFILE_LAYOUT = {
     columns: LAYOUT_COLUMNS,
     panels: [
       // Left column
-      { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5 },
+      { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
       { id: "identity",     enabled: true, x: 0, y: 5,  w: 4, h: 3 },
       { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 3 },
       { id: "topFriends",   enabled: true, x: 0, y: 11, w: 4, h: 3 },
@@ -42,7 +47,7 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
     columns: LAYOUT_COLUMNS,
     panels: [
       // Left column
-      { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5 },
+      { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
       { id: "identity",     enabled: true, x: 0, y: 5,  w: 4, h: 3 },
       { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 3 },
       { id: "friends",      enabled: true, x: 0, y: 11, w: 4, h: 3 },

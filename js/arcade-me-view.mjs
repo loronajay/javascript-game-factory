@@ -69,7 +69,7 @@ export function renderMeHeroCard(container, model) {
 
   container.innerHTML = `
     <div class="me-hero-card__backdrop" aria-hidden="true"></div>
-    <section class="me-hero-card__portrait-panel">
+    <section class="me-hero-card__portrait-panel me-hero-card__child" data-profile-child-id="portrait">
       <div class="me-hero-card__portrait" aria-hidden="true">
         <div class="me-hero-card__portrait-shell">
           <div class="me-hero-card__portrait-frame">
@@ -83,7 +83,7 @@ export function renderMeHeroCard(container, model) {
         </div>
       </div>
     </section>
-    <section class="me-hero-card__metrics-panel">
+    <section class="me-hero-card__metrics-panel me-hero-card__child" data-profile-child-id="metrics">
       <div class="me-hero-card__section-topline">
         <h3 class="me-hero-card__section-title">Profile Metrics</h3>
       </div>

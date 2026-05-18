@@ -1,5 +1,6 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
 import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs";
+import { PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -49,14 +50,27 @@ export function normalizeLayout(raw) {
     // Clamp x so panel fits within the grid
     const clampedX = Math.min(x, columns - w);
 
-    normalized.push({ id, enabled, x: clampedX, y, w, h, style: normalizePanelStyle(p.style) });
+    normalized.push({
+      id,
+      enabled,
+      x: clampedX,
+      y,
+      w,
+      h,
+      style: normalizePanelStyle(p.style),
+      children: normalizePanelChildren(id, p.children),
+    });
   }
 
   // Add any required panels that are missing
   for (const defaultPanel of defaultLayout.desktop.panels) {
     const def = PROFILE_PANEL_REGISTRY[defaultPanel.id];
     if (def.required && !seenIds.has(defaultPanel.id)) {
-      normalized.push({ ...defaultPanel, style: normalizePanelStyle(defaultPanel.style) });
+      normalized.push({
+        ...defaultPanel,
+        style: normalizePanelStyle(defaultPanel.style),
+        children: normalizePanelChildren(defaultPanel.id, defaultPanel.children),
+      });
     }
   }
 
@@ -96,6 +110,35 @@ export function normalizePanelStyle(raw) {
   if (gradientAngle !== null) style.gradientAngle = gradientAngle;
 
   return style;
+}
+
+export function normalizePanelChildren(panelId, rawChildren) {
+  const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
+  if (!registry) return undefined;
+
+  const rawById = new Map(
+    (Array.isArray(rawChildren) ? rawChildren : [])
+      .filter((child) => child && typeof child === "object")
+      .map((child) => [child.id, child]),
+  );
+
+  return Object.entries(registry.children).map(([id, def]) => {
+    const raw = rawById.get(id) || {};
+    const w = clamp(toInt(raw.w, def.defaultW), def.minW, def.maxW);
+    const h = clamp(toInt(raw.h, def.defaultH), def.minH, def.maxH);
+    const x = clamp(toInt(raw.x, def.defaultX), 0, registry.columns - 1);
+    const y = clamp(toInt(raw.y, def.defaultY), 0, registry.rows - 1);
+
+    return {
+      id,
+      enabled: raw.enabled !== false,
+      x: Math.min(x, registry.columns - w),
+      y: Math.min(y, registry.rows - h),
+      w,
+      h,
+      style: normalizePanelStyle(raw.style),
+    };
+  });
 }
 
 function toInt(val, fallback) {

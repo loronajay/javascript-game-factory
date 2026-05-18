@@ -10,6 +10,7 @@ import { buildAppUrl } from "../arcade-paths.mjs";
 import { fetchLayout, saveLayout } from "./layout-storage.mjs";
 import { normalizeLayout } from "./normalize-layout.mjs";
 import { getDefaultLayout } from "./default-layout.mjs";
+import { PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import { renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
@@ -67,6 +68,8 @@ if (doc?.getElementById) {
     let currentLayout = getDefaultLayout();
     let isDirty = false;
     let selectedPanelId = null;
+    let childEditPanelId = null;
+    let selectedChildId = null;
     let gridOverlayOn = true;
     let zoom = 1;
     let previewModels = {};
@@ -106,7 +109,10 @@ if (doc?.getElementById) {
       renderLayoutGrid(canvas, currentLayout, {
         editMode: true,
         selectedId: selectedPanelId,
+        childEditPanelId,
+        selectedChildId,
         onSelect: selectPanel,
+        onSelectChild: selectChild,
         previewModels,
       });
       // renderer preserves extra classes, but re-assert overlay to be safe
@@ -118,7 +124,27 @@ if (doc?.getElementById) {
 
     function selectPanel(id) {
       selectedPanelId = id === selectedPanelId ? null : id;
+      if (selectedPanelId !== childEditPanelId) {
+        childEditPanelId = null;
+        selectedChildId = null;
+      }
       refreshAll();
+    }
+
+    function selectChild(id) {
+      selectedChildId = id;
+      renderInspector();
+      renderLayoutGrid(canvas, currentLayout, {
+        editMode: true,
+        selectedId: selectedPanelId,
+        childEditPanelId,
+        selectedChildId,
+        onSelect: selectPanel,
+        onSelectChild: selectChild,
+        previewModels,
+      });
+      canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
+      requestAnimationFrame(applyLivePreviewScaling);
     }
 
     // --- zoom ---
@@ -211,7 +237,10 @@ if (doc?.getElementById) {
       renderLayoutGrid(canvas, currentLayout, {
         editMode: true,
         selectedId: selectedPanelId,
+        childEditPanelId,
+        selectedChildId,
         onSelect: selectPanel,
+        onSelectChild: selectChild,
         previewModels,
       });
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
@@ -352,6 +381,7 @@ if (doc?.getElementById) {
           ${enableToggle}
           ${!def.draggable ? `<p class="me-layout-inspector__locked">Position locked</p>` : ""}
           ${!def.resizable ? `<p class="me-layout-inspector__locked">Size locked</p>` : ""}
+          ${renderChildLayoutControls(panel)}
           ${renderStyleControls(panel)}
         </div>
       `;
@@ -373,6 +403,95 @@ if (doc?.getElementById) {
       inspector.querySelector("[data-reset-panel-style]")?.addEventListener("click", () => {
         resetPanelStyle(panel.id);
       });
+      inspector.querySelector("[data-toggle-child-edit]")?.addEventListener("click", () => {
+        childEditPanelId = childEditPanelId === panel.id ? null : panel.id;
+        selectedChildId = childEditPanelId ? (panel.children?.[0]?.id || null) : null;
+        refreshAll();
+      });
+      inspector.querySelectorAll("[data-child-select]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          childEditPanelId = panel.id;
+          selectChild(btn.dataset.childSelect);
+        });
+      });
+      inspector.querySelectorAll("[data-child-action]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          updateChildLayout(panel.id, btn.dataset.childId, btn.dataset.childAction);
+        });
+      });
+    }
+
+    function renderChildLayoutControls(panel) {
+      const registry = PROFILE_PANEL_CHILD_REGISTRY[panel.id];
+      if (!registry) return "";
+      const children = Array.isArray(panel.children) ? panel.children : [];
+      const activeChild = selectedChildId || children[0]?.id || "";
+      const childRows = children.map((child) => {
+        const childDef = registry.children[child.id];
+        if (!childDef) return "";
+        const selected = child.id === activeChild && childEditPanelId === panel.id;
+        return `
+          <div class="me-layout-child-editor__row${selected ? " me-layout-child-editor__row--selected" : ""}">
+            <button type="button" class="me-layout-child-editor__select" data-child-select="${escapeHtml(child.id)}">${escapeHtml(childDef.label)}</button>
+            <span class="me-layout-child-editor__meta">${child.x + 1},${child.y + 1} @ ${child.w} x ${child.h}</span>
+          </div>
+        `;
+      }).join("");
+
+      const actionDisabled = childEditPanelId === panel.id && activeChild ? "" : " disabled";
+      return `
+        <div class="me-layout-child-editor">
+          <div class="me-layout-style-editor__header">
+            <p class="me-layout-style-editor__title">Panel Contents</p>
+            <button class="me-layout-style-editor__reset" type="button" data-toggle-child-edit="${escapeHtml(panel.id)}">${childEditPanelId === panel.id ? "Done" : "Edit"}</button>
+          </div>
+          ${childRows}
+          <div class="me-layout-child-editor__actions" data-active-child="${escapeHtml(activeChild)}">
+            <button type="button" data-child-action="up" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Up</button>
+            <button type="button" data-child-action="down" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Down</button>
+            <button type="button" data-child-action="left" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Left</button>
+            <button type="button" data-child-action="right" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Right</button>
+            <button type="button" data-child-action="w-minus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>W-</button>
+            <button type="button" data-child-action="w-plus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>W+</button>
+            <button type="button" data-child-action="h-minus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>H-</button>
+            <button type="button" data-child-action="h-plus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>H+</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateChildLayout(panelId, childId, action) {
+      const panelIdx = currentLayout.desktop.panels.findIndex((p) => p.id === panelId);
+      if (panelIdx < 0 || !childId) return;
+      const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
+      const panel = currentLayout.desktop.panels[panelIdx];
+      const childIdx = panel.children?.findIndex((child) => child.id === childId) ?? -1;
+      const childDef = registry?.children?.[childId];
+      if (!registry || childIdx < 0 || !childDef) return;
+
+      const child = panel.children[childIdx];
+      let next = { ...child };
+      if (action === "up") next.y -= 1;
+      if (action === "down") next.y += 1;
+      if (action === "left") next.x -= 1;
+      if (action === "right") next.x += 1;
+      if (action === "w-minus") next.w -= 1;
+      if (action === "w-plus") next.w += 1;
+      if (action === "h-minus") next.h -= 1;
+      if (action === "h-plus") next.h += 1;
+
+      next.w = Math.max(childDef.minW, Math.min(childDef.maxW, next.w));
+      next.h = Math.max(childDef.minH, Math.min(childDef.maxH, next.h));
+      next.x = Math.max(0, Math.min(registry.columns - next.w, next.x));
+      next.y = Math.max(0, Math.min(registry.rows - next.h, next.y));
+
+      const nextChildren = [...panel.children];
+      nextChildren[childIdx] = next;
+      currentLayout.desktop.panels[panelIdx] = { ...panel, children: nextChildren };
+      childEditPanelId = panelId;
+      selectedChildId = childId;
+      markDirty();
+      refreshAll();
     }
 
     function renderStyleControls(panel) {
@@ -450,6 +569,8 @@ if (doc?.getElementById) {
       if (!confirm("Reset to default layout? This will clear your current changes.")) return;
       currentLayout = getDefaultLayout();
       selectedPanelId = null;
+      childEditPanelId = null;
+      selectedChildId = null;
       markDirty();
       refreshAll();
       setStatus("Layout reset to default.");

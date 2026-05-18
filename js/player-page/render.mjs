@@ -61,7 +61,7 @@ function renderHeroCard(container, model) {
 
   container.innerHTML = `
     <div class="player-hero-card__backdrop" aria-hidden="true"></div>
-    <section class="player-hero-card__portrait-panel">
+    <section class="player-hero-card__portrait-panel player-hero-card__child" data-profile-child-id="portrait">
       <div class="player-hero-card__portrait" aria-hidden="true">
         <div class="player-hero-card__portrait-shell">
           <div class="player-hero-card__portrait-frame">
@@ -75,7 +75,7 @@ function renderHeroCard(container, model) {
         </div>
       </div>
     </section>
-    <section class="player-hero-card__metrics-panel">
+    <section class="player-hero-card__metrics-panel player-hero-card__child" data-profile-child-id="metrics">
       <div class="player-hero-card__section-topline">
         <h3 class="player-hero-card__section-title">Profile Metrics</h3>
       </div>

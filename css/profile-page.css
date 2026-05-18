@@ -34,7 +34,7 @@
 .me-hero-card > .panel-zoom-shell,
 .player-hero-card > .panel-zoom-shell {
   justify-content: center;
-  justify-items: center;
+  justify-items: stretch;
   text-align: center;
 }
 

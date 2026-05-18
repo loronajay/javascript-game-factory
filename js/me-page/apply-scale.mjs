@@ -73,9 +73,10 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       el.style.width = "";
       el.style.height = "";
       shell.style.justifySelf = "center";
-      shell.style.justifyItems = "center";
+      shell.style.justifyItems = "stretch";
       shell.style.justifyContent = "center";
-      shell.style.gridTemplateColumns = "minmax(0, 1fr)";
+      shell.style.gridTemplateColumns = cs.gridTemplateColumns;
+      shell.style.gridTemplateRows = cs.gridTemplateRows;
       shell.style.columnGap = cs.columnGap;
       shell.style.rowGap = cs.rowGap;
       shell.style.gridAutoRows = cs.gridAutoRows;
@@ -83,6 +84,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.alignItems = cs.alignItems;
     } else {
       shell.style.gridTemplateColumns = "";
+      shell.style.gridTemplateRows = "";
       shell.style.columnGap = "";
       shell.style.rowGap = "";
       shell.style.gridAutoRows = "";

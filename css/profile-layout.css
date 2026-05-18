@@ -300,6 +300,70 @@
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.me-layout-child-editor {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(153, 255, 255, 0.1);
+}
+
+.me-layout-child-editor__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+}
+
+.me-layout-child-editor__row--selected {
+  border-color: rgba(153, 255, 255, 0.34);
+  background: rgba(153, 255, 255, 0.06);
+}
+
+.me-layout-child-editor__select {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0;
+  text-align: left;
+}
+
+.me-layout-child-editor__meta {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+
+.me-layout-child-editor__actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+
+.me-layout-child-editor__actions button {
+  min-height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.68);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.64rem;
+  padding: 0.15rem 0.25rem;
+}
+
+.me-layout-child-editor__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
 .me-layout-style-editor__header,
 .me-layout-style-control {
   display: grid;
@@ -499,6 +563,51 @@
   border-radius: 3px;
   color: rgba(255, 255, 255, 0.48);
   background: rgba(7, 6, 18, 0.5);
+}
+
+.profile-layout-child-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(var(--profile-child-columns, 4), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--profile-child-rows, 5), minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px;
+  pointer-events: none;
+}
+
+.profile-layout-child-grid__cell {
+  border: 1px solid rgba(153, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(153, 255, 255, 0.025);
+}
+
+.profile-layout-child-grid__box {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.25rem;
+  border: 1.5px solid rgba(153, 255, 255, 0.46);
+  border-radius: 8px;
+  background: rgba(7, 6, 18, 0.36);
+  color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.profile-layout-child-grid__box--selected {
+  border-color: rgba(255, 220, 187, 0.9);
+  color: #fff8ff;
+  box-shadow:
+    0 0 0 2px rgba(255, 220, 187, 0.16),
+    0 0 18px rgba(153, 255, 255, 0.16);
 }
 
 .profile-layout-tile--locked {

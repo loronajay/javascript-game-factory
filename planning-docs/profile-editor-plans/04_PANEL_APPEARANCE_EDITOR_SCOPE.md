@@ -129,6 +129,20 @@ Continue storing appearance under the existing layout JSON:
 
 This should not require a backend migration if the API already saves normalized `profile_layout` JSON.
 
+Panel sub-grid layout now also lives under the same panel record:
+
+```json
+{
+  "id": "hero",
+  "children": [
+    { "id": "portrait", "enabled": true, "x": 0, "y": 0, "w": 4, "h": 2, "style": {} },
+    { "id": "metrics", "enabled": true, "x": 0, "y": 2, "w": 4, "h": 2, "style": {} }
+  ]
+}
+```
+
+The first shipped sub-grid is hero-only. It gives the portrait chip and metrics chip stable child IDs and persisted inner-grid placement before deeper child-level appearance controls are added.
+
 Normalization should:
 
 ```txt
@@ -137,6 +151,7 @@ Clamp numeric values.
 Normalize hex colors.
 Drop unknown fields.
 Fallback cleanly if old saved layouts lack the new keys.
+For child layouts, only allow registered child IDs and clamp each child inside that panel's inner grid.
 ```
 
 ## Rendering Contract
@@ -150,6 +165,7 @@ Current shipped direction:
 ```txt
 Hero preview in /me/layout uses the live /me hero renderer.
 Identity, music, thoughts, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges now use live /me renderers/templates in /me/layout.
+Hero has a first-pass child grid with portrait and metrics child blocks.
 The editor page loads the live owner-profile CSS needed for that hero.
 Editor tiles set both editor variables and live --profile-panel-* variables.
 Live previews use the same scale-to-fit helper as the live profile.

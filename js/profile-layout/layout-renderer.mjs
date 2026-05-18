@@ -1,5 +1,6 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs";
+import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   renderMeFriendCodePanel,
   renderMeFriendsPanel,
@@ -36,6 +37,9 @@ export function renderLayoutGrid(container, layout, options = {}) {
   const selectedId = options.selectedId || null;
   const onSelect = typeof options.onSelect === "function" ? options.onSelect : null;
   const previewModels = options.previewModels || {};
+  const childEditPanelId = options.childEditPanelId || null;
+  const selectedChildId = options.selectedChildId || null;
+  const onSelectChild = typeof options.onSelectChild === "function" ? options.onSelectChild : null;
 
   const panels = layout?.desktop?.panels ?? getDefaultLayout().desktop.panels;
   const enabledPanels = panels.filter((p) => p.enabled !== false);
@@ -78,7 +82,10 @@ export function renderLayoutGrid(container, layout, options = {}) {
     }
     tile.className = classes.join(" ");
 
-    renderLivePreview(tile, panel.id, previewModels);
+    renderLivePreview(tile, panel, previewModels);
+    if (editMode && childEditPanelId === panel.id) {
+      renderChildEditorOverlay(tile, panel, selectedChildId, onSelectChild);
+    }
 
     if (editMode && def.draggable) {
       const handle = document.createElement("button");
@@ -155,7 +162,8 @@ function hasLivePreview(panelId, previewModels) {
   ].includes(panelId) && !!previewModels.hero;
 }
 
-function renderLivePreview(tile, panelId, previewModels) {
+function renderLivePreview(tile, panel, previewModels) {
+  const panelId = panel?.id;
   if (!hasLivePreview(panelId, previewModels)) return;
 
   const preview = document.createElement("div");
@@ -213,7 +221,61 @@ function renderLivePreview(tile, panelId, previewModels) {
     renderBadgesPanel(preview, "Badges", previewModels.hero.badgeItems || []);
   }
 
+  applyPreviewChildLayout(preview, panel);
   tile.appendChild(preview);
+}
+
+function applyPreviewChildLayout(preview, panel) {
+  if (!Array.isArray(panel?.children)) return;
+  for (const child of panel.children) {
+    if (!child?.id || child.enabled === false) continue;
+    const childEl = preview.querySelector(`[data-profile-child-id="${child.id}"]`);
+    if (!childEl) continue;
+    childEl.style.gridColumn = `${child.x + 1} / span ${child.w}`;
+    childEl.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    applyTileVisualStyle(childEl, child.style);
+  }
+}
+
+function renderChildEditorOverlay(tile, panel, selectedChildId, onSelectChild) {
+  const grid = getPanelChildGrid(panel.id);
+  const registry = PROFILE_PANEL_CHILD_REGISTRY[panel.id];
+  if (!grid || !registry || !Array.isArray(panel.children)) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "profile-layout-child-grid";
+  overlay.style.setProperty("--profile-child-columns", String(grid.columns));
+  overlay.style.setProperty("--profile-child-rows", String(grid.rows));
+
+  for (let row = 0; row < grid.rows; row += 1) {
+    for (let col = 0; col < grid.columns; col += 1) {
+      const cell = document.createElement("span");
+      cell.className = "profile-layout-child-grid__cell";
+      cell.style.gridColumn = `${col + 1} / span 1`;
+      cell.style.gridRow = `${row + 1} / span 1`;
+      overlay.appendChild(cell);
+    }
+  }
+
+  for (const child of panel.children) {
+    const def = registry.children[child.id];
+    if (!def || child.enabled === false) continue;
+    const box = document.createElement("button");
+    box.type = "button";
+    box.className = "profile-layout-child-grid__box" +
+      (child.id === selectedChildId ? " profile-layout-child-grid__box--selected" : "");
+    box.style.gridColumn = `${child.x + 1} / span ${child.w}`;
+    box.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    box.textContent = def.label;
+    box.setAttribute("aria-label", `Select ${def.label}`);
+    box.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onSelectChild?.(child.id);
+    });
+    overlay.appendChild(box);
+  }
+
+  tile.appendChild(overlay);
 }
 
 function renderGridOverlay(container, panels) {
