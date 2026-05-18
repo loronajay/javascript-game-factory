@@ -574,11 +574,14 @@
 }
 
 .profile-layout-child-grid__box {
-  position: relative;
+  position: absolute;
   display: grid;
   place-items: center;
   min-width: 0;
   min-height: 0;
+  width: var(--profile-child-box-w, auto);
+  height: var(--profile-child-box-h, auto);
+  transform: translate(var(--profile-child-box-x, 0), var(--profile-child-box-y, 0));
   padding: 0.25rem;
   border: 1.5px solid rgba(153, 255, 255, 0.46);
   border-radius: 8px;

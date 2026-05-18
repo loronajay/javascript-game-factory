@@ -250,6 +250,7 @@ if (doc?.getElementById) {
         about: "meLayoutAboutPreview",
         badges: "meLayoutBadgesPreview",
       }, "#meLayoutCanvas");
+      syncChildEditorOverlayBoxes();
       doc.querySelectorAll([
         "#meLayoutHeroPreview img",
         "#meLayoutIdentityPreview img",
@@ -431,7 +432,32 @@ if (doc?.getElementById) {
         el.style.gridColumn = `${child.x + 1} / span ${child.w}`;
         el.style.gridRow = `${child.y + 1} / span ${child.h}`;
       });
+      syncChildEditorOverlayBoxes();
       renderInspector();
+    }
+
+    function syncChildEditorOverlayBoxes() {
+      if (!canvas) return;
+      canvas.querySelectorAll(".profile-layout-child-grid").forEach((overlay) => {
+        const panelTile = overlay.closest("[data-panel-id]");
+        if (!panelTile) return;
+        const overlayRect = overlay.getBoundingClientRect();
+        if (!overlayRect.width || !overlayRect.height) return;
+        const zoomX = overlay.offsetWidth ? overlayRect.width / overlay.offsetWidth : 1;
+        const zoomY = overlay.offsetHeight ? overlayRect.height / overlay.offsetHeight : zoomX;
+
+        overlay.querySelectorAll("[data-child-id]").forEach((box) => {
+          const childId = box.dataset.childId;
+          const liveChild = panelTile.querySelector(`[data-profile-child-id="${childId}"]`);
+          if (!liveChild) return;
+
+          const childRect = liveChild.getBoundingClientRect();
+          box.style.setProperty("--profile-child-box-x", `${((childRect.left - overlayRect.left) / zoomX).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-y", `${((childRect.top - overlayRect.top) / zoomY).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-w", `${(childRect.width / zoomX).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-h", `${(childRect.height / zoomY).toFixed(2)}px`);
+        });
+      });
     }
 
     // --- panel list ---
