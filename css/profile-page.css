@@ -46,6 +46,17 @@
   overflow: hidden;
 }
 
+.me-hero-card > .panel-zoom-shell > [data-profile-child-id],
+.player-hero-card > .panel-zoom-shell > [data-profile-child-id],
+.profile-layout-tile__live-panel.me-hero-card > .panel-zoom-shell > [data-profile-child-id] {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  grid-column: auto !important;
+  grid-row: auto !important;
+}
+
 /* --- Container query compact rules — content scales before overflow occurs --- */
 /* Note: only descendant selectors work inside @container — the container itself cannot be targeted */
 

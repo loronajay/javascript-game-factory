@@ -42,13 +42,14 @@ function applyHeroChildScaling(heroEl) {
     childEl.style.overflow = "hidden";
     const shell = ensureChildZoomShell(childEl);
     shell.style.zoom = "";
-    shell.style.width = "";
-    shell.style.height = "";
+    shell.style.width = "max-content";
+    shell.style.height = "max-content";
 
     const availableW = Math.max(1, childEl.clientWidth);
     const availableH = Math.max(1, childEl.clientHeight);
-    const naturalW = Math.max(1, shell.scrollWidth || shell.offsetWidth || availableW);
-    const naturalH = Math.max(1, shell.scrollHeight || shell.offsetHeight || availableH);
+    const naturalRect = shell.getBoundingClientRect();
+    const naturalW = Math.max(1, shell.scrollWidth || naturalRect.width || availableW);
+    const naturalH = Math.max(1, shell.scrollHeight || naturalRect.height || availableH);
     const z = parseFloat(Math.max(
       MIN_ZOOM,
       Math.min(availableW / naturalW, availableH / naturalH, MAX_ZOOM),
