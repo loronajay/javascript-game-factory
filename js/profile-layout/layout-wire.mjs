@@ -1,5 +1,7 @@
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
-import { bindFactoryProfileToSession } from "../platform/identity/factory-profile.mjs";
+import { bindFactoryProfileToSession, loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
+import { loadProfileMetricsRecord } from "../platform/metrics/metrics.mjs";
+import { loadProfileRelationshipsRecord } from "../platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { buildAppUrl } from "../arcade-paths.mjs";
@@ -9,6 +11,8 @@ import { getDefaultLayout } from "./default-layout.mjs";
 import { renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
+import { buildMePageViewModel } from "../me-page/view-model.mjs";
+import { applyPanelScaling } from "../me-page/apply-scale.mjs";
 
 const DEFAULT_PANEL_STYLE = {
   panelColor: "#150e37",
@@ -62,6 +66,7 @@ if (doc?.getElementById) {
     let selectedPanelId = null;
     let gridOverlayOn = true;
     let zoom = 1;
+    let previewModels = {};
 
     const canvas = doc.getElementById("meLayoutCanvas");
     const canvasWrap = doc.getElementById("meLayoutCanvasWrap");
@@ -99,9 +104,11 @@ if (doc?.getElementById) {
         editMode: true,
         selectedId: selectedPanelId,
         onSelect: selectPanel,
+        previewModels,
       });
       // renderer preserves extra classes, but re-assert overlay to be safe
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
+      requestAnimationFrame(applyHeroPreviewScaling);
       renderPanelList();
       renderInspector();
     }
@@ -202,8 +209,19 @@ if (doc?.getElementById) {
         editMode: true,
         selectedId: selectedPanelId,
         onSelect: selectPanel,
+        previewModels,
       });
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
+      requestAnimationFrame(applyHeroPreviewScaling);
+    }
+
+    function applyHeroPreviewScaling() {
+      applyPanelScaling(doc, currentLayout, { hero: "meLayoutHeroPreview" }, "#meLayoutCanvas");
+      doc.querySelectorAll("#meLayoutHeroPreview img").forEach((img) => {
+        if (!img.complete) {
+          img.addEventListener("load", applyHeroPreviewScaling, { once: true });
+        }
+      });
     }
 
     function resetPanelStyle(id) {
@@ -430,6 +448,7 @@ if (doc?.getElementById) {
 
     setStatus("Loading…");
     const saved = await fetchLayout();
+    previewModels = await buildPreviewModels(session.playerId, storage, apiClient);
     if (saved) {
       currentLayout = normalizeLayout(saved);
       setStatus("Loaded saved layout.");
@@ -442,4 +461,22 @@ if (doc?.getElementById) {
     // Default to zoom-to-fit so the full layout is visible without scrolling.
     requestAnimationFrame(fitToScreen);
   }
+}
+
+async function buildPreviewModels(playerId, storage, apiClient) {
+  const localProfile = loadFactoryProfile(storage);
+  let profile = localProfile;
+  if (playerId && apiClient?.loadPlayerProfile) {
+    try {
+      profile = await apiClient.loadPlayerProfile(playerId) || localProfile;
+    } catch {
+      profile = localProfile;
+    }
+  }
+
+  const metricsRecord = loadProfileMetricsRecord(playerId || profile?.playerId, storage);
+  const relationshipsRecord = loadProfileRelationshipsRecord(playerId || profile?.playerId, storage);
+  return {
+    hero: buildMePageViewModel(profile, { metricsRecord, relationshipsRecord }),
+  };
 }

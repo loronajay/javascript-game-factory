@@ -1,5 +1,6 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs";
+import { renderMeHeroCard } from "../arcade-me-view.mjs";
 
 const DRAG_HANDLE_SVG = `<svg viewBox="0 0 8 12" fill="currentColor" aria-hidden="true" focusable="false">
   <circle cx="2" cy="2" r="1.3"/><circle cx="6" cy="2" r="1.3"/>
@@ -19,6 +20,7 @@ export function renderLayoutGrid(container, layout, options = {}) {
   const editMode = !!options.editMode;
   const selectedId = options.selectedId || null;
   const onSelect = typeof options.onSelect === "function" ? options.onSelect : null;
+  const previewModels = options.previewModels || {};
 
   const panels = layout?.desktop?.panels ?? getDefaultLayout().desktop.panels;
   const enabledPanels = panels.filter((p) => p.enabled !== false);
@@ -57,8 +59,17 @@ export function renderLayoutGrid(container, layout, options = {}) {
       classes.push("profile-layout-tile--edit");
       if (panel.id === selectedId) classes.push("profile-layout-tile--selected");
       if (!def.draggable && !def.resizable) classes.push("profile-layout-tile--locked");
+      if (panel.id === "hero" && previewModels.hero) classes.push("profile-layout-tile--live-preview");
     }
     tile.className = classes.join(" ");
+
+    if (editMode && panel.id === "hero" && previewModels.hero) {
+      const preview = document.createElement("div");
+      preview.id = "meLayoutHeroPreview";
+      preview.className = "profile-layout-tile__live-panel me-hero-card";
+      renderMeHeroCard(preview, previewModels.hero);
+      tile.appendChild(preview);
+    }
 
     if (editMode && def.draggable) {
       const handle = document.createElement("button");
@@ -71,10 +82,12 @@ export function renderLayoutGrid(container, layout, options = {}) {
       tile.appendChild(handle);
     }
 
-    const label = document.createElement("span");
-    label.className = "profile-layout-tile__label";
-    label.textContent = def.label;
-    tile.appendChild(label);
+    if (!(editMode && panel.id === "hero" && previewModels.hero)) {
+      const label = document.createElement("span");
+      label.className = "profile-layout-tile__label";
+      label.textContent = def.label;
+      tile.appendChild(label);
+    }
 
     if (editMode && (def.draggable || def.resizable)) {
       const badge = document.createElement("span");

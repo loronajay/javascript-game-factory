@@ -57,7 +57,7 @@ function renderPageHeader(doc, model) {
   }
 }
 
-function renderHeroCard(container, model) {
+export function renderMeHeroCard(container, model) {
   if (!container) return;
 
   const statsHtml = (Array.isArray(model.heroStats) ? model.heroStats : []).map((item) => `
@@ -188,7 +188,7 @@ export function renderMePageView(doc, model, options = {}) {
   if (!doc?.getElementById) return;
 
   renderPageHeader(doc, model);
-  renderHeroCard(doc.getElementById("meHeroCard"), model);
+  renderMeHeroCard(doc.getElementById("meHeroCard"), model);
   renderIdentityPanel(doc.getElementById("meIdentityPanel"), model);
   socialView.renderThoughtsPanel(
     doc.getElementById("meThoughtsPanel"),
