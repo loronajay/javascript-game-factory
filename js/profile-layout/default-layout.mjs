@@ -2,8 +2,8 @@ export const LAYOUT_COLUMNS = 12;
 export const LAYOUT_VERSION = 1;
 
 const DEFAULT_HERO_CHILDREN = [
-  { id: "portrait", enabled: true, x: 0, y: 0, w: 4, h: 3 },
-  { id: "metrics", enabled: true, x: 0, y: 3, w: 4, h: 2 },
+  { id: "portrait", enabled: true, x: 25, y: 5, w: 50, h: 36 },
+  { id: "metrics", enabled: true, x: 20, y: 46, w: 60, h: 48 },
 ];
 
 // Maps the classic 3-column profile structure onto a 12-column grid.

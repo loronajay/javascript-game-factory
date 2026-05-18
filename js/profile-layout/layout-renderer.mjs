@@ -248,13 +248,19 @@ function renderChildEditorOverlay(container, panel, selectedChildId) {
   overlay.className = "profile-layout-child-grid";
   overlay.style.setProperty("--profile-child-columns", String(grid.columns));
   overlay.style.setProperty("--profile-child-rows", String(grid.rows));
+  overlay.style.setProperty("--profile-child-visual-columns", String(grid.visualColumns || grid.columns));
+  overlay.style.setProperty("--profile-child-visual-rows", String(grid.visualRows || grid.rows));
 
-  for (let row = 0; row < grid.rows; row += 1) {
-    for (let col = 0; col < grid.columns; col += 1) {
+  const visualColumns = grid.visualColumns || grid.columns;
+  const visualRows = grid.visualRows || grid.rows;
+  const visualColSpan = grid.columns / visualColumns;
+  const visualRowSpan = grid.rows / visualRows;
+  for (let row = 0; row < visualRows; row += 1) {
+    for (let col = 0; col < visualColumns; col += 1) {
       const cell = document.createElement("span");
       cell.className = "profile-layout-child-grid__cell";
-      cell.style.gridColumn = `${col + 1} / span 1`;
-      cell.style.gridRow = `${row + 1} / span 1`;
+      cell.style.gridColumn = `${Math.floor(col * visualColSpan) + 1} / span ${Math.ceil(visualColSpan)}`;
+      cell.style.gridRow = `${Math.floor(row * visualRowSpan) + 1} / span ${Math.ceil(visualRowSpan)}`;
       overlay.appendChild(cell);
     }
   }

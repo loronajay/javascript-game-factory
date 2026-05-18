@@ -1,32 +1,36 @@
-export const HERO_CHILD_COLUMNS = 4;
-export const HERO_CHILD_ROWS = 5;
+export const HERO_CHILD_COLUMNS = 100;
+export const HERO_CHILD_ROWS = 100;
+export const HERO_CHILD_VISUAL_COLUMNS = 10;
+export const HERO_CHILD_VISUAL_ROWS = 10;
 
 export const PROFILE_PANEL_CHILD_REGISTRY = {
   hero: {
     columns: HERO_CHILD_COLUMNS,
     rows: HERO_CHILD_ROWS,
+    visualColumns: HERO_CHILD_VISUAL_COLUMNS,
+    visualRows: HERO_CHILD_VISUAL_ROWS,
     children: {
       portrait: {
         label: "Portrait Chip",
-        minW: 1,
-        minH: 1,
+        minW: 12,
+        minH: 12,
         maxW: HERO_CHILD_COLUMNS,
         maxH: HERO_CHILD_ROWS,
-        defaultX: 0,
-        defaultY: 0,
-        defaultW: 4,
-        defaultH: 3,
+        defaultX: 25,
+        defaultY: 5,
+        defaultW: 50,
+        defaultH: 36,
       },
       metrics: {
         label: "Metrics Chip",
-        minW: 1,
-        minH: 1,
+        minW: 18,
+        minH: 18,
         maxW: HERO_CHILD_COLUMNS,
         maxH: HERO_CHILD_ROWS,
-        defaultX: 0,
-        defaultY: 3,
-        defaultW: 4,
-        defaultH: 2,
+        defaultX: 20,
+        defaultY: 46,
+        defaultW: 60,
+        defaultH: 48,
       },
     },
   },
@@ -49,5 +53,10 @@ export function getDefaultPanelChildren(panelId) {
 
 export function getPanelChildGrid(panelId) {
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
-  return registry ? { columns: registry.columns, rows: registry.rows } : null;
+  return registry ? {
+    columns: registry.columns,
+    rows: registry.rows,
+    visualColumns: registry.visualColumns || registry.columns,
+    visualRows: registry.visualRows || registry.rows,
+  } : null;
 }

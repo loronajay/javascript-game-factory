@@ -147,15 +147,50 @@ function migratePanelChildren(panelId, rawChildren) {
 
   const portrait = rawChildren.find((child) => child?.id === "portrait");
   const metrics = rawChildren.find((child) => child?.id === "metrics");
+  const defaults = PROFILE_PANEL_CHILD_REGISTRY.hero.children;
   const isCrampedOldDefault =
     portrait?.x === 0 && portrait?.y === 0 && portrait?.w === 4 && portrait?.h === 2 &&
     metrics?.x === 0 && metrics?.y === 2 && metrics?.w === 4 && metrics?.h === 2;
-  if (!isCrampedOldDefault) return rawChildren;
+  const isPreviousDefault =
+    portrait?.x === 0 && portrait?.y === 0 && portrait?.w === 4 && portrait?.h === 3 &&
+    metrics?.x === 0 && metrics?.y === 3 && metrics?.w === 4 && metrics?.h === 2;
+
+  if (isCrampedOldDefault || isPreviousDefault) {
+    return rawChildren.map((child) => {
+      const def = defaults[child?.id];
+      return def
+        ? { ...child, x: def.defaultX, y: def.defaultY, w: def.defaultW, h: def.defaultH }
+        : child;
+    });
+  }
+
+  const looksLikeLegacyGrid = rawChildren.every((child) => (
+    !child ||
+    (
+      toInt(child.x, 0) <= 4 &&
+      toInt(child.y, 0) <= 5 &&
+      toInt(child.w, 1) <= 4 &&
+      toInt(child.h, 1) <= 5
+    )
+  ));
+  if (!looksLikeLegacyGrid) return rawChildren;
 
   return rawChildren.map((child) => {
-    if (child?.id === "portrait") return { ...child, h: 3 };
-    if (child?.id === "metrics") return { ...child, y: 3, h: 2 };
-    return child;
+    if (!child || typeof child !== "object") return child;
+    const scaled = {
+      ...child,
+      x: Math.round(toInt(child.x, 0) * 25),
+      y: Math.round(toInt(child.y, 0) * 20),
+      w: Math.round(toInt(child.w, 1) * 25),
+      h: Math.round(toInt(child.h, 1) * 20),
+    };
+    const def = defaults[child.id];
+    if (!def) return scaled;
+    return {
+      ...scaled,
+      w: Math.max(def.minW, scaled.w),
+      h: Math.max(def.minH, scaled.h),
+    };
   });
 }
 

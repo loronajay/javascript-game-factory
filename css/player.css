@@ -97,8 +97,8 @@
 }
 
 .player-hero-card {
-  grid-template-columns: repeat(var(--profile-hero-child-columns, 4), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--profile-hero-child-rows, 5), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--profile-hero-child-columns, 100), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--profile-hero-child-rows, 100), minmax(0, 1fr));
   grid-auto-rows: minmax(0, 1fr);
 }
 
