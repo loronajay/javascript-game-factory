@@ -1,5 +1,11 @@
 # Profile Layout Grid and Draggable Panel System Scope
 
+Status snapshot: 2026-05-17
+
+This document is now mostly historical scope and product guardrails. `/me/layout` has shipped with draggable/resizable panel placement, optional panel visibility, explicit save/reset, public rendering on `/me` and `/player`, and per-panel visual style controls. Current style controls persist under `panel.style` in the existing `profile_layout` JSON: panel surface color, second gradient color, title bubble color, inner element color, transparency, saturation, brightness, and gradient angle.
+
+The current live-panel behavior is scale-to-fit: panel content scales down to the user-selected panel footprint instead of adding panel-level scrollbars. The thoughts feed is the intentional exception and remains internally scrollable. The hero card uses an inner scaling shell so its outer grid item continues to obey saved layout placement.
+
 ## Purpose
 
 This document scopes the second milestone: a constrained profile layout system where users can customize panel placement and size.
@@ -721,4 +727,3 @@ Do not use pixels as the saved layout format.
 Do not save invalid client JSON.
 
 Do not collapse profile content editing and layout editing back into the same page.
-

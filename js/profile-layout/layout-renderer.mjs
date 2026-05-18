@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
-import { getDefaultLayout } from "./default-layout.mjs";
+import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs";
 
 const DRAG_HANDLE_SVG = `<svg viewBox="0 0 8 12" fill="currentColor" aria-hidden="true" focusable="false">
   <circle cx="2" cy="2" r="1.3"/><circle cx="6" cy="2" r="1.3"/>
@@ -26,14 +26,20 @@ export function renderLayoutGrid(container, layout, options = {}) {
   // Preserve extra classes (like --overlay) while replacing base edit class.
   const extraClasses = [...container.classList]
     .filter((c) => c !== "profile-layout-grid" && c !== "profile-layout-grid--edit")
+    .filter((c) => c !== "profile-layout-grid--has-selection")
     .join(" ");
 
   container.innerHTML = "";
   container.className = [
     "profile-layout-grid",
     editMode ? "profile-layout-grid--edit" : "",
+    editMode && selectedId ? "profile-layout-grid--has-selection" : "",
     extraClasses,
   ].filter(Boolean).join(" ");
+
+  if (editMode) {
+    renderGridOverlay(container, enabledPanels);
+  }
 
   for (const panel of enabledPanels) {
     const def = PROFILE_PANEL_REGISTRY[panel.id];
@@ -108,6 +114,26 @@ export function renderLayoutGrid(container, layout, options = {}) {
 
     container.appendChild(tile);
   }
+}
+
+function renderGridOverlay(container, panels) {
+  const maxRows = Math.max(
+    1,
+    ...panels.map((panel) => (panel.y || 0) + (panel.h || 1)),
+  );
+  const overlay = document.createElement("div");
+  overlay.className = "profile-layout-grid__overlay-cells";
+  overlay.setAttribute("aria-hidden", "true");
+  for (let row = 0; row < maxRows; row += 1) {
+    for (let col = 0; col < LAYOUT_COLUMNS; col += 1) {
+      const cell = document.createElement("span");
+      cell.className = "profile-layout-grid__overlay-cell";
+      cell.style.gridColumn = `${col + 1} / span 1`;
+      cell.style.gridRow = `${row + 1} / span 1`;
+      overlay.appendChild(cell);
+    }
+  }
+  container.appendChild(overlay);
 }
 
 function applyTileVisualStyle(tile, style = {}) {

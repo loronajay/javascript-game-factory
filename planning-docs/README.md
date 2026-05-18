@@ -20,7 +20,8 @@ After a context clear, read in this order:
 - `COMMENT_DELETE_PLAN.md` - active implementation plan for the remaining comment-delete gap
 - `TYPESCRIPT_MIGRATION_PLAN.md` - deferred future work, still useful as a staging plan
 - `badge-plans/javascript_game_factory_canon_badge_batch_1_scope.md` - future badge pass reference
-- `profile-editor-plans/` - mixed status; `/me/edit` shipped, layout customization still pending
+- `profile-editor-plans/` - historical scope docs; `/me/edit` and `/me/layout` are shipped, with current caveats called out in the handoff README
+- `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md` - active scope for deeper live-preview panel appearance editing, starting with the hero card
 
 ## Historical Or Mostly Implemented Docs
 
@@ -30,6 +31,7 @@ These are still useful for context, but they should not be treated as the curren
 - `PHOTO_UPLOADS.md` - upload workstream history and remaining deployment-verification notes
 - `me-page-cleanup-handoff.md` - completed `/me` subsystem extraction handoff
 - `profile-css-ownership-cleanup-handoff.md` - completed shared profile CSS cleanup handoff
+- `profile-editor-plans/` - original editor/layout scope, now useful as implementation history and guardrails
 - `profile-music-upload-investigation-handoff.md` - resolved investigation; profile music shipped
 
 ## Working Guidance

@@ -1,28 +1,32 @@
 # JavaScript Game Factory Profile Editor + Custom Layout Scope
 
-Status snapshot: 2026-05-12
+Status snapshot: 2026-05-17
 
 - Milestone 1, the standalone editor route at `/me/edit`, is shipped.
-- Milestone 2, profile layout customization and draggable/resizable panel management, is still unimplemented.
-- Read the docs in this folder as a mix of shipped foundation history plus pending layout scope. Do not treat the original sequencing language as a statement that `/me/edit` still needs to be built.
+- Milestone 2, profile layout customization and draggable/resizable panel management at `/me/layout`, is shipped.
+- The 2026-05-17 pass added per-panel visual customization under the existing `profile_layout` JSON: panel surface color, gradient color, title bubble color, inner element color, transparency, saturation, brightness, and gradient angle.
+- Read the docs in this folder as shipped foundation history and product guardrails. Do not treat the original sequencing language as a statement that `/me/edit` or `/me/layout` still needs to be built.
 
 ## Purpose
 
 This document set scopes the next profile customization milestone for JavaScript Game Factory.
 
-The work should begin with a standalone profile editor page, then continue into a draggable/resizable profile panel layout system. The standalone editor page is not just a cosmetic refactor. It is the foundation that prevents layout customization from being jammed into the existing profile view and becoming coupled to unrelated profile content systems.
+The work began with a standalone profile editor page, then continued into a draggable/resizable profile panel layout system. The standalone editor page was not just a cosmetic refactor. It is the foundation that prevents layout customization from being jammed into the existing profile view and becoming coupled to unrelated profile content systems.
 
 ## Required Read Order
 
 1. `01_STANDALONE_PROFILE_EDITOR_PAGE_SCOPE.md`
 2. `02_PROFILE_LAYOUT_GRID_AND_PANEL_SYSTEM_SCOPE.md`
 3. `03_AGENT_IMPLEMENTATION_HANDOFF.md`
+4. `04_PANEL_APPEARANCE_EDITOR_SCOPE.md`
 
 The first document defines how the dedicated editor page should behave and what it should own.
 
 The second document defines the draggable/resizable panel layout model, grid rules, responsive behavior, validation rules, and save model.
 
 The third document gives the agent the implementation boundaries, pass order, and anti-drift rules.
+
+The fourth document scopes the next appearance-editing pass: start with a deeper hero-card appearance editor that uses live panel preview and normalized style tokens before expanding the pattern to other panels.
 
 ## Scope Boundary
 
@@ -38,7 +42,7 @@ Profiles should become user-customizable spaces.
 
 The user should be able to edit profile content through a dedicated editor page.
 
-Later, the user should be able to customize where profile panels appear, how large they are within constraints, and which optional panels are visible.
+Users can now customize where profile panels appear, how large they are within constraints, which optional panels are visible, and how each panel is visually styled.
 
 The platform still owns the rules. User customization must be constrained, validated, and responsive.
 
@@ -77,9 +81,7 @@ Do not blur these responsibilities.
 
 The standalone editor page should continue using existing profile fields wherever possible.
 
-The draggable/resizable layout system should introduce a layout JSON field only when that pass is reached.
-
-Recommended future field:
+The draggable/resizable layout system uses the profile layout JSON field:
 
 ```sql
 ALTER TABLE player_profiles
@@ -87,6 +89,8 @@ ADD COLUMN profile_layout JSONB DEFAULT NULL;
 ```
 
 Keep the field nullable. If no saved layout exists, code should derive the default layout.
+
+Panel visual style is stored per panel under `panel.style` in that same JSON, so the color/gradient controls did not require a backend migration.
 
 ## Hard Constraints
 

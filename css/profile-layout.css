@@ -390,22 +390,29 @@
   position: relative;
 }
 
-/* Grid overlay: column + row lines using background-size tiling */
-.profile-layout-grid--overlay {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size:
-    calc(100% / 12) 100%,
-    100% var(--profile-layout-row-height);
-  background-position: 0 0, 0 0;
-  background-repeat: repeat-x, repeat-y;
+/* Real grid overlay: cells sit on the same CSS grid tracks as the panels. */
+.profile-layout-grid__overlay-cells {
+  display: contents;
+}
+
+.profile-layout-grid__overlay-cell {
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(126, 200, 227, 0.025) inset;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.profile-layout-grid--overlay .profile-layout-grid__overlay-cell {
+  opacity: 1;
 }
 
 /* --- Panel Tiles (layout editor) --- */
 
 .profile-layout-tile {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -434,6 +441,14 @@
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(126, 200, 227, 0.1) inset;
+}
+
+.profile-layout-grid--has-selection .profile-layout-tile--edit:not(.profile-layout-tile--selected) {
+  opacity: 0.55;
+}
+
+.profile-layout-grid--has-selection .profile-layout-tile--edit:not(.profile-layout-tile--selected):hover {
+  opacity: 0.82;
 }
 
 .profile-layout-tile--selected {
@@ -578,7 +593,7 @@
   background: rgba(126, 200, 227, 0.07);
   pointer-events: none;
   transition: border-color 0.1s, background 0.1s;
-  z-index: 2;
+  z-index: 3;
 }
 
 .profile-layout-ghost--invalid {
@@ -621,6 +636,10 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .profile-layout-grid__overlay-cell {
+    display: none;
   }
 
   .profile-layout-tile {

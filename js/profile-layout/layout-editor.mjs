@@ -1,27 +1,32 @@
+import { LAYOUT_COLUMNS } from "./default-layout.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
 // Reads the shared CSS tokens so the editor and live page always snap to the same grid.
 export function getGridMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
-  const root = document.documentElement;
-  const computedGap = parseFloat(getComputedStyle(root).getPropertyValue("--profile-layout-gap"));
-  const computedRow = parseFloat(getComputedStyle(root).getPropertyValue("--profile-layout-row-height"));
+  const cs = getComputedStyle(canvas);
+  const computedGap = parseFloat(cs.columnGap || cs.gap);
+  const computedRow = parseFloat(cs.gridAutoRows);
   const vw = window.innerWidth;
   const gap = Number.isFinite(computedGap) ? Math.round(computedGap) : Math.round(Math.max(8, Math.min(vw * 0.01, 14)));
   const rowHeight = Number.isFinite(computedRow) ? Math.round(computedRow) : Math.round(Math.max(56, Math.min(vw * 0.06, 88)));
-  const colWidth = (canvas.offsetWidth - gap * 11) / 12;
-  return { rect, gap, colWidth, rowHeight };
+  const columns = LAYOUT_COLUMNS;
+  const canvasWidth = canvas.offsetWidth || rect.width;
+  const colWidth = (canvasWidth - gap * (columns - 1)) / columns;
+  return { rect, columns, gap, colWidth, rowHeight, canvasWidth };
 }
 
 // Convert client coords → grid col/row under the pointer.
 // zoom: CSS transform scale applied to the canvas (used to correct pointer math).
 function pointerToCell(clientX, clientY, canvas, zoom = 1) {
-  const { rect, gap, colWidth, rowHeight } = getGridMetrics(canvas);
+  const { rect, columns, gap, colWidth, rowHeight } = getGridMetrics(canvas);
   const mx = (clientX - rect.left) / zoom;
   const my = (clientY - rect.top) / zoom;
+  const colPitch = colWidth + gap;
+  const rowPitch = rowHeight + gap;
   return {
-    col: Math.floor(mx / (colWidth + gap)),
-    row: Math.floor(my / (rowHeight + gap)),
+    col: Math.max(0, Math.min(columns - 1, Math.floor((mx + gap / 2) / colPitch))),
+    row: Math.max(0, Math.floor((my + gap / 2) / rowPitch)),
   };
 }
 
