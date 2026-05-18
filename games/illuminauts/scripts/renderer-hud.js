@@ -67,10 +67,20 @@ export function drawHud(ctx, state, now, width, height, spriteCatalog = undefine
       const coreColor = allDone ? COLORS.dataCore : '#2a7a4a';
       const coreStr = `${state.solo.dataCoresCollected}/${state.solo.dataCoreTotal}`;
       const coreGroupX = width / 2 + Math.floor(chipIconSize * 1.2);
+      ctx.save();
+      ctx.filter = 'hue-rotate(80deg)';
+      const coreIconOk = drawHudIcon(ctx, 'accessChip', coreGroupX, barH / 2, chipIconSize, spriteCatalog);
+      ctx.restore();
+      if (!coreIconOk) {
+        ctx.fillStyle = coreColor;
+        ctx.font = `bold ${fontSize}px ui-monospace, Consolas, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('[K]', coreGroupX, barH / 2);
+      }
       ctx.fillStyle = coreColor;
       ctx.font = `bold ${fontSize}px ui-monospace, Consolas, monospace`;
       ctx.textAlign = 'left';
-      ctx.fillText(`[K] ${coreStr}`, coreGroupX, barH / 2);
+      ctx.fillText(coreStr, coreGroupX + Math.floor(chipIconSize * 0.72), barH / 2);
     }
   }
 

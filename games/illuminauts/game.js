@@ -20,6 +20,7 @@ import { getLocalIdentity } from './scripts/online-identity.js';
 import { shouldQuitMatchOnKey } from './scripts/session-controls.js';
 
 const canvas = document.getElementById('gameCanvas');
+const backLinkEl = document.querySelector('.back-link');
 const audioController = createAudioController();
 
 // Input bound once to DOM events — survives state resets.
@@ -506,6 +507,8 @@ function loop(now) {
   }
 
   void audioController.sync(state, phase, now);
+
+  if (backLinkEl) backLinkEl.style.display = phase === 'playing' ? 'none' : '';
 
   clearButtons();
 
