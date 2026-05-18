@@ -199,9 +199,9 @@ Exit criteria before re-scoping TypeScript:
    - **Image-load rescale**: `/me` and `/player` now rescale panels again after images load, which avoids bottom clipping in friend/top-friends/gallery-style panels.
    - **Panel constraints**: the hero is draggable/resizable and panel widths can go down to 2 columns where the registry allows it.
    - **Per-panel visual styling**: `normalize-layout.mjs`, `layout-wire.mjs`, `layout-renderer.mjs`, and `apply-layout.mjs` now support `panel.style` values for panel color, gradient color, title bubble color, inner element color, transparency, saturation, brightness, and gradient angle. CSS profile modules consume those values through custom properties on `/me`, `/player`, and the editor preview.
-   - **Live hero preview**: `/me/layout` now renders the hero tile with the live `/me` hero renderer, the live owner-profile CSS stack, live `--profile-panel-*` style variables, and the same hero scale-to-fit path. This is the required pattern for future panel previews.
+   - **Live editor previews**: `/me/layout` now renders hero, identity, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges with live `/me` renderers, the live owner-profile CSS stack, live `--profile-panel-*` style variables, and the same scale-to-fit path. This is the required pattern for future panel previews.
    - **Backend note**: no Railway/backend migration was needed for the style controls because they persist inside the existing `profile_layout` JSONB payload.
-   - **Remaining verification**: do a manual post-deploy browser pass for tiny panels, hero drag/resize, gradients across panel types, thoughts feed scrolling, and public `/player` pages with real friend data. Next preview work should proceed panel family by panel family, reusing live renderers/CSS instead of recreating fake editor-only blocks.
+   - **Remaining verification**: do a manual post-deploy browser pass for tiny panels, hero drag/resize, gradients across panel types, music/thoughts live previews, thoughts feed scrolling, and public `/player` pages with real friend data. Next preview work should proceed panel family by panel family, reusing live renderers/CSS instead of recreating fake editor-only blocks.
 
 
 ## Folder Reorg — Stable Shape

@@ -511,7 +511,27 @@ async function buildPreviewModels(playerId, storage, apiClient) {
   }
 
   return {
-    hero: buildMePageViewModel(profile, { metricsRecord, relationshipsRecord }),
+    hero: resolvePreviewAssetUrls(buildMePageViewModel(profile, { metricsRecord, relationshipsRecord })),
     galleryPhotos,
   };
+}
+
+function resolvePreviewAssetUrls(value) {
+  if (Array.isArray(value)) {
+    return value.map(resolvePreviewAssetUrls);
+  }
+  if (!value || typeof value !== "object") {
+    return resolvePreviewAssetUrl(value);
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [key, resolvePreviewAssetUrls(child)]),
+  );
+}
+
+function resolvePreviewAssetUrl(value) {
+  if (typeof value !== "string") return value;
+  if (value.startsWith("../images/")) return `../../${value.slice(3)}`;
+  if (value.startsWith("../grid-previews/")) return `../../${value.slice(3)}`;
+  return value;
 }
