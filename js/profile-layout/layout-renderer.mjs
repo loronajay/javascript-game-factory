@@ -262,6 +262,12 @@ function renderChildEditorOverlay(container, panel, selectedChildId) {
   for (const child of panel.children) {
     const def = registry.children[child.id];
     if (!def || child.enabled === false) continue;
+    const hitbox = document.createElement("span");
+    hitbox.dataset.childHitbox = child.id;
+    hitbox.className = "profile-layout-child-grid__hitbox";
+    hitbox.setAttribute("aria-hidden", "true");
+    overlay.appendChild(hitbox);
+
     const box = document.createElement("div");
     box.dataset.childId = child.id;
     box.className = "profile-layout-child-grid__box" +

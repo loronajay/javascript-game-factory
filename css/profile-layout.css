@@ -574,16 +574,12 @@
 }
 
 .profile-layout-child-grid__box {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: relative;
+  z-index: 3;
   display: grid;
   place-items: center;
   min-width: 0;
   min-height: 0;
-  width: var(--profile-child-box-w, auto);
-  height: var(--profile-child-box-h, auto);
-  transform: translate(var(--profile-child-box-x, 0), var(--profile-child-box-y, 0));
   padding: 0.25rem;
   border: 1.5px solid rgba(153, 255, 255, 0.46);
   border-radius: 8px;
@@ -595,6 +591,17 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.profile-layout-child-grid__hitbox {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: var(--profile-child-hitbox-w, 0);
+  height: var(--profile-child-hitbox-h, 0);
+  transform: translate(var(--profile-child-hitbox-x, 0), var(--profile-child-hitbox-y, 0));
   pointer-events: auto;
 }
 
