@@ -233,8 +233,7 @@ function applyPreviewChildLayout(preview, panel) {
     if (!child?.id || child.enabled === false) continue;
     const childEl = preview.querySelector(`[data-profile-child-id="${child.id}"]`);
     if (!childEl) continue;
-    childEl.style.gridColumn = `${child.x + 1} / span ${child.w}`;
-    childEl.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    applyChildRectStyle(childEl, child);
     applyTileVisualStyle(childEl, child.style);
   }
 }
@@ -272,8 +271,7 @@ function renderChildEditorOverlay(container, panel, selectedChildId) {
     slot.dataset.childSlot = child.id;
     slot.className = "profile-layout-child-grid__slot" +
       (child.id === selectedChildId ? " profile-layout-child-grid__slot--selected" : "");
-    slot.style.gridColumn = `${child.x + 1} / span ${child.w}`;
-    slot.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    applyChildRectStyle(slot, child);
     slot.setAttribute("aria-hidden", "true");
     overlay.appendChild(slot);
 
@@ -281,6 +279,7 @@ function renderChildEditorOverlay(container, panel, selectedChildId) {
     box.dataset.childId = child.id;
     box.className = "profile-layout-child-grid__box" +
       (child.id === selectedChildId ? " profile-layout-child-grid__box--selected" : "");
+    applyChildRectStyle(box, child);
     box.setAttribute("role", "button");
     box.setAttribute("tabindex", "0");
     box.setAttribute("aria-label", `Select ${def.label}`);
@@ -292,6 +291,15 @@ function renderChildEditorOverlay(container, panel, selectedChildId) {
   }
 
   container.appendChild(overlay);
+}
+
+function applyChildRectStyle(el, child) {
+  el.style.gridColumn = "";
+  el.style.gridRow = "";
+  el.style.left = `${child.x}%`;
+  el.style.top = `${child.y}%`;
+  el.style.width = `${child.w}%`;
+  el.style.height = `${child.h}%`;
 }
 
 function renderGridOverlay(container, panels) {

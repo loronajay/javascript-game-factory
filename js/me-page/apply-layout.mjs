@@ -82,8 +82,12 @@ function applyPanelChildLayout(panelEl, panel) {
     if (!child?.id || child.enabled === false) continue;
     const childEl = panelEl.querySelector(`[data-profile-child-id="${child.id}"]`);
     if (!childEl) continue;
-    childEl.style.gridColumn = `${child.x + 1} / span ${child.w}`;
-    childEl.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    childEl.style.gridColumn = "";
+    childEl.style.gridRow = "";
+    childEl.style.left = `${child.x}%`;
+    childEl.style.top = `${child.y}%`;
+    childEl.style.width = `${child.w}%`;
+    childEl.style.height = `${child.h}%`;
     applyPanelVisualStyle(childEl, child.style);
   }
 }

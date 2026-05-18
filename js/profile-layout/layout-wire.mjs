@@ -250,7 +250,6 @@ if (doc?.getElementById) {
         about: "meLayoutAboutPreview",
         badges: "meLayoutBadgesPreview",
       }, "#meLayoutCanvas");
-      syncChildEditorOverlayBoxes();
       doc.querySelectorAll([
         "#meLayoutHeroPreview img",
         "#meLayoutIdentityPreview img",
@@ -329,7 +328,7 @@ if (doc?.getElementById) {
       const overlay = canvas.querySelector(`[data-panel-id="${panelId}"] .profile-layout-child-grid`);
       if (panelIdx < 0 || childIdx < 0 || !child || !grid || !childDef || !overlay) return;
 
-      const startCell = pointerToChildCell(event.clientX, event.clientY, overlay);
+      const startPoint = pointerToChildPoint(event.clientX, event.clientY, overlay);
       childDrag = {
         mode,
         panelId,
@@ -339,8 +338,8 @@ if (doc?.getElementById) {
         childDef,
         grid,
         overlay,
-        startCol: startCell.col,
-        startRow: startCell.row,
+        grabX: Math.max(0, Math.min(child.w, startPoint.x - child.x)),
+        grabY: Math.max(0, Math.min(child.h, startPoint.y - child.y)),
         start: { ...child },
         next: { ...child },
       };
@@ -356,17 +355,15 @@ if (doc?.getElementById) {
     function onChildDragMove(event) {
       if (!childDrag) return;
       event.preventDefault();
-      const cell = pointerToChildCell(event.clientX, event.clientY, childDrag.overlay);
-      const dx = cell.col - childDrag.startCol;
-      const dy = cell.row - childDrag.startRow;
+      const point = pointerToChildPoint(event.clientX, event.clientY, childDrag.overlay);
       const next = { ...childDrag.start };
 
       if (childDrag.mode === "resize") {
-        next.w += dx;
-        next.h += dy;
+        next.w = point.x - childDrag.start.x;
+        next.h = point.y - childDrag.start.y;
       } else {
-        next.x += dx;
-        next.y += dy;
+        next.x = point.x - childDrag.grabX;
+        next.y = point.y - childDrag.grabY;
       }
 
       childDrag.next = clampChildRect(next, childDrag.grid, childDrag.childDef);
@@ -399,100 +396,47 @@ if (doc?.getElementById) {
       refreshAll();
     }
 
-    function pointerToChildCell(clientX, clientY, overlay) {
+    function pointerToChildPoint(clientX, clientY, overlay) {
       const rect = overlay.getBoundingClientRect();
       const grid = getPanelChildGrid(overlay.closest("[data-panel-id]")?.dataset.panelId);
       const columns = grid?.columns || 1;
       const rows = grid?.rows || 1;
-      const col = Math.floor(((clientX - rect.left) / Math.max(1, rect.width)) * columns);
-      const row = Math.floor(((clientY - rect.top) / Math.max(1, rect.height)) * rows);
+      const x = ((clientX - rect.left) / Math.max(1, rect.width)) * columns;
+      const y = ((clientY - rect.top) / Math.max(1, rect.height)) * rows;
       return {
-        col: Math.max(0, Math.min(columns - 1, col)),
-        row: Math.max(0, Math.min(rows - 1, row)),
+        x: Math.max(0, Math.min(columns, x)),
+        y: Math.max(0, Math.min(rows, y)),
       };
     }
 
     function clampChildRect(child, grid, def) {
-      const w = Math.max(def.minW, Math.min(def.maxW, child.w));
-      const h = Math.max(def.minH, Math.min(def.maxH, child.h));
+      const w = roundChildUnit(Math.max(def.minW, Math.min(def.maxW, child.w)));
+      const h = roundChildUnit(Math.max(def.minH, Math.min(def.maxH, child.h)));
       return {
         ...child,
         w,
         h,
-        x: Math.max(0, Math.min(grid.columns - w, child.x)),
-        y: Math.max(0, Math.min(grid.rows - h, child.y)),
+        x: roundChildUnit(Math.max(0, Math.min(grid.columns - w, child.x))),
+        y: roundChildUnit(Math.max(0, Math.min(grid.rows - h, child.y))),
       };
+    }
+
+    function roundChildUnit(value) {
+      return Math.round(value * 10) / 10;
     }
 
     function paintChildDragPreview(child) {
       const box = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] .profile-layout-child-grid__box[data-child-id="${child.id}"]`);
       const slot = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] [data-child-slot="${child.id}"]`);
       const liveChild = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] [data-profile-child-id="${child.id}"]`);
-      [slot, liveChild].forEach((el) => {
+      [box, slot, liveChild].forEach((el) => {
         if (!el) return;
-        el.style.gridColumn = `${child.x + 1} / span ${child.w}`;
-        el.style.gridRow = `${child.y + 1} / span ${child.h}`;
+        el.style.left = `${child.x}%`;
+        el.style.top = `${child.y}%`;
+        el.style.width = `${child.w}%`;
+        el.style.height = `${child.h}%`;
       });
-      syncChildEditorOverlayBoxes();
       renderInspector();
-    }
-
-    function syncChildEditorOverlayBoxes() {
-      if (!canvas) return;
-      canvas.querySelectorAll(".profile-layout-child-grid").forEach((overlay) => {
-        const panelTile = overlay.closest("[data-panel-id]");
-        if (!panelTile) return;
-        const overlayRect = overlay.getBoundingClientRect();
-        if (!overlayRect.width || !overlayRect.height) return;
-        const zoomX = overlay.offsetWidth ? overlayRect.width / overlay.offsetWidth : 1;
-        const zoomY = overlay.offsetHeight ? overlayRect.height / overlay.offsetHeight : zoomX;
-
-        overlay.querySelectorAll("[data-child-id]").forEach((box) => {
-          const childId = box.dataset.childId;
-          const liveChild = panelTile.querySelector(`[data-profile-child-id="${childId}"]`);
-          if (!liveChild) return;
-
-          const childRect = getVisibleChildRect(liveChild, overlayRect);
-          box.style.setProperty("--profile-child-box-x", `${((childRect.left - overlayRect.left) / zoomX).toFixed(2)}px`);
-          box.style.setProperty("--profile-child-box-y", `${((childRect.top - overlayRect.top) / zoomY).toFixed(2)}px`);
-          box.style.setProperty("--profile-child-box-w", `${(childRect.width / zoomX).toFixed(2)}px`);
-          box.style.setProperty("--profile-child-box-h", `${(childRect.height / zoomY).toFixed(2)}px`);
-        });
-      });
-    }
-
-    function getVisibleChildRect(liveChild, boundsRect) {
-      const rects = [liveChild.getBoundingClientRect()];
-      liveChild.querySelectorAll("*").forEach((el) => {
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) rects.push(rect);
-      });
-
-      const raw = rects.reduce((acc, rect) => ({
-        left: Math.min(acc.left, rect.left),
-        top: Math.min(acc.top, rect.top),
-        right: Math.max(acc.right, rect.right),
-        bottom: Math.max(acc.bottom, rect.bottom),
-      }), {
-        left: Infinity,
-        top: Infinity,
-        right: -Infinity,
-        bottom: -Infinity,
-      });
-
-      const left = Math.max(boundsRect.left, raw.left);
-      const top = Math.max(boundsRect.top, raw.top);
-      const right = Math.min(boundsRect.right, raw.right);
-      const bottom = Math.min(boundsRect.bottom, raw.bottom);
-      if (right <= left || bottom <= top) return liveChild.getBoundingClientRect();
-      return {
-        left,
-        top,
-        right,
-        bottom,
-        width: right - left,
-        height: bottom - top,
-      };
     }
 
     // --- panel list ---

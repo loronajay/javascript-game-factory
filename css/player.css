@@ -322,10 +322,11 @@
 }
 
 .player-hero-card__child {
-  position: relative;
+  position: absolute;
   z-index: 1;
   min-width: 0;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 .player-hero-card__portrait-panel,
