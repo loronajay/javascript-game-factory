@@ -76,20 +76,26 @@ export function applyProfileLayout(doc, layout, {
 
 function applyPanelVisualStyle(el, style = {}) {
   const panelColor = normalizeHexColor(style.panelColor);
+  const panelColor2 = normalizeHexColor(style.panelColor2);
   const titleColor = normalizeHexColor(style.titleColor);
   const elementColor = normalizeHexColor(style.elementColor);
   const opacity = clampNumber(style.opacity, 0.15, 1, DEFAULT_PANEL_STYLE.opacity);
   const saturation = clampNumber(style.saturation, 0, 2, DEFAULT_PANEL_STYLE.saturation);
   const brightness = clampNumber(style.brightness, 0.35, 1.8, DEFAULT_PANEL_STYLE.brightness);
+  const gradientAngle = clampNumber(style.gradientAngle, 0, 360, 180);
 
   const panelRgb = panelColor ? adjustHexColor(panelColor, saturation, brightness) : "";
+  const panelRgb2 = panelColor2 ? adjustHexColor(panelColor2, saturation, brightness) : panelRgb;
   const titleRgb = titleColor ? hexToRgbString(titleColor) : "";
   const elementRgb = elementColor ? hexToRgbString(elementColor) : "";
 
   setOrClear(el, "--profile-panel-custom-rgb", panelRgb);
+  setOrClear(el, "--profile-panel-custom-rgb-2", panelRgb2);
   setOrClear(el, "--profile-panel-custom-opacity", panelColor ? String(opacity) : "");
   setOrClear(el, "--profile-panel-base-rgb", panelRgb);
+  setOrClear(el, "--profile-panel-base-rgb-2", panelRgb2);
   setOrClear(el, "--profile-panel-base-opacity", panelColor ? String(Math.max(0.55, opacity)) : "");
+  setOrClear(el, "--profile-panel-gradient-angle", panelColor ? `${gradientAngle}deg` : "");
   setOrClear(el, "--profile-panel-title-rgb", titleRgb);
   setOrClear(el, "--profile-panel-element-rgb", elementRgb);
 }

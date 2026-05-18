@@ -12,11 +12,13 @@ import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
 const DEFAULT_PANEL_STYLE = {
   panelColor: "#150e37",
+  panelColor2: "#070716",
   titleColor: "#ffdcbb",
   elementColor: "#ffffff",
   opacity: 0.96,
   saturation: 1,
   brightness: 1,
+  gradientAngle: 180,
 };
 
 const doc = globalThis.document;
@@ -315,7 +317,9 @@ if (doc?.getElementById) {
           const key = input.dataset.panelStyle;
           const value = input.type === "range" ? parseFloat(input.value) : input.value;
           const output = input.parentElement?.querySelector?.("output");
-          if (output && input.type === "range") output.textContent = `${Math.round(value * 100)}%`;
+          if (output && input.type === "range") {
+            output.textContent = key === "gradientAngle" ? `${Math.round(value)}deg` : `${Math.round(value * 100)}%`;
+          }
           updatePanelStyle(panel.id, { [key]: value });
         });
       });
@@ -333,11 +337,13 @@ if (doc?.getElementById) {
             <button class="me-layout-style-editor__reset" type="button" data-reset-panel-style="${escapeHtml(panel.id)}">Reset</button>
           </div>
           ${renderColorControl("Panel Color", "panelColor", style.panelColor)}
+          ${renderColorControl("Gradient Color", "panelColor2", style.panelColor2)}
           ${renderColorControl("Title Bubble", "titleColor", style.titleColor)}
           ${renderColorControl("Inner Elements", "elementColor", style.elementColor)}
           ${renderRangeControl("Transparency", "opacity", style.opacity, 0.15, 1, 0.01, `${Math.round(style.opacity * 100)}%`)}
           ${renderRangeControl("Saturation", "saturation", style.saturation, 0, 2, 0.01, `${Math.round(style.saturation * 100)}%`)}
           ${renderRangeControl("Brightness", "brightness", style.brightness, 0.35, 1.8, 0.01, `${Math.round(style.brightness * 100)}%`)}
+          ${renderRangeControl("Gradient Angle", "gradientAngle", style.gradientAngle, 0, 360, 1, `${Math.round(style.gradientAngle)}deg`)}
         </div>
       `;
     }

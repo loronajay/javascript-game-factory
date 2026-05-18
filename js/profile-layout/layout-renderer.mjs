@@ -112,15 +112,22 @@ export function renderLayoutGrid(container, layout, options = {}) {
 
 function applyTileVisualStyle(tile, style = {}) {
   const panelColor = normalizeHexColor(style.panelColor);
+  const panelColor2 = normalizeHexColor(style.panelColor2);
   const titleColor = normalizeHexColor(style.titleColor);
   const opacity = clampNumber(style.opacity, 0.15, 1, 0.92);
   const saturation = clampNumber(style.saturation, 0, 2, 1);
   const brightness = clampNumber(style.brightness, 0.35, 1.8, 1);
+  const gradientAngle = clampNumber(style.gradientAngle, 0, 360, 180);
   if (panelColor) {
-    tile.style.setProperty("--layout-tile-custom-rgb", adjustHexColor(panelColor, saturation, brightness));
+    const rgb = adjustHexColor(panelColor, saturation, brightness);
+    const rgb2 = panelColor2 ? adjustHexColor(panelColor2, saturation, brightness) : rgb;
+    tile.style.setProperty("--layout-tile-custom-rgb", rgb);
+    tile.style.setProperty("--layout-tile-custom-rgb-2", rgb2);
     tile.style.setProperty("--layout-tile-custom-opacity", String(opacity));
-    tile.style.setProperty("--layout-tile-base-rgb", adjustHexColor(panelColor, saturation, brightness));
+    tile.style.setProperty("--layout-tile-base-rgb", rgb);
+    tile.style.setProperty("--layout-tile-base-rgb-2", rgb2);
     tile.style.setProperty("--layout-tile-base-opacity", String(Math.max(0.55, opacity)));
+    tile.style.setProperty("--layout-tile-gradient-angle", `${gradientAngle}deg`);
   }
   if (titleColor) {
     tile.style.setProperty("--layout-tile-label-color", titleColor);
