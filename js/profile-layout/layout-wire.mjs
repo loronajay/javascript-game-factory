@@ -1,4 +1,5 @@
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
+import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 import { bindFactoryProfileToSession, loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { loadProfileMetricsRecord } from "../platform/metrics/metrics.mjs";
 import { loadProfileRelationshipsRecord } from "../platform/relationships/relationships.mjs";
