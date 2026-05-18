@@ -1,6 +1,6 @@
 # Javascript Game Factory Platform Status Plan
 
-Last updated: 2026-05-15
+Last updated: 2026-05-18
 
 ## Purpose
 
@@ -119,7 +119,7 @@ Not implemented yet:
 
 ## Shipped But Still Needing Manual Verification Or Polish
 
-- Latest manual verification is complete for the profile CSS ownership pass. The 2026-05-17 layout scaling and per-panel color/gradient work still needs a post-deploy browser pass.
+- Latest manual verification is complete for the profile CSS ownership pass. The 2026-05-18 layout-editor pass still needs a post-deploy browser pass across `/me`, `/me/layout`, and `/player`.
 - Upload flows are manually verified as working, including avatar/background/media uploads and multiple-photo gallery usage.
 - Ladder placements, badges, and favorite-cabinet empty-state polish still need a cleaner pass even though the surrounding profile surfaces are live.
 
@@ -143,9 +143,12 @@ Not implemented yet:
 - Profile page layout columns refactored 2026-05-15 to equal-width (`repeat(3, minmax(0, 1fr))` in `profile-page.css`). Previously the three columns used different fractional widths; now all three are even.
 - Layout editor hero card bug fixed 2026-05-15: `registry.mjs` had `minW: 8` / `defaultW: 12` for the hero panel, but the default layout places it at `w: 4`. `normalize-layout.mjs` was clamping `w: 4` up to `minW: 8`, causing the hero tile to overlap into the middle column in the editor. Fix: registry corrected to `minW: 4, defaultW: 4`; `normalize-layout.mjs` now resets any position-locked panel (`draggable: false, resizable: false`) to its default geometry on load so stale saved values cannot cause the same drift again.
 - The 2026-05-17 pass changed live panel behavior to scale content down to the user-selected panel size instead of forcing panel-level scrollbars. The thoughts feed remains an intentional internal-scroll exception.
-- Hero rendering now uses an inner zoom shell so the outer panel still respects saved grid placement; image-heavy panels rescale after images load to avoid bottom clipping.
+- Hero rendering uses an inner zoom shell so the outer panel still respects saved grid placement; image-heavy panels rescale after images load to avoid bottom clipping.
 - Per-panel style customization is live under `panel.style` inside the existing `profile_layout` JSON: panel surface color, second gradient color, title bubble color, inner element color, transparency, saturation, brightness, and gradient angle. No backend migration was needed for this visual customization because it rides inside the existing layout JSONB field.
-- Next scoped customization work is a deeper panel appearance editor, starting with the hero card only. See `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md`.
+- The 2026-05-18 layout-editor pass made the editor grid overlay real instead of decorative: overlay cells now sit on the same CSS Grid tracks as panels, and drag/resize metrics read from the editor canvas itself.
+- The hero tile in `/me/layout` now uses the live `/me` hero renderer, live profile CSS stack, live panel style variables, and the same scale-to-fit path as the real page. The editor no longer uses a fake hero placeholder.
+- Hero centering was hardened after the live preview exposed the recurring left-alignment regression: the hero scaling shell now uses an explicit centered single-column layout rather than trying to recreate the outer hero grid inside the scaling wrapper.
+- Next scoped customization work is to continue the live-preview pattern for the other panels, one panel family at a time. The rule: editor previews must reuse live renderers/CSS variables or they are not trustworthy. See `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md`.
 - Still pending: danger zone is now in `/me/edit` rather than `/me`; do a manual post-deploy browser pass for tiny-panel scaling, hero resize/drag behavior, gradients, and public `/player` pages with real relationship data.
 
 ## Deferred Or Later

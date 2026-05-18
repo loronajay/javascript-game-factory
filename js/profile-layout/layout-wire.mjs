@@ -110,7 +110,7 @@ if (doc?.getElementById) {
       });
       // renderer preserves extra classes, but re-assert overlay to be safe
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
-      requestAnimationFrame(applyHeroPreviewScaling);
+      requestAnimationFrame(applyLivePreviewScaling);
       renderPanelList();
       renderInspector();
     }
@@ -214,14 +214,36 @@ if (doc?.getElementById) {
         previewModels,
       });
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
-      requestAnimationFrame(applyHeroPreviewScaling);
+      requestAnimationFrame(applyLivePreviewScaling);
     }
 
-    function applyHeroPreviewScaling() {
-      applyPanelScaling(doc, currentLayout, { hero: "meLayoutHeroPreview" }, "#meLayoutCanvas");
-      doc.querySelectorAll("#meLayoutHeroPreview img").forEach((img) => {
+    function applyLivePreviewScaling() {
+      applyPanelScaling(doc, currentLayout, {
+        hero: "meLayoutHeroPreview",
+        identity: "meLayoutIdentityPreview",
+        rankings: "meLayoutRankingsPreview",
+        topFriends: "meLayoutTopFriendsPreview",
+        friends: "meLayoutFriendsPreview",
+        friendCode: "meLayoutFriendCodePreview",
+        favoriteGame: "meLayoutFavoriteGamePreview",
+        gallery: "meLayoutGalleryPreview",
+        about: "meLayoutAboutPreview",
+        badges: "meLayoutBadgesPreview",
+      }, "#meLayoutCanvas");
+      doc.querySelectorAll([
+        "#meLayoutHeroPreview img",
+        "#meLayoutIdentityPreview img",
+        "#meLayoutRankingsPreview img",
+        "#meLayoutTopFriendsPreview img",
+        "#meLayoutFriendsPreview img",
+        "#meLayoutFriendCodePreview img",
+        "#meLayoutFavoriteGamePreview img",
+        "#meLayoutGalleryPreview img",
+        "#meLayoutAboutPreview img",
+        "#meLayoutBadgesPreview img",
+      ].join(", ")).forEach((img) => {
         if (!img.complete) {
-          img.addEventListener("load", applyHeroPreviewScaling, { once: true });
+          img.addEventListener("load", applyLivePreviewScaling, { once: true });
         }
       });
     }
@@ -478,7 +500,18 @@ async function buildPreviewModels(playerId, storage, apiClient) {
 
   const metricsRecord = loadProfileMetricsRecord(playerId || profile?.playerId, storage);
   const relationshipsRecord = loadProfileRelationshipsRecord(playerId || profile?.playerId, storage);
+  let galleryPhotos = [];
+  if ((playerId || profile?.playerId) && apiClient?.listPlayerPhotos) {
+    try {
+      const photos = await apiClient.listPlayerPhotos(playerId || profile.playerId);
+      galleryPhotos = Array.isArray(photos) ? photos : [];
+    } catch {
+      galleryPhotos = [];
+    }
+  }
+
   return {
     hero: buildMePageViewModel(profile, { metricsRecord, relationshipsRecord }),
+    galleryPhotos,
   };
 }

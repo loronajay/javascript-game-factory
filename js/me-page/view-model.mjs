@@ -72,6 +72,7 @@ export function buildMePageViewModel(profile, options = {}) {
   const badgeItems = buildBadgeItems(publicView.badgeIds);
 
   return {
+    playerId: publicView.playerId,
     pageTitle: heroName,
     pageSubtitle: heroTagline,
     heroName,

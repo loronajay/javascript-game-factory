@@ -1,6 +1,19 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs";
-import { renderMeHeroCard } from "../arcade-me-view.mjs";
+import {
+  renderMeFriendCodePanel,
+  renderMeFriendsPanel,
+  renderMeGalleryPanel,
+  renderMeHeroCard,
+  renderMeIdentityPanel,
+  renderMeRankingsPanel,
+  renderMeTopFriendsPanel,
+} from "../arcade-me-view.mjs";
+import {
+  renderAboutPanel,
+  renderBadgesPanel,
+  renderFavoritePanel,
+} from "../me-page/render-sections.mjs";
 
 const DRAG_HANDLE_SVG = `<svg viewBox="0 0 8 12" fill="currentColor" aria-hidden="true" focusable="false">
   <circle cx="2" cy="2" r="1.3"/><circle cx="6" cy="2" r="1.3"/>
@@ -59,17 +72,11 @@ export function renderLayoutGrid(container, layout, options = {}) {
       classes.push("profile-layout-tile--edit");
       if (panel.id === selectedId) classes.push("profile-layout-tile--selected");
       if (!def.draggable && !def.resizable) classes.push("profile-layout-tile--locked");
-      if (panel.id === "hero" && previewModels.hero) classes.push("profile-layout-tile--live-preview");
+      if (hasLivePreview(panel.id, previewModels)) classes.push("profile-layout-tile--live-preview");
     }
     tile.className = classes.join(" ");
 
-    if (editMode && panel.id === "hero" && previewModels.hero) {
-      const preview = document.createElement("div");
-      preview.id = "meLayoutHeroPreview";
-      preview.className = "profile-layout-tile__live-panel me-hero-card";
-      renderMeHeroCard(preview, previewModels.hero);
-      tile.appendChild(preview);
-    }
+    renderLivePreview(tile, panel.id, previewModels);
 
     if (editMode && def.draggable) {
       const handle = document.createElement("button");
@@ -82,7 +89,7 @@ export function renderLayoutGrid(container, layout, options = {}) {
       tile.appendChild(handle);
     }
 
-    if (!(editMode && panel.id === "hero" && previewModels.hero)) {
+    if (!hasLivePreview(panel.id, previewModels)) {
       const label = document.createElement("span");
       label.className = "profile-layout-tile__label";
       label.textContent = def.label;
@@ -127,6 +134,74 @@ export function renderLayoutGrid(container, layout, options = {}) {
 
     container.appendChild(tile);
   }
+}
+
+function hasLivePreview(panelId, previewModels) {
+  return [
+    "hero",
+    "identity",
+    "rankings",
+    "topFriends",
+    "friends",
+    "friendCode",
+    "favoriteGame",
+    "gallery",
+    "about",
+    "badges",
+  ].includes(panelId) && !!previewModels.hero;
+}
+
+function renderLivePreview(tile, panelId, previewModels) {
+  if (!hasLivePreview(panelId, previewModels)) return;
+
+  const preview = document.createElement("div");
+  preview.className = "profile-layout-tile__live-panel";
+
+  if (panelId === "hero") {
+    preview.id = "meLayoutHeroPreview";
+    preview.classList.add("me-hero-card");
+    renderMeHeroCard(preview, previewModels.hero);
+  } else if (panelId === "identity") {
+    preview.id = "meLayoutIdentityPreview";
+    preview.classList.add("me-panel", "me-panel--identity");
+    renderMeIdentityPanel(preview, previewModels.hero);
+  } else if (panelId === "rankings") {
+    preview.id = "meLayoutRankingsPreview";
+    preview.classList.add("me-panel", "me-panel--rankings");
+    renderMeRankingsPanel(preview, previewModels.hero);
+  } else if (panelId === "topFriends") {
+    preview.id = "meLayoutTopFriendsPreview";
+    preview.classList.add("me-panel", "me-panel--top-friends");
+    renderMeTopFriendsPanel(preview, previewModels.hero);
+  } else if (panelId === "friends") {
+    preview.id = "meLayoutFriendsPreview";
+    preview.classList.add("me-panel", "me-panel--friends");
+    renderMeFriendsPanel(preview, previewModels.hero);
+  } else if (panelId === "friendCode") {
+    preview.id = "meLayoutFriendCodePreview";
+    preview.classList.add("me-panel", "me-panel--friend-code");
+    renderMeFriendCodePanel(preview, previewModels.hero);
+  } else if (panelId === "favoriteGame") {
+    preview.id = "meLayoutFavoriteGamePreview";
+    preview.classList.add("me-panel", "me-panel--favorite");
+    renderFavoritePanel(preview, "Favorite Game", previewModels.hero.favoriteGameItems?.[0]);
+  } else if (panelId === "gallery") {
+    preview.id = "meLayoutGalleryPreview";
+    preview.classList.add("me-panel", "me-panel--gallery");
+    renderMeGalleryPanel(preview, previewModels.galleryPhotos || [], {
+      galleryPlayerId: previewModels.hero.playerId,
+    });
+  } else if (panelId === "about") {
+    preview.id = "meLayoutAboutPreview";
+    preview.classList.add("me-panel", "me-panel--about");
+    renderAboutPanel(preview, "About Me", previewModels.hero.aboutText);
+  } else if (panelId === "badges") {
+    preview.id = "meLayoutBadgesPreview";
+    preview.classList.add("me-panel", "me-panel--badges");
+    renderBadgesPanel(preview, "Badges", previewModels.hero.badgeItems || []);
+  }
+
+  tile.appendChild(preview);
 }
 
 function renderGridOverlay(container, panels) {

@@ -1,6 +1,6 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-05-17
+Last updated: 2026-05-18
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 
@@ -188,18 +188,20 @@ Exit criteria before re-scoping TypeScript:
    - Profile page layout columns switched to equal-width: `grid-template-columns` in `profile-page.css` changed from `minmax(430px, 1.08fr) minmax(280px, 320px) minmax(380px, 1fr)` to `repeat(3, minmax(0, 1fr))`. Both `/me` and `/player` now use three even columns.
    - Layout editor hero card bug fixed: `js/profile-layout/registry.mjs` had inconsistent `minW: 8 / defaultW: 12` for the hero panel (default layout uses `w: 4`). `normalize-layout.mjs` was clamping `w: 4` → `minW: 8` on every load, making the hero overlap into the middle column in the editor. Registry corrected to `minW: 4, defaultW: 4`; normalize now resets position-locked panels (`draggable: false, resizable: false`) to their default geometry so saved value drift cannot recur.
 
-   Layout editor WYSIWYG, scale-to-fit, and panel styling status as of 2026-05-17:
+   Layout editor WYSIWYG, scale-to-fit, and panel styling status as of 2026-05-18:
    - **`syncCanvasWidth()` in `layout-wire.mjs`**: editor canvas is forced to match the live profile grid width (`min(94vw, 1380px)`), called on load and on `window.resize`.
    - **`fitToScreen()` in `layout-wire.mjs`**: accounts for both canvas width and height when computing fit zoom, so the canvas is never wider than the available viewport.
    - **`getGridMetrics()` in `layout-editor.mjs`**: `colWidth` uses `canvas.offsetWidth` instead of `getBoundingClientRect().width`, keeping drag/resize pointer math in layout coordinates when CSS transform zoom is active.
+   - **Real grid overlay**: the editor grid overlay now renders real grid-cell elements on the same CSS Grid tracks as panels, instead of a background image based on `100% / 12` that ignored gaps and drifted from true placement.
    - **`apply-scale.mjs` scale-to-fit contract**: panel content is scaled down to the user-selected grid footprint using `.panel-zoom-shell`; panel-level scrollbars are not the default behavior. `MAX_ZOOM = 1`, so content only scales down and never scales up.
-   - **Hero card scaling**: the hero uses an inner zoom shell so its children keep their internal grid relationships while the outer panel still obeys saved layout placement. The hero shell is centered to avoid the left-aligned regression.
+   - **Hero card scaling**: the hero uses an inner zoom shell so the outer panel still obeys saved layout placement. The hero shell now uses an explicit centered single-column layout to avoid the recurring left-aligned regression at custom sizes.
    - **Thoughts feed exception**: the thoughts/feed content remains internally scrollable by design. That is the one panel where scrolling is part of the content behavior rather than the layout shell behavior.
    - **Image-load rescale**: `/me` and `/player` now rescale panels again after images load, which avoids bottom clipping in friend/top-friends/gallery-style panels.
    - **Panel constraints**: the hero is draggable/resizable and panel widths can go down to 2 columns where the registry allows it.
    - **Per-panel visual styling**: `normalize-layout.mjs`, `layout-wire.mjs`, `layout-renderer.mjs`, and `apply-layout.mjs` now support `panel.style` values for panel color, gradient color, title bubble color, inner element color, transparency, saturation, brightness, and gradient angle. CSS profile modules consume those values through custom properties on `/me`, `/player`, and the editor preview.
+   - **Live hero preview**: `/me/layout` now renders the hero tile with the live `/me` hero renderer, the live owner-profile CSS stack, live `--profile-panel-*` style variables, and the same hero scale-to-fit path. This is the required pattern for future panel previews.
    - **Backend note**: no Railway/backend migration was needed for the style controls because they persist inside the existing `profile_layout` JSONB payload.
-   - **Remaining verification**: do a manual post-deploy browser pass for tiny panels, hero drag/resize, gradients across panel types, thoughts feed scrolling, and public `/player` pages with real friend data.
+   - **Remaining verification**: do a manual post-deploy browser pass for tiny panels, hero drag/resize, gradients across panel types, thoughts feed scrolling, and public `/player` pages with real friend data. Next preview work should proceed panel family by panel family, reusing live renderers/CSS instead of recreating fake editor-only blocks.
 
 
 ## Folder Reorg — Stable Shape

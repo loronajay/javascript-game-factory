@@ -135,7 +135,7 @@ export function renderMeHeroCard(container, model) {
   }
 }
 
-function renderIdentityPanel(container, model) {
+export function renderMeIdentityPanel(container, model) {
   if (!container) return;
 
   const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
@@ -184,28 +184,17 @@ function renderIdentityPanel(container, model) {
   `;
 }
 
-export function renderMePageView(doc, model, options = {}) {
-  if (!doc?.getElementById) return;
+export function renderMeGalleryPanel(container, photos = [], options = {}) {
+  socialView.renderGalleryPanel(container, "Photo Gallery", photos, {
+    isOwner: true,
+    previewCap: 5,
+    viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
+  });
+}
 
-  renderPageHeader(doc, model);
-  renderMeHeroCard(doc.getElementById("meHeroCard"), model);
-  renderIdentityPanel(doc.getElementById("meIdentityPanel"), model);
-  socialView.renderThoughtsPanel(
-    doc.getElementById("meThoughtsPanel"),
-    "Player Feed",
-    model.thoughtItems,
-    model.thoughtComposer,
-    {
-      openReactionThoughtId: options?.openReactionThoughtId || "",
-      sharePanelState: options?.sharePanelState || {},
-      commentPanelState: options?.commentPanelState || {},
-      composerState: options?.thoughtComposerState || {},
-    },
-  );
-  renderFriendCodePanel(doc.getElementById("meFriendCodePanel"), "Friend Code", model);
-  renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
+export function renderMeRankingsPanel(container, model) {
   renderRailPanel(
-    doc.getElementById("meRankingsPanel"),
+    container,
     "Top Ladder Rankings",
     model.rankingItems,
     (item) => `
@@ -218,8 +207,11 @@ export function renderMePageView(doc, model, options = {}) {
       </article>
     `,
   );
+}
+
+export function renderMeTopFriendsPanel(container, model) {
   renderRailPanel(
-    doc.getElementById("meTopFriendsPanel"),
+    container,
     "Top Friends",
     model.friendItems,
     (item) => {
@@ -242,14 +234,47 @@ export function renderMePageView(doc, model, options = {}) {
       return `<article class="${cardClass}">${inner}</article>`;
     },
   );
+}
+
+export function renderMeFriendCodePanel(container, model) {
+  renderFriendCodePanel(container, "Friend Code", model);
+}
+
+export function renderMeFriendsPanel(container, model) {
+  renderFriendNavigatorPanel(container, "Friends", model.friendNavigator, {
+    expanded: false,
+    searchQuery: "",
+  });
+}
+
+export function renderMePageView(doc, model, options = {}) {
+  if (!doc?.getElementById) return;
+
+  renderPageHeader(doc, model);
+  renderMeHeroCard(doc.getElementById("meHeroCard"), model);
+  renderMeIdentityPanel(doc.getElementById("meIdentityPanel"), model);
+  socialView.renderThoughtsPanel(
+    doc.getElementById("meThoughtsPanel"),
+    "Player Feed",
+    model.thoughtItems,
+    model.thoughtComposer,
+    {
+      openReactionThoughtId: options?.openReactionThoughtId || "",
+      sharePanelState: options?.sharePanelState || {},
+      commentPanelState: options?.commentPanelState || {},
+      composerState: options?.thoughtComposerState || {},
+    },
+  );
+  renderMeFriendCodePanel(doc.getElementById("meFriendCodePanel"), model);
+  renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
+  renderMeRankingsPanel(doc.getElementById("meRankingsPanel"), model);
+  renderMeTopFriendsPanel(doc.getElementById("meTopFriendsPanel"), model);
   renderFriendNavigatorPanel(doc.getElementById("meFriendsPanel"), "Friends", model.friendNavigator, {
     expanded: !!options?.friendNavigatorExpanded,
     searchQuery: options?.friendNavigatorSearchQuery || "",
   });
-  socialView.renderGalleryPanel(doc.getElementById("meGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
-    isOwner: true,
-    previewCap: 5,
-    viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
+  renderMeGalleryPanel(doc.getElementById("meGalleryPanel"), options?.galleryPhotos || [], {
+    galleryPlayerId: options?.galleryPlayerId,
   });
   renderAboutPanel(doc.getElementById("meAboutPanel"), "About Me", model.aboutText);
   renderBadgesPanel(doc.getElementById("meBadgesPanel"), "Badges", model.badgeItems);

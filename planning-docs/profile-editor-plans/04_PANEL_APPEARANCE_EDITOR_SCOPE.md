@@ -1,10 +1,12 @@
 # Panel Appearance Editor Scope
 
-Status snapshot: 2026-05-17
+Status snapshot: 2026-05-18
 
 This scopes the next customization pass after the first `/me/layout` visual controls. The goal is a smoother appearance-editing experience where users can tune one panel while seeing the real live panel as it currently appears on their profile, before saving.
 
-Start with the hero card only. Do not roll this across every panel until the hero flow feels solid, debuggable, and pleasant.
+The first live-preview slice has moved past the hero card into most non-composer panels. Do not roll the deeper appearance controls across every panel until the hero flow feels solid, debuggable, and pleasant.
+
+Important 2026-05-18 lesson: a preview is only useful if it uses the same renderer, CSS stack, scaling path, and CSS variables as the real profile page. Fake editor-only tiles drift too easily.
 
 ## Product Goal
 
@@ -143,6 +145,16 @@ The live profile renderer should remain the source of truth.
 
 Avoid building a fake hero preview with duplicated markup. The appearance editor should reuse the same hero card renderer and CSS variables that `/me` and `/player` use, ideally through a preview container that receives the same normalized layout/style data.
 
+Current shipped direction:
+
+```txt
+Hero preview in /me/layout uses the live /me hero renderer.
+Identity, rankings, top friends, friends, friend code, favorite game, gallery, about, and badges now use live /me renderers in /me/layout.
+The editor page loads the live owner-profile CSS needed for that hero.
+Editor tiles set both editor variables and live --profile-panel-* variables.
+Live previews use the same scale-to-fit helper as the live profile.
+```
+
 Implementation direction:
 
 ```txt
@@ -235,6 +247,22 @@ Make the selected hero panel preview feel like the main subject while editing ap
 
 Avoid building a separate fake component; use the same panel DOM/render path wherever practical.
 
+### Pass 5b - Extend Live Preview Pattern
+
+After the hero preview remains stable, extend live previews one panel family at a time:
+
+```txt
+Identity/Profile panel - shipped
+Favorite Game panel - shipped
+Gallery panel - shipped
+About/Badges panels - shipped
+Friends/Top Friends/Rankings/Friend Code panels - shipped
+Music panel
+Thoughts feed panel
+```
+
+For each panel, first reuse the live renderer/CSS and verify it matches `/me`; only then add deeper appearance controls for that panel.
+
 ### Pass 6 - Save/Reset Polish
 
 Add reset-selected-appearance behavior for hero.
@@ -267,3 +295,17 @@ Reset selected appearance restores hero defaults without moving/resizing panels.
 The editor has a clear Layout vs Appearance distinction.
 The implementation creates a pattern that can be repeated for the next panel.
 ```
+
+## Next Panel Preview Scope
+
+Before adding more appearance controls, continue the live-preview foundation.
+
+Recommended next panel order:
+
+```txt
+1. Music panel - important visually, but more interactive.
+2. Thoughts feed - keep internal scrolling intentional.
+3. Then begin deeper hero-panel appearance controls and sub-grid planning.
+```
+
+Each panel preview should ship only when it visually matches the live `/me` panel at the same saved grid size.
