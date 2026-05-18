@@ -305,11 +305,11 @@ if (doc?.getElementById) {
 
     function initChildLayoutEditor(canvasEl) {
       canvasEl.addEventListener("pointerdown", (event) => {
-        const childTarget = event.target.closest("[data-child-hitbox],[data-child-id]");
+        const childTarget = event.target.closest("[data-child-id]");
         if (!childTarget || !canvasEl.contains(childTarget)) return;
         const panelTile = childTarget.closest("[data-panel-id]");
         const panelId = panelTile?.dataset.panelId;
-        const childId = childTarget.dataset.childId || childTarget.dataset.childHitbox;
+        const childId = childTarget.dataset.childId;
         if (!panelId || childEditPanelId !== panelId || !childId) return;
 
         event.preventDefault();
@@ -426,8 +426,9 @@ if (doc?.getElementById) {
 
     function paintChildDragPreview(child) {
       const box = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] .profile-layout-child-grid__box[data-child-id="${child.id}"]`);
+      const slot = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] [data-child-slot="${child.id}"]`);
       const liveChild = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] [data-profile-child-id="${child.id}"]`);
-      [box, liveChild].forEach((el) => {
+      [slot, liveChild].forEach((el) => {
         if (!el) return;
         el.style.gridColumn = `${child.x + 1} / span ${child.w}`;
         el.style.gridRow = `${child.y + 1} / span ${child.h}`;
@@ -446,16 +447,16 @@ if (doc?.getElementById) {
         const zoomX = overlay.offsetWidth ? overlayRect.width / overlay.offsetWidth : 1;
         const zoomY = overlay.offsetHeight ? overlayRect.height / overlay.offsetHeight : zoomX;
 
-        overlay.querySelectorAll("[data-child-hitbox]").forEach((hitbox) => {
-          const childId = hitbox.dataset.childHitbox;
+        overlay.querySelectorAll("[data-child-id]").forEach((box) => {
+          const childId = box.dataset.childId;
           const liveChild = panelTile.querySelector(`[data-profile-child-id="${childId}"]`);
           if (!liveChild) return;
 
           const childRect = getVisibleChildRect(liveChild, overlayRect);
-          hitbox.style.setProperty("--profile-child-hitbox-x", `${((childRect.left - overlayRect.left) / zoomX).toFixed(2)}px`);
-          hitbox.style.setProperty("--profile-child-hitbox-y", `${((childRect.top - overlayRect.top) / zoomY).toFixed(2)}px`);
-          hitbox.style.setProperty("--profile-child-hitbox-w", `${(childRect.width / zoomX).toFixed(2)}px`);
-          hitbox.style.setProperty("--profile-child-hitbox-h", `${(childRect.height / zoomY).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-x", `${((childRect.left - overlayRect.left) / zoomX).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-y", `${((childRect.top - overlayRect.top) / zoomY).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-w", `${(childRect.width / zoomX).toFixed(2)}px`);
+          box.style.setProperty("--profile-child-box-h", `${(childRect.height / zoomY).toFixed(2)}px`);
         });
       });
     }

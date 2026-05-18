@@ -38,6 +38,14 @@
   text-align: center;
 }
 
+.profile-child-zoom-shell {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: inherit;
+  overflow: hidden;
+}
+
 /* --- Container query compact rules — content scales before overflow occurs --- */
 /* Note: only descendant selectors work inside @container — the container itself cannot be targeted */
 

@@ -2,6 +2,7 @@ import { PROFILE_PANEL_REGISTRY } from "../profile-layout/registry.mjs";
 import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM } from "./apply-layout.mjs";
 
 const ZOOM_SHELL_CLASS = "panel-zoom-shell";
+const CHILD_ZOOM_SHELL_CLASS = "profile-child-zoom-shell";
 const MAX_ZOOM = 1;
 const MIN_ZOOM = 0.05;
 const SCALE_FIT_BUFFER = 8;
@@ -23,6 +24,40 @@ function ensureZoomShell(panelEl) {
     panelEl.appendChild(shell);
   }
   return shell;
+}
+
+function ensureChildZoomShell(childEl) {
+  let shell = childEl.querySelector(":scope > ." + CHILD_ZOOM_SHELL_CLASS);
+  if (!shell) {
+    shell = document.createElement("div");
+    shell.className = CHILD_ZOOM_SHELL_CLASS;
+    while (childEl.firstChild) shell.appendChild(childEl.firstChild);
+    childEl.appendChild(shell);
+  }
+  return shell;
+}
+
+function applyHeroChildScaling(heroEl) {
+  heroEl.querySelectorAll(":scope .panel-zoom-shell > [data-profile-child-id]").forEach((childEl) => {
+    childEl.style.overflow = "hidden";
+    const shell = ensureChildZoomShell(childEl);
+    shell.style.zoom = "";
+    shell.style.width = "";
+    shell.style.height = "";
+
+    const availableW = Math.max(1, childEl.clientWidth);
+    const availableH = Math.max(1, childEl.clientHeight);
+    const naturalW = Math.max(1, shell.scrollWidth || shell.offsetWidth || availableW);
+    const naturalH = Math.max(1, shell.scrollHeight || shell.offsetHeight || availableH);
+    const z = parseFloat(Math.max(
+      MIN_ZOOM,
+      Math.min(availableW / naturalW, availableH / naturalH, MAX_ZOOM),
+    ).toFixed(4));
+
+    shell.style.zoom = String(z);
+    shell.style.width = `${(availableW / z).toFixed(2)}px`;
+    shell.style.height = `${(availableH / z).toFixed(2)}px`;
+  });
 }
 
 export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
@@ -103,6 +138,10 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       : availableW / z;
     shell.style.width = `${shellW.toFixed(2)}px`;
     shell.style.height = `${(availableH / z).toFixed(2)}px`;
+
+    if (panel.id === "hero") {
+      applyHeroChildScaling(el);
+    }
   }
 }
 

@@ -262,18 +262,19 @@ function renderChildEditorOverlay(container, panel, selectedChildId) {
   for (const child of panel.children) {
     const def = registry.children[child.id];
     if (!def || child.enabled === false) continue;
-    const hitbox = document.createElement("span");
-    hitbox.dataset.childHitbox = child.id;
-    hitbox.className = "profile-layout-child-grid__hitbox";
-    hitbox.setAttribute("aria-hidden", "true");
-    overlay.appendChild(hitbox);
+    const slot = document.createElement("span");
+    slot.dataset.childSlot = child.id;
+    slot.className = "profile-layout-child-grid__slot" +
+      (child.id === selectedChildId ? " profile-layout-child-grid__slot--selected" : "");
+    slot.style.gridColumn = `${child.x + 1} / span ${child.w}`;
+    slot.style.gridRow = `${child.y + 1} / span ${child.h}`;
+    slot.setAttribute("aria-hidden", "true");
+    overlay.appendChild(slot);
 
     const box = document.createElement("div");
     box.dataset.childId = child.id;
     box.className = "profile-layout-child-grid__box" +
       (child.id === selectedChildId ? " profile-layout-child-grid__box--selected" : "");
-    box.style.gridColumn = `${child.x + 1} / span ${child.w}`;
-    box.style.gridRow = `${child.y + 1} / span ${child.h}`;
     box.setAttribute("role", "button");
     box.setAttribute("tabindex", "0");
     box.setAttribute("aria-label", `Select ${def.label}`);
