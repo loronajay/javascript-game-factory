@@ -48,8 +48,8 @@ function applyHeroChildScaling(heroEl) {
     const availableW = Math.max(1, childEl.clientWidth);
     const availableH = Math.max(1, childEl.clientHeight);
     const naturalRect = shell.getBoundingClientRect();
-    const naturalW = Math.max(1, shell.scrollWidth || naturalRect.width || availableW);
-    const naturalH = Math.max(1, shell.scrollHeight || naturalRect.height || availableH);
+    const naturalW = Math.max(1, naturalRect.width || shell.scrollWidth || availableW);
+    const naturalH = Math.max(1, naturalRect.height || shell.scrollHeight || availableH);
     const z = parseFloat(Math.max(
       MIN_ZOOM,
       Math.min(availableW / naturalW, availableH / naturalH, MAX_ZOOM),

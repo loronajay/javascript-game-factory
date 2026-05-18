@@ -40,6 +40,7 @@
 
 .profile-child-zoom-shell {
   display: grid;
+  box-sizing: border-box;
   justify-items: center;
   align-content: center;
   gap: inherit;
@@ -55,6 +56,21 @@
   min-height: 0;
   grid-column: auto !important;
   grid-row: auto !important;
+  padding: 0 !important;
+}
+
+.me-hero-card > .panel-zoom-shell > [data-profile-child-id="portrait"] > .profile-child-zoom-shell,
+.player-hero-card > .panel-zoom-shell > [data-profile-child-id="portrait"] > .profile-child-zoom-shell,
+.profile-layout-tile__live-panel.me-hero-card > .panel-zoom-shell > [data-profile-child-id="portrait"] > .profile-child-zoom-shell {
+  padding: 18px 12px;
+}
+
+.me-hero-card > .panel-zoom-shell > [data-profile-child-id="metrics"] > .profile-child-zoom-shell,
+.player-hero-card > .panel-zoom-shell > [data-profile-child-id="metrics"] > .profile-child-zoom-shell,
+.profile-layout-tile__live-panel.me-hero-card > .panel-zoom-shell > [data-profile-child-id="metrics"] > .profile-child-zoom-shell {
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
 }
 
 /* --- Container query compact rules — content scales before overflow occurs --- */
