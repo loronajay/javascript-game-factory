@@ -39,7 +39,6 @@ export function renderLayoutGrid(container, layout, options = {}) {
   const previewModels = options.previewModels || {};
   const childEditPanelId = options.childEditPanelId || null;
   const selectedChildId = options.selectedChildId || null;
-  const onSelectChild = typeof options.onSelectChild === "function" ? options.onSelectChild : null;
 
   const panels = layout?.desktop?.panels ?? getDefaultLayout().desktop.panels;
   const enabledPanels = panels.filter((p) => p.enabled !== false);
@@ -84,7 +83,7 @@ export function renderLayoutGrid(container, layout, options = {}) {
 
     renderLivePreview(tile, panel, previewModels);
     if (editMode && childEditPanelId === panel.id) {
-      renderChildEditorOverlay(tile, panel, selectedChildId, onSelectChild);
+      renderChildEditorOverlay(tile, panel, selectedChildId);
     }
 
     if (editMode && def.draggable) {
@@ -237,7 +236,7 @@ function applyPreviewChildLayout(preview, panel) {
   }
 }
 
-function renderChildEditorOverlay(tile, panel, selectedChildId, onSelectChild) {
+function renderChildEditorOverlay(tile, panel, selectedChildId) {
   const grid = getPanelChildGrid(panel.id);
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panel.id];
   if (!grid || !registry || !Array.isArray(panel.children)) return;
@@ -260,18 +259,19 @@ function renderChildEditorOverlay(tile, panel, selectedChildId, onSelectChild) {
   for (const child of panel.children) {
     const def = registry.children[child.id];
     if (!def || child.enabled === false) continue;
-    const box = document.createElement("button");
-    box.type = "button";
+    const box = document.createElement("div");
+    box.dataset.childId = child.id;
     box.className = "profile-layout-child-grid__box" +
       (child.id === selectedChildId ? " profile-layout-child-grid__box--selected" : "");
     box.style.gridColumn = `${child.x + 1} / span ${child.w}`;
     box.style.gridRow = `${child.y + 1} / span ${child.h}`;
-    box.textContent = def.label;
+    box.setAttribute("role", "button");
+    box.setAttribute("tabindex", "0");
     box.setAttribute("aria-label", `Select ${def.label}`);
-    box.addEventListener("click", (e) => {
-      e.stopPropagation();
-      onSelectChild?.(child.id);
-    });
+    box.innerHTML = `
+      <span class="profile-layout-child-grid__label">${def.label}</span>
+      <span class="profile-layout-child-grid__resize" data-child-resize-handle aria-hidden="true">${RESIZE_HANDLE_SVG}</span>
+    `;
     overlay.appendChild(box);
   }
 

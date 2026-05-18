@@ -10,7 +10,7 @@ import { buildAppUrl } from "../arcade-paths.mjs";
 import { fetchLayout, saveLayout } from "./layout-storage.mjs";
 import { normalizeLayout } from "./normalize-layout.mjs";
 import { getDefaultLayout } from "./default-layout.mjs";
-import { PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
+import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import { renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
@@ -73,6 +73,7 @@ if (doc?.getElementById) {
     let gridOverlayOn = true;
     let zoom = 1;
     let previewModels = {};
+    let childDrag = null;
 
     const canvas = doc.getElementById("meLayoutCanvas");
     const canvasWrap = doc.getElementById("meLayoutCanvasWrap");
@@ -112,7 +113,6 @@ if (doc?.getElementById) {
         childEditPanelId,
         selectedChildId,
         onSelect: selectPanel,
-        onSelectChild: selectChild,
         previewModels,
       });
       // renderer preserves extra classes, but re-assert overlay to be safe
@@ -133,18 +133,7 @@ if (doc?.getElementById) {
 
     function selectChild(id) {
       selectedChildId = id;
-      renderInspector();
-      renderLayoutGrid(canvas, currentLayout, {
-        editMode: true,
-        selectedId: selectedPanelId,
-        childEditPanelId,
-        selectedChildId,
-        onSelect: selectPanel,
-        onSelectChild: selectChild,
-        previewModels,
-      });
-      canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
-      requestAnimationFrame(applyLivePreviewScaling);
+      refreshAll();
     }
 
     // --- zoom ---
@@ -240,7 +229,6 @@ if (doc?.getElementById) {
         childEditPanelId,
         selectedChildId,
         onSelect: selectPanel,
-        onSelectChild: selectChild,
         previewModels,
       });
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
@@ -311,6 +299,139 @@ if (doc?.getElementById) {
         onDirty: markDirty,
         getZoom: () => zoom,
       });
+      initChildLayoutEditor(canvas);
+    }
+
+    function initChildLayoutEditor(canvasEl) {
+      canvasEl.addEventListener("pointerdown", (event) => {
+        const childBox = event.target.closest("[data-child-id]");
+        if (!childBox || !canvasEl.contains(childBox)) return;
+        const panelTile = childBox.closest("[data-panel-id]");
+        const panelId = panelTile?.dataset.panelId;
+        const childId = childBox.dataset.childId;
+        if (!panelId || childEditPanelId !== panelId || !childId) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        beginChildDrag(event, panelId, childId, event.target.closest("[data-child-resize-handle]") ? "resize" : "move");
+      });
+    }
+
+    function beginChildDrag(event, panelId, childId, mode) {
+      const panelIdx = currentLayout.desktop.panels.findIndex((panel) => panel.id === panelId);
+      const panel = currentLayout.desktop.panels[panelIdx];
+      const childIdx = panel?.children?.findIndex((child) => child.id === childId) ?? -1;
+      const child = panel?.children?.[childIdx];
+      const grid = getPanelChildGrid(panelId);
+      const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
+      const childDef = registry?.children?.[childId];
+      const overlay = canvas.querySelector(`[data-panel-id="${panelId}"] .profile-layout-child-grid`);
+      if (panelIdx < 0 || childIdx < 0 || !child || !grid || !childDef || !overlay) return;
+
+      const startCell = pointerToChildCell(event.clientX, event.clientY, overlay);
+      childDrag = {
+        mode,
+        panelId,
+        panelIdx,
+        childId,
+        childIdx,
+        childDef,
+        grid,
+        overlay,
+        startCol: startCell.col,
+        startRow: startCell.row,
+        start: { ...child },
+        next: { ...child },
+      };
+      selectedPanelId = panelId;
+      childEditPanelId = panelId;
+      selectedChildId = childId;
+      paintChildDragPreview(childDrag.next);
+      document.addEventListener("pointermove", onChildDragMove);
+      document.addEventListener("pointerup", onChildDragEnd);
+      document.addEventListener("pointercancel", onChildDragCancel);
+    }
+
+    function onChildDragMove(event) {
+      if (!childDrag) return;
+      event.preventDefault();
+      const cell = pointerToChildCell(event.clientX, event.clientY, childDrag.overlay);
+      const dx = cell.col - childDrag.startCol;
+      const dy = cell.row - childDrag.startRow;
+      const next = { ...childDrag.start };
+
+      if (childDrag.mode === "resize") {
+        next.w += dx;
+        next.h += dy;
+      } else {
+        next.x += dx;
+        next.y += dy;
+      }
+
+      childDrag.next = clampChildRect(next, childDrag.grid, childDrag.childDef);
+      paintChildDragPreview(childDrag.next);
+    }
+
+    function onChildDragEnd() {
+      finishChildDrag(true);
+    }
+
+    function onChildDragCancel() {
+      finishChildDrag(false);
+    }
+
+    function finishChildDrag(commit) {
+      if (!childDrag) return;
+      const dragState = childDrag;
+      childDrag = null;
+      document.removeEventListener("pointermove", onChildDragMove);
+      document.removeEventListener("pointerup", onChildDragEnd);
+      document.removeEventListener("pointercancel", onChildDragCancel);
+
+      if (commit) {
+        const panel = currentLayout.desktop.panels[dragState.panelIdx];
+        const nextChildren = [...panel.children];
+        nextChildren[dragState.childIdx] = dragState.next;
+        currentLayout.desktop.panels[dragState.panelIdx] = { ...panel, children: nextChildren };
+        markDirty();
+      }
+      refreshAll();
+    }
+
+    function pointerToChildCell(clientX, clientY, overlay) {
+      const rect = overlay.getBoundingClientRect();
+      const grid = getPanelChildGrid(overlay.closest("[data-panel-id]")?.dataset.panelId);
+      const columns = grid?.columns || 1;
+      const rows = grid?.rows || 1;
+      const col = Math.floor(((clientX - rect.left) / Math.max(1, rect.width)) * columns);
+      const row = Math.floor(((clientY - rect.top) / Math.max(1, rect.height)) * rows);
+      return {
+        col: Math.max(0, Math.min(columns - 1, col)),
+        row: Math.max(0, Math.min(rows - 1, row)),
+      };
+    }
+
+    function clampChildRect(child, grid, def) {
+      const w = Math.max(def.minW, Math.min(def.maxW, child.w));
+      const h = Math.max(def.minH, Math.min(def.maxH, child.h));
+      return {
+        ...child,
+        w,
+        h,
+        x: Math.max(0, Math.min(grid.columns - w, child.x)),
+        y: Math.max(0, Math.min(grid.rows - h, child.y)),
+      };
+    }
+
+    function paintChildDragPreview(child) {
+      const box = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] [data-child-id="${child.id}"]`);
+      const liveChild = canvas.querySelector(`[data-panel-id="${childDrag.panelId}"] [data-profile-child-id="${child.id}"]`);
+      [box, liveChild].forEach((el) => {
+        if (!el) return;
+        el.style.gridColumn = `${child.x + 1} / span ${child.w}`;
+        el.style.gridRow = `${child.y + 1} / span ${child.h}`;
+      });
+      renderInspector();
     }
 
     // --- panel list ---
@@ -414,11 +535,6 @@ if (doc?.getElementById) {
           selectChild(btn.dataset.childSelect);
         });
       });
-      inspector.querySelectorAll("[data-child-action]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          updateChildLayout(panel.id, btn.dataset.childId, btn.dataset.childAction);
-        });
-      });
     }
 
     function renderChildLayoutControls(panel) {
@@ -438,7 +554,6 @@ if (doc?.getElementById) {
         `;
       }).join("");
 
-      const actionDisabled = childEditPanelId === panel.id && activeChild ? "" : " disabled";
       return `
         <div class="me-layout-child-editor">
           <div class="me-layout-style-editor__header">
@@ -446,52 +561,11 @@ if (doc?.getElementById) {
             <button class="me-layout-style-editor__reset" type="button" data-toggle-child-edit="${escapeHtml(panel.id)}">${childEditPanelId === panel.id ? "Done" : "Edit"}</button>
           </div>
           ${childRows}
-          <div class="me-layout-child-editor__actions" data-active-child="${escapeHtml(activeChild)}">
-            <button type="button" data-child-action="up" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Up</button>
-            <button type="button" data-child-action="down" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Down</button>
-            <button type="button" data-child-action="left" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Left</button>
-            <button type="button" data-child-action="right" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>Right</button>
-            <button type="button" data-child-action="w-minus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>W-</button>
-            <button type="button" data-child-action="w-plus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>W+</button>
-            <button type="button" data-child-action="h-minus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>H-</button>
-            <button type="button" data-child-action="h-plus" data-child-id="${escapeHtml(activeChild)}"${actionDisabled}>H+</button>
-          </div>
+          ${childEditPanelId === panel.id
+            ? `<p class="me-layout-child-editor__hint">Drag a content box to move it. Drag its corner to resize it.</p>`
+            : ""}
         </div>
       `;
-    }
-
-    function updateChildLayout(panelId, childId, action) {
-      const panelIdx = currentLayout.desktop.panels.findIndex((p) => p.id === panelId);
-      if (panelIdx < 0 || !childId) return;
-      const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
-      const panel = currentLayout.desktop.panels[panelIdx];
-      const childIdx = panel.children?.findIndex((child) => child.id === childId) ?? -1;
-      const childDef = registry?.children?.[childId];
-      if (!registry || childIdx < 0 || !childDef) return;
-
-      const child = panel.children[childIdx];
-      let next = { ...child };
-      if (action === "up") next.y -= 1;
-      if (action === "down") next.y += 1;
-      if (action === "left") next.x -= 1;
-      if (action === "right") next.x += 1;
-      if (action === "w-minus") next.w -= 1;
-      if (action === "w-plus") next.w += 1;
-      if (action === "h-minus") next.h -= 1;
-      if (action === "h-plus") next.h += 1;
-
-      next.w = Math.max(childDef.minW, Math.min(childDef.maxW, next.w));
-      next.h = Math.max(childDef.minH, Math.min(childDef.maxH, next.h));
-      next.x = Math.max(0, Math.min(registry.columns - next.w, next.x));
-      next.y = Math.max(0, Math.min(registry.rows - next.h, next.y));
-
-      const nextChildren = [...panel.children];
-      nextChildren[childIdx] = next;
-      currentLayout.desktop.panels[panelIdx] = { ...panel, children: nextChildren };
-      childEditPanelId = panelId;
-      selectedChildId = childId;
-      markDirty();
-      refreshAll();
     }
 
     function renderStyleControls(panel) {

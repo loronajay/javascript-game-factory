@@ -15,7 +15,7 @@ export const PROFILE_PANEL_CHILD_REGISTRY = {
         defaultX: 0,
         defaultY: 0,
         defaultW: 4,
-        defaultH: 2,
+        defaultH: 3,
       },
       metrics: {
         label: "Metrics Chip",
@@ -24,7 +24,7 @@ export const PROFILE_PANEL_CHILD_REGISTRY = {
         maxW: HERO_CHILD_COLUMNS,
         maxH: HERO_CHILD_ROWS,
         defaultX: 0,
-        defaultY: 2,
+        defaultY: 3,
         defaultW: 4,
         defaultH: 2,
       },
@@ -51,4 +51,3 @@ export function getPanelChildGrid(panelId) {
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
   return registry ? { columns: registry.columns, rows: registry.rows } : null;
 }
-
