@@ -236,7 +236,7 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
       tile.classList.toggle("me-hero-card--default-backdrop", !heroModel.backgroundImageUrl);
       tile.classList.toggle("me-hero-card--custom-backdrop", !!heroModel.backgroundImageUrl);
     } else {
-      tile.classList.add("me-panel", `me-panel--${def.category}`);
+      tile.classList.add("me-panel", `me-panel--${getPanelCssSlug(def.category)}`);
     }
     return;
   }
@@ -260,6 +260,39 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
         </div>
       </div>
     `;
+    return;
+  }
+
+  if (def.type === "badges") {
+    const badgeItems = Array.isArray(heroModel.badgeItems) ? heroModel.badgeItems : [];
+    const badgesHtml = badgeItems[0]?.isPlaceholder
+      ? `<p class="me-badge-empty">${escapeHtml(badgeItems[0].label)}</p>`
+      : `<div class="me-badge-list">${badgeItems.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
+    tile.dataset.compositionScale = "true";
+    tile.innerHTML = `
+      <div class="profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--badges">
+        <div class="me-badge-box" data-profile-child-id="content">
+          ${badgesHtml}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (def.type === "friendCode") {
+    const preview = document.createElement("div");
+    renderMeFriendCodePanel(preview, heroModel);
+    const child = preview.querySelector('[data-profile-child-id="code"]');
+    tile.dataset.compositionScale = "true";
+    const stage = document.createElement("div");
+    stage.className = "profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--friend-code";
+    if (child) {
+      child.removeAttribute("data-profile-child-id");
+      stage.appendChild(child);
+    } else {
+      stage.innerHTML = `<div class="friend-code-card"><p class="friend-code-card__value">${escapeHtml(heroModel.friendCodeDisplay || "PENDING")}</p></div>`;
+    }
+    tile.appendChild(stage);
     return;
   }
 
@@ -314,6 +347,13 @@ function applyCompositionRectStyle(el, item) {
   el.style.top = `${y}%`;
   el.style.width = `${w}%`;
   el.style.height = `${h}%`;
+}
+
+function getPanelCssSlug(category) {
+  if (category === "friendCode") return "friend-code";
+  if (category === "favoriteGame") return "favorite";
+  if (category === "topFriends") return "top-friends";
+  return category;
 }
 
 function hasLivePreview(panelId, previewModels) {

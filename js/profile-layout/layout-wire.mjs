@@ -827,23 +827,48 @@ if (doc?.getElementById) {
         ? [
             renderColorControl("Bubble Color", "titleColor", style.titleColor),
           ]
-        : type === "text"
+        : type === "portrait"
           ? [
-              renderColorControl("Text Box Color", "panelColor", style.panelColor),
+              renderColorControl("Chip Color", "panelColor", style.panelColor),
               renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-              renderColorControl("Text Accents", "elementColor", style.elementColor),
+              renderColorControl("Frame Accent", "elementColor", style.elementColor),
             ]
-          : type === "surface"
+          : type === "metrics"
             ? [
-                renderColorControl("Surface Color", "panelColor", style.panelColor),
+                renderColorControl("Chip Color", "panelColor", style.panelColor),
                 renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                renderColorControl("Metrics Title", "titleColor", style.titleColor),
+                renderColorControl("Stat Boxes", "elementColor", style.elementColor),
               ]
-            : [
-                renderColorControl("Panel Color", "panelColor", style.panelColor),
-                renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                renderColorControl("Title Bubble", "titleColor", style.titleColor),
-                renderColorControl("Inner Elements", "elementColor", style.elementColor),
-              ];
+            : type === "text"
+              ? [
+                  renderColorControl("Text Box Color", "panelColor", style.panelColor),
+                  renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                  renderColorControl("Text Accents", "elementColor", style.elementColor),
+                ]
+              : type === "badges"
+                ? [
+                    renderColorControl("Badge Box Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Badge Accents", "elementColor", style.elementColor),
+                  ]
+              : type === "friendCode"
+                ? [
+                    renderColorControl("Code Box Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Code Accents", "elementColor", style.elementColor),
+                  ]
+              : type === "surface"
+                ? [
+                    renderColorControl("Surface Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                  ]
+                : [
+                    renderColorControl("Panel Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Title Bubble", "titleColor", style.titleColor),
+                    renderColorControl("Inner Elements", "elementColor", style.elementColor),
+                  ];
       const showGradientAngle = type !== "title";
       return `
         <div class="me-layout-style-editor">

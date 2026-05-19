@@ -103,6 +103,12 @@ function applyHeroCompositionScaling(panelEl) {
   });
 }
 
+function applyCompositionOverlayScaling(layoutEl) {
+  layoutEl.querySelectorAll(":scope > [data-profile-composition-overlay][data-profile-child-id]").forEach((overlayEl) => {
+    applyChildScaling(overlayEl);
+  });
+}
+
 function getNaturalShellSize(shell) {
   const rects = [shell.getBoundingClientRect()];
   shell.querySelectorAll("*").forEach((el) => {
@@ -212,6 +218,8 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       applyPanelChildScaling(el);
     }
   }
+
+  applyCompositionOverlayScaling(layoutEl);
 }
 
 export function applyMeScaling(doc, layout) {

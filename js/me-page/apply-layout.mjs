@@ -160,14 +160,20 @@ function applyHeroCompositionChild(heroEl, elementId, childEl, element, surface)
 
 function renderCompositionOverlays(doc, layoutEl, elements) {
   if (!Array.isArray(elements)) return;
+  const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
     if (element?.enabled === false) continue;
-    if (isCustomTitleElement(element) || element.id === "aboutTitle") {
-      renderTitleOverlay(doc, layoutEl, element, element.text || (element.id === "aboutTitle" ? "About Me" : "New Section"));
-    } else if (element.id === "aboutSurface") {
-      renderSurfaceOverlay(doc, layoutEl, element, "about");
+    if (element.category === "friendCode" && !isOwnerLayout) continue;
+    if (isCustomTitleElement(element) || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle") {
+      renderTitleOverlay(doc, layoutEl, element, element.text || getDefaultTitleText(element));
+    } else if (element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface") {
+      renderSurfaceOverlay(doc, layoutEl, element, element.category);
     } else if (element.id === "aboutText") {
       renderAboutTextOverlay(doc, layoutEl, element);
+    } else if (element.id === "badgesContent") {
+      renderBadgesContentOverlay(doc, layoutEl, element);
+    } else if (element.id === "friendCodeContent") {
+      renderFriendCodeContentOverlay(doc, layoutEl, element);
     }
   }
 }
@@ -201,7 +207,8 @@ function renderTitleOverlay(doc, layoutEl, element, text) {
 
 function renderSurfaceOverlay(doc, layoutEl, element, category) {
   const surfaceEl = doc.createElement("section");
-  surfaceEl.className = `profile-composition-overlay profile-composition-overlay--surface me-panel player-panel me-panel--${category} player-panel--${category}`;
+  const panelClass = getPanelCssSlug(category);
+  surfaceEl.className = `profile-composition-overlay profile-composition-overlay--surface me-panel player-panel me-panel--${panelClass} player-panel--${panelClass}`;
   surfaceEl.dataset.profileCompositionOverlay = element.id;
   applyCompositionOverlayRect(surfaceEl, element);
   applyPanelVisualStyle(surfaceEl, element.style);
@@ -218,6 +225,48 @@ function renderAboutTextOverlay(doc, layoutEl, element) {
   applyCompositionOverlayRect(textEl, element);
   applyPanelVisualStyle(textEl, element.style);
   layoutEl.appendChild(textEl);
+}
+
+function renderBadgesContentOverlay(doc, layoutEl, element) {
+  const badgesEl = doc.createElement("div");
+  const source = doc.querySelector("#meBadgesPanel [data-profile-child-id='content'], #playerBadgesPanel [data-profile-child-id='content']");
+  badgesEl.className = "profile-composition-overlay profile-composition-overlay--badges me-badge-box";
+  badgesEl.dataset.profileCompositionOverlay = element.id;
+  badgesEl.dataset.profileChildId = "content";
+  badgesEl.innerHTML = source?.innerHTML || `<p class="me-badge-empty player-badge-empty">Badge case still empty</p>`;
+  applyCompositionOverlayRect(badgesEl, element);
+  applyPanelVisualStyle(badgesEl, element.style);
+  layoutEl.appendChild(badgesEl);
+}
+
+function renderFriendCodeContentOverlay(doc, layoutEl, element) {
+  const codeEl = doc.createElement("div");
+  const source = doc.querySelector("#meFriendCodePanel [data-profile-child-id='code']");
+  codeEl.className = "profile-composition-overlay profile-composition-overlay--friend-code friend-code-card";
+  codeEl.dataset.profileCompositionOverlay = element.id;
+  codeEl.dataset.profileChildId = "code";
+  codeEl.innerHTML = source?.innerHTML || `
+    <p class="friend-code-card__label">Your Friend Code</p>
+    <p class="friend-code-card__value">PENDING</p>
+    <p class="friend-code-card__helper">Share this code so friends can link with you directly.</p>
+  `;
+  applyCompositionOverlayRect(codeEl, element);
+  applyPanelVisualStyle(codeEl, element.style);
+  layoutEl.appendChild(codeEl);
+}
+
+function getDefaultTitleText(element) {
+  if (element.id === "aboutTitle") return "About Me";
+  if (element.id === "badgesTitle") return "Badges";
+  if (element.id === "friendCodeTitle") return "Friend Code";
+  return "New Section";
+}
+
+function getPanelCssSlug(category) {
+  if (category === "friendCode") return "friend-code";
+  if (category === "favoriteGame") return "favorite";
+  if (category === "topFriends") return "top-friends";
+  return category;
 }
 
 function applyCompositionOverlayRect(el, element) {

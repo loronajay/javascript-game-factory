@@ -813,6 +813,14 @@
   width: 280px;
 }
 
+.profile-layout-composition-element__scale-stage--badges {
+  width: 280px;
+}
+
+.profile-layout-composition-element__scale-stage--friend-code {
+  width: 340px;
+}
+
 .profile-layout-composition-element__scale-stage--text .me-about-copy-wrap {
   width: 100%;
   min-height: 120px;
@@ -826,10 +834,53 @@
     rgba(9, 8, 22, 0.9);
 }
 
+.profile-layout-composition-element__scale-stage--badges .me-badge-box {
+  width: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--profile-panel-custom-rgb, 255, 214, 189), 0.22);
+  border-radius: var(--profile-radius-sm, 12px);
+  background:
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 21, 14, 55), var(--profile-panel-custom-opacity, 0.96)), rgba(var(--profile-panel-custom-rgb-2, 7, 7, 22), var(--profile-panel-custom-opacity, 0.96))),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
+    rgba(9, 8, 22, 0.9);
+}
+
 .profile-layout-composition-element__scale-stage--text .me-about-copy {
   display: grid;
   place-items: center;
   min-height: 92px;
+}
+
+.profile-layout-composition-element__scale-stage--badges .me-badge-box {
+  display: grid;
+  place-items: center;
+}
+
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-card {
+  width: 100%;
+  min-height: 190px;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid rgba(var(--profile-panel-custom-rgb, 255, 214, 189), 0.22);
+  border-radius: var(--profile-radius-sm, 12px);
+  background:
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 21, 14, 55), var(--profile-panel-custom-opacity, 0.96)), rgba(var(--profile-panel-custom-rgb-2, 7, 7, 22), var(--profile-panel-custom-opacity, 0.96))),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
+    rgba(9, 8, 22, 0.9);
+}
+
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-card__label,
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-form__label,
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-card__helper,
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-form__flash {
+  color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.84);
+}
+
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-form__input,
+.profile-layout-composition-element__scale-stage--friend-code .friend-code-form__submit {
+  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.28);
 }
 
 .profile-layout-composition-element__scale-stage .me-hero-card__portrait-panel,
