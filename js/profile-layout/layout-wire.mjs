@@ -253,7 +253,16 @@ if (doc?.getElementById) {
         style: { ...currentStyle, ...patch },
       };
       markDirty();
-      refreshAll();
+      renderLayoutGrid(canvas, currentLayout, {
+        editMode: true,
+        selectedId: selectedPanelId,
+        childEditPanelId,
+        selectedChildId,
+        onSelect: selectPanel,
+        previewModels,
+      });
+      canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
+      requestAnimationFrame(applyLivePreviewScaling);
     }
 
     function applyLivePreviewScaling() {
