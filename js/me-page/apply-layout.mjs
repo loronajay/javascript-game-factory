@@ -110,8 +110,8 @@ function applyHeroCompositionLayout(doc, heroEl, elements) {
     applyPanelVisualStyle(heroEl, surface.style);
   }
 
-  applyHeroCompositionChild(heroEl, "heroPortrait", heroEl.querySelector('[data-profile-child-id="portrait"]'), byId.get("heroPortrait"));
-  applyHeroCompositionChild(heroEl, "heroMetrics", heroEl.querySelector('[data-profile-child-id="metrics"]'), byId.get("heroMetrics"));
+  applyHeroCompositionChild(heroEl, "heroPortrait", heroEl.querySelector('[data-profile-child-id="portrait"]'), byId.get("heroPortrait"), surface);
+  applyHeroCompositionChild(heroEl, "heroMetrics", heroEl.querySelector('[data-profile-child-id="metrics"]'), byId.get("heroMetrics"), surface);
 
   const title = byId.get("heroTitle");
   let titleEl = heroEl.querySelector('[data-profile-composition-id="heroTitle"]');
@@ -126,13 +126,13 @@ function applyHeroCompositionLayout(doc, heroEl, elements) {
     }
     const heading = titleEl.querySelector(".me-panel__title");
     if (heading) heading.textContent = title.text || "Player Profile";
-    applyHeroCompositionChild(heroEl, "heroTitle", titleEl, title);
+    applyHeroCompositionChild(heroEl, "heroTitle", titleEl, title, surface);
   } else if (titleEl) {
     titleEl.remove();
   }
 }
 
-function applyHeroCompositionChild(heroEl, elementId, childEl, element) {
+function applyHeroCompositionChild(heroEl, elementId, childEl, element, surface) {
   if (!childEl || !element) return;
   childEl.dataset.profileCompositionId = elementId;
   childEl.hidden = element.enabled === false;
@@ -141,12 +141,23 @@ function applyHeroCompositionChild(heroEl, elementId, childEl, element) {
 
   childEl.style.gridColumn = "";
   childEl.style.gridRow = "";
-  childEl.style.left = `${(element.x / COMPOSITION_GRID_COLUMNS) * 100}%`;
-  childEl.style.top = `${(element.y / COMPOSITION_GRID_ROWS) * 100}%`;
-  childEl.style.width = `${(element.w / COMPOSITION_GRID_COLUMNS) * 100}%`;
-  childEl.style.height = `${(element.h / COMPOSITION_GRID_ROWS) * 100}%`;
+  childEl.style.left = `${compositionToSurfacePercent(element.x, surface?.x, surface?.w, COMPOSITION_GRID_COLUMNS)}%`;
+  childEl.style.top = `${compositionToSurfacePercent(element.y, surface?.y, surface?.h, COMPOSITION_GRID_ROWS)}%`;
+  childEl.style.width = `${compositionSizeToSurfacePercent(element.w, surface?.w, COMPOSITION_GRID_COLUMNS)}%`;
+  childEl.style.height = `${compositionSizeToSurfacePercent(element.h, surface?.h, COMPOSITION_GRID_ROWS)}%`;
   applyPanelVisualStyle(childEl, element.style);
   heroEl.classList.add("profile-composition-hero");
+}
+
+function compositionToSurfacePercent(value, surfaceStart, surfaceSize, gridSize) {
+  const start = Number.isFinite(surfaceStart) ? surfaceStart : 0;
+  const size = Number.isFinite(surfaceSize) && surfaceSize > 0 ? surfaceSize : gridSize;
+  return ((value - start) / size) * 100;
+}
+
+function compositionSizeToSurfacePercent(value, surfaceSize, gridSize) {
+  const size = Number.isFinite(surfaceSize) && surfaceSize > 0 ? surfaceSize : gridSize;
+  return (value / size) * 100;
 }
 
 function applyPanelVisualStyle(el, style = {}) {
