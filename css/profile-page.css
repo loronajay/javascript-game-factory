@@ -37,7 +37,7 @@
   grid-row: auto !important;
 }
 
-.profile-custom-title-bubble {
+.profile-composition-overlay {
   position: absolute;
   z-index: 8;
   min-width: 0;
@@ -46,12 +46,36 @@
   pointer-events: none;
 }
 
-.profile-custom-title-bubble .me-panel__title {
+.profile-composition-overlay--surface {
+  z-index: 3;
+}
+
+.profile-composition-overlay--text {
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  padding: 14px 16px;
+}
+
+.profile-composition-overlay--title {
+  z-index: 8;
+}
+
+.profile-composition-overlay--title .me-panel__title {
   width: 100%;
   height: 100%;
   justify-content: center;
   text-align: center;
   box-sizing: border-box;
+}
+
+.profile-composition-overlay--text .me-about-copy,
+.profile-composition-overlay--text .player-about-copy {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow-wrap: anywhere;
 }
 
 .panel-zoom-shell {

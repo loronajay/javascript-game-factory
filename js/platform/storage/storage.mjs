@@ -7,6 +7,8 @@ export const PLATFORM_STORAGE_KEYS = Object.freeze({
   thoughtFeed: "javascript-game-factory.thoughtFeed",
   thoughtComments: "javascript-game-factory.thoughtComments",
   loversLostLegacyOnlineName: "lovers-lost.onlineIdentity.displayName",
+  loversLostPbBoy:  "lovers-lost.pb.boy",
+  loversLostPbGirl: "lovers-lost.pb.girl",
 });
 
 function isNonEmptyString(value) {

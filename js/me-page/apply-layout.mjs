@@ -53,7 +53,8 @@ export function applyProfileLayout(doc, layout, {
 
   const layoutEl = doc.querySelector(layoutSelector);
   if (!layoutEl) return;
-  layoutEl.querySelectorAll("[data-profile-custom-composition]").forEach((el) => el.remove());
+  layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
+  const compositionCategories = getCompositionCategories(layout.desktop.elements);
 
   // Sort: column bucket first (0=left, 1=mid, 2=right), then y within bucket.
   const panels = [...layout.desktop.panels].sort((a, b) => {
@@ -68,7 +69,8 @@ export function applyProfileLayout(doc, layout, {
     if (!el) continue;
 
     const enabled = panel.enabled !== false || required.has(panel.id);
-    el.classList.toggle("layout-panel--hidden", !enabled);
+    const renderedAsComposition = compositionCategories.has(panel.id);
+    el.classList.toggle("layout-panel--hidden", !enabled || renderedAsComposition);
 
     el.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
     el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;
@@ -80,7 +82,7 @@ export function applyProfileLayout(doc, layout, {
     layoutEl.appendChild(el);
   }
 
-  renderCustomTitleBubbles(doc, layoutEl, layout.desktop.elements);
+  renderCompositionOverlays(doc, layoutEl, layout.desktop.elements);
 }
 
 function applyPanelChildLayout(panelEl, panel) {
@@ -153,27 +155,73 @@ function applyHeroCompositionChild(heroEl, elementId, childEl, element, surface)
   heroEl.classList.add("profile-composition-hero");
 }
 
-function renderCustomTitleBubbles(doc, layoutEl, elements) {
+function renderCompositionOverlays(doc, layoutEl, elements) {
   if (!Array.isArray(elements)) return;
   for (const element of elements) {
-    if (!isCustomTitleElement(element) || element.enabled === false) continue;
-    const titleEl = doc.createElement("div");
-    titleEl.className = "profile-custom-title-bubble me-panel__header player-panel__header";
-    titleEl.dataset.profileCustomComposition = element.id;
-    titleEl.innerHTML = `<h2 class="me-panel__title player-panel__title"></h2>`;
-    const heading = titleEl.querySelector(".me-panel__title");
-    if (heading) heading.textContent = element.text || "New Section";
-    titleEl.style.left = `${(element.x / COMPOSITION_GRID_COLUMNS) * 100}%`;
-    titleEl.style.top = `${(element.y / COMPOSITION_GRID_ROWS) * 100}%`;
-    titleEl.style.width = `${(element.w / COMPOSITION_GRID_COLUMNS) * 100}%`;
-    titleEl.style.height = `${(element.h / COMPOSITION_GRID_ROWS) * 100}%`;
-    applyPanelVisualStyle(titleEl, element.style);
-    layoutEl.appendChild(titleEl);
+    if (element?.enabled === false) continue;
+    if (isCustomTitleElement(element) || element.id === "aboutTitle") {
+      renderTitleOverlay(doc, layoutEl, element, element.text || (element.id === "aboutTitle" ? "About Me" : "New Section"));
+    } else if (element.id === "aboutSurface") {
+      renderSurfaceOverlay(doc, layoutEl, element, "about");
+    } else if (element.id === "aboutText") {
+      renderAboutTextOverlay(doc, layoutEl, element);
+    }
   }
 }
 
 function isCustomTitleElement(element) {
   return element?.type === "title" && typeof element.id === "string" && element.id.startsWith(CUSTOM_TITLE_PREFIX);
+}
+
+function getCompositionCategories(elements) {
+  return new Set((Array.isArray(elements) ? elements : [])
+    .filter((element) => (
+      element?.enabled !== false &&
+      element.category &&
+      element.category !== "custom" &&
+      element.category !== "hero"
+    ))
+    .map((element) => element.category));
+}
+
+function renderTitleOverlay(doc, layoutEl, element, text) {
+  const titleEl = doc.createElement("div");
+  titleEl.className = "profile-composition-overlay profile-composition-overlay--title me-panel__header player-panel__header";
+  titleEl.dataset.profileCompositionOverlay = element.id;
+  titleEl.innerHTML = `<h2 class="me-panel__title player-panel__title"></h2>`;
+  const heading = titleEl.querySelector(".me-panel__title");
+  if (heading) heading.textContent = text;
+  applyCompositionOverlayRect(titleEl, element);
+  applyPanelVisualStyle(titleEl, element.style);
+  layoutEl.appendChild(titleEl);
+}
+
+function renderSurfaceOverlay(doc, layoutEl, element, category) {
+  const surfaceEl = doc.createElement("section");
+  surfaceEl.className = `profile-composition-overlay profile-composition-overlay--surface me-panel player-panel me-panel--${category} player-panel--${category}`;
+  surfaceEl.dataset.profileCompositionOverlay = element.id;
+  applyCompositionOverlayRect(surfaceEl, element);
+  applyPanelVisualStyle(surfaceEl, element.style);
+  layoutEl.appendChild(surfaceEl);
+}
+
+function renderAboutTextOverlay(doc, layoutEl, element) {
+  const textEl = doc.createElement("div");
+  const source = doc.querySelector("#meAboutPanel [data-profile-child-id='text'], #playerAboutPanel [data-profile-child-id='text']");
+  textEl.className = "profile-composition-overlay profile-composition-overlay--text me-about-copy-wrap";
+  textEl.dataset.profileCompositionOverlay = element.id;
+  textEl.dataset.profileChildId = "text";
+  textEl.innerHTML = source?.innerHTML || `<p class="me-about-copy player-about-copy"></p>`;
+  applyCompositionOverlayRect(textEl, element);
+  applyPanelVisualStyle(textEl, element.style);
+  layoutEl.appendChild(textEl);
+}
+
+function applyCompositionOverlayRect(el, element) {
+  el.style.left = `${(element.x / COMPOSITION_GRID_COLUMNS) * 100}%`;
+  el.style.top = `${(element.y / COMPOSITION_GRID_ROWS) * 100}%`;
+  el.style.width = `${(element.w / COMPOSITION_GRID_COLUMNS) * 100}%`;
+  el.style.height = `${(element.h / COMPOSITION_GRID_ROWS) * 100}%`;
 }
 
 function compositionToSurfacePercent(value, surfaceStart, surfaceSize, gridSize) {

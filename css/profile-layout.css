@@ -809,6 +809,23 @@
   min-width: 180px;
 }
 
+.profile-layout-composition-element__scale-stage--text {
+  width: 280px;
+}
+
+.profile-layout-composition-element__scale-stage--text .me-about-copy-wrap {
+  width: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+}
+
+.profile-layout-composition-element__scale-stage--text .me-about-copy {
+  display: grid;
+  place-items: center;
+  min-height: 92px;
+}
+
 .profile-layout-composition-element__scale-stage .me-hero-card__portrait-panel,
 .profile-layout-composition-element__scale-stage .me-hero-card__metrics-panel {
   width: 100%;

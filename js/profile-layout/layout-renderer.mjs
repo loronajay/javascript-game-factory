@@ -48,10 +48,12 @@ export function renderLayoutGrid(container, layout, options = {}) {
   const panels = layout?.desktop?.panels ?? getDefaultLayout().desktop.panels;
   const elements = Array.isArray(layout?.desktop?.elements) ? layout.desktop.elements : [];
   const enabledPanels = panels.filter((p) => p.enabled !== false);
-  const hasHeroComposition = elements.some((element) => element.category === "hero" && element.enabled !== false);
-  const renderedPanels = hasHeroComposition
-    ? enabledPanels.filter((panel) => panel.id !== "hero")
-    : enabledPanels;
+  const compositionCategories = new Set(
+    elements
+      .filter((element) => element?.enabled !== false && element.category && element.category !== "custom")
+      .map((element) => element.category),
+  );
+  const renderedPanels = enabledPanels.filter((panel) => !compositionCategories.has(panel.id));
 
   // Preserve extra classes (like --overlay) while replacing base edit class.
   const extraClasses = [...container.classList]
@@ -223,14 +225,19 @@ function renderCompositionElements(container, elements, options = {}) {
 
 function renderCompositionElementContent(tile, element, def, heroModel) {
   if (def.type === "surface") {
-    tile.classList.add("me-hero-card", "profile-layout-composition-surface");
-    tile.innerHTML = `<div class="me-hero-card__backdrop" aria-hidden="true"></div>`;
-    const backdrop = tile.querySelector(".me-hero-card__backdrop");
-    if (backdrop && heroModel.backgroundImageUrl) {
-      backdrop.style.setProperty("--me-profile-backdrop-image", `url("${heroModel.backgroundImageUrl}")`);
+    tile.classList.add("profile-layout-composition-surface");
+    if (def.category === "hero") {
+      tile.classList.add("me-hero-card");
+      tile.innerHTML = `<div class="me-hero-card__backdrop" aria-hidden="true"></div>`;
+      const backdrop = tile.querySelector(".me-hero-card__backdrop");
+      if (backdrop && heroModel.backgroundImageUrl) {
+        backdrop.style.setProperty("--me-profile-backdrop-image", `url("${heroModel.backgroundImageUrl}")`);
+      }
+      tile.classList.toggle("me-hero-card--default-backdrop", !heroModel.backgroundImageUrl);
+      tile.classList.toggle("me-hero-card--custom-backdrop", !!heroModel.backgroundImageUrl);
+    } else {
+      tile.classList.add("me-panel", `me-panel--${def.category}`);
     }
-    tile.classList.toggle("me-hero-card--default-backdrop", !heroModel.backgroundImageUrl);
-    tile.classList.toggle("me-hero-card--custom-backdrop", !!heroModel.backgroundImageUrl);
     return;
   }
 
@@ -239,6 +246,18 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
     tile.innerHTML = `
       <div class="profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--title">
         <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(element.text || def.defaultText || def.label)}</h2></div>
+      </div>
+    `;
+    return;
+  }
+
+  if (def.type === "text") {
+    tile.dataset.compositionScale = "true";
+    tile.innerHTML = `
+      <div class="profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--text">
+        <div class="me-about-copy-wrap" data-profile-child-id="text">
+          <p class="me-about-copy">${escapeHtml(heroModel.aboutText || "")}</p>
+        </div>
       </div>
     `;
     return;

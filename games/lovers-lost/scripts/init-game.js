@@ -21,6 +21,7 @@ import { createInput, keyToAction } from './input.js';
 import { createSounds } from './sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './online.js';
 import { evaluateRun } from './scoring.js';
+import { updatePersonalBest } from './personal-best.js';
 import { publishLoversLostRunActivity } from '../../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile } from '../../../js/platform/identity/factory-profile.mjs';
 import { createOnlineIdentityPayload } from '../../../js/platform/identity/match-identity.mjs';
@@ -226,6 +227,7 @@ function _initWithAssets(images, emoteImages) {
   // ── Solo state ───────────────────────────────────────────────────────────────
   let soloMode          = false;
   let soloSide          = 'boy';
+  let soloPbResult      = null;
   let soloCountdownTick = 0;
   let localCountdownTick = 0;
   let soloSideBoyHov    = false;
@@ -391,6 +393,7 @@ function _initWithAssets(images, emoteImages) {
 
   function startPlayingSolo(side) {
     sounds.stop('run-success'); sounds.stop('run-failed');
+    soloPbResult = null;
     const newGs      = { ...createGameState('single', Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
     const partnerKey = side === 'boy' ? 'girl' : 'boy';
     const obsKey     = partnerKey === 'boy' ? 'boyObstacles' : 'girlObstacles';
@@ -421,6 +424,7 @@ function _initWithAssets(images, emoteImages) {
   function returnToMenu() {
     sounds.stop('run-success'); sounds.stop('run-failed');
     soloMode = false;
+    soloPbResult = null;
     if (gs.mode === 'online' || gs.phase === 'online_countdown') {
       onlineClient.disconnect(); onlineClient.reset();
       onlineRemoteSide = null; onlineRemoteIdentity = null; onlineCountdown = null;
@@ -499,6 +503,7 @@ function _initWithAssets(images, emoteImages) {
               actorDisplayName: gs.mode === 'online' ? onlineIdentity.displayName : factoryProfile.profileName,
               sessionId: gs.mode === 'online' ? `lovers-lost:${onlineRoomCode || 'online'}:${gs.seed ?? 0}` : '',
             });
+            if (soloMode) soloPbResult = updatePersonalBest(storage, soloSide, gs.runSummary);
           }
           if (gs.phase === 'reunion') sounds.play('run-success');
           if (gs.phase === 'gameover') sounds.play('run-failed');
@@ -573,7 +578,7 @@ function _initWithAssets(images, emoteImages) {
     }
     else if (gs.phase === 'reunion')      renderer.renderReunion(boyPlayer, girlPlayer, gs.phaseFrames);
     else if (gs.phase === 'gameover')     renderer.renderGameOver(gs.boy, gs.girl, gs.runSummary, soloMode ? soloSide : null);
-    else if (gs.phase === 'score_screen') renderer.renderScore(gs.boy, gs.girl, gs.runSummary, soloMode ? soloSide : null);
+    else if (gs.phase === 'score_screen') renderer.renderScore(gs.boy, gs.girl, gs.runSummary, soloMode ? soloSide : null, soloPbResult);
 
     updateScoreOverlay(gs.phase, prevPhase, gs.runSummary, onlineSide);
     if (gs.phase !== prevPhase) prevPhase = gs.phase;

@@ -57,10 +57,12 @@ export function createResultsRenderer(ctx, images, {
 
     ctx.font = '16px monospace';
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillStyle = lines[i] === 'Your partner disconnected.'
-        ? 'rgba(255,176,176,0.96)'
-        : 'rgba(210,215,255,0.90)';
-      ctx.fillText(lines[i], CANVAS_W / 2, panelY + 88 + i * rowH);
+      const line = lines[i];
+      const text = typeof line === 'string' ? line : line.text;
+      ctx.fillStyle = typeof line === 'object' && line.color
+        ? line.color
+        : (text === 'Your partner disconnected.' ? 'rgba(255,176,176,0.96)' : 'rgba(210,215,255,0.90)');
+      ctx.fillText(text, CANVAS_W / 2, panelY + 88 + i * rowH);
     }
 
     if (footer) {
@@ -71,15 +73,33 @@ export function createResultsRenderer(ctx, images, {
     ctx.restore();
   }
 
-  function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide = null) {
+  function _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide = null, pbResult = null) {
     if (soloSide) {
       const score = soloSide === 'boy'
         ? (runSummary ? (runSummary.boyFinished  ? runSummary.boyScore  : boyPlayer.score)  : boyPlayer.score)
         : (runSummary ? (runSummary.girlFinished ? runSummary.girlScore : girlPlayer.score) : girlPlayer.score);
-      _drawOverlayPanel(title, [
-        runSummary ? `Time: ${_formatRunTime(runSummary.elapsedFrames)}` : null,
-        `Score: ${score}`,
-      ].filter(Boolean), footer);
+      const finished = soloSide === 'boy'
+        ? (runSummary ? runSummary.boyFinished : false)
+        : (runSummary ? runSummary.girlFinished : false);
+
+      const lines = [];
+      if (runSummary) {
+        lines.push(`Time: ${_formatRunTime(runSummary.elapsedFrames)}`);
+        if (finished) {
+          if (pbResult?.isNewBestTime) {
+            lines.push({ text: '★  New Best Time!', color: 'rgba(255,220,80,0.96)' });
+          } else if (pbResult?.prevPb?.bestTime != null) {
+            lines.push({ text: `Best Time: ${_formatRunTime(pbResult.prevPb.bestTime)}`, color: 'rgba(160,170,220,0.60)' });
+          }
+        }
+      }
+      lines.push(`Score: ${score}`);
+      if (pbResult?.isNewHighScore && score > 0) {
+        lines.push({ text: '★  New High Score!', color: 'rgba(255,220,80,0.96)' });
+      } else if (pbResult?.prevPb?.highScore != null) {
+        lines.push({ text: `High Score: ${pbResult.prevPb.highScore}`, color: 'rgba(160,170,220,0.60)' });
+      }
+      _drawOverlayPanel(title, lines, footer);
       return;
     }
 
@@ -112,7 +132,7 @@ export function createResultsRenderer(ctx, images, {
     const footer = runSummary?.disconnectNote
       ? 'Partner disconnected  ·  Score screen incoming...'
       : 'Score screen incoming...';
-    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide);
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, footer, soloSide, null);
   }
 
   function _scoreTitle(runSummary, soloSide) {
@@ -125,11 +145,11 @@ export function createResultsRenderer(ctx, images, {
     return 'Lovers Reunited';
   }
 
-  function renderScore(boyPlayer, girlPlayer, runSummary, soloSide = null) {
+  function renderScore(boyPlayer, girlPlayer, runSummary, soloSide = null, pbResult = null) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
     const title = _scoreTitle(runSummary, soloSide);
-    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any key to return to menu', soloSide);
+    _drawResultSummary(title, boyPlayer, girlPlayer, runSummary, 'Press any key to return to menu', soloSide, pbResult);
   }
 
   function renderReunion(boyPlayer, girlPlayer, phaseFrames) {
