@@ -296,6 +296,40 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
     return;
   }
 
+  if (def.type === "identityField") {
+    const preview = document.createElement("div");
+    renderMeIdentityPanel(preview, heroModel);
+    const child = preview.querySelector(`[data-profile-child-id="${getIdentityChildId(element.id)}"]`);
+    tile.dataset.compositionScale = "true";
+    const stage = document.createElement("div");
+    stage.className = "profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--identity-field";
+    if (child) {
+      child.removeAttribute("data-profile-child-id");
+      child.style.left = "";
+      child.style.top = "";
+      child.style.width = "";
+      child.style.height = "";
+      stage.appendChild(child);
+    } else {
+      stage.innerHTML = `<div class="me-hero-card__identity-field"><span class="me-hero-card__identity-field-label">${escapeHtml(def.label)}</span></div>`;
+    }
+    tile.appendChild(stage);
+    return;
+  }
+
+  if (def.type === "playerAction") {
+    tile.dataset.compositionScale = "true";
+    tile.innerHTML = `
+      <div class="profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--player-action">
+        <div class="profile-layout-player-action-preview">
+          <span>${escapeHtml(def.label)}</span>
+          <button type="button">${escapeHtml(getPlayerActionPreviewLabel(element.id))}</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   if (def.type === "thoughtsComposer" || def.type === "thoughtsFeed") {
     const preview = document.createElement("div");
     renderMeThoughtsPanel(preview, heroModel);
@@ -375,6 +409,21 @@ function applyCompositionRectStyle(el, item) {
   el.style.top = `${y}%`;
   el.style.width = `${w}%`;
   el.style.height = `${h}%`;
+}
+
+function getIdentityChildId(elementId) {
+  if (elementId === "identityName") return "name";
+  if (elementId === "identityPageViews") return "pageViews";
+  if (elementId === "identityFactoryId") return "factoryId";
+  if (elementId === "identitySocialLinks") return "socialLinks";
+  return "";
+}
+
+function getPlayerActionPreviewLabel(elementId) {
+  if (elementId === "identityFriendAction") return "Add Friend";
+  if (elementId === "identityMessageAction") return "Message";
+  if (elementId === "identityGestureActions") return "Kick / Blow Kiss / Challenge";
+  return "Action";
 }
 
 function getPanelCssSlug(category) {

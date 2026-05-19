@@ -58,7 +58,7 @@
           <h2>Configure Solo Match</h2>
           <label>
             Penalty Word
-            <input id="single-player-word" type="text" value="STATIC" maxlength="10" autocomplete="off" spellcheck="false" inputmode="text">
+            <input id="single-player-word" type="text" value="HORSE" maxlength="10" autocomplete="off" spellcheck="false" inputmode="text">
           </label>
           <p id="single-player-error" class="error-text hidden"></p>
           <div class="row-buttons">
@@ -95,7 +95,7 @@
             </label>
             <label class="form-wide">
               Penalty Word
-              <input id="online-word" type="text" value="STATIC" maxlength="10" autocomplete="off" spellcheck="false" inputmode="text">
+              <input id="online-word" type="text" value="HORSE" maxlength="10" autocomplete="off" spellcheck="false" inputmode="text">
             </label>
           </div>
           <p id="online-error" class="error-text hidden"></p>
@@ -136,7 +136,18 @@
         </div>
       </section>
 
+      <div id="phase-flash" class="phase-flash" aria-hidden="true">
+        <div class="phase-flash__inner">
+          <span class="phase-flash__kicker"></span>
+          <strong class="phase-flash__title"></strong>
+        </div>
+      </div>
+
       <section id="screen-match" class="screen screen-match">
+        <div class="match-waveform" aria-hidden="true">
+          <div class="match-waveform__track match-waveform__track--cyan"></div>
+          <div class="match-waveform__track match-waveform__track--orange"></div>
+        </div>
         <header class="match-header">
           <div>
             <p class="eyebrow" id="phase-kicker">Phase</p>
@@ -145,7 +156,7 @@
           </div>
           <div class="word-card">
             <span>Penalty Word</span>
-            <strong id="penalty-word">STATIC</strong>
+            <strong id="penalty-word">HORSE</strong>
           </div>
         </header>
 

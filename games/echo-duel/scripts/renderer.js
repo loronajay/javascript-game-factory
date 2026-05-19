@@ -23,8 +23,44 @@ const screenMap = {
 };
 
 const previousPenaltyLetters = new Map();
+let _lastFlashedPhase = null;
+let _waveformReady = false;
 
 function qs(id) { return document.getElementById(id); }
+
+function initWaveform() {
+  if (_waveformReady) return;
+  _waveformReady = true;
+  const tracks = document.querySelectorAll('.match-waveform__track');
+  const BAR_COUNT = 52;
+  tracks.forEach((track, trackIndex) => {
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'match-waveform__bar';
+      const durationMs = 800 + (i % 11) * 80 + trackIndex * 110;
+      const delayMs = -(i * 38 + trackIndex * 290) % durationMs;
+      bar.style.animationDuration = `${durationMs}ms`;
+      bar.style.animationDelay = `${delayMs}ms`;
+      fragment.appendChild(bar);
+    }
+    track.appendChild(fragment);
+    track.closest('.match-waveform')?.classList.add('is-visible');
+  });
+}
+
+function triggerPhaseFlash(kicker, title) {
+  const el = qs('phase-flash');
+  if (!el) return;
+  const kickerEl = el.querySelector('.phase-flash__kicker');
+  const titleEl = el.querySelector('.phase-flash__title');
+  if (kickerEl) kickerEl.textContent = kicker;
+  if (titleEl) titleEl.textContent = title;
+  el.classList.remove('is-playing');
+  void el.offsetWidth;
+  el.classList.add('is-playing');
+  el.addEventListener('animationend', () => el.classList.remove('is-playing'), { once: true });
+}
 
 function playbackIndex(state, now = performance.now()) {
   const playback = state.playback;
@@ -356,7 +392,21 @@ export function renderMatch(state) {
   }
 
   showScreen('match');
+  initWaveform();
   const [kicker, title, detail] = getPhaseCopy(state);
+
+  const flashPhases = new Set([
+    PHASES.OWNER_CREATE_INITIAL,
+    PHASES.OWNER_REPLAY,
+    PHASES.OWNER_APPEND,
+    PHASES.SIGNAL_PLAYBACK,
+    PHASES.CHALLENGER_COPY,
+  ]);
+  if (state.phase !== _lastFlashedPhase && flashPhases.has(state.phase)) {
+    triggerPhaseFlash(kicker, title);
+    _lastFlashedPhase = state.phase;
+  }
+
   qs('phase-kicker').textContent = kicker;
   qs('phase-title').textContent = title;
   qs('phase-detail').textContent = state.mode === 'single'
@@ -372,6 +422,13 @@ export function renderMatch(state) {
 }
 
 export function renderEnded(state) {
+  _lastFlashedPhase = null;
+  _waveformReady = false;
+  const waveform = document.querySelector('.match-waveform');
+  if (waveform) {
+    waveform.classList.remove('is-visible');
+    waveform.querySelectorAll('.match-waveform__bar').forEach(b => b.remove());
+  }
   showScreen('ended');
   const winner = state.players.find(player => player.id === state.winnerId);
   const finalScore = state.mode === 'single' ? getSinglePlayerFinalScoreText(state) : '';

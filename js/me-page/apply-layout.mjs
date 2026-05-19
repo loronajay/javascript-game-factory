@@ -38,6 +38,7 @@ const DEFAULT_PANEL_STYLE = {
 
 const ME_REQUIRED = new Set(["hero"]);
 const PLAYER_REQUIRED = new Set(["hero"]);
+const PLAYER_IDENTITY_MIN_ROWS = 5;
 
 // Applies saved panel layout onto the 12-column CSS grid.
 // Panels are sorted by column-group (x<4=left, x<8=mid, x>=8=right) then by y within
@@ -57,7 +58,7 @@ export function applyProfileLayout(doc, layout, {
   const compositionCategories = getCompositionCategories(layout.desktop.elements);
 
   // Sort: column bucket first (0=left, 1=mid, 2=right), then y within bucket.
-  const panels = [...layout.desktop.panels].sort((a, b) => {
+  const panels = getRenderablePanels(layout.desktop.panels, layoutSelector).sort((a, b) => {
     const ga = a.x < 4 ? 0 : a.x < 8 ? 1 : 2;
     const gb = b.x < 4 ? 0 : b.x < 8 ? 1 : 2;
     return ga !== gb ? ga - gb : a.y - b.y;
@@ -88,12 +89,33 @@ export function applyProfileLayout(doc, layout, {
   renderCompositionOverlays(doc, layoutEl, layout.desktop.elements, layout.desktop.panels);
 }
 
+function getRenderablePanels(panels, layoutSelector) {
+  const renderPanels = [...panels];
+  if (layoutSelector !== ".player-layout") return renderPanels;
+
+  const identity = renderPanels.find((panel) => panel.id === "identity" && panel.enabled !== false);
+  if (!identity || identity.h >= PLAYER_IDENTITY_MIN_ROWS) return renderPanels;
+
+  const originalBottom = identity.y + identity.h;
+  const delta = PLAYER_IDENTITY_MIN_ROWS - identity.h;
+  return renderPanels.map((panel) => {
+    if (panel.id === "identity") {
+      return { ...panel, h: PLAYER_IDENTITY_MIN_ROWS };
+    }
+    const sameColumn = panel.x === identity.x;
+    const belowIdentity = panel.y >= originalBottom;
+    return sameColumn && belowIdentity
+      ? { ...panel, y: panel.y + delta }
+      : panel;
+  });
+}
+
 function applyPanelChildLayout(panelEl, panel) {
   if (!Array.isArray(panel?.children)) return;
 
   for (const child of panel.children) {
     if (!child?.id || child.enabled === false) continue;
-    const childEl = panelEl.querySelector(`[data-profile-child-id="${child.id}"]`);
+    const childEl = findPanelLayoutChild(panelEl, child.id);
     if (!childEl) continue;
     childEl.style.gridColumn = "";
     childEl.style.gridRow = "";
@@ -103,6 +125,12 @@ function applyPanelChildLayout(panelEl, panel) {
     childEl.style.height = `${child.h}%`;
     applyPanelVisualStyle(childEl, child.style);
   }
+}
+
+function findPanelLayoutChild(panelEl, childId) {
+  const all = [...panelEl.querySelectorAll(`[data-profile-child-id="${childId}"]`)];
+  if (all.length === 0) return null;
+  return all.find((childEl) => childEl.parentElement === panelEl) || null;
 }
 
 function applyHeroCompositionLayout(doc, heroEl, elements) {
@@ -164,11 +192,16 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
   for (const element of elements) {
     if (element?.enabled === false) continue;
     if (element.category === "friendCode" && !isOwnerLayout) continue;
+    if (element.type === "playerAction" && isOwnerLayout) continue;
     if (element.id === "thoughtsComposer" && !isOwnerLayout) continue;
-    if (isCustomTitleElement(element) || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle" || element.id === "thoughtsTitle") {
+    if (isCustomTitleElement(element) || element.id === "identityTitle" || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle" || element.id === "thoughtsTitle") {
       renderTitleOverlay(doc, layoutEl, element, element.text || getDefaultTitleText(element));
-    } else if (element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface" || element.id === "thoughtsSurface") {
+    } else if (element.id === "identitySurface" || element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface" || element.id === "thoughtsSurface") {
       renderSurfaceOverlay(doc, layoutEl, element, element.category);
+    } else if (element.type === "identityField") {
+      renderIdentityFieldOverlay(doc, layoutEl, element, panels);
+    } else if (element.type === "playerAction") {
+      renderPlayerActionOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "aboutText") {
       renderAboutTextOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "badgesContent") {
@@ -193,7 +226,8 @@ function getCompositionCategories(elements) {
       element?.enabled !== false &&
       element.category &&
       element.category !== "custom" &&
-      element.category !== "hero"
+      element.category !== "hero" &&
+      element.type !== "playerAction"
     ))
     .map((element) => element.category));
 }
@@ -230,6 +264,36 @@ function renderAboutTextOverlay(doc, layoutEl, element, panels) {
   applyCompositionOverlayRect(textEl, element);
   applyPanelVisualStyle(textEl, mergeLegacyChildStyle(element, panels, "about", "text"));
   layoutEl.appendChild(textEl);
+}
+
+function renderIdentityFieldOverlay(doc, layoutEl, element, panels) {
+  const childId = getIdentityChildId(element.id);
+  const fieldEl = doc.querySelector(`#meIdentityPanel [data-profile-child-id='${childId}'], #playerIdentityPanel [data-profile-child-id='${childId}']`) || doc.createElement("div");
+  fieldEl.classList.add("profile-composition-overlay", "profile-composition-overlay--identity-field");
+  fieldEl.dataset.profileCompositionOverlay = element.id;
+  fieldEl.dataset.profileChildId = childId;
+  if (!fieldEl.innerHTML) {
+    fieldEl.classList.add("me-hero-card__identity-field", "player-hero-card__identity-field");
+    fieldEl.innerHTML = `<span class="me-hero-card__identity-field-label player-hero-card__identity-field-label">${getDefaultIdentityFieldLabel(element.id)}</span>`;
+  }
+  applyCompositionOverlayRect(fieldEl, element);
+  applyPanelVisualStyle(fieldEl, mergeLegacyChildStyle(element, panels, "identity", childId));
+  layoutEl.appendChild(fieldEl);
+}
+
+function renderPlayerActionOverlay(doc, layoutEl, element, panels) {
+  const childId = getPlayerActionChildId(element.id);
+  const actionEl = doc.querySelector(`#playerIdentityPanel [data-profile-action-id='${childId}']`) || doc.createElement("div");
+  actionEl.classList.add("profile-composition-overlay", "profile-composition-overlay--player-action");
+  actionEl.dataset.profileCompositionOverlay = element.id;
+  actionEl.dataset.profileChildId = childId;
+  actionEl.removeAttribute("data-profile-action-id");
+  if (!actionEl.innerHTML) {
+    actionEl.innerHTML = `<button class="player-hero-card__friend-action" type="button">${getDefaultPlayerActionLabel(element.id)}</button>`;
+  }
+  applyCompositionOverlayRect(actionEl, element);
+  applyPanelVisualStyle(actionEl, mergeLegacyChildStyle(element, panels, "identity", childId));
+  layoutEl.appendChild(actionEl);
 }
 
 function renderBadgesContentOverlay(doc, layoutEl, element, panels) {
@@ -321,11 +385,42 @@ function mergeLegacyChildStyle(element, panels, panelId, childId) {
 }
 
 function getDefaultTitleText(element) {
+  if (element.id === "identityTitle") return "Player Profile";
   if (element.id === "aboutTitle") return "About Me";
   if (element.id === "badgesTitle") return "Badges";
   if (element.id === "friendCodeTitle") return "Friend Code";
   if (element.id === "thoughtsTitle") return "Player Feed";
   return "New Section";
+}
+
+function getIdentityChildId(elementId) {
+  if (elementId === "identityName") return "name";
+  if (elementId === "identityPageViews") return "pageViews";
+  if (elementId === "identityFactoryId") return "factoryId";
+  if (elementId === "identitySocialLinks") return "socialLinks";
+  return "";
+}
+
+function getPlayerActionChildId(elementId) {
+  if (elementId === "identityFriendAction") return "friendAction";
+  if (elementId === "identityMessageAction") return "messageAction";
+  if (elementId === "identityGestureActions") return "gestureActions";
+  return "";
+}
+
+function getDefaultIdentityFieldLabel(elementId) {
+  if (elementId === "identityName") return "Name";
+  if (elementId === "identityPageViews") return "Page Views";
+  if (elementId === "identityFactoryId") return "Factory ID";
+  if (elementId === "identitySocialLinks") return "Social Links";
+  return "Field";
+}
+
+function getDefaultPlayerActionLabel(elementId) {
+  if (elementId === "identityFriendAction") return "Add Friend";
+  if (elementId === "identityMessageAction") return "Message";
+  if (elementId === "identityGestureActions") return "Kick / Blow Kiss / Challenge";
+  return "Action";
 }
 
 function getPanelCssSlug(category) {

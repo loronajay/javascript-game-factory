@@ -7,6 +7,7 @@ const MAX_ZOOM = 1;
 const MIN_ZOOM = 0.05;
 const SCALE_FIT_BUFFER = 8;
 const CHILD_SCALE_FIT_BUFFER = 6;
+const PLAYER_IDENTITY_MIN_ROWS = 5;
 
 function getCssToken(name, fallback) {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
@@ -144,7 +145,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
   // Column width derived from the live grid element's actual rendered width.
   const colW = (layoutEl.offsetWidth - 11 * gap) / 12;
 
-  for (const panel of layout.desktop.panels) {
+  for (const panel of getRenderablePanelsForScaling(layout.desktop.panels, layoutSelector)) {
     if (panel.enabled === false) continue;
     const domId = panelToDom[panel.id];
     if (!domId) continue;
@@ -220,6 +221,19 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
   }
 
   applyCompositionOverlayScaling(layoutEl);
+}
+
+function getRenderablePanelsForScaling(panels, layoutSelector) {
+  const renderPanels = [...panels];
+  if (layoutSelector !== ".player-layout") return renderPanels;
+
+  const identity = renderPanels.find((panel) => panel.id === "identity" && panel.enabled !== false);
+  if (!identity || identity.h >= PLAYER_IDENTITY_MIN_ROWS) return renderPanels;
+  return renderPanels.map((panel) => (
+    panel.id === "identity"
+      ? { ...panel, h: PLAYER_IDENTITY_MIN_ROWS }
+      : panel
+  ));
 }
 
 export function applyMeScaling(doc, layout) {

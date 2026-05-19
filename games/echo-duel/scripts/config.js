@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   minPlayers: 2,
   maxPlayers: 6,
   playerCount: 4,
-  penaltyWord: 'STATIC',
+  penaltyWord: 'HORSE',
   startingPatternLength: 4,
   patternAppendCount: 2,
   maxPatternLength: 10,

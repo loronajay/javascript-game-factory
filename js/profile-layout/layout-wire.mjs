@@ -858,6 +858,18 @@ if (doc?.getElementById) {
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Code Accents", "elementColor", style.elementColor),
                   ]
+              : type === "identityField"
+                ? [
+                    renderColorControl("Field Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Field Accents", "elementColor", style.elementColor),
+                  ]
+              : type === "playerAction"
+                ? [
+                    renderColorControl("Action Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Button Accents", "elementColor", style.elementColor),
+                  ]
               : type === "thoughtsComposer"
                 ? [
                     renderColorControl("Composer Color", "panelColor", style.panelColor),

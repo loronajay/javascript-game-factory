@@ -151,7 +151,7 @@ function renderIdentityPanel(container, model) {
 
   const friendActionHtml = model.friendAction?.enabled
     ? `
-      <div class="player-hero-card__social-action">
+      <div class="player-hero-card__social-action" data-profile-action-id="friendAction">
         <button
           class="${isUnfriendMode ? "player-hero-card__friend-action player-hero-card__friend-action--unfriend" : "player-hero-card__friend-action"}"
           type="button"
@@ -187,7 +187,7 @@ function renderIdentityPanel(container, model) {
 
   const messageActionHtml = model.messageAction?.enabled
     ? `
-      <div class="player-hero-card__social-action">
+      <div class="player-hero-card__social-action" data-profile-action-id="messageAction">
         <button
           class="player-hero-card__friend-action player-hero-card__friend-action--message"
           type="button"
@@ -200,7 +200,7 @@ function renderIdentityPanel(container, model) {
 
   const gestureActionHtml = model.gestureAction?.enabled
     ? `
-      <div class="player-hero-card__gesture-rail">
+      <div class="player-hero-card__gesture-rail" data-profile-action-id="gestureActions">
         <p class="player-hero-card__gesture-label">Send a gesture</p>
         <div class="player-hero-card__gesture-buttons">
           ${(model.gestureAction.gestures || []).map((g) => `
@@ -224,24 +224,24 @@ function renderIdentityPanel(container, model) {
     : "";
 
   container.innerHTML = `
-    <div class="player-panel__header"><h2 class="player-panel__title">Player Profile</h2></div>
+    <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">Player Profile</h2></div>
     <div class="player-identity-panel__fields">
-      <div class="player-hero-card__identity-field">
+      <div class="player-hero-card__identity-field" data-profile-child-id="name">
         <span class="player-hero-card__identity-field-label">Name</span>
         <div class="player-hero-card__identity-field-value-row">
           <span class="player-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
           <span class="player-presence-dot player-presence-dot--${escapeHtml(model.presenceToneClass || "offline")}" title="${escapeHtml(model.presenceLabel || "Offline")}"></span>
         </div>
       </div>
-      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
+      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack" data-profile-child-id="pageViews">
         <span class="player-hero-card__identity-field-label">Page Views</span>
         <span class="player-hero-card__identity-field-value">${escapeHtml(pageViewCount)}</span>
       </div>
-      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
+      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack" data-profile-child-id="factoryId">
         <span class="player-hero-card__identity-field-label">Factory ID</span>
         <span class="player-hero-card__identity-field-value player-hero-card__identity-field-value--mono">${escapeHtml(factoryId)}</span>
       </div>
-      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack">
+      <div class="player-hero-card__identity-field player-hero-card__identity-field--stack" data-profile-child-id="socialLinks">
         <span class="player-hero-card__identity-field-label">Social Links</span>
         <div class="player-identity-links">
           ${linksHtml}

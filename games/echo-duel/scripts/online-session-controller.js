@@ -85,7 +85,7 @@ export function createOnlineSessionController({
       minPlayers: 2,
       maxPlayers: 6,
       members: [],
-      settings: { penaltyWord: "STATIC" },
+      settings: { penaltyWord: "HORSE" },
       status: "searching",
     };
   }
@@ -445,7 +445,7 @@ export function createOnlineSessionController({
 
   async function findPublic() {
     const net = await ensureOnlineClient();
-    const defaults = { minPlayers: 2, maxPlayers: 6, penaltyWord: "STATIC" };
+    const defaults = { minPlayers: 2, maxPlayers: 6, penaltyWord: "HORSE" };
     online.findingPublic = true;
     const search = () => {
       if (!online.findingPublic || !online.net?.clientId) return;

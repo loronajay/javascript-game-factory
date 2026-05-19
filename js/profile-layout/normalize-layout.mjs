@@ -183,6 +183,14 @@ function migrateCompositionElementStylesFromPanelChildren(elements, panels) {
   const childStyleByElementId = new Map();
   const panelById = new Map((Array.isArray(panels) ? panels : []).map((panel) => [panel.id, panel]));
   const legacyLinks = [
+    ["identityTitle", "identity", "title"],
+    ["identityName", "identity", "name"],
+    ["identityPageViews", "identity", "pageViews"],
+    ["identityFactoryId", "identity", "factoryId"],
+    ["identitySocialLinks", "identity", "socialLinks"],
+    ["identityFriendAction", "identity", "friendAction"],
+    ["identityMessageAction", "identity", "messageAction"],
+    ["identityGestureActions", "identity", "gestureActions"],
     ["aboutTitle", "about", "title"],
     ["aboutText", "about", "text"],
     ["badgesTitle", "badges", "title"],
