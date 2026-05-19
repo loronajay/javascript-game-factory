@@ -6,6 +6,8 @@ let menuMusicWanted = false;
 
 const MENU_MUSIC_SRC = 'assets/sounds/menu.mp3';
 const MENU_MUSIC_VOLUME = 0.34;
+const FAIL_SRC = 'assets/sounds/fail.wav';
+const FAIL_VOLUME = 0.72;
 
 function getContext() {
   if (!ctx) {
@@ -78,6 +80,12 @@ export function playInputTone(input) {
   osc.connect(gain).connect(audio.destination);
   osc.start(now);
   osc.stop(now + 0.18);
+}
+
+export function playFailSound() {
+  const audio = new Audio(FAIL_SRC);
+  audio.volume = FAIL_VOLUME;
+  audio.play().catch(() => {});
 }
 
 export function playFailureTone() {

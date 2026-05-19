@@ -173,19 +173,34 @@
   pointer-events: none;
 }
 
-/* Match screen goes full-bleed — content floats on the atmospheric background */
+/* Hide orbs during match — the splash image provides all atmosphere */
+.game-shell:has(.screen-match.screen--active) .scene-orb,
+.game-shell:has(.screen-match.screen--active) .bg-grid,
+.game-shell:has(.screen-match.screen--active) .scene-noise {
+  opacity: 0;
+}
+
+/* Match screen: HUD frame background, dark center is already readable */
 #game-root:has(.screen-match.screen--active)::before {
   position: fixed;
   inset: 0;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
+    url("../assets/match-background.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-color: #000;
   box-shadow: none;
+  image-rendering: auto;
 }
 
 #game-root:has(.screen-match.screen--active)::after {
   border-radius: 0;
   box-shadow: none;
+  background: transparent;
 }
 
 @media (max-width: 720px) {

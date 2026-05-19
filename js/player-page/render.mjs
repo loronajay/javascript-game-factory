@@ -224,7 +224,7 @@ function renderIdentityPanel(container, model) {
     : "";
 
   container.innerHTML = `
-    <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">Player Profile</h2></div>
+    <div class="player-panel__header"><h2 class="player-panel__title">Player Profile</h2></div>
     <div class="player-identity-panel__fields">
       <div class="player-hero-card__identity-field" data-profile-child-id="name">
         <span class="player-hero-card__identity-field-label">Name</span>

@@ -3,7 +3,7 @@ import { applyAuthoritativeMatchMessage, getAuthoritativeSyncSeq, isAuthoritativ
 import { activePlayers, cloneState, createMatchState, hydrateNetworkState, serializeStateForNetwork } from './state.js';
 import { handleInput, resolveCopyPhase, startSinglePlayerMatch, tick } from './engine.js';
 import { createInputController } from './input.js';
-import { playFailureTone, playInputTone, startMenuMusic, stopMenuMusic, unlockAudio } from './audio.js';
+import { playFailSound, playFailureTone, playInputTone, startMenuMusic, stopMenuMusic, unlockAudio } from './audio.js';
 import { currentPlaybackStep, flashInput, renderMatch, renderOnlineLobby, showScreen } from './renderer.js';
 import { createOnlineClient } from './online.js';
 import { loadArcadeIdentity } from './identity.js';
@@ -177,7 +177,7 @@ function submitLocalInput(input) {
   const after = handleInput(state, input);
   if (after !== before) {
     const failed = after.players.some((player, index) => player.lastResult && player.lastResult !== before.players[index]?.lastResult && ['fail', 'owner-fail', 'eliminated'].includes(player.lastResult));
-    if (failed) playFailureTone();
+    if (failed) playFailSound();
     setState(after);
   }
 }
@@ -221,7 +221,7 @@ function applyAuthoritativeInput(senderId, input, meta = null) {
   const after = handleInput(state, input, playerIdForClientId(senderId));
   if (after !== before) {
     const failed = after.players.some((player, index) => player.lastResult && player.lastResult !== before.players[index]?.lastResult && ['fail', 'owner-fail', 'eliminated'].includes(player.lastResult));
-    if (failed) playFailureTone();
+    if (failed) playFailSound();
     setState(after, { broadcast: true });
   }
 }

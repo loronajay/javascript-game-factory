@@ -6,7 +6,6 @@ import {
   getPhaseCopy,
   getProgressCountForPhase,
   getSinglePlayerFinalScoreText,
-  getSinglePlayerScoreText,
   shouldShowLoserCallout,
 } from './match-view-state.js';
 
@@ -23,7 +22,9 @@ const screenMap = {
 };
 
 const previousPenaltyLetters = new Map();
+const _flashTimers = new Map();
 let _lastFlashedPhase = null;
+let _lastPlaybackIndex = -1;
 let _waveformReady = false;
 
 function qs(id) { return document.getElementById(id); }
@@ -95,16 +96,21 @@ function renderLiveSignal(state) {
     sequence.forEach((input, index) => {
       const key = String(input || '').toUpperCase();
       const box = document.createElement('div');
-      box.className = `live-signal-box is-lit key-${key.toLowerCase()}`;
-      box.textContent = key;
+      box.className = 'live-signal-box';
+      box.dataset.chipKey = key.toLowerCase();
       box.setAttribute('aria-label', `Signal input ${index + 1}: ${key}`);
       strip.appendChild(box);
     });
   }
 
   Array.from(strip.children).forEach((box, index) => {
-    box.classList.toggle('is-current', index === current);
-    box.classList.toggle('pop', index === current);
+    const isCurrent = index === current;
+    box.classList.toggle('is-current', isCurrent);
+    box.classList.toggle('pop', isCurrent);
+    const chipKey = box.dataset.chipKey;
+    if (chipKey) {
+      box.style.backgroundImage = `url("../assets/input-chips/${chipKey}-${isCurrent ? 'lit' : 'dim'}.png")`;
+    }
   });
 }
 
@@ -173,7 +179,16 @@ function renderSequence(state) {
     slot.className = 'sequence-slot sequence-slot--hidden';
     if (i < progress) {
       slot.classList.add('is-complete');
-      slot.textContent = '•';
+      const input = state.activeSequence?.[i];
+      if (input) {
+        const chipKey = String(input).toLowerCase();
+        slot.style.backgroundImage = `url("../assets/input-chips/${chipKey}-dim.png")`;
+        slot.style.backgroundSize = '72%';
+        slot.style.backgroundRepeat = 'no-repeat';
+        slot.style.backgroundPosition = 'center';
+      } else {
+        slot.textContent = '•';
+      }
     } else {
       slot.textContent = String(i + 1);
     }
@@ -359,13 +374,18 @@ function renderTimer(state) {
   bar.style.width = `${pct}%`;
 }
 
-export function flashInput(input) {
+export function flashInput(input, durationMs = 380) {
   const key = String(input || '').toUpperCase();
   const button = document.querySelector(`[data-echo-key="${key}"]`);
   if (!button) return;
+  if (_flashTimers.has(key)) clearTimeout(_flashTimers.get(key));
   button.classList.remove('flash');
   void button.offsetWidth;
   button.classList.add('flash');
+  _flashTimers.set(key, setTimeout(() => {
+    button.classList.remove('flash');
+    _flashTimers.delete(key);
+  }, durationMs));
 }
 
 export function revealOwnerInput() {
@@ -407,11 +427,18 @@ export function renderMatch(state) {
     _lastFlashedPhase = state.phase;
   }
 
+  if (state.phase === PHASES.SIGNAL_PLAYBACK) {
+    const step = currentPlaybackStep(state);
+    const idx = step ? step.index : -1;
+    if (idx !== _lastPlaybackIndex) {
+      _lastPlaybackIndex = idx;
+      if (step) flashInput(step.input, 420);
+    }
+  } else {
+    _lastPlaybackIndex = -1;
+  }
+
   qs('phase-kicker').textContent = kicker;
-  qs('phase-title').textContent = title;
-  qs('phase-detail').textContent = state.mode === 'single'
-    ? `${detail} ${getSinglePlayerScoreText(state)}.`
-    : detail;
   qs('penalty-word').textContent = state.settings.penaltyWord;
   renderPlayers(state);
   renderPenaltyLetterBursts(state);
@@ -423,7 +450,10 @@ export function renderMatch(state) {
 
 export function renderEnded(state) {
   _lastFlashedPhase = null;
+  _lastPlaybackIndex = -1;
   _waveformReady = false;
+  _flashTimers.forEach(t => clearTimeout(t));
+  _flashTimers.clear();
   const waveform = document.querySelector('.match-waveform');
   if (waveform) {
     waveform.classList.remove('is-visible');
