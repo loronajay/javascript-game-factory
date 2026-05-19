@@ -2,6 +2,11 @@ import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs";
 import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
+  COMPOSITION_GRID_COLUMNS,
+  COMPOSITION_GRID_ROWS,
+  PROFILE_COMPOSITION_ELEMENT_REGISTRY,
+} from "./composition-layout.mjs";
+import {
   renderMeFriendCodePanel,
   renderMeFriendsPanel,
   renderMeGalleryPanel,
@@ -41,7 +46,12 @@ export function renderLayoutGrid(container, layout, options = {}) {
   const selectedChildId = options.selectedChildId || null;
 
   const panels = layout?.desktop?.panels ?? getDefaultLayout().desktop.panels;
+  const elements = Array.isArray(layout?.desktop?.elements) ? layout.desktop.elements : [];
   const enabledPanels = panels.filter((p) => p.enabled !== false);
+  const hasHeroComposition = elements.some((element) => element.category === "hero" && element.enabled !== false);
+  const renderedPanels = hasHeroComposition
+    ? enabledPanels.filter((panel) => panel.id !== "hero")
+    : enabledPanels;
 
   // Preserve extra classes (like --overlay) while replacing base edit class.
   const extraClasses = [...container.classList]
@@ -58,10 +68,10 @@ export function renderLayoutGrid(container, layout, options = {}) {
   ].filter(Boolean).join(" ");
 
   if (editMode) {
-    renderGridOverlay(container, enabledPanels);
+    renderGridOverlay(container, renderedPanels);
   }
 
-  for (const panel of enabledPanels) {
+  for (const panel of renderedPanels) {
     const def = PROFILE_PANEL_REGISTRY[panel.id];
     if (!def) continue;
 
@@ -144,6 +154,115 @@ export function renderLayoutGrid(container, layout, options = {}) {
 
     container.appendChild(tile);
   }
+
+  renderCompositionElements(container, elements, {
+    editMode,
+    selectedId,
+    previewModels,
+    onSelect,
+  });
+}
+
+function renderCompositionElements(container, elements, options = {}) {
+  if (!Array.isArray(elements) || elements.length === 0 || !options.previewModels?.hero) return;
+
+  for (const element of elements.filter((item) => item?.enabled !== false)) {
+    const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element.id];
+    if (!def) continue;
+
+    const tile = document.createElement("div");
+    tile.dataset.elementId = element.id;
+    tile.dataset.panelId = element.category;
+    tile.className = [
+      "profile-layout-composition-element",
+      `profile-layout-composition-element--${def.type}`,
+      options.editMode ? "profile-layout-composition-element--edit" : "",
+      options.selectedId === element.id ? "profile-layout-composition-element--selected" : "",
+    ].filter(Boolean).join(" ");
+    applyCompositionRectStyle(tile, element);
+    applyTileVisualStyle(tile, element.style);
+    renderCompositionElementContent(tile, element, def, options.previewModels.hero);
+
+    if (options.editMode) {
+      const handle = document.createElement("button");
+      handle.className = "profile-layout-composition-element__drag-handle";
+      handle.setAttribute("type", "button");
+      handle.setAttribute("data-element-drag-handle", "");
+      handle.setAttribute("aria-label", `Drag ${def.label}`);
+      handle.innerHTML = DRAG_HANDLE_SVG;
+      tile.appendChild(handle);
+
+      const resize = document.createElement("button");
+      resize.className = "profile-layout-composition-element__resize-handle";
+      resize.setAttribute("type", "button");
+      resize.setAttribute("data-element-resize-handle", "");
+      resize.setAttribute("aria-label", `Resize ${def.label}`);
+      resize.innerHTML = RESIZE_HANDLE_SVG;
+      tile.appendChild(resize);
+    }
+
+    if (options.editMode && options.onSelect) {
+      tile.setAttribute("role", "button");
+      tile.setAttribute("tabindex", "0");
+      tile.setAttribute("aria-label", `Select ${def.label}`);
+      tile.addEventListener("click", (event) => {
+        event.stopPropagation();
+        options.onSelect(element.id);
+      });
+      tile.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          options.onSelect(element.id);
+        }
+      });
+    }
+
+    container.appendChild(tile);
+  }
+}
+
+function renderCompositionElementContent(tile, element, def, heroModel) {
+  if (def.type === "surface") {
+    tile.classList.add("me-hero-card", "profile-layout-composition-surface");
+    tile.innerHTML = `<div class="me-hero-card__backdrop" aria-hidden="true"></div>`;
+    const backdrop = tile.querySelector(".me-hero-card__backdrop");
+    if (backdrop && heroModel.backgroundImageUrl) {
+      backdrop.style.setProperty("--me-profile-backdrop-image", `url("${heroModel.backgroundImageUrl}")`);
+    }
+    tile.classList.toggle("me-hero-card--default-backdrop", !heroModel.backgroundImageUrl);
+    tile.classList.toggle("me-hero-card--custom-backdrop", !!heroModel.backgroundImageUrl);
+    return;
+  }
+
+  if (def.type === "title") {
+    tile.innerHTML = `<div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(element.text || def.defaultText || def.label)}</h2></div>`;
+    return;
+  }
+
+  const hero = document.createElement("div");
+  hero.className = "me-hero-card";
+  renderMeHeroCard(hero, heroModel);
+  const childId = def.type === "portrait" ? "portrait" : "metrics";
+  const child = hero.querySelector(`[data-profile-child-id="${childId}"]`);
+  if (child) {
+    child.removeAttribute("data-profile-child-id");
+    child.style.left = "";
+    child.style.top = "";
+    child.style.width = "";
+    child.style.height = "";
+    tile.appendChild(child);
+  }
+}
+
+function applyCompositionRectStyle(el, item) {
+  const x = (item.x / COMPOSITION_GRID_COLUMNS) * 100;
+  const y = (item.y / COMPOSITION_GRID_ROWS) * 100;
+  const w = (item.w / COMPOSITION_GRID_COLUMNS) * 100;
+  const h = (item.h / COMPOSITION_GRID_ROWS) * 100;
+  el.style.left = `${x}%`;
+  el.style.top = `${y}%`;
+  el.style.width = `${w}%`;
+  el.style.height = `${h}%`;
 }
 
 function hasLivePreview(panelId, previewModels) {
@@ -300,6 +419,14 @@ function applyChildRectStyle(el, child) {
   el.style.top = `${child.y}%`;
   el.style.width = `${child.w}%`;
   el.style.height = `${child.h}%`;
+}
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function renderGridOverlay(container, panels) {

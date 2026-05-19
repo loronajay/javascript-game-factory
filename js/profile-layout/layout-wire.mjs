@@ -11,6 +11,11 @@ import { fetchLayout, saveLayout } from "./layout-storage.mjs";
 import { normalizeLayout } from "./normalize-layout.mjs";
 import { getDefaultLayout } from "./default-layout.mjs";
 import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
+import {
+  COMPOSITION_GRID_COLUMNS,
+  COMPOSITION_GRID_ROWS,
+  PROFILE_COMPOSITION_ELEMENT_REGISTRY,
+} from "./composition-layout.mjs";
 import { renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
@@ -74,6 +79,7 @@ if (doc?.getElementById) {
     let zoom = 1;
     let previewModels = {};
     let childDrag = null;
+    let elementDrag = null;
 
     const canvas = doc.getElementById("meLayoutCanvas");
     const canvasWrap = doc.getElementById("meLayoutCanvasWrap");
@@ -216,7 +222,10 @@ if (doc?.getElementById) {
 
     function updatePanelStyle(id, patch) {
       const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
-      if (idx < 0) return;
+      if (idx < 0) {
+        updateElementStyle(id, patch);
+        return;
+      }
       const currentStyle = currentLayout.desktop.panels[idx].style || {};
       currentLayout.desktop.panels[idx] = {
         ...currentLayout.desktop.panels[idx],
@@ -233,6 +242,18 @@ if (doc?.getElementById) {
       });
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
       requestAnimationFrame(applyLivePreviewScaling);
+    }
+
+    function updateElementStyle(id, patch) {
+      const idx = currentLayout.desktop.elements?.findIndex((element) => element.id === id) ?? -1;
+      if (idx < 0) return;
+      const currentStyle = currentLayout.desktop.elements[idx].style || {};
+      currentLayout.desktop.elements[idx] = {
+        ...currentLayout.desktop.elements[idx],
+        style: { ...currentStyle, ...patch },
+      };
+      markDirty();
+      refreshAll();
     }
 
     function applyLivePreviewScaling() {
@@ -272,9 +293,21 @@ if (doc?.getElementById) {
 
     function resetPanelStyle(id) {
       const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
-      if (idx < 0) return;
+      if (idx < 0) {
+        resetElementStyle(id);
+        return;
+      }
       const { style, ...panel } = currentLayout.desktop.panels[idx];
       currentLayout.desktop.panels[idx] = panel;
+      markDirty();
+      refreshAll();
+    }
+
+    function resetElementStyle(id) {
+      const idx = currentLayout.desktop.elements?.findIndex((element) => element.id === id) ?? -1;
+      if (idx < 0) return;
+      const { style, ...element } = currentLayout.desktop.elements[idx];
+      currentLayout.desktop.elements[idx] = element;
       markDirty();
       refreshAll();
     }
@@ -300,6 +333,118 @@ if (doc?.getElementById) {
         getZoom: () => zoom,
       });
       initChildLayoutEditor(canvas);
+      initCompositionElementEditor(canvas);
+    }
+
+    function initCompositionElementEditor(canvasEl) {
+      canvasEl.addEventListener("pointerdown", (event) => {
+        const elementTarget = event.target.closest("[data-element-id]");
+        if (!elementTarget || !canvasEl.contains(elementTarget)) return;
+        const elementId = elementTarget.dataset.elementId;
+        const mode = event.target.closest("[data-element-resize-handle]") ? "resize" : "move";
+        event.preventDefault();
+        event.stopPropagation();
+        beginElementDrag(event, elementId, mode);
+      });
+    }
+
+    function beginElementDrag(event, elementId, mode) {
+      const elementIdx = currentLayout.desktop.elements?.findIndex((element) => element.id === elementId) ?? -1;
+      const element = currentLayout.desktop.elements?.[elementIdx];
+      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[elementId];
+      if (elementIdx < 0 || !element || !def || !canvas) return;
+      const startPoint = pointerToCompositionPoint(event.clientX, event.clientY, canvas);
+      elementDrag = {
+        mode,
+        elementId,
+        elementIdx,
+        def,
+        start: { ...element },
+        next: { ...element },
+        grabX: Math.max(0, Math.min(element.w, startPoint.x - element.x)),
+        grabY: Math.max(0, Math.min(element.h, startPoint.y - element.y)),
+      };
+      selectedPanelId = elementId;
+      childEditPanelId = null;
+      selectedChildId = null;
+      document.addEventListener("pointermove", onElementDragMove);
+      document.addEventListener("pointerup", onElementDragEnd);
+      document.addEventListener("pointercancel", onElementDragCancel);
+    }
+
+    function onElementDragMove(event) {
+      if (!elementDrag) return;
+      event.preventDefault();
+      const point = pointerToCompositionPoint(event.clientX, event.clientY, canvas);
+      const next = { ...elementDrag.start };
+
+      if (elementDrag.mode === "resize") {
+        next.w = point.x - elementDrag.start.x;
+        next.h = point.y - elementDrag.start.y;
+      } else {
+        next.x = point.x - elementDrag.grabX;
+        next.y = point.y - elementDrag.grabY;
+      }
+
+      elementDrag.next = clampCompositionRect(next, elementDrag.def);
+      paintElementDragPreview(elementDrag.next);
+    }
+
+    function onElementDragEnd() {
+      finishElementDrag(true);
+    }
+
+    function onElementDragCancel() {
+      finishElementDrag(false);
+    }
+
+    function finishElementDrag(commit) {
+      if (!elementDrag) return;
+      const dragState = elementDrag;
+      elementDrag = null;
+      document.removeEventListener("pointermove", onElementDragMove);
+      document.removeEventListener("pointerup", onElementDragEnd);
+      document.removeEventListener("pointercancel", onElementDragCancel);
+
+      if (commit) {
+        currentLayout.desktop.elements[dragState.elementIdx] = dragState.next;
+        markDirty();
+      }
+      refreshAll();
+    }
+
+    function pointerToCompositionPoint(clientX, clientY, canvasEl) {
+      const rect = canvasEl.getBoundingClientRect();
+      return {
+        x: ((clientX - rect.left) / Math.max(1, rect.width)) * COMPOSITION_GRID_COLUMNS,
+        y: ((clientY - rect.top) / Math.max(1, rect.height)) * COMPOSITION_GRID_ROWS,
+      };
+    }
+
+    function clampCompositionRect(element, def) {
+      const w = roundChildUnit(Math.max(def.minW, Math.min(def.maxW, element.w)));
+      const h = roundChildUnit(Math.max(def.minH, Math.min(def.maxH, element.h)));
+      return {
+        ...element,
+        w,
+        h,
+        x: roundChildUnit(Math.max(0, Math.min(COMPOSITION_GRID_COLUMNS - w, element.x))),
+        y: roundChildUnit(Math.max(0, Math.min(COMPOSITION_GRID_ROWS - h, element.y))),
+      };
+    }
+
+    function paintElementDragPreview(element) {
+      const el = canvas.querySelector(`[data-element-id="${element.id}"]`);
+      if (!el) return;
+      const x = (element.x / COMPOSITION_GRID_COLUMNS) * 100;
+      const y = (element.y / COMPOSITION_GRID_ROWS) * 100;
+      const w = (element.w / COMPOSITION_GRID_COLUMNS) * 100;
+      const h = (element.h / COMPOSITION_GRID_ROWS) * 100;
+      el.style.left = `${x}%`;
+      el.style.top = `${y}%`;
+      el.style.width = `${w}%`;
+      el.style.height = `${h}%`;
+      renderInspector();
     }
 
     function initChildLayoutEditor(canvasEl) {
@@ -444,7 +589,7 @@ if (doc?.getElementById) {
     function renderPanelList() {
       if (!panelListEl) return;
       const panels = currentLayout.desktop.panels;
-      panelListEl.innerHTML = panels.map((panel) => {
+      const panelHtml = panels.map((panel) => {
         const def = PROFILE_PANEL_REGISTRY[panel.id];
         if (!def) return "";
         const isSelected = panel.id === selectedPanelId;
@@ -463,6 +608,26 @@ if (doc?.getElementById) {
           </button>
         `;
       }).join("");
+      const elementHtml = (currentLayout.desktop.elements || []).map((element) => {
+        const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element.id];
+        if (!def) return "";
+        const isSelected = element.id === selectedPanelId;
+        const isEnabled = element.enabled !== false;
+        return `
+          <button
+            class="me-layout-panel-item${isSelected ? " me-layout-panel-item--selected" : ""}${!isEnabled ? " me-layout-panel-item--hidden" : ""}"
+            type="button"
+            data-panel-select="${escapeHtml(element.id)}"
+            aria-pressed="${isSelected ? "true" : "false"}"
+          >
+            <span class="me-layout-panel-item__dot"></span>
+            <span class="me-layout-panel-item__label">${escapeHtml(def.label)}</span>
+            <span class="me-layout-panel-item__badge">${escapeHtml(def.category)}</span>
+            ${isEnabled ? "" : `<span class="me-layout-panel-item__badge">hidden</span>`}
+          </button>
+        `;
+      }).join("");
+      panelListEl.innerHTML = `${panelHtml}${elementHtml}`;
 
       panelListEl.querySelectorAll("[data-panel-select]").forEach((btn) => {
         btn.addEventListener("click", () => selectPanel(btn.dataset.panelSelect));
@@ -481,7 +646,10 @@ if (doc?.getElementById) {
 
       const panel = currentLayout.desktop.panels.find((p) => p.id === selectedPanelId);
       const def = PROFILE_PANEL_REGISTRY[selectedPanelId];
-      if (!panel || !def) return;
+      if (!panel || !def) {
+        renderElementInspector(selectedPanelId);
+        return;
+      }
 
       const enableToggle = !def.required
         ? `<label class="me-layout-inspector__toggle-label">
@@ -540,6 +708,68 @@ if (doc?.getElementById) {
           selectChild(btn.dataset.childSelect);
         });
       });
+    }
+
+    function renderElementInspector(id) {
+      const element = currentLayout.desktop.elements?.find((item) => item.id === id);
+      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[id];
+      if (!element || !def) {
+        inspector.innerHTML = `<p class="me-layout-inspector__empty">Click a panel or element to inspect it.</p>`;
+        return;
+      }
+
+      inspector.innerHTML = `
+        <div class="me-layout-inspector__panel">
+          <p class="me-layout-inspector__panel-label">${escapeHtml(def.label)}</p>
+          <dl class="me-layout-inspector__meta">
+            <dt>Category</dt><dd>${escapeHtml(def.category)}</dd>
+            <dt>Type</dt><dd>${escapeHtml(def.type)}</dd>
+            <dt>Position</dt><dd>col ${formatNumber(element.x + 1)}, row ${formatNumber(element.y + 1)}</dd>
+            <dt>Size</dt><dd>${formatNumber(element.w)} x ${formatNumber(element.h)}</dd>
+          </dl>
+          <label class="me-layout-inspector__toggle-label">
+            <input
+              class="me-layout-inspector__visible-toggle"
+              type="checkbox"
+              data-toggle-element="${escapeHtml(element.id)}"
+              ${element.enabled !== false ? "checked" : ""}
+            >
+            Visible
+          </label>
+          ${def.type === "title" ? `
+            <label class="me-layout-style-control">
+              <span>Title Text</span>
+              <input class="me-layout-style-control__text" type="text" value="${escapeHtml(element.text || def.defaultText || "")}" data-element-text="${escapeHtml(element.id)}">
+            </label>
+          ` : ""}
+          ${renderStyleControls(element)}
+        </div>
+      `;
+
+      inspector.querySelector("[data-toggle-element]")?.addEventListener("change", (e) => {
+        toggleElement(element.id, e.target.checked);
+      });
+      inspector.querySelector("[data-element-text]")?.addEventListener("change", (e) => {
+        updateElementText(element.id, e.target.value);
+      });
+      inspector.querySelectorAll("[data-panel-style]").forEach((input) => {
+        input.addEventListener("input", () => {
+          const key = input.dataset.panelStyle;
+          const value = input.type === "range" ? parseFloat(input.value) : input.value;
+          const output = input.parentElement?.querySelector?.("output");
+          if (output && input.type === "range") {
+            output.textContent = key === "gradientAngle" ? `${Math.round(value)}deg` : `${Math.round(value * 100)}%`;
+          }
+          updateElementStyle(element.id, { [key]: value });
+        });
+      });
+      inspector.querySelector("[data-reset-panel-style]")?.addEventListener("click", () => {
+        resetElementStyle(element.id);
+      });
+    }
+
+    function formatNumber(value) {
+      return Math.round(value * 10) / 10;
     }
 
     function renderChildLayoutControls(panel) {
@@ -616,6 +846,22 @@ if (doc?.getElementById) {
       const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
       if (idx < 0) return;
       currentLayout.desktop.panels[idx] = { ...currentLayout.desktop.panels[idx], enabled };
+      markDirty();
+      refreshAll();
+    }
+
+    function toggleElement(id, enabled) {
+      const idx = currentLayout.desktop.elements?.findIndex((element) => element.id === id) ?? -1;
+      if (idx < 0) return;
+      currentLayout.desktop.elements[idx] = { ...currentLayout.desktop.elements[idx], enabled };
+      markDirty();
+      refreshAll();
+    }
+
+    function updateElementText(id, text) {
+      const idx = currentLayout.desktop.elements?.findIndex((element) => element.id === id) ?? -1;
+      if (idx < 0) return;
+      currentLayout.desktop.elements[idx] = { ...currentLayout.desktop.elements[idx], text };
       markDirty();
       refreshAll();
     }

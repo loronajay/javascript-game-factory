@@ -1,6 +1,12 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
 import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs";
 import { PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
+import {
+  COMPOSITION_GRID_COLUMNS,
+  COMPOSITION_GRID_ROWS,
+  PROFILE_COMPOSITION_ELEMENT_REGISTRY,
+  getDefaultCompositionElements,
+} from "./composition-layout.mjs";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -84,7 +90,42 @@ export function normalizeLayout(raw) {
     }
   }
 
-  return { version: LAYOUT_VERSION, desktop: { columns, panels: normalized } };
+  return {
+    version: LAYOUT_VERSION,
+    desktop: {
+      columns,
+      elements: normalizeCompositionElements(desktop.elements),
+      panels: normalized,
+    },
+  };
+}
+
+export function normalizeCompositionElements(rawElements) {
+  const rawById = new Map(
+    (Array.isArray(rawElements) ? rawElements : getDefaultCompositionElements())
+      .filter((element) => element && typeof element === "object")
+      .map((element) => [element.id, element]),
+  );
+
+  return Object.entries(PROFILE_COMPOSITION_ELEMENT_REGISTRY).map(([id, def]) => {
+    const raw = rawById.get(id) || {};
+    const w = clamp(toNumber(raw.w, def.defaultW), def.minW, def.maxW);
+    const h = clamp(toNumber(raw.h, def.defaultH), def.minH, def.maxH);
+    const x = clamp(toNumber(raw.x, def.defaultX), 0, COMPOSITION_GRID_COLUMNS - w);
+    const y = clamp(toNumber(raw.y, def.defaultY), 0, COMPOSITION_GRID_ROWS - h);
+    return {
+      id,
+      category: def.category,
+      type: def.type,
+      enabled: raw.enabled ?? (def.defaultEnabled !== false),
+      text: typeof raw.text === "string" ? raw.text : (def.defaultText || ""),
+      x,
+      y,
+      w,
+      h,
+      style: normalizePanelStyle(raw.style),
+    };
+  });
 }
 
 export function normalizePanelStyle(raw) {
@@ -229,6 +270,11 @@ function migratePanelChildren(panelId, rawChildren) {
 
 function toInt(val, fallback) {
   const n = parseInt(val, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toNumber(val, fallback) {
+  const n = parseFloat(val);
   return Number.isFinite(n) ? n : fallback;
 }
 

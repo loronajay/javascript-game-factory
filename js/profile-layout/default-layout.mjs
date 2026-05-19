@@ -1,4 +1,5 @@
 import { getDefaultPanelChildren } from "./child-layout.mjs";
+import { getDefaultCompositionElements } from "./composition-layout.mjs";
 
 export const LAYOUT_COLUMNS = 12;
 export const LAYOUT_VERSION = 1;
@@ -28,6 +29,7 @@ export const DEFAULT_PROFILE_LAYOUT = {
   version: LAYOUT_VERSION,
   desktop: {
     columns: LAYOUT_COLUMNS,
+    elements: getDefaultCompositionElements(),
     panels: [
       // Left column
       { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
@@ -58,6 +60,7 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
   version: LAYOUT_VERSION,
   desktop: {
     columns: LAYOUT_COLUMNS,
+    elements: getDefaultCompositionElements(),
     panels: [
       // Left column
       { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
