@@ -16,7 +16,7 @@ import {
   COMPOSITION_GRID_ROWS,
   PROFILE_COMPOSITION_ELEMENT_REGISTRY,
 } from "./composition-layout.mjs";
-import { renderLayoutGrid } from "./layout-renderer.mjs";
+import { applyCompositionElementScaling, renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { buildMePageViewModel } from "../me-page/view-model.mjs";
@@ -266,6 +266,7 @@ if (doc?.getElementById) {
     }
 
     function applyLivePreviewScaling() {
+      applyCompositionElementScaling(canvas);
       applyPanelScaling(doc, currentLayout, {
         hero: "meLayoutHeroPreview",
         identity: "meLayoutIdentityPreview",

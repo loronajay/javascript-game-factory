@@ -235,7 +235,12 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
   }
 
   if (def.type === "title") {
-    tile.innerHTML = `<div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(element.text || def.defaultText || def.label)}</h2></div>`;
+    tile.dataset.compositionScale = "true";
+    tile.innerHTML = `
+      <div class="profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--title">
+        <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(element.text || def.defaultText || def.label)}</h2></div>
+      </div>
+    `;
     return;
   }
 
@@ -250,8 +255,30 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
     child.style.top = "";
     child.style.width = "";
     child.style.height = "";
-    tile.appendChild(child);
+    tile.dataset.compositionScale = "true";
+    const stage = document.createElement("div");
+    stage.className = [
+      "profile-layout-composition-element__scale-stage",
+      `profile-layout-composition-element__scale-stage--${def.type}`,
+    ].join(" ");
+    stage.appendChild(child);
+    tile.appendChild(stage);
   }
+}
+
+export function applyCompositionElementScaling(root = document) {
+  root.querySelectorAll("[data-composition-scale]").forEach((tile) => {
+    const stage = tile.querySelector(".profile-layout-composition-element__scale-stage");
+    if (!stage) return;
+
+    stage.style.transform = "translate(-50%, -50%) scale(1)";
+    const tileRect = tile.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    if (!tileRect.width || !tileRect.height || !stageRect.width || !stageRect.height) return;
+
+    const scale = Math.min(tileRect.width / stageRect.width, tileRect.height / stageRect.height, 1);
+    stage.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(4)})`;
+  });
 }
 
 function applyCompositionRectStyle(el, item) {
