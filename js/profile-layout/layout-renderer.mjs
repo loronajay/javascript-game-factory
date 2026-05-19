@@ -296,6 +296,30 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
     return;
   }
 
+  if (def.type === "galleryGrid" || def.type === "galleryLink") {
+    const preview = document.createElement("div");
+    renderMeGalleryPanel(preview, previewModels.galleryPhotos || [], {
+      galleryPlayerId: heroModel.playerId,
+    });
+    if (def.type === "galleryGrid") {
+      const content = preview.querySelector('[data-profile-child-id="content"]');
+      const grid = content?.querySelector(".gallery-grid");
+      tile.dataset.compositionScale = "none";
+      tile.classList.add("profile-layout-composition-element--gallery-grid");
+      if (grid) tile.appendChild(grid.cloneNode(true));
+      else tile.innerHTML = `<span class="profile-layout-tile__label">${escapeHtml(def.label)}</span>`;
+    } else {
+      const link = preview.querySelector(".gallery-view-all");
+      tile.dataset.compositionScale = "true";
+      const stage = document.createElement("div");
+      stage.className = "profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--gallery-link";
+      if (link) stage.appendChild(link.cloneNode(true));
+      else stage.innerHTML = `<a class="gallery-view-all" href="#">View All Photos -></a>`;
+      tile.appendChild(stage);
+    }
+    return;
+  }
+
   if (def.type === "identityField") {
     const preview = document.createElement("div");
     renderMeIdentityPanel(preview, heroModel);

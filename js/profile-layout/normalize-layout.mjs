@@ -197,6 +197,8 @@ function migrateCompositionElementStylesFromPanelChildren(elements, panels) {
     ["badgesContent", "badges", "content"],
     ["friendCodeTitle", "friendCode", "title"],
     ["friendCodeContent", "friendCode", "code"],
+    ["galleryTitle", "gallery", "title"],
+    ["galleryContent", "gallery", "content"],
     ["thoughtsTitle", "thoughts", "title"],
     ["thoughtsComposer", "thoughts", "composer"],
     ["thoughtsFeed", "thoughts", "feed"],

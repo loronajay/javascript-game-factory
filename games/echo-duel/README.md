@@ -20,9 +20,13 @@ The browser entry is `index.html`, which imports `initGame()` from root `game.js
 - WASD, mouse, and touch input.
 - Driver create, replay, append, and simultaneous challenger copy rules.
 - Penalty-word elimination and last-active-player win condition.
+- Single-player survival mode: score-attack against Echo CPU — how many full 10-input chains before you spell the penalty word.
+- Personal best tracking for solo mode: high score persisted in `echo-duel.pb.solo` via the platform storage registry; results screen shows gold `★ New Personal Best!` banner or muted prior-best comparison.
 - Screen-state transitions instead of hard page-swap hiding.
 - Modular CSS theming under `styles/`.
 - Server-authoritative online play through the Echo Duel path in `factory-network-server`, with the older host-client fallback still present in the client for compatibility.
+- Full match screen UI: `match-background.png` HUD frame full-bleed, WASD input chips (lit/dim PNG states, per-key glow, mini chips in sequence slots and live signal strip), waveform atmosphere layer, phase flash overlay.
+- `fail.wav` plays on letter award (driver pattern drop and challenger copy fail).
 
 ## Network Contract
 
@@ -72,7 +76,9 @@ scripts/
   online-session-controller.js
   online-session-state.js
   online.js
+  personal-best.js
   renderer.js
+  single-player-setup.js
   state.js
   validation.js
 styles/
@@ -95,6 +101,8 @@ styles/
 - `online-session-controller.js` owns online lifecycle, callbacks, and lobby-to-match orchestration.
 - `renderer.js` owns DOM rendering.
 - `match-view-state.js` and `online-lobby-view-state.js` own pure UI/view-model decisions.
+- `personal-best.js` owns solo PB load/save against the platform storage registry.
+- `audio.js` owns music, input tones, and the `fail.wav` one-shot on letter award.
 - `styles/` owns the visual system in focused CSS modules.
 
 ## Notes

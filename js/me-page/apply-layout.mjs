@@ -194,9 +194,9 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
     if (element.category === "friendCode" && !isOwnerLayout) continue;
     if (element.type === "playerAction" && isOwnerLayout) continue;
     if (element.id === "thoughtsComposer" && !isOwnerLayout) continue;
-    if (isCustomTitleElement(element) || element.id === "identityTitle" || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle" || element.id === "thoughtsTitle") {
+    if (isCustomTitleElement(element) || element.id === "identityTitle" || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle" || element.id === "galleryTitle" || element.id === "thoughtsTitle") {
       renderTitleOverlay(doc, layoutEl, element, element.text || getDefaultTitleText(element));
-    } else if (element.id === "identitySurface" || element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface" || element.id === "thoughtsSurface") {
+    } else if (element.id === "identitySurface" || element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface" || element.id === "gallerySurface" || element.id === "thoughtsSurface") {
       renderSurfaceOverlay(doc, layoutEl, element, element.category);
     } else if (element.type === "identityField") {
       renderIdentityFieldOverlay(doc, layoutEl, element, panels);
@@ -208,6 +208,10 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
       renderBadgesContentOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "friendCodeContent") {
       renderFriendCodeContentOverlay(doc, layoutEl, element, panels);
+    } else if (element.id === "galleryContent") {
+      renderGalleryContentOverlay(doc, layoutEl, element, panels);
+    } else if (element.id === "galleryLink") {
+      renderGalleryLinkOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "thoughtsComposer") {
       renderThoughtsComposerOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "thoughtsFeed") {
@@ -324,6 +328,33 @@ function renderFriendCodeContentOverlay(doc, layoutEl, element, panels) {
   layoutEl.appendChild(codeEl);
 }
 
+function renderGalleryContentOverlay(doc, layoutEl, element, panels) {
+  const galleryEl = doc.createElement("div");
+  const source = doc.querySelector("#meGalleryPanel [data-profile-child-id='content'], #playerGalleryPanel [data-profile-child-id='content']");
+  galleryEl.className = "profile-composition-overlay profile-composition-overlay--gallery-grid gallery-panel__content";
+  galleryEl.dataset.profileCompositionOverlay = element.id;
+  galleryEl.dataset.profileChildId = "content";
+  const grid = source?.querySelector(".gallery-grid")?.cloneNode(true);
+  if (grid) galleryEl.appendChild(grid);
+  else galleryEl.innerHTML = `<div class="gallery-grid"><p class="me-panel__empty player-panel__empty">No photos yet.</p></div>`;
+  applyCompositionOverlayRect(galleryEl, element);
+  applyPanelVisualStyle(galleryEl, mergeLegacyChildStyle(element, panels, "gallery", "content"));
+  layoutEl.appendChild(galleryEl);
+}
+
+function renderGalleryLinkOverlay(doc, layoutEl, element, panels) {
+  const source = doc.querySelector("#meGalleryPanel .gallery-view-all, #playerGalleryPanel .gallery-view-all");
+  const linkEl = doc.createElement("a");
+  linkEl.className = "profile-composition-overlay profile-composition-overlay--gallery-link gallery-view-all";
+  linkEl.dataset.profileCompositionOverlay = element.id;
+  linkEl.dataset.profileChildId = "galleryLink";
+  linkEl.href = source?.getAttribute("href") || "#";
+  linkEl.textContent = source?.textContent || "View All Photos ->";
+  applyCompositionOverlayRect(linkEl, element);
+  applyPanelVisualStyle(linkEl, mergeLegacyChildStyle(element, panels, "gallery", "content"));
+  layoutEl.appendChild(linkEl);
+}
+
 function renderThoughtsComposerOverlay(doc, layoutEl, element, panels) {
   const source = doc.querySelector("#meThoughtsPanel [data-profile-child-id='composer']");
   const composerEl = source || doc.createElement("div");
@@ -389,6 +420,7 @@ function getDefaultTitleText(element) {
   if (element.id === "aboutTitle") return "About Me";
   if (element.id === "badgesTitle") return "Badges";
   if (element.id === "friendCodeTitle") return "Friend Code";
+  if (element.id === "galleryTitle") return "Photo Gallery";
   if (element.id === "thoughtsTitle") return "Player Feed";
   return "New Section";
 }

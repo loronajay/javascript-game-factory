@@ -866,6 +866,20 @@ if (doc?.getElementById) {
                     renderColorControl("Input/Button Color", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                   ]
+              : type === "galleryGrid"
+                ? [
+                    renderColorControl("Grid Box Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Photo Card Color", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
+                  ]
+              : type === "galleryLink"
+                ? [
+                    renderColorControl("Link Box Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Link Accent", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
+                  ]
               : type === "identityField"
                 ? [
                     renderColorControl("Field Color", "panelColor", style.panelColor),

@@ -216,7 +216,7 @@ export function renderMeGalleryPanel(container, photos = [], options = {}) {
   socialView.renderGalleryPanel(container, "Photo Gallery", photos, {
     isOwner: true,
     childLayout: true,
-    previewCap: 5,
+    previewCap: 8,
     viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
 }
