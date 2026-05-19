@@ -26,6 +26,9 @@ export const PLAYER_PANEL_TO_DOM = {
   badges: "playerBadgesPanel",
 };
 
+const COMPOSITION_GRID_COLUMNS = 12;
+const COMPOSITION_GRID_ROWS = 17;
+
 const DEFAULT_PANEL_STYLE = {
   opacity: 0.96,
   saturation: 1,
@@ -69,6 +72,7 @@ export function applyProfileLayout(doc, layout, {
     el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;
     applyPanelVisualStyle(el, panel.style);
     applyPanelChildLayout(el, panel);
+    applyHeroCompositionLayout(doc, el, layout.desktop.elements);
 
     // Append in sort order so DOM order drives mobile stacking.
     layoutEl.appendChild(el);
@@ -90,6 +94,59 @@ function applyPanelChildLayout(panelEl, panel) {
     childEl.style.height = `${child.h}%`;
     applyPanelVisualStyle(childEl, child.style);
   }
+}
+
+function applyHeroCompositionLayout(doc, heroEl, elements) {
+  if (!heroEl?.classList?.contains("me-hero-card") && !heroEl?.classList?.contains("player-hero-card")) return;
+  if (!Array.isArray(elements)) return;
+
+  const heroElements = elements.filter((element) => element?.category === "hero");
+  if (!heroElements.some((element) => element.enabled !== false)) return;
+
+  const byId = new Map(heroElements.map((element) => [element.id, element]));
+  const surface = byId.get("heroSurface");
+  if (surface) {
+    heroEl.classList.toggle("profile-composition-surface--hidden", surface.enabled === false);
+    applyPanelVisualStyle(heroEl, surface.style);
+  }
+
+  applyHeroCompositionChild(heroEl, "heroPortrait", heroEl.querySelector('[data-profile-child-id="portrait"]'), byId.get("heroPortrait"));
+  applyHeroCompositionChild(heroEl, "heroMetrics", heroEl.querySelector('[data-profile-child-id="metrics"]'), byId.get("heroMetrics"));
+
+  const title = byId.get("heroTitle");
+  let titleEl = heroEl.querySelector('[data-profile-composition-id="heroTitle"]');
+  if (title?.enabled !== false) {
+    if (!titleEl) {
+      titleEl = doc.createElement("div");
+      titleEl.className = "me-panel__header";
+      titleEl.dataset.profileChildId = "title";
+      titleEl.dataset.profileCompositionId = "heroTitle";
+      titleEl.innerHTML = `<h2 class="me-panel__title"></h2>`;
+      heroEl.appendChild(titleEl);
+    }
+    const heading = titleEl.querySelector(".me-panel__title");
+    if (heading) heading.textContent = title.text || "Player Profile";
+    applyHeroCompositionChild(heroEl, "heroTitle", titleEl, title);
+  } else if (titleEl) {
+    titleEl.remove();
+  }
+}
+
+function applyHeroCompositionChild(heroEl, elementId, childEl, element) {
+  if (!childEl || !element) return;
+  childEl.dataset.profileCompositionId = elementId;
+  childEl.hidden = element.enabled === false;
+  childEl.classList.toggle("profile-composition-child--hidden", element.enabled === false);
+  if (element.enabled === false) return;
+
+  childEl.style.gridColumn = "";
+  childEl.style.gridRow = "";
+  childEl.style.left = `${(element.x / COMPOSITION_GRID_COLUMNS) * 100}%`;
+  childEl.style.top = `${(element.y / COMPOSITION_GRID_ROWS) * 100}%`;
+  childEl.style.width = `${(element.w / COMPOSITION_GRID_COLUMNS) * 100}%`;
+  childEl.style.height = `${(element.h / COMPOSITION_GRID_ROWS) * 100}%`;
+  applyPanelVisualStyle(childEl, element.style);
+  heroEl.classList.add("profile-composition-hero");
 }
 
 function applyPanelVisualStyle(el, style = {}) {

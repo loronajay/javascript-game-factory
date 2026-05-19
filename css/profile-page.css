@@ -18,6 +18,16 @@
 }
 
 /* Inner zoom shell — wraps all panel content; zoom is set by apply-scale.mjs */
+.profile-composition-surface--hidden {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.profile-composition-child--hidden {
+  display: none !important;
+}
+
 .panel-zoom-shell {
   position: relative;
   display: grid;
