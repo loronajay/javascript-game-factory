@@ -124,10 +124,25 @@
   max-height: none !important;
   overflow-y: auto !important;
   padding: 10px 12px;
+  scrollbar-color: rgba(255, 124, 190, 0.72) rgba(12, 8, 30, 0.42);
+  scrollbar-width: thin;
 }
 
 .profile-composition-overlay--thoughts-feed .thought-card {
   border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.18);
+}
+
+.profile-composition-overlay--thoughts-feed::-webkit-scrollbar {
+  width: 10px;
+}
+
+.profile-composition-overlay--thoughts-feed::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 197, 228, 0.78), rgba(255, 124, 190, 0.54));
+  border: 2px solid rgba(18, 9, 31, 0.9);
+}
+
+.profile-composition-overlay--thoughts-feed::-webkit-scrollbar-track {
+  background: rgba(12, 8, 30, 0.42);
 }
 
 .profile-composition-overlay--title {

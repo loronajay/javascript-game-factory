@@ -38,8 +38,8 @@
 .bg-grid {
   opacity: 0.16;
   background-image:
-    linear-gradient(rgba(184, 255, 100, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(184, 255, 100, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(25, 247, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(25, 247, 255, 0.05) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(circle at 50% 44%, black 0%, transparent 76%);
 }
@@ -47,7 +47,7 @@
 .scene-noise {
   opacity: 0.18;
   background-image:
-    linear-gradient(transparent 0, rgba(184, 255, 100, 0.06) 50%, transparent 100%),
+    linear-gradient(transparent 0, rgba(25, 247, 255, 0.04) 50%, transparent 100%),
     linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 42%, rgba(255, 255, 255, 0.025));
   background-size: 100% 3px, 220px 100%;
   mix-blend-mode: plus-lighter;
@@ -62,14 +62,14 @@
   inset: 10% auto auto 6%;
   width: 22rem;
   height: 22rem;
-  background: radial-gradient(circle, rgba(184, 255, 100, 0.24), transparent 68%);
+  background: radial-gradient(circle, rgba(25, 247, 255, 0.22), transparent 68%);
 }
 
 .scene-orb--amber {
   inset: auto 4% 8% auto;
   width: 26rem;
   height: 26rem;
-  background: radial-gradient(circle, rgba(116, 255, 200, 0.18), transparent 66%);
+  background: radial-gradient(circle, rgba(255, 122, 24, 0.2), transparent 66%);
 }
 
 #game-root {
@@ -171,6 +171,21 @@
   height: 16rem;
   background: radial-gradient(circle, rgba(184, 255, 100, 0.12), transparent 70%);
   pointer-events: none;
+}
+
+/* Match screen goes full-bleed — content floats on the atmospheric background */
+#game-root:has(.screen-match.screen--active)::before {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#game-root:has(.screen-match.screen--active)::after {
+  border-radius: 0;
+  box-shadow: none;
 }
 
 @media (max-width: 720px) {

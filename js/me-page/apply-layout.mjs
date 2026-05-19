@@ -178,7 +178,7 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
     } else if (element.id === "thoughtsComposer") {
       renderThoughtsComposerOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "thoughtsFeed") {
-      renderThoughtsFeedOverlay(doc, layoutEl, element, panels);
+      renderThoughtsFeedOverlay(doc, layoutEl, getThoughtsFeedRenderElement(element, elements, isOwnerLayout), panels);
     }
   }
 }
@@ -292,6 +292,20 @@ function renderThoughtsFeedOverlay(doc, layoutEl, element, panels) {
   applyCompositionOverlayRect(feedEl, element);
   applyPanelVisualStyle(feedEl, mergeLegacyChildStyle(element, panels, "thoughts", "feed"));
   layoutEl.appendChild(feedEl);
+}
+
+function getThoughtsFeedRenderElement(feedElement, elements, isOwnerLayout) {
+  if (isOwnerLayout) return feedElement;
+  const composer = (Array.isArray(elements) ? elements : [])
+    .find((element) => element.id === "thoughtsComposer" && element.enabled !== false);
+  if (!composer) return feedElement;
+  const y = Math.min(feedElement.y, composer.y);
+  const bottom = Math.max(feedElement.y + feedElement.h, composer.y + composer.h);
+  return {
+    ...feedElement,
+    y,
+    h: Math.max(feedElement.h, bottom - y),
+  };
 }
 
 function mergeLegacyChildStyle(element, panels, panelId, childId) {

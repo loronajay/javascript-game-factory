@@ -122,7 +122,7 @@ export function normalizeCompositionElements(rawElements) {
     .filter((element) => element && isCustomTitleElementId(element.id))
     .map((element) => normalizeCompositionElement(element.id, element, CUSTOM_TITLE_ELEMENT_DEF));
 
-  return [...normalized, ...customTitles];
+  return [...disableUntouchedThoughtsFreeformDefaults(normalized, rawById), ...customTitles];
 }
 
 function normalizeCompositionElement(id, raw, def) {
@@ -145,6 +145,38 @@ function normalizeCompositionElement(id, raw, def) {
     h,
     style: normalizePanelStyle(raw.style),
   };
+}
+
+function disableUntouchedThoughtsFreeformDefaults(elements, rawById) {
+  const thoughtsIds = ["thoughtsSurface", "thoughtsTitle", "thoughtsComposer", "thoughtsFeed"];
+  const rawThoughts = thoughtsIds.map((id) => rawById.get(id));
+  const badDefaultWasSaved = rawThoughts.every((raw) => raw && raw.enabled !== false) &&
+    thoughtsIds.every((id) => {
+      const raw = rawById.get(id);
+      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[id];
+      if (!raw || !def) return false;
+      const rawStyle = raw.style && typeof raw.style === "object" ? raw.style : {};
+      const textMatches = def.type !== "title" || !raw.text || raw.text === def.defaultText;
+      return textMatches &&
+        Object.keys(rawStyle).length === 0 &&
+        numbersEqual(raw.x, def.defaultX) &&
+        numbersEqual(raw.y, def.defaultY) &&
+        numbersEqual(raw.w, def.defaultW) &&
+        numbersEqual(raw.h, def.defaultH);
+    });
+
+  if (!badDefaultWasSaved) return elements;
+
+  return elements.map((element) => (
+    thoughtsIds.includes(element.id)
+      ? { ...element, enabled: false }
+      : element
+  ));
+}
+
+function numbersEqual(value, expected) {
+  const n = parseFloat(value);
+  return Number.isFinite(n) && Math.abs(n - expected) < 0.001;
 }
 
 function migrateCompositionElementStylesFromPanelChildren(elements, panels) {

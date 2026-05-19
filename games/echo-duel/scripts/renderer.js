@@ -5,7 +5,6 @@ import {
   getExpectedSlotCount,
   getPhaseCopy,
   getProgressCountForPhase,
-  getRoleLabel,
   getSinglePlayerFinalScoreText,
   getSinglePlayerScoreText,
   shouldShowLoserCallout,
@@ -268,7 +267,6 @@ function renderPlayers(state) {
         <div class="player-card__badge" aria-hidden="true">${initials}</div>
         <div class="player-card__meta">
           <div class="player-name">${player.name}</div>
-          <div class="player-role">${player.eliminated ? 'Eliminated' : getRoleLabel(state, player)}</div>
         </div>
       </div>
       <div class="letter-track">${safeLetters}</div>
@@ -365,8 +363,6 @@ export function renderMatch(state) {
     ? `${detail} ${getSinglePlayerScoreText(state)}.`
     : detail;
   qs('penalty-word').textContent = state.settings.penaltyWord;
-  qs('sequence-label').textContent = state.phase === PHASES.OWNER_CREATE_INITIAL ? 'Draft Progress' : 'Memory Progress';
-  qs('status-line').textContent = state.status || '';
   renderPlayers(state);
   renderPenaltyLetterBursts(state);
   renderSequence(state);
