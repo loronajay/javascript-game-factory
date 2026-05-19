@@ -48,7 +48,7 @@ export function clearBattleTimers() {
 }
 
 function triggerFleetBowlShake(sunk) {
-  const bowl = document.querySelector('.board-bowl--fleet');
+  const bowl = document.querySelector('#screen-battle .board-bowl--fleet');
   if (!bowl) return;
   const cls = sunk ? 'bowl--taking-sunk' : 'bowl--taking-hit';
   bowl.classList.remove('bowl--taking-hit', 'bowl--taking-sunk');

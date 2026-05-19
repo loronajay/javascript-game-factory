@@ -71,6 +71,9 @@ export function applyProfileLayout(doc, layout, {
     const enabled = panel.enabled !== false || required.has(panel.id);
     const renderedAsComposition = compositionCategories.has(panel.id);
     el.classList.toggle("layout-panel--hidden", !enabled || renderedAsComposition);
+    if (renderedAsComposition && !required.has(panel.id)) {
+      continue;
+    }
 
     el.style.gridColumn = `${panel.x + 1} / span ${panel.w}`;
     el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;

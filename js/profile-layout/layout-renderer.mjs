@@ -263,6 +263,11 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
     return;
   }
 
+  if (def.category !== "hero" || !["portrait", "metrics"].includes(def.type)) {
+    tile.innerHTML = `<span class="profile-layout-tile__label">${escapeHtml(def.label)}</span>`;
+    return;
+  }
+
   const hero = document.createElement("div");
   hero.className = "me-hero-card";
   renderMeHeroCard(hero, heroModel);
