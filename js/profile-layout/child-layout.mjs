@@ -97,6 +97,25 @@ export const PROFILE_PANEL_CHILD_REGISTRY = {
       },
     },
   },
+  music: {
+    columns: 100,
+    rows: 100,
+    visualColumns: 10,
+    visualRows: 10,
+    children: {
+      player: {
+        label: "Music Player",
+        minW: 24,
+        minH: 20,
+        maxW: 100,
+        maxH: 100,
+        defaultX: 8,
+        defaultY: 12,
+        defaultW: 84,
+        defaultH: 76,
+      },
+    },
+  },
   favoriteGame: {
     columns: 100,
     rows: 100,

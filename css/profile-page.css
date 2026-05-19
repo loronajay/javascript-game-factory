@@ -345,6 +345,30 @@
   justify-items: stretch;
 }
 
+[data-profile-child-id="player"].cassette-player,
+[data-profile-child-id="player"].cassette-empty {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="player"].cassette-player > .profile-child-zoom-shell,
+[data-profile-child-id="player"].cassette-empty > .profile-child-zoom-shell {
+  display: grid;
+  align-content: center;
+  justify-items: stretch;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+[data-profile-child-id="player"].cassette-player .cassette-player__body {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 @container profile-child (max-height: 130px) {
   [data-profile-child-id="metrics"] > .profile-child-zoom-shell {
     gap: 6px;

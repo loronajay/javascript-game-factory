@@ -5,7 +5,7 @@
 
 export function playerTemplate(uid) {
   return `
-    <div class="cassette-player" role="region" aria-label="Music player">
+    <div class="cassette-player" data-profile-child-id="player" role="region" aria-label="Music player">
       <div class="cassette-player__body">
 
         <div class="cassette-player__viewport">
@@ -49,7 +49,7 @@ export function playerTemplate(uid) {
 
 export function emptyStateTemplate() {
   return `
-    <div class="cassette-empty">
+    <div class="cassette-empty" data-profile-child-id="player">
       <span class="cassette-empty__icon" aria-hidden="true">&#128252;</span>
       <p class="cassette-empty__text">No tape loaded</p>
       <p class="cassette-empty__sub">This player hasn't set up their music yet.</p>
