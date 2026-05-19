@@ -143,6 +143,28 @@ export function normalizePanelChildren(panelId, rawChildren) {
 }
 
 function migratePanelChildren(panelId, rawChildren) {
+  if (panelId === "identity" && Array.isArray(rawChildren)) {
+    const defaults = PROFILE_PANEL_CHILD_REGISTRY.identity.children;
+    const oldDefaultById = {
+      name: { x: 8, y: 22, w: 84, h: 16 },
+      pageViews: { x: 8, y: 42, w: 84, h: 16 },
+      factoryId: { x: 8, y: 62, w: 84, h: 16 },
+      socialLinks: { x: 8, y: 82, w: 84, h: 14 },
+    };
+    return rawChildren.map((child) => {
+      const oldDefault = oldDefaultById[child?.id];
+      const nextDefault = defaults[child?.id];
+      const isOldDefault = oldDefault && nextDefault &&
+        child.x === oldDefault.x &&
+        child.y === oldDefault.y &&
+        child.w === oldDefault.w &&
+        child.h === oldDefault.h;
+      return isOldDefault
+        ? { ...child, x: nextDefault.defaultX, y: nextDefault.defaultY, w: nextDefault.defaultW, h: nextDefault.defaultH }
+        : child;
+    });
+  }
+
   if (panelId === "topFriends" && Array.isArray(rawChildren)) {
     return rawChildren.map((child) => (
       child?.id === "friend1" ? { ...child, id: "mainSqueeze" } : child
