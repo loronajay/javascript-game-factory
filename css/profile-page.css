@@ -28,6 +28,15 @@
   display: none !important;
 }
 
+.profile-composition-hero > [data-profile-composition-id] {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  grid-column: auto !important;
+  grid-row: auto !important;
+}
+
 .panel-zoom-shell {
   position: relative;
   display: grid;

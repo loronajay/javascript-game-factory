@@ -27,6 +27,13 @@ function ensureZoomShell(panelEl) {
   return shell;
 }
 
+function unwrapZoomShell(panelEl) {
+  const shell = panelEl.querySelector(":scope > ." + ZOOM_SHELL_CLASS);
+  if (!shell) return;
+  while (shell.firstChild) panelEl.insertBefore(shell.firstChild, shell);
+  shell.remove();
+}
+
 function ensureChildZoomShell(childEl) {
   let shell = childEl.querySelector(":scope > ." + CHILD_ZOOM_SHELL_CLASS);
   if (!shell) {
@@ -38,41 +45,61 @@ function ensureChildZoomShell(childEl) {
   return shell;
 }
 
+function applyChildScaling(childEl) {
+  if (childEl.dataset.profileChildScroll === "true" || childEl.dataset.profileChildScale === "none") {
+    childEl.style.overflow = "hidden auto";
+    return;
+  }
+
+  childEl.style.overflow = "hidden";
+  const shell = ensureChildZoomShell(childEl);
+  shell.style.zoom = "";
+  shell.style.width = "max-content";
+  shell.style.height = "max-content";
+
+  const childStyle = getComputedStyle(childEl);
+  const childPaddingX = parseFloat(childStyle.paddingLeft) + parseFloat(childStyle.paddingRight);
+  const childPaddingY = parseFloat(childStyle.paddingTop) + parseFloat(childStyle.paddingBottom);
+  const childBorderX = parseFloat(childStyle.borderLeftWidth) + parseFloat(childStyle.borderRightWidth);
+  const childBorderY = parseFloat(childStyle.borderTopWidth) + parseFloat(childStyle.borderBottomWidth);
+  const availableW = Math.max(1, childEl.clientWidth - childPaddingX - childBorderX);
+  const availableH = Math.max(1, childEl.clientHeight - childPaddingY - childBorderY);
+  const naturalSize = getNaturalShellSize(shell);
+  const naturalW = Math.max(1, naturalSize.width, shell.scrollWidth, shell.offsetWidth, availableW);
+  const naturalH = Math.max(1, naturalSize.height, shell.scrollHeight, shell.offsetHeight, availableH);
+  const z = parseFloat(Math.max(
+    MIN_ZOOM,
+    Math.min(
+      Math.max(1, availableW - CHILD_SCALE_FIT_BUFFER) / naturalW,
+      Math.max(1, availableH - CHILD_SCALE_FIT_BUFFER * 2) / naturalH,
+      MAX_ZOOM,
+    ),
+  ).toFixed(4));
+
+  shell.style.zoom = String(z);
+  shell.style.width = `${(availableW / z).toFixed(2)}px`;
+  shell.style.height = `${(availableH / z).toFixed(2)}px`;
+}
+
 function applyPanelChildScaling(panelEl) {
   panelEl.querySelectorAll(":scope .panel-zoom-shell > [data-profile-child-id]").forEach((childEl) => {
-    if (childEl.dataset.profileChildScroll === "true" || childEl.dataset.profileChildScale === "none") {
-      childEl.style.overflow = "hidden auto";
-      return;
-    }
+    applyChildScaling(childEl);
+  });
+}
 
-    childEl.style.overflow = "hidden";
-    const shell = ensureChildZoomShell(childEl);
-    shell.style.zoom = "";
-    shell.style.width = "max-content";
-    shell.style.height = "max-content";
+function hasHeroComposition(layout) {
+  return Array.isArray(layout?.desktop?.elements) &&
+    layout.desktop.elements.some((element) => element?.category === "hero" && element.enabled !== false);
+}
 
-    const childStyle = getComputedStyle(childEl);
-    const childPaddingX = parseFloat(childStyle.paddingLeft) + parseFloat(childStyle.paddingRight);
-    const childPaddingY = parseFloat(childStyle.paddingTop) + parseFloat(childStyle.paddingBottom);
-    const childBorderX = parseFloat(childStyle.borderLeftWidth) + parseFloat(childStyle.borderRightWidth);
-    const childBorderY = parseFloat(childStyle.borderTopWidth) + parseFloat(childStyle.borderBottomWidth);
-    const availableW = Math.max(1, childEl.clientWidth - childPaddingX - childBorderX);
-    const availableH = Math.max(1, childEl.clientHeight - childPaddingY - childBorderY);
-    const naturalSize = getNaturalShellSize(shell);
-    const naturalW = Math.max(1, naturalSize.width, shell.scrollWidth, shell.offsetWidth, availableW);
-    const naturalH = Math.max(1, naturalSize.height, shell.scrollHeight, shell.offsetHeight, availableH);
-    const z = parseFloat(Math.max(
-      MIN_ZOOM,
-      Math.min(
-        Math.max(1, availableW - CHILD_SCALE_FIT_BUFFER) / naturalW,
-        Math.max(1, availableH - CHILD_SCALE_FIT_BUFFER * 2) / naturalH,
-        MAX_ZOOM,
-      ),
-    ).toFixed(4));
-
-    shell.style.zoom = String(z);
-    shell.style.width = `${(availableW / z).toFixed(2)}px`;
-    shell.style.height = `${(availableH / z).toFixed(2)}px`;
+function applyHeroCompositionScaling(panelEl) {
+  unwrapZoomShell(panelEl);
+  panelEl.style.zoom = "";
+  panelEl.style.width = "";
+  panelEl.style.height = "";
+  panelEl.style.overflow = "hidden";
+  panelEl.querySelectorAll(":scope > [data-profile-composition-id]").forEach((childEl) => {
+    applyChildScaling(childEl);
   });
 }
 
@@ -122,6 +149,10 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     if (!def) continue;
 
     el.style.overflow = "hidden";
+    if (panel.id === "hero" && hasHeroComposition(layout)) {
+      applyHeroCompositionScaling(el);
+      continue;
+    }
 
     // Reference = the size this panel's content was designed for (default w × h).
     const refW = def.defaultW * colW + (def.defaultW - 1) * gap;
