@@ -29,6 +29,8 @@ const DEFAULT_PANEL_STYLE = {
   panelColor2: "#070716",
   titleColor: "#ffdcbb",
   elementColor: "#ffffff",
+  textColor: "#fff7fc",
+  buttonColor: "#ffc5e4",
   opacity: 0.96,
   saturation: 1,
   brightness: 1,
@@ -826,12 +828,14 @@ if (doc?.getElementById) {
       const colorControls = type === "title"
         ? [
             renderColorControl("Bubble Color", "titleColor", style.titleColor),
+            renderColorControl("Text Color", "textColor", style.textColor),
           ]
         : type === "portrait"
           ? [
               renderColorControl("Chip Color", "panelColor", style.panelColor),
               renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
               renderColorControl("Frame Accent", "elementColor", style.elementColor),
+              renderColorControl("Text Color", "textColor", style.textColor),
             ]
           : type === "metrics"
             ? [
@@ -839,59 +843,71 @@ if (doc?.getElementById) {
                 renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                 renderColorControl("Metrics Title", "titleColor", style.titleColor),
                 renderColorControl("Stat Boxes", "elementColor", style.elementColor),
+                renderColorControl("Text Color", "textColor", style.textColor),
               ]
             : type === "text"
               ? [
                   renderColorControl("Text Box Color", "panelColor", style.panelColor),
                   renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                   renderColorControl("Text Accents", "elementColor", style.elementColor),
+                  renderColorControl("Text Color", "textColor", style.textColor),
                 ]
               : type === "badges"
                 ? [
                     renderColorControl("Badge Box Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Badge Accents", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "friendCode"
                 ? [
                     renderColorControl("Code Box Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Code Accents", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "identityField"
                 ? [
                     renderColorControl("Field Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Field Accents", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "playerAction"
                 ? [
                     renderColorControl("Action Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Button Accents", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "thoughtsComposer"
                 ? [
                     renderColorControl("Composer Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                    renderColorControl("Composer Accents", "elementColor", style.elementColor),
+                    renderColorControl("Input Color", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
+                    renderColorControl("Button Color", "buttonColor", style.buttonColor),
                   ]
               : type === "thoughtsFeed"
                 ? [
                     renderColorControl("Feed Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Thought Cards", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
+                    renderColorControl("Button Color", "buttonColor", style.buttonColor),
                   ]
               : type === "surface"
                 ? [
                     renderColorControl("Surface Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Text Color", "textColor", style.textColor),
                   ]
                 : [
                     renderColorControl("Panel Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Title Bubble", "titleColor", style.titleColor),
                     renderColorControl("Inner Elements", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
                   ];
       const showGradientAngle = type !== "title";
       return `

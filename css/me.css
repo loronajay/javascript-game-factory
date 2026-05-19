@@ -298,3 +298,41 @@
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+
+.me-panel,
+.me-hero-card {
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
+}
+
+.me-panel .me-panel__label,
+.me-panel .me-card-item__title,
+.me-panel .me-friends-navigator__search-label,
+.me-panel .me-friends-navigator__label,
+.me-panel .me-friends-navigator__meta,
+.me-panel .me-friends-navigator__points {
+  color: rgba(var(--profile-panel-text-rgb, 255, 215, 185), 0.88);
+}
+
+.me-panel .me-panel__empty,
+.me-panel .me-card-item__meta,
+.me-panel .me-friends-navigator__toggle-helper,
+.me-panel .me-friends-navigator__empty {
+  color: rgba(var(--profile-panel-text-rgb, 255, 248, 255), 0.72);
+}
+
+.me-panel .me-friends-navigator__toggle,
+.me-panel .me-friends-navigator__toggle-label,
+.me-panel .me-friends-navigator__search-input,
+.me-panel .me-friends-navigator__avatar-text,
+.me-panel .me-friends-navigator__name,
+.me-panel .me-link__url,
+.me-panel .me-card-item__value,
+.me-panel .me-card-item__link,
+.me-panel .me-badge-chip,
+.me-panel .me-about-copy,
+.me-panel .me-badge-empty,
+.me-hero-card .me-hero-card__section-topline,
+.me-hero-card .me-hero-card__metrics-stat,
+.me-hero-card .me-hero-card__identity-field {
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
+}

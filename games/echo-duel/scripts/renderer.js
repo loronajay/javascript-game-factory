@@ -6,6 +6,7 @@ import {
   getPhaseCopy,
   getProgressCountForPhase,
   getSinglePlayerFinalScoreText,
+  getSinglePlayerScoreText,
   shouldShowLoserCallout,
 } from './match-view-state.js';
 
@@ -225,31 +226,35 @@ function progressStateForPlayer(state, player) {
     return { label: 'ELIMINATED', current: 0, total: 0, status: 'eliminated' };
   }
 
+  // RESULT_REVEAL is the single-player "Echo is thinking" pause. activeSequence is already
+  // set to the next round's length but lastResult still reflects the previous round, so
+  // any fallthrough would show stale dots against the wrong total. Show nothing.
+  if (state.phase === PHASES.RESULT_REVEAL) {
+    return { label: 'STANDBY', current: 0, total: 0, status: 'watching' };
+  }
+
   if (state.phase === PHASES.OWNER_CREATE_INITIAL) {
-    const total = Number(state.settings?.startingPatternLength || 4);
     return isOwner
-      ? { label: 'DRIVING', current: Number(state.ownerDraft?.length || 0), total, status: 'driver' }
-      : { label: 'WATCHING DRIVER', current: 0, total, status: 'watching' };
+      ? { label: 'DRIVING', current: 0, total: 0, status: 'driver' }
+      : { label: 'WATCHING DRIVER', current: 0, total: 0, status: 'watching' };
   }
 
   if (state.phase === PHASES.OWNER_REPLAY) {
     return isOwner
-      ? { label: 'REPLAYING', current: Number(state.ownerReplayIndex || 0), total: sequenceLength, status: 'driver' }
-      : { label: 'WATCHING DRIVER', current: 0, total: sequenceLength, status: 'watching' };
+      ? { label: 'REPLAYING', current: 0, total: 0, status: 'driver' }
+      : { label: 'WATCHING DRIVER', current: 0, total: 0, status: 'watching' };
   }
 
   if (state.phase === PHASES.OWNER_APPEND) {
-    const target = Math.max(sequenceLength, Number(state.appendTargetLength || sequenceLength));
     return isOwner
-      ? { label: 'ADDING INPUTS', current: sequenceLength, total: target, status: 'driver' }
-      : { label: 'WATCHING DRIVER', current: 0, total: target, status: 'watching' };
+      ? { label: 'ADDING INPUTS', current: 0, total: 0, status: 'driver' }
+      : { label: 'WATCHING DRIVER', current: 0, total: 0, status: 'watching' };
   }
 
   if (state.phase === PHASES.SIGNAL_PLAYBACK) {
-    const current = Math.max(0, Math.min(sequenceLength, getProgressCountForPhase(state)));
     return isOwner
-      ? { label: 'PLAYING SIGNAL', current, total: sequenceLength, status: 'playback' }
-      : { label: 'MEMORIZE', current, total: sequenceLength, status: 'playback' };
+      ? { label: 'PLAYING SIGNAL', current: 0, total: 0, status: 'playback' }
+      : { label: 'MEMORIZE', current: 0, total: 0, status: 'playback' };
   }
 
   if (state.phase === PHASES.CHALLENGER_COPY) {
@@ -461,11 +466,10 @@ export function renderEnded(state) {
   }
   showScreen('ended');
   const winner = state.players.find(player => player.id === state.winnerId);
-  const finalScore = state.mode === 'single' ? getSinglePlayerFinalScoreText(state) : '';
   qs('ended-title').textContent = winner ? `${winner.name} Wins` : 'No Winner';
   qs('ended-message').textContent = winner
-    ? `${winner.name} is the last active player.${finalScore ? ` ${finalScore}.` : ''}`
-    : `The match ended without an active player.${finalScore ? ` ${finalScore}.` : ''}`;
+    ? `${winner.name} is the last active player.`
+    : `The match ended without an active player.`;
 
   const callout = qs('loser-callout');
   if (callout) {
@@ -487,14 +491,15 @@ export function renderEnded(state) {
   if (!standings) return;
   standings.innerHTML = '';
   state.players.forEach(player => {
+    if (state.mode === 'single' && (player.id === 'cpu' || player.clientId === 'cpu')) return;
     const row = document.createElement('div');
     row.className = 'standing-row';
     if (player.id === state.winnerId) row.classList.add('is-winner');
     if (player.eliminated) row.classList.add('is-loser');
-    const score = state.mode === 'single' && (player.id === 'player' || player.clientId === 'player')
-      ? `<small class="single-player-score">${getSinglePlayerScoreText(state)}</small>`
-      : '';
-    row.innerHTML = `<span>${player.name}${score}</span><strong>${player.letters || '—'}</strong>`;
+    const right = state.mode === 'single'
+      ? getSinglePlayerFinalScoreText(state)
+      : (player.letters || '—');
+    row.innerHTML = `<span>${player.name}</span><strong>${right}</strong>`;
     standings.appendChild(row);
   });
 }

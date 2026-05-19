@@ -651,6 +651,14 @@ function applyTileVisualStyle(tile, style = {}) {
   if (elementColor) {
     tile.style.setProperty("--profile-panel-element-rgb", hexToRgbString(elementColor));
   }
+  const textColor = normalizeHexColor(style.textColor);
+  if (textColor) {
+    tile.style.setProperty("--profile-panel-text-rgb", hexToRgbString(textColor));
+  }
+  const buttonColor = normalizeHexColor(style.buttonColor);
+  if (buttonColor) {
+    tile.style.setProperty("--profile-panel-button-rgb", hexToRgbString(buttonColor));
+  }
 }
 
 function getPanelDensity(panel) {

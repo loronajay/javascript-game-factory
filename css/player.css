@@ -367,6 +367,41 @@
   align-items: center;
 }
 
+.player-panel,
+.player-hero-card {
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
+}
+
+.player-panel .player-card-item__title,
+.player-panel .player-link__topline,
+.player-hero-card .player-hero-card__gesture-label,
+.player-hero-card .player-hero-card__challenge-picker-label {
+  color: rgba(var(--profile-panel-text-rgb, 255, 215, 185), 0.88);
+}
+
+.player-panel .player-card-item__meta,
+.player-panel .player-panel__empty,
+.player-hero-card .player-hero-card__friend-flash,
+.player-hero-card .player-hero-card__gesture-flash {
+  color: rgba(var(--profile-panel-text-rgb, 255, 248, 255), 0.72);
+}
+
+.player-panel .player-link__url,
+.player-panel .player-card-item__value,
+.player-panel .player-card-item__link,
+.player-panel .player-badge-chip,
+.player-panel .player-about-copy,
+.player-panel .player-badge-empty,
+.player-hero-card .player-hero-card__section-topline,
+.player-hero-card .player-hero-card__metrics-stat,
+.player-hero-card .player-hero-card__identity-field,
+.player-hero-card .player-hero-card__friend-action,
+.player-hero-card .player-hero-card__gesture-btn,
+.player-hero-card .player-hero-card__challenge-game-btn,
+.player-hero-card .player-hero-card__challenge-cancel {
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
+}
+
 @media (max-width: 640px) {
   .player-stage__nav {
     justify-content: space-between;

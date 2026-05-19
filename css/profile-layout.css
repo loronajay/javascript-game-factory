@@ -913,7 +913,7 @@
   gap: 10px;
   justify-items: center;
   padding: 14px 16px;
-  color: rgba(255, 248, 255, 0.84);
+  color: rgba(var(--profile-panel-text-rgb, 255, 248, 255), 0.84);
   text-align: center;
   text-transform: uppercase;
 }
@@ -923,7 +923,7 @@
   border: 1px solid rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.3);
   border-radius: var(--profile-radius-pill, 999px);
   background: rgba(9, 8, 22, 0.82);
-  color: #fff8ff;
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
   font-family: var(--font-display);
   letter-spacing: 0.08em;
 }
@@ -959,7 +959,81 @@
 }
 
 .profile-layout-composition-element--thoughtsFeed .thought-card {
-  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.18);
+  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.28);
+  background:
+    linear-gradient(135deg, rgba(var(--profile-panel-button-rgb, 255, 197, 228), 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 33, 14, 60), 0.92), rgba(var(--profile-panel-element-rgb, 10, 8, 26), 0.72)),
+    rgba(10, 8, 26, 0.94);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer {
+  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.22);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__subject,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__body,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__field-input,
+.profile-layout-composition-element--thoughtsFeed .thought-card__share-input {
+  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.34);
+  background:
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 6, 4, 18), 0.24), rgba(0, 0, 0, 0.3)),
+    rgba(var(--profile-panel-element-rgb, 6, 4, 18), 0.5);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__subject::placeholder,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__body::placeholder,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__field-input::placeholder,
+.profile-layout-composition-element--thoughtsFeed .thought-card__share-input::placeholder {
+  color: rgba(var(--profile-panel-text-rgb, 255, 247, 252), 0.5);
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__submit,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__attach-label,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__photo-clear,
+.profile-layout-composition-element--thoughtsFeed .thought-card__action,
+.profile-layout-composition-element--thoughtsFeed .thought-card__share-button,
+.profile-layout-composition-element--thoughtsFeed .thought-card__reaction-chip,
+.profile-layout-composition-element--thoughtsFeed .thought-card__comment-dismiss {
+  border-color: rgba(var(--profile-panel-button-rgb, 255, 197, 228), 0.42);
+  background:
+    linear-gradient(180deg, rgba(var(--profile-panel-button-rgb, 255, 197, 228), 0.18), rgba(var(--profile-panel-button-rgb, 255, 121, 183), 0.08)),
+    rgba(9, 8, 22, 0.76);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__photo-card,
+.profile-layout-composition-element--thoughtsFeed .thought-card__comment,
+.profile-layout-composition-element--thoughtsFeed .thought-card__quoted-thought {
+  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.24);
+  background:
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.08), rgba(0, 0, 0, 0.24)),
+    rgba(var(--profile-panel-element-rgb, 10, 8, 26), 0.42);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
+}
+
+.profile-layout-composition-element--thoughtsFeed .thought-card__author,
+.profile-layout-composition-element--thoughtsFeed .thought-card__meta,
+.profile-layout-composition-element--thoughtsFeed .thought-card__topic-kicker,
+.profile-layout-composition-element--thoughtsFeed .thought-card__reactions,
+.profile-layout-composition-element--thoughtsFeed .thought-card__share-label,
+.profile-layout-composition-element--thoughtsFeed .thought-card__quoted-kicker,
+.profile-layout-composition-element--thoughtsFeed .thought-card__quoted-author,
+.profile-layout-composition-element--thoughtsFeed .thought-card__quoted-date,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__photo-name,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__field-label,
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer__toggle-copy {
+  color: rgba(var(--profile-panel-text-rgb, 255, 247, 252), 0.88);
+}
+
+.profile-layout-composition-element--thoughtsFeed .thought-card__summary,
+.profile-layout-composition-element--thoughtsFeed .thought-card__date,
+.profile-layout-composition-element--thoughtsFeed .thought-card__comment-body,
+.profile-layout-composition-element--thoughtsFeed .thought-card__comment-empty,
+.profile-layout-composition-element--thoughtsFeed .thought-card__quoted-summary {
+  color: rgba(var(--profile-panel-text-rgb, 255, 247, 252), 0.82);
 }
 
 .profile-layout-composition-element__scale-stage .me-hero-card__portrait-panel,
@@ -1108,6 +1182,37 @@
 .profile-layout-tile--resizing {
   opacity: 0.3;
   pointer-events: none;
+}
+
+.profile-layout-composition-element,
+.profile-layout-composition-element .me-panel,
+.profile-layout-composition-element .player-panel,
+.profile-layout-composition-element .me-about-copy,
+.profile-layout-composition-element .player-about-copy,
+.profile-layout-composition-element .me-badge-empty,
+.profile-layout-composition-element .player-badge-empty,
+.profile-layout-composition-element .me-badge-chip,
+.profile-layout-composition-element .player-badge-chip,
+.profile-layout-composition-element .me-card-item__value,
+.profile-layout-composition-element .player-card-item__value,
+.profile-layout-composition-element .me-card-item__link,
+.profile-layout-composition-element .player-card-item__link,
+.profile-layout-composition-element .me-link__url,
+.profile-layout-composition-element .player-link__url,
+.profile-layout-composition-element .me-panel__title,
+.profile-layout-composition-element .player-panel__title,
+.profile-layout-composition-element .gallery-panel__title {
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
+}
+
+.profile-layout-composition-element .me-card-item__title,
+.profile-layout-composition-element .player-card-item__title {
+  color: rgba(var(--profile-panel-text-rgb, 255, 215, 185), 0.88);
+}
+
+.profile-layout-composition-element .me-card-item__meta,
+.profile-layout-composition-element .player-card-item__meta {
+  color: rgba(var(--profile-panel-text-rgb, 255, 248, 255), 0.68);
 }
 
 /* --- Ghost panel (drop target preview) --- */

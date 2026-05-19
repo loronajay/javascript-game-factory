@@ -232,10 +232,14 @@ export function normalizePanelStyle(raw) {
   const panelColor2 = normalizeHexColor(raw.panelColor2);
   const titleColor = normalizeHexColor(raw.titleColor);
   const elementColor = normalizeHexColor(raw.elementColor);
+  const textColor = normalizeHexColor(raw.textColor);
+  const buttonColor = normalizeHexColor(raw.buttonColor);
   if (panelColor) style.panelColor = panelColor;
   if (panelColor2) style.panelColor2 = panelColor2;
   if (titleColor) style.titleColor = titleColor;
   if (elementColor) style.elementColor = elementColor;
+  if (textColor) style.textColor = textColor;
+  if (buttonColor) style.buttonColor = buttonColor;
 
   const opacity = clampNumber(raw.opacity, 0.15, 1);
   const saturation = clampNumber(raw.saturation, 0, 2);
