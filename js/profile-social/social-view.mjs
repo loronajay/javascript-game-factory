@@ -108,7 +108,7 @@ export function createProfileSocialViewRenderer({
     container.innerHTML = `
       <div class="${panelPrefix}-panel__header"${useChildLayout ? ' data-profile-child-id="title"' : ""}><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
       ${uploadHtml}
-      <div class="gallery-panel__content"${useChildLayout ? ' data-profile-child-id="content"' : ""}>
+      <div class="gallery-panel__content"${useChildLayout ? ' data-profile-child-id="content" data-profile-child-scale="none"' : ""}>
         <div class="gallery-grid">${gridHtml}</div>
         ${viewAllHtml}
       </div>
