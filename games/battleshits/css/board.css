@@ -304,6 +304,94 @@
   pointer-events: none;
 }
 
+.board-cell:has(.hit-overlay) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -8px 12px rgba(4, 45, 79, 0.18),
+    0 0 10px rgba(255, 90, 0, 0.38),
+    0 0 20px rgba(255, 50, 0, 0.18);
+}
+
+.hit-overlay::before,
+.hit-overlay::after {
+  content: '';
+  position: absolute;
+  transform-origin: bottom center;
+  border-radius: 50% 50% 28% 28% / 60% 60% 30% 30%;
+  pointer-events: none;
+}
+
+/* Outer flame — orange-red body */
+.hit-overlay::before {
+  width: 52%;
+  height: 62%;
+  bottom: 5%;
+  left: 24%;
+  background: radial-gradient(
+    ellipse at 50% 72%,
+    rgba(255, 236, 66, 0.95) 0%,
+    rgba(255, 110, 0, 0.88) 32%,
+    rgba(205, 15, 0, 0.72) 65%,
+    transparent 88%
+  );
+  animation: flame-flicker 0.75s ease-in-out infinite alternate;
+}
+
+/* Inner flame — bright yellow core */
+.hit-overlay::after {
+  width: 28%;
+  height: 40%;
+  bottom: 5%;
+  left: 36%;
+  background: radial-gradient(
+    ellipse at 50% 75%,
+    rgba(255, 255, 220, 1) 0%,
+    rgba(255, 230, 80, 0.9) 40%,
+    transparent 70%
+  );
+  animation: flame-flicker-alt 0.58s ease-in-out infinite alternate;
+  animation-delay: -0.15s;
+}
+
+@keyframes flame-flicker {
+  0% {
+    transform: scaleX(0.9) scaleY(1) rotate(-3deg);
+    opacity: 0.82;
+  }
+
+  35% {
+    transform: scaleX(1.06) scaleY(0.93) rotate(2.5deg);
+    opacity: 1;
+  }
+
+  65% {
+    transform: scaleX(0.93) scaleY(1.06) rotate(-2deg);
+    opacity: 0.88;
+  }
+
+  100% {
+    transform: scaleX(1.04) scaleY(0.97) rotate(3deg);
+    opacity: 0.95;
+  }
+}
+
+@keyframes flame-flicker-alt {
+  0% {
+    transform: scaleX(1.04) scaleY(0.88) rotate(4.5deg);
+    opacity: 0.72;
+  }
+
+  45% {
+    transform: scaleX(0.84) scaleY(1.1) rotate(-5.5deg);
+    opacity: 0.95;
+  }
+
+  100% {
+    transform: scaleX(1.1) scaleY(0.84) rotate(3.5deg);
+    opacity: 0.76;
+  }
+}
+
 .cell-sunk .ship-sprite {
   filter: brightness(0.62) saturate(0.7);
 }

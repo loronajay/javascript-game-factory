@@ -86,13 +86,19 @@ export function currentPlaybackInput(state, now = performance.now()) {
 }
 
 
+let _activeScreen = null;
+
 function fitGameToViewport() {
   const root = document.getElementById('game-root');
   const shell = root && root.closest('.game-shell');
   if (!root || !shell) return;
+  const cs = getComputedStyle(shell);
+  // clientHeight includes shell's own padding (border-box), so subtract it to get the
+  // true inner area where game-root lives.
+  const available = shell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   root.style.zoom = '';
-  const available = shell.clientHeight;
-  const natural = root.scrollHeight;
+  // Reserve room for the live-signal-strip that appears mid-match during signal playback.
+  const natural = root.scrollHeight + (_activeScreen === 'match' ? 80 : 0);
   if (natural > available) {
     root.style.zoom = String((available / natural).toFixed(4));
   }
@@ -103,6 +109,8 @@ if (typeof window !== 'undefined') {
 }
 
 export function showScreen(name) {
+  const changed = name !== _activeScreen;
+  _activeScreen = name;
   Object.values(screenMap).forEach(id => {
     const screen = qs(id);
     if (!screen) return;
@@ -110,7 +118,11 @@ export function showScreen(name) {
     screen.classList.toggle('screen--active', isActive);
     screen.setAttribute('aria-hidden', isActive ? 'false' : 'true');
   });
-  requestAnimationFrame(fitGameToViewport);
+  // Only recalculate zoom on real screen transitions; renderMatch() calls showScreen('match')
+  // on every tick so we must not reset+measure+reapply zoom at 60fps or it causes visible jitter.
+  if (changed) {
+    requestAnimationFrame(fitGameToViewport);
+  }
 }
 
 function renderSequence(state) {
