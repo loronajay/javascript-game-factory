@@ -404,19 +404,23 @@ button.thought-card__action {
   gap: 12px;
   padding: 18px;
   border-radius: var(--profile-radius-md);
-  border: 1px solid rgba(255, 197, 228, 0.16);
+  border: 1px solid rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.24);
   background:
-    linear-gradient(180deg, rgba(255, 197, 228, 0.08), rgba(19, 10, 35, 0.92)),
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 14, 10, 30), var(--profile-panel-custom-opacity, 0.94)), rgba(var(--profile-panel-custom-rgb-2, 19, 10, 35), var(--profile-panel-custom-opacity, 0.94))),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.08), rgba(0, 0, 0, 0.18)),
     rgba(14, 10, 30, 0.94);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
 }
 
 .thought-composer__subject,
 .thought-composer__body {
   width: 100%;
   border-radius: var(--profile-radius-xs);
-  border: 2px solid rgba(255, 197, 228, 0.22);
-  background: rgba(6, 4, 18, 0.9);
-  color: #fff7fc;
+  border: 2px solid rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.34);
+  background:
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 6, 4, 18), 0.24), rgba(0, 0, 0, 0.3)),
+    rgba(var(--profile-panel-element-rgb, 6, 4, 18), 0.5);
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
 }
 
 .thought-composer__subject {
@@ -459,11 +463,11 @@ button.thought-card__action {
   min-height: 38px;
   padding: 0 16px;
   border-radius: var(--profile-radius-pill);
-  border: 1px solid rgba(255, 197, 228, 0.28);
+  border: 1px solid rgba(var(--profile-panel-button-rgb, 255, 197, 228), 0.42);
   background:
-    linear-gradient(180deg, rgba(255, 197, 228, 0.16), rgba(255, 121, 183, 0.12)),
+    linear-gradient(180deg, rgba(var(--profile-panel-button-rgb, 255, 197, 228), 0.18), rgba(var(--profile-panel-button-rgb, 255, 121, 183), 0.08)),
     rgba(14, 10, 30, 0.94);
-  color: #fff7fc;
+  color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
   font-family: var(--font-display);
   font-size: 0.74rem;
   letter-spacing: 0.12em;

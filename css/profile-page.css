@@ -179,7 +179,8 @@
   color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
 }
 
-.profile-composition-overlay--thoughts-composer .thought-composer {
+.profile-composition-overlay--thoughts-composer .thought-composer,
+[data-profile-child-id="composer"].thought-composer {
   border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.22);
   background:
     linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.08), rgba(var(--profile-panel-element-rgb, 19, 10, 35), 0.48)),
@@ -190,6 +191,9 @@
 .profile-composition-overlay--thoughts-composer .thought-composer__subject,
 .profile-composition-overlay--thoughts-composer .thought-composer__body,
 .profile-composition-overlay--thoughts-composer .thought-composer__field-input,
+[data-profile-child-id="composer"].thought-composer .thought-composer__subject,
+[data-profile-child-id="composer"].thought-composer .thought-composer__body,
+[data-profile-child-id="composer"].thought-composer .thought-composer__field-input,
 .profile-composition-overlay--thoughts-feed .thought-card__share-input {
   border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.34);
   background:
@@ -201,6 +205,9 @@
 .profile-composition-overlay--thoughts-composer .thought-composer__subject::placeholder,
 .profile-composition-overlay--thoughts-composer .thought-composer__body::placeholder,
 .profile-composition-overlay--thoughts-composer .thought-composer__field-input::placeholder,
+[data-profile-child-id="composer"].thought-composer .thought-composer__subject::placeholder,
+[data-profile-child-id="composer"].thought-composer .thought-composer__body::placeholder,
+[data-profile-child-id="composer"].thought-composer .thought-composer__field-input::placeholder,
 .profile-composition-overlay--thoughts-feed .thought-card__share-input::placeholder {
   color: rgba(var(--profile-panel-text-rgb, 255, 247, 252), 0.5);
 }
@@ -208,6 +215,9 @@
 .profile-composition-overlay--thoughts-composer .thought-composer__submit,
 .profile-composition-overlay--thoughts-composer .thought-composer__attach-label,
 .profile-composition-overlay--thoughts-composer .thought-composer__photo-clear,
+[data-profile-child-id="composer"].thought-composer .thought-composer__submit,
+[data-profile-child-id="composer"].thought-composer .thought-composer__attach-label,
+[data-profile-child-id="composer"].thought-composer .thought-composer__photo-clear,
 .profile-composition-overlay--thoughts-feed .thought-card__action,
 .profile-composition-overlay--thoughts-feed .thought-card__share-button,
 .profile-composition-overlay--thoughts-feed .thought-card__reaction-chip,
@@ -220,6 +230,7 @@
 }
 
 .profile-composition-overlay--thoughts-composer .thought-composer__photo-card,
+[data-profile-child-id="composer"].thought-composer .thought-composer__photo-card,
 .profile-composition-overlay--thoughts-feed .thought-card__comment,
 .profile-composition-overlay--thoughts-feed .thought-card__quoted-thought {
   border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.24);
@@ -239,7 +250,10 @@
 .profile-composition-overlay--thoughts-feed .thought-card__quoted-date,
 .profile-composition-overlay--thoughts-composer .thought-composer__photo-name,
 .profile-composition-overlay--thoughts-composer .thought-composer__field-label,
-.profile-composition-overlay--thoughts-composer .thought-composer__toggle-copy {
+.profile-composition-overlay--thoughts-composer .thought-composer__toggle-copy,
+[data-profile-child-id="composer"].thought-composer .thought-composer__photo-name,
+[data-profile-child-id="composer"].thought-composer .thought-composer__field-label,
+[data-profile-child-id="composer"].thought-composer .thought-composer__toggle-copy {
   color: rgba(var(--profile-panel-text-rgb, 255, 247, 252), 0.88);
 }
 
@@ -515,14 +529,16 @@
 }
 
 [data-profile-child-id="text"] {
-  border: 1px solid rgba(255, 214, 189, 0.14);
+  border: 1px solid rgba(var(--profile-panel-custom-rgb, 255, 214, 189), 0.22);
   border-radius: var(--profile-radius-sm, 12px);
   background:
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 21, 14, 55), var(--profile-panel-custom-opacity, 0.96)), rgba(var(--profile-panel-custom-rgb-2, 7, 7, 22), var(--profile-panel-custom-opacity, 0.96))),
     linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
-    rgba(255, 255, 255, 0.035);
+    rgba(9, 8, 22, 0.9);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.035),
     0 8px 18px rgba(0, 0, 0, 0.12);
+  color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
 }
 
 [data-profile-child-id="text"] .me-about-copy,

@@ -465,11 +465,24 @@ export function renderEnded(state) {
     waveform.querySelectorAll('.match-waveform__bar').forEach(b => b.remove());
   }
   showScreen('ended');
-  const winner = state.players.find(player => player.id === state.winnerId);
-  qs('ended-title').textContent = winner ? `${winner.name} Wins` : 'No Winner';
-  qs('ended-message').textContent = winner
-    ? `${winner.name} is the last active player.`
-    : `The match ended without an active player.`;
+
+  const eyebrowEl = document.querySelector('#screen-ended .eyebrow');
+  if (state.mode === 'single') {
+    const humanPlayer = state.players.find(p => p.id === 'player' || p.clientId === 'player');
+    const score = Number(state.singlePlayer?.score || 0);
+    if (eyebrowEl) eyebrowEl.textContent = 'Solo Mode';
+    qs('ended-title').textContent = humanPlayer?.eliminated ? 'Signal Lost' : 'Survived';
+    qs('ended-message').textContent = score === 0
+      ? `You didn't complete a full signal chain. Try again.`
+      : `You cleared ${score} full signal chain${score === 1 ? '' : 's'} before the penalty got you.`;
+  } else {
+    const winner = state.players.find(player => player.id === state.winnerId);
+    if (eyebrowEl) eyebrowEl.textContent = 'Match Over';
+    qs('ended-title').textContent = winner ? `${winner.name} Wins` : 'No Winner';
+    qs('ended-message').textContent = winner
+      ? `${winner.name} is the last active player.`
+      : `The match ended without an active player.`;
+  }
 
   const callout = qs('loser-callout');
   if (callout) {

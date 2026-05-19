@@ -834,14 +834,14 @@ if (doc?.getElementById) {
           ? [
               renderColorControl("Chip Color", "panelColor", style.panelColor),
               renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-              renderColorControl("Frame Accent", "elementColor", style.elementColor),
+              renderColorControl("Frame Color", "elementColor", style.elementColor),
               renderColorControl("Text Color", "textColor", style.textColor),
             ]
           : type === "metrics"
             ? [
                 renderColorControl("Chip Color", "panelColor", style.panelColor),
                 renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                renderColorControl("Metrics Title", "titleColor", style.titleColor),
+                renderColorControl("Title Bubble", "titleColor", style.titleColor),
                 renderColorControl("Stat Boxes", "elementColor", style.elementColor),
                 renderColorControl("Text Color", "textColor", style.textColor),
               ]
@@ -849,42 +849,42 @@ if (doc?.getElementById) {
               ? [
                   renderColorControl("Text Box Color", "panelColor", style.panelColor),
                   renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                  renderColorControl("Text Accents", "elementColor", style.elementColor),
+                  renderColorControl("Border Accent", "elementColor", style.elementColor),
                   renderColorControl("Text Color", "textColor", style.textColor),
                 ]
               : type === "badges"
                 ? [
                     renderColorControl("Badge Box Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                    renderColorControl("Badge Accents", "elementColor", style.elementColor),
+                    renderColorControl("Badge Color", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "friendCode"
                 ? [
                     renderColorControl("Code Box Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                    renderColorControl("Code Accents", "elementColor", style.elementColor),
+                    renderColorControl("Input/Button Color", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "identityField"
                 ? [
                     renderColorControl("Field Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                    renderColorControl("Field Accents", "elementColor", style.elementColor),
+                    renderColorControl("Border Accent", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "playerAction"
                 ? [
                     renderColorControl("Action Color", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                    renderColorControl("Button Accents", "elementColor", style.elementColor),
+                    renderColorControl("Button Color", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                   ]
               : type === "thoughtsComposer"
                 ? [
-                    renderColorControl("Composer Color", "panelColor", style.panelColor),
+                    renderColorControl("Composer Box", "panelColor", style.panelColor),
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
-                    renderColorControl("Input Color", "elementColor", style.elementColor),
+                    renderColorControl("Input Boxes", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                     renderColorControl("Button Color", "buttonColor", style.buttonColor),
                   ]
