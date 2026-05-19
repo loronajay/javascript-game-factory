@@ -1,12 +1,16 @@
 import { escapeHtml } from "../profile-social/social-view.mjs";
 
-export function renderRailPanel(container, title, items, renderItem) {
+export function renderRailPanel(container, title, items, renderItem, options = {}) {
   if (!container) return;
   container.hidden = false;
 
-  const itemsHtml = items.map(renderItem).join("");
+  const itemsHtml = items.map((item, index) => {
+    const html = renderItem(item, index);
+    const childId = options.childIdForItem?.(item, index);
+    return childId ? `<div class="me-hero-card__rail-child" data-profile-child-id="${escapeHtml(childId)}">${html}</div>` : html;
+  }).join("");
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="me-panel__header"${options.titleChildId ? ` data-profile-child-id="${escapeHtml(options.titleChildId)}"` : ""}><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-hero-card__rail-list">
       ${itemsHtml}
     </div>
@@ -192,7 +196,9 @@ export function renderBadgesPanel(container, title, items) {
     : `<div class="me-badge-list">${items.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
 
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
-    ${badgesHtml}
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="me-badge-box" data-profile-child-id="content">
+      ${badgesHtml}
+    </div>
   `;
 }

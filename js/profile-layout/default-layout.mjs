@@ -9,6 +9,8 @@ const DEFAULT_HERO_CHILDREN = [
 ];
 const DEFAULT_FAVORITE_GAME_CHILDREN = getDefaultPanelChildren("favoriteGame");
 const DEFAULT_ABOUT_CHILDREN = getDefaultPanelChildren("about");
+const DEFAULT_BADGES_CHILDREN = getDefaultPanelChildren("badges");
+const DEFAULT_TOP_FRIENDS_CHILDREN = getDefaultPanelChildren("topFriends");
 
 // Maps the classic 3-column profile structure onto a 12-column grid.
 // Left col = x 0–3 (w4), Middle col = x 4–7 (w4), Right col = x 8–11 (w4).
@@ -24,7 +26,7 @@ export const DEFAULT_PROFILE_LAYOUT = {
       { id: "hero",         enabled: true, x: 0, y: 0,  w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
       { id: "identity",     enabled: true, x: 0, y: 5,  w: 4, h: 3 },
       { id: "rankings",     enabled: true, x: 0, y: 8,  w: 4, h: 3 },
-      { id: "topFriends",   enabled: true, x: 0, y: 11, w: 4, h: 3 },
+      { id: "topFriends",   enabled: true, x: 0, y: 11, w: 4, h: 3, children: DEFAULT_TOP_FRIENDS_CHILDREN },
       { id: "friends",      enabled: true, x: 0, y: 14, w: 4, h: 3 },
       // Middle column
       { id: "music",        enabled: true, x: 4, y: 0,  w: 4, h: 3 },
@@ -33,7 +35,7 @@ export const DEFAULT_PROFILE_LAYOUT = {
       { id: "gallery",      enabled: true, x: 4, y: 10, w: 4, h: 3 },
       // Right column
       { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2, children: DEFAULT_ABOUT_CHILDREN },
-      { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2 },
+      { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2, children: DEFAULT_BADGES_CHILDREN },
       { id: "thoughts",     enabled: true, x: 8, y: 4,  w: 4, h: 5 },
     ],
   },
@@ -61,7 +63,7 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
       { id: "gallery",      enabled: true, x: 4, y: 7,  w: 4, h: 3 },
       // Right column
       { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2, children: DEFAULT_ABOUT_CHILDREN },
-      { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2 },
+      { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2, children: DEFAULT_BADGES_CHILDREN },
       { id: "thoughts",     enabled: true, x: 8, y: 4,  w: 4, h: 5 },
     ],
   },

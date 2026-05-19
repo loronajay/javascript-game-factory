@@ -143,6 +143,12 @@ export function normalizePanelChildren(panelId, rawChildren) {
 }
 
 function migratePanelChildren(panelId, rawChildren) {
+  if (panelId === "topFriends" && Array.isArray(rawChildren)) {
+    return rawChildren.map((child) => (
+      child?.id === "friend1" ? { ...child, id: "mainSqueeze" } : child
+    ));
+  }
+
   if (panelId !== "hero" || !Array.isArray(rawChildren)) return rawChildren;
 
   const portrait = rawChildren.find((child) => child?.id === "portrait");

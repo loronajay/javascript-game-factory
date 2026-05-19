@@ -351,8 +351,10 @@ function renderBadgesPanel(container, title, items) {
     : `<div class="player-badge-list">${items.map((item) => `<span class="player-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
 
   container.innerHTML = `
-    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
-    ${badgesHtml}
+    <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="player-badge-box" data-profile-child-id="content">
+      ${badgesHtml}
+    </div>
   `;
 }
 

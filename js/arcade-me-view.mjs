@@ -12,6 +12,7 @@ import {
   renderRailPanel,
 } from "./me-page/render-sections.mjs";
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
+const TOP_FRIEND_CHILD_IDS = ["mainSqueeze", "friend2", "friend3", "friend4", "friend5"];
 const socialView = createProfileSocialViewRenderer({
   pageKey: "me",
   panelPrefix: "me",
@@ -19,6 +20,21 @@ const socialView = createProfileSocialViewRenderer({
   ownerGalleryEmptyText: "No photos yet. Upload one above.",
   viewerGalleryEmptyText: "No photos yet.",
 });
+
+function createTopFriendFallback(index) {
+  return {
+    title: index === 0 ? "Main Squeeze" : "Friend Slot",
+    value: index === 0 ? "Awaiting Main Squeeze" : "Awaiting Arcade Friend",
+    meta: "Friendship points pending",
+    isPlaceholder: true,
+    avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
+  };
+}
+
+function normalizeTopFriendItems(items = []) {
+  const source = Array.isArray(items) ? items : [];
+  return TOP_FRIEND_CHILD_IDS.map((_, index) => source[index] || createTopFriendFallback(index));
+}
 
 function renderPageHeader(doc, model) {
   if (!doc?.getElementById) return;
@@ -225,30 +241,35 @@ export function renderMeRankingsPanel(container, model) {
 }
 
 export function renderMeTopFriendsPanel(container, model) {
-  renderRailPanel(
-    container,
-    "Top Friends",
-    model.friendItems,
-    (item) => {
-      const cardClass = item.isPlaceholder
-        ? "me-hero-card__friend-card me-hero-card__friend-card--placeholder"
-        : "me-hero-card__friend-card";
-      const inner = `
-        <div class="me-hero-card__friend-avatar" aria-hidden="true">
-          <img class="me-hero-card__friend-avatar-img" src="${escapeHtml(item.avatarSrc || DEFAULT_PROFILE_PICTURE_SRC)}" alt="" loading="lazy">
-        </div>
-        <div class="me-hero-card__friend-copy">
-          <p class="me-hero-card__friend-label">${escapeHtml(item.title || "Friend Slot")}</p>
-          <p class="me-hero-card__friend-name">${escapeHtml(item.value)}</p>
-          <p class="me-hero-card__friend-points">${escapeHtml(item.meta || "Friendship points pending")}</p>
-        </div>
-      `;
-      if (!item.isPlaceholder && item.playerId) {
-        return `<a class="${cardClass}" href="../player/index.html?id=${encodeURIComponent(item.playerId)}">${inner}</a>`;
-      }
-      return `<article class="${cardClass}">${inner}</article>`;
-    },
-  );
+  if (!container) return;
+
+  const friendItems = normalizeTopFriendItems(model.friendItems);
+  const friendCards = friendItems.map((item, index) => {
+    const childId = TOP_FRIEND_CHILD_IDS[index];
+    const cardClass = item.isPlaceholder
+      ? "me-hero-card__friend-card me-hero-card__friend-card--placeholder"
+      : "me-hero-card__friend-card";
+    const inner = `
+      <div class="me-hero-card__friend-avatar" aria-hidden="true">
+        <img class="me-hero-card__friend-avatar-img" src="${escapeHtml(item.avatarSrc || DEFAULT_PROFILE_PICTURE_SRC)}" alt="" loading="lazy">
+      </div>
+      <div class="me-hero-card__friend-copy">
+        <p class="me-hero-card__friend-label">${escapeHtml(item.title || (index === 0 ? "Main Squeeze" : "Friend Slot"))}</p>
+        <p class="me-hero-card__friend-name">${escapeHtml(item.value)}</p>
+        <p class="me-hero-card__friend-points">${escapeHtml(item.meta || "Friendship points pending")}</p>
+      </div>
+    `;
+    if (!item.isPlaceholder && item.playerId) {
+      return `<a class="${cardClass}" data-profile-child-id="${escapeHtml(childId)}" href="../player/index.html?id=${encodeURIComponent(item.playerId)}">${inner}</a>`;
+    }
+    return `<article class="${cardClass}" data-profile-child-id="${escapeHtml(childId)}">${inner}</article>`;
+  }).join("");
+
+  container.hidden = false;
+  container.innerHTML = `
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">Top Friends</h2></div>
+    ${friendCards}
+  `;
 }
 
 export function renderMeFriendCodePanel(container, model) {
