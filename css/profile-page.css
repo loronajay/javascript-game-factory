@@ -134,6 +134,76 @@
     0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
+[data-profile-child-id="content"].gallery-panel__content {
+  display: grid;
+  align-content: start;
+  justify-items: stretch;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 10px 12px;
+}
+
+[data-profile-child-id="content"].gallery-panel__content > .profile-child-zoom-shell {
+  display: grid;
+  align-content: start;
+  justify-items: stretch;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+[data-profile-child-id="content"] .gallery-grid {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="content"].me-friends-navigator {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="content"].me-friends-navigator > .profile-child-zoom-shell {
+  display: grid;
+  align-content: start;
+  justify-items: stretch;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+[data-profile-child-id="composer"].thought-composer,
+[data-profile-child-id="feed"].thoughts-feed {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="composer"].thought-composer > .profile-child-zoom-shell {
+  display: grid;
+  align-content: start;
+  justify-items: stretch;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 18px;
+}
+
+[data-profile-child-id="feed"].thoughts-feed {
+  align-content: start;
+  gap: 16px;
+  max-height: none !important;
+  overflow-y: auto !important;
+  padding: 10px 12px;
+}
+
 .me-panel > .panel-zoom-shell > [data-profile-child-id="text"] > .profile-child-zoom-shell,
 .player-panel > .panel-zoom-shell > [data-profile-child-id="text"] > .profile-child-zoom-shell,
 .profile-layout-tile__live-panel.me-panel > .panel-zoom-shell > [data-profile-child-id="text"] > .profile-child-zoom-shell,

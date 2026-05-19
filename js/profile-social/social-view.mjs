@@ -29,6 +29,7 @@ export function createProfileSocialViewRenderer({
     const isOwner = !!options?.isOwner;
     const previewCap = options?.previewCap ? Number(options.previewCap) : 0;
     const viewAllHref = options?.viewAllHref || "";
+    const useChildLayout = !!options?.childLayout;
     const isPreview = previewCap > 0;
     const visiblePhotos = isPreview ? photos.slice(0, previewCap) : photos;
     const uploadState = options?.uploadState || {};
@@ -105,10 +106,12 @@ export function createProfileSocialViewRenderer({
       : "";
 
     container.innerHTML = `
-      <div class="${panelPrefix}-panel__header"><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
+      <div class="${panelPrefix}-panel__header"${useChildLayout ? ' data-profile-child-id="title"' : ""}><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
       ${uploadHtml}
-      <div class="gallery-grid">${gridHtml}</div>
-      ${viewAllHtml}
+      <div class="gallery-panel__content"${useChildLayout ? ' data-profile-child-id="content"' : ""}>
+        <div class="gallery-grid">${gridHtml}</div>
+        ${viewAllHtml}
+      </div>
     `;
   }
 
@@ -116,9 +119,10 @@ export function createProfileSocialViewRenderer({
     if (!container) return;
 
     const composerState = options?.composerState || {};
+    const useChildLayout = !!options?.childLayout;
     const composerHtml = composer?.enabled
       ? `
-        <form id="${pageKey}ThoughtComposer" class="thought-composer thought-composer--owner">
+        <form id="${pageKey}ThoughtComposer" class="thought-composer thought-composer--owner"${useChildLayout ? ' data-profile-child-id="composer"' : ""}>
           <input
             id="${pageKey}ThoughtSubject"
             class="thought-composer__subject"
@@ -191,9 +195,9 @@ export function createProfileSocialViewRenderer({
       : "";
 
     container.innerHTML = `
-      <div class="${panelPrefix}-panel__header"><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
+      <div class="${panelPrefix}-panel__header"${useChildLayout ? ' data-profile-child-id="title"' : ""}><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
       ${composerHtml}
-      <div class="${thoughtsFeedClass} thoughts-feed">
+      <div class="${thoughtsFeedClass} thoughts-feed"${useChildLayout ? ' data-profile-child-id="feed" data-profile-child-scroll="true"' : ""}>
         ${items.map((item) => renderThoughtItem({
           item,
           openReactionThoughtId: options?.openReactionThoughtId || "",

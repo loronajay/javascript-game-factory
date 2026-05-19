@@ -120,8 +120,8 @@ export function renderFriendNavigatorPanel(container, title, navigator, options 
 
   container.hidden = false;
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
-    <div class="me-friends-navigator">
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="me-friends-navigator" data-profile-child-id="content">
       <button
         id="meFriendsToggle"
         class="me-friends-navigator__toggle"

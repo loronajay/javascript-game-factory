@@ -40,6 +40,11 @@ function ensureChildZoomShell(childEl) {
 
 function applyPanelChildScaling(panelEl) {
   panelEl.querySelectorAll(":scope .panel-zoom-shell > [data-profile-child-id]").forEach((childEl) => {
+    if (childEl.dataset.profileChildScroll === "true") {
+      childEl.style.overflow = "hidden auto";
+      return;
+    }
+
     childEl.style.overflow = "hidden";
     const shell = ensureChildZoomShell(childEl);
     shell.style.zoom = "";

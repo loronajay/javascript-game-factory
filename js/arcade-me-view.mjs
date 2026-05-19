@@ -215,6 +215,7 @@ export function renderMeIdentityPanel(container, model) {
 export function renderMeGalleryPanel(container, photos = [], options = {}) {
   socialView.renderGalleryPanel(container, "Photo Gallery", photos, {
     isOwner: true,
+    childLayout: true,
     previewCap: 5,
     viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
@@ -231,6 +232,7 @@ export function renderMeThoughtsPanel(container, model, options = {}) {
       sharePanelState: options?.sharePanelState || {},
       commentPanelState: options?.commentPanelState || {},
       composerState: options?.thoughtComposerState || {},
+      childLayout: true,
     },
   );
 }

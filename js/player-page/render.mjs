@@ -417,6 +417,7 @@ export function renderPlayerPageView(doc, model, options = {}) {
   );
   socialView.renderGalleryPanel(doc.getElementById("playerGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
     isOwner: !!options?.isOwner,
+    childLayout: true,
     previewCap: 5,
     viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
   });
