@@ -325,7 +325,7 @@
 .hit-overlay::before {
   width: 52%;
   height: 62%;
-  bottom: 5%;
+  bottom: 18%;
   left: 24%;
   background: radial-gradient(
     ellipse at 50% 72%,
@@ -341,7 +341,7 @@
 .hit-overlay::after {
   width: 28%;
   height: 40%;
-  bottom: 5%;
+  bottom: 18%;
   left: 36%;
   background: radial-gradient(
     ellipse at 50% 75%,

@@ -95,11 +95,11 @@ export function showScreen(name) {
   }
 }
 
-export function showAnnouncement(text) {
+export function showAnnouncement(text, modifier = '') {
   const el = document.getElementById('battle-announcement');
   if (!el) return;
   el.textContent = text;
-  el.classList.remove('is-visible');
+  el.className = 'battle-announcement' + (modifier ? ' ' + modifier : '');
   void el.offsetWidth;
   el.classList.add('is-visible');
 }
@@ -297,6 +297,7 @@ export function renderFleetStatus(gs) {
   for (const def of buildOwnFleetStatusRows(gs.myFleet)) {
     const row = document.createElement('div');
     row.className = 'ship-status-row';
+    row.dataset.shipId = def.id;
     const sunk = def.sunk;
     row.classList.add(sunk ? 'ship-status--sunk' : 'ship-status--afloat');
     row.textContent = getFleetStatusLabel(def);

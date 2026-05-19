@@ -67,6 +67,95 @@
   100% { opacity: 0; transform: translateY(4px) scale(0.96); }
 }
 
+/* Announcement color modifiers */
+
+.battle-announcement.announcement--hit,
+.battle-announcement.announcement--sunk {
+  background: rgba(218, 245, 226, 0.97);
+  border-color: rgba(38, 138, 68, 0.55);
+  color: rgba(14, 74, 34, 0.92);
+}
+
+.battle-announcement.announcement--miss,
+.battle-announcement.announcement--incoming-miss {
+  background: rgba(220, 240, 255, 0.97);
+  border-color: rgba(50, 128, 200, 0.5);
+  color: rgba(10, 54, 100, 0.88);
+}
+
+.battle-announcement.announcement--incoming-hit,
+.battle-announcement.announcement--incoming-sunk {
+  background: rgba(255, 226, 220, 0.97);
+  border-color: rgba(195, 48, 34, 0.55);
+  color: rgba(128, 14, 8, 0.92);
+}
+
+/* Sunk events hold longer */
+.battle-announcement.is-visible.announcement--sunk,
+.battle-announcement.is-visible.announcement--incoming-sunk {
+  animation-duration: 3.6s;
+}
+
+/* Fleet bowl shake on incoming hit */
+.board-bowl--fleet.bowl--taking-hit {
+  animation: bowl-hit-shake 0.45s ease-out;
+}
+
+.board-bowl--fleet.bowl--taking-sunk {
+  animation: bowl-sunk-shake 0.65s ease-out;
+}
+
+@keyframes bowl-hit-shake {
+  0%, 100% { transform: translateX(0); }
+  15%  { transform: translateX(-5px); }
+  30%  { transform: translateX(5px); }
+  45%  { transform: translateX(-4px); }
+  60%  { transform: translateX(4px); }
+  75%  { transform: translateX(-2px); }
+  90%  { transform: translateX(2px); }
+}
+
+@keyframes bowl-sunk-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  10%  { transform: translateX(-7px) rotate(-1deg); }
+  22%  { transform: translateX(7px) rotate(1deg); }
+  34%  { transform: translateX(-6px) rotate(-0.8deg); }
+  46%  { transform: translateX(6px) rotate(0.8deg); }
+  58%  { transform: translateX(-3px); }
+  70%  { transform: translateX(3px); }
+  82%  { transform: translateX(-1.5px); }
+}
+
+/* Red flash overlay when a ship sinks */
+.board-bowl--fleet.bowl--taking-sunk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: rgba(195, 28, 10, 0.22);
+  animation: sunk-bowl-flash 0.65s ease-out forwards;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes sunk-bowl-flash {
+  0%   { opacity: 1; }
+  60%  { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* Ship status row pulse when just sunk */
+.ship-status--just-sunk {
+  border-radius: 6px;
+  animation: ship-sunk-pulse 1.8s ease-out forwards;
+}
+
+@keyframes ship-sunk-pulse {
+  0%   { background: rgba(195, 28, 10, 0.24); }
+  40%  { background: rgba(195, 28, 10, 0.12); }
+  100% { background: transparent; }
+}
+
 .screen-battle .board-column {
   justify-content: flex-start;
 }

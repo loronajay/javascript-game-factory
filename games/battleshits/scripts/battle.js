@@ -47,6 +47,16 @@ export function clearBattleTimers() {
   clearEmoteTimers();
 }
 
+function triggerFleetBowlShake(sunk) {
+  const bowl = document.querySelector('.board-bowl--fleet');
+  if (!bowl) return;
+  const cls = sunk ? 'bowl--taking-sunk' : 'bowl--taking-hit';
+  bowl.classList.remove('bowl--taking-hit', 'bowl--taking-sunk');
+  void bowl.offsetWidth;
+  bowl.classList.add(cls);
+  setTimeout(() => bowl.classList.remove(cls), sunk ? 700 : 450);
+}
+
 export function showBattleEmote(gs, side, emoteType) {
   if (!EMOTE_ASSET_PATHS[emoteType]) return;
   gs.activeEmotes = { ...gs.activeEmotes, [side]: emoteType };
@@ -89,9 +99,9 @@ function applyShotResult(gs, { clearAll }, { col, row, hit, sunk, shipId, fleetD
   audio.play(getResolutionSoundId(hit));
 
   const def = FLEET_DEFS.find(d => d.id === shipId);
-  if (sunk && def) showAnnouncement(`💀 You sunk their ${def.name}!`);
-  else if (hit)    showAnnouncement('💥 Direct hit!');
-  else             showAnnouncement('💦 Splash! Missed.');
+  if (sunk && def) showAnnouncement(`💀 You sunk their ${def.name}!`, 'announcement--sunk');
+  else if (hit)    showAnnouncement('💥 Direct hit!', 'announcement--hit');
+  else             showAnnouncement('💦 Splash! Missed.', 'announcement--miss');
 
   renderTargetBoard(gs);
   renderOpponentFleetStatus(gs);
@@ -137,12 +147,28 @@ export function handleIncomingShot(gs, net, col, row, { clearAll }) {
     renderFleetBoard(gs);
     renderFleetStatus(gs);
 
+    if (hit) triggerFleetBowlShake(sunk);
+
     if (fleetDestroyed) {
       transitionToMatchEnded(gs, 'loss', { clearAll });
     } else {
       gs.turn = 'mine';
       renderBattleStatus(gs);
       renderTargetBoard(gs);
+
+      const def = shipId ? FLEET_DEFS.find(d => d.id === shipId) : null;
+      if (sunk && def) {
+        showAnnouncement(`☠️ They sunk your ${def.name}!`, 'announcement--incoming-sunk');
+        const statusRow = document.querySelector(`#fleet-ships-status [data-ship-id="${shipId}"]`);
+        if (statusRow) {
+          statusRow.classList.add('ship-status--just-sunk');
+          setTimeout(() => statusRow.classList.remove('ship-status--just-sunk'), 2000);
+        }
+      } else if (hit) {
+        showAnnouncement('💥 They hit your ships!', 'announcement--incoming-hit');
+      } else {
+        showAnnouncement('💦 Splash! They missed.', 'announcement--incoming-miss');
+      }
     }
   }, SHOT_ANIMATION_MS);
 }
