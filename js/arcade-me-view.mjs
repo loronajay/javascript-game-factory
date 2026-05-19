@@ -9,9 +9,9 @@ import {
   renderFavoritePanel,
   renderFriendCodePanel,
   renderFriendNavigatorPanel,
-  renderRailPanel,
 } from "./me-page/render-sections.mjs";
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
+const RANKING_CHILD_IDS = ["ranking1", "ranking2", "ranking3"];
 const TOP_FRIEND_CHILD_IDS = ["mainSqueeze", "friend2", "friend3", "friend4", "friend5"];
 const socialView = createProfileSocialViewRenderer({
   pageKey: "me",
@@ -34,6 +34,20 @@ function createTopFriendFallback(index) {
 function normalizeTopFriendItems(items = []) {
   const source = Array.isArray(items) ? items : [];
   return TOP_FRIEND_CHILD_IDS.map((_, index) => source[index] || createTopFriendFallback(index));
+}
+
+function createRankingFallback(index) {
+  return {
+    title: index === 0 ? "Top Ladder Rankings" : `Ranking Slot ${index + 1}`,
+    value: index === 0 ? "Rank snapshots will appear here once shared standings come online." : "Awaiting ladder placement",
+    meta: "",
+    isPlaceholder: true,
+  };
+}
+
+function normalizeRankingItems(items = []) {
+  const source = Array.isArray(items) ? items : [];
+  return RANKING_CHILD_IDS.map((_, index) => source[index] || createRankingFallback(index));
 }
 
 function renderPageHeader(doc, model) {
@@ -173,28 +187,26 @@ export function renderMeIdentityPanel(container, model) {
   }).join("");
 
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">Player Profile</h2></div>
-    <div class="me-identity-panel__fields">
-      <div class="me-hero-card__identity-field">
-        <span class="me-hero-card__identity-field-label">Name</span>
-        <div class="me-hero-card__identity-field-value-row">
-          <span class="me-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
-          <span class="me-presence-dot me-presence-dot--${escapeHtml(model.presenceToneClass)}" title="${escapeHtml(model.presenceLabel)}"></span>
-        </div>
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">Player Profile</h2></div>
+    <div class="me-hero-card__identity-field" data-profile-child-id="name">
+      <span class="me-hero-card__identity-field-label">Name</span>
+      <div class="me-hero-card__identity-field-value-row">
+        <span class="me-hero-card__identity-field-value">${escapeHtml(realNameValue)}</span>
+        <span class="me-presence-dot me-presence-dot--${escapeHtml(model.presenceToneClass)}" title="${escapeHtml(model.presenceLabel)}"></span>
       </div>
-      <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
-        <span class="me-hero-card__identity-field-label">Page Views</span>
-        <span class="me-hero-card__identity-field-value">${escapeHtml(pageViewCount)}</span>
-      </div>
-      <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
-        <span class="me-hero-card__identity-field-label">Factory ID</span>
-        <span class="me-hero-card__identity-field-value me-hero-card__identity-field-value--mono">${escapeHtml(factoryId)}</span>
-      </div>
-      <div class="me-hero-card__identity-field me-hero-card__identity-field--stack">
-        <span class="me-hero-card__identity-field-label">Social Links</span>
-        <div class="me-identity-links">
-          ${linksHtml}
-        </div>
+    </div>
+    <div class="me-hero-card__identity-field me-hero-card__identity-field--stack" data-profile-child-id="pageViews">
+      <span class="me-hero-card__identity-field-label">Page Views</span>
+      <span class="me-hero-card__identity-field-value">${escapeHtml(pageViewCount)}</span>
+    </div>
+    <div class="me-hero-card__identity-field me-hero-card__identity-field--stack" data-profile-child-id="factoryId">
+      <span class="me-hero-card__identity-field-label">Factory ID</span>
+      <span class="me-hero-card__identity-field-value me-hero-card__identity-field-value--mono">${escapeHtml(factoryId)}</span>
+    </div>
+    <div class="me-hero-card__identity-field me-hero-card__identity-field--stack" data-profile-child-id="socialLinks">
+      <span class="me-hero-card__identity-field-label">Social Links</span>
+      <div class="me-identity-links">
+        ${linksHtml}
       </div>
     </div>
   `;
@@ -224,20 +236,25 @@ export function renderMeThoughtsPanel(container, model, options = {}) {
 }
 
 export function renderMeRankingsPanel(container, model) {
-  renderRailPanel(
-    container,
-    "Top Ladder Rankings",
-    model.rankingItems,
-    (item) => `
-      <article class="${item.isPlaceholder ? "me-hero-card__rail-item me-hero-card__rail-item--placeholder" : "me-hero-card__rail-item"}">
-        ${item.isPlaceholder ? "" : `<p class="me-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
-        <div class="me-hero-card__rail-value-row">
-          <p class="me-hero-card__rail-value">${escapeHtml(item.value)}</p>
-          ${item.meta ? `<span class="me-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
-        </div>
-      </article>
-    `,
-  );
+  if (!container) return;
+
+  const rankingCards = normalizeRankingItems(model.rankingItems).map((item, index) => `
+    <article
+      class="${item.isPlaceholder ? "me-hero-card__rail-item me-hero-card__rail-item--placeholder" : "me-hero-card__rail-item"}"
+      data-profile-child-id="${escapeHtml(RANKING_CHILD_IDS[index])}"
+    >
+      ${item.isPlaceholder ? "" : `<p class="me-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
+      <div class="me-hero-card__rail-value-row">
+        <p class="me-hero-card__rail-value">${escapeHtml(item.value)}</p>
+        ${item.meta ? `<span class="me-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
+      </div>
+    </article>
+  `).join("");
+
+  container.innerHTML = `
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">Top Ladder Rankings</h2></div>
+    ${rankingCards}
+  `;
 }
 
 export function renderMeTopFriendsPanel(container, model) {

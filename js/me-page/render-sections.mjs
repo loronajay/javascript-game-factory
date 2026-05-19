@@ -21,8 +21,8 @@ export function renderFriendCodePanel(container, title, model) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
-    <div class="friend-code-card">
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="friend-code-card" data-profile-child-id="code">
       <p class="friend-code-card__label">Your Friend Code</p>
       <p class="friend-code-card__value">${escapeHtml(model.friendCodeDisplay || "PENDING")}</p>
       <p class="friend-code-card__helper">Share this code so friends can link with you directly.</p>

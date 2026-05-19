@@ -191,6 +191,73 @@
   padding: 10px 12px;
 }
 
+[data-profile-child-id="ranking1"].me-hero-card__rail-item,
+[data-profile-child-id="ranking2"].me-hero-card__rail-item,
+[data-profile-child-id="ranking3"].me-hero-card__rail-item {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="ranking1"].me-hero-card__rail-item > .profile-child-zoom-shell,
+[data-profile-child-id="ranking2"].me-hero-card__rail-item > .profile-child-zoom-shell,
+[data-profile-child-id="ranking3"].me-hero-card__rail-item > .profile-child-zoom-shell {
+  display: grid;
+  align-content: center;
+  justify-items: stretch;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+[data-profile-child-id="code"].friend-code-card {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="code"].friend-code-card > .profile-child-zoom-shell {
+  display: grid;
+  align-content: center;
+  justify-items: stretch;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+}
+
+[data-profile-child-id="name"].me-hero-card__identity-field,
+[data-profile-child-id="pageViews"].me-hero-card__identity-field,
+[data-profile-child-id="factoryId"].me-hero-card__identity-field,
+[data-profile-child-id="socialLinks"].me-hero-card__identity-field {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+[data-profile-child-id="name"].me-hero-card__identity-field > .profile-child-zoom-shell,
+[data-profile-child-id="pageViews"].me-hero-card__identity-field > .profile-child-zoom-shell,
+[data-profile-child-id="factoryId"].me-hero-card__identity-field > .profile-child-zoom-shell,
+[data-profile-child-id="socialLinks"].me-hero-card__identity-field > .profile-child-zoom-shell {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+[data-profile-child-id="socialLinks"].me-hero-card__identity-field > .profile-child-zoom-shell {
+  align-content: start;
+  justify-items: stretch;
+}
+
 @container profile-child (max-height: 130px) {
   [data-profile-child-id="metrics"] > .profile-child-zoom-shell {
     gap: 6px;
