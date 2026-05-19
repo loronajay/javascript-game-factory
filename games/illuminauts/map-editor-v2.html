@@ -42,12 +42,14 @@
     h1 { font-size: 20px; }
     .subhead { color: var(--muted); font-size: 11px; margin-top: 2px; }
     .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .map-id-wrap { display: flex; align-items: center; gap: 6px; }
+    .map-id-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .map-id-wrap label { font-size: 11px; color: var(--muted); }
     .map-id-wrap input {
       background: #0a1020; border: 1px solid var(--line); border-radius: 7px;
       color: var(--text); font-size: 12px; padding: 5px 9px; width: 110px;
     }
+    .map-id-wrap input.short { width: 72px; }
+    .map-id-wrap .sep { color: var(--line); font-size: 14px; }
     .panel {
       background: linear-gradient(180deg, rgba(16,24,39,0.98), rgba(13,19,32,0.98));
       border: 1px solid var(--line);
@@ -170,6 +172,14 @@
       <div class="map-id-wrap">
         <label for="mapIdInput">Map ID</label>
         <input type="text" id="mapIdInput" value="map-01" placeholder="map-01" />
+        <span class="sep">|</span>
+        <label for="mapNameInput">Name</label>
+        <input type="text" id="mapNameInput" value="" placeholder="Sector 01" />
+        <span class="sep">|</span>
+        <label for="sprintParInput">Sprint par (ms)</label>
+        <input type="number" id="sprintParInput" class="short" value="120000" min="0" step="1000" />
+        <label for="sweepParInput">Sweep par (ms)</label>
+        <input type="number" id="sweepParInput" class="short" value="270000" min="0" step="1000" />
       </div>
       <div class="toolbar">
         <button id="tabTiles" class="tab-active">Tiles</button>
@@ -232,7 +242,10 @@ const gridEl    = document.getElementById('grid');
 const gridWrap  = document.getElementById('gridWrap');
 const overlayEl = document.getElementById('overlay');
 const sideEl    = document.getElementById('sidePanel');
-const mapIdInput = document.getElementById('mapIdInput');
+const mapIdInput     = document.getElementById('mapIdInput');
+const mapNameInput   = document.getElementById('mapNameInput');
+const sprintParInput = document.getElementById('sprintParInput');
+const sweepParInput  = document.getElementById('sweepParInput');
 const octx = overlayEl.getContext('2d');
 
 // ── History ────────────────────────────────────────────────────────────────────
@@ -477,8 +490,17 @@ function renderGrid() {
 function toRows() { return map.map(r => r.join('')); }
 
 function toMapsEntry() {
+  const id = mapIdInput.value.trim() || 'map-01';
+  const name = mapNameInput.value.trim() || id.replace('map-', 'Sector ');
+  const sprintPar = parseInt(sprintParInput.value, 10) || 120000;
+  const sweepPar  = parseInt(sweepParInput.value,  10) || 270000;
   return {
-    id: mapIdInput.value.trim() || 'map-01',
+    id,
+    soloConfig: {
+      name,
+      sprint: { parMs: sprintPar },
+      sweep:  { parMs: sweepPar },
+    },
     raw: toRows(),
     hazards: JSON.parse(JSON.stringify(hazards))
   };
@@ -507,9 +529,19 @@ function formatEntry(entry) {
     `        {\n          id: '${t.id}', x: ${t.x}, y: ${t.y}, dx: ${t.dx}, dy: ${t.dy}, range: ${t.range},\n          cycleMs: ${t.cycleMs}, warningMs: ${t.warningMs}, activeMs: ${t.activeMs}, offsetMs: ${t.offsetMs}\n        }`
   ).join(',\n');
 
+  const sc = entry.soloConfig;
+  const soloBlock = sc ? [
+    `    soloConfig: {`,
+    `      name: '${sc.name}',`,
+    `      sprint: { parMs: ${sc.sprint.parMs} },`,
+    `      sweep:  { parMs: ${sc.sweep.parMs} },`,
+    `    },`,
+  ].join('\n') : null;
+
   return [
     `  {`,
     `    id: '${entry.id}',`,
+    soloBlock,
     `    raw: [`,
     rawLines,
     `    ],`,
@@ -525,7 +557,7 @@ function formatEntry(entry) {
     `      ]`,
     `    }`,
     `  }`
-  ].join('\n');
+  ].filter(x => x !== null).join('\n');
 }
 
 function parseRawArray(text) {
@@ -556,6 +588,11 @@ function importFromText(text) {
       enforceLockedTiles();
       if (entry.hazards) hazards = JSON.parse(JSON.stringify(entry.hazards));
       if (entry.id) mapIdInput.value = entry.id;
+      if (entry.soloConfig) {
+        mapNameInput.value   = entry.soloConfig.name ?? '';
+        sprintParInput.value = entry.soloConfig.sprint?.parMs ?? 120000;
+        sweepParInput.value  = entry.soloConfig.sweep?.parMs  ?? 270000;
+      }
       syncIds();
       pushHistory(); syncAll();
       return { ok: true, msg: 'Loaded map entry with hazards.' };

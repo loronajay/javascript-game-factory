@@ -38,8 +38,8 @@ function ensureChildZoomShell(childEl) {
   return shell;
 }
 
-function applyHeroChildScaling(heroEl) {
-  heroEl.querySelectorAll(":scope .panel-zoom-shell > [data-profile-child-id]").forEach((childEl) => {
+function applyPanelChildScaling(panelEl) {
+  panelEl.querySelectorAll(":scope .panel-zoom-shell > [data-profile-child-id]").forEach((childEl) => {
     childEl.style.overflow = "hidden";
     const shell = ensureChildZoomShell(childEl);
     shell.style.zoom = "";
@@ -172,8 +172,8 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     shell.style.width = `${(availableW / z).toFixed(2)}px`;
     shell.style.height = `${(availableH / z).toFixed(2)}px`;
 
-    if (panel.id === "hero") {
-      applyHeroChildScaling(el);
+    if (Array.isArray(panel.children) && panel.children.length > 0) {
+      applyPanelChildScaling(el);
     }
   }
 }
