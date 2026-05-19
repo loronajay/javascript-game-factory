@@ -821,6 +821,10 @@
   width: 340px;
 }
 
+.profile-layout-composition-element__scale-stage--thoughts-composer {
+  width: 360px;
+}
+
 .profile-layout-composition-element__scale-stage--text .me-about-copy-wrap {
   width: 100%;
   min-height: 120px;
@@ -881,6 +885,40 @@
 .profile-layout-composition-element__scale-stage--friend-code .friend-code-form__input,
 .profile-layout-composition-element__scale-stage--friend-code .friend-code-form__submit {
   border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.28);
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer,
+.profile-layout-composition-element--thoughtsFeed .thoughts-feed {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(var(--profile-panel-custom-rgb, 255, 214, 189), 0.22);
+  border-radius: var(--profile-radius-sm, 12px);
+  background:
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 21, 14, 55), var(--profile-panel-custom-opacity, 0.96)), rgba(var(--profile-panel-custom-rgb-2, 7, 7, 22), var(--profile-panel-custom-opacity, 0.96))),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.08), rgba(var(--profile-panel-element-rgb, 255, 255, 255), 0.03)),
+    rgba(9, 8, 22, 0.9);
+}
+
+.profile-layout-composition-element__scale-stage--thoughts-composer .thought-composer {
+  min-height: 210px;
+}
+
+.profile-layout-composition-element--thoughtsFeed {
+  overflow: hidden;
+}
+
+.profile-layout-composition-element--thoughtsFeed .thoughts-feed {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.profile-layout-composition-element--thoughtsFeed .thought-card {
+  border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.18);
 }
 
 .profile-layout-composition-element__scale-stage .me-hero-card__portrait-panel,

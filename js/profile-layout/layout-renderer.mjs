@@ -296,6 +296,34 @@ function renderCompositionElementContent(tile, element, def, heroModel) {
     return;
   }
 
+  if (def.type === "thoughtsComposer" || def.type === "thoughtsFeed") {
+    const preview = document.createElement("div");
+    renderMeThoughtsPanel(preview, heroModel);
+    const childId = def.type === "thoughtsComposer" ? "composer" : "feed";
+    const child = preview.querySelector(`[data-profile-child-id="${childId}"]`);
+    tile.dataset.compositionScale = def.type === "thoughtsComposer" ? "true" : "none";
+    if (child) {
+      child.removeAttribute("data-profile-child-id");
+      child.removeAttribute("data-profile-child-scroll");
+      child.style.left = "";
+      child.style.top = "";
+      child.style.width = "";
+      child.style.height = "";
+      if (def.type === "thoughtsComposer") {
+        const stage = document.createElement("div");
+        stage.className = "profile-layout-composition-element__scale-stage profile-layout-composition-element__scale-stage--thoughts-composer";
+        stage.appendChild(child);
+        tile.appendChild(stage);
+      } else {
+        tile.classList.add("profile-layout-composition-element--scroll-content");
+        tile.appendChild(child);
+      }
+    } else {
+      tile.innerHTML = `<span class="profile-layout-tile__label">${escapeHtml(def.label)}</span>`;
+    }
+    return;
+  }
+
   if (def.category !== "hero" || !["portrait", "metrics"].includes(def.type)) {
     tile.innerHTML = `<span class="profile-layout-tile__label">${escapeHtml(def.label)}</span>`;
     return;

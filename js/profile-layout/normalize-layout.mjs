@@ -97,7 +97,10 @@ export function normalizeLayout(raw) {
     version: LAYOUT_VERSION,
     desktop: {
       columns,
-      elements: normalizeCompositionElements(desktop.elements),
+      elements: migrateCompositionElementStylesFromPanelChildren(
+        normalizeCompositionElements(desktop.elements),
+        normalized,
+      ),
       panels: normalized,
     },
   };
@@ -142,6 +145,43 @@ function normalizeCompositionElement(id, raw, def) {
     h,
     style: normalizePanelStyle(raw.style),
   };
+}
+
+function migrateCompositionElementStylesFromPanelChildren(elements, panels) {
+  const childStyleByElementId = new Map();
+  const panelById = new Map((Array.isArray(panels) ? panels : []).map((panel) => [panel.id, panel]));
+  const legacyLinks = [
+    ["aboutTitle", "about", "title"],
+    ["aboutText", "about", "text"],
+    ["badgesTitle", "badges", "title"],
+    ["badgesContent", "badges", "content"],
+    ["friendCodeTitle", "friendCode", "title"],
+    ["friendCodeContent", "friendCode", "code"],
+    ["thoughtsTitle", "thoughts", "title"],
+    ["thoughtsComposer", "thoughts", "composer"],
+    ["thoughtsFeed", "thoughts", "feed"],
+  ];
+
+  for (const [elementId, panelId, childId] of legacyLinks) {
+    const child = panelById.get(panelId)?.children?.find((item) => item.id === childId);
+    if (child?.style && Object.keys(child.style).length > 0) {
+      childStyleByElementId.set(elementId, child.style);
+    }
+  }
+
+  if (childStyleByElementId.size === 0) return elements;
+
+  return elements.map((element) => {
+    const legacyStyle = childStyleByElementId.get(element.id);
+    if (!legacyStyle) return element;
+    return {
+      ...element,
+      style: {
+        ...legacyStyle,
+        ...(element.style || {}),
+      },
+    };
+  });
 }
 
 export function normalizePanelStyle(raw) {

@@ -858,6 +858,18 @@ if (doc?.getElementById) {
                     renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
                     renderColorControl("Code Accents", "elementColor", style.elementColor),
                   ]
+              : type === "thoughtsComposer"
+                ? [
+                    renderColorControl("Composer Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Composer Accents", "elementColor", style.elementColor),
+                  ]
+              : type === "thoughtsFeed"
+                ? [
+                    renderColorControl("Feed Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Thought Cards", "elementColor", style.elementColor),
+                  ]
               : type === "surface"
                 ? [
                     renderColorControl("Surface Color", "panelColor", style.panelColor),

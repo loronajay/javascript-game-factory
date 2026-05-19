@@ -85,7 +85,7 @@ export function applyProfileLayout(doc, layout, {
     layoutEl.appendChild(el);
   }
 
-  renderCompositionOverlays(doc, layoutEl, layout.desktop.elements);
+  renderCompositionOverlays(doc, layoutEl, layout.desktop.elements, layout.desktop.panels);
 }
 
 function applyPanelChildLayout(panelEl, panel) {
@@ -158,22 +158,27 @@ function applyHeroCompositionChild(heroEl, elementId, childEl, element, surface)
   heroEl.classList.add("profile-composition-hero");
 }
 
-function renderCompositionOverlays(doc, layoutEl, elements) {
+function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
   if (!Array.isArray(elements)) return;
   const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
     if (element?.enabled === false) continue;
     if (element.category === "friendCode" && !isOwnerLayout) continue;
-    if (isCustomTitleElement(element) || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle") {
+    if (element.id === "thoughtsComposer" && !isOwnerLayout) continue;
+    if (isCustomTitleElement(element) || element.id === "aboutTitle" || element.id === "badgesTitle" || element.id === "friendCodeTitle" || element.id === "thoughtsTitle") {
       renderTitleOverlay(doc, layoutEl, element, element.text || getDefaultTitleText(element));
-    } else if (element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface") {
+    } else if (element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface" || element.id === "thoughtsSurface") {
       renderSurfaceOverlay(doc, layoutEl, element, element.category);
     } else if (element.id === "aboutText") {
-      renderAboutTextOverlay(doc, layoutEl, element);
+      renderAboutTextOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "badgesContent") {
-      renderBadgesContentOverlay(doc, layoutEl, element);
+      renderBadgesContentOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "friendCodeContent") {
-      renderFriendCodeContentOverlay(doc, layoutEl, element);
+      renderFriendCodeContentOverlay(doc, layoutEl, element, panels);
+    } else if (element.id === "thoughtsComposer") {
+      renderThoughtsComposerOverlay(doc, layoutEl, element, panels);
+    } else if (element.id === "thoughtsFeed") {
+      renderThoughtsFeedOverlay(doc, layoutEl, element, panels);
     }
   }
 }
@@ -215,7 +220,7 @@ function renderSurfaceOverlay(doc, layoutEl, element, category) {
   layoutEl.appendChild(surfaceEl);
 }
 
-function renderAboutTextOverlay(doc, layoutEl, element) {
+function renderAboutTextOverlay(doc, layoutEl, element, panels) {
   const textEl = doc.createElement("div");
   const source = doc.querySelector("#meAboutPanel [data-profile-child-id='text'], #playerAboutPanel [data-profile-child-id='text']");
   textEl.className = "profile-composition-overlay profile-composition-overlay--text me-about-copy-wrap";
@@ -223,11 +228,11 @@ function renderAboutTextOverlay(doc, layoutEl, element) {
   textEl.dataset.profileChildId = "text";
   textEl.innerHTML = source?.innerHTML || `<p class="me-about-copy player-about-copy"></p>`;
   applyCompositionOverlayRect(textEl, element);
-  applyPanelVisualStyle(textEl, element.style);
+  applyPanelVisualStyle(textEl, mergeLegacyChildStyle(element, panels, "about", "text"));
   layoutEl.appendChild(textEl);
 }
 
-function renderBadgesContentOverlay(doc, layoutEl, element) {
+function renderBadgesContentOverlay(doc, layoutEl, element, panels) {
   const badgesEl = doc.createElement("div");
   const source = doc.querySelector("#meBadgesPanel [data-profile-child-id='content'], #playerBadgesPanel [data-profile-child-id='content']");
   badgesEl.className = "profile-composition-overlay profile-composition-overlay--badges me-badge-box";
@@ -235,11 +240,11 @@ function renderBadgesContentOverlay(doc, layoutEl, element) {
   badgesEl.dataset.profileChildId = "content";
   badgesEl.innerHTML = source?.innerHTML || `<p class="me-badge-empty player-badge-empty">Badge case still empty</p>`;
   applyCompositionOverlayRect(badgesEl, element);
-  applyPanelVisualStyle(badgesEl, element.style);
+  applyPanelVisualStyle(badgesEl, mergeLegacyChildStyle(element, panels, "badges", "content"));
   layoutEl.appendChild(badgesEl);
 }
 
-function renderFriendCodeContentOverlay(doc, layoutEl, element) {
+function renderFriendCodeContentOverlay(doc, layoutEl, element, panels) {
   const codeEl = doc.createElement("div");
   const source = doc.querySelector("#meFriendCodePanel [data-profile-child-id='code']");
   codeEl.className = "profile-composition-overlay profile-composition-overlay--friend-code friend-code-card";
@@ -251,14 +256,61 @@ function renderFriendCodeContentOverlay(doc, layoutEl, element) {
     <p class="friend-code-card__helper">Share this code so friends can link with you directly.</p>
   `;
   applyCompositionOverlayRect(codeEl, element);
-  applyPanelVisualStyle(codeEl, element.style);
+  applyPanelVisualStyle(codeEl, mergeLegacyChildStyle(element, panels, "friendCode", "code"));
   layoutEl.appendChild(codeEl);
+}
+
+function renderThoughtsComposerOverlay(doc, layoutEl, element, panels) {
+  const source = doc.querySelector("#meThoughtsPanel [data-profile-child-id='composer']");
+  const composerEl = source || doc.createElement("div");
+  composerEl.classList.add("profile-composition-overlay", "profile-composition-overlay--thoughts-composer");
+  composerEl.dataset.profileCompositionOverlay = element.id;
+  composerEl.dataset.profileChildId = "composer";
+  composerEl.removeAttribute("data-profile-child-scroll");
+  if (!source) {
+    composerEl.classList.add("thought-composer");
+    composerEl.innerHTML = `
+      <input class="thought-composer__subject" type="text" placeholder="Optional headline">
+      <textarea class="thought-composer__body" rows="4" placeholder="Share a thought."></textarea>
+    `;
+  }
+  applyCompositionOverlayRect(composerEl, element);
+  applyPanelVisualStyle(composerEl, mergeLegacyChildStyle(element, panels, "thoughts", "composer"));
+  layoutEl.appendChild(composerEl);
+}
+
+function renderThoughtsFeedOverlay(doc, layoutEl, element, panels) {
+  const source = doc.querySelector("#meThoughtsPanel [data-profile-child-id='feed'], #playerThoughtsPanel .thoughts-feed");
+  const feedEl = source || doc.createElement("div");
+  feedEl.classList.add("profile-composition-overlay", "profile-composition-overlay--thoughts-feed", "thoughts-feed");
+  feedEl.dataset.profileCompositionOverlay = element.id;
+  feedEl.dataset.profileChildId = "feed";
+  feedEl.dataset.profileChildScroll = "true";
+  if (!source) {
+    feedEl.innerHTML = `<p class="me-panel__empty player-panel__empty">No thoughts posted yet.</p>`;
+  }
+  applyCompositionOverlayRect(feedEl, element);
+  applyPanelVisualStyle(feedEl, mergeLegacyChildStyle(element, panels, "thoughts", "feed"));
+  layoutEl.appendChild(feedEl);
+}
+
+function mergeLegacyChildStyle(element, panels, panelId, childId) {
+  const legacyStyle = (Array.isArray(panels) ? panels : [])
+    .find((panel) => panel.id === panelId)
+    ?.children
+    ?.find((child) => child.id === childId)
+    ?.style;
+  return {
+    ...(legacyStyle || {}),
+    ...(element.style || {}),
+  };
 }
 
 function getDefaultTitleText(element) {
   if (element.id === "aboutTitle") return "About Me";
   if (element.id === "badgesTitle") return "Badges";
   if (element.id === "friendCodeTitle") return "Friend Code";
+  if (element.id === "thoughtsTitle") return "Player Feed";
   return "New Section";
 }
 
