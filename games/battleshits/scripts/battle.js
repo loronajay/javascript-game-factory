@@ -165,7 +165,7 @@ export function handleIncomingShot(gs, net, col, row, { clearAll }) {
           setTimeout(() => statusRow.classList.remove('ship-status--just-sunk'), 2000);
         }
       } else if (hit) {
-        showAnnouncement('💥 They hit your ships!', 'announcement--incoming-hit');
+        showAnnouncement('💥 They hit your ship!', 'announcement--incoming-hit');
       } else {
         showAnnouncement('💦 Splash! They missed.', 'announcement--incoming-miss');
       }
