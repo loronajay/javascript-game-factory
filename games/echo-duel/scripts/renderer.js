@@ -86,6 +86,22 @@ export function currentPlaybackInput(state, now = performance.now()) {
 }
 
 
+function fitGameToViewport() {
+  const root = document.getElementById('game-root');
+  const shell = root && root.closest('.game-shell');
+  if (!root || !shell) return;
+  root.style.zoom = '';
+  const available = shell.clientHeight;
+  const natural = root.scrollHeight;
+  if (natural > available) {
+    root.style.zoom = String((available / natural).toFixed(4));
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', fitGameToViewport);
+}
+
 export function showScreen(name) {
   Object.values(screenMap).forEach(id => {
     const screen = qs(id);
@@ -94,6 +110,7 @@ export function showScreen(name) {
     screen.classList.toggle('screen--active', isActive);
     screen.setAttribute('aria-hidden', isActive ? 'false' : 'true');
   });
+  requestAnimationFrame(fitGameToViewport);
 }
 
 function renderSequence(state) {
