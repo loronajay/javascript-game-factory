@@ -79,6 +79,24 @@
   padding: 12px;
 }
 
+.me-panel > .panel-zoom-shell > [data-profile-child-id="title"] > .profile-child-zoom-shell,
+.player-panel > .panel-zoom-shell > [data-profile-child-id="title"] > .profile-child-zoom-shell,
+.profile-layout-tile__live-panel.me-panel > .panel-zoom-shell > [data-profile-child-id="title"] > .profile-child-zoom-shell,
+.profile-layout-tile__live-panel.player-panel > .panel-zoom-shell > [data-profile-child-id="title"] > .profile-child-zoom-shell {
+  align-content: stretch;
+  justify-items: stretch;
+}
+
+[data-profile-child-id="title"] .me-panel__title,
+[data-profile-child-id="title"] .player-panel__title,
+[data-profile-child-id="title"] .gallery-panel__title {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
 @container profile-child (max-height: 130px) {
   [data-profile-child-id="metrics"] > .profile-child-zoom-shell {
     gap: 6px;
