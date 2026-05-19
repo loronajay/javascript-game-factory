@@ -183,8 +183,9 @@
 [data-profile-child-id="composer"].thought-composer {
   border-color: rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.22);
   background:
-    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.08), rgba(var(--profile-panel-element-rgb, 19, 10, 35), 0.48)),
-    transparent;
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 14, 10, 30), var(--profile-panel-custom-opacity, 0.94)), rgba(var(--profile-panel-custom-rgb-2, 19, 10, 35), var(--profile-panel-custom-opacity, 0.94))),
+    linear-gradient(180deg, rgba(var(--profile-panel-element-rgb, 255, 197, 228), 0.08), rgba(0, 0, 0, 0.18)),
+    rgba(14, 10, 30, 0.94);
   color: rgb(var(--profile-panel-text-rgb, 255, 247, 252));
 }
 

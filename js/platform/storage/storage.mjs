@@ -9,6 +9,7 @@ export const PLATFORM_STORAGE_KEYS = Object.freeze({
   loversLostLegacyOnlineName: "lovers-lost.onlineIdentity.displayName",
   loversLostPbBoy:  "lovers-lost.pb.boy",
   loversLostPbGirl: "lovers-lost.pb.girl",
+  echoDuelPbSolo:   "echo-duel.pb.solo",
 });
 
 function isNonEmptyString(value) {

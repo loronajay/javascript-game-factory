@@ -1,4 +1,5 @@
 import { PHASES } from './config.js';
+import { updateSoloPb } from './personal-best.js';
 import { buildLobbyStartButtonState, getLobbyStatusText } from './online-lobby-view-state.js';
 import {
   buildInputModeState,
@@ -467,6 +468,7 @@ export function renderEnded(state) {
   showScreen('ended');
 
   const eyebrowEl = document.querySelector('#screen-ended .eyebrow');
+  const pbEl = qs('ended-pb');
   if (state.mode === 'single') {
     const humanPlayer = state.players.find(p => p.id === 'player' || p.clientId === 'player');
     const score = Number(state.singlePlayer?.score || 0);
@@ -475,7 +477,23 @@ export function renderEnded(state) {
     qs('ended-message').textContent = score === 0
       ? `You didn't complete a full signal chain. Try again.`
       : `You cleared ${score} full signal chain${score === 1 ? '' : 's'} before the penalty got you.`;
+
+    const { isNew, prevPb } = updateSoloPb(score);
+    if (pbEl) {
+      pbEl.classList.remove('hidden');
+      if (isNew && prevPb.highScore === null) {
+        pbEl.className = 'pb-record pb-record--new';
+        pbEl.textContent = score === 0 ? 'First run recorded.' : '★ New Personal Best!';
+      } else if (isNew) {
+        pbEl.className = 'pb-record pb-record--new';
+        pbEl.textContent = `★ New Personal Best! (was ${prevPb.highScore} chain${prevPb.highScore === 1 ? '' : 's'})`;
+      } else {
+        pbEl.className = 'pb-record pb-record--previous';
+        pbEl.textContent = `Personal best: ${prevPb.highScore} chain${prevPb.highScore === 1 ? '' : 's'}`;
+      }
+    }
   } else {
+    if (pbEl) { pbEl.className = 'hidden'; pbEl.textContent = ''; }
     const winner = state.players.find(player => player.id === state.winnerId);
     if (eyebrowEl) eyebrowEl.textContent = 'Match Over';
     qs('ended-title').textContent = winner ? `${winner.name} Wins` : 'No Winner';
