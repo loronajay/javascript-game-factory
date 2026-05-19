@@ -28,6 +28,7 @@ export const PLAYER_PANEL_TO_DOM = {
 
 const COMPOSITION_GRID_COLUMNS = 12;
 const COMPOSITION_GRID_ROWS = 17;
+const CUSTOM_TITLE_PREFIX = "customTitle_";
 
 const DEFAULT_PANEL_STYLE = {
   opacity: 0.96,
@@ -52,6 +53,7 @@ export function applyProfileLayout(doc, layout, {
 
   const layoutEl = doc.querySelector(layoutSelector);
   if (!layoutEl) return;
+  layoutEl.querySelectorAll("[data-profile-custom-composition]").forEach((el) => el.remove());
 
   // Sort: column bucket first (0=left, 1=mid, 2=right), then y within bucket.
   const panels = [...layout.desktop.panels].sort((a, b) => {
@@ -77,6 +79,8 @@ export function applyProfileLayout(doc, layout, {
     // Append in sort order so DOM order drives mobile stacking.
     layoutEl.appendChild(el);
   }
+
+  renderCustomTitleBubbles(doc, layoutEl, layout.desktop.elements);
 }
 
 function applyPanelChildLayout(panelEl, panel) {
@@ -147,6 +151,29 @@ function applyHeroCompositionChild(heroEl, elementId, childEl, element, surface)
   childEl.style.height = `${compositionSizeToSurfacePercent(element.h, surface?.h, COMPOSITION_GRID_ROWS)}%`;
   applyPanelVisualStyle(childEl, element.style);
   heroEl.classList.add("profile-composition-hero");
+}
+
+function renderCustomTitleBubbles(doc, layoutEl, elements) {
+  if (!Array.isArray(elements)) return;
+  for (const element of elements) {
+    if (!isCustomTitleElement(element) || element.enabled === false) continue;
+    const titleEl = doc.createElement("div");
+    titleEl.className = "profile-custom-title-bubble me-panel__header player-panel__header";
+    titleEl.dataset.profileCustomComposition = element.id;
+    titleEl.innerHTML = `<h2 class="me-panel__title player-panel__title"></h2>`;
+    const heading = titleEl.querySelector(".me-panel__title");
+    if (heading) heading.textContent = element.text || "New Section";
+    titleEl.style.left = `${(element.x / COMPOSITION_GRID_COLUMNS) * 100}%`;
+    titleEl.style.top = `${(element.y / COMPOSITION_GRID_ROWS) * 100}%`;
+    titleEl.style.width = `${(element.w / COMPOSITION_GRID_COLUMNS) * 100}%`;
+    titleEl.style.height = `${(element.h / COMPOSITION_GRID_ROWS) * 100}%`;
+    applyPanelVisualStyle(titleEl, element.style);
+    layoutEl.appendChild(titleEl);
+  }
+}
+
+function isCustomTitleElement(element) {
+  return element?.type === "title" && typeof element.id === "string" && element.id.startsWith(CUSTOM_TITLE_PREFIX);
 }
 
 function compositionToSurfacePercent(value, surfaceStart, surfaceSize, gridSize) {

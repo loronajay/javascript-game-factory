@@ -4,8 +4,11 @@ import { PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
+  CUSTOM_TITLE_PREFIX,
   PROFILE_COMPOSITION_ELEMENT_REGISTRY,
+  CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
+  isCustomTitleElementId,
 } from "./composition-layout.mjs";
 
 export function normalizeLayout(raw) {
@@ -107,25 +110,38 @@ export function normalizeCompositionElements(rawElements) {
       .map((element) => [element.id, element]),
   );
 
-  return Object.entries(PROFILE_COMPOSITION_ELEMENT_REGISTRY).map(([id, def]) => {
+  const normalized = Object.entries(PROFILE_COMPOSITION_ELEMENT_REGISTRY).map(([id, def]) => {
     const raw = rawById.get(id) || {};
-    const w = clamp(toNumber(raw.w, def.defaultW), def.minW, def.maxW);
-    const h = clamp(toNumber(raw.h, def.defaultH), def.minH, def.maxH);
-    const x = clamp(toNumber(raw.x, def.defaultX), 0, COMPOSITION_GRID_COLUMNS - w);
-    const y = clamp(toNumber(raw.y, def.defaultY), 0, COMPOSITION_GRID_ROWS - h);
-    return {
-      id,
-      category: def.category,
-      type: def.type,
-      enabled: raw.enabled ?? (def.defaultEnabled !== false),
-      text: typeof raw.text === "string" ? raw.text : (def.defaultText || ""),
-      x,
-      y,
-      w,
-      h,
-      style: normalizePanelStyle(raw.style),
-    };
+    return normalizeCompositionElement(id, raw, def);
   });
+
+  const customTitles = (Array.isArray(rawElements) ? rawElements : [])
+    .filter((element) => element && isCustomTitleElementId(element.id))
+    .map((element) => normalizeCompositionElement(element.id, element, CUSTOM_TITLE_ELEMENT_DEF));
+
+  return [...normalized, ...customTitles];
+}
+
+function normalizeCompositionElement(id, raw, def) {
+  const safeId = isCustomTitleElementId(id)
+    ? `${CUSTOM_TITLE_PREFIX}${String(id).slice(CUSTOM_TITLE_PREFIX.length).replace(/[^a-z0-9_-]/gi, "").slice(0, 40)}`
+    : id;
+  const w = clamp(toNumber(raw.w, def.defaultW), def.minW, def.maxW);
+  const h = clamp(toNumber(raw.h, def.defaultH), def.minH, def.maxH);
+  const x = clamp(toNumber(raw.x, def.defaultX), 0, COMPOSITION_GRID_COLUMNS - w);
+  const y = clamp(toNumber(raw.y, def.defaultY), 0, COMPOSITION_GRID_ROWS - h);
+  return {
+    id: safeId,
+    category: def.category,
+    type: def.type,
+    enabled: raw.enabled ?? (def.defaultEnabled !== false),
+    text: typeof raw.text === "string" ? raw.text : (def.defaultText || ""),
+    x,
+    y,
+    w,
+    h,
+    style: normalizePanelStyle(raw.style),
+  };
 }
 
 export function normalizePanelStyle(raw) {

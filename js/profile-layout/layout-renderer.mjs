@@ -4,7 +4,7 @@ import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
-  PROFILE_COMPOSITION_ELEMENT_REGISTRY,
+  getCompositionElementDef,
 } from "./composition-layout.mjs";
 import {
   renderMeFriendCodePanel,
@@ -167,7 +167,7 @@ function renderCompositionElements(container, elements, options = {}) {
   if (!Array.isArray(elements) || elements.length === 0 || !options.previewModels?.hero) return;
 
   for (const element of elements.filter((item) => item?.enabled !== false)) {
-    const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element.id];
+    const def = getCompositionElementDef(element.id);
     if (!def) continue;
 
     const tile = document.createElement("div");

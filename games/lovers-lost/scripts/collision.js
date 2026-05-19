@@ -127,11 +127,10 @@ function spikeFullyBehindPlayer(player, obstacle) {
 // ── Debug collision snapshot ───────────────────────────────────────────────────
 
 function contactActionForPlayer(player, animState) {
-  if (player.state === 'jumping') return 'jump';
   if (playerIsCrouching(player, animState)) return 'crouch';
-  if (!animState) return null;
-  if (animState.state === 'attack') return 'attack';
-  if (animState.state === 'block')  return 'block';
+  if (animState && animState.state === 'attack') return 'attack';
+  if (animState && animState.state === 'block')  return 'block';
+  if (player.state === 'jumping') return 'jump';
   return null;
 }
 

@@ -156,6 +156,26 @@
   color: rgba(255, 255, 255, 0.35);
 }
 
+.me-layout-sidebar__action {
+  width: 100%;
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(126, 200, 227, 0.28);
+  border-radius: 6px;
+  background: rgba(126, 200, 227, 0.08);
+  color: #fff8ff;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.me-layout-sidebar__action:hover {
+  border-color: rgba(126, 200, 227, 0.52);
+  background: rgba(126, 200, 227, 0.14);
+}
+
 /* --- Panel List --- */
 
 .me-layout-panel-list {
@@ -376,6 +396,15 @@
   font: inherit;
   font-size: 0.68rem;
   padding: 0.2rem 0.45rem;
+}
+
+.me-layout-style-editor__reset--danger {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-color: rgba(255, 80, 80, 0.24);
+  background: rgba(255, 80, 80, 0.07);
+  color: rgba(255, 170, 170, 0.9);
 }
 
 .me-layout-style-control {

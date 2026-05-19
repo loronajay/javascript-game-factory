@@ -554,12 +554,32 @@ test('attacking state clears a goblin when the sword hitbox connects', () => {
   assertEq(result.action, 'attack');
 });
 
+test('airborne player can kill a goblin when the elevated sword box still overlaps', () => {
+  const jumping = jumpingPlayerAt(100, 90, 'boy', { jumpY: 21, jumpVY: 2 });
+  const obs = [createObstacle('goblin', 100)];
+  const result = resolveContactAction(jumping, obs, { state: 'attack', actionTick: 4 });
+
+  assertEq(result.player.chain, 1);
+  assertEq(result.obstacles.length, 0);
+  assertEq(result.action, 'attack');
+});
+
 test('shield hitbox blocks arrows before they touch the player body', () => {
   const player = playerAt(96, 'boy');
   const obs = [createObstacle('arrowwall', 100)];
   const result = resolveContactAction(player, obs, { state: 'block', actionTick: 4 });
 
   assertEq(result.player.score, 100);
+  assertEq(result.obstacles.length, 0);
+  assertEq(result.action, 'block');
+});
+
+test('airborne player can block an arrow wall when the elevated shield box still overlaps', () => {
+  const jumping = jumpingPlayerAt(100, 90, 'boy', { jumpY: 21, jumpVY: 2 });
+  const obs = [createObstacle('arrowwall', 100)];
+  const result = resolveContactAction(jumping, obs, { state: 'block', actionTick: 4 });
+
+  assertEq(result.player.chain, 1);
   assertEq(result.obstacles.length, 0);
   assertEq(result.action, 'block');
 });

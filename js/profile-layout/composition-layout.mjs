@@ -1,5 +1,23 @@
 export const COMPOSITION_GRID_COLUMNS = 12;
 export const COMPOSITION_GRID_ROWS = 17;
+export const CUSTOM_TITLE_PREFIX = "customTitle_";
+
+export const CUSTOM_TITLE_ELEMENT_DEF = {
+  label: "Custom Title Bubble",
+  category: "custom",
+  type: "title",
+  defaultEnabled: true,
+  defaultText: "New Section",
+  defaultX: 4,
+  defaultY: 1,
+  defaultW: 2.4,
+  defaultH: 0.55,
+  minW: 0.75,
+  minH: 0.4,
+  maxW: 12,
+  maxH: 17,
+  custom: true,
+};
 
 export const PROFILE_COMPOSITION_ELEMENT_REGISTRY = {
   heroSurface: {
@@ -60,6 +78,14 @@ export const PROFILE_COMPOSITION_ELEMENT_REGISTRY = {
     maxH: 17,
   },
 };
+
+export function isCustomTitleElementId(id) {
+  return typeof id === "string" && id.startsWith(CUSTOM_TITLE_PREFIX);
+}
+
+export function getCompositionElementDef(id) {
+  return PROFILE_COMPOSITION_ELEMENT_REGISTRY[id] || (isCustomTitleElementId(id) ? CUSTOM_TITLE_ELEMENT_DEF : null);
+}
 
 export function getDefaultCompositionElements() {
   return Object.entries(PROFILE_COMPOSITION_ELEMENT_REGISTRY).map(([id, def]) => ({

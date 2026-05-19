@@ -14,7 +14,9 @@ import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
-  PROFILE_COMPOSITION_ELEMENT_REGISTRY,
+  CUSTOM_TITLE_PREFIX,
+  getCompositionElementDef,
+  isCustomTitleElementId,
 } from "./composition-layout.mjs";
 import { applyCompositionElementScaling, renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
@@ -85,6 +87,7 @@ if (doc?.getElementById) {
     const canvasWrap = doc.getElementById("meLayoutCanvasWrap");
     const inspector = doc.getElementById("meLayoutInspector");
     const panelListEl = doc.getElementById("meLayoutPanelList");
+    const addTitleBtn = doc.getElementById("meLayoutAddTitleBtn");
     const dirtyFlag = doc.getElementById("meLayoutDirtyFlag");
     const saveBtn = doc.getElementById("meLayoutSaveBtn");
     const resetBtn = doc.getElementById("meLayoutResetBtn");
@@ -361,7 +364,7 @@ if (doc?.getElementById) {
     function beginElementDrag(event, elementId, mode) {
       const elementIdx = currentLayout.desktop.elements?.findIndex((element) => element.id === elementId) ?? -1;
       const element = currentLayout.desktop.elements?.[elementIdx];
-      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[elementId];
+      const def = getCompositionElementDef(elementId);
       if (elementIdx < 0 || !element || !def || !canvas) return;
       const startPoint = pointerToCompositionPoint(event.clientX, event.clientY, canvas);
       elementDrag = {
@@ -619,7 +622,7 @@ if (doc?.getElementById) {
         `;
       }).join("");
       const elementHtml = (currentLayout.desktop.elements || []).map((element) => {
-        const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element.id];
+        const def = getCompositionElementDef(element.id);
         if (!def) return "";
         const isSelected = element.id === selectedPanelId;
         const isEnabled = element.enabled !== false;
@@ -631,7 +634,7 @@ if (doc?.getElementById) {
             aria-pressed="${isSelected ? "true" : "false"}"
           >
             <span class="me-layout-panel-item__dot"></span>
-            <span class="me-layout-panel-item__label">${escapeHtml(def.label)}</span>
+            <span class="me-layout-panel-item__label">${escapeHtml(isCustomTitleElementId(element.id) ? (element.text || def.label) : def.label)}</span>
             <span class="me-layout-panel-item__badge">${escapeHtml(def.category)}</span>
             ${isEnabled ? "" : `<span class="me-layout-panel-item__badge">hidden</span>`}
           </button>
@@ -722,7 +725,7 @@ if (doc?.getElementById) {
 
     function renderElementInspector(id) {
       const element = currentLayout.desktop.elements?.find((item) => item.id === id);
-      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[id];
+      const def = getCompositionElementDef(id);
       if (!element || !def) {
         inspector.innerHTML = `<p class="me-layout-inspector__empty">Click a panel or element to inspect it.</p>`;
         return;
@@ -753,6 +756,7 @@ if (doc?.getElementById) {
             </label>
           ` : ""}
           ${renderStyleControls(element)}
+          ${isCustomTitleElementId(element.id) ? `<button class="me-layout-style-editor__reset me-layout-style-editor__reset--danger" type="button" data-delete-element="${escapeHtml(element.id)}">Delete Title Bubble</button>` : ""}
         </div>
       `;
 
@@ -775,6 +779,9 @@ if (doc?.getElementById) {
       });
       inspector.querySelector("[data-reset-panel-style]")?.addEventListener("click", () => {
         resetElementStyle(element.id);
+      });
+      inspector.querySelector("[data-delete-element]")?.addEventListener("click", () => {
+        deleteElement(element.id);
       });
     }
 
@@ -852,6 +859,38 @@ if (doc?.getElementById) {
       `;
     }
 
+    function addCustomTitleBubble() {
+      const id = `${CUSTOM_TITLE_PREFIX}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+      currentLayout.desktop.elements = Array.isArray(currentLayout.desktop.elements)
+        ? currentLayout.desktop.elements
+        : [];
+      currentLayout.desktop.elements.push({
+        id,
+        category: "custom",
+        type: "title",
+        enabled: true,
+        text: "New Section",
+        x: 4,
+        y: 1,
+        w: 2.4,
+        h: 0.55,
+        style: {},
+      });
+      selectedPanelId = id;
+      childEditPanelId = null;
+      selectedChildId = null;
+      markDirty();
+      refreshAll();
+    }
+
+    function deleteElement(id) {
+      if (!isCustomTitleElementId(id)) return;
+      currentLayout.desktop.elements = (currentLayout.desktop.elements || []).filter((element) => element.id !== id);
+      if (selectedPanelId === id) selectedPanelId = null;
+      markDirty();
+      refreshAll();
+    }
+
     function togglePanel(id, enabled) {
       const idx = currentLayout.desktop.panels.findIndex((p) => p.id === id);
       if (idx < 0) return;
@@ -886,6 +925,8 @@ if (doc?.getElementById) {
         gridToggleBtn.setAttribute("aria-pressed", String(gridOverlayOn));
       }
     });
+
+    addTitleBtn?.addEventListener("click", addCustomTitleBubble);
 
     // --- click canvas background to deselect ---
 
