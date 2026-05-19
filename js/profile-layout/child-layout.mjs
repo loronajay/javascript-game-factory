@@ -64,6 +64,36 @@ export const PROFILE_PANEL_CHILD_REGISTRY = {
       },
     },
   },
+  about: {
+    columns: 100,
+    rows: 100,
+    visualColumns: 10,
+    visualRows: 10,
+    children: {
+      title: {
+        label: "Title Bubble",
+        minW: 12,
+        minH: 8,
+        maxW: 100,
+        maxH: 40,
+        defaultX: 25,
+        defaultY: 4,
+        defaultW: 50,
+        defaultH: 16,
+      },
+      text: {
+        label: "About Text",
+        minW: 20,
+        minH: 16,
+        maxW: 100,
+        maxH: 100,
+        defaultX: 12,
+        defaultY: 26,
+        defaultW: 76,
+        defaultH: 64,
+      },
+    },
+  },
 };
 
 export function getDefaultPanelChildren(panelId) {

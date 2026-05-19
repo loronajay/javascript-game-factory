@@ -8,6 +8,7 @@ const DEFAULT_HERO_CHILDREN = [
   { id: "metrics", enabled: true, x: 20, y: 46, w: 60, h: 48 },
 ];
 const DEFAULT_FAVORITE_GAME_CHILDREN = getDefaultPanelChildren("favoriteGame");
+const DEFAULT_ABOUT_CHILDREN = getDefaultPanelChildren("about");
 
 // Maps the classic 3-column profile structure onto a 12-column grid.
 // Left col = x 0–3 (w4), Middle col = x 4–7 (w4), Right col = x 8–11 (w4).
@@ -31,7 +32,7 @@ export const DEFAULT_PROFILE_LAYOUT = {
       { id: "friendCode",   enabled: true, x: 4, y: 7,  w: 4, h: 3 },
       { id: "gallery",      enabled: true, x: 4, y: 10, w: 4, h: 3 },
       // Right column
-      { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2 },
+      { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2, children: DEFAULT_ABOUT_CHILDREN },
       { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2 },
       { id: "thoughts",     enabled: true, x: 8, y: 4,  w: 4, h: 5 },
     ],
@@ -59,7 +60,7 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
       { id: "favoriteGame", enabled: true, x: 4, y: 3,  w: 4, h: 4, children: DEFAULT_FAVORITE_GAME_CHILDREN },
       { id: "gallery",      enabled: true, x: 4, y: 7,  w: 4, h: 3 },
       // Right column
-      { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2 },
+      { id: "about",        enabled: true, x: 8, y: 0,  w: 4, h: 2, children: DEFAULT_ABOUT_CHILDREN },
       { id: "badges",       enabled: true, x: 8, y: 2,  w: 4, h: 2 },
       { id: "thoughts",     enabled: true, x: 8, y: 4,  w: 4, h: 5 },
     ],

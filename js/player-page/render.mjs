@@ -336,8 +336,10 @@ function renderAboutPanel(container, title, text) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
-    <p class="player-about-copy">${escapeHtml(text)}</p>
+    <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="player-about-copy-wrap" data-profile-child-id="text">
+      <p class="player-about-copy">${escapeHtml(text)}</p>
+    </div>
   `;
 }
 

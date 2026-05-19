@@ -177,8 +177,10 @@ export function renderAboutPanel(container, title, text) {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
-    <p class="me-about-copy">${escapeHtml(text)}</p>
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="me-about-copy-wrap" data-profile-child-id="text">
+      <p class="me-about-copy">${escapeHtml(text)}</p>
+    </div>
   `;
 }
 
