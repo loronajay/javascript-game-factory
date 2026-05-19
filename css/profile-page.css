@@ -97,6 +97,25 @@
   box-sizing: border-box;
 }
 
+.me-panel > .panel-zoom-shell > [data-profile-child-id="content"] > .profile-child-zoom-shell,
+.player-panel > .panel-zoom-shell > [data-profile-child-id="content"] > .profile-child-zoom-shell,
+.profile-layout-tile__live-panel.me-panel > .panel-zoom-shell > [data-profile-child-id="content"] > .profile-child-zoom-shell,
+.profile-layout-tile__live-panel.player-panel > .panel-zoom-shell > [data-profile-child-id="content"] > .profile-child-zoom-shell {
+  align-content: stretch;
+  justify-items: stretch;
+}
+
+[data-profile-child-id="content"] .me-featured-cabinet,
+[data-profile-child-id="content"] .player-featured-cabinet,
+[data-profile-child-id="content"] .me-featured-cabinet__card,
+[data-profile-child-id="content"] .player-featured-cabinet__card {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  box-sizing: border-box;
+}
+
 @container profile-child (max-height: 130px) {
   [data-profile-child-id="metrics"] > .profile-child-zoom-shell {
     gap: 6px;
