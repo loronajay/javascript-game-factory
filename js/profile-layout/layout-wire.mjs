@@ -755,7 +755,7 @@ if (doc?.getElementById) {
               <input class="me-layout-style-control__text" type="text" value="${escapeHtml(element.text || def.defaultText || "")}" data-element-text="${escapeHtml(element.id)}">
             </label>
           ` : ""}
-          ${renderStyleControls(element)}
+          ${renderStyleControls(element, def)}
           ${isCustomTitleElementId(element.id) ? `<button class="me-layout-style-editor__reset me-layout-style-editor__reset--danger" type="button" data-delete-element="${escapeHtml(element.id)}">Delete Title Bubble</button>` : ""}
         </div>
       `;
@@ -820,22 +820,42 @@ if (doc?.getElementById) {
       `;
     }
 
-    function renderStyleControls(panel) {
+    function renderStyleControls(panel, def = null) {
       const style = { ...DEFAULT_PANEL_STYLE, ...(panel.style || {}) };
+      const type = def?.type || "panel";
+      const colorControls = type === "title"
+        ? [
+            renderColorControl("Bubble Color", "titleColor", style.titleColor),
+          ]
+        : type === "text"
+          ? [
+              renderColorControl("Text Box Color", "panelColor", style.panelColor),
+              renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+              renderColorControl("Text Accents", "elementColor", style.elementColor),
+            ]
+          : type === "surface"
+            ? [
+                renderColorControl("Surface Color", "panelColor", style.panelColor),
+                renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+              ]
+            : [
+                renderColorControl("Panel Color", "panelColor", style.panelColor),
+                renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                renderColorControl("Title Bubble", "titleColor", style.titleColor),
+                renderColorControl("Inner Elements", "elementColor", style.elementColor),
+              ];
+      const showGradientAngle = type !== "title";
       return `
         <div class="me-layout-style-editor">
           <div class="me-layout-style-editor__header">
-            <p class="me-layout-style-editor__title">Panel Style</p>
+            <p class="me-layout-style-editor__title">${type === "panel" ? "Panel Style" : "Element Style"}</p>
             <button class="me-layout-style-editor__reset" type="button" data-reset-panel-style="${escapeHtml(panel.id)}">Reset</button>
           </div>
-          ${renderColorControl("Panel Color", "panelColor", style.panelColor)}
-          ${renderColorControl("Gradient Color", "panelColor2", style.panelColor2)}
-          ${renderColorControl("Title Bubble", "titleColor", style.titleColor)}
-          ${renderColorControl("Inner Elements", "elementColor", style.elementColor)}
+          ${colorControls.join("")}
           ${renderRangeControl("Transparency", "opacity", style.opacity, 0.15, 1, 0.01, `${Math.round(style.opacity * 100)}%`)}
           ${renderRangeControl("Saturation", "saturation", style.saturation, 0, 2, 0.01, `${Math.round(style.saturation * 100)}%`)}
           ${renderRangeControl("Brightness", "brightness", style.brightness, 0.35, 1.8, 0.01, `${Math.round(style.brightness * 100)}%`)}
-          ${renderRangeControl("Gradient Angle", "gradientAngle", style.gradientAngle, 0, 360, 1, `${Math.round(style.gradientAngle)}deg`)}
+          ${showGradientAngle ? renderRangeControl("Gradient Angle", "gradientAngle", style.gradientAngle, 0, 360, 1, `${Math.round(style.gradientAngle)}deg`) : ""}
         </div>
       `;
     }
