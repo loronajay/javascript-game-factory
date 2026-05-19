@@ -328,15 +328,6 @@ function handleButtonClick(id) {
     case 'btn_solo_beta':
       soloSide = 'beta';
       break;
-    case 'btn_map_0':
-      startSoloGame(0);
-      break;
-    case 'btn_map_1':
-      startSoloGame(1);
-      break;
-    case 'btn_map_2':
-      startSoloGame(2);
-      break;
     case 'btn_side_alpha':
       void enterLobby('alpha');
       break;
@@ -369,6 +360,11 @@ function handleButtonClick(id) {
       if (phase === 'disconnected') goToMenu();
       else leaveLobby();
       break;
+    default:
+      if (id.startsWith('btn_map_')) {
+        const idx = parseInt(id.slice('btn_map_'.length), 10);
+        if (Number.isFinite(idx)) startSoloGame(idx);
+      }
   }
 }
 

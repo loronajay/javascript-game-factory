@@ -77,8 +77,8 @@ export function renderFavoritePanel(container, title, item) {
     `;
 
   container.innerHTML = `
-    <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
-    <div class="me-featured-cabinet">
+    <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="me-featured-cabinet" data-profile-child-id="content">
       ${cardHtml}
     </div>
   `;

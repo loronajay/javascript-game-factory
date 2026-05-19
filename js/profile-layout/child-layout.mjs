@@ -34,6 +34,36 @@ export const PROFILE_PANEL_CHILD_REGISTRY = {
       },
     },
   },
+  favoriteGame: {
+    columns: 100,
+    rows: 100,
+    visualColumns: 10,
+    visualRows: 10,
+    children: {
+      title: {
+        label: "Title Bubble",
+        minW: 12,
+        minH: 8,
+        maxW: 100,
+        maxH: 40,
+        defaultX: 25,
+        defaultY: 2,
+        defaultW: 50,
+        defaultH: 12,
+      },
+      content: {
+        label: "Favorite Card",
+        minW: 20,
+        minH: 20,
+        maxW: 100,
+        maxH: 100,
+        defaultX: 16,
+        defaultY: 18,
+        defaultW: 68,
+        defaultH: 76,
+      },
+    },
+  },
 };
 
 export function getDefaultPanelChildren(panelId) {

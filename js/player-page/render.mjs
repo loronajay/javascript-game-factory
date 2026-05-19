@@ -324,8 +324,8 @@ function renderFavoritePanel(container, title, item) {
     `;
 
   container.innerHTML = `
-    <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
-    <div class="player-featured-cabinet">
+    <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
+    <div class="player-featured-cabinet" data-profile-child-id="content">
       ${cardHtml}
     </div>
   `;

@@ -49,6 +49,10 @@
 
 .me-hero-card > .panel-zoom-shell > [data-profile-child-id],
 .player-hero-card > .panel-zoom-shell > [data-profile-child-id],
+.me-panel > .panel-zoom-shell > [data-profile-child-id],
+.player-panel > .panel-zoom-shell > [data-profile-child-id],
+.profile-layout-tile__live-panel.me-panel > .panel-zoom-shell > [data-profile-child-id],
+.profile-layout-tile__live-panel.player-panel > .panel-zoom-shell > [data-profile-child-id],
 .profile-layout-tile__live-panel.me-hero-card > .panel-zoom-shell > [data-profile-child-id] {
   position: absolute;
   box-sizing: border-box;
