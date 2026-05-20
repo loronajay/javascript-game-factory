@@ -1,0 +1,2509 @@
+{
+  "source": "bird-duty.sb3",
+  "stage": {
+    "width": 666,
+    "height": 368,
+    "centerX": 333,
+    "centerY": 184
+  },
+  "targets": [
+    {
+      "name": "Stage",
+      "isStage": true,
+      "currentCostume": 6,
+      "costumes": [
+        {
+          "name": "menu",
+          "assetId": "5c1cec6a64c868726d8aad3cdfa84e43",
+          "file": "5c1cec6a64c868726d8aad3cdfa84e43.svg",
+          "format": "svg",
+          "rotationCenterX": 324.31067000000013,
+          "rotationCenterY": 184.0435149999999,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "game",
+          "assetId": "857c84dd11012406b54441b3ad1cbd5a",
+          "file": "857c84dd11012406b54441b3ad1cbd5a.svg",
+          "format": "svg",
+          "rotationCenterX": 333.0000000000001,
+          "rotationCenterY": 184.0435149999998,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "keyboard controls",
+          "assetId": "a50612c79412fa42e10b8cad27d0e5c5",
+          "file": "a50612c79412fa42e10b8cad27d0e5c5.svg",
+          "format": "svg",
+          "rotationCenterX": 335.5,
+          "rotationCenterY": 192,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "mobile controls",
+          "assetId": "34eac77ffb4c6c6e68f091453c2486ae",
+          "file": "34eac77ffb4c6c6e68f091453c2486ae.svg",
+          "format": "svg",
+          "rotationCenterX": 335.5,
+          "rotationCenterY": 192,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "xbox controls",
+          "assetId": "4d7f6c6da095a874fdf39769485716de",
+          "file": "4d7f6c6da095a874fdf39769485716de.svg",
+          "format": "svg",
+          "rotationCenterX": 335.5,
+          "rotationCenterY": 192,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "scanline text",
+          "assetId": "e422b8a15d75d85a4adc7d91052fb8d6",
+          "file": "e422b8a15d75d85a4adc7d91052fb8d6.svg",
+          "format": "svg",
+          "rotationCenterX": 55.405587500000024,
+          "rotationCenterY": -74.40650250000002,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "Blank Screen",
+          "assetId": "11f71ab3ded18911d8a957482d2fcc5e",
+          "file": "11f71ab3ded18911d8a957482d2fcc5e.svg",
+          "format": "svg",
+          "rotationCenterX": 356.105105,
+          "rotationCenterY": 202.2012,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "xbox a",
+          "assetId": "2738fc8198c7b245e724929175e63b37",
+          "file": "2738fc8198c7b245e724929175e63b37.png",
+          "format": "png",
+          "rotationCenterX": 11,
+          "rotationCenterY": 11,
+          "bitmapResolution": 2
+        }
+      ],
+      "sounds": [
+        {
+          "name": "goin nowheretown",
+          "assetId": "c0ba01144c7c8cd928a5b1a429c6b8ce",
+          "file": "c0ba01144c7c8cd928a5b1a429c6b8ce.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 6080000
+        }
+      ]
+    },
+    {
+      "name": "Bird-PLAYER",
+      "isStage": false,
+      "x": 0,
+      "y": 105,
+      "size": 350,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "white1",
+          "assetId": "1e90846b06383fbce88dad7807f22116",
+          "file": "1e90846b06383fbce88dad7807f22116.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799136410256438,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white2",
+          "assetId": "aede33b6401efdac03125c8aeeff111e",
+          "file": "aede33b6401efdac03125c8aeeff111e.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white3",
+          "assetId": "abe99d5c5d27298d09ee27d81bf6738c",
+          "file": "abe99d5c5d27298d09ee27d81bf6738c.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white4",
+          "assetId": "64d77b703b44dffffbd7a130aba390fa",
+          "file": "64d77b703b44dffffbd7a130aba390fa.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.9999999999998295,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white5",
+          "assetId": "df15e2d4bb32a226a2b2974917807b73",
+          "file": "df15e2d4bb32a226a2b2974917807b73.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5.999999999999886,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white6",
+          "assetId": "0fb2d59ccc5dbe1428aaa5e49a6b63bb",
+          "file": "0fb2d59ccc5dbe1428aaa5e49a6b63bb.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.499999999999886,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black1",
+          "assetId": "04a12f10dac668de03332d26b7322ec6",
+          "file": "04a12f10dac668de03332d26b7322ec6.svg",
+          "format": "svg",
+          "rotationCenterX": 14.79913641025638,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black2",
+          "assetId": "4108689ffdca8ad69a1a0c4f5f0ad3ea",
+          "file": "4108689ffdca8ad69a1a0c4f5f0ad3ea.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black3",
+          "assetId": "1b8d610f591cbb6a8ff418e000d9d126",
+          "file": "1b8d610f591cbb6a8ff418e000d9d126.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black4",
+          "assetId": "1cdf3356b30864218bf231b0a380a349",
+          "file": "1cdf3356b30864218bf231b0a380a349.svg",
+          "format": "svg",
+          "rotationCenterX": 9.499995000000013,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black5",
+          "assetId": "f691c0802c2ce9a332376ac9189f9ab9",
+          "file": "f691c0802c2ce9a332376ac9189f9ab9.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black6",
+          "assetId": "d7a1e3655c92a06c0739a5bd5954a236",
+          "file": "d7a1e3655c92a06c0739a5bd5954a236.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue1",
+          "assetId": "bbb11679dfa27a909af4db6e503a2ef5",
+          "file": "bbb11679dfa27a909af4db6e503a2ef5.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue2",
+          "assetId": "1b815ba90c81b275843165ce047f427c",
+          "file": "1b815ba90c81b275843165ce047f427c.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue3",
+          "assetId": "dd846cf8fd18a18e121cb231ff6cb222",
+          "file": "dd846cf8fd18a18e121cb231ff6cb222.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue4",
+          "assetId": "3d45477d55a16d599e95bc00a18f3b75",
+          "file": "3d45477d55a16d599e95bc00a18f3b75.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue5",
+          "assetId": "362eedaa692feead48023bb45f24103a",
+          "file": "362eedaa692feead48023bb45f24103a.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue6",
+          "assetId": "404e856e1f0dceb2a42cc092ff942e35",
+          "file": "404e856e1f0dceb2a42cc092ff942e35.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green1",
+          "assetId": "f06a764877cffe82650330791cfbe85b",
+          "file": "f06a764877cffe82650330791cfbe85b.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green2",
+          "assetId": "e55bb3d42fe212f635a8e0199cd3020e",
+          "file": "e55bb3d42fe212f635a8e0199cd3020e.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green3",
+          "assetId": "2c6d92f45b142aa09a09fdefbfd4f003",
+          "file": "2c6d92f45b142aa09a09fdefbfd4f003.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green4",
+          "assetId": "c1a345ffd90c305e9a016ba443edb28d",
+          "file": "c1a345ffd90c305e9a016ba443edb28d.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green5",
+          "assetId": "b5df95ae1ed6d163c02df5dbf4d43b74",
+          "file": "b5df95ae1ed6d163c02df5dbf4d43b74.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green6",
+          "assetId": "a65c1df6773512af3d1d571a86bd457a",
+          "file": "a65c1df6773512af3d1d571a86bd457a.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue1",
+          "assetId": "cfe414cf27d94d39bf22a84d43deceaa",
+          "file": "cfe414cf27d94d39bf22a84d43deceaa.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue2",
+          "assetId": "a1a9f42e10aa8b05f09c7de90ae10b82",
+          "file": "a1a9f42e10aa8b05f09c7de90ae10b82.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue3",
+          "assetId": "a2c8df16a2e2c3306ac8f656c8b24459",
+          "file": "a2c8df16a2e2c3306ac8f656c8b24459.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue4",
+          "assetId": "123c34796cce7c1ab5ecfbd2904177d2",
+          "file": "123c34796cce7c1ab5ecfbd2904177d2.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue5",
+          "assetId": "6a84be4d549a9463aa3399bb6adf1d37",
+          "file": "6a84be4d549a9463aa3399bb6adf1d37.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue6",
+          "assetId": "11966bbe2963fac7a84bdac3aee31208",
+          "file": "11966bbe2963fac7a84bdac3aee31208.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange1",
+          "assetId": "6d160403b31e246950707f395f592610",
+          "file": "6d160403b31e246950707f395f592610.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange2",
+          "assetId": "f89850f3a27438e406b23cda8e5764b7",
+          "file": "f89850f3a27438e406b23cda8e5764b7.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange3",
+          "assetId": "4d52f0dee9873b0723ef83b079551213",
+          "file": "4d52f0dee9873b0723ef83b079551213.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange4",
+          "assetId": "9f41905fb966d79b56a0171d01333be5",
+          "file": "9f41905fb966d79b56a0171d01333be5.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange5",
+          "assetId": "5fe2cafd188a7c693390b5dd430adeef",
+          "file": "5fe2cafd188a7c693390b5dd430adeef.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange6",
+          "assetId": "3962b3845760c95a1ad3e8b814e8dcf7",
+          "file": "3962b3845760c95a1ad3e8b814e8dcf7.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink1",
+          "assetId": "0eae982e122c0510a90f7ec05c849a48",
+          "file": "0eae982e122c0510a90f7ec05c849a48.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink2",
+          "assetId": "1706babf21311cfd39c348dfd6b67681",
+          "file": "1706babf21311cfd39c348dfd6b67681.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink3",
+          "assetId": "c8dc9ec707e8ff97a08c9d024e5c5eb1",
+          "file": "c8dc9ec707e8ff97a08c9d024e5c5eb1.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink4",
+          "assetId": "fbdc9de7efe4b3ea4310206be64312f5",
+          "file": "fbdc9de7efe4b3ea4310206be64312f5.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink5",
+          "assetId": "194da6a6664eca32567601753b1db7ac",
+          "file": "194da6a6664eca32567601753b1db7ac.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink6",
+          "assetId": "76e06c2c8451a3e9f26d1e3f9f408577",
+          "file": "76e06c2c8451a3e9f26d1e3f9f408577.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red1",
+          "assetId": "cf2e9edf7d296f023eefd86d22a5eea3",
+          "file": "cf2e9edf7d296f023eefd86d22a5eea3.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red2",
+          "assetId": "2e6fad0f1676da339390e3a225f2b9cd",
+          "file": "2e6fad0f1676da339390e3a225f2b9cd.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red3",
+          "assetId": "1944d7d08f7e27867460eedd85be9f61",
+          "file": "1944d7d08f7e27867460eedd85be9f61.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red4",
+          "assetId": "745fd5e85ae2ef89c49dba499f577f7b",
+          "file": "745fd5e85ae2ef89c49dba499f577f7b.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red5",
+          "assetId": "fb8c76c9407f80bd3bcc1bf925179fe3",
+          "file": "fb8c76c9407f80bd3bcc1bf925179fe3.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red6",
+          "assetId": "4627886a374a85f1111ad25337dfa69f",
+          "file": "4627886a374a85f1111ad25337dfa69f.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow1",
+          "assetId": "151540ce3cc9f869bbf37a8c23013852",
+          "file": "151540ce3cc9f869bbf37a8c23013852.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow2",
+          "assetId": "59d61481ed3b8ebdc04bc88ed0593a42",
+          "file": "59d61481ed3b8ebdc04bc88ed0593a42.svg",
+          "format": "svg",
+          "rotationCenterX": 14.799134999999978,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow3",
+          "assetId": "48cd537b64a1672be5b7b9bfd3233b81",
+          "file": "48cd537b64a1672be5b7b9bfd3233b81.svg",
+          "format": "svg",
+          "rotationCenterX": 14.788880000000006,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow4",
+          "assetId": "1748604ec225a9e7a4976437e2e38e77",
+          "file": "1748604ec225a9e7a4976437e2e38e77.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow5",
+          "assetId": "83a238cc08189a75d7e14a498c60fdc0",
+          "file": "83a238cc08189a75d7e14a498c60fdc0.svg",
+          "format": "svg",
+          "rotationCenterX": 9.500004999999987,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow6",
+          "assetId": "4cb478a4b1be557cd06902d021410074",
+          "file": "4cb478a4b1be557cd06902d021410074.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "Bird Duty//Alan",
+      "isStage": false,
+      "x": -55,
+      "y": -115,
+      "size": 40,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "1",
+          "assetId": "5d75eededd5aa7f90d2ca2c52d2b9670",
+          "file": "5d75eededd5aa7f90d2ca2c52d2b9670.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522185193268,
+          "rotationCenterY": 95.00134193065439,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "40160efd384bb787649fdddb7338925e",
+          "file": "40160efd384bb787649fdddb7338925e.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.02084941437346,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "8275fa0160fcf1e3885ab5cb4c09f4b4",
+          "file": "8275fa0160fcf1e3885ab5cb4c09f4b4.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 94.04921069643096,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "4df6bac593d0fa135ec23a0a23235568",
+          "file": "4df6bac593d0fa135ec23a0a23235568.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.87254903051817,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "cf2f7c8c6ef856b00ed3679cc65c05f0",
+          "file": "cf2f7c8c6ef856b00ed3679cc65c05f0.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 95.00134193065443,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "9e5139561289523a1e83f3d4b59611b2",
+          "file": "9e5139561289523a1e83f3d4b59611b2.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.02084941437349,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "7",
+          "assetId": "37b59714dc057b2a18d8433ea416fbf3",
+          "file": "37b59714dc057b2a18d8433ea416fbf3.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 94.04921069643096,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "8",
+          "assetId": "b5ac87b084dbe6547055b115c1a707b5",
+          "file": "b5ac87b084dbe6547055b115c1a707b5.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.87254903051819,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "mothafucka",
+          "assetId": "720662d316530fdbc13ff70880853e1b",
+          "file": "720662d316530fdbc13ff70880853e1b.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 32190
+        }
+      ]
+    },
+    {
+      "name": "Bird Duty//John",
+      "isStage": false,
+      "x": 75,
+      "y": -115,
+      "size": 40,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "1",
+          "assetId": "d853f698cd3602f8de51e734e2c3c434",
+          "file": "d853f698cd3602f8de51e734e2c3c434.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 95.00134570900552,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "7f10d65ab70ac968792d45ebc3721857",
+          "file": "7f10d65ab70ac968792d45ebc3721857.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.02084441437349,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "3386b2c95173c0a2bd7e07c73fb8fe04",
+          "file": "3386b2c95173c0a2bd7e07c73fb8fe04.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 94.049205696431,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "14732cba73b2c2769e75ae6a5d19dd97",
+          "file": "14732cba73b2c2769e75ae6a5d19dd97.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.87254403051818,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "b3b2c085b8a1bb176204eca62b73c23e",
+          "file": "b3b2c085b8a1bb176204eca62b73c23e.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 95.00133693065445,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "adde56c65b9ce6632843d5d67269c16b",
+          "file": "adde56c65b9ce6632843d5d67269c16b.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.0208444143735,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "7",
+          "assetId": "74dd20a8074b01bbcb611afc0bad8fa4",
+          "file": "74dd20a8074b01bbcb611afc0bad8fa4.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 94.04921569643095,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "8",
+          "assetId": "efcc11364660088cc60528edf6d22d6d",
+          "file": "efcc11364660088cc60528edf6d22d6d.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 96.87254403051817,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "i-don't-like-you",
+          "assetId": "8f1f4f4b37c1864f43d3d2d5479e7fd0",
+          "file": "8f1f4f4b37c1864f43d3d2d5479e7fd0.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 49634
+        }
+      ]
+    },
+    {
+      "name": "Bird Duty//Sanjeet",
+      "isStage": false,
+      "x": -75,
+      "y": -115,
+      "size": 40,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "1",
+          "assetId": "e9bb8ca6b1c44013a4129fade1c4cf60",
+          "file": "e9bb8ca6b1c44013a4129fade1c4cf60.svg",
+          "format": "svg",
+          "rotationCenterX": 90.94432258298764,
+          "rotationCenterY": 109.43195612202018,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "57bc685b4a9dcf6a676d5dec4b576d64",
+          "file": "57bc685b4a9dcf6a676d5dec4b576d64.svg",
+          "format": "svg",
+          "rotationCenterX": 105.70780693562085,
+          "rotationCenterY": 118.99373510099709,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "7e0fddb8ea2a636e2dd1b677f84a03fb",
+          "file": "7e0fddb8ea2a636e2dd1b677f84a03fb.svg",
+          "format": "svg",
+          "rotationCenterX": 82.22237646559779,
+          "rotationCenterY": 104.08208842146419,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "48bc9938b9a3afaf40a501a6a8fc32c4",
+          "file": "48bc9938b9a3afaf40a501a6a8fc32c4.svg",
+          "format": "svg",
+          "rotationCenterX": 99.8468224016359,
+          "rotationCenterY": 115.97053385926823,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "df896fe26979efea8b0d55d8a311f7e7",
+          "file": "df896fe26979efea8b0d55d8a311f7e7.svg",
+          "format": "svg",
+          "rotationCenterX": 90.94480861643586,
+          "rotationCenterY": 109.43227285086324,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "d49ca91be1479abd028f0dd6848d3ef3",
+          "file": "d49ca91be1479abd028f0dd6848d3ef3.svg",
+          "format": "svg",
+          "rotationCenterX": 105.71187236175342,
+          "rotationCenterY": 118.99598562872272,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "7",
+          "assetId": "428132fd8d54ad430ffd79b37db98921",
+          "file": "428132fd8d54ad430ffd79b37db98921.svg",
+          "format": "svg",
+          "rotationCenterX": 82.22352948421627,
+          "rotationCenterY": 104.0827263750124,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "8",
+          "assetId": "f47400e9f2a0415afcceb22f248f039a",
+          "file": "f47400e9f2a0415afcceb22f248f039a.svg",
+          "format": "svg",
+          "rotationCenterX": 99.84656777016644,
+          "rotationCenterY": 115.97038512680498,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose1",
+          "assetId": "a1db2ba9f7e843a6c51cded4a1e25545",
+          "file": "a1db2ba9f7e843a6c51cded4a1e25545.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 113.26497775737556,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose2",
+          "assetId": "a3134ddb39229354881b2ad7284400c9",
+          "file": "a3134ddb39229354881b2ad7284400c9.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 111.1969945860115,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "HELLO SAR",
+          "assetId": "33a58eb3d7f7e63a67530a9a42abc273",
+          "file": "33a58eb3d7f7e63a67530a9a42abc273.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 157071
+        }
+      ]
+    },
+    {
+      "name": "Bird Duty//Sanjeet2",
+      "isStage": false,
+      "x": 100,
+      "y": -115,
+      "size": 40,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "1",
+          "assetId": "e9bb8ca6b1c44013a4129fade1c4cf60",
+          "file": "e9bb8ca6b1c44013a4129fade1c4cf60.svg",
+          "format": "svg",
+          "rotationCenterX": 90.94432258298764,
+          "rotationCenterY": 109.43195612202018,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "57bc685b4a9dcf6a676d5dec4b576d64",
+          "file": "57bc685b4a9dcf6a676d5dec4b576d64.svg",
+          "format": "svg",
+          "rotationCenterX": 105.70780693562085,
+          "rotationCenterY": 118.99373510099709,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "7e0fddb8ea2a636e2dd1b677f84a03fb",
+          "file": "7e0fddb8ea2a636e2dd1b677f84a03fb.svg",
+          "format": "svg",
+          "rotationCenterX": 82.22237646559779,
+          "rotationCenterY": 104.08208842146419,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "48bc9938b9a3afaf40a501a6a8fc32c4",
+          "file": "48bc9938b9a3afaf40a501a6a8fc32c4.svg",
+          "format": "svg",
+          "rotationCenterX": 99.8468224016359,
+          "rotationCenterY": 115.97053385926823,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "df896fe26979efea8b0d55d8a311f7e7",
+          "file": "df896fe26979efea8b0d55d8a311f7e7.svg",
+          "format": "svg",
+          "rotationCenterX": 90.94480861643586,
+          "rotationCenterY": 109.43227285086324,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "d49ca91be1479abd028f0dd6848d3ef3",
+          "file": "d49ca91be1479abd028f0dd6848d3ef3.svg",
+          "format": "svg",
+          "rotationCenterX": 105.71187236175342,
+          "rotationCenterY": 118.99598562872272,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "7",
+          "assetId": "428132fd8d54ad430ffd79b37db98921",
+          "file": "428132fd8d54ad430ffd79b37db98921.svg",
+          "format": "svg",
+          "rotationCenterX": 82.22352948421627,
+          "rotationCenterY": 104.0827263750124,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "8",
+          "assetId": "f47400e9f2a0415afcceb22f248f039a",
+          "file": "f47400e9f2a0415afcceb22f248f039a.svg",
+          "format": "svg",
+          "rotationCenterX": 99.84656777016644,
+          "rotationCenterY": 115.97038512680498,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose1",
+          "assetId": "9fa65a696e34396c10ad28a23282b8c0",
+          "file": "9fa65a696e34396c10ad28a23282b8c0.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 117.17326788609131,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose2",
+          "assetId": "b25b6340c5366165f2932c05e130af93",
+          "file": "b25b6340c5366165f2932c05e130af93.svg",
+          "format": "svg",
+          "rotationCenterX": 79.31522000000001,
+          "rotationCenterY": 111.84837663334736,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "HELLO SAR",
+          "assetId": "17c2ef33117f405c877070393b5ee016",
+          "file": "17c2ef33117f405c877070393b5ee016.wav",
+          "format": "wav",
+          "rate": 48000,
+          "sampleCount": 124667
+        }
+      ]
+    },
+    {
+      "name": "Bird Duty//Bryan",
+      "isStage": false,
+      "x": -100,
+      "y": -115,
+      "size": 30,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "Ten80 Top Freeze2",
+          "assetId": "9f550c12880d437a537878d760baab30",
+          "file": "9f550c12880d437a537878d760baab30.svg",
+          "format": "svg",
+          "rotationCenterX": 179.20735328756336,
+          "rotationCenterY": 140.65561,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "Ten80 Top R Cross2",
+          "assetId": "a12fec5e98b45e514d5eeb914a73e329",
+          "file": "a12fec5e98b45e514d5eeb914a73e329.svg",
+          "format": "svg",
+          "rotationCenterX": 179.207355,
+          "rotationCenterY": 162.66289595171176,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "Ten80 Top L Step2",
+          "assetId": "984cafef3379a2e85ee10d8c6d371ad1",
+          "file": "984cafef3379a2e85ee10d8c6d371ad1.svg",
+          "format": "svg",
+          "rotationCenterX": 179.207355,
+          "rotationCenterY": 133,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "Ten80 Top Freeze",
+          "assetId": "98c1c7ecc3b3791f65554f2315f72293",
+          "file": "98c1c7ecc3b3791f65554f2315f72293.svg",
+          "format": "svg",
+          "rotationCenterX": 107.97992082973758,
+          "rotationCenterY": 143.25254989638697,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "Ten80 Top R Cross",
+          "assetId": "7568b2993088038af00f8f8c551710a2",
+          "file": "7568b2993088038af00f8f8c551710a2.svg",
+          "format": "svg",
+          "rotationCenterX": 146.2596282001467,
+          "rotationCenterY": 152.20652526915882,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "Ten80 Top L Step",
+          "assetId": "0fcb9a199a2e7b0cc76d5bdf4cd4150c",
+          "file": "0fcb9a199a2e7b0cc76d5bdf4cd4150c.svg",
+          "format": "svg",
+          "rotationCenterX": 107.97991999999999,
+          "rotationCenterY": 133,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "Grunt",
+          "assetId": "21de08faff3cdb1a3244e316f84943fe",
+          "file": "21de08faff3cdb1a3244e316f84943fe.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 34353
+        }
+      ]
+    },
+    {
+      "name": "Bird Duty//Anna",
+      "isStage": false,
+      "x": -75,
+      "y": -115,
+      "size": 30,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "1",
+          "assetId": "c6ff20c819070defbd40be8b1230a127",
+          "file": "c6ff20c819070defbd40be8b1230a127.svg",
+          "format": "svg",
+          "rotationCenterX": 132.16405720930254,
+          "rotationCenterY": 129,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "6fc29bc7a3afb02f139a2ed2af680291",
+          "file": "6fc29bc7a3afb02f139a2ed2af680291.svg",
+          "format": "svg",
+          "rotationCenterX": 132.164055,
+          "rotationCenterY": 143,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "35f06e0d97b345b9a7ba00f35896e950",
+          "file": "35f06e0d97b345b9a7ba00f35896e950.svg",
+          "format": "svg",
+          "rotationCenterX": 98.69312476744182,
+          "rotationCenterY": 178.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "73f314e497be0f4ff8b8c85ba07f5f2d",
+          "file": "73f314e497be0f4ff8b8c85ba07f5f2d.svg",
+          "format": "svg",
+          "rotationCenterX": 98.69312500000001,
+          "rotationCenterY": 139,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "3edeb268cb605f59e3fd9c4217245bec",
+          "file": "3edeb268cb605f59e3fd9c4217245bec.svg",
+          "format": "svg",
+          "rotationCenterX": 111.02452011627906,
+          "rotationCenterY": 129,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "9e0c7145958a57b742c9c0aa000bffcb",
+          "file": "9e0c7145958a57b742c9c0aa000bffcb.svg",
+          "format": "svg",
+          "rotationCenterX": 117,
+          "rotationCenterY": 143,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "7",
+          "assetId": "9bf4e98477ede25ae3112c964ea3387b",
+          "file": "9bf4e98477ede25ae3112c964ea3387b.svg",
+          "format": "svg",
+          "rotationCenterX": 92.52742732558147,
+          "rotationCenterY": 178.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "8",
+          "assetId": "8dbd2477b71c30ee363e3d877586be5a",
+          "file": "8dbd2477b71c30ee363e3d877586be5a.svg",
+          "format": "svg",
+          "rotationCenterX": 92.527425,
+          "rotationCenterY": 139,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose1",
+          "assetId": "657a106d7eadb97a0a1333e4650f9bf1",
+          "file": "657a106d7eadb97a0a1333e4650f9bf1.svg",
+          "format": "svg",
+          "rotationCenterX": 92.527425,
+          "rotationCenterY": 45,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose2",
+          "assetId": "a285bcdb8bc60f639cabaacf5054d6bb",
+          "file": "a285bcdb8bc60f639cabaacf5054d6bb.svg",
+          "format": "svg",
+          "rotationCenterX": 92.527425,
+          "rotationCenterY": 136,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose3",
+          "assetId": "b7ef21c7a8101b554665d1df03decd59",
+          "file": "b7ef21c7a8101b554665d1df03decd59.svg",
+          "format": "svg",
+          "rotationCenterX": 92.527425,
+          "rotationCenterY": 139.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pose4",
+          "assetId": "ee8c6ef8d61013e85b4c86b84bb8c51d",
+          "file": "ee8c6ef8d61013e85b4c86b84bb8c51d.svg",
+          "format": "svg",
+          "rotationCenterX": 92.527425,
+          "rotationCenterY": 139.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "scream",
+          "assetId": "e00780c4ff542172d9099ef713d9372c",
+          "file": "e00780c4ff542172d9099ef713d9372c.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 82787
+        }
+      ]
+    },
+    {
+      "name": "SHIT",
+      "isStage": false,
+      "x": -55,
+      "y": 105,
+      "size": 200,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "0235f345e0584510ef6f2c6a85d5eea2",
+          "file": "0235f345e0584510ef6f2c6a85d5eea2.svg",
+          "format": "svg",
+          "rotationCenterX": 4,
+          "rotationCenterY": 3,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "costume2",
+          "assetId": "760bcfb5e20650a3930741aaf406de96",
+          "file": "760bcfb5e20650a3930741aaf406de96.svg",
+          "format": "svg",
+          "rotationCenterX": 17.438596491228054,
+          "rotationCenterY": 9.3333333333334,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "SHIT",
+          "assetId": "cf6c24f237c743f58d5ecc19ed477b9e",
+          "file": "cf6c24f237c743f58d5ecc19ed477b9e.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 49374
+        },
+        {
+          "name": "ShitSPLASH",
+          "assetId": "e9493101deec347d7462fe075e3dc1fa",
+          "file": "e9493101deec347d7462fe075e3dc1fa.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 50688
+        }
+      ]
+    },
+    {
+      "name": "Bird-Menu",
+      "isStage": false,
+      "x": -195,
+      "y": -35,
+      "size": 500,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "white1",
+          "assetId": "b9ac78b598eace03e901f505a425fa2c",
+          "file": "b9ac78b598eace03e901f505a425fa2c.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white2",
+          "assetId": "c06c78553c16a80e51abca7bcef04cdc",
+          "file": "c06c78553c16a80e51abca7bcef04cdc.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white3",
+          "assetId": "45289cbed90e9237a9c4310e0a007f96",
+          "file": "45289cbed90e9237a9c4310e0a007f96.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black1",
+          "assetId": "fc143d9ea38079ce025fc16513d18ccf",
+          "file": "fc143d9ea38079ce025fc16513d18ccf.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black2",
+          "assetId": "90c95e2a0e2386106008b7f6556fb7b3",
+          "file": "90c95e2a0e2386106008b7f6556fb7b3.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black3",
+          "assetId": "23ced3526774a268c5b0a95a387ec8a9",
+          "file": "23ced3526774a268c5b0a95a387ec8a9.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue1",
+          "assetId": "deed3dec1462059c7bd5b2a34b6e3566",
+          "file": "deed3dec1462059c7bd5b2a34b6e3566.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue2",
+          "assetId": "1fafd9f4d6f68b22255ac62a01757206",
+          "file": "1fafd9f4d6f68b22255ac62a01757206.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue3",
+          "assetId": "d8c7cb15ace855a43c613533c2c786c0",
+          "file": "d8c7cb15ace855a43c613533c2c786c0.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green1",
+          "assetId": "d2cb42b170273e7c5ce2cb4480f1cc76",
+          "file": "d2cb42b170273e7c5ce2cb4480f1cc76.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green2",
+          "assetId": "33e2b96c6e603b064d0c5a0870d901ce",
+          "file": "33e2b96c6e603b064d0c5a0870d901ce.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green3",
+          "assetId": "f124125837ff173292fb43e79cdf2ffb",
+          "file": "f124125837ff173292fb43e79cdf2ffb.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue1",
+          "assetId": "1b9d7d918aea154449ec322021e3f4a5",
+          "file": "1b9d7d918aea154449ec322021e3f4a5.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue2",
+          "assetId": "6f74d6e6c39087d042f3e6fdb4927788",
+          "file": "6f74d6e6c39087d042f3e6fdb4927788.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue3",
+          "assetId": "e9063906f8843c0859081f6eeb5f572f",
+          "file": "e9063906f8843c0859081f6eeb5f572f.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange1",
+          "assetId": "3fcaf9cfeec2967c1e25eb0f3e95fc12",
+          "file": "3fcaf9cfeec2967c1e25eb0f3e95fc12.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange2",
+          "assetId": "5a2aba3334e98d76012241423bf2b534",
+          "file": "5a2aba3334e98d76012241423bf2b534.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange3",
+          "assetId": "6b4d367ddc8802427da87c4bcb4f0e97",
+          "file": "6b4d367ddc8802427da87c4bcb4f0e97.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink1",
+          "assetId": "73a811d3911463d5d02f67350e9a0093",
+          "file": "73a811d3911463d5d02f67350e9a0093.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink2",
+          "assetId": "c52b2f48ec6760414685c95d90dc8598",
+          "file": "c52b2f48ec6760414685c95d90dc8598.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink3",
+          "assetId": "a47a417aa5b15539828970137235ae89",
+          "file": "a47a417aa5b15539828970137235ae89.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red1",
+          "assetId": "d3f551c4405e6fad993225fc56deed67",
+          "file": "d3f551c4405e6fad993225fc56deed67.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red2",
+          "assetId": "4dbf24209c3072909fd31b8eddee87a6",
+          "file": "4dbf24209c3072909fd31b8eddee87a6.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red3",
+          "assetId": "9bf2164e32bf43e98792f5ef00c43f05",
+          "file": "9bf2164e32bf43e98792f5ef00c43f05.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow1",
+          "assetId": "b32fdcf5e6f559c23ffd9c80e0de6479",
+          "file": "b32fdcf5e6f559c23ffd9c80e0de6479.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow2",
+          "assetId": "257ac25184be2969dddd7be690114416",
+          "file": "257ac25184be2969dddd7be690114416.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow3",
+          "assetId": "f4c11149ad37ec7c533fec4bc3dc34fd",
+          "file": "f4c11149ad37ec7c533fec4bc3dc34fd.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "Bird-Menu2",
+      "isStage": false,
+      "x": 195,
+      "y": -35,
+      "size": 500,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "white1",
+          "assetId": "49db17ee557b4548a5a546257de727cf",
+          "file": "49db17ee557b4548a5a546257de727cf.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white2",
+          "assetId": "9b6477adc6b457a42c1e1b3e8b799491",
+          "file": "9b6477adc6b457a42c1e1b3e8b799491.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "white3",
+          "assetId": "0600840a0cc229733de62ec4c82d506a",
+          "file": "0600840a0cc229733de62ec4c82d506a.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black1",
+          "assetId": "3d62b176aa11bdc3cb62c04782a04dca",
+          "file": "3d62b176aa11bdc3cb62c04782a04dca.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black2",
+          "assetId": "ebce1df7066b19d12dc7330bcb95b359",
+          "file": "ebce1df7066b19d12dc7330bcb95b359.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "black3",
+          "assetId": "7828953c25dbdb72b2371037e7b95349",
+          "file": "7828953c25dbdb72b2371037e7b95349.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue1",
+          "assetId": "9eb27946272e0369db5b42ac468a6b78",
+          "file": "9eb27946272e0369db5b42ac468a6b78.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue2",
+          "assetId": "1a916f721c057dd03fc027627782bf59",
+          "file": "1a916f721c057dd03fc027627782bf59.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "blue3",
+          "assetId": "f8dcf6612cf8b22a2f7556b4915c59a4",
+          "file": "f8dcf6612cf8b22a2f7556b4915c59a4.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green1",
+          "assetId": "28f40c962d26e88449b57deb01441cdb",
+          "file": "28f40c962d26e88449b57deb01441cdb.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green2",
+          "assetId": "b58c84e6a1a5a40383bbba2df76e0f59",
+          "file": "b58c84e6a1a5a40383bbba2df76e0f59.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "green3",
+          "assetId": "c9d0bee531d9c58cc13cc657df001683",
+          "file": "c9d0bee531d9c58cc13cc657df001683.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue1",
+          "assetId": "af9b1ca427e1d01b92dd9f0f3d0ada61",
+          "file": "af9b1ca427e1d01b92dd9f0f3d0ada61.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue2",
+          "assetId": "4f1f40525807ac3cb30d53a4b9349251",
+          "file": "4f1f40525807ac3cb30d53a4b9349251.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "lightblue3",
+          "assetId": "d712874f6a5d4074077b92680fc47385",
+          "file": "d712874f6a5d4074077b92680fc47385.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange1",
+          "assetId": "1fbff31f193b7b0a5895c5fa4cefff0f",
+          "file": "1fbff31f193b7b0a5895c5fa4cefff0f.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange2",
+          "assetId": "760804d8aa07a4b0df561ba548756974",
+          "file": "760804d8aa07a4b0df561ba548756974.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "orange3",
+          "assetId": "25bcafcf3e4d2d1d333b2e989cace5c5",
+          "file": "25bcafcf3e4d2d1d333b2e989cace5c5.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink1",
+          "assetId": "8017be79b4842fa0b455b7e844a49bc9",
+          "file": "8017be79b4842fa0b455b7e844a49bc9.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink2",
+          "assetId": "19949616f4b8be32ba009d393b7dbba4",
+          "file": "19949616f4b8be32ba009d393b7dbba4.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "pink3",
+          "assetId": "536d36b78e142c8f59d591a57bed4c9c",
+          "file": "536d36b78e142c8f59d591a57bed4c9c.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red1",
+          "assetId": "9f8d00979134a9f1c8e06cc64aec0a62",
+          "file": "9f8d00979134a9f1c8e06cc64aec0a62.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red2",
+          "assetId": "12bea8fb83b047271a53e796e01e4cdf",
+          "file": "12bea8fb83b047271a53e796e01e4cdf.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "red3",
+          "assetId": "1caae0c0bb6ad8ebea607a532fb0c44e",
+          "file": "1caae0c0bb6ad8ebea607a532fb0c44e.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow1",
+          "assetId": "2320ca78ab2943b62781e3e908867812",
+          "file": "2320ca78ab2943b62781e3e908867812.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow2",
+          "assetId": "9b15e9ac1e106741ad88e5f626e92bca",
+          "file": "9b15e9ac1e106741ad88e5f626e92bca.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 6,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "yellow3",
+          "assetId": "14c8fbb1fa29902cf6972c2950a1b10f",
+          "file": "14c8fbb1fa29902cf6972c2950a1b10f.svg",
+          "format": "svg",
+          "rotationCenterX": 9.5,
+          "rotationCenterY": 4.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "BirdDUTYmenutext",
+      "isStage": false,
+      "x": 0,
+      "y": 105,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "9975cce3f6a8bdf643c205b1bab14fce",
+          "file": "9975cce3f6a8bdf643c205b1bab14fce.svg",
+          "format": "svg",
+          "rotationCenterX": 234.5023952174942,
+          "rotationCenterY": 62.867025,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "GameOVERBD",
+      "isStage": false,
+      "x": 0,
+      "y": -25,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "GAMEOVER",
+          "assetId": "df6e1f1032b8de58efc5fa4094f7d608",
+          "file": "df6e1f1032b8de58efc5fa4094f7d608.svg",
+          "format": "svg",
+          "rotationCenterX": 162.50145990081785,
+          "rotationCenterY": 42.94247999999999,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "P1 WINS",
+          "assetId": "0f1e3e669fc5aae238630c474ba64872",
+          "file": "0f1e3e669fc5aae238630c474ba64872.svg",
+          "format": "svg",
+          "rotationCenterX": 264.31085737579343,
+          "rotationCenterY": 42.94247999999999,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "P2 WINS",
+          "assetId": "7b41b4b19259f3e93e91da3f1aa54e66",
+          "file": "7b41b4b19259f3e93e91da3f1aa54e66.svg",
+          "format": "svg",
+          "rotationCenterX": 266.3148583412171,
+          "rotationCenterY": 42.94247999999999,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "DRAW",
+          "assetId": "7c5aba804e2c9a9b9171b2cd473cea85",
+          "file": "7c5aba804e2c9a9b9171b2cd473cea85.svg",
+          "format": "svg",
+          "rotationCenterX": 91.93266038352965,
+          "rotationCenterY": 42.94247999999999,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "SINGLE PLAYER",
+      "isStage": false,
+      "x": 0,
+      "y": -15,
+      "size": 120,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "0b721cbd3ba498b8e9fa6e039188364b",
+          "file": "0b721cbd3ba498b8e9fa6e039188364b.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "MULTIPLAYER",
+      "isStage": false,
+      "x": 0,
+      "y": -85,
+      "size": 120,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "18900da9a9262ccc548f37b2eebb619a",
+          "file": "18900da9a9262ccc548f37b2eebb619a.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "PLAYER?",
+      "isStage": false,
+      "x": -275,
+      "y": 115,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "P1",
+          "assetId": "094def7970ea1237f0097db4f9a69c5a",
+          "file": "094def7970ea1237f0097db4f9a69c5a.svg",
+          "format": "svg",
+          "rotationCenterX": 31.125004999999987,
+          "rotationCenterY": 14.851305000000025,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "P2",
+          "assetId": "4b745de41c15afc0e6a5e6e30ba185b8",
+          "file": "4b745de41c15afc0e6a5e6e30ba185b8.svg",
+          "format": "svg",
+          "rotationCenterX": 31.12500319532569,
+          "rotationCenterY": 14.851307392200113,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "ROUND?",
+      "isStage": false,
+      "x": 235,
+      "y": 157,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "ROUND1",
+          "assetId": "0601cf6ad02e2bb3572f6e81b64e5b81",
+          "file": "0601cf6ad02e2bb3572f6e81b64e5b81.svg",
+          "format": "svg",
+          "rotationCenterX": 58.869174999999984,
+          "rotationCenterY": 17.897515,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "ROUND2",
+          "assetId": "271e2b6596458024a5392bddc072bff0",
+          "file": "271e2b6596458024a5392bddc072bff0.svg",
+          "format": "svg",
+          "rotationCenterX": 58.869155000000035,
+          "rotationCenterY": 17.897505000000024,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "ROUND3",
+          "assetId": "efa8acbb1ed0ac57a86b1d5087756ef5",
+          "file": "efa8acbb1ed0ac57a86b1d5087756ef5.svg",
+          "format": "svg",
+          "rotationCenterX": 58.869155000000035,
+          "rotationCenterY": 17.897505000000024,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "SCORES",
+      "isStage": false,
+      "x": -40,
+      "y": 45,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "c194d6e9cb8812ca3f91c2a00a438ec0",
+          "file": "c194d6e9cb8812ca3f91c2a00a438ec0.svg",
+          "format": "svg",
+          "rotationCenterX": 105.12499500000004,
+          "rotationCenterY": 14.851300000000009,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "reset pb",
+      "isStage": false,
+      "x": 255,
+      "y": -155,
+      "size": 80,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "c82e702a71c6566e2cbfccc008317d34",
+          "file": "c82e702a71c6566e2cbfccc008317d34.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "reset all",
+      "isStage": false,
+      "x": 275,
+      "y": 111,
+      "size": 80,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "81521ca35c6299738cb0b187e5b09ab2",
+          "file": "81521ca35c6299738cb0b187e5b09ab2.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "turn text",
+      "isStage": false,
+      "x": 0,
+      "y": 0,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "P1",
+          "assetId": "6ec234569cfe6a02706a2c4442e6061c",
+          "file": "6ec234569cfe6a02706a2c4442e6061c.svg",
+          "format": "svg",
+          "rotationCenterX": 266.100154677887,
+          "rotationCenterY": 42.94247999999999,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "P2",
+          "assetId": "777977835f4360db1012eb3decc7fa51",
+          "file": "777977835f4360db1012eb3decc7fa51.svg",
+          "format": "svg",
+          "rotationCenterX": 268.10415564331055,
+          "rotationCenterY": 42.94247999999999,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "To Main Menu",
+      "isStage": false,
+      "x": 0,
+      "y": -155,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "770a6ab431727b86ba4c5e415e116d6c",
+          "file": "770a6ab431727b86ba4c5e415e116d6c.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "Back to Arcade",
+      "isStage": false,
+      "x": -165,
+      "y": -155,
+      "size": 80,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "e26185bc2f342df155590c7e58881452",
+          "file": "e26185bc2f342df155590c7e58881452.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "Back to Homepage",
+      "isStage": false,
+      "x": -255,
+      "y": -155,
+      "size": 80,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "4523ca74b7864f4111eb8ede9cd43296",
+          "file": "4523ca74b7864f4111eb8ede9cd43296.svg",
+          "format": "svg",
+          "rotationCenterX": 53.5,
+          "rotationCenterY": 23.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "CLICK",
+          "assetId": "26beeed8683df0d248aa43bbe42699b4",
+          "file": "26beeed8683df0d248aa43bbe42699b4.mp3",
+          "format": "mp3",
+          "rate": 48000,
+          "sampleCount": 8326
+        }
+      ]
+    },
+    {
+      "name": "CRT OVERLAY",
+      "isStage": false,
+      "x": 0,
+      "y": 1,
+      "size": 100,
+      "direction": 90,
+      "visible": true,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "OVERLAY",
+          "assetId": "acfe66612db6a400e4377042cb8cd99e",
+          "file": "acfe66612db6a400e4377042cb8cd99e.svg",
+          "format": "svg",
+          "rotationCenterX": 320,
+          "rotationCenterY": 180,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "POWER ON/OFF",
+      "isStage": false,
+      "x": 0,
+      "y": 0,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "1",
+          "assetId": "6444d572cf803b2ea1ee698467fe4551",
+          "file": "6444d572cf803b2ea1ee698467fe4551.svg",
+          "format": "svg",
+          "rotationCenterX": 363.3633633633633,
+          "rotationCenterY": 211.7117117117117,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "6f6fda5beec4ae13c8c47441e5cf1563",
+          "file": "6f6fda5beec4ae13c8c47441e5cf1563.svg",
+          "format": "svg",
+          "rotationCenterX": 327,
+          "rotationCenterY": 195.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "62884f4a1049d1ff79c8fa7b274b8860",
+          "file": "62884f4a1049d1ff79c8fa7b274b8860.svg",
+          "format": "svg",
+          "rotationCenterX": 327,
+          "rotationCenterY": 243.54804804804803,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "00cb4338cc92b53ed436e1e9efbe2a5f",
+          "file": "00cb4338cc92b53ed436e1e9efbe2a5f.svg",
+          "format": "svg",
+          "rotationCenterX": 327,
+          "rotationCenterY": 302.1066066066066,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "304541e8d53c07cdb15c4f672894b5f2",
+          "file": "304541e8d53c07cdb15c4f672894b5f2.svg",
+          "format": "svg",
+          "rotationCenterX": 327,
+          "rotationCenterY": 359.16366366366367,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "6444d572cf803b2ea1ee698467fe4551",
+          "file": "6444d572cf803b2ea1ee698467fe4551.svg",
+          "format": "svg",
+          "rotationCenterX": 363.3633633633633,
+          "rotationCenterY": 211.7117117117117,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "power on",
+          "assetId": "393eb1525280f1b460f84b2ce5c0dd19",
+          "file": "393eb1525280f1b460f84b2ce5c0dd19.wav",
+          "format": "wav",
+          "rate": 48000,
+          "sampleCount": 28507
+        },
+        {
+          "name": "power off",
+          "assetId": "0b9bb2de4dbbec890c94c57bc1de079f",
+          "file": "0b9bb2de4dbbec890c94c57bc1de079f.wav",
+          "format": "wav",
+          "rate": 48000,
+          "sampleCount": 28507
+        }
+      ]
+    },
+    {
+      "name": "PAUSED",
+      "isStage": false,
+      "x": 0,
+      "y": 0,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "b709fa4eef4d4a4d43e6196fa479e625",
+          "file": "b709fa4eef4d4a4d43e6196fa479e625.svg",
+          "format": "svg",
+          "rotationCenterX": 355.10508500000003,
+          "rotationCenterY": 201.20120000000003,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    },
+    {
+      "name": "Controls",
+      "isStage": false,
+      "x": 36,
+      "y": 28,
+      "size": 100,
+      "direction": 90,
+      "visible": true,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "3339a2953a3bf62bb80e54ff575dbced",
+          "file": "3339a2953a3bf62bb80e54ff575dbced.svg",
+          "format": "svg",
+          "rotationCenterX": 0,
+          "rotationCenterY": 0,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "collect",
+          "assetId": "800da7f757dad11810ce0e1396601a7d",
+          "file": "800da7f757dad11810ce0e1396601a7d.wav",
+          "format": "wav",
+          "rate": 48000,
+          "sampleCount": 19746
+        }
+      ]
+    },
+    {
+      "name": "Selected Button",
+      "isStage": false,
+      "x": 0,
+      "y": -120,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 1,
+      "costumes": [
+        {
+          "name": "costume1",
+          "assetId": "1150cc16ee46eb501d5548a37523827c",
+          "file": "1150cc16ee46eb501d5548a37523827c.svg",
+          "format": "svg",
+          "rotationCenterX": 100.12382,
+          "rotationCenterY": 11.25,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "searching",
+          "assetId": "c1b974fd0dc4982d6808e4d164c45d90",
+          "file": "c1b974fd0dc4982d6808e4d164c45d90.svg",
+          "format": "svg",
+          "rotationCenterX": 97.23365403503186,
+          "rotationCenterY": 15.540273770700622,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": [
+        {
+          "name": "collect",
+          "assetId": "800da7f757dad11810ce0e1396601a7d",
+          "file": "800da7f757dad11810ce0e1396601a7d.wav",
+          "format": "wav",
+          "rate": 48000,
+          "sampleCount": 19746
+        }
+      ]
+    },
+    {
+      "name": "Watchdog Timer",
+      "isStage": false,
+      "x": 0,
+      "y": 0,
+      "size": 100,
+      "direction": 90,
+      "visible": false,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "10",
+          "assetId": "c8a4438f650ce0d14162f7d570c5e409",
+          "file": "c8a4438f650ce0d14162f7d570c5e409.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "9",
+          "assetId": "8263e523c2ef358b93c56a0ea17497f0",
+          "file": "8263e523c2ef358b93c56a0ea17497f0.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "8",
+          "assetId": "ddab16544e6476b5dcdb0bcc30aae4b2",
+          "file": "ddab16544e6476b5dcdb0bcc30aae4b2.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "7",
+          "assetId": "881795e6be02a51f4a3d7570354baea1",
+          "file": "881795e6be02a51f4a3d7570354baea1.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "6",
+          "assetId": "f046935231359d6b2a6447cb4d8548a0",
+          "file": "f046935231359d6b2a6447cb4d8548a0.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "5",
+          "assetId": "9a19fd85a94876d614eaa04026409250",
+          "file": "9a19fd85a94876d614eaa04026409250.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "4",
+          "assetId": "3bbcd0058e8af09fc05775aa6ca6f333",
+          "file": "3bbcd0058e8af09fc05775aa6ca6f333.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "3",
+          "assetId": "1c84b3d5558aaa07bd5a27592d2d5e62",
+          "file": "1c84b3d5558aaa07bd5a27592d2d5e62.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "2",
+          "assetId": "f95b9f847474e2c185844a4d30954a29",
+          "file": "f95b9f847474e2c185844a4d30954a29.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        },
+        {
+          "name": "1",
+          "assetId": "ec2de2d403cc9a553e458afe9b4390a7",
+          "file": "ec2de2d403cc9a553e458afe9b4390a7.svg",
+          "format": "svg",
+          "rotationCenterX": 160,
+          "rotationCenterY": 28.5,
+          "bitmapResolution": 1
+        }
+      ],
+      "sounds": []
+    }
+  ]
+}

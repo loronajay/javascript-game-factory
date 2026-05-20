@@ -1,0 +1,103 @@
+@font-face {
+  font-family: "Moonlit Free";
+  src: url("assets/scratch/703ed40436eb83edf9d93fd02a70a6a2.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #050505;
+  color: #f7f2df;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  display: grid;
+  place-items: start center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.bird-duty-shell {
+  position: relative;
+  display: grid;
+  place-items: start center;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+}
+
+#bird-duty-canvas {
+  display: block;
+  width: min(100vw, calc(100vh * var(--bird-duty-aspect, 1.8098)));
+  aspect-ratio: var(--bird-duty-aspect, 1.8098);
+  height: auto;
+  max-width: 100vw;
+  max-height: 100vh;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: #050505;
+  cursor: default;
+}
+
+#bird-duty-canvas.is-menu-hot {
+  cursor: pointer;
+}
+
+.back-link {
+  position: fixed;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  color: #f7f2df;
+  font-size: 13px;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  opacity: 1;
+}
+
+.status-line {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 10px;
+  color: #f7f2df;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 13px;
+}
+
+.selection-line {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  margin: 0;
+  color: #f7f2df;
+  font-size: 12px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+[hidden] {
+  display: none !important;
+}

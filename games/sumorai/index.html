@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sumorai | Javascript Game Factory</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="../../js/platform-config.js"></script>
+</head>
+<body>
+  <a href="../../grid.html" class="back-link">&larr; Arcade</a>
+  <main class="shell">
+
+    <section id="screen-menu" class="screen screen--active">
+      <div class="menu-card">
+        <p class="eyebrow">Javascript Game Factory</p>
+        <h1>Sumorai</h1>
+        <p class="tagline">Two samurai. One stage. One hit. One winner.</p>
+        <div class="menu-actions">
+          <button id="btn-local" class="btn btn--primary">Local 2-Player</button>
+          <button class="btn" disabled>vs CPU &mdash; Coming Soon</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-setup" class="screen">
+      <div class="menu-card">
+        <p class="eyebrow">Match Setup</p>
+        <h2>Match Length</h2>
+        <div class="round-picker">
+          <button class="round-btn round-btn--active" data-rounds="3">Best of 3</button>
+          <button class="round-btn" data-rounds="5">Best of 5</button>
+        </div>
+        <h2>Stage</h2>
+        <div class="layout-picker">
+          <button class="layout-btn layout-btn--active" data-layout="single">Center</button>
+          <button class="layout-btn" data-layout="battlefield">Battlefield</button>
+          <button class="layout-btn" data-layout="moving">Moving</button>
+          <button class="layout-btn" data-layout="none">None</button>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-start-match" class="btn btn--primary">Start Match</button>
+          <button id="btn-setup-back" class="btn">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-game" class="screen">
+      <canvas id="game-canvas"></canvas>
+    </section>
+
+    <section id="screen-result" class="screen">
+      <div class="menu-card">
+        <p class="eyebrow">Match Over</p>
+        <h2 id="result-winner"></h2>
+        <div class="menu-actions">
+          <button id="btn-rematch" class="btn btn--primary">Rematch</button>
+          <button id="btn-result-menu" class="btn">Menu</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  <script type="module">
+    import { initGame } from './game.js';
+    initGame();
+  </script>
+</body>
+</html>
