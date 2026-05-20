@@ -67,17 +67,17 @@ export function resolveHits(p1, p2) {
   const p1HitBox = p1AtkLive ? getAttackHitbox(p1) : p1DashLive ? getDashHitbox(p1) : null;
   const p2HitBox = p2AtkLive ? getAttackHitbox(p2) : p2DashLive ? getDashHitbox(p2) : null;
 
-  const p1Hits = p1HitBox && _overlaps(p1HitBox, p2Body);
-  const p2Hits = p2HitBox && _overlaps(p2HitBox, p1Body);
-
-  if (!p1Hits && !p2Hits) return null;
-
-  // Gridlock: both connect simultaneously, neither blocking
-  if (p1Hits && p2Hits && !p1.blocking && !p2.blocking) {
+  // Weapon clash: hitboxes meet in mid-air → gridlock (blocking is impossible while attacking)
+  if (p1HitBox && p2HitBox && _overlaps(p1HitBox, p2HitBox)) {
     p1.hitLanded = true;
     p2.hitLanded = true;
     return { p1Killed: false, p2Killed: false, gridlock: true };
   }
+
+  const p1Hits = p1HitBox && _overlaps(p1HitBox, p2Body);
+  const p2Hits = p2HitBox && _overlaps(p2HitBox, p1Body);
+
+  if (!p1Hits && !p2Hits) return null;
 
   let p1Killed = false;
   let p2Killed = false;
@@ -102,5 +102,5 @@ export function resolveHits(p1, p2) {
     }
   }
 
-  return { p1Killed, p2Killed, gridlock: false };
+  return { p1Killed, p2Killed, gridlock: false, p1HitP2: p1Hits, p2HitP1: p2Hits };
 }

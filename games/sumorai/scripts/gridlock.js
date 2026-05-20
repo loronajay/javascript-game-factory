@@ -4,10 +4,12 @@ const MASH_PER_PRESS = 0.08;  // progress added per attack-just-pressed
 
 export function createGridlockState() {
   return {
-    p1Progress: 0,
-    p2Progress: 0,
-    resolved:   false,
-    winner:     null,   // 'p1' | 'p2' | 'tie'
+    p1Progress:  0,
+    p2Progress:  0,
+    resolved:    false,
+    winner:      null,   // 'p1' | 'p2' | 'tie'
+    p1MashFlash: 0,      // ticks remaining on "pressed" display
+    p2MashFlash: 0,
   };
 }
 
@@ -17,8 +19,11 @@ export function createGridlockState() {
 export function tickGridlock(state, p1, p2, p1In, p2In) {
   if (state.resolved) return { resolved: true, winner: state.winner };
 
-  if (p1In.attackJustPressed) state.p1Progress = Math.min(1, state.p1Progress + MASH_PER_PRESS);
-  if (p2In.attackJustPressed) state.p2Progress = Math.min(1, state.p2Progress + MASH_PER_PRESS);
+  if (state.p1MashFlash > 0) state.p1MashFlash--;
+  if (state.p2MashFlash > 0) state.p2MashFlash--;
+
+  if (p1In.attackJustPressed) { state.p1Progress = Math.min(1, state.p1Progress + MASH_PER_PRESS); state.p1MashFlash = 8; }
+  if (p2In.attackJustPressed) { state.p2Progress = Math.min(1, state.p2Progress + MASH_PER_PRESS); state.p2MashFlash = 8; }
 
   const p1Done = state.p1Progress >= 1;
   const p2Done = state.p2Progress >= 1;
@@ -26,16 +31,22 @@ export function tickGridlock(state, p1, p2, p1In, p2In) {
 
   state.resolved = true;
 
+  const HIT_FLASH_TICKS = 40;
+
   if (p1Done && p2Done) {
     state.winner = 'tie';
-    p1.speedX = -GRIDLOCK_KNOCKBACK;
-    p2.speedX =  GRIDLOCK_KNOCKBACK;
+    p1.speedX = (p1.x >= p2.x ? 1 : -1) * GRIDLOCK_KNOCKBACK;
+    p2.speedX = (p2.x >= p1.x ? 1 : -1) * GRIDLOCK_KNOCKBACK;
+    p1.hitFlashTimer = HIT_FLASH_TICKS;
+    p2.hitFlashTimer = HIT_FLASH_TICKS;
   } else if (p1Done) {
     state.winner = 'p1';
     p2.speedX = (p2.x >= p1.x ? 1 : -1) * GRIDLOCK_KNOCKBACK;
+    p2.hitFlashTimer = HIT_FLASH_TICKS;
   } else {
     state.winner = 'p2';
     p1.speedX = (p1.x >= p2.x ? 1 : -1) * GRIDLOCK_KNOCKBACK;
+    p1.hitFlashTimer = HIT_FLASH_TICKS;
   }
 
   return { resolved: true, winner: state.winner };

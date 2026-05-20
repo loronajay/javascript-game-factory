@@ -176,4 +176,5 @@ export function updatePlayer(state, now, dtMs) {
   player.moveStartAt = now;
   player.stepMs = sprinting ? SPRINT_STEP_MS : WALK_STEP_MS;
   player.isSprinting = sprinting;
+  player.walkFrame = (player.walkFrame + 1) % 3;
 }

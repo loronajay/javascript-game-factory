@@ -157,12 +157,14 @@ function wireOnlineCallbacks() {
         state.remote.playerId    = remotePlayerId;
       }
     } else if (messageType === 'position' && phase === 'playing') {
+      const moved = value.x !== state.remote.tx || value.y !== state.remote.ty;
       state.remote.tx = value.x;
       state.remote.ty = value.y;
       state.remote.px = value.x + 0.5;
       state.remote.py = value.y + 0.5;
       state.remote.dir = value.dir;
       state.remote.active = true;
+      if (moved) state.remote.walkFrame = ((state.remote.walkFrame ?? 0) + 1) % 3;
     } else if (messageType === 'event' && phase === 'playing') {
       handleRemoteEvent(value);
     }

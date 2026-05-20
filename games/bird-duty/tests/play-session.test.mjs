@@ -1,6 +1,7 @@
 import {
   GAME_OVER_TICKS,
   SHOTS_PER_RUN,
+  addScore,
   createPlaySession,
   fireShot,
   shouldReturnToMenu,
@@ -35,10 +36,22 @@ test("single player run starts with ten shots and zero score", () => {
   assertEqual(session.score, 0);
 });
 
+test("play session can start with a custom shot count", () => {
+  const session = createPlaySession({ shotsPerRun: 5 });
+
+  assertEqual(session.shotsRemaining, 5);
+});
+
 test("firing a shot decrements shots remaining", () => {
   const session = fireShot(createPlaySession());
 
   assertEqual(session.shotsRemaining, SHOTS_PER_RUN - 1);
+});
+
+test("score increments by hit value", () => {
+  const session = addScore(createPlaySession(), 3);
+
+  assertEqual(session.score, 3);
 });
 
 test("shots do not decrement below zero", () => {
@@ -65,6 +78,8 @@ test("game over waits until the final poop is gone", () => {
 });
 
 test("game over remains visible briefly before returning to menu", () => {
+  assertEqual(GAME_OVER_TICKS, 240);
+
   let session = { ...createPlaySession(), shotsRemaining: 0 };
   session = updatePlaySession(session, { phase: "inactive" });
 

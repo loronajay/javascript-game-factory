@@ -3,6 +3,12 @@ export const SOUND_PATHS = Object.freeze({
   gameMusic: "assets/scratch/sounds/game-music.mp3",
   poopRelease: "assets/scratch/sounds/poop-release.mp3",
   splat: "assets/scratch/sounds/splat.mp3",
+  alan: "assets/scratch/sounds/alan.mp3",
+  anna: "assets/scratch/sounds/anna.mp3",
+  bryan: "assets/scratch/sounds/bryan.mp3",
+  john: "assets/scratch/sounds/john.mp3",
+  sanjeet: "assets/scratch/sounds/sanjeet.mp3",
+  sanjeetFast: "assets/scratch/sounds/sanjeet-fast.wav",
 });
 
 export function createSoundController(root = globalThis, paths = SOUND_PATHS) {
@@ -59,6 +65,9 @@ export function createSoundController(root = globalThis, paths = SOUND_PATHS) {
     },
     playSplat() {
       return play("splat");
+    },
+    playNpcHit(type) {
+      return play(type);
     },
     startGameMusic() {
       return startLoop("gameMusic");

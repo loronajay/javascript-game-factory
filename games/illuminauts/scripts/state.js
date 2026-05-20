@@ -41,6 +41,7 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
       stepMs: 0,
       isSprinting: false,
       dir: 'down',
+      walkFrame: 0,
       hearts: HEARTS_MAX,
       chips: 0,
       stamina: STAMINA_MAX,
@@ -58,6 +59,7 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
       px: remoteStart.x + 0.5,
       py: remoteStart.y + 0.5,
       dir: 'down',
+      walkFrame: 0,
       displayName: '',
       playerId: '',
       invulnerableUntil: 0, // kept for drawPlayer compat; not updated

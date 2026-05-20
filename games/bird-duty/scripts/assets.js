@@ -31,6 +31,11 @@ const SVG_VIEWPORT_OVERRIDES = Object.freeze({
   "4523ca74b7864f4111eb8ede9cd43296.svg": 190,
   "e26185bc2f342df155590c7e58881452.svg": 165,
   "c82e702a71c6566e2cbfccc008317d34.svg": 145,
+  "multiplayer.svg": 145,
+  "local-button.svg": 130,
+  "online-button.svg": 135,
+  "back-button.svg": 130,
+  "multiplayer-title.svg": 650,
 });
 
 let moonlitFontDataUrlPromise = null;
@@ -89,6 +94,13 @@ export function loadImage(src) {
     image.onerror = () => reject(new Error(`Unable to load image: ${src}`));
     image.src = src;
   });
+}
+
+export async function loadScratchImage(src, basePath = "assets/scratch/") {
+  if (src.endsWith(".svg")) {
+    return loadImage(await normalizeScratchSvg(src, basePath));
+  }
+  return loadImage(src);
 }
 
 export async function loadCostumeImage(costume, basePath = "assets/scratch/") {

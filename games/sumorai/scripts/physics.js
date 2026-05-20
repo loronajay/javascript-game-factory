@@ -12,7 +12,6 @@ const DASH_BURST_SPEED_MIN = 6;    // tap release: ~72 px (6 × 12 ticks)
 const DASH_BURST_SPEED_MAX = 32;   // full charge: ~384 px (32 × 12 ticks)
 const DASH_BURST_TICKS     = 12;   // 3 dash frames × 4 ticks
 const DASH_RECOVERY_TICKS  = 28;   // end-lag after burst — longer than a basic attack (24 ticks)
-const PROJ_COOLDOWN        = 90;   // ticks between projectile fires (~1.5 s)
 
 // Returns 'dead' if player exits a blast zone this tick, else null.
 function applyPhysics(player, inputs, platforms) {
@@ -40,12 +39,11 @@ function applyPhysics(player, inputs, platforms) {
     player.dashRecoveryTimer--;
     if (player.dashRecoveryTimer === 0) player.dashRecovering = false;
   }
-  if (player.projectileCooldown > 0) player.projectileCooldown--;
 
   // ── Stamina regen ──────────────────────────────────────────────────────────
   if (player.stamina < 10 && player.attackTimer === 0 && !player.dashBursting) {
     player.staminaRegenTimer++;
-    if (player.staminaRegenTimer >= 90) {
+    if (player.staminaRegenTimer >= 30) {
       player.staminaRegenTimer = 0;
       player.stamina = Math.min(10, player.stamina + 1);
     }
@@ -58,7 +56,7 @@ function applyPhysics(player, inputs, platforms) {
 
   if (!player.inputsLocked && !player.dashBursting && !player.dashRecovering) {
     // Block (hold down, only when not attacking)
-    player.blocking = inputs.down && player.attackTimer === 0;
+    player.blocking = inputs.down && player.attackTimer === 0 && player.grounded;
 
     // Normal attack
     if (inputs.attackJustPressed && !player.blocking && player.attackTimer === 0 && player.stamina >= 2) {
@@ -94,11 +92,10 @@ function applyPhysics(player, inputs, platforms) {
     }
 
     // Projectile (just-pressed via prev-frame tracking)
-    if (inputs.projectile && !player.prevProjectile &&
-        player.stamina >= 2 && player.attackTimer === 0 && player.projectileCooldown === 0) {
-      player.wantsProjectile     = true;
-      player.stamina            -= 2;
-      player.projectileCooldown  = PROJ_COOLDOWN;
+    if (inputs.projectile && !player.prevProjectile && !player.blocking &&
+        player.stamina >= 2 && player.attackTimer === 0) {
+      player.wantsProjectile = true;
+      player.stamina        -= 2;
       // Use the throw animation (3 frames × 5 ticks); mark hitLanded so melee hitbox never fires.
       player.throwing    = true;
       player.attackTimer = 15;
@@ -107,12 +104,14 @@ function applyPhysics(player, inputs, platforms) {
       player.hitLanded   = true;
     }
 
-    // Horizontal movement
-    if (inputs.left)  player.speedX -= MOVESPEED;
-    if (inputs.right) player.speedX += MOVESPEED;
+    // Horizontal movement and jump locked while shielding
+    if (!player.blocking) {
+      if (inputs.left)  player.speedX -= MOVESPEED;
+      if (inputs.right) player.speedX += MOVESPEED;
+    }
 
     // Jump
-    if (inputs.up && player.grounded) {
+    if (inputs.up && player.grounded && !player.blocking) {
       player.speedY      = JUMP_FORCE;
       player.grounded    = false;
       player.onPlatform  = false;

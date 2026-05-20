@@ -1,7 +1,7 @@
 import { scratchToGamePoint } from "./coordinates.js";
 
 export const POOP_LANDING_Y = 674;
-export const POOP_FALL_SPEED = 10;
+export const POOP_FALL_SPEED = 15;
 export const POOP_BACKSIDE_OFFSET_X = 35;
 export const POOP_BACKSIDE_OFFSET_Y = 150;
 export const POOP_RENDER_SCALE = 2;

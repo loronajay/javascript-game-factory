@@ -39,3 +39,9 @@ export function checkProjectileClash(p1Proj, p2Proj) {
   if (!p1Proj?.active || !p2Proj?.active) return false;
   return _overlaps(_projBox(p1Proj), _projBox(p2Proj));
 }
+
+// Returns true if a melee/dash hitbox box overlaps an active projectile (sword deflect)
+export function checkHitboxVsProjectile(box, proj) {
+  if (!proj?.active) return false;
+  return _overlaps(box, _projBox(proj));
+}

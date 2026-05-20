@@ -42,6 +42,9 @@ function createPlayer(side) {
     staminaRegenTimer: 0,
     attackTimer: 0,
     blocking: false,
+    shieldAnimFrame: 0,
+    shieldAnimTimer: 0,
+    hitFlashTimer: 0,
     dead: false,
     dying: false,           // killed on-stage; still drawn, death anim playing
     inputsLocked: false,    // no input accepted (set on kill)
@@ -55,7 +58,6 @@ function createPlayer(side) {
     dashRecovering: false,  // frozen on last dash frame after burst ends
     dashRecoveryTimer: 0,   // ticks remaining in recovery
     wantsProjectile: false, // physics sets true when projectile input fires
-    projectileCooldown: 0,
     prevDash: false,        // dash-held state last tick (for release detection)
     prevProjectile: false,
     wins: 0,
@@ -79,6 +81,8 @@ function resetPlayer(player) {
   player.staminaRegenTimer = 0;
   player.attackTimer      = 0;
   player.blocking         = false;
+  player.shieldAnimFrame  = 0;
+  player.shieldAnimTimer  = 0;
   player.dead             = false;
   player.dying            = false;
   player.inputsLocked     = false;
@@ -92,9 +96,9 @@ function resetPlayer(player) {
   player.dashRecovering   = false;
   player.dashRecoveryTimer = 0;
   player.wantsProjectile  = false;
-  player.projectileCooldown = 0;
   player.prevDash         = false;
   player.prevProjectile   = false;
+  player.hitFlashTimer    = 0;
 }
 
 function resolveAnimState(player) {
@@ -118,6 +122,20 @@ function stepAnimation(player) {
 
   const speed  = ANIM_SPEED[player.animState] ?? 6;
   const frames = ANIM_FRAMES[player.animState] ?? ['idle'];
+
+  if (player.hitFlashTimer > 0) player.hitFlashTimer--;
+
+  // Shield animation: advance while blocking, reset when not
+  if (player.blocking) {
+    player.shieldAnimTimer++;
+    if (player.shieldAnimTimer >= 4) {
+      player.shieldAnimTimer = 0;
+      player.shieldAnimFrame = (player.shieldAnimFrame + 1) % 9;
+    }
+  } else {
+    player.shieldAnimFrame = 0;
+    player.shieldAnimTimer = 0;
+  }
 
   // Hold last frame during dash recovery (and death)
   if (player.dashRecovering) {

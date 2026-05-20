@@ -25,6 +25,8 @@ test("button click sound path points at the native sound folder", () => {
   assertEqual(SOUND_PATHS.gameMusic, "assets/scratch/sounds/game-music.mp3");
   assertEqual(SOUND_PATHS.poopRelease, "assets/scratch/sounds/poop-release.mp3");
   assertEqual(SOUND_PATHS.splat, "assets/scratch/sounds/splat.mp3");
+  assertEqual(SOUND_PATHS.alan, "assets/scratch/sounds/alan.mp3");
+  assertEqual(SOUND_PATHS.sanjeetFast, "assets/scratch/sounds/sanjeet-fast.wav");
 });
 
 test("playButtonClick clones and plays the click sound", () => {
@@ -91,8 +93,10 @@ test("gameplay sound helpers play the mapped one-shot sounds", () => {
 
   assertEqual(controller.playPoopRelease(), true);
   assertEqual(controller.playSplat(), true);
+  assertEqual(controller.playNpcHit("sanjeetFast"), true);
   assertEqual(played[0], SOUND_PATHS.poopRelease);
   assertEqual(played[1], SOUND_PATHS.splat);
+  assertEqual(played[2], SOUND_PATHS.sanjeetFast);
 });
 
 test("background music loops and can be stopped", () => {

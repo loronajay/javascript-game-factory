@@ -11,6 +11,16 @@ export const spriteAssetDefs = {
   playerLeft:  { src: `${ASSET_BASE_PATH}/player-left.png` },
   playerRight: { src: `${ASSET_BASE_PATH}/player-right.png` },
 
+  playerDown1: { src: `${ASSET_BASE_PATH}/new-player/player-down1.png` },
+  playerDown2: { src: `${ASSET_BASE_PATH}/new-player/player-down2.png` },
+  playerDown3: { src: `${ASSET_BASE_PATH}/new-player/player-down3.png` },
+  playerUp1:   { src: `${ASSET_BASE_PATH}/new-player/player-up1.png` },
+  playerUp2:   { src: `${ASSET_BASE_PATH}/new-player/player-up2.png` },
+  playerUp3:   { src: `${ASSET_BASE_PATH}/new-player/player-up3.png` },
+  playerSide1: { src: `${ASSET_BASE_PATH}/new-player/player-side1.png` },
+  playerSide2: { src: `${ASSET_BASE_PATH}/new-player/player-side2.png` },
+  playerSide3: { src: `${ASSET_BASE_PATH}/new-player/player-side3.png` },
+
   alienPatrol: { src: `${ASSET_BASE_PATH}/alien.png` },
   powerCell:   { src: `${ASSET_BASE_PATH}/power-cell.png` },
   accessChip:  { src: `${ASSET_BASE_PATH}/access-chip.png` },
@@ -39,7 +49,12 @@ export const spriteAssetDefs = {
   lobbySplash: { src: `${ASSET_BASE_PATH}/lobby-splash.png` }
 };
 
-const PLAYER_SPRITE_NAMES = ['playerDown', 'playerUp', 'playerLeft', 'playerRight'];
+const PLAYER_SPRITE_NAMES = [
+  'playerDown', 'playerUp', 'playerLeft', 'playerRight',
+  'playerDown1', 'playerDown2', 'playerDown3',
+  'playerUp1', 'playerUp2', 'playerUp3',
+  'playerSide1', 'playerSide2', 'playerSide3',
+];
 
 export let sprites = {};
 

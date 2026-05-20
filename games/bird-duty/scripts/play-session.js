@@ -1,10 +1,11 @@
 export const SHOTS_PER_RUN = 10;
-export const GAME_OVER_TICKS = 120;
+export const GAME_OVER_TICKS = 240;
 
-export function createPlaySession() {
+export function createPlaySession(options = {}) {
+  const shotsPerRun = Math.max(0, Number(options.shotsPerRun ?? SHOTS_PER_RUN) || 0);
   return {
     phase: "running",
-    shotsRemaining: SHOTS_PER_RUN,
+    shotsRemaining: shotsPerRun,
     score: 0,
     finalScore: null,
     gameOverTicks: 0,
@@ -20,6 +21,13 @@ export function fireShot(session) {
   return {
     ...session,
     shotsRemaining: Math.max(0, session.shotsRemaining - 1),
+  };
+}
+
+export function addScore(session, amount) {
+  return {
+    ...session,
+    score: session.score + Math.max(0, Number(amount) || 0),
   };
 }
 

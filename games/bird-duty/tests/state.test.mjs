@@ -1,5 +1,6 @@
 import { MENU_ACTIONS } from "../scripts/menu-input.js";
 import { SCREEN, applyMenuAction, createInitialState } from "../scripts/state.js";
+import { TWO_PLAYER_ACTIONS } from "../scripts/two-player-menu.js";
 
 let passed = 0;
 let failed = 0;
@@ -36,11 +37,41 @@ test("single player starts gameplay immediately", () => {
   assertEqual(state.lastAction, MENU_ACTIONS.SINGLE_PLAYER);
 });
 
-test("two players records a pending two-player state", () => {
+test("two players opens the two-player mode selector", () => {
   const state = applyMenuAction(createInitialState(), MENU_ACTIONS.TWO_PLAYERS);
 
-  assertEqual(state.screen, SCREEN.TWO_PLAYER_PENDING);
+  assertEqual(state.screen, SCREEN.TWO_PLAYER_MENU);
   assertEqual(state.mode, "two-player");
+});
+
+test("local two-player action starts hotseat mode", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.TWO_PLAYER_MENU, mode: "two-player" },
+    TWO_PLAYER_ACTIONS.LOCAL
+  );
+
+  assertEqual(state.screen, SCREEN.HOTSEAT_PLAY);
+  assertEqual(state.mode, "hotseat");
+});
+
+test("online two-player action records online placeholder", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.TWO_PLAYER_MENU, mode: "two-player" },
+    TWO_PLAYER_ACTIONS.ONLINE
+  );
+
+  assertEqual(state.screen, SCREEN.TWO_PLAYER_MENU);
+  assertEqual(state.mode, "online-pending");
+});
+
+test("two-player back action returns to main menu", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.TWO_PLAYER_MENU, mode: "two-player" },
+    TWO_PLAYER_ACTIONS.BACK
+  );
+
+  assertEqual(state.screen, SCREEN.MENU);
+  assertEqual(state.mode, null);
 });
 
 test("navigation actions keep the current screen for the caller to handle", () => {

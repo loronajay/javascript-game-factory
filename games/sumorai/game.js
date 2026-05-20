@@ -1,11 +1,11 @@
-import { loadAssets }               from './scripts/assets.js';
+import { loadAssets, getSound }      from './scripts/assets.js';
 import { createInput }              from './scripts/input.js';
 import { LOCAL_2P_BINDINGS }       from './scripts/controls.js';
 import { createPlayer, resetPlayer, stepAnimation } from './scripts/player.js';
 import { applyPhysics }            from './scripts/physics.js';
-import { resolveHits }             from './scripts/combat.js';
+import { resolveHits, getAttackHitbox, getDashHitbox, isAttackActive, isDashAttackActive } from './scripts/combat.js';
 import { createGridlockState, tickGridlock } from './scripts/gridlock.js';
-import { createProjectile, tickProjectile, checkProjectileVsPlayer, checkProjectileClash, PROJ_SHIELD_KNOCKBACK } from './scripts/projectile.js';
+import { createProjectile, tickProjectile, checkProjectileVsPlayer, checkProjectileClash, checkHitboxVsProjectile, PROJ_SHIELD_KNOCKBACK } from './scripts/projectile.js';
 import { createCamera, updateCamera, resetCamera } from './scripts/camera.js';
 import { render, setScaleFactor }  from './scripts/renderer.js';
 import { VIEWPORT_W, VIEWPORT_H }  from './scripts/stage.js';
@@ -45,6 +45,9 @@ function _boot(sounds) {
     p2Projectile: null,
     gridlock:    null,
     effects:     [],
+    clashFlash:      0,   // 0–1 white flash intensity, decays each tick
+    deathFlash:      0,   // 0–1 red flash intensity on kill, decays each tick
+    roundStartTick:  0,   // ticks into the round-start banner sequence
     roundEnd:    null,
     platforms:   createPlatforms('single'),
   };
@@ -88,8 +91,57 @@ function _boot(sounds) {
   document.getElementById('btn-result-menu').addEventListener('click', () => {
     gameState.p1.wins = 0;
     gameState.p2.wins = 0;
+    stopAmbient();
     showScreen('screen-menu');
   });
+
+  // ── Clash effects ──────────────────────────────────────────────────────────
+
+  function spawnChing(x, y) {
+    gameState.clashFlash = 1;
+    gameState.effects.push({ type: 'ching', x, y, frame: 0, timer: 0, maxFrames: 5, ticksPerFrame: 1 });
+    playSound('ching');
+  }
+
+  function spawnBlood(x, y, flip) {
+    gameState.effects.push({ type: 'blood', x, y, frame: 0, timer: 0, maxFrames: 8, flip });
+  }
+
+  // ── Sound helpers ──────────────────────────────────────────────────────────
+  function playSound(name) {
+    const audio = getSound(name);
+    if (!audio) return;
+    const clone = audio.cloneNode();
+    clone.play().catch(() => {});
+  }
+
+  let ambientAudio = null;
+  function startAmbient() {
+    if (ambientAudio) return;
+    const audio = getSound('bg_music');
+    if (!audio) return;
+    audio.loop        = true;
+    audio.volume      = 0.25;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+    ambientAudio = audio;
+  }
+  function stopAmbient() {
+    if (!ambientAudio) return;
+    ambientAudio.pause();
+    ambientAudio.currentTime = 0;
+    ambientAudio = null;
+  }
+
+  function tickEffects() {
+    gameState.clashFlash = Math.max(0, gameState.clashFlash - 0.14);
+    gameState.deathFlash = Math.max(0, gameState.deathFlash - 0.06);
+    for (const fx of gameState.effects) {
+      fx.timer++;
+      if (fx.timer % (fx.ticksPerFrame ?? 3) === 0) fx.frame++;
+    }
+    gameState.effects = gameState.effects.filter(fx => fx.frame < fx.maxFrames);
+  }
 
   // ── Match flow ─────────────────────────────────────────────────────────────
   function startMatch() {
@@ -97,18 +149,25 @@ function _boot(sounds) {
     gameState.p2.wins = 0;
     gameState.roundNum = 0;
     gameState.roundEnd = null;
+    startAmbient();
     startRound();
   }
 
   function startRound() {
     gameState.roundNum++;
-    gameState.phase        = 'active';
-    gameState.platforms    = createPlatforms(selectedLayout);
-    gameState.p1Projectile = null;
-    gameState.p2Projectile = null;
-    gameState.gridlock     = null;
+    gameState.phase          = 'round_start';
+    gameState.roundStartTick = 0;
+    gameState.platforms      = createPlatforms(selectedLayout);
+    gameState.p1Projectile   = null;
+    gameState.p2Projectile   = null;
+    gameState.gridlock       = null;
+    gameState.effects        = [];
+    gameState.clashFlash     = 0;
+    gameState.deathFlash     = 0;
     resetPlayer(gameState.p1);
     resetPlayer(gameState.p2);
+    gameState.p1.inputsLocked = true;
+    gameState.p2.inputsLocked = true;
     resetCamera(camera);
     showScreen('screen-game');
   }
@@ -116,11 +175,54 @@ function _boot(sounds) {
   // ── Round end sequence ─────────────────────────────────────────────────────
 
   function triggerRoundEnd(winner, isBlastKill = false) {
-    gameState.phase = 'round_end';
-    const loserSide = winner === 'p1' ? 'p2' : 'p1';
-    const loser = gameState[loserSide];
+    gameState.phase      = 'round_end';
+    gameState.deathFlash = 1;
+    if (isBlastKill) playSound('explosion');
+    else             playSound('death');
+
+    if (winner === 'draw') {
+      for (const p of [gameState.p1, gameState.p2]) {
+        p.inputsLocked      = true;
+        p.attackTimer       = 0;
+        p.throwing          = false;
+        p.dashBursting      = false;
+        p.dashBurstTimer    = 0;
+        p.dashRecovering    = false;
+        p.dashRecoveryTimer = 0;
+        p.speedX            = 0;
+        if (!p.dead) {
+          p.dying = true;
+          if (!isBlastKill) spawnBlood(p.x - p.facing * 10, p.y - 14, p.facing === -1);
+        }
+      }
+      gameState.roundEnd = { winner: 'draw', loser: null, tick: 0, triggered: false, fadingIn: false, isBlastKill };
+      return;
+    }
+
+    const loserSide    = winner === 'p1' ? 'p2' : 'p1';
+    const loser        = gameState[loserSide];
+    const winnerPlayer = gameState[winner];
+
     loser.inputsLocked = true;
-    if (!loser.dead) loser.dying = true;
+    if (!loser.dead) {
+      loser.dying = true;
+      if (!isBlastKill) spawnBlood(
+        loser.x - loser.facing * 10,
+        loser.y - 14,
+        loser.facing === -1,
+      );
+    }
+
+    // Lock winner so held attack/movement doesn't loop during the death sequence
+    winnerPlayer.inputsLocked      = true;
+    winnerPlayer.attackTimer       = 0;
+    winnerPlayer.throwing          = false;
+    winnerPlayer.dashBursting      = false;
+    winnerPlayer.dashBurstTimer    = 0;
+    winnerPlayer.dashRecovering    = false;
+    winnerPlayer.dashRecoveryTimer = 0;
+    winnerPlayer.speedX            = 0;
+
     gameState.roundEnd = {
       winner,
       loser:      loserSide,
@@ -134,6 +236,7 @@ function _boot(sounds) {
   function tickRoundEnd() {
     const re = gameState.roundEnd;
     updatePlatforms(gameState.platforms);
+    tickEffects();
     stepAnimation(gameState.p1);
     stepAnimation(gameState.p2);
     updateCamera(camera, gameState.p1, gameState.p2);
@@ -141,8 +244,9 @@ function _boot(sounds) {
 
     if (re.tick === 180 && !re.triggered) {
       re.triggered = true;
-      if (re.winner === 'p1') gameState.p1.wins++;
-      else                    gameState.p2.wins++;
+      if      (re.winner === 'p1') gameState.p1.wins++;
+      else if (re.winner === 'p2') gameState.p2.wins++;
+      // 'draw': no wins awarded
 
       if (gameState.p1.wins >= gameState.roundTarget || gameState.p2.wins >= gameState.roundTarget) {
         gameState.phase = 'match_end';
@@ -157,14 +261,36 @@ function _boot(sounds) {
         gameState.gridlock     = null;
         resetPlayer(gameState.p1);
         resetPlayer(gameState.p2);
+        gameState.p1.inputsLocked = true;
+        gameState.p2.inputsLocked = true;
         resetCamera(camera);
         re.fadingIn = true;
       }
     }
 
     if (re.fadingIn && re.tick >= 240) {
+      gameState.phase          = 'round_start';
+      gameState.roundStartTick = 0;
+      gameState.roundEnd       = null;
+    }
+  }
+
+  // ── Round-start banner sequence ───────────────────────────────────────────
+
+  function tickRoundStart() {
+    gameState.roundStartTick++;
+    updatePlatforms(gameState.platforms);
+    stepAnimation(gameState.p1);
+    stepAnimation(gameState.p2);
+    updateCamera(camera, gameState.p1, gameState.p2);
+
+    if (gameState.roundStartTick === 1)  playSound('are_you_ready');
+    if (gameState.roundStartTick === 90) playSound('fight');
+
+    if (gameState.roundStartTick >= 150) {
       gameState.phase = 'active';
-      gameState.roundEnd = null;
+      gameState.p1.inputsLocked = false;
+      gameState.p2.inputsLocked = false;
     }
   }
 
@@ -173,16 +299,16 @@ function _boot(sounds) {
   let accum    = 0;
 
   function tick() {
-    if (gameState.phase === 'active') {
-      tickActive();
-    } else if (gameState.phase === 'round_end') {
-      tickRoundEnd();
-    }
+    if      (gameState.phase === 'active')      tickActive();
+    else if (gameState.phase === 'round_end')   tickRoundEnd();
+    else if (gameState.phase === 'round_start') tickRoundStart();
   }
 
   // ── Gridlock mash phase (sub-state of 'active') ───────────────────────────
 
   function tickGridlockPhase() {
+    tickEffects();
+
     const p1In = input.getSnapshot(bindings.p1);
     const p2In = input.getSnapshot(bindings.p2);
     input.flush();
@@ -194,6 +320,7 @@ function _boot(sounds) {
     updateCamera(camera, gameState.p1, gameState.p2);
 
     if (result?.resolved) {
+      playSound('gridlock_end');
       gameState.gridlock = null;
       gameState.p1.inGridlock   = false;
       gameState.p2.inGridlock   = false;
@@ -207,14 +334,38 @@ function _boot(sounds) {
   function tickActive() {
     if (gameState.gridlock) { tickGridlockPhase(); return; }
 
+    tickEffects();
+
     const p1In = input.getSnapshot(bindings.p1);
     const p2In = input.getSnapshot(bindings.p2);
     input.flush();
 
     updatePlatforms(gameState.platforms);
 
+    // Snapshot pre-physics states for transition-based sound detection
+    const p1WasCharging  = gameState.p1.dashCharge > 0;
+    const p2WasCharging  = gameState.p2.dashCharge > 0;
+    const p1WasBlocking  = gameState.p1.blocking;
+    const p2WasBlocking  = gameState.p2.blocking;
+    const p1WasAttacking = gameState.p1.attackTimer > 0;
+    const p2WasAttacking = gameState.p2.attackTimer > 0;
+    const p1WasDashAtk   = isDashAttackActive(gameState.p1);
+    const p2WasDashAtk   = isDashAttackActive(gameState.p2);
+
     const p1Result = applyPhysics(gameState.p1, p1In, gameState.platforms);
     const p2Result = applyPhysics(gameState.p2, p2In, gameState.platforms);
+
+    // Post-physics transition sounds
+    if (!p1WasCharging  && gameState.p1.dashCharge > 0) playSound('dash');
+    if (!p2WasCharging  && gameState.p2.dashCharge > 0) playSound('dash');
+    if (!p1WasBlocking  && gameState.p1.blocking)       playSound('shield');
+    if (!p2WasBlocking  && gameState.p2.blocking)       playSound('shield');
+    // Throw sound fires on attack start; swing is deferred to hitbox-active frame below
+    if (!p1WasAttacking && gameState.p1.attackTimer > 0 && gameState.p1.throwing) playSound('throw');
+    if (!p2WasAttacking && gameState.p2.attackTimer > 0 && gameState.p2.throwing) playSound('throw');
+    // Dash attack swing fires when the dash hitbox first goes live
+    if (!p1WasDashAtk && isDashAttackActive(gameState.p1)) playSound('swing');
+    if (!p2WasDashAtk && isDashAttackActive(gameState.p2)) playSound('swing');
 
     // ── Projectile spawning ──────────────────────────────────────────────────
     if (gameState.p1.wantsProjectile && !gameState.p1Projectile) {
@@ -230,8 +381,28 @@ function _boot(sounds) {
 
     // ── Projectile clash ─────────────────────────────────────────────────────
     if (checkProjectileClash(gameState.p1Projectile, gameState.p2Projectile)) {
+      spawnChing(
+        (gameState.p1Projectile.x + gameState.p2Projectile.x) / 2,
+        (gameState.p1Projectile.y + gameState.p2Projectile.y) / 2,
+      );
       gameState.p1Projectile.active = false;
       gameState.p2Projectile.active = false;
+    }
+
+    // ── Sword deflection: melee/dash hitbox destroys opponent's projectile ───
+    const p1Box = isAttackActive(gameState.p1)     ? getAttackHitbox(gameState.p1)
+                : isDashAttackActive(gameState.p1)  ? getDashHitbox(gameState.p1)
+                : null;
+    const p2Box = isAttackActive(gameState.p2)     ? getAttackHitbox(gameState.p2)
+                : isDashAttackActive(gameState.p2)  ? getDashHitbox(gameState.p2)
+                : null;
+    if (p1Box && checkHitboxVsProjectile(p1Box, gameState.p2Projectile)) {
+      spawnChing(gameState.p2Projectile.x, gameState.p2Projectile.y);
+      gameState.p2Projectile.active = false;
+    }
+    if (p2Box && checkHitboxVsProjectile(p2Box, gameState.p1Projectile)) {
+      spawnChing(gameState.p1Projectile.x, gameState.p1Projectile.y);
+      gameState.p1Projectile.active = false;
     }
 
     // ── Projectile vs player ─────────────────────────────────────────────────
@@ -245,8 +416,10 @@ function _boot(sounds) {
         if (r === 'block') {
           gameState.p1.speedX = facing * PROJ_SHIELD_KNOCKBACK;
           gameState.p1.stamina = Math.max(0, gameState.p1.stamina - 3);
+          playSound('ching');
         } else {
           projKillP1 = true;
+          playSound('proj_hit');
         }
       }
     }
@@ -261,8 +434,10 @@ function _boot(sounds) {
         if (r === 'block') {
           gameState.p2.speedX = facing * PROJ_SHIELD_KNOCKBACK;
           gameState.p2.stamina = Math.max(0, gameState.p2.stamina - 3);
+          playSound('ching');
         } else {
           projKillP2 = true;
+          playSound('proj_hit');
         }
       }
     }
@@ -270,8 +445,26 @@ function _boot(sounds) {
     // ── Melee hit resolution ─────────────────────────────────────────────────
     const combatResult = resolveHits(gameState.p1, gameState.p2);
 
+    if (combatResult && !combatResult.gridlock) {
+      if (combatResult.p1HitP2) {
+        playSound(gameState.p1.dashBursting ? 'dash2' : 'hit');
+        playSound(combatResult.p2Killed ? 'hurt' : 'ching');
+      }
+      if (combatResult.p2HitP1) {
+        playSound(gameState.p2.dashBursting ? 'dash2' : 'hit');
+        playSound(combatResult.p1Killed ? 'hurt' : 'ching');
+      }
+    }
+
+    const p1WasSwingActive = isAttackActive(gameState.p1);
+    const p2WasSwingActive = isAttackActive(gameState.p2);
+
     stepAnimation(gameState.p1);
     stepAnimation(gameState.p2);
+
+    if (!p1WasSwingActive && isAttackActive(gameState.p1)) playSound('swing');
+    if (!p2WasSwingActive && isAttackActive(gameState.p2)) playSound('swing');
+
     updateCamera(camera, gameState.p1, gameState.p2);
 
     // ── Clean up inactive projectiles ────────────────────────────────────────
@@ -280,11 +473,20 @@ function _boot(sounds) {
 
     // ── Gridlock entry ───────────────────────────────────────────────────────
     if (combatResult?.gridlock) {
-      gameState.gridlock       = createGridlockState();
-      gameState.p1.inGridlock  = true;
-      gameState.p2.inGridlock  = true;
-      gameState.p1.inputsLocked = true;
-      gameState.p2.inputsLocked = true;
+      spawnChing(
+        (gameState.p1.x + gameState.p2.x) / 2,
+        (gameState.p1.y + gameState.p2.y) / 2,
+      );
+      gameState.gridlock = createGridlockState();
+      for (const p of [gameState.p1, gameState.p2]) {
+        p.inGridlock        = true;
+        p.inputsLocked      = true;
+        p.dashBursting      = false;
+        p.dashBurstTimer    = 0;
+        p.dashRecovering    = false;
+        p.dashRecoveryTimer = 0;
+        p.speedX            = 0;
+      }
       return;
     }
 
@@ -295,10 +497,9 @@ function _boot(sounds) {
     if (p1Dead || p2Dead) {
       if (p1Dead) { gameState.p1.dead = (p1Result === 'dead'); gameState.p1.inputsLocked = true; }
       if (p2Dead) { gameState.p2.dead = (p2Result === 'dead'); gameState.p2.inputsLocked = true; }
-      // Determine winner (opposite of who died); simultaneous → p1 wins
       const winner = (p2Dead && !p1Dead) ? 'p1'
                    : (p1Dead && !p2Dead) ? 'p2'
-                   : 'p1';
+                   : 'draw';
       const isBlastKill = (p1Dead && p1Result === 'dead') || (p2Dead && p2Result === 'dead');
       triggerRoundEnd(winner, isBlastKill);
     }
@@ -314,7 +515,10 @@ function _boot(sounds) {
     }
     lastTime = ts;
 
-    if (gameState.phase === 'active' || gameState.phase === 'round_end') {
+    if (gameState.phase === 'active'      ||
+        gameState.phase === 'round_end'   ||
+        gameState.phase === 'round_start' ||
+        gameState.phase === 'match_end') {
       render(ctx, canvas, gameState, camera);
     }
 
