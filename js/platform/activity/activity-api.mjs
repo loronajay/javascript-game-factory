@@ -16,6 +16,7 @@ import {
 import {
   buildBattleshitsMatchActivity,
   buildLoversLostRunActivity,
+  buildSumoraiMatchActivity,
 } from "./activity-builders.mjs";
 
 function queueSharedSessionRelationshipUpdate(leftPlayerId, rightPlayerId, options = {}) {
@@ -60,6 +61,25 @@ function maybeRecordSharedSessionFromActivity(activity, storage, options = {}) {
       occurredAt: item.createdAt,
     };
     queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
+    return;
+  }
+
+  if (item.gameSlug === "sumorai") {
+    const myProfile = normalizeIdentity(item.metadata?.myProfile);
+    const opponentProfile = normalizeIdentity(item.metadata?.opponentProfile);
+    const matchResult = sanitizeSingleLine(item.metadata?.matchResult, 24).toLowerCase();
+    if (!myProfile.playerId || !opponentProfile.playerId || matchResult === "forfeit_win") return;
+
+    const sessionOptions = {
+      storage,
+      apiClient: options?.apiClient,
+      sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
+      gameSlug: item.gameSlug,
+      startedTogether: true,
+      reachedResults: true,
+      occurredAt: item.createdAt,
+    };
+    queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
   }
 }
 
@@ -78,6 +98,12 @@ export function publishLoversLostRunActivity(runSummary, options = {}) {
 export function publishBattleshitsMatchActivity(match, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildBattleshitsMatchActivity(match, options);
+  return publishActivityItemWithApi(item, storage, options);
+}
+
+export function publishSumoraiMatchActivity(match, options = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const item = buildSumoraiMatchActivity(match, options);
   return publishActivityItemWithApi(item, storage, options);
 }
 

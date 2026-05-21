@@ -17,6 +17,8 @@ import { VIEWPORT_W, VIEWPORT_H }  from './scripts/stage.js';
 import { createPlatforms, updatePlatforms } from './scripts/platforms.js';
 import { createOnlineClient, getCountdownSecondsRemaining } from './scripts/online.js';
 import { buildOnlineIdentity } from './scripts/online-identity.js';
+import { publishSumoraiMatchActivity } from '../../js/platform/activity/activity.mjs';
+import { createPlatformApiClient } from '../../js/platform/api/platform-api.mjs';
 
 const TICK_MS        = 1000 / 60;
 const ROLLBACK_WINDOW = 12;   // frames of rollback history (~200 ms at 60 hz)
@@ -38,6 +40,18 @@ function _boot(sounds) {
   }
   window.addEventListener('resize', resize);
   resize();
+
+  // Warn before leaving the page during an active online match (forfeit guard)
+  window.addEventListener('beforeunload', (e) => {
+    if (!isOnline) return;
+    const activePhase = gameState.phase === 'active'      ||
+                        gameState.phase === 'round_end'   ||
+                        gameState.phase === 'round_start' ||
+                        gameState.phase === 'online_countdown';
+    if (!activePhase) return;
+    e.preventDefault();
+    e.returnValue = '';  // triggers browser's native "Leave site?" dialog
+  });
 
   // ── State ──────────────────────────────────────────────────────────────────
   const input  = createInput();
@@ -591,6 +605,33 @@ function _boot(sounds) {
     };
   }
 
+  function _publishOnlineMatchResult(matchWinner) {
+    const myResult   = matchWinner === onlineSide ? 'win' : 'loss';
+    const sessionId  = `sumorai:${onlineMatchSeed}`;
+
+    publishSumoraiMatchActivity({
+      result:          myResult,
+      mySide:          onlineSide,
+      p1Wins:          gameState.p1.wins,
+      p2Wins:          gameState.p2.wins,
+      myProfile:       onlineIdentity,
+      opponentProfile: onlineRemoteIdentity,
+      sessionId,
+    }).catch(() => {});
+
+    // Update ELO — both players call this; session dedup on the server prevents double-applying
+    if (onlineIdentity?.playerId && onlineRemoteIdentity?.playerId) {
+      const apiClient = createPlatformApiClient();
+      if (typeof apiClient?.updateGameRating === 'function') {
+        apiClient.updateGameRating('sumorai', {
+          opponentPlayerId: onlineRemoteIdentity.playerId,
+          outcome:          myResult,
+          sessionId,
+        }).catch(() => {});
+      }
+    }
+  }
+
   function _startOnlineMatch() {
     const myName     = onlineIdentity?.displayName || factoryName;
     const remoteName = onlineRemoteIdentity?.displayName || 'Opponent';
@@ -932,6 +973,7 @@ function _boot(sounds) {
             re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
           document.getElementById('online-result-opponent').textContent =
             onlineRemoteIdentity?.displayName ? `vs ${onlineRemoteIdentity.displayName}` : '';
+          _publishOnlineMatchResult(re.winner);
           setTimeout(() => showScreen('screen-online-result'), 2000);
         } else {
           document.getElementById('result-winner').textContent =

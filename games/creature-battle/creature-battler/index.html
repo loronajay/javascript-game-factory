@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Creature Battle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/title.css">
+  <link rel="stylesheet" href="styles/mode-select.css">
+  <link rel="stylesheet" href="styles/team-select.css">
+  <link rel="stylesheet" href="styles/battle.css">
+</head>
+<body>
+  <div id="game-shell">
+    <div id="game-canvas">
+
+      <div id="screen-title" class="screen active"></div>
+
+      <div id="screen-mode-select" class="screen">
+        <!-- rendered by screen-mode-select.js -->
+      </div>
+
+      <div id="screen-team-select" class="screen">
+        <!-- rendered by screen-team-select.js -->
+      </div>
+
+      <div id="screen-battle" class="screen">
+        <!-- rendered by screen-battle.js -->
+      </div>
+
+    </div>
+  </div>
+
+  <script src="scripts/config.js"></script>
+  <script src="scripts/state.js"></script>
+  <script src="scripts/screen-title.js"></script>
+  <script src="scripts/screen-mode-select.js"></script>
+  <script src="scripts/screen-team-select.js"></script>
+  <script src="scripts/screen-battle.js"></script>
+  <script src="scripts/input.js"></script>
+  <script src="scripts/init-game.js"></script>
+</body>
+</html>

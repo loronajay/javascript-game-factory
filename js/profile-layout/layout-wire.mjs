@@ -18,6 +18,13 @@ import {
   getCompositionElementDef,
   isCustomTitleElementId,
 } from "./composition-layout.mjs";
+import {
+  buildZoomFrame,
+  clampZoom,
+  computeFitZoom,
+  computeLiveCanvasWidth,
+  getLayoutMaxRow,
+} from "./layout-zoom.mjs";
 import { applyCompositionElementScaling, renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
@@ -149,33 +156,20 @@ if (doc?.getElementById) {
 
     // --- zoom ---
 
-    function getMaxRow(layout) {
-      const panels = layout?.desktop?.panels ?? [];
-      return panels.reduce((max, p) => Math.max(max, (p.y || 0) + (p.h || 1)), 0);
-    }
-
     function applyZoom(z) {
-      zoom = Math.max(0.25, Math.min(1, z));
+      zoom = clampZoom(z);
       if (canvas) {
-        if (zoom < 1) {
-          const scaledW = canvas.offsetWidth * zoom;
-          const wrapW = canvasWrap.clientWidth || window.innerWidth;
-          // Center the scaled canvas horizontally; fall back to left-align if it's wider than wrap.
-          const tx = Math.max(0, (wrapW - scaledW) / 2);
-          canvas.style.transform = `translateX(${tx}px) scale(${zoom})`;
-          canvas.style.transformOrigin = "top left";
-          canvas.style.marginLeft = "0";
-          // Prevent the unscaled layout box from creating a horizontal scrollbar.
-          canvasWrap.style.overflowX = scaledW <= wrapW ? "hidden" : "auto";
-          if (canvas.offsetHeight) {
-            canvasWrap.style.height = `${Math.ceil(canvas.offsetHeight * zoom)}px`;
-          }
-        } else {
-          canvas.style.transform = "";
-          canvas.style.transformOrigin = "";
-          canvasWrap.style.height = "";
-          canvasWrap.style.overflowX = "auto";
-        }
+        const frame = buildZoomFrame({
+          zoom,
+          canvasWidth: canvas.offsetWidth,
+          canvasHeight: canvas.offsetHeight,
+          wrapWidth: canvasWrap.clientWidth || window.innerWidth,
+        });
+        canvas.style.transform = frame.transform;
+        canvas.style.transformOrigin = frame.transformOrigin;
+        canvas.style.marginLeft = frame.marginLeft;
+        canvasWrap.style.height = frame.wrapHeight;
+        canvasWrap.style.overflowX = frame.overflowX;
       }
       if (zoomFitBtn) zoomFitBtn.textContent = zoom < 1 ? `Zoom: ${Math.round(zoom * 100)}%` : "Fit";
     }
@@ -184,21 +178,23 @@ if (doc?.getElementById) {
     // in the editor are identical to what the player sees on /me and /player.
     function syncCanvasWidth() {
       if (!canvas) return;
-      const liveW = Math.min(window.innerWidth * 0.94, 1380);
+      const liveW = computeLiveCanvasWidth(window.innerWidth);
       canvas.style.width = `${liveW}px`;
     }
 
     function fitToScreen() {
       if (!canvas || !canvasWrap) return;
       const { rowHeight, gap } = getGridMetrics(canvas);
-      const rows = getMaxRow(currentLayout);
-      const totalHeight = rows * rowHeight + Math.max(0, rows - 1) * gap;
-      const canvasW = canvas.offsetWidth;
-      const availH = canvasWrap.clientHeight || window.innerHeight * 0.75;
-      const availW = canvasWrap.clientWidth || window.innerWidth;
-      const zH = availH / totalHeight;
-      const zW = canvasW > 0 && availW > 0 ? availW / canvasW : 1;
-      applyZoom(Math.min(1, zH, zW));
+      applyZoom(computeFitZoom({
+        rowHeight,
+        gap,
+        rowCount: getLayoutMaxRow(currentLayout),
+        canvasWidth: canvas.offsetWidth,
+        wrapWidth: canvasWrap.clientWidth,
+        wrapHeight: canvasWrap.clientHeight,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+      }));
     }
 
     zoomFitBtn?.addEventListener("click", fitToScreen);

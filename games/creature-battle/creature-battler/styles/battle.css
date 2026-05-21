@@ -1,0 +1,215 @@
+#screen-battle {
+  flex-direction: column;
+  background: #020d1a;
+}
+
+/* Background layer */
+.battle-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('../../game-docs/battle_scene_canon_docs/battle_scene_canon_docs/assets/reference/arena_background_reference.png');
+  background-size: cover;
+  background-position: center;
+}
+
+/* Top HUD */
+.battle-hud {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: 100%;
+  background: var(--cb-panel-bg);
+  border-bottom: 3px solid var(--cb-border);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.7), 0 1px 0 var(--cb-accent-soft);
+  flex-shrink: 0;
+}
+
+.hud-side {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.hud-side.enemy {
+  justify-content: flex-end;
+}
+
+.hud-divider {
+  width: 3px;
+  background: linear-gradient(180deg, transparent, var(--cb-accent-soft), transparent);
+  flex-shrink: 0;
+}
+
+.hud-creature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(3, 31, 68, 0.6);
+  border: 1px solid rgba(39, 202, 255, 0.2);
+  border-radius: 8px;
+  min-width: 130px;
+}
+
+.hud-portrait {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.hud-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hud-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--cb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.hud-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.hud-bar-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.hud-bar-label.hp { color: var(--cb-hp); }
+.hud-bar-label.mp { color: var(--cb-mp); }
+
+.hud-bar-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hud-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.hud-bar-fill.hp { background: var(--cb-hp); box-shadow: 0 0 4px rgba(53, 216, 75, 0.5); }
+.hud-bar-fill.mp { background: var(--cb-mp); box-shadow: 0 0 4px rgba(39, 191, 255, 0.5); }
+
+.hud-bar-nums {
+  font-size: 8px;
+  color: var(--cb-muted);
+  white-space: nowrap;
+  min-width: 44px;
+  text-align: right;
+}
+
+/* Battlefield creature layer */
+.battle-field {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.battle-creature {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -50%);
+}
+
+.battle-creature img {
+  image-rendering: pixelated;
+  object-fit: contain;
+  display: block;
+}
+
+.battle-creature.enemy img {
+  transform: scaleX(-1);
+}
+
+.battle-shadow {
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, transparent 70%);
+  margin: -4px auto 0;
+  pointer-events: none;
+}
+
+/* Bottom command panel */
+.battle-commands {
+  position: relative;
+  z-index: 10;
+  background: var(--cb-panel-bg);
+  border-top: 3px solid var(--cb-border);
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.7), 0 -1px 0 var(--cb-accent-soft);
+  padding: 10px 16px;
+  flex-shrink: 0;
+}
+
+.battle-commands-prompt {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--cb-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.battle-commands-row {
+  display: flex;
+  gap: 8px;
+}
+
+.command-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 8px;
+  background: rgba(3, 31, 68, 0.7);
+  border: 2px solid rgba(39, 202, 255, 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.1s, box-shadow 0.1s, background 0.1s;
+}
+
+.command-btn:hover,
+.command-btn.focused {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 12px var(--cb-accent-soft);
+  background: var(--cb-panel-bg-soft);
+}
+
+.command-btn.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.command-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.command-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+}

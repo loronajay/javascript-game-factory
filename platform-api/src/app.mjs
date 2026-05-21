@@ -7,6 +7,7 @@ import { handleAuthRoute } from "./routes/auth-routes.mjs";
 import { handleMessageRoute } from "./routes/message-routes.mjs";
 import { handleNotificationRoute } from "./routes/notification-routes.mjs";
 import { handleLayoutRoute } from "./routes/layout-routes.mjs";
+import { handleRatingRoute } from "./routes/rating-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
 import { handleThoughtRoute } from "./routes/thought-routes.mjs";
 import { handlePhotoRoute } from "./routes/photo-routes.mjs";
@@ -179,6 +180,12 @@ export function createApp(options = {}) {
   const savePlayerLayout = typeof options?.savePlayerLayout === "function"
     ? options.savePlayerLayout
     : async () => null;
+  const getGameRating = typeof options?.getGameRating === "function"
+    ? options.getGameRating
+    : async () => null;
+  const recordMatchRating = typeof options?.recordMatchRating === "function"
+    ? options.recordMatchRating
+    : async () => null;
   const savePlayerPhoto = typeof options?.savePlayerPhoto === "function"
     ? options.savePlayerPhoto
     : async () => null;
@@ -284,6 +291,10 @@ export function createApp(options = {}) {
   const layoutServices = {
     loadPlayerLayout,
     savePlayerLayout,
+  };
+  const ratingServices = {
+    getGameRating,
+    recordMatchRating,
   };
   const notificationServices = {
     listNotifications,
@@ -456,6 +467,19 @@ export function createApp(options = {}) {
       requestOrigin,
       timestamp,
       services: layoutServices,
+    })) {
+      return;
+    }
+
+    if (await handleRatingRoute({
+      req,
+      res,
+      method,
+      pathname,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: ratingServices,
     })) {
       return;
     }

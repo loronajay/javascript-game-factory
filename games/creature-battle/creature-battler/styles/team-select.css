@@ -1,0 +1,203 @@
+#screen-team-select {
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 10%, rgba(6, 79, 143, 0.35) 0%, transparent 50%),
+    linear-gradient(180deg, #01111f 0%, #020d1a 100%);
+}
+
+.team-select-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 0;
+  flex-shrink: 0;
+}
+
+.team-select-title {
+  text-align: center;
+  flex: 1;
+}
+
+.team-select-title .phase-label {
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--cb-accent);
+  margin-bottom: 2px;
+}
+
+.team-select-title h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+  text-shadow: 0 0 16px var(--cb-accent-soft);
+}
+
+.team-select-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+  padding: 16px 20px 12px;
+}
+
+/* Roster grid */
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  flex: 1;
+  align-content: start;
+}
+
+.creature-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 10px 10px;
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+  position: relative;
+  user-select: none;
+}
+
+.creature-card:hover,
+.creature-card.focused {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 14px var(--cb-accent-soft);
+  background: var(--cb-panel-bg-soft);
+}
+
+.creature-card.selected {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 18px var(--cb-accent-soft), inset 0 0 12px rgba(39, 202, 255, 0.08);
+  background: rgba(3, 70, 120, 0.75);
+}
+
+.creature-card.picked-by-other {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.creature-card-sprite {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.6));
+}
+
+.creature-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+  margin-bottom: 3px;
+}
+
+.creature-card-role {
+  font-size: 10px;
+  color: var(--cb-muted);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.selected-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cb-accent);
+  text-shadow: 0 0 8px var(--cb-accent-soft);
+}
+
+/* Selected team sidebar */
+.team-sidebar {
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.team-sidebar-label {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cb-muted);
+  text-align: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(39, 202, 255, 0.15);
+}
+
+.team-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-border);
+  border-radius: 10px;
+  min-height: 52px;
+}
+
+.team-slot.filled {
+  border-color: rgba(39, 202, 255, 0.3);
+}
+
+.team-slot-sprite {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.team-slot-empty-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px dashed rgba(168, 216, 239, 0.2);
+  flex-shrink: 0;
+}
+
+.team-slot-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cb-text);
+}
+
+.team-slot-empty-text {
+  font-size: 11px;
+  color: rgba(168, 216, 239, 0.3);
+  font-style: italic;
+}
+
+.team-select-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 14px;
+  flex-shrink: 0;
+}
+
+.team-select-hint {
+  font-size: 12px;
+  color: var(--cb-muted);
+  letter-spacing: 0.06em;
+}
+
+.team-select-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cb-accent);
+}

@@ -249,9 +249,10 @@ export function createOnlineClient() {
     });
   }
 
-  function findMatch(side) {
+  function findMatch(side, ranked = false) {
     _mySide = side;
-    _send({ type: 'find_match', gameId: 'sumorai', side, ...sanitizeIdentityPayload(_identity) });
+    const gameId = ranked ? 'sumorai-ranked' : 'sumorai';
+    _send({ type: 'find_match', gameId, side, ...sanitizeIdentityPayload(_identity) });
   }
 
   function createRoom(side) {

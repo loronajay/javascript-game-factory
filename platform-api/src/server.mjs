@@ -9,6 +9,7 @@ import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
+import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import {
   createFriendshipBetweenPlayers,
   loadPlayerRelationships,
@@ -176,6 +177,8 @@ async function bootstrap() {
     listMessages: (convId) => listMessages(pool, convId),
     createMessage: (params) => createMessage(pool, params),
     markConversationRead: (convId, playerId) => markConversationRead(pool, convId, playerId),
+    getGameRating: (gameSlug, playerId) => getGameRating(pool, playerId, gameSlug),
+    recordMatchRating: (gameSlug, params) => recordMatchRating(pool, { ...params, gameSlug }),
     savePlayerPhoto: (params) => savePlayerPhoto(pool, params),
     listPlayerPhotos: (playerId, opts) => listPlayerPhotos(pool, playerId, opts),
     getPlayerPhoto: (photoId, opts) => getPlayerPhoto(pool, photoId, opts),

@@ -410,5 +410,15 @@ export function createPlatformApiClient(options = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? get(`/players/${encoded}/layout`, "layout") : Promise.resolve(null);
     },
+    // ELO/MMR
+    updateGameRating(gameSlug, { opponentPlayerId, outcome, sessionId }) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded ? post(`/ratings/${encoded}`, { opponentPlayerId, outcome, sessionId }) : Promise.resolve(null);
+    },
+    getGameRating(gameSlug, playerId) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? get(`/ratings/${gs}/${pid}`, "rating") : Promise.resolve(null);
+    },
   };
 }

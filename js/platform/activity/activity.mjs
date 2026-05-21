@@ -10,6 +10,7 @@ export { loadActivityFeed } from "./activity-store.mjs";
 export {
   buildBattleshitsMatchActivity,
   buildLoversLostRunActivity,
+  buildSumoraiMatchActivity,
 } from "./activity-builders.mjs";
 
 export {
@@ -17,5 +18,6 @@ export {
   publishActivityItemWithApi,
   publishBattleshitsMatchActivity,
   publishLoversLostRunActivity,
+  publishSumoraiMatchActivity,
   syncActivityFeedFromApi,
 } from "./activity-api.mjs";

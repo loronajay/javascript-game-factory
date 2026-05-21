@@ -46,6 +46,48 @@ export function buildLoversLostRunActivity(runSummary, options = {}) {
   });
 }
 
+export function buildSumoraiMatchActivity(match, options = {}) {
+  const source = isPlainObject(match) ? match : {};
+  const myProfile = normalizeIdentity(source.myProfile);
+  const opponentProfile = normalizeIdentity(source.opponentProfile);
+  const actorDisplayName = myProfile.displayName || actorNameFromOptions(options);
+  const result = sanitizeSingleLine(source.result, 24).toLowerCase() || "loss";
+  const opponentName = opponentProfile.displayName || "an opponent";
+  const p1Wins = Math.max(0, Math.floor(Number(source.p1Wins) || 0));
+  const p2Wins = Math.max(0, Math.floor(Number(source.p2Wins) || 0));
+  const myWins = source.mySide === "p1" ? p1Wins : p2Wins;
+  const oppWins = source.mySide === "p1" ? p2Wins : p1Wins;
+
+  let text;
+  if (result === "forfeit_win") {
+    text = `${actorDisplayName} won a Sumorai match by forfeit against ${opponentName}.`;
+  } else if (result === "win") {
+    text = `${actorDisplayName} defeated ${opponentName} in Sumorai (${myWins}-${oppWins}).`;
+  } else {
+    text = `${actorDisplayName} lost a Sumorai match to ${opponentName} (${myWins}-${oppWins}).`;
+  }
+
+  return normalizeActivityItem({
+    type: "game-result",
+    actorPlayerId: myProfile.playerId || sanitizeSingleLine(options?.actorPlayerId, 80),
+    actorDisplayName,
+    gameSlug: "sumorai",
+    summary: text,
+    visibility: options?.visibility || "friends",
+    createdAt: source.createdAt || options?.createdAt,
+    metadata: {
+      matchResult: result,
+      mySide: sanitizeSingleLine(source.mySide, 4),
+      p1Wins,
+      p2Wins,
+      opponentDisplayName: opponentProfile.displayName,
+      sessionId: sanitizeSingleLine(source.sessionId, 120) || sanitizeSingleLine(options?.sessionId, 120),
+      myProfile,
+      opponentProfile,
+    },
+  });
+}
+
 export function buildBattleshitsMatchActivity(match, options = {}) {
   const source = isPlainObject(match) ? match : {};
   const myProfile = normalizeIdentity(source.myProfile);
