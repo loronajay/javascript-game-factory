@@ -183,7 +183,7 @@ function renderCompositionElements(container, elements, options = {}) {
     ].filter(Boolean).join(" ");
     applyCompositionRectStyle(tile, element);
     applyTileVisualStyle(tile, element.style);
-    renderCompositionElementContent(tile, element, def, options.previewModels.hero);
+    renderCompositionElementContent(tile, element, def, options.previewModels);
 
     if (options.editMode) {
       const handle = document.createElement("button");
@@ -223,7 +223,8 @@ function renderCompositionElements(container, elements, options = {}) {
   }
 }
 
-function renderCompositionElementContent(tile, element, def, heroModel) {
+function renderCompositionElementContent(tile, element, def, previewModels) {
+  const heroModel = previewModels.hero;
   if (def.type === "surface") {
     tile.classList.add("profile-layout-composition-surface");
     if (def.category === "hero") {
