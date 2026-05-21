@@ -146,14 +146,12 @@ Goal: full match flow, win tracking, timer, result screen.
 
 - [ ] `round.js`
   - State machine: `countdown → active → round_end → [next round | match_end]`
-  - Round timer countdown at 60 Hz; sudden death flag on expiry
-  - Stamina tiebreak on timeout
   - `startRound()`, `endRound(winner)`, `endMatch(winner)`
+  - No timer, no tiebreak — rounds end only on kill or ring-out
 - [ ] `hud.js`
   - Stamina meter (s0–s10 sprite per player)
   - Round win meter (p1_frame/p2_frame sprites)
-  - Countdown timer text
-  - Round banner overlay: "Round N", "FIGHT!", "P1/P2 Wins", "GAME OVER", tie/sudden death
+  - Round banner overlay: "Round N", "FIGHT!", "P1/P2 Wins", "GAME OVER"
   - Gridlock mash bars (visible only during gridlock phase)
 - [ ] Pre-match setup screen in `game.js`: BO3 / BO5 picker before first round
 - [ ] Match result screen: winner display, rematch / back to menu
@@ -252,4 +250,4 @@ games/sumorai/
 | combat.js      | Hit detection overlap, hitstun application, shield knockback impulse, gridlock trigger condition |
 | gridlock.js    | Mash progress increments, win condition, tie condition, knockback direction |
 | projectile.js  | Movement per tick, hit detection, block destroy, clash cancel at midpoint |
-| round.js       | Timer countdown, win threshold, tiebreak logic, state transitions |
+| round.js       | Win threshold, state transitions (no timer or tiebreak)           |

@@ -127,10 +127,11 @@
 .profile-composition-overlay--gallery-grid .gallery-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(clamp(40px, 18%, 82px), 1fr));
-  gap: clamp(4px, 2%, 10px);
-  padding: clamp(4px, 2%, 10px);
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: clamp(3px, 1.3%, 8px);
+  padding: clamp(4px, 1.8%, 10px);
   align-content: start;
+  justify-content: start;
   box-sizing: border-box;
 }
 
@@ -547,9 +548,9 @@
 }
 
 [data-profile-child-id="content"].gallery-panel__content > .gallery-grid {
-  grid-template-columns: repeat(auto-fit, minmax(clamp(40px, 18%, 82px), 1fr));
-  gap: clamp(4px, 2%, 10px);
-  padding: clamp(4px, 2%, 10px);
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: clamp(3px, 1.3%, 8px);
+  padding: clamp(4px, 1.8%, 10px);
 }
 
 [data-profile-child-id="content"].gallery-panel__content .gallery-item__caption {
