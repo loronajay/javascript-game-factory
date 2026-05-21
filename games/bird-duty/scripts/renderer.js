@@ -513,8 +513,11 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.lineWidth = Math.max(2, 2 * grow);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    const hasDigits = /\d/.test(button.label);
     const fontSize = (button.label.length > 7 ? 18 : 24) * grow;
-    ctx.font = `${fontSize}px ${GAME_OVER_FONT}`;
+    ctx.font = hasDigits
+      ? `bold ${Math.max(18, fontSize)}px ${HUD_VALUE_FONT}`
+      : `${fontSize}px ${GAME_OVER_FONT}`;
     if (hot && !disabled) {
       ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
       ctx.shadowBlur = 0;
@@ -576,8 +579,10 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `bold 38px ${HUD_VALUE_FONT}`;
-    ctx.fillStyle = code ? "#ffffff" : "rgba(255, 255, 255, 0.72)";
-    ctx.fillText(code || "------", SCRATCH_STAGE.width / 2, boxY + boxH / 2 + 1);
+    ctx.fillStyle = "#ffffff";
+    if (code) {
+      ctx.fillText(code, SCRATCH_STAGE.width / 2, boxY + boxH / 2 + 1);
+    }
     if (showCursor) {
       const cursorX = SCRATCH_STAGE.width / 2 + ctx.measureText(code || "").width / 2 + 8;
       ctx.fillStyle = "#b8ff00";
