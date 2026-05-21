@@ -2,6 +2,7 @@ export const ARCADE_GAME_SLUGS = Object.freeze([
   "lovers-lost",
   "battleshits",
   "echo-duel",
+  "bird-duty",
   "circuit-siege",
   "illuminauts",
 ]);
