@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs";
+import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260521-gallery-photo-defaults-2";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -9,7 +9,7 @@ import {
   CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
   isCustomTitleElementId,
-} from "./composition-layout.mjs";
+} from "./composition-layout.mjs?v=20260521-gallery-photo-defaults-2";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -159,12 +159,30 @@ function migrateCompositionElementGeometry(id, raw, def) {
   const looksLikeOldTinyPhotoDefault = numbersEqual(rawW, 0.4) && numbersEqual(rawH, 0.62);
   if (!looksLikeOldTinyPhotoDefault) return raw;
 
+  const migratedDefault = getMigratedGalleryPhotoDefault(id, def);
   return {
     ...raw,
-    x: def.defaultX,
-    y: def.defaultY,
-    w: def.defaultW,
-    h: def.defaultH,
+    x: migratedDefault.x,
+    y: migratedDefault.y,
+    w: migratedDefault.w,
+    h: migratedDefault.h,
+  };
+}
+
+function getMigratedGalleryPhotoDefault(id, def) {
+  const match = String(id || "").match(/^galleryPhoto(\d+)$/);
+  const index = match ? Number.parseInt(match[1], 10) - 1 : -1;
+  if (index < 0 || index >= 8) {
+    return { x: def.defaultX, y: def.defaultY, w: def.defaultW, h: def.defaultH };
+  }
+
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  return {
+    x: 4.35 + col * 0.88,
+    y: 7.85 + row * 1.15,
+    w: 0.8,
+    h: 1.05,
   };
 }
 

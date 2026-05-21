@@ -204,7 +204,8 @@ Exit criteria before re-scoping TypeScript:
    - **Hero sub-grid foundation**: hero now supports registered `panel.children` entries for `portrait` and `metrics` in a 4 x 5 inner grid. The child layout normalizes inside the existing `profile_layout` JSON, renders on `/me`, `/player`, and `/me/layout`, and has a first editor overlay/inspector control path.
    - **Backend note**: no Railway/backend migration was needed for the style controls because they persist inside the existing `profile_layout` JSONB payload.
    - **Remaining verification**: do a manual post-deploy browser pass for tiny panels, hero drag/resize, gradients across panel types, thoughts feed scrolling, and public `/player` pages with real friend data. Any future panel preview work should proceed panel family by panel family, reusing live renderers/CSS instead of recreating fake editor-only blocks.
-   - **Remaining architecture cleanup**: `layout-wire.mjs` and `layout-renderer.mjs` are still large. The next safest seams there are inspector/control HTML shaping and drag-preview helpers before any TypeScript pass touches the editor-heavy files.
+   - **Inspector/panel-list seam extracted**: `js/profile-layout/layout-inspector-view.mjs` now owns panel-list rows, inspector markup, child-layout rows, and style-control HTML for the layout editor. `layout-wire.mjs` keeps the event wiring and state transitions, but no longer owns that markup shaping inline.
+   - **Remaining architecture cleanup**: `layout-wire.mjs` and `layout-renderer.mjs` are still large, but the safer next seams have narrowed to drag-preview/controller helpers and any renderer-side view-model/token shaping before a TypeScript pass touches the editor-heavy files.
 
 
 ## Folder Reorg — Stable Shape
