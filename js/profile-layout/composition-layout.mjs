@@ -19,6 +19,28 @@ export const CUSTOM_TITLE_ELEMENT_DEF = {
   custom: true,
 };
 
+function buildGalleryPhotoElements() {
+  return Object.fromEntries(Array.from({ length: 8 }, (_, index) => {
+    const slot = index + 1;
+    const col = index % 8;
+    return [`galleryPhoto${slot}`, {
+      label: `Gallery Photo ${slot}`,
+      category: "gallery",
+      type: "galleryPhoto",
+      defaultEnabled: false,
+      defaultX: 4.35 + col * 0.42,
+      defaultY: 7.85,
+      defaultW: 0.4,
+      defaultH: 0.62,
+      minW: 0.25,
+      minH: 0.25,
+      maxW: 12,
+      maxH: 17,
+      photoIndex: index,
+    }];
+  }));
+}
+
 export const PROFILE_COMPOSITION_ELEMENT_REGISTRY = {
   heroSurface: {
     label: "Hero Surface",
@@ -390,6 +412,7 @@ export const PROFILE_COMPOSITION_ELEMENT_REGISTRY = {
     maxW: 12,
     maxH: 17,
   },
+  ...buildGalleryPhotoElements(),
   thoughtsSurface: {
     label: "Thoughts Surface",
     category: "thoughts",

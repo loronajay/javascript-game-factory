@@ -880,6 +880,13 @@ if (doc?.getElementById) {
                     renderColorControl("Link Accent", "elementColor", style.elementColor),
                     renderColorControl("Text Color", "textColor", style.textColor),
                   ]
+              : type === "galleryPhoto"
+                ? [
+                    renderColorControl("Photo Box Color", "panelColor", style.panelColor),
+                    renderColorControl("Gradient Color", "panelColor2", style.panelColor2),
+                    renderColorControl("Frame Color", "elementColor", style.elementColor),
+                    renderColorControl("Text Color", "textColor", style.textColor),
+                  ]
               : type === "identityField"
                 ? [
                     renderColorControl("Field Color", "panelColor", style.panelColor),

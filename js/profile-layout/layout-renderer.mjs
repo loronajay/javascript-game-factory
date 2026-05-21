@@ -321,6 +321,33 @@ function renderCompositionElementContent(tile, element, def, previewModels) {
     return;
   }
 
+  if (def.type === "galleryPhoto") {
+    const photoIndex = getGalleryPhotoIndex(element.id);
+    const photo = Array.isArray(previewModels.galleryPhotos) && Number.isInteger(photoIndex)
+      ? previewModels.galleryPhotos[photoIndex]
+      : null;
+    tile.dataset.compositionScale = "none";
+    tile.classList.add("profile-layout-composition-element--gallery-photo");
+    if (photo) {
+      tile.innerHTML = `
+        <div class="gallery-item" data-photo-id="${escapeHtml(photo.id)}">
+          <div class="gallery-item__img-frame">
+            <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+          </div>
+          ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
+        </div>
+      `;
+    } else {
+      tile.innerHTML = `
+        <div class="gallery-item gallery-item--placeholder">
+          <div class="gallery-item__img-frame"></div>
+          <p class="gallery-item__caption">Photo ${photoIndex + 1}</p>
+        </div>
+      `;
+    }
+    return;
+  }
+
   if (def.type === "identityField") {
     const preview = document.createElement("div");
     renderMeIdentityPanel(preview, heroModel);
@@ -449,6 +476,13 @@ function getPlayerActionPreviewLabel(elementId) {
   if (elementId === "identityMessageAction") return "Message";
   if (elementId === "identityGestureActions") return "Kick / Blow Kiss / Challenge";
   return "Action";
+}
+
+function getGalleryPhotoIndex(elementId) {
+  const match = String(elementId || "").match(/^galleryPhoto(\d+)$/);
+  if (!match) return null;
+  const index = Number.parseInt(match[1], 10) - 1;
+  return index >= 0 && index < 8 ? index : null;
 }
 
 function getPanelCssSlug(category) {

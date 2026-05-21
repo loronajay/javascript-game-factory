@@ -212,6 +212,8 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
       renderGalleryContentOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "galleryLink") {
       renderGalleryLinkOverlay(doc, layoutEl, element, panels);
+    } else if (element.type === "galleryPhoto") {
+      renderGalleryPhotoOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "thoughtsComposer") {
       renderThoughtsComposerOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "thoughtsFeed") {
@@ -355,6 +357,22 @@ function renderGalleryLinkOverlay(doc, layoutEl, element, panels) {
   layoutEl.appendChild(linkEl);
 }
 
+function renderGalleryPhotoOverlay(doc, layoutEl, element, panels) {
+  const index = getGalleryPhotoIndex(element.id);
+  const sourceItems = doc.querySelectorAll("#meGalleryPanel .gallery-item, #playerGalleryPanel .gallery-item");
+  const source = Number.isInteger(index) ? sourceItems[index] : null;
+  const photoEl = source?.cloneNode(true) || doc.createElement("div");
+  photoEl.classList.add("profile-composition-overlay", "profile-composition-overlay--gallery-photo", "gallery-item");
+  photoEl.dataset.profileCompositionOverlay = element.id;
+  photoEl.dataset.profileChildId = element.id;
+  if (!source) {
+    photoEl.innerHTML = `<div class="gallery-item__img-frame"></div><p class="gallery-item__caption">Photo ${index + 1}</p>`;
+  }
+  applyCompositionOverlayRect(photoEl, element);
+  applyPanelVisualStyle(photoEl, mergeLegacyChildStyle(element, panels, "gallery", "content"));
+  layoutEl.appendChild(photoEl);
+}
+
 function renderThoughtsComposerOverlay(doc, layoutEl, element, panels) {
   const source = doc.querySelector("#meThoughtsPanel [data-profile-child-id='composer']");
   const composerEl = source || doc.createElement("div");
@@ -438,6 +456,13 @@ function getPlayerActionChildId(elementId) {
   if (elementId === "identityMessageAction") return "messageAction";
   if (elementId === "identityGestureActions") return "gestureActions";
   return "";
+}
+
+function getGalleryPhotoIndex(elementId) {
+  const match = String(elementId || "").match(/^galleryPhoto(\d+)$/);
+  if (!match) return null;
+  const index = Number.parseInt(match[1], 10) - 1;
+  return index >= 0 && index < 8 ? index : null;
 }
 
 function getDefaultIdentityFieldLabel(elementId) {
