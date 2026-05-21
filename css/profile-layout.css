@@ -913,6 +913,32 @@
 
 .profile-layout-composition-element--gallery-grid .gallery-grid {
   width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(40px, 18%, 82px), 1fr));
+  gap: clamp(4px, 2%, 10px);
+  padding: clamp(4px, 2%, 10px);
+  align-content: start;
+  box-sizing: border-box;
+}
+
+.profile-layout-composition-element--gallery-grid .gallery-item {
+  min-width: 0;
+  gap: 2px;
+}
+
+.profile-layout-composition-element--gallery-grid .gallery-item__img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.profile-layout-composition-element--gallery-grid .gallery-item__counts {
+  gap: 3px;
+  padding: 2px 3px;
+}
+
+.profile-layout-composition-element--gallery-grid .gallery-item__count {
+  font-size: clamp(0.42rem, 1.5cqw, 0.62rem);
 }
 
 .profile-layout-composition-element--gallery-grid .gallery-item__img-frame {
@@ -927,6 +953,11 @@
 .profile-layout-composition-element--gallery-grid .player-panel__empty,
 .profile-layout-composition-element__scale-stage--gallery-link .gallery-view-all {
   color: rgb(var(--profile-panel-text-rgb, 255, 248, 255));
+}
+
+.profile-layout-composition-element--gallery-grid .gallery-item__caption {
+  font-size: clamp(0.42rem, 1.7cqw, 0.68rem);
+  line-height: 1.15;
 }
 
 .profile-layout-composition-element__scale-stage--identity-field .me-hero-card__identity-field,
