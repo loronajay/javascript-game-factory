@@ -47,8 +47,17 @@ function confirmTeamSelectPhase() {
 }
 
 function startBattle() {
-  const playerCreatures  = state.playerTeam.map(id => buildRentalCreature(RENTAL_ROSTER.find(c => c.id === id)));
-  const opponentCreatures = state.opponentTeam.map(id => buildRentalCreature(RENTAL_ROSTER.find(c => c.id === id)));
-  state.battleState = { player: playerCreatures, opponent: opponentCreatures };
+  function buildSide(teamIds) {
+    return SLOT_NAMES.reduce((acc, slot, i) => {
+      const creature = RENTAL_ROSTER.find(c => c.id === teamIds[i]);
+      acc[slot] = buildRentalCreature(creature, slot);
+      return acc;
+    }, {});
+  }
+  state.battleState = {
+    player: buildSide(state.playerTeam),
+    opponent: buildSide(state.opponentTeam),
+    round: 1,
+  };
   setScreen('battle');
 }

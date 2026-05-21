@@ -97,6 +97,7 @@ function _boot(sounds) {
   let onlineClient         = null;
   let onlineIdentity       = null;
   let onlineSide           = 'p1';
+  let onlineIsRanked       = false;
   let onlineLobbyPhase     = 'side_select';
   let onlineMatchSeed      = 0;
   let onlineClockOffset    = 0;
@@ -153,12 +154,12 @@ function _boot(sounds) {
     if (_searchDotsInterval) { clearInterval(_searchDotsInterval); _searchDotsInterval = null; }
   }
 
-  function _startSearchDots() {
+  function _startSearchDots(baseText = 'Searching') {
     _stopSearchDots();
     let tick = 0;
     const el = document.getElementById('searching-label');
     _searchDotsInterval = setInterval(() => {
-      if (el) el.textContent = 'Searching' + '.'.repeat(tick % 4);
+      if (el) el.textContent = baseText + '.'.repeat(tick % 4);
       tick++;
     }, 400);
   }
@@ -309,6 +310,8 @@ function _boot(sounds) {
   document.getElementById('btn-cpu').addEventListener('click', () => showScreen('screen-cpu-setup'));
 
   document.getElementById('btn-online').addEventListener('click', () => enterOnlineFlow());
+
+  document.getElementById('btn-ranked').addEventListener('click', () => _showRankedProfile());
 
   document.querySelectorAll('.side-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -527,7 +530,7 @@ function _boot(sounds) {
 
     onlineClient.cb.onSearching = () => {
       _setSideLocked('searching-side-locked');
-      _startSearchDots();
+      _startSearchDots(onlineIsRanked ? 'Searching Ranked' : 'Searching');
       showLobbyPhase('searching');
     };
 
@@ -593,6 +596,22 @@ function _boot(sounds) {
       _stopSearchDots();
       _stopWaitingDots();
       onlineClient.stopPinging();
+
+      // Award forfeit ELO win if we were in an active ranked match
+      const activePhasesForForfeit = new Set(['online_countdown', 'round_start', 'active', 'round_end']);
+      if (onlineIsRanked && activePhasesForForfeit.has(gameState.phase)
+          && onlineIdentity?.playerId && onlineRemoteIdentity?.playerId) {
+        const sessionId = `sumorai:${onlineMatchSeed}:forfeit`;
+        const apiClient = createPlatformApiClient();
+        if (typeof apiClient?.updateGameRating === 'function') {
+          apiClient.updateGameRating('sumorai-ranked', {
+            opponentPlayerId: onlineRemoteIdentity.playerId,
+            outcome:          'win',
+            sessionId,
+          }).catch(() => {});
+        }
+      }
+
       isOnline = false;
       onlineRemoteIdentity = null;
       gameState.phase = 'menu';
@@ -619,16 +638,65 @@ function _boot(sounds) {
       sessionId,
     }).catch(() => {});
 
-    // Update ELO — both players call this; session dedup on the server prevents double-applying
-    if (onlineIdentity?.playerId && onlineRemoteIdentity?.playerId) {
+    // Update ELO for ranked matches only — session dedup prevents double-applying
+    if (onlineIsRanked && onlineIdentity?.playerId && onlineRemoteIdentity?.playerId) {
       const apiClient = createPlatformApiClient();
       if (typeof apiClient?.updateGameRating === 'function') {
-        apiClient.updateGameRating('sumorai', {
+        apiClient.updateGameRating('sumorai-ranked', {
           opponentPlayerId: onlineRemoteIdentity.playerId,
           outcome:          myResult,
           sessionId,
         }).catch(() => {});
       }
+    }
+  }
+
+  async function _showOnlineResultRating() {
+    const pid = onlineIdentity?.playerId;
+    const wrapper = document.getElementById('ranked-result-rating');
+    if (!pid || !wrapper) return;
+    try {
+      const apiClient = createPlatformApiClient();
+      const rating = await apiClient.getGameRating('sumorai-ranked', pid);
+      if (rating) {
+        document.getElementById('ranked-result-value').textContent = `Rating: ${rating.rating}`;
+        const w = rating.wins ?? 0, l = rating.losses ?? 0, d = rating.draws ?? 0;
+        document.getElementById('ranked-result-record').textContent = `${w}W / ${l}L / ${d}D`;
+        wrapper.hidden = false;
+      }
+    } catch { /* silent — don't break result screen */ }
+  }
+
+  async function _showRankedProfile() {
+    showScreen('screen-ranked-profile');
+    const identity = onlineIdentity ?? buildOnlineIdentity(factoryProfile);
+    const pid = identity?.playerId;
+    if (!pid) {
+      document.getElementById('ranked-rating-num').textContent = '—';
+      document.getElementById('ranked-record').textContent = 'Sign in to track your rating.';
+      document.getElementById('ranked-winrate').textContent = '';
+      return;
+    }
+    document.getElementById('ranked-rating-num').textContent = '…';
+    document.getElementById('ranked-record').textContent = '';
+    document.getElementById('ranked-winrate').textContent = '';
+    try {
+      const apiClient = createPlatformApiClient();
+      const rating = await apiClient.getGameRating('sumorai-ranked', pid);
+      if (rating) {
+        document.getElementById('ranked-rating-num').textContent = String(rating.rating ?? 1200);
+        const w = rating.wins ?? 0, l = rating.losses ?? 0, d = rating.draws ?? 0;
+        document.getElementById('ranked-record').textContent = `${w}W / ${l}L / ${d}D`;
+        const total = w + l + d;
+        document.getElementById('ranked-winrate').textContent =
+          total > 0 ? `${Math.round(w / total * 100)}% win rate` : '';
+      } else {
+        document.getElementById('ranked-rating-num').textContent = '1200';
+        document.getElementById('ranked-record').textContent = '0W / 0L / 0D';
+      }
+    } catch {
+      document.getElementById('ranked-rating-num').textContent = '—';
+      document.getElementById('ranked-record').textContent = 'Could not load rating.';
     }
   }
 
@@ -687,9 +755,14 @@ function _boot(sounds) {
   });
 
   // Main lobby
+  document.getElementById('btn-ranked-match').addEventListener('click', () => {
+    onlineIsRanked = true;
+    onlineClient.findMatch(onlineSide, true);
+  });
+
   document.getElementById('btn-find-match').addEventListener('click', () => {
-    onlineClient.findMatch(onlineSide);
-    // onSearching callback transitions to searching phase
+    onlineIsRanked = false;
+    onlineClient.findMatch(onlineSide, false);
   });
 
   document.getElementById('btn-play-friend').addEventListener('click', () => {
@@ -788,6 +861,8 @@ function _boot(sounds) {
   });
 
   // Disconnected
+  document.getElementById('btn-ranked-back').addEventListener('click', () => showScreen('screen-menu'));
+
   document.getElementById('btn-disconnected-menu').addEventListener('click', () => {
     gameState.p1.wins = 0;
     gameState.p2.wins = 0;
@@ -973,8 +1048,12 @@ function _boot(sounds) {
             re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
           document.getElementById('online-result-opponent').textContent =
             onlineRemoteIdentity?.displayName ? `vs ${onlineRemoteIdentity.displayName}` : '';
+          document.getElementById('ranked-result-rating').hidden = true;
           _publishOnlineMatchResult(re.winner);
-          setTimeout(() => showScreen('screen-online-result'), 2000);
+          setTimeout(() => {
+            showScreen('screen-online-result');
+            if (onlineIsRanked) _showOnlineResultRating();
+          }, 2000);
         } else {
           document.getElementById('result-winner').textContent =
             re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
