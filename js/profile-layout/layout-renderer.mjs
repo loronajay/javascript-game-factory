@@ -1,11 +1,11 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
-import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs?v=20260521-freeform-panels-1";
 import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
   getCompositionElementDef,
-} from "./composition-layout.mjs?v=20260521-gallery-photo-sync-2";
+} from "./composition-layout.mjs?v=20260521-freeform-panels-1";
 import {
   renderMeFriendCodePanel,
   renderMeFriendsPanel,
@@ -53,7 +53,9 @@ export function renderLayoutGrid(container, layout, options = {}) {
       .filter((element) => element?.enabled !== false && element.category && element.category !== "custom")
       .map((element) => element.category),
   );
-  const renderedPanels = enabledPanels.filter((panel) => !compositionCategories.has(panel.id));
+  const renderedPanels = enabledPanels
+    .filter((panel) => !compositionCategories.has(panel.id))
+    .sort(comparePanelsByFreeformPosition);
 
   // Preserve extra classes (like --overlay) while replacing base edit class.
   const extraClasses = [...container.classList]
@@ -163,6 +165,10 @@ export function renderLayoutGrid(container, layout, options = {}) {
     previewModels,
     onSelect,
   });
+}
+
+function comparePanelsByFreeformPosition(a, b) {
+  return (a.y - b.y) || (a.x - b.x);
 }
 
 function renderCompositionElements(container, elements, options = {}) {

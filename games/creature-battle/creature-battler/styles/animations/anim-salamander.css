@@ -106,3 +106,124 @@
 .anim-cast-cinder-burst {
   animation: cast-cinder-burst 600ms ease-in-out;
 }
+
+/* ── Spark Flick 2: bigger bob, stronger glow ─────────────────────────────── */
+@keyframes cast-spark-flick-2 {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 7px)) scale(1.04); filter: drop-shadow(0 0 11px #ff9900) drop-shadow(0 0 5px #ffcc00); }
+  44%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.09); filter: drop-shadow(0 0 24px #ff6600) drop-shadow(0 0 9px #ffaa00) brightness(1.35); }
+  70%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: drop-shadow(0 0 9px #ff8800); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-spark-flick-2 { animation: cast-spark-flick-2 470ms ease-in-out; }
+
+/* ── Spark Flick 3: peak intensity, slow peak hold ────────────────────────── */
+@keyframes cast-spark-flick-3 {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 9px))  scale(1.05); filter: drop-shadow(0 0 15px #ff9900) drop-shadow(0 0 7px #ffcc00); }
+  42%  { transform: translate(-50%, calc(-50% + 2px))  scale(1.13); filter: drop-shadow(0 0 34px #ff5500) drop-shadow(0 0 14px #ffcc00) brightness(1.55); }
+  62%  { transform: translate(-50%, calc(-50% - 1px))  scale(1.07); filter: drop-shadow(0 0 18px #ff7700) brightness(1.25); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-spark-flick-3 { animation: cast-spark-flick-3 510ms ease-in-out; }
+
+/* ── Ember Trail: soft smoldering cast ───────────────────────────────────── */
+@keyframes cast-ember-trail {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  22%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.03); filter: drop-shadow(0 0 9px rgba(255,110,20,0.6)) brightness(1.12); }
+  48%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.06); filter: drop-shadow(0 0 20px rgba(255,70,10,0.88)) drop-shadow(0 0 6px #ffaa44) brightness(1.28); }
+  75%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: drop-shadow(0 0 9px rgba(255,100,0,0.5)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-ember-trail { animation: cast-ember-trail 480ms ease-in-out; }
+
+/* ── Ember Burn hit: warm lingering smolder on target ────────────────────── */
+@keyframes hit-ember-burn-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 7px), calc(-50% - 2px)); filter: brightness(2.4) sepia(1) saturate(4.5) hue-rotate(-12deg) drop-shadow(0 0 9px rgba(255,100,30,0.9)); }
+  48%  { transform: translate(calc(-50% - 2px), -50%);             filter: brightness(1.55) sepia(0.55) saturate(2.5); }
+  76%  { transform: translate(-50%, -50%);                         filter: brightness(1.2) sepia(0.3) saturate(1.5); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+@keyframes hit-ember-burn-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 7px), calc(-50% - 2px)); filter: brightness(2.4) sepia(1) saturate(4.5) hue-rotate(-12deg) drop-shadow(0 0 9px rgba(255,100,30,0.9)); }
+  48%  { transform: translate(calc(-50% + 2px), -50%);             filter: brightness(1.55) sepia(0.55) saturate(2.5); }
+  76%  { transform: translate(-50%, -50%);                         filter: brightness(1.2) sepia(0.3) saturate(1.5); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-ember-burn   { animation: hit-ember-burn-left  440ms ease-out; }
+[data-creature^="opponent"].anim-hit-ember-burn { animation: hit-ember-burn-right 440ms ease-out; }
+
+/* ── Ash Veil: ashen swirl around self ───────────────────────────────────── */
+@keyframes cast-ash-veil {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.04, 0.98); filter: drop-shadow(0 0 9px rgba(190,165,140,0.55)) brightness(1.1); }
+  40%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.08, 0.95); filter: drop-shadow(0 0 24px rgba(165,140,120,0.92)) drop-shadow(0 0 9px rgba(255,210,175,0.65)) brightness(1.28); }
+  68%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.03);       filter: drop-shadow(0 0 13px rgba(200,180,155,0.62)) brightness(1.14); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-ash-veil { animation: cast-ash-veil 560ms ease-in-out; }
+
+/* ── Smoke Screen: smoky exhale cast ─────────────────────────────────────── */
+@keyframes cast-smoke-screen {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  20%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.03); filter: drop-shadow(0 0 10px rgba(110,85,55,0.52)) brightness(1.1); }
+  44%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.07); filter: drop-shadow(0 0 24px rgba(90,65,40,0.88)) drop-shadow(0 0 9px rgba(255,180,80,0.52)) brightness(1.22); }
+  70%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.02); filter: drop-shadow(0 0 11px rgba(130,95,60,0.52)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-smoke-screen { animation: cast-smoke-screen 540ms ease-in-out; }
+
+/* ── Smoke Blind hit: target darkened/obscured ───────────────────────────── */
+@keyframes hit-smoke-blind {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  16%  { transform: translate(-50%, calc(-50% + 2px)); filter: brightness(0.42) sepia(0.8) saturate(0.5) blur(0.4px); }
+  42%  { transform: translate(-50%, -50%);             filter: brightness(0.68) sepia(0.45) saturate(0.6); }
+  72%  { transform: translate(-50%, calc(-50% - 1px)); filter: brightness(0.84) sepia(0.2); }
+  100% { transform: translate(-50%, -50%);             filter: brightness(1); }
+}
+.anim-hit-smoke-blind { animation: hit-smoke-blind 480ms ease-out; }
+
+/* ── Cinder Burst 2: wider eruption ──────────────────────────────────────── */
+@keyframes cast-cinder-burst-2 {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.06); filter: drop-shadow(0 0 22px rgba(255,75,0,0.92)); }
+  44%  { transform: translate(-50%, calc(-50% - 19px)) scale(1.14); filter: drop-shadow(0 0 44px rgba(255,35,0,1)) drop-shadow(0 0 20px #ffcc00) brightness(1.6); }
+  68%  { transform: translate(-50%, calc(-50% - 8px))  scale(1.05); filter: drop-shadow(0 0 16px rgba(255,95,0,0.65)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-cinder-burst-2 { animation: cast-cinder-burst-2 660ms ease-in-out; }
+
+/* ── Cinder Burst 3: maximum eruption ────────────────────────────────────── */
+@keyframes cast-cinder-burst-3 {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 12px)) scale(1.07); filter: drop-shadow(0 0 28px rgba(255,60,0,0.96)); }
+  42%  { transform: translate(-50%, calc(-50% - 24px)) scale(1.18); filter: drop-shadow(0 0 56px rgba(255,20,0,1)) drop-shadow(0 0 26px #ffdd00) brightness(1.72); }
+  65%  { transform: translate(-50%, calc(-50% - 11px)) scale(1.07); filter: drop-shadow(0 0 22px rgba(255,80,0,0.75)) brightness(1.24); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-cinder-burst-3 { animation: cast-cinder-burst-3 720ms ease-in-out; }
+
+/* ── Scorch: two-beat double-strike wind-up ──────────────────────────────── */
+@keyframes cast-scorch {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  14%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.04); filter: drop-shadow(0 0 10px #ff8800) brightness(1.18); }
+  28%  { transform: translate(-50%, -50%) scale(1.01); filter: drop-shadow(0 0 5px #ff6600) brightness(1.08); }
+  50%  { transform: translate(-50%, calc(-50% - 7px)) scale(1.07); filter: drop-shadow(0 0 20px #ff5500) drop-shadow(0 0 8px #ffaa00) brightness(1.38); }
+  70%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: drop-shadow(0 0 9px #ff7700); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-scorch { animation: cast-scorch 480ms ease-in-out; }
+
+/* ── Magma Surge: deep slow rise to full magma eruption ─────────────────── */
+@keyframes cast-magma-surge {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  12%  { transform: translate(-50%, calc(-50% - 4px))  scale(1.03); filter: drop-shadow(0 0 14px rgba(255,50,0,0.65)) brightness(1.12); }
+  28%  { transform: translate(-50%, calc(-50% - 13px)) scale(1.08); filter: drop-shadow(0 0 28px rgba(255,30,0,0.92)) drop-shadow(0 0 10px #ff7700) brightness(1.3); }
+  48%  { transform: translate(-50%, calc(-50% - 23px)) scale(1.17); filter: drop-shadow(0 0 54px rgba(255,0,0,1)) drop-shadow(0 0 26px #ff8800) drop-shadow(0 0 12px #ffcc00) brightness(1.75); }
+  66%  { transform: translate(-50%, calc(-50% - 15px)) scale(1.09); filter: drop-shadow(0 0 34px rgba(255,40,0,0.92)) brightness(1.38); }
+  84%  { transform: translate(-50%, calc(-50% - 5px))  scale(1.03); filter: drop-shadow(0 0 15px rgba(255,70,0,0.65)) brightness(1.14); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-magma-surge { animation: cast-magma-surge 820ms ease-in-out; }

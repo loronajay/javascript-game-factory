@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Creature Battle | Javascript Game Factory</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="../../js/platform-config.js"></script>
+  <link rel="stylesheet" href="creature-battler/styles/tokens.css">
+  <link rel="stylesheet" href="creature-battler/styles/base.css">
+  <link rel="stylesheet" href="creature-battler/styles/title.css">
+  <link rel="stylesheet" href="creature-battler/styles/mode-select.css">
+  <link rel="stylesheet" href="creature-battler/styles/battle-config.css">
+  <link rel="stylesheet" href="creature-battler/styles/team-select.css">
+  <link rel="stylesheet" href="creature-battler/styles/battle.css">
+  <link rel="stylesheet" href="creature-battler/styles/animations/anim-universal.css">
+  <link rel="stylesheet" href="creature-battler/styles/animations/anim-salamander.css">
+  <link rel="stylesheet" href="creature-battler/styles/animations/anim-aquaphant.css">
+  <link rel="stylesheet" href="creature-battler/styles/animations/anim-pengun.css">
+  <link rel="stylesheet" href="creature-battler/styles/animations/anim-flor.css">
+</head>
+<body>
+  <a href="../../grid.html" class="back-btn">&#8592; Arcade</a>
+
+  <div id="game-shell">
+    <div id="game-canvas">
+      <div id="screen-title" class="screen active"></div>
+      <div id="screen-mode-select" class="screen"></div>
+      <div id="screen-battle-config" class="screen"></div>
+      <div id="screen-team-select" class="screen"></div>
+      <div id="screen-battle" class="screen"></div>
+    </div>
+  </div>
+
+  <script src="creature-battler/scripts/sounds.js"></script>
+  <script src="creature-battler/scripts/config.js"></script>
+  <script src="creature-battler/scripts/state.js"></script>
+  <script src="creature-battler/scripts/battle-engine.js"></script>
+  <script src="creature-battler/scripts/battle-ai.js"></script>
+  <script src="creature-battler/scripts/battle-animations.js"></script>
+  <script src="creature-battler/scripts/animations/anim-universal.js"></script>
+  <script src="creature-battler/scripts/animations/anim-salamander.js"></script>
+  <script src="creature-battler/scripts/animations/anim-aquaphant.js"></script>
+  <script src="creature-battler/scripts/animations/anim-pengun.js"></script>
+  <script src="creature-battler/scripts/animations/anim-flor.js"></script>
+  <script src="creature-battler/scripts/battle-input.js"></script>
+  <script src="creature-battler/scripts/battle-round.js"></script>
+  <script src="creature-battler/scripts/screen-title.js"></script>
+  <script src="creature-battler/scripts/screen-mode-select.js"></script>
+  <script src="creature-battler/scripts/screen-battle-config.js"></script>
+  <script src="creature-battler/scripts/screen-team-select.js"></script>
+  <script src="creature-battler/scripts/screen-battle.js"></script>
+  <script src="creature-battler/scripts/input.js"></script>
+  <script src="creature-battler/scripts/init-game.js"></script>
+
+  <script type="module">
+    import { loadFactoryProfile } from '../../js/platform/identity/factory-profile.mjs';
+    import { mountMobileController } from '../../js/mobile-controller.mjs';
+    import { publishCreatureBattleMatchActivity } from '../../js/platform/activity/activity.mjs';
+
+    const profile = loadFactoryProfile();
+    window.__factoryProfile = profile;
+
+    window.__publishBattleResult = function(winner) {
+      const myName = profile?.profileName || 'Player';
+      publishCreatureBattleMatchActivity({
+        result: winner === 'player' ? 'win' : winner === 'draw' ? 'draw' : 'loss',
+        myProfile: { playerId: profile?.playerId, displayName: myName },
+        opponentProfile: { playerId: 'ai', displayName: 'CPU' },
+        playerTeam: window.state?.playerTeam || [],
+        opponentTeam: window.state?.opponentTeam || [],
+        sessionId: `cb-${Date.now()}`,
+      });
+    };
+
+    mountMobileController({ profileId: 'creature-battle' });
+  </script>
+</body>
+</html>

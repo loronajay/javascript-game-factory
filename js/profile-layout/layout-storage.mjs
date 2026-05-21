@@ -1,5 +1,5 @@
 import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
-import { normalizeLayout } from "./normalize-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { normalizeLayout } from "./normalize-layout.mjs?v=20260521-freeform-panels-1";
 
 // Returns saved layout JSON or null if none exists / route not yet implemented.
 export async function fetchLayout(apiClient = createPlatformApiClient()) {

@@ -31,6 +31,7 @@ function initSounds() {
   loadSfx('hit-heavy',    'assets/sounds/combat-sounds/hit-heavy.wav');
   loadSfx('fire',         'assets/sounds/combat-sounds/fire.wav');
   loadSfx('charge-light', 'assets/sounds/combat-sounds/charge-light.wav');
+  loadSfx('beam-light',   'assets/sounds/combat-sounds/beam-light.mp3');
   _battleMusic = loadMusic('assets/sounds/battle-theme.mp3');
 }
 

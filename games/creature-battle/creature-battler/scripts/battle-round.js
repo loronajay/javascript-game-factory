@@ -35,22 +35,28 @@ function playbackStep(actions, index) {
     return;
   }
   const action = actions[index];
-  const result = resolveAction(action);
-  renderBattleHud();
-  updateFieldKoStates();
-  showResult(result, action, () => {
+  const preview = previewAction(action);
+  showResult(preview, action, () => {
+    updateFieldKoStates();
     const end = checkBattleEnd();
     if (end) { showBattleEnd(end); return; }
     setTimeout(() => playbackStep(actions, index + 1), 180);
   });
 }
 
-function showResult(result, action, onDone) {
+function getResultMessage(result) {
   let msg = '';
   switch (result.type) {
     case 'skipped':   msg = '...'; break;
+    case 'stunned':   msg = `${result.actorName} is stunned and cannot act!`; break;
+    case 'silenced':  msg = `${result.actorName} is silenced — cannot use ${result.moveName}!`; break;
     case 'defend':    msg = `${result.actorName} braces for impact!`; break;
-    case 'utility':   msg = `${result.actorName} uses ${result.moveName}!`; break;
+    case 'utility': {
+      const target = result.targetName ? ` ${result.targetName}:` : '';
+      const status = result.statusText ? ` ${result.statusText}!` : '';
+      msg = `${result.actorName} uses ${result.moveName}!${target}${status}`;
+      break;
+    }
     case 'no_target': msg = `${result.actorName}'s ${result.moveName} found no target!`; break;
     case 'miss':      msg = `${result.actorName} uses ${result.moveName}... Miss!`; break;
     case 'heal':      msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} recovers ${result.amount} HP.`; break;
@@ -59,7 +65,24 @@ function showResult(result, action, onDone) {
       const crit = result.isCrit ? 'Critical hit! ' : '';
       const eff  = result.elemMod > 1 ? ' Super effective!' : result.elemMod < 1 ? ' Not very effective...' : '';
       msg = `${result.actorName} uses ${result.moveName}! ${crit}${result.targetName} takes ${result.amount} damage.${eff}`;
+      if (result.lifestolen) msg += ` ${result.actorName} restored ${result.lifestolen} HP.`;
+      if (result.statusText) msg += ` ${result.statusText}!`;
       if (result.wasKO) msg += ` ${result.targetName} is knocked out!`;
+      break;
+    }
+    case 'multi_hit': {
+      const landed = result.hits.filter(h => !h.missed);
+      const parts  = landed.map(h => `${h.damage}${h.isCrit ? '!' : ''}`).join(' + ');
+      const total  = landed.reduce((s, h) => s + h.damage, 0);
+      const eff    = landed.find(h => h.elemMod > 1) ? ' Super effective!' : landed.find(h => h.elemMod < 1) ? ' Not very effective...' : '';
+      const ko     = result.hits.some(h => h.wasKO) ? ` ${result.targetName} is knocked out!` : '';
+      msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} takes ${parts} (${total} total).${eff}${ko}`;
+      break;
+    }
+    case 'world_tree': {
+      const dmg   = result.damageHits.map(h => h.missed ? `${h.name} missed` : `${h.name} ${h.amount}${h.wasKO ? ' KO!' : ''}`).join(' / ');
+      const heals = result.allyHeals.map(h => `${h.name} +${h.amount}`).join(' / ');
+      msg = `${result.actorName} uses ${result.moveName}! Hits: ${dmg}. Heals: ${heals}.`;
       break;
     }
     case 'multi': {
@@ -74,18 +97,41 @@ function showResult(result, action, onDone) {
     }
     default: msg = '...';
   }
+  return msg;
+}
+
+function showResult(result, action, onDone) {
   playMoveAnimation(result, action, () => {
-    updateBattleLog(msg);
+    updateBattleLog(getResultMessage(result));
     pendingAdvance = onDone;
     document.getElementById('battle-commands')?.classList.add('awaiting-advance');
+  }, {
+    onImpact: () => {
+      result = resolveAction(action);
+      renderBattleHud();
+      return result;
+    },
   });
 }
 
 function endRound() {
   const end = checkBattleEnd();
   if (end) { showBattleEnd(end); return; }
+  const tickResults = applyEndOfRoundStatuses();
+  renderBattleHud();
+  if (tickResults.length) {
+    const tickMsg = tickResults.map(t => {
+      const label = STATUS_DEFS[t.statusId]?.label || t.statusId.toUpperCase();
+      return `${t.creatureName} (${label}: −${t.damage} HP${t.wasKO ? ' KO!' : ''})`;
+    }).join(', ');
+    updateBattleLog(`End of round — ${tickMsg}`);
+    const afterTick = checkBattleEnd();
+    if (afterTick) { setTimeout(() => showBattleEnd(afterTick), 900); return; }
+  }
+  advanceStatusDurations();
+  renderBattleHud();
   state.battleState.round++;
-  setTimeout(startRound, 500);
+  setTimeout(startRound, tickResults.length ? 900 : 500);
 }
 
 function showBattleEnd(winner) {

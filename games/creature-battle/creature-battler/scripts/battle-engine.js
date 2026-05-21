@@ -3,6 +3,8 @@ const ENGINE = {
   CRIT_CHANCE:     0.05,
   CRIT_MOD:        1.5,
   DEFEND_MOD:      0.5,
+  STAT_STAGE_CAP:  5,
+  STAT_STAGE_MULTIPLIERS: [1, 1.2, 1.35, 1.47, 1.57, 1.65],
   RANDOM_MIN:      -2,
   RANDOM_MAX:      4,
   MIN_DAMAGE:      1,
@@ -11,8 +13,170 @@ const ENGINE = {
   SPECIES_EVA_BASE: 60,
 };
 
+const STATUS_DEFS = {
+  poison:  { label: 'POISON'  },
+  burn:    { label: 'BURN'    },
+  stun:    { label: 'STUN'    },
+  blind:   { label: 'BLIND'   },
+  slow:    { label: 'SLOW'    },
+  silence: { label: 'SILENCE' },
+};
+
+const STAT_LABELS = {
+  strength: 'STR',
+  defense: 'DEF',
+  intelligence: 'INT',
+  spirit: 'SPI',
+  speed: 'SPD',
+  accuracy: 'ACC',
+  evasion: 'EVA',
+};
+
 function engineRandom(min, max) {
   return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function getAllCreatures() {
+  const bs = state.battleState;
+  if (!bs) return [];
+  return ['player', 'opponent'].flatMap(side =>
+    SLOT_NAMES.map(slot => bs[side][slot]).filter(Boolean)
+  );
+}
+
+function ensureStatusList(creature) {
+  if (!creature.statusEffects) creature.statusEffects = [];
+  return creature.statusEffects;
+}
+
+function ensureStatModifierList(creature) {
+  if (!creature.statModifiers) creature.statModifiers = [];
+  return creature.statModifiers;
+}
+
+function hasStatus(creature, id) {
+  return ensureStatusList(creature).some(status => status.id === id);
+}
+
+function applyStatus(creature, id, options = {}) {
+  const list = ensureStatusList(creature);
+  const existing = list.find(status => status.id === id);
+  const next = {
+    id,
+    appliedRound: state.battleState.round,
+    remainingRounds: options.remainingRounds ?? 1,
+    consumeOn: options.consumeOn || null,
+    permanent: options.permanent || false,
+  };
+  if (existing) Object.assign(existing, next);
+  else list.push(next);
+  return STATUS_DEFS[id]?.label || 'STATUS';
+}
+
+function applyStatModifier(creature, stat, direction, options = {}) {
+  const list = ensureStatModifierList(creature);
+  const normalizedDirection = direction >= 0 ? 1 : -1;
+  const oppositeIndex = list.findIndex(mod => mod.stat === stat && mod.direction === -normalizedDirection);
+  if (oppositeIndex !== -1) {
+    list.splice(oppositeIndex, 1);
+  } else {
+    const sameDirectionCount = list.filter(mod => mod.stat === stat && mod.direction === normalizedDirection).length;
+    if (sameDirectionCount < ENGINE.STAT_STAGE_CAP) {
+      list.push({
+        stat,
+        direction: normalizedDirection,
+        appliedRound: state.battleState.round,
+      });
+    } else {
+      const oldest = list.find(mod => mod.stat === stat && mod.direction === normalizedDirection);
+      if (oldest) {
+        oldest.appliedRound = state.battleState.round;
+      }
+    }
+  }
+  return `${STAT_LABELS[stat] || stat.toUpperCase()} ${normalizedDirection > 0 ? 'UP' : 'DOWN'}`;
+}
+
+function removeStatus(creature, id) {
+  creature.statusEffects = ensureStatusList(creature).filter(status => status.id !== id);
+}
+
+function consumeStatus(creature, id) {
+  removeStatus(creature, id);
+}
+
+function applyEndOfRoundStatuses() {
+  const tickResults = [];
+  getAllCreatures().forEach(creature => {
+    if (creature.isKnockedOut) return;
+    ['poison', 'burn'].forEach(statusId => {
+      if (!hasStatus(creature, statusId) || creature.isKnockedOut) return;
+      const dmg = Math.max(1, Math.round(creature.hp.max * 0.06));
+      creature.hp.current = Math.max(0, creature.hp.current - dmg);
+      const wasKO = !creature.isKnockedOut && creature.hp.current <= 0;
+      if (wasKO) { creature.isKnockedOut = true; clearBattleModifiers(creature); }
+      tickResults.push({ creatureName: creature.displayName, statusId, damage: dmg, wasKO });
+    });
+  });
+  return tickResults;
+}
+
+function advanceStatusDurations() {
+  const round = state.battleState.round;
+  getAllCreatures().forEach(creature => {
+    creature.statusEffects = ensureStatusList(creature).filter(status => {
+      if (status.permanent) return true;
+      if (status.consumeOn && status.appliedRound <= round) return false;
+      if (status.appliedRound >= round) return true;
+      status.remainingRounds = (status.remainingRounds ?? 1) - 1;
+      return status.remainingRounds > 0;
+    });
+  });
+}
+
+function clearBattleModifiers(creature) {
+  creature.statModifiers = [];
+  creature.statusEffects = [];
+}
+
+function getStatStage(creature, stat) {
+  return ensureStatModifierList(creature)
+    .filter(mod => mod.stat === stat)
+    .reduce((sum, mod) => sum + mod.direction, 0);
+}
+
+function getStageMultiplier(stage) {
+  const capped = Math.max(-ENGINE.STAT_STAGE_CAP, Math.min(ENGINE.STAT_STAGE_CAP, stage));
+  const mult = ENGINE.STAT_STAGE_MULTIPLIERS[Math.abs(capped)];
+  return capped >= 0 ? mult : 1 / mult;
+}
+
+function getEffectiveStat(creature, stat) {
+  const base = creature.stats[stat] ?? 0;
+  return Math.max(1, Math.round(base * getStageMultiplier(getStatStage(creature, stat))));
+}
+
+function getEffectiveSpeed(creature) {
+  let speed = getEffectiveStat(creature, 'speed');
+  if (hasStatus(creature, 'slow')) speed = Math.max(1, Math.floor(speed * 0.5));
+  return speed;
+}
+
+function getCreatureStatusLabels(creature) {
+  const statusLabels = ensureStatusList(creature).map(status => ({
+    label: STATUS_DEFS[status.id]?.label || status.id.toUpperCase(),
+    kind: status.id,
+  }));
+  const statLabels = Object.keys(STAT_LABELS).map(stat => {
+    const stage = getStatStage(creature, stat);
+    if (!stage) return null;
+    return { label: `${STAT_LABELS[stat]} ${stage > 0 ? '+' : ''}${stage}`, kind: stage > 0 ? 'buff' : 'debuff' };
+  }).filter(Boolean);
+  return [...statusLabels, ...statLabels];
+}
+
+function spendMoveCost(actor, move) {
+  actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
 }
 
 function getElementModifier(moveElement, resistances) {
@@ -21,19 +185,21 @@ function getElementModifier(moveElement, resistances) {
 }
 
 function calcHitChance(attacker, target, move) {
-  if (move.accuracy >= 100) return 100;
-  const atkAcc = ENGINE.SPECIES_ACC_BASE + attacker.stats.speed * 0.15 + attacker.stats.intelligence * 0.10;
-  const tgtEva = ENGINE.SPECIES_EVA_BASE + target.stats.speed * 0.15 + target.stats.intelligence * 0.10;
-  return Math.max(75, Math.min(98, move.accuracy + (atkAcc - tgtEva) * 0.25));
+  const atkAcc = (ENGINE.SPECIES_ACC_BASE + getEffectiveSpeed(attacker) * 0.15 + getEffectiveStat(attacker, 'intelligence') * 0.10)
+    * getStageMultiplier(getStatStage(attacker, 'accuracy'));
+  const tgtEva = (ENGINE.SPECIES_EVA_BASE + getEffectiveSpeed(target) * 0.15 + getEffectiveStat(target, 'intelligence') * 0.10)
+    * getStageMultiplier(getStatStage(target, 'evasion'));
+  return Math.max(75, Math.min(100, move.accuracy + (atkAcc - tgtEva) * 0.25));
 }
 
 function resolveHit(attacker, target, move) {
+  if (hasStatus(attacker, 'blind')) return false;
   return Math.random() * 100 < calcHitChance(attacker, target, move);
 }
 
 function calcDamage(attacker, target, move) {
-  const offStat   = move.damageClass === 'physical' ? attacker.stats.strength     : attacker.stats.intelligence;
-  const defStat   = move.damageClass === 'physical' ? target.stats.defense        : target.stats.spirit;
+  const offStat   = move.damageClass === 'physical' ? getEffectiveStat(attacker, 'strength') : getEffectiveStat(attacker, 'intelligence');
+  const defStat   = move.damageClass === 'physical' ? getEffectiveStat(target, 'defense')    : getEffectiveStat(target, 'spirit');
   const levelMod  = attacker.level * ENGINE.LEVEL_MOD;
   const pressure  = (offStat - defStat) * move.offensiveScaling;
   const elemMod   = getElementModifier(move.element, target.resistances);
@@ -70,7 +236,11 @@ function findValidTarget(side, preferredSlot) {
 
 function sortActions(actions) {
   return [...actions].sort((a, b) => {
-    if (b.speed !== a.speed) return b.speed - a.speed;
+    const aActor = state.battleState[a.actorSide]?.[a.actorSlot];
+    const bActor = state.battleState[b.actorSide]?.[b.actorSlot];
+    const aSpeed = aActor ? getEffectiveSpeed(aActor) : a.speed;
+    const bSpeed = bActor ? getEffectiveSpeed(bActor) : b.speed;
+    if (bSpeed !== aSpeed) return bSpeed - aSpeed;
     // player side wins speed ties
     if (a.actorSide !== b.actorSide) return a.actorSide === 'player' ? -1 : 1;
     return SLOT_NAMES.indexOf(a.actorSlot) - SLOT_NAMES.indexOf(b.actorSlot);
@@ -87,7 +257,7 @@ function checkBattleEnd() {
   return null;
 }
 
-function resolveAction(action) {
+function previewAction(action) {
   const bs    = state.battleState;
   const actor = bs[action.actorSide][action.actorSlot];
 
@@ -96,17 +266,116 @@ function resolveAction(action) {
   }
 
   if (action.commandType === 'defend') {
-    actor.isDefending = true;
-    return { type: 'defend', actorName: actor.displayName };
+    return { type: 'defend', actorName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
   }
 
   const move = getMoveData(action.moveId);
   if (!move) return { type: 'skipped' };
 
+  if (move.damageClass === 'utility') {
+    if (move.targeting === 'all_allies') {
+      return { type: 'utility', actorName: actor.displayName, moveName: move.name, targetName: 'all allies', targetSide: action.actorSide, targetSlot: null };
+    }
+    const targetSide = action.targetSide || action.actorSide;
+    const targetSlot = action.targetSlot || action.actorSlot;
+    const target = bs[targetSide][targetSlot];
+    return { type: 'utility', actorName: actor.displayName, moveName: move.name, targetName: target?.displayName || actor.displayName, targetSide, targetSlot };
+  }
+
+  if (move.targeting === 'all_enemies' || move.targeting === 'all_allies') {
+    const targetSide = move.targeting === 'all_allies' ? action.actorSide : (action.actorSide === 'player' ? 'opponent' : 'player');
+    const hits = SLOT_NAMES
+      .filter(slot => {
+        const target = bs[targetSide][slot];
+        return target && !target.isKnockedOut;
+      })
+      .map(slot => ({ slot, name: bs[targetSide][slot].displayName }));
+    if (!hits.length) return { type: 'no_target', actorName: actor.displayName, moveName: move.name };
+    return { type: 'multi', actorName: actor.displayName, moveName: move.name, damageClass: move.damageClass, targetSide, hits };
+  }
+
+  if (move.damageClass === 'heal') {
+    const targetSide = action.targetSide || action.actorSide;
+    const targetSlot = action.targetSlot || action.actorSlot;
+    const target = bs[targetSide][targetSlot];
+    if (!target || target.isKnockedOut) {
+      return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetSide, targetSlot };
+    }
+    return { type: 'heal', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide, targetSlot };
+  }
+
+  const targetSide = action.targetSide;
+  const targetSlot = findValidTarget(targetSide, action.targetSlot);
+  if (!targetSlot) {
+    return { type: 'no_target', actorName: actor.displayName, moveName: move.name };
+  }
+
+  const target = bs[targetSide][targetSlot];
+  return {
+    type: 'damage',
+    actorName: actor.displayName,
+    moveName: move.name,
+    targetName: target.displayName,
+    targetSide,
+    targetSlot,
+    retargeted: targetSlot !== action.targetSlot,
+  };
+}
+
+function resolveAction(action) {
+  const bs    = state.battleState;
+  const actor = bs[action.actorSide][action.actorSlot];
+
+  if (!actor || actor.isKnockedOut) {
+    return { type: 'skipped' };
+  }
+
+  if (hasStatus(actor, 'stun')) {
+    return { type: 'stunned', actorName: actor.displayName };
+  }
+
+  if (action.commandType === 'defend') {
+    actor.isDefending = true;
+    return { type: 'defend', actorName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
+  }
+
+  const move = getMoveData(action.moveId);
+  if (!move) return { type: 'skipped' };
+
+  if (hasStatus(actor, 'silence') && move.category !== 'basic' && action.commandType !== 'defend') {
+    return { type: 'silenced', actorName: actor.displayName, moveName: move.name };
+  }
+
   // Utility moves: deduct MP, no damage yet
   if (move.damageClass === 'utility') {
-    actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
-    return { type: 'utility', actorName: actor.displayName, moveName: move.name };
+    if (move.targeting === 'all_allies') {
+      const tgtSide = action.actorSide;
+      const slots = SLOT_NAMES.filter(s => { const c = bs[tgtSide][s]; return c && !c.isKnockedOut; });
+      if (!slots.length) return { type: 'no_target', actorName: actor.displayName, moveName: move.name };
+      spendMoveCost(actor, move);
+      let statusText = 'BUFF';
+      slots.forEach(s => { statusText = applyUtilityMove(move.id, bs[tgtSide][s]) || statusText; });
+      return { type: 'utility', actorName: actor.displayName, moveName: move.name, targetName: 'all allies', targetSide: tgtSide, targetSlot: null, statusText };
+    }
+
+    const targetSide = action.targetSide || action.actorSide;
+    const targetSlot = action.targetSlot || action.actorSlot;
+    const target = bs[targetSide][targetSlot];
+    if (!target || target.isKnockedOut) {
+      return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetSide, targetSlot };
+    }
+
+    spendMoveCost(actor, move);
+    const isHostile = targetSide !== action.actorSide;
+    if (isHostile) {
+      const didHit = resolveHit(actor, target, move);
+      if (!didHit) {
+        return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide, targetSlot };
+      }
+    }
+
+    const statusText = applyUtilityMove(move.id, target);
+    return { type: 'utility', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide, targetSlot, statusText };
   }
 
   // Multi-target moves (all_enemies or all_allies)
@@ -115,7 +384,7 @@ function resolveAction(action) {
     const slots   = SLOT_NAMES.filter(s => { const c = bs[tgtSide][s]; return c && !c.isKnockedOut; });
     if (!slots.length) return { type: 'no_target', actorName: actor.displayName, moveName: move.name };
 
-    actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
+    spendMoveCost(actor, move);
     const hits = slots.map(slot => {
       const target = bs[tgtSide][slot];
       if (move.damageClass === 'heal') {
@@ -123,13 +392,32 @@ function resolveAction(action) {
         target.hp.current = Math.min(target.hp.max, target.hp.current + amt);
         return { slot, name: target.displayName, amount: amt, wasKO: false };
       }
-      if (!resolveHit(actor, target, move)) return { slot, name: target.displayName, missed: true };
+      const didHit = resolveHit(actor, target, move);
+      if (!didHit) return { slot, name: target.displayName, missed: true };
       const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
       target.hp.current = Math.max(0, target.hp.current - damage);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
-      if (wasKO) target.isKnockedOut = true;
+      if (wasKO) {
+        target.isKnockedOut = true;
+        clearBattleModifiers(target);
+      } else {
+        applySecondaryEffect(move.id, target);
+      }
       return { slot, name: target.displayName, amount: damage, wasKO, isCrit, elemMod };
     });
+    if (move.healAllAllies) {
+      const allySide  = action.actorSide;
+      const allySlots = SLOT_NAMES.filter(s => { const c = bs[allySide][s]; return c && !c.isKnockedOut; });
+      const healMove  = { basePower: move.allyHealBasePower, movePowerModifier: 0, offensiveScaling: move.allyHealScaling || 0.35 };
+      const allyHeals = allySlots.map(s => {
+        const ally = bs[allySide][s];
+        const amt  = calcHeal(actor, healMove);
+        ally.hp.current = Math.min(ally.hp.max, ally.hp.current + amt);
+        return { slot: s, name: ally.displayName, amount: amt };
+      });
+      return { type: 'world_tree', actorName: actor.displayName, moveName: move.name, targetSide: tgtSide, damageHits: hits, allyHeals };
+    }
+
     return { type: 'multi', actorName: actor.displayName, moveName: move.name, damageClass: move.damageClass, targetSide: tgtSide, hits };
   }
 
@@ -138,12 +426,12 @@ function resolveAction(action) {
     const tgtSlot = action.targetSlot || action.actorSlot;
     const target  = bs[action.targetSide || action.actorSide][tgtSlot];
     if (!target || target.isKnockedOut) {
-      return { type: 'miss', actorName: actor.displayName, moveName: move.name };
+      return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetSide: action.targetSide || action.actorSide, targetSlot: tgtSlot };
     }
-    actor.mp.current  = Math.max(0, actor.mp.current - move.mpCost);
+    spendMoveCost(actor, move);
     const amt = calcHeal(actor, move);
     target.hp.current = Math.min(target.hp.max, target.hp.current + amt);
-    return { type: 'heal', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, amount: amt };
+    return { type: 'heal', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide: action.targetSide || action.actorSide, targetSlot: tgtSlot, amount: amt };
   }
 
   // Single-target damage — retarget if needed
@@ -156,15 +444,43 @@ function resolveAction(action) {
   const target  = bs[tgtSide][tgtSlot];
   const retargeted = tgtSlot !== action.targetSlot;
 
-  if (!resolveHit(actor, target, move)) {
-    return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetName: target.displayName };
+  spendMoveCost(actor, move);
+
+  // Multi-hit moves (e.g. Scorch)
+  if (move.hitCount > 1) {
+    const hits = [];
+    for (let h = 0; h < move.hitCount; h++) {
+      if (target.isKnockedOut) break;
+      const didHit = resolveHit(actor, target, move);
+      if (!didHit) { hits.push({ missed: true }); continue; }
+      const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
+      target.hp.current = Math.max(0, target.hp.current - damage);
+      const wasKO = !target.isKnockedOut && target.hp.current <= 0;
+      if (wasKO) { target.isKnockedOut = true; clearBattleModifiers(target); }
+      hits.push({ damage, isCrit, elemMod, wasKO });
+    }
+    return { type: 'multi_hit', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide: tgtSide, targetSlot: tgtSlot, hits, retargeted };
   }
 
-  actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
+  const didHit = resolveHit(actor, target, move);
+  if (!didHit) {
+    return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide: tgtSide, targetSlot: tgtSlot };
+  }
+
   const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
   target.hp.current = Math.max(0, target.hp.current - damage);
   const wasKO = !target.isKnockedOut && target.hp.current <= 0;
-  if (wasKO) target.isKnockedOut = true;
+  if (wasKO) {
+    target.isKnockedOut = true;
+    clearBattleModifiers(target);
+  }
+  const statusText = applySecondaryEffect(move.id, target);
+
+  let lifestolen = null;
+  if (move.lifeSteal && damage > 0) {
+    lifestolen = Math.max(1, Math.round(damage * move.lifeSteal));
+    actor.hp.current = Math.min(actor.hp.max, actor.hp.current + lifestolen);
+  }
 
   return {
     type: isCrit ? 'crit' : 'damage',
@@ -178,5 +494,76 @@ function resolveAction(action) {
     isCrit,
     wasKO,
     retargeted,
+    statusText,
+    lifestolen,
   };
+}
+
+function applyUtilityMove(moveId, target) {
+  let text = null;
+  switch (moveId) {
+    case 'cold_feet':    text = applyStatModifier(target, 'speed', -1); break;
+    case 'snow_blind':   text = applyStatModifier(target, 'accuracy', -1); break;
+    case 'heat_haze':    text = applyStatModifier(target, 'evasion', 1); break;
+    case 'ash_veil':     text = applyStatModifier(target, 'spirit', 1); break;
+    case 'soak_hide':    text = applyStatModifier(target, 'defense', 1); break;
+    case 'verdant_guard':
+    case 'natures_ward': text = applyStatModifier(target, 'spirit', 1); break;
+    case 'bloom_surge': {
+      applyStatModifier(target, 'intelligence', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
+    case 'hydro_skin':
+    case 'glacier_wall': {
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
+    case 'whirlpool': {
+      applyStatModifier(target, 'speed', -1);
+      text = applyStatModifier(target, 'accuracy', -1);
+      break;
+    }
+    case 'cleanse': {
+      const had = (target.statusEffects || []).length > 0;
+      target.statusEffects = [];
+      text = had ? 'CLEANSED' : 'BUFF';
+      break;
+    }
+  }
+  const move = getMoveData(moveId);
+  if (move?.applyStatus && !target.isKnockedOut) {
+    const { id, duration, permanent, chance = 100 } = move.applyStatus;
+    if (!hasStatus(target, id) && Math.random() * 100 < chance) {
+      const label = applyStatus(target, id, { remainingRounds: duration, permanent });
+      if (id === 'burn') applyStatModifier(target, 'defense', -1);
+      text = text ? `${text}! ${label}` : label;
+    }
+  }
+  return text || 'BUFF';
+}
+
+function applySecondaryEffect(moveId, target) {
+  let text = null;
+  switch (moveId) {
+    case 'root_snare':
+    case 'frozen_pulse':  text = applyStatModifier(target, 'speed', -1); break;
+    case 'thorn_bind':    text = applyStatModifier(target, 'defense', -1); break;
+    case 'absolute_zero': {
+      applyStatModifier(target, 'speed', -1);
+      text = applyStatModifier(target, 'accuracy', -1);
+      break;
+    }
+  }
+  const move = getMoveData(moveId);
+  if (move?.applyStatus && !target.isKnockedOut) {
+    const { id, duration, permanent, chance = 100 } = move.applyStatus;
+    if (!hasStatus(target, id) && Math.random() * 100 < chance) {
+      const label = applyStatus(target, id, { remainingRounds: duration, permanent });
+      if (id === 'burn') applyStatModifier(target, 'defense', -1);
+      text = text ? `${text}! ${label}` : label;
+    }
+  }
+  return text;
 }

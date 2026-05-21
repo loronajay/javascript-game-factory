@@ -9,6 +9,7 @@ export { loadActivityFeed } from "./activity-store.mjs";
 
 export {
   buildBattleshitsMatchActivity,
+  buildCreatureBattleMatchActivity,
   buildLoversLostRunActivity,
   buildSumoraiMatchActivity,
 } from "./activity-builders.mjs";
@@ -17,6 +18,7 @@ export {
   publishActivityItem,
   publishActivityItemWithApi,
   publishBattleshitsMatchActivity,
+  publishCreatureBattleMatchActivity,
   publishLoversLostRunActivity,
   publishSumoraiMatchActivity,
   syncActivityFeedFromApi,

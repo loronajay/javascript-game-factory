@@ -22,18 +22,29 @@ function alivePlayerSlots() {
 }
 
 function startCommandInput(onComplete) {
-  inputState.queue = alivePlayerSlots();
-  if (!inputState.queue.length) { onComplete([]); return; }
-  inputState.queueIndex    = 0;
-  inputState.phase         = 'command';
+  const allAlive = alivePlayerSlots();
+  if (!allAlive.length) { onComplete([]); return; }
+  const autoActions = [];
+  const needsInput = allAlive.filter(slot => {
+    const c = state.battleState.player[slot];
+    if (hasStatus(c, 'stun')) {
+      autoActions.push({ actorSide: 'player', actorSlot: slot, commandType: 'art', moveId: null, targetSide: null, targetSlot: null, speed: getEffectiveSpeed(c) });
+      return false;
+    }
+    return true;
+  });
+  if (!needsInput.length) { onComplete(autoActions); return; }
+  inputState.queue          = needsInput;
+  inputState.queueIndex     = 0;
+  inputState.phase          = 'command';
   inputState.focusedCommand = 0;
-  inputState.focusedArt    = 0;
-  inputState.focusedTarget = 0;
-  inputState.lockedActions = [];
+  inputState.focusedArt     = 0;
+  inputState.focusedTarget  = 0;
+  inputState.lockedActions  = autoActions;
   inputState.pendingCommandType = null;
-  inputState.pendingMoveId = null;
-  inputState.active        = true;
-  inputState.onComplete    = onComplete;
+  inputState.pendingMoveId  = null;
+  inputState.active         = true;
+  inputState.onComplete     = onComplete;
   renderBattleCommandPanel();
   highlightActiveCommander();
 }
@@ -42,19 +53,54 @@ function currentSlot()     { return inputState.queue[inputState.queueIndex]; }
 function currentCreature() { return state.battleState.player[currentSlot()]; }
 
 function getCommandDefs(creature) {
+  const silenced = hasStatus(creature, 'silence');
   return [
     { id: 'attack', label: 'ATTACK', icon: '⚔️',  enabled: true },
     { id: 'defend', label: 'DEFEND', icon: '🛡️',  enabled: true },
-    { id: 'art',    label: 'ART',    icon: '✦',   enabled: getArtsFor(creature).length > 0 },
+    { id: 'art',    label: 'ART',    icon: '✦',   enabled: !silenced && getArtsFor(creature).length > 0 },
     { id: 'skill',  label: 'SKILL',  icon: '◎',   enabled: false },
     { id: 'item',   label: 'ITEM',   icon: '🧪',  enabled: false },
   ];
 }
 
+function getAllArtsFor(creature) {
+  return creature.moves.filter(m => ['art', 'heal', 'utility'].includes(m.category));
+}
+
 function getArtsFor(creature) {
-  return creature.moves.filter(m =>
-    ['art', 'heal', 'utility'].includes(m.category) && m.mpCost <= creature.mp.current
-  );
+  return getAllArtsFor(creature).filter(m => m.mpCost <= creature.mp.current);
+}
+
+function sortArtsForGrid(arts) {
+  const baseOf = id => id.replace(/_[23]$/, '');
+  const tierOf = id => id.endsWith('_3') ? 3 : id.endsWith('_2') ? 2 : 1;
+  const groupMap = new Map();
+  arts.forEach(a => {
+    const base = baseOf(a.id);
+    if (!groupMap.has(base)) groupMap.set(base, []);
+    groupMap.get(base).push(a);
+  });
+  groupMap.forEach(g => g.sort((a, b) => tierOf(a.id) - tierOf(b.id)));
+  const tiered = [], singles = [];
+  groupMap.forEach(g => (g.length > 1 ? tiered : singles).push(g));
+  tiered.sort((a, b) => a[0].learnedAt - b[0].learnedAt);
+  singles.sort((a, b) => a[0].learnedAt - b[0].learnedAt);
+  const result = [];
+  tiered.forEach(g => {
+    result.push(...g);
+    const rem = g.length % 3;
+    if (rem) for (let i = 0; i < 3 - rem; i++) result.push(null);
+  });
+  singles.forEach(g => result.push(g[0]));
+  return result;
+}
+
+function getGridArts(creature) {
+  return sortArtsForGrid(getAllArtsFor(creature));
+}
+
+function getNonNullArts(creature) {
+  return getGridArts(creature).filter(Boolean);
 }
 
 function aliveTargetSlots() {
@@ -75,24 +121,24 @@ function handleBattleKey(key) {
 function handleCommandKey(key) {
   const cmds  = getCommandDefs(currentCreature());
   const count = cmds.length;
-  if (key === 'ArrowLeft')  { inputState.focusedCommand = (inputState.focusedCommand - 1 + count) % count; renderBattleCommandPanel(); }
-  if (key === 'ArrowRight') { inputState.focusedCommand = (inputState.focusedCommand + 1) % count;          renderBattleCommandPanel(); }
+  if (key === 'ArrowLeft')  { playClick(); inputState.focusedCommand = (inputState.focusedCommand - 1 + count) % count; renderBattleCommandPanel(); }
+  if (key === 'ArrowRight') { playClick(); inputState.focusedCommand = (inputState.focusedCommand + 1) % count;          renderBattleCommandPanel(); }
   if (key === 'Enter' || key === ' ') { playClick(); confirmCommand(); }
   if (key === 'Escape' && inputState.queueIndex > 0) { playClick(); undoLast(); }
 }
 
 function handleArtKey(key) {
-  const arts = getArtsFor(currentCreature());
-  if (key === 'ArrowUp'   || key === 'ArrowLeft')  { inputState.focusedArt = (inputState.focusedArt - 1 + arts.length) % arts.length; renderBattleCommandPanel(); }
-  if (key === 'ArrowDown' || key === 'ArrowRight') { inputState.focusedArt = (inputState.focusedArt + 1) % arts.length;                renderBattleCommandPanel(); }
+  const arts = getNonNullArts(currentCreature());
+  if (key === 'ArrowUp'   || key === 'ArrowLeft')  { playClick(); inputState.focusedArt = (inputState.focusedArt - 1 + arts.length) % arts.length; renderBattleCommandPanel(); }
+  if (key === 'ArrowDown' || key === 'ArrowRight') { playClick(); inputState.focusedArt = (inputState.focusedArt + 1) % arts.length;                renderBattleCommandPanel(); }
   if (key === 'Enter' || key === ' ') { playClick(); confirmArt(); }
   if (key === 'Escape') { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); }
 }
 
 function handleTargetKey(key) {
   const targets = aliveTargetSlots();
-  if (key === 'ArrowUp'   || key === 'ArrowLeft')  { inputState.focusedTarget = (inputState.focusedTarget - 1 + aliveTargetSlots().length) % aliveTargetSlots().length; renderBattleCommandPanel(); refreshTargetHighlight(); }
-  if (key === 'ArrowDown' || key === 'ArrowRight') { inputState.focusedTarget = (inputState.focusedTarget + 1) % aliveTargetSlots().length;                                renderBattleCommandPanel(); refreshTargetHighlight(); }
+  if (key === 'ArrowUp'   || key === 'ArrowLeft')  { playClick(); inputState.focusedTarget = (inputState.focusedTarget - 1 + aliveTargetSlots().length) % aliveTargetSlots().length; renderBattleCommandPanel(); refreshTargetHighlight(); }
+  if (key === 'ArrowDown' || key === 'ArrowRight') { playClick(); inputState.focusedTarget = (inputState.focusedTarget + 1) % aliveTargetSlots().length;                                renderBattleCommandPanel(); refreshTargetHighlight(); }
   if (key === 'Enter' || key === ' ') { playClick(); confirmTarget(); }
   if (key === 'Escape') { playClick();
     inputState.phase = inputState.pendingCommandType === 'attack' ? 'command' : 'art_menu';
@@ -110,7 +156,7 @@ function confirmCommand() {
   inputState.pendingCommandType = cmd.id;
 
   if (cmd.id === 'defend') {
-    lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: 'defend', moveId: null, targetSide: null, targetSlot: null, speed: currentCreature().stats.speed });
+    lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: 'defend', moveId: null, targetSide: null, targetSlot: null, speed: getEffectiveSpeed(currentCreature()) });
   } else if (cmd.id === 'attack') {
     inputState.pendingMoveId      = 'basic_attack';
     inputState.pendingTargetSide  = 'opponent';
@@ -127,13 +173,37 @@ function confirmCommand() {
 }
 
 function confirmArt() {
-  const arts = getArtsFor(currentCreature());
+  const arts = getNonNullArts(currentCreature());
   if (!arts.length) return;
   const art = arts[inputState.focusedArt];
+  if (!art) return;
+  if (art.mpCost > currentCreature().mp.current) { playInvalid(); return; }
   inputState.pendingMoveId = art.id;
 
   if (art.damageClass === 'utility') {
-    lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: 'art', moveId: art.id, targetSide: 'player', targetSlot: currentSlot(), speed: currentCreature().stats.speed });
+    if (art.targeting === 'self') {
+      lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: 'art', moveId: art.id, targetSide: 'player', targetSlot: currentSlot(), speed: getEffectiveSpeed(currentCreature()) });
+      return;
+    }
+    if (art.targeting === 'all_allies' || art.targeting === 'all_enemies') {
+      inputState.pendingTargetSide = art.targeting === 'all_allies' ? 'player' : 'opponent';
+      inputState.phase = 'multi_confirm';
+      renderBattleCommandPanel();
+      refreshMultiTargetHighlight();
+      return;
+    }
+    inputState.pendingTargetSide = art.targeting === 'single_ally' ? 'player' : 'opponent';
+    inputState.focusedTarget     = 0;
+    inputState.phase             = 'target_select';
+    const sideLabel = art.targeting === 'single_ally' ? 'an ally' : 'a target';
+    updateBattleLog(`${currentCreature().displayName} — click ${sideLabel} on the field, or use W/S to select`);
+    renderBattleCommandPanel();
+    refreshTargetHighlight();
+    return;
+  }
+
+  if (art.damageClass === 'heal' && art.targeting === 'self') {
+    lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: 'art', moveId: art.id, targetSide: 'player', targetSlot: currentSlot(), speed: getEffectiveSpeed(currentCreature()) });
     return;
   }
 
@@ -159,7 +229,7 @@ function confirmTarget() {
   const tgtSlot = targets[inputState.focusedTarget];
   if (!tgtSlot) { playInvalid(); return; }
   clearTargetHighlights();
-  lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: inputState.pendingCommandType, moveId: inputState.pendingMoveId, targetSide: inputState.pendingTargetSide, targetSlot: tgtSlot, speed: currentCreature().stats.speed });
+  lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: inputState.pendingCommandType, moveId: inputState.pendingMoveId, targetSide: inputState.pendingTargetSide, targetSlot: tgtSlot, speed: getEffectiveSpeed(currentCreature()) });
 }
 
 function lockAction(action) {
@@ -215,7 +285,7 @@ function confirmMultiTarget() {
     moveId: inputState.pendingMoveId,
     targetSide: inputState.pendingTargetSide,
     targetSlot: null,
-    speed: currentCreature().stats.speed,
+    speed: getEffectiveSpeed(currentCreature()),
   });
 }
 
@@ -330,20 +400,26 @@ function renderBattleCommandPanel() {
     );
 
   } else if (inputState.phase === 'art_menu') {
-    const arts = getArtsFor(creature);
+    const gridArts = getGridArts(creature);
+    let nonNullIdx = 0;
     el.innerHTML = `
-      <div class="battle-cmd-prompt"><span class="cmd-actor">${creature.displayName}</span> — Choose Art <span class="cmd-back" id="art-back">← Back</span></div>
+      <div class="battle-cmd-prompt"><span class="cmd-actor">${creature.displayName}</span> — Choose Art ${progress} <span class="cmd-back" id="art-back">← Back</span></div>
       <div class="art-list">
-        ${arts.map((a, i) => {
-          const badge = a.targeting === 'all_enemies' ? '<span class="art-target-badge foes">ALL FOES</span>'
-                      : a.targeting === 'all_allies'  ? '<span class="art-target-badge allies">ALL ALLIES</span>'
+        ${gridArts.map(a => {
+          if (!a) return `<div class="art-cell-empty"></div>`;
+          const artIdx = nonNullIdx++;
+          const canAfford = a.mpCost <= creature.mp.current;
+          const badge = a.targeting === 'all_enemies' ? '<span class="art-target-badge foes">ALL</span>'
+                      : a.targeting === 'all_allies'  ? '<span class="art-target-badge allies">ALLIES</span>'
                       : '';
           return `
-          <div class="art-btn ${i === inputState.focusedArt ? 'focused' : ''}" data-art="${i}">
+          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${artIdx === inputState.focusedArt ? 'focused' : ''}" data-art="${artIdx}">
             <span class="art-name">${a.name}</span>
-            ${badge}
-            <span class="element-tag element-${a.element}">${a.element}</span>
-            <span class="art-cost">${a.mpCost} MP</span>
+            <div class="art-meta">
+              <span class="element-tag element-${a.element}">${a.element}</span>
+              <span class="art-cost ${!canAfford ? 'unaffordable' : ''}">${a.mpCost} MP</span>
+              ${badge}
+            </div>
             ${a.desc ? `<div class="art-tooltip">${a.desc}</div>` : ''}
           </div>`;
         }).join('')}
@@ -351,6 +427,7 @@ function renderBattleCommandPanel() {
     el.querySelectorAll('.art-btn').forEach(btn =>
       btn.addEventListener('click', () => { playClick(); inputState.focusedArt = +btn.dataset.art; confirmArt(); })
     );
+    el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
     document.getElementById('art-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
 
   } else if (inputState.phase === 'target_select') {
@@ -365,9 +442,20 @@ function renderBattleCommandPanel() {
           const c = state.battleState[side][s];
           return `
             <div class="target-btn ${side === 'player' ? 'ally' : ''} ${i === inputState.focusedTarget ? 'focused' : ''}" data-tgt="${i}">
-              <img src="${c.sprite}" style="width:28px;height:28px;image-rendering:pixelated;object-fit:contain">
-              <span class="target-name">${c.displayName}</span>
-              <span class="target-hp">${c.hp.current}/${c.hp.max}</span>
+              <img src="${c.sprite}" style="width:32px;height:32px;image-rendering:pixelated;object-fit:contain;flex-shrink:0">
+              <div class="target-info">
+                <div class="target-name">${c.displayName}</div>
+                <div class="hud-bar-row">
+                  <span class="hud-bar-label hp">HP</span>
+                  <div class="hud-bar-track"><div class="hud-bar-fill hp" style="width:${pct(c.hp)}%"></div></div>
+                  <span class="hud-bar-nums">${c.hp.current}/${c.hp.max}</span>
+                </div>
+                <div class="hud-bar-row">
+                  <span class="hud-bar-label mp">MP</span>
+                  <div class="hud-bar-track"><div class="hud-bar-fill mp" style="width:${pct(c.mp)}%"></div></div>
+                  <span class="hud-bar-nums">${c.mp.current}/${c.mp.max}</span>
+                </div>
+              </div>
             </div>`;
         }).join('')}
       </div>`;

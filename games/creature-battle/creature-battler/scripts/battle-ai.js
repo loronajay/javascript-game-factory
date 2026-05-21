@@ -18,7 +18,7 @@ function buildAiAction(creature, slot) {
       .filter(c => c && !c.isKnockedOut && c.hp.current / c.hp.max < 0.5)
       .sort((a, b) => a.hp.current / a.hp.max - b.hp.current / b.hp.max)[0];
     if (hurtAlly) {
-      return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: healMove.id, targetSide: 'opponent', targetSlot: hurtAlly.slot, speed: creature.stats.speed };
+      return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: healMove.id, targetSide: 'opponent', targetSlot: hurtAlly.slot, speed: getEffectiveSpeed(creature) };
     }
   }
 
@@ -36,7 +36,7 @@ function buildAiAction(creature, slot) {
     moveId: move.id,
     targetSide: 'player',
     targetSlot: target,
-    speed: creature.stats.speed,
+    speed: getEffectiveSpeed(creature),
   };
 }
 

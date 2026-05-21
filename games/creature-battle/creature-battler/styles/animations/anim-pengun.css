@@ -1,0 +1,285 @@
+/* Pengun ice animations preserve translate(-50%,-50%) field positioning. */
+
+/* Ice Pebble: quick snap-cast with a brittle blue glint. */
+@keyframes cast-ice-pebble {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.02); filter: drop-shadow(0 0 8px rgba(170,230,255,0.65)) brightness(1.12); }
+  40%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.05); filter: drop-shadow(0 0 16px rgba(130,220,255,0.95)) drop-shadow(0 0 5px #ffffff) brightness(1.35) saturate(0.85); }
+  65%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.01); filter: drop-shadow(0 0 7px rgba(180,235,255,0.55)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-ice-pebble {
+  animation: cast-ice-pebble 390ms ease-out;
+}
+
+/* Ice light hit: crisp flash and tight recoil. */
+@keyframes hit-ice-light-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  16%  { transform: translate(calc(-50% + 11px), calc(-50% - 5px)); filter: brightness(3) saturate(0.65) hue-rotate(175deg) drop-shadow(0 0 11px rgba(190,240,255,0.95)); }
+  45%  { transform: translate(calc(-50% - 3px), -50%); filter: brightness(1.45) saturate(0.75) hue-rotate(180deg); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes hit-ice-light-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  16%  { transform: translate(calc(-50% - 11px), calc(-50% - 5px)); filter: brightness(3) saturate(0.65) hue-rotate(175deg) drop-shadow(0 0 11px rgba(190,240,255,0.95)); }
+  45%  { transform: translate(calc(-50% + 3px), -50%); filter: brightness(1.45) saturate(0.75) hue-rotate(180deg); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-ice-light {
+  animation: hit-ice-light-left 310ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-ice-light {
+  animation: hit-ice-light-right 310ms ease-out;
+}
+
+/* Cold Feet: ground-freeze pulse from caster. */
+@keyframes cast-cold-feet {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  20%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.04, 0.98); filter: drop-shadow(0 0 9px rgba(160,230,255,0.55)); }
+  46%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.08, 0.95); filter: drop-shadow(0 0 22px rgba(115,215,255,0.92)) drop-shadow(0 0 7px #ffffff) brightness(1.28); }
+  74%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.03); filter: drop-shadow(0 0 12px rgba(185,240,255,0.62)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-cold-feet {
+  animation: cast-cold-feet 500ms ease-in-out;
+}
+
+/* Freeze status hit: icy lock-up shimmer on the recipient. */
+@keyframes hit-freeze-status {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  18%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.02, 0.96); filter: brightness(2.5) saturate(0.45) hue-rotate(180deg) drop-shadow(0 0 14px rgba(190,245,255,0.9)); }
+  48%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.01, 0.98); filter: brightness(1.55) saturate(0.6) hue-rotate(180deg); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+.anim-hit-freeze-status {
+  animation: hit-freeze-status 380ms ease-out;
+}
+
+/* Snow Blind: powdery cast with a small sideways shake. */
+@keyframes cast-snow-blind {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  18%  { transform: translate(calc(-50% - 3px), calc(-50% - 4px)); filter: drop-shadow(0 0 9px rgba(220,250,255,0.58)); }
+  42%  { transform: translate(calc(-50% + 4px), calc(-50% - 7px)); filter: drop-shadow(0 0 20px rgba(190,240,255,0.95)) drop-shadow(0 0 8px #ffffff) brightness(1.32); }
+  68%  { transform: translate(calc(-50% - 2px), calc(-50% - 2px)); filter: drop-shadow(0 0 10px rgba(230,255,255,0.55)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-snow-blind {
+  animation: cast-snow-blind 540ms ease-in-out;
+}
+
+/* Snow Blind hit: whiteout flash with a dazed wobble. */
+@keyframes hit-snow-blind-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  16%  { transform: translate(calc(-50% + 7px), calc(-50% - 2px)); filter: brightness(3.4) saturate(0.25) blur(0.3px); }
+  36%  { transform: translate(calc(-50% - 5px), calc(-50% + 1px)); filter: brightness(2) saturate(0.45); }
+  64%  { transform: translate(calc(-50% + 3px), -50%); filter: brightness(1.25); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes hit-snow-blind-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  16%  { transform: translate(calc(-50% - 7px), calc(-50% - 2px)); filter: brightness(3.4) saturate(0.25) blur(0.3px); }
+  36%  { transform: translate(calc(-50% + 5px), calc(-50% + 1px)); filter: brightness(2) saturate(0.45); }
+  64%  { transform: translate(calc(-50% - 3px), -50%); filter: brightness(1.25); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-snow-blind {
+  animation: hit-snow-blind-left 420ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-snow-blind {
+  animation: hit-snow-blind-right 420ms ease-out;
+}
+
+/* Frost Nip charge: compact, sharp two-beat chill build. */
+@keyframes cast-frost-charge {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+  20%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.03); filter: brightness(1.35) drop-shadow(0 0 10px rgba(180,235,255,0.55)); }
+  44%  { transform: translate(-50%, -50%) scale(1.01); filter: brightness(1.05); }
+  68%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.06); filter: brightness(1.65) drop-shadow(0 0 22px rgba(135,225,255,0.95)) drop-shadow(0 0 8px #ffffff); }
+  100% { transform: translate(-50%, calc(-50% - 2px)) scale(1.03); filter: brightness(1.2) drop-shadow(0 0 10px rgba(180,235,255,0.5)); }
+}
+.anim-cast-frost-charge {
+  animation: cast-frost-charge 430ms ease-in-out;
+}
+
+/* Frost Nip: fast icy lunge with a held bite moment. */
+@keyframes cast-frost-nip {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  14%  { transform: translate(-50%, calc(-50% - 5px)); filter: drop-shadow(0 0 12px rgba(180,235,255,0.65)); }
+  42%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 25px rgba(145,225,255,1)) drop-shadow(0 0 8px #ffffff) brightness(1.36); }
+  58%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 15px rgba(190,240,255,0.72)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-frost-nip {
+  animation: cast-frost-nip 500ms cubic-bezier(0.2, 0, 0.45, 1);
+}
+
+/* Ice heavy hit: hard shatter flash and shove. */
+@keyframes hit-ice-heavy-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  14%  { transform: translate(calc(-50% + 18px), calc(-50% - 7px)); filter: brightness(3.5) saturate(0.45) hue-rotate(180deg) drop-shadow(0 0 18px rgba(205,250,255,1)); }
+  34%  { transform: translate(calc(-50% + 7px), calc(-50% - 2px)); filter: brightness(1.95) saturate(0.55) hue-rotate(180deg); }
+  62%  { transform: translate(calc(-50% - 4px), -50%); filter: brightness(1.15); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes hit-ice-heavy-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  14%  { transform: translate(calc(-50% - 18px), calc(-50% - 7px)); filter: brightness(3.5) saturate(0.45) hue-rotate(180deg) drop-shadow(0 0 18px rgba(205,250,255,1)); }
+  34%  { transform: translate(calc(-50% - 7px), calc(-50% - 2px)); filter: brightness(1.95) saturate(0.55) hue-rotate(180deg); }
+  62%  { transform: translate(calc(-50% + 4px), -50%); filter: brightness(1.15); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-ice-heavy {
+  animation: hit-ice-heavy-left 430ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-ice-heavy {
+  animation: hit-ice-heavy-right 430ms ease-out;
+}
+
+/* Shatter Chill: icy lift, bright crackle, then targets shatter in sequence. */
+@keyframes cast-shatter-chill {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 7px)) scale(1.03); filter: drop-shadow(0 0 14px rgba(190,240,255,0.7)); }
+  44%  { transform: translate(-50%, calc(-50% - 16px)) scale(1.08); filter: drop-shadow(0 0 34px rgba(155,230,255,1)) drop-shadow(0 0 15px #ffffff) brightness(1.5) saturate(0.75); }
+  66%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.04); filter: drop-shadow(0 0 20px rgba(205,250,255,0.82)) brightness(1.24); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-shatter-chill {
+  animation: cast-shatter-chill 680ms ease-in-out;
+}
+
+/* Glacier Wall: hunker down and ice-plate up — dense defensive formation. */
+@keyframes cast-glacier-wall {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.04, 0.96); filter: drop-shadow(0 0 10px rgba(180,235,255,0.55)) brightness(1.1); }
+  42%  { transform: translate(-50%, calc(-50% + 7px)) scale(1.1, 0.92); filter: drop-shadow(0 0 26px rgba(145,225,255,0.95)) drop-shadow(0 0 10px #ffffff) brightness(1.32) saturate(0.7); }
+  65%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.06, 0.95); filter: drop-shadow(0 0 18px rgba(200,248,255,0.75)) brightness(1.18); }
+  85%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.03, 0.98); filter: drop-shadow(0 0 10px rgba(220,252,255,0.45)) brightness(1.07); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-glacier-wall {
+  animation: cast-glacier-wall 520ms ease-in-out;
+}
+
+/* Whiteout: blinding flurry blast, stronger horizontal scatter than Snow Blind. */
+@keyframes cast-whiteout {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  16%  { transform: translate(calc(-50% - 4px), calc(-50% - 5px)); filter: drop-shadow(0 0 11px rgba(220,250,255,0.65)); }
+  38%  { transform: translate(calc(-50% + 7px), calc(-50% - 9px)); filter: drop-shadow(0 0 26px rgba(200,245,255,1)) drop-shadow(0 0 10px #ffffff) brightness(1.45) saturate(0.55); }
+  62%  { transform: translate(calc(-50% - 3px), calc(-50% - 4px)); filter: drop-shadow(0 0 15px rgba(235,255,255,0.72)) brightness(1.22); }
+  84%  { transform: translate(calc(-50% + 1px), calc(-50% - 1px)); filter: drop-shadow(0 0 8px rgba(240,255,255,0.45)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-whiteout {
+  animation: cast-whiteout 540ms ease-in-out;
+}
+
+/* Ice Pebble 2: bigger, faster shard with more bite. */
+@keyframes cast-ice-pebble-2 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.04); filter: drop-shadow(0 0 11px rgba(160,230,255,0.72)) brightness(1.18); }
+  41%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.08); filter: drop-shadow(0 0 22px rgba(120,215,255,1)) drop-shadow(0 0 8px #ffffff) brightness(1.42) saturate(0.8); }
+  66%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.02); filter: drop-shadow(0 0 9px rgba(185,240,255,0.58)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-ice-pebble-2 {
+  animation: cast-ice-pebble-2 430ms ease-out;
+}
+
+/* Ice Lock: solid encasing freeze — slow compression then crystal lock. */
+@keyframes cast-ice-lock {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% + 3px)) scale(1.03, 0.97); filter: drop-shadow(0 0 12px rgba(155,225,255,0.6)) brightness(1.1); }
+  40%  { transform: translate(-50%, calc(-50% + 6px)) scale(1.07, 0.93); filter: drop-shadow(0 0 28px rgba(120,215,255,0.98)) drop-shadow(0 0 12px #ffffff) brightness(1.3) saturate(0.65); }
+  62%  { transform: translate(-50%, calc(-50% + 3px)) scale(1.05, 0.96); filter: drop-shadow(0 0 20px rgba(190,245,255,0.82)) brightness(1.18); }
+  82%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.02); filter: drop-shadow(0 0 12px rgba(215,252,255,0.5)) brightness(1.08); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-ice-lock {
+  animation: cast-ice-lock 580ms ease-in-out;
+}
+
+/* Frozen Pulse: sharp upward burst with a piercing crackle. */
+@keyframes cast-frozen-pulse {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.04); filter: drop-shadow(0 0 14px rgba(170,235,255,0.7)) brightness(1.15); }
+  41%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.09); filter: drop-shadow(0 0 30px rgba(130,220,255,1)) drop-shadow(0 0 12px #f0ffff) brightness(1.48) saturate(0.72); }
+  66%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.04); filter: drop-shadow(0 0 18px rgba(185,240,255,0.75)) brightness(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-frozen-pulse {
+  animation: cast-frozen-pulse 560ms ease-in-out;
+}
+
+/* Blizzard: sustained roaring lift, sweeping ice-wind aura. */
+@keyframes cast-blizzard {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  15%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.04); filter: drop-shadow(0 0 14px rgba(195,245,255,0.68)); }
+  36%  { transform: translate(-50%, calc(-50% - 16px)) scale(1.09); filter: drop-shadow(0 0 36px rgba(160,235,255,1)) drop-shadow(0 0 16px #ffffff) brightness(1.52) saturate(0.68); }
+  56%  { transform: translate(-50%, calc(-50% - 20px)) scale(1.12); filter: drop-shadow(0 0 42px rgba(145,230,255,1)) drop-shadow(0 0 18px #f8ffff) brightness(1.58) saturate(0.65); }
+  76%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.06); filter: drop-shadow(0 0 24px rgba(190,245,255,0.82)) brightness(1.28); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-blizzard {
+  animation: cast-blizzard 660ms ease-in-out;
+}
+
+/* Shatter Chill 2: wider, brighter frozen detonation. */
+@keyframes cast-shatter-chill-2 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 9px)) scale(1.04); filter: drop-shadow(0 0 18px rgba(180,238,255,0.72)) brightness(1.18); }
+  42%  { transform: translate(-50%, calc(-50% - 20px)) scale(1.12); filter: drop-shadow(0 0 44px rgba(140,225,255,1)) drop-shadow(0 0 20px #ffffff) brightness(1.62) saturate(0.7); }
+  64%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.06); filter: drop-shadow(0 0 28px rgba(200,248,255,0.86)) brightness(1.3); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-shatter-chill-2 {
+  animation: cast-shatter-chill-2 700ms ease-in-out;
+}
+
+/* Ice Pebble 3: razor-edge lance at crushing velocity. */
+@keyframes cast-ice-pebble-3 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.05); filter: drop-shadow(0 0 14px rgba(150,228,255,0.78)) brightness(1.22); }
+  42%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.12); filter: drop-shadow(0 0 30px rgba(110,210,255,1)) drop-shadow(0 0 12px #ffffff) drop-shadow(0 0 5px #d8f8ff) brightness(1.55) saturate(0.75); }
+  66%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.04); filter: drop-shadow(0 0 14px rgba(185,240,255,0.65)) brightness(1.18); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-ice-pebble-3 {
+  animation: cast-ice-pebble-3 480ms ease-out;
+}
+
+/* Shatter Chill 3: field-wide devastating frozen detonation. */
+@keyframes cast-shatter-chill-3 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  14%  { transform: translate(-50%, calc(-50% - 11px)) scale(1.05); filter: drop-shadow(0 0 20px rgba(175,238,255,0.75)) brightness(1.2); }
+  38%  { transform: translate(-50%, calc(-50% - 24px)) scale(1.16); filter: drop-shadow(0 0 52px rgba(130,222,255,1)) drop-shadow(0 0 24px #ffffff) drop-shadow(0 0 10px #c8f8ff) brightness(1.72) saturate(0.65); }
+  62%  { transform: translate(-50%, calc(-50% - 12px)) scale(1.08); filter: drop-shadow(0 0 34px rgba(198,246,255,0.9)) brightness(1.36); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-shatter-chill-3 {
+  animation: cast-shatter-chill-3 760ms ease-in-out;
+}
+
+/* Absolute Zero charge: three escalating deep-freeze pulses. */
+@keyframes cast-absolute-zero-charge {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+  18%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.04); filter: brightness(1.38) drop-shadow(0 0 12px rgba(155,228,255,0.65)); }
+  36%  { transform: translate(-50%, -50%) scale(1.01); filter: brightness(1.06); }
+  58%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.08); filter: brightness(1.62) drop-shadow(0 0 26px rgba(120,215,255,0.95)) drop-shadow(0 0 10px #f0ffff); }
+  78%  { transform: translate(-50%, -50%) scale(1.02); filter: brightness(1.1); }
+  100% { transform: translate(-50%, calc(-50% - 10px)) scale(1.1); filter: brightness(1.75) drop-shadow(0 0 36px rgba(100,205,255,1)) drop-shadow(0 0 14px #ffffff); }
+}
+.anim-cast-absolute-zero-charge {
+  animation: cast-absolute-zero-charge 520ms ease-in-out;
+}
+
+/* Absolute Zero: deep-freeze lunge — total cold delivered on contact. */
+@keyframes cast-absolute-zero {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  13%  { transform: translate(-50%, calc(-50% - 8px)); filter: drop-shadow(0 0 20px rgba(130,218,255,0.8)); }
+  42%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 44px rgba(100,205,255,1)) drop-shadow(0 0 18px #ffffff) drop-shadow(0 0 8px #b8f4ff) brightness(1.6) saturate(0.55); }
+  62%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 26px rgba(150,228,255,0.82)) brightness(1.22); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-absolute-zero {
+  animation: cast-absolute-zero 640ms cubic-bezier(0.18, 0, 0.45, 1);
+}

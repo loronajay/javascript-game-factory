@@ -541,6 +541,7 @@
 }
 
 .profile-layout-tile--selected {
+  z-index: 6;
   border-color: rgba(126, 200, 227, 0.75) !important;
   box-shadow:
     0 0 0 2px rgba(126, 200, 227, 0.2),

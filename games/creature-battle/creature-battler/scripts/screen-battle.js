@@ -60,9 +60,15 @@ function renderHudSide(side, sideName) {
             <div class="hud-bar-track"><div class="hud-bar-fill mp" id="mp-bar-${sideName}-${slot}" style="width:${pct(c.mp)}%"></div></div>
             <span class="hud-bar-nums" id="mp-nums-${sideName}-${slot}">${c.mp.current}/${c.mp.max}</span>
           </div>
+          <div class="hud-status-row" id="status-row-${sideName}-${slot}">${renderStatusBadges(c)}</div>
         </div>
       </div>`;
   }).join('');
+}
+
+function renderStatusBadges(creature) {
+  const labels = typeof getCreatureStatusLabels === 'function' ? getCreatureStatusLabels(creature) : [];
+  return labels.map(({ label, kind }) => `<span class="hud-status-badge ${kind}">${label}</span>`).join('');
 }
 
 function pct(resource) {
@@ -80,11 +86,13 @@ function renderBattleHud() {
       const hpNums = document.getElementById(`hp-nums-${side}-${slot}`);
       const mpBar  = document.getElementById(`mp-bar-${side}-${slot}`);
       const mpNums = document.getElementById(`mp-nums-${side}-${slot}`);
+      const statusRow = document.getElementById(`status-row-${side}-${slot}`);
       const card   = document.querySelector(`[data-hud="${side}-${slot}"]`);
       if (hpBar)  hpBar.style.width  = `${pct(c.hp)}%`;
       if (hpNums) hpNums.textContent = `${c.hp.current}/${c.hp.max}`;
       if (mpBar)  mpBar.style.width  = `${pct(c.mp)}%`;
       if (mpNums) mpNums.textContent = `${c.mp.current}/${c.mp.max}`;
+      if (statusRow) statusRow.innerHTML = renderStatusBadges(c);
       if (card)   card.classList.toggle('ko', c.isKnockedOut);
     }
   }
@@ -130,6 +138,10 @@ function updateBattleLog(msg) {
 // ── End overlay ───────────────────────────────────────────────────────────────
 
 function renderBattleEndOverlay(winner) {
+  if (typeof window.__publishBattleResult === 'function') {
+    window.__publishBattleResult(winner);
+  }
+
   const screen  = document.getElementById('screen-battle');
   const overlay = document.createElement('div');
   overlay.className = 'battle-end-overlay';

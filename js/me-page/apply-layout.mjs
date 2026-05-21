@@ -1,5 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-freeform-panels-1";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -44,8 +44,8 @@ const PLAYER_REQUIRED = new Set(["hero"]);
 const PLAYER_IDENTITY_MIN_ROWS = 5;
 
 // Applies saved panel layout onto the 12-column CSS grid.
-// Panels are sorted by column-group (x<4=left, x<8=mid, x>=8=right) then by y within
-// each group so DOM order produces correct single-column stacking at mobile breakpoints.
+// Panels are sorted by their actual freeform position so DOM order produces a readable
+// single-column stack at mobile breakpoints without forcing the old three-lane layout.
 // Inline grid-column / grid-row styles drive desktop placement; the mobile CSS overrides
 // them back to auto with !important so the DOM order takes over.
 export function applyProfileLayout(doc, layout, {
@@ -62,12 +62,7 @@ export function applyProfileLayout(doc, layout, {
   const renderElements = getCompositionElementsForRender(layout.desktop.elements, { galleryPhotos });
   const compositionCategories = getCompositionCategories(renderElements);
 
-  // Sort: column bucket first (0=left, 1=mid, 2=right), then y within bucket.
-  const panels = getRenderablePanels(layout.desktop.panels, layoutSelector).sort((a, b) => {
-    const ga = a.x < 4 ? 0 : a.x < 8 ? 1 : 2;
-    const gb = b.x < 4 ? 0 : b.x < 8 ? 1 : 2;
-    return ga !== gb ? ga - gb : a.y - b.y;
-  });
+  const panels = getRenderablePanels(layout.desktop.panels, layoutSelector).sort(comparePanelsByFreeformPosition);
 
   for (const panel of panels) {
     if (!panelToDom[panel.id]) continue;
@@ -113,6 +108,10 @@ function getRenderablePanels(panels, layoutSelector) {
       ? { ...panel, y: panel.y + delta }
       : panel;
   });
+}
+
+export function comparePanelsByFreeformPosition(a, b) {
+  return (a.y - b.y) || (a.x - b.x);
 }
 
 function applyPanelChildLayout(panelEl, panel) {

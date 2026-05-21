@@ -34,6 +34,15 @@
   color: var(--cb-muted);
 }
 
+.title-player-name {
+  margin-top: 10px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cb-accent);
+  opacity: 0.7;
+}
+
 .title-creatures {
   display: flex;
   gap: 24px;

@@ -1,0 +1,11 @@
+{
+  "title": "Creature Battle",
+  "tagline": "Draft a team of three and fight.",
+  "description": "A 3v3 turn-based battle game. Pick your rental team from the roster, plan your commands, and outlast the opponent. Six status effects, elemental matchups, and a full move library across four creatures.",
+  "players": "1",
+  "status": "Playable prototype",
+  "order": 8,
+  "featured": false,
+  "theme": "void",
+  "accentColor": "#27caff"
+}

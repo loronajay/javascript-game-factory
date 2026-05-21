@@ -1,0 +1,308 @@
+/* Flor gaia animations preserve translate(-50%,-50%) field positioning. */
+
+/* Sprout Tap: small leaf snap and bright green pulse. */
+@keyframes cast-sprout-tap {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.03); filter: drop-shadow(0 0 8px rgba(115,235,105,0.62)) brightness(1.12); }
+  42%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.06); filter: drop-shadow(0 0 18px rgba(75,210,80,0.92)) drop-shadow(0 0 6px #e8ffd0) brightness(1.28); }
+  68%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: drop-shadow(0 0 8px rgba(130,240,120,0.52)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-sprout-tap {
+  animation: cast-sprout-tap 420ms ease-in-out;
+}
+
+/* Gaia light hit: leafy flash and soft recoil. */
+@keyframes hit-gaia-light-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 10px), calc(-50% - 3px)); filter: brightness(2.8) saturate(1.8) hue-rotate(55deg) drop-shadow(0 0 10px rgba(120,245,110,0.9)); }
+  48%  { transform: translate(calc(-50% - 3px), -50%); filter: brightness(1.35) saturate(1.3) hue-rotate(45deg); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes hit-gaia-light-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 10px), calc(-50% - 3px)); filter: brightness(2.8) saturate(1.8) hue-rotate(55deg) drop-shadow(0 0 10px rgba(120,245,110,0.9)); }
+  48%  { transform: translate(calc(-50% + 3px), -50%); filter: brightness(1.35) saturate(1.3) hue-rotate(45deg); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-gaia-light {
+  animation: hit-gaia-light-left 330ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-gaia-light {
+  animation: hit-gaia-light-right 330ms ease-out;
+}
+
+/* Petal Mend: gentle rise and green bloom before allies receive heals. */
+@keyframes cast-petal-mend {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  20%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.03); filter: drop-shadow(0 0 10px rgba(130,245,120,0.58)); }
+  46%  { transform: translate(-50%, calc(-50% - 12px)) scale(1.08); filter: drop-shadow(0 0 26px rgba(90,220,100,0.95)) drop-shadow(0 0 10px #f4ffd8) brightness(1.35); }
+  72%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.03); filter: drop-shadow(0 0 14px rgba(145,245,130,0.62)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-petal-mend {
+  animation: cast-petal-mend 620ms ease-in-out;
+}
+
+/* Petal heal hit: soft green lift on each recipient. */
+@keyframes hit-petal-heal {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+  18%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.04); filter: brightness(2.2) saturate(1.45) hue-rotate(45deg) drop-shadow(0 0 14px rgba(115,255,130,0.9)); }
+  52%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.02); filter: brightness(1.35) saturate(1.2) hue-rotate(45deg); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+}
+.anim-hit-petal-heal {
+  animation: hit-petal-heal 410ms ease-out;
+}
+
+/* Root Snare: grounded cast, as if roots are being pulled up. */
+@keyframes cast-root-snare {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  22%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.04, 0.98); filter: drop-shadow(0 0 10px rgba(120,210,70,0.58)); }
+  50%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.09, 0.94); filter: drop-shadow(0 0 24px rgba(75,190,65,0.95)) drop-shadow(0 0 8px #e5ffc8) brightness(1.28); }
+  76%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.03); filter: drop-shadow(0 0 12px rgba(120,225,90,0.6)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-root-snare {
+  animation: cast-root-snare 560ms ease-in-out;
+}
+
+/* Root Snare hit: upward binding jolt and heavier green flash. */
+@keyframes hit-root-snare-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  14%  { transform: translate(calc(-50% + 5px), calc(-50% - 12px)); filter: brightness(3) saturate(1.6) hue-rotate(45deg) drop-shadow(0 0 16px rgba(105,230,80,0.95)); }
+  34%  { transform: translate(calc(-50% - 4px), calc(-50% - 5px)); filter: brightness(1.75) saturate(1.3) hue-rotate(45deg); }
+  66%  { transform: translate(calc(-50% + 2px), -50%); filter: brightness(1.12); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes hit-root-snare-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  14%  { transform: translate(calc(-50% - 5px), calc(-50% - 12px)); filter: brightness(3) saturate(1.6) hue-rotate(45deg) drop-shadow(0 0 16px rgba(105,230,80,0.95)); }
+  34%  { transform: translate(calc(-50% + 4px), calc(-50% - 5px)); filter: brightness(1.75) saturate(1.3) hue-rotate(45deg); }
+  66%  { transform: translate(calc(-50% - 2px), -50%); filter: brightness(1.12); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-root-snare {
+  animation: hit-root-snare-left 450ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-root-snare {
+  animation: hit-root-snare-right 450ms ease-out;
+}
+
+/* Verdant Guard: bark-like defensive shell around Flor. */
+@keyframes cast-verdant-guard {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.04, 0.98); filter: drop-shadow(0 0 9px rgba(120,230,90,0.5)) brightness(1.1); }
+  42%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.08, 0.95); filter: drop-shadow(0 0 22px rgba(80,205,75,0.9)) drop-shadow(0 0 8px #e9ffd0) brightness(1.26); }
+  68%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.04, 0.98); filter: drop-shadow(0 0 14px rgba(125,235,100,0.65)) brightness(1.14); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-verdant-guard {
+  animation: cast-verdant-guard 570ms ease-in-out;
+}
+
+/* Thorn Bind: aggressive forward lean with a vine-whip snap. */
+@keyframes cast-thorn-bind {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  20%  { transform: translate(-50%, calc(-50% + 3px)) scale(1.04, 0.97); filter: drop-shadow(0 0 10px rgba(100,200,60,0.6)); }
+  41%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.09); filter: drop-shadow(0 0 24px rgba(65,185,50,0.95)) drop-shadow(0 0 8px #d8ffb0) brightness(1.32); }
+  66%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.03); filter: drop-shadow(0 0 12px rgba(115,220,85,0.6)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-thorn-bind {
+  animation: cast-thorn-bind 520ms ease-in-out;
+}
+
+/* Gaia heavy hit: strong green flash and solid shove. */
+@keyframes hit-gaia-heavy-right {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  15%  { transform: translate(calc(-50% + 16px), calc(-50% - 6px)); filter: brightness(3.1) saturate(2) hue-rotate(55deg) drop-shadow(0 0 17px rgba(110,240,95,1)); }
+  35%  { transform: translate(calc(-50% + 7px), calc(-50% - 2px)); filter: brightness(1.75) saturate(1.5) hue-rotate(50deg); }
+  62%  { transform: translate(calc(-50% - 4px), -50%); filter: brightness(1.12); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes hit-gaia-heavy-left {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  15%  { transform: translate(calc(-50% - 16px), calc(-50% - 6px)); filter: brightness(3.1) saturate(2) hue-rotate(55deg) drop-shadow(0 0 17px rgba(110,240,95,1)); }
+  35%  { transform: translate(calc(-50% - 7px), calc(-50% - 2px)); filter: brightness(1.75) saturate(1.5) hue-rotate(50deg); }
+  62%  { transform: translate(calc(-50% + 4px), -50%); filter: brightness(1.12); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-gaia-heavy {
+  animation: hit-gaia-heavy-left 430ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-gaia-heavy {
+  animation: hit-gaia-heavy-right 430ms ease-out;
+}
+
+/* Toxic Spores: forward puff with a sickly yellow-green cloud dispersal. */
+@keyframes cast-toxic-spores {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.03); filter: drop-shadow(0 0 10px rgba(165,215,40,0.6)) brightness(1.1); }
+  40%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.07); filter: drop-shadow(0 0 22px rgba(140,205,25,0.92)) drop-shadow(0 0 8px #eeffaa) brightness(1.28) saturate(1.3); }
+  66%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.03); filter: drop-shadow(0 0 12px rgba(160,210,45,0.55)) brightness(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-toxic-spores {
+  animation: cast-toxic-spores 540ms ease-in-out;
+}
+
+/* Toxic spores hit: target coated in sickly haze, no knockback. */
+@keyframes hit-toxic-spores {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  20%  { transform: translate(-50%, calc(-50% + 3px)); filter: brightness(0.78) saturate(1.6) hue-rotate(25deg) drop-shadow(0 0 12px rgba(155,210,30,0.85)); }
+  55%  { transform: translate(-50%, calc(-50% + 1px)); filter: brightness(0.88) saturate(1.3) hue-rotate(20deg); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+.anim-hit-toxic-spores {
+  animation: hit-toxic-spores 400ms ease-out;
+}
+
+/* Bloom Surge: upward burst of vivid growth energy, self-buff. */
+@keyframes cast-bloom-surge {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.04); filter: drop-shadow(0 0 12px rgba(100,235,90,0.65)) brightness(1.18); }
+  40%  { transform: translate(-50%, calc(-50% - 14px)) scale(1.1); filter: drop-shadow(0 0 30px rgba(70,215,75,1)) drop-shadow(0 0 12px #e0ffc0) brightness(1.42); }
+  62%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.06); filter: drop-shadow(0 0 18px rgba(115,235,105,0.75)) brightness(1.22); }
+  82%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.02); filter: drop-shadow(0 0 10px rgba(130,240,120,0.45)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-bloom-surge {
+  animation: cast-bloom-surge 560ms ease-in-out;
+}
+
+/* Sprout Tap 2: stronger snap, more pronounced forward pop. */
+@keyframes cast-sprout-tap-2 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.05); filter: drop-shadow(0 0 11px rgba(105,230,95,0.68)) brightness(1.16); }
+  41%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.09); filter: drop-shadow(0 0 24px rgba(68,205,75,0.95)) drop-shadow(0 0 8px #e6ffd2) brightness(1.36); }
+  66%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.03); filter: drop-shadow(0 0 10px rgba(125,238,115,0.55)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-sprout-tap-2 {
+  animation: cast-sprout-tap-2 460ms ease-in-out;
+}
+
+/* Pollen Veil: slow soft dispersal — cloud of golden-green silence drifts forward. */
+@keyframes cast-pollen-veil {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.03); filter: drop-shadow(0 0 10px rgba(200,230,60,0.55)) brightness(1.1); }
+  40%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.08); filter: drop-shadow(0 0 24px rgba(185,220,45,0.9)) drop-shadow(0 0 10px #f6ffb8) brightness(1.3) saturate(1.2); }
+  64%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.04); filter: drop-shadow(0 0 14px rgba(200,225,55,0.6)) brightness(1.14); }
+  84%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.01); filter: drop-shadow(0 0 8px rgba(210,230,70,0.35)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-pollen-veil {
+  animation: cast-pollen-veil 560ms ease-in-out;
+}
+
+/* Pollen veil hit: target dulled in golden-green haze, no knockback. */
+@keyframes hit-pollen-veil {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  22%  { transform: translate(-50%, calc(-50% - 2px)); filter: brightness(0.82) saturate(1.4) hue-rotate(30deg) drop-shadow(0 0 12px rgba(195,225,50,0.82)) blur(0.3px); }
+  56%  { transform: translate(-50%, -50%); filter: brightness(0.9) saturate(1.2) hue-rotate(28deg) blur(0.2px); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+.anim-hit-pollen-veil {
+  animation: hit-pollen-veil 440ms ease-out;
+}
+
+/* Nature's Ward: broad swelling aura — warm forest green ripple for the whole team. */
+@keyframes cast-natures-ward {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.04); filter: drop-shadow(0 0 11px rgba(95,230,85,0.6)) brightness(1.14); }
+  40%  { transform: translate(-50%, calc(-50% - 12px)) scale(1.11); filter: drop-shadow(0 0 28px rgba(65,210,70,0.98)) drop-shadow(0 0 12px #dcffb8) brightness(1.38); }
+  62%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.06); filter: drop-shadow(0 0 18px rgba(110,235,100,0.72)) brightness(1.2); }
+  82%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: drop-shadow(0 0 10px rgba(130,240,120,0.4)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-natures-ward {
+  animation: cast-natures-ward 580ms ease-in-out;
+}
+
+/* Petal Mend 2: richer bloom, higher float than the original. */
+@keyframes cast-petal-mend-2 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 7px)) scale(1.04); filter: drop-shadow(0 0 12px rgba(120,242,115,0.65)); }
+  44%  { transform: translate(-50%, calc(-50% - 16px)) scale(1.1); filter: drop-shadow(0 0 32px rgba(80,215,95,0.98)) drop-shadow(0 0 14px #eeffcc) brightness(1.42); }
+  70%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.05); filter: drop-shadow(0 0 18px rgba(140,242,125,0.7)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-petal-mend-2 {
+  animation: cast-petal-mend-2 640ms ease-in-out;
+}
+
+/* Sprout Tap 3: full forest power, brightest peak of the tier. */
+@keyframes cast-sprout-tap-3 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.06); filter: drop-shadow(0 0 14px rgba(95,228,88,0.72)) brightness(1.2); }
+  41%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.13); filter: drop-shadow(0 0 32px rgba(55,200,65,1)) drop-shadow(0 0 12px #e0ffb8) drop-shadow(0 0 5px #ccffaa) brightness(1.5); }
+  66%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.05); filter: drop-shadow(0 0 16px rgba(120,235,110,0.68)) brightness(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-sprout-tap-3 {
+  animation: cast-sprout-tap-3 500ms ease-in-out;
+}
+
+/* Petal Mend 3: torrent bloom — slow, deep, sweeping restoration. */
+@keyframes cast-petal-mend-3 {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  15%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.05); filter: drop-shadow(0 0 14px rgba(115,240,110,0.68)); }
+  36%  { transform: translate(-50%, calc(-50% - 18px)) scale(1.11); filter: drop-shadow(0 0 36px rgba(72,210,82,1)) drop-shadow(0 0 16px #eeffcc) brightness(1.46); }
+  58%  { transform: translate(-50%, calc(-50% - 22px)) scale(1.14); filter: drop-shadow(0 0 42px rgba(60,205,72,1)) drop-shadow(0 0 20px #f2ffd8) brightness(1.52); }
+  78%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.06); filter: drop-shadow(0 0 22px rgba(130,242,120,0.72)) brightness(1.24); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-petal-mend-3 {
+  animation: cast-petal-mend-3 700ms ease-in-out;
+}
+
+/* Cleanse: bright wash of pure gaia light — gentle upward bloom, then radiates out to the target. */
+@keyframes cast-cleanse {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  16%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.04); filter: drop-shadow(0 0 12px rgba(160,255,160,0.65)) brightness(1.18); }
+  42%  { transform: translate(-50%, calc(-50% - 11px)) scale(1.09); filter: drop-shadow(0 0 28px rgba(120,255,140,0.98)) drop-shadow(0 0 12px #ffffff) brightness(1.45) saturate(0.85); }
+  66%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.04); filter: drop-shadow(0 0 16px rgba(150,255,160,0.7)) brightness(1.2); }
+  84%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.01); filter: drop-shadow(0 0 8px rgba(170,255,175,0.38)); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-cleanse {
+  animation: cast-cleanse 520ms ease-in-out;
+}
+
+/* Cleanse hit: target washed in pure light — bright upward lift, no knockback. */
+@keyframes hit-cleanse {
+  0%   { transform: translate(-50%, -50%); filter: brightness(1); }
+  20%  { transform: translate(-50%, calc(-50% - 9px)); filter: brightness(2.2) saturate(0.6) drop-shadow(0 0 18px rgba(180,255,190,0.95)) drop-shadow(0 0 6px #ffffff); }
+  55%  { transform: translate(-50%, calc(-50% - 4px)); filter: brightness(1.45) saturate(0.75) drop-shadow(0 0 10px rgba(160,255,170,0.55)); }
+  100% { transform: translate(-50%, -50%); filter: brightness(1); }
+}
+.anim-hit-cleanse {
+  animation: hit-cleanse 460ms ease-out;
+}
+
+/* World Tree charge: three deep-root earth-pull beats. */
+@keyframes cast-world-tree-charge {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+  18%  { transform: translate(-50%, calc(-50% + 3px)) scale(1.03, 0.98); filter: brightness(1.35) drop-shadow(0 0 12px rgba(80,210,75,0.65)); }
+  36%  { transform: translate(-50%, -50%) scale(1.01); filter: brightness(1.06); }
+  60%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.06, 0.95); filter: brightness(1.55) drop-shadow(0 0 24px rgba(60,195,65,0.95)) drop-shadow(0 0 10px #d8ffb0); }
+  80%  { transform: translate(-50%, -50%) scale(1.02); filter: brightness(1.1); }
+  100% { transform: translate(-50%, calc(-50% - 8px)) scale(1.1); filter: brightness(1.72) drop-shadow(0 0 34px rgba(45,185,55,1)) drop-shadow(0 0 14px #e4ffc0); }
+}
+.anim-cast-world-tree-charge {
+  animation: cast-world-tree-charge 480ms ease-in-out;
+}
+
+/* World Tree: grand slow rise — deep forest power sweeps all enemies. */
+@keyframes cast-world-tree {
+  0%   { transform: translate(-50%, -50%) scale(1); filter: none; }
+  14%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.06); filter: drop-shadow(0 0 18px rgba(80,210,80,0.7)) brightness(1.2); }
+  38%  { transform: translate(-50%, calc(-50% - 22px)) scale(1.14); filter: drop-shadow(0 0 44px rgba(50,195,60,1)) drop-shadow(0 0 20px #d8ffaa) brightness(1.55); }
+  58%  { transform: translate(-50%, calc(-50% - 26px)) scale(1.18); filter: drop-shadow(0 0 54px rgba(40,185,52,1)) drop-shadow(0 0 26px #e4ffc0) drop-shadow(0 0 10px #ffffff) brightness(1.68); }
+  78%  { transform: translate(-50%, calc(-50% - 14px)) scale(1.08); filter: drop-shadow(0 0 28px rgba(100,225,95,0.85)) brightness(1.3); }
+  100% { transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+.anim-cast-world-tree {
+  animation: cast-world-tree 820ms ease-in-out;
+}

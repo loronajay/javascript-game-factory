@@ -1,4 +1,4 @@
-import { LAYOUT_COLUMNS } from "./default-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { LAYOUT_COLUMNS } from "./default-layout.mjs?v=20260521-freeform-panels-1";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
 // Reads the shared CSS tokens so the editor and live page always snap to the same grid.
@@ -30,13 +30,23 @@ function pointerToCell(clientX, clientY, canvas, zoom = 1) {
   };
 }
 
-function overlapsAny(panels, skipIds, x, y, w, h) {
-  const skip = typeof skipIds === "string" ? new Set([skipIds]) : new Set(skipIds);
-  for (const p of panels) {
-    if (skip.has(p.id) || p.enabled === false) continue;
-    if (x < p.x + p.w && x + w > p.x && y < p.y + p.h && y + h > p.y) return true;
-  }
-  return false;
+export function resolvePanelDragDrop({
+  col,
+  row,
+  grabCol,
+  grabRow,
+  w,
+  h,
+  columns = LAYOUT_COLUMNS,
+}) {
+  return {
+    x: Math.max(0, Math.min(col - grabCol, columns - w)),
+    y: Math.max(0, row - grabRow),
+    w,
+    h,
+    valid: true,
+    ghostState: "valid",
+  };
 }
 
 // Returns the single panel that would be displaced by (x, y, w, h), or null if 0 or 2+.
@@ -50,6 +60,27 @@ function findSwapTarget(panels, skipId, x, y, w, h) {
     }
   }
   return found;
+}
+
+export function resolvePanelResizeDrop({
+  panelX,
+  panelY,
+  col,
+  row,
+  def,
+  origW,
+  columns = LAYOUT_COLUMNS,
+}) {
+  const rawW = col - panelX + 1;
+  const rawH = row - panelY + 1;
+  const maxW = def.resizableWidth === false ? origW : def.maxW;
+  const minW = def.resizableWidth === false ? origW : def.minW;
+  return {
+    w: Math.max(minW, Math.min(maxW, rawW, columns - panelX)),
+    h: Math.max(def.minH, Math.min(def.maxH, rawH)),
+    valid: true,
+    ghostState: "valid",
+  };
 }
 
 // initLayoutEditor wires drag + resize onto the canvas via event delegation.
@@ -100,50 +131,25 @@ export function initLayoutEditor(canvas, {
     if (!drag) return;
     const zoom = getZoom();
     const { col, row } = pointerToCell(e.clientX, e.clientY, canvas, zoom);
-    const x = Math.max(0, Math.min(col - drag.grabCol, 12 - drag.w));
-    const y = Math.max(0, row - drag.grabRow);
-    const layout = getLayout();
-    const panels = layout.desktop.panels;
+    const drop = resolvePanelDragDrop({
+      col,
+      row,
+      grabCol: drag.grabCol,
+      grabRow: drag.grabRow,
+      w: drag.w,
+      h: drag.h,
+    });
 
-    const swapTarget = findSwapTarget(panels, drag.panelId, x, y, drag.w, drag.h);
-    let ghostState = "invalid";
-
-    if (swapTarget) {
-      // Swap is valid when both panels fit at each other's original positions.
-      // Exclude both panels when checking for conflicts at each target position.
-      const skipBoth = [drag.panelId, swapTarget.id];
-      const draggingDef = PROFILE_PANEL_REGISTRY[drag.panelId];
-      const targetDef   = PROFILE_PANEL_REGISTRY[swapTarget.id];
-      const draggingFitsAtTarget = (
-        drag.w >= (targetDef?.minW ?? 1) &&
-        !overlapsAny(panels, skipBoth, swapTarget.x, swapTarget.y, drag.w, drag.h)
-      );
-      const targetFitsAtOrigin = (
-        swapTarget.w >= (draggingDef?.minW ?? 1) &&
-        !overlapsAny(panels, skipBoth, drag.origX, drag.origY, swapTarget.w, swapTarget.h)
-      );
-      if (draggingFitsAtTarget && targetFitsAtOrigin) {
-        drag.swapTarget = swapTarget;
-        ghostState = "swap";
-      } else {
-        drag.swapTarget = null;
-      }
-    } else if (!overlapsAny(panels, drag.panelId, x, y, drag.w, drag.h)) {
-      drag.swapTarget = null;
-      ghostState = "valid";
-    } else {
-      drag.swapTarget = null;
-    }
-
-    drag.dropX = x;
-    drag.dropY = y;
-    drag.valid = ghostState === "valid" || ghostState === "swap";
-    placeGhost(x, y, drag.w, drag.h, ghostState);
+    drag.swapTarget = null;
+    drag.dropX = drop.x;
+    drag.dropY = drop.y;
+    drag.valid = drop.valid;
+    placeGhost(drop.x, drop.y, drop.w, drop.h, drop.ghostState);
   }
 
   function finishDrag(commit) {
     if (!drag) return;
-    const { panelId, dropX, dropY, origX, origY, valid, swapTarget } = drag;
+    const { panelId, dropX, dropY, origX, origY, valid } = drag;
     drag = null;
     document.removeEventListener("pointermove", onDragMove);
     document.removeEventListener("pointerup", onDragUp);
@@ -151,10 +157,7 @@ export function initLayoutEditor(canvas, {
     dropGhost();
 
     if (commit && valid) {
-      if (swapTarget && swapPanels) {
-        swapPanels(panelId, swapTarget.x, swapTarget.y, swapTarget.id, origX, origY);
-        onDirty();
-      } else if (!swapTarget && (dropX !== origX || dropY !== origY)) {
+      if (dropX !== origX || dropY !== origY) {
         updatePanelPosition(panelId, dropX, dropY);
         onDirty();
       } else {
@@ -179,25 +182,19 @@ export function initLayoutEditor(canvas, {
     const zoom = getZoom();
     const { col, row } = pointerToCell(e.clientX, e.clientY, canvas, zoom);
     const def = PROFILE_PANEL_REGISTRY[resize.panelId];
+    const drop = resolvePanelResizeDrop({
+      panelX: resize.panelX,
+      panelY: resize.panelY,
+      col,
+      row,
+      def,
+      origW: resize.origW,
+    });
 
-    // New size = distance from panel origin to pointer cell, inclusive
-    const rawW = col - resize.panelX + 1;
-    const rawH = row - resize.panelY + 1;
-
-    // Clamp by registry min/max and grid bounds.
-    // When resizableWidth is false, lock width to its original value.
-    const maxW = def.resizableWidth === false ? resize.origW : def.maxW;
-    const minW = def.resizableWidth === false ? resize.origW : def.minW;
-    const newW = Math.max(minW, Math.min(maxW, rawW, 12 - resize.panelX));
-    const newH = Math.max(def.minH, Math.min(def.maxH, rawH));
-
-    const layout = getLayout();
-    const valid = !overlapsAny(layout.desktop.panels, resize.panelId, resize.panelX, resize.panelY, newW, newH);
-
-    resize.newW = newW;
-    resize.newH = newH;
-    resize.valid = valid;
-    placeGhost(resize.panelX, resize.panelY, newW, newH, valid ? "valid" : "invalid");
+    resize.newW = drop.w;
+    resize.newH = drop.h;
+    resize.valid = drop.valid;
+    placeGhost(resize.panelX, resize.panelY, drop.w, drop.h, drop.ghostState);
   }
 
   function finishResize(commit) {
