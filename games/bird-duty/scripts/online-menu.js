@@ -34,7 +34,7 @@ export const ONLINE_MENU_BUTTONS = Object.freeze([
   {
     action: ONLINE_ACTIONS.PUBLIC_4,
     label: "4 PLAYER",
-    x: 105,
+    x: 110,
     y: 10,
     width: 96,
     height: 48,
@@ -130,6 +130,10 @@ export function normalizeJoinCodeInput(value) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 6);
+}
+
+export function shouldShowJoinCodeCursor(tick = 0) {
+  return Math.floor(Math.max(0, Number(tick) || 0) / 30) % 2 === 0;
 }
 
 export function resolveOnlineActionAtScratchPoint(point, buttons = ONLINE_MENU_BUTTONS) {

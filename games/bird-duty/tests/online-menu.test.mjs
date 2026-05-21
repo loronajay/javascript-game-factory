@@ -3,6 +3,7 @@ import {
   getOnlineActionSettings,
   normalizeJoinCodeInput,
   resolveOnlineActionAtScratchPoint,
+  shouldShowJoinCodeCursor,
 } from "../scripts/online-menu.js";
 
 let passed = 0;
@@ -28,7 +29,7 @@ function assertEqual(actual, expected, message) {
 test("online menu resolves public matchmaking size buttons", () => {
   assertEqual(resolveOnlineActionAtScratchPoint({ x: -105, y: 10 }), ONLINE_ACTIONS.PUBLIC_2);
   assertEqual(resolveOnlineActionAtScratchPoint({ x: 0, y: 10 }), ONLINE_ACTIONS.PUBLIC_3);
-  assertEqual(resolveOnlineActionAtScratchPoint({ x: 105, y: 10 }), ONLINE_ACTIONS.PUBLIC_4);
+  assertEqual(resolveOnlineActionAtScratchPoint({ x: 110, y: 10 }), ONLINE_ACTIONS.PUBLIC_4);
 });
 
 test("online menu resolves private join and back buttons", () => {
@@ -63,6 +64,14 @@ test("online action settings map public modes to exact player counts", () => {
 test("join code input normalizes uppercase room code characters", () => {
   assertEqual(normalizeJoinCodeInput(" ab-cd 12! "), "ABCD12");
   assertEqual(normalizeJoinCodeInput("ABCDEFGHI"), "ABCDEF");
+});
+
+test("join code cursor blinks on a fixed tick cadence", () => {
+  assertEqual(shouldShowJoinCodeCursor(0), true);
+  assertEqual(shouldShowJoinCodeCursor(29), true);
+  assertEqual(shouldShowJoinCodeCursor(30), false);
+  assertEqual(shouldShowJoinCodeCursor(59), false);
+  assertEqual(shouldShowJoinCodeCursor(60), true);
 });
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);

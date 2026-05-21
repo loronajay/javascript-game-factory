@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #0a0608 url('assets/pngs/bg-splash.png') center center / cover no-repeat fixed;
+  background: #0a0608 url('assets/pngs/bg-splash.png') top center / cover no-repeat fixed;
   color: #fff;
   font-family: 'Segoe UI', system-ui, sans-serif;
   height: 100dvh;
@@ -50,6 +50,46 @@ body {
   background: rgba(0,0,0,0.35);
 }
 
+/* ── Per-screen positioning ──────────────────────────────────────────────── */
+
+/* Main menu: card at the bottom so the splash art fills the upper area */
+#screen-menu {
+  justify-content: flex-end;
+  padding-bottom: 52px;
+}
+#screen-menu .menu-card { gap: 14px; }
+
+/* Setup screens: push content below the splash title band;
+   tighter card gap since there are many sections */
+#screen-setup,
+#screen-cpu-setup {
+  align-items: center;
+  justify-content: center;
+  padding-top: 110px;
+}
+#screen-setup .menu-card,
+#screen-cpu-setup .menu-card { gap: 12px; }
+
+/* Section headers inside setup cards — smaller so cards stay compact */
+#screen-setup h2,
+#screen-cpu-setup h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Controls: centered, slight top padding to clear the title */
+#screen-controls {
+  align-items: center;
+  justify-content: center;
+  padding-top: 80px;
+}
+
+/* Result: centered */
+#screen-result {
+  align-items: center;
+  justify-content: center;
+}
+
 /* ── Menu card ───────────────────────────────────────────────────────────── */
 .menu-card {
   display: flex;
@@ -60,7 +100,7 @@ body {
   background: rgba(6,3,6,0.6);
   border: 1px solid rgba(160,20,12,0.22);
   border-radius: 12px;
-  padding: 28px 36px;
+  padding: 22px 32px;
 }
 
 /* Splash already has the title — hide the HTML duplicate on main menu */

@@ -17,7 +17,12 @@ import { PLAYER_FRAME_FILES, PLAYER_RENDER_SCALE, getPlayerFrameIndex } from "./
 import { POOP_RENDER_SCALE } from "./poop.js";
 import { NPC_DEFINITIONS, getNpcFrameFile } from "./npcs.js";
 import { TWO_PLAYER_BUTTONS } from "./two-player-menu.js";
-import { ONLINE_JOIN_BUTTONS, ONLINE_LOBBY_BUTTONS, ONLINE_MENU_BUTTONS } from "./online-menu.js";
+import {
+  ONLINE_JOIN_BUTTONS,
+  ONLINE_LOBBY_BUTTONS,
+  ONLINE_MENU_BUTTONS,
+  shouldShowJoinCodeCursor,
+} from "./online-menu.js";
 import { HOTSEAT_PHASE, HOTSEAT_ROUNDS } from "./hotseat-session.js";
 
 const HUD_TEXT_COLOR = "#ffffff";
@@ -504,16 +509,19 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.fillRect(x, y, width, height);
     ctx.strokeRect(x, y, width, height);
     ctx.fillStyle = disabled ? "#d8d8d8" : "#b8ff00";
+    ctx.strokeStyle = "#8b0000";
+    ctx.lineWidth = Math.max(2, 2 * grow);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const fontSize = (button.label.length > 7 ? 17 : 20) * grow;
-    ctx.font = `bold ${fontSize}px ${HUD_VALUE_FONT}`;
+    const fontSize = (button.label.length > 7 ? 18 : 24) * grow;
+    ctx.font = `${fontSize}px ${GAME_OVER_FONT}`;
     if (hot && !disabled) {
       ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
       ctx.shadowBlur = 0;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
     }
+    ctx.strokeText(button.label, center.x, center.y + 1);
     ctx.fillText(button.label, center.x, center.y + 1);
     ctx.restore();
   }
@@ -535,6 +543,7 @@ export async function createBirdDutyRenderer(canvas, manifest) {
 
   function renderOnlineJoin(state = {}) {
     const code = String(state.onlineJoinCode || "");
+    const showCursor = shouldShowJoinCodeCursor(state.menuBirdTick || 0);
     resizeForStage(SCRATCH_STAGE);
     clear();
     drawCostume(multiplayerMenuBackdrop, menuCostume, {
@@ -553,19 +562,30 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     const gradient = ctx.createLinearGradient(0, boxY, 0, boxY + boxH);
     gradient.addColorStop(0, "#ff4a17");
     gradient.addColorStop(1, "#ff0b67");
+    ctx.shadowColor = "rgba(255, 130, 20, 0.95)";
+    ctx.shadowBlur = 16;
     ctx.fillStyle = gradient;
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 4;
     ctx.fillRect(boxX, boxY, boxW, boxH);
     ctx.strokeRect(boxX, boxY, boxW, boxH);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#b8ff00";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(boxX + 8, boxY + 8, boxW - 16, boxH - 16);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `bold 38px ${HUD_VALUE_FONT}`;
     ctx.fillStyle = code ? "#ffffff" : "rgba(255, 255, 255, 0.72)";
     ctx.fillText(code || "------", SCRATCH_STAGE.width / 2, boxY + boxH / 2 + 1);
+    if (showCursor) {
+      const cursorX = SCRATCH_STAGE.width / 2 + ctx.measureText(code || "").width / 2 + 8;
+      ctx.fillStyle = "#b8ff00";
+      ctx.fillRect(Math.min(cursorX, boxX + boxW - 30), boxY + 14, 4, boxH - 28);
+    }
     ctx.font = `15px ${HUD_VALUE_FONT}`;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("TYPE CODE, ENTER TO JOIN", SCRATCH_STAGE.width / 2, 246);
+    ctx.fillText("TYPE ROOM CODE - ENTER TO JOIN", SCRATCH_STAGE.width / 2, 246);
     ctx.restore();
 
     for (const button of ONLINE_JOIN_BUTTONS) {
