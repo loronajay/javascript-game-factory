@@ -1,5 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-gallery-photo-sync-1";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-gallery-photo-sync-2";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -237,18 +237,31 @@ export function getCompositionElementsForRender(elements, { galleryPhotos = [] }
     element?.enabled !== false &&
     element.category === "gallery"
   ));
-  const hasEnabledGalleryContent = renderElements.some((element) => (
+  const hasEnabledGalleryGrid = renderElements.some((element) => (
     element?.enabled !== false &&
-    (element.id === "galleryContent" || element.type === "galleryPhoto")
+    element.id === "galleryContent"
+  ));
+  const hasEnabledNonLegacyGalleryPhoto = renderElements.some((element) => (
+    element?.enabled !== false &&
+    element.type === "galleryPhoto" &&
+    !isLegacyTinyGalleryPhotoElement(element)
   ));
 
-  if (!hasEnabledGalleryComposition || hasEnabledGalleryContent) {
+  if (!hasEnabledGalleryComposition) {
+    return renderElements;
+  }
+
+  if (hasEnabledGalleryGrid) {
+    return removeLegacyTinyGalleryPhotos(renderElements);
+  }
+
+  if (hasEnabledNonLegacyGalleryPhoto) {
     return renderElements;
   }
 
   const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY.galleryContent;
   return [
-    ...renderElements,
+    ...removeLegacyTinyGalleryPhotos(renderElements),
     {
       id: "galleryContent",
       category: def.category,
@@ -262,6 +275,21 @@ export function getCompositionElementsForRender(elements, { galleryPhotos = [] }
       style: {},
     },
   ];
+}
+
+function removeLegacyTinyGalleryPhotos(elements) {
+  return elements.filter((element) => !isLegacyTinyGalleryPhotoElement(element));
+}
+
+function isLegacyTinyGalleryPhotoElement(element) {
+  return element?.type === "galleryPhoto" &&
+    numbersEqual(element.w, 0.4) &&
+    numbersEqual(element.h, 0.62);
+}
+
+function numbersEqual(value, expected) {
+  const n = parseFloat(value);
+  return Number.isFinite(n) && Math.abs(n - expected) < 0.001;
 }
 
 export function getCompositionCategories(elements) {

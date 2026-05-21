@@ -74,8 +74,8 @@ function showResult(result, action, onDone) {
     }
     default: msg = '...';
   }
-  updateBattleLog(msg);
   playMoveAnimation(result, action, () => {
+    updateBattleLog(msg);
     pendingAdvance = onDone;
     document.getElementById('battle-commands')?.classList.add('awaiting-advance');
   });

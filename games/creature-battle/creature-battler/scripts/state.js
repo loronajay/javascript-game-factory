@@ -21,6 +21,10 @@ function registerRenderer(id, fn) {
 
 function setScreen(id) {
   state.screen = id;
+  if (typeof startBattleMusic === 'function' && typeof stopBattleMusic === 'function') {
+    if (id === 'battle') startBattleMusic();
+    else stopBattleMusic();
+  }
   for (const el of document.querySelectorAll('.screen')) {
     el.classList.toggle('active', el.id === `screen-${id}`);
   }

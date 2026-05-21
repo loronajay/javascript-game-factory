@@ -7,11 +7,11 @@ import { addFriendByCode } from "./friend-code-actions.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
 import { buildAppUrl } from "../arcade-paths.mjs";
-import { fetchLayout } from "../profile-layout/layout-storage.mjs?v=20260521-gallery-photo-sync-1";
-import { getDefaultLayout } from "../profile-layout/default-layout.mjs?v=20260521-gallery-photo-sync-1";
-import { normalizeLayout } from "../profile-layout/normalize-layout.mjs?v=20260521-gallery-photo-sync-1";
-import { applyMeLayout } from "./apply-layout.mjs?v=20260521-gallery-photo-sync-1";
-import { applyMeScaling } from "./apply-scale.mjs?v=20260521-gallery-photo-sync-1";
+import { fetchLayout } from "../profile-layout/layout-storage.mjs?v=20260521-gallery-photo-sync-2";
+import { getDefaultLayout } from "../profile-layout/default-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { normalizeLayout } from "../profile-layout/normalize-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { applyMeLayout } from "./apply-layout.mjs?v=20260521-gallery-photo-sync-2";
+import { applyMeScaling } from "./apply-scale.mjs?v=20260521-gallery-photo-sync-2";
 
 const doc = globalThis.document;
 
