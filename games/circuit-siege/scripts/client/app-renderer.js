@@ -260,6 +260,7 @@ function renderSpriteImage({ href, width, height, rotation = 0, className = "" }
 
 export function createAppRenderer(root = document) {
   let lastBoardRef = null;
+  let lastToolSide = null;
   const els = {
     menuNotice: root.querySelector("#menu-notice"),
     publicQueueHeading: root.querySelector("#public-queue-heading"),
@@ -357,8 +358,14 @@ export function createAppRenderer(root = document) {
     if (els.toolDock) {
       els.toolDock.classList.toggle("tool-dock--hidden", viewModel.screen !== "match");
     }
+    const toolSide = viewModel.selectedSide || "blue";
+    if (toolSide !== lastToolSide) {
+      lastToolSide = toolSide;
+      for (const button of els.toolButtons) {
+        button.innerHTML = renderToolPreview(button.dataset.tool || "", toolSide);
+      }
+    }
     for (const button of els.toolButtons) {
-      button.innerHTML = renderToolPreview(button.dataset.tool || "", viewModel.selectedSide || "blue");
       button.classList.toggle("tool--active", button.dataset.tool === viewModel.heldMask);
     }
     if (els.heldCursor) {

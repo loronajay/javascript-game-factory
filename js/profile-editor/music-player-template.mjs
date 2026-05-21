@@ -3,6 +3,8 @@
  * No DOM access, no logic — only returns markup strings.
  */
 
+import { PROFILE_MUSIC_DEFAULT_VOLUME } from "./constants.mjs";
+
 export function playerTemplate(uid) {
   return `
     <div class="cassette-player" data-profile-child-id="player" role="region" aria-label="Music player">
@@ -39,7 +41,7 @@ export function playerTemplate(uid) {
             <span class="cassette-btn__icon" aria-hidden="true">&#128266;</span>
           </button>
           <input type="range" class="cassette-volume" id="${uid}-volume"
-            min="0" max="1" step="0.02" value="1" aria-label="Volume">
+            min="0" max="1" step="0.02" value="${PROFILE_MUSIC_DEFAULT_VOLUME}" aria-label="Volume">
         </div>
 
       </div>

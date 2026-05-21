@@ -171,6 +171,31 @@ export function hydrateNetworkState(snapshot) {
       remainingMs,
       startedAt: now - Math.max(0, totalMs - remainingMs),
     };
+  } else if (snapshot.playback && Number.isFinite(Number(snapshot.playback.createdAtEpochMs))) {
+    // Server-authority mode sends startedAt in server's performance.now() which is unusable on
+    // clients. createdAtEpochMs is Date.now() from the server, consistent across all machines.
+    const epochElapsed = Math.max(0, Date.now() - Number(snapshot.playback.createdAtEpochMs));
+    const now = performance.now();
+    const totalMs = Number(snapshot.playback.totalMs) || 3000;
+    const remainingMs = Math.max(0, totalMs - epochElapsed);
+    copy.playback = {
+      ...snapshot.playback,
+      sequence: Array.isArray(snapshot.playback.sequence) ? [...snapshot.playback.sequence] : [],
+      totalMs,
+      remainingMs,
+      startedAt: now - epochElapsed,
+    };
+  } else if (snapshot.playback && Array.isArray(snapshot.playback.sequence) && snapshot.playback.sequence.length > 0) {
+    // No usable timing info at all — start playback fresh so the animation is always visible.
+    const now = performance.now();
+    const totalMs = Number(snapshot.playback.totalMs) || 3000;
+    copy.playback = {
+      ...snapshot.playback,
+      sequence: [...snapshot.playback.sequence],
+      totalMs,
+      remainingMs: totalMs,
+      startedAt: now,
+    };
   }
   return copy;
 }

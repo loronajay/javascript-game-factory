@@ -97,6 +97,9 @@ export async function initGame() {
     let onlineRemoteInputs = {};
     let onlineBroadcastTick = 0;
     let onlineSyncSeq = 0;
+    let onlineMatchOverTicks = 0;
+    let lastOnlinePoopPhase = "inactive";
+    let lastOnlineScoreTotal = 0;
     let lastTime = null;
     let accumulator = 0;
 
@@ -195,7 +198,28 @@ export async function initGame() {
       playSession = snapshot.playSession || playSession;
       npcState = snapshot.npcs || npcState;
       onlineMatchSession = snapshot.match || onlineMatchSession;
+      playOnlineSnapshotSounds(snapshot);
       gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
+    }
+
+    function onlineScoreTotal(match = onlineMatchSession) {
+      return Object.values(match?.scores || {}).reduce((total, score) => total + (Number(score) || 0), 0);
+    }
+
+    function playOnlineSnapshotSounds(snapshot) {
+      const nextPoopPhase = snapshot?.poop?.phase || "inactive";
+      const nextScoreTotal = onlineScoreTotal(snapshot?.match);
+      if (lastOnlinePoopPhase === "inactive" && nextPoopPhase === "airborne") {
+        sounds.playPoopRelease();
+      }
+      if (lastOnlinePoopPhase === "airborne" && nextPoopPhase === "splat") {
+        sounds.playSplat();
+      }
+      if (nextScoreTotal > lastOnlineScoreTotal) {
+        sounds.playNpcHit("alan");
+      }
+      lastOnlinePoopPhase = nextPoopPhase;
+      lastOnlineScoreTotal = nextScoreTotal;
     }
 
     function broadcastOnlineSnapshot(force = false) {
@@ -217,6 +241,9 @@ export async function initGame() {
       onlineMatchSession = createOnlineMatchSession(players);
       onlineRemoteInputs = {};
       onlineSyncSeq = 0;
+      onlineMatchOverTicks = 0;
+      lastOnlinePoopPhase = "inactive";
+      lastOnlineScoreTotal = 0;
       resetOnlineTurnState(onlineMatchSession);
       gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
       sounds.startGameMusic();
@@ -513,6 +540,18 @@ export async function initGame() {
     function tick() {
       menuBirdState = advanceMenuBirdState(menuBirdState);
       if (gameState.screen === SCREEN.ONLINE_PLAY) {
+        if (onlineMatchSession?.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
+          onlineMatchOverTicks += 1;
+          if (inputState.dropRequested || onlineMatchOverTicks >= 240) {
+            sounds.stopGameMusic();
+            leaveOnlineLobby();
+            gameState = createInitialState();
+            onlineMatchSession = null;
+          }
+          inputState = consumeDropRequest(inputState);
+          return;
+        }
+
         if (onlineLobby.ownerId !== onlineClient?.clientId || !onlineMatchSession) {
           inputState = consumeDropRequest(inputState);
           return;
@@ -522,12 +561,14 @@ export async function initGame() {
         const activeInput = activePlayer?.clientId === onlineClient?.clientId
           ? inputState
           : onlineRemoteInputs[activePlayer?.clientId] || createInputState();
+        let handledTurnStart = false;
 
         if (activeInput.dropRequested) {
           if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.READY || onlineMatchSession.phase === ONLINE_MATCH_PHASE.TURN_OVER) {
             onlineMatchSession = startOnlineMatchTurn(onlineMatchSession);
             resetOnlineTurnState(onlineMatchSession);
             broadcastOnlineSnapshot(true);
+            handledTurnStart = true;
           } else if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
             sounds.stopGameMusic();
             leaveOnlineLobby();
@@ -539,7 +580,7 @@ export async function initGame() {
 
         if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.PLAYING) {
           playerState = updatePlayer(playerState, activeInput);
-          if (activeInput.dropRequested && poopState.phase === "inactive" && canFireShot(playSession)) {
+          if (!handledTurnStart && activeInput.dropRequested && poopState.phase === "inactive" && canFireShot(playSession)) {
             poopState = spawnPoopFromPlayer(playerState);
             playSession = fireShot(playSession);
             sounds.playPoopRelease();
@@ -566,6 +607,9 @@ export async function initGame() {
           playSession = updatePlaySession(playSession, poopState);
           if (previousSessionPhase === "running" && playSession.phase === "game-over") {
             onlineMatchSession = finishOnlineMatchTurn(onlineMatchSession);
+            if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
+              onlineMatchOverTicks = 0;
+            }
             resetOnlineTurnState(onlineMatchSession);
             broadcastOnlineSnapshot(true);
           }

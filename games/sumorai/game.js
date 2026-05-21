@@ -93,9 +93,10 @@ function _boot(sounds) {
   let onlineRemoteInputBuf  = {};
   let onlineRemoteLastInput = null;
   let onlineLocalSeq        = 0;
-  let onlinePendingEnd      = null;
-  let onlinePartnerEnd      = null;
-  let _searchDotsInterval   = null;
+  let onlinePendingEnd        = null;
+  let onlinePartnerEnd        = null;
+  let onlinePartnerGraceTicks = 0;
+  let _searchDotsInterval     = null;
   let _waitingDotsInterval  = null;
 
   // ── Screen helpers ─────────────────────────────────────────────────────────
@@ -470,9 +471,9 @@ function _boot(sounds) {
     };
 
     onlineClient.cb.onRemoteRoundEnd = (re) => {
-      // Partner detected the round end — trigger locally if we haven't yet
+      // Buffer the partner's result; local sim gets a few ticks to agree before we force it
       if (gameState.phase === 'active') {
-        triggerRoundEnd(re.winner, false);
+        onlinePartnerEnd = re;
       }
     };
 
@@ -512,6 +513,7 @@ function _boot(sounds) {
     onlineRemoteLastInput = null;
     onlinePendingEnd      = null;
     onlinePartnerEnd      = null;
+    onlinePartnerGraceTicks = 0;
     gameState.phase = 'online_countdown';
     showScreen('screen-game');
     startAmbient();
@@ -739,8 +741,10 @@ function _boot(sounds) {
   // ── Round end sequence ─────────────────────────────────────────────────────
 
   function triggerRoundEnd(winner, isBlastKill = false) {
-    gameState.phase      = 'round_end';
-    gameState.deathFlash = 1;
+    gameState.phase        = 'round_end';
+    gameState.deathFlash   = 1;
+    gameState.p1Projectile = null;
+    gameState.p2Projectile = null;
     if (isBlastKill) playSound('explosion');
     else             playSound('death');
 
@@ -1125,8 +1129,19 @@ function _boot(sounds) {
                    : (p1Dead && !p2Dead) ? 'p2'
                    : 'draw';
       const isBlastKill = (p1Dead && p1Result === 'dead') || (p2Dead && p2Result === 'dead');
+      onlinePartnerEnd = null;
+      onlinePartnerGraceTicks = 0;
       if (isOnline) onlineClient.sendRoundEnd(winner);
       triggerRoundEnd(winner, isBlastKill);
+    } else if (onlinePartnerEnd) {
+      // Local sim hasn't detected the kill yet — give it a few more ticks to agree
+      onlinePartnerGraceTicks++;
+      if (onlinePartnerGraceTicks >= 8) {
+        onlinePartnerGraceTicks = 0;
+        if (isOnline) onlineClient.sendRoundEnd(onlinePartnerEnd.winner);
+        triggerRoundEnd(onlinePartnerEnd.winner, false);
+        onlinePartnerEnd = null;
+      }
     }
   }
 
