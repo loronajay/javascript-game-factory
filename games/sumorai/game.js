@@ -490,6 +490,7 @@ function _boot(sounds) {
       _stopWaitingDots();
       isOnline = false;
       onlineRemoteIdentity = null;
+      gameState.phase = 'menu';
       stopAmbient();
       showScreen('screen-online-disconnected');
     };
@@ -671,6 +672,7 @@ function _boot(sounds) {
     const audio = getSound(name);
     if (!audio) return;
     const clone = audio.cloneNode();
+    clone.volume = 0.4;
     clone.play().catch(() => {});
   }
 
@@ -680,7 +682,7 @@ function _boot(sounds) {
     const audio = getSound('bg_music');
     if (!audio) return;
     audio.loop        = true;
-    audio.volume      = 0.25;
+    audio.volume      = 0.35;
     audio.currentTime = 0;
     audio.play().catch(() => {});
     ambientAudio = audio;

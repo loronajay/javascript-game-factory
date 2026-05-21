@@ -4,9 +4,12 @@
  * Knows nothing about how the HTML is structured beyond the element IDs it queries.
  */
 
+import { PROFILE_MUSIC_DEFAULT_VOLUME } from "./constants.mjs";
+
 export function mountPlayerController(container, tracks, uid, doc) {
   const audio = doc.createElement("audio");
   audio.preload = "metadata";
+  audio.volume = PROFILE_MUSIC_DEFAULT_VOLUME;
 
   let currentIndex = 0;
 
