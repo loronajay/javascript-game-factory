@@ -22,18 +22,19 @@ export const CUSTOM_TITLE_ELEMENT_DEF = {
 function buildGalleryPhotoElements() {
   return Object.fromEntries(Array.from({ length: 8 }, (_, index) => {
     const slot = index + 1;
-    const col = index % 8;
+    const col = index % 4;
+    const row = Math.floor(index / 4);
     return [`galleryPhoto${slot}`, {
       label: `Gallery Photo ${slot}`,
       category: "gallery",
       type: "galleryPhoto",
       defaultEnabled: false,
-      defaultX: 4.35 + col * 0.42,
-      defaultY: 7.85,
-      defaultW: 0.4,
-      defaultH: 0.62,
-      minW: 0.25,
-      minH: 0.25,
+      defaultX: 4.35 + col * 0.88,
+      defaultY: 7.85 + row * 1.15,
+      defaultW: 0.8,
+      defaultH: 1.05,
+      minW: 0.45,
+      minH: 0.45,
       maxW: 12,
       maxH: 17,
       photoIndex: index,

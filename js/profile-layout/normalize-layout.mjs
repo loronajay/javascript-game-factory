@@ -129,24 +129,42 @@ export function normalizeCompositionElements(rawElements) {
 }
 
 function normalizeCompositionElement(id, raw, def) {
+  const migratedRaw = migrateCompositionElementGeometry(id, raw, def);
   const safeId = isCustomTitleElementId(id)
     ? `${CUSTOM_TITLE_PREFIX}${String(id).slice(CUSTOM_TITLE_PREFIX.length).replace(/[^a-z0-9_-]/gi, "").slice(0, 40)}`
     : id;
-  const w = clamp(toNumber(raw.w, def.defaultW), def.minW, def.maxW);
-  const h = clamp(toNumber(raw.h, def.defaultH), def.minH, def.maxH);
-  const x = clamp(toNumber(raw.x, def.defaultX), 0, COMPOSITION_GRID_COLUMNS - w);
-  const y = clamp(toNumber(raw.y, def.defaultY), 0, COMPOSITION_GRID_ROWS - h);
+  const w = clamp(toNumber(migratedRaw.w, def.defaultW), def.minW, def.maxW);
+  const h = clamp(toNumber(migratedRaw.h, def.defaultH), def.minH, def.maxH);
+  const x = clamp(toNumber(migratedRaw.x, def.defaultX), 0, COMPOSITION_GRID_COLUMNS - w);
+  const y = clamp(toNumber(migratedRaw.y, def.defaultY), 0, COMPOSITION_GRID_ROWS - h);
   return {
     id: safeId,
     category: def.category,
     type: def.type,
-    enabled: raw.enabled ?? (def.defaultEnabled !== false),
-    text: typeof raw.text === "string" ? raw.text : (def.defaultText || ""),
+    enabled: migratedRaw.enabled ?? (def.defaultEnabled !== false),
+    text: typeof migratedRaw.text === "string" ? migratedRaw.text : (def.defaultText || ""),
     x,
     y,
     w,
     h,
-    style: normalizePanelStyle(raw.style),
+    style: normalizePanelStyle(migratedRaw.style),
+  };
+}
+
+function migrateCompositionElementGeometry(id, raw, def) {
+  if (def.type !== "galleryPhoto" || !raw || raw.enabled === false) return raw || {};
+
+  const rawW = toNumber(raw.w, def.defaultW);
+  const rawH = toNumber(raw.h, def.defaultH);
+  const looksLikeOldTinyPhotoDefault = numbersEqual(rawW, 0.4) && numbersEqual(rawH, 0.62);
+  if (!looksLikeOldTinyPhotoDefault) return raw;
+
+  return {
+    ...raw,
+    x: def.defaultX,
+    y: def.defaultY,
+    w: def.defaultW,
+    h: def.defaultH,
   };
 }
 
