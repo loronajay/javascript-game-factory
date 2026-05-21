@@ -65,7 +65,13 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       galleryElements: Array.isArray(currentLayout?.desktop?.elements)
         ? currentLayout.desktop.elements
           .filter((element) => element?.category === "gallery" && element.enabled !== false)
-          .map((element) => element.id)
+          .map((element) => ({
+            id: element.id,
+            x: element.x,
+            y: element.y,
+            w: element.w,
+            h: element.h,
+          }))
         : [],
     };
     if (currentLayout) {

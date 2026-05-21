@@ -110,11 +110,7 @@ export function normalizeCompositionElements(rawElements) {
   if (!Array.isArray(rawElements) || rawElements.length === 0) return [];
   if (compositionElementsAreUntouchedDefault(rawElements)) return [];
 
-  const rawById = new Map(
-    rawElements
-      .filter((element) => element && typeof element === "object")
-      .map((element) => [element.id, element]),
-  );
+  const rawById = buildRawCompositionElementMap(rawElements);
 
   const normalized = Object.entries(PROFILE_COMPOSITION_ELEMENT_REGISTRY).map(([id, def]) => {
     const raw = rawById.get(id) || {};
@@ -126,6 +122,33 @@ export function normalizeCompositionElements(rawElements) {
     .map((element) => normalizeCompositionElement(element.id, element, CUSTOM_TITLE_ELEMENT_DEF));
 
   return [...disableUntouchedThoughtsFreeformDefaults(normalized, rawById), ...customTitles];
+}
+
+function buildRawCompositionElementMap(rawElements) {
+  const rawById = new Map();
+  rawElements
+    .filter((element) => element && typeof element === "object")
+    .forEach((element) => {
+      const existing = rawById.get(element.id);
+      rawById.set(element.id, selectRawCompositionElement(existing, element));
+    });
+  return rawById;
+}
+
+function selectRawCompositionElement(existing, incoming) {
+  if (!existing) return incoming;
+  if (incoming?.enabled !== false && existing?.enabled === false) return incoming;
+  if (existing?.enabled !== false && incoming?.enabled === false) return existing;
+  if (String(incoming?.id || "").startsWith("galleryPhoto")) {
+    const existingOldTiny = isOldTinyGalleryPhotoGeometry(existing);
+    const incomingOldTiny = isOldTinyGalleryPhotoGeometry(incoming);
+    if (existingOldTiny && !incomingOldTiny) return incoming;
+    if (!existingOldTiny && incomingOldTiny) return existing;
+    const existingArea = Math.max(0, toNumber(existing.w, 0)) * Math.max(0, toNumber(existing.h, 0));
+    const incomingArea = Math.max(0, toNumber(incoming.w, 0)) * Math.max(0, toNumber(incoming.h, 0));
+    return incomingArea >= existingArea ? incoming : existing;
+  }
+  return incoming;
 }
 
 function normalizeCompositionElement(id, raw, def) {
@@ -156,7 +179,7 @@ function migrateCompositionElementGeometry(id, raw, def) {
 
   const rawW = toNumber(raw.w, def.defaultW);
   const rawH = toNumber(raw.h, def.defaultH);
-  const looksLikeOldTinyPhotoDefault = numbersEqual(rawW, 0.4) && numbersEqual(rawH, 0.62);
+  const looksLikeOldTinyPhotoDefault = isOldTinyGalleryPhotoGeometry({ ...raw, w: rawW, h: rawH });
   if (!looksLikeOldTinyPhotoDefault) return raw;
 
   const migratedDefault = getMigratedGalleryPhotoDefault(id, def);
@@ -167,6 +190,10 @@ function migrateCompositionElementGeometry(id, raw, def) {
     w: migratedDefault.w,
     h: migratedDefault.h,
   };
+}
+
+function isOldTinyGalleryPhotoGeometry(element) {
+  return numbersEqual(element?.w, 0.4) && numbersEqual(element?.h, 0.62);
 }
 
 function getMigratedGalleryPhotoDefault(id, def) {
