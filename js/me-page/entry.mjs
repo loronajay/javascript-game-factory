@@ -1,8 +1,8 @@
 import { bindFactoryProfileToSession } from "../platform/identity/factory-profile.mjs";
 import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
-import { renderMePage } from "./render.mjs";
-import { wireMePage } from "./wire.mjs";
+import { renderMePage } from "./render.mjs?v=20260521-gallery-live-photos-3";
+import { wireMePage } from "./wire.mjs?v=20260521-gallery-live-photos-3";
 import { addFriendByCode } from "./friend-code-actions.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
@@ -10,8 +10,8 @@ import { buildAppUrl } from "../arcade-paths.mjs";
 import { fetchLayout } from "../profile-layout/layout-storage.mjs";
 import { getDefaultLayout } from "../profile-layout/default-layout.mjs";
 import { normalizeLayout } from "../profile-layout/normalize-layout.mjs";
-import { applyMeLayout } from "./apply-layout.mjs";
-import { applyMeScaling } from "./apply-scale.mjs";
+import { applyMeLayout } from "./apply-layout.mjs?v=20260521-gallery-live-photos-3";
+import { applyMeScaling } from "./apply-scale.mjs?v=20260521-gallery-live-photos-3";
 
 const doc = globalThis.document;
 

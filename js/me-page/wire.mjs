@@ -25,8 +25,8 @@ import {
   uploadPendingThoughtPhoto,
 } from "./media-actions.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
-import { applyMeLayout } from "./apply-layout.mjs";
-import { applyMeScaling } from "./apply-scale.mjs";
+import { applyMeLayout } from "./apply-layout.mjs?v=20260521-gallery-live-photos-3";
+import { applyMeScaling } from "./apply-scale.mjs?v=20260521-gallery-live-photos-3";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, savedLayout = null }) {
   let currentLayout = savedLayout;
@@ -59,6 +59,15 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       friendNavigatorExpanded: friendNavigator.getViewState().expanded,
       friendNavigatorSearchQuery: friendNavigator.getViewState().searchQuery,
     });
+    globalThis.__JGF_ME_GALLERY_DEBUG__ = {
+      photos: Array.isArray(renderState.galleryPhotos) ? renderState.galleryPhotos.length : 0,
+      photoIds: Array.isArray(renderState.galleryPhotos) ? renderState.galleryPhotos.map((photo) => photo?.id || "") : [],
+      galleryElements: Array.isArray(currentLayout?.desktop?.elements)
+        ? currentLayout.desktop.elements
+          .filter((element) => element?.category === "gallery" && element.enabled !== false)
+          .map((element) => element.id)
+        : [],
+    };
     if (currentLayout) {
       applyMeLayout(doc, currentLayout, { galleryPhotos: renderState.galleryPhotos });
       requestAnimationFrame(() => applyMeScaling(doc, currentLayout));

@@ -59,8 +59,6 @@ export function normalizeLayout(raw) {
     // Clamp x so panel fits within the grid
     const clampedX = Math.min(x, columns - w);
 
-    const childSource = panelChildrenAreUntouchedDefault(id, p.children) ? undefined : p.children;
-
     normalized.push({
       id,
       enabled,
@@ -69,7 +67,7 @@ export function normalizeLayout(raw) {
       w,
       h,
       style: normalizePanelStyle(p.style),
-      children: normalizePanelChildren(id, childSource),
+      children: normalizePanelChildren(id, p.children),
     });
   }
 
@@ -263,7 +261,6 @@ export function normalizePanelStyle(raw) {
 export function normalizePanelChildren(panelId, rawChildren) {
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
   if (!registry) return undefined;
-  if (!Array.isArray(rawChildren)) return undefined;
 
   const migratedChildren = migratePanelChildren(panelId, rawChildren);
   const rawById = new Map(
@@ -310,26 +307,6 @@ function compositionElementsAreUntouchedDefault(rawElements) {
       numbersEqual(element.y, def.y) &&
       numbersEqual(element.w, def.w) &&
       numbersEqual(element.h, def.h);
-  });
-}
-
-function panelChildrenAreUntouchedDefault(panelId, rawChildren) {
-  if (!Array.isArray(rawChildren) || rawChildren.length === 0) return false;
-
-  const defaults = getDefaultPanelChildren(panelId);
-  if (!Array.isArray(defaults) || rawChildren.length !== defaults.length) return false;
-  const defaultsById = new Map(defaults.map((child) => [child.id, child]));
-
-  return rawChildren.every((child) => {
-    const def = defaultsById.get(child?.id);
-    if (!def) return false;
-    const style = child.style && typeof child.style === "object" ? child.style : {};
-    return (child.enabled ?? true) === (def.enabled ?? true) &&
-      Object.keys(style).length === 0 &&
-      numbersEqual(child.x, def.x) &&
-      numbersEqual(child.y, def.y) &&
-      numbersEqual(child.w, def.w) &&
-      numbersEqual(child.h, def.h);
   });
 }
 

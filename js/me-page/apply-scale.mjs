@@ -214,8 +214,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.justifyContent = "";
     }
 
-    const usesEditorGeometry = hasEnabledComposition(layout) || (Array.isArray(panel.children) && panel.children.length > 0);
-    const z = usesEditorGeometry
+    const z = hasEnabledComposition(layout)
       ? fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0))
       : 1;
     shell.style.zoom = String(z);

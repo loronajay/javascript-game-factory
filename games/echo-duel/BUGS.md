@@ -1,1 +1,0 @@
-Pattern is still not showing on driver playback for watchers. Players need to see the pattern laid out once like single player does.

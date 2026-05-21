@@ -233,7 +233,6 @@ function isCustomTitleElement(element) {
 
 export function getCompositionElementsForRender(elements, { galleryPhotos = [] } = {}) {
   const renderElements = Array.isArray(elements) ? [...elements] : [];
-  const hasGalleryPhotos = Array.isArray(galleryPhotos) && galleryPhotos.length > 0;
   const hasEnabledGalleryComposition = renderElements.some((element) => (
     element?.enabled !== false &&
     element.category === "gallery"
@@ -243,7 +242,7 @@ export function getCompositionElementsForRender(elements, { galleryPhotos = [] }
     (element.id === "galleryContent" || element.type === "galleryPhoto")
   ));
 
-  if (!hasGalleryPhotos || !hasEnabledGalleryComposition || hasEnabledGalleryContent) {
+  if (!hasEnabledGalleryComposition || hasEnabledGalleryContent) {
     return renderElements;
   }
 

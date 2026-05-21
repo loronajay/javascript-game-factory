@@ -507,7 +507,42 @@ function drawWinnerBannerHUD(ctx, gameState) {
   ctx.drawImage(img, VIEWPORT_W / 2 - w / 2, VIEWPORT_H / 2 - BANNER_TARGET_H / 2, w, BANNER_TARGET_H);
 }
 
-function drawHUD(ctx, canvas, gameState) {
+function drawNetworkHUD(ctx, latencyMs, rollbacksPerSec) {
+  const pad  = 6;
+  const x    = VIEWPORT_W - 80;
+  const y    = 8;
+  const w    = 72;
+  const h    = 30;
+
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.fillStyle   = '#111111';
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 4);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  const pingColor = latencyMs === null  ? '#aaaaaa'
+                  : latencyMs < 60      ? '#44cc44'
+                  : latencyMs < 120     ? '#ddcc22'
+                                        : '#ee4444';
+
+  ctx.font      = 'bold 9px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = pingColor;
+  const pingText = latencyMs === null ? '--- ms' : `${latencyMs} ms`;
+  ctx.fillText(pingText, x + pad, y + pad + 8);
+
+  const rbColor = rollbacksPerSec === 0 ? '#44cc44'
+                : rollbacksPerSec < 5   ? '#ddcc22'
+                                        : '#ee4444';
+  ctx.fillStyle = rbColor;
+  ctx.fillText(`${rollbacksPerSec} rb/s`, x + pad, y + pad + 20);
+
+  ctx.restore();
+}
+
+function drawHUD(ctx, canvas, gameState, netInfo = null) {
   applyViewport(ctx, canvas);
 
   const showMeters = gameState.phase === 'active'      ||
@@ -524,11 +559,15 @@ function drawHUD(ctx, canvas, gameState) {
   if (gameState.phase === 'active' && gameState.p1.inGridlock && gameState.gridlock)
     drawGridlockHUD(ctx, gameState.gridlock);
   drawWinnerBannerHUD(ctx, gameState);
+
+  if (netInfo && (gameState.phase === 'active' || gameState.phase === 'round_end')) {
+    drawNetworkHUD(ctx, netInfo.latencyMs, netInfo.rollbacksPerSec);
+  }
 }
 
 // ── Main render call ─────────────────────────────────────────────────────────
 
-function render(ctx, canvas, gameState, camera) {
+function render(ctx, canvas, gameState, camera, netInfo = null) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   resetTransform(ctx);
@@ -602,7 +641,7 @@ function render(ctx, canvas, gameState, camera) {
     }
   }
 
-  drawHUD(ctx, canvas, gameState);
+  drawHUD(ctx, canvas, gameState, netInfo);
 }
 
 export { render, setScaleFactor };

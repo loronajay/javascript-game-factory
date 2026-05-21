@@ -68,10 +68,8 @@ export function getProgressCountForPhase(state, now = performance.now()) {
   if (state.phase === PHASES.OWNER_REPLAY) return state.ownerReplayIndex || 0;
   if (state.phase === PHASES.OWNER_APPEND) return state.activeSequence.length;
   if (state.phase === PHASES.CHALLENGER_COPY) return Number(getLocalCopyProgress(state)?.index || 0);
-  if (state.phase === PHASES.SIGNAL_PLAYBACK && state.playback) {
-    const elapsed = Math.max(0, now - Number(state.playback.startedAt || now));
-    const perInputMs = Number(state.playback.perInputMs || 570);
-    return Math.min(state.activeSequence.length, Math.floor(elapsed / perInputMs) + 1);
+  if (state.phase === PHASES.SIGNAL_PLAYBACK) {
+    return state.activeSequence.length;
   }
   return 0;
 }

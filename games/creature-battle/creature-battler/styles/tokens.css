@@ -1,0 +1,21 @@
+:root {
+  --cb-primary: #064f8f;
+  --cb-primary-dark: #02172f;
+  --cb-accent: #27caff;
+  --cb-accent-soft: rgba(39, 202, 255, 0.45);
+  --cb-panel-bg: rgba(3, 31, 68, 0.86);
+  --cb-panel-bg-soft: rgba(3, 70, 120, 0.62);
+  --cb-border: #06182d;
+  --cb-text: #f2fbff;
+  --cb-muted: #a8d8ef;
+  --cb-hp: #35d84b;
+  --cb-mp: #27bfff;
+  --cb-disabled: rgba(145, 164, 178, 0.45);
+  --cb-selected: #ffffff;
+  --cb-player-accent: #27caff;
+  --cb-enemy-accent: #ff6a2a;
+  --cb-panel-opacity: 0.86;
+  --cb-border-width: 4px;
+  --cb-corner: 16px;
+  --cb-glow: 0.45;
+}

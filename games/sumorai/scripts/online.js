@@ -103,6 +103,8 @@ export function createOnlineClient() {
   let _inRoom      = false;
   let _coordinator = false;
   let _identity    = null;
+  let _latencyMs   = null;
+  let _pingTimer   = null;
 
   const cb = {
     onConnected:       null,  // ()
@@ -151,6 +153,24 @@ export function createOnlineClient() {
     if (messageType === 'profile') {
       const profile = parseProfileMessage(value);
       if (profile) cb.onRemoteProfile?.(profile);
+      return;
+    }
+    if (messageType === 'ping') {
+      // Echo back so partner can measure RTT
+      try {
+        const p = JSON.parse(value);
+        _roomMsg('pong', value);
+      } catch { /* ignore malformed */ }
+      return;
+    }
+    if (messageType === 'pong') {
+      try {
+        const p = JSON.parse(value);
+        if (typeof p.t === 'number') {
+          // RTT / 2 = one-way estimate
+          _latencyMs = Math.round((Date.now() - p.t) / 2);
+        }
+      } catch { /* ignore malformed */ }
     }
   }
 
@@ -272,19 +292,36 @@ export function createOnlineClient() {
     _roomMsg('round_end', JSON.stringify({ winner }));
   }
 
+  function startPinging() {
+    stopPinging();
+    _pingTimer = setInterval(() => {
+      _roomMsg('ping', JSON.stringify({ t: Date.now() }));
+    }, 2000);
+  }
+
+  function stopPinging() {
+    if (_pingTimer !== null) { clearInterval(_pingTimer); _pingTimer = null; }
+    _latencyMs = null;
+  }
+
+  function getLatencyMs() { return _latencyMs; }
+
   function disconnect() {
+    stopPinging();
     _inRoom = false; _roomCode = null;
     ws?.close();
     ws = null;
   }
 
   function reset() {
+    stopPinging();
     _roomCode = null; _inRoom = false; _coordinator = false;
   }
 
   return {
     connect, findMatch, createRoom, joinRoom, requestQueueStatus,
     cancelSearch, cancelRoom, sendInput, sendRoundEnd, setIdentity,
+    startPinging, stopPinging, getLatencyMs,
     disconnect, reset, cb,
   };
 }
