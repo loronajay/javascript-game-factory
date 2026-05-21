@@ -20,6 +20,7 @@
         <div class="menu-actions">
           <button id="btn-local" class="btn btn--primary">Local 2-Player</button>
           <button id="btn-cpu" class="btn">vs CPU</button>
+          <button id="btn-online" class="btn">Online Play</button>
           <button id="btn-controls" class="btn">Controls</button>
         </div>
       </div>
@@ -113,6 +114,125 @@
         <div class="menu-actions">
           <button id="btn-rematch" class="btn btn--primary">Rematch</button>
           <button id="btn-result-menu" class="btn">Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Online lobby — phases toggled by JS ───────────────────────────── -->
+    <section id="screen-online-lobby" class="screen">
+
+      <!-- side_select -->
+      <div class="lobby-phase" id="lobby-phase-side-select">
+        <div class="menu-card online-lobby-card">
+          <p class="eyebrow">Online Multiplayer</p>
+          <h2>Choose Your Side</h2>
+          <div class="side-cards">
+            <button class="side-card side-card--selected" id="online-side-p1" data-side="p1">
+              <span class="side-card-num">P1</span>
+              <span class="side-card-sub">Left</span>
+            </button>
+            <button class="side-card" id="online-side-p2" data-side="p2">
+              <span class="side-card-num">P2</span>
+              <span class="side-card-sub">Right</span>
+            </button>
+          </div>
+          <p class="conflict-error" id="side-conflict-error" hidden>Both players chose the same side — pick the other.</p>
+          <div class="menu-actions">
+            <button class="btn btn--primary" id="btn-side-confirm">Continue</button>
+            <button class="btn" id="btn-online-side-back">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- main -->
+      <div class="lobby-phase" id="lobby-phase-main" hidden>
+        <div class="menu-card">
+          <p class="eyebrow">Online Play</p>
+          <p class="online-side-locked" id="online-side-locked"></p>
+          <p class="queue-hint" id="queue-hint"></p>
+          <div class="menu-actions">
+            <button class="btn btn--primary" id="btn-find-match">Find Match</button>
+            <button class="btn" id="btn-play-friend">Play Friend</button>
+            <button class="btn" id="btn-lobby-main-back">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- searching (also used while waiting after joinRoom) -->
+      <div class="lobby-phase" id="lobby-phase-searching" hidden>
+        <div class="menu-card">
+          <p class="eyebrow">Matchmaking</p>
+          <p class="searching-label" id="searching-label">Searching…</p>
+          <p class="online-side-locked" id="searching-side-locked"></p>
+          <div class="menu-actions">
+            <button class="btn" id="btn-cancel-search">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- friend_options -->
+      <div class="lobby-phase" id="lobby-phase-friend-options" hidden>
+        <div class="menu-card">
+          <p class="eyebrow">Play with Friend</p>
+          <p class="online-side-locked" id="friend-side-locked"></p>
+          <div class="menu-actions">
+            <button class="btn btn--primary" id="btn-create-room">Create Room</button>
+            <button class="btn" id="btn-join-room-option">Enter Code</button>
+            <button class="btn" id="btn-friend-options-back">Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- create -->
+      <div class="lobby-phase" id="lobby-phase-create" hidden>
+        <div class="menu-card">
+          <p class="eyebrow">Private Room</p>
+          <p class="room-hint">Share this code with your friend:</p>
+          <p class="room-code-display" id="room-code-display">——————</p>
+          <p class="room-waiting-text" id="room-waiting-text">Waiting for partner…</p>
+          <div class="menu-actions">
+            <button class="btn" id="btn-cancel-room">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- join -->
+      <div class="lobby-phase" id="lobby-phase-join" hidden>
+        <div class="menu-card online-lobby-card">
+          <p class="eyebrow">Join Room</p>
+          <p class="room-hint">Enter your friend's room code:</p>
+          <input type="text" class="room-code-input" id="room-code-input"
+            maxlength="6" placeholder="XXXXXX"
+            autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <div class="menu-actions">
+            <button class="btn btn--primary" id="btn-join-submit">Join</button>
+            <button class="btn" id="btn-join-back">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Online result -->
+    <section id="screen-online-result" class="screen">
+      <div class="menu-card">
+        <p class="eyebrow">Online Match Over</p>
+        <h2 id="online-result-winner"></h2>
+        <p class="online-opponent-name" id="online-result-opponent"></p>
+        <div class="menu-actions">
+          <button id="btn-online-rematch" class="btn btn--primary">Rematch</button>
+          <button id="btn-online-result-menu" class="btn">Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Opponent disconnected -->
+    <section id="screen-online-disconnected" class="screen">
+      <div class="menu-card">
+        <p class="eyebrow">Disconnected</p>
+        <h2>Opponent left the match.</h2>
+        <div class="menu-actions">
+          <button id="btn-disconnected-menu" class="btn btn--primary">Menu</button>
         </div>
       </div>
     </section>

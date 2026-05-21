@@ -9,6 +9,7 @@ export const SCREEN = Object.freeze({
   ONLINE_MENU: "online-menu",
   ONLINE_JOIN: "online-join",
   ONLINE_LOBBY: "online-lobby",
+  ONLINE_PLAY: "online-play",
   HOTSEAT_PLAY: "hotseat-play",
 });
 

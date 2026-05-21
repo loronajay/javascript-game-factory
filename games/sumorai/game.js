@@ -15,6 +15,8 @@ import { createCamera, updateCamera, resetCamera } from './scripts/camera.js';
 import { render, setScaleFactor }  from './scripts/renderer.js';
 import { VIEWPORT_W, VIEWPORT_H }  from './scripts/stage.js';
 import { createPlatforms, updatePlatforms } from './scripts/platforms.js';
+import { createOnlineClient, getCountdownSecondsRemaining } from './scripts/online.js';
+import { buildOnlineIdentity } from './scripts/online-identity.js';
 
 const TICK_MS = 1000 / 60;
 
@@ -76,10 +78,132 @@ function _boot(sounds) {
   let botConfig = { enabled: false, side: 'p2', difficulty: 'hard' };
   let botState  = createBotState();
 
+  // ── Online state ───────────────────────────────────────────────────────────
+  let onlineClient         = null;
+  let onlineIdentity       = null;
+  let onlineSide           = 'p1';
+  let onlineLobbyPhase     = 'side_select';
+  let onlineMatchSeed      = 0;
+  let onlineClockOffset    = 0;
+  let onlineStartAt        = 0;
+  let onlineRemoteIdentity = null;
+  let onlineQueueCounts    = null;
+  let isOnline             = false;
+  // Input sync buffers (wired in next phase with full game loop integration)
+  let onlineRemoteInputBuf  = {};
+  let onlineRemoteLastInput = null;
+  let onlineLocalSeq        = 0;
+  let onlinePendingEnd      = null;
+  let onlinePartnerEnd      = null;
+  let _searchDotsInterval   = null;
+  let _waitingDotsInterval  = null;
+
   // ── Screen helpers ─────────────────────────────────────────────────────────
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('screen--active'));
     document.getElementById(id).classList.add('screen--active');
+  }
+
+  // ── Online lobby helpers ───────────────────────────────────────────────────
+  const _LOBBY_PHASE_IDS = {
+    side_select:    'lobby-phase-side-select',
+    main:           'lobby-phase-main',
+    searching:      'lobby-phase-searching',
+    friend_options: 'lobby-phase-friend-options',
+    create:         'lobby-phase-create',
+    join:           'lobby-phase-join',
+  };
+
+  function showLobbyPhase(phase) {
+    document.querySelectorAll('.lobby-phase').forEach(el => { el.hidden = true; });
+    document.getElementById(_LOBBY_PHASE_IDS[phase]).hidden = false;
+    onlineLobbyPhase = phase;
+  }
+
+  function _stopSearchDots() {
+    if (_searchDotsInterval) { clearInterval(_searchDotsInterval); _searchDotsInterval = null; }
+  }
+
+  function _startSearchDots() {
+    _stopSearchDots();
+    let tick = 0;
+    const el = document.getElementById('searching-label');
+    _searchDotsInterval = setInterval(() => {
+      if (el) el.textContent = 'Searching' + '.'.repeat(tick % 4);
+      tick++;
+    }, 400);
+  }
+
+  function _stopWaitingDots() {
+    if (_waitingDotsInterval) { clearInterval(_waitingDotsInterval); _waitingDotsInterval = null; }
+  }
+
+  function _startWaitingDots() {
+    _stopWaitingDots();
+    let tick = 0;
+    const el = document.getElementById('room-waiting-text');
+    _waitingDotsInterval = setInterval(() => {
+      if (el) el.textContent = 'Waiting for partner' + '.'.repeat(tick % 4);
+      tick++;
+    }, 400);
+  }
+
+  function _updateQueueHint() {
+    const el = document.getElementById('queue-hint');
+    if (!el) return;
+    if (!onlineQueueCounts) { el.textContent = ''; return; }
+    const other = onlineSide === 'p1' ? 'p2' : 'p1';
+    const n = onlineQueueCounts[other];
+    if (!Number.isFinite(n)) { el.textContent = ''; return; }
+    el.textContent = n === 0 ? 'No opponents searching yet'
+                              : `${n} ${n === 1 ? 'player' : 'players'} searching`;
+  }
+
+  function _setSideLocked(elId) {
+    const el = document.getElementById(elId);
+    if (el) el.textContent = onlineSide === 'p1' ? 'Playing as P1 (Left)' : 'Playing as P2 (Right)';
+  }
+
+  // ── Online game helpers ────────────────────────────────────────────────────
+
+  const EMPTY_INPUT = { left: false, right: false, up: false, down: false, attack: false, dash: false, projectile: false, attackJustPressed: false };
+
+  function pickOnlineStage(seed, roundNum) {
+    const stages = ['single', 'battlefield', 'battlefield', 'moving', 'none'];
+    const idx = Math.abs(Math.floor(seed * 9301 + roundNum * 49297)) % stages.length;
+    return stages[idx];
+  }
+
+  function _drainRemoteInput() {
+    const keys = Object.keys(onlineRemoteInputBuf).map(Number).sort((a, b) => a - b);
+    if (keys.length === 0) return null;
+    const seq = keys[0];
+    const snap = onlineRemoteInputBuf[seq];
+    delete onlineRemoteInputBuf[seq];
+    onlineRemoteLastInput = snap;
+    return snap;
+  }
+
+  function _drawOnlineCountdown(ctx, canvas) {
+    const secsLeft = getCountdownSecondsRemaining(onlineStartAt, onlineClockOffset);
+    const sf = Math.min(canvas.width / VIEWPORT_W, canvas.height / VIEWPORT_H);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    ctx.fillStyle = '#0a0608';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.38)';
+    ctx.font = `${Math.round(15 * sf)}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillText(`${p1Label}  vs  ${p2Label}`, cx, cy - Math.round(68 * sf));
+    ctx.fillStyle = '#e05a50';
+    ctx.font = `bold ${Math.round(88 * sf)}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillText(secsLeft > 0 ? String(secsLeft) : '!', cx, cy);
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font = `${Math.round(13 * sf)}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillText('Get Ready', cx, cy + Math.round(58 * sf));
+    ctx.restore();
   }
 
   // ── Menu wiring ────────────────────────────────────────────────────────────
@@ -91,6 +215,8 @@ function _boot(sounds) {
   });
 
   document.getElementById('btn-cpu').addEventListener('click', () => showScreen('screen-cpu-setup'));
+
+  document.getElementById('btn-online').addEventListener('click', () => enterOnlineFlow());
 
   document.querySelectorAll('.side-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -276,6 +402,258 @@ function _boot(sounds) {
     showScreen('screen-menu');
   });
 
+  // ── Online lobby wiring ────────────────────────────────────────────────────
+
+  function enterOnlineFlow() {
+    onlineSide = 'p1';
+    document.querySelectorAll('.side-card').forEach(c => c.classList.remove('side-card--selected'));
+    document.getElementById('online-side-p1').classList.add('side-card--selected');
+    document.getElementById('side-conflict-error').hidden = true;
+    onlineQueueCounts = null;
+    document.getElementById('queue-hint').textContent = '';
+
+    if (onlineClient) { onlineClient.disconnect(); onlineClient = null; }
+    onlineIdentity   = buildOnlineIdentity(factoryProfile);
+    onlineClient     = createOnlineClient();
+    onlineClient.setIdentity(onlineIdentity);
+    _wireOnlineCallbacks();
+    onlineClient.connect();
+
+    showScreen('screen-online-lobby');
+    showLobbyPhase('side_select');
+  }
+
+  function _wireOnlineCallbacks() {
+    onlineClient.cb.onConnected = () => {
+      onlineClient.requestQueueStatus();
+    };
+
+    onlineClient.cb.onQueueCounts = (counts) => {
+      onlineQueueCounts = counts;
+      _updateQueueHint();
+    };
+
+    onlineClient.cb.onSearching = () => {
+      _setSideLocked('searching-side-locked');
+      _startSearchDots();
+      showLobbyPhase('searching');
+    };
+
+    onlineClient.cb.onSearchCancelled = () => {
+      _stopSearchDots();
+      _setSideLocked('online-side-locked');
+      _updateQueueHint();
+      showLobbyPhase('main');
+    };
+
+    onlineClient.cb.onRoomCreated = (code) => {
+      document.getElementById('room-code-display').textContent = code;
+      _startWaitingDots();
+      showLobbyPhase('create');
+    };
+
+    onlineClient.cb.onMatchReady = ({ seed, remoteSide, serverNow, startAt }) => {
+      _stopSearchDots();
+      _stopWaitingDots();
+      onlineMatchSeed   = seed;
+      onlineClockOffset = serverNow - Date.now();
+      onlineStartAt     = startAt;
+      _startOnlineMatch();
+    };
+
+    onlineClient.cb.onRemoteProfile = (profile) => {
+      onlineRemoteIdentity = profile;
+    };
+
+    onlineClient.cb.onRemoteInput = (snap) => {
+      onlineRemoteInputBuf[snap.seq] = snap;
+    };
+
+    onlineClient.cb.onRemoteRoundEnd = (re) => {
+      // Partner detected the round end — trigger locally if we haven't yet
+      if (gameState.phase === 'active') {
+        triggerRoundEnd(re.winner, false);
+      }
+    };
+
+    onlineClient.cb.onSideConflict = () => {
+      _stopSearchDots();
+      _stopWaitingDots();
+      document.querySelectorAll('.side-card').forEach(c => c.classList.remove('side-card--selected'));
+      document.getElementById('side-conflict-error').hidden = false;
+      showScreen('screen-online-lobby');
+      showLobbyPhase('side_select');
+    };
+
+    onlineClient.cb.onPartnerLeft = () => {
+      _stopSearchDots();
+      _stopWaitingDots();
+      isOnline = false;
+      onlineRemoteIdentity = null;
+      stopAmbient();
+      showScreen('screen-online-disconnected');
+    };
+
+    onlineClient.cb.onError = (code, message) => {
+      console.warn('[Sumorai Online] error:', code, message);
+    };
+  }
+
+  function _startOnlineMatch() {
+    const myName     = onlineIdentity?.displayName || factoryName;
+    const remoteName = onlineRemoteIdentity?.displayName || 'Opponent';
+    p1Label = onlineSide === 'p1' ? myName : remoteName;
+    p2Label = onlineSide === 'p2' ? myName : remoteName;
+    gameState.roundTarget = 3;
+    isOnline              = true;
+    onlineLocalSeq        = 0;
+    onlineRemoteInputBuf  = {};
+    onlineRemoteLastInput = null;
+    onlinePendingEnd      = null;
+    onlinePartnerEnd      = null;
+    gameState.phase = 'online_countdown';
+    showScreen('screen-game');
+    startAmbient();
+  }
+
+  // ── Online lobby button wiring ─────────────────────────────────────────────
+
+  // Side-select cards
+  document.querySelectorAll('.side-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.side-card').forEach(c => c.classList.remove('side-card--selected'));
+      btn.classList.add('side-card--selected');
+      onlineSide = btn.dataset.side;
+      document.getElementById('side-conflict-error').hidden = true;
+    });
+  });
+
+  document.getElementById('btn-side-confirm').addEventListener('click', () => {
+    document.getElementById('side-conflict-error').hidden = true;
+    _setSideLocked('online-side-locked');
+    _updateQueueHint();
+    showLobbyPhase('main');
+  });
+
+  document.getElementById('btn-online-side-back').addEventListener('click', () => {
+    _stopSearchDots();
+    _stopWaitingDots();
+    if (onlineClient) { onlineClient.disconnect(); onlineClient = null; }
+    onlineQueueCounts = null;
+    showScreen('screen-menu');
+  });
+
+  // Main lobby
+  document.getElementById('btn-find-match').addEventListener('click', () => {
+    onlineClient.findMatch(onlineSide);
+    // onSearching callback transitions to searching phase
+  });
+
+  document.getElementById('btn-play-friend').addEventListener('click', () => {
+    _setSideLocked('friend-side-locked');
+    showLobbyPhase('friend_options');
+  });
+
+  document.getElementById('btn-lobby-main-back').addEventListener('click', () => {
+    showLobbyPhase('side_select');
+  });
+
+  // Searching phase
+  document.getElementById('btn-cancel-search').addEventListener('click', () => {
+    _stopSearchDots();
+    onlineClient.cancelSearch();
+    onlineClient.cancelRoom();
+    _setSideLocked('online-side-locked');
+    _updateQueueHint();
+    showLobbyPhase('main');
+  });
+
+  // Friend options
+  document.getElementById('btn-create-room').addEventListener('click', () => {
+    onlineClient.createRoom(onlineSide);
+    // onRoomCreated callback handles transition
+  });
+
+  document.getElementById('btn-join-room-option').addEventListener('click', () => {
+    document.getElementById('room-code-input').value = '';
+    showLobbyPhase('join');
+  });
+
+  document.getElementById('btn-friend-options-back').addEventListener('click', () => {
+    _setSideLocked('online-side-locked');
+    _updateQueueHint();
+    showLobbyPhase('main');
+  });
+
+  // Create (waiting) phase
+  document.getElementById('btn-cancel-room').addEventListener('click', () => {
+    _stopWaitingDots();
+    onlineClient.cancelRoom();
+    _setSideLocked('online-side-locked');
+    _updateQueueHint();
+    showLobbyPhase('main');
+  });
+
+  // Join phase
+  document.getElementById('btn-join-submit').addEventListener('click', () => {
+    const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+    if (code.length < 4) return;
+    document.getElementById('searching-label').textContent = 'Joining room…';
+    _setSideLocked('searching-side-locked');
+    showLobbyPhase('searching');
+    onlineClient.joinRoom(onlineSide, code);
+  });
+
+  document.getElementById('room-code-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-join-submit').click();
+  });
+
+  document.getElementById('room-code-input').addEventListener('input', (e) => {
+    e.target.value = e.target.value.toUpperCase();
+  });
+
+  document.getElementById('btn-join-back').addEventListener('click', () => {
+    showLobbyPhase('friend_options');
+    _setSideLocked('friend-side-locked');
+  });
+
+  // Online result
+  document.getElementById('btn-online-rematch').addEventListener('click', () => {
+    isOnline = false;
+    gameState.p1.wins = 0;
+    gameState.p2.wins = 0;
+    stopAmbient();
+    if (onlineClient) {
+      _setSideLocked('online-side-locked');
+      _updateQueueHint();
+      showScreen('screen-online-lobby');
+      showLobbyPhase('main');
+    } else {
+      showScreen('screen-menu');
+    }
+  });
+
+  document.getElementById('btn-online-result-menu').addEventListener('click', () => {
+    gameState.p1.wins = 0;
+    gameState.p2.wins = 0;
+    stopAmbient();
+    _stopSearchDots();
+    _stopWaitingDots();
+    if (onlineClient) { onlineClient.disconnect(); onlineClient = null; }
+    isOnline = false;
+    showScreen('screen-menu');
+  });
+
+  // Disconnected
+  document.getElementById('btn-disconnected-menu').addEventListener('click', () => {
+    gameState.p1.wins = 0;
+    gameState.p2.wins = 0;
+    stopAmbient();
+    if (onlineClient) { onlineClient.disconnect(); onlineClient = null; }
+    isOnline = false;
+    showScreen('screen-menu');
+  });
+
   // ── Clash effects ──────────────────────────────────────────────────────────
 
   function spawnChing(x, y) {
@@ -339,7 +717,9 @@ function _boot(sounds) {
     gameState.roundNum++;
     gameState.phase          = 'round_start';
     gameState.roundStartTick = 0;
-    gameState.platforms      = createPlatforms(selectedLayout);
+    gameState.platforms      = isOnline
+      ? createPlatforms(pickOnlineStage(onlineMatchSeed, gameState.roundNum))
+      : createPlatforms(selectedLayout);
     gameState.p1Projectile   = null;
     gameState.p2Projectile   = null;
     gameState.gridlock       = null;
@@ -441,12 +821,22 @@ function _boot(sounds) {
 
       if (gameState.p1.wins >= gameState.roundTarget || gameState.p2.wins >= gameState.roundTarget) {
         gameState.phase = 'match_end';
-        document.getElementById('result-winner').textContent =
-          re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
-        setTimeout(() => showScreen('screen-result'), 2000);
+        if (isOnline) {
+          document.getElementById('online-result-winner').textContent =
+            re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
+          document.getElementById('online-result-opponent').textContent =
+            onlineRemoteIdentity?.displayName ? `vs ${onlineRemoteIdentity.displayName}` : '';
+          setTimeout(() => showScreen('screen-online-result'), 2000);
+        } else {
+          document.getElementById('result-winner').textContent =
+            re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
+          setTimeout(() => showScreen('screen-result'), 2000);
+        }
       } else {
         gameState.roundNum++;
-        gameState.platforms    = createPlatforms(selectedLayout);
+        gameState.platforms    = isOnline
+          ? createPlatforms(pickOnlineStage(onlineMatchSeed, gameState.roundNum))
+          : createPlatforms(selectedLayout);
         gameState.p1Projectile = null;
         gameState.p2Projectile = null;
         gameState.gridlock     = null;
@@ -485,14 +875,29 @@ function _boot(sounds) {
     }
   }
 
+  // ── Online countdown phase ─────────────────────────────────────────────────
+
+  function tickOnlineCountdown() {
+    const secsLeft = getCountdownSecondsRemaining(onlineStartAt, onlineClockOffset);
+    if (secsLeft <= 0) {
+      gameState.p1.wins = 0;
+      gameState.p2.wins = 0;
+      gameState.roundNum = 0;
+      gameState.roundEnd = null;
+      botState = createBotState();
+      startRound();
+    }
+  }
+
   // ── Game loop ──────────────────────────────────────────────────────────────
   let lastTime = null;
   let accum    = 0;
 
   function tick() {
-    if      (gameState.phase === 'active')      tickActive();
-    else if (gameState.phase === 'round_end')   tickRoundEnd();
-    else if (gameState.phase === 'round_start') tickRoundStart();
+    if      (gameState.phase === 'active')           tickActive();
+    else if (gameState.phase === 'round_end')        tickRoundEnd();
+    else if (gameState.phase === 'round_start')      tickRoundStart();
+    else if (gameState.phase === 'online_countdown') tickOnlineCountdown();
   }
 
   // ── Gridlock mash phase (sub-state of 'active') ───────────────────────────
@@ -500,12 +905,21 @@ function _boot(sounds) {
   function tickGridlockPhase() {
     tickEffects();
 
-    const p1In = (botConfig.enabled && botConfig.side === 'p1')
-      ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
-      : input.getSnapshot(bindings.p1);
-    const p2In = (botConfig.enabled && botConfig.side === 'p2')
-      ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
-      : input.getSnapshot(bindings.p2);
+    let p1In, p2In;
+    if (isOnline) {
+      const localIn  = input.getSnapshot(bindings[onlineSide]);
+      const remoteIn = _drainRemoteInput() ?? onlineRemoteLastInput ?? EMPTY_INPUT;
+      p1In = onlineSide === 'p1' ? localIn : remoteIn;
+      p2In = onlineSide === 'p2' ? localIn : remoteIn;
+      onlineClient.sendInput(onlineLocalSeq++, localIn);
+    } else {
+      p1In = (botConfig.enabled && botConfig.side === 'p1')
+        ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
+        : input.getSnapshot(bindings.p1);
+      p2In = (botConfig.enabled && botConfig.side === 'p2')
+        ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
+        : input.getSnapshot(bindings.p2);
+    }
     input.flush();
 
     const result = tickGridlock(gameState.gridlock, gameState.p1, gameState.p2, p1In, p2In);
@@ -531,12 +945,21 @@ function _boot(sounds) {
 
     tickEffects();
 
-    const p1In = (botConfig.enabled && botConfig.side === 'p1')
-      ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
-      : input.getSnapshot(bindings.p1);
-    const p2In = (botConfig.enabled && botConfig.side === 'p2')
-      ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
-      : input.getSnapshot(bindings.p2);
+    let p1In, p2In;
+    if (isOnline) {
+      const localIn  = input.getSnapshot(bindings[onlineSide]);
+      const remoteIn = _drainRemoteInput() ?? onlineRemoteLastInput ?? EMPTY_INPUT;
+      p1In = onlineSide === 'p1' ? localIn : remoteIn;
+      p2In = onlineSide === 'p2' ? localIn : remoteIn;
+      onlineClient.sendInput(onlineLocalSeq++, localIn);
+    } else {
+      p1In = (botConfig.enabled && botConfig.side === 'p1')
+        ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
+        : input.getSnapshot(bindings.p1);
+      p2In = (botConfig.enabled && botConfig.side === 'p2')
+        ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
+        : input.getSnapshot(bindings.p2);
+    }
     input.flush();
 
     updatePlatforms(gameState.platforms);
@@ -700,6 +1123,7 @@ function _boot(sounds) {
                    : (p1Dead && !p2Dead) ? 'p2'
                    : 'draw';
       const isBlastKill = (p1Dead && p1Result === 'dead') || (p2Dead && p2Result === 'dead');
+      if (isOnline) onlineClient.sendRoundEnd(winner);
       triggerRoundEnd(winner, isBlastKill);
     }
   }
@@ -714,10 +1138,12 @@ function _boot(sounds) {
     }
     lastTime = ts;
 
-    if (gameState.phase === 'active'      ||
-        gameState.phase === 'round_end'   ||
-        gameState.phase === 'round_start' ||
-        gameState.phase === 'match_end') {
+    if (gameState.phase === 'online_countdown') {
+      _drawOnlineCountdown(ctx, canvas);
+    } else if (gameState.phase === 'active'      ||
+               gameState.phase === 'round_end'   ||
+               gameState.phase === 'round_start' ||
+               gameState.phase === 'match_end') {
       render(ctx, canvas, gameState, camera);
     }
 

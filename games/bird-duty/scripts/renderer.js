@@ -24,6 +24,7 @@ import {
   shouldShowJoinCodeCursor,
 } from "./online-menu.js";
 import { HOTSEAT_PHASE, HOTSEAT_ROUNDS } from "./hotseat-session.js";
+import { ONLINE_MATCH_PHASE } from "./online-match.js";
 
 const HUD_TEXT_COLOR = "#ffffff";
 const HUD_TEXT_SHADOW = "rgba(0, 0, 0, 0.35)";
@@ -432,6 +433,69 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.restore();
   }
 
+  function drawOnlineHud(match, myClientId = null) {
+    if (!match?.players?.length) return;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const slotWidth = GAME_STAGE.width / Math.max(2, match.players.length);
+    for (let index = 0; index < match.players.length; index++) {
+      const player = match.players[index];
+      const x = slotWidth * index + slotWidth / 2;
+      const active = index === match.activeIndex;
+      ctx.fillStyle = player.clientId === myClientId ? "#ff861a" : "#ff0b67";
+      ctx.strokeStyle = active ? "#b8ff00" : "#b50000";
+      ctx.lineWidth = active ? 5 : 3;
+      ctx.fillRect(x - 72, 100, 144, 50);
+      ctx.strokeRect(x - 72, 100, 144, 50);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `15px ${HUD_VALUE_FONT}`;
+      ctx.fillText(player.name, x, 116);
+      ctx.font = `22px ${HUD_VALUE_FONT}`;
+      ctx.fillText(String(match.scores?.[player.clientId] || 0), x, 138);
+    }
+    ctx.font = `28px ${HUD_VALUE_FONT}`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`ROUND ${match.round}/${HOTSEAT_ROUNDS}`, 1090, 46);
+    ctx.restore();
+  }
+
+  function drawOnlineOverlay(match, myClientId = null) {
+    if (!match || match.phase === ONLINE_MATCH_PHASE.PLAYING) return;
+    const active = match.players?.[match.activeIndex] || null;
+    const isMine = active?.clientId === myClientId;
+    const isFinal = match.phase === ONLINE_MATCH_PHASE.MATCH_OVER;
+    const winner = match.winnerClientId === "tie"
+      ? null
+      : match.players?.find((player) => player.clientId === match.winnerClientId);
+    const title = isFinal
+      ? winner
+        ? `${winner.name} WINS`
+        : "TIE GAME"
+      : `${active?.name || "PLAYER"} READY`;
+    const subtitle = isFinal
+      ? "PRESS SPACE"
+      : isMine
+        ? `ROUND ${match.round} - PRESS SPACE`
+        : `WAITING FOR ${active?.name || "PLAYER"}`;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 56px Arial, Helvetica, sans-serif";
+    ctx.fillStyle = "#b8ff00";
+    ctx.strokeStyle = "#b50000";
+    ctx.lineWidth = 5;
+    ctx.strokeText(title, GAME_STAGE.width / 2, 310);
+    ctx.fillText(title, GAME_STAGE.width / 2, 310);
+    ctx.font = `36px ${HUD_VALUE_FONT}`;
+    ctx.strokeText(subtitle, GAME_STAGE.width / 2, 380);
+    ctx.fillText(subtitle, GAME_STAGE.width / 2, 380);
+    ctx.restore();
+  }
+
   function renderMenu(state = {}) {
     resizeForStage(SCRATCH_STAGE);
     clear();
@@ -660,7 +724,7 @@ export async function createBirdDutyRenderer(canvas, manifest) {
   }
 
   function render(state = {}) {
-    if (state.screen === "play" || state.screen === "hotseat-play") {
+    if (state.screen === "play" || state.screen === "hotseat-play" || state.screen === "online-play") {
       renderPlay(state);
       if (state.poop?.phase === "splat") {
         drawCanvasImageCentered(splatImage, {
@@ -700,6 +764,10 @@ export async function createBirdDutyRenderer(canvas, manifest) {
       if (state.screen === "hotseat-play") {
         drawHotseatHud(state.hotseat);
         drawHotseatOverlay(state.hotseat);
+      }
+      if (state.screen === "online-play") {
+        drawOnlineHud(state.onlineMatch, state.onlineClientId);
+        drawOnlineOverlay(state.onlineMatch, state.onlineClientId);
       }
       return;
     }

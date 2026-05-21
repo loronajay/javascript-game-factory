@@ -49,6 +49,15 @@ import {
   finishHotseatTurn,
   startHotseatTurn,
 } from "./scripts/hotseat-session.js";
+import {
+  ONLINE_MATCH_PHASE,
+  addOnlineMatchScore,
+  createOnlineMatchSession,
+  createOnlineTurnSession,
+  finishOnlineMatchTurn,
+  getOnlineActivePlayer,
+  startOnlineMatchTurn,
+} from "./scripts/online-match.js";
 
 const TICK_MS = 1000 / 60;
 
@@ -84,11 +93,19 @@ export async function initGame() {
       members: [],
     };
     let onlineJoinCode = "";
+    let onlineMatchSession = null;
+    let onlineRemoteInputs = {};
+    let onlineBroadcastTick = 0;
+    let onlineSyncSeq = 0;
     let lastTime = null;
     let accumulator = 0;
 
     function createHotseatNpcState(session = hotseatSession) {
       return createNpcState({ round: session.round });
+    }
+
+    function createOnlineNpcState(session = onlineMatchSession) {
+      return createNpcState({ round: session?.round || 1 });
     }
 
     function canvasPointFromEvent(event) {
@@ -138,6 +155,72 @@ export async function initGame() {
     function lobbyMemberId(member) {
       if (typeof member === "string") return member;
       return member?.clientId || member?.id || "";
+    }
+
+    function buildOnlinePlayersFromLobby(payload = onlineLobby) {
+      const members = normalizeLobbyMembers(payload.members || onlineLobby.members);
+      const profiles = onlineLobby.profiles || {};
+      return members.map((member, index) => {
+        const clientId = lobbyMemberId(member);
+        const profile = profiles[clientId] || {};
+        return {
+          clientId,
+          name: profile.displayName
+            || (clientId === onlineClient?.clientId ? onlineIdentity?.displayName : "")
+            || `Player ${index + 1}`,
+        };
+      }).filter((player) => player.clientId);
+    }
+
+    function serializeOnlineSnapshot() {
+      return {
+        syncSeq: ++onlineSyncSeq,
+        player: playerState,
+        poop: poopState,
+        playSession,
+        npcs: npcState,
+        match: {
+          ...onlineMatchSession,
+          syncSeq: onlineSyncSeq,
+        },
+      };
+    }
+
+    function applyOnlineSnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== "object") return;
+      const syncSeq = Number(snapshot.syncSeq || snapshot.match?.syncSeq || 0);
+      if (syncSeq && onlineMatchSession?.syncSeq && syncSeq <= onlineMatchSession.syncSeq) return;
+      playerState = snapshot.player || playerState;
+      poopState = snapshot.poop || poopState;
+      playSession = snapshot.playSession || playSession;
+      npcState = snapshot.npcs || npcState;
+      onlineMatchSession = snapshot.match || onlineMatchSession;
+      gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
+    }
+
+    function broadcastOnlineSnapshot(force = false) {
+      if (!onlineClient || onlineLobby.ownerId !== onlineClient.clientId || !onlineMatchSession) return;
+      onlineBroadcastTick += 1;
+      if (!force && onlineBroadcastTick % 3 !== 0) return;
+      onlineClient.sendState(serializeOnlineSnapshot());
+    }
+
+    function resetOnlineTurnState(session = onlineMatchSession) {
+      playerState = createPlayerState();
+      poopState = createPoopState();
+      playSession = createOnlineTurnSession();
+      npcState = createOnlineNpcState(session);
+    }
+
+    function startOnlineMatchAsHost(payload = onlineLobby) {
+      const players = buildOnlinePlayersFromLobby(payload);
+      onlineMatchSession = createOnlineMatchSession(players);
+      onlineRemoteInputs = {};
+      onlineSyncSeq = 0;
+      resetOnlineTurnState(onlineMatchSession);
+      gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
+      sounds.startGameMusic();
+      broadcastOnlineSnapshot(true);
     }
 
     function syncOnlineLobby(payload = {}, message = "") {
@@ -202,6 +285,12 @@ export async function initGame() {
       };
       onlineClient.cb.onLobbyStarted = (payload) => {
         syncOnlineLobby(payload, "Match sync coming next.");
+        gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
+        if (payload.ownerId === onlineClient?.clientId) {
+          startOnlineMatchAsHost(payload);
+        } else {
+          sounds.startGameMusic();
+        }
       };
       onlineClient.cb.onPlayerJoined = () => {
         broadcastProfileSoon();
@@ -215,6 +304,34 @@ export async function initGame() {
         };
       };
       onlineClient.cb.onLobbyMessage = ({ messageType, value, senderId }) => {
+        if (messageType === "input") {
+          if (onlineLobby.ownerId !== onlineClient?.clientId) return;
+          try {
+            const message = JSON.parse(value);
+            const input = message?.input || {};
+            const key = String(input.key || "");
+            if (!key) return;
+            const previous = onlineRemoteInputs[senderId] || createInputState();
+            onlineRemoteInputs = {
+              ...onlineRemoteInputs,
+              [senderId]: updateInputForKey(previous, key, input.pressed === true),
+            };
+          } catch {
+            // Ignore malformed input packets.
+          }
+          return;
+        }
+
+        if (messageType === "state_sync") {
+          if (onlineLobby.ownerId === onlineClient?.clientId) return;
+          try {
+            applyOnlineSnapshot(JSON.parse(value));
+          } catch {
+            // Ignore malformed snapshots.
+          }
+          return;
+        }
+
         if (messageType !== "profile") return;
         try {
           const profile = JSON.parse(value);
@@ -395,6 +512,77 @@ export async function initGame() {
 
     function tick() {
       menuBirdState = advanceMenuBirdState(menuBirdState);
+      if (gameState.screen === SCREEN.ONLINE_PLAY) {
+        if (onlineLobby.ownerId !== onlineClient?.clientId || !onlineMatchSession) {
+          inputState = consumeDropRequest(inputState);
+          return;
+        }
+
+        const activePlayer = getOnlineActivePlayer(onlineMatchSession);
+        const activeInput = activePlayer?.clientId === onlineClient?.clientId
+          ? inputState
+          : onlineRemoteInputs[activePlayer?.clientId] || createInputState();
+
+        if (activeInput.dropRequested) {
+          if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.READY || onlineMatchSession.phase === ONLINE_MATCH_PHASE.TURN_OVER) {
+            onlineMatchSession = startOnlineMatchTurn(onlineMatchSession);
+            resetOnlineTurnState(onlineMatchSession);
+            broadcastOnlineSnapshot(true);
+          } else if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
+            sounds.stopGameMusic();
+            leaveOnlineLobby();
+            gameState = createInitialState();
+            onlineMatchSession = null;
+            return;
+          }
+        }
+
+        if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.PLAYING) {
+          playerState = updatePlayer(playerState, activeInput);
+          if (activeInput.dropRequested && poopState.phase === "inactive" && canFireShot(playSession)) {
+            poopState = spawnPoopFromPlayer(playerState);
+            playSession = fireShot(playSession);
+            sounds.playPoopRelease();
+          }
+          const previousPoopPhase = poopState.phase;
+          poopState = updatePoop(poopState);
+          if (previousPoopPhase === "airborne" && poopState.phase === "splat") {
+            sounds.playSplat();
+          }
+          npcState = updateNpcState(npcState);
+          const hitResult = processNpcHits(npcState.entities, poopState);
+          npcState = {
+            ...npcState,
+            entities: hitResult.entities,
+          };
+          if (hitResult.scoreDelta > 0) {
+            playSession = addScore(playSession, hitResult.scoreDelta);
+            onlineMatchSession = addOnlineMatchScore(onlineMatchSession, hitResult.scoreDelta);
+            for (const type of hitResult.hitTypes) {
+              sounds.playNpcHit(type);
+            }
+          }
+          const previousSessionPhase = playSession.phase;
+          playSession = updatePlaySession(playSession, poopState);
+          if (previousSessionPhase === "running" && playSession.phase === "game-over") {
+            onlineMatchSession = finishOnlineMatchTurn(onlineMatchSession);
+            resetOnlineTurnState(onlineMatchSession);
+            broadcastOnlineSnapshot(true);
+          }
+        }
+
+        if (activePlayer?.clientId === onlineClient?.clientId) {
+          inputState = consumeDropRequest(inputState);
+        } else if (onlineRemoteInputs[activePlayer?.clientId]) {
+          onlineRemoteInputs = {
+            ...onlineRemoteInputs,
+            [activePlayer.clientId]: consumeDropRequest(onlineRemoteInputs[activePlayer.clientId]),
+          };
+        }
+        broadcastOnlineSnapshot(false);
+        return;
+      }
+
       if (gameState.screen === SCREEN.HOTSEAT_PLAY) {
         let handledHotseatContinue = false;
         if (inputState.dropRequested) {
@@ -527,6 +715,24 @@ export async function initGame() {
           return;
         }
       }
+      if (gameState.screen === SCREEN.ONLINE_PLAY) {
+        if (!shouldPreventGameKey(event.key)) return;
+        event.preventDefault();
+        const activePlayer = getOnlineActivePlayer(onlineMatchSession);
+        const isMyTurn = activePlayer?.clientId === onlineClient?.clientId;
+        if (!isMyTurn && onlineMatchSession?.phase !== ONLINE_MATCH_PHASE.MATCH_OVER) return;
+
+        if (onlineLobby.ownerId === onlineClient?.clientId) {
+          inputState = updateInputForKey(inputState, event.key, pressed);
+        } else if (onlineMatchSession?.phase === ONLINE_MATCH_PHASE.MATCH_OVER && event.key === " ") {
+          sounds.stopGameMusic();
+          leaveOnlineLobby();
+          gameState = createInitialState();
+        } else {
+          onlineClient?.sendInput({ key: event.key, pressed });
+        }
+        return;
+      }
       if (!shouldPreventGameKey(event.key)) return;
       event.preventDefault();
       inputState = updateInputForKey(inputState, event.key, pressed);
@@ -559,6 +765,8 @@ export async function initGame() {
         hotseat: hotseatSession,
         onlineLobby,
         onlineJoinCode,
+        onlineMatch: onlineMatchSession,
+        onlineClientId: onlineClient?.clientId || null,
       });
       requestAnimationFrame(loop);
     }
@@ -585,6 +793,8 @@ export async function initGame() {
       hotseat: hotseatSession,
       onlineLobby,
       onlineJoinCode,
+      onlineMatch: onlineMatchSession,
+      onlineClientId: onlineClient?.clientId || null,
     });
     requestAnimationFrame(loop);
   } catch (error) {
