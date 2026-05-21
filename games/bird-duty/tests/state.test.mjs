@@ -1,6 +1,7 @@
 import { MENU_ACTIONS } from "../scripts/menu-input.js";
 import { SCREEN, applyMenuAction, createInitialState } from "../scripts/state.js";
 import { TWO_PLAYER_ACTIONS } from "../scripts/two-player-menu.js";
+import { ONLINE_ACTIONS } from "../scripts/online-menu.js";
 
 let passed = 0;
 let failed = 0;
@@ -54,14 +55,35 @@ test("local two-player action starts hotseat mode", () => {
   assertEqual(state.mode, "hotseat");
 });
 
-test("online two-player action records online placeholder", () => {
+test("online two-player action opens the online flow menu", () => {
   const state = applyMenuAction(
     { ...createInitialState(), screen: SCREEN.TWO_PLAYER_MENU, mode: "two-player" },
     TWO_PLAYER_ACTIONS.ONLINE
   );
 
+  assertEqual(state.screen, SCREEN.ONLINE_MENU);
+  assertEqual(state.mode, "online-menu");
+});
+
+test("public online matchmaking starts an online lobby intent", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.ONLINE_MENU, mode: "online-menu" },
+    ONLINE_ACTIONS.PUBLIC_4
+  );
+
+  assertEqual(state.screen, SCREEN.ONLINE_LOBBY);
+  assertEqual(state.mode, "online");
+  assertEqual(state.onlineSettings.maxPlayers, 4);
+});
+
+test("online back action returns to multiplayer menu", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.ONLINE_MENU, mode: "online-menu" },
+    ONLINE_ACTIONS.BACK
+  );
+
   assertEqual(state.screen, SCREEN.TWO_PLAYER_MENU);
-  assertEqual(state.mode, "online-pending");
+  assertEqual(state.mode, "two-player");
 });
 
 test("two-player back action returns to main menu", () => {

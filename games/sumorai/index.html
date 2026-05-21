@@ -16,9 +16,43 @@
         <p class="eyebrow">Javascript Game Factory</p>
         <h1>Sumorai</h1>
         <p class="tagline">Two samurai. One stage. One hit. One winner.</p>
+        <p class="menu-player-name" id="menu-player-name"></p>
         <div class="menu-actions">
           <button id="btn-local" class="btn btn--primary">Local 2-Player</button>
-          <button class="btn" disabled>vs CPU &mdash; Coming Soon</button>
+          <button id="btn-cpu" class="btn">vs CPU</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-cpu-setup" class="screen">
+      <div class="menu-card">
+        <p class="eyebrow">vs CPU</p>
+        <h2>You Play As</h2>
+        <div class="side-picker">
+          <button class="side-btn side-btn--active" data-side="p1">P1 &mdash; Left</button>
+          <button class="side-btn" data-side="p2">P2 &mdash; Right</button>
+        </div>
+        <h2>Difficulty</h2>
+        <div class="diff-picker">
+          <button class="diff-btn" data-difficulty="easy">Easy</button>
+          <button class="diff-btn" data-difficulty="medium">Medium</button>
+          <button class="diff-btn diff-btn--active" data-difficulty="hard">Hard</button>
+        </div>
+        <h2>Match Length</h2>
+        <div class="cpu-round-picker">
+          <button class="cpu-round-btn cpu-round-btn--active" data-rounds="3">Best of 3</button>
+          <button class="cpu-round-btn" data-rounds="5">Best of 5</button>
+        </div>
+        <h2>Stage</h2>
+        <div class="cpu-layout-picker">
+          <button class="cpu-layout-btn cpu-layout-btn--active" data-layout="single">Center</button>
+          <button class="cpu-layout-btn" data-layout="battlefield">Battlefield</button>
+          <button class="cpu-layout-btn" data-layout="moving">Moving</button>
+          <button class="cpu-layout-btn" data-layout="none">None</button>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-start-cpu" class="btn btn--primary">Fight</button>
+          <button id="btn-cpu-back" class="btn">Back</button>
         </div>
       </div>
     </section>

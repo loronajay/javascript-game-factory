@@ -1,4 +1,6 @@
 import { loadAssets, getSound }      from './scripts/assets.js';
+import { createBotState, tickBot }  from './scripts/bot.js';
+import { loadFactoryProfile }       from '../../js/platform/identity/factory-profile.mjs';
 import { createInput }              from './scripts/input.js';
 import { LOCAL_2P_BINDINGS }       from './scripts/controls.js';
 import { createPlayer, resetPlayer, stepAnimation } from './scripts/player.js';
@@ -52,9 +54,24 @@ function _boot(sounds) {
     platforms:   createPlatforms('single'),
   };
 
+  const factoryProfile = loadFactoryProfile();
+  const factoryName    = factoryProfile.profileName || 'Player 1';
+
+  // Display name on menu
+  const nameEl = document.getElementById('menu-player-name');
+  if (nameEl) nameEl.textContent = factoryName;
+
+  // Match display labels — set when match mode is chosen
+  let p1Label = factoryName;
+  let p2Label = 'Player 2';
+
   let bindings = LOCAL_2P_BINDINGS;
-  let selectedRounds = 3;   // BO3 default
+  let selectedRounds = 3;
   let selectedLayout = 'single';
+
+  // CPU config — set before startMatch, read during tick
+  let botConfig = { enabled: false, side: 'p2', difficulty: 'hard' };
+  let botState  = createBotState();
 
   // ── Screen helpers ─────────────────────────────────────────────────────────
   function showScreen(id) {
@@ -63,7 +80,62 @@ function _boot(sounds) {
   }
 
   // ── Menu wiring ────────────────────────────────────────────────────────────
-  document.getElementById('btn-local').addEventListener('click', () => showScreen('screen-setup'));
+  document.getElementById('btn-local').addEventListener('click', () => {
+    botConfig.enabled = false;
+    p1Label = factoryName;
+    p2Label = 'Player 2';
+    showScreen('screen-setup');
+  });
+
+  document.getElementById('btn-cpu').addEventListener('click', () => showScreen('screen-cpu-setup'));
+
+  document.querySelectorAll('.side-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('side-btn--active'));
+      btn.classList.add('side-btn--active');
+      botConfig.side = btn.dataset.side === 'p1' ? 'p2' : 'p1'; // bot is opposite of human
+    });
+  });
+
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('diff-btn--active'));
+      btn.classList.add('diff-btn--active');
+      botConfig.difficulty = btn.dataset.difficulty;
+    });
+  });
+
+  document.querySelectorAll('.cpu-round-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cpu-round-btn').forEach(b => b.classList.remove('cpu-round-btn--active'));
+      btn.classList.add('cpu-round-btn--active');
+      selectedRounds = Number(btn.dataset.rounds);
+    });
+  });
+
+  document.querySelectorAll('.cpu-layout-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cpu-layout-btn').forEach(b => b.classList.remove('cpu-layout-btn--active'));
+      btn.classList.add('cpu-layout-btn--active');
+      selectedLayout = btn.dataset.layout;
+    });
+  });
+
+  document.getElementById('btn-start-cpu').addEventListener('click', () => {
+    botConfig.enabled = true;
+    // Human side gets the factory name; bot gets 'CPU'
+    if (botConfig.side === 'p1') {
+      p1Label = 'CPU';
+      p2Label = factoryName;
+    } else {
+      p1Label = factoryName;
+      p2Label = 'CPU';
+    }
+    gameState.roundTarget = selectedRounds === 3 ? 2 : 3;
+    startMatch();
+  });
+
+  document.getElementById('btn-cpu-back').addEventListener('click', () => showScreen('screen-menu'));
 
   document.querySelectorAll('.round-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -149,6 +221,7 @@ function _boot(sounds) {
     gameState.p2.wins = 0;
     gameState.roundNum = 0;
     gameState.roundEnd = null;
+    botState = createBotState();
     startAmbient();
     startRound();
   }
@@ -237,6 +310,15 @@ function _boot(sounds) {
     const re = gameState.roundEnd;
     updatePlatforms(gameState.platforms);
     tickEffects();
+
+    // Keep gravity + floor collision running — inputs locked so no movement, just fall
+    const noInputs = {
+      left: false, right: false, up: false, down: false,
+      attack: false, dash: false, projectile: false, attackJustPressed: false,
+    };
+    applyPhysics(gameState.p1, noInputs, gameState.platforms);
+    applyPhysics(gameState.p2, noInputs, gameState.platforms);
+
     stepAnimation(gameState.p1);
     stepAnimation(gameState.p2);
     updateCamera(camera, gameState.p1, gameState.p2);
@@ -251,7 +333,7 @@ function _boot(sounds) {
       if (gameState.p1.wins >= gameState.roundTarget || gameState.p2.wins >= gameState.roundTarget) {
         gameState.phase = 'match_end';
         document.getElementById('result-winner').textContent =
-          re.winner === 'p1' ? 'Player 1 Wins!' : 'Player 2 Wins!';
+          re.winner === 'p1' ? `${p1Label} Wins!` : `${p2Label} Wins!`;
         setTimeout(() => showScreen('screen-result'), 2000);
       } else {
         gameState.roundNum++;
@@ -309,8 +391,12 @@ function _boot(sounds) {
   function tickGridlockPhase() {
     tickEffects();
 
-    const p1In = input.getSnapshot(bindings.p1);
-    const p2In = input.getSnapshot(bindings.p2);
+    const p1In = (botConfig.enabled && botConfig.side === 'p1')
+      ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
+      : input.getSnapshot(bindings.p1);
+    const p2In = (botConfig.enabled && botConfig.side === 'p2')
+      ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
+      : input.getSnapshot(bindings.p2);
     input.flush();
 
     const result = tickGridlock(gameState.gridlock, gameState.p1, gameState.p2, p1In, p2In);
@@ -336,8 +422,12 @@ function _boot(sounds) {
 
     tickEffects();
 
-    const p1In = input.getSnapshot(bindings.p1);
-    const p2In = input.getSnapshot(bindings.p2);
+    const p1In = (botConfig.enabled && botConfig.side === 'p1')
+      ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
+      : input.getSnapshot(bindings.p1);
+    const p2In = (botConfig.enabled && botConfig.side === 'p2')
+      ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
+      : input.getSnapshot(bindings.p2);
     input.flush();
 
     updatePlatforms(gameState.platforms);

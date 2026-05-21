@@ -5,6 +5,7 @@ export const ARCADE_GAME_SLUGS = Object.freeze([
   "bird-duty",
   "circuit-siege",
   "illuminauts",
+  "sumorai",
 ]);
 
 export const GRID_PAGE_SIZE = 9;

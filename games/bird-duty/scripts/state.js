@@ -1,10 +1,13 @@
 import { MENU_ACTIONS } from "./menu-input.js";
+import { getOnlineActionSettings, ONLINE_ACTIONS } from "./online-menu.js";
 import { TWO_PLAYER_ACTIONS } from "./two-player-menu.js";
 
 export const SCREEN = Object.freeze({
   MENU: "menu",
   PLAY: "play",
   TWO_PLAYER_MENU: "two-player-menu",
+  ONLINE_MENU: "online-menu",
+  ONLINE_LOBBY: "online-lobby",
   HOTSEAT_PLAY: "hotseat-play",
 });
 
@@ -49,8 +52,28 @@ export function applyMenuAction(state, action) {
   if (action === TWO_PLAYER_ACTIONS.ONLINE) {
     return {
       ...state,
+      screen: SCREEN.ONLINE_MENU,
+      mode: "online-menu",
+      lastAction: action,
+    };
+  }
+
+  if (action === ONLINE_ACTIONS.BACK) {
+    return {
+      ...state,
       screen: SCREEN.TWO_PLAYER_MENU,
-      mode: "online-pending",
+      mode: "two-player",
+      lastAction: action,
+    };
+  }
+
+  const onlineSettings = getOnlineActionSettings(action);
+  if (onlineSettings) {
+    return {
+      ...state,
+      screen: SCREEN.ONLINE_LOBBY,
+      mode: "online",
+      onlineSettings,
       lastAction: action,
     };
   }

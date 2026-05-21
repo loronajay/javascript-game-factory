@@ -8,7 +8,7 @@ Usage: python generate_map.py <map_id> <seed>
 Outputs a complete maps.js entry block to stdout.
 Append it to MAPS array in scripts/maps.js before the closing ];
 """
-import random, sys, re
+import random, sys
 from collections import deque
 
 MAP_W, MAP_H = 35, 27
@@ -27,13 +27,10 @@ def make_grid():
 
 
 def place_fixed(grid):
-    # Beacon 5×5
     for y in range(BY1, BY2 + 1):
         for x in range(BX1, BX2 + 1):
             grid[y][x] = 'B'
-    # Entry door
     grid[DOOR_Y][DOOR_X] = 'D'
-    # Player starts
     grid[AY][AX] = 'S'
     grid[BY][BX] = 'T'
 
@@ -54,15 +51,8 @@ def passable(grid, x, y):
 
 
 # ─── Maze generation ──────────────────────────────────────────────────────────
-# Cell-based maze: cells sit at odd (x,y) positions; walls are even positions
-# between adjacent cells.  We use randomised iterative DFS (backtracker).
 
 def gen_maze(rng, grid):
-    """
-    Carve a connected labyrinth into `grid` using randomised DFS.
-    Leaves the beacon, door, and starts intact.
-    """
-    # Cells: x in 1,3,...,33  y in 1,3,...,25
     def valid_cell(cx, cy):
         return (1 <= cx <= MAP_W - 2 and 1 <= cy <= MAP_H - 2
                 and not in_beacon(cx, cy))
@@ -89,7 +79,6 @@ def gen_maze(rng, grid):
             grid[cy][cx] = '.'
         visited.add((cx, cy))
 
-    # Iterative DFS from Alpha start
     stack = [(AX, AY)]
     carve_cell(AX, AY)
 
@@ -101,22 +90,18 @@ def gen_maze(rng, grid):
             continue
         rng.shuffle(nbrs)
         nx, ny = nbrs[0]
-        # Carve wall between
         wx, wy = wall_between((cx, cy), (nx, ny))
         if not in_beacon(wx, wy) and not (wx == DOOR_X and wy == DOOR_Y):
             grid[wy][wx] = '.'
         carve_cell(nx, ny)
         stack.append((nx, ny))
 
-    # If Beta start wasn't reached (shouldn't happen but handle it)
     if (BX, BY) not in visited:
         grid[BY][BX] = '.'
         visited.add((BX, BY))
 
-    # Ensure approach cell below door (17,17) is carved and connected
-    approachX, approachY = DOOR_X, DOOR_Y + 1  # (17, 17) — odd/odd cell
+    approachX, approachY = DOOR_X, DOOR_Y + 1
     if valid_cell(approachX, approachY) and (approachX, approachY) not in visited:
-        # Force a DFS from there to connect it
         stack = [(approachX, approachY)]
         carve_cell(approachX, approachY)
         while stack:
@@ -137,14 +122,12 @@ def gen_maze(rng, grid):
 
 
 def add_loops(rng, grid, count=14):
-    """Knock down some walls between already-carved cells to add loops."""
     added = 0
     attempts = 0
     while added < count and attempts < 3000:
         attempts += 1
         orientation = rng.choice(['h', 'v'])
         if orientation == 'h':
-            # wall at even x, odd y
             wx = rng.choice(range(2, MAP_W - 2, 2))
             wy = rng.choice(range(1, MAP_H - 2, 2))
             if (grid[wy][wx] == '#' and not in_beacon(wx, wy)
@@ -154,7 +137,6 @@ def add_loops(rng, grid, count=14):
                 grid[wy][wx] = '.'
                 added += 1
         else:
-            # wall at odd x, even y
             wx = rng.choice(range(1, MAP_W - 2, 2))
             wy = rng.choice(range(2, MAP_H - 2, 2))
             if (grid[wy][wx] == '#' and not in_beacon(wx, wy)
@@ -168,24 +150,22 @@ def add_loops(rng, grid, count=14):
 # ─── Pickup placement ─────────────────────────────────────────────────────────
 
 def find_floor(grid, exclude=()):
-    tiles = []
     ex = set(exclude)
-    for y in range(1, MAP_H - 1):
-        for x in range(1, MAP_W - 1):
-            if grid[y][x] == '.' and (x, y) not in ex:
-                tiles.append((x, y))
-    return tiles
+    return [
+        (x, y)
+        for y in range(1, MAP_H - 1)
+        for x in range(1, MAP_W - 1)
+        if grid[y][x] == '.' and (x, y) not in ex
+    ]
 
 
 def place_scattered(rng, grid, char, count, floor_pool, min_dist=5, used=None):
-    """Place `count` copies of `char` on floor tiles, at least min_dist apart."""
-    placed = []
+    placed = list(used) if used else []
     pool = list(floor_pool)
     rng.shuffle(pool)
-    if used:
-        placed.extend(used)
+    target = (len(used) if used else 0) + count
     for x, y in pool:
-        if len(placed) - (len(used) if used else 0) >= count:
+        if len(placed) >= target:
             break
         if grid[y][x] != '.':
             continue
@@ -197,7 +177,6 @@ def place_scattered(rng, grid, char, count, floor_pool, min_dist=5, used=None):
 
 def place_near_quadrant(rng, grid, char, qx_min, qx_max, qy_min, qy_max,
                         avoid=(), min_dist_from=4):
-    """Place one tile of `char` in the given quadrant."""
     candidates = [
         (x, y)
         for y in range(qy_min, qy_max)
@@ -215,34 +194,70 @@ def place_near_quadrant(rng, grid, char, qx_min, qx_max, qy_min, qy_max,
 def place_pickups(rng, grid):
     avoid_starts = [(AX, AY), (BX, BY)]
 
-    # One chip per player home quadrant (roughly mirrors for balance)
     alpha_chip = place_near_quadrant(rng, grid, 'A', 1, 17, 1, 13, avoid=avoid_starts)
     beta_chip  = place_near_quadrant(rng, grid, 'A', 18, 34, 1, 13, avoid=avoid_starts)
-
     placed_chips = [c for c in [alpha_chip, beta_chip] if c]
 
-    # 2-3 extra chips in lower half
     floor = find_floor(grid)
     lower = [(x, y) for x, y in floor if y >= 14]
     place_scattered(rng, grid, 'A', 2, lower, min_dist=6, used=placed_chips)
 
-    # Power cells — spread across the whole map
     floor = find_floor(grid)
     place_scattered(rng, grid, 'P', 4, floor, min_dist=6)
 
-    # Data cores (K) — for sweep mode, spread evenly
     floor = find_floor(grid)
     place_scattered(rng, grid, 'K', 5, floor, min_dist=5)
 
-    # Extra laser doors (D) — at corridor chokepoints
-    floor = find_floor(grid)
-    place_scattered(rng, grid, 'D', 4, floor, min_dist=7)
+
+# ─── Door placement ───────────────────────────────────────────────────────────
+
+def is_corridor_chokepoint(grid, x, y):
+    """True if this floor tile has exactly 2 passable neighbors that are directly opposite
+    (i.e. it sits in a single-width corridor, not an open room or junction)."""
+    if grid[y][x] != '.':
+        return False
+    nbrs = [
+        (x + dx, y + dy)
+        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        if passable(grid, x + dx, y + dy)
+    ]
+    if len(nbrs) != 2:
+        return False
+    (x1, y1), (x2, y2) = nbrs
+    # Opposite means their midpoint is exactly (x, y)
+    return x1 + x2 == 2 * x and y1 + y2 == 2 * y
+
+
+def place_doors(rng, grid, count=4):
+    """Place Laser Doors only at single-width corridor chokepoints."""
+    fixed_points = [(AX, AY), (BX, BY), (DOOR_X, DOOR_Y)]
+    min_dist = 4
+
+    candidates = [
+        (x, y)
+        for y in range(1, MAP_H - 1)
+        for x in range(1, MAP_W - 1)
+        if is_corridor_chokepoint(grid, x, y)
+        and not is_protected(x, y)
+        and abs(x - DOOR_X) + abs(y - DOOR_Y) >= 5
+        and all(abs(x - fx) + abs(y - fy) >= min_dist for fx, fy in fixed_points)
+    ]
+
+    rng.shuffle(candidates)
+    placed = []
+    for x, y in candidates:
+        if len(placed) >= count:
+            break
+        if all(abs(x - px) + abs(y - py) >= min_dist for px, py in placed):
+            grid[y][x] = 'D'
+            placed.append((x, y))
+
+    return placed
 
 
 # ─── Hazard generation ────────────────────────────────────────────────────────
 
 def find_runs(grid):
-    """Return (h_runs, v_runs) — lists of (y, [x...]) and (x, [y...])."""
     def non_wall(x, y):
         return grid[y][x] not in ('#', 'B')
 
@@ -275,161 +290,180 @@ def find_runs(grid):
     return h_runs, v_runs
 
 
+def corridor_key(axis, fixed, coords):
+    return (axis, fixed, coords[0], coords[-1])
+
+
+def beam_clear(grid, tx, ty, dx, dy, length):
+    """Return True if at least `length` tiles in direction (dx,dy) from (tx,ty) are passable."""
+    clear = 0
+    for i in range(1, length + 2):
+        nx, ny = tx + dx * i, ty + dy * i
+        if nx < 0 or nx >= MAP_W or ny < 0 or ny >= MAP_H:
+            break
+        if grid[ny][nx] in ('#', 'B'):
+            break
+        clear += 1
+    return clear >= length
+
+
+STAGGER = [0, 1000, 500, 1500, 250, 750, 1250]
+
+PROFILES = {
+    'balanced':     {'aliens': 4, 'gates': 4, 'turrets': 3},
+    'alien_heavy':  {'aliens': 7, 'gates': 2, 'turrets': 1},
+    'gate_heavy':   {'aliens': 2, 'gates': 8, 'turrets': 2},
+    'turret_heavy': {'aliens': 2, 'gates': 3, 'turrets': 6},
+}
+
+
 def gen_hazards(rng, grid):
     h_runs, v_runs = find_runs(grid)
 
-    # Filter runs that overlap the beacon area
     h_runs = [(y, xs) for y, xs in h_runs
               if not (BY1 <= y <= BY2 and any(BX1 <= x <= BX2 for x in xs))]
     v_runs = [(x, ys) for x, ys in v_runs
               if not (BX1 <= x <= BX2 and any(BY1 <= y <= BY2 for y in ys))]
 
-    all_h = sorted(h_runs, key=lambda r: -len(r[1]))
-    all_v = sorted(v_runs, key=lambda r: -len(r[1]))
-    rng.shuffle(all_h)
-    rng.shuffle(all_v)
+    profile_name = rng.choice(list(PROFILES.keys()))
+    counts = PROFILES[profile_name]
 
-    # ── Aliens (5 total) ──
+    # Single corridor pool shared across all hazard types — no corridor gets two hazards
+    used_corridors = set()
+
+    # ── Aliens ──
     aliens = []
-    used = set()
+    acount = 0
 
-    def add_alien(aid, route):
+    alien_pool = (
+        [('h', y, xs) for y, xs in h_runs if len(xs) >= 4] +
+        [('v', x, ys) for x, ys in v_runs if len(ys) >= 4]
+    )
+    rng.shuffle(alien_pool)
+
+    for axis, fixed, coords in alien_pool:
+        if acount >= counts['aliens']:
+            break
+        key = corridor_key(axis, fixed, coords)
+        if key in used_corridors:
+            continue
+        if axis == 'h':
+            y, xs = fixed, coords
+            if any(abs(y - AY) + abs(x - AX) < 3 for x in xs):
+                continue
+            if any(abs(y - BY) + abs(x - BX) < 3 for x in xs):
+                continue
+            route = ([{'x': x, 'y': y} for x in xs]
+                     + [{'x': x, 'y': y} for x in reversed(xs[:-1])])
+        else:
+            x, ys = fixed, coords
+            if any(abs(y - AY) + abs(x - AX) < 3 for y in ys):
+                continue
+            if any(abs(y - BY) + abs(x - BX) < 3 for y in ys):
+                continue
+            route = ([{'x': x, 'y': y} for y in ys]
+                     + [{'x': x, 'y': y} for y in reversed(ys[:-1])])
+        used_corridors.add(key)
         aliens.append({
-            'id': aid,
+            'id': f'alien{acount + 1}',
             'route': route,
             'index': 0,
             'lastStepAt': 0,
             'stepMs': 620,
         })
-
-    acount = 0
-    for y, xs in all_h:
-        if acount >= 3:
-            break
-        key = (y, xs[0], xs[-1])
-        if key in used:
-            continue
-        used.add(key)
-        route = (
-            [{'x': x, 'y': y} for x in xs]
-            + [{'x': x, 'y': y} for x in reversed(xs[:-1])]
-        )
-        add_alien(f'alien{acount + 1}', route)
         acount += 1
 
-    for x, ys in all_v:
-        if acount >= 5:
-            break
-        key = (x, ys[0], ys[-1])
-        if key in used:
-            continue
-        used.add(key)
-        route = (
-            [{'x': x, 'y': y} for y in ys]
-            + [{'x': x, 'y': y} for y in reversed(ys[:-1])]
-        )
-        add_alien(f'alien{acount + 1}', route)
-        acount += 1
-
-    # ── Laser gates (4 total) ──
+    # ── Laser gates ──
     gates = []
+    gcount = 0
 
-    def add_gate(gid, tiles):
+    gate_pool = (
+        [('h', y, xs) for y, xs in h_runs if len(xs) >= 3] +
+        [('v', x, ys) for x, ys in v_runs if len(ys) >= 3]
+    )
+    rng.shuffle(gate_pool)
+
+    for axis, fixed, coords in gate_pool:
+        if gcount >= counts['gates']:
+            break
+        key = corridor_key(axis, fixed, coords)
+        if key in used_corridors:
+            continue
+        mid = len(coords) // 2
+        chunk = coords[max(0, mid - 1): mid + 2]
+        tiles = (
+            [{'x': c, 'y': fixed} for c in chunk] if axis == 'h'
+            else [{'x': fixed, 'y': c} for c in chunk]
+        )
+        used_corridors.add(key)
         gates.append({
-            'id': gid,
+            'id': f'gate{gcount + 1}',
             'tiles': tiles,
             'cycleMs': 3000,
             'warningMs': 760,
             'activeMs': 820,
-            'offsetMs': 0,
+            'offsetMs': STAGGER[gcount % len(STAGGER)],
         })
-
-    gcount = 0
-    gate_used = set()
-    for y, xs in all_h:
-        if gcount >= 2:
-            break
-        if len(xs) < 3:
-            continue
-        mid = len(xs) // 2
-        chunk = xs[max(0, mid - 1): mid + 2]
-        key = (y, chunk[0])
-        if key in gate_used:
-            continue
-        gate_used.add(key)
-        add_gate(f'gate{gcount + 1}', [{'x': x, 'y': y} for x in chunk])
         gcount += 1
 
-    for x, ys in all_v:
-        if gcount >= 4:
-            break
-        if len(ys) < 3:
-            continue
-        mid = len(ys) // 2
-        chunk = ys[max(0, mid - 1): mid + 2]
-        key = (x, chunk[0])
-        if key in gate_used:
-            continue
-        gate_used.add(key)
-        add_gate(f'gate{gcount + 1}', [{'x': x, 'y': y} for y in chunk])
-        gcount += 1
-
-    # ── Turrets (4-5 total) ──
+    # ── Turrets ──
     turrets = []
+    tcount = 0
 
-    def add_turret(tid, tx, ty, dx, dy, rng_dist):
+    turret_pool = (
+        [('h', y, xs) for y, xs in h_runs if len(xs) >= 5] +
+        [('v', x, ys) for x, ys in v_runs if len(ys) >= 5]
+    )
+    rng.shuffle(turret_pool)
+
+    for axis, fixed, coords in turret_pool:
+        if tcount >= counts['turrets']:
+            break
+        key = corridor_key(axis, fixed, coords)
+        if key in used_corridors:
+            continue
+        length = min(len(coords) - 1, 4)
+        if axis == 'h':
+            y = fixed
+            # Randomly fire left or right
+            if rng.choice([True, False]):
+                tx, dx, dy = coords[0], 1, 0
+            else:
+                tx, dx, dy = coords[-1], -1, 0
+            ty = y
+        else:
+            x = fixed
+            if rng.choice([True, False]):
+                ty, dx, dy = coords[0], 0, 1
+            else:
+                ty, dx, dy = coords[-1], 0, -1
+            tx = x
+        if not beam_clear(grid, tx, ty, dx, dy, length):
+            continue
+        used_corridors.add(key)
         turrets.append({
-            'id': tid,
+            'id': f'turret{tcount + 1}',
             'x': tx, 'y': ty,
             'dx': dx, 'dy': dy,
-            'range': rng_dist,
+            'range': length,
             'cycleMs': 3000,
             'warningMs': 820,
             'activeMs': 520,
-            'offsetMs': 0,
+            'offsetMs': STAGGER[tcount % len(STAGGER)],
         })
-
-    tcount = 0
-    turret_used = set()
-
-    for y, xs in all_h:
-        if tcount >= 3:
-            break
-        if len(xs) < 5:
-            continue
-        tx = xs[0]
-        key = (tx, y)
-        if key in turret_used:
-            continue
-        turret_used.add(key)
-        add_turret(f'turret{tcount + 1}', tx, y, 1, 0, min(len(xs) - 1, 4))
         tcount += 1
 
-    for x, ys in all_v:
-        if tcount >= 5:
-            break
-        if len(ys) < 5:
-            continue
-        ty = ys[0]
-        key = (x, ty)
-        if key in turret_used:
-            continue
-        turret_used.add(key)
-        add_turret(f'turret{tcount + 1}', x, ty, 0, 1, min(len(ys) - 1, 4))
-        tcount += 1
-
-    return aliens, gates, turrets
+    return aliens, gates, turrets, profile_name
 
 
 # ─── BFS balance check ────────────────────────────────────────────────────────
 
 def bfs_dist(grid, sx, sy, targets=None):
-    """BFS from (sx,sy); returns dict of {(x,y): dist} or distances to targets."""
     dist = {(sx, sy): 0}
     q = deque([(sx, sy)])
     while q:
         cx, cy = q.popleft()
-        for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
             nx, ny = cx + dx, cy + dy
             if (nx, ny) not in dist and passable(grid, nx, ny):
                 dist[(nx, ny)] = dist[(cx, cy)] + 1
@@ -440,7 +474,6 @@ def bfs_dist(grid, sx, sy, targets=None):
 
 
 def balance_report(grid):
-    # Chip positions
     chips = [(x, y) for y in range(MAP_H) for x in range(MAP_W) if grid[y][x] == 'A']
     door  = (DOOR_X, DOOR_Y)
 
@@ -458,7 +491,7 @@ def balance_report(grid):
         return best
 
     a = race_len(alpha_dists, chips, door)
-    b = race_len(beta_dists, chips, door)
+    b = race_len(beta_dists,  chips, door)
     return a, b
 
 
@@ -489,7 +522,7 @@ def build_entry(map_id, grid, aliens, gates, turrets,
         return (f"        {{\n"
                 f"          id: '{g['id']}', tiles: {fmt_tiles(g['tiles'])},\n"
                 f"          cycleMs: {g['cycleMs']}, warningMs: {g['warningMs']},"
-                f" activeMs: {g['activeMs']}, offsetMs: 0\n"
+                f" activeMs: {g['activeMs']}, offsetMs: {g['offsetMs']}\n"
                 f"        }}")
 
     def turret_block(t):
@@ -497,7 +530,7 @@ def build_entry(map_id, grid, aliens, gates, turrets,
                 f"          id: '{t['id']}', x: {t['x']}, y: {t['y']},"
                 f" dx: {t['dx']}, dy: {t['dy']}, range: {t['range']},\n"
                 f"          cycleMs: {t['cycleMs']}, warningMs: {t['warningMs']},"
-                f" activeMs: {t['activeMs']}, offsetMs: 0\n"
+                f" activeMs: {t['activeMs']}, offsetMs: {t['offsetMs']}\n"
                 f"        }}")
 
     aliens_str  = ',\n'.join(alien_block(a) for a in aliens)
@@ -532,7 +565,7 @@ def build_entry(map_id, grid, aliens, gates, turrets,
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    map_id = sys.argv[1] if len(sys.argv) > 1 else 'map-04'
+    map_id = sys.argv[1] if len(sys.argv) > 1 else 'map-07'
     seed   = int(sys.argv[2]) if len(sys.argv) > 2 else 42
 
     rng = random.Random(seed)
@@ -540,13 +573,14 @@ def main():
     place_fixed(grid)
     gen_maze(rng, grid)
     add_loops(rng, grid)
-    place_fixed(grid)   # restore any overwritten starts/door
+    place_fixed(grid)
     place_pickups(rng, grid)
-    aliens, gates, turrets = gen_hazards(rng, grid)
+    place_doors(rng, grid, count=4)
+    aliens, gates, turrets, profile = gen_hazards(rng, grid)
 
     alpha_len, beta_len = balance_report(grid)
 
-    print(f"# {map_id}  seed={seed}", file=sys.stderr)
+    print(f"# {map_id}  seed={seed}  profile={profile}", file=sys.stderr)
     print(f"# Balance: Alpha={alpha_len}  Beta={beta_len}  gap={abs(alpha_len-beta_len)}",
           file=sys.stderr)
     print(f"# Hazards: {len(aliens)} aliens, {len(gates)} gates, {len(turrets)} turrets",

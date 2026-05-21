@@ -97,6 +97,7 @@ function damagePlayer(state, now) {
     player.moveStartAt = 0;
     player.stepMs = 0;
     player.isSprinting = false;
+    player.walkFrame = 0;
     player.hearts = HEARTS_MAX;
     player.powerUntil = 0;
     player.invulnerableUntil = now + INVULN_MS;
@@ -141,6 +142,7 @@ export function updatePlayer(state, now, dtMs) {
 
   if (!moving) {
     player.isSprinting = false;
+    player.walkFrame = 0;
     player.stamina = Math.min(STAMINA_MAX, player.stamina + STAMINA_RECOVER_PER_SECOND * dt);
     return;
   }

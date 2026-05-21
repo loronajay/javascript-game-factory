@@ -17,6 +17,7 @@ import { PLAYER_FRAME_FILES, PLAYER_RENDER_SCALE, getPlayerFrameIndex } from "./
 import { POOP_RENDER_SCALE } from "./poop.js";
 import { NPC_DEFINITIONS, getNpcFrameFile } from "./npcs.js";
 import { TWO_PLAYER_BUTTONS } from "./two-player-menu.js";
+import { ONLINE_LOBBY_BUTTONS, ONLINE_MENU_BUTTONS } from "./online-menu.js";
 import { HOTSEAT_PHASE, HOTSEAT_ROUNDS } from "./hotseat-session.js";
 
 const HUD_TEXT_COLOR = "#ffffff";
@@ -463,6 +464,123 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     }
   }
 
+  function drawOnlinePanelTitle(title, subtitle) {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#b8ff00";
+    ctx.strokeStyle = "#b50000";
+    ctx.lineWidth = 5;
+    ctx.font = `48px ${GAME_OVER_FONT}`;
+    ctx.strokeText(title, SCRATCH_STAGE.width / 2, 92);
+    ctx.fillText(title, SCRATCH_STAGE.width / 2, 92);
+    if (subtitle) {
+      ctx.font = `20px ${HUD_VALUE_FONT}`;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(subtitle, SCRATCH_STAGE.width / 2, 128);
+    }
+    ctx.restore();
+  }
+
+  function drawOnlineMenuButton(button, hot = false, disabled = false) {
+    const center = scratchToCanvasPoint(button.x, button.y);
+    const grow = hot && !disabled ? 1.06 : 1;
+    const width = button.width * grow;
+    const height = button.height * grow;
+    const x = center.x - width / 2;
+    const y = center.y - height / 2;
+
+    ctx.save();
+    if (hot && !disabled) {
+      ctx.shadowColor = "rgba(255, 130, 20, 0.95)";
+      ctx.shadowBlur = 14;
+    }
+    const gradient = ctx.createLinearGradient(0, y, 0, y + height);
+    gradient.addColorStop(0, disabled ? "#9a4b36" : "#ff4a17");
+    gradient.addColorStop(1, disabled ? "#74314f" : "#ff0b67");
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = "#b50000";
+    ctx.lineWidth = 7;
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeRect(x, y, width, height);
+    ctx.fillStyle = disabled ? "#d8d8d8" : "#b8ff00";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `bold ${button.label.length > 7 ? 17 : 20}px ${HUD_VALUE_FONT}`;
+    ctx.fillText(button.label, center.x, center.y + 1);
+    ctx.restore();
+  }
+
+  function renderOnlineMenu(state = {}) {
+    resizeForStage(SCRATCH_STAGE);
+    clear();
+    drawCostume(multiplayerMenuBackdrop, menuCostume, {
+      width: multiplayerMenuBackdrop.naturalWidth || multiplayerMenuBackdrop.width || 0,
+      height: multiplayerMenuBackdrop.naturalHeight || multiplayerMenuBackdrop.height || 0,
+      rotationCenterX: menuCostume.rotationCenterX,
+      rotationCenterY: menuCostume.rotationCenterY,
+    });
+    drawOnlinePanelTitle("ONLINE", "PUBLIC MATCHMAKING");
+    for (const button of ONLINE_MENU_BUTTONS) {
+      drawOnlineMenuButton(button, state.hoverAction === button.action, false);
+    }
+  }
+
+  function memberId(member) {
+    if (typeof member === "string") return member;
+    return member?.clientId || member?.id || "";
+  }
+
+  function renderOnlineLobby(state = {}) {
+    const lobby = state.onlineLobby || {};
+    const members = Array.isArray(lobby.members) ? lobby.members : [];
+    const profiles = lobby.profiles || {};
+    resizeForStage(SCRATCH_STAGE);
+    clear();
+    drawCostume(multiplayerMenuBackdrop, menuCostume, {
+      width: multiplayerMenuBackdrop.naturalWidth || multiplayerMenuBackdrop.width || 0,
+      height: multiplayerMenuBackdrop.naturalHeight || multiplayerMenuBackdrop.height || 0,
+      rotationCenterX: menuCostume.rotationCenterX,
+      rotationCenterY: menuCostume.rotationCenterY,
+    });
+    drawOnlinePanelTitle("ONLINE LOBBY", lobby.status || "Connecting...");
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `24px ${HUD_VALUE_FONT}`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`ROOM: ${lobby.roomCode || "-----"}`, SCRATCH_STAGE.width / 2, 152);
+    ctx.fillText(
+      `${lobby.playerCount || members.length || 0}/${lobby.maxPlayers || 4} PLAYERS`,
+      SCRATCH_STAGE.width / 2,
+      184
+    );
+
+    const startY = 218;
+    const slotWidth = 132;
+    const firstX = SCRATCH_STAGE.width / 2 - ((Math.max(lobby.maxPlayers || 4, 2) - 1) * slotWidth) / 2;
+    for (let index = 0; index < Math.max(lobby.maxPlayers || 4, 2); index++) {
+      const id = memberId(members[index]);
+      const name = id ? profiles[id]?.displayName || (id === lobby.clientId ? lobby.identityName : "") || id.slice(0, 6) : "WAITING";
+      const x = firstX + index * slotWidth;
+      ctx.fillStyle = id === lobby.clientId ? "#ff861a" : "#ff0b67";
+      ctx.strokeStyle = "#b50000";
+      ctx.lineWidth = 5;
+      ctx.fillRect(x - 54, startY - 20, 108, 40);
+      ctx.strokeRect(x - 54, startY - 20, 108, 40);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `16px ${HUD_VALUE_FONT}`;
+      ctx.fillText(String(name).slice(0, 12), x, startY + 1);
+    }
+    ctx.restore();
+
+    for (const button of ONLINE_LOBBY_BUTTONS) {
+      const disabled = button.action.includes("start") && !lobby.canStart;
+      drawOnlineMenuButton(button, state.hoverAction === button.action, disabled);
+    }
+  }
+
   function renderPlay() {
     resizeForStage(GAME_STAGE);
     clear();
@@ -516,6 +634,16 @@ export async function createBirdDutyRenderer(canvas, manifest) {
 
     if (state.screen === "two-player-menu") {
       renderTwoPlayerMenu(state);
+      return;
+    }
+
+    if (state.screen === "online-menu") {
+      renderOnlineMenu(state);
+      return;
+    }
+
+    if (state.screen === "online-lobby") {
+      renderOnlineLobby(state);
       return;
     }
 

@@ -15,12 +15,20 @@ import { createBirdDutyRenderer } from "./scripts/renderer.js";
 import { createSoundController } from "./scripts/sounds.js";
 import { applyMenuAction, createInitialState, SCREEN } from "./scripts/state.js";
 import {
-  TWO_PLAYER_ACTIONS,
   resolveTwoPlayerActionAtCanvasPoint,
 } from "./scripts/two-player-menu.js";
 import { createPlayerState, updatePlayer } from "./scripts/player.js";
 import { createPoopState, spawnPoopFromPlayer, updatePoop } from "./scripts/poop.js";
 import { clearPersonalBest, getPersonalBest, updatePersonalBest } from "./scripts/personal-best.js";
+import { loadArcadeIdentity } from "./scripts/identity.js";
+import { createOnlineClient } from "./scripts/online-client.js";
+import {
+  ONLINE_ACTIONS,
+  ONLINE_LOBBY_BUTTONS,
+  ONLINE_MENU_BUTTONS,
+  getOnlineActionSettings,
+  resolveOnlineActionAtCanvasPoint,
+} from "./scripts/online-menu.js";
 import {
   addScore,
   canFireShot,
@@ -65,6 +73,14 @@ export async function initGame() {
     let inputState = createInputState();
     let menuBirdState = { tick: 0 };
     let menuInteractionState = { selectedAction: null, lastAction: null };
+    let onlineClient = null;
+    let onlineIdentity = null;
+    let onlinePendingAction = null;
+    let onlineLobby = {
+      status: "",
+      profiles: {},
+      members: [],
+    };
     let lastTime = null;
     let accumulator = 0;
 
@@ -83,18 +99,204 @@ export async function initGame() {
       if (gameState.screen === SCREEN.TWO_PLAYER_MENU) {
         return resolveTwoPlayerActionAtCanvasPoint(point.x, point.y);
       }
+      if (gameState.screen === SCREEN.ONLINE_MENU) {
+        return resolveOnlineActionAtCanvasPoint(point.x, point.y, ONLINE_MENU_BUTTONS);
+      }
+      if (gameState.screen === SCREEN.ONLINE_LOBBY) {
+        return resolveOnlineActionAtCanvasPoint(point.x, point.y, ONLINE_LOBBY_BUTTONS);
+      }
       return resolveMenuActionAtCanvasPoint(point.x, point.y);
     }
 
     function updateMenuHover(event) {
-      if (gameState.screen !== SCREEN.MENU && gameState.screen !== SCREEN.TWO_PLAYER_MENU) return;
+      if (
+        gameState.screen !== SCREEN.MENU
+        && gameState.screen !== SCREEN.TWO_PLAYER_MENU
+        && gameState.screen !== SCREEN.ONLINE_MENU
+        && gameState.screen !== SCREEN.ONLINE_LOBBY
+      ) return;
       const action = actionFromEvent(event);
       menuInteractionState = createMenuInteractionState(menuInteractionState, action);
       canvas.classList.toggle("is-menu-hot", Boolean(action));
     }
 
+    function normalizeLobbyMembers(members = []) {
+      return Array.isArray(members) ? members : [];
+    }
+
+    function lobbyMemberId(member) {
+      if (typeof member === "string") return member;
+      return member?.clientId || member?.id || "";
+    }
+
+    function syncOnlineLobby(payload = {}, message = "") {
+      const members = normalizeLobbyMembers(payload.members || onlineLobby.members);
+      const playerCount = Number(payload.playerCount || members.length || onlineLobby.playerCount || 0);
+      const minPlayers = Number(payload.minPlayers || onlineLobby.minPlayers || 2);
+      const maxPlayers = Number(payload.maxPlayers || onlineLobby.maxPlayers || 4);
+      const ownerId = payload.ownerId || onlineLobby.ownerId || null;
+      onlineLobby = {
+        ...onlineLobby,
+        ...payload,
+        ownerId,
+        members,
+        playerCount,
+        minPlayers,
+        maxPlayers,
+        clientId: onlineClient?.clientId || onlineLobby.clientId || null,
+        identityName: onlineIdentity?.displayName || onlineLobby.identityName || "Player",
+        profiles: { ...(onlineLobby.profiles || {}) },
+        status: message || onlineLobby.status,
+        canStart: ownerId === onlineClient?.clientId && playerCount >= minPlayers,
+      };
+      if (onlineClient?.clientId && onlineIdentity) {
+        onlineLobby.profiles[onlineClient.clientId] = { ...onlineIdentity };
+      }
+    }
+
+    function broadcastProfileSoon() {
+      window.setTimeout(() => onlineClient?.sendProfile(), 50);
+      window.setTimeout(() => onlineClient?.sendProfile(), 450);
+    }
+
+    async function ensureOnlineClient() {
+      if (onlineClient) return onlineClient;
+      onlineIdentity = await loadArcadeIdentity();
+      onlineClient = createOnlineClient("bird-duty");
+      onlineClient.setIdentity(onlineIdentity);
+      onlineLobby = {
+        status: "Connecting...",
+        profiles: {},
+        members: [],
+        identityName: onlineIdentity.displayName,
+      };
+
+      onlineClient.cb.onConnected = () => {
+        syncOnlineLobby({ clientId: onlineClient.clientId }, "Connected.");
+        if (onlinePendingAction) {
+          onlinePendingAction();
+          onlinePendingAction = null;
+        }
+      };
+      onlineClient.cb.onLobbyJoined = (payload) => {
+        syncOnlineLobby(payload, payload.created ? "Lobby created." : "Joined lobby.");
+        broadcastProfileSoon();
+      };
+      onlineClient.cb.onLobbyUpdated = (payload) => {
+        syncOnlineLobby(payload, "Waiting for players...");
+        broadcastProfileSoon();
+      };
+      onlineClient.cb.onLobbyCountdownStarted = (payload) => {
+        syncOnlineLobby(payload, "Match starting...");
+      };
+      onlineClient.cb.onLobbyStarted = (payload) => {
+        syncOnlineLobby(payload, "Match sync coming next.");
+      };
+      onlineClient.cb.onPlayerJoined = () => {
+        broadcastProfileSoon();
+      };
+      onlineClient.cb.onPlayerLeft = (payload) => {
+        const leavingId = payload.clientId;
+        onlineLobby = {
+          ...onlineLobby,
+          members: onlineLobby.members.filter((member) => lobbyMemberId(member) !== leavingId),
+          status: "A player left.",
+        };
+      };
+      onlineClient.cb.onLobbyMessage = ({ messageType, value, senderId }) => {
+        if (messageType !== "profile") return;
+        try {
+          const profile = JSON.parse(value);
+          if (!profile?.displayName) return;
+          onlineLobby = {
+            ...onlineLobby,
+            profiles: {
+              ...(onlineLobby.profiles || {}),
+              [senderId]: {
+                playerId: profile.playerId || "",
+                displayName: String(profile.displayName).slice(0, 18),
+              },
+            },
+          };
+        } catch {
+          // Ignore malformed profile broadcasts from stale lobby clients.
+        }
+      };
+      onlineClient.cb.onError = (code, message) => {
+        onlineLobby = {
+          ...onlineLobby,
+          status: message || code || "Network error",
+        };
+      };
+      onlineClient.cb.onClosed = () => {
+        onlineClient = null;
+        onlineLobby = {
+          ...onlineLobby,
+          status: "Connection closed.",
+        };
+      };
+      onlineClient.connect();
+      return onlineClient;
+    }
+
+    function leaveOnlineLobby() {
+      onlineClient?.leaveLobby?.();
+      onlineClient?.disconnect?.();
+      onlineClient = null;
+      onlinePendingAction = null;
+      onlineLobby = {
+        status: "",
+        profiles: {},
+        members: [],
+      };
+    }
+
+    async function startOnlineAction(action) {
+      const settings = getOnlineActionSettings(action);
+      if (action !== ONLINE_ACTIONS.JOIN && !settings) return false;
+      if (action === ONLINE_ACTIONS.JOIN) {
+        const code = window.prompt?.("Enter Bird Duty room code") || "";
+        const roomCode = code.trim().toUpperCase();
+        if (!roomCode) return false;
+        gameState = { ...gameState, screen: SCREEN.ONLINE_LOBBY, mode: "online" };
+        onlineLobby = {
+          status: "Connecting...",
+          profiles: {},
+          members: [],
+          roomCode,
+          minPlayers: 2,
+          maxPlayers: 4,
+        };
+        const client = await ensureOnlineClient();
+        onlinePendingAction = () => client.joinLobby(roomCode);
+      } else {
+        gameState = applyMenuAction(gameState, action);
+        onlineLobby = {
+          status: "Connecting...",
+          profiles: {},
+          members: [],
+          minPlayers: settings.minPlayers,
+          maxPlayers: settings.maxPlayers,
+        };
+        const client = await ensureOnlineClient();
+        onlinePendingAction = settings.private
+          ? () => client.createLobby(settings)
+          : () => client.findLobby(settings);
+      }
+      if (onlineClient?.clientId && onlinePendingAction) {
+        onlinePendingAction();
+        onlinePendingAction = null;
+      }
+      return true;
+    }
+
     function activateMenuAction(event) {
-      if (gameState.screen !== SCREEN.MENU && gameState.screen !== SCREEN.TWO_PLAYER_MENU) return;
+      if (
+        gameState.screen !== SCREEN.MENU
+        && gameState.screen !== SCREEN.TWO_PLAYER_MENU
+        && gameState.screen !== SCREEN.ONLINE_MENU
+        && gameState.screen !== SCREEN.ONLINE_LOBBY
+      ) return;
       const action = actionFromEvent(event);
       if (!action) return;
       event.preventDefault();
@@ -106,6 +308,28 @@ export async function initGame() {
       }
       if (action === MENU_ACTIONS.BACK_HOME) {
         window.location.href = "../../index.html";
+        return;
+      }
+      if (gameState.screen === SCREEN.ONLINE_LOBBY) {
+        if (action === ONLINE_ACTIONS.LOBBY_BACK) {
+          leaveOnlineLobby();
+          gameState = { ...gameState, screen: SCREEN.ONLINE_MENU, mode: "online-menu" };
+          canvas.classList.remove("is-menu-hot");
+        } else if (action === ONLINE_ACTIONS.LOBBY_START && onlineLobby.canStart) {
+          onlineLobby = { ...onlineLobby, status: "Requesting match start..." };
+          onlineClient?.startLobby?.();
+        }
+        return;
+      }
+      if (gameState.screen === SCREEN.ONLINE_MENU) {
+        if (action === ONLINE_ACTIONS.BACK) {
+          leaveOnlineLobby();
+          gameState = applyMenuAction(gameState, action);
+          canvas.classList.remove("is-menu-hot");
+          return;
+        }
+        startOnlineAction(action);
+        canvas.classList.remove("is-menu-hot");
         return;
       }
       gameState = applyMenuAction(gameState, action);
@@ -131,8 +355,6 @@ export async function initGame() {
         clearPersonalBest();
         personalBest = getPersonalBest();
         if (selection) selection.textContent = "Reset score selected";
-      } else if (action === TWO_PLAYER_ACTIONS.ONLINE) {
-        if (selection) selection.textContent = "Online play coming next";
       } else if (selection) {
         selection.textContent = "";
       }
@@ -279,6 +501,7 @@ export async function initGame() {
         npcs: npcState.entities,
         personalBest,
         hotseat: hotseatSession,
+        onlineLobby,
       });
       requestAnimationFrame(loop);
     }
@@ -303,6 +526,7 @@ export async function initGame() {
       npcs: npcState.entities,
       personalBest,
       hotseat: hotseatSession,
+      onlineLobby,
     });
     requestAnimationFrame(loop);
   } catch (error) {
