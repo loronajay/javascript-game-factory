@@ -8,6 +8,8 @@ export const ONLINE_ACTIONS = Object.freeze({
   PRIVATE: "online-private",
   JOIN: "online-join",
   BACK: "online-back",
+  JOIN_SUBMIT: "online-join-submit",
+  JOIN_BACK: "online-join-back",
   LOBBY_START: "online-lobby-start",
   LOBBY_BACK: "online-lobby-back",
 });
@@ -82,6 +84,25 @@ export const ONLINE_LOBBY_BUTTONS = Object.freeze([
   },
 ]);
 
+export const ONLINE_JOIN_BUTTONS = Object.freeze([
+  {
+    action: ONLINE_ACTIONS.JOIN_SUBMIT,
+    label: "JOIN",
+    x: -65,
+    y: -140,
+    width: 106,
+    height: 38,
+  },
+  {
+    action: ONLINE_ACTIONS.JOIN_BACK,
+    label: "BACK",
+    x: 65,
+    y: -140,
+    width: 88,
+    height: 38,
+  },
+]);
+
 export function isPublicOnlineAction(action) {
   return action === ONLINE_ACTIONS.PUBLIC_2
     || action === ONLINE_ACTIONS.PUBLIC_3
@@ -102,6 +123,13 @@ export function getOnlineActionSettings(action) {
     return { mode: "private", minPlayers: 2, maxPlayers: 4, private: true };
   }
   return null;
+}
+
+export function normalizeJoinCodeInput(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
 }
 
 export function resolveOnlineActionAtScratchPoint(point, buttons = ONLINE_MENU_BUTTONS) {

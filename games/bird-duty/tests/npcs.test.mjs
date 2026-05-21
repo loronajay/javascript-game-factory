@@ -1,5 +1,6 @@
 import {
   FIRST_WAVE,
+  HOTSEAT_ROUND_WAVES,
   NPC_DEFINITIONS,
   POOP_HITBOX,
   REFRESH_WAVE,
@@ -54,6 +55,31 @@ test("first and refresh wave queues match the single-player scripts", () => {
   assertEqual(REFRESH_WAVE.length, 14);
   assertEqual(REFRESH_WAVE[6], "wait");
   assertEqual(REFRESH_WAVE[13], "john");
+});
+
+test("hotseat rounds have distinct spawn patterns", () => {
+  assertEqual(HOTSEAT_ROUND_WAVES[1].first.join(","), "alan,anna,john,sanjeet");
+  assertEqual(HOTSEAT_ROUND_WAVES[2].first.join(","), "alan,anna,john,sanjeet,bryan,sanjeetFast");
+  assertEqual(HOTSEAT_ROUND_WAVES[3].first.join(","), "alan,anna,john,sanjeet,wait,alan,anna,john,sanjeetFast");
+  assertEqual(HOTSEAT_ROUND_WAVES[1].refresh.join(","), "alan,anna,john,sanjeet,sanjeetFast,john");
+  assertEqual(HOTSEAT_ROUND_WAVES[2].refresh.join(","), "alan,anna,john,sanjeet,bryan,sanjeetFast,bryan,anna");
+  assertEqual(HOTSEAT_ROUND_WAVES[3].refresh[6], "wait");
+  assertEqual(HOTSEAT_ROUND_WAVES[3].refresh.length, 11);
+});
+
+test("npc state can start with the configured hotseat round wave", () => {
+  let state = startNextWave(createNpcState({ round: 2 }));
+  assertEqual(state.wave.queue.join(","), HOTSEAT_ROUND_WAVES[2].first.join(","));
+
+  state = {
+    ...createNpcState({ round: 3 }),
+    waveIndex: 1,
+    wave: createNpcWaveState([]),
+    entities: [],
+  };
+
+  const next = updateNpcState(state);
+  assertEqual(next.wave.queue.join(","), HOTSEAT_ROUND_WAVES[3].refresh.join(","));
 });
 
 test("starting waves allows duplicate npc types", () => {

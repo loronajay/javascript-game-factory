@@ -2,7 +2,10 @@ import { loadAssets, getSound }      from './scripts/assets.js';
 import { createBotState, tickBot }  from './scripts/bot.js';
 import { loadFactoryProfile }       from '../../js/platform/identity/factory-profile.mjs';
 import { createInput }              from './scripts/input.js';
-import { LOCAL_2P_BINDINGS }       from './scripts/controls.js';
+import {
+  ACTIONS, ACTION_LABELS, DEFAULT_P1, DEFAULT_P2,
+  formatKeyCode, loadBindings, saveBindings,
+} from './scripts/controls.js';
 import { createPlayer, resetPlayer, stepAnimation } from './scripts/player.js';
 import { applyPhysics }            from './scripts/physics.js';
 import { resolveHits, getAttackHitbox, getDashHitbox, isAttackActive, isDashAttackActive } from './scripts/combat.js';
@@ -65,7 +68,7 @@ function _boot(sounds) {
   let p1Label = factoryName;
   let p2Label = 'Player 2';
 
-  let bindings = LOCAL_2P_BINDINGS;
+  let bindings = loadBindings();
   let selectedRounds = 3;
   let selectedLayout = 'single';
 
@@ -164,6 +167,112 @@ function _boot(sounds) {
     gameState.p1.wins = 0;
     gameState.p2.wins = 0;
     stopAmbient();
+    showScreen('screen-menu');
+  });
+
+  // ── Controls screen ────────────────────────────────────────────────────────
+
+  let workingBindings = null;   // editable copy while controls screen is open
+  let listeningState  = null;   // { side, action, btn, prevKey }
+
+  function _keyBtnEl(side, action) {
+    return document.querySelector(`#controls-table-${side} [data-action="${action}"]`);
+  }
+
+  function _buildControlsTable(side) {
+    const table = document.getElementById(`controls-table-${side}`);
+    table.innerHTML = '';
+    for (const action of ACTIONS) {
+      const tr      = document.createElement('tr');
+      const labelTd = document.createElement('td');
+      labelTd.className   = 'controls-label';
+      labelTd.textContent = ACTION_LABELS[action];
+
+      const keyTd  = document.createElement('td');
+      const keyBtn = document.createElement('button');
+      keyBtn.className       = 'key-btn';
+      keyBtn.textContent     = formatKeyCode(workingBindings[side][action]);
+      keyBtn.dataset.side    = side;
+      keyBtn.dataset.action  = action;
+      keyBtn.addEventListener('click', () => _startListening(side, action, keyBtn));
+
+      keyTd.appendChild(keyBtn);
+      tr.appendChild(labelTd);
+      tr.appendChild(keyTd);
+      table.appendChild(tr);
+    }
+  }
+
+  function _startListening(side, action, btn) {
+    if (listeningState) _cancelListening();
+    listeningState = { side, action, btn, prevKey: workingBindings[side][action] };
+    btn.textContent = '…';
+    btn.classList.add('key-btn--listening');
+  }
+
+  function _cancelListening() {
+    if (!listeningState) return;
+    const { btn, prevKey } = listeningState;
+    btn.textContent = formatKeyCode(prevKey);
+    btn.classList.remove('key-btn--listening');
+    btn.classList.remove('key-btn--conflict');
+    listeningState = null;
+  }
+
+  function _commitListening(code) {
+    if (!listeningState) return;
+    const { side, action, btn } = listeningState;
+
+    // Auto-swap: if this key is already bound to another action on the same side, swap them
+    for (const other of ACTIONS) {
+      if (other === action) continue;
+      if (workingBindings[side][other] === code) {
+        const displaced = _keyBtnEl(side, other);
+        workingBindings[side][other] = workingBindings[side][action];
+        if (displaced) displaced.textContent = formatKeyCode(workingBindings[side][other]);
+        break;
+      }
+    }
+
+    workingBindings[side][action] = code;
+    btn.textContent = formatKeyCode(code);
+    btn.classList.remove('key-btn--listening');
+    btn.classList.remove('key-btn--conflict');
+    listeningState = null;
+  }
+
+  // Global keydown handler for capture mode — always registered, no-ops when not listening
+  window.addEventListener('keydown', (e) => {
+    if (!listeningState) return;
+    e.preventDefault();
+    if (e.code === 'Escape') { _cancelListening(); return; }
+    _commitListening(e.code);
+  });
+
+  document.getElementById('btn-controls').addEventListener('click', () => {
+    workingBindings = { p1: { ...bindings.p1 }, p2: { ...bindings.p2 } };
+    _buildControlsTable('p1');
+    _buildControlsTable('p2');
+    showScreen('screen-controls');
+  });
+
+  document.getElementById('controls-reset-p1').addEventListener('click', () => {
+    if (listeningState?.side === 'p1') _cancelListening();
+    workingBindings.p1 = { ...DEFAULT_P1 };
+    _buildControlsTable('p1');
+  });
+
+  document.getElementById('controls-reset-p2').addEventListener('click', () => {
+    if (listeningState?.side === 'p2') _cancelListening();
+    workingBindings.p2 = { ...DEFAULT_P2 };
+    _buildControlsTable('p2');
+  });
+
+  document.getElementById('controls-done').addEventListener('click', () => {
+    if (listeningState) _cancelListening();
+    saveBindings(workingBindings.p1, workingBindings.p2);
+    bindings = { ...workingBindings };
+    workingBindings = null;
     showScreen('screen-menu');
   });
 

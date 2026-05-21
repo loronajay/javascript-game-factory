@@ -7,6 +7,7 @@ export const SCREEN = Object.freeze({
   PLAY: "play",
   TWO_PLAYER_MENU: "two-player-menu",
   ONLINE_MENU: "online-menu",
+  ONLINE_JOIN: "online-join",
   ONLINE_LOBBY: "online-lobby",
   HOTSEAT_PLAY: "hotseat-play",
 });
@@ -63,6 +64,24 @@ export function applyMenuAction(state, action) {
       ...state,
       screen: SCREEN.TWO_PLAYER_MENU,
       mode: "two-player",
+      lastAction: action,
+    };
+  }
+
+  if (action === ONLINE_ACTIONS.JOIN) {
+    return {
+      ...state,
+      screen: SCREEN.ONLINE_JOIN,
+      mode: "online-join",
+      lastAction: action,
+    };
+  }
+
+  if (action === ONLINE_ACTIONS.JOIN_BACK) {
+    return {
+      ...state,
+      screen: SCREEN.ONLINE_MENU,
+      mode: "online-menu",
       lastAction: action,
     };
   }

@@ -20,6 +20,7 @@
         <div class="menu-actions">
           <button id="btn-local" class="btn btn--primary">Local 2-Player</button>
           <button id="btn-cpu" class="btn">vs CPU</button>
+          <button id="btn-controls" class="btn">Controls</button>
         </div>
       </div>
     </section>
@@ -75,6 +76,28 @@
         <div class="menu-actions">
           <button id="btn-start-match" class="btn btn--primary">Start Match</button>
           <button id="btn-setup-back" class="btn">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-controls" class="screen">
+      <div class="menu-card controls-card">
+        <p class="eyebrow">Controls</p>
+        <p class="controls-hint">Click any key to rebind &mdash; press Esc to cancel.</p>
+        <div class="controls-grid">
+          <div class="controls-col">
+            <h2>Player 1</h2>
+            <table class="controls-table" id="controls-table-p1"></table>
+            <button class="btn controls-reset-btn" id="controls-reset-p1">Reset to Default</button>
+          </div>
+          <div class="controls-col">
+            <h2>Player 2</h2>
+            <table class="controls-table" id="controls-table-p2"></table>
+            <button class="btn controls-reset-btn" id="controls-reset-p2">Reset to Default</button>
+          </div>
+        </div>
+        <div class="menu-actions" style="width:160px; margin-top:8px;">
+          <button class="btn btn--primary" id="controls-done">Done</button>
         </div>
       </div>
     </section>

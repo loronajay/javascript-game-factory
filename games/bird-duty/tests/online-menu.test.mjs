@@ -1,6 +1,7 @@
 import {
   ONLINE_ACTIONS,
   getOnlineActionSettings,
+  normalizeJoinCodeInput,
   resolveOnlineActionAtScratchPoint,
 } from "../scripts/online-menu.js";
 
@@ -36,6 +37,16 @@ test("online menu resolves private join and back buttons", () => {
   assertEqual(resolveOnlineActionAtScratchPoint({ x: 0, y: -140 }), ONLINE_ACTIONS.BACK);
 });
 
+test("online join code panel resolves submit and back", () => {
+  const buttons = [
+    { action: ONLINE_ACTIONS.JOIN_SUBMIT, x: -65, y: -140, width: 106, height: 38 },
+    { action: ONLINE_ACTIONS.JOIN_BACK, x: 65, y: -140, width: 88, height: 38 },
+  ];
+
+  assertEqual(resolveOnlineActionAtScratchPoint({ x: -65, y: -140 }, buttons), ONLINE_ACTIONS.JOIN_SUBMIT);
+  assertEqual(resolveOnlineActionAtScratchPoint({ x: 65, y: -140 }, buttons), ONLINE_ACTIONS.JOIN_BACK);
+});
+
 test("online menu rejects empty space", () => {
   assertEqual(resolveOnlineActionAtScratchPoint({ x: 190, y: 10 }), null);
   assertEqual(resolveOnlineActionAtScratchPoint({ x: 0, y: 90 }), null);
@@ -47,6 +58,11 @@ test("online action settings map public modes to exact player counts", () => {
   assertEqual(getOnlineActionSettings(ONLINE_ACTIONS.PUBLIC_3).maxPlayers, 3);
   assertEqual(getOnlineActionSettings(ONLINE_ACTIONS.PUBLIC_4).maxPlayers, 4);
   assertEqual(getOnlineActionSettings(ONLINE_ACTIONS.PRIVATE).private, true);
+});
+
+test("join code input normalizes uppercase room code characters", () => {
+  assertEqual(normalizeJoinCodeInput(" ab-cd 12! "), "ABCD12");
+  assertEqual(normalizeJoinCodeInput("ABCDEFGHI"), "ABCDEF");
 });
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);

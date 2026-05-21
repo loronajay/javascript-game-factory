@@ -17,7 +17,7 @@ import { PLAYER_FRAME_FILES, PLAYER_RENDER_SCALE, getPlayerFrameIndex } from "./
 import { POOP_RENDER_SCALE } from "./poop.js";
 import { NPC_DEFINITIONS, getNpcFrameFile } from "./npcs.js";
 import { TWO_PLAYER_BUTTONS } from "./two-player-menu.js";
-import { ONLINE_LOBBY_BUTTONS, ONLINE_MENU_BUTTONS } from "./online-menu.js";
+import { ONLINE_JOIN_BUTTONS, ONLINE_LOBBY_BUTTONS, ONLINE_MENU_BUTTONS } from "./online-menu.js";
 import { HOTSEAT_PHASE, HOTSEAT_ROUNDS } from "./hotseat-session.js";
 
 const HUD_TEXT_COLOR = "#ffffff";
@@ -506,7 +506,14 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.fillStyle = disabled ? "#d8d8d8" : "#b8ff00";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `bold ${button.label.length > 7 ? 17 : 20}px ${HUD_VALUE_FONT}`;
+    const fontSize = (button.label.length > 7 ? 17 : 20) * grow;
+    ctx.font = `bold ${fontSize}px ${HUD_VALUE_FONT}`;
+    if (hot && !disabled) {
+      ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+    }
     ctx.fillText(button.label, center.x, center.y + 1);
     ctx.restore();
   }
@@ -523,6 +530,46 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     drawOnlinePanelTitle("ONLINE", "PUBLIC MATCHMAKING");
     for (const button of ONLINE_MENU_BUTTONS) {
       drawOnlineMenuButton(button, state.hoverAction === button.action, false);
+    }
+  }
+
+  function renderOnlineJoin(state = {}) {
+    const code = String(state.onlineJoinCode || "");
+    resizeForStage(SCRATCH_STAGE);
+    clear();
+    drawCostume(multiplayerMenuBackdrop, menuCostume, {
+      width: multiplayerMenuBackdrop.naturalWidth || multiplayerMenuBackdrop.width || 0,
+      height: multiplayerMenuBackdrop.naturalHeight || multiplayerMenuBackdrop.height || 0,
+      rotationCenterX: menuCostume.rotationCenterX,
+      rotationCenterY: menuCostume.rotationCenterY,
+    });
+    drawOnlinePanelTitle("JOIN ROOM", "ENTER ROOM CODE");
+
+    ctx.save();
+    const boxX = SCRATCH_STAGE.width / 2 - 132;
+    const boxY = 164;
+    const boxW = 264;
+    const boxH = 62;
+    const gradient = ctx.createLinearGradient(0, boxY, 0, boxY + boxH);
+    gradient.addColorStop(0, "#ff4a17");
+    gradient.addColorStop(1, "#ff0b67");
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 4;
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.strokeRect(boxX, boxY, boxW, boxH);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `bold 38px ${HUD_VALUE_FONT}`;
+    ctx.fillStyle = code ? "#ffffff" : "rgba(255, 255, 255, 0.72)";
+    ctx.fillText(code || "------", SCRATCH_STAGE.width / 2, boxY + boxH / 2 + 1);
+    ctx.font = `15px ${HUD_VALUE_FONT}`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("TYPE CODE, ENTER TO JOIN", SCRATCH_STAGE.width / 2, 246);
+    ctx.restore();
+
+    for (const button of ONLINE_JOIN_BUTTONS) {
+      drawOnlineMenuButton(button, state.hoverAction === button.action, button.action.includes("submit") && code.length === 0);
     }
   }
 
@@ -639,6 +686,11 @@ export async function createBirdDutyRenderer(canvas, manifest) {
 
     if (state.screen === "online-menu") {
       renderOnlineMenu(state);
+      return;
+    }
+
+    if (state.screen === "online-join") {
+      renderOnlineJoin(state);
       return;
     }
 

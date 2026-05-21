@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #0a0a0f;
+  background: #0a0608 url('assets/pngs/bg-splash.png') center center / cover no-repeat fixed;
   color: #fff;
   font-family: 'Segoe UI', system-ui, sans-serif;
   height: 100dvh;
@@ -41,6 +41,15 @@ body {
 }
 .screen--active { display: flex; }
 
+/* Non-game screens (except main menu) get a subtle dark overlay so text
+   pops cleanly against the more complex areas of the splash. */
+#screen-cpu-setup,
+#screen-setup,
+#screen-controls,
+#screen-result {
+  background: rgba(0,0,0,0.35);
+}
+
 /* ── Menu card ───────────────────────────────────────────────────────────── */
 .menu-card {
   display: flex;
@@ -48,6 +57,16 @@ body {
   align-items: center;
   gap: 18px;
   text-align: center;
+  background: rgba(6,3,6,0.6);
+  border: 1px solid rgba(160,20,12,0.22);
+  border-radius: 12px;
+  padding: 28px 36px;
+}
+
+/* Splash already has the title — hide the HTML duplicate on main menu */
+#screen-menu h1,
+#screen-menu .eyebrow {
+  display: none;
 }
 
 .eyebrow {
@@ -74,7 +93,7 @@ h2 { font-size: 26px; font-weight: 700; }
 
 .menu-player-name {
   font-size: 12px;
-  color: rgba(255,210,80,0.6);
+  color: rgba(196,52,42,0.85);
   letter-spacing: 0.06em;
 }
 
@@ -89,7 +108,7 @@ h2 { font-size: 26px; font-weight: 700; }
 
 .btn {
   padding: 12px 20px;
-  border: 1px solid rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.05);
   color: #fff;
   font-size: 14px;
@@ -99,14 +118,14 @@ h2 { font-size: 26px; font-weight: 700; }
 }
 .btn:hover:not(:disabled) {
   background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.3);
+  border-color: rgba(255,255,255,0.28);
 }
 .btn--primary {
-  background: rgba(255,210,80,0.12);
-  border-color: rgba(255,210,80,0.4);
-  color: #ffd84a;
+  background: rgba(196,40,32,0.18);
+  border-color: rgba(196,40,32,0.55);
+  color: #e05a50;
 }
-.btn--primary:hover:not(:disabled) { background: rgba(255,210,80,0.22); }
+.btn--primary:hover:not(:disabled) { background: rgba(196,40,32,0.3); }
 .btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ── Round / layout pickers ──────────────────────────────────────────────── */
@@ -131,9 +150,9 @@ h2 { font-size: 26px; font-weight: 700; }
 }
 .round-btn--active,
 .layout-btn--active {
-  border-color: rgba(255,210,80,0.5);
-  color: #ffd84a;
-  background: rgba(255,210,80,0.1);
+  border-color: rgba(196,40,32,0.6);
+  color: #e05a50;
+  background: rgba(196,40,32,0.14);
 }
 
 /* CPU setup pickers reuse the same active-state style */
@@ -164,9 +183,94 @@ h2 { font-size: 26px; font-weight: 700; }
 .diff-btn--active,
 .cpu-round-btn--active,
 .cpu-layout-btn--active {
-  border-color: rgba(255,210,80,0.5);
-  color: #ffd84a;
-  background: rgba(255,210,80,0.1);
+  border-color: rgba(196,40,32,0.6);
+  color: #e05a50;
+  background: rgba(196,40,32,0.14);
+}
+
+/* ── Controls screen ─────────────────────────────────────────────────────── */
+.controls-card {
+  max-width: 600px;
+  width: 100%;
+}
+
+.controls-hint {
+  font-size: 12px;
+  color: rgba(255,255,255,0.35);
+  margin-top: -6px;
+}
+
+.controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  width: 100%;
+}
+
+.controls-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.controls-col h2 {
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.controls-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.controls-table tr {
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.controls-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  padding: 7px 10px 7px 4px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.key-btn {
+  padding: 4px 10px;
+  min-width: 52px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.key-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+}
+
+/* Listening state uses amber so it's visually distinct from the red accent */
+.key-btn--listening {
+  border-color: rgba(220,160,40,0.8);
+  background: rgba(220,160,40,0.12);
+  color: rgba(240,190,80,1);
+}
+
+.key-btn--conflict {
+  border-color: rgba(255,80,80,0.7);
+  background: rgba(255,80,80,0.1);
+  color: rgba(255,120,120,1);
+}
+
+.controls-reset-btn {
+  align-self: center;
+  padding: 8px 14px;
+  font-size: 12px;
 }
 
 /* ── Game canvas ─────────────────────────────────────────────────────────── */

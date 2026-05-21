@@ -76,6 +76,16 @@ test("public online matchmaking starts an online lobby intent", () => {
   assertEqual(state.onlineSettings.maxPlayers, 4);
 });
 
+test("join code action opens the in-game join screen", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.ONLINE_MENU, mode: "online-menu" },
+    ONLINE_ACTIONS.JOIN
+  );
+
+  assertEqual(state.screen, SCREEN.ONLINE_JOIN);
+  assertEqual(state.mode, "online-join");
+});
+
 test("online back action returns to multiplayer menu", () => {
   const state = applyMenuAction(
     { ...createInitialState(), screen: SCREEN.ONLINE_MENU, mode: "online-menu" },
@@ -84,6 +94,16 @@ test("online back action returns to multiplayer menu", () => {
 
   assertEqual(state.screen, SCREEN.TWO_PLAYER_MENU);
   assertEqual(state.mode, "two-player");
+});
+
+test("join back action returns to online menu", () => {
+  const state = applyMenuAction(
+    { ...createInitialState(), screen: SCREEN.ONLINE_JOIN, mode: "online-join" },
+    ONLINE_ACTIONS.JOIN_BACK
+  );
+
+  assertEqual(state.screen, SCREEN.ONLINE_MENU);
+  assertEqual(state.mode, "online-menu");
 });
 
 test("two-player back action returns to main menu", () => {

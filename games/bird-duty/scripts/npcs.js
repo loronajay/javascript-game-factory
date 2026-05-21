@@ -114,6 +114,51 @@ export const REFRESH_WAVE = Object.freeze([
   "john",
 ]);
 
+export const HOTSEAT_ROUND_WAVES = Object.freeze({
+  1: Object.freeze({
+    first: Object.freeze(["alan", "anna", "john", "sanjeet"]),
+    refresh: Object.freeze(["alan", "anna", "john", "sanjeet", "sanjeetFast", "john"]),
+  }),
+  2: Object.freeze({
+    first: Object.freeze(["alan", "anna", "john", "sanjeet", "bryan", "sanjeetFast"]),
+    refresh: Object.freeze(["alan", "anna", "john", "sanjeet", "bryan", "sanjeetFast", "bryan", "anna"]),
+  }),
+  3: Object.freeze({
+    first: Object.freeze(["alan", "anna", "john", "sanjeet", "wait", "alan", "anna", "john", "sanjeetFast"]),
+    refresh: Object.freeze([
+      "alan",
+      "anna",
+      "john",
+      "sanjeet",
+      "sanjeet",
+      "bryan",
+      "wait",
+      "bryan",
+      "sanjeetFast",
+      "bryan",
+      "sanjeetFast",
+    ]),
+  }),
+});
+
+function resolveWaveSet(options = {}) {
+  const requestedRound = Number(options.round);
+  const round = Number.isFinite(requestedRound) && requestedRound > 0
+    ? Math.max(1, Math.min(3, Math.floor(requestedRound)))
+    : 0;
+  const hotseatWaves = HOTSEAT_ROUND_WAVES[round];
+  if (hotseatWaves) {
+    return {
+      firstWave: hotseatWaves.first,
+      refreshWave: hotseatWaves.refresh,
+    };
+  }
+  return {
+    firstWave: FIRST_WAVE,
+    refreshWave: REFRESH_WAVE,
+  };
+}
+
 export function createNpcWaveState(queue = FIRST_WAVE) {
   return {
     queue: [...queue],
@@ -121,17 +166,22 @@ export function createNpcWaveState(queue = FIRST_WAVE) {
   };
 }
 
-export function createNpcState() {
+export function createNpcState(options = {}) {
+  const waveSet = resolveWaveSet(options);
   return {
     entities: [],
     wave: createNpcWaveState([]),
     waveIndex: 0,
     nextId: 1,
+    firstWave: waveSet.firstWave,
+    refreshWave: waveSet.refreshWave,
   };
 }
 
 export function startNextWave(state) {
-  const queue = state.waveIndex === 0 ? FIRST_WAVE : REFRESH_WAVE;
+  const queue = state.waveIndex === 0
+    ? state.firstWave || FIRST_WAVE
+    : state.refreshWave || REFRESH_WAVE;
   return {
     ...state,
     wave: createNpcWaveState(queue),
