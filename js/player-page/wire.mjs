@@ -61,6 +61,17 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     };
   };
 
+  const applyCurrentLayout = () => {
+    if (!currentLayout) return;
+    applyPlayerLayout(doc, currentLayout, { galleryPhotos });
+    requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
+    doc.querySelectorAll(".player-layout img").forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener("load", () => applyPlayerScaling(doc, currentLayout), { once: true });
+      }
+    });
+  };
+
   const rerender = async (thoughtComposerFlash = "", disableProfileViewTracking = true) => {
     const pageData = await loadPageData({ storage, apiClient, authSessionPlayerId });
     currentPageData = pageData;
@@ -69,15 +80,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
       thoughtComposerFlash,
       disableProfileViewTracking,
     }));
-    if (currentLayout) {
-      applyPlayerLayout(doc, currentLayout);
-      requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
-      doc.querySelectorAll(".player-layout img").forEach((img) => {
-        if (!img.complete) {
-          img.addEventListener("load", () => applyPlayerScaling(doc, currentLayout), { once: true });
-        }
-      });
-    }
+    applyCurrentLayout();
   };
 
   const renderCurrentPageData = async () => {
@@ -85,15 +88,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     currentPageData = pageData;
     profilePanel?.render?.("");
     renderPage(doc, buildRenderPayload(pageData));
-    if (currentLayout) {
-      applyPlayerLayout(doc, currentLayout);
-      requestAnimationFrame(() => applyPlayerScaling(doc, currentLayout));
-      doc.querySelectorAll(".player-layout img").forEach((img) => {
-        if (!img.complete) {
-          img.addEventListener("load", () => applyPlayerScaling(doc, currentLayout), { once: true });
-        }
-      });
-    }
+    applyCurrentLayout();
   };
 
   const socialActions = createProfileSocialActions({
@@ -152,6 +147,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
     },
     renderCurrent(overrides = {}) {
       renderPage(doc, buildRenderPayload(currentPageData || {}, overrides));
+      applyCurrentLayout();
     },
     profilePanel,
   });

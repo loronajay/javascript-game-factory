@@ -58,14 +58,18 @@ export function createPlayerHeroActions({
       const currentProfile = loadCurrentProfile?.();
       if (!gameSlug || !targetPlayerId || !authSession?.playerId) return true;
       challengeGameBtn.disabled = true;
-      const notifApi = createNotificationsApiClientImpl();
-      const challenge = await notifApi.sendChallenge(
-        targetPlayerId,
-        gameSlug,
-        gameTitle,
-        currentProfile.profileName || "UNNAMED PILOT",
-      );
-      challengeGameBtn.disabled = false;
+      let challenge = false;
+      try {
+        const notifApi = createNotificationsApiClientImpl();
+        challenge = !!(await notifApi.sendChallenge(
+          targetPlayerId,
+          gameSlug,
+          gameTitle,
+          currentProfile.profileName || "UNNAMED PILOT",
+        ));
+      } catch (_error) {
+        challenge = false;
+      }
       challengePickerOpen = false;
       await renderWithCurrentState({
         gestureFlash: challenge ? `${gameTitle} challenge sent!` : "Could not send challenge — please try again.",
@@ -80,9 +84,13 @@ export function createPlayerHeroActions({
       const currentProfile = loadCurrentProfile?.();
       if (!gestureType || !targetPlayerId || !authSession?.playerId) return true;
       gestureButton.disabled = true;
-      const notifApi = createNotificationsApiClientImpl();
-      const ok = await notifApi.sendGesture(targetPlayerId, gestureType, currentProfile.profileName || "UNNAMED PILOT");
-      gestureButton.disabled = false;
+      let ok = false;
+      try {
+        const notifApi = createNotificationsApiClientImpl();
+        ok = !!(await notifApi.sendGesture(targetPlayerId, gestureType, currentProfile.profileName || "UNNAMED PILOT"));
+      } catch (_error) {
+        ok = false;
+      }
       await renderWithCurrentState({
         gestureFlash: ok ? "Gesture sent!" : "Could not send gesture — please try again.",
       });

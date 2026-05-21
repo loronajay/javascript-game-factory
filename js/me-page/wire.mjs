@@ -60,7 +60,7 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
       friendNavigatorSearchQuery: friendNavigator.getViewState().searchQuery,
     });
     if (currentLayout) {
-      applyMeLayout(doc, currentLayout);
+      applyMeLayout(doc, currentLayout, { galleryPhotos: renderState.galleryPhotos });
       requestAnimationFrame(() => applyMeScaling(doc, currentLayout));
       doc.querySelectorAll(".me-layout img").forEach((img) => {
         if (!img.complete) {

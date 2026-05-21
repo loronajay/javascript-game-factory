@@ -303,6 +303,21 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.restore();
   }
 
+  function drawMainMenuControls() {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.fillRect(202, 330, 263, 34);
+    ctx.strokeRect(202, 330, 263, 34);
+    ctx.font = `16px ${HUD_VALUE_FONT}`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("MOVE: ARROWS / A-D   DROP: SPACE", SCRATCH_STAGE.width / 2, 348);
+    ctx.restore();
+  }
+
   function drawMenuButton(button, hot = false, disabled = false) {
     const image = button.asset ? twoPlayerButtonImages.get(button.asset) : null;
     if (image) {
@@ -474,10 +489,15 @@ export async function createBirdDutyRenderer(canvas, manifest) {
         : "TIE GAME"
       : `${active?.name || "PLAYER"} READY`;
     const subtitle = isFinal
-      ? "PRESS SPACE"
+      ? formatOnlineScoreboard(match)
       : isMine
         ? `ROUND ${match.round} - PRESS SPACE`
         : `WAITING FOR ${active?.name || "PLAYER"}`;
+    const helper = isFinal
+      ? "PRESS SPACE"
+      : isMine
+        ? "ARROWS/A-D MOVE  SPACE DROPS"
+        : "WATCHING CURRENT TURN";
 
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
@@ -493,7 +513,16 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.font = `36px ${HUD_VALUE_FONT}`;
     ctx.strokeText(subtitle, GAME_STAGE.width / 2, 380);
     ctx.fillText(subtitle, GAME_STAGE.width / 2, 380);
+    ctx.font = `24px ${HUD_VALUE_FONT}`;
+    ctx.strokeText(helper, GAME_STAGE.width / 2, 430);
+    ctx.fillText(helper, GAME_STAGE.width / 2, 430);
     ctx.restore();
+  }
+
+  function formatOnlineScoreboard(match) {
+    return (match.players || [])
+      .map((player) => `${player.name}: ${match.scores?.[player.clientId] || 0}`)
+      .join("  -  ");
   }
 
   function renderMenu(state = {}) {
@@ -510,6 +539,7 @@ export async function createBirdDutyRenderer(canvas, manifest) {
       drawMenuBird(frame, placement);
     }
     drawMenuPersonalBest(state.personalBest);
+    drawMainMenuControls();
   }
 
   function renderTwoPlayerMenu(state = {}) {

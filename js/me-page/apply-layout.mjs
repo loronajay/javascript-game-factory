@@ -1,3 +1,5 @@
+import { escapeHtml } from "../profile-social/social-view-shared.mjs";
+
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
   identity: "meIdentityPanel",
@@ -49,6 +51,7 @@ export function applyProfileLayout(doc, layout, {
   panelToDom = ME_PANEL_TO_DOM,
   required = ME_REQUIRED,
   layoutSelector = ".me-layout",
+  galleryPhotos = [],
 } = {}) {
   if (!layout?.desktop?.panels) return;
 
@@ -86,7 +89,7 @@ export function applyProfileLayout(doc, layout, {
     layoutEl.appendChild(el);
   }
 
-  renderCompositionOverlays(doc, layoutEl, layout.desktop.elements, layout.desktop.panels);
+  renderCompositionOverlays(doc, layoutEl, layout.desktop.elements, layout.desktop.panels, { galleryPhotos });
 }
 
 function getRenderablePanels(panels, layoutSelector) {
@@ -186,7 +189,7 @@ function applyHeroCompositionChild(heroEl, elementId, childEl, element, surface)
   heroEl.classList.add("profile-composition-hero");
 }
 
-function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
+function renderCompositionOverlays(doc, layoutEl, elements, panels = [], { galleryPhotos = [] } = {}) {
   if (!Array.isArray(elements)) return;
   const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
@@ -213,7 +216,7 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = []) {
     } else if (element.id === "galleryLink") {
       renderGalleryLinkOverlay(doc, layoutEl, element, panels);
     } else if (element.type === "galleryPhoto") {
-      renderGalleryPhotoOverlay(doc, layoutEl, element, panels);
+      renderGalleryPhotoOverlay(doc, layoutEl, element, panels, galleryPhotos);
     } else if (element.id === "thoughtsComposer") {
       renderThoughtsComposerOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "thoughtsFeed") {
@@ -357,15 +360,24 @@ function renderGalleryLinkOverlay(doc, layoutEl, element, panels) {
   layoutEl.appendChild(linkEl);
 }
 
-function renderGalleryPhotoOverlay(doc, layoutEl, element, panels) {
+function renderGalleryPhotoOverlay(doc, layoutEl, element, panels, galleryPhotos = []) {
   const index = getGalleryPhotoIndex(element.id);
   const sourceItems = doc.querySelectorAll("#meGalleryPanel .gallery-item, #playerGalleryPanel .gallery-item");
   const source = Number.isInteger(index) ? sourceItems[index] : null;
+  const photo = Array.isArray(galleryPhotos) && Number.isInteger(index) ? galleryPhotos[index] : null;
   const photoEl = source?.cloneNode(true) || doc.createElement("div");
   photoEl.classList.add("profile-composition-overlay", "profile-composition-overlay--gallery-photo", "gallery-item");
   photoEl.dataset.profileCompositionOverlay = element.id;
   photoEl.dataset.profileChildId = element.id;
-  if (!source) {
+  if (photo && !source) {
+    photoEl.dataset.photoId = photo.id || "";
+    photoEl.innerHTML = `
+      <div class="gallery-item__img-frame">
+        <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl || "")}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+      </div>
+      ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
+    `;
+  } else if (!source) {
     photoEl.innerHTML = `<div class="gallery-item__img-frame"></div><p class="gallery-item__caption">Photo ${index + 1}</p>`;
   }
   applyCompositionOverlayRect(photoEl, element);
@@ -577,18 +589,20 @@ function adjustHexColor(hex, saturation, brightness) {
   return `${adjust(rgb.r)}, ${adjust(rgb.g)}, ${adjust(rgb.b)}`;
 }
 
-export function applyMeLayout(doc, layout) {
+export function applyMeLayout(doc, layout, options = {}) {
   applyProfileLayout(doc, layout, {
     panelToDom: ME_PANEL_TO_DOM,
     required: ME_REQUIRED,
     layoutSelector: ".me-layout",
+    galleryPhotos: options.galleryPhotos,
   });
 }
 
-export function applyPlayerLayout(doc, layout) {
+export function applyPlayerLayout(doc, layout, options = {}) {
   applyProfileLayout(doc, layout, {
     panelToDom: PLAYER_PANEL_TO_DOM,
     required: PLAYER_REQUIRED,
     layoutSelector: ".player-layout",
+    galleryPhotos: options.galleryPhotos,
   });
 }

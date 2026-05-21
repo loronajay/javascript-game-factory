@@ -258,8 +258,23 @@
   padding: 10px 12px;
 }
 
+.profile-composition-overlay--player-action[data-profile-child-id="gestureActions"] {
+  overflow: visible;
+  z-index: 24;
+}
+
 .profile-composition-overlay--player-action .player-hero-card__gesture-buttons {
   justify-content: center;
+}
+
+.profile-composition-overlay--player-action .player-hero-card__challenge-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  max-height: 220px;
+  overflow: auto;
 }
 
 .profile-composition-overlay--player-action .player-hero-card__friend-action,
