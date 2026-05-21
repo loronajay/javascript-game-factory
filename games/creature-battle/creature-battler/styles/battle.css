@@ -168,6 +168,12 @@
 .battle-creature.targeted {
   animation: target-pulse 0.6s ease-in-out infinite alternate;
 }
+.battle-creature.multi-targeted img {
+  filter: drop-shadow(0 0 10px rgba(255,100,40,0.9)) drop-shadow(0 0 4px #ffa060);
+}
+.battle-creature.multi-targeted {
+  animation: target-pulse 0.6s ease-in-out infinite alternate;
+}
 .battle-creature.ko {
   opacity: 0.25;
   filter: grayscale(1);
@@ -230,6 +236,10 @@
 }
 .cmd-actor  { color: var(--cb-accent); font-weight: 700; }
 .cmd-progress { margin-left: auto; color: var(--cb-muted); opacity: 0.6; }
+.multi-confirm-label       { font-weight: 700; }
+.multi-confirm-label.foes  { color: #ff7a50; }
+.multi-confirm-label.allies { color: var(--cb-accent); }
+
 .cmd-back {
   margin-left: auto;
   color: var(--cb-muted);
@@ -304,6 +314,18 @@
 }
 .art-name { font-size: 12px; font-weight: 700; color: var(--cb-text); flex: 1; }
 .art-cost { font-size: 11px; color: var(--cb-mp); white-space: nowrap; }
+
+.art-target-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.art-target-badge.foes   { background: rgba(255,90,30,0.18); color: #ff7a50; border: 1px solid rgba(255,90,30,0.35); }
+.art-target-badge.allies { background: rgba(39,202,255,0.15); color: var(--cb-accent); border: 1px solid rgba(39,202,255,0.3); }
 
 .art-btn { position: relative; }
 .art-tooltip {

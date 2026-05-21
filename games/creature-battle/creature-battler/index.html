@@ -8,8 +8,11 @@
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/title.css">
   <link rel="stylesheet" href="styles/mode-select.css">
+  <link rel="stylesheet" href="styles/battle-config.css">
   <link rel="stylesheet" href="styles/team-select.css">
   <link rel="stylesheet" href="styles/battle.css">
+  <link rel="stylesheet" href="styles/animations/anim-universal.css">
+  <link rel="stylesheet" href="styles/animations/anim-salamander.css">
 </head>
 <body>
   <div id="game-shell">
@@ -19,6 +22,10 @@
 
       <div id="screen-mode-select" class="screen">
         <!-- rendered by screen-mode-select.js -->
+      </div>
+
+      <div id="screen-battle-config" class="screen">
+        <!-- rendered by screen-battle-config.js -->
       </div>
 
       <div id="screen-team-select" class="screen">
@@ -32,14 +39,19 @@
     </div>
   </div>
 
+  <script src="scripts/sounds.js"></script>
   <script src="scripts/config.js"></script>
   <script src="scripts/state.js"></script>
   <script src="scripts/battle-engine.js"></script>
   <script src="scripts/battle-ai.js"></script>
+  <script src="scripts/battle-animations.js"></script>
+  <script src="scripts/animations/anim-universal.js"></script>
+  <script src="scripts/animations/anim-salamander.js"></script>
   <script src="scripts/battle-input.js"></script>
   <script src="scripts/battle-round.js"></script>
   <script src="scripts/screen-title.js"></script>
   <script src="scripts/screen-mode-select.js"></script>
+  <script src="scripts/screen-battle-config.js"></script>
   <script src="scripts/screen-team-select.js"></script>
   <script src="scripts/screen-battle.js"></script>
   <script src="scripts/input.js"></script>

@@ -14,5 +14,5 @@ function renderTitle() {
     <div class="title-press-start">Press Enter or Click to Start</div>
   `;
 
-  el.addEventListener('click', () => setScreen('mode-select'));
+  el.addEventListener('click', () => { playClick(); setScreen('mode-select'); });
 }

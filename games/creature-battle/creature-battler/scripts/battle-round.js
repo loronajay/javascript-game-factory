@@ -34,17 +34,18 @@ function playbackStep(actions, index) {
     endRound();
     return;
   }
-  const result = resolveAction(actions[index]);
+  const action = actions[index];
+  const result = resolveAction(action);
   renderBattleHud();
   updateFieldKoStates();
-  showResult(result, () => {
+  showResult(result, action, () => {
     const end = checkBattleEnd();
     if (end) { showBattleEnd(end); return; }
     setTimeout(() => playbackStep(actions, index + 1), 180);
   });
 }
 
-function showResult(result, onDone) {
+function showResult(result, action, onDone) {
   let msg = '';
   switch (result.type) {
     case 'skipped':   msg = '...'; break;
@@ -61,11 +62,23 @@ function showResult(result, onDone) {
       if (result.wasKO) msg += ` ${result.targetName} is knocked out!`;
       break;
     }
+    case 'multi': {
+      const parts = result.hits.map(h => {
+        if (h.missed) return `${h.name} missed`;
+        if (result.damageClass === 'heal') return `${h.name} +${h.amount}`;
+        return `${h.name} ${h.amount}${h.wasKO ? ' KO!' : ''}`;
+      });
+      const verb = result.damageClass === 'heal' ? 'heals' : 'hits all';
+      msg = `${result.actorName} uses ${result.moveName}! ${verb}: ${parts.join(' / ')}`;
+      break;
+    }
     default: msg = '...';
   }
   updateBattleLog(msg);
-  pendingAdvance = onDone;
-  document.getElementById('battle-commands')?.classList.add('awaiting-advance');
+  playMoveAnimation(result, action, () => {
+    pendingAdvance = onDone;
+    document.getElementById('battle-commands')?.classList.add('awaiting-advance');
+  });
 }
 
 function endRound() {

@@ -28,6 +28,7 @@ function renderTeamSelect() {
               <div class="creature-card-role">${c.role}</div>
               <span class="element-tag element-${c.element}">${c.element}</span>
               ${isSelected ? `<div class="selected-badge">#${slotNum}</div>` : ''}
+              ${isFocused ? `<div class="card-stats-hint">R · Stats</div>` : ''}
             </div>
           `;
         }).join('')}
@@ -51,7 +52,7 @@ function renderTeamSelect() {
       </div>
     </div>
     <div class="team-select-footer">
-      <div class="team-select-hint">↑↓←→ Navigate · Enter to pick/unpick · Esc back</div>
+      <div class="team-select-hint">↑↓←→ Navigate · Space pick/unpick · R stats · Esc back</div>
       <div class="team-select-count">${currentTeam.length} / 3</div>
     </div>
     ${currentTeam.length === 3 ? `
@@ -65,13 +66,14 @@ function renderTeamSelect() {
 
   el.querySelectorAll('.creature-card').forEach(card => {
     card.addEventListener('click', () => {
+      playClick();
       state.teamSelectFocusIndex = parseInt(card.dataset.index, 10);
       toggleTeamCreature(card.dataset.id);
     });
   });
 
   const confirmBtn = el.querySelector('#ts-confirm-btn');
-  if (confirmBtn) confirmBtn.addEventListener('click', confirmTeamSelectPhase);
+  if (confirmBtn) confirmBtn.addEventListener('click', () => { playClick(); confirmTeamSelectPhase(); });
 }
 
 registerRenderer('team-select', renderTeamSelect);
@@ -101,4 +103,96 @@ function moveTeamSelectCursor(dir) {
   const next = r * cols + c;
   if (next < RENTAL_ROSTER.length) state.teamSelectFocusIndex = next;
   renderTeamSelect();
+}
+
+// ── Creature stats popup ──────────────────────────────────────────────────────
+
+function isStatsPopupOpen() {
+  return !!document.getElementById('creature-stats-popup');
+}
+
+function hideCreatureStats() {
+  document.getElementById('creature-stats-popup')?.remove();
+}
+
+function showCreatureStats() {
+  const creature = RENTAL_ROSTER[state.teamSelectFocusIndex];
+  if (!creature) return;
+  hideCreatureStats();
+
+  const level = state.battleConfig.level;
+  const stats = resolveStats(creature, level);
+  const moves = getCreatureMoves(creature.id, level);
+  const arts   = moves.filter(m => m.category === 'art' || m.category === 'heal');
+  const skills = moves.filter(m => m.category === 'utility');
+
+  function targetBadge(targeting) {
+    if (targeting === 'all_enemies') return `<span class="art-target-badge foes">ALL FOES</span>`;
+    if (targeting === 'all_allies')  return `<span class="art-target-badge allies">ALL ALLIES</span>`;
+    if (targeting === 'self')        return `<span class="art-target-badge self-target">SELF</span>`;
+    return `<span class="art-target-badge single-target">SINGLE</span>`;
+  }
+
+  function moveEntryHTML(m) {
+    const elemTag = m.element !== 'neutral'
+      ? `<span class="element-tag element-${m.element}">${m.element}</span>` : '';
+    const mpTag = m.mpCost > 0 ? `<span class="move-entry-mp">${m.mpCost} MP</span>` : '';
+    return `
+      <div class="move-entry">
+        <div class="move-entry-header">
+          <span class="move-entry-name">${m.name}</span>
+          ${elemTag}
+          ${targetBadge(m.targeting)}
+          ${mpTag}
+        </div>
+        <div class="move-entry-desc">${m.desc}</div>
+      </div>`;
+  }
+
+  function sectionHTML(label, list, emptyMsg) {
+    const content = list.length
+      ? `<div class="move-list">${list.map(moveEntryHTML).join('')}</div>`
+      : emptyMsg ? `<div class="stats-section-empty">${emptyMsg}</div>` : '';
+    if (!content) return '';
+    return `
+      <div class="stats-section-label">${label}</div>
+      ${content}`;
+  }
+
+  const popup = document.createElement('div');
+  popup.id = 'creature-stats-popup';
+  popup.className = 'creature-stats-popup';
+  popup.innerHTML = `
+    <div class="stats-popup-card">
+      <div class="stats-popup-header">
+        <img class="stats-popup-sprite" src="${creature.sprite}" alt="${creature.name}">
+        <div class="stats-popup-identity">
+          <div class="stats-popup-name">${creature.name}</div>
+          <span class="element-tag element-${creature.element}">${creature.element}</span>
+          <div class="stats-popup-role">${creature.role}</div>
+        </div>
+      </div>
+      <div class="stats-popup-body">
+        <div class="stats-section-label">Stats · Lv.${level}</div>
+        <div class="stats-resources">
+          <div class="stat-item hp"><div class="stat-label">HP</div><div class="stat-value">${stats.hp}</div></div>
+          <div class="stat-item mp"><div class="stat-label">MP</div><div class="stat-value">${stats.mp}</div></div>
+        </div>
+        <div class="stats-combat">
+          <div class="stat-item"><div class="stat-label">STR</div><div class="stat-value">${stats.strength}</div></div>
+          <div class="stat-item"><div class="stat-label">DEF</div><div class="stat-value">${stats.defense}</div></div>
+          <div class="stat-item"><div class="stat-label">INT</div><div class="stat-value">${stats.intelligence}</div></div>
+          <div class="stat-item"><div class="stat-label">SPR</div><div class="stat-value">${stats.spirit}</div></div>
+          <div class="stat-item spd"><div class="stat-label">SPD</div><div class="stat-value">${stats.speed}</div></div>
+        </div>
+        ${sectionHTML('Arts', arts)}
+        ${sectionHTML('Skills', skills, 'Skills coming soon...')}
+      </div>
+      <div class="stats-popup-footer">R · ESC — Close</div>
+    </div>`;
+
+  popup.addEventListener('click', e => {
+    if (e.target === popup) { playClick(); hideCreatureStats(); }
+  });
+  document.getElementById('screen-team-select').appendChild(popup);
 }

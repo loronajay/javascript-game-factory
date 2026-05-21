@@ -109,7 +109,31 @@ function resolveAction(action) {
     return { type: 'utility', actorName: actor.displayName, moveName: move.name };
   }
 
-  // Heal moves: target own side
+  // Multi-target moves (all_enemies or all_allies)
+  if (move.targeting === 'all_enemies' || move.targeting === 'all_allies') {
+    const tgtSide = move.targeting === 'all_allies' ? action.actorSide : (action.actorSide === 'player' ? 'opponent' : 'player');
+    const slots   = SLOT_NAMES.filter(s => { const c = bs[tgtSide][s]; return c && !c.isKnockedOut; });
+    if (!slots.length) return { type: 'no_target', actorName: actor.displayName, moveName: move.name };
+
+    actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
+    const hits = slots.map(slot => {
+      const target = bs[tgtSide][slot];
+      if (move.damageClass === 'heal') {
+        const amt = calcHeal(actor, move);
+        target.hp.current = Math.min(target.hp.max, target.hp.current + amt);
+        return { slot, name: target.displayName, amount: amt, wasKO: false };
+      }
+      if (!resolveHit(actor, target, move)) return { slot, name: target.displayName, missed: true };
+      const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
+      target.hp.current = Math.max(0, target.hp.current - damage);
+      const wasKO = !target.isKnockedOut && target.hp.current <= 0;
+      if (wasKO) target.isKnockedOut = true;
+      return { slot, name: target.displayName, amount: damage, wasKO, isCrit, elemMod };
+    });
+    return { type: 'multi', actorName: actor.displayName, moveName: move.name, damageClass: move.damageClass, targetSide: tgtSide, hits };
+  }
+
+  // Single-target heal
   if (move.damageClass === 'heal') {
     const tgtSlot = action.targetSlot || action.actorSlot;
     const target  = bs[action.targetSide || action.actorSide][tgtSlot];
@@ -122,7 +146,7 @@ function resolveAction(action) {
     return { type: 'heal', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, amount: amt };
   }
 
-  // Damage moves — retarget if needed
+  // Single-target damage — retarget if needed
   const tgtSide = action.targetSide;
   const tgtSlot = findValidTarget(tgtSide, action.targetSlot);
   if (!tgtSlot) {

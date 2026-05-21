@@ -144,5 +144,5 @@ function renderBattleEndOverlay(winner) {
       <button class="btn primary" id="end-back-btn">Back to Title</button>
     </div>`;
   screen.appendChild(overlay);
-  document.getElementById('end-back-btn')?.addEventListener('click', () => setScreen('title'));
+  document.getElementById('end-back-btn')?.addEventListener('click', () => { playClick(); setScreen('title'); });
 }

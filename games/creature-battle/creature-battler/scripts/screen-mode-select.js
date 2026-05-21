@@ -20,11 +20,12 @@ function renderModeSelect() {
         </div>
       `).join('')}
     </div>
-    <div class="mode-select-hint">↑↓ Navigate · Enter to Select · Esc to go back</div>
+    <div class="mode-select-hint">↑↓ Navigate · Space to Select · Esc to go back</div>
   `;
 
   el.querySelectorAll('.mode-card:not(.disabled)').forEach(card => {
     card.addEventListener('click', () => {
+      playClick();
       state.modeSelectIndex = parseInt(card.dataset.index, 10);
       handleModeConfirm();
     });
@@ -34,7 +35,7 @@ function renderModeSelect() {
 function handleModeConfirm() {
   const mode = MODES[state.modeSelectIndex];
   if (!mode.available) return;
-  if (mode.id === 'training') startTeamSelect();
+  if (mode.id === 'training') startBattleConfig();
 }
 
 registerRenderer('mode-select', renderModeSelect);

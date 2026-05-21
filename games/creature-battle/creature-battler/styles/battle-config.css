@@ -1,0 +1,103 @@
+#screen-battle-config {
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 10%, rgba(6, 79, 143, 0.35) 0%, transparent 50%),
+    linear-gradient(180deg, #01111f 0%, #020d1a 100%);
+}
+
+.battle-config-header {
+  text-align: center;
+  padding: 44px 24px 0;
+  flex-shrink: 0;
+}
+
+.battle-config-phase {
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--cb-accent);
+  margin-bottom: 6px;
+}
+
+.battle-config-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+  text-shadow: 0 0 20px var(--cb-accent-soft);
+  margin-bottom: 8px;
+}
+
+.battle-config-sub {
+  font-size: 12px;
+  color: var(--cb-muted);
+  letter-spacing: 0.04em;
+}
+
+.battle-config-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.level-tier-row {
+  display: flex;
+  gap: 10px;
+}
+
+.level-tier-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 112px;
+  height: 84px;
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+  user-select: none;
+}
+
+.level-tier-card:hover,
+.level-tier-card.focused {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 18px var(--cb-accent-soft);
+  background: var(--cb-panel-bg-soft);
+}
+
+.level-tier-num {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--cb-text);
+}
+
+.level-tier-card.focused .level-tier-num {
+  color: var(--cb-accent);
+  text-shadow: 0 0 10px var(--cb-accent-soft);
+}
+
+.level-tier-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cb-muted);
+}
+
+.battle-config-footer {
+  padding: 0 24px 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.battle-config-hint {
+  font-size: 12px;
+  color: var(--cb-muted);
+  letter-spacing: 0.06em;
+}

@@ -1,4 +1,4 @@
-import { LAYOUT_COLUMNS } from "./default-layout.mjs";
+import { LAYOUT_COLUMNS } from "./default-layout.mjs?v=20260521-gallery-photo-sync-1";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
 // Reads the shared CSS tokens so the editor and live page always snap to the same grid.

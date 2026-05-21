@@ -1,5 +1,14 @@
-const RENTAL_LEVEL = 30;
 const SLOT_NAMES = ['top', 'middle', 'bottom'];
+
+const LEVEL_TIERS = [
+  { level: 5,   label: 'Beginner'   },
+  { level: 10,  label: 'Novice'     },
+  { level: 20,  label: 'Apprentice' },
+  { level: 30,  label: 'Standard'   },
+  { level: 50,  label: 'Veteran'    },
+  { level: 75,  label: 'Expert'     },
+  { level: 100, label: 'Maximum'    },
+];
 
 const RENTAL_ROSTER = [
   {
@@ -45,33 +54,34 @@ const RENTAL_ROSTER = [
 ];
 
 const MOVES_DATA = [
-  { id: 'basic_attack',  name: 'Attack',        desc: 'A straightforward physical strike.',                              owner: 'shared',     learnedAt: 1,  category: 'basic',   damageClass: 'physical', element: 'neutral', basePower: 12, offensiveScaling: 0.75, mpCost: 0,  accuracy: 100, canCrit: true,  movePowerModifier: 0 },
-  { id: 'sprout_tap',    name: 'Sprout Tap',    desc: 'Tap a foe with a budding gaia strike.',                          owner: 'flor',       learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'gaia',    basePower: 14, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'petal_mend',    name: 'Petal Mend',    desc: 'Shower an ally with healing petals to restore HP.',              owner: 'flor',       learnedAt: 1,  category: 'heal',    damageClass: 'heal',     element: 'gaia',    basePower: 24, offensiveScaling: 0.55, mpCost: 8,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
-  { id: 'root_snare',    name: 'Root Snare',    desc: 'Bind a foe in erupting roots, dealing gaia magic damage.',       owner: 'flor',       learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'gaia',    basePower: 12, offensiveScaling: 0.85, mpCost: 6,  accuracy: 90,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'verdant_guard', name: 'Verdant Guard', desc: 'Wrap self in living bark, boosting defense this turn.',          owner: 'flor',       learnedAt: 20, category: 'utility', damageClass: 'utility',  element: 'gaia',    basePower: 0,  offensiveScaling: 0,    mpCost: 10, accuracy: 100, canCrit: false, movePowerModifier: 0 },
-  { id: 'bubble_shot',   name: 'Bubble Shot',   desc: 'Fire a pressurized water bubble at an enemy.',                   owner: 'aquaphant',  learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'water',   basePower: 15, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'soak_hide',     name: 'Soak Hide',     desc: 'Saturate hide with water to harden defenses this turn.',         owner: 'aquaphant',  learnedAt: 1,  category: 'utility', damageClass: 'utility',  element: 'water',   basePower: 0,  offensiveScaling: 0,    mpCost: 8,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
-  { id: 'tidal_bump',    name: 'Tidal Bump',    desc: 'Crash a rolling wave of water into a target.',                   owner: 'aquaphant',  learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'water',   basePower: 24, offensiveScaling: 1.0,  mpCost: 7,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'surge_crash',   name: 'Surge Crash',   desc: 'Unleash a surging torrent for heavy water damage.',              owner: 'aquaphant',  learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'water',   basePower: 36, offensiveScaling: 1.05, mpCost: 12, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'ice_pebble',    name: 'Ice Pebble',    desc: 'Hurl a sharp shard of ice at a target.',                         owner: 'pengun',     learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'ice',     basePower: 14, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'cold_feet',     name: 'Cold Feet',     desc: 'Flash-freeze the ground to slow and disrupt a foe.',             owner: 'pengun',     learnedAt: 1,  category: 'utility', damageClass: 'utility',  element: 'ice',     basePower: 0,  offensiveScaling: 0,    mpCost: 6,  accuracy: 92,  canCrit: false, movePowerModifier: 0 },
-  { id: 'snow_blind',    name: 'Snow Blind',    desc: 'Blast snow into a foe\'s eyes, impairing their aim.',            owner: 'pengun',     learnedAt: 10, category: 'utility', damageClass: 'utility',  element: 'ice',     basePower: 0,  offensiveScaling: 0,    mpCost: 7,  accuracy: 88,  canCrit: false, movePowerModifier: 0 },
-  { id: 'frost_nip',     name: 'Frost Nip',     desc: 'Nip at a foe with biting cold for ice magic damage.',            owner: 'pengun',     learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'ice',     basePower: 23, offensiveScaling: 1.0,  mpCost: 7,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'shatter_chill', name: 'Shatter Chill', desc: 'Detonate a frozen blast for powerful ice damage.',               owner: 'pengun',     learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'ice',     basePower: 34, offensiveScaling: 1.05, mpCost: 12, accuracy: 86,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'spark_flick',   name: 'Spark Flick',   desc: 'Snap hot sparks at a foe with a fiery flick.',                   owner: 'salamander', learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 15, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'heat_haze',     name: 'Heat Haze',     desc: 'Distort the air with shimmering heat to confuse attackers.',     owner: 'salamander', learnedAt: 1,  category: 'utility', damageClass: 'utility',  element: 'fire',    basePower: 0,  offensiveScaling: 0,    mpCost: 6,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
-  { id: 'flare_bite',    name: 'Flare Bite',    desc: 'Chomp down with a jaw wreathed in fire for solid fire damage.',  owner: 'salamander', learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 26, offensiveScaling: 1.0,  mpCost: 7,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
-  { id: 'cinder_burst',  name: 'Cinder Burst',  desc: 'Ignite an ember and detonate it for explosive fire damage.',     owner: 'salamander', learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 38, offensiveScaling: 1.1,  mpCost: 12, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'basic_attack',  name: 'Attack',        targeting: 'single',      desc: 'A straightforward physical strike.',                                  owner: 'shared',     learnedAt: 1,  category: 'basic',   damageClass: 'physical', element: 'neutral', basePower: 12, offensiveScaling: 0.75, mpCost: 0,  accuracy: 100, canCrit: true,  movePowerModifier: 0 },
+  { id: 'sprout_tap',    name: 'Sprout Tap',    targeting: 'single',      desc: 'Tap a foe with a budding gaia strike.',                              owner: 'flor',       learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'gaia',    basePower: 14, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'petal_mend',    name: 'Petal Mend',    targeting: 'all_allies',  desc: 'Rain healing petals on the whole team, restoring HP to all allies.', owner: 'flor',       learnedAt: 1,  category: 'heal',    damageClass: 'heal',     element: 'gaia',    basePower: 14, offensiveScaling: 0.35, mpCost: 8,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'root_snare',    name: 'Root Snare',    targeting: 'single',      desc: 'Bind a foe in erupting roots, dealing gaia magic damage.',           owner: 'flor',       learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'gaia',    basePower: 12, offensiveScaling: 0.85, mpCost: 6,  accuracy: 90,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'verdant_guard', name: 'Verdant Guard', targeting: 'self',        desc: 'Wrap self in living bark, boosting defense this turn.',              owner: 'flor',       learnedAt: 20, category: 'art',     damageClass: 'utility',  element: 'gaia',    basePower: 0,  offensiveScaling: 0,    mpCost: 10, accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'bubble_shot',   name: 'Bubble Shot',   targeting: 'single',      desc: 'Fire a pressurized water bubble at an enemy.',                       owner: 'aquaphant',  learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'water',   basePower: 15, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'soak_hide',     name: 'Soak Hide',     targeting: 'self',        desc: 'Saturate hide with water to harden defenses this turn.',             owner: 'aquaphant',  learnedAt: 1,  category: 'art',     damageClass: 'utility',  element: 'water',   basePower: 0,  offensiveScaling: 0,    mpCost: 8,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'tidal_bump',    name: 'Tidal Bump',    targeting: 'single',      desc: 'Crash a rolling wave of water into a target.',                       owner: 'aquaphant',  learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'water',   basePower: 24, offensiveScaling: 1.0,  mpCost: 7,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'surge_crash',   name: 'Surge Crash',   targeting: 'all_enemies', desc: 'Unleash a surging torrent that crashes into all enemies at once.',   owner: 'aquaphant',  learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'water',   basePower: 20, offensiveScaling: 0.85, mpCost: 12, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'ice_pebble',    name: 'Ice Pebble',    targeting: 'single',      desc: 'Hurl a sharp shard of ice at a target.',                             owner: 'pengun',     learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'ice',     basePower: 14, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'cold_feet',     name: 'Cold Feet',     targeting: 'single',      desc: 'Flash-freeze the ground beneath one foe to slow and disrupt them.',  owner: 'pengun',     learnedAt: 1,  category: 'art',     damageClass: 'utility',  element: 'ice',     basePower: 0,  offensiveScaling: 0,    mpCost: 6,  accuracy: 92,  canCrit: false, movePowerModifier: 0 },
+  { id: 'snow_blind',    name: 'Snow Blind',    targeting: 'single',      desc: "Blast snow into one foe's eyes, impairing their aim.",               owner: 'pengun',     learnedAt: 10, category: 'art',     damageClass: 'utility',  element: 'ice',     basePower: 0,  offensiveScaling: 0,    mpCost: 7,  accuracy: 88,  canCrit: false, movePowerModifier: 0 },
+  { id: 'frost_nip',     name: 'Frost Nip',     targeting: 'single',      desc: 'Nip at a foe with biting cold for ice magic damage.',                owner: 'pengun',     learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'ice',     basePower: 23, offensiveScaling: 1.0,  mpCost: 7,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'shatter_chill', name: 'Shatter Chill', targeting: 'all_enemies', desc: 'Detonate a frozen blast that shatters across all enemies.',          owner: 'pengun',     learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'ice',     basePower: 18, offensiveScaling: 0.85, mpCost: 12, accuracy: 86,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'spark_flick',   name: 'Spark Flick',   targeting: 'single',      desc: 'Snap hot sparks at a foe with a fiery flick.',                       owner: 'salamander', learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 15, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'heat_haze',     name: 'Heat Haze',     targeting: 'single',      desc: 'Distort the air around one target with shimmering heat.',            owner: 'salamander', learnedAt: 1,  category: 'art',     damageClass: 'utility',  element: 'fire',    basePower: 0,  offensiveScaling: 0,    mpCost: 6,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'flare_bite',    name: 'Flare Bite',    targeting: 'single',      desc: 'Chomp down with a jaw wreathed in fire for solid fire damage.',      owner: 'salamander', learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 26, offensiveScaling: 1.0,  mpCost: 7,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'cinder_burst',  name: 'Cinder Burst',  targeting: 'all_enemies', desc: 'Detonate an ember that bursts with fire damage across all enemies.', owner: 'salamander', learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 22, offensiveScaling: 0.9,  mpCost: 12, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
 ];
 
 function getMoveData(moveId) {
   return MOVES_DATA.find(m => m.id === moveId) || null;
 }
 
-function getCreatureMoves(creatureId) {
+function getCreatureMoves(creatureId, level) {
+  const lvl = level !== undefined ? level : state.battleConfig.level;
   return MOVES_DATA.filter(m =>
-    (m.owner === creatureId || m.owner === 'shared') && m.learnedAt <= RENTAL_LEVEL
+    (m.owner === creatureId || m.owner === 'shared') && m.learnedAt <= lvl
   );
 }
 
@@ -84,20 +94,21 @@ function resolveStats(creature, level) {
 }
 
 function buildRentalCreature(creature, slot) {
-  const stats = resolveStats(creature, RENTAL_LEVEL);
+  const level = state.battleConfig.level;
+  const stats = resolveStats(creature, level);
   return {
     runtimeId: `${creature.id}-${Math.random().toString(36).slice(2, 7)}`,
     creatureId: creature.id,
     displayName: creature.name,
     element: creature.element,
     role: creature.role,
-    level: RENTAL_LEVEL,
+    level,
     slot,
     hp: { current: stats.hp, max: stats.hp },
     mp: { current: stats.mp, max: stats.mp },
     stats,
     resistances: creature.resistances,
-    moves: getCreatureMoves(creature.id),
+    moves: getCreatureMoves(creature.id, level),
     sprite: creature.sprite,
     isKnockedOut: false,
     isDefending: false,

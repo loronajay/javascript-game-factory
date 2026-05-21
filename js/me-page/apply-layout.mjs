@@ -1,5 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-gallery-photo-defaults-2";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-gallery-photo-sync-1";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",

@@ -1,0 +1,108 @@
+/* All keyframes preserve the base translate(-50%,-50%) that positions field creatures.
+   Lunge keyframes use --anim-dx / --anim-dy set by JS before the class is added. */
+
+/* ── Spark Flick: small upward bob + orange glow ─────────────────────────── */
+@keyframes cast-spark-flick {
+  0%   { transform: translate(-50%, -50%);              filter: none; }
+  20%  { transform: translate(-50%, calc(-50% - 5px)); filter: drop-shadow(0 0 7px #ff9900) drop-shadow(0 0 3px #ffcc00); }
+  45%  { transform: translate(-50%, calc(-50% + 2px)); filter: drop-shadow(0 0 14px #ff6600) drop-shadow(0 0 5px #ff9900); }
+  70%  { transform: translate(-50%, calc(-50% - 2px)); filter: drop-shadow(0 0 5px #ff8800); }
+  100% { transform: translate(-50%, -50%);              filter: none; }
+}
+.anim-cast-spark-flick {
+  animation: cast-spark-flick 420ms ease-in-out;
+}
+
+/* ── Fire light hit: orange flash + small shake (Spark Flick) ─────────────── */
+@keyframes hit-fire-light-right {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 9px), calc(-50% - 3px)); filter: brightness(2.8) sepia(1) saturate(5) hue-rotate(-10deg); }
+  50%  { transform: translate(calc(-50% - 3px), -50%);             filter: brightness(1.4) sepia(0.4) saturate(2); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+@keyframes hit-fire-light-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 9px), calc(-50% - 3px));  filter: brightness(2.8) sepia(1) saturate(5) hue-rotate(-10deg); }
+  50%  { transform: translate(calc(-50% + 3px), -50%);              filter: brightness(1.4) sepia(0.4) saturate(2); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-fire-light {
+  animation: hit-fire-light-left 340ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-fire-light {
+  animation: hit-fire-light-right 340ms ease-out;
+}
+
+/* ── Heat Haze: shimmer scale pulse + warm aura (self) ────────────────────── */
+@keyframes cast-heat-haze {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  15%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(255,120,0,0.6)) brightness(1.15); }
+  35%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.07); filter: drop-shadow(0 0 20px rgba(255,70,0,0.85)) drop-shadow(0 0 6px #ffaa00) brightness(1.3); }
+  55%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.04); filter: drop-shadow(0 0 13px rgba(255,110,0,0.7)) brightness(1.2); }
+  78%  { transform: translate(-50%, -50%) scale(1.02); filter: drop-shadow(0 0 6px rgba(255,150,0,0.35)) brightness(1.08); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-heat-haze {
+  animation: cast-heat-haze 560ms ease-in-out;
+}
+
+/* ── Flare Bite: charge phase — 3 escalating flashes with upward tension ─── */
+@keyframes cast-flare-charge {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  8%   { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: brightness(3)   saturate(0.2) sepia(0.3); }
+  20%  { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  38%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.03); filter: brightness(3.5) saturate(0.3) sepia(0.4); }
+  50%  { transform: translate(-50%, -50%) scale(1.01); filter: brightness(1.1); }
+  68%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.05); filter: brightness(4.2) saturate(0.4) sepia(0.5); }
+  82%  { transform: translate(-50%, -50%) scale(1.02); filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1.02); filter: brightness(1.2); }
+}
+.anim-cast-flare-charge {
+  animation: cast-flare-charge 560ms ease-in-out;
+}
+
+/* ── Flare Bite: travel to target, hold briefly with fire glow, return ───── */
+@keyframes cast-flare-lunge-to {
+  0%   { transform: translate(-50%, -50%);                                                        filter: none; }
+  12%  { transform: translate(-50%, calc(-50% - 4px));                                            filter: drop-shadow(0 0 10px rgba(255,80,0,0.7)); }
+  40%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 22px rgba(255,40,0,1)) drop-shadow(0 0 9px #ffaa00) brightness(1.35); }
+  58%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 14px rgba(255,60,0,0.7)); }
+  100% { transform: translate(-50%, -50%);                                                        filter: none; }
+}
+.anim-cast-flare-bite {
+  animation: cast-flare-lunge-to 540ms cubic-bezier(0.2, 0, 0.4, 1);
+}
+
+/* ── Fire heavy hit: strong orange flash + hard shake ────────────────────── */
+@keyframes hit-fire-heavy-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  15%  { transform: translate(calc(-50% + 16px), calc(-50% - 5px)); filter: brightness(3.5) sepia(1) saturate(7) hue-rotate(-15deg); }
+  35%  { transform: translate(calc(-50% + 6px),  calc(-50% - 2px)); filter: brightness(2.2) sepia(0.7) saturate(3.5); }
+  60%  { transform: translate(calc(-50% - 4px),  -50%);             filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+@keyframes hit-fire-heavy-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  15%  { transform: translate(calc(-50% - 16px), calc(-50% - 5px)); filter: brightness(3.5) sepia(1) saturate(7) hue-rotate(-15deg); }
+  35%  { transform: translate(calc(-50% - 6px),  calc(-50% - 2px)); filter: brightness(2.2) sepia(0.7) saturate(3.5); }
+  60%  { transform: translate(calc(-50% + 4px),  -50%);             filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-fire-heavy {
+  animation: hit-fire-heavy-left 420ms ease-out;
+}
+[data-creature^="opponent"].anim-hit-fire-heavy {
+  animation: hit-fire-heavy-right 420ms ease-out;
+}
+
+/* ── Cinder Burst: rise up + burst glow (AoE) ───────────────────────────── */
+@keyframes cast-cinder-burst {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  20%  { transform: translate(-50%, calc(-50% - 8px))  scale(1.05); filter: drop-shadow(0 0 16px rgba(255,80,0,0.85)); }
+  45%  { transform: translate(-50%, calc(-50% - 13px)) scale(1.1);  filter: drop-shadow(0 0 30px rgba(255,40,0,1)) drop-shadow(0 0 14px #ffbb00) brightness(1.45); }
+  70%  { transform: translate(-50%, calc(-50% - 5px))  scale(1.03); filter: drop-shadow(0 0 10px rgba(255,100,0,0.5)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-cinder-burst {
+  animation: cast-cinder-burst 600ms ease-in-out;
+}

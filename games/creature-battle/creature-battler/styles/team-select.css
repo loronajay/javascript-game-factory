@@ -201,3 +201,240 @@
   font-weight: 700;
   color: var(--cb-accent);
 }
+
+/* Focused card R hint */
+.card-stats-hint {
+  position: absolute;
+  bottom: 5px;
+  left: 7px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--cb-accent);
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
+/* ── Creature stats popup ──────────────────────────────────────────────────── */
+
+.creature-stats-popup {
+  position: absolute;
+  inset: 0;
+  background: rgba(1, 8, 20, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.stats-popup-card {
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-accent);
+  border-radius: 14px;
+  box-shadow: 0 0 40px var(--cb-accent-soft);
+  width: 480px;
+  max-height: 490px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.stats-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(39, 202, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.stats-popup-sprite {
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.7));
+  flex-shrink: 0;
+}
+
+.stats-popup-identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats-popup-name {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+  text-shadow: 0 0 12px var(--cb-accent-soft);
+}
+
+.stats-popup-role {
+  font-size: 11px;
+  color: var(--cb-muted);
+}
+
+.stats-popup-body {
+  overflow-y: auto;
+  padding: 14px 18px;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(39, 202, 255, 0.35) transparent;
+}
+
+.stats-popup-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.stats-popup-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.stats-popup-body::-webkit-scrollbar-thumb {
+  background: rgba(39, 202, 255, 0.35);
+  border-radius: 3px;
+}
+
+.stats-popup-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(39, 202, 255, 0.6);
+}
+
+.stats-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cb-accent);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(39, 202, 255, 0.15);
+}
+
+/* Resource stats (HP / MP) */
+.stats-resources {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stats-resources .stat-item {
+  flex: 1;
+  background: rgba(3, 31, 68, 0.6);
+  border: 1px solid var(--cb-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.stats-resources .stat-value { font-size: 22px; }
+
+/* Combat stats row */
+.stats-combat {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.stats-combat .stat-item {
+  flex: 1;
+  text-align: center;
+  padding: 6px 4px;
+  background: rgba(3, 31, 68, 0.4);
+  border: 1px solid var(--cb-border);
+  border-radius: 7px;
+}
+
+.stats-combat .stat-value { font-size: 15px; }
+
+.stat-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cb-muted);
+  margin-bottom: 2px;
+}
+
+.stat-value {
+  font-weight: 700;
+  color: var(--cb-text);
+}
+
+.stat-item.hp .stat-value { color: var(--cb-hp); }
+.stat-item.mp .stat-value { color: var(--cb-mp); }
+.stat-item.spd .stat-value { color: #ffd060; }
+
+/* Move entries */
+.move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.move-entry {
+  padding: 8px 10px;
+  background: rgba(3, 31, 68, 0.55);
+  border: 1px solid var(--cb-border);
+  border-radius: 8px;
+}
+
+.move-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.move-entry-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cb-text);
+  flex: 1;
+  min-width: 0;
+}
+
+.move-entry-mp {
+  font-size: 11px;
+  color: var(--cb-mp);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.move-entry-desc {
+  font-size: 10px;
+  color: var(--cb-muted);
+  line-height: 1.45;
+}
+
+/* Target badges inside the stats popup — all neutral to avoid clashing with element tags */
+.stats-popup-card .art-target-badge,
+.stats-popup-card .art-target-badge.foes,
+.stats-popup-card .art-target-badge.allies {
+  background: rgba(168, 216, 239, 0.1);
+  color: var(--cb-muted);
+  border: 1px solid rgba(168, 216, 239, 0.2);
+}
+
+.stats-section-empty {
+  font-size: 11px;
+  color: rgba(168, 216, 239, 0.3);
+  font-style: italic;
+  padding: 6px 2px 12px;
+  letter-spacing: 0.04em;
+}
+
+.stats-popup-footer {
+  padding: 9px 18px;
+  border-top: 1px solid rgba(39, 202, 255, 0.15);
+  text-align: right;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--cb-muted);
+  flex-shrink: 0;
+}

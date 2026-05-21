@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260521-gallery-photo-defaults-2";
+import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260521-gallery-photo-sync-1";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -9,7 +9,7 @@ import {
   CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
   isCustomTitleElementId,
-} from "./composition-layout.mjs?v=20260521-gallery-photo-defaults-2";
+} from "./composition-layout.mjs?v=20260521-gallery-photo-sync-1";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();

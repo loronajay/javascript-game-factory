@@ -10,47 +10,62 @@ function initInput() {
     const key = normalizeKey(e.key);
 
     if (s === 'title') {
-      if (e.key === 'Enter' || e.key === ' ') setScreen('mode-select');
+      if (e.key === 'Enter' || e.key === ' ') { playClick(); setScreen('mode-select'); }
       return;
     }
 
     if (s === 'mode-select') {
-      if (key === 'ArrowUp')   { e.preventDefault(); moveModeSelectCursor(-1); }
-      if (key === 'ArrowDown') { e.preventDefault(); moveModeSelectCursor(1);  }
-      if (e.key === 'Enter')   handleModeConfirm();
-      if (e.key === 'Escape')  setScreen('title');
+      if (key === 'ArrowUp')   { e.preventDefault(); playClick(); moveModeSelectCursor(-1); }
+      if (key === 'ArrowDown') { e.preventDefault(); playClick(); moveModeSelectCursor(1);  }
+      if (e.key === ' ')       { e.preventDefault(); playClick(); handleModeConfirm(); }
+      if (e.key === 'Escape')  { playClick(); setScreen('title'); }
+      return;
+    }
+
+    if (s === 'battle-config') {
+      if (key === 'ArrowLeft')  { e.preventDefault(); playClick(); moveBattleConfigCursor(-1); }
+      if (key === 'ArrowRight') { e.preventDefault(); playClick(); moveBattleConfigCursor(1);  }
+      if (e.key === ' ')        { e.preventDefault(); playClick(); confirmBattleConfig(); }
+      if (e.key === 'Escape')   { playClick(); setScreen('mode-select'); }
       return;
     }
 
     if (s === 'team-select') {
-      if (key === 'ArrowUp')    { e.preventDefault(); moveTeamSelectCursor('up');    }
-      if (key === 'ArrowDown')  { e.preventDefault(); moveTeamSelectCursor('down');  }
-      if (key === 'ArrowLeft')  { e.preventDefault(); moveTeamSelectCursor('left');  }
-      if (key === 'ArrowRight') { e.preventDefault(); moveTeamSelectCursor('right'); }
-      if (e.key === 'Enter') {
-        const focused = RENTAL_ROSTER[state.teamSelectFocusIndex];
-        if (focused) toggleTeamCreature(focused.id);
+      if (isStatsPopupOpen()) {
+        if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') { playClick(); hideCreatureStats(); }
+        return;
       }
+      if (key === 'ArrowUp')    { e.preventDefault(); playClick(); moveTeamSelectCursor('up');    }
+      if (key === 'ArrowDown')  { e.preventDefault(); playClick(); moveTeamSelectCursor('down');  }
+      if (key === 'ArrowLeft')  { e.preventDefault(); playClick(); moveTeamSelectCursor('left');  }
+      if (key === 'ArrowRight') { e.preventDefault(); playClick(); moveTeamSelectCursor('right'); }
+      if (e.key === ' ') {
+        e.preventDefault();
+        const focused = RENTAL_ROSTER[state.teamSelectFocusIndex];
+        if (focused) { playClick(); toggleTeamCreature(focused.id); }
+      }
+      if (e.key === 'Enter') {
+        const currentTeam = state.teamSelectPhase === 'player' ? state.playerTeam : state.opponentTeam;
+        if (currentTeam.length === 3) { playClick(); confirmTeamSelectPhase(); }
+      }
+      if (e.key === 'r' || e.key === 'R') { playClick(); showCreatureStats(); }
       if (e.key === 'Escape') {
+        playClick();
         if (state.teamSelectPhase === 'opponent') {
           state.teamSelectPhase = 'player';
           state.opponentTeam = [];
           state.teamSelectFocusIndex = 0;
           renderTeamSelect();
         } else {
-          setScreen('mode-select');
+          setScreen('battle-config');
         }
-      }
-      if (e.key === ' ') {
-        const currentTeam = state.teamSelectPhase === 'player' ? state.playerTeam : state.opponentTeam;
-        if (currentTeam.length === 3) confirmTeamSelectPhase();
       }
       return;
     }
 
     if (s === 'battle') {
       e.preventDefault();
-      if ((e.key === ' ' || e.key === 'Enter') && advancePlayback()) return;
+      if ((e.key === ' ' || e.key === 'Enter') && advancePlayback()) { playClick(); return; }
       handleBattleKey(key);
       return;
     }

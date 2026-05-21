@@ -14,7 +14,7 @@ function scaleCanvas() {
 function init() {
   scaleCanvas();
   window.addEventListener('resize', scaleCanvas);
-
+  initSounds();
   renderTitle();
   setScreen('title');
   initInput();

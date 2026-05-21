@@ -1,8 +1,11 @@
-const SCREENS = ['title', 'mode-select', 'team-select', 'battle'];
+const SCREENS = ['title', 'mode-select', 'battle-config', 'team-select', 'battle'];
+const DEFAULT_LEVEL_INDEX = 3; // index of level 30 in LEVEL_TIERS
 
 const state = {
   screen: 'title',
   modeSelectIndex: 0,
+  battleConfigLevelIndex: DEFAULT_LEVEL_INDEX,
+  battleConfig: { level: 30 },
   teamSelectPhase: 'player',   // 'player' | 'opponent'
   playerTeam: [],              // array of creatureIds (max 3)
   opponentTeam: [],
@@ -22,6 +25,12 @@ function setScreen(id) {
     el.classList.toggle('active', el.id === `screen-${id}`);
   }
   if (SCREEN_RENDERERS[id]) SCREEN_RENDERERS[id]();
+}
+
+function startBattleConfig() {
+  state.battleConfigLevelIndex = LEVEL_TIERS.findIndex(t => t.level === state.battleConfig.level);
+  if (state.battleConfigLevelIndex === -1) state.battleConfigLevelIndex = DEFAULT_LEVEL_INDEX;
+  setScreen('battle-config');
 }
 
 function startTeamSelect() {
