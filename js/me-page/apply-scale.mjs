@@ -93,6 +93,11 @@ function hasHeroComposition(layout) {
     layout.desktop.elements.some((element) => element?.category === "hero" && element.enabled !== false);
 }
 
+function hasEnabledComposition(layout) {
+  return Array.isArray(layout?.desktop?.elements) &&
+    layout.desktop.elements.some((element) => element?.enabled !== false);
+}
+
 function applyHeroCompositionScaling(panelEl) {
   unwrapZoomShell(panelEl);
   panelEl.style.zoom = "";
@@ -209,7 +214,10 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.justifyContent = "";
     }
 
-    const z = fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0));
+    const usesEditorGeometry = hasEnabledComposition(layout) || (Array.isArray(panel.children) && panel.children.length > 0);
+    const z = usesEditorGeometry
+      ? fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0))
+      : 1;
     shell.style.zoom = String(z);
     shell.style.overflow = "hidden";
     shell.style.width = `${(availableW / z).toFixed(2)}px`;

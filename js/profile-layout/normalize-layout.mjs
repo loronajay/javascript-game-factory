@@ -1,6 +1,6 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
 import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs";
-import { PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
+import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
@@ -59,6 +59,8 @@ export function normalizeLayout(raw) {
     // Clamp x so panel fits within the grid
     const clampedX = Math.min(x, columns - w);
 
+    const childSource = panelChildrenAreUntouchedDefault(id, p.children) ? undefined : p.children;
+
     normalized.push({
       id,
       enabled,
@@ -67,7 +69,7 @@ export function normalizeLayout(raw) {
       w,
       h,
       style: normalizePanelStyle(p.style),
-      children: normalizePanelChildren(id, p.children),
+      children: normalizePanelChildren(id, childSource),
     });
   }
 
@@ -107,8 +109,11 @@ export function normalizeLayout(raw) {
 }
 
 export function normalizeCompositionElements(rawElements) {
+  if (!Array.isArray(rawElements) || rawElements.length === 0) return [];
+  if (compositionElementsAreUntouchedDefault(rawElements)) return [];
+
   const rawById = new Map(
-    (Array.isArray(rawElements) ? rawElements : getDefaultCompositionElements())
+    rawElements
       .filter((element) => element && typeof element === "object")
       .map((element) => [element.id, element]),
   );
@@ -258,6 +263,7 @@ export function normalizePanelStyle(raw) {
 export function normalizePanelChildren(panelId, rawChildren) {
   const registry = PROFILE_PANEL_CHILD_REGISTRY[panelId];
   if (!registry) return undefined;
+  if (!Array.isArray(rawChildren)) return undefined;
 
   const migratedChildren = migratePanelChildren(panelId, rawChildren);
   const rawById = new Map(
@@ -282,6 +288,48 @@ export function normalizePanelChildren(panelId, rawChildren) {
       h,
       style: normalizePanelStyle(raw.style),
     };
+  });
+}
+
+function compositionElementsAreUntouchedDefault(rawElements) {
+  if (!Array.isArray(rawElements) || rawElements.length === 0) return false;
+
+  const defaultsById = new Map(getDefaultCompositionElements().map((element) => [element.id, element]));
+  const knownElements = rawElements.filter((element) => defaultsById.has(element?.id));
+  if (knownElements.length !== defaultsById.size) return false;
+
+  return knownElements.every((element) => {
+    const def = defaultsById.get(element.id);
+    const style = element.style && typeof element.style === "object" ? element.style : {};
+    return element.category === def.category &&
+      element.type === def.type &&
+      (element.enabled ?? true) === (def.enabled ?? true) &&
+      (element.text || "") === (def.text || "") &&
+      Object.keys(style).length === 0 &&
+      numbersEqual(element.x, def.x) &&
+      numbersEqual(element.y, def.y) &&
+      numbersEqual(element.w, def.w) &&
+      numbersEqual(element.h, def.h);
+  });
+}
+
+function panelChildrenAreUntouchedDefault(panelId, rawChildren) {
+  if (!Array.isArray(rawChildren) || rawChildren.length === 0) return false;
+
+  const defaults = getDefaultPanelChildren(panelId);
+  if (!Array.isArray(defaults) || rawChildren.length !== defaults.length) return false;
+  const defaultsById = new Map(defaults.map((child) => [child.id, child]));
+
+  return rawChildren.every((child) => {
+    const def = defaultsById.get(child?.id);
+    if (!def) return false;
+    const style = child.style && typeof child.style === "object" ? child.style : {};
+    return (child.enabled ?? true) === (def.enabled ?? true) &&
+      Object.keys(style).length === 0 &&
+      numbersEqual(child.x, def.x) &&
+      numbersEqual(child.y, def.y) &&
+      numbersEqual(child.w, def.w) &&
+      numbersEqual(child.h, def.h);
   });
 }
 

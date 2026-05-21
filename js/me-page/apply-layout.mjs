@@ -1,4 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -58,7 +59,8 @@ export function applyProfileLayout(doc, layout, {
   const layoutEl = doc.querySelector(layoutSelector);
   if (!layoutEl) return;
   layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
-  const compositionCategories = getCompositionCategories(layout.desktop.elements);
+  const renderElements = getCompositionElementsForRender(layout.desktop.elements, { galleryPhotos });
+  const compositionCategories = getCompositionCategories(renderElements);
 
   // Sort: column bucket first (0=left, 1=mid, 2=right), then y within bucket.
   const panels = getRenderablePanels(layout.desktop.panels, layoutSelector).sort((a, b) => {
@@ -83,13 +85,13 @@ export function applyProfileLayout(doc, layout, {
     el.style.gridRow    = `${panel.y + 1} / span ${panel.h}`;
     applyPanelVisualStyle(el, panel.style);
     applyPanelChildLayout(el, panel);
-    applyHeroCompositionLayout(doc, el, layout.desktop.elements);
+    applyHeroCompositionLayout(doc, el, renderElements);
 
     // Append in sort order so DOM order drives mobile stacking.
     layoutEl.appendChild(el);
   }
 
-  renderCompositionOverlays(doc, layoutEl, layout.desktop.elements, layout.desktop.panels, { galleryPhotos });
+  renderCompositionOverlays(doc, layoutEl, renderElements, layout.desktop.panels, { galleryPhotos });
 }
 
 function getRenderablePanels(panels, layoutSelector) {
@@ -212,7 +214,7 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = [], { galle
     } else if (element.id === "friendCodeContent") {
       renderFriendCodeContentOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "galleryContent") {
-      renderGalleryContentOverlay(doc, layoutEl, element, panels);
+      renderGalleryContentOverlay(doc, layoutEl, element, panels, galleryPhotos);
     } else if (element.id === "galleryLink") {
       renderGalleryLinkOverlay(doc, layoutEl, element, panels);
     } else if (element.type === "galleryPhoto") {
@@ -229,7 +231,41 @@ function isCustomTitleElement(element) {
   return element?.type === "title" && typeof element.id === "string" && element.id.startsWith(CUSTOM_TITLE_PREFIX);
 }
 
-function getCompositionCategories(elements) {
+export function getCompositionElementsForRender(elements, { galleryPhotos = [] } = {}) {
+  const renderElements = Array.isArray(elements) ? [...elements] : [];
+  const hasGalleryPhotos = Array.isArray(galleryPhotos) && galleryPhotos.length > 0;
+  const hasEnabledGalleryComposition = renderElements.some((element) => (
+    element?.enabled !== false &&
+    element.category === "gallery"
+  ));
+  const hasEnabledGalleryContent = renderElements.some((element) => (
+    element?.enabled !== false &&
+    (element.id === "galleryContent" || element.type === "galleryPhoto")
+  ));
+
+  if (!hasGalleryPhotos || !hasEnabledGalleryComposition || hasEnabledGalleryContent) {
+    return renderElements;
+  }
+
+  const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY.galleryContent;
+  return [
+    ...renderElements,
+    {
+      id: "galleryContent",
+      category: def.category,
+      type: def.type,
+      enabled: true,
+      text: "",
+      x: def.defaultX,
+      y: def.defaultY,
+      w: def.defaultW,
+      h: def.defaultH,
+      style: {},
+    },
+  ];
+}
+
+export function getCompositionCategories(elements) {
   return new Set((Array.isArray(elements) ? elements : [])
     .filter((element) => (
       element?.enabled !== false &&
@@ -333,7 +369,7 @@ function renderFriendCodeContentOverlay(doc, layoutEl, element, panels) {
   layoutEl.appendChild(codeEl);
 }
 
-function renderGalleryContentOverlay(doc, layoutEl, element, panels) {
+function renderGalleryContentOverlay(doc, layoutEl, element, panels, galleryPhotos = []) {
   const galleryEl = doc.createElement("div");
   const source = doc.querySelector("#meGalleryPanel [data-profile-child-id='content'], #playerGalleryPanel [data-profile-child-id='content']");
   galleryEl.className = "profile-composition-overlay profile-composition-overlay--gallery-grid gallery-panel__content";
@@ -341,7 +377,7 @@ function renderGalleryContentOverlay(doc, layoutEl, element, panels) {
   galleryEl.dataset.profileChildId = "content";
   const grid = source?.querySelector(".gallery-grid")?.cloneNode(true);
   if (grid) galleryEl.appendChild(grid);
-  else galleryEl.innerHTML = `<div class="gallery-grid"><p class="me-panel__empty player-panel__empty">No photos yet.</p></div>`;
+  else galleryEl.innerHTML = renderGalleryGridHtml(galleryPhotos);
   applyCompositionOverlayRect(galleryEl, element);
   applyPanelVisualStyle(galleryEl, mergeLegacyChildStyle(element, panels, "gallery", "content"));
   layoutEl.appendChild(galleryEl);
@@ -383,6 +419,25 @@ function renderGalleryPhotoOverlay(doc, layoutEl, element, panels, galleryPhotos
   applyCompositionOverlayRect(photoEl, element);
   applyPanelVisualStyle(photoEl, mergeLegacyChildStyle(element, panels, "gallery", "content"));
   layoutEl.appendChild(photoEl);
+}
+
+function renderGalleryGridHtml(galleryPhotos = []) {
+  const photos = Array.isArray(galleryPhotos) ? galleryPhotos.slice(0, 8) : [];
+  const content = photos.length > 0
+    ? photos.map((photo) => renderGalleryItemHtml(photo)).join("")
+    : `<p class="me-panel__empty player-panel__empty">No photos yet.</p>`;
+  return `<div class="gallery-grid">${content}</div>`;
+}
+
+function renderGalleryItemHtml(photo) {
+  return `
+    <div class="gallery-item" data-photo-id="${escapeHtml(photo?.id || "")}">
+      <div class="gallery-item__img-frame">
+        <img class="gallery-item__img" src="${escapeHtml(photo?.imageUrl || "")}" alt="${escapeHtml(photo?.caption || "")}" loading="lazy">
+      </div>
+      ${photo?.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
+    </div>
+  `;
 }
 
 function renderThoughtsComposerOverlay(doc, layoutEl, element, panels) {
