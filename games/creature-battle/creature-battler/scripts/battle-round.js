@@ -107,6 +107,7 @@ function getResultMessage(result) {
     case 'no_target': msg = `${result.actorName}'s ${result.moveName} found no target!`; break;
     case 'miss':      msg = `${result.actorName} uses ${result.moveName}... Miss!`; break;
     case 'heal':      msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} recovers ${result.amount} HP.`; break;
+    case 'absorb':    msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} absorbs the attack and recovers ${result.amount} HP!`; break;
     case 'damage':
     case 'crit': {
       const crit = result.isCrit ? 'Critical hit! ' : '';

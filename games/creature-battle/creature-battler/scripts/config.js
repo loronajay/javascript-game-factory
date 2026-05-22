@@ -18,7 +18,7 @@ const RENTAL_ROSTER = [
     role: 'Magic Art pressure',
     baseStats: { hp: 72, mp: 27, strength: 7, defense: 7, intelligence: 16, spirit: 11, speed: 14 },
     growth:    { hp: 6.8, mp: 2.85, strength: 0.7, defense: 0.75, intelligence: 1.75, spirit: 1.05, speed: 1.45 },
-    resistances: { neutral: 1, fire: 0.5, water: 1.5, gaia: 0.75, ice: 0.75, earth: 1.25, wind: 1, light: 1, dark: 1 },
+    resistances: {},
     sprite: 'shared/creatures/salamander/salamander.png',
   },
   {
@@ -28,7 +28,7 @@ const RENTAL_ROSTER = [
     role: 'Sustain bruiser',
     baseStats: { hp: 96, mp: 24, strength: 10, defense: 14, intelligence: 11, spirit: 12, speed: 6 },
     growth:    { hp: 10.0, mp: 2.55, strength: 1.0, defense: 1.45, intelligence: 1.15, spirit: 1.15, speed: 0.6 },
-    resistances: { neutral: 1, fire: 0.75, water: 0.5, gaia: 1.25, ice: 0.75, earth: 1, wind: 1, light: 1, dark: 1 },
+    resistances: {},
     sprite: 'shared/creatures/aquaphant/aquaphant.png',
   },
   {
@@ -38,7 +38,7 @@ const RENTAL_ROSTER = [
     role: 'Control / debuff',
     baseStats: { hp: 68, mp: 26, strength: 6, defense: 8, intelligence: 13, spirit: 11, speed: 16 },
     growth:    { hp: 6.7, mp: 2.7, strength: 0.65, defense: 0.85, intelligence: 1.45, spirit: 1.1, speed: 1.7 },
-    resistances: { neutral: 1, fire: 1.5, water: 0.75, gaia: 1, ice: 0.5, earth: 1, wind: 1, light: 1, dark: 1 },
+    resistances: {},
     sprite: 'shared/creatures/pengun/pengun.png',
   },
   {
@@ -48,7 +48,7 @@ const RENTAL_ROSTER = [
     role: 'Sustain / control',
     baseStats: { hp: 76, mp: 28, strength: 7, defense: 10, intelligence: 11, spirit: 15, speed: 9 },
     growth:    { hp: 7.8, mp: 3.1, strength: 0.7, defense: 1.15, intelligence: 1.15, spirit: 1.65, speed: 0.95 },
-    resistances: { neutral: 1, fire: 1.25, water: 0.75, gaia: 0.5, ice: 1, earth: 0.75, wind: 1, light: 1, dark: 1.25 },
+    resistances: {},
     sprite: 'shared/creatures/flor/flor.png',
   },
 ];

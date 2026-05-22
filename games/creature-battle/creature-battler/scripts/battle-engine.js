@@ -194,9 +194,19 @@ function spendMoveCost(actor, move) {
   actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
 }
 
-function getElementModifier(moveElement, resistances) {
+const ELEMENT_OPPOSITES = {
+  fire: 'ice',   ice:   'fire',
+  water: 'gaia', gaia:  'water',
+  wind:  'earth', earth: 'wind',
+  light: 'dark', dark:  'light',
+};
+
+// Returns a numeric modifier, or the string 'absorb' when the move element matches the target's element.
+function getElementModifier(moveElement, target) {
   if (!moveElement || moveElement === 'neutral' || moveElement === 'none') return 1.0;
-  return resistances[moveElement] ?? 1.0;
+  if (target.element === moveElement) return 'absorb';
+  if (ELEMENT_OPPOSITES[target.element] === moveElement) return 1.5;
+  return target.resistances?.[moveElement] ?? 1.0;
 }
 
 function calcHitChance(attacker, target, move) {
@@ -213,19 +223,26 @@ function resolveHit(attacker, target, move) {
 }
 
 function calcDamage(attacker, target, move) {
-  const offStat   = move.damageClass === 'physical' ? getEffectiveStat(attacker, 'strength') : getEffectiveStat(attacker, 'intelligence');
-  const defStat   = move.damageClass === 'physical' ? getEffectiveStat(target, 'defense')    : getEffectiveStat(target, 'spirit');
-  const levelMod  = attacker.level * ENGINE.LEVEL_MOD;
-  const pressure  = (offStat - defStat) * move.offensiveScaling;
-  const elemMod   = getElementModifier(move.element, target.resistances);
-  const isCrit    = move.canCrit && _battleRng() < ENGINE.CRIT_CHANCE;
-  const critMod   = isCrit ? ENGINE.CRIT_MOD : 1.0;
-  const defMod    = target.isDefending ? ENGINE.DEFEND_MOD : 1.0;
-  const randMod   = engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
+  const offStat  = move.damageClass === 'physical' ? getEffectiveStat(attacker, 'strength') : getEffectiveStat(attacker, 'intelligence');
+  const defStat  = move.damageClass === 'physical' ? getEffectiveStat(target, 'defense')    : getEffectiveStat(target, 'spirit');
+  const levelMod = attacker.level * ENGINE.LEVEL_MOD;
+  const pressure = (offStat - defStat) * move.offensiveScaling;
+  const elemMod  = getElementModifier(move.element, target);
+
+  if (elemMod === 'absorb') {
+    const raw = move.basePower + move.movePowerModifier + pressure + levelMod + engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
+    return { damage: 0, healAmount: Math.max(1, Math.round(raw * 0.5)), isCrit: false, elemMod: 'absorb' };
+  }
+
+  const isCrit  = move.canCrit && _battleRng() < ENGINE.CRIT_CHANCE;
+  const critMod = isCrit ? ENGINE.CRIT_MOD : 1.0;
+  const defMod  = target.isDefending ? ENGINE.DEFEND_MOD : 1.0;
+  const randMod = engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
   const raw = (move.basePower + move.movePowerModifier + pressure + levelMod)
               * elemMod * defMod * critMod + randMod;
   return {
     damage: Math.max(ENGINE.MIN_DAMAGE, Math.min(ENGINE.MAX_DAMAGE, Math.round(raw))),
+    healAmount: 0,
     isCrit,
     elemMod,
   };
@@ -409,7 +426,11 @@ function resolveAction(action) {
       }
       const didHit = resolveHit(actor, target, move);
       if (!didHit) return { slot, name: target.displayName, missed: true };
-      const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
+      const { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+      if (elemMod === 'absorb') {
+        target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
+        return { slot, name: target.displayName, amount: healAmount, elemMod: 'absorb', wasKO: false, isCrit: false };
+      }
       target.hp.current = Math.max(0, target.hp.current - damage);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
       if (wasKO) {
@@ -468,7 +489,12 @@ function resolveAction(action) {
       if (target.isKnockedOut) break;
       const didHit = resolveHit(actor, target, move);
       if (!didHit) { hits.push({ missed: true }); continue; }
-      const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
+      const { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+      if (elemMod === 'absorb') {
+        target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
+        hits.push({ healAmount, elemMod: 'absorb', wasKO: false, isCrit: false });
+        continue;
+      }
       target.hp.current = Math.max(0, target.hp.current - damage);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
       if (wasKO) { target.isKnockedOut = true; clearBattleModifiers(target); }
@@ -482,7 +508,22 @@ function resolveAction(action) {
     return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide: tgtSide, targetSlot: tgtSlot };
   }
 
-  const { damage, isCrit, elemMod } = calcDamage(actor, target, move);
+  const { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+
+  if (elemMod === 'absorb') {
+    target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
+    return {
+      type: 'absorb',
+      actorName: actor.displayName,
+      moveName: move.name,
+      targetName: target.displayName,
+      targetSide: tgtSide,
+      targetSlot: tgtSlot,
+      amount: healAmount,
+      retargeted,
+    };
+  }
+
   target.hp.current = Math.max(0, target.hp.current - damage);
   const wasKO = !target.isKnockedOut && target.hp.current <= 0;
   if (wasKO) {

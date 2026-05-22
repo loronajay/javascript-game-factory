@@ -6,6 +6,14 @@
     earth: 'Earth', wind: 'Wind', light: 'Light', dark: 'Dark',
   };
 
+  // Opposing pairs: each element is weak to its opposite and absorbs its own element.
+  var OPPOSITES = {
+    fire: 'ice',   ice:   'fire',
+    water: 'gaia', gaia:  'water',
+    wind:  'earth', earth: 'wind',
+    light: 'dark', dark:  'light',
+  };
+
   var GUIDE_STATUS_DEFS = [
     { name: 'Burn',    tag: 'burn',    duration: '3 rounds',  desc: 'Deals 6% max HP each round and lowers Defense by 1 stage.' },
     { name: 'Poison',  tag: 'poison',  duration: 'Permanent', desc: 'Deals 6% max HP each round until cleansed.' },
@@ -15,17 +23,22 @@
     { name: 'Silence', tag: 'silence', duration: 'Timed',     desc: 'Cannot use Arts. Basic Attack and Defend still work.' },
   ];
 
-  function multClass(val) {
-    if (val >= 1.5)  return 'eg-weak-2';
-    if (val >= 1.25) return 'eg-weak-1';
-    if (val <= 0.5)  return 'eg-res-2';
-    if (val <= 0.75) return 'eg-res-1';
+  function getMatchup(defenderElement, attackerElement) {
+    if (defenderElement === attackerElement)          return 'absorb';
+    if (OPPOSITES[defenderElement] === attackerElement) return 'weak';
+    return 'neutral';
+  }
+
+  function cellClass(matchup) {
+    if (matchup === 'absorb')  return 'eg-absorb';
+    if (matchup === 'weak')    return 'eg-weak-2';
     return 'eg-neutral';
   }
 
-  function multLabel(val) {
-    if (val === 1) return '&mdash;';
-    return val + '&times;';
+  function cellLabel(matchup) {
+    if (matchup === 'absorb') return 'Absorb';
+    if (matchup === 'weak')   return '1.5&times;';
+    return '&mdash;';
   }
 
   window.isElementGuideOpen = function() {
@@ -40,23 +53,19 @@
   window.showElementGuide = function(screenId) {
     window.hideElementGuide();
 
-    var chartRows = RENTAL_ROSTER.map(function(c) {
-      var cells = GUIDE_ELEMENTS.map(function(el) {
-        var val = (c.resistances && c.resistances[el] != null) ? c.resistances[el] : 1;
-        return '<td class="eg-cell ' + multClass(val) + '">' + multLabel(val) + '</td>';
-      }).join('');
-      return '<tr>' +
-        '<td class="eg-creature-cell">' +
-          '<img class="eg-creature-sprite" src="' + c.sprite + '" alt="' + c.name + '">' +
-          '<span class="eg-creature-name">' + c.name + '</span>' +
-          '<span class="element-tag element-' + c.element + '">' + c.element + '</span>' +
-        '</td>' +
-        cells +
-        '</tr>';
-    }).join('');
-
     var elementHeaders = GUIDE_ELEMENTS.map(function(el) {
       return '<th><span class="eg-elem-header element-' + el + '">' + GUIDE_ELEMENT_LABELS[el] + '</span></th>';
+    }).join('');
+
+    var chartRows = GUIDE_ELEMENTS.map(function(defEl) {
+      var cells = GUIDE_ELEMENTS.map(function(atkEl) {
+        var matchup = getMatchup(defEl, atkEl);
+        return '<td class="eg-cell ' + cellClass(matchup) + '">' + cellLabel(matchup) + '</td>';
+      }).join('');
+      return '<tr>' +
+        '<th class="eg-row-header"><span class="eg-elem-header element-' + defEl + '">' + GUIDE_ELEMENT_LABELS[defEl] + '</span></th>' +
+        cells +
+        '</tr>';
     }).join('');
 
     var statusRows = GUIDE_STATUS_DEFS.map(function(s) {
@@ -78,19 +87,14 @@
           '<div class="guide-popup-title">Battle Reference</div>' +
         '</div>' +
         '<div class="guide-popup-body">' +
-          '<div class="stats-section-label">Element Chart &mdash; Incoming Damage</div>' +
+          '<div class="stats-section-label">Element Chart &mdash; Attacker &rarr; / Defender &darr;</div>' +
           '<div class="eg-chart-legend">' +
-            '<span class="eg-legend-dot eg-weak-2">1.5&times; Weak</span>' +
-            '<span class="eg-legend-dot eg-weak-1">1.25&times; Slight</span>' +
+            '<span class="eg-legend-dot eg-weak-2">1.5&times; Weakness</span>' +
+            '<span class="eg-legend-dot eg-absorb">Absorb (heals)</span>' +
             '<span class="eg-legend-dot eg-neutral">Neutral</span>' +
-            '<span class="eg-legend-dot eg-res-1">0.75&times; Resists</span>' +
-            '<span class="eg-legend-dot eg-res-2">0.5&times; Blocks</span>' +
           '</div>' +
           '<table class="eg-chart">' +
-            '<thead><tr>' +
-              '<th class="eg-chart-corner">Target &darr; &nbsp; Attacker &rarr;</th>' +
-              elementHeaders +
-            '</tr></thead>' +
+            '<thead><tr><th class="eg-chart-corner"></th>' + elementHeaders + '</tr></thead>' +
             '<tbody>' + chartRows + '</tbody>' +
           '</table>' +
           '<div class="stats-section-label" style="margin-top:18px">Status Effects</div>' +
