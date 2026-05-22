@@ -63,6 +63,19 @@ function initInput() {
       return;
     }
 
+    if (s === 'online-lobby') {
+      if (e.target.tagName === 'INPUT') return; // let the code input field capture keys
+      if (e.key === 'Escape') handleOnlineLobbyEsc();
+      return;
+    }
+
+    if (s === 'blind-pick') {
+      if (e.key === 'Escape') {
+        // No back-out once in blind pick — match is live.
+      }
+      return;
+    }
+
     if (s === 'battle') {
       e.preventDefault();
       if ((e.key === ' ' || e.key === 'Enter') && advancePlayback()) { playClick(); return; }

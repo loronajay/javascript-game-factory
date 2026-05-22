@@ -1,0 +1,57 @@
+#screen-blind-pick {
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 10%, rgba(6, 79, 143, 0.35) 0%, transparent 50%),
+    linear-gradient(180deg, #01111f 0%, #020d1a 100%);
+}
+
+/* Reuse team-select layout — blind pick shares the same shell */
+
+/* ── Opponent status badge ──────────────────────────────────────────────────── */
+.bp-opponent-status {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-top: 4px;
+}
+
+.bp-opponent-status.waiting {
+  color: var(--cb-muted);
+  background: rgba(6, 24, 45, 0.6);
+  border: 1px solid rgba(6, 24, 45, 0.8);
+}
+
+.bp-opponent-status.ready {
+  color: var(--cb-accent);
+  background: rgba(39, 202, 255, 0.1);
+  border: 1px solid rgba(39, 202, 255, 0.35);
+  text-shadow: 0 0 8px var(--cb-accent-soft);
+}
+
+/* ── Locked state ──────────────────────────────────────────────────────────── */
+.roster-grid.roster-locked .creature-card {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.roster-grid.roster-locked .creature-card.selected {
+  opacity: 1;
+}
+
+/* ── Footer states ─────────────────────────────────────────────────────────── */
+.bp-locked-msg {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cb-accent);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px var(--cb-accent-soft);
+}
+
+.bp-hint {
+  font-size: 13px;
+  color: var(--cb-muted);
+  letter-spacing: 0.06em;
+}

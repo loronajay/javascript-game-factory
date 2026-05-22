@@ -25,14 +25,14 @@ function playSfx(id) {
 }
 
 function initSounds() {
-  loadSfx('click',        'assets/sounds/button-click.wav');
-  loadSfx('invalid',      'assets/sounds/invalid.wav');
-  loadSfx('hit-light',    'assets/sounds/combat-sounds/hit-light.wav');
-  loadSfx('hit-heavy',    'assets/sounds/combat-sounds/hit-heavy.wav');
-  loadSfx('fire',         'assets/sounds/combat-sounds/fire.wav');
-  loadSfx('charge-light', 'assets/sounds/combat-sounds/charge-light.wav');
-  loadSfx('beam-light',   'assets/sounds/combat-sounds/beam-light.mp3');
-  _battleMusic = loadMusic('assets/sounds/battle-theme.mp3');
+  loadSfx('click',        'creature-battler/assets/sounds/button-click.wav');
+  loadSfx('invalid',      'creature-battler/assets/sounds/invalid.wav');
+  loadSfx('hit-light',    'creature-battler/assets/sounds/combat-sounds/hit-light.wav');
+  loadSfx('hit-heavy',    'creature-battler/assets/sounds/combat-sounds/hit-heavy.wav');
+  loadSfx('fire',         'creature-battler/assets/sounds/combat-sounds/fire.wav');
+  loadSfx('charge-light', 'creature-battler/assets/sounds/combat-sounds/charge-light.wav');
+  loadSfx('beam-light',   'creature-battler/assets/sounds/combat-sounds/beam-light.mp3');
+  _battleMusic = loadMusic('creature-battler/assets/sounds/battle-theme.mp3');
 }
 
 function startBattleMusic() {

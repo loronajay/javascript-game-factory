@@ -36,6 +36,7 @@ function handleModeConfirm() {
   const mode = MODES[state.modeSelectIndex];
   if (!mode.available) return;
   if (mode.id === 'training') startBattleConfig();
+  if (mode.id === 'online')   enterOnlineLobby();
 }
 
 registerRenderer('mode-select', renderModeSelect);

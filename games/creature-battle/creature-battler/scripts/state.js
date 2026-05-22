@@ -1,4 +1,4 @@
-const SCREENS = ['title', 'mode-select', 'battle-config', 'team-select', 'battle'];
+const SCREENS = ['title', 'mode-select', 'battle-config', 'team-select', 'battle', 'online-lobby', 'blind-pick'];
 const DEFAULT_LEVEL_INDEX = 3; // index of level 30 in LEVEL_TIERS
 
 const state = {
@@ -11,6 +11,24 @@ const state = {
   opponentTeam: [],
   teamSelectFocusIndex: 0,
   battleState: null,           // set when battle begins
+  isOnlineMatch: false,
+
+  // Online 1v1
+  onlineLobbyPhase: 'settings', // 'settings' | 'main' | 'searching' | 'friend_opts' | 'create' | 'join'
+  onlineSettings: { pickStyle: 'blind', levelCapIndex: 0, resolvedLevelCap: null },
+  onlineClient: null,
+  onlineRoomCode: '',
+  onlineCodeInput: '',
+  remotePlayerInfo: null,      // { displayName, playerId }
+
+  // Blind pick phase
+  blindPick: {
+    myTeam: [],
+    myLocked: false,
+    opponentLocked: false,
+    remoteTeam: null,          // coordinator stores opponent's locked team here
+    settingsReceived: false,   // non-coordinator waits for match_settings
+  },
 };
 
 const SCREEN_RENDERERS = {};
