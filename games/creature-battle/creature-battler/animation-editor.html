@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Animation Editor — Creature Battler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Game styles needed to render the field correctly -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/battle.css">
+  <link rel="stylesheet" href="styles/animation-overlay.css">
+  <link rel="stylesheet" href="styles/animations/anim-universal.css">
+  <link rel="stylesheet" href="styles/animations/anim-salamander.css">
+  <link rel="stylesheet" href="styles/animations/anim-aquaphant.css">
+  <link rel="stylesheet" href="styles/animations/anim-pengun.css">
+  <link rel="stylesheet" href="styles/animations/anim-flor.css">
+
+  <!-- Editor styles -->
+  <link rel="stylesheet" href="animation-editor.css">
+</head>
+<body class="ae-body">
+
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <div id="ae-header">
+    <span class="ae-title">Animation Editor</span>
+    <div class="ae-controls">
+      <button id="ae-play"   class="ae-btn primary">▶ Play</button>
+      <button id="ae-loop"   class="ae-btn">⟳ Loop</button>
+      <button id="ae-reset"  class="ae-btn">↺ Reset</button>
+      <button id="ae-sort"   class="ae-btn">↕ Sort</button>
+      <button id="ae-export" class="ae-btn">⬆ Export</button>
+    </div>
+    <span class="ae-header-spacer"></span>
+    <span class="ae-hint">actor = player-middle &nbsp;·&nbsp; target = opponent-middle</span>
+  </div>
+
+  <!-- ── Main: field + sidebar ───────────────────────────────────────── -->
+  <div id="ae-main">
+
+    <!-- Field preview -->
+    <div id="ae-field-wrap">
+      <div id="ae-field-container">
+        <div class="battle-field" id="battle-field">
+          <!-- Creatures injected by animation-editor.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar: palette + inspector -->
+    <div id="ae-sidebar">
+
+      <div id="ae-palette">
+        <div class="ae-section-label">Add Event</div>
+        <div id="ae-palette-grid">
+          <button class="ae-palette-btn" data-type="creature_anim">
+            <span class="ae-type-dot" style="background:#4488ff"></span>creature_anim
+          </button>
+          <button class="ae-palette-btn" data-type="projectile">
+            <span class="ae-type-dot" style="background:#ff8833"></span>projectile
+          </button>
+          <button class="ae-palette-btn" data-type="beam">
+            <span class="ae-type-dot" style="background:#ffdd44"></span>beam
+          </button>
+          <button class="ae-palette-btn" data-type="particle_burst">
+            <span class="ae-type-dot" style="background:#44cc88"></span>particle_burst
+          </button>
+          <button class="ae-palette-btn" data-type="field_flash">
+            <span class="ae-type-dot" style="background:#cc66ff"></span>field_flash
+          </button>
+          <button class="ae-palette-btn" data-type="screen_shake">
+            <span class="ae-type-dot" style="background:#ff4444"></span>screen_shake
+          </button>
+          <button class="ae-palette-btn" data-type="creature_shake">
+            <span class="ae-type-dot" style="background:#ff8866"></span>creature_shake
+          </button>
+          <button class="ae-palette-btn" data-type="sound">
+            <span class="ae-type-dot" style="background:#888888"></span>sound
+          </button>
+          <button class="ae-palette-btn" data-type="preset">
+            <span class="ae-type-dot" style="background:#44cccc"></span>preset
+          </button>
+          <button class="ae-palette-btn" data-type="impact">
+            <span class="ae-type-dot" style="background:#ffcc44"></span>impact
+          </button>
+        </div>
+      </div>
+
+      <div id="ae-inspector">
+        <div class="ae-section-label">Properties</div>
+        <div id="ae-inspector-empty" style="color:#334;font-size:11px;padding:12px;font-style:italic">
+          Select an event to edit its properties.
+        </div>
+        <div id="ae-inspector-form"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Timeline ────────────────────────────────────────────────────── -->
+  <div id="ae-timeline">
+    <div id="ae-timeline-header">
+      <span class="ae-tl-label">Timeline</span>
+      <span class="ae-tl-count" id="ae-tl-count">0 events</span>
+    </div>
+    <div id="ae-strip-wrap">
+      <div id="ae-strip"></div>
+    </div>
+    <div id="ae-event-list"></div>
+  </div>
+
+  <!-- ── Export modal ────────────────────────────────────────────────── -->
+  <div id="ae-export-modal" class="ae-modal-backdrop hidden">
+    <div class="ae-modal-box">
+      <div class="ae-modal-header">
+        <span>Export Timeline</span>
+        <button id="ae-modal-close" class="ae-btn">✕</button>
+      </div>
+      <pre id="ae-export-output" class="ae-modal-pre"></pre>
+      <div class="ae-modal-footer">
+        <button id="ae-copy-btn" class="ae-btn primary">Copy to Clipboard</button>
+        <button class="ae-btn" onclick="document.getElementById('ae-export-modal').classList.add('hidden')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Engine scripts (same files the game loads, same order) ──────── -->
+  <script src="scripts/animation-components.js"></script>
+  <script src="scripts/animation-presets.js"></script>
+  <script src="scripts/animation-engine.js"></script>
+  <script src="scripts/animation-state.js"></script>
+
+  <!-- ── Editor driver ────────────────────────────────────────────────── -->
+  <script src="animation-editor.js"></script>
+
+</body>
+</html>

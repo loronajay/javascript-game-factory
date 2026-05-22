@@ -39,6 +39,7 @@ function renderBattle() {
     document.getElementById('battle-bg').style.backgroundImage = `url('${arenaFile}')`;
   }
 
+  CreatureState.initBattle();
   inputState.logMessage = 'Preparing for battle...';
   renderBattleCommandPanel();
   setTimeout(startRound, 600);
@@ -116,8 +117,10 @@ function renderFieldCreature(creature, side, slot) {
     <div class="battle-creature ${side} ${creature.isKnockedOut ? 'ko' : ''}"
          data-creature="${side}-${slot}"
          style="left:${layout.xPct}%;top:${layout.yPct}%;z-index:${layout.zIndex}">
-      <img src="${creature.sprite}" alt="${creature.displayName}"
-           style="width:${size}px;height:${size}px;transform:${flip};display:block;image-rendering:pixelated;object-fit:contain">
+      <div class="creature-breathe-wrapper">
+        <img src="${creature.sprite}" alt="${creature.displayName}"
+             style="width:${size}px;height:${size}px;transform:${flip};display:block;image-rendering:pixelated;object-fit:contain">
+      </div>
       <div class="battle-shadow" style="width:${shadowW}px;height:${shadowH}px"></div>
     </div>`;
 }
@@ -128,7 +131,11 @@ function updateFieldKoStates() {
     for (const slot of SLOT_NAMES) {
       const c = bs[side][slot];
       if (!c) continue;
-      document.querySelector(`[data-creature="${side}-${slot}"]`)?.classList.toggle('ko', c.isKnockedOut);
+      const el = document.querySelector(`[data-creature="${side}-${slot}"]`);
+      if (!el) continue;
+      const wasKo = el.classList.contains('ko');
+      el.classList.toggle('ko', c.isKnockedOut);
+      if (c.isKnockedOut && !wasKo) CreatureState.setKO(side, slot);
     }
   }
 }

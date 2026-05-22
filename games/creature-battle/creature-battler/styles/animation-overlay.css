@@ -1,0 +1,153 @@
+/* ── Battle Animation Overlay ───────────────────────────────────────────────
+   Parent for all VFX elements spawned by the animation engine:
+   projectiles, particles, beams, field flashes.
+   Lives inside #battle-field so it inherits the field's overflow:hidden clip.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+#battle-anim-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ── Base element classes ───────────────────────────────────────────────────
+   Spawned elements get one of these as their base class. JS sets position
+   and CSS vars; the animation class drives the actual motion. */
+
+.anim-projectile {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.anim-particle {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.anim-beam {
+  position: absolute;
+  pointer-events: none;
+  height: 4px;
+  width: 0;
+  transform-origin: left center;
+}
+
+.anim-field-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* ── Projectile travel ──────────────────────────────────────────────────────
+   JS sets --proj-dx, --proj-dy, --proj-angle, --proj-duration on the element.
+   .anim-proj-flat  = straight line travel
+   .anim-proj-arc   = arced path (--proj-arc controls peak offset, negative = arc upward) */
+
+@keyframes proj-travel {
+  from { transform: translate(-50%, -50%) translate(0, 0) rotate(var(--proj-angle, 0deg)); }
+  to   { transform: translate(-50%, -50%) translate(var(--proj-dx, 0px), var(--proj-dy, 0px)) rotate(var(--proj-angle, 0deg)); }
+}
+
+@keyframes proj-travel-arc {
+  0%   { transform: translate(-50%, -50%) translate(0, 0) rotate(var(--proj-angle, 0deg)); }
+  50%  { transform: translate(-50%, -50%)
+         translate(calc(var(--proj-dx, 0px) * 0.5), calc(var(--proj-dy, 0px) * 0.5 + var(--proj-arc, -30px)))
+         rotate(var(--proj-angle, 0deg)); }
+  100% { transform: translate(-50%, -50%) translate(var(--proj-dx, 0px), var(--proj-dy, 0px)) rotate(var(--proj-angle, 0deg)); }
+}
+
+.anim-proj-flat { animation: proj-travel     var(--proj-duration, 300ms) ease-in         forwards; }
+.anim-proj-arc  { animation: proj-travel-arc var(--proj-duration, 300ms) ease-in-out     forwards; }
+
+/* ── Beam extend ────────────────────────────────────────────────────────────
+   JS sets --beam-length, --beam-duration on the element.
+   Element is positioned at the FROM point; transform-origin: left center
+   so it extends rightward then rotates to face target. */
+
+@keyframes beam-extend {
+  0%   { width: 0;                    opacity: 1; }
+  60%  { width: var(--beam-length, 100px); opacity: 1; }
+  100% { width: var(--beam-length, 100px); opacity: 0; }
+}
+
+.anim-beam-extend {
+  animation: beam-extend var(--beam-duration, 400ms) ease-out forwards;
+}
+
+/* ── Field flash ────────────────────────────────────────────────────────────
+   JS sets --flash-opacity, --flash-duration on the element. */
+
+@keyframes field-flash {
+  0%   { opacity: 0; }
+  15%  { opacity: var(--flash-opacity, 0.5); }
+  100% { opacity: 0; }
+}
+
+.anim-field-flash-in {
+  animation: field-flash var(--flash-duration, 200ms) ease-out forwards;
+}
+
+/* ── Screen shake ───────────────────────────────────────────────────────────
+   Applied to #battle-field itself, not the overlay.
+   JS sets --shake-intensity, --shake-duration on the field element.
+   smooth = sine-wave jitter; stutter = sudden snap (lightning style) */
+
+@keyframes shake-smooth {
+  0%   { transform: translate(0, 0); }
+  15%  { transform: translate(calc(var(--shake-intensity) * -1), calc(var(--shake-intensity) * 0.5)); }
+  30%  { transform: translate(var(--shake-intensity), calc(var(--shake-intensity) * -0.3)); }
+  45%  { transform: translate(calc(var(--shake-intensity) * -0.6), var(--shake-intensity)); }
+  60%  { transform: translate(calc(var(--shake-intensity) * 0.4), calc(var(--shake-intensity) * -0.6)); }
+  75%  { transform: translate(calc(var(--shake-intensity) * -0.2), calc(var(--shake-intensity) * 0.3)); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes shake-stutter {
+  0%   { transform: translate(0, 0); }
+  8%   { transform: translate(var(--shake-intensity), calc(var(--shake-intensity) * -0.3)); }
+  9%   { transform: translate(0, 0); }
+  55%  { transform: translate(0, 0); }
+  63%  { transform: translate(calc(var(--shake-intensity) * -1), calc(var(--shake-intensity) * 0.5)); }
+  64%  { transform: translate(0, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+.anim-shake-smooth  { animation: shake-smooth  var(--shake-duration, 300ms) ease-out; }
+.anim-shake-stutter { animation: shake-stutter var(--shake-duration, 300ms) ease-out; }
+
+/* ── Creature shake ─────────────────────────────────────────────────────────
+   Applied to a .battle-creature element. Must preserve translate(-50%,-50%)
+   that positions all creatures, then add the shake offset on top of it.
+   JS sets --shake-intensity, --shake-duration on the creature element. */
+
+@keyframes creature-shake {
+  0%   { transform: translate(-50%, -50%); }
+  20%  { transform: translate(calc(-50% + var(--shake-intensity)), calc(-50% - calc(var(--shake-intensity) * 0.4))); }
+  40%  { transform: translate(calc(-50% - calc(var(--shake-intensity) * 0.6)), calc(-50% + calc(var(--shake-intensity) * 0.3))); }
+  60%  { transform: translate(calc(-50% + calc(var(--shake-intensity) * 0.3)), calc(-50% - calc(var(--shake-intensity) * 0.2))); }
+  80%  { transform: translate(calc(-50% - calc(var(--shake-intensity) * 0.15)), calc(-50% + calc(var(--shake-intensity) * 0.1))); }
+  100% { transform: translate(-50%, -50%); }
+}
+
+.anim-creature-shake {
+  animation: creature-shake var(--shake-duration, 200ms) ease-out;
+}
+
+/* ── Status ring ────────────────────────────────────────────────────────────
+   Persistent glow loop on a creature element while a status is active.
+   JS sets --status-color on the creature element.
+   Cleared by removing the class when the status expires. */
+
+@keyframes status-ring-pulse {
+  0%   { filter: drop-shadow(0 0 4px var(--status-color, #ffffff)) brightness(1); }
+  50%  { filter: drop-shadow(0 0 10px var(--status-color, #ffffff)) drop-shadow(0 0 3px #fff) brightness(1.15); }
+  100% { filter: drop-shadow(0 0 4px var(--status-color, #ffffff)) brightness(1); }
+}
+
+.anim-status-ring {
+  animation: status-ring-pulse 1.4s ease-in-out infinite;
+}

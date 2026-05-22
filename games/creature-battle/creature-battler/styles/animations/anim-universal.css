@@ -1,5 +1,8 @@
 /* All keyframes preserve the base translate(-50%,-50%) that positions field creatures.
-   Lunge keyframes use --anim-dx / --anim-dy set by JS before the class is added. */
+   Lunge keyframes use --anim-dx / --anim-dy set by JS before the class is added.
+
+   Universal creature state animations (idle, hurt, ko, defend) are defined below
+   the combat animations. They are locked — do not add per-creature overrides. */
 
 /* ── Physical lunge: travel to target ────────────────────────────────────── */
 @keyframes cast-lunge-to {
@@ -31,4 +34,76 @@
 /* opponent recoils right — hit arrives from player on the left */
 [data-creature^="opponent"].anim-hit-physical {
   animation: hit-recoil-right 310ms ease-out;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   UNIVERSAL CREATURE STATE ANIMATIONS
+   Locked after Phase 2. One implementation, all creatures, no overrides.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Idle breathe ────────────────────────────────────────────────────────
+   Applied to the inner .creature-breathe-wrapper so it never conflicts
+   with transform-based combat animations on the outer .battle-creature.
+   JS staggers animation-delay per creature so all 6 don't breathe in sync. */
+
+@keyframes state-idle-breathe {
+  0%, 100% { transform: translateY(0)    scale(1); }
+  50%       { transform: translateY(-2px) scale(1.012); }
+}
+
+.battle-creature.anim-state-idle .creature-breathe-wrapper {
+  animation: state-idle-breathe 2.2s ease-in-out infinite;
+}
+
+/* ── Hurt flinch ─────────────────────────────────────────────────────────
+   Universal fallback for moves with no element-specific hit animation.
+   Direction mirrors by side — player is hit from the right, opponent from left. */
+
+@keyframes state-hurt-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  15%  { transform: translate(calc(-50% + 10px), calc(-50% - 3px)); filter: brightness(3) saturate(0.1) sepia(0.2); }
+  50%  { transform: translate(calc(-50% - 2px),  -50%);             filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+@keyframes state-hurt-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  15%  { transform: translate(calc(-50% - 10px), calc(-50% - 3px)); filter: brightness(3) saturate(0.1) sepia(0.2); }
+  50%  { transform: translate(calc(-50% + 2px),  -50%);             filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-state-hurt   { animation: state-hurt-left  280ms ease-out; }
+[data-creature^="opponent"].anim-state-hurt { animation: state-hurt-right 280ms ease-out; }
+
+/* ── KO slump ────────────────────────────────────────────────────────────
+   One-shot. Creature briefly rises then drops and dims.
+   forwards fill holds the final slumped state permanently.
+   Final values match what .battle-creature.ko sets (opacity 0.25, grayscale)
+   so the transition is seamless when the animation fill takes over. */
+
+@keyframes state-ko-slump {
+  0%   { transform: translate(-50%, -50%) scale(1);           filter: brightness(1)   grayscale(0); opacity: 1;    }
+  18%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.03, 0.97); filter: brightness(1.6) grayscale(0.1); opacity: 1;    }
+  55%  { transform: translate(-50%, calc(-50% + 9px)) scale(0.96, 0.89); filter: brightness(0.5) grayscale(0.7); opacity: 0.45; }
+  100% { transform: translate(-50%, calc(-50% + 5px)) scale(0.92, 0.85); filter: brightness(0.3) grayscale(1);   opacity: 0.25; }
+}
+
+.anim-state-ko {
+  animation: state-ko-slump 540ms ease-in forwards;
+  pointer-events: none;
+}
+
+/* ── Defend crouch ───────────────────────────────────────────────────────
+   Held state for one full round — class stays on creature until round start.
+   Creature compresses slightly and gains a cool defensive aura.
+   forwards fill holds the braced posture until JS removes the class. */
+
+@keyframes state-defend-brace {
+  0%   { transform: translate(-50%, -50%) scale(1);             filter: none; }
+  100% { transform: translate(-50%, calc(-50% + 4px)) scale(0.94, 0.91);
+         filter: drop-shadow(0 0 7px rgba(110,190,255,0.75)) brightness(1.08); }
+}
+
+.anim-state-defend {
+  animation: state-defend-brace 160ms ease-out forwards;
 }

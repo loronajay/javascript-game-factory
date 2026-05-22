@@ -19,6 +19,7 @@ function startRound() {
     if (bs.player[s])   bs.player[s].isDefending   = false;
     if (bs.opponent[s]) bs.opponent[s].isDefending = false;
   });
+  CreatureState.clearDefend();
   updateBattleLog(`Round ${bs.round} — Select commands for your team.`);
   startCommandInput(onPlayerCommandsDone);
 }

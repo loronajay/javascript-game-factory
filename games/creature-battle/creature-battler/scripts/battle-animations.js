@@ -1,32 +1,10 @@
+// animateEl and delayMs live in animation-components.js (loaded before this file).
+// They are globals; nothing here needs to redeclare them.
+
 const MOVE_ANIM_REGISTRY = {};
 
 function registerMoveAnimations(map) {
   Object.assign(MOVE_ANIM_REGISTRY, map);
-}
-
-function animateEl(el, className, cssVars) {
-  return new Promise(resolve => {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      el.classList.remove(className);
-      if (cssVars) {
-        for (const key of Object.keys(cssVars)) el.style.removeProperty(key);
-      }
-      resolve();
-    };
-    if (cssVars) {
-      for (const [key, val] of Object.entries(cssVars)) el.style.setProperty(key, val);
-    }
-    el.classList.add(className);
-    el.addEventListener('animationend', finish, { once: true });
-    setTimeout(finish, 1200);
-  });
-}
-
-function delayMs(ms) {
-  return new Promise(r => setTimeout(r, ms));
 }
 
 function getResultFloatSpecs(result, action) {
@@ -89,14 +67,6 @@ function getMultiHitFloatSpec(result, hit) {
   return { side: result.targetSide, slot: hit.slot, text: `${hit.amount}`, kind: hit.isCrit ? 'crit' : 'damage' };
 }
 
-function getLungeVars(actorEl, targetEl) {
-  const ar = actorEl.getBoundingClientRect();
-  const tr = targetEl.getBoundingClientRect();
-  return {
-    '--anim-dx': `${Math.round((tr.left + tr.width  / 2) - (ar.left + ar.width  / 2))}px`,
-    '--anim-dy': `${Math.round((tr.top  + tr.height / 2) - (ar.top  + ar.height / 2))}px`,
-  };
-}
 
 function getLungeTarget(result, action) {
   if (result.type === 'damage' || result.type === 'crit') {
@@ -111,7 +81,23 @@ function getLungeTarget(result, action) {
 function playMoveAnimation(result, action, onDone, options) {
   if (!action || result.type === 'skipped') { onDone(); return; }
 
-  const entry   = MOVE_ANIM_REGISTRY[action.moveId];
+  const entry = MOVE_ANIM_REGISTRY[action.moveId];
+
+  // ── New timeline format ────────────────────────────────────────────────
+  // If the registry entry has a timeline array, hand off to the engine.
+  // The legacy { cast, hit, hitDelay } path below handles all existing moves.
+  if (entry?.timeline) {
+    runAnimTimeline(entry.timeline, {
+      actorSide: action.actorSide,
+      actorSlot: action.actorSlot,
+      result,
+      action,
+      options,
+    }).then(finalResult => onDone(finalResult));
+    return;
+  }
+
+  // ── Legacy format (CSS-class only) ────────────────────────────────────
   const actorEl = document.querySelector(`[data-creature="${action.actorSide}-${action.actorSlot}"]`);
   let finalResult = result;
   let impactResolved = false;
@@ -164,8 +150,14 @@ function playMoveAnimation(result, action, onDone, options) {
             return animateEl(targetEl, entry.hit);
           }
 
-          if (impactResult.type === 'miss' || impactResult.type === 'defend') {
+          if (impactResult.type === 'miss') {
             showFloatTextsOnce(impactResult);
+            return null;
+          }
+
+          if (impactResult.type === 'defend') {
+            showFloatTextsOnce(impactResult);
+            CreatureState.setDefend(impactResult.targetSide, impactResult.targetSlot);
             return null;
           }
 
