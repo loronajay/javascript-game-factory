@@ -10,6 +10,7 @@ function advancePlayback() {
 }
 
 function startRound() {
+  _resetOnlineRoundState();
   const end = checkBattleEnd();
   if (end) { showBattleEnd(end); return; }
 
@@ -22,7 +23,53 @@ function startRound() {
   startCommandInput(onPlayerCommandsDone);
 }
 
+// ── Online round sync ─────────────────────────────────────────────────────────
+
+let _myPendingActions      = null;
+let _opponentPendingActions = null;
+
+function _resetOnlineRoundState() {
+  _myPendingActions      = null;
+  _opponentPendingActions = null;
+}
+
+function handleBattleRemoteMessage(messageType, value) {
+  if (messageType !== 'player_actions') return;
+  const raw = Array.isArray(value?.actions) ? value.actions : [];
+  // Flip perspective: sender's 'player' side is our 'opponent', and vice-versa.
+  const flipped = raw.map(a => ({
+    ...a,
+    actorSide:  'opponent',
+    targetSide: a.targetSide === 'player' ? 'opponent' : 'player',
+  }));
+
+  if (_myPendingActions) {
+    _resolveOnlineRound(_myPendingActions, flipped);
+  } else {
+    _opponentPendingActions = flipped;
+  }
+}
+
+function _resolveOnlineRound(myActions, opponentActions) {
+  _resetOnlineRoundState();
+  const allActions = sortActions([...myActions, ...opponentActions]);
+  updateBattleLog('Commands locked! Resolving...');
+  setTimeout(() => playbackStep(allActions, 0), 700);
+}
+
+// ── Round flow ────────────────────────────────────────────────────────────────
+
 function onPlayerCommandsDone(playerActions) {
+  if (state.isOnlineMatch) {
+    state.onlineClient.send('player_actions', { actions: playerActions });
+    updateBattleLog('Waiting for opponent…');
+    if (_opponentPendingActions) {
+      _resolveOnlineRound(playerActions, _opponentPendingActions);
+    } else {
+      _myPendingActions = playerActions;
+    }
+    return;
+  }
   const aiActions  = selectAiCommands();
   const allActions = sortActions([...playerActions, ...aiActions]);
   updateBattleLog('Commands locked! Resolving...');

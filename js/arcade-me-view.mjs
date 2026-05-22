@@ -295,10 +295,10 @@ export function renderMeFriendCodePanel(container, model) {
   renderFriendCodePanel(container, "Friend Code", model);
 }
 
-export function renderMeFriendsPanel(container, model) {
+export function renderMeFriendsPanel(container, model, options = {}) {
   renderFriendNavigatorPanel(container, "Friends", model.friendNavigator, {
-    expanded: false,
-    searchQuery: "",
+    expanded: !!options.expanded,
+    searchQuery: options.searchQuery || "",
   });
 }
 
@@ -313,7 +313,7 @@ export function renderMePageView(doc, model, options = {}) {
   renderFavoritePanel(doc.getElementById("meFavoriteGamePanel"), "Favorite Game", model.favoriteGameItems[0]);
   renderMeRankingsPanel(doc.getElementById("meRankingsPanel"), model);
   renderMeTopFriendsPanel(doc.getElementById("meTopFriendsPanel"), model);
-  renderFriendNavigatorPanel(doc.getElementById("meFriendsPanel"), "Friends", model.friendNavigator, {
+  renderMeFriendsPanel(doc.getElementById("meFriendsPanel"), model, {
     expanded: !!options?.friendNavigatorExpanded,
     searchQuery: options?.friendNavigatorSearchQuery || "",
   });

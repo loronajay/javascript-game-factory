@@ -95,6 +95,8 @@ export function renderFriendNavigatorPanel(container, title, navigator, options 
   const isExpanded = !!options.expanded;
   const searchValue = typeof options.searchQuery === "string" ? options.searchQuery : "";
   const hasItems = items.length > 0;
+  const hideDropdown = isExpanded ? "" : " hidden";
+  const hideSearch = isExpanded && hasItems ? "" : " hidden";
   const listHtml = items.map((item) => {
     const avatarHtml = item.avatarSrc
       ? `<img class="me-friends-navigator__avatar-img" src="${escapeHtml(item.avatarSrc)}" alt="" loading="lazy">`
@@ -121,40 +123,40 @@ export function renderFriendNavigatorPanel(container, title, navigator, options 
   container.hidden = false;
   container.innerHTML = `
     <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
-    <div class="me-friends-navigator" data-profile-child-id="content">
-      <button
-        id="meFriendsToggle"
-        class="me-friends-navigator__toggle"
-        type="button"
-        aria-controls="meFriendsDropdown"
-        aria-expanded="${isExpanded ? "true" : "false"}"
+    <div class="me-friends-navigator" data-profile-child-id="navigatorSurface" aria-hidden="true"></div>
+    <button
+      id="meFriendsToggle"
+      class="me-friends-navigator__toggle"
+      data-profile-child-id="toggle"
+      type="button"
+      aria-controls="meFriendsDropdown"
+      aria-expanded="${isExpanded ? "true" : "false"}"
+    >
+      <span class="me-friends-navigator__toggle-label">${escapeHtml(navigator?.triggerLabel || "Friends")}</span>
+      <span class="me-friends-navigator__toggle-helper">${escapeHtml(navigator?.helperText || "")}</span>
+    </button>
+    <label class="me-friends-navigator__search" data-profile-child-id="search" for="meFriendsSearchInput"${hideSearch}>
+      <span class="me-friends-navigator__search-label">Search Friends</span>
+      <input
+        id="meFriendsSearchInput"
+        class="me-friends-navigator__search-input"
+        type="search"
+        placeholder="${escapeHtml(navigator?.searchPlaceholder || "Search friends")}"
+        value="${escapeHtml(searchValue)}"
+        spellcheck="false"
+        autocomplete="off"
       >
-        <span class="me-friends-navigator__toggle-label">${escapeHtml(navigator?.triggerLabel || "Friends")}</span>
-        <span class="me-friends-navigator__toggle-helper">${escapeHtml(navigator?.helperText || "")}</span>
-      </button>
-      <div id="meFriendsDropdown" class="me-friends-navigator__dropdown"${isExpanded ? "" : " hidden"}>
-        ${hasItems ? `
-          <label class="me-friends-navigator__search" for="meFriendsSearchInput">
-            <span class="me-friends-navigator__search-label">Search Friends</span>
-            <input
-              id="meFriendsSearchInput"
-              class="me-friends-navigator__search-input"
-              type="search"
-              placeholder="${escapeHtml(navigator?.searchPlaceholder || "Search friends")}"
-              value="${escapeHtml(searchValue)}"
-              spellcheck="false"
-              autocomplete="off"
-            >
-          </label>
-          <p id="meFriendsSearchEmpty" class="me-friends-navigator__empty" hidden>No friends match your search.</p>
-          <div id="meFriendsList" class="me-friends-navigator__list">
-            ${listHtml}
-          </div>
-        ` : `
-          <p class="me-friends-navigator__empty">${escapeHtml(navigator?.emptyText || "No linked friends yet.")}</p>
-        `}
+    </label>
+    <div id="meFriendsDropdown" class="me-friends-navigator__dropdown" data-profile-child-id="list"${hideDropdown}>
+      ${hasItems ? `
+        <p id="meFriendsSearchEmpty" class="me-friends-navigator__empty" hidden>No friends match your search.</p>
+        <div id="meFriendsList" class="me-friends-navigator__list">
+          ${listHtml}
+        </div>
+      ` : `
+        <p class="me-friends-navigator__empty">${escapeHtml(navigator?.emptyText || "No linked friends yet.")}</p>
+      `}
       </div>
-    </div>
   `;
 }
 

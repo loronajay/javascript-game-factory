@@ -72,6 +72,8 @@ function _wireOnlineCbs(client) {
   client.cb.onRemoteMessage = ({ messageType, value }) => {
     if (state.screen === 'blind-pick') {
       handleBlindPickRemoteMessage(messageType, value);
+    } else if (state.screen === 'battle' && state.isOnlineMatch) {
+      handleBattleRemoteMessage(messageType, value);
     }
   };
 }

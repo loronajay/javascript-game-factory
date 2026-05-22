@@ -417,6 +417,16 @@ function migratePanelChildren(panelId, rawChildren) {
     }
   }
 
+  if (panelId === "friends" && Array.isArray(rawChildren)) {
+    const oldContent = rawChildren.find((child) => child?.id === "content");
+    const hasSplitChildren = rawChildren.some((child) => (
+      ["navigatorSurface", "toggle", "search", "list"].includes(child?.id)
+    ));
+    if (oldContent && !hasSplitChildren) {
+      return migrateLegacyFriendsContentChild(rawChildren, oldContent);
+    }
+  }
+
   if (panelId !== "hero" || !Array.isArray(rawChildren)) return rawChildren;
 
   const portrait = rawChildren.find((child) => child?.id === "portrait");
@@ -488,6 +498,31 @@ function migrateLegacyMusicPlayerChild(oldPlayer) {
     place("deck", 0.07, 0.08, 0.86, 0.34),
     place("trackLabel", 0.07, 0.49, 0.86, 0.26),
     place("controls", 0.07, 0.82, 0.86, 0.18),
+  ];
+}
+
+function migrateLegacyFriendsContentChild(rawChildren, oldContent) {
+  const title = rawChildren.find((child) => child?.id === "title");
+  const x = toInt(oldContent.x, 8);
+  const y = toInt(oldContent.y, 24);
+  const w = toInt(oldContent.w, 84);
+  const h = toInt(oldContent.h, 68);
+  const place = (id, rx, ry, rw, rh) => ({
+    id,
+    enabled: oldContent.enabled !== false,
+    x: Math.round(x + w * rx),
+    y: Math.round(y + h * ry),
+    w: Math.round(w * rw),
+    h: Math.round(h * rh),
+    style: {},
+  });
+
+  return [
+    title || { id: "title", enabled: true, x: 25, y: 4, w: 50, h: 14, style: {} },
+    { id: "navigatorSurface", enabled: oldContent.enabled !== false, x, y, w, h, style: oldContent.style },
+    place("toggle", 0.08, 0.09, 0.84, 0.26),
+    place("search", 0.08, 0.44, 0.84, 0.24),
+    place("list", 0.08, 0.72, 0.84, 0.26),
   ];
 }
 

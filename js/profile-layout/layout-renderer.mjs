@@ -549,7 +549,7 @@ function renderLivePreview(tile, panel, previewModels) {
   } else if (panelId === "friends") {
     preview.id = "meLayoutFriendsPreview";
     preview.classList.add("me-panel", "me-panel--friends");
-    renderMeFriendsPanel(preview, previewModels.hero);
+    renderMeFriendsPanel(preview, previewModels.hero, { expanded: true });
   } else if (panelId === "friendCode") {
     preview.id = "meLayoutFriendCodePreview";
     preview.classList.add("me-panel", "me-panel--friend-code");
