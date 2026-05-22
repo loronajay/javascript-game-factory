@@ -139,6 +139,7 @@ function applyEndOfRoundStatuses() {
 function advanceStatusDurations() {
   const round = state.battleState.round;
   getAllCreatures().forEach(creature => {
+    const hadBurn = hasStatus(creature, 'burn');
     creature.statusEffects = ensureStatusList(creature).filter(status => {
       if (status.permanent) return true;
       if (status.consumeOn && status.appliedRound <= round) return false;
@@ -146,6 +147,9 @@ function advanceStatusDurations() {
       status.remainingRounds = (status.remainingRounds ?? 1) - 1;
       return status.remainingRounds > 0;
     });
+    if (hadBurn && !hasStatus(creature, 'burn')) {
+      applyStatModifier(creature, 'defense', 1);
+    }
   });
 }
 

@@ -127,10 +127,41 @@ function handleCommandKey(key) {
   if (key === 'Escape' && inputState.queueIndex > 0) { playClick(); undoLast(); }
 }
 
+const ART_GRID_COLS = 3;
+
+function artGridNav(dir) {
+  const grid  = getGridArts(currentCreature());
+  const total = grid.length;
+  const cur   = inputState.focusedArt;
+  let newIdx  = cur;
+
+  if (dir === 'left') {
+    for (let i = cur - 1; i >= 0; i--) {
+      if (grid[i] !== null) { newIdx = i; break; }
+    }
+  } else if (dir === 'right') {
+    for (let i = cur + 1; i < total; i++) {
+      if (grid[i] !== null) { newIdx = i; break; }
+    }
+  } else if (dir === 'up') {
+    const t = cur - ART_GRID_COLS;
+    if (t >= 0 && grid[t] !== null) newIdx = t;
+  } else if (dir === 'down') {
+    const t = cur + ART_GRID_COLS;
+    if (t < total && grid[t] !== null) newIdx = t;
+  }
+
+  if (newIdx !== cur) {
+    inputState.focusedArt = newIdx;
+    renderBattleCommandPanel();
+  }
+}
+
 function handleArtKey(key) {
-  const arts = getNonNullArts(currentCreature());
-  if (key === 'ArrowUp'   || key === 'ArrowLeft')  { playClick(); inputState.focusedArt = (inputState.focusedArt - 1 + arts.length) % arts.length; renderBattleCommandPanel(); }
-  if (key === 'ArrowDown' || key === 'ArrowRight') { playClick(); inputState.focusedArt = (inputState.focusedArt + 1) % arts.length;                renderBattleCommandPanel(); }
+  if (key === 'ArrowLeft')  { playClick(); artGridNav('left');  }
+  if (key === 'ArrowRight') { playClick(); artGridNav('right'); }
+  if (key === 'ArrowUp')    { playClick(); artGridNav('up');    }
+  if (key === 'ArrowDown')  { playClick(); artGridNav('down');  }
   if (key === 'Enter' || key === ' ') { playClick(); confirmArt(); }
   if (key === 'Escape') { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); }
 }
@@ -173,9 +204,7 @@ function confirmCommand() {
 }
 
 function confirmArt() {
-  const arts = getNonNullArts(currentCreature());
-  if (!arts.length) return;
-  const art = arts[inputState.focusedArt];
+  const art = getGridArts(currentCreature())[inputState.focusedArt];
   if (!art) return;
   if (art.mpCost > currentCreature().mp.current) { playInvalid(); return; }
   inputState.pendingMoveId = art.id;
@@ -401,19 +430,17 @@ function renderBattleCommandPanel() {
 
   } else if (inputState.phase === 'art_menu') {
     const gridArts = getGridArts(creature);
-    let nonNullIdx = 0;
     el.innerHTML = `
       <div class="battle-cmd-prompt"><span class="cmd-actor">${creature.displayName}</span> — Choose Art ${progress} <span class="cmd-back" id="art-back">← Back</span></div>
       <div class="art-list">
-        ${gridArts.map(a => {
+        ${gridArts.map((a, gridIdx) => {
           if (!a) return `<div class="art-cell-empty"></div>`;
-          const artIdx = nonNullIdx++;
           const canAfford = a.mpCost <= creature.mp.current;
           const badge = a.targeting === 'all_enemies' ? '<span class="art-target-badge foes">ALL</span>'
                       : a.targeting === 'all_allies'  ? '<span class="art-target-badge allies">ALLIES</span>'
                       : '';
           return `
-          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${artIdx === inputState.focusedArt ? 'focused' : ''}" data-art="${artIdx}">
+          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${gridIdx === inputState.focusedArt ? 'focused' : ''}" data-art="${gridIdx}">
             <span class="art-name">${a.name}</span>
             <div class="art-meta">
               <span class="element-tag element-${a.element}">${a.element}</span>
