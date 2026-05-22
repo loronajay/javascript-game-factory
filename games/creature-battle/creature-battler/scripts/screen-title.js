@@ -7,7 +7,7 @@ function renderTitle() {
     : '';
   el.innerHTML = `
     <div class="title-logo">
-      <h1>Creature Battle</h1>
+      <h1>Creature Battler</h1>
       <div class="subtitle">Rental Combat Alpha</div>
       ${playerLine}
     </div>

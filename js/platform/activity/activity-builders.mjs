@@ -88,7 +88,7 @@ export function buildSumoraiMatchActivity(match, options = {}) {
   });
 }
 
-export function buildCreatureBattleMatchActivity(match, options = {}) {
+export function buildCreatureBattlerMatchActivity(match, options = {}) {
   const source = isPlainObject(match) ? match : {};
   const myProfile = normalizeIdentity(source.myProfile);
   const opponentProfile = normalizeIdentity(source.opponentProfile);
@@ -98,18 +98,18 @@ export function buildCreatureBattleMatchActivity(match, options = {}) {
 
   let text;
   if (result === 'win') {
-    text = `${actorDisplayName} won a Creature Battle match against ${opponentName}.`;
+    text = `${actorDisplayName} won a Creature Battler match against ${opponentName}.`;
   } else if (result === 'draw') {
-    text = `${actorDisplayName} fought to a draw in Creature Battle against ${opponentName}.`;
+    text = `${actorDisplayName} fought to a draw in Creature Battler against ${opponentName}.`;
   } else {
-    text = `${actorDisplayName} lost a Creature Battle match to ${opponentName}.`;
+    text = `${actorDisplayName} lost a Creature Battler match to ${opponentName}.`;
   }
 
   return normalizeActivityItem({
     type: 'game-result',
     actorPlayerId: myProfile.playerId || sanitizeSingleLine(options?.actorPlayerId, 80),
     actorDisplayName,
-    gameSlug: 'creature-battle',
+    gameSlug: 'creature-battler',
     summary: text,
     visibility: options?.visibility || 'friends',
     createdAt: source.createdAt || options?.createdAt,

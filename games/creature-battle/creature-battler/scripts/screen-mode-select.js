@@ -2,7 +2,7 @@ function renderModeSelect() {
   const el = document.getElementById('screen-mode-select');
   el.innerHTML = `
     <div class="mode-select-header">
-      <h2>Creature Battle</h2>
+      <h2>Creature Battler</h2>
       <h1>Select Mode</h1>
     </div>
     <div class="mode-list">

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Creature Battle | Javascript Game Factory</title>
+  <title>Creature Battler | Javascript Game Factory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="../../js/platform-config.js"></script>
   <link rel="stylesheet" href="creature-battler/styles/tokens.css">
@@ -62,14 +62,14 @@
   <script type="module">
     import { loadFactoryProfile } from '../../js/platform/identity/factory-profile.mjs';
     import { mountMobileController } from '../../js/mobile-controller.mjs';
-    import { publishCreatureBattleMatchActivity } from '../../js/platform/activity/activity.mjs';
+    import { publishCreatureBattlerMatchActivity } from '../../js/platform/activity/activity.mjs';
 
     const profile = loadFactoryProfile();
     window.__factoryProfile = profile;
 
     window.__publishBattleResult = function(winner) {
       const myName = profile?.profileName || 'Player';
-      publishCreatureBattleMatchActivity({
+      publishCreatureBattlerMatchActivity({
         result: winner === 'player' ? 'win' : winner === 'draw' ? 'draw' : 'loss',
         myProfile: { playerId: profile?.playerId, displayName: myName },
         opponentProfile: { playerId: 'ai', displayName: 'CPU' },
@@ -79,7 +79,7 @@
       });
     };
 
-    mountMobileController({ profileId: 'creature-battle' });
+    mountMobileController({ profileId: 'creature-battler' });
   </script>
 </body>
 </html>

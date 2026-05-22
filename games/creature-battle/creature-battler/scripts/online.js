@@ -1,4 +1,4 @@
-// online.js — WebSocket client for Creature Battle online 1v1.
+// online.js — WebSocket client for Creature Battler online 1v1.
 // All new WebSocket() calls live here.
 
 const CB_WS_URL = 'wss://factory-network-server-production.up.railway.app';
@@ -6,7 +6,7 @@ const CB_WS_URL = 'wss://factory-network-server-production.up.railway.app';
 function buildCbGameId(pickStyle, levelCap) {
   // levelCap: 'any' or a number
   const lvlStr = (levelCap === 'any') ? 'any' : `lv${levelCap}`;
-  return `creature-battle-${pickStyle}-${lvlStr}`;
+  return `creature-battler-${pickStyle}-${lvlStr}`;
 }
 
 function createCbOnlineClient() {

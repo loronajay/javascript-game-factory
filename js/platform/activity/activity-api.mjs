@@ -15,7 +15,7 @@ import {
 } from "./activity-store.mjs";
 import {
   buildBattleshitsMatchActivity,
-  buildCreatureBattleMatchActivity,
+  buildCreatureBattlerMatchActivity,
   buildLoversLostRunActivity,
   buildSumoraiMatchActivity,
 } from "./activity-builders.mjs";
@@ -96,9 +96,9 @@ export function publishLoversLostRunActivity(runSummary, options = {}) {
   return publishActivityItemWithApi(item, storage, options);
 }
 
-export function publishCreatureBattleMatchActivity(match, options = {}) {
+export function publishCreatureBattlerMatchActivity(match, options = {}) {
   const storage = options.storage || getDefaultPlatformStorage();
-  const item = buildCreatureBattleMatchActivity(match, options);
+  const item = buildCreatureBattlerMatchActivity(match, options);
   return publishActivityItemWithApi(item, storage, options);
 }
 

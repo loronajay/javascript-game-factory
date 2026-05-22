@@ -6,7 +6,8 @@ export const ARCADE_GAME_SLUGS = Object.freeze([
   "circuit-siege",
   "illuminauts",
   "sumorai",
-  "creature-battle",
+  // slug is the public identity; path is the actual games/ subfolder (umbrella folder differs from game name)
+  { slug: "creature-battler", path: "creature-battle" },
 ]);
 
 export const GRID_PAGE_SIZE = 9;
@@ -19,7 +20,8 @@ function titleFromSlug(slug) {
     .join(" ");
 }
 
-export function normalizeGameEntry(slug, config = {}) {
+export function normalizeGameEntry(slug, config = {}, path = null) {
+  const folderPath = path || slug;
   return {
     slug,
     title: config.title || titleFromSlug(slug),
@@ -31,7 +33,7 @@ export function normalizeGameEntry(slug, config = {}) {
     featured: config.featured === true,
     theme: config.theme || "ember",
     accentColor: config.accentColor || "#ffb84d",
-    href: `games/${slug}/index.html`,
+    href: `games/${folderPath}/index.html`,
     previewImage: config.previewImage || `grid-previews/${slug}.png`,
     cardClasses: Array.isArray(config.card_classes) ? [...config.card_classes] : [],
   };
@@ -91,17 +93,20 @@ export function fillArcadePageSlots(games, pageSize = GRID_PAGE_SIZE) {
 
 export async function loadArcadeCatalog(fetcher = fetch, slugs = ARCADE_GAME_SLUGS) {
   const entries = await Promise.all(
-    slugs.map(async (slug) => {
+    slugs.map(async (entry) => {
+      const slug = typeof entry === "string" ? entry : entry.slug;
+      const path = typeof entry === "string" ? null : (entry.path || null);
+      const folderPath = path || slug;
       try {
-        const response = await fetcher(`games/${slug}/game.json`);
+        const response = await fetcher(`games/${folderPath}/game.json`);
         if (!response || response.ok === false) {
           throw new Error(`Unable to load metadata for ${slug}`);
         }
 
         const config = await response.json();
-        return normalizeGameEntry(slug, config);
+        return normalizeGameEntry(slug, config, path);
       } catch (error) {
-        return normalizeGameEntry(slug);
+        return normalizeGameEntry(slug, {}, path);
       }
     })
   );
