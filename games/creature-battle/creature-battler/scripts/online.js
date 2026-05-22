@@ -60,7 +60,7 @@ function createCbOnlineClient() {
         // Server assigned sides; derive ours from remoteSide so both players agree.
         if (msg.remoteSide) _mySide = msg.remoteSide === 'alpha' ? 'beta' : 'alpha';
         if (_mySide) _isCoordinator = (_mySide === 'alpha');
-        cb.onMatchReady?.({ remoteSide: msg.remoteSide ?? null });
+        cb.onMatchReady?.({ remoteSide: msg.remoteSide ?? null, seed: msg.seed ?? null });
         break;
 
       case 'player_left':

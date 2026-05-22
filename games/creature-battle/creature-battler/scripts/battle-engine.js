@@ -32,8 +32,23 @@ const STAT_LABELS = {
   evasion: 'EVA',
 };
 
+// ── Seeded RNG (replaced per-match for online play; defaults to Math.random for training) ──
+let _battleRng = Math.random.bind(Math);
+
+function setBattleRng(seed) {
+  if (seed == null) { _battleRng = Math.random.bind(Math); return; }
+  let s = seed >>> 0;
+  _battleRng = function() {
+    s += 0x6D2B79F5;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function engineRandom(min, max) {
-  return min + Math.floor(Math.random() * (max - min + 1));
+  return min + Math.floor(_battleRng() * (max - min + 1));
 }
 
 function getAllCreatures() {
@@ -194,7 +209,7 @@ function calcHitChance(attacker, target, move) {
 
 function resolveHit(attacker, target, move) {
   if (hasStatus(attacker, 'blind')) return false;
-  return Math.random() * 100 < calcHitChance(attacker, target, move);
+  return _battleRng() * 100 < calcHitChance(attacker, target, move);
 }
 
 function calcDamage(attacker, target, move) {
@@ -203,7 +218,7 @@ function calcDamage(attacker, target, move) {
   const levelMod  = attacker.level * ENGINE.LEVEL_MOD;
   const pressure  = (offStat - defStat) * move.offensiveScaling;
   const elemMod   = getElementModifier(move.element, target.resistances);
-  const isCrit    = move.canCrit && Math.random() < ENGINE.CRIT_CHANCE;
+  const isCrit    = move.canCrit && _battleRng() < ENGINE.CRIT_CHANCE;
   const critMod   = isCrit ? ENGINE.CRIT_MOD : 1.0;
   const defMod    = target.isDefending ? ENGINE.DEFEND_MOD : 1.0;
   const randMod   = engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
@@ -535,7 +550,7 @@ function applyUtilityMove(moveId, target) {
   const move = getMoveData(moveId);
   if (move?.applyStatus && !target.isKnockedOut) {
     const { id, duration, permanent, chance = 100 } = move.applyStatus;
-    if (!hasStatus(target, id) && Math.random() * 100 < chance) {
+    if (!hasStatus(target, id) && _battleRng() * 100 < chance) {
       const label = applyStatus(target, id, { remainingRounds: duration, permanent });
       if (id === 'burn') applyStatModifier(target, 'defense', -1);
       text = text ? `${text}! ${label}` : label;
@@ -559,7 +574,7 @@ function applySecondaryEffect(moveId, target) {
   const move = getMoveData(moveId);
   if (move?.applyStatus && !target.isKnockedOut) {
     const { id, duration, permanent, chance = 100 } = move.applyStatus;
-    if (!hasStatus(target, id) && Math.random() * 100 < chance) {
+    if (!hasStatus(target, id) && _battleRng() * 100 < chance) {
       const label = applyStatus(target, id, { remainingRounds: duration, permanent });
       if (id === 'burn') applyStatModifier(target, 'defense', -1);
       text = text ? `${text}! ${label}` : label;

@@ -65,8 +65,8 @@ function _wireOnlineCbs(client) {
     }
   };
 
-  client.cb.onMatchReady = () => {
-    _startBlindPick();
+  client.cb.onMatchReady = ({ seed }) => {
+    _startBlindPick(seed);
   };
 
   client.cb.onRemoteMessage = ({ messageType, value }) => {
@@ -107,10 +107,11 @@ function _showLobbyBanner(msg) {
 
 // ── Blind pick bootstrap ──────────────────────────────────────────────────────
 
-function _startBlindPick() {
+function _startBlindPick(seed) {
   const client  = state.onlineClient;
   const isCoord = client.isCoordinator;
 
+  state.onlineSettings.battleSeed = seed ?? null;
   state.blindPick = {
     myTeam: [], myLocked: false, opponentLocked: false,
     remoteTeam: null, settingsReceived: isCoord,

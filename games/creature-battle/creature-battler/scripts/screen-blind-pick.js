@@ -170,6 +170,7 @@ function _checkBothLocked() {
 }
 
 function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
+  setBattleRng(state.onlineSettings.battleSeed);
   state.battleConfig.level = levelCap;
   state.isOnlineMatch      = true;
   state.playerTeam         = myTeamIds;

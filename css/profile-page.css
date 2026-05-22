@@ -617,21 +617,52 @@
   justify-self: start;
 }
 
-[data-profile-child-id="content"].me-friends-navigator {
+[data-profile-child-id="navigatorSurface"].me-friends-navigator,
+[data-profile-child-id="toggle"].me-friends-navigator__toggle,
+[data-profile-child-id="search"].me-friends-navigator__search,
+[data-profile-child-id="list"].me-friends-navigator__dropdown {
   width: 100%;
   height: 100%;
   max-width: none;
   box-sizing: border-box;
 }
 
-[data-profile-child-id="content"].me-friends-navigator > .profile-child-zoom-shell {
+[data-profile-child-id="navigatorSurface"].me-friends-navigator {
+  border: 1px solid rgba(var(--profile-panel-custom-rgb, 255, 214, 189), 0.16);
+  border-radius: var(--profile-radius-md, 16px);
+  background:
+    linear-gradient(var(--profile-panel-gradient-angle, 180deg), rgba(var(--profile-panel-custom-rgb, 21, 14, 55), var(--profile-panel-custom-opacity, 0.35)), rgba(var(--profile-panel-custom-rgb-2, 7, 7, 22), var(--profile-panel-custom-opacity, 0.35))),
+    rgba(9, 8, 22, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+[data-profile-child-id="toggle"].me-friends-navigator__toggle > .profile-child-zoom-shell,
+[data-profile-child-id="search"].me-friends-navigator__search > .profile-child-zoom-shell,
+[data-profile-child-id="list"].me-friends-navigator__dropdown > .profile-child-zoom-shell {
   display: grid;
   align-content: start;
   justify-items: stretch;
-  gap: 12px;
   width: 100%;
   height: 100%;
-  padding: 10px 12px;
+}
+
+[data-profile-child-id="toggle"].me-friends-navigator__toggle > .profile-child-zoom-shell {
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+[data-profile-child-id="search"].me-friends-navigator__search > .profile-child-zoom-shell {
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+[data-profile-child-id="list"].me-friends-navigator__dropdown {
+  overflow: hidden auto;
+}
+
+[data-profile-child-id="list"].me-friends-navigator__dropdown > .profile-child-zoom-shell {
+  gap: 8px;
+  padding: 8px 10px;
 }
 
 [data-profile-child-id="composer"].thought-composer,
