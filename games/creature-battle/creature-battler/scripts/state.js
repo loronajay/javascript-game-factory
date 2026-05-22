@@ -21,6 +21,8 @@ const state = {
   onlineCodeInput: '',
   remotePlayerInfo: null,      // { displayName, playerId }
 
+  blindPickFocusIndex: 0,
+
   // Blind pick phase
   blindPick: {
     myTeam: [],

@@ -41,13 +41,17 @@ function _wireOnlineCbs(client) {
 
   client.cb.onPartnerLeft = () => {
     playInvalid();
-    if (state.screen === 'blind-pick') {
-      state.onlineLobbyPhase = 'main';
-      setScreen('online-lobby');
-      _showLobbyBanner('Opponent disconnected.');
+    if (state.screen === 'battle') {
+      renderBattleEndOverlay('player', 'disconnect');
+    } else if (state.screen === 'blind-pick') {
+      _renderDisconnectOverlay('screen-blind-pick', () => {
+        state.onlineLobbyPhase = 'main';
+        setScreen('online-lobby');
+      });
     } else {
       state.onlineLobbyPhase = 'main';
       renderOnlineLobby();
+      _showLobbyBanner('Opponent disconnected.');
     }
   };
 
@@ -70,6 +74,23 @@ function _wireOnlineCbs(client) {
       handleBlindPickRemoteMessage(messageType, value);
     }
   };
+}
+
+function _renderDisconnectOverlay(screenId, onBack) {
+  const screen  = document.getElementById(screenId);
+  if (!screen) return;
+  const existing = screen.querySelector('.dc-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'dc-overlay';
+  overlay.innerHTML = `
+    <div class="battle-end-card">
+      <div class="battle-end-title">Opponent Disconnected</div>
+      <div class="battle-end-sub">Your opponent left. The match has been cancelled.</div>
+      <button class="btn primary" id="dc-back-btn">Back to Lobby</button>
+    </div>`;
+  screen.appendChild(overlay);
+  overlay.querySelector('#dc-back-btn')?.addEventListener('click', () => { playClick(); onBack(); });
 }
 
 let _lobbyBannerTimeout = null;
@@ -158,11 +179,15 @@ function _buildSettingsHtml() {
     </div>
   `).join('');
 
-  const levelChips = ONLINE_LEVEL_OPTIONS.map((opt, i) => `
+  const levelChips = ONLINE_LEVEL_OPTIONS.map((opt, i) => {
+    const sub = opt.level === 'any' ? 'Random' : `Lv ${opt.level}`;
+    return `
     <button class="lobby-level-chip ${i === levelCapIndex ? 'selected' : ''}" data-lvl-idx="${i}">
-      ${opt.label}
+      <span class="lvl-chip-label">${opt.label}</span>
+      <span class="lvl-chip-sub">${sub}</span>
     </button>
-  `).join('');
+  `;
+  }).join('');
 
   return `
     <div class="lobby-header">

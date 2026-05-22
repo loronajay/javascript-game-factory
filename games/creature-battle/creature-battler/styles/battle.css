@@ -521,7 +521,8 @@
 }
 
 /* Battle end overlay */
-.battle-end-overlay {
+.battle-end-overlay,
+.dc-overlay {
   position: absolute;
   inset: 0;
   background: rgba(1,10,24,0.78);

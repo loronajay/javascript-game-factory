@@ -786,27 +786,56 @@
   justify-items: stretch;
 }
 
-[data-profile-child-id="player"].cassette-player,
-[data-profile-child-id="player"].cassette-empty {
+[data-profile-child-id="playerSurface"].cassette-player,
+[data-profile-child-id="playerSurface"].cassette-empty,
+[data-profile-child-id="deck"].cassette-player__viewport,
+[data-profile-child-id="trackLabel"].cassette-player__label,
+[data-profile-child-id="controls"].cassette-player__controls {
   width: 100%;
   height: 100%;
   max-width: none;
   box-sizing: border-box;
 }
 
-[data-profile-child-id="player"].cassette-player > .profile-child-zoom-shell,
-[data-profile-child-id="player"].cassette-empty > .profile-child-zoom-shell {
+[data-profile-child-id="playerSurface"].cassette-player > .profile-child-zoom-shell,
+[data-profile-child-id="playerSurface"].cassette-empty > .profile-child-zoom-shell {
   display: grid;
   align-content: center;
   justify-items: stretch;
-  gap: 10px;
   width: 100%;
   height: 100%;
-  padding: 10px 12px;
 }
 
-[data-profile-child-id="player"].cassette-player .cassette-player__body {
+[data-profile-child-id="deck"].cassette-player__viewport > .profile-child-zoom-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   width: 100%;
+  height: 100%;
+  padding: 0.35rem 0.55rem;
+}
+
+[data-profile-child-id="trackLabel"].cassette-player__label > .profile-child-zoom-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.35rem 0.55rem;
+  text-align: center;
+}
+
+[data-profile-child-id="controls"].cassette-player__controls > .profile-child-zoom-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.25rem 0.35rem;
   box-sizing: border-box;
 }
 

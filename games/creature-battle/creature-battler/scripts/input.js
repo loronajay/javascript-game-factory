@@ -70,9 +70,27 @@ function initInput() {
     }
 
     if (s === 'blind-pick') {
-      if (e.key === 'Escape') {
-        // No back-out once in blind pick — match is live.
+      if (isStatsPopupOpen()) {
+        if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') { playClick(); hideCreatureStats(); }
+        return;
       }
+      if (key === 'ArrowLeft')  { e.preventDefault(); moveBlindPickCursor('left');  }
+      if (key === 'ArrowRight') { e.preventDefault(); moveBlindPickCursor('right'); }
+      if (key === 'ArrowUp')    { e.preventDefault(); moveBlindPickCursor('up');    }
+      if (key === 'ArrowDown')  { e.preventDefault(); moveBlindPickCursor('down');  }
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        const bp = state.blindPick;
+        if (bp.myLocked) return;
+        if (bp.myTeam.length === 3) {
+          playClick(); _lockInMyTeam();
+        } else if (e.key === ' ') {
+          const focused = RENTAL_ROSTER[state.blindPickFocusIndex];
+          if (focused) { playClick(); _toggleBlindPickCreature(focused.id); }
+        }
+      }
+      if (e.key === 'r' || e.key === 'R') { playClick(); showBlindPickStats(); }
+      // No Escape back-out — match is live.
       return;
     }
 

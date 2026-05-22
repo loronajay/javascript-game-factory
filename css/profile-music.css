@@ -4,7 +4,8 @@
   padding: 0.25rem 0;
 }
 
-.cassette-player__body {
+.cassette-player__body,
+.cassette-player__surface {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -26,6 +27,15 @@
   justify-content: center;
   gap: 0.5rem;
   height: 3.2rem;
+}
+
+[data-profile-child-id="deck"].cassette-player__viewport,
+[data-profile-child-id="controls"].cassette-player__controls {
+  padding: 0;
+}
+
+[data-profile-child-id="trackLabel"].cassette-player__label {
+  padding: 0;
 }
 
 .cassette-player__tape-window {

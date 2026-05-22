@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260521-freeform-panels-1";
+import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260521-music-freeform-1";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -9,7 +9,7 @@ import {
   CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
   isCustomTitleElementId,
-} from "./composition-layout.mjs?v=20260521-freeform-panels-1";
+} from "./composition-layout.mjs?v=20260521-music-freeform-1";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -407,6 +407,16 @@ function migratePanelChildren(panelId, rawChildren) {
     ));
   }
 
+  if (panelId === "music" && Array.isArray(rawChildren)) {
+    const oldPlayer = rawChildren.find((child) => child?.id === "player");
+    const hasSplitChildren = rawChildren.some((child) => (
+      ["playerSurface", "deck", "trackLabel", "controls"].includes(child?.id)
+    ));
+    if (oldPlayer && !hasSplitChildren) {
+      return migrateLegacyMusicPlayerChild(oldPlayer);
+    }
+  }
+
   if (panelId !== "hero" || !Array.isArray(rawChildren)) return rawChildren;
 
   const portrait = rawChildren.find((child) => child?.id === "portrait");
@@ -456,6 +466,29 @@ function migratePanelChildren(panelId, rawChildren) {
       h: Math.max(def.minH, scaled.h),
     };
   });
+}
+
+function migrateLegacyMusicPlayerChild(oldPlayer) {
+  const x = toInt(oldPlayer.x, 8);
+  const y = toInt(oldPlayer.y, 12);
+  const w = toInt(oldPlayer.w, 84);
+  const h = toInt(oldPlayer.h, 76);
+  const place = (id, rx, ry, rw, rh) => ({
+    id,
+    enabled: oldPlayer.enabled !== false,
+    x: Math.round(x + w * rx),
+    y: Math.round(y + h * ry),
+    w: Math.round(w * rw),
+    h: Math.round(h * rh),
+    style: id === "playerSurface" ? oldPlayer.style : {},
+  });
+
+  return [
+    { id: "playerSurface", enabled: oldPlayer.enabled !== false, x, y, w, h, style: oldPlayer.style },
+    place("deck", 0.07, 0.08, 0.86, 0.34),
+    place("trackLabel", 0.07, 0.49, 0.86, 0.26),
+    place("controls", 0.07, 0.82, 0.86, 0.18),
+  ];
 }
 
 function toInt(val, fallback) {

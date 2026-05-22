@@ -137,7 +137,7 @@ function updateBattleLog(msg) {
 
 // ── End overlay ───────────────────────────────────────────────────────────────
 
-function renderBattleEndOverlay(winner) {
+function renderBattleEndOverlay(winner, reason) {
   if (typeof window.__publishBattleResult === 'function') {
     window.__publishBattleResult(winner);
   }
@@ -145,10 +145,18 @@ function renderBattleEndOverlay(winner) {
   const screen  = document.getElementById('screen-battle');
   const overlay = document.createElement('div');
   overlay.className = 'battle-end-overlay';
-  const title = winner === 'player' ? 'Victory!' : winner === 'draw' ? 'Draw' : 'Defeat';
-  const sub   = winner === 'player' ? 'All opponents knocked out!'
-              : winner === 'draw'   ? 'Both teams were knocked out.'
-              :                       'Your team was knocked out.';
+
+  let title, sub;
+  if (reason === 'disconnect') {
+    title = 'Opponent Disconnected';
+    sub   = 'Your opponent left the match. You win by forfeit.';
+  } else {
+    title = winner === 'player' ? 'Victory!' : winner === 'draw' ? 'Draw' : 'Defeat';
+    sub   = winner === 'player' ? 'All opponents knocked out!'
+          : winner === 'draw'   ? 'Both teams were knocked out.'
+          :                       'Your team was knocked out.';
+  }
+
   overlay.innerHTML = `
     <div class="battle-end-card">
       <div class="battle-end-title">${title}</div>

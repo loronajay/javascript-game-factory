@@ -19,8 +19,9 @@ function renderBlindPick() {
     const isSelected = bp.myTeam.includes(c.id);
     const slotNum    = isSelected ? bp.myTeam.indexOf(c.id) + 1 : '';
     const disabled   = bp.myLocked ? 'locked' : '';
+    const isFocused  = i === state.blindPickFocusIndex;
     return `
-      <div class="creature-card ${isSelected ? 'selected' : ''} ${disabled}" data-id="${c.id}" data-index="${i}">
+      <div class="creature-card ${isSelected ? 'selected' : ''} ${disabled} ${isFocused ? 'focused' : ''}" data-id="${c.id}" data-index="${i}">
         <img class="creature-card-sprite" src="${c.sprite}" alt="${c.name}">
         <div class="creature-card-name">${c.name}</div>
         <div class="creature-card-role">${c.role}</div>
@@ -52,9 +53,15 @@ function renderBlindPick() {
   if (bp.myLocked) {
     footerHtml = `<div class="bp-locked-msg">Locked in! Waiting for opponent<span class="cb-dots"></span></div>`;
   } else if (bp.myTeam.length === 3) {
-    footerHtml = `<button class="btn primary lobby-btn" id="bp-lockin-btn">Lock In →</button>`;
+    footerHtml = `
+      <button class="btn primary lobby-btn" id="bp-lockin-btn">Lock In →</button>
+      <div class="bp-hint">R — View Stats</div>
+    `;
   } else {
-    footerHtml = `<div class="bp-hint">Pick ${3 - bp.myTeam.length} more creature${3 - bp.myTeam.length === 1 ? '' : 's'}</div>`;
+    footerHtml = `
+      <div class="bp-hint">Pick ${3 - bp.myTeam.length} more creature${3 - bp.myTeam.length === 1 ? '' : 's'}</div>
+      <div class="bp-hint">R — View Stats</div>
+    `;
   }
 
   el.innerHTML = `
@@ -77,6 +84,16 @@ function renderBlindPick() {
     </div>
   `;
 
+  el.querySelectorAll('.creature-card').forEach(card => {
+    card.addEventListener('mouseenter', () => {
+      const i = parseInt(card.dataset.index, 10);
+      if (state.blindPickFocusIndex !== i) {
+        state.blindPickFocusIndex = i;
+        renderBlindPick();
+      }
+    });
+  });
+
   if (!bp.myLocked) {
     el.querySelectorAll('.creature-card:not(.locked)').forEach(card => {
       card.addEventListener('click', () => {
@@ -90,6 +107,25 @@ function renderBlindPick() {
     playClick();
     _lockInMyTeam();
   });
+}
+
+function showBlindPickStats() {
+  const level = state.onlineSettings.resolvedLevelCap ?? state.battleConfig.level;
+  showCreatureStats(state.blindPickFocusIndex, level, 'screen-blind-pick');
+}
+
+function moveBlindPickCursor(dir) {
+  const cols  = 2;
+  const total = RENTAL_ROSTER.length;
+  let idx = state.blindPickFocusIndex;
+  if (dir === 'left')  idx = Math.max(0, idx - 1);
+  if (dir === 'right') idx = Math.min(total - 1, idx + 1);
+  if (dir === 'up')    idx = Math.max(0, idx - cols);
+  if (dir === 'down')  idx = Math.min(total - 1, idx + cols);
+  if (idx !== state.blindPickFocusIndex) {
+    state.blindPickFocusIndex = idx;
+    renderBlindPick();
+  }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────

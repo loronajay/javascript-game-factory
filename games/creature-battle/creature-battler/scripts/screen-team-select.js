@@ -115,12 +115,13 @@ function hideCreatureStats() {
   document.getElementById('creature-stats-popup')?.remove();
 }
 
-function showCreatureStats() {
-  const creature = RENTAL_ROSTER[state.teamSelectFocusIndex];
+function showCreatureStats(indexOverride, levelOverride, screenIdOverride) {
+  const idx = indexOverride ?? state.teamSelectFocusIndex;
+  const creature = RENTAL_ROSTER[idx];
   if (!creature) return;
   hideCreatureStats();
 
-  const level = state.battleConfig.level;
+  const level = levelOverride ?? state.battleConfig.level;
   const stats = resolveStats(creature, level);
   const moves = getCreatureMoves(creature.id, level);
   const arts   = moves.filter(m => m.category === 'art' || m.category === 'heal');
@@ -194,5 +195,5 @@ function showCreatureStats() {
   popup.addEventListener('click', e => {
     if (e.target === popup) { playClick(); hideCreatureStats(); }
   });
-  document.getElementById('screen-team-select').appendChild(popup);
+  document.getElementById(screenIdOverride ?? 'screen-team-select').appendChild(popup);
 }

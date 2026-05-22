@@ -1,11 +1,11 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
-import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs?v=20260521-freeform-panels-1";
+import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs?v=20260521-music-freeform-1";
 import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
   getCompositionElementDef,
-} from "./composition-layout.mjs?v=20260521-freeform-panels-1";
+} from "./composition-layout.mjs?v=20260521-music-freeform-1";
 import {
   renderMeFriendCodePanel,
   renderMeFriendsPanel,
