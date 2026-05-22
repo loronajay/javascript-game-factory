@@ -617,16 +617,21 @@
   margin-bottom: 3px;
 }
 
-.eg-status-icon {
-  font-size: 14px;
-  flex-shrink: 0;
+.eg-status-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.eg-status-name > span:nth-child(2) {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--cb-text);
-}
+.eg-tag-burn    { background: rgba(255, 80, 20, 0.25);  color: #ff9060; }
+.eg-tag-poison  { background: rgba(140, 60, 200, 0.25); color: #c080f8; }
+.eg-tag-stun    { background: rgba(255, 200, 30, 0.25); color: #ffe050; }
+.eg-tag-blind   { background: rgba(100, 100, 100, 0.3); color: #c0c8d0; }
+.eg-tag-slow    { background: rgba(30, 120, 200, 0.25); color: #60b8ff; }
+.eg-tag-silence { background: rgba(60, 180, 60, 0.2);   color: #80e080; }
 
 .eg-status-duration {
   font-size: 10px;
