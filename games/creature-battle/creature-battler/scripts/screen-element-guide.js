@@ -6,12 +6,20 @@
     earth: 'Earth', wind: 'Wind', light: 'Light', dark: 'Dark',
   };
 
-  // Opposing pairs: each element is weak to its opposite and absorbs its own element.
   var OPPOSITES = {
     fire: 'ice',   ice:   'fire',
     water: 'gaia', gaia:  'water',
     wind:  'earth', earth: 'wind',
     light: 'dark', dark:  'light',
+  };
+
+  var SUB = {
+    fire:  { gaia: 1.25, wind:  0.75 },
+    ice:   { gaia: 1.25, water: 0.75 },
+    water: { fire: 1.25, earth: 1.25 },
+    gaia:  { earth: 0.75 },
+    earth: { water: 0.75 },
+    wind:  { ice: 0.75 },
   };
 
   var GUIDE_STATUS_DEFS = [
@@ -24,20 +32,27 @@
   ];
 
   function getMatchup(defenderElement, attackerElement) {
-    if (defenderElement === attackerElement)          return 'absorb';
+    if (defenderElement === attackerElement)            return 'absorb';
     if (OPPOSITES[defenderElement] === attackerElement) return 'weak';
+    var sub = SUB[attackerElement] && SUB[attackerElement][defenderElement];
+    if (sub === 1.25) return 'sub-weak';
+    if (sub === 0.75) return 'sub-resist';
     return 'neutral';
   }
 
   function cellClass(matchup) {
-    if (matchup === 'absorb')  return 'eg-absorb';
-    if (matchup === 'weak')    return 'eg-weak-2';
+    if (matchup === 'absorb')     return 'eg-absorb';
+    if (matchup === 'weak')       return 'eg-weak-2';
+    if (matchup === 'sub-weak')   return 'eg-sub-weak';
+    if (matchup === 'sub-resist') return 'eg-sub-resist';
     return 'eg-neutral';
   }
 
   function cellLabel(matchup) {
-    if (matchup === 'absorb') return 'Absorb';
-    if (matchup === 'weak')   return '1.5&times;';
+    if (matchup === 'absorb')     return 'Absorb';
+    if (matchup === 'weak')       return '1.5&times;';
+    if (matchup === 'sub-weak')   return '1.25&times;';
+    if (matchup === 'sub-resist') return '0.75&times;';
     return '&mdash;';
   }
 
@@ -90,7 +105,9 @@
           '<div class="stats-section-label">Element Chart &mdash; Attacker &rarr; / Defender &darr;</div>' +
           '<div class="eg-chart-legend">' +
             '<span class="eg-legend-dot eg-weak-2">1.5&times; Weakness</span>' +
+            '<span class="eg-legend-dot eg-sub-weak">1.25&times; Partial Weakness</span>' +
             '<span class="eg-legend-dot eg-absorb">Absorb (heals)</span>' +
+            '<span class="eg-legend-dot eg-sub-resist">0.75&times; Partial Resist</span>' +
             '<span class="eg-legend-dot eg-neutral">Neutral</span>' +
           '</div>' +
           '<table class="eg-chart">' +

@@ -201,12 +201,24 @@ const ELEMENT_OPPOSITES = {
   light: 'dark', dark:  'light',
 };
 
+// Sub-interactions between non-opposing elements. Light and Dark are intentionally absent —
+// they are neutral against all elements except their direct opposite.
+const ELEMENT_SUB = {
+  fire:  { gaia: 1.25, wind:  0.75 },
+  ice:   { gaia: 1.25, water: 0.75 },
+  water: { fire: 1.25, earth: 1.25 },
+  gaia:  { earth: 0.75 },
+  earth: { water: 0.75 },
+  wind:  { ice: 0.75 },
+};
+
 // Returns a numeric modifier, or the string 'absorb' when the move element matches the target's element.
+// Priority: absorb > full opposition > creature resistance override > sub-interaction > neutral.
 function getElementModifier(moveElement, target) {
   if (!moveElement || moveElement === 'neutral' || moveElement === 'none') return 1.0;
   if (target.element === moveElement) return 'absorb';
   if (ELEMENT_OPPOSITES[target.element] === moveElement) return 1.5;
-  return target.resistances?.[moveElement] ?? 1.0;
+  return target.resistances?.[moveElement] ?? ELEMENT_SUB[moveElement]?.[target.element] ?? 1.0;
 }
 
 function calcHitChance(attacker, target, move) {
