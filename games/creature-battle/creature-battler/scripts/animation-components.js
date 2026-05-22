@@ -38,6 +38,16 @@ function animateEl(el, className, cssVars) {
 
 // ── DOM helpers ──────────────────────────────────────────────────────────
 
+// Returns the CSS scale factor applied to #game-canvas.
+// getBoundingClientRect() returns viewport px; dividing by this converts back
+// to unscaled CSS px so projectile/lunge positions land on the right creature.
+function _getCanvasScale() {
+  const canvas = document.getElementById('game-canvas');
+  if (!canvas) return 1;
+  const rect = canvas.getBoundingClientRect();
+  return rect.width / 960;
+}
+
 // Returns (or lazily creates) the VFX overlay inside #battle-field.
 function getAnimOverlay() {
   let overlay = document.getElementById('battle-anim-overlay');
@@ -51,13 +61,14 @@ function getAnimOverlay() {
   return overlay;
 }
 
-// Returns the center of an element relative to the overlay's top-left corner.
+// Returns the center of an element in overlay-relative CSS px (unscaled).
 function getElementCenter(el, overlay) {
-  const er = el.getBoundingClientRect();
-  const or = overlay.getBoundingClientRect();
+  const er    = el.getBoundingClientRect();
+  const or    = overlay.getBoundingClientRect();
+  const scale = _getCanvasScale();
   return {
-    x: (er.left + er.width  / 2) - or.left,
-    y: (er.top  + er.height / 2) - or.top,
+    x: ((er.left + er.width  / 2) - or.left) / scale,
+    y: ((er.top  + er.height / 2) - or.top)  / scale,
   };
 }
 
@@ -348,11 +359,12 @@ function animCreatureShake(el, options = {}) {
 // the legacy CSS-class animation path in battle-animations.js.
 
 function getLungeVars(actorEl, targetEl) {
-  const ar = actorEl.getBoundingClientRect();
-  const tr = targetEl.getBoundingClientRect();
+  const ar    = actorEl.getBoundingClientRect();
+  const tr    = targetEl.getBoundingClientRect();
+  const scale = _getCanvasScale();
   return {
-    '--anim-dx': `${Math.round((tr.left + tr.width  / 2) - (ar.left + ar.width  / 2))}px`,
-    '--anim-dy': `${Math.round((tr.top  + tr.height / 2) - (ar.top  + ar.height / 2))}px`,
+    '--anim-dx': `${Math.round(((tr.left + tr.width  / 2) - (ar.left + ar.width  / 2)) / scale)}px`,
+    '--anim-dy': `${Math.round(((tr.top  + tr.height / 2) - (ar.top  + ar.height / 2)) / scale)}px`,
   };
 }
 
