@@ -20,7 +20,7 @@ function renderModeSelect() {
         </div>
       `).join('')}
     </div>
-    <div class="mode-select-hint">↑↓ Navigate · Space to Select · Esc to go back</div>
+    <div class="mode-select-hint">↑↓ Navigate · Space to Select · I Guide · Esc back</div>
   `;
 
   el.querySelectorAll('.mode-card:not(.disabled)').forEach(card => {

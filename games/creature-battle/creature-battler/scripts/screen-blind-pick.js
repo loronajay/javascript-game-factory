@@ -55,12 +55,12 @@ function renderBlindPick() {
   } else if (bp.myTeam.length === 3) {
     footerHtml = `
       <button class="btn primary lobby-btn" id="bp-lockin-btn">Lock In →</button>
-      <div class="bp-hint">R — View Stats</div>
+      <div class="bp-hint">R — Stats · I — Guide</div>
     `;
   } else {
     footerHtml = `
       <div class="bp-hint">Pick ${3 - bp.myTeam.length} more creature${3 - bp.myTeam.length === 1 ? '' : 's'}</div>
-      <div class="bp-hint">R — View Stats</div>
+      <div class="bp-hint">R — Stats · I — Guide</div>
     `;
   }
 

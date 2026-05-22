@@ -438,3 +438,205 @@
   color: var(--cb-muted);
   flex-shrink: 0;
 }
+
+/* ── Element guide popup ──────────────────────────────────────────────────── */
+
+.element-guide-popup {
+  position: absolute;
+  inset: 0;
+  background: rgba(1, 8, 20, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.guide-popup-card {
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-accent);
+  border-radius: 14px;
+  box-shadow: 0 0 40px var(--cb-accent-soft);
+  width: 700px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guide-popup-header {
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid rgba(39, 202, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.guide-popup-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+  text-shadow: 0 0 12px var(--cb-accent-soft);
+}
+
+.guide-popup-body {
+  overflow-y: auto;
+  padding: 14px 18px;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(39, 202, 255, 0.35) transparent;
+}
+
+.guide-popup-body::-webkit-scrollbar { width: 5px; }
+.guide-popup-body::-webkit-scrollbar-track { background: transparent; }
+.guide-popup-body::-webkit-scrollbar-thumb { background: rgba(39, 202, 255, 0.35); border-radius: 3px; }
+
+.guide-popup-footer {
+  padding: 9px 18px;
+  border-top: 1px solid rgba(39, 202, 255, 0.15);
+  text-align: right;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--cb-muted);
+  flex-shrink: 0;
+}
+
+/* Compact element header pill used in the chart (no border, tight padding) */
+.eg-elem-header {
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Element chart table */
+.eg-chart-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.eg-legend-dot {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.04em;
+}
+
+.eg-chart {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+
+.eg-chart th {
+  padding: 5px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cb-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.eg-chart-corner {
+  text-align: left !important;
+  font-size: 9px !important;
+  color: rgba(168, 216, 239, 0.35) !important;
+  white-space: nowrap;
+  padding-right: 8px !important;
+}
+
+.eg-creature-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  white-space: nowrap;
+}
+
+.eg-creature-sprite {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.eg-creature-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: 0.04em;
+}
+
+.eg-cell {
+  text-align: center;
+  padding: 5px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 5px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.eg-chart tbody tr {
+  border-bottom: 1px solid rgba(39, 202, 255, 0.07);
+}
+
+/* Matchup colours */
+.eg-weak-2  { background: rgba(255, 70, 70, 0.22);  color: #ff7070; }
+.eg-weak-1  { background: rgba(255, 160, 50, 0.2);  color: #ffaa50; }
+.eg-neutral { background: transparent;               color: rgba(168, 216, 239, 0.35); }
+.eg-res-1   { background: rgba(39, 180, 255, 0.14); color: #60b8ff; }
+.eg-res-2   { background: rgba(39, 202, 255, 0.22); color: #27caff; }
+
+/* Status effects list */
+.eg-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eg-status-row {
+  padding: 8px 10px;
+  background: rgba(3, 31, 68, 0.55);
+  border: 1px solid var(--cb-border);
+  border-radius: 8px;
+}
+
+.eg-status-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.eg-status-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.eg-status-name > span:nth-child(2) {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cb-text);
+}
+
+.eg-status-duration {
+  font-size: 10px;
+  color: var(--cb-accent);
+  letter-spacing: 0.06em;
+  margin-left: auto;
+}
+
+.eg-status-desc {
+  font-size: 10px;
+  color: var(--cb-muted);
+  line-height: 1.45;
+}

@@ -15,9 +15,14 @@ function initInput() {
     }
 
     if (s === 'mode-select') {
+      if (isElementGuideOpen()) {
+        if (e.key === 'Escape' || e.key === 'i' || e.key === 'I') { playClick(); hideElementGuide(); }
+        return;
+      }
       if (key === 'ArrowUp')   { e.preventDefault(); playClick(); moveModeSelectCursor(-1); }
       if (key === 'ArrowDown') { e.preventDefault(); playClick(); moveModeSelectCursor(1);  }
       if (e.key === ' ')       { e.preventDefault(); playClick(); handleModeConfirm(); }
+      if (e.key === 'i' || e.key === 'I') { playClick(); showElementGuide('screen-mode-select'); }
       if (e.key === 'Escape')  { playClick(); setScreen('title'); }
       return;
     }
@@ -35,6 +40,10 @@ function initInput() {
         if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') { playClick(); hideCreatureStats(); }
         return;
       }
+      if (isElementGuideOpen()) {
+        if (e.key === 'Escape' || e.key === 'i' || e.key === 'I') { playClick(); hideElementGuide(); }
+        return;
+      }
       if (key === 'ArrowUp')    { e.preventDefault(); playClick(); moveTeamSelectCursor('up');    }
       if (key === 'ArrowDown')  { e.preventDefault(); playClick(); moveTeamSelectCursor('down');  }
       if (key === 'ArrowLeft')  { e.preventDefault(); playClick(); moveTeamSelectCursor('left');  }
@@ -49,6 +58,7 @@ function initInput() {
         if (currentTeam.length === 3) { playClick(); confirmTeamSelectPhase(); }
       }
       if (e.key === 'r' || e.key === 'R') { playClick(); showCreatureStats(); }
+      if (e.key === 'i' || e.key === 'I') { playClick(); showElementGuide('screen-team-select'); }
       if (e.key === 'Escape') {
         playClick();
         if (state.teamSelectPhase === 'opponent') {
@@ -74,6 +84,10 @@ function initInput() {
         if (e.key === 'Escape' || e.key === 'r' || e.key === 'R') { playClick(); hideCreatureStats(); }
         return;
       }
+      if (isElementGuideOpen()) {
+        if (e.key === 'Escape' || e.key === 'i' || e.key === 'I') { playClick(); hideElementGuide(); }
+        return;
+      }
       if (key === 'ArrowLeft')  { e.preventDefault(); moveBlindPickCursor('left');  }
       if (key === 'ArrowRight') { e.preventDefault(); moveBlindPickCursor('right'); }
       if (key === 'ArrowUp')    { e.preventDefault(); moveBlindPickCursor('up');    }
@@ -90,6 +104,7 @@ function initInput() {
         }
       }
       if (e.key === 'r' || e.key === 'R') { playClick(); showBlindPickStats(); }
+      if (e.key === 'i' || e.key === 'I') { playClick(); showElementGuide('screen-blind-pick'); }
       // No Escape back-out — match is live.
       return;
     }
