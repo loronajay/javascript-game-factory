@@ -52,7 +52,7 @@ function renderTeamSelect() {
       </div>
     </div>
     <div class="team-select-footer">
-      <div class="team-select-hint">↑↓←→ Navigate · Space pick/unpick · R stats · I guide · Esc back</div>
+      <div class="team-select-hint">↑↓←→ Navigate · Space pick/unpick · R stats · F guide · Esc back</div>
       <div class="team-select-count">${currentTeam.length} / 3</div>
     </div>
     ${currentTeam.length === 3 ? `

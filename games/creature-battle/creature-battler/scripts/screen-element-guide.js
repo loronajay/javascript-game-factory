@@ -1,5 +1,5 @@
 (function() {
-  var GUIDE_ELEMENTS = ['fire', 'water', 'ice', 'gaia', 'earth', 'wind', 'light', 'dark'];
+  var GUIDE_ELEMENTS = ['fire', 'ice', 'water', 'gaia', 'earth', 'wind', 'light', 'dark'];
 
   var GUIDE_ELEMENT_LABELS = {
     fire: 'Fire', water: 'Water', ice: 'Ice', gaia: 'Gaia',
@@ -100,7 +100,7 @@
           '<div class="stats-section-label" style="margin-top:18px">Status Effects</div>' +
           '<div class="eg-status-list">' + statusRows + '</div>' +
         '</div>' +
-        '<div class="guide-popup-footer">I &middot; ESC &mdash; Close</div>' +
+        '<div class="guide-popup-footer">F &middot; ESC &mdash; Close</div>' +
       '</div>';
 
     popup.addEventListener('click', function(e) {

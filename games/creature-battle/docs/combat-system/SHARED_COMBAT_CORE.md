@@ -542,6 +542,8 @@ Absorption should be previewed clearly in the battle UI when possible. If a play
 
 Element relationships should be authored in data rather than hardcoded throughout the engine.
 
+**Implementation status (Creature Battler):** Element relationships live in `ELEMENT_OPPOSITES` in `battle-engine.js`. `getElementModifier(moveElement, target)` returns `'absorb'` for same-element (heals target at ~50% damage roll), `1.5` for opposing element, and falls through to `target.resistances?.[el] ?? 1.0` for intentional per-creature overrides (empty `{}` by default). All three damage paths (single-target, multi-target, multi-hit) handle the absorb sentinel. This is the canonical implementation until the shared engine module is extracted.
+
 ## Damage Type, Base Power, and Element Mode
 
 Damage type, base power, command source, and element are separate fields.
