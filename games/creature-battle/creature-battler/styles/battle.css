@@ -3,13 +3,13 @@
   background: #020d1a;
 }
 
-/* Background layer */
+/* Background layer — image set dynamically by renderBattle() */
 .battle-bg {
   position: absolute;
   inset: 0;
-  background-image: url('../../docs/battle-scene/reference/arena_background_reference.png');
   background-size: cover;
   background-position: center;
+  background-color: #020d1a;
 }
 
 /* Top HUD */

@@ -21,7 +21,7 @@ function renderBattle() {
   const el = document.getElementById('screen-battle');
 
   el.innerHTML = `
-    <div class="battle-bg"></div>
+    <div class="battle-bg" id="battle-bg"></div>
     <div class="battle-hud" id="battle-hud">
       <div class="hud-side player">${renderHudSide(player, 'player')}</div>
       <div class="hud-divider"></div>
@@ -33,6 +33,11 @@ function renderBattle() {
     </div>
     <div class="battle-commands" id="battle-commands"></div>
   `;
+
+  const arenaFile = state.battleState?.arenaFile;
+  if (arenaFile) {
+    document.getElementById('battle-bg').style.backgroundImage = `url('${arenaFile}')`;
+  }
 
   inputState.logMessage = 'Preparing for battle...';
   renderBattleCommandPanel();

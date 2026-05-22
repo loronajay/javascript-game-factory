@@ -178,3 +178,37 @@ const ONLINE_LEVEL_OPTIONS = [
   { level: 'any', label: 'Any' },
   ...LEVEL_TIERS,
 ];
+
+// ── Arena registry ────────────────────────────────────────────────────────────
+
+const ARENA_BASE_PATH = 'shared/battle-backgrounds/';
+
+const ARENAS = [
+  { id: 'battle-academy',        name: 'Battle Academy'          },
+  { id: 'battle-bridge',         name: 'Battle Bridge'           },
+  { id: 'castle-ruins',          name: 'Castle Ruins'            },
+  { id: 'deep-cavern-arena',     name: 'Deep Cavern'             },
+  { id: 'forest-arena-day',      name: 'Forest Arena (Day)'      },
+  { id: 'forest-arena-night',    name: 'Forest Arena (Night)'    },
+  { id: 'forest-arena-twilight', name: 'Forest Arena (Twilight)' },
+  { id: 'forest-labrynth',       name: 'Forest Labyrinth'        },
+  { id: 'ice-cave',              name: 'Ice Cave'                },
+  { id: 'lava-cavern',           name: 'Lava Cavern'             },
+  { id: 'old-ruins',             name: 'Old Ruins'               },
+  { id: 'snowy-bridge',          name: 'Snowy Bridge'            },
+  { id: 'snowy-forest',          name: 'Snowy Forest'            },
+  { id: 'sunset-bridge',         name: 'Sunset Bridge'           },
+  { id: 'temple-ruins',          name: 'Temple Ruins'            },
+  { id: 'throne-room',           name: 'Throne Room'             },
+  { id: 'town-in-flames',        name: 'Town in Flames'          },
+  { id: 'village-yard',          name: 'Village Yard'            },
+];
+
+// arenaIndex 0 = Random. Returns a resolved { id, name, file } object.
+function resolveArena(arenaIndex) {
+  const idx = (arenaIndex === 0)
+    ? Math.floor(Math.random() * ARENAS.length)
+    : arenaIndex - 1;
+  const a = ARENAS[idx];
+  return { ...a, file: ARENA_BASE_PATH + a.id + '.png' };
+}

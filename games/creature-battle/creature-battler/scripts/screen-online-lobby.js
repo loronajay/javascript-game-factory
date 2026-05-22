@@ -4,7 +4,7 @@
 
 function enterOnlineLobby() {
   state.onlineLobbyPhase = 'settings';
-  state.onlineSettings   = { pickStyle: 'blind', levelCapIndex: 0, resolvedLevelCap: null };
+  state.onlineSettings   = { pickStyle: 'blind', levelCapIndex: 0, resolvedLevelCap: null, arenaIndex: 0, resolvedArenaId: null };
   state.onlineRoomCode   = '';
   state.onlineCodeInput  = '';
   state.remotePlayerInfo = null;
@@ -121,10 +121,13 @@ function _startBlindPick(seed) {
 
   if (isCoord) {
     const resolved = _resolveOnlineLevelCap();
+    const arena    = resolveArena(state.onlineSettings.arenaIndex);
     state.onlineSettings.resolvedLevelCap = resolved;
+    state.onlineSettings.resolvedArenaId  = arena.id;
     client.send('match_settings', {
       pickStyle: state.onlineSettings.pickStyle,
       levelCap:  resolved,
+      arenaId:   arena.id,
     });
   }
 
@@ -169,7 +172,7 @@ function renderOnlineLobby() {
 // ── Phase builders ────────────────────────────────────────────────────────────
 
 function _buildSettingsHtml() {
-  const { pickStyle, levelCapIndex } = state.onlineSettings;
+  const { pickStyle, levelCapIndex, arenaIndex } = state.onlineSettings;
 
   const pickCards = [
     { id: 'blind', label: 'Blind Pick', sub: 'Both pick simultaneously · Mirrors allowed', disabled: false },
@@ -192,6 +195,10 @@ function _buildSettingsHtml() {
   `;
   }).join('');
 
+  const arenaName = arenaIndex === 0 ? 'Random' : ARENAS[arenaIndex - 1].name;
+  const arenaFile = arenaIndex === 0 ? null : ARENA_BASE_PATH + ARENAS[arenaIndex - 1].id + '.png';
+  const arenaTotal = ARENAS.length + 1;
+
   return `
     <div class="lobby-header">
       <div class="lobby-eyebrow">ONLINE 1V1</div>
@@ -204,6 +211,17 @@ function _buildSettingsHtml() {
     <div class="lobby-section">
       <div class="lobby-section-label">LEVEL CAP</div>
       <div class="lobby-level-row">${levelChips}</div>
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-section-label">ARENA</div>
+      <div class="arena-navigator arena-navigator--compact">
+        <button class="arena-nav-btn" id="online-arena-prev">&#8592;</button>
+        <div class="arena-preview arena-preview--compact ${arenaFile ? '' : 'arena-preview--random'}"
+             style="${arenaFile ? `background-image:url('${arenaFile}')` : ''}">
+          <div class="arena-preview-name">${arenaName}</div>
+        </div>
+        <button class="arena-nav-btn" id="online-arena-next">&#8594;</button>
+      </div>
     </div>
     <div class="lobby-actions">
       <button class="btn primary lobby-btn" id="lobby-continue-btn">Continue →</button>
@@ -322,6 +340,18 @@ function _attachLobbyListeners(phase) {
         state.onlineSettings.levelCapIndex = parseInt(chip.dataset.lvlIdx, 10);
         renderOnlineLobby();
       });
+    });
+    document.getElementById('online-arena-prev')?.addEventListener('click', () => {
+      playClick();
+      const total = ARENAS.length + 1;
+      state.onlineSettings.arenaIndex = (state.onlineSettings.arenaIndex - 1 + total) % total;
+      renderOnlineLobby();
+    });
+    document.getElementById('online-arena-next')?.addEventListener('click', () => {
+      playClick();
+      const total = ARENAS.length + 1;
+      state.onlineSettings.arenaIndex = (state.onlineSettings.arenaIndex + 1) % total;
+      renderOnlineLobby();
     });
     document.getElementById('lobby-continue-btn')?.addEventListener('click', () => {
       playClick();

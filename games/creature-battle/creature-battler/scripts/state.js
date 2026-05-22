@@ -5,6 +5,8 @@ const state = {
   screen: 'title',
   modeSelectIndex: 0,
   battleConfigLevelIndex: DEFAULT_LEVEL_INDEX,
+  battleConfigArenaIndex: 0,        // 0 = Random, 1..ARENAS.length = specific arena
+  battleConfigFocusSection: 'level', // 'level' | 'arena'
   battleConfig: { level: 30 },
   teamSelectPhase: 'player',   // 'player' | 'opponent'
   playerTeam: [],              // array of creatureIds (max 3)
@@ -15,7 +17,7 @@ const state = {
 
   // Online 1v1
   onlineLobbyPhase: 'settings', // 'settings' | 'main' | 'searching' | 'friend_opts' | 'create' | 'join'
-  onlineSettings: { pickStyle: 'blind', levelCapIndex: 0, resolvedLevelCap: null },
+  onlineSettings: { pickStyle: 'blind', levelCapIndex: 0, resolvedLevelCap: null, arenaIndex: 0, resolvedArenaId: null },
   onlineClient: null,
   onlineRoomCode: '',
   onlineCodeInput: '',
@@ -52,8 +54,9 @@ function setScreen(id) {
 }
 
 function startBattleConfig() {
-  state.battleConfigLevelIndex = LEVEL_TIERS.findIndex(t => t.level === state.battleConfig.level);
+  state.battleConfigLevelIndex   = LEVEL_TIERS.findIndex(t => t.level === state.battleConfig.level);
   if (state.battleConfigLevelIndex === -1) state.battleConfigLevelIndex = DEFAULT_LEVEL_INDEX;
+  state.battleConfigFocusSection = 'level';
   setScreen('battle-config');
 }
 
@@ -87,10 +90,12 @@ function startBattle() {
       return acc;
     }, {});
   }
+  const arena = resolveArena(state.battleConfigArenaIndex);
   state.battleState = {
     player: buildSide(state.playerTeam),
     opponent: buildSide(state.opponentTeam),
     round: 1,
+    arenaFile: arena.file,
   };
   setScreen('battle');
 }

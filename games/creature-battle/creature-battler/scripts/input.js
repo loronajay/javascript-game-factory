@@ -28,6 +28,8 @@ function initInput() {
     }
 
     if (s === 'battle-config') {
+      if (key === 'ArrowUp')    { e.preventDefault(); playClick(); moveBattleConfigSection(-1); }
+      if (key === 'ArrowDown')  { e.preventDefault(); playClick(); moveBattleConfigSection(1);  }
       if (key === 'ArrowLeft')  { e.preventDefault(); playClick(); moveBattleConfigCursor(-1); }
       if (key === 'ArrowRight') { e.preventDefault(); playClick(); moveBattleConfigCursor(1);  }
       if (e.key === ' ')        { e.preventDefault(); playClick(); confirmBattleConfig(); }

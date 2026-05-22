@@ -184,10 +184,17 @@ function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
     }, {});
   }
 
+  const arenaId   = state.onlineSettings.resolvedArenaId;
+  const arenaData = arenaId ? ARENAS.find(a => a.id === arenaId) : null;
+  const arenaFile = arenaData
+    ? ARENA_BASE_PATH + arenaData.id + '.png'
+    : resolveArena(0).file; // fallback: random
+
   state.battleState = {
-    player:   buildSide(myTeamIds),
-    opponent: buildSide(opponentTeamIds),
-    round:    1,
+    player:    buildSide(myTeamIds),
+    opponent:  buildSide(opponentTeamIds),
+    round:     1,
+    arenaFile,
   };
   setScreen('battle');
 }
@@ -200,6 +207,7 @@ function handleBlindPickRemoteMessage(messageType, value) {
 
   if (messageType === 'match_settings') {
     state.onlineSettings.resolvedLevelCap = value.levelCap;
+    state.onlineSettings.resolvedArenaId  = value.arenaId ?? null;
     bp.settingsReceived = true;
     if (state.screen === 'blind-pick') renderBlindPick();
     return;

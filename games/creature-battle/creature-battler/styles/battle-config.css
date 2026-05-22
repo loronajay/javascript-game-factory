@@ -38,8 +38,31 @@
 .battle-config-body {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 28px;
+  padding: 24px;
+}
+
+/* Section container — highlights the focused section */
+.bc-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.bc-section-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cb-muted);
+  transition: color 0.12s;
+}
+
+.bc-section.bc-focused .bc-section-label {
+  color: var(--cb-accent);
 }
 
 .level-tier-row {
@@ -88,6 +111,108 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--cb-muted);
+}
+
+/* Arena navigator */
+.arena-navigator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.arena-navigator--compact {
+  gap: 8px;
+}
+
+.arena-nav-btn {
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-border);
+  border-radius: 8px;
+  color: var(--cb-text);
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  flex-shrink: 0;
+}
+
+.arena-nav-btn:hover {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 12px var(--cb-accent-soft);
+}
+
+.arena-preview {
+  width: 320px;
+  height: 100px;
+  border-radius: 10px;
+  border: 2px solid var(--cb-border);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--cb-panel-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.arena-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(2, 13, 26, 0.75) 0%, transparent 60%);
+}
+
+.arena-preview--random {
+  border-style: dashed;
+  background-image: none !important;
+}
+
+.arena-preview--random::after {
+  content: '?';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--cb-muted);
+  opacity: 0.4;
+}
+
+.arena-preview-name {
+  position: relative;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cb-text);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+}
+
+.arena-preview-counter {
+  position: relative;
+  font-size: 10px;
+  color: var(--cb-muted);
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+
+.arena-preview--compact {
+  width: 200px;
+  height: 64px;
+}
+
+.bc-section.bc-focused .arena-preview {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 18px var(--cb-accent-soft);
 }
 
 .battle-config-footer {
