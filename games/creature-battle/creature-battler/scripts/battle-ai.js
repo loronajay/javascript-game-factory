@@ -10,15 +10,21 @@ function selectAiCommands() {
 function buildAiAction(creature, slot) {
   const bs = state.battleState;
 
-  // Consider healing if a teammate is below 50% HP
-  const healMove = creature.moves.find(m => m.damageClass === 'heal' && m.mpCost <= creature.mp.current);
-  if (healMove) {
+  // Self-heal: use if this creature itself is below 50% HP
+  const selfHealMove = creature.moves.find(m => m.damageClass === 'heal' && m.targeting === 'self' && m.mpCost <= creature.mp.current);
+  if (selfHealMove && creature.hp.current / creature.hp.max < 0.5) {
+    return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: selfHealMove.id, targetSide: 'opponent', targetSlot: slot, speed: getEffectiveSpeed(creature) };
+  }
+
+  // Ally-heal: use on the most-hurt teammate below 50% HP
+  const allyHealMove = creature.moves.find(m => m.damageClass === 'heal' && m.targeting === 'single_ally' && m.mpCost <= creature.mp.current);
+  if (allyHealMove) {
     const hurtAlly = SLOT_NAMES
       .map(s => bs.opponent[s])
       .filter(c => c && !c.isKnockedOut && c.hp.current / c.hp.max < 0.5)
       .sort((a, b) => a.hp.current / a.hp.max - b.hp.current / b.hp.max)[0];
     if (hurtAlly) {
-      return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: healMove.id, targetSide: 'opponent', targetSlot: hurtAlly.slot, speed: getEffectiveSpeed(creature) };
+      return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: allyHealMove.id, targetSide: 'opponent', targetSlot: hurtAlly.slot, speed: getEffectiveSpeed(creature) };
     }
   }
 

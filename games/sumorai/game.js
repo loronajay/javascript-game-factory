@@ -1221,7 +1221,7 @@ function _boot(sounds) {
         if (r === 'block') {
           gameState.p1.speedX  = facing * PROJ_SHIELD_KNOCKBACK;
           gameState.p1.stamina = Math.max(0, gameState.p1.stamina - 3);
-          playSound('ching');
+          spawnChing(gameState.p1.x, gameState.p1.y);
         } else {
           projKillP1 = true;
           playSound('proj_hit');
@@ -1238,7 +1238,7 @@ function _boot(sounds) {
         if (r === 'block') {
           gameState.p2.speedX  = facing * PROJ_SHIELD_KNOCKBACK;
           gameState.p2.stamina = Math.max(0, gameState.p2.stamina - 3);
-          playSound('ching');
+          spawnChing(gameState.p2.x, gameState.p2.y);
         } else {
           projKillP2 = true;
           playSound('proj_hit');
@@ -1252,11 +1252,19 @@ function _boot(sounds) {
     if (combatResult && !combatResult.gridlock) {
       if (combatResult.p1HitP2) {
         playSound(gameState.p1.dashBursting ? 'dash2' : 'hit');
-        playSound(combatResult.p2Killed ? 'hurt' : 'ching');
+        if (combatResult.p2Killed) {
+          playSound('hurt');
+        } else {
+          spawnChing(gameState.p2.x, gameState.p2.y);
+        }
       }
       if (combatResult.p2HitP1) {
         playSound(gameState.p2.dashBursting ? 'dash2' : 'hit');
-        playSound(combatResult.p1Killed ? 'hurt' : 'ching');
+        if (combatResult.p1Killed) {
+          playSound('hurt');
+        } else {
+          spawnChing(gameState.p1.x, gameState.p1.y);
+        }
       }
     }
 

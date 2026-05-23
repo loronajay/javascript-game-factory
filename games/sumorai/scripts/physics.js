@@ -104,14 +104,14 @@ function applyPhysics(player, inputs, platforms) {
       player.hitLanded   = true;
     }
 
-    // Horizontal movement and jump locked while shielding
-    if (!player.blocking) {
+    // Horizontal movement and jump locked while shielding or attacking
+    if (!player.blocking && player.attackTimer === 0) {
       if (inputs.left)  player.speedX -= MOVESPEED;
       if (inputs.right) player.speedX += MOVESPEED;
     }
 
     // Jump
-    if (inputs.up && player.grounded && !player.blocking) {
+    if (inputs.up && player.grounded && !player.blocking && player.attackTimer === 0) {
       player.speedY      = JUMP_FORCE;
       player.grounded    = false;
       player.onPlatform  = false;

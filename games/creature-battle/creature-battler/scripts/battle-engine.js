@@ -592,6 +592,17 @@ function applyUtilityMove(moveId, target) {
       text = applyStatModifier(target, 'spirit', 1);
       break;
     }
+    case 'boulder_wall': {
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'defense', 1);
+      break;
+    }
+    case 'earthen_shell': {
+      applyStatModifier(target, 'defense', 1);
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
     case 'whirlpool': {
       applyStatModifier(target, 'speed', -1);
       text = applyStatModifier(target, 'accuracy', -1);

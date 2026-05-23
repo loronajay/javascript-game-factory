@@ -1,0 +1,245 @@
+/* All keyframes preserve base translate(-50%,-50%) positioning.
+   Lunge keyframes use --anim-dx / --anim-dy set by JS before the class is added. */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CAST ANIMATIONS — actor
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Stone Strike: downward power-up bob + earthy glow ─────────────────────── */
+@keyframes cast-stone-strike {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  20%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.03); filter: drop-shadow(0 0 8px rgba(120,80,30,0.65)); }
+  45%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.07); filter: drop-shadow(0 0 18px rgba(150,100,40,0.9)) drop-shadow(0 0 6px #997744) brightness(1.2); }
+  70%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.03); filter: drop-shadow(0 0 8px rgba(120,80,30,0.5)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-stone-strike { animation: cast-stone-strike 400ms ease-in-out; }
+
+/* ── Stone Strike 2: heavier bob with stronger glow ──────────────────────────── */
+@keyframes cast-stone-strike-2 {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  18%  { transform: translate(-50%, calc(-50% + 7px)) scale(1.04); filter: drop-shadow(0 0 12px rgba(120,80,30,0.7)); }
+  42%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.10); filter: drop-shadow(0 0 26px rgba(150,100,40,1)) drop-shadow(0 0 10px #886644) brightness(1.3); }
+  68%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(120,80,30,0.5)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-stone-strike-2 { animation: cast-stone-strike-2 450ms ease-in-out; }
+
+/* ── Stone Strike 3: full-force, peak hold ────────────────────────────────────── */
+@keyframes cast-stone-strike-3 {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  16%  { transform: translate(-50%, calc(-50% + 9px))  scale(1.05); filter: drop-shadow(0 0 16px rgba(120,80,30,0.8)); }
+  40%  { transform: translate(-50%, calc(-50% - 5px))  scale(1.14); filter: drop-shadow(0 0 36px rgba(150,100,40,1)) drop-shadow(0 0 16px #886644) brightness(1.5); }
+  62%  { transform: translate(-50%, calc(-50% - 1px))  scale(1.07); filter: drop-shadow(0 0 20px rgba(140,90,35,0.75)) brightness(1.3); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-stone-strike-3 { animation: cast-stone-strike-3 500ms ease-in-out; }
+
+/* ── Earth lunge — light: snappy travel for Stone Strike variants ──────────── */
+@keyframes cast-earth-lunge-light {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  12%  { transform: translate(-50%, calc(-50% - 3px)); filter: drop-shadow(0 0 8px rgba(120,80,30,0.6)); }
+  40%  { transform: translate(calc(-50% + var(--anim-dx,0px)), calc(-50% + var(--anim-dy,0px))); filter: drop-shadow(0 0 18px rgba(150,100,40,0.9)) brightness(1.25); }
+  60%  { transform: translate(calc(-50% + var(--anim-dx,0px)), calc(-50% + var(--anim-dy,0px))); filter: drop-shadow(0 0 10px rgba(120,80,30,0.5)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-stone-strike-lunge,
+.anim-cast-stone-strike-2-lunge { animation: cast-earth-lunge-light 400ms cubic-bezier(0.2, 0, 0.4, 1); }
+
+/* ── Earth lunge — heavy: slower wind-up then crash for Stone Strike 3 ──────── */
+.anim-cast-stone-strike-3-lunge { animation: cast-earth-lunge-light 460ms cubic-bezier(0.15, 0, 0.35, 1); }
+
+/* ── Rock Toss: rear-back then release ──────────────────────────────────────── */
+@keyframes cast-rock-toss {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  22%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(120,80,30,0.6)); }
+  45%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.06); filter: drop-shadow(0 0 20px rgba(150,100,40,0.85)) brightness(1.2); }
+  70%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.02); filter: drop-shadow(0 0 7px rgba(120,80,30,0.4)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-rock-toss { animation: cast-rock-toss 440ms ease-in-out; }
+
+/* ── Mud Slap: quick underhand throw ────────────────────────────────────────── */
+@keyframes cast-mud-slap {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  25%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.03); filter: drop-shadow(0 0 8px rgba(80,50,20,0.55)); }
+  50%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.05); filter: drop-shadow(0 0 14px rgba(85,52,20,0.8)) brightness(1.12); }
+  78%  { transform: translate(-50%, -50%) scale(1.01); filter: none; }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-mud-slap { animation: cast-mud-slap 380ms ease-in-out; }
+
+/* ── Boulder Wall: root self + hardening pulse ──────────────────────────────── */
+@keyframes cast-boulder-wall {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  15%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.03); filter: drop-shadow(0 0 12px rgba(100,70,30,0.5)); }
+  40%  { transform: translate(-50%, calc(-50% + 6px)) scale(1.09); filter: drop-shadow(0 0 28px rgba(120,85,40,0.9)) drop-shadow(0 0 10px #997744) brightness(1.25); }
+  65%  { transform: translate(-50%, calc(-50% + 3px)) scale(1.05); filter: drop-shadow(0 0 14px rgba(100,70,30,0.55)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-boulder-wall { animation: cast-boulder-wall 560ms ease-in-out; }
+
+/* ── Earthen Shell: full-body armor surge ───────────────────────────────────── */
+@keyframes cast-earthen-shell {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  12%  { transform: translate(-50%, calc(-50% + 5px))  scale(1.04); filter: drop-shadow(0 0 14px rgba(100,70,30,0.6)); }
+  35%  { transform: translate(-50%, calc(-50% + 8px))  scale(1.12); filter: drop-shadow(0 0 38px rgba(130,90,40,0.95)) drop-shadow(0 0 14px #886644) brightness(1.35); }
+  55%  { transform: translate(-50%, calc(-50% + 4px))  scale(1.08); filter: drop-shadow(0 0 22px rgba(110,75,35,0.7)) brightness(1.2); }
+  80%  { transform: translate(-50%, calc(-50% + 2px))  scale(1.04); filter: drop-shadow(0 0 10px rgba(100,70,30,0.45)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-earthen-shell { animation: cast-earthen-shell 700ms ease-in-out; }
+
+/* ── Quake Stomp: slam down, shockwave pose ─────────────────────────────────── */
+@keyframes cast-quake-stomp {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  18%  { transform: translate(-50%, calc(-50% - 10px)) scale(1.06); filter: drop-shadow(0 0 14px rgba(120,80,30,0.6)); }
+  38%  { transform: translate(-50%, calc(-50% + 8px))  scale(1.10); filter: drop-shadow(0 0 30px rgba(150,100,40,0.95)) brightness(1.35); }
+  55%  { transform: translate(-50%, calc(-50% + 3px))  scale(1.04); filter: drop-shadow(0 0 10px rgba(120,80,30,0.5)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+.anim-cast-quake-stomp { animation: cast-quake-stomp 560ms ease-in-out; }
+
+/* ── Quake Stomp 2: deeper slam with two-phase charge ───────────────────────── */
+@keyframes cast-quake-stomp-2 {
+  0%   { transform: translate(-50%, -50%) scale(1);      filter: none; }
+  12%  { transform: translate(-50%, calc(-50% - 12px))  scale(1.07); filter: drop-shadow(0 0 16px rgba(120,80,30,0.7)); }
+  28%  { transform: translate(-50%, calc(-50% - 4px))   scale(1.04); filter: drop-shadow(0 0 8px rgba(100,65,25,0.5)); }
+  44%  { transform: translate(-50%, calc(-50% + 12px))  scale(1.14); filter: drop-shadow(0 0 40px rgba(150,100,40,1)) brightness(1.5); }
+  62%  { transform: translate(-50%, calc(-50% + 5px))   scale(1.06); filter: drop-shadow(0 0 18px rgba(130,90,40,0.65)); }
+  100% { transform: translate(-50%, -50%) scale(1);      filter: none; }
+}
+.anim-cast-quake-stomp-2 { animation: cast-quake-stomp-2 660ms ease-in-out; }
+
+/* ── Dust Cloud: shake and scatter ──────────────────────────────────────────── */
+@keyframes cast-dust-cloud {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  20%  { transform: translate(-50%, calc(-50% + 3px)) scale(1.04); filter: brightness(1.1) sepia(0.2) saturate(1.4); }
+  45%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.07); filter: brightness(1.2) sepia(0.35) saturate(2) drop-shadow(0 0 16px rgba(160,140,80,0.7)); }
+  72%  { transform: translate(-50%, -50%) scale(1.02); filter: brightness(1.05) sepia(0.1); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-dust-cloud { animation: cast-dust-cloud 500ms ease-in-out; }
+
+/* ── Rubble Crash: charge phase — escalating earth glow ─────────────────────── */
+@keyframes cast-rubble-crash {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  8%   { transform: translate(-50%, calc(-50% + 3px)) scale(1.02); filter: brightness(1.1) drop-shadow(0 0 8px rgba(120,80,30,0.5)); }
+  24%  { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  42%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.06); filter: brightness(1.2) drop-shadow(0 0 20px rgba(140,90,35,0.75)); }
+  58%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.03); filter: brightness(1.1); }
+  78%  { transform: translate(-50%, calc(-50% + 7px)) scale(1.10); filter: brightness(1.35) drop-shadow(0 0 32px rgba(160,110,45,0.95)); }
+  100% { transform: translate(-50%, calc(-50% + 7px)) scale(1.10); filter: brightness(1.35); }
+}
+.anim-cast-rubble-crash { animation: cast-rubble-crash 640ms ease-in-out; }
+
+/* ── Rubble Crash 2: three-phase escalating charge ───────────────────────────── */
+@keyframes cast-rubble-crash-2 {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  8%   { transform: translate(-50%, calc(-50% + 4px)) scale(1.03); filter: brightness(1.15) drop-shadow(0 0 10px rgba(120,80,30,0.55)); }
+  18%  { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  36%  { transform: translate(-50%, calc(-50% + 6px)) scale(1.07); filter: brightness(1.25) drop-shadow(0 0 24px rgba(140,90,35,0.8)); }
+  48%  { transform: translate(-50%, -50%) scale(1.01); filter: brightness(1.1); }
+  68%  { transform: translate(-50%, calc(-50% + 9px)) scale(1.14); filter: brightness(1.5) drop-shadow(0 0 42px rgba(160,110,45,1)) drop-shadow(0 0 14px #886644); }
+  100% { transform: translate(-50%, calc(-50% + 9px)) scale(1.14); filter: brightness(1.5); }
+}
+.anim-cast-rubble-crash-2 { animation: cast-rubble-crash-2 800ms ease-in-out; }
+
+/* ── Earth lunge — crash: slower arc down for Rubble Crash ──────────────────── */
+@keyframes cast-earth-lunge-crash {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  8%   { transform: translate(-50%, calc(-50% - 5px)); filter: drop-shadow(0 0 14px rgba(140,90,35,0.7)); }
+  38%  { transform: translate(calc(-50% + var(--anim-dx,0px)), calc(-50% + var(--anim-dy,0px))); filter: drop-shadow(0 0 30px rgba(160,110,45,1)) brightness(1.4); }
+  58%  { transform: translate(calc(-50% + var(--anim-dx,0px)), calc(-50% + var(--anim-dy,0px))); filter: drop-shadow(0 0 16px rgba(130,90,40,0.6)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-rubble-crash-lunge  { animation: cast-earth-lunge-crash 520ms cubic-bezier(0.15, 0, 0.35, 1); }
+.anim-cast-rubble-crash-2-lunge { animation: cast-earth-lunge-crash 600ms cubic-bezier(0.12, 0, 0.3, 1); }
+
+/* ── Gravel Barrage: quick repeat-throw pose ────────────────────────────────── */
+@keyframes cast-gravel-barrage {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  20%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(120,80,30,0.6)); }
+  45%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.06); filter: drop-shadow(0 0 18px rgba(140,95,38,0.82)) brightness(1.18); }
+  70%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.02); filter: drop-shadow(0 0 7px rgba(110,72,28,0.4)); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+.anim-cast-gravel-barrage   { animation: cast-gravel-barrage 440ms ease-in-out; }
+.anim-cast-gravel-barrage-2 { animation: cast-gravel-barrage 480ms ease-in-out; }
+
+/* ── Tectonic Crash: long two-phase charge, earth power peaks ───────────────── */
+@keyframes cast-tectonic-charge {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: brightness(1); }
+  7%   { transform: translate(-50%, calc(-50% + 5px))  scale(1.03); filter: brightness(1.15) drop-shadow(0 0 12px rgba(120,80,30,0.6)); }
+  18%  { transform: translate(-50%, -50%) scale(1);     filter: brightness(1); }
+  36%  { transform: translate(-50%, calc(-50% + 8px))  scale(1.08); filter: brightness(1.3) drop-shadow(0 0 28px rgba(150,100,40,0.85)); }
+  50%  { transform: translate(-50%, calc(-50% + 2px))  scale(1.03); filter: brightness(1.1); }
+  70%  { transform: translate(-50%, calc(-50% + 13px)) scale(1.18); filter: brightness(1.65) drop-shadow(0 0 50px rgba(170,120,50,1)) drop-shadow(0 0 20px #886644); }
+  100% { transform: translate(-50%, calc(-50% + 13px)) scale(1.18); filter: brightness(1.65); }
+}
+.anim-cast-tectonic-charge { animation: cast-tectonic-charge 900ms ease-in-out; }
+
+/* ── Tectonic lunge: ultimate crash arc ────────────────────────────────────── */
+@keyframes cast-tectonic-lunge {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  6%   { transform: translate(-50%, calc(-50% - 8px)); filter: drop-shadow(0 0 20px rgba(160,110,45,0.8)); }
+  36%  { transform: translate(calc(-50% + var(--anim-dx,0px)), calc(-50% + var(--anim-dy,0px))); filter: drop-shadow(0 0 50px rgba(180,130,55,1)) brightness(1.6); }
+  56%  { transform: translate(calc(-50% + var(--anim-dx,0px)), calc(-50% + var(--anim-dy,0px))); filter: drop-shadow(0 0 24px rgba(150,100,40,0.7)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+.anim-cast-tectonic-crash-lunge { animation: cast-tectonic-lunge 640ms cubic-bezier(0.1, 0, 0.3, 1); }
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   HIT ANIMATIONS — target
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Earth light hit: earthy brown flash + small shake ─────────────────────── */
+@keyframes hit-earth-light-right {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 9px), calc(-50% - 3px)); filter: brightness(2.6) sepia(1) saturate(4) hue-rotate(15deg); }
+  50%  { transform: translate(calc(-50% - 3px), -50%);             filter: brightness(1.4) sepia(0.5) saturate(2); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+@keyframes hit-earth-light-left {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 9px), calc(-50% - 3px)); filter: brightness(2.6) sepia(1) saturate(4) hue-rotate(15deg); }
+  50%  { transform: translate(calc(-50% + 3px), -50%);             filter: brightness(1.4) sepia(0.5) saturate(2); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-earth-light   { animation: hit-earth-light-left  340ms ease-out; }
+[data-creature^="opponent"].anim-hit-earth-light { animation: hit-earth-light-right 340ms ease-out; }
+
+/* ── Earth heavy hit: strong sepia flash + hard knock ──────────────────────── */
+@keyframes hit-earth-heavy-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  15%  { transform: translate(calc(-50% + 18px), calc(-50% - 5px)); filter: brightness(3.2) sepia(1) saturate(6) hue-rotate(18deg); }
+  35%  { transform: translate(calc(-50% + 7px),  calc(-50% - 2px)); filter: brightness(2.0) sepia(0.75) saturate(3.5); }
+  60%  { transform: translate(calc(-50% - 4px),  -50%);             filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+@keyframes hit-earth-heavy-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  15%  { transform: translate(calc(-50% - 18px), calc(-50% - 5px)); filter: brightness(3.2) sepia(1) saturate(6) hue-rotate(18deg); }
+  35%  { transform: translate(calc(-50% - 7px),  calc(-50% - 2px)); filter: brightness(2.0) sepia(0.75) saturate(3.5); }
+  60%  { transform: translate(calc(-50% + 4px),  -50%);             filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-earth-heavy   { animation: hit-earth-heavy-left  420ms ease-out; }
+[data-creature^="opponent"].anim-hit-earth-heavy { animation: hit-earth-heavy-right 420ms ease-out; }
+
+/* ── Mud Slap hit: slow sticky splat ───────────────────────────────────────── */
+@keyframes hit-mud-slap-right {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  20%  { transform: translate(calc(-50% + 7px), calc(-50% + 2px)); filter: brightness(1.8) sepia(1) saturate(3) hue-rotate(20deg) drop-shadow(0 0 8px rgba(80,50,20,0.8)); }
+  55%  { transform: translate(calc(-50% - 2px), calc(-50% + 1px)); filter: brightness(1.3) sepia(0.5) saturate(2); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+@keyframes hit-mud-slap-left {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  20%  { transform: translate(calc(-50% - 7px), calc(-50% + 2px)); filter: brightness(1.8) sepia(1) saturate(3) hue-rotate(20deg) drop-shadow(0 0 8px rgba(80,50,20,0.8)); }
+  55%  { transform: translate(calc(-50% + 2px), calc(-50% + 1px)); filter: brightness(1.3) sepia(0.5) saturate(2); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-mud-slap   { animation: hit-mud-slap-left  380ms ease-out; }
+[data-creature^="opponent"].anim-hit-mud-slap { animation: hit-mud-slap-right 380ms ease-out; }

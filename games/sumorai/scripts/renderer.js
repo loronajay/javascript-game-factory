@@ -394,7 +394,7 @@ function drawStaminaHUD(ctx, player, side) {
   const h = img.naturalHeight * scale;
   // Bottom-anchor: base of the bar stays at baseY
   const baseY = 52 + STAM_TARGET_H;
-  const x     = side === 'p1' ? -75 : VIEWPORT_W - refW + 75;
+  const x     = side === 'p1' ? -75 + refW - w : VIEWPORT_W - refW + 75;
   ctx.drawImage(img, x, baseY - h, w, h);
   return STAM_TARGET_H;
 }

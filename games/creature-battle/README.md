@@ -7,6 +7,7 @@
 - `creature-battler/`: **active playable game** — open `creature-battler/index.html` to play
 - `creature-rpg/`: reserved for future RPG implementation
 - `shared/creatures/`: creature sprites shared by both implementations (`aquaphant/`, `flor/`, `pengun/`, `salamander/`)
+- `shared/creature-sheets/`: multi-creature concept-art PNGs; run `python slice_sheets.py` from that folder to extract individuals into `sliced/`
 - `docs/`: design archive for combat rules, progression, creature scope, and simulator docs
 
 ## creature-battler — current status

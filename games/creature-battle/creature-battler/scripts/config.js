@@ -51,6 +51,16 @@ const RENTAL_ROSTER = [
     resistances: {},
     sprite: 'shared/creatures/flor/flor.png',
   },
+  {
+    id: 'clod',
+    name: 'Clod',
+    element: 'earth',
+    role: 'Physical tank / cleanup',
+    baseStats: { hp: 100, mp: 18, strength: 17, defense: 20, intelligence: 5, spirit: 9, speed: 5 },
+    growth:    { hp: 10.5, mp: 1.8, strength: 1.65, defense: 2.0, intelligence: 0.5, spirit: 0.85, speed: 0.55 },
+    resistances: {},
+    sprite: 'shared/creatures/clod/clod.png',
+  },
 ];
 
 const MOVES_DATA = [
@@ -120,6 +130,23 @@ const MOVES_DATA = [
   { id: 'spark_flick_3',    name: 'Spark Flick 3',   targeting: 'single',      desc: 'A full-force fire burst channeling the heat of a living blaze.',                owner: 'salamander', learnedAt: 50, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 46, offensiveScaling: 1.0,  mpCost: 12, accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
   { id: 'cinder_burst_3',   name: 'Cinder Burst 3',  targeting: 'all_enemies', desc: 'A field-scorching eruption that overwhelms all enemies with flame.',            owner: 'salamander', learnedAt: 58, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 52, offensiveScaling: 0.9,  mpCost: 26, accuracy: 84,  canCrit: true,  movePowerModifier: 0 },
   { id: 'magma_surge',      name: 'Magma Surge',     targeting: 'all_enemies', desc: 'Erupt the battlefield with a surge of magma that engulfs all enemies.',         owner: 'salamander', learnedAt: 65, category: 'art',     damageClass: 'magic',    element: 'fire',    basePower: 64, offensiveScaling: 0.85, mpCost: 32, accuracy: 82,  canCrit: true,  movePowerModifier: 0 },
+
+  // ── Clod ─────────────────────────────────────────────────────────────────────
+  { id: 'stone_strike',     name: 'Stone Strike',    targeting: 'single',      desc: 'Drive a heavy stone fist into one foe for solid earth physical damage.',          owner: 'clod',       learnedAt: 1,  category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 16, offensiveScaling: 1.0,  mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'boulder_wall',     name: 'Boulder Wall',    targeting: 'self',        desc: 'Harden into dense rock, raising Defense by two stages.',                         owner: 'clod',       learnedAt: 1,  category: 'utility', damageClass: 'utility',  element: 'earth',   basePower: 0,  offensiveScaling: 0,    mpCost: 8,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'rock_toss',        name: 'Rock Toss',       targeting: 'single',      desc: 'Hurl a jagged chunk of earth at a target for earth physical damage.',            owner: 'clod',       learnedAt: 8,  category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 22, offensiveScaling: 0.9,  mpCost: 6,  accuracy: 90,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'mud_slap',         name: 'Mud Slap',        targeting: 'single',      desc: 'Sling a heavy glob of mud at a foe to slow their movement.',                     owner: 'clod',       learnedAt: 10, category: 'utility', damageClass: 'utility',  element: 'earth',   basePower: 0,  offensiveScaling: 0,    mpCost: 6,  accuracy: 88,  canCrit: false, movePowerModifier: 0, applyStatus: { id: 'slow', duration: 2 } },
+  { id: 'earthen_shell',    name: 'Earthen Shell',   targeting: 'self',        desc: 'Coat self in layered earth armor, raising Defense and Spirit.',                  owner: 'clod',       learnedAt: 18, category: 'utility', damageClass: 'utility',  element: 'earth',   basePower: 0,  offensiveScaling: 0,    mpCost: 10, accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'quake_stomp',      name: 'Quake Stomp',     targeting: 'all_enemies', desc: 'Slam the ground to send a shockwave crashing into all enemies.',                 owner: 'clod',       learnedAt: 20, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 20, offensiveScaling: 0.8,  mpCost: 12, accuracy: 86,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'dust_cloud',       name: 'Dust Cloud',      targeting: 'all_enemies', desc: 'Kick up a blinding cloud of dust and grit that impairs all enemies.',            owner: 'clod',       learnedAt: 22, category: 'utility', damageClass: 'utility',  element: 'earth',   basePower: 0,  offensiveScaling: 0,    mpCost: 10, accuracy: 85,  canCrit: false, movePowerModifier: 0, applyStatus: { id: 'blind', duration: 1 } },
+  { id: 'stone_strike_2',   name: 'Stone Strike 2',  targeting: 'single',      desc: 'A heavier stone blow with greater force behind it.',                             owner: 'clod',       learnedAt: 28, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 30, offensiveScaling: 1.0,  mpCost: 8,  accuracy: 94,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'rubble_crash',     name: 'Rubble Crash',    targeting: 'single',      desc: 'Crash down on a foe with a heavy mass of rubble for earth physical damage.',    owner: 'clod',       learnedAt: 30, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 42, offensiveScaling: 1.0,  mpCost: 12, accuracy: 84,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'gravel_barrage',   name: 'Gravel Barrage',  targeting: 'single',      desc: 'Launch a rapid volley of gravel shards that strikes twice.',                     owner: 'clod',       learnedAt: 35, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 15, offensiveScaling: 0.8,  mpCost: 10, accuracy: 90,  canCrit: true,  movePowerModifier: 0, hitCount: 2 },
+  { id: 'quake_stomp_2',    name: 'Quake Stomp 2',   targeting: 'all_enemies', desc: 'A deeper seismic slam that sends a crushing wave through all enemies.',          owner: 'clod',       learnedAt: 42, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 34, offensiveScaling: 0.8,  mpCost: 18, accuracy: 84,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'gravel_barrage_2', name: 'Gravel Barrage 2', targeting: 'single',     desc: 'A relentless three-shot volley of high-velocity earth shards.',                  owner: 'clod',       learnedAt: 45, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 18, offensiveScaling: 0.8,  mpCost: 14, accuracy: 88,  canCrit: true,  movePowerModifier: 0, hitCount: 3 },
+  { id: 'stone_strike_3',   name: 'Stone Strike 3',  targeting: 'single',      desc: 'A fully empowered earth strike channeling the weight of stone itself.',          owner: 'clod',       learnedAt: 50, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 48, offensiveScaling: 1.0,  mpCost: 12, accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'rubble_crash_2',   name: 'Rubble Crash 2',  targeting: 'single',      desc: 'A devastating avalanche that buries one target under massive rubble.',           owner: 'clod',       learnedAt: 55, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 58, offensiveScaling: 1.0,  mpCost: 18, accuracy: 82,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'tectonic_crash',   name: 'Tectonic Crash',  targeting: 'single',      desc: 'Split the ground beneath a target with the force of a tectonic collision.',     owner: 'clod',       learnedAt: 65, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 76, offensiveScaling: 1.0,  mpCost: 32, accuracy: 86,  canCrit: true,  movePowerModifier: 0 },
 ];
 
 function getMoveData(moveId) {
