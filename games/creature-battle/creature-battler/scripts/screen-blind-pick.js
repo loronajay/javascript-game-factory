@@ -115,15 +115,9 @@ function showBlindPickStats() {
 }
 
 function moveBlindPickCursor(dir) {
-  const cols  = 2;
-  const total = RENTAL_ROSTER.length;
-  let idx = state.blindPickFocusIndex;
-  if (dir === 'left')  idx = Math.max(0, idx - 1);
-  if (dir === 'right') idx = Math.min(total - 1, idx + 1);
-  if (dir === 'up')    idx = Math.max(0, idx - cols);
-  if (dir === 'down')  idx = Math.min(total - 1, idx + cols);
-  if (idx !== state.blindPickFocusIndex) {
-    state.blindPickFocusIndex = idx;
+  const next = moveGridCursor(state.blindPickFocusIndex, dir, RENTAL_ROSTER.length);
+  if (next !== state.blindPickFocusIndex) {
+    state.blindPickFocusIndex = next;
     renderBlindPick();
   }
 }

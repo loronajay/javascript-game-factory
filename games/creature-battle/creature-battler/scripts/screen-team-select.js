@@ -89,19 +89,25 @@ function toggleTeamCreature(id) {
   renderTeamSelect();
 }
 
-function moveTeamSelectCursor(dir) {
-  const cols = 2;
-  const rows = Math.ceil(RENTAL_ROSTER.length / cols);
-  let r = Math.floor(state.teamSelectFocusIndex / cols);
-  let c = state.teamSelectFocusIndex % cols;
+// Shared grid navigation: row-aware, clamping (no wrap), handles incomplete last rows.
+// cols comes from ROSTER_COLS so adding creatures never needs a code change here.
+function moveGridCursor(current, dir, total) {
+  const cols = ROSTER_COLS;
+  const rows = Math.ceil(total / cols);
+  let r = Math.floor(current / cols);
+  let c = current % cols;
 
-  if (dir === 'up')    r = (r - 1 + rows) % rows;
-  if (dir === 'down')  r = (r + 1) % rows;
-  if (dir === 'left')  c = (c - 1 + cols) % cols;
-  if (dir === 'right') c = (c + 1) % cols;
+  if (dir === 'left'  && c > 0) c--;
+  if (dir === 'right' && c < cols - 1) c++;
+  if (dir === 'up'   && r > 0) r--;
+  if (dir === 'down' && r < rows - 1) r++;
 
   const next = r * cols + c;
-  if (next < RENTAL_ROSTER.length) state.teamSelectFocusIndex = next;
+  return next < total ? next : total - 1;
+}
+
+function moveTeamSelectCursor(dir) {
+  state.teamSelectFocusIndex = moveGridCursor(state.teamSelectFocusIndex, dir, RENTAL_ROSTER.length);
   renderTeamSelect();
 }
 

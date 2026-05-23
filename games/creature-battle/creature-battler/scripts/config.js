@@ -1,5 +1,7 @@
 const SLOT_NAMES = ['top', 'middle', 'bottom'];
 
+const ROSTER_COLS = 3;
+
 const LEVEL_TIERS = [
   { level: 5,   label: 'Beginner'   },
   { level: 10,  label: 'Novice'     },
