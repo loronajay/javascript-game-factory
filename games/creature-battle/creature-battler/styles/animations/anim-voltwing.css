@@ -1,0 +1,107 @@
+/* ── Voltwing animations — Wind / Lightning element ────────────────────────── */
+
+/* Cast: sharp electric bob with yellow-white glow */
+@keyframes cast-lightning-default {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  40%  { transform: translate(-50%, calc(-50% - 7px)) scale(1.08); filter: drop-shadow(0 0 20px #eeffaa) brightness(1.15); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Cast: electric surge for self-buffs (dodge_step, phase_shift) */
+@keyframes cast-lightning-buff {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  35%  { transform: translate(-50%, calc(-50% - 13px)) scale(1.10); filter: drop-shadow(0 0 26px #ffffff) brightness(1.4); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Lunge: fast electric dash — light (spark_jab, spark_jab_2) */
+@keyframes cast-lightning-lunge-light {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  36%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 22px #eeffaa) brightness(1.2); }
+  58%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* Lunge: overcharged dash — heavy (spark_jab_3) */
+@keyframes cast-lightning-lunge-heavy {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  33%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 30px #ffffff) brightness(1.5); }
+  56%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* ── Cast class assignments ─────────────────────────────────────────────── */
+
+.anim-cast-spark-jab,
+.anim-cast-spark-jab-2,
+.anim-cast-spark-jab-3 { animation: cast-lightning-default 360ms ease-in-out; }
+
+.anim-cast-volt-dart,
+.anim-cast-static-burst,
+.anim-cast-static-burst-2,
+.anim-cast-chain-spark,
+.anim-cast-volt-snap,
+.anim-cast-lightning-strike,
+.anim-cast-lightning-strike-2,
+.anim-cast-twin-bolt,
+.anim-cast-twin-bolt-2,
+.anim-cast-thunderclap { animation: cast-lightning-default 400ms ease-in-out; }
+
+.anim-cast-dodge-step,
+.anim-cast-phase-shift { animation: cast-lightning-buff 460ms ease-in-out; }
+
+.anim-cast-spark-jab-lunge,
+.anim-cast-spark-jab-2-lunge { animation: cast-lightning-lunge-light 400ms cubic-bezier(0.2, 0, 0.4, 1); }
+
+.anim-cast-spark-jab-3-lunge { animation: cast-lightning-lunge-heavy 460ms cubic-bezier(0.15, 0, 0.35, 1); }
+
+/* ── Hit animations ─────────────────────────────────────────────────────── */
+
+@keyframes hit-lightning-light-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  16%  { transform: translate(calc(-50% + 9px), calc(-50% - 3px));  filter: brightness(3.0) sepia(0.2) saturate(2); }
+  50%  { transform: translate(calc(-50% - 3px), -50%);              filter: brightness(1.4); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-lightning-light-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  16%  { transform: translate(calc(-50% - 9px), calc(-50% - 3px));  filter: brightness(3.0) sepia(0.2) saturate(2); }
+  50%  { transform: translate(calc(-50% + 3px), -50%);              filter: brightness(1.4); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-lightning-light   { animation: hit-lightning-light-left  300ms ease-out; }
+[data-creature^="opponent"].anim-hit-lightning-light { animation: hit-lightning-light-right 300ms ease-out; }
+
+@keyframes hit-lightning-heavy-right {
+  0%   { transform: translate(-50%, -50%);                            filter: brightness(1); }
+  14%  { transform: translate(calc(-50% + 13px), calc(-50% - 5px));  filter: brightness(4.0) saturate(2); }
+  44%  { transform: translate(calc(-50% - 4px), -50%);               filter: brightness(1.6); }
+  100% { transform: translate(-50%, -50%);                            filter: brightness(1); }
+}
+@keyframes hit-lightning-heavy-left {
+  0%   { transform: translate(-50%, -50%);                            filter: brightness(1); }
+  14%  { transform: translate(calc(-50% - 13px), calc(-50% - 5px));  filter: brightness(4.0) saturate(2); }
+  44%  { transform: translate(calc(-50% + 4px), -50%);               filter: brightness(1.6); }
+  100% { transform: translate(-50%, -50%);                            filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-lightning-heavy   { animation: hit-lightning-heavy-left  340ms ease-out; }
+[data-creature^="opponent"].anim-hit-lightning-heavy { animation: hit-lightning-heavy-right 340ms ease-out; }
+
+/* volt_snap hit — white stun flash */
+@keyframes hit-volt-snap-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 6px), calc(-50% - 2px));  filter: brightness(5.0) saturate(0.2); }
+  55%  { transform: translate(calc(-50% - 2px), -50%);              filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-volt-snap-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 6px), calc(-50% - 2px));  filter: brightness(5.0) saturate(0.2); }
+  55%  { transform: translate(calc(-50% + 2px), -50%);              filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-volt-snap   { animation: hit-volt-snap-left  320ms ease-out; }
+[data-creature^="opponent"].anim-hit-volt-snap { animation: hit-volt-snap-right 320ms ease-out; }

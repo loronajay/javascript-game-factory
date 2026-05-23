@@ -613,6 +613,16 @@ function applyUtilityMove(moveId, target) {
       text = applyStatModifier(target, 'evasion', 1);
       break;
     }
+    case 'dodge_step': {
+      applyStatModifier(target, 'evasion', 1);
+      text = applyStatModifier(target, 'evasion', 1);
+      break;
+    }
+    case 'phase_shift': {
+      applyStatModifier(target, 'evasion', 1);
+      text = applyStatModifier(target, 'speed', 1);
+      break;
+    }
     case 'whirlpool': {
       applyStatModifier(target, 'speed', -1);
       text = applyStatModifier(target, 'accuracy', -1);
@@ -622,6 +632,22 @@ function applyUtilityMove(moveId, target) {
       const had = (target.statusEffects || []).length > 0;
       target.statusEffects = [];
       text = had ? 'CLEANSED' : 'BUFF';
+      break;
+    }
+    case 'clarity': {
+      applyStatModifier(target, 'speed', 1);
+      text = applyStatModifier(target, 'accuracy', 1);
+      break;
+    }
+    case 'holy_ward': {
+      applyStatModifier(target, 'spirit', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
+    case 'shadow_surge': {
+      applyStatModifier(target, 'intelligence', 1);
+      applyStatModifier(target, 'intelligence', 1);
+      text = applyStatModifier(target, 'defense', -1);
       break;
     }
   }

@@ -1,0 +1,116 @@
+/* ── Lumora animations — Light element ─────────────────────────────────────── */
+
+/* Cast: gentle upward bob with warm gold glow */
+@keyframes cast-light-default {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  40%  { transform: translate(-50%, calc(-50% - 7px)) scale(1.07); filter: drop-shadow(0 0 20px #ffeeaa) brightness(1.15); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Cast: radiant surge for self-buffs (clarity, holy_ward) */
+@keyframes cast-light-buff {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  35%  { transform: translate(-50%, calc(-50% - 14px)) scale(1.09); filter: drop-shadow(0 0 28px #ffffff) brightness(1.5); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Cast: gentle forward lean for heals (mend_light, rejuvenate, etc.) */
+@keyframes cast-light-heal {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  40%  { transform: translate(-50%, calc(-50% - 5px)) scale(1.06); filter: drop-shadow(0 0 18px #ffeeaa) brightness(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Lunge: light (radiant_tap, radiant_tap_2) */
+@keyframes cast-light-lunge-light {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  38%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 22px #ffeeaa) brightness(1.2); }
+  60%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* Lunge: heavy (radiant_tap_3, divine_light) */
+@keyframes cast-light-lunge-heavy {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  34%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 32px #ffffff) brightness(1.6); }
+  57%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* ── Cast class assignments ─────────────────────────────────────────────── */
+
+.anim-cast-radiant-tap,
+.anim-cast-radiant-tap-2,
+.anim-cast-radiant-tap-3 { animation: cast-light-default 380ms ease-in-out; }
+
+.anim-cast-light-ray,
+.anim-cast-blind-flash,
+.anim-cast-light-beam,
+.anim-cast-divine-light-charge { animation: cast-light-default 420ms ease-in-out; }
+
+.anim-cast-mend-light,
+.anim-cast-mend-light-2,
+.anim-cast-cleanse,
+.anim-cast-rejuvenate,
+.anim-cast-healing-surge,
+.anim-cast-full-restore { animation: cast-light-heal 440ms ease-in-out; }
+
+.anim-cast-clarity,
+.anim-cast-holy-ward { animation: cast-light-buff 480ms ease-in-out; }
+
+.anim-cast-radiant-tap-lunge,
+.anim-cast-radiant-tap-2-lunge { animation: cast-light-lunge-light 420ms cubic-bezier(0.2, 0, 0.4, 1); }
+
+.anim-cast-radiant-tap-3-lunge,
+.anim-cast-divine-light-lunge { animation: cast-light-lunge-heavy 480ms cubic-bezier(0.15, 0, 0.35, 1); }
+
+/* ── Hit animations ─────────────────────────────────────────────────────── */
+
+@keyframes hit-light-light-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 8px), calc(-50% - 3px));  filter: brightness(2.8) sepia(0.6) saturate(3); }
+  52%  { transform: translate(calc(-50% - 3px), -50%);              filter: brightness(1.4); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-light-light-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 8px), calc(-50% - 3px));  filter: brightness(2.8) sepia(0.6) saturate(3); }
+  52%  { transform: translate(calc(-50% + 3px), -50%);              filter: brightness(1.4); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-light-light   { animation: hit-light-light-left  320ms ease-out; }
+[data-creature^="opponent"].anim-hit-light-light { animation: hit-light-light-right 320ms ease-out; }
+
+@keyframes hit-light-heavy-right {
+  0%   { transform: translate(-50%, -50%);                            filter: brightness(1); }
+  14%  { transform: translate(calc(-50% + 12px), calc(-50% - 5px));  filter: brightness(4.5) saturate(2); }
+  44%  { transform: translate(calc(-50% - 4px), -50%);               filter: brightness(1.7); }
+  100% { transform: translate(-50%, -50%);                            filter: brightness(1); }
+}
+@keyframes hit-light-heavy-left {
+  0%   { transform: translate(-50%, -50%);                            filter: brightness(1); }
+  14%  { transform: translate(calc(-50% - 12px), calc(-50% - 5px));  filter: brightness(4.5) saturate(2); }
+  44%  { transform: translate(calc(-50% + 4px), -50%);               filter: brightness(1.7); }
+  100% { transform: translate(-50%, -50%);                            filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-light-heavy   { animation: hit-light-heavy-left  360ms ease-out; }
+[data-creature^="opponent"].anim-hit-light-heavy { animation: hit-light-heavy-right 360ms ease-out; }
+
+/* blind_flash — pure white overexposure hit */
+@keyframes hit-blind-flash-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  16%  { transform: translate(calc(-50% + 6px), calc(-50% - 2px));  filter: brightness(6.0) saturate(0); }
+  55%  { transform: translate(calc(-50% - 2px), -50%);              filter: brightness(1.5); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-blind-flash-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  16%  { transform: translate(calc(-50% - 6px), calc(-50% - 2px));  filter: brightness(6.0) saturate(0); }
+  55%  { transform: translate(calc(-50% + 2px), -50%);              filter: brightness(1.5); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-blind-flash   { animation: hit-blind-flash-left  340ms ease-out; }
+[data-creature^="opponent"].anim-hit-blind-flash { animation: hit-blind-flash-right 340ms ease-out; }

@@ -1,0 +1,127 @@
+/* ── Nocthorn animations — Dark element ────────────────────────────────────── */
+
+/* Cast: menacing crouch with deep purple glow */
+@keyframes cast-dark-default {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  40%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.06); filter: drop-shadow(0 0 20px #8800cc); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Cast: dark power surge for shadow_surge */
+@keyframes cast-dark-surge {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: none; }
+  35%  { transform: translate(-50%, calc(-50% + 8px)) scale(1.10); filter: drop-shadow(0 0 30px #8800cc) brightness(1.4); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: none; }
+}
+
+/* Lunge: dark dash — light (shadow_claw, shadow_claw_2) */
+@keyframes cast-dark-lunge-light {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  38%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 22px #8800cc); }
+  60%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* Lunge: void dash — heavy (shadow_claw_3, phantom_strike, void_collapse) */
+@keyframes cast-dark-lunge-heavy {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  34%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 30px #550099); }
+  57%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* ── Cast class assignments ─────────────────────────────────────────────── */
+
+.anim-cast-shadow-claw,
+.anim-cast-shadow-claw-2,
+.anim-cast-shadow-claw-3 { animation: cast-dark-default 360ms ease-in-out; }
+
+.anim-cast-life-drain,
+.anim-cast-soul-rend,
+.anim-cast-soul-rend-2,
+.anim-cast-curse,
+.anim-cast-dark-pulse,
+.anim-cast-silence,
+.anim-cast-phantom-strike,
+.anim-cast-phantom-strike-2,
+.anim-cast-dark-eruption,
+.anim-cast-dark-eruption-2,
+.anim-cast-void-collapse-charge { animation: cast-dark-default 400ms ease-in-out; }
+
+.anim-cast-shadow-surge { animation: cast-dark-surge 480ms ease-in-out; }
+
+.anim-cast-shadow-claw-lunge,
+.anim-cast-shadow-claw-2-lunge { animation: cast-dark-lunge-light 400ms cubic-bezier(0.2, 0, 0.4, 1); }
+
+.anim-cast-shadow-claw-3-lunge,
+.anim-cast-phantom-strike-lunge,
+.anim-cast-phantom-strike-2-lunge,
+.anim-cast-void-collapse-lunge { animation: cast-dark-lunge-heavy 480ms cubic-bezier(0.15, 0, 0.35, 1); }
+
+/* ── Hit animations ─────────────────────────────────────────────────────── */
+
+@keyframes hit-dark-light-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 8px), calc(-50% - 3px));  filter: brightness(1.6) hue-rotate(270deg) saturate(4); }
+  52%  { transform: translate(calc(-50% - 3px), -50%);              filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-dark-light-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 8px), calc(-50% - 3px));  filter: brightness(1.6) hue-rotate(270deg) saturate(4); }
+  52%  { transform: translate(calc(-50% + 3px), -50%);              filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-dark-light   { animation: hit-dark-light-left  320ms ease-out; }
+[data-creature^="opponent"].anim-hit-dark-light { animation: hit-dark-light-right 320ms ease-out; }
+
+@keyframes hit-dark-heavy-right {
+  0%   { transform: translate(-50%, -50%);                            filter: brightness(1); }
+  14%  { transform: translate(calc(-50% + 12px), calc(-50% - 5px));  filter: brightness(1.8) hue-rotate(270deg) saturate(5); }
+  44%  { transform: translate(calc(-50% - 4px), -50%);               filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%);                            filter: brightness(1); }
+}
+@keyframes hit-dark-heavy-left {
+  0%   { transform: translate(-50%, -50%);                            filter: brightness(1); }
+  14%  { transform: translate(calc(-50% - 12px), calc(-50% - 5px));  filter: brightness(1.8) hue-rotate(270deg) saturate(5); }
+  44%  { transform: translate(calc(-50% + 4px), -50%);               filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%);                            filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-dark-heavy   { animation: hit-dark-heavy-left  360ms ease-out; }
+[data-creature^="opponent"].anim-hit-dark-heavy { animation: hit-dark-heavy-right 360ms ease-out; }
+
+/* curse hit — sickly dark brand */
+@keyframes hit-curse-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  20%  { transform: translate(calc(-50% + 5px), calc(-50% - 2px));  filter: brightness(0.6) hue-rotate(280deg) saturate(3); }
+  60%  { transform: translate(calc(-50% - 2px), -50%);              filter: brightness(0.8); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-curse-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  20%  { transform: translate(calc(-50% - 5px), calc(-50% - 2px));  filter: brightness(0.6) hue-rotate(280deg) saturate(3); }
+  60%  { transform: translate(calc(-50% + 2px), -50%);              filter: brightness(0.8); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-curse   { animation: hit-curse-left  400ms ease-out; }
+[data-creature^="opponent"].anim-hit-curse { animation: hit-curse-right 400ms ease-out; }
+
+/* silence hit — crushing void suppression */
+@keyframes hit-silence-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% + 6px), calc(-50% - 2px));  filter: brightness(0.4) saturate(0); }
+  55%  { transform: translate(calc(-50% - 2px), -50%);              filter: brightness(0.7); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-silence-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  18%  { transform: translate(calc(-50% - 6px), calc(-50% - 2px));  filter: brightness(0.4) saturate(0); }
+  55%  { transform: translate(calc(-50% + 2px), -50%);              filter: brightness(0.7); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+
+[data-creature^="player"].anim-hit-silence   { animation: hit-silence-left  380ms ease-out; }
+[data-creature^="opponent"].anim-hit-silence { animation: hit-silence-right 380ms ease-out; }
