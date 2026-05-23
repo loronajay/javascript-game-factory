@@ -334,7 +334,11 @@ function _toggleCCPassive() {
   } else if (cfg.equippedPassives.length < 3) {
     cfg.equippedPassives.push(passive.id);
   }
+
+  const prevScroll = document.querySelector('.cc-passive-select-list')?.scrollTop ?? 0;
   renderClassCustomization();
+  const list = document.querySelector('.cc-passive-select-list');
+  if (list) list.scrollTop = prevScroll;
 }
 
 function _lockInCreature() {

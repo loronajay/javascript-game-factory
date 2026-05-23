@@ -461,27 +461,7 @@
 .art-target-badge.allies { background: rgba(39,202,255,0.15); color: var(--cb-accent); border: 1px solid rgba(39,202,255,0.3); }
 
 .art-btn { position: relative; }
-.art-tooltip {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(2, 12, 30, 0.97);
-  border: 1px solid var(--cb-accent);
-  border-radius: 7px;
-  padding: 7px 11px;
-  width: 190px;
-  z-index: 100;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--cb-text);
-  pointer-events: none;
-  white-space: normal;
-  text-align: center;
-  box-shadow: 0 0 12px var(--cb-accent-soft);
-}
-.art-btn:hover .art-tooltip { display: block; }
+/* Tooltip is now a JS-driven fixed-position overlay (#cb-tooltip) — never clipped by menu scroll container. */
 
 /* Target selection */
 .target-row { gap: 8px; }

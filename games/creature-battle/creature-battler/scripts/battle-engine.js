@@ -320,6 +320,18 @@ function previewAction(action) {
     return { type: 'defend', actorName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
   }
 
+  if (action.commandType === 'skill') {
+    const skill = getClassSkill(action.moveId);
+    if (!skill) return { type: 'skipped' };
+    if (skill.targeting === 'self') {
+      return { type: 'utility', actorName: actor.displayName, moveName: skill.name, targetName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
+    }
+    const tgtSlot = findValidTarget(action.targetSide, action.targetSlot);
+    if (!tgtSlot) return { type: 'no_target', actorName: actor.displayName, moveName: skill.name };
+    const tgt = bs[action.targetSide][tgtSlot];
+    return { type: 'damage', actorName: actor.displayName, moveName: skill.name, targetName: tgt.displayName, targetSide: action.targetSide, targetSlot: tgtSlot };
+  }
+
   const move = getMoveData(action.moveId);
   if (!move) return { type: 'skipped' };
 

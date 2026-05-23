@@ -495,6 +495,72 @@ function clearTargetHighlights() {
   document.querySelectorAll('[data-creature]').forEach(el => { el.style.cursor = ''; el.onclick = null; });
 }
 
+// ── Floating tooltip (never clipped by menu container) ───────────────────────
+
+function _getCBTooltip() {
+  let tip = document.getElementById('cb-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'cb-tooltip';
+    tip.style.cssText = [
+      'position:fixed',
+      'z-index:9999',
+      'background:rgba(2,12,30,0.97)',
+      'border:1px solid var(--cb-accent)',
+      'border-radius:7px',
+      'padding:7px 11px',
+      'width:190px',
+      'font-size:11px',
+      'line-height:1.5',
+      'color:var(--cb-text)',
+      'pointer-events:none',
+      'white-space:normal',
+      'text-align:center',
+      'box-shadow:0 0 12px var(--cb-accent-soft)',
+      'display:none',
+    ].join(';');
+    document.body.appendChild(tip);
+  }
+  return tip;
+}
+
+function _showCBTooltip(text, anchorEl) {
+  const tip = _getCBTooltip();
+  tip.textContent = text;
+  tip.style.display = 'block';
+  tip.style.left = '0px';
+  tip.style.top  = '0px';
+
+  const rect   = anchorEl.getBoundingClientRect();
+  const tipH   = tip.offsetHeight;
+  const tipW   = tip.offsetWidth;
+
+  // Prefer above the element; fall back to below if it would be clipped
+  let top  = rect.top - tipH - 8;
+  if (top < 8) top = rect.bottom + 8;
+
+  let left = rect.left + (rect.width / 2) - (tipW / 2);
+  if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+  if (left < 8) left = 8;
+
+  tip.style.left = left + 'px';
+  tip.style.top  = top  + 'px';
+}
+
+function _hideCBTooltip() {
+  const tip = document.getElementById('cb-tooltip');
+  if (tip) tip.style.display = 'none';
+}
+
+function _wireCBTooltips(container) {
+  container.querySelectorAll('[data-desc]').forEach(el => {
+    const desc = el.dataset.desc;
+    if (!desc) return;
+    el.addEventListener('mouseenter', () => _showCBTooltip(desc, el));
+    el.addEventListener('mouseleave', _hideCBTooltip);
+  });
+}
+
 function clearAllInputHighlights() {
   document.querySelectorAll('[data-hud]').forEach(el => el.classList.remove('active', 'locked'));
   document.querySelectorAll('[data-creature]').forEach(el => {
@@ -509,6 +575,7 @@ function clearAllInputHighlights() {
 function renderBattleCommandPanel() {
   const el = document.getElementById('battle-commands');
   if (!el) return;
+  _hideCBTooltip();
 
   if (!inputState.active) {
     el.innerHTML = `<div class="battle-cmd-announcement" onclick="playClick();advancePlayback()">${inputState.logMessage}</div>`;
@@ -545,14 +612,13 @@ function renderBattleCommandPanel() {
                       : a.targeting === 'all_allies'  ? '<span class="art-target-badge allies">ALLIES</span>'
                       : '';
           return `
-          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${gridIdx === inputState.focusedArt ? 'focused' : ''}" data-art="${gridIdx}">
+          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${gridIdx === inputState.focusedArt ? 'focused' : ''}" data-art="${gridIdx}" ${a.desc ? `data-desc="${a.desc}"` : ''}>
             <span class="art-name">${a.name}</span>
             <div class="art-meta">
               <span class="element-tag element-${a.element}">${a.element}</span>
               <span class="art-cost ${!canAfford ? 'unaffordable' : ''}">${a.mpCost} MP</span>
               ${badge}
             </div>
-            ${a.desc ? `<div class="art-tooltip">${a.desc}</div>` : ''}
           </div>`;
         }).join('')}
       </div>`;
@@ -561,6 +627,7 @@ function renderBattleCommandPanel() {
     );
     el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
     document.getElementById('art-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
+    _wireCBTooltips(el);
 
   } else if (inputState.phase === 'skill_menu') {
     const gridSkills = getGridSkills(creature);
@@ -572,12 +639,11 @@ function renderBattleCommandPanel() {
           const canAfford = canUseSkill(s, creature);
           const costLabel = _skillCostLabel(s, creature);
           return `
-          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${i === inputState.focusedSkill ? 'focused' : ''}" data-skill="${i}">
+          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${i === inputState.focusedSkill ? 'focused' : ''}" data-skill="${i}" ${s.description ? `data-desc="${s.description}"` : ''}>
             <span class="art-name">${s.name}</span>
             <div class="art-meta">
               <span class="art-cost ${!canAfford ? 'unaffordable' : ''}">${costLabel}</span>
             </div>
-            ${s.description ? `<div class="art-tooltip">${s.description}</div>` : ''}
           </div>`;
         }).join('')}
       </div>`;
@@ -586,6 +652,7 @@ function renderBattleCommandPanel() {
     );
     el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
     document.getElementById('skill-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
+    _wireCBTooltips(el);
 
   } else if (inputState.phase === 'target_select') {
     const side     = inputState.pendingTargetSide;
