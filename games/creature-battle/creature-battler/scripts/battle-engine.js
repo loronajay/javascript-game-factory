@@ -603,6 +603,16 @@ function applyUtilityMove(moveId, target) {
       text = applyStatModifier(target, 'spirit', 1);
       break;
     }
+    case 'tailwind': {
+      applyStatModifier(target, 'speed', 1);
+      text = applyStatModifier(target, 'speed', 1);
+      break;
+    }
+    case 'slipstream': {
+      applyStatModifier(target, 'speed', 1);
+      text = applyStatModifier(target, 'evasion', 1);
+      break;
+    }
     case 'whirlpool': {
       applyStatModifier(target, 'speed', -1);
       text = applyStatModifier(target, 'accuracy', -1);

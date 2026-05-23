@@ -63,6 +63,16 @@ const RENTAL_ROSTER = [
     resistances: {},
     sprite: 'shared/creatures/clod/clod.png',
   },
+  {
+    id: 'galeon',
+    name: 'Galeon',
+    element: 'wind',
+    role: 'Speed / tempo combo setup',
+    baseStats: { hp: 60, mp: 22, strength: 7, defense: 9, intelligence: 17, spirit: 13, speed: 22 },
+    growth:    { hp: 10.0, mp: 2.2, strength: 0.7, defense: 0.9, intelligence: 1.7, spirit: 1.3, speed: 2.2 },
+    resistances: {},
+    sprite: 'shared/creatures/galeon/galeon.png',
+  },
 ];
 
 const MOVES_DATA = [
@@ -149,6 +159,23 @@ const MOVES_DATA = [
   { id: 'stone_strike_3',   name: 'Stone Strike 3',  targeting: 'single',      desc: 'A fully empowered earth strike channeling the weight of stone itself.',          owner: 'clod',       learnedAt: 50, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 48, offensiveScaling: 1.0,  mpCost: 12, accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
   { id: 'rubble_crash_2',   name: 'Rubble Crash 2',  targeting: 'single',      desc: 'A devastating avalanche that buries one target under massive rubble.',           owner: 'clod',       learnedAt: 55, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 58, offensiveScaling: 1.0,  mpCost: 18, accuracy: 82,  canCrit: true,  movePowerModifier: 0 },
   { id: 'tectonic_crash',   name: 'Tectonic Crash',  targeting: 'single',      desc: 'Split the ground beneath a target with the force of a tectonic collision.',     owner: 'clod',       learnedAt: 65, category: 'art',     damageClass: 'physical', element: 'earth',   basePower: 76, offensiveScaling: 1.0,  mpCost: 32, accuracy: 86,  canCrit: true,  movePowerModifier: 0 },
+
+  // ── Galeon ────────────────────────────────────────────────────────────────────
+  { id: 'gust_slash',       name: 'Gust Slash',      targeting: 'single',      desc: 'Slash the air around a foe to deal light wind damage.',                           owner: 'galeon',     learnedAt: 1,  category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 16, offensiveScaling: 0.95, mpCost: 4,  accuracy: 96,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'tailwind',         name: 'Tailwind',         targeting: 'self',        desc: 'Ride an updraft to sharply raise own Speed by two stages.',                      owner: 'galeon',     learnedAt: 1,  category: 'utility', damageClass: 'utility',  element: 'wind',    basePower: 0,  offensiveScaling: 0,    mpCost: 8,  accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'wind_blade',       name: 'Wind Blade',       targeting: 'single',      desc: 'Launch a spinning blade of compressed air at a single foe.',                     owner: 'galeon',     learnedAt: 8,  category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 24, offensiveScaling: 0.95, mpCost: 6,  accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'feather_storm',    name: 'Feather Storm',    targeting: 'all_enemies', desc: 'Summon a storm of razor feathers that lashes all enemies.',                      owner: 'galeon',     learnedAt: 10, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 14, offensiveScaling: 0.8,  mpCost: 10, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'slipstream',       name: 'Slipstream',       targeting: 'self',        desc: 'Enter a slipstream to raise Speed and Evasion.',                                  owner: 'galeon',     learnedAt: 18, category: 'utility', damageClass: 'utility',  element: 'wind',    basePower: 0,  offensiveScaling: 0,    mpCost: 10, accuracy: 100, canCrit: false, movePowerModifier: 0 },
+  { id: 'cyclone_shot',     name: 'Cyclone Shot',     targeting: 'single',      desc: 'Fire a tight cyclone burst at one target for solid wind damage.',                 owner: 'galeon',     learnedAt: 20, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 32, offensiveScaling: 0.95, mpCost: 10, accuracy: 90,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'wind_shear',       name: 'Wind Shear',       targeting: 'single',      desc: 'Cut the wind around a foe, slowing their movement.',                              owner: 'galeon',     learnedAt: 22, category: 'utility', damageClass: 'utility',  element: 'wind',    basePower: 0,  offensiveScaling: 0,    mpCost: 8,  accuracy: 86,  canCrit: false, movePowerModifier: 0, applyStatus: { id: 'slow', duration: 2 } },
+  { id: 'gust_slash_2',     name: 'Gust Slash 2',     targeting: 'single',      desc: 'A sharper air slash refined through advanced tempo control.',                     owner: 'galeon',     learnedAt: 28, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 34, offensiveScaling: 0.95, mpCost: 8,  accuracy: 94,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'tempest_burst',    name: 'Tempest Burst',    targeting: 'single',      desc: 'Detonate a compressed tempest against a single target.',                          owner: 'galeon',     learnedAt: 30, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 46, offensiveScaling: 0.95, mpCost: 14, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'blade_gale',       name: 'Blade Gale',       targeting: 'single',      desc: 'Send two spinning wind blades in rapid succession.',                              owner: 'galeon',     learnedAt: 35, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 18, offensiveScaling: 0.85, mpCost: 12, accuracy: 90,  canCrit: true,  movePowerModifier: 0, hitCount: 2 },
+  { id: 'cyclone_shot_2',   name: 'Cyclone Shot 2',   targeting: 'single',      desc: 'A reinforced cyclone that hits with greater density and force.',                  owner: 'galeon',     learnedAt: 42, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 48, offensiveScaling: 0.95, mpCost: 16, accuracy: 88,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'blade_gale_2',     name: 'Blade Gale 2',     targeting: 'single',      desc: 'Three rapid wind blades that shred through a target in sequence.',                owner: 'galeon',     learnedAt: 45, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 20, offensiveScaling: 0.85, mpCost: 16, accuracy: 88,  canCrit: true,  movePowerModifier: 0, hitCount: 3 },
+  { id: 'gust_slash_3',     name: 'Gust Slash 3',     targeting: 'single',      desc: 'A fully empowered air slash channeling pure wind tempo.',                         owner: 'galeon',     learnedAt: 50, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 52, offensiveScaling: 0.95, mpCost: 14, accuracy: 92,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'tempest_burst_2',  name: 'Tempest Burst 2',  targeting: 'single',      desc: 'A massive concentrated tempest released at full force.',                          owner: 'galeon',     learnedAt: 55, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 64, offensiveScaling: 0.95, mpCost: 20, accuracy: 86,  canCrit: true,  movePowerModifier: 0 },
+  { id: 'storm_finale',     name: 'Storm Finale',     targeting: 'single',      desc: 'Channel the eye of the storm and strike with peak wind force.',                   owner: 'galeon',     learnedAt: 65, category: 'art',     damageClass: 'magic',    element: 'wind',    basePower: 82, offensiveScaling: 1.0,  mpCost: 34, accuracy: 84,  canCrit: true,  movePowerModifier: 0 },
 ];
 
 function getMoveData(moveId) {
