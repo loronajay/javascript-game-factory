@@ -119,6 +119,8 @@ function moveBlindPickCursor(dir) {
   if (next !== state.blindPickFocusIndex) {
     state.blindPickFocusIndex = next;
     renderBlindPick();
+    document.querySelector('#screen-blind-pick .creature-card.focused')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 }
 
@@ -160,20 +162,58 @@ function _checkBothLocked() {
     betaTeam:  bp.remoteTeam,
     levelCap,
   });
-  _launchOnlineBattle(bp.myTeam, bp.remoteTeam, levelCap);
+  _startOnlineClassCustomization(bp.myTeam, bp.remoteTeam, levelCap);
 }
 
-function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
+function _startOnlineClassCustomization(myTeamIds, opponentTeamIds, levelCap) {
   setBattleRng(state.onlineSettings.battleSeed);
   state.battleConfig.level = levelCap;
   state.isOnlineMatch      = true;
   state.playerTeam         = myTeamIds;
   state.opponentTeam       = opponentTeamIds;
+  state.blindPick.myClassReady       = false;
+  state.blindPick.opponentClassReady = false;
+  startClassCustomization('player');
+}
 
-  function buildSide(teamIds) {
+function _sendOnlineClassReady() {
+  state.blindPick.myClassReady = true;
+  state.onlineClient.send('class_ready', {});
+  state.classCustom.view = 'waiting';
+  renderClassCustomization();
+  _checkBothClassReady();
+}
+
+function _checkBothClassReady() {
+  const bp = state.blindPick;
+  if (!bp.myClassReady || !bp.opponentClassReady) return;
+  _launchOnlineBattle(state.playerTeam, state.opponentTeam, state.battleConfig.level);
+}
+
+function handleClassCustomRemoteMessage(messageType, value) {
+  if (messageType === 'class_ready') {
+    state.blindPick.opponentClassReady = true;
+    _checkBothClassReady();
+  }
+}
+
+function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
+  function _applyClassConfig(built, config) {
+    if (!config || !config.routeId) return;
+    const pool = resolveClassPool(config.routeId, built.level);
+    built.classRoute = config.routeId;
+    built.classSkills = pool.skills;
+    built.equippedPassives = config.equippedPassives
+      .map(id => getClassPassive(id))
+      .filter(Boolean);
+  }
+  function buildSide(teamIds, configs) {
     return SLOT_NAMES.reduce((acc, slot, i) => {
       const creature = RENTAL_ROSTER.find(c => c.id === teamIds[i]);
-      if (creature) acc[slot] = buildRentalCreature(creature, slot);
+      if (!creature) return acc;
+      const built = buildRentalCreature(creature, slot);
+      _applyClassConfig(built, configs?.[i]);
+      acc[slot] = built;
       return acc;
     }, {});
   }
@@ -182,12 +222,12 @@ function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
   const arenaData = arenaId ? ARENAS.find(a => a.id === arenaId) : null;
   const arenaFile = arenaData
     ? ARENA_BASE_PATH + arenaData.id + '.png'
-    : resolveArena(0).file; // fallback: random
+    : resolveArena(0).file;
 
   state.battleState = {
-    player:    buildSide(myTeamIds),
-    opponent:  buildSide(opponentTeamIds),
-    round:     1,
+    player:   buildSide(myTeamIds,     state.classCustom.playerConfigs),
+    opponent: buildSide(opponentTeamIds, null), // opponent config not synced yet (Phase 3)
+    round:    1,
     arenaFile,
   };
   setScreen('battle');
@@ -222,10 +262,10 @@ function handleBlindPickRemoteMessage(messageType, value) {
 
   if (messageType === 'match_start') {
     // Non-coordinator receives this — alpha team is opponent, beta team is ours.
-    const levelCap      = value.levelCap;
-    const myTeamIds     = value.betaTeam;
-    const opponentIds   = value.alphaTeam;
-    _launchOnlineBattle(myTeamIds, opponentIds, levelCap);
+    const levelCap    = value.levelCap;
+    const myTeamIds   = value.betaTeam;
+    const opponentIds = value.alphaTeam;
+    _startOnlineClassCustomization(myTeamIds, opponentIds, levelCap);
     return;
   }
 }

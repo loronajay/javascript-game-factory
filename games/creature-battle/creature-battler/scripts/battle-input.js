@@ -1,6 +1,6 @@
 const inputState = {
   active: false,
-  phase: 'command',       // 'command' | 'art_menu' | 'target_select'
+  phase: 'command',       // 'command' | 'art_menu' | 'skill_menu' | 'target_select' | 'multi_confirm'
   queue: [],              // alive player slots in order
   queueIndex: 0,
   pendingCommandType: null,
@@ -8,6 +8,7 @@ const inputState = {
   pendingTargetSide: 'opponent', // 'opponent' | 'player'
   focusedCommand: 0,
   focusedArt: 0,
+  focusedSkill: 0,
   focusedTarget: 0,
   lockedActions: [],
   onComplete: null,
@@ -58,7 +59,7 @@ function getCommandDefs(creature) {
     { id: 'attack', label: 'ATTACK', icon: '⚔️',  enabled: true },
     { id: 'defend', label: 'DEFEND', icon: '🛡️',  enabled: true },
     { id: 'art',    label: 'ART',    icon: '✦',   enabled: !silenced && getArtsFor(creature).length > 0 },
-    { id: 'skill',  label: 'SKILL',  icon: '◎',   enabled: false },
+    { id: 'skill',  label: 'SKILL',  icon: '◎',   enabled: (creature.classSkills?.length > 0) },
     { id: 'item',   label: 'ITEM',   icon: '🧪',  enabled: false },
   ];
 }
@@ -112,8 +113,9 @@ function aliveTargetSlots() {
 
 function handleBattleKey(key) {
   if (!inputState.active) return;
-  if (inputState.phase === 'command')          handleCommandKey(key);
-  else if (inputState.phase === 'art_menu')    handleArtKey(key);
+  if (inputState.phase === 'command')            handleCommandKey(key);
+  else if (inputState.phase === 'art_menu')      handleArtKey(key);
+  else if (inputState.phase === 'skill_menu')    handleSkillKey(key);
   else if (inputState.phase === 'target_select') handleTargetKey(key);
   else if (inputState.phase === 'multi_confirm') handleMultiConfirmKey(key);
 }
@@ -166,13 +168,78 @@ function handleArtKey(key) {
   if (key === 'Escape') { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); }
 }
 
+// ── Skill grid (mirrors art grid) ────────────────────────────────────────────
+
+function sortSkillsForGrid(skills) {
+  const groupMap = new Map();
+  skills.forEach(s => {
+    if (!groupMap.has(s.family)) groupMap.set(s.family, []);
+    groupMap.get(s.family).push(s);
+  });
+  groupMap.forEach(g => g.sort((a, b) => a.rank - b.rank));
+  const tiered = [], singles = [];
+  groupMap.forEach(g => (g.length > 1 ? tiered : singles).push(g));
+  const result = [];
+  tiered.forEach(g => {
+    result.push(...g);
+    const rem = g.length % 3;
+    if (rem) for (let i = 0; i < 3 - rem; i++) result.push(null);
+  });
+  singles.forEach(g => result.push(g[0]));
+  return result;
+}
+
+function getGridSkills(creature) {
+  return sortSkillsForGrid(creature.classSkills || []);
+}
+
+function skillGridNav(dir) {
+  const grid  = getGridSkills(currentCreature());
+  const total = grid.length;
+  const cur   = inputState.focusedSkill;
+  let newIdx  = cur;
+  if (dir === 'left') {
+    for (let i = cur - 1; i >= 0; i--) { if (grid[i] !== null) { newIdx = i; break; } }
+  } else if (dir === 'right') {
+    for (let i = cur + 1; i < total; i++) { if (grid[i] !== null) { newIdx = i; break; } }
+  } else if (dir === 'up') {
+    const t = cur - ART_GRID_COLS; if (t >= 0 && grid[t] !== null) newIdx = t;
+  } else if (dir === 'down') {
+    const t = cur + ART_GRID_COLS; if (t < total && grid[t] !== null) newIdx = t;
+  }
+  if (newIdx !== cur) { inputState.focusedSkill = newIdx; renderBattleCommandPanel(); }
+}
+
+function handleSkillKey(key) {
+  if (key === 'ArrowLeft')  { playClick(); skillGridNav('left');  }
+  if (key === 'ArrowRight') { playClick(); skillGridNav('right'); }
+  if (key === 'ArrowUp')    { playClick(); skillGridNav('up');    }
+  if (key === 'ArrowDown')  { playClick(); skillGridNav('down');  }
+  if (key === 'Enter' || key === ' ') { playClick(); confirmSkill(); }
+  if (key === 'Escape') { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); }
+}
+
+function _skillCostLabel(skill, actor) {
+  switch (skill.costType) {
+    case 'flatMP':    return `${skill.costAmount} MP`;
+    case 'percentMP': return `${Math.round(skill.costAmount * 100)}% MP`;
+    case 'flatHP':    return `${skill.costAmount} HP`;
+    case 'percentHP': return `${Math.round(skill.costAmount * 100)}% HP`;
+    case 'none':      return 'FREE';
+    case 'selfDebuff':return 'DEBUFF';
+    default:          return '—';
+  }
+}
+
 function handleTargetKey(key) {
   const targets = aliveTargetSlots();
   if (key === 'ArrowUp'   || key === 'ArrowLeft')  { playClick(); inputState.focusedTarget = (inputState.focusedTarget - 1 + aliveTargetSlots().length) % aliveTargetSlots().length; renderBattleCommandPanel(); refreshTargetHighlight(); }
   if (key === 'ArrowDown' || key === 'ArrowRight') { playClick(); inputState.focusedTarget = (inputState.focusedTarget + 1) % aliveTargetSlots().length;                                renderBattleCommandPanel(); refreshTargetHighlight(); }
   if (key === 'Enter' || key === ' ') { playClick(); confirmTarget(); }
   if (key === 'Escape') { playClick();
-    inputState.phase = inputState.pendingCommandType === 'attack' ? 'command' : 'art_menu';
+    inputState.phase = inputState.pendingCommandType === 'attack' ? 'command'
+                     : inputState.pendingCommandType === 'skill'  ? 'skill_menu'
+                     : 'art_menu';
     clearTargetHighlights();
     renderBattleCommandPanel();
   }
@@ -199,6 +266,10 @@ function confirmCommand() {
   } else if (cmd.id === 'art') {
     inputState.focusedArt = 0;
     inputState.phase      = 'art_menu';
+    renderBattleCommandPanel();
+  } else if (cmd.id === 'skill') {
+    inputState.focusedSkill = 0;
+    inputState.phase        = 'skill_menu';
     renderBattleCommandPanel();
   }
 }
@@ -253,6 +324,40 @@ function confirmArt() {
   refreshTargetHighlight();
 }
 
+function confirmSkill() {
+  const grid  = getGridSkills(currentCreature());
+  const skill = grid[inputState.focusedSkill];
+  if (!skill) return;
+  if (!canUseSkill(skill, currentCreature())) { playInvalid(); return; }
+  inputState.pendingMoveId      = skill.id;
+  inputState.pendingCommandType = 'skill';
+
+  if (skill.targeting === 'self') {
+    lockAction({ actorSide: 'player', actorSlot: currentSlot(), commandType: 'skill', moveId: skill.id, targetSide: 'player', targetSlot: currentSlot(), speed: getEffectiveSpeed(currentCreature()) });
+    return;
+  }
+  if (skill.targeting === 'all_enemies') {
+    inputState.pendingTargetSide = 'opponent';
+    inputState.phase = 'multi_confirm';
+    renderBattleCommandPanel();
+    refreshMultiTargetHighlight();
+    return;
+  }
+  if (skill.targeting === 'all_allies') {
+    inputState.pendingTargetSide = 'player';
+    inputState.phase = 'multi_confirm';
+    renderBattleCommandPanel();
+    refreshMultiTargetHighlight();
+    return;
+  }
+  inputState.pendingTargetSide = 'opponent';
+  inputState.focusedTarget     = 0;
+  inputState.phase             = 'target_select';
+  updateBattleLog(`${currentCreature().displayName} — click a target on the field, or use W/S to select`);
+  renderBattleCommandPanel();
+  refreshTargetHighlight();
+}
+
 function confirmTarget() {
   const targets = aliveTargetSlots();
   const tgtSlot = targets[inputState.focusedTarget];
@@ -300,7 +405,7 @@ function handleMultiConfirmKey(key) {
   if (key === 'Escape') {
     playClick();
     clearMultiTargetHighlights();
-    inputState.phase = 'art_menu';
+    inputState.phase = inputState.pendingCommandType === 'skill' ? 'skill_menu' : 'art_menu';
     renderBattleCommandPanel();
   }
 }
@@ -457,6 +562,31 @@ function renderBattleCommandPanel() {
     el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
     document.getElementById('art-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
 
+  } else if (inputState.phase === 'skill_menu') {
+    const gridSkills = getGridSkills(creature);
+    el.innerHTML = `
+      <div class="battle-cmd-prompt"><span class="cmd-actor">${creature.displayName}</span> — Choose Skill ${progress} <span class="cmd-back" id="skill-back">← Back</span></div>
+      <div class="art-list">
+        ${gridSkills.map((s, i) => {
+          if (!s) return `<div class="art-cell-empty"></div>`;
+          const canAfford = canUseSkill(s, creature);
+          const costLabel = _skillCostLabel(s, creature);
+          return `
+          <div class="art-btn ${!canAfford ? 'disabled' : ''} ${i === inputState.focusedSkill ? 'focused' : ''}" data-skill="${i}">
+            <span class="art-name">${s.name}</span>
+            <div class="art-meta">
+              <span class="art-cost ${!canAfford ? 'unaffordable' : ''}">${costLabel}</span>
+            </div>
+            ${s.description ? `<div class="art-tooltip">${s.description}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+    el.querySelectorAll('.art-btn').forEach(btn =>
+      btn.addEventListener('click', () => { playClick(); inputState.focusedSkill = +btn.dataset.skill; confirmSkill(); })
+    );
+    el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
+    document.getElementById('skill-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
+
   } else if (inputState.phase === 'target_select') {
     const side     = inputState.pendingTargetSide;
     const targets  = aliveTargetSlots();
@@ -491,7 +621,9 @@ function renderBattleCommandPanel() {
     );
     document.getElementById('tgt-back')?.addEventListener('click', () => {
       playClick();
-      inputState.phase = inputState.pendingCommandType === 'attack' ? 'command' : 'art_menu';
+      inputState.phase = inputState.pendingCommandType === 'attack' ? 'command'
+                       : inputState.pendingCommandType === 'skill'  ? 'skill_menu'
+                       : 'art_menu';
       clearTargetHighlights();
       renderBattleCommandPanel();
     });
@@ -520,7 +652,7 @@ function renderBattleCommandPanel() {
     el.querySelector('#multi-back')?.addEventListener('click', () => {
       playClick();
       clearMultiTargetHighlights();
-      inputState.phase = 'art_menu';
+      inputState.phase = inputState.pendingCommandType === 'skill' ? 'skill_menu' : 'art_menu';
       renderBattleCommandPanel();
     });
     el.querySelectorAll('.target-btn').forEach(btn => btn.addEventListener('click', () => { playClick(); confirmMultiTarget(); }));

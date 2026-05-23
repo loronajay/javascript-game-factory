@@ -109,6 +109,8 @@ function moveGridCursor(current, dir, total) {
 function moveTeamSelectCursor(dir) {
   state.teamSelectFocusIndex = moveGridCursor(state.teamSelectFocusIndex, dir, RENTAL_ROSTER.length);
   renderTeamSelect();
+  document.querySelector('#screen-team-select .creature-card.focused')
+    ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 // ── Creature stats popup ──────────────────────────────────────────────────────

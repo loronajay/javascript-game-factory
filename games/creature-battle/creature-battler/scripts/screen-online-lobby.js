@@ -48,6 +48,12 @@ function _wireOnlineCbs(client) {
         state.onlineLobbyPhase = 'main';
         setScreen('online-lobby');
       });
+    } else if (state.screen === 'class-customization') {
+      _renderDisconnectOverlay('screen-class-customization', () => {
+        state.isOnlineMatch = false;
+        state.onlineLobbyPhase = 'main';
+        setScreen('online-lobby');
+      });
     } else {
       state.onlineLobbyPhase = 'main';
       renderOnlineLobby();
@@ -72,6 +78,8 @@ function _wireOnlineCbs(client) {
   client.cb.onRemoteMessage = ({ messageType, value }) => {
     if (state.screen === 'blind-pick') {
       handleBlindPickRemoteMessage(messageType, value);
+    } else if (state.screen === 'class-customization' && state.isOnlineMatch) {
+      handleClassCustomRemoteMessage(messageType, value);
     } else if (state.screen === 'battle' && state.isOnlineMatch) {
       handleBattleRemoteMessage(messageType, value);
     }
@@ -115,6 +123,7 @@ function _startBlindPick(seed) {
   state.blindPick = {
     myTeam: [], myLocked: false, opponentLocked: false,
     remoteTeam: null, settingsReceived: isCoord,
+    myClassReady: false, opponentClassReady: false,
   };
 
   setScreen('blind-pick');

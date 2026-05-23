@@ -75,6 +75,12 @@ function initInput() {
       return;
     }
 
+    if (s === 'class-customization') {
+      e.preventDefault();
+      handleClassCustomKey(key, e.key);
+      return;
+    }
+
     if (s === 'online-lobby') {
       if (e.target.tagName === 'INPUT') return; // let the code input field capture keys
       if (e.key === 'Escape') handleOnlineLobbyEsc();

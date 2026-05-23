@@ -5,6 +5,9 @@ This folder is the design archive for the Creature Battle initiative.
 ## Main areas
 
 - `combat-system/`: shared combat core, rule sets, modes, roster, and data contracts
+  - `CLASS_SYSTEM_IMPLEMENTATION_PLAN.md` — **current build target** — 4-phase plan for implementing class system, skills, and passives into the live engine; file map, data shapes, hook system design, done states per phase
+  - `CLASS_CUSTOMIZATION_SCREEN_SCOPE.md` — scope for the class customization screen (between team select and battle): level tier → class depth, UX flow, passive equip, information hiding rules
+  - `CLASS_SKILLS_AND_PASSIVES_CANON.md` — living canon record of all locked skills and passives per class route and tier; Strength route complete; Defense route next
 - `progression-system/`: long-term RPG progression planning
 - `creatures/`: per-creature scope docs; `creatures/reference/` holds loose reference art
 - `battle-scene/`: battle scene canon package, implementation spec, and reference assets (flattened from original double-nested structure)

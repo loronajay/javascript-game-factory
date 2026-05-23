@@ -171,8 +171,9 @@ function getStageMultiplier(stage) {
 }
 
 function getEffectiveStat(creature, stat) {
-  const base = creature.stats[stat] ?? 0;
-  return Math.max(1, Math.round(base * getStageMultiplier(getStatStage(creature, stat))));
+  const base   = creature.stats[stat] ?? 0;
+  const staged = Math.max(1, Math.round(base * getStageMultiplier(getStatStage(creature, stat))));
+  return Math.max(1, Math.round(staged * getPassiveStatMultiplier(creature, stat)));
 }
 
 function getEffectiveSpeed(creature) {
@@ -250,12 +251,14 @@ function calcDamage(attacker, target, move) {
     return { damage: 0, healAmount: Math.max(1, Math.round(raw * 0.5)), isCrit: false, elemMod: 'absorb' };
   }
 
-  const isCrit  = move.canCrit && _battleRng() < ENGINE.CRIT_CHANCE;
+  const critThreshold = ENGINE.CRIT_CHANCE + getPassiveCritBonus(attacker, move);
+  const isCrit  = move.canCrit && _battleRng() < critThreshold;
   const critMod = isCrit ? ENGINE.CRIT_MOD : 1.0;
   const defMod  = target.isDefending ? ENGINE.DEFEND_MOD : 1.0;
   const randMod = engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
-  const raw = (move.basePower + move.movePowerModifier + pressure + levelMod)
-              * elemMod * defMod * critMod + randMod;
+  const passiveMult = getPassiveDamageMultiplier(attacker, target, move);
+  const raw = ((move.basePower + move.movePowerModifier + pressure + levelMod)
+              * elemMod * defMod * critMod + randMod) * passiveMult;
   return {
     damage: Math.max(ENGINE.MIN_DAMAGE, Math.min(ENGINE.MAX_DAMAGE, Math.round(raw))),
     healAmount: 0,
@@ -385,6 +388,15 @@ function resolveAction(action) {
   if (action.commandType === 'defend') {
     actor.isDefending = true;
     return { type: 'defend', actorName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
+  }
+
+  if (action.commandType === 'skill') {
+    const skill = getClassSkill(action.moveId);
+    if (!skill) return { type: 'skipped' };
+    if (hasStatus(actor, 'silence')) {
+      return { type: 'silenced', actorName: actor.displayName, moveName: skill.name };
+    }
+    return executeRegisteredSkill(skill, actor, action.actorSide, action.actorSlot, action.targetSide, action.targetSlot, bs);
   }
 
   const move = getMoveData(action.moveId);

@@ -360,6 +360,22 @@ function resolveStats(creature, level) {
   return out;
 }
 
+// Returns which skills and passives a creature has access to given a class route and level.
+// Each tier's content unlocks once the creature's level meets or exceeds the tier's levelRange[0].
+function resolveClassPool(classRouteId, level) {
+  const route = getClassRoute(classRouteId);
+  if (!route) return { skills: [], passives: [] };
+  const skills = [];
+  const passives = [];
+  for (const tier of route.tiers) {
+    if (level >= tier.levelRange[0]) {
+      for (const id of tier.skills)   { const s = getClassSkill(id);   if (s) skills.push(s);   }
+      for (const id of tier.passives) { const p = getClassPassive(id); if (p) passives.push(p); }
+    }
+  }
+  return { skills, passives };
+}
+
 function buildRentalCreature(creature, slot) {
   const level = state.battleConfig.level;
   const stats = resolveStats(creature, level);
@@ -381,6 +397,9 @@ function buildRentalCreature(creature, slot) {
     statModifiers: [],
     isKnockedOut: false,
     isDefending: false,
+    classRoute: null,
+    classSkills: [],
+    equippedPassives: [],
   };
 }
 

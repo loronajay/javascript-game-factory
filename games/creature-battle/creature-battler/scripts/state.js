@@ -1,4 +1,4 @@
-const SCREENS = ['title', 'mode-select', 'battle-config', 'team-select', 'battle', 'online-lobby', 'blind-pick'];
+const SCREENS = ['title', 'mode-select', 'battle-config', 'team-select', 'class-customization', 'battle', 'online-lobby', 'blind-pick'];
 const DEFAULT_LEVEL_INDEX = 3; // index of level 30 in LEVEL_TIERS
 
 const state = {
@@ -24,6 +24,26 @@ const state = {
   remotePlayerInfo: null,      // { displayName, playerId }
 
   blindPickFocusIndex: 0,
+
+  classCustom: {
+    teamPhase: 'player',     // 'player' | 'opponent'
+    view: 'overview',        // 'overview' | 'browse' | 'deep'
+    creatureIndex: 0,        // focused creature slot in overview (0–2)
+    browseRouteIndex: 0,     // focused route index in ROUTE_STUBS during browse
+    deepPassiveIndex: 0,     // focused passive index in deep view passive list
+    selectedRouteId: null,   // route the player entered deep view for
+    locked: [false, false, false],
+    playerConfigs: [
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+    ],
+    opponentConfigs: [
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+    ],
+  },
 
   // Blind pick phase
   blindPick: {
@@ -78,22 +98,58 @@ function confirmTeamSelectPhase() {
     state.teamSelectFocusIndex = 0;
     renderTeamSelect();
   } else {
-    startBattle();
+    startClassCustomization('player');
   }
 }
 
+function startClassCustomization(teamPhase) {
+  const cc = state.classCustom;
+  cc.teamPhase = teamPhase;
+  cc.view = 'overview';
+  cc.creatureIndex = 0;
+  cc.browseRouteIndex = 0;
+  cc.deepPassiveIndex = 0;
+  cc.selectedRouteId = null;
+  cc.locked = [false, false, false];
+  if (teamPhase === 'player') {
+    cc.playerConfigs = [
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+    ];
+  } else {
+    cc.opponentConfigs = [
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+      { routeId: null, equippedPassives: [] },
+    ];
+  }
+  setScreen('class-customization');
+}
+
 function startBattle() {
-  function buildSide(teamIds) {
+  function _applyClassConfig(built, config) {
+    if (!config || !config.routeId) return;
+    const pool = resolveClassPool(config.routeId, built.level);
+    built.classRoute = config.routeId;
+    built.classSkills = pool.skills;
+    built.equippedPassives = config.equippedPassives
+      .map(id => getClassPassive(id))
+      .filter(Boolean);
+  }
+  function buildSide(teamIds, configs) {
     return SLOT_NAMES.reduce((acc, slot, i) => {
       const creature = RENTAL_ROSTER.find(c => c.id === teamIds[i]);
-      acc[slot] = buildRentalCreature(creature, slot);
+      const built = buildRentalCreature(creature, slot);
+      _applyClassConfig(built, configs[i]);
+      acc[slot] = built;
       return acc;
     }, {});
   }
   const arena = resolveArena(state.battleConfigArenaIndex);
   state.battleState = {
-    player: buildSide(state.playerTeam),
-    opponent: buildSide(state.opponentTeam),
+    player:   buildSide(state.playerTeam,   state.classCustom.playerConfigs),
+    opponent: buildSide(state.opponentTeam, state.classCustom.opponentConfigs),
     round: 1,
     arenaFile: arena.file,
   };

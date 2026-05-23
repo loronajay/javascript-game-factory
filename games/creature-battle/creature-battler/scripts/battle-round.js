@@ -114,8 +114,9 @@ function getResultMessage(result) {
       const crit = result.isCrit ? 'Critical hit! ' : '';
       const eff  = result.elemMod > 1 ? ' Super effective!' : result.elemMod < 1 ? ' Not very effective...' : '';
       msg = `${result.actorName} uses ${result.moveName}! ${crit}${result.targetName} takes ${result.amount} damage.${eff}`;
-      if (result.lifestolen) msg += ` ${result.actorName} restored ${result.lifestolen} HP.`;
-      if (result.statusText) msg += ` ${result.statusText}!`;
+      if (result.lifestolen)   msg += ` ${result.actorName} restored ${result.lifestolen} HP.`;
+      if (result.statusText)   msg += ` ${result.statusText}!`;
+      if (result.recoilAmount) msg += ` ${result.actorName} takes ${result.recoilAmount} recoil!`;
       if (result.wasKO) msg += ` ${result.targetName} is knocked out!`;
       break;
     }
