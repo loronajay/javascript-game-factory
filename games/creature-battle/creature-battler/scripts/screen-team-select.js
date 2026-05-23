@@ -130,8 +130,8 @@ function showCreatureStats(indexOverride, levelOverride, screenIdOverride) {
   const level = levelOverride ?? state.battleConfig.level;
   const stats = resolveStats(creature, level);
   const moves = getCreatureMoves(creature.id, level);
-  const arts   = moves.filter(m => m.category === 'art' || m.category === 'heal');
-  const skills = moves.filter(m => m.category === 'utility');
+  const arts   = moves.filter(m => m.category === 'art' || m.category === 'heal' || m.category === 'utility');
+  const skills = moves.filter(m => m.category === 'skill');
 
   function targetBadge(targeting) {
     if (targeting === 'all_enemies') return `<span class="art-target-badge foes">ALL FOES</span>`;
