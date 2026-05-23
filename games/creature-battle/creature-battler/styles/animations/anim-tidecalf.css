@@ -1,0 +1,85 @@
+/* ── Tidecalf animations — Water element (defensive support) ────────────────── */
+
+/* Cast: steady forward swell — heavy body, deliberate motion */
+@keyframes cast-water-default {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  28%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.05); filter: drop-shadow(0 0 12px rgba(30,150,255,0.6)); }
+  52%  { transform: translate(-50%, calc(-50% + 2px)) scale(1.08); filter: drop-shadow(0 0 22px rgba(0,136,204,0.85)) drop-shadow(0 0 6px #44bbee) brightness(1.2); }
+  75%  { transform: translate(-50%, calc(-50% - 1px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(30,150,255,0.45)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+
+/* Cast: defensive buff — body hardens, water shell solidifies (downward brace) */
+@keyframes cast-water-buff {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  18%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.04, 0.97); filter: drop-shadow(0 0 10px rgba(30,150,255,0.5)); }
+  40%  { transform: translate(-50%, calc(-50% + 8px)) scale(1.11, 0.94); filter: drop-shadow(0 0 30px rgba(0,100,180,0.95)) drop-shadow(0 0 10px #44bbee) brightness(1.28); }
+  62%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.06, 0.97); filter: drop-shadow(0 0 16px rgba(30,150,255,0.6)) brightness(1.15); }
+  82%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.03); filter: drop-shadow(0 0 8px rgba(30,150,255,0.35)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+
+/* Lunge: light — tide_slap, tide_slap_2 */
+@keyframes cast-water-lunge-light {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  12%  { transform: translate(-50%, calc(-50% - 3px)); filter: drop-shadow(0 0 8px rgba(30,150,255,0.5)); }
+  40%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 20px rgba(0,136,204,0.9)) brightness(1.25); }
+  62%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 10px rgba(30,150,255,0.5)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* Lunge: heavy — tide_slap_3, ocean_crush */
+@keyframes cast-water-lunge-heavy {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  8%   { transform: translate(-50%, calc(-50% - 5px)); filter: drop-shadow(0 0 14px rgba(30,150,255,0.65)); }
+  36%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 34px rgba(0,85,153,1)) brightness(1.45); }
+  56%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 16px rgba(30,150,255,0.6)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* ── Cast class assignments ─────────────────────────────────────────────── */
+
+.anim-cast-tide-slap,
+.anim-cast-tide-slap-2,
+.anim-cast-tide-slap-3    { animation: cast-water-default 380ms ease-in-out; }
+
+.anim-cast-water-jet,
+.anim-cast-whirlpool,
+.anim-cast-surf-wave,
+.anim-cast-high-tide,
+.anim-cast-high-tide-2,
+.anim-cast-deep-surge,
+.anim-cast-deep-surge-2,
+.anim-cast-tidal-crash     { animation: cast-water-default 420ms ease-in-out; }
+
+.anim-cast-brine-shield    { animation: cast-water-buff 440ms ease-in-out; }
+.anim-cast-barnacle-wall   { animation: cast-water-buff 480ms ease-in-out; }
+.anim-cast-tide-wall       { animation: cast-water-buff 520ms ease-in-out; }
+
+.anim-cast-ocean-crush-charge { animation: cast-water-buff 540ms ease-in-out; }
+
+/* lunge casts */
+.anim-cast-tide-slap-lunge,
+.anim-cast-tide-slap-2-lunge { animation: cast-water-lunge-light 420ms cubic-bezier(0.2, 0, 0.4, 1); }
+
+.anim-cast-tide-slap-3-lunge { animation: cast-water-lunge-heavy 480ms cubic-bezier(0.15, 0, 0.35, 1); }
+
+.anim-cast-ocean-crush-lunge { animation: cast-water-lunge-heavy 560ms cubic-bezier(0.1, 0, 0.3, 1); }
+
+/* ── Hit animations ─────────────────────────────────────────────────────── */
+
+/* whirlpool hit: slow spinning pull, teal-blue tint, muted knockback */
+@keyframes hit-whirlpool-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  20%  { transform: translate(calc(-50% + 6px), calc(-50% + 3px));  filter: brightness(2.2) saturate(2.5) hue-rotate(170deg) drop-shadow(0 0 8px rgba(0,136,204,0.7)); }
+  55%  { transform: translate(calc(-50% - 2px), calc(-50% + 1px));  filter: brightness(1.4) saturate(1.8) hue-rotate(165deg); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-whirlpool-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  20%  { transform: translate(calc(-50% - 6px), calc(-50% + 3px));  filter: brightness(2.2) saturate(2.5) hue-rotate(170deg) drop-shadow(0 0 8px rgba(0,136,204,0.7)); }
+  55%  { transform: translate(calc(-50% + 2px), calc(-50% + 1px));  filter: brightness(1.4) saturate(1.8) hue-rotate(165deg); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-whirlpool   { animation: hit-whirlpool-left  380ms ease-out; }
+[data-creature^="opponent"].anim-hit-whirlpool { animation: hit-whirlpool-right 380ms ease-out; }

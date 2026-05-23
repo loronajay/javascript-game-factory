@@ -13,7 +13,7 @@ function renderTitle() {
     </div>
     <div class="title-creatures">
       ${RENTAL_ROSTER.map((c, i) => `
-        <img class="title-creature-sprite" src="${c.sprite}" alt="${c.name}" style="animation-delay:${i * 0.4}s">
+        <img class="title-creature-sprite" src="${c.sprite}" alt="${c.name}" style="animation-delay:${(i % 4) * 0.4}s">
       `).join('')}
     </div>
     <div class="title-press-start">Press Enter or Click to Start</div>

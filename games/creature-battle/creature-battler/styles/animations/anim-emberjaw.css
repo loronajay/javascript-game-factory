@@ -1,0 +1,117 @@
+/* ── Emberjaw animations — Fire element (physical attacker) ─────────────────── */
+
+/* Cast: aggressive downward-crouch then forward surge — physical brawler feel */
+@keyframes cast-fire-physical-default {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  25%  { transform: translate(-50%, calc(-50% + 5px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(255,100,0,0.55)); }
+  48%  { transform: translate(-50%, calc(-50% - 4px)) scale(1.09); filter: drop-shadow(0 0 22px rgba(255,70,0,0.9)) drop-shadow(0 0 8px #ffaa00) brightness(1.25); }
+  72%  { transform: translate(-50%, calc(-50% + 1px)) scale(1.04); filter: drop-shadow(0 0 10px rgba(255,100,0,0.5)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+
+/* Cast: buff stance — body swells with flame energy */
+@keyframes cast-fire-physical-buff {
+  0%   { transform: translate(-50%, -50%) scale(1);     filter: none; }
+  20%  { transform: translate(-50%, calc(-50% + 4px)) scale(1.05); filter: drop-shadow(0 0 14px rgba(255,100,0,0.6)); }
+  42%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.12); filter: drop-shadow(0 0 32px rgba(255,60,0,0.95)) drop-shadow(0 0 12px #ff8800) brightness(1.35); }
+  65%  { transform: translate(-50%, calc(-50% - 2px)) scale(1.07); filter: drop-shadow(0 0 18px rgba(255,100,0,0.7)) brightness(1.18); }
+  85%  { transform: translate(-50%, -50%) scale(1.03); filter: drop-shadow(0 0 8px rgba(255,120,0,0.4)); }
+  100% { transform: translate(-50%, -50%) scale(1);     filter: none; }
+}
+
+/* Lunge: fast physical dash — light (ember_bite, flame_charge, fire_fang) */
+@keyframes cast-fire-physical-lunge-light {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  10%  { transform: translate(-50%, calc(-50% + 4px)); filter: drop-shadow(0 0 8px rgba(255,100,0,0.5)); }
+  38%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 20px rgba(255,70,0,0.9)) brightness(1.3); }
+  60%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 10px rgba(255,90,0,0.5)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* Lunge: heavy crash — magma_crash, magma_crash_2, inferno_crash */
+@keyframes cast-fire-physical-lunge-heavy {
+  0%   { transform: translate(-50%, -50%); filter: none; }
+  8%   { transform: translate(-50%, calc(-50% + 6px)); filter: drop-shadow(0 0 12px rgba(255,100,0,0.6)); }
+  35%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 32px rgba(255,60,0,1)) brightness(1.5); }
+  56%  { transform: translate(calc(-50% + var(--anim-dx, 0px)), calc(-50% + var(--anim-dy, 0px))); filter: drop-shadow(0 0 16px rgba(255,80,0,0.65)); }
+  100% { transform: translate(-50%, -50%); filter: none; }
+}
+
+/* ── Cast class assignments ─────────────────────────────────────────────── */
+
+.anim-cast-ember-bite,
+.anim-cast-ember-bite-2,
+.anim-cast-ember-bite-3   { animation: cast-fire-physical-default 380ms ease-in-out; }
+
+.anim-cast-flame-charge,
+.anim-cast-flame-charge-2 { animation: cast-fire-physical-default 360ms ease-in-out; }
+
+.anim-cast-fire-fang,
+.anim-cast-cinder-toss    { animation: cast-fire-physical-default 400ms ease-in-out; }
+
+.anim-cast-blaze-stance   { animation: cast-fire-physical-buff 480ms ease-in-out; }
+
+.anim-cast-magma-crash,
+.anim-cast-magma-crash-2  { animation: cast-fire-physical-default 440ms ease-in-out; }
+
+.anim-cast-heat-rush,
+.anim-cast-heat-rush-2    { animation: cast-fire-physical-default 400ms ease-in-out; }
+
+.anim-cast-fire-volley,
+.anim-cast-fire-volley-2  { animation: cast-fire-physical-default 360ms ease-in-out; }
+
+.anim-cast-inferno-charge { animation: cast-fire-physical-buff 520ms ease-in-out; }
+
+/* lunge casts */
+.anim-cast-ember-bite-lunge,
+.anim-cast-ember-bite-2-lunge,
+.anim-cast-flame-charge-lunge,
+.anim-cast-fire-fang-lunge,
+.anim-cast-fire-volley-lunge-1,
+.anim-cast-fire-volley-lunge-2,
+.anim-cast-fire-volley-2-lunge-1,
+.anim-cast-fire-volley-2-lunge-2 { animation: cast-fire-physical-lunge-light 420ms cubic-bezier(0.2, 0, 0.4, 1); }
+
+.anim-cast-ember-bite-3-lunge,
+.anim-cast-flame-charge-2-lunge,
+.anim-cast-magma-crash-lunge,
+.anim-cast-magma-crash-2-lunge,
+.anim-cast-fire-volley-2-lunge-3 { animation: cast-fire-physical-lunge-heavy 500ms cubic-bezier(0.15, 0, 0.35, 1); }
+
+.anim-cast-inferno-crash-lunge { animation: cast-fire-physical-lunge-heavy 560ms cubic-bezier(0.1, 0, 0.3, 1); }
+
+/* ── Hit animations ─────────────────────────────────────────────────────── */
+
+/* fire-physical-light: snappy orange flash + small knock */
+@keyframes hit-fire-physical-light-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  16%  { transform: translate(calc(-50% + 10px), calc(-50% - 3px)); filter: brightness(3.0) sepia(1) saturate(5) hue-rotate(-15deg); }
+  48%  { transform: translate(calc(-50% - 3px), -50%);              filter: brightness(1.5) sepia(0.4) saturate(2); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-fire-physical-light-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  16%  { transform: translate(calc(-50% - 10px), calc(-50% - 3px)); filter: brightness(3.0) sepia(1) saturate(5) hue-rotate(-15deg); }
+  48%  { transform: translate(calc(-50% + 3px), -50%);              filter: brightness(1.5) sepia(0.4) saturate(2); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-fire-physical-light   { animation: hit-fire-physical-light-left  320ms ease-out; }
+[data-creature^="opponent"].anim-hit-fire-physical-light { animation: hit-fire-physical-light-right 320ms ease-out; }
+
+/* fire-physical-heavy: hard knockback + lingering red-orange afterburn */
+@keyframes hit-fire-physical-heavy-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  12%  { transform: translate(calc(-50% + 16px), calc(-50% - 5px)); filter: brightness(3.8) sepia(1) saturate(7) hue-rotate(-20deg); }
+  32%  { transform: translate(calc(-50% + 7px),  calc(-50% - 2px)); filter: brightness(2.2) sepia(0.7) saturate(4) hue-rotate(-10deg); }
+  58%  { transform: translate(calc(-50% - 4px),  -50%);             filter: brightness(1.3) sepia(0.2) saturate(1.5); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+@keyframes hit-fire-physical-heavy-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  12%  { transform: translate(calc(-50% - 16px), calc(-50% - 5px)); filter: brightness(3.8) sepia(1) saturate(7) hue-rotate(-20deg); }
+  32%  { transform: translate(calc(-50% - 7px),  calc(-50% - 2px)); filter: brightness(2.2) sepia(0.7) saturate(4) hue-rotate(-10deg); }
+  58%  { transform: translate(calc(-50% + 4px),  -50%);             filter: brightness(1.3) sepia(0.2) saturate(1.5); }
+  100% { transform: translate(-50%, -50%);                           filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-fire-physical-heavy   { animation: hit-fire-physical-heavy-left  400ms ease-out; }
+[data-creature^="opponent"].anim-hit-fire-physical-heavy { animation: hit-fire-physical-heavy-right 400ms ease-out; }

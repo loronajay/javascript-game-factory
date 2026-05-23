@@ -650,6 +650,37 @@ function applyUtilityMove(moveId, target) {
       text = applyStatModifier(target, 'defense', -1);
       break;
     }
+    case 'blaze_stance': {
+      applyStatModifier(target, 'strength', 1);
+      text = applyStatModifier(target, 'strength', 1);
+      break;
+    }
+    case 'brine_shield': {
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
+    case 'barnacle_wall': {
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'defense', 1);
+      break;
+    }
+    case 'tide_wall': {
+      applyStatModifier(target, 'defense', 1);
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
+    case 'overgrowth': {
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'defense', 1);
+      break;
+    }
+    case 'moss_wall': {
+      applyStatModifier(target, 'defense', 1);
+      text = applyStatModifier(target, 'spirit', 1);
+      break;
+    }
   }
   const move = getMoveData(moveId);
   if (move?.applyStatus && !target.isKnockedOut) {
