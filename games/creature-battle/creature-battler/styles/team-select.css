@@ -46,20 +46,28 @@
 /* Roster grid */
 .roster-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
   flex: 1;
+  min-height: 0;
   align-content: start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(39, 202, 255, 0.25) transparent;
 }
+
+.roster-grid::-webkit-scrollbar { width: 4px; }
+.roster-grid::-webkit-scrollbar-track { background: transparent; }
+.roster-grid::-webkit-scrollbar-thumb { background: rgba(39, 202, 255, 0.25); border-radius: 3px; }
 
 .creature-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 10px 10px;
+  padding: 8px 8px 7px;
   background: var(--cb-panel-bg);
   border: 2px solid var(--cb-border);
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
   transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
   position: relative;
@@ -86,25 +94,25 @@
 }
 
 .creature-card-sprite {
-  width: 72px;
-  height: 72px;
+  width: 60px;
+  height: 60px;
   object-fit: contain;
   image-rendering: pixelated;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   filter: drop-shadow(0 3px 8px rgba(0,0,0,0.6));
 }
 
 .creature-card-name {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cb-text);
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .creature-card-role {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--cb-muted);
   text-align: center;
   margin-bottom: 4px;
