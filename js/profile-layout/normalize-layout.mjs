@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260524-default-layout-cleanup-6";
+import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260524-default-layout-cleanup-2";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -9,7 +9,7 @@ import {
   CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
   isCustomTitleElementId,
-} from "./composition-layout.mjs?v=20260524-default-layout-cleanup-6";
+} from "./composition-layout.mjs?v=20260524-default-layout-cleanup-2";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -136,23 +136,14 @@ function shouldKeepCompositionElement(element, raw, def) {
   if (def.type === "galleryPhoto" && isOldTinyGalleryPhotoGeometry(raw)) return false;
 
   const defaultEnabled = def.defaultEnabled !== false;
+  if ((raw.enabled ?? defaultEnabled) !== defaultEnabled) return true;
+
   if (def.type === "title" && typeof raw.text === "string" && raw.text !== (def.defaultText || "")) return true;
 
-  const geometryChanged = !numbersEqual(element.x, def.defaultX) ||
+  return !numbersEqual(element.x, def.defaultX) ||
     !numbersEqual(element.y, def.defaultY) ||
     !numbersEqual(element.w, def.defaultW) ||
     !numbersEqual(element.h, def.defaultH);
-
-  if (geometryChanged) return true;
-
-  // Older editor passes accidentally persisted optional freeform records at
-  // their registry defaults. Keeping those records hides the readable parent
-  // panels and replaces them with tiny default-slot overlays on live profiles.
-  if (!defaultEnabled && (raw.enabled ?? defaultEnabled) !== defaultEnabled) return false;
-
-  if ((raw.enabled ?? defaultEnabled) !== defaultEnabled) return true;
-
-  return false;
 }
 
 function buildRawCompositionElementMap(rawElements) {
