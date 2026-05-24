@@ -137,6 +137,80 @@
   animation: creature-shake var(--shake-duration, 200ms) ease-out;
 }
 
+/* ── Shockwave ring ─────────────────────────────────────────────────────────
+   Expanding impact ring. Base div is 10×10px; JS sets --shock-scale (unitless
+   scale factor = target diameter / 10), --shock-opacity, --shock-duration,
+   border-color, border-width. */
+
+.anim-shockwave {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border-style: solid;
+  pointer-events: none;
+  animation: shockwave-expand var(--shock-duration, 380ms) ease-out forwards;
+}
+
+@keyframes shockwave-expand {
+  0%   {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: var(--shock-opacity, 0.7);
+  }
+  55%  { opacity: calc(var(--shock-opacity, 0.7) * 0.35); }
+  100% {
+    transform: translate(-50%, -50%) scale(var(--shock-scale, 12));
+    opacity: 0;
+  }
+}
+
+/* ── Creature tint overlay ───────────────────────────────────────────────────
+   Sits inside .creature-breathe-wrapper, which needs position:relative so the
+   tint can use inset:0 to cover only the sprite area. JS sets background color,
+   mix-blend-mode, --tint-opacity, --tint-duration. */
+
+.creature-breathe-wrapper { position: relative; }
+
+.anim-creature-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: creature-tint-pulse var(--tint-duration, 500ms) ease-out forwards;
+}
+
+@keyframes creature-tint-pulse {
+  0%   { opacity: 0; }
+  12%  { opacity: var(--tint-opacity, 0.35); }
+  75%  { opacity: var(--tint-opacity, 0.35); }
+  100% { opacity: 0; }
+}
+
+/* ── Sweep wave ─────────────────────────────────────────────────────────────
+   Expanding elliptical wave that travels from actor toward the target side.
+   JS sets --sweep-tx (signed CSS px travel distance) and --sweep-duration. */
+
+.anim-sweep-wave {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: sweep-wave-travel var(--sweep-duration, 380ms) ease-out forwards;
+}
+
+@keyframes sweep-wave-travel {
+  0%   {
+    transform: translate(-50%, -50%) translateX(0px) scaleX(0.25) scaleY(0.35);
+    opacity: 0.9;
+  }
+  25%  { opacity: 0.75; }
+  65%  { opacity: 0.45; }
+  100% {
+    transform: translate(-50%, -50%) translateX(var(--sweep-tx)) scaleX(5.5) scaleY(4);
+    opacity: 0;
+  }
+}
+
 /* ── Status ring ────────────────────────────────────────────────────────────
    Persistent glow loop on a creature element while a status is active.
    JS sets --status-color on the creature element.

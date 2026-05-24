@@ -287,45 +287,53 @@ registerMoveAnimations({
   },
 
   // ── sweep ───────────────────────────────────────────────────────────────
-  // AoE physical sweep. Actor plants and swings wide — no lunge.
-  // Particles fan across the whole enemy side (spread:130). Hits everyone.
+  // AoE physical sweep. An expanding wave rolls out from the actor toward all
+  // enemies — visible travel, visible arrival. Impact fires as the wave front
+  // reaches the target side; particle burst adds dust at the wave's peak.
   sweep: {
     timeline: [
       { at:0,   type:'sound',          id:'charge-light' },
       { at:0,   type:'creature_anim',  target:'actor', class:'anim-cast-lunge' },
-      { at:180, type:'impact' },
-      { at:180, type:'sound',          id:'hit-light' },
-      { at:180, type:'particle_burst', origin:'actor', color:'#d4c0a0', count:22, spread:130, direction:'all', duration:440 },
-      { at:180, type:'field_flash',    color:'#aa9970', opacity:0.22, duration:260 },
-      { at:180, type:'screen_shake',   intensity:2, duration:180 },
+      { at:60,  type:'wave_sweep',     color:'#d4c0a0', duration:340 },
+      { at:260, type:'impact' },
+      { at:260, type:'sound',          id:'hit-light' },
+      { at:260, type:'particle_burst', origin:'actor', color:'#d4c0a0', count:16, spread:110, direction:'all', duration:400 },
+      { at:260, type:'field_flash',    color:'#aa9970', opacity:0.20, duration:240 },
+      { at:260, type:'screen_shake',   intensity:2, duration:180 },
     ],
   },
 
   // ── sweep_2 ─────────────────────────────────────────────────────────────
+  // Heavier wave, hits harder. A second dust burst trails the wave front.
   sweep_2: {
     timeline: [
       { at:0,   type:'sound',          id:'charge-light' },
       { at:0,   type:'creature_anim',  target:'actor', class:'anim-cast-lunge' },
-      { at:160, type:'impact' },
-      { at:160, type:'sound',          id:'hit-heavy' },
-      { at:160, type:'particle_burst', origin:'actor', color:'#d4c0a0', count:28, spread:140, direction:'all', duration:480 },
-      { at:160, type:'field_flash',    color:'#aa9970', opacity:0.28, duration:280 },
-      { at:160, type:'screen_shake',   intensity:4, duration:220 },
+      { at:60,  type:'wave_sweep',     color:'#ccb890', duration:360 },
+      { at:280, type:'impact' },
+      { at:280, type:'sound',          id:'hit-heavy' },
+      { at:280, type:'particle_burst', origin:'actor', color:'#d4c0a0', count:22, spread:120, direction:'all', duration:460 },
+      { at:280, type:'field_flash',    color:'#aa9970', opacity:0.26, duration:260 },
+      { at:280, type:'screen_shake',   intensity:4, duration:220 },
+      { at:400, type:'particle_burst', origin:'actor', color:'#c8b080', count:10, spread:80, direction:'all', duration:320 },
     ],
   },
 
   // ── sweep_3 ─────────────────────────────────────────────────────────────
-  // Golden dust storm — widest fan, hardest shake, long particle trail.
+  // Golden dust storm. Double wave — a second wave chases the first, creating
+  // a rolling wall. Stutter shake as both waves crash into the enemy side.
   sweep_3: {
     timeline: [
       { at:0,   type:'sound',          id:'charge-light' },
       { at:0,   type:'creature_shake', target:'actor', intensity:2, duration:160 },
-      { at:160, type:'creature_anim',  target:'actor', class:'anim-cast-lunge' },
-      { at:180, type:'sound',          id:'hit-heavy' },
-      { at:180, type:'impact' },
-      { at:180, type:'particle_burst', origin:'actor', color:'#e0d0a0', count:36, spread:150, direction:'all', duration:560 },
-      { at:180, type:'field_flash',    color:'#cc9944', opacity:0.34, duration:320 },
-      { at:180, type:'screen_shake',   intensity:6, duration:260, style:'stutter' },
+      { at:60,  type:'creature_anim',  target:'actor', class:'anim-cast-lunge' },
+      { at:80,  type:'wave_sweep',     color:'#d4be90', duration:380 },
+      { at:160, type:'wave_sweep',     color:'#e8d4a0', duration:340 },
+      { at:300, type:'impact' },
+      { at:300, type:'sound',          id:'hit-heavy' },
+      { at:300, type:'particle_burst', origin:'actor', color:'#e0d0a0', count:30, spread:130, direction:'all', duration:520 },
+      { at:300, type:'field_flash',    color:'#cc9944', opacity:0.32, duration:300 },
+      { at:300, type:'screen_shake',   intensity:6, duration:260, style:'stutter' },
     ],
   },
 

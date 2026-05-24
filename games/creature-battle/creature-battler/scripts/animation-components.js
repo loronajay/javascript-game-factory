@@ -353,6 +353,185 @@ function animCreatureShake(el, options = {}) {
   });
 }
 
+// ── animWaveSweep ────────────────────────────────────────────────────────
+// Spawns an expanding elliptical wave at fromEl that travels toward the
+// target side of the field, growing as it goes. Used for AoE sweep moves.
+//
+// options:
+//   direction  1 | -1     +1 = rightward (player→opponent), -1 = leftward (default 1)
+//   duration   ms         total travel time (default 380)
+//   color      css color  wave fill color (default '#d4c0a0')
+
+function animWaveSweep(fromEl, options = {}) {
+  const overlay = getAnimOverlay();
+  if (!fromEl || !overlay) return Promise.resolve();
+
+  const duration = options.duration  ?? 380;
+  const color    = options.color     ?? '#d4c0a0';
+  const dir      = options.direction ?? 1;
+
+  const center  = getElementCenter(fromEl, overlay);
+  const sweepTx = Math.round(overlay.offsetWidth * 0.38) * dir;
+
+  const wave = document.createElement('div');
+  wave.className = 'anim-sweep-wave';
+  wave.style.cssText = `
+    left: ${center.x}px;
+    top:  ${center.y}px;
+    background: radial-gradient(ellipse at center, ${color}cc 0%, ${color}66 45%, transparent 72%);
+    box-shadow: 0 0 22px ${color}55;
+    --sweep-tx: ${sweepTx}px;
+    --sweep-duration: ${duration}ms;
+  `;
+  overlay.appendChild(wave);
+
+  return new Promise(resolve => {
+    setTimeout(() => { wave.remove(); resolve(); }, duration + 60);
+  });
+}
+
+// ── animParticleStream ───────────────────────────────────────────────────
+// Continuously emits particles from originEl for a set duration.
+// Returns a { clear } controller — non-blocking. Engine fires and moves on;
+// the stream runs in parallel with subsequent timeline events.
+//
+// options:
+//   duration  ms          total stream time (required)
+//   interval  ms          ms between emissions (default 80)
+//   count     number      particles per emission (default 3)
+//   color, spread, direction, size, glow — passed through to animParticleBurst
+
+function animParticleStream(originEl, options = {}) {
+  if (!originEl) return { clear: () => {} };
+
+  const interval  = options.interval ?? 80;
+  const duration  = options.duration ?? 600;
+  const burstOpts = {
+    count:     options.count     ?? 3,
+    color:     options.color     ?? '#ffffff',
+    spread:    options.spread    ?? 30,
+    direction: options.direction ?? 'up',
+    size:      options.size      ?? 4,
+    glow:      options.glow      ?? false,
+    duration:  Math.min(interval * 3, 300),
+  };
+
+  const id = setInterval(() => animParticleBurst(originEl, burstOpts), interval);
+  const timer = setTimeout(() => clearInterval(id), duration);
+
+  return {
+    clear() {
+      clearInterval(id);
+      clearTimeout(timer);
+    },
+  };
+}
+
+// ── animShockwave ────────────────────────────────────────────────────────
+// Spawns an expanding ring at originEl's center that grows outward and fades.
+// The canonical "kinetic impact" ring from fighting games.
+//
+// options:
+//   size       px          max radius (default 60)
+//   thickness  px          ring border thickness (default 4)
+//   color      css color   (default '#ffffff')
+//   opacity    0–1         peak opacity (default 0.7)
+//   duration   ms          total expand + fade time (default 380)
+
+function animShockwave(originEl, options = {}) {
+  const overlay = getAnimOverlay();
+  if (!originEl || !overlay) return Promise.resolve();
+
+  const size      = options.size      ?? 60;
+  const thickness = options.thickness ?? 4;
+  const color     = options.color     ?? '#ffffff';
+  const opacity   = options.opacity   ?? 0.7;
+  const duration  = options.duration  ?? 380;
+
+  const center = getElementCenter(originEl, overlay);
+
+  const ring = document.createElement('div');
+  ring.className = 'anim-shockwave';
+  // --shock-scale: unitless; base div = 10px, so scale = (size * 2) / 10
+  ring.style.cssText = `
+    left: ${center.x}px;
+    top:  ${center.y}px;
+    border-color: ${color};
+    border-width: ${thickness}px;
+    --shock-scale: ${size * 2 / 10};
+    --shock-opacity: ${opacity};
+    --shock-duration: ${duration}ms;
+  `;
+  overlay.appendChild(ring);
+
+  return new Promise(resolve => {
+    setTimeout(() => { ring.remove(); resolve(); }, duration + 40);
+  });
+}
+
+// ── animCreatureTint ─────────────────────────────────────────────────────
+// Temporarily overlays a color on a creature sprite using mix-blend-mode.
+// Targets the .creature-breathe-wrapper inside the creature element so the
+// tint follows the sprite rather than the whole creature div.
+//
+// options:
+//   color    css color   tint color
+//   opacity  0–1         peak opacity (default 0.35)
+//   duration ms          total fade-in hold fade-out time (default 500)
+//   blend    string      CSS mix-blend-mode (default 'screen')
+
+function animCreatureTint(el, options = {}) {
+  if (!el) return Promise.resolve();
+
+  const wrapper = el.querySelector('.creature-breathe-wrapper') ?? el;
+  const color   = options.color   ?? '#ffffff';
+  const opacity = options.opacity ?? 0.35;
+  const duration = options.duration ?? 500;
+  const blend   = options.blend   ?? 'screen';
+
+  const tint = document.createElement('div');
+  tint.className = 'anim-creature-tint';
+  tint.style.cssText = `
+    background: ${color};
+    mix-blend-mode: ${blend};
+    --tint-opacity: ${opacity};
+    --tint-duration: ${duration}ms;
+  `;
+  wrapper.appendChild(tint);
+
+  return new Promise(resolve => {
+    setTimeout(() => { tint.remove(); resolve(); }, duration + 40);
+  });
+}
+
+// ── animHitStop ──────────────────────────────────────────────────────────
+// Briefly pauses all CSS animations in the battle field to create a
+// freeze-frame on heavy impacts. The timeline scheduler continues via
+// setTimeout so subsequent events still fire at their absolute timestamps.
+//
+// options:
+//   duration  ms   freeze time (default 80)
+
+function animHitStop(options = {}) {
+  const duration = options.duration ?? 80;
+  const field    = document.getElementById('battle-field');
+  const overlay  = document.getElementById('battle-anim-overlay');
+
+  const pause  = el => { if (el) el.style.animationPlayState = 'paused'; };
+  const resume = el => { if (el) el.style.removeProperty('animation-play-state'); };
+
+  pause(field);
+  pause(overlay);
+
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resume(field);
+      resume(overlay);
+      resolve();
+    }, duration);
+  });
+}
+
 // ── getLungeVars ─────────────────────────────────────────────────────────
 // Returns --anim-dx / --anim-dy CSS vars for a lunge from actorEl to targetEl.
 // Used by both the timeline engine (lunge: true on creature_anim events) and

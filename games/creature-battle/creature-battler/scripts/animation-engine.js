@@ -19,6 +19,12 @@
 //   sound          — fires a sound effect (with optional repeat)
 //   preset         — references a named preset from ANIM_PRESETS
 //   impact         — signals when damage resolves and float text shows
+//   status_ring    — timed glow ring on actor/target (auto-clears after duration)
+//   wave_sweep     — expanding wave that travels from actor toward target side
+//   particle_stream — sustained particle emitter for duration ms (non-blocking)
+//   shockwave      — expanding impact ring at actor or target position
+//   creature_tint  — temporary elemental color overlay on a creature sprite
+//   hit_stop       — freeze-frame pause on heavy impacts
 // ─────────────────────────────────────────────────────────────────────────
 
 // ── Public coordinate helper ─────────────────────────────────────────────
@@ -118,6 +124,31 @@ function _executeTimelineEvent(event, context) {
       // Merge preset definition with any per-event overrides, then execute
       return _executeTimelineEvent({ ...preset, ...event, type: preset.type }, context);
     }
+
+    case 'wave_sweep': {
+      const fromEl = _resolveEl('actor', actorSide, actorSlot, targetSide, targetSlot);
+      const dir = actorSide === 'player' ? 1 : -1;
+      return animWaveSweep(fromEl, { ...event, direction: dir });
+    }
+
+    case 'particle_stream': {
+      const originEl = _resolveEl(event.origin, actorSide, actorSlot, targetSide, targetSlot);
+      animParticleStream(originEl, event); // non-blocking: fire and move on
+      return Promise.resolve();
+    }
+
+    case 'shockwave': {
+      const originEl = _resolveEl(event.origin, actorSide, actorSlot, targetSide, targetSlot);
+      return animShockwave(originEl, event);
+    }
+
+    case 'creature_tint': {
+      const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
+      return animCreatureTint(el, event);
+    }
+
+    case 'hit_stop':
+      return animHitStop(event);
 
     case 'status_ring': {
       const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
