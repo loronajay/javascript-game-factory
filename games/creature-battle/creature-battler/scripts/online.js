@@ -99,8 +99,7 @@ function createCbOnlineClient() {
 
     // levelCap: 'any' or a number from ONLINE_LEVEL_OPTIONS
     findMatch(pickStyle, levelCap, playerId, displayName) {
-      _mySide = Math.random() < 0.5 ? 'alpha' : 'beta';
-      _send({ type: 'find_match', gameId: buildCbGameId(pickStyle, levelCap), side: _mySide, playerId, displayName });
+      _send({ type: 'find_match', gameId: buildCbGameId(pickStyle, levelCap), playerId, displayName });
     },
 
     createRoom(playerId, displayName) {

@@ -119,6 +119,15 @@ function _executeTimelineEvent(event, context) {
       return _executeTimelineEvent({ ...preset, ...event, type: preset.type }, context);
     }
 
+    case 'status_ring': {
+      const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
+      if (!el) return Promise.resolve();
+      const ctrl = animStatusRing(el, { color: event.color ?? '#ffffff' });
+      const dur = event.duration ?? 600;
+      setTimeout(() => ctrl.clear(), dur);
+      return Promise.resolve();
+    }
+
     // 'impact' is handled by the caller (runAnimTimeline) before this function runs
     default:
       return Promise.resolve();
