@@ -14,6 +14,22 @@ function startRound() {
   const end = checkBattleEnd();
   if (end) { showBattleEnd(end); return; }
 
+  // Damage Store: deferred physical damage lands and converts to a strike this round.
+  getAllCreatures().forEach(c => {
+    if (!c.damageStorePool || c.damageStorePool <= 0 || c.isKnockedOut) return;
+    const pool = c.damageStorePool;
+    c.damageStorePool  = 0;
+    c.damageStorePower = pool;
+    c.hp.current = Math.max(0, c.hp.current - pool);
+    if (c.hp.current <= 0 && !c.isKnockedOut) {
+      c.isKnockedOut = true;
+      clearBattleModifiers(c);
+    }
+    if (!c.isKnockedOut) {
+      c.pendingAutoAction = { commandType: 'skill', moveId: 'damage_store_strike' };
+    }
+  });
+
   tickRelentlessStreaks();
   const bs = state.battleState;
   SLOT_NAMES.forEach(s => {
@@ -194,6 +210,32 @@ function endRound() {
   getAllCreatures().forEach(c => {
     if (c.vengeanceActive > 0) c.vengeanceActive--;
     c.isChallengedBy = null;
+    // Defense round-end passive effects (Resilient HP regen, etc.)
+    if (!c.isKnockedOut) applyPassiveOnRoundEnd(c);
+    // Clear per-round Defense state flags
+    c.barrierHP            = 0;
+    c.counterStanceActive  = false;
+    c.retaliationActive    = false;
+    c.retaliationCount     = 0;
+    c.damageStoreActive    = false;
+    c.damageStorePower     = 0;
+    c.standFirmActive      = false;
+    c.totalDefenseActive   = false;
+    c.aegisShieldActive    = false;
+    c.absorbActive         = false;
+    c.meditateActive       = false;
+    // totalDefenseUsedLastTurn gates the alternating-turn restriction; set it for next round check
+    if (c.totalDefenseJustUsed) { c.totalDefenseUsedLastTurn = true; c.totalDefenseJustUsed = false; }
+    else { c.totalDefenseUsedLastTurn = false; }
+  });
+  // Decrement Shield Wall team aura duration
+  ['player', 'opponent'].forEach(side => {
+    if ((state.battleState[side].shieldWallTurns || 0) > 0) {
+      state.battleState[side].shieldWallTurns--;
+      if (state.battleState[side].shieldWallTurns === 0) {
+        SLOT_NAMES.forEach(s => { if (state.battleState[side][s]) state.battleState[side][s].shieldWallActive = false; });
+      }
+    }
   });
   renderBattleHud();
   state.battleState.round++;

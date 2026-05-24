@@ -11,6 +11,7 @@ const ENGINE = {
   MAX_DAMAGE:      9999,
   SPECIES_ACC_BASE: 70,
   SPECIES_EVA_BASE: 60,
+  ABSORB_REDUCTION:  0.60,
 };
 
 const STATUS_DEFS = {
@@ -74,6 +75,7 @@ function hasStatus(creature, id) {
 }
 
 function applyStatus(creature, id, options = {}) {
+  if (checkPassivePreventStatus(creature, id)) return null;
   const list = ensureStatusList(creature);
   const existing = list.find(status => status.id === id);
   const next = {
@@ -300,8 +302,22 @@ function findValidTarget(side, preferredSlot) {
   return null;
 }
 
+// Returns the ally on targetSide that volunteered to intercept with the Absorb skill.
+function _findAbsorbInterceptor(target, targetSide) {
+  const bs = state.battleState;
+  for (const slot of SLOT_NAMES) {
+    const ally = bs[targetSide][slot];
+    if (ally && !ally.isKnockedOut && ally !== target && ally.absorbActive) return { ally, slot };
+  }
+  return null;
+}
+
 // Moves that always resolve before speed-sorted actions.
-const PRIORITY_MOVES = new Set(['brace', 'challenge']);
+const PRIORITY_MOVES = new Set([
+  'brace', 'challenge',
+  'counter_stance', 'total_defense', 'aegis_shield', 'absorb',
+  'stand_firm', 'meditate', 'taunt', 'shield_wall', 'rampart', 'rampart_2',
+]);
 
 function _actionPriority(action) {
   if (action.commandType === 'defend') return 1;
@@ -516,7 +532,15 @@ function resolveAction(action) {
         return { slot, name: target.displayName, amount: healAmount, elemMod: 'absorb', wasKO: false, isCrit: false };
       }
       const aoeBonus = getPassiveAoeBonusMultiplier(actor, move);
-      const damage = Math.max(ENGINE.MIN_DAMAGE, Math.round(rawDmg * aoeBonus));
+      let damage = Math.max(ENGINE.MIN_DAMAGE, Math.round(rawDmg * aoeBonus));
+      if (move.damageClass === 'physical') {
+        if (target.totalDefenseActive || target.aegisShieldActive) damage = 0;
+        if (target.standFirmActive && damage > 0) damage = Math.max(1, Math.floor(damage * 0.5));
+        if (target.meditateActive && damage > 0) damage = Math.max(1, Math.round(damage * 0.75));
+        if ((state.battleState[tgtSide]?.shieldWallTurns || 0) > 0 && damage > 0) damage = Math.max(1, Math.round(damage * 0.85));
+        if (target.damageStoreActive && damage > 0) { target.damageStorePool = (target.damageStorePool || 0) + damage; damage = 0; }
+      }
+      if (target.barrierHP > 0 && damage > 0) { const bAbsorb = Math.min(target.barrierHP, damage); target.barrierHP -= bAbsorb; damage -= bAbsorb; }
       target.hp.current = Math.max(0, target.hp.current - damage);
       checkPassiveSurviveKO(target);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
@@ -529,7 +553,7 @@ function resolveAction(action) {
         applySecondaryEffect(move.id, target);
       }
       if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
-      if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage);
+      if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage, actor);
       return { slot, name: target.displayName, amount: damage, wasKO, isCrit, elemMod };
     });
     if (move.healAllAllies) {
@@ -582,12 +606,13 @@ function resolveAction(action) {
       if (target.isKnockedOut) break;
       const didHit = resolveHit(actor, target, move);
       if (!didHit) { hits.push({ missed: true }); continue; }
-      const { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+      let { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
       if (elemMod === 'absorb') {
         target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
         hits.push({ healAmount, elemMod: 'absorb', wasKO: false, isCrit: false });
         continue;
       }
+      if (target.barrierHP > 0 && damage > 0) { const bAbsorb = Math.min(target.barrierHP, damage); target.barrierHP -= bAbsorb; damage -= bAbsorb; }
       target.hp.current = Math.max(0, target.hp.current - damage);
       checkPassiveSurviveKO(target);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
@@ -598,6 +623,7 @@ function resolveAction(action) {
         applyPassiveOnAllyKO(tgtSide, bs);
       }
       if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
+      if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage, actor);
       hits.push({ damage, isCrit, elemMod, wasKO });
     }
     applyPassiveAfterAction(actor, move);
@@ -627,11 +653,68 @@ function resolveAction(action) {
     };
   }
 
+  // Absorb intercept: an ally used the Absorb skill and takes this physical hit instead.
+  if (move.damageClass === 'physical' && damage > 0) {
+    const intercept = _findAbsorbInterceptor(target, tgtSide);
+    if (intercept) {
+      const { ally: interceptor, slot: interceptSlot } = intercept;
+      interceptor.absorbActive = false;
+      const interceptDamage = Math.max(ENGINE.MIN_DAMAGE, Math.round(damage * ENGINE.ABSORB_REDUCTION));
+      interceptor.hp.current = Math.max(0, interceptor.hp.current - interceptDamage);
+      checkPassiveSurviveKO(interceptor);
+      const interceptKO = !interceptor.isKnockedOut && interceptor.hp.current <= 0;
+      if (interceptKO) {
+        interceptor.isKnockedOut = true;
+        clearBattleModifiers(interceptor);
+        applyPassiveOnKO(actor, interceptor);
+        applyPassiveOnAllyKO(tgtSide, bs);
+      }
+      if (interceptor.equippedPassives?.some(p => p.id === 'sacrifice_drive')) {
+        const reflectDmg = Math.round(interceptDamage * 0.30);
+        if (reflectDmg > 0) actor.hp.current = Math.max(0, actor.hp.current - reflectDmg);
+      }
+      applyPassiveOnPhysicalHit(interceptor, interceptDamage, actor);
+      applyPassiveAfterAction(actor, move);
+      return {
+        type: isCrit ? 'crit' : 'damage',
+        actorName: actor.displayName,
+        moveName: move.name,
+        targetName: interceptor.displayName,
+        targetSide: tgtSide,
+        targetSlot: interceptSlot,
+        amount: interceptDamage,
+        elemMod,
+        isCrit,
+        wasKO: interceptKO,
+        retargeted,
+        statusText: null,
+      };
+    }
+  }
+
   if (target.isBraced && move.damageClass === 'physical') {
     damage = Math.max(1, Math.floor(damage / 2));
     target.pendingAutoAction = { commandType: 'skill', moveId: 'counter_strike', targetSide: action.actorSide, targetSlot: action.actorSlot };
     target.isBraced = false;
   }
+
+  if (target.counterStanceActive && move.damageClass === 'physical') {
+    const preSplit = damage;
+    damage = Math.max(1, Math.floor(damage / 2));
+    target.counterStanceAbsorbed = (target.counterStanceAbsorbed || 0) + (preSplit - damage);
+    target.counterSurgeAvailable = true;
+    target.pendingAutoAction = { commandType: 'skill', moveId: 'counter_stance_counter', targetSide: action.actorSide, targetSlot: action.actorSlot };
+    target.counterStanceActive = false;
+  }
+
+  if (move.damageClass === 'physical') {
+    if (target.totalDefenseActive || target.aegisShieldActive) damage = 0;
+    if (target.standFirmActive && damage > 0) damage = Math.max(1, Math.floor(damage * 0.5));
+    if (target.meditateActive && damage > 0) damage = Math.max(1, Math.round(damage * 0.75));
+    if ((state.battleState[tgtSide]?.shieldWallTurns || 0) > 0 && damage > 0) damage = Math.max(1, Math.round(damage * 0.85));
+    if (target.damageStoreActive && damage > 0) { target.damageStorePool = (target.damageStorePool || 0) + damage; damage = 0; }
+  }
+  if (target.barrierHP > 0 && damage > 0) { const bAbsorb = Math.min(target.barrierHP, damage); target.barrierHP -= bAbsorb; damage -= bAbsorb; }
 
   target.hp.current = Math.max(0, target.hp.current - damage);
   checkPassiveSurviveKO(target);
@@ -644,7 +727,7 @@ function resolveAction(action) {
   }
   if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
   const statusText = wasKO ? null : applySecondaryEffect(move.id, target);
-  if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage);
+  if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage, actor);
   applyPassiveAfterAction(actor, move);
 
   let lifestolen = null;

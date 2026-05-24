@@ -61,11 +61,13 @@ function currentCreature() { return state.battleState.player[currentSlot()]; }
 
 function getCommandDefs(creature) {
   const silenced = hasStatus(creature, 'silence');
+  const taunted  = !!creature.tauntActive;
+  const aegis    = !!creature.aegisShieldActive;
   return [
-    { id: 'attack', label: 'ATTACK', icon: '⚔️',  enabled: true },
+    { id: 'attack', label: 'ATTACK', icon: '⚔️',  enabled: !aegis },
     { id: 'defend', label: 'DEFEND', icon: '🛡️',  enabled: true },
     { id: 'art',    label: 'ART',    icon: '✦',   enabled: !silenced && getArtsFor(creature).length > 0 },
-    { id: 'skill',  label: 'SKILL',  icon: '◎',   enabled: (creature.classSkills?.length > 0) },
+    { id: 'skill',  label: 'SKILL',  icon: '◎',   enabled: !taunted && (creature.classSkills?.length > 0) },
     { id: 'item',   label: 'ITEM',   icon: '🧪',  enabled: false },
   ];
 }
@@ -75,7 +77,10 @@ function getAllArtsFor(creature) {
 }
 
 function getArtsFor(creature) {
-  return getAllArtsFor(creature).filter(m => m.mpCost <= creature.mp.current);
+  const arts = getAllArtsFor(creature).filter(m => m.mpCost <= creature.mp.current);
+  if (creature.tauntActive)       return arts.filter(m => m.damageClass !== 'utility' && m.damageClass !== 'heal');
+  if (creature.aegisShieldActive) return arts.filter(m => m.damageClass === 'utility' || m.damageClass === 'heal');
+  return arts;
 }
 
 function sortArtsForGrid(arts) {
