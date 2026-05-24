@@ -483,11 +483,12 @@ function animShockwave(originEl, options = {}) {
 function animCreatureTint(el, options = {}) {
   if (!el) return Promise.resolve();
 
-  const wrapper = el.querySelector('.creature-breathe-wrapper') ?? el;
-  const color   = options.color   ?? '#ffffff';
-  const opacity = options.opacity ?? 0.35;
+  const wrapper  = el.querySelector('.creature-breathe-wrapper') ?? el;
+  const img      = wrapper.querySelector('img');
+  const color    = options.color    ?? '#ffffff';
+  const opacity  = options.opacity  ?? 0.35;
   const duration = options.duration ?? 500;
-  const blend   = options.blend   ?? 'screen';
+  const blend    = options.blend    ?? 'screen';
 
   const tint = document.createElement('div');
   tint.className = 'anim-creature-tint';
@@ -497,6 +498,23 @@ function animCreatureTint(el, options = {}) {
     --tint-opacity: ${opacity};
     --tint-duration: ${duration}ms;
   `;
+
+  // Mask to the sprite's alpha channel so the tint follows the creature shape
+  // rather than appearing as a solid rectangle over the transparent areas.
+  if (img && img.src) {
+    const maskUrl = `url('${img.src}')`;
+    tint.style.maskImage         = maskUrl;
+    tint.style.maskSize          = 'contain';
+    tint.style.maskRepeat        = 'no-repeat';
+    tint.style.maskPosition      = 'center';
+    tint.style.webkitMaskImage   = maskUrl;
+    tint.style.webkitMaskSize    = 'contain';
+    tint.style.webkitMaskRepeat  = 'no-repeat';
+    tint.style.webkitMaskPosition = 'center';
+    // Match the opponent's horizontal flip so the mask aligns
+    if (img.style.transform) tint.style.transform = img.style.transform;
+  }
+
   wrapper.appendChild(tint);
 
   return new Promise(resolve => {
