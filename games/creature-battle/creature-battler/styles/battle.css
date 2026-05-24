@@ -537,3 +537,133 @@
   display: block;
   margin: 0 auto;
 }
+
+/* Rich end card — stats layout */
+.battle-end-card.rich {
+  padding: 22px 28px 26px;
+  min-width: 420px;
+  max-width: 520px;
+}
+
+.battle-end-title.player { color: #58ff8d; text-shadow: 0 0 24px rgba(88,255,141,0.5); }
+.battle-end-title.opponent { color: #ff7060; text-shadow: 0 0 24px rgba(255,100,80,0.45); }
+
+.bes-teams {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+
+.bes-team {
+  flex: 1;
+  text-align: center;
+}
+
+.bes-team-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cb-muted);
+  margin-bottom: 6px;
+}
+
+.bes-portraits {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.bes-portrait {
+  position: relative;
+  width: 38px;
+  height: 38px;
+}
+
+.bes-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.bes-portrait.ko img {
+  opacity: 0.22;
+  filter: grayscale(1);
+}
+
+.bes-portrait-ko {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 900;
+  color: #ff6060;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 4px rgba(255,60,60,0.7);
+}
+
+.bes-rounds {
+  flex-shrink: 0;
+  text-align: center;
+  min-width: 52px;
+}
+
+.bes-rounds-num {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--cb-accent);
+  line-height: 1;
+}
+
+.bes-rounds-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cb-muted);
+  margin-top: 2px;
+}
+
+.bes-stats-table {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid rgba(39,202,255,0.15);
+  border-bottom: 1px solid rgba(39,202,255,0.15);
+  padding: 10px 0;
+  margin-bottom: 18px;
+}
+
+.bes-stat-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.bes-val {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.bes-val.player {
+  text-align: right;
+  color: var(--cb-accent);
+}
+
+.bes-val.opp {
+  text-align: left;
+  color: #ff8060;
+}
+
+.bes-stat-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cb-muted);
+  text-align: center;
+  white-space: nowrap;
+}

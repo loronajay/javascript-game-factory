@@ -91,6 +91,13 @@ function getLungeTarget(result, action) {
 function playMoveAnimation(result, action, onDone, options) {
   if (!action || result.type === 'skipped') { onDone(); return; }
 
+  if (result.type === 'stunned' || result.type === 'silenced') {
+    const text = result.type === 'stunned' ? 'STUNNED!' : 'SILENCED!';
+    showBattleFloatText(action.actorSide, action.actorSlot, text, 'status');
+    onDone();
+    return;
+  }
+
   const entry = MOVE_ANIM_REGISTRY[action.moveId];
 
   // ── New timeline format ────────────────────────────────────────────────

@@ -156,6 +156,18 @@ function updateBattleLog(msg) {
 
 // ── End overlay ───────────────────────────────────────────────────────────────
 
+function _renderEndPortraits(side) {
+  const bs = state.battleState;
+  return SLOT_NAMES.map(slot => {
+    const c = bs[side][slot];
+    if (!c) return '';
+    return `<div class="bes-portrait ${c.isKnockedOut ? 'ko' : ''}">
+      <img src="${c.sprite}" alt="${c.displayName}">
+      ${c.isKnockedOut ? '<div class="bes-portrait-ko">KO</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
 function renderBattleEndOverlay(winner, reason) {
   if (typeof window.__publishBattleResult === 'function') {
     window.__publishBattleResult(winner);
@@ -176,10 +188,55 @@ function renderBattleEndOverlay(winner, reason) {
           :                       'Your team was knocked out.';
   }
 
+  const bs     = state.battleState;
+  const pStats = bs?.battleStats?.player   ?? { damageDealt: 0, healingDone: 0, kos: 0, highestHit: 0 };
+  const oStats = bs?.battleStats?.opponent ?? { damageDealt: 0, healingDone: 0, kos: 0, highestHit: 0 };
+  const round  = bs?.round ?? 1;
+  const fmt    = n => n.toLocaleString();
+
+  const statsBlock = reason === 'disconnect' ? '' : `
+    <div class="bes-teams">
+      <div class="bes-team">
+        <div class="bes-team-label">YOUR TEAM</div>
+        <div class="bes-portraits">${_renderEndPortraits('player')}</div>
+      </div>
+      <div class="bes-rounds">
+        <div class="bes-rounds-num">${round}</div>
+        <div class="bes-rounds-label">ROUND${round !== 1 ? 'S' : ''}</div>
+      </div>
+      <div class="bes-team">
+        <div class="bes-team-label">THEIR TEAM</div>
+        <div class="bes-portraits">${_renderEndPortraits('opponent')}</div>
+      </div>
+    </div>
+    <div class="bes-stats-table">
+      <div class="bes-stat-row">
+        <div class="bes-val player">${fmt(pStats.damageDealt)}</div>
+        <div class="bes-stat-label">DAMAGE</div>
+        <div class="bes-val opp">${fmt(oStats.damageDealt)}</div>
+      </div>
+      <div class="bes-stat-row">
+        <div class="bes-val player">${fmt(pStats.highestHit)}</div>
+        <div class="bes-stat-label">BEST HIT</div>
+        <div class="bes-val opp">${fmt(oStats.highestHit)}</div>
+      </div>
+      <div class="bes-stat-row">
+        <div class="bes-val player">${fmt(pStats.healingDone)}</div>
+        <div class="bes-stat-label">HEALING</div>
+        <div class="bes-val opp">${fmt(oStats.healingDone)}</div>
+      </div>
+      <div class="bes-stat-row">
+        <div class="bes-val player">${pStats.kos}</div>
+        <div class="bes-stat-label">KOs</div>
+        <div class="bes-val opp">${oStats.kos}</div>
+      </div>
+    </div>`;
+
   overlay.innerHTML = `
-    <div class="battle-end-card">
-      <div class="battle-end-title">${title}</div>
+    <div class="battle-end-card ${reason !== 'disconnect' ? 'rich' : ''}">
+      <div class="battle-end-title ${winner}">${title}</div>
       <div class="battle-end-sub">${sub}</div>
+      ${statsBlock}
       <button class="btn primary" id="end-back-btn">Back to Title</button>
     </div>`;
   screen.appendChild(overlay);

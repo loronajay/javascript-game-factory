@@ -152,6 +152,7 @@ function startBattle() {
     opponent: buildSide(state.opponentTeam, state.classCustom.opponentConfigs),
     round: 1,
     arenaFile: arena.file,
+    battleStats: { player: makeBattleStats(), opponent: makeBattleStats() },
   };
   setScreen('battle');
 }

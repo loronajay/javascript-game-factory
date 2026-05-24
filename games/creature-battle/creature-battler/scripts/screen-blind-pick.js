@@ -234,6 +234,7 @@ function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
     opponent: buildSide(opponentTeamIds, state.blindPick.opponentClassConfigs),
     round:    1,
     arenaFile,
+    battleStats: { player: makeBattleStats(), opponent: makeBattleStats() },
   };
   setScreen('battle');
 }

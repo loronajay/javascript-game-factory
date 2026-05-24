@@ -343,6 +343,10 @@ function previewAction(action) {
     return { type: 'skipped' };
   }
 
+  if (hasStatus(actor, 'stun')) {
+    return { type: 'stunned', actorName: actor.displayName };
+  }
+
   if (action.commandType === 'defend') {
     return { type: 'defend', actorName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
   }
@@ -350,6 +354,9 @@ function previewAction(action) {
   if (action.commandType === 'skill') {
     const skill = getClassSkill(action.moveId);
     if (!skill) return { type: 'skipped' };
+    if (hasStatus(actor, 'silence')) {
+      return { type: 'silenced', actorName: actor.displayName, moveName: skill.name };
+    }
     if (skill.targeting === 'self' || skill.targeting === 'all_allies') {
       return { type: 'utility', actorName: actor.displayName, moveName: skill.name, targetName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
     }
@@ -367,6 +374,10 @@ function previewAction(action) {
 
   const move = getMoveData(action.moveId);
   if (!move) return { type: 'skipped' };
+
+  if (hasStatus(actor, 'silence') && move.category !== 'basic' && action.commandType !== 'defend') {
+    return { type: 'silenced', actorName: actor.displayName, moveName: move.name };
+  }
 
   if (move.damageClass === 'utility') {
     if (move.targeting === 'all_allies') {
@@ -659,6 +670,65 @@ function resolveAction(action) {
   };
 }
 
+function makeBattleStats() {
+  return { damageDealt: 0, healingDone: 0, kos: 0, highestHit: 0 };
+}
+
+function accumulateBattleStats(result, actorSide) {
+  const bs = state.battleState;
+  if (!bs?.battleStats) return;
+  const side = bs.battleStats[actorSide];
+  if (!side) return;
+
+  switch (result.type) {
+    case 'damage':
+    case 'crit': {
+      side.damageDealt += result.amount;
+      if (result.amount > side.highestHit) side.highestHit = result.amount;
+      if (result.wasKO) side.kos++;
+      if (result.lifestolen) side.healingDone += result.lifestolen;
+      break;
+    }
+    case 'heal':
+      side.healingDone += result.amount;
+      break;
+    case 'multi_hit': {
+      for (const h of (result.hits || [])) {
+        if (h.missed || h.elemMod === 'absorb') continue;
+        side.damageDealt += h.damage ?? 0;
+        if ((h.damage ?? 0) > side.highestHit) side.highestHit = h.damage ?? 0;
+        if (h.wasKO) side.kos++;
+      }
+      break;
+    }
+    case 'multi': {
+      for (const h of (result.hits || [])) {
+        if (h.missed || h.elemMod === 'absorb') continue;
+        if (result.damageClass === 'heal') {
+          side.healingDone += h.amount ?? 0;
+        } else {
+          side.damageDealt += h.amount ?? 0;
+          if ((h.amount ?? 0) > side.highestHit) side.highestHit = h.amount ?? 0;
+          if (h.wasKO) side.kos++;
+        }
+      }
+      break;
+    }
+    case 'world_tree': {
+      for (const h of (result.damageHits || [])) {
+        if (h.missed) continue;
+        side.damageDealt += h.amount ?? 0;
+        if ((h.amount ?? 0) > side.highestHit) side.highestHit = h.amount ?? 0;
+        if (h.wasKO) side.kos++;
+      }
+      for (const h of (result.allyHeals || [])) {
+        side.healingDone += h.amount ?? 0;
+      }
+      break;
+    }
+  }
+}
+
 function applyUtilityMove(moveId, target) {
   let text = null;
   switch (moveId) {
@@ -719,7 +789,7 @@ function applyUtilityMove(moveId, target) {
     case 'cleanse': {
       const had = (target.statusEffects || []).length > 0;
       target.statusEffects = [];
-      text = had ? 'CLEANSED' : 'BUFF';
+      text = had ? 'CLEANSED' : 'ALL CLEAR';
       break;
     }
     case 'clarity': {

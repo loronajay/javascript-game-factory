@@ -168,6 +168,7 @@ function showResult(result, action, onDone) {
   }, {
     onImpact: () => {
       result = resolveAction(action);
+      accumulateBattleStats(result, action.actorSide);
       renderBattleHud();
       return result;
     },

@@ -199,7 +199,6 @@ function showCreatureStats(indexOverride, levelOverride, screenIdOverride) {
           <div class="stat-item spd"><div class="stat-label">SPD</div><div class="stat-value">${stats.speed}</div></div>
         </div>
         ${sectionHTML('Arts', arts)}
-        ${sectionHTML('Skills', skills, 'Skills coming soon...')}
       </div>
       <div class="stats-popup-footer">R · ESC — Close</div>
     </div>`;
