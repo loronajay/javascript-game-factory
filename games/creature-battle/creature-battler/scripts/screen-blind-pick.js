@@ -64,6 +64,7 @@ function renderBlindPick() {
     `;
   }
 
+  const prevScroll = el.querySelector('.roster-grid')?.scrollTop ?? 0;
   el.innerHTML = `
     <div class="team-select-header">
       <div class="team-select-title">
@@ -83,6 +84,9 @@ function renderBlindPick() {
       ${footerHtml}
     </div>
   `;
+
+  const rosterGrid = el.querySelector('.roster-grid');
+  if (rosterGrid && prevScroll) rosterGrid.scrollTop = prevScroll;
 
   el.querySelectorAll('.creature-card').forEach(card => {
     card.addEventListener('mouseenter', () => {

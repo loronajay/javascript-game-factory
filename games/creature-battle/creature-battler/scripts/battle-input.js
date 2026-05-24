@@ -421,7 +421,7 @@ function confirmMultiTarget() {
   lockAction({
     actorSide: 'player',
     actorSlot: currentSlot(),
-    commandType: 'art',
+    commandType: inputState.pendingCommandType,
     moveId: inputState.pendingMoveId,
     targetSide: inputState.pendingTargetSide,
     targetSlot: null,

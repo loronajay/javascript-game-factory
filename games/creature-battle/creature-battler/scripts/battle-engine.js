@@ -300,8 +300,20 @@ function findValidTarget(side, preferredSlot) {
   return null;
 }
 
+// Moves that always resolve before speed-sorted actions.
+const PRIORITY_MOVES = new Set(['brace', 'challenge']);
+
+function _actionPriority(action) {
+  if (action.commandType === 'defend') return 1;
+  if (action.commandType === 'skill' && PRIORITY_MOVES.has(action.moveId)) return 1;
+  return 0;
+}
+
 function sortActions(actions) {
   return [...actions].sort((a, b) => {
+    const aPri = _actionPriority(a);
+    const bPri = _actionPriority(b);
+    if (bPri !== aPri) return bPri - aPri;
     const aActor = state.battleState[a.actorSide]?.[a.actorSlot];
     const bActor = state.battleState[b.actorSide]?.[b.actorSlot];
     const aSpeed = aActor ? getEffectiveSpeed(aActor) : a.speed;

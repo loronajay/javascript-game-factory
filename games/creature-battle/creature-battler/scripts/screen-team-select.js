@@ -6,6 +6,7 @@ function renderTeamSelect() {
   const title       = isPlayer ? 'Choose Your Team' : 'Choose Opponent Team';
 
   const el = document.getElementById('screen-team-select');
+  const prevScroll = el.querySelector('.roster-grid')?.scrollTop ?? 0;
   el.innerHTML = `
     <div class="team-select-header">
       <div class="team-select-title">
@@ -63,6 +64,9 @@ function renderTeamSelect() {
       </div>
     ` : ''}
   `;
+
+  const rosterGrid = el.querySelector('.roster-grid');
+  if (rosterGrid && prevScroll) rosterGrid.scrollTop = prevScroll;
 
   el.querySelectorAll('.creature-card').forEach(card => {
     card.addEventListener('click', () => {
