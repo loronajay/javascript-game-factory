@@ -10,6 +10,20 @@ function selectAiCommands() {
 function buildAiAction(creature, slot) {
   const bs = state.battleState;
 
+  // Challenge taunt: forced to target the challenger if still alive
+  if (creature.isChallengedBy) {
+    const { side: cSide, slot: cSlot } = creature.isChallengedBy;
+    const challenger = bs[cSide]?.[cSlot];
+    if (challenger && !challenger.isKnockedOut) {
+      const dmgMove = creature.moves
+        .filter(m => (m.damageClass === 'physical' || m.damageClass === 'magic') && m.mpCost <= creature.mp.current)
+        .sort((a, b) => b.basePower - a.basePower)[0];
+      const move = dmgMove || getMoveData('basic_attack');
+      return { actorSide: 'opponent', actorSlot: slot, commandType: move.category === 'art' ? 'art' : 'attack', moveId: move.id, targetSide: cSide, targetSlot: cSlot, speed: getEffectiveSpeed(creature) };
+    }
+    creature.isChallengedBy = null; // challenger KO'd, ignore
+  }
+
   // Self-heal: use if this creature itself is below 50% HP
   const selfHealMove = creature.moves.find(m => m.damageClass === 'heal' && m.targeting === 'self' && m.mpCost <= creature.mp.current);
   if (selfHealMove && creature.hp.current / creature.hp.max < 0.5) {

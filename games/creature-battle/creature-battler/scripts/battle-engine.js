@@ -101,6 +101,7 @@ function applyStatModifier(creature, stat, direction, options = {}) {
         stat,
         direction: normalizedDirection,
         appliedRound: state.battleState.round,
+        duration: options.duration ?? null,
       });
     } else {
       const oldest = list.find(mod => mod.stat === stat && mod.direction === normalizedDirection);
@@ -156,6 +157,19 @@ function advanceStatusDurations() {
 function clearBattleModifiers(creature) {
   creature.statModifiers = [];
   creature.statusEffects = [];
+}
+
+// Tick down all timed stat stages across all creatures; remove any that expire.
+// Called at end of each round. Permanent stages (duration: null) are untouched.
+function tickStatModifiers() {
+  getAllCreatures().forEach(creature => {
+    if (!creature.statModifiers?.length) return;
+    creature.statModifiers = creature.statModifiers.filter(mod => {
+      if (mod.duration === null || mod.duration === undefined) return true;
+      mod.duration--;
+      return mod.duration > 0;
+    });
+  });
 }
 
 function getStatStage(creature, stat) {
@@ -253,12 +267,13 @@ function calcDamage(attacker, target, move) {
 
   const critThreshold = ENGINE.CRIT_CHANCE + getPassiveCritBonus(attacker, move);
   const isCrit  = move.canCrit && _battleRng() < critThreshold;
-  const critMod = isCrit ? ENGINE.CRIT_MOD : 1.0;
+  const critMod = isCrit ? ENGINE.CRIT_MOD * getPassiveCritMultiplier(attacker, move) : 1.0;
   const defMod  = target.isDefending ? ENGINE.DEFEND_MOD : 1.0;
   const randMod = engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
-  const passiveMult = getPassiveDamageMultiplier(attacker, target, move);
+  const passiveMult = getPassiveDamageMultiplier(attacker, target, move) * getWarlordPresenceBonus(attacker, move);
+  const incomingMult = getPassiveIncomingMultiplier(target, move);
   const raw = ((move.basePower + move.movePowerModifier + pressure + levelMod)
-              * elemMod * defMod * critMod + randMod) * passiveMult;
+              * elemMod * defMod * critMod + randMod) * passiveMult * incomingMult;
   return {
     damage: Math.max(ENGINE.MIN_DAMAGE, Math.min(ENGINE.MAX_DAMAGE, Math.round(raw))),
     healAmount: 0,
@@ -323,8 +338,14 @@ function previewAction(action) {
   if (action.commandType === 'skill') {
     const skill = getClassSkill(action.moveId);
     if (!skill) return { type: 'skipped' };
-    if (skill.targeting === 'self') {
+    if (skill.targeting === 'self' || skill.targeting === 'all_allies') {
       return { type: 'utility', actorName: actor.displayName, moveName: skill.name, targetName: actor.displayName, targetSide: action.actorSide, targetSlot: action.actorSlot };
+    }
+    if (skill.targeting === 'all_enemies') {
+      const tgtSide = action.actorSide === 'player' ? 'opponent' : 'player';
+      const hits = SLOT_NAMES.filter(s => { const c = bs[tgtSide][s]; return c && !c.isKnockedOut; }).map(slot => ({ slot, name: bs[tgtSide][slot].displayName }));
+      if (!hits.length) return { type: 'no_target', actorName: actor.displayName, moveName: skill.name };
+      return { type: 'multi', actorName: actor.displayName, moveName: skill.name, damageClass: 'physical', targetSide: tgtSide, hits };
     }
     const tgtSlot = findValidTarget(action.targetSide, action.targetSlot);
     if (!tgtSlot) return { type: 'no_target', actorName: actor.displayName, moveName: skill.name };
@@ -466,19 +487,26 @@ function resolveAction(action) {
       }
       const didHit = resolveHit(actor, target, move);
       if (!didHit) return { slot, name: target.displayName, missed: true };
-      const { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+      const { damage: rawDmg, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
       if (elemMod === 'absorb') {
         target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
         return { slot, name: target.displayName, amount: healAmount, elemMod: 'absorb', wasKO: false, isCrit: false };
       }
+      const aoeBonus = getPassiveAoeBonusMultiplier(actor, move);
+      const damage = Math.max(ENGINE.MIN_DAMAGE, Math.round(rawDmg * aoeBonus));
       target.hp.current = Math.max(0, target.hp.current - damage);
+      checkPassiveSurviveKO(target);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
       if (wasKO) {
         target.isKnockedOut = true;
         clearBattleModifiers(target);
+        applyPassiveOnKO(actor, target);
+        applyPassiveOnAllyKO(tgtSide, bs);
       } else {
         applySecondaryEffect(move.id, target);
       }
+      if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
+      if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage);
       return { slot, name: target.displayName, amount: damage, wasKO, isCrit, elemMod };
     });
     if (move.healAllAllies) {
@@ -491,9 +519,11 @@ function resolveAction(action) {
         ally.hp.current = Math.min(ally.hp.max, ally.hp.current + amt);
         return { slot: s, name: ally.displayName, amount: amt };
       });
+      applyPassiveAfterAction(actor, move);
       return { type: 'world_tree', actorName: actor.displayName, moveName: move.name, targetSide: tgtSide, damageHits: hits, allyHeals };
     }
 
+    applyPassiveAfterAction(actor, move);
     return { type: 'multi', actorName: actor.displayName, moveName: move.name, damageClass: move.damageClass, targetSide: tgtSide, hits };
   }
 
@@ -536,22 +566,32 @@ function resolveAction(action) {
         continue;
       }
       target.hp.current = Math.max(0, target.hp.current - damage);
+      checkPassiveSurviveKO(target);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
-      if (wasKO) { target.isKnockedOut = true; clearBattleModifiers(target); }
+      if (wasKO) {
+        target.isKnockedOut = true;
+        clearBattleModifiers(target);
+        applyPassiveOnKO(actor, target);
+        applyPassiveOnAllyKO(tgtSide, bs);
+      }
+      if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
       hits.push({ damage, isCrit, elemMod, wasKO });
     }
+    applyPassiveAfterAction(actor, move);
     return { type: 'multi_hit', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide: tgtSide, targetSlot: tgtSlot, hits, retargeted };
   }
 
   const didHit = resolveHit(actor, target, move);
   if (!didHit) {
+    applyPassiveAfterAction(actor, move);
     return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetName: target.displayName, targetSide: tgtSide, targetSlot: tgtSlot };
   }
 
-  const { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+  let { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
 
   if (elemMod === 'absorb') {
     target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
+    applyPassiveAfterAction(actor, move);
     return {
       type: 'absorb',
       actorName: actor.displayName,
@@ -564,13 +604,25 @@ function resolveAction(action) {
     };
   }
 
+  if (target.isBraced && move.damageClass === 'physical') {
+    damage = Math.max(1, Math.floor(damage / 2));
+    target.pendingAutoAction = { commandType: 'skill', moveId: 'counter_strike', targetSide: action.actorSide, targetSlot: action.actorSlot };
+    target.isBraced = false;
+  }
+
   target.hp.current = Math.max(0, target.hp.current - damage);
+  checkPassiveSurviveKO(target);
   const wasKO = !target.isKnockedOut && target.hp.current <= 0;
   if (wasKO) {
     target.isKnockedOut = true;
     clearBattleModifiers(target);
+    applyPassiveOnKO(actor, target);
+    applyPassiveOnAllyKO(tgtSide, bs);
   }
-  const statusText = applySecondaryEffect(move.id, target);
+  if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
+  const statusText = wasKO ? null : applySecondaryEffect(move.id, target);
+  if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage);
+  applyPassiveAfterAction(actor, move);
 
   let lifestolen = null;
   if (move.lifeSteal && damage > 0) {

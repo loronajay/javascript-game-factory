@@ -32,6 +32,12 @@ function startCommandInput(onComplete) {
       autoActions.push({ actorSide: 'player', actorSlot: slot, commandType: 'art', moveId: null, targetSide: null, targetSlot: null, speed: getEffectiveSpeed(c) });
       return false;
     }
+    if (c.pendingAutoAction) {
+      const pa = c.pendingAutoAction;
+      c.pendingAutoAction = null;
+      autoActions.push({ actorSide: 'player', actorSlot: slot, commandType: pa.commandType, moveId: pa.moveId, targetSide: pa.targetSide, targetSlot: pa.targetSlot, speed: getEffectiveSpeed(c) });
+      return false;
+    }
     return true;
   });
   if (!needsInput.length) { onComplete(autoActions); return; }
@@ -328,7 +334,7 @@ function confirmSkill() {
   const grid  = getGridSkills(currentCreature());
   const skill = grid[inputState.focusedSkill];
   if (!skill) return;
-  if (!canUseSkill(skill, currentCreature())) { playInvalid(); return; }
+  if (!canUseSkill(skill, currentCreature(), { bs: state.battleState, actorSide: 'player' })) { playInvalid(); return; }
   inputState.pendingMoveId      = skill.id;
   inputState.pendingCommandType = 'skill';
 
@@ -636,7 +642,7 @@ function renderBattleCommandPanel() {
       <div class="art-list">
         ${gridSkills.map((s, i) => {
           if (!s) return `<div class="art-cell-empty"></div>`;
-          const canAfford = canUseSkill(s, creature);
+          const canAfford = canUseSkill(s, creature, { bs: state.battleState, actorSide: 'player' });
           const costLabel = _skillCostLabel(s, creature);
           return `
           <div class="art-btn ${!canAfford ? 'disabled' : ''} ${i === inputState.focusedSkill ? 'focused' : ''}" data-skill="${i}" ${s.description ? `data-desc="${s.description}"` : ''}>

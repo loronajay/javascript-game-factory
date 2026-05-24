@@ -14,10 +14,11 @@ function startRound() {
   const end = checkBattleEnd();
   if (end) { showBattleEnd(end); return; }
 
+  tickRelentlessStreaks();
   const bs = state.battleState;
   SLOT_NAMES.forEach(s => {
-    if (bs.player[s])   bs.player[s].isDefending   = false;
-    if (bs.opponent[s]) bs.opponent[s].isDefending = false;
+    if (bs.player[s])   { bs.player[s].isDefending = false;   bs.player[s].wasHitSuperEffective = false; }
+    if (bs.opponent[s]) { bs.opponent[s].isDefending = false; bs.opponent[s].wasHitSuperEffective = false; }
   });
   CreatureState.clearDefend();
   updateBattleLog(`Round ${bs.round} — Select commands for your team.`);
@@ -105,7 +106,8 @@ function getResultMessage(result) {
       msg = `${result.actorName} uses ${result.moveName}!${target}${status}`;
       break;
     }
-    case 'no_target': msg = `${result.actorName}'s ${result.moveName} found no target!`; break;
+    case 'no_target':    msg = `${result.actorName}'s ${result.moveName} found no target!`; break;
+    case 'no_activate':  msg = `${result.actorName} readies ${result.moveName}... but wasn't hit by a super effective move last turn!`; break;
     case 'miss':      msg = `${result.actorName} uses ${result.moveName}... Miss!`; break;
     case 'heal':      msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} recovers ${result.amount} HP.`; break;
     case 'absorb':    msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} absorbs the attack and recovers ${result.amount} HP!`; break;
@@ -115,6 +117,7 @@ function getResultMessage(result) {
       const eff  = result.elemMod > 1 ? ' Super effective!' : result.elemMod < 1 ? ' Not very effective...' : '';
       msg = `${result.actorName} uses ${result.moveName}! ${crit}${result.targetName} takes ${result.amount} damage.${eff}`;
       if (result.lifestolen)   msg += ` ${result.actorName} restored ${result.lifestolen} HP.`;
+      if (result.drainAmount)  msg += ` ${result.actorName} drained ${result.drainAmount} HP!`;
       if (result.statusText)   msg += ` ${result.statusText}!`;
       if (result.recoilAmount) msg += ` ${result.actorName} takes ${result.recoilAmount} recoil!`;
       if (result.wasKO) msg += ` ${result.targetName} is knocked out!`;
@@ -178,7 +181,12 @@ function endRound() {
     const afterTick = checkBattleEnd();
     if (afterTick) { setTimeout(() => showBattleEnd(afterTick), 900); return; }
   }
+  tickStatModifiers();
   advanceStatusDurations();
+  getAllCreatures().forEach(c => {
+    if (c.vengeanceActive > 0) c.vengeanceActive--;
+    c.isChallengedBy = null;
+  });
   renderBattleHud();
   state.battleState.round++;
   setTimeout(startRound, tickResults.length ? 900 : 500);

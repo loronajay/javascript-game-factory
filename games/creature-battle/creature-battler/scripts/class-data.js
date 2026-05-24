@@ -339,6 +339,38 @@ const CLASS_SKILLS = [
     description: 'Deals physical damage that scales upward with the target\'s Defense — the higher their Defense, the harder this hits.',
     tiered: false,
   },
+
+  // ── Pseudo-skills — not player-selectable; auto-fired by the engine ──────────
+
+  // Counter Strike fires automatically after Brace absorbs a physical hit.
+  {
+    id: 'counter_strike',
+    name: 'Counter Strike',
+    family: 'counter_strike',
+    rank: 1,
+    classRoute: 'strength',
+    category: 'offensive',
+    costType: 'none',
+    costAmount: 0,
+    targeting: 'single',
+    description: 'Auto-executed after Brace absorbs a physical hit. Deals a swift physical counter.',
+    tiered: false,
+  },
+
+  // Courage Strike Execute fires automatically the turn after Courage Strike is used.
+  {
+    id: 'courage_strike_execute',
+    name: 'Courage Strike',
+    family: 'courage_strike',
+    rank: 1,
+    classRoute: 'strength',
+    category: 'offensive',
+    costType: 'none',
+    costAmount: 0,
+    targeting: 'single',
+    description: 'The stored power from Courage Strike unleashes as a massive physical strike.',
+    tiered: false,
+  },
 ];
 
 // ── Passive definitions ───────────────────────────────────────────────────────

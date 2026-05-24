@@ -178,7 +178,7 @@ function _startOnlineClassCustomization(myTeamIds, opponentTeamIds, levelCap) {
 
 function _sendOnlineClassReady() {
   state.blindPick.myClassReady = true;
-  state.onlineClient.send('class_ready', {});
+  state.onlineClient.send('class_ready', { configs: state.classCustom.playerConfigs });
   state.classCustom.view = 'waiting';
   renderClassCustomization();
   _checkBothClassReady();
@@ -193,6 +193,7 @@ function _checkBothClassReady() {
 function handleClassCustomRemoteMessage(messageType, value) {
   if (messageType === 'class_ready') {
     state.blindPick.opponentClassReady = true;
+    state.blindPick.opponentClassConfigs = Array.isArray(value?.configs) ? value.configs : null;
     _checkBothClassReady();
   }
 }
@@ -225,8 +226,8 @@ function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
     : resolveArena(0).file;
 
   state.battleState = {
-    player:   buildSide(myTeamIds,     state.classCustom.playerConfigs),
-    opponent: buildSide(opponentTeamIds, null), // opponent config not synced yet (Phase 3)
+    player:   buildSide(myTeamIds,       state.classCustom.playerConfigs),
+    opponent: buildSide(opponentTeamIds, state.blindPick.opponentClassConfigs),
     round:    1,
     arenaFile,
   };
