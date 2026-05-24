@@ -42,7 +42,7 @@ function handleBattleRemoteMessage(messageType, value) {
   const flipped = raw.map(a => ({
     ...a,
     actorSide:  'opponent',
-    targetSide: a.targetSide === 'player' ? 'opponent' : 'player',
+    targetSide: a.targetSide === 'player' ? 'opponent' : a.targetSide === 'opponent' ? 'player' : null,
   }));
 
   if (_myPendingActions) {
