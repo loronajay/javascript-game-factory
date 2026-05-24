@@ -125,11 +125,17 @@ function getResultMessage(result) {
     }
     case 'multi_hit': {
       const landed = result.hits.filter(h => !h.missed);
-      const parts  = landed.map(h => `${h.damage}${h.isCrit ? '!' : ''}`).join(' + ');
-      const total  = landed.reduce((s, h) => s + h.damage, 0);
-      const eff    = landed.find(h => h.elemMod > 1) ? ' Super effective!' : landed.find(h => h.elemMod < 1) ? ' Not very effective...' : '';
-      const ko     = result.hits.some(h => h.wasKO) ? ` ${result.targetName} is knocked out!` : '';
-      msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} takes ${parts} (${total} total).${eff}${ko}`;
+      const allAbsorb = landed.every(h => h.elemMod === 'absorb');
+      if (allAbsorb) {
+        const recovered = landed.reduce((s, h) => s + (h.healAmount ?? 0), 0);
+        msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} absorbs the attack and recovers ${recovered} HP!`;
+      } else {
+        const parts = landed.map(h => h.elemMod === 'absorb' ? `absorb` : `${h.damage}${h.isCrit ? '!' : ''}`).join(' + ');
+        const total = landed.reduce((s, h) => s + (h.damage ?? 0), 0);
+        const eff   = landed.find(h => h.elemMod > 1) ? ' Super effective!' : landed.find(h => typeof h.elemMod === 'number' && h.elemMod < 1) ? ' Not very effective...' : '';
+        const ko    = result.hits.some(h => h.wasKO) ? ` ${result.targetName} is knocked out!` : '';
+        msg = `${result.actorName} uses ${result.moveName}! ${result.targetName} takes ${parts} (${total} total).${eff}${ko}`;
+      }
       break;
     }
     case 'world_tree': {

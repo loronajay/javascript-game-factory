@@ -15,23 +15,30 @@ function delayMs(ms) {
 
 // Adds a CSS class to an element, resolves when animationend fires.
 // 1200ms hard timeout guards against missing animationend events.
+// Uses e.target === el to ignore animationend events that bubble up from
+// child elements (e.g. creature_tint divs inside creature-breathe-wrapper).
 function animateEl(el, className, cssVars) {
   return new Promise(resolve => {
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
+      el.removeEventListener('animationend', handler);
       el.classList.remove(className);
       if (cssVars) {
         for (const key of Object.keys(cssVars)) el.style.removeProperty(key);
       }
       resolve();
     };
+    const handler = (e) => {
+      if (e.target !== el) return;
+      finish();
+    };
     if (cssVars) {
       for (const [key, val] of Object.entries(cssVars)) el.style.setProperty(key, val);
     }
     el.classList.add(className);
-    el.addEventListener('animationend', finish, { once: true });
+    el.addEventListener('animationend', handler);
     setTimeout(finish, 1200);
   });
 }

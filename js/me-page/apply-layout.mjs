@@ -1,5 +1,6 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
 import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-friends-freeform-1";
+import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260521-friends-freeform-1";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -115,7 +116,7 @@ export function comparePanelsByFreeformPosition(a, b) {
 }
 
 function applyPanelChildLayout(panelEl, panel) {
-  if (!Array.isArray(panel?.children)) return;
+  if (!panelHasCustomizedChildren(panel)) return;
 
   for (const child of panel.children) {
     if (!child?.id || child.enabled === false) continue;
@@ -135,6 +136,25 @@ function findPanelLayoutChild(panelEl, childId) {
   const all = [...panelEl.querySelectorAll(`[data-profile-child-id="${childId}"]`)];
   if (all.length === 0) return null;
   return all.find((childEl) => childEl.parentElement === panelEl) || null;
+}
+
+export function panelHasCustomizedChildren(panel) {
+  const registry = PROFILE_PANEL_CHILD_REGISTRY[panel?.id];
+  if (!registry || !Array.isArray(panel?.children)) return false;
+
+  return panel.children.some((child) => {
+    if (!child?.id) return false;
+    const def = registry.children?.[child.id];
+    if (!def) return false;
+
+    const style = child.style && typeof child.style === "object" ? child.style : {};
+    return child.enabled === false ||
+      Object.keys(style).length > 0 ||
+      !numbersEqual(child.x, def.defaultX) ||
+      !numbersEqual(child.y, def.defaultY) ||
+      !numbersEqual(child.w, def.defaultW) ||
+      !numbersEqual(child.h, def.defaultH);
+  });
 }
 
 function applyHeroCompositionLayout(doc, heroEl, elements) {

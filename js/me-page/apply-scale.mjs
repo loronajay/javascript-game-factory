@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY } from "../profile-layout/registry.mjs";
-import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM } from "./apply-layout.mjs";
+import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM, panelHasCustomizedChildren } from "./apply-layout.mjs";
 
 const ZOOM_SHELL_CLASS = "panel-zoom-shell";
 const CHILD_ZOOM_SHELL_CLASS = "profile-child-zoom-shell";
@@ -222,7 +222,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     shell.style.width = `${(availableW / z).toFixed(2)}px`;
     shell.style.height = `${(availableH / z).toFixed(2)}px`;
 
-    if (Array.isArray(panel.children) && panel.children.length > 0) {
+    if (panelHasCustomizedChildren(panel)) {
       applyPanelChildScaling(el);
     }
   }

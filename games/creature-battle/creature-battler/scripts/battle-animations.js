@@ -24,12 +24,20 @@ function getResultFloatSpecs(result, action) {
     ].filter(Boolean);
   }
 
-  if (result.type === 'heal') {
+  if (result.type === 'heal' || result.type === 'absorb') {
     return [targetSpec(result.targetSide || action?.targetSide, result.targetSlot || action?.targetSlot, `+${result.amount}`, 'heal')].filter(Boolean);
   }
 
   if (result.type === 'defend' || result.type === 'utility') {
     return [targetSpec(result.targetSide || action?.actorSide, result.targetSlot || action?.actorSlot, result.statusText || (result.type === 'defend' ? 'GUARD' : 'BUFF'), 'status')].filter(Boolean);
+  }
+
+  if (result.type === 'multi_hit') {
+    return result.hits.map(hit => {
+      if (hit.missed)              return targetSpec(result.targetSide, result.targetSlot, 'MISS!', 'miss');
+      if (hit.elemMod === 'absorb') return targetSpec(result.targetSide, result.targetSlot, `+${hit.healAmount}`, 'heal');
+      return targetSpec(result.targetSide, result.targetSlot, `${hit.damage}`, hit.isCrit ? 'crit' : 'damage');
+    }).filter(Boolean);
   }
 
   if (result.type === 'multi') {

@@ -112,16 +112,41 @@ export function normalizeCompositionElements(rawElements) {
 
   const rawById = buildRawCompositionElementMap(rawElements);
 
-  const normalized = Object.entries(PROFILE_COMPOSITION_ELEMENT_REGISTRY).map(([id, def]) => {
-    const raw = rawById.get(id) || {};
-    return normalizeCompositionElement(id, raw, def);
-  });
+  const normalized = [...rawById.entries()]
+    .filter(([id]) => PROFILE_COMPOSITION_ELEMENT_REGISTRY[id])
+    .map(([id, raw]) => {
+      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[id];
+      return normalizeCompositionElement(id, raw, def);
+    })
+    .filter((element) => {
+      const raw = rawById.get(element.id);
+      const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element.id];
+      return shouldKeepCompositionElement(element, raw, def);
+    });
 
   const customTitles = (Array.isArray(rawElements) ? rawElements : [])
     .filter((element) => element && isCustomTitleElementId(element.id))
     .map((element) => normalizeCompositionElement(element.id, element, CUSTOM_TITLE_ELEMENT_DEF));
 
   return [...disableUntouchedThoughtsFreeformDefaults(normalized, rawById), ...customTitles];
+}
+
+function shouldKeepCompositionElement(element, raw, def) {
+  if (!raw || !def) return false;
+  if (def.type === "galleryPhoto" && isOldTinyGalleryPhotoGeometry(raw)) return false;
+
+  const rawStyle = raw.style && typeof raw.style === "object" ? raw.style : {};
+  if (Object.keys(normalizePanelStyle(rawStyle)).length > 0) return true;
+
+  const defaultEnabled = def.defaultEnabled !== false;
+  if ((raw.enabled ?? defaultEnabled) !== defaultEnabled) return true;
+
+  if (def.type === "title" && typeof raw.text === "string" && raw.text !== (def.defaultText || "")) return true;
+
+  return !numbersEqual(element.x, def.defaultX) ||
+    !numbersEqual(element.y, def.defaultY) ||
+    !numbersEqual(element.w, def.defaultW) ||
+    !numbersEqual(element.h, def.defaultH);
 }
 
 function buildRawCompositionElementMap(rawElements) {
