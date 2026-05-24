@@ -11,14 +11,14 @@ import {
   syncThoughtCommentsFromApi,
 } from "../platform/thoughts/thoughts.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
-import { createPlayerHeroActions } from "./hero-actions.mjs?v=20260524-default-layout-cleanup-2";
+import { createPlayerHeroActions } from "./hero-actions.mjs?v=20260524-profile-rollback-2";
 import { createPlayerMediaActions } from "./media-actions.mjs";
 import { createPlayerThoughtComposerActions } from "./thought-composer-actions.mjs";
 import { createMediaComposerState } from "../profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
 import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
-import { applyPlayerLayout } from "../me-page/apply-layout.mjs?v=20260524-default-layout-cleanup-2";
-import { applyPlayerScaling } from "../me-page/apply-scale.mjs?v=20260524-default-layout-cleanup-2";
+import { applyPlayerLayout } from "../me-page/apply-layout.mjs?v=20260524-profile-rollback-2";
+import { applyPlayerScaling } from "../me-page/apply-scale.mjs?v=20260524-profile-rollback-2";
 
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession, savedLayout = null }) {
   let currentLayout = savedLayout;
