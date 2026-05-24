@@ -148,6 +148,7 @@ function getResultMessage(result) {
       const parts = result.hits.map(h => {
         if (h.missed) return `${h.name} missed`;
         if (result.damageClass === 'heal') return `${h.name} +${h.amount}`;
+        if (h.elemMod === 'absorb') return `${h.name} absorbed (+${h.amount})`;
         return `${h.name} ${h.amount}${h.wasKO ? ' KO!' : ''}`;
       });
       const verb = result.damageClass === 'heal' ? 'heals' : 'hits all';

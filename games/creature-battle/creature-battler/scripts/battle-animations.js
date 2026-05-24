@@ -44,6 +44,7 @@ function getResultFloatSpecs(result, action) {
     return result.hits.map(hit => {
       if (hit.missed) return targetSpec(result.targetSide, hit.slot, 'MISS!', 'miss');
       if (result.damageClass === 'heal') return targetSpec(result.targetSide, hit.slot, `+${hit.amount}`, 'heal');
+      if (hit.elemMod === 'absorb') return targetSpec(result.targetSide, hit.slot, `+${hit.amount}`, 'heal');
       return targetSpec(result.targetSide, hit.slot, `${hit.amount}`, hit.isCrit ? 'crit' : 'damage');
     }).filter(Boolean);
   }
@@ -72,6 +73,7 @@ function showResultFloatTexts(result, action) {
 function getMultiHitFloatSpec(result, hit) {
   if (hit.missed) return { side: result.targetSide, slot: hit.slot, text: 'MISS!', kind: 'miss' };
   if (result.damageClass === 'heal') return { side: result.targetSide, slot: hit.slot, text: `+${hit.amount}`, kind: 'heal' };
+  if (hit.elemMod === 'absorb') return { side: result.targetSide, slot: hit.slot, text: `+${hit.amount}`, kind: 'heal' };
   return { side: result.targetSide, slot: hit.slot, text: `${hit.amount}`, kind: hit.isCrit ? 'crit' : 'damage' };
 }
 
