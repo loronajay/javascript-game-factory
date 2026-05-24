@@ -1,6 +1,6 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-default-layout-cleanup-1";
-import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-default-layout-cleanup-1";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-default-layout-cleanup-2";
+import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-default-layout-cleanup-2";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -331,9 +331,6 @@ function shouldRenderCompositionOverlay(element) {
 
   const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element?.id];
   if (!def) return true;
-
-  const defaultEnabled = def.defaultEnabled !== false;
-  if ((element.enabled ?? defaultEnabled) !== defaultEnabled) return true;
 
   if (def.type === "title" && typeof element.text === "string" && element.text !== (def.defaultText || "")) {
     return true;

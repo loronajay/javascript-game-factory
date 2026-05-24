@@ -2,7 +2,8 @@ registerMoveAnimations({
 
   // ── bubble_shot ────────────────────────────────────────────────────────────
   // Snappy pressurized bubble. Brief mist before the shot, small pressure ring
-  // on impact — even the basic move reads as water.
+  // on impact — even the basic move reads as water. Dot particles: bubbles are
+  // circular, symbols would feel off for a fired projectile.
   bubble_shot: {
     timeline: [
       { at:0,   type:'particle_stream', origin:'actor',  color:'#66ccff', count:2, interval:80, direction:'up', duration:100 },
@@ -63,11 +64,11 @@ registerMoveAnimations({
   },
 
   // ── soak_hide ──────────────────────────────────────────────────────────────
-  // Self-buff (defense). Water drips DOWN over the body as a shell forms —
-  // the drip direction distinguishes armor from attack moves.
+  // Self-buff (defense). 💧 drips DOWN over the body as a water shell forms —
+  // the drop direction and symbol make it unmistakably "armoring with water."
   soak_hide: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#44bbee', count:3, interval:85, direction:'down', size:3, duration:480 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#44bbee', count:3, interval:85, direction:'down', size:12, duration:480, content:'💧' },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#2288dd', blend:'screen', opacity:0.25, duration:560 },
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-soak-hide' },
@@ -79,11 +80,11 @@ registerMoveAnimations({
   },
 
   // ── healing_wave ───────────────────────────────────────────────────────────
-  // Self-heal. Teal energy rises from the healer; the recipient glows with
-  // restoration. Distinct teal palette separates heal from all attack blues.
+  // Self-heal. 💧 rises from the healer and recipient as teal restoration.
+  // Teal palette separates heal from all attack blues.
   healing_wave: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#44ffee', count:3, interval:80, direction:'up', glow:true, duration:380 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#44ffee', count:3, interval:80, direction:'up', size:12, glow:true, duration:380, content:'💧' },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#33ddcc', blend:'screen', opacity:0.28, duration:500 },
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-healing-wave' },
@@ -91,9 +92,9 @@ registerMoveAnimations({
       { at:260, type:'impact' },
       { at:260, type:'sound',           id:'beam-light' },
       { at:260, type:'creature_anim',   target:'target', class:'anim-hit-water-heal' },
-      { at:260, type:'particle_burst',  origin:'actor',  color:'#66ffee', count:8, spread:40, direction:'up', duration:500 },
+      { at:260, type:'particle_burst',  origin:'actor',  color:'#66ffee', count:8, spread:40, direction:'up', duration:500, content:'💧', size:12 },
       { at:260, type:'field_flash',     color:'#00ccbb', opacity:0.20, duration:220 },
-      { at:260, type:'particle_stream', origin:'target', color:'#44ffee', count:2, interval:90, direction:'up', glow:true, duration:500 },
+      { at:260, type:'particle_stream', origin:'target', color:'#44ffee', count:2, interval:90, direction:'up', size:12, glow:true, duration:500, content:'💧' },
       { at:260, type:'creature_tint',   target:'target', color:'#33ddcc', blend:'screen', opacity:0.30, duration:480 },
       { at:260, type:'status_ring',     target:'target', color:'#33ddcc', duration:700 },
     ],
@@ -118,23 +119,24 @@ registerMoveAnimations({
       { at:685, type:'preset',          id:'water_hit_flash_heavy' },
       { at:685, type:'screen_shake',    intensity:6, duration:260, style:'stutter' },
       { at:685, type:'hit_stop',        duration:65 },
+      { at:685, type:'particle_burst',  origin:'target', color:'#44aaee', count:6, spread:55, direction:'all', duration:500, content:'🌊', size:16 },
       { at:750, type:'shockwave',       origin:'target', size:68, color:'#2266dd', opacity:0.72, thickness:5 },
       { at:750, type:'creature_tint',   target:'target', color:'#0044aa', blend:'multiply', opacity:0.28, duration:400 },
     ],
   },
 
   // ── hydro_skin ─────────────────────────────────────────────────────────────
-  // Dual self-buff (defense + spirit). Heavier drip armor than soak_hide;
+  // Dual self-buff (defense + spirit). Heavier 💧 drip armor than soak_hide;
   // two status rings signal the double stat raise.
   hydro_skin: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#44bbee', count:3, interval:90, direction:'down', size:3, duration:500 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#44bbee', count:3, interval:90, direction:'down', size:12, duration:500, content:'💧' },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#0077cc', blend:'screen', opacity:0.30, duration:620 },
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-hydro-skin' },
       { at:0,   type:'preset',          id:'water_cast_aura', count:8, direction:'all', spread:40 },
       { at:340, type:'impact' },
-      { at:340, type:'particle_burst',  origin:'actor',  color:'#44bbee', count:5, spread:25, direction:'up', duration:420 },
+      { at:340, type:'particle_burst',  origin:'actor',  color:'#44bbee', count:6, spread:28, direction:'up', duration:440, content:'💧', size:12 },
       { at:340, type:'field_flash',     color:'#0066cc', opacity:0.18, duration:220 },
       { at:340, type:'status_ring',     target:'actor',  color:'#4499ff', duration:700 },
       { at:420, type:'status_ring',     target:'actor',  color:'#33ddcc', duration:620 },
@@ -142,20 +144,20 @@ registerMoveAnimations({
   },
 
   // ── undertow ───────────────────────────────────────────────────────────────
-  // Slow utility. Target dragged into dark water — downward particles both on
+  // Slow utility. Target dragged into dark water — 💧 fall downward both on
   // actor and target, deep navy tint, slow status ring.
   undertow: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#2255aa', count:3, interval:90, direction:'down', size:3, duration:420 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#2255aa', count:3, interval:90, direction:'down', size:11, duration:420, content:'💧' },
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-undertow' },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#2255aa', count:5, spread:28, direction:'down', duration:480 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#2255aa', count:5, spread:28, direction:'down', duration:480, content:'💧', size:11 },
       { at:280, type:'impact' },
       { at:280, type:'sound',           id:'hit-light' },
       { at:280, type:'creature_anim',   target:'target', class:'anim-hit-undertow' },
-      { at:280, type:'particle_burst',  origin:'target', color:'#1133aa', count:8, spread:45, direction:'down', duration:500 },
+      { at:280, type:'particle_burst',  origin:'target', color:'#1133aa', count:8, spread:45, direction:'down', duration:500, content:'💧', size:11 },
       { at:280, type:'field_flash',     color:'#001144', opacity:0.22, duration:240 },
-      { at:280, type:'particle_stream', origin:'target', color:'#1133aa', count:2, interval:100, direction:'down', size:3, duration:500 },
+      { at:280, type:'particle_stream', origin:'target', color:'#1133aa', count:2, interval:100, direction:'down', size:11, duration:500, content:'💧' },
       { at:280, type:'creature_tint',   target:'target', color:'#001144', blend:'multiply', opacity:0.30, duration:500 },
       { at:280, type:'status_ring',     target:'target', color:'#2244aa', duration:700 },
     ],
@@ -222,8 +224,8 @@ registerMoveAnimations({
   },
 
   // ── surge_crash_3 ──────────────────────────────────────────────────────────
-  // Maximum wave. Dense storm, hit_stop, double shockwave cascade, lingering
-  // water wash after the crash.
+  // Maximum wave. Dense storm, hit_stop, double shockwave cascade, 🌊 linger
+  // after the crash reads as the wave still washing over the field.
   surge_crash_3: {
     timeline: [
       { at:0,   type:'particle_stream', origin:'actor',  color:'#1166dd', count:5, interval:68, direction:'up', spread:38, duration:500, glow:true },
@@ -238,7 +240,7 @@ registerMoveAnimations({
       { at:540, type:'screen_shake',    intensity:8, duration:380, style:'stutter' },
       { at:540, type:'hit_stop',        duration:75 },
       { at:615, type:'shockwave',       origin:'actor', size:125, color:'#1155cc', opacity:0.72, thickness:6 },
-      { at:615, type:'particle_stream', origin:'actor',  color:'#2266dd', count:3, interval:90, direction:'all', duration:340 },
+      { at:615, type:'particle_stream', origin:'actor',  color:'#2266dd', count:3, interval:90, direction:'all', duration:340, content:'🌊', size:16 },
       { at:635, type:'preset',          id:'water_particle_heavy', origin:'actor' },
       { at:660, type:'field_flash',     color:'#003388', opacity:0.30, duration:220 },
       { at:745, type:'shockwave',       origin:'actor', size:65, color:'#44aaff', opacity:0.48, thickness:3 },
@@ -246,8 +248,8 @@ registerMoveAnimations({
   },
 
   // ── torrent ────────────────────────────────────────────────────────────────
-  // Aquaphant's signature. Full 480ms charge churning with deep water energy,
-  // hit_stop 75ms, heavy pressure ring + submerged tint on target.
+  // Aquaphant's signature lunge. Full 480ms charge churning with deep water
+  // energy; hit_stop 75ms; 🌊 burst on impact + heavy pressure ring.
   torrent: {
     timeline: [
       { at:0,   type:'particle_stream', origin:'actor',  color:'#2277dd', count:4, interval:72, direction:'up', spread:30, duration:480, glow:true },
@@ -264,6 +266,7 @@ registerMoveAnimations({
       { at:720, type:'preset',          id:'water_hit_flash_heavy' },
       { at:720, type:'screen_shake',    intensity:8, duration:300, style:'stutter' },
       { at:720, type:'hit_stop',        duration:75 },
+      { at:720, type:'particle_burst',  origin:'target', color:'#2266dd', count:8, spread:60, direction:'all', duration:560, content:'🌊', size:16 },
       { at:795, type:'shockwave',       origin:'target', size:75, color:'#0044cc', opacity:0.75, thickness:5 },
       { at:795, type:'creature_tint',   target:'target', color:'#0033aa', blend:'multiply', opacity:0.28, duration:420 },
     ],
