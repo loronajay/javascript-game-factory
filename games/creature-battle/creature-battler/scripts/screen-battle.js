@@ -39,6 +39,13 @@ function renderBattle() {
     document.getElementById('battle-bg').style.backgroundImage = `url('${arenaFile}')`;
   }
 
+  el.addEventListener('click', e => {
+    if (!pendingAdvance) return;
+    if (e.target.closest('#battle-commands button, #battle-commands .art-btn, #battle-commands .cmd-back')) return;
+    playClick();
+    advancePlayback();
+  });
+
   CreatureState.initBattle();
   inputState.logMessage = 'Preparing for battle...';
   renderBattleCommandPanel();
