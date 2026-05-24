@@ -1,6 +1,6 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-default-layout-cleanup-5";
-import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-default-layout-cleanup-5";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-default-layout-cleanup-6";
+import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-default-layout-cleanup-6";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",

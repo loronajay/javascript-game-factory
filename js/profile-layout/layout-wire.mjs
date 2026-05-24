@@ -7,9 +7,9 @@ import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { syncThoughtFeedFromApi } from "../platform/thoughts/thoughts.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { buildAppUrl } from "../arcade-paths.mjs";
-import { fetchLayout, saveLayout } from "./layout-storage.mjs?v=20260524-default-layout-cleanup-5";
-import { normalizeLayout } from "./normalize-layout.mjs?v=20260524-default-layout-cleanup-5";
-import { getDefaultLayout } from "./default-layout.mjs?v=20260524-default-layout-cleanup-5";
+import { fetchLayout, saveLayout } from "./layout-storage.mjs?v=20260524-default-layout-cleanup-6";
+import { normalizeLayout } from "./normalize-layout.mjs?v=20260524-default-layout-cleanup-6";
+import { getDefaultLayout } from "./default-layout.mjs?v=20260524-default-layout-cleanup-6";
 import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -17,7 +17,7 @@ import {
   CUSTOM_TITLE_PREFIX,
   getCompositionElementDef,
   isCustomTitleElementId,
-} from "./composition-layout.mjs?v=20260524-default-layout-cleanup-5";
+} from "./composition-layout.mjs?v=20260524-default-layout-cleanup-6";
 import {
   buildZoomFrame,
   clampZoom,
@@ -30,8 +30,8 @@ import {
   renderPanelInspectorHtml,
   renderPanelListHtml,
 } from "./layout-inspector-view.mjs";
-import { applyCompositionElementScaling, renderLayoutGrid } from "./layout-renderer.mjs?v=20260524-default-layout-cleanup-5";
-import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs?v=20260524-default-layout-cleanup-5";
+import { applyCompositionElementScaling, renderLayoutGrid } from "./layout-renderer.mjs?v=20260524-default-layout-cleanup-6";
+import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs?v=20260524-default-layout-cleanup-6";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { buildMePageViewModel } from "../me-page/view-model.mjs";
 import { applyPanelScaling } from "../me-page/apply-scale.mjs";

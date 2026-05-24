@@ -1,5 +1,5 @@
-export { addFriendByCode } from "./me-page/friend-code-actions.mjs?v=20260524-default-layout-cleanup-5";
-export { buildMePageViewModel } from "./me-page/view-model.mjs?v=20260524-default-layout-cleanup-5";
-export { renderMePage } from "./me-page/render.mjs?v=20260524-default-layout-cleanup-5";
+export { addFriendByCode } from "./me-page/friend-code-actions.mjs?v=20260524-default-layout-cleanup-6";
+export { buildMePageViewModel } from "./me-page/view-model.mjs?v=20260524-default-layout-cleanup-6";
+export { renderMePage } from "./me-page/render.mjs?v=20260524-default-layout-cleanup-6";
 
-import "./me-page/entry.mjs?v=20260524-default-layout-cleanup-5";
+import "./me-page/entry.mjs?v=20260524-default-layout-cleanup-6";
