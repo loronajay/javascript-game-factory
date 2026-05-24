@@ -163,7 +163,7 @@ function _renderEndPortraits(side) {
     if (!c) return '';
     return `<div class="bes-portrait ${c.isKnockedOut ? 'ko' : ''}">
       <img src="${c.sprite}" alt="${c.displayName}">
-      ${c.isKnockedOut ? '<div class="bes-portrait-ko">KO</div>' : ''}
+      ${c.isKnockedOut ? '<div class="bes-portrait-ko">✕</div>' : ''}
     </div>`;
   }).join('');
 }
