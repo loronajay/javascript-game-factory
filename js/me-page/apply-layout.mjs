@@ -1,5 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-friends-freeform-1";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-gallery-photo-fix-1";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -282,8 +282,10 @@ function removeLegacyTinyGalleryPhotos(elements) {
 
 function isLegacyTinyGalleryPhotoElement(element) {
   return element?.type === "galleryPhoto" &&
-    numbersEqual(element.w, 0.4) &&
-    numbersEqual(element.h, 0.62);
+    (
+      (numbersEqual(element.w, 0.4) && numbersEqual(element.h, 0.62)) ||
+      (numbersEqual(element.w, 0.8) && numbersEqual(element.h, 1.05))
+    );
 }
 
 function numbersEqual(value, expected) {

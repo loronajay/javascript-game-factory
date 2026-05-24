@@ -25,8 +25,8 @@ import {
   uploadPendingThoughtPhoto,
 } from "./media-actions.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
-import { applyMeLayout } from "./apply-layout.mjs?v=20260521-friends-freeform-1";
-import { applyMeScaling } from "./apply-scale.mjs?v=20260521-friends-freeform-1";
+import { applyMeLayout } from "./apply-layout.mjs?v=20260524-gallery-photo-fix-1";
+import { applyMeScaling } from "./apply-scale.mjs?v=20260524-gallery-photo-fix-1";
 
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, savedLayout = null }) {
   let currentLayout = savedLayout;

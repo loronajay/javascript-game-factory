@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260521-friends-freeform-1";
+import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260524-gallery-photo-fix-1";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -9,7 +9,7 @@ import {
   CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
   isCustomTitleElementId,
-} from "./composition-layout.mjs?v=20260521-friends-freeform-1";
+} from "./composition-layout.mjs?v=20260524-gallery-photo-fix-1";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -193,7 +193,8 @@ function migrateCompositionElementGeometry(id, raw, def) {
 }
 
 function isOldTinyGalleryPhotoGeometry(element) {
-  return numbersEqual(element?.w, 0.4) && numbersEqual(element?.h, 0.62);
+  return (numbersEqual(element?.w, 0.4) && numbersEqual(element?.h, 0.62)) ||
+    (numbersEqual(element?.w, 0.8) && numbersEqual(element?.h, 1.05));
 }
 
 function getMigratedGalleryPhotoDefault(id, def) {

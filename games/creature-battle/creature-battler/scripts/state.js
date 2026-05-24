@@ -154,5 +154,16 @@ function startBattle() {
     arenaFile: arena.file,
     battleStats: { player: makeBattleStats(), opponent: makeBattleStats() },
   };
+  // Fire onBattleStart passive hooks (e.g. Still Mind raises SPI at start).
+  ['player', 'opponent'].forEach(side => {
+    SLOT_NAMES.forEach(slot => {
+      const c = state.battleState[side][slot];
+      if (!c) return;
+      (c.equippedPassives || []).forEach(passive => {
+        const reg = typeof PASSIVE_REGISTRY !== 'undefined' ? PASSIVE_REGISTRY[passive.id] : null;
+        if (reg?.onBattleStart) reg.onBattleStart({ creature: c });
+      });
+    });
+  });
   setScreen('battle');
 }

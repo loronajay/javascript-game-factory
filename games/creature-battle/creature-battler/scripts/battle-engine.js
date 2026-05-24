@@ -12,6 +12,8 @@ const ENGINE = {
   SPECIES_ACC_BASE: 70,
   SPECIES_EVA_BASE: 60,
   ABSORB_REDUCTION:  0.60,
+  CHANNEL_MP_RESTORE: 0.20,
+  ATTUNE_BONUS:       1.50,
 };
 
 const STATUS_DEFS = {
@@ -212,7 +214,14 @@ function getCreatureStatusLabels(creature) {
 }
 
 function spendMoveCost(actor, move) {
-  actor.mp.current = Math.max(0, actor.mp.current - move.mpCost);
+  let mpCost = move.mpCost;
+  if (move.category === 'art' && typeof getArtCostMultiplier === 'function') {
+    mpCost = Math.round(mpCost * getArtCostMultiplier(actor));
+    // Transcendence and Quicken are one-Art flags; clear them after the Art fires.
+    if (actor.transcendenceActive) actor.transcendenceActive = false;
+    if (actor.quickenActive) actor.quickenActive = false;
+  }
+  actor.mp.current = Math.max(0, actor.mp.current - mpCost);
 }
 
 const ELEMENT_OPPOSITES = {
@@ -302,6 +311,16 @@ function findValidTarget(side, preferredSlot) {
   return null;
 }
 
+// Restores MP to a creature using Channel when they take a hit.
+// Called from every damage-application path; no-ops if channelActive is not set.
+function _applyChannelRestore(defender, damage) {
+  if (!defender.channelActive || damage <= 0 || defender.isKnockedOut) return;
+  const hasConduit = defender.equippedPassives?.some(p => p.id === 'conduit');
+  const rate = ENGINE.CHANNEL_MP_RESTORE * (hasConduit ? 1.5 : 1.0);
+  const restore = Math.max(1, Math.round(damage * rate));
+  defender.mp.current = Math.min(defender.mp.max, defender.mp.current + restore);
+}
+
 // Returns the ally on targetSide that volunteered to intercept with the Absorb skill.
 function _findAbsorbInterceptor(target, targetSide) {
   const bs = state.battleState;
@@ -318,6 +337,8 @@ const PRIORITY_MOVES = new Set([
   'counter_stance', 'total_defense', 'aegis_shield', 'absorb',
   'stand_firm', 'meditate', 'taunt', 'shield_wall', 'rampart', 'rampart_2',
   'retaliation', 'damage_store', 'grit',
+  'channel', 'attune',
+  'ward', 'ward_2', 'ward_3', 'deep_meditation', 'arcane_veil', 'quicken',
 ]);
 
 function _actionPriority(action) {
@@ -479,6 +500,10 @@ function resolveAction(action) {
     return { type: 'silenced', actorName: actor.displayName, moveName: move.name };
   }
 
+  // Attune: consume the flag before the move fires; bonus is applied in every damage path below.
+  const attuneBonus = (actor.attuneActive && action.commandType === 'art') ? ENGINE.ATTUNE_BONUS : 1.0;
+  if (attuneBonus !== 1.0) actor.attuneActive = false;
+
   // Utility moves: deduct MP, no damage yet
   if (move.damageClass === 'utility') {
     if (move.targeting === 'all_allies') {
@@ -533,7 +558,7 @@ function resolveAction(action) {
         return { slot, name: target.displayName, amount: healAmount, elemMod: 'absorb', wasKO: false, isCrit: false };
       }
       const aoeBonus = getPassiveAoeBonusMultiplier(actor, move);
-      let damage = Math.max(ENGINE.MIN_DAMAGE, Math.round(rawDmg * aoeBonus));
+      let damage = Math.max(ENGINE.MIN_DAMAGE, Math.round(rawDmg * aoeBonus * attuneBonus));
       if (move.damageClass === 'physical') {
         if (target.totalDefenseActive || target.aegisShieldActive) damage = 0;
         if (target.standFirmActive && damage > 0) damage = Math.max(1, Math.floor(damage * 0.5));
@@ -541,8 +566,13 @@ function resolveAction(action) {
         if ((state.battleState[tgtSide]?.shieldWallTurns || 0) > 0 && damage > 0) damage = Math.max(1, Math.round(damage * 0.85));
         if (target.damageStoreActive && damage > 0) { target.damageStorePool = (target.damageStorePool || 0) + damage; damage = 0; }
       }
+      if (move.damageClass === 'magic' && move.category === 'art') {
+        if (target.arcaneVeilActive) damage = 0;
+        if (target.wardActive && damage > 0) damage = Math.max(1, Math.round(damage * (1 - target.wardDamageReduction)));
+      }
       if (target.barrierHP > 0 && damage > 0) { const bAbsorb = Math.min(target.barrierHP, damage); target.barrierHP -= bAbsorb; damage -= bAbsorb; }
       target.hp.current = Math.max(0, target.hp.current - damage);
+      _applyChannelRestore(target, damage);
       checkPassiveSurviveKO(target);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
       if (wasKO) {
@@ -555,6 +585,7 @@ function resolveAction(action) {
       }
       if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
       if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage, actor);
+      if (!wasKO && move.damageClass === 'magic' && damage > 0) applyPassiveOnMagicHit(target, damage, bs);
       return { slot, name: target.displayName, amount: damage, wasKO, isCrit, elemMod };
     });
     if (move.healAllAllies) {
@@ -613,8 +644,10 @@ function resolveAction(action) {
         hits.push({ healAmount, elemMod: 'absorb', wasKO: false, isCrit: false });
         continue;
       }
+      if (attuneBonus !== 1.0) damage = Math.round(damage * attuneBonus);
       if (target.barrierHP > 0 && damage > 0) { const bAbsorb = Math.min(target.barrierHP, damage); target.barrierHP -= bAbsorb; damage -= bAbsorb; }
       target.hp.current = Math.max(0, target.hp.current - damage);
+      _applyChannelRestore(target, damage);
       checkPassiveSurviveKO(target);
       const wasKO = !target.isKnockedOut && target.hp.current <= 0;
       if (wasKO) {
@@ -693,6 +726,8 @@ function resolveAction(action) {
     }
   }
 
+  if (attuneBonus !== 1.0) damage = Math.round(damage * attuneBonus);
+
   if (target.isBraced && move.damageClass === 'physical') {
     damage = Math.max(1, Math.floor(damage / 2));
     target.pendingAutoAction = { commandType: 'skill', moveId: 'counter_strike', targetSide: action.actorSide, targetSlot: action.actorSlot };
@@ -715,9 +750,14 @@ function resolveAction(action) {
     if ((state.battleState[tgtSide]?.shieldWallTurns || 0) > 0 && damage > 0) damage = Math.max(1, Math.round(damage * 0.85));
     if (target.damageStoreActive && damage > 0) { target.damageStorePool = (target.damageStorePool || 0) + damage; damage = 0; }
   }
+  if (move.damageClass === 'magic' && move.category === 'art') {
+    if (target.arcaneVeilActive) damage = 0;
+    if (target.wardActive && damage > 0) damage = Math.max(1, Math.round(damage * (1 - target.wardDamageReduction)));
+  }
   if (target.barrierHP > 0 && damage > 0) { const bAbsorb = Math.min(target.barrierHP, damage); target.barrierHP -= bAbsorb; damage -= bAbsorb; }
 
   target.hp.current = Math.max(0, target.hp.current - damage);
+  _applyChannelRestore(target, damage);
   checkPassiveSurviveKO(target);
   const wasKO = !target.isKnockedOut && target.hp.current <= 0;
   if (wasKO) {
@@ -729,6 +769,18 @@ function resolveAction(action) {
   if (elemMod >= 1.5) { target.wasHitSuperEffective = true; applyPassiveOnSuperEffectiveHit(target); }
   const statusText = wasKO ? null : applySecondaryEffect(move.id, target);
   if (!wasKO && move.damageClass === 'physical') applyPassiveOnPhysicalHit(target, damage, actor);
+  if (!wasKO && move.damageClass === 'magic' && damage > 0) {
+    applyPassiveOnMagicHit(target, damage, bs);
+    // Ward reflection for Arts
+    if (move.category === 'art' && target.wardActive && target.wardReflectRatio > 0 && !actor.isKnockedOut) {
+      const reflectDmg = Math.max(1, Math.round(damage * target.wardReflectRatio));
+      actor.hp.current = Math.max(0, actor.hp.current - reflectDmg);
+      if (actor.hp.current <= 0 && !actor.isKnockedOut) {
+        actor.isKnockedOut = true;
+        clearBattleModifiers(actor);
+      }
+    }
+  }
   applyPassiveAfterAction(actor, move);
 
   let lifestolen = null;

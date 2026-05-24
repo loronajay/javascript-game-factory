@@ -136,7 +136,10 @@ function getResultMessage(result) {
       if (result.drainAmount)  msg += ` ${result.actorName} drained ${result.drainAmount} HP!`;
       if (result.statusText)   msg += ` ${result.statusText}!`;
       if (result.recoilAmount) msg += ` ${result.actorName} takes ${result.recoilAmount} recoil!`;
+      if (result.wardReflect)  msg += ` Ward reflects ${result.wardReflect} back!`;
       if (result.wasKO) msg += ` ${result.targetName} is knocked out!`;
+      if (result.echoAmount)   msg += ` Spell Echo! +${result.echoAmount} more.${result.echoWasKO ? ' KO!' : ''}`;
+      if (result.stormAmount)  msg += ` Spellstorm! +${result.stormAmount} more.${result.stormWasKO ? ' KO!' : ''}`;
       break;
     }
     case 'multi_hit': {
@@ -224,9 +227,30 @@ function endRound() {
     c.aegisShieldActive    = false;
     c.absorbActive         = false;
     c.meditateActive       = false;
+    c.channelActive        = false;
+    c.attuneActive         = false;
+    c.usedMagicLastRound   = c.usedMagicThisRound || false;
+    c.usedMagicThisRound   = false;
+    c.wasHitLastRound      = c.wasHitThisRound || false;
+    c.wasHitThisRound      = false;
     // totalDefenseUsedLastTurn gates the alternating-turn restriction; set it for next round check
     if (c.totalDefenseJustUsed) { c.totalDefenseUsedLastTurn = true; c.totalDefenseJustUsed = false; }
     else { c.totalDefenseUsedLastTurn = false; }
+    // Clear per-round Spirit state flags
+    c.wardActive           = false;
+    c.wardDamageReduction  = 0;
+    c.wardMPRestoreRate    = 0;
+    c.wardReflectRatio     = 0;
+    c.arcaneVeilActive     = false;
+    c.quickenActive        = false;
+    // Deep Meditation: deferred restore fires at round end before clearing the flag.
+    if (c.deepMeditationActive) {
+      const deferred = Math.floor(c.mp.max * 0.20);
+      c.mp.current = Math.min(c.mp.max, c.mp.current + deferred);
+      c.deepMeditationActive = false;
+    }
+    // Transcendence persists until the creature is KO'd or the battle ends (not cleared per round).
+    // quickenActive is a one-round buff cleared above; transcendenceActive is persistent.
   });
   // Decrement Shield Wall team aura duration
   ['player', 'opponent'].forEach(side => {
