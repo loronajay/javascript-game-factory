@@ -317,6 +317,7 @@ const PRIORITY_MOVES = new Set([
   'brace', 'challenge',
   'counter_stance', 'total_defense', 'aegis_shield', 'absorb',
   'stand_firm', 'meditate', 'taunt', 'shield_wall', 'rampart', 'rampart_2',
+  'retaliation', 'damage_store', 'grit',
 ]);
 
 function _actionPriority(action) {
