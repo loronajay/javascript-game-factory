@@ -1,11 +1,11 @@
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
-import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs?v=20260524-profile-rollback-2";
+import { LAYOUT_COLUMNS, getDefaultLayout } from "./default-layout.mjs?v=20260524-profile-rollback-3";
 import { getPanelChildGrid, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
   COMPOSITION_GRID_ROWS,
   getCompositionElementDef,
-} from "./composition-layout.mjs?v=20260524-profile-rollback-2";
+} from "./composition-layout.mjs?v=20260524-profile-rollback-3";
 import {
   renderMeFriendCodePanel,
   renderMeFriendsPanel,

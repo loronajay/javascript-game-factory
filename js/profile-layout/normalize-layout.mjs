@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260524-profile-rollback-2";
+import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs?v=20260524-profile-rollback-3";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -9,7 +9,7 @@ import {
   CUSTOM_TITLE_ELEMENT_DEF,
   getDefaultCompositionElements,
   isCustomTitleElementId,
-} from "./composition-layout.mjs?v=20260524-profile-rollback-2";
+} from "./composition-layout.mjs?v=20260524-profile-rollback-3";
 
 export function normalizeLayout(raw) {
   if (!raw || typeof raw !== "object") return getDefaultLayout();
@@ -22,7 +22,6 @@ export function normalizeLayout(raw) {
 
   const columns = typeof desktop.columns === "number" ? desktop.columns : LAYOUT_COLUMNS;
   if (columns !== LAYOUT_COLUMNS) return getDefaultLayout();
-  if (isFailedFreeformCleanupLayout(desktop)) return getDefaultLayout();
 
   const rawPanels = Array.isArray(desktop.panels) ? desktop.panels : [];
   const seenIds = new Set();
@@ -145,35 +144,6 @@ function shouldKeepCompositionElement(element, raw, def) {
     !numbersEqual(element.y, def.defaultY) ||
     !numbersEqual(element.w, def.defaultW) ||
     !numbersEqual(element.h, def.defaultH);
-}
-
-function isFailedFreeformCleanupLayout(desktop) {
-  const panels = Array.isArray(desktop?.panels) ? desktop.panels : [];
-  const elements = Array.isArray(desktop?.elements) ? desktop.elements : [];
-  if (panels.length === 0 || elements.length === 0) return false;
-
-  const panelById = new Map(panels.map((panel) => [panel?.id, panel]));
-  const compactPanelCount = ["music", "favoriteGame", "about", "badges"]
-    .filter((id) => {
-      const panel = panelById.get(id);
-      return panel?.enabled !== false &&
-        toInt(panel.w, 99) <= 2 &&
-        toInt(panel.h, 99) <= 2;
-    })
-    .length;
-  if (compactPanelCount < 3) return false;
-
-  const elementById = new Map(elements.map((element) => [element?.id, element]));
-  const aboutTitle = elementById.get("aboutTitle");
-  const badgesTitle = elementById.get("badgesTitle");
-  const thoughtsTitle = elementById.get("thoughtsTitle");
-
-  return aboutTitle?.enabled !== false &&
-    badgesTitle?.enabled !== false &&
-    thoughtsTitle?.enabled !== false &&
-    toNumber(aboutTitle.y, 99) < 0.5 &&
-    toNumber(badgesTitle.y, 99) < 0.5 &&
-    toNumber(thoughtsTitle.y, 99) < 3;
 }
 
 function buildRawCompositionElementMap(rawElements) {

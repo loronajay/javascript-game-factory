@@ -145,6 +145,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
   const layoutEl = doc.querySelector(layoutSelector);
   if (!layoutEl) return;
 
+  const layoutHasComposition = hasEnabledComposition(layout);
   const gap = getCssToken("--profile-layout-gap", 14);
   const rowH = getCssToken("--profile-layout-row-height", 80);
   // Column width derived from the live grid element's actual rendered width.
@@ -163,6 +164,15 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     el.style.overflow = "hidden";
     if (panel.id === "hero" && hasHeroComposition(layout)) {
       applyHeroCompositionScaling(el);
+      continue;
+    }
+
+    if (!shouldUsePanelZoomShell(layoutHasComposition, panel)) {
+      unwrapZoomShell(el);
+      el.style.overflow = "";
+      el.style.zoom = "";
+      el.style.width = "";
+      el.style.height = "";
       continue;
     }
 
@@ -214,7 +224,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.justifyContent = "";
     }
 
-    const z = hasEnabledComposition(layout)
+    const z = layoutHasComposition
       ? fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0))
       : 1;
     shell.style.zoom = String(z);
@@ -228,6 +238,10 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
   }
 
   applyCompositionOverlayScaling(layoutEl);
+}
+
+export function shouldUsePanelZoomShell(layoutHasComposition, panel) {
+  return Boolean(layoutHasComposition || panelHasCustomizedChildren(panel));
 }
 
 function getRenderablePanelsForScaling(panels, layoutSelector) {
