@@ -1,6 +1,6 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-default-layout-cleanup-4";
-import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-default-layout-cleanup-4";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-default-layout-cleanup-5";
+import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-default-layout-cleanup-5";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -216,7 +216,6 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = [], { galle
   const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
     if (element?.enabled === false) continue;
-    if (!shouldRenderCompositionOverlay(element)) continue;
     if (element.category === "friendCode" && !isOwnerLayout) continue;
     if (element.type === "playerAction" && isOwnerLayout) continue;
     if (element.id === "thoughtsComposer" && !isOwnerLayout) continue;
@@ -321,26 +320,9 @@ export function getCompositionCategories(elements) {
       element.category !== "custom" &&
       element.category !== "hero" &&
       element.type !== "playerAction" &&
-      element.type !== "title" &&
-      shouldRenderCompositionOverlay(element)
+      element.type !== "title"
     ))
     .map((element) => element.category));
-}
-
-function shouldRenderCompositionOverlay(element) {
-  if (isCustomTitleElement(element)) return true;
-
-  const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element?.id];
-  if (!def) return true;
-
-  if (def.type === "title" && typeof element.text === "string" && element.text !== (def.defaultText || "")) {
-    return true;
-  }
-
-  return !numbersEqual(element.x, def.defaultX) ||
-    !numbersEqual(element.y, def.defaultY) ||
-    !numbersEqual(element.w, def.defaultW) ||
-    !numbersEqual(element.h, def.defaultH);
 }
 
 function renderTitleOverlay(doc, layoutEl, element, text) {
