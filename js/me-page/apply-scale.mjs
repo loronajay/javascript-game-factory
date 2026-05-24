@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY } from "../profile-layout/registry.mjs";
-import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM, panelHasCustomizedChildren } from "./apply-layout.mjs";
+import { ME_PANEL_TO_DOM, PLAYER_PANEL_TO_DOM } from "./apply-layout.mjs";
 
 const ZOOM_SHELL_CLASS = "panel-zoom-shell";
 const CHILD_ZOOM_SHELL_CLASS = "profile-child-zoom-shell";
@@ -145,7 +145,6 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
   const layoutEl = doc.querySelector(layoutSelector);
   if (!layoutEl) return;
 
-  const layoutHasComposition = hasEnabledComposition(layout);
   const gap = getCssToken("--profile-layout-gap", 14);
   const rowH = getCssToken("--profile-layout-row-height", 80);
   // Column width derived from the live grid element's actual rendered width.
@@ -164,15 +163,6 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     el.style.overflow = "hidden";
     if (panel.id === "hero" && hasHeroComposition(layout)) {
       applyHeroCompositionScaling(el);
-      continue;
-    }
-
-    if (!shouldUsePanelZoomShell(layoutHasComposition, panel)) {
-      unwrapZoomShell(el);
-      el.style.overflow = "";
-      el.style.zoom = "";
-      el.style.width = "";
-      el.style.height = "";
       continue;
     }
 
@@ -224,7 +214,7 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
       shell.style.justifyContent = "";
     }
 
-    const z = layoutHasComposition
+    const z = hasEnabledComposition(layout)
       ? fitZoom(Math.max(refW, shell.scrollWidth || 0), Math.max(refH, shell.scrollHeight || 0))
       : 1;
     shell.style.zoom = String(z);
@@ -232,16 +222,12 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     shell.style.width = `${(availableW / z).toFixed(2)}px`;
     shell.style.height = `${(availableH / z).toFixed(2)}px`;
 
-    if (panelHasCustomizedChildren(panel)) {
+    if (Array.isArray(panel.children) && panel.children.length > 0) {
       applyPanelChildScaling(el);
     }
   }
 
   applyCompositionOverlayScaling(layoutEl);
-}
-
-export function shouldUsePanelZoomShell(layoutHasComposition, panel) {
-  return Boolean(layoutHasComposition || panelHasCustomizedChildren(panel));
 }
 
 function getRenderablePanelsForScaling(panels, layoutSelector) {

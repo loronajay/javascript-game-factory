@@ -1,6 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-profile-rollback-3";
-import { PROFILE_PANEL_CHILD_REGISTRY } from "../profile-layout/child-layout.mjs?v=20260524-profile-rollback-3";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260521-friends-freeform-1";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -117,20 +116,17 @@ export function comparePanelsByFreeformPosition(a, b) {
 
 function applyPanelChildLayout(panelEl, panel) {
   if (!Array.isArray(panel?.children)) return;
-  const hasCustomLayout = panelHasCustomizedChildren(panel);
 
   for (const child of panel.children) {
     if (!child?.id || child.enabled === false) continue;
     const childEl = findPanelLayoutChild(panelEl, child.id);
     if (!childEl) continue;
-    if (hasCustomLayout) {
-      childEl.style.gridColumn = "";
-      childEl.style.gridRow = "";
-      childEl.style.left = `${child.x}%`;
-      childEl.style.top = `${child.y}%`;
-      childEl.style.width = `${child.w}%`;
-      childEl.style.height = `${child.h}%`;
-    }
+    childEl.style.gridColumn = "";
+    childEl.style.gridRow = "";
+    childEl.style.left = `${child.x}%`;
+    childEl.style.top = `${child.y}%`;
+    childEl.style.width = `${child.w}%`;
+    childEl.style.height = `${child.h}%`;
     applyPanelVisualStyle(childEl, child.style);
   }
 }
@@ -139,23 +135,6 @@ function findPanelLayoutChild(panelEl, childId) {
   const all = [...panelEl.querySelectorAll(`[data-profile-child-id="${childId}"]`)];
   if (all.length === 0) return null;
   return all.find((childEl) => childEl.parentElement === panelEl) || null;
-}
-
-export function panelHasCustomizedChildren(panel) {
-  const registry = PROFILE_PANEL_CHILD_REGISTRY[panel?.id];
-  if (!registry || !Array.isArray(panel?.children)) return false;
-
-  return panel.children.some((child) => {
-    if (!child?.id) return false;
-    const def = registry.children?.[child.id];
-    if (!def) return false;
-
-    return child.enabled === false ||
-      !numbersEqual(child.x, def.defaultX) ||
-      !numbersEqual(child.y, def.defaultY) ||
-      !numbersEqual(child.w, def.defaultW) ||
-      !numbersEqual(child.h, def.defaultH);
-  });
 }
 
 function applyHeroCompositionLayout(doc, heroEl, elements) {
@@ -216,7 +195,6 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = [], { galle
   const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
     if (element?.enabled === false) continue;
-    if (!shouldRenderCompositionOverlay(element)) continue;
     if (element.category === "friendCode" && !isOwnerLayout) continue;
     if (element.type === "playerAction" && isOwnerLayout) continue;
     if (element.id === "thoughtsComposer" && !isOwnerLayout) continue;
@@ -320,27 +298,9 @@ export function getCompositionCategories(elements) {
       element.category &&
       element.category !== "custom" &&
       element.category !== "hero" &&
-      element.type !== "playerAction" &&
-      element.type !== "title" &&
-      shouldRenderCompositionOverlay(element)
+      element.type !== "playerAction"
     ))
     .map((element) => element.category));
-}
-
-function shouldRenderCompositionOverlay(element) {
-  if (isCustomTitleElement(element)) return true;
-
-  const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element?.id];
-  if (!def) return true;
-
-  if (def.type === "title" && typeof element.text === "string" && element.text !== (def.defaultText || "")) {
-    return true;
-  }
-
-  return !numbersEqual(element.x, def.defaultX) ||
-    !numbersEqual(element.y, def.defaultY) ||
-    !numbersEqual(element.w, def.defaultW) ||
-    !numbersEqual(element.h, def.defaultH);
 }
 
 function renderTitleOverlay(doc, layoutEl, element, text) {

@@ -1,17 +1,17 @@
 import { bindFactoryProfileToSession } from "../platform/identity/factory-profile.mjs";
 import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
-import { renderMePage } from "./render.mjs?v=20260524-profile-rollback-3";
-import { wireMePage } from "./wire.mjs?v=20260524-profile-rollback-3";
+import { renderMePage } from "./render.mjs?v=20260521-gallery-photo-defaults-1";
+import { wireMePage } from "./wire.mjs?v=20260521-gallery-photo-defaults-1";
 import { addFriendByCode } from "./friend-code-actions.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
 import { buildAppUrl } from "../arcade-paths.mjs";
-import { fetchLayout } from "../profile-layout/layout-storage.mjs?v=20260524-profile-rollback-3";
-import { getDefaultLayout } from "../profile-layout/default-layout.mjs?v=20260524-profile-rollback-3";
-import { normalizeLayout } from "../profile-layout/normalize-layout.mjs?v=20260524-profile-rollback-3";
-import { applyMeLayout } from "./apply-layout.mjs?v=20260524-profile-rollback-3";
-import { applyMeScaling } from "./apply-scale.mjs?v=20260524-profile-rollback-3";
+import { fetchLayout } from "../profile-layout/layout-storage.mjs?v=20260521-friends-freeform-1";
+import { getDefaultLayout } from "../profile-layout/default-layout.mjs?v=20260521-friends-freeform-1";
+import { normalizeLayout } from "../profile-layout/normalize-layout.mjs?v=20260521-friends-freeform-1";
+import { applyMeLayout } from "./apply-layout.mjs?v=20260521-friends-freeform-1";
+import { applyMeScaling } from "./apply-scale.mjs?v=20260521-friends-freeform-1";
 
 const doc = globalThis.document;
 

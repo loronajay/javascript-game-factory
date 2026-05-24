@@ -15,12 +15,12 @@ import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { loadThoughtFeed } from "../platform/thoughts/thoughts.mjs";
 import { renderPlayerPageView } from "./render.mjs";
-import { wirePlayerPage } from "./wire.mjs?v=20260524-profile-rollback-3";
+import { wirePlayerPage } from "./wire.mjs?v=20260521-friends-freeform-1";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
-import { getPlayerDefaultLayout } from "../profile-layout/default-layout.mjs?v=20260524-profile-rollback-3";
-import { normalizeLayout } from "../profile-layout/normalize-layout.mjs?v=20260524-profile-rollback-3";
-import { applyPlayerLayout } from "../me-page/apply-layout.mjs?v=20260524-profile-rollback-3";
-import { applyPlayerScaling } from "../me-page/apply-scale.mjs?v=20260524-profile-rollback-3";
+import { getPlayerDefaultLayout } from "../profile-layout/default-layout.mjs?v=20260521-friends-freeform-1";
+import { normalizeLayout } from "../profile-layout/normalize-layout.mjs?v=20260521-friends-freeform-1";
+import { applyPlayerLayout } from "../me-page/apply-layout.mjs?v=20260521-friends-freeform-1";
+import { applyPlayerScaling } from "../me-page/apply-scale.mjs?v=20260521-friends-freeform-1";
 
 export { loadPlayerPageData, loadRequestedPlayerProfile } from "./loader.mjs";
 export { buildPlayerPageViewModel } from "./view-model.mjs";
