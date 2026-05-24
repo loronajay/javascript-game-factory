@@ -1,4 +1,4 @@
-import { LAYOUT_COLUMNS } from "./default-layout.mjs?v=20260524-default-layout-cleanup-3";
+import { LAYOUT_COLUMNS } from "./default-layout.mjs?v=20260524-default-layout-cleanup-4";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 
 // Reads the shared CSS tokens so the editor and live page always snap to the same grid.
