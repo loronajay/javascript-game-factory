@@ -205,10 +205,11 @@ function animBeam(fromEl, toEl, options = {}) {
 //   count     int        number of particles (default 8)
 //   spread    px         max radius of burst (default 55)
 //   duration  ms         (default 420)
-//   size      px         particle diameter (default 6)
+//   size      px         particle diameter / font-size (default 6)
 //   color     css color  (default '#ffffff')
 //   direction 'up'|'down'|'all'  bias (default 'all')
 //   glow      bool       adds a radial glow per particle (default false)
+//   content   string     if set, render this text/emoji as the particle instead of a colored dot
 
 function animParticleBurst(originEl, options = {}) {
   const overlay = getAnimOverlay();
@@ -220,6 +221,7 @@ function animParticleBurst(originEl, options = {}) {
   const duration = options.duration ?? 420;
   const size     = options.size     ?? 6;
   const color    = options.color    ?? '#ffffff';
+  const content  = options.content  ?? null;
 
   // Direction bias: limit angle range
   let angleMin = 0, angleMax = Math.PI * 2;
@@ -236,20 +238,36 @@ function animParticleBurst(originEl, options = {}) {
     const el = document.createElement('div');
     el.className = 'anim-particle';
 
-    const glow = options.glow
-      ? `box-shadow: 0 0 ${size * 2}px ${color};`
-      : '';
-
-    el.style.cssText = `
-      left: ${center.x}px;
-      top:  ${center.y}px;
-      width: ${size}px;
-      height: ${size}px;
-      background: ${color};
-      ${glow}
-      transform: translate(-50%, -50%);
-      transition: transform ${duration}ms ease-out, opacity ${duration * 0.9}ms ease-out;
-    `;
+    if (content) {
+      el.textContent = content;
+      const glow = options.glow ? `text-shadow: 0 0 ${size}px ${color};` : '';
+      el.style.cssText = `
+        left: ${center.x}px;
+        top:  ${center.y}px;
+        width: auto;
+        height: auto;
+        background: transparent;
+        font-size: ${size}px;
+        line-height: 1;
+        color: ${color};
+        user-select: none;
+        ${glow}
+        transform: translate(-50%, -50%);
+        transition: transform ${duration}ms ease-out, opacity ${duration * 0.9}ms ease-out;
+      `;
+    } else {
+      const glow = options.glow ? `box-shadow: 0 0 ${size * 2}px ${color};` : '';
+      el.style.cssText = `
+        left: ${center.x}px;
+        top:  ${center.y}px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        ${glow}
+        transform: translate(-50%, -50%);
+        transition: transform ${duration}ms ease-out, opacity ${duration * 0.9}ms ease-out;
+      `;
+    }
 
     overlay.appendChild(el);
     particles.push({ el, dx, dy });
@@ -420,6 +438,7 @@ function animParticleStream(originEl, options = {}) {
     direction: options.direction ?? 'up',
     size:      options.size      ?? 4,
     glow:      options.glow      ?? false,
+    content:   options.content,
     duration:  Math.min(interval * 3, 300),
   };
 

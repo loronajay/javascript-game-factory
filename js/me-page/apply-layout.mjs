@@ -215,6 +215,7 @@ function renderCompositionOverlays(doc, layoutEl, elements, panels = [], { galle
   const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
     if (element?.enabled === false) continue;
+    if (!shouldRenderCompositionOverlay(element)) continue;
     if (element.category === "friendCode" && !isOwnerLayout) continue;
     if (element.type === "playerAction" && isOwnerLayout) continue;
     if (element.id === "thoughtsComposer" && !isOwnerLayout) continue;
@@ -318,9 +319,30 @@ export function getCompositionCategories(elements) {
       element.category &&
       element.category !== "custom" &&
       element.category !== "hero" &&
-      element.type !== "playerAction"
+      element.type !== "playerAction" &&
+      element.type !== "title" &&
+      shouldRenderCompositionOverlay(element)
     ))
     .map((element) => element.category));
+}
+
+function shouldRenderCompositionOverlay(element) {
+  if (isCustomTitleElement(element)) return true;
+
+  const def = PROFILE_COMPOSITION_ELEMENT_REGISTRY[element?.id];
+  if (!def) return true;
+
+  const defaultEnabled = def.defaultEnabled !== false;
+  if ((element.enabled ?? defaultEnabled) !== defaultEnabled) return true;
+
+  if (def.type === "title" && typeof element.text === "string" && element.text !== (def.defaultText || "")) {
+    return true;
+  }
+
+  return !numbersEqual(element.x, def.defaultX) ||
+    !numbersEqual(element.y, def.defaultY) ||
+    !numbersEqual(element.w, def.defaultW) ||
+    !numbersEqual(element.h, def.defaultH);
 }
 
 function renderTitleOverlay(doc, layoutEl, element, text) {

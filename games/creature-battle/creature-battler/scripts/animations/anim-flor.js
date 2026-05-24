@@ -55,6 +55,7 @@ registerMoveAnimations({
       { at:440, type:'preset',          id:'gaia_hit_flash_heavy' },
       { at:440, type:'screen_shake',    intensity:6, duration:280, style:'stutter' },
       { at:440, type:'hit_stop',        duration:55 },
+      { at:440, type:'particle_burst',  origin:'target', color:'#44cc44', count:6, spread:50, direction:'all', duration:500, content:'🍃' },
       { at:495, type:'shockwave',       origin:'target', size:70, color:'#228822', opacity:0.65, thickness:4 },
       { at:495, type:'creature_tint',   target:'target', color:'#224411', blend:'multiply', opacity:0.22, duration:360 },
     ],
@@ -62,7 +63,7 @@ registerMoveAnimations({
 
   // ── thorn_bind ─────────────────────────────────────────────────────────────
   // Damage + DEF down. Identity: vine entanglement lingers on target as proof
-  // the bind landed — dark green particle_stream + multiply tint + status ring.
+  // the bind landed — leaf particles + multiply tint + status ring.
   thorn_bind: {
     timeline: [
       { at:0,   type:'particle_stream', origin:'actor',  color:'#558833', count:3, interval:85, direction:'up', duration:160 },
@@ -73,9 +74,9 @@ registerMoveAnimations({
       { at:360, type:'impact' },
       { at:360, type:'sound',           id:'hit-heavy' },
       { at:360, type:'creature_anim',   target:'target', class:'anim-hit-gaia-heavy' },
-      { at:360, type:'particle_burst',  origin:'target', color:'#336622', count:8, spread:45, direction:'all', duration:500 },
+      { at:360, type:'particle_burst',  origin:'target', color:'#336622', count:10, spread:50, direction:'all', duration:540, content:'🍃' },
       { at:360, type:'preset',          id:'gaia_hit_flash_light' },
-      { at:360, type:'particle_stream', origin:'target', color:'#336622', count:3, interval:90, direction:'all', spread:40, duration:520 },
+      { at:360, type:'particle_stream', origin:'target', color:'#336622', count:3, interval:90, direction:'all', spread:40, duration:520, content:'🍃' },
       { at:360, type:'creature_tint',   target:'target', color:'#224411', blend:'multiply', opacity:0.28, duration:560 },
       { at:360, type:'status_ring',     target:'target', color:'#558833', duration:700 },
     ],
@@ -83,7 +84,7 @@ registerMoveAnimations({
 
   // ── root_snare ─────────────────────────────────────────────────────────────
   // Damage + SPD down. Beam delivery — roots erupt UP from under the target.
-  // Identity: upward particle_stream at target + slow green multiply tint.
+  // Identity: upward leaf particles erupting at target + slow green multiply tint.
   root_snare: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
@@ -94,30 +95,30 @@ registerMoveAnimations({
       { at:290, type:'impact' },
       { at:290, type:'sound',           id:'hit-heavy' },
       { at:290, type:'creature_anim',   target:'target', class:'anim-hit-root-snare' },
-      { at:290, type:'particle_burst',  origin:'target', color:'#336611', count:10, spread:45, direction:'up', duration:520 },
+      { at:290, type:'particle_burst',  origin:'target', color:'#447722', count:12, spread:50, direction:'up', duration:560, content:'🍃' },
       { at:290, type:'preset',          id:'gaia_hit_flash_light' },
-      { at:290, type:'particle_stream', origin:'target', color:'#447722', count:3, interval:95, direction:'up', duration:580 },
+      { at:290, type:'particle_stream', origin:'target', color:'#447722', count:3, interval:95, direction:'up', duration:580, content:'🍃' },
       { at:290, type:'creature_tint',   target:'target', color:'#224411', blend:'multiply', opacity:0.30, duration:600 },
       { at:290, type:'status_ring',     target:'target', color:'#447722', duration:700 },
     ],
   },
 
   // ── petal_mend ─────────────────────────────────────────────────────────────
-  // All-ally heal. Petals float upward from actor; wave_sweep carries the bloom.
+  // All-ally heal. Flower petals float upward from actor; wave_sweep carries the bloom.
   // targetSlot is null (all_allies) — no creature target animations.
   petal_mend: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-petal-mend' },
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#88ee88', count:3, interval:80, direction:'up', spread:45, duration:300 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#88ee88', count:3, interval:80, direction:'up', spread:45, duration:300, content:'✿', size:10 },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#66dd66', blend:'screen', opacity:0.22, duration:480 },
       { at:0,   type:'preset',          id:'gaia_cast_aura', direction:'all', spread:42 },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#88ee88', count:10, spread:55, direction:'all', duration:600 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#88ee88', count:8, spread:55, direction:'all', duration:600, content:'✿', size:12 },
       { at:300, type:'impact' },
       { at:300, type:'sound',           id:'beam-light' },
       { at:300, type:'field_flash',     color:'#44cc44', opacity:0.18, duration:240 },
       { at:300, type:'wave_sweep',      color:'#88ee88', opacity:0.45, duration:380 },
-      { at:300, type:'particle_burst',  origin:'actor',  color:'#aaffaa', count:8, spread:70, direction:'up', duration:560 },
+      { at:300, type:'particle_burst',  origin:'actor',  color:'#aaffaa', count:10, spread:70, direction:'up', duration:600, content:'✿', size:14 },
       { at:300, type:'status_ring',     target:'actor',  color:'#66ee66', duration:600 },
     ],
   },
@@ -128,15 +129,15 @@ registerMoveAnimations({
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-petal-mend-2' },
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#77dd77', count:4, interval:72, direction:'up', spread:50, duration:380 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#77dd77', count:4, interval:72, direction:'up', spread:50, duration:380, content:'✿', size:11 },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#55cc55', blend:'screen', opacity:0.28, duration:560 },
       { at:0,   type:'preset',          id:'gaia_cast_aura', count:9, direction:'all', spread:48 },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#77dd77', count:14, spread:65, direction:'all', duration:680 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#77dd77', count:12, spread:65, direction:'all', duration:680, content:'✿', size:12 },
       { at:340, type:'impact' },
       { at:340, type:'sound',           id:'beam-light' },
       { at:340, type:'field_flash',     color:'#33bb33', opacity:0.24, duration:280 },
       { at:340, type:'wave_sweep',      color:'#77dd77', opacity:0.55, duration:420 },
-      { at:340, type:'particle_burst',  origin:'actor',  color:'#99ffaa', count:12, spread:80, direction:'up', duration:640 },
+      { at:340, type:'particle_burst',  origin:'actor',  color:'#99ffaa', count:14, spread:80, direction:'up', duration:660, content:'✿', size:14 },
       { at:340, type:'status_ring',     target:'actor',  color:'#55ee55', duration:700 },
     ],
   },
@@ -147,15 +148,15 @@ registerMoveAnimations({
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-petal-mend-3' },
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#66dd66', count:5, interval:65, direction:'up', spread:55, duration:440, glow:true },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#66dd66', count:5, interval:60, direction:'up', spread:55, duration:440, content:'✿', size:13, glow:true },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#44cc44', blend:'screen', opacity:0.35, duration:640 },
       { at:0,   type:'preset',          id:'gaia_cast_aura', count:12, direction:'all', spread:55 },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#66dd66', count:18, spread:75, direction:'all', duration:780 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#66dd66', count:16, spread:75, direction:'all', duration:780, content:'✿', size:13 },
       { at:380, type:'impact' },
       { at:380, type:'sound',           id:'beam-light' },
       { at:380, type:'field_flash',     color:'#22aa22', opacity:0.30, duration:320 },
       { at:380, type:'wave_sweep',      color:'#66dd66', opacity:0.65, duration:460 },
-      { at:380, type:'particle_burst',  origin:'actor',  color:'#bbffbb', count:16, spread:90, direction:'up', duration:720 },
+      { at:380, type:'particle_burst',  origin:'actor',  color:'#bbffbb', count:18, spread:90, direction:'up', duration:740, content:'✿', size:15, glow:true },
       { at:380, type:'status_ring',     target:'actor',  color:'#44ee44', duration:800 },
       { at:480, type:'field_flash',     color:'#004400', opacity:0.12, duration:200 },
     ],
@@ -163,19 +164,19 @@ registerMoveAnimations({
 
   // ── verdant_guard ──────────────────────────────────────────────────────────
   // Utility (SPI buff, single ally). Bark-wrap pulse radiates to the target.
-  // Identity: green particle_stream lingers on target + teal screen tint + status ring.
+  // Identity: leaf particle_stream lingers on target + teal screen tint + status ring.
   verdant_guard: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-verdant-guard' },
       { at:0,   type:'preset',          id:'gaia_cast_aura', direction:'all', spread:36 },
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#55bb55', count:2, interval:100, direction:'up', duration:280 },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#55bb55', count:6, spread:32, direction:'up', duration:480 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#55bb55', count:2, interval:100, direction:'up', duration:280, content:'🍃', size:12 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#55bb55', count:6, spread:32, direction:'up', duration:480, content:'🍃', size:12 },
       { at:300, type:'impact' },
       { at:300, type:'sound',           id:'beam-light' },
       { at:300, type:'creature_anim',   target:'target', class:'anim-hit-petal-heal' },
       { at:300, type:'field_flash',     color:'#226622', opacity:0.16, duration:220 },
-      { at:300, type:'particle_stream', origin:'target', color:'#77dd77', count:3, interval:85, direction:'up', duration:480 },
+      { at:300, type:'particle_stream', origin:'target', color:'#77dd77', count:3, interval:85, direction:'up', duration:480, content:'🍃', size:12 },
       { at:300, type:'creature_tint',   target:'target', color:'#55bb55', blend:'screen', opacity:0.22, duration:520 },
       { at:300, type:'status_ring',     target:'target', color:'#66cc66', duration:700 },
     ],
@@ -184,7 +185,7 @@ registerMoveAnimations({
   // ── toxic_spores ───────────────────────────────────────────────────────────
   // Utility (permanent poison). Sickly yellow-green spore cloud drifts to target.
   // Identity: multiply toxic tint settles on target + lingering spore particle_stream
-  // + poison status ring.
+  // + poison status ring. Spores are dots (no symbol — blobs feel more biological).
   toxic_spores: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
@@ -210,10 +211,10 @@ registerMoveAnimations({
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-bloom-surge' },
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#aaff77', count:4, interval:72, direction:'up', spread:38, duration:360 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#aaff77', count:4, interval:72, direction:'up', spread:38, duration:360, content:'✿', size:12 },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#88ff44', blend:'screen', opacity:0.30, duration:560 },
       { at:0,   type:'preset',          id:'gaia_cast_aura', count:8, direction:'all', spread:42 },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#aaff77', count:8, spread:40, direction:'up', duration:560 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#aaff77', count:10, spread:45, direction:'all', duration:580, content:'✿', size:13 },
       { at:340, type:'impact' },
       { at:340, type:'field_flash',     color:'#228844', opacity:0.16, duration:220 },
       { at:340, type:'status_ring',     target:'actor',  color:'#aaff44', duration:700 },
@@ -224,6 +225,7 @@ registerMoveAnimations({
   // ── cleanse ────────────────────────────────────────────────────────────────
   // Utility (remove ally status). Teal-green beam washes status off the target.
   // Identity: teal screen-blend tint on target + bright status ring = clean slate.
+  // No flower symbols here — cleanse reads as "washing away", not blooming.
   cleanse: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
@@ -245,6 +247,7 @@ registerMoveAnimations({
   // ── pollen_veil ────────────────────────────────────────────────────────────
   // Utility (silence). Yellow-green pollen oval drifts to target, muffles Arts.
   // Identity: multiply golden-green tint settles on target + dull status ring.
+  // Dot particles here — pollen is fine particulate, not petals.
   pollen_veil: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
@@ -266,20 +269,20 @@ registerMoveAnimations({
   // ── natures_ward ───────────────────────────────────────────────────────────
   // Utility (SPI buff, all allies). Forest aura radiates from actor outward.
   // targetSlot is null (all_allies) — actor-origin effects only.
-  // Identity: wave_sweep carries the ward energy to all allies + status ring.
+  // Identity: wave_sweep carries the ward + leaf particles shower down from above.
   natures_ward: {
     timeline: [
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-natures-ward' },
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#88ee88', count:4, interval:72, direction:'up', spread:50, duration:400 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#88ee88', count:4, interval:72, direction:'up', spread:50, duration:400, content:'🍃', size:12 },
       { at:0,   type:'creature_tint',   target:'actor',  color:'#44cc44', blend:'screen', opacity:0.28, duration:580 },
       { at:0,   type:'preset',          id:'gaia_cast_aura', count:10, direction:'all', spread:50 },
-      { at:0,   type:'particle_burst',  origin:'actor',  color:'#88ee88', count:10, spread:55, direction:'up', duration:620 },
+      { at:0,   type:'particle_burst',  origin:'actor',  color:'#88ee88', count:12, spread:60, direction:'all', duration:640, content:'🍃', size:12 },
       { at:360, type:'impact' },
       { at:360, type:'sound',           id:'beam-light' },
       { at:360, type:'field_flash',     color:'#335533', opacity:0.18, duration:240 },
       { at:360, type:'wave_sweep',      color:'#88ee88', opacity:0.50, duration:420 },
-      { at:360, type:'particle_burst',  origin:'actor',  color:'#aaffaa', count:8, spread:65, direction:'all', duration:540 },
+      { at:360, type:'particle_burst',  origin:'actor',  color:'#aaffaa', count:10, spread:70, direction:'all', duration:560, content:'🍃', size:12 },
       { at:360, type:'status_ring',     target:'actor',  color:'#66ee66', duration:750 },
     ],
   },
@@ -291,7 +294,7 @@ registerMoveAnimations({
     timeline: [
       { at:0,   type:'sound',           id:'charge-light', repeat:3, interval:220 },
       { at:0,   type:'creature_anim',   target:'actor',    class:'anim-cast-world-tree-charge' },
-      { at:0,   type:'particle_stream', origin:'actor',    color:'#66dd66', count:5, interval:65, direction:'up', spread:50, duration:480, glow:true },
+      { at:0,   type:'particle_stream', origin:'actor',    color:'#66dd66', count:5, interval:62, direction:'up', spread:50, duration:480, content:'🍃', size:13, glow:true },
       { at:0,   type:'creature_tint',   target:'actor',    color:'#33bb33', blend:'screen', opacity:0.40, duration:640 },
       { at:0,   type:'preset',          id:'gaia_cast_aura', count:12, spread:55, direction:'all' },
       { at:480, type:'sound',           id:'beam-light' },
@@ -302,9 +305,9 @@ registerMoveAnimations({
       { at:820, type:'screen_shake',    intensity:7, duration:340, style:'stutter' },
       { at:820, type:'hit_stop',        duration:80 },
       { at:900, type:'shockwave',       origin:'actor', size:140, color:'#228833', opacity:0.75, thickness:6 },
-      { at:900, type:'particle_stream', origin:'actor',    color:'#44dd44', count:4, interval:80, direction:'all', spread:55, duration:380 },
+      { at:900, type:'particle_stream', origin:'actor',    color:'#44dd44', count:4, interval:80, direction:'all', spread:55, duration:380, content:'🍃', size:12 },
       { at:900, type:'preset',          id:'gaia_particle_heavy', origin:'actor' },
-      { at:960, type:'particle_burst',  origin:'actor',    color:'#aaffaa', count:16, spread:80, direction:'up', duration:700 },
+      { at:960, type:'particle_burst',  origin:'actor',    color:'#aaffaa', count:16, spread:80, direction:'up', duration:700, content:'✿', size:14, glow:true },
       { at:980, type:'wave_sweep',      color:'#88ee88', opacity:0.65, duration:480 },
       { at:1020, type:'field_flash',    color:'#002200', opacity:0.14, duration:280 },
       { at:1060, type:'shockwave',      origin:'actor', size:80, color:'#66ff66', opacity:0.50, thickness:4 },
