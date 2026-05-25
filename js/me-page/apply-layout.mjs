@@ -1,5 +1,5 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
-import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-gallery-photo-fix-1";
+import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs?v=20260524-gallery-photo-fix-2";
 
 export const ME_PANEL_TO_DOM = {
   hero: "meHeroCard",
@@ -429,11 +429,11 @@ function renderGalleryPhotoOverlay(doc, layoutEl, element, panels, galleryPhotos
   const sourceItems = doc.querySelectorAll("#meGalleryPanel .gallery-item, #playerGalleryPanel .gallery-item");
   const source = Number.isInteger(index) ? sourceItems[index] : null;
   const photo = Array.isArray(galleryPhotos) && Number.isInteger(index) ? galleryPhotos[index] : null;
-  const photoEl = source?.cloneNode(true) || doc.createElement("div");
+  const photoEl = doc.createElement("div");
   photoEl.classList.add("profile-composition-overlay", "profile-composition-overlay--gallery-photo", "gallery-item");
   photoEl.dataset.profileCompositionOverlay = element.id;
   photoEl.dataset.profileChildId = element.id;
-  if (photo && !source) {
+  if (photo) {
     photoEl.dataset.photoId = photo.id || "";
     photoEl.innerHTML = `
       <div class="gallery-item__img-frame">
@@ -441,7 +441,10 @@ function renderGalleryPhotoOverlay(doc, layoutEl, element, panels, galleryPhotos
       </div>
       ${photo.caption ? `<p class="gallery-item__caption">${escapeHtml(photo.caption)}</p>` : ""}
     `;
-  } else if (!source) {
+  } else if (source) {
+    photoEl.innerHTML = source.innerHTML;
+    if (source.dataset.photoId) photoEl.dataset.photoId = source.dataset.photoId;
+  } else {
     photoEl.innerHTML = `<div class="gallery-item__img-frame"></div><p class="gallery-item__caption">Photo ${index + 1}</p>`;
   }
   applyCompositionOverlayRect(photoEl, element);
