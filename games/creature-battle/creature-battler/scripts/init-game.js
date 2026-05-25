@@ -2,6 +2,22 @@ function scaleCanvas() {
   const shell  = document.getElementById('game-shell');
   const canvas = document.getElementById('game-canvas');
   const W = 960, H = 540;
+  const useMobileLayout = shell.clientWidth < 720 || (window.matchMedia && window.matchMedia('(pointer: coarse) and (max-width: 900px)').matches);
+
+  canvas.classList.toggle('mobile-layout', useMobileLayout);
+
+  if (useMobileLayout) {
+    canvas.style.transform = 'none';
+    canvas.style.left = '0px';
+    canvas.style.top = '0px';
+    canvas.style.width = `${shell.clientWidth}px`;
+    canvas.style.height = `${shell.clientHeight}px`;
+    canvas.style.position = 'absolute';
+    return;
+  }
+
+  canvas.style.width = `${W}px`;
+  canvas.style.height = `${H}px`;
   const scaleX = shell.clientWidth  / W;
   const scaleY = shell.clientHeight / H;
   const scale  = Math.min(scaleX, scaleY);

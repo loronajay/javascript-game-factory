@@ -117,7 +117,10 @@
           '<div class="stats-section-label" style="margin-top:18px">Status Effects</div>' +
           '<div class="eg-status-list">' + statusRows + '</div>' +
         '</div>' +
-        '<div class="guide-popup-footer">F &middot; ESC &mdash; Close</div>' +
+        '<div class="guide-popup-footer">' +
+          renderControlHint('F &middot; ESC &mdash; Close', 'Tap outside or close') +
+          '<button class="touch-popup-close" type="button" id="guide-popup-close">Close</button>' +
+        '</div>' +
       '</div>';
 
     popup.addEventListener('click', function(e) {
@@ -126,5 +129,9 @@
 
     var screen = document.getElementById(screenId);
     if (screen) screen.appendChild(popup);
+    document.getElementById('guide-popup-close')?.addEventListener('click', function() {
+      playClick();
+      window.hideElementGuide();
+    });
   };
 }());

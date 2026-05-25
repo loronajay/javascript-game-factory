@@ -20,7 +20,11 @@ function renderModeSelect() {
         </div>
       `).join('')}
     </div>
-    <div class="mode-select-hint">↑↓ Navigate · Space to Select · F Guide · Esc back</div>
+    <div class="mode-select-hint">${renderControlHint('↑↓ Navigate · Space to Select · F Guide · Esc back', 'Tap a mode to play')}</div>
+    ${renderTouchActionBar([
+      { id: 'guide', label: 'Guide' },
+      { id: 'back', label: 'Back' },
+    ])}
   `;
 
   el.querySelectorAll('.mode-card:not(.disabled)').forEach(card => {
@@ -29,6 +33,11 @@ function renderModeSelect() {
       state.modeSelectIndex = parseInt(card.dataset.index, 10);
       handleModeConfirm();
     });
+  });
+
+  bindTouchActionBar(el, {
+    guide() { playClick(); showElementGuide('screen-mode-select'); },
+    back() { playClick(); setScreen('title'); },
   });
 }
 

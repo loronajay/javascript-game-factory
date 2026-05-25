@@ -53,7 +53,7 @@ function renderTeamSelect() {
       </div>
     </div>
     <div class="team-select-footer">
-      <div class="team-select-hint">↑↓←→ Navigate · Space pick/unpick · R stats · F guide · Esc back</div>
+      <div class="team-select-hint">${renderControlHint('↑↓←→ Navigate · Space pick/unpick · R stats · F guide · Esc back', 'Tap cards to pick. Use Stats for the focused creature.')}</div>
       <div class="team-select-count">${currentTeam.length} / 3</div>
     </div>
     ${currentTeam.length === 3 ? `
@@ -63,6 +63,12 @@ function renderTeamSelect() {
         </button>
       </div>
     ` : ''}
+    ${renderTouchActionBar([
+      { id: 'stats', label: 'Stats' },
+      { id: 'guide', label: 'Guide' },
+      { id: 'back', label: 'Back' },
+      ...(currentTeam.length === 3 ? [{ id: 'confirm', label: isPlayer ? 'Next' : 'Battle', primary: true }] : []),
+    ])}
   `;
 
   const rosterGrid = el.querySelector('.roster-grid');
@@ -78,6 +84,23 @@ function renderTeamSelect() {
 
   const confirmBtn = el.querySelector('#ts-confirm-btn');
   if (confirmBtn) confirmBtn.addEventListener('click', () => { playClick(); confirmTeamSelectPhase(); });
+
+  bindTouchActionBar(el, {
+    stats() { playClick(); showCreatureStats(); },
+    guide() { playClick(); showElementGuide('screen-team-select'); },
+    back() {
+      playClick();
+      if (state.teamSelectPhase === 'opponent') {
+        state.teamSelectPhase = 'player';
+        state.opponentTeam = [];
+        state.teamSelectFocusIndex = 0;
+        renderTeamSelect();
+      } else {
+        setScreen('battle-config');
+      }
+    },
+    confirm() { playClick(); confirmTeamSelectPhase(); },
+  });
 }
 
 registerRenderer('team-select', renderTeamSelect);
@@ -200,11 +223,15 @@ function showCreatureStats(indexOverride, levelOverride, screenIdOverride) {
         </div>
         ${sectionHTML('Arts', arts)}
       </div>
-      <div class="stats-popup-footer">R · ESC — Close</div>
+      <div class="stats-popup-footer">
+        ${renderControlHint('R · ESC — Close', 'Tap outside or close')}
+        <button class="touch-popup-close" type="button" id="stats-popup-close">Close</button>
+      </div>
     </div>`;
 
   popup.addEventListener('click', e => {
     if (e.target === popup) { playClick(); hideCreatureStats(); }
   });
   document.getElementById(screenIdOverride ?? 'screen-team-select').appendChild(popup);
+  document.getElementById('stats-popup-close')?.addEventListener('click', () => { playClick(); hideCreatureStats(); });
 }

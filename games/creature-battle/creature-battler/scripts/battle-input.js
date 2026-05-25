@@ -589,7 +589,11 @@ function renderBattleCommandPanel() {
   _hideCBTooltip();
 
   if (!inputState.active) {
-    el.innerHTML = `<div class="battle-cmd-announcement" onclick="playClick();advancePlayback()">${inputState.logMessage}</div>`;
+    el.innerHTML = `
+      <div class="battle-cmd-announcement" onclick="playClick();advancePlayback()">
+        <span>${inputState.logMessage}</span>
+        <span class="battle-tap-advance">Tap to continue</span>
+      </div>`;
     return;
   }
 
@@ -606,10 +610,14 @@ function renderBattleCommandPanel() {
             <span class="command-icon">${c.icon}</span>
             <span class="command-label">${c.label}</span>
           </div>`).join('')}
-      </div>`;
+      </div>
+      ${renderTouchActionBar(inputState.queueIndex > 0 ? [{ id: 'undo', label: 'Undo' }] : [])}`;
     el.querySelectorAll('.command-btn:not(.disabled)').forEach(btn =>
       btn.addEventListener('click', () => { playClick(); inputState.focusedCommand = +btn.dataset.cmd; confirmCommand(); })
     );
+    bindTouchActionBar(el, {
+      undo() { playClick(); undoLast(); },
+    });
 
   } else if (inputState.phase === 'art_menu') {
     const gridArts = getGridArts(creature);
@@ -632,13 +640,17 @@ function renderBattleCommandPanel() {
             </div>
           </div>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${renderTouchActionBar([{ id: 'back', label: 'Back' }])}`;
     el.querySelectorAll('.art-btn').forEach(btn =>
       btn.addEventListener('click', () => { playClick(); inputState.focusedArt = +btn.dataset.art; confirmArt(); })
     );
     el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
     document.getElementById('art-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
     _wireCBTooltips(el);
+    bindTouchActionBar(el, {
+      back() { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); },
+    });
 
   } else if (inputState.phase === 'skill_menu') {
     const gridSkills = getGridSkills(creature);
@@ -657,13 +669,17 @@ function renderBattleCommandPanel() {
             </div>
           </div>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${renderTouchActionBar([{ id: 'back', label: 'Back' }])}`;
     el.querySelectorAll('.art-btn').forEach(btn =>
       btn.addEventListener('click', () => { playClick(); inputState.focusedSkill = +btn.dataset.skill; confirmSkill(); })
     );
     el.querySelector('.art-btn.focused')?.scrollIntoView({ block: 'nearest' });
     document.getElementById('skill-back')?.addEventListener('click', () => { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); });
     _wireCBTooltips(el);
+    bindTouchActionBar(el, {
+      back() { playClick(); inputState.phase = 'command'; renderBattleCommandPanel(); },
+    });
 
   } else if (inputState.phase === 'target_select') {
     const side     = inputState.pendingTargetSide;
@@ -693,7 +709,8 @@ function renderBattleCommandPanel() {
               </div>
             </div>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${renderTouchActionBar([{ id: 'back', label: 'Back' }])}`;
     el.querySelectorAll('.target-btn').forEach(btn =>
       btn.addEventListener('click', () => { playClick(); inputState.focusedTarget = +btn.dataset.tgt; confirmTarget(); })
     );
@@ -704,6 +721,16 @@ function renderBattleCommandPanel() {
                        : 'art_menu';
       clearTargetHighlights();
       renderBattleCommandPanel();
+    });
+    bindTouchActionBar(el, {
+      back() {
+        playClick();
+        inputState.phase = inputState.pendingCommandType === 'attack' ? 'command'
+                         : inputState.pendingCommandType === 'skill'  ? 'skill_menu'
+                         : 'art_menu';
+        clearTargetHighlights();
+        renderBattleCommandPanel();
+      },
     });
     refreshTargetHighlight();
 
@@ -726,7 +753,11 @@ function renderBattleCommandPanel() {
             <span class="target-hp">${c.hp.current}/${c.hp.max}</span>
           </div>`;
         }).join('')}
-      </div>`;
+      </div>
+      ${renderTouchActionBar([
+        { id: 'back', label: 'Back' },
+        { id: 'confirm', label: 'Confirm', primary: true },
+      ])}`;
     el.querySelector('#multi-back')?.addEventListener('click', () => {
       playClick();
       clearMultiTargetHighlights();
@@ -734,5 +765,14 @@ function renderBattleCommandPanel() {
       renderBattleCommandPanel();
     });
     el.querySelectorAll('.target-btn').forEach(btn => btn.addEventListener('click', () => { playClick(); confirmMultiTarget(); }));
+    bindTouchActionBar(el, {
+      back() {
+        playClick();
+        clearMultiTargetHighlights();
+        inputState.phase = inputState.pendingCommandType === 'skill' ? 'skill_menu' : 'art_menu';
+        renderBattleCommandPanel();
+      },
+      confirm() { playClick(); confirmMultiTarget(); },
+    });
   }
 }

@@ -74,9 +74,13 @@ function _renderCCOverview() {
         </button>
       </div>` : ''}
     <div class="cc-footer">
-      <div class="cc-hint">← → Select · Space / Enter Configure${state.isOnlineMatch ? '' : ' · Esc Back'}</div>
+      <div class="cc-hint">${renderControlHint(`← → Select · Space / Enter Configure${state.isOnlineMatch ? '' : ' · Esc Back'}`, 'Tap a creature to configure its class')}</div>
       <div class="cc-hint" style="color:var(--cb-accent)">${cc.locked.filter(v=>v).length} / 3 Locked</div>
     </div>
+    ${renderTouchActionBar([
+      ...(state.isOnlineMatch ? [] : [{ id: 'back', label: 'Back' }]),
+      ...(allLocked ? [{ id: 'confirm', label: state.isOnlineMatch ? 'Lock In' : (cc.teamPhase === 'player' ? 'Next' : 'Battle'), primary: true }] : []),
+    ])}
   `;
 
   el.querySelectorAll('.cc-creature-card').forEach(card => {
@@ -90,6 +94,11 @@ function _renderCCOverview() {
 
   const confirmBtn = el.querySelector('#cc-confirm-btn');
   if (confirmBtn) confirmBtn.addEventListener('click', () => { playClick(); _confirmCCPhase(); });
+
+  bindTouchActionBar(el, {
+    back() { playClick(); _backFromCCOverview(); },
+    confirm() { playClick(); _confirmCCPhase(); },
+  });
 }
 
 function _enterCCBrowse() {
@@ -177,14 +186,22 @@ function _renderCCBrowse() {
       ${contentHTML}
     </div>
     <div class="cc-footer">
-      <div class="cc-hint">← → Browse · Enter Select · Esc Back</div>
+      <div class="cc-hint">${renderControlHint('← → Browse · Enter Select · Esc Back', 'Use arrows to browse, then select this class')}</div>
       <div class="cc-hint" style="color:var(--cb-accent)">Lv.${level}</div>
     </div>
+    ${renderTouchActionBar([
+      { id: 'back', label: 'Back' },
+      ...(route ? [{ id: 'select', label: 'Select Class', primary: true }] : []),
+    ])}
   `;
 
   el.querySelector('#cc-nav-left')?.addEventListener('click',  () => { if (canLeft)  { playClick(); moveCCBrowseCursor(-1); } });
   el.querySelector('#cc-nav-right')?.addEventListener('click', () => { if (canRight) { playClick(); moveCCBrowseCursor(1);  } });
   el.querySelector('#cc-select-route-btn')?.addEventListener('click', () => { playClick(); _enterCCDeep(stub.id); });
+  bindTouchActionBar(el, {
+    back() { playClick(); cc.view = 'overview'; renderClassCustomization(); },
+    select() { playClick(); if (route) _enterCCDeep(stub.id); },
+  });
 }
 
 function _enterCCDeep(routeId) {
@@ -275,9 +292,13 @@ function _renderCCDeep() {
       </div>
     </div>
     <div class="cc-footer">
-      <div class="cc-hint">↑↓ Navigate · Space Equip/Remove · Enter Lock In · Esc Back</div>
+      <div class="cc-hint">${renderControlHint('↑↓ Navigate · Space Equip/Remove · Enter Lock In · Esc Back', 'Tap passives to equip or remove')}</div>
       <div class="cc-hint" style="color:var(--cb-accent)">Lv.${level}</div>
     </div>
+    ${renderTouchActionBar([
+      { id: 'back', label: 'Back' },
+      { id: 'lock', label: 'Lock In', primary: true },
+    ])}
   `;
 
   el.querySelectorAll('.cc-passive-row').forEach(row => {
@@ -289,6 +310,10 @@ function _renderCCDeep() {
   });
 
   el.querySelector('#cc-lockin-btn')?.addEventListener('click', () => { playClick(); _lockInCreature(); });
+  bindTouchActionBar(el, {
+    back() { playClick(); cc.view = 'browse'; renderClassCustomization(); },
+    lock() { playClick(); _lockInCreature(); },
+  });
 }
 
 // ── Navigation functions ──────────────────────────────────────────────────────
@@ -355,6 +380,17 @@ function _lockInCreature() {
   renderClassCustomization();
 }
 
+function _backFromCCOverview() {
+  const cc = state.classCustom;
+  if (state.isOnlineMatch) return;
+  if (cc.teamPhase === 'player') {
+    state.teamSelectPhase = 'opponent';
+    setScreen('team-select');
+  } else {
+    startClassCustomization('player');
+  }
+}
+
 function _confirmCCPhase() {
   const cc = state.classCustom;
   if (!cc.locked.every(v => v)) return;
@@ -395,16 +431,7 @@ function handleClassCustomKey(key, rawKey) {
       return;
     }
     if (rawKey === 'Escape') {
-      if (state.isOnlineMatch) {
-        // No backing out of an online match's class customization phase.
-        return;
-      }
-      if (cc.teamPhase === 'player') {
-        state.teamSelectPhase = 'opponent';
-        setScreen('team-select');
-      } else {
-        startClassCustomization('player');
-      }
+      _backFromCCOverview();
       return;
     }
     // Allow confirm with Enter when all locked

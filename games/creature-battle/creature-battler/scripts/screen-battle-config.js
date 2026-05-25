@@ -39,8 +39,12 @@ function renderBattleConfig() {
       </div>
     </div>
     <div class="battle-config-footer">
-      <div class="battle-config-hint">↑↓ Section · ←→ Navigate · Space Confirm · Esc back</div>
+      <div class="battle-config-hint">${renderControlHint('↑↓ Section · ←→ Navigate · Space Confirm · Esc back', 'Tap a level, choose an arena, then continue')}</div>
     </div>
+    ${renderTouchActionBar([
+      { id: 'back', label: 'Back' },
+      { id: 'continue', label: 'Continue', primary: true },
+    ])}
   `;
 
   el.querySelectorAll('.level-tier-card').forEach(card => {
@@ -61,6 +65,11 @@ function renderBattleConfig() {
     playClick();
     state.battleConfigFocusSection = 'arena';
     _moveArenaCursor(1);
+  });
+
+  bindTouchActionBar(el, {
+    back() { playClick(); setScreen('mode-select'); },
+    continue() { playClick(); confirmBattleConfig(); },
   });
 }
 
