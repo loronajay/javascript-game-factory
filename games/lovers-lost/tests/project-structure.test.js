@@ -167,6 +167,10 @@ test('Lovers Lost mobile controller hides generic arrow glyphs behind action lab
     /content:\s*"BOY"/.test(styleSource) && /content:\s*"GIRL"/.test(styleSource),
     'expected side labels to sit outside the action wheels'
   );
+  assert(
+    /--ll-side-legend-offset:\s*-1%/.test(styleSource),
+    'expected side action labels to be pushed outward from the pad center'
+  );
 });
 
 test('old root-level clutter is gone', () => {

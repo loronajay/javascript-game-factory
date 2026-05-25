@@ -132,6 +132,7 @@ body {
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__pad {
+  --ll-side-legend-offset: -1%;
   border-color: rgba(255, 142, 189, 0.82);
   background:
     radial-gradient(circle at 50% 35%, rgba(255, 209, 102, 0.18), transparent 34%),
@@ -165,7 +166,7 @@ body {
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__legend {
-  width: 58px;
+  width: 50px;
   height: 20px;
   color: #fff0c4;
   font-size: 9px;
@@ -173,23 +174,27 @@ body {
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__legend--up {
-  left: calc(50% - 29px);
+  left: calc(50% - 25px);
   top: 10%;
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__legend--down {
-  left: calc(50% - 29px);
+  left: calc(50% - 25px);
   bottom: 10%;
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__legend--left {
-  left: 5%;
+  left: var(--ll-side-legend-offset);
   top: calc(50% - 10px);
+  justify-items: start;
+  text-align: left;
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__legend--right {
-  right: 5%;
+  right: var(--ll-side-legend-offset);
   top: calc(50% - 10px);
+  justify-items: end;
+  text-align: right;
 }
 
 .mobile-landscape-gate {
