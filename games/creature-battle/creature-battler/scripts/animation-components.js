@@ -69,6 +69,12 @@ function getAnimOverlay() {
   return overlay;
 }
 
+// Field flashes cover the visual battlefield from the battle screen layer so
+// mobile command-panel overlays cannot reveal the clipped edge of #battle-field.
+function getFieldFlashHost() {
+  return document.getElementById('screen-battle') || getAnimOverlay();
+}
+
 // Returns the center of an element in overlay-relative CSS px (unscaled).
 function getElementCenter(el, overlay) {
   const er    = el.getBoundingClientRect();
@@ -299,8 +305,8 @@ function animParticleBurst(originEl, options = {}) {
 //   opacity   0–1        peak opacity (default 0.5)
 
 function animFieldFlash(options = {}) {
-  const overlay = getAnimOverlay();
-  if (!overlay) return Promise.resolve();
+  const host = getFieldFlashHost();
+  if (!host) return Promise.resolve();
 
   const duration = options.duration ?? 200;
   const color    = options.color   ?? '#ffffff';
@@ -312,7 +318,7 @@ function animFieldFlash(options = {}) {
   el.style.setProperty('--flash-opacity',  String(opacity));
   el.style.setProperty('--flash-duration', `${duration}ms`);
 
-  overlay.appendChild(el);
+  host.appendChild(el);
   el.classList.add('anim-field-flash-in');
 
   return new Promise(resolve => {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Lovers Lost | Javascript Game Factory</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
@@ -19,8 +19,46 @@
   </main>
   <script type="module">
     import { mountMobileController } from '../../js/mobile-controller.mjs';
+    import { initMobileLandscapeGate } from './scripts/mobile-ui.js';
     import { initGame } from './game.js';
-    mountMobileController({ profileId: 'lovers-lost' });
+
+    const KEY = {
+      w: { key: 'w', code: 'KeyW' },
+      a: { key: 'a', code: 'KeyA' },
+      s: { key: 's', code: 'KeyS' },
+      d: { key: 'd', code: 'KeyD' },
+      up: { key: 'ArrowUp', code: 'ArrowUp' },
+      down: { key: 'ArrowDown', code: 'ArrowDown' },
+      left: { key: 'ArrowLeft', code: 'ArrowLeft' },
+      right: { key: 'ArrowRight', code: 'ArrowRight' },
+    };
+
+    const LOVERS_LOST_MOBILE_PROFILE = {
+      id: 'lovers-lost-touch',
+      layout: 'dual-dpad',
+      accent: '#ff8ebd',
+      glow: '#ffd166',
+      pads: [
+        {
+          id: 'boy',
+          label: 'BOY',
+          dpad: { up: KEY.w, down: KEY.s, left: KEY.a, right: KEY.d },
+          directionMode: 'cardinal',
+          legends: { up: 'JUMP', down: 'CROUCH', left: 'BLOCK', right: 'ATTACK' },
+        },
+        {
+          id: 'girl',
+          label: 'GIRL',
+          dpad: { up: KEY.up, down: KEY.down, left: KEY.left, right: KEY.right },
+          directionMode: 'cardinal',
+          legends: { up: 'JUMP', down: 'CROUCH', left: 'ATTACK', right: 'BLOCK' },
+        },
+      ],
+    };
+
+    const forceMobileControls = new URLSearchParams(window.location.search).has('forceMobileControls');
+    initMobileLandscapeGate({ force: forceMobileControls });
+    mountMobileController({ profile: LOVERS_LOST_MOBILE_PROFILE, force: forceMobileControls });
     initGame();
   </script>
 </body>

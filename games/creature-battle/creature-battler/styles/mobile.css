@@ -121,18 +121,21 @@
 
   #game-canvas.mobile-layout #screen-battle {
     --battle-hud-space: 86px;
-    --battle-command-space: clamp(96px, 28vh, 158px);
+    --battle-command-base-space: clamp(96px, 28vh, 158px);
+    --battle-command-space: var(--battle-command-base-space);
+    --battle-field-bottom: var(--battle-command-base-space);
     --battle-command-menu-space: clamp(176px, 46vh, 260px);
   }
 
   #game-canvas.mobile-layout #screen-battle[data-command-phase="art_menu"],
-  #game-canvas.mobile-layout #screen-battle[data-command-phase="skill_menu"] {
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="skill_menu"],
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="multi_confirm"] {
     --battle-command-space: var(--battle-command-menu-space);
   }
 
   #game-canvas.mobile-layout #screen-battle .battle-field {
     top: var(--battle-hud-space);
-    bottom: var(--battle-command-space);
+    bottom: var(--battle-field-bottom);
     height: auto;
   }
 
@@ -366,7 +369,8 @@
   }
 
   #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="art_menu"],
-  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"] {
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"],
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="multi_confirm"] {
     box-sizing: border-box;
     height: var(--battle-command-space);
     min-height: var(--battle-command-space);
@@ -399,6 +403,16 @@
     flex: 1 1 auto;
     min-height: 104px;
     max-height: none;
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="multi_confirm"] .target-row {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="multi_confirm"] .touch-action-bar {
+    flex-shrink: 0;
   }
 
   .battle-cmd-announcement {
@@ -465,9 +479,13 @@
     flex-shrink: 0;
   }
 
+  #game-canvas.mobile-layout #screen-battle {
+    --battle-field-bottom: clamp(106px, 30vh, 170px);
+  }
+
   #game-canvas.mobile-layout #screen-battle .battle-field {
     top: 78px;
-    bottom: clamp(106px, 30vh, 170px);
+    bottom: var(--battle-field-bottom);
   }
 }
 
@@ -479,12 +497,15 @@
 
   #game-canvas.mobile-layout #screen-battle {
     --battle-hud-space: 49px;
-    --battle-command-space: clamp(78px, 25vh, 126px);
-    --battle-command-menu-space: clamp(172px, 46vh, 220px);
+    --battle-command-base-space: clamp(78px, 25vh, 126px);
+    --battle-command-space: var(--battle-command-base-space);
+    --battle-field-bottom: var(--battle-command-base-space);
+    --battle-command-menu-space: clamp(188px, 50vh, 228px);
   }
 
   #game-canvas.mobile-layout #screen-battle[data-command-phase="art_menu"],
-  #game-canvas.mobile-layout #screen-battle[data-command-phase="skill_menu"] {
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="skill_menu"],
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="multi_confirm"] {
     --battle-command-space: var(--battle-command-menu-space);
   }
 
@@ -787,7 +808,7 @@
 
   #game-canvas.mobile-layout #screen-battle .battle-field {
     top: var(--battle-hud-space);
-    bottom: var(--battle-command-space);
+    bottom: var(--battle-field-bottom);
   }
 
   .battle-creature img {
@@ -801,7 +822,8 @@
   }
 
   #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="art_menu"],
-  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"] {
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"],
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="multi_confirm"] {
     box-sizing: border-box;
     height: var(--battle-command-space);
     min-height: var(--battle-command-space);
@@ -842,6 +864,16 @@
     flex: 1 1 auto;
     min-height: 112px;
     max-height: none;
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="multi_confirm"] .target-row {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="multi_confirm"] .touch-action-bar {
+    flex-shrink: 0;
   }
 
   .art-btn {

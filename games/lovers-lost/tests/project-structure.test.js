@@ -33,6 +33,7 @@ console.log('\nproject structure');
 test('support modules live under scripts/', () => {
   const expected = [
     'scripts/input.js',
+    'scripts/mobile-ui.js',
     'scripts/obstacles.js',
     'scripts/player.js',
     'scripts/renderer.js',
@@ -76,15 +77,95 @@ test('dev-only artifacts are separated from the shipped root', () => {
   assert(exists('docs/PACING.md'), 'missing docs/PACING.md');
 });
 
-test('mobile controller is mounted with the Lovers Lost control profile', () => {
+test('mobile controller is mounted with a Lovers Lost-specific control profile', () => {
   const indexSource = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert(
     indexSource.includes("from '../../js/mobile-controller.mjs'"),
     'expected index.html to import the shared mobile controller'
   );
   assert(
-    /mountMobileController\(\{\s*profileId:\s*['"]lovers-lost['"]\s*\}\)/.test(indexSource),
-    'expected index.html to mount the Lovers Lost mobile profile'
+    indexSource.includes("from './scripts/mobile-ui.js'"),
+    'expected index.html to import the Lovers Lost mobile UI helpers'
+  );
+  assert(
+    /mountMobileController\(\{\s*profile:\s*LOVERS_LOST_MOBILE_PROFILE,\s*force:\s*forceMobileControls\s*\}\)/.test(indexSource),
+    'expected index.html to mount a local Lovers Lost mobile profile'
+  );
+  assert(
+    indexSource.includes("label: 'BOY'"),
+    'expected the boy pad label to describe the playable side'
+  );
+  assert(
+    indexSource.includes("label: 'GIRL'"),
+    'expected the girl pad label to describe the playable side'
+  );
+  assert(
+    indexSource.includes("legends: { up: 'JUMP', down: 'CROUCH', left: 'BLOCK', right: 'ATTACK' }"),
+    'expected the boy pad to use Lovers Lost action labels instead of keyboard letters'
+  );
+  assert(
+    indexSource.includes("legends: { up: 'JUMP', down: 'CROUCH', left: 'ATTACK', right: 'BLOCK' }"),
+    'expected the girl pad to use Lovers Lost action labels instead of keyboard letters'
+  );
+});
+
+test('mobile fullscreen landscape gate is mounted before game init', () => {
+  const indexSource = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert(
+    /initMobileLandscapeGate\(\{\s*force:\s*forceMobileControls\s*\}\)/.test(indexSource),
+    'expected index.html to mount the mobile landscape/fullscreen gate'
+  );
+  assert(
+    indexSource.indexOf('initMobileLandscapeGate') < indexSource.indexOf('initGame();'),
+    'expected the mobile gate to initialize before the game starts'
+  );
+});
+
+test('mobile styles use dynamic fullscreen viewport sizing', () => {
+  const styleSource = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8');
+  assert(
+    styleSource.includes('height: 100dvh'),
+    'expected dynamic viewport height to avoid mobile browser chrome clipping'
+  );
+  assert(
+    styleSource.includes('.mobile-landscape-gate'),
+    'expected mobile landscape gate styles'
+  );
+  assert(
+    styleSource.includes('(pointer: coarse)'),
+    'expected touch-specific viewport styling'
+  );
+});
+
+test('mobile controller can be forced on for local visual QA', () => {
+  const indexSource = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert(
+    indexSource.includes("new URLSearchParams(window.location.search).has('forceMobileControls')"),
+    'expected a query switch for desktop mobile-controller QA'
+  );
+  assert(
+    /mountMobileController\(\{\s*profile:\s*LOVERS_LOST_MOBILE_PROFILE,\s*force:\s*forceMobileControls\s*\}\)/.test(indexSource),
+    'expected the mobile controller mount to use the QA force switch'
+  );
+});
+
+test('Lovers Lost mobile controller hides generic arrow glyphs behind action labels', () => {
+  const styleSource = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8');
+  assert(
+    /\.mobile-controller\[data-mobile-controller-root="lovers-lost-touch"\]\s+\.mobile-controller__arrow/.test(styleSource),
+    'expected Lovers Lost-specific mobile controller arrow override'
+  );
+  assert(
+    /display:\s*none/.test(styleSource),
+    'expected the generic mobile controller arrows to be hidden for Lovers Lost'
+  );
+  assert(
+    /\.mobile-controller\[data-mobile-controller-root="lovers-lost-touch"\]\s+\.mobile-controller__pad-label/.test(styleSource),
+    'expected Lovers Lost to override the shared center pad labels'
+  );
+  assert(
+    /content:\s*"BOY"/.test(styleSource) && /content:\s*"GIRL"/.test(styleSource),
+    'expected side labels to sit outside the action wheels'
   );
 });
 
