@@ -51,6 +51,7 @@ function animateEl(el, className, cssVars) {
 function _getCanvasScale() {
   const canvas = document.getElementById('game-canvas');
   if (!canvas) return 1;
+  if (canvas.classList.contains('mobile-layout')) return 1;
   const rect = canvas.getBoundingClientRect();
   return rect.width / 960;
 }

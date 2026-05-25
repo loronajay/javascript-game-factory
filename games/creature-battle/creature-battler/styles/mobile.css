@@ -35,6 +35,79 @@
   box-shadow: 0 0 10px var(--cb-accent-soft);
 }
 
+.mobile-landscape-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(39, 202, 255, 0.18), transparent 55%),
+    rgba(0, 5, 14, 0.92);
+  color: var(--cb-text);
+}
+
+.mobile-landscape-gate.is-visible {
+  display: flex;
+}
+
+.mobile-play-gated #game-shell {
+  filter: blur(2px) brightness(0.55);
+}
+
+.mobile-landscape-gate-card {
+  width: min(520px, 92vw);
+  border: 2px solid rgba(39, 202, 255, 0.55);
+  border-radius: 10px;
+  background: rgba(2, 18, 42, 0.96);
+  box-shadow: 0 0 30px rgba(39, 202, 255, 0.3), inset 0 0 24px rgba(0, 0, 0, 0.35);
+  padding: 18px 20px 20px;
+  text-align: center;
+}
+
+.mobile-landscape-gate-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cb-accent);
+  margin-bottom: 7px;
+}
+
+.mobile-landscape-gate-title {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  text-shadow: 0 0 18px var(--cb-accent-soft);
+}
+
+.mobile-landscape-gate-copy {
+  max-width: 420px;
+  margin: 0 auto 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--cb-muted);
+}
+
+.mobile-landscape-gate-btn {
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 2px solid var(--cb-accent);
+  border-radius: 8px;
+  background: rgba(3, 70, 120, 0.82);
+  color: var(--cb-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 0 16px var(--cb-accent-soft);
+}
+
 @media (hover: none), (pointer: coarse), (max-width: 720px) {
   html,
   body {
@@ -44,6 +117,17 @@
 
   #game-canvas.mobile-layout {
     overflow: hidden;
+  }
+
+  #game-canvas.mobile-layout #screen-battle {
+    --battle-hud-space: 86px;
+    --battle-command-space: clamp(96px, 28vh, 158px);
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-field {
+    top: var(--battle-hud-space);
+    bottom: var(--battle-command-space);
+    height: auto;
   }
 
   .control-hint-desktop {
@@ -261,6 +345,10 @@
 
   .battle-commands {
     padding: 7px 8px 0;
+    max-height: var(--battle-command-space);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .battle-cmd-prompt {
@@ -279,7 +367,7 @@
 
   .art-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: 170px;
+    max-height: calc(var(--battle-command-space) - 48px);
   }
 
   .battle-cmd-announcement {
@@ -346,8 +434,9 @@
     flex-shrink: 0;
   }
 
-  .battle-field {
-    transform: translateY(18px);
+  #game-canvas.mobile-layout #screen-battle .battle-field {
+    top: 78px;
+    bottom: clamp(106px, 30vh, 170px);
   }
 }
 
@@ -355,6 +444,11 @@
   #game-canvas.mobile-layout {
     width: 100vw;
     height: 100vh;
+  }
+
+  #game-canvas.mobile-layout #screen-battle {
+    --battle-hud-space: 49px;
+    --battle-command-space: clamp(78px, 25vh, 126px);
   }
 
   .title-logo {
@@ -628,6 +722,11 @@
     transform: none;
   }
 
+  #game-canvas.mobile-layout #screen-battle .battle-field {
+    top: var(--battle-hud-space);
+    bottom: var(--battle-command-space);
+  }
+
   .battle-creature img {
     max-width: 70px;
     max-height: 70px;
@@ -635,6 +734,7 @@
 
   .battle-commands {
     padding: 6px 10px 0;
+    max-height: var(--battle-command-space);
   }
 
   .battle-cmd-prompt {
@@ -660,7 +760,7 @@
 
   .art-list {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    max-height: 126px;
+    max-height: calc(var(--battle-command-space) - 42px);
     gap: 4px;
   }
 

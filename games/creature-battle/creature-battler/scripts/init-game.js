@@ -30,6 +30,7 @@ function scaleCanvas() {
 }
 
 function init() {
+  if (typeof initMobileLandscapeGate === 'function') initMobileLandscapeGate();
   scaleCanvas();
   window.addEventListener('resize', scaleCanvas);
   initSounds();
