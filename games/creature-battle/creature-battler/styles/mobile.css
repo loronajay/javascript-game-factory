@@ -350,3 +350,356 @@
     transform: translateY(18px);
   }
 }
+
+@media (hover: none) and (orientation: landscape), (pointer: coarse) and (orientation: landscape), (max-height: 520px) and (min-width: 700px) {
+  #game-canvas.mobile-layout {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .title-logo {
+    margin-bottom: 12px;
+  }
+
+  .title-logo h1 {
+    font-size: 34px;
+  }
+
+  .title-logo .subtitle,
+  .title-player-name {
+    font-size: 10px;
+  }
+
+  .title-creatures {
+    grid-template-columns: repeat(6, 46px);
+    gap: 6px 10px;
+    margin-bottom: 14px;
+  }
+
+  .title-creature-sprite {
+    width: 46px;
+    height: 46px;
+  }
+
+  .title-press-start {
+    font-size: 12px;
+  }
+
+  #screen-mode-select {
+    justify-content: flex-start;
+    padding-top: 10px;
+  }
+
+  .mode-select-header {
+    margin-bottom: 8px;
+  }
+
+  .mode-select-header h2 {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+
+  .mode-select-header h1 {
+    font-size: 22px;
+  }
+
+  .mode-list {
+    width: min(76vw, 640px);
+    gap: 5px;
+  }
+
+  .mode-card {
+    min-height: 50px;
+    padding: 8px 14px;
+  }
+
+  .mode-card-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .mode-select-hint {
+    margin-top: 8px;
+  }
+
+  .battle-config-header,
+  .team-select-header,
+  .cc-header {
+    padding: 8px 18px 0;
+  }
+
+  .battle-config-header h2,
+  .team-select-title h2,
+  .cc-header h2 {
+    font-size: 18px;
+    margin-bottom: 0;
+  }
+
+  .battle-config-phase,
+  .team-select-title .phase-label,
+  .cc-phase-label {
+    font-size: 9px;
+    margin-bottom: 1px;
+  }
+
+  .battle-config-sub {
+    display: none;
+  }
+
+  .battle-config-body {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 10px 16px 4px;
+  }
+
+  .bc-section {
+    gap: 7px;
+  }
+
+  .level-tier-row {
+    flex-wrap: nowrap;
+    gap: 7px;
+  }
+
+  .level-tier-card {
+    width: 92px;
+    height: 60px;
+    min-height: 60px;
+    gap: 3px;
+  }
+
+  .level-tier-num {
+    font-size: 17px;
+  }
+
+  .arena-preview {
+    width: min(34vw, 260px);
+    height: 78px;
+  }
+
+  .team-select-body {
+    flex-direction: row;
+    gap: 10px;
+    padding: 8px 14px 4px;
+  }
+
+  .roster-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .creature-card {
+    min-height: 84px;
+    padding: 5px 6px;
+  }
+
+  .creature-card-sprite {
+    width: 42px;
+    height: 42px;
+    margin-bottom: 2px;
+  }
+
+  .creature-card-name {
+    font-size: 10px;
+  }
+
+  .creature-card-role,
+  .card-stats-hint {
+    display: none;
+  }
+
+  .team-sidebar {
+    width: 180px;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .team-slot {
+    min-height: 42px;
+    padding: 5px 7px;
+  }
+
+  .team-select-footer,
+  .battle-config-footer,
+  .cc-footer {
+    padding: 0 14px 2px;
+  }
+
+  .touch-action-bar {
+    padding: 4px 10px 6px;
+  }
+
+  .touch-action-btn,
+  .touch-popup-close {
+    min-height: 30px;
+    padding: 5px 12px;
+    font-size: 10px;
+  }
+
+  .cc-overview-body {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 24px 4px;
+  }
+
+  .cc-creature-card {
+    max-width: 190px;
+    min-height: 122px;
+    padding: 8px;
+  }
+
+  .cc-creature-sprite {
+    width: 48px;
+    height: 48px;
+  }
+
+  .cc-browse-body,
+  .cc-deep-body {
+    padding: 7px 18px 0;
+    gap: 7px;
+  }
+
+  .cc-route-content,
+  .cc-deep-cols {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .cc-route-nav {
+    gap: 12px;
+  }
+
+  .cc-nav-arrow {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+  }
+
+  .cc-passive-slots-row {
+    gap: 8px;
+  }
+
+  .cc-skills-col {
+    width: 210px;
+    max-height: none;
+  }
+
+  .battle-hud {
+    flex-direction: row;
+  }
+
+  .hud-side {
+    padding: 4px 6px;
+    gap: 3px;
+  }
+
+  .hud-divider {
+    width: 2px;
+    height: auto;
+  }
+
+  .hud-creature {
+    min-height: 44px;
+    padding: 3px 5px;
+  }
+
+  .hud-portrait {
+    width: 24px;
+    height: 24px;
+  }
+
+  .hud-name {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+
+  .hud-bar-row {
+    margin-bottom: 1px;
+  }
+
+  .hud-status-row {
+    display: none;
+  }
+
+  .battle-field {
+    transform: none;
+  }
+
+  .battle-creature img {
+    max-width: 70px;
+    max-height: 70px;
+  }
+
+  .battle-commands {
+    padding: 6px 10px 0;
+  }
+
+  .battle-cmd-prompt {
+    margin-bottom: 4px;
+    font-size: 10px;
+  }
+
+  .battle-cmd-row {
+    flex-wrap: nowrap;
+  }
+
+  .command-btn,
+  .target-btn {
+    min-width: 0;
+    min-height: 38px;
+    padding: 6px;
+  }
+
+  .command-label,
+  .art-name {
+    font-size: 10px;
+  }
+
+  .art-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: 126px;
+    gap: 4px;
+  }
+
+  .art-btn {
+    min-height: 46px;
+    padding: 5px 7px;
+  }
+
+  .target-row {
+    flex-wrap: nowrap;
+  }
+
+  .target-btn img {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .stats-popup-card,
+  .guide-popup-card {
+    width: min(86vw, 760px);
+    max-height: calc(100vh - 18px);
+  }
+
+  .stats-popup-header {
+    padding: 10px 14px 8px;
+  }
+
+  .stats-popup-sprite {
+    width: 50px;
+    height: 50px;
+  }
+
+  .stats-popup-body,
+  .guide-popup-body {
+    padding: 10px 14px;
+  }
+
+  .stats-popup-footer,
+  .guide-popup-footer {
+    padding: 6px 14px;
+  }
+}

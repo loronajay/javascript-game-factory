@@ -2,7 +2,9 @@ function scaleCanvas() {
   const shell  = document.getElementById('game-shell');
   const canvas = document.getElementById('game-canvas');
   const W = 960, H = 540;
-  const useMobileLayout = shell.clientWidth < 720 || (window.matchMedia && window.matchMedia('(pointer: coarse) and (max-width: 900px)').matches);
+  const coarsePhone = window.matchMedia && window.matchMedia('(pointer: coarse) and (max-width: 900px)').matches;
+  const shortLandscape = shell.clientWidth >= 700 && shell.clientHeight <= 540;
+  const useMobileLayout = shell.clientWidth < 720 || coarsePhone || shortLandscape;
 
   canvas.classList.toggle('mobile-layout', useMobileLayout);
 
