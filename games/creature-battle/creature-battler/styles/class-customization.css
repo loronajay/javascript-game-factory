@@ -173,16 +173,20 @@
 }
 
 .cc-route-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
-  justify-content: center;
-  gap: 18px;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+  min-height: 58px;
+  margin: 0 auto;
   flex-shrink: 0;
 }
 
 .cc-nav-arrow {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: var(--cb-panel-bg);
   border: 2px solid var(--cb-border);
   border-radius: 8px;
@@ -194,7 +198,7 @@
   cursor: pointer;
   user-select: none;
   transition: border-color 0.1s, color 0.1s;
-  flex-shrink: 0;
+  justify-self: center;
 }
 
 .cc-nav-arrow:not(.disabled):hover,
@@ -211,7 +215,10 @@
 
 .cc-route-name-block {
   text-align: center;
-  min-width: 200px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 8px;
+  overflow: hidden;
 }
 
 .cc-route-name {
@@ -221,6 +228,9 @@
   text-transform: uppercase;
   color: var(--cb-text);
   text-shadow: 0 0 14px rgba(160, 100, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cc-route-counter {
@@ -235,6 +245,9 @@
   color: #a878ff;
   letter-spacing: 0.06em;
   margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cc-route-coming-soon {
