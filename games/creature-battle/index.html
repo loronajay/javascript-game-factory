@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>Creature Battler | Javascript Game Factory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
   <script src="../../js/platform-config.js"></script>
   <link rel="stylesheet" href="creature-battler/styles/tokens.css">
   <link rel="stylesheet" href="creature-battler/styles/base.css">
@@ -16,6 +17,7 @@
   <link rel="stylesheet" href="creature-battler/styles/animation-overlay.css">
   <link rel="stylesheet" href="creature-battler/styles/online-lobby.css">
   <link rel="stylesheet" href="creature-battler/styles/blind-pick.css">
+  <link rel="stylesheet" href="creature-battler/styles/mobile.css">
   <link rel="stylesheet" href="creature-battler/styles/animations/anim-universal.css">
   <link rel="stylesheet" href="creature-battler/styles/animations/anim-salamander.css">
   <link rel="stylesheet" href="creature-battler/styles/animations/anim-aquaphant.css">
@@ -46,13 +48,28 @@
     </div>
   </div>
 
-  <script src="creature-battler/scripts/online.js"></script>
   <script src="creature-battler/scripts/sounds.js"></script>
-  <script src="creature-battler/scripts/class-data.js"></script>
-  <script src="creature-battler/scripts/passive-registry.js"></script>
-  <script src="creature-battler/scripts/skill-registry.js"></script>
+  <script src="creature-battler/scripts/class-data-core.js"></script>
+  <script src="creature-battler/scripts/class-data-strength.js"></script>
+  <script src="creature-battler/scripts/class-data-defense.js"></script>
+  <script src="creature-battler/scripts/class-data-intelligence.js"></script>
+  <script src="creature-battler/scripts/class-data-spirit.js"></script>
+  <script src="creature-battler/scripts/class-data-speed.js"></script>
+  <script src="creature-battler/scripts/passive-registry-core.js"></script>
+  <script src="creature-battler/scripts/passive-registry-strength.js"></script>
+  <script src="creature-battler/scripts/passive-registry-defense.js"></script>
+  <script src="creature-battler/scripts/passive-registry-intelligence.js"></script>
+  <script src="creature-battler/scripts/passive-registry-spirit.js"></script>
+  <script src="creature-battler/scripts/passive-registry-speed.js"></script>
+  <script src="creature-battler/scripts/skill-registry-core.js"></script>
+  <script src="creature-battler/scripts/skill-registry-strength.js"></script>
+  <script src="creature-battler/scripts/skill-registry-defense.js"></script>
+  <script src="creature-battler/scripts/skill-registry-intelligence.js"></script>
+  <script src="creature-battler/scripts/skill-registry-spirit.js"></script>
+  <script src="creature-battler/scripts/skill-registry-speed.js"></script>
   <script src="creature-battler/scripts/config.js"></script>
   <script src="creature-battler/scripts/state.js"></script>
+  <script src="creature-battler/scripts/online.js"></script>
   <script src="creature-battler/scripts/battle-engine.js"></script>
   <script src="creature-battler/scripts/battle-ai.js"></script>
   <script src="creature-battler/scripts/animation-components.js"></script>
@@ -73,9 +90,14 @@
   <script src="creature-battler/scripts/animations/anim-emberjaw.js"></script>
   <script src="creature-battler/scripts/animations/anim-tidecalf.js"></script>
   <script src="creature-battler/scripts/animations/anim-gravemoss.js"></script>
-  <script src="creature-battler/scripts/animations/anim-skills.js"></script>
+  <script src="creature-battler/scripts/animations/anim-skills-strength.js"></script>
+  <script src="creature-battler/scripts/animations/anim-skills-defense.js"></script>
+  <script src="creature-battler/scripts/animations/anim-skills-intelligence.js"></script>
+  <script src="creature-battler/scripts/animations/anim-skills-spirit.js"></script>
+  <script src="creature-battler/scripts/animations/anim-skills-speed.js"></script>
   <script src="creature-battler/scripts/battle-input.js"></script>
   <script src="creature-battler/scripts/battle-round.js"></script>
+  <script src="creature-battler/scripts/mobile-ui.js"></script>
   <script src="creature-battler/scripts/screen-element-guide.js"></script>
   <script src="creature-battler/scripts/screen-title.js"></script>
   <script src="creature-battler/scripts/screen-mode-select.js"></script>
