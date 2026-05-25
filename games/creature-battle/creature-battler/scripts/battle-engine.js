@@ -261,7 +261,65 @@ function calcHitChance(attacker, target, move) {
 
 function resolveHit(attacker, target, move) {
   if (hasStatus(attacker, 'blind')) return false;
+
+  const isPhysical = move.damageClass === 'physical';
+
+  // Phasebreaker: bypass evasion checks entirely for physical moves.
+  const attackerHasPhasebreaker = isPhysical && (attacker.equippedPassives || []).some(p => p.id === 'phasebreaker');
+
+  if (isPhysical && !attackerHasPhasebreaker) {
+    // Vault: full evasion window for the round — queues counter.
+    if (target.vaultActive) {
+      target.hasEvadedThisRound = true;
+      _fireEvadePassives(target, attacker, state.battleState);
+      target.pendingAutoAction = {
+        skillId: 'vault_counter',
+        targetSide: target._side === 'player' ? 'opponent' : 'player',
+        targetSlot: attacker._slot,
+      };
+      return false;
+    }
+
+    // Afterimage: next incoming physical hit auto-misses.
+    if (target.afterimageActive) {
+      target.hasEvadedThisRound = true;
+      if (typeof target.afterimageActive === 'number' && target.afterimageActive > 1) {
+        target.afterimageActive -= 1;
+      } else {
+        // afterimage_3: also queues a dodge counter on evade
+        if (target.afterimage3Ready) {
+          target.afterimage3Ready = false;
+          _fireEvadePassives(target, attacker, state.battleState);
+          target.pendingAutoAction = {
+            skillId: 'dodge_counter_strike',
+            targetSide: target._side === 'player' ? 'opponent' : 'player',
+            targetSlot: attacker._slot,
+          };
+        }
+        target.afterimageActive = false;
+        _fireEvadePassives(target, attacker, state.battleState);
+      }
+      return false;
+    }
+
+    // Blur: 15% flat evasion chance.
+    const targetHasBlur = (target.equippedPassives || []).some(p => p.id === 'blur');
+    if (targetHasBlur && _battleRng() < 0.15) {
+      target.hasEvadedThisRound = true;
+      _fireEvadePassives(target, attacker, state.battleState);
+      return false;
+    }
+  }
+
   return _battleRng() * 100 < calcHitChance(attacker, target, move);
+}
+
+// Fires onEvadePhysicalHit passive hooks (dodge_counter passive, etc.)
+function _fireEvadePassives(evader, attacker, bs) {
+  (evader.equippedPassives || []).forEach(p => {
+    const reg = typeof PASSIVE_REGISTRY !== 'undefined' ? PASSIVE_REGISTRY[p.id] : null;
+    if (reg?.onEvadePhysicalHit) reg.onEvadePhysicalHit({ evader, attacker, bs });
+  });
 }
 
 function calcDamage(attacker, target, move) {
@@ -339,6 +397,7 @@ const PRIORITY_MOVES = new Set([
   'retaliation', 'damage_store', 'grit',
   'channel', 'attune',
   'ward', 'ward_2', 'ward_3', 'deep_meditation', 'arcane_veil', 'quicken',
+  'dash', 'dash_2', 'dash_3', 'afterimage', 'afterimage_2', 'afterimage_3', 'vault', 'ghost_step',
 ]);
 
 function _actionPriority(action) {

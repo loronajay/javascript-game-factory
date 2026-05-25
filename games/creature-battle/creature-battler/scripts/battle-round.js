@@ -31,6 +31,7 @@ function startRound() {
   });
 
   tickRelentlessStreaks();
+  if (typeof tickSpeedStreaks === 'function') tickSpeedStreaks();
   const bs = state.battleState;
   SLOT_NAMES.forEach(s => {
     if (bs.player[s])   { bs.player[s].isDefending = false;   bs.player[s].wasHitSuperEffective = false; }
@@ -251,6 +252,11 @@ function endRound() {
     }
     // Transcendence persists until the creature is KO'd or the battle ends (not cleared per round).
     // quickenActive is a one-round buff cleared above; transcendenceActive is persistent.
+    // Clear per-round Speed state flags
+    c.afterimageActive     = false;
+    c.afterimage3Ready     = false;
+    c.vaultActive          = false;
+    c.hasEvadedThisRound   = false;
   });
   // Decrement Shield Wall team aura duration
   ['player', 'opponent'].forEach(side => {

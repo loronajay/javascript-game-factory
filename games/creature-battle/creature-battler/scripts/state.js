@@ -154,7 +154,14 @@ function startBattle() {
     arenaFile: arena.file,
     battleStats: { player: makeBattleStats(), opponent: makeBattleStats() },
   };
-  // Fire onBattleStart passive hooks (e.g. Still Mind raises SPI at start).
+  // Tag each creature with its side and slot (used by evasion/counter logic).
+  ['player', 'opponent'].forEach(side => {
+    SLOT_NAMES.forEach(slot => {
+      const c = state.battleState[side][slot];
+      if (c) { c._side = side; c._slot = slot; }
+    });
+  });
+  // Fire onBattleStart passive hooks (e.g. Still Mind raises SPI at start, Fleet Footed raises SPD).
   ['player', 'opponent'].forEach(side => {
     SLOT_NAMES.forEach(slot => {
       const c = state.battleState[side][slot];
