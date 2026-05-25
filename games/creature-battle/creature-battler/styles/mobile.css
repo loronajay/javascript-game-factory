@@ -122,12 +122,26 @@
   #game-canvas.mobile-layout #screen-battle {
     --battle-hud-space: 86px;
     --battle-command-space: clamp(96px, 28vh, 158px);
+    --battle-command-menu-space: clamp(176px, 46vh, 260px);
+  }
+
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="art_menu"],
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="skill_menu"] {
+    --battle-command-space: var(--battle-command-menu-space);
   }
 
   #game-canvas.mobile-layout #screen-battle .battle-field {
     top: var(--battle-hud-space);
     bottom: var(--battle-command-space);
     height: auto;
+  }
+
+  #game-canvas.mobile-layout #screen-battle-config .battle-config-body,
+  #game-canvas.mobile-layout #screen-battle-config .bc-section,
+  #game-canvas.mobile-layout #screen-battle-config .level-tier-row,
+  #game-canvas.mobile-layout #screen-battle-config .arena-navigator {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .control-hint-desktop {
@@ -351,6 +365,13 @@
     flex-direction: column;
   }
 
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="art_menu"],
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"] {
+    box-sizing: border-box;
+    height: var(--battle-command-space);
+    min-height: var(--battle-command-space);
+  }
+
   .battle-cmd-prompt {
     gap: 6px;
     letter-spacing: 0.05em;
@@ -368,6 +389,16 @@
   .art-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-height: calc(var(--battle-command-space) - 48px);
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="art_menu"] .art-list,
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"] .art-list {
+    flex: 1 1 auto;
+    min-height: 104px;
+    max-height: none;
   }
 
   .battle-cmd-announcement {
@@ -449,6 +480,12 @@
   #game-canvas.mobile-layout #screen-battle {
     --battle-hud-space: 49px;
     --battle-command-space: clamp(78px, 25vh, 126px);
+    --battle-command-menu-space: clamp(172px, 46vh, 220px);
+  }
+
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="art_menu"],
+  #game-canvas.mobile-layout #screen-battle[data-command-phase="skill_menu"] {
+    --battle-command-space: var(--battle-command-menu-space);
   }
 
   .title-logo {
@@ -540,37 +577,63 @@
     display: none;
   }
 
-  .battle-config-body {
-    flex-direction: row;
+  #game-canvas.mobile-layout #screen-battle-config .battle-config-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
     align-items: center;
+    justify-items: center;
+    gap: clamp(8px, 2vw, 14px);
+    width: 100%;
+    padding: 8px clamp(10px, 2vw, 18px) 4px;
+  }
+
+  #game-canvas.mobile-layout #screen-battle-config .bc-section {
+    gap: 7px;
+    width: 100%;
+  }
+
+  #game-canvas.mobile-layout #screen-battle-config .level-tier-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     justify-content: center;
-    gap: 18px;
-    padding: 10px 16px 4px;
+    gap: clamp(4px, 1vw, 7px);
+    width: 100%;
+    max-width: 420px;
   }
 
-  .bc-section {
-    gap: 7px;
-  }
-
-  .level-tier-row {
-    flex-wrap: nowrap;
-    gap: 7px;
-  }
-
-  .level-tier-card {
-    width: 92px;
-    height: 60px;
-    min-height: 60px;
+  #game-canvas.mobile-layout #screen-battle-config .level-tier-card {
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    height: 48px;
+    min-height: 48px;
     gap: 3px;
+    padding: 4px;
   }
 
   .level-tier-num {
     font-size: 17px;
   }
 
-  .arena-preview {
-    width: min(34vw, 260px);
-    height: 78px;
+  #game-canvas.mobile-layout #screen-battle-config .arena-navigator {
+    justify-content: center;
+    gap: clamp(5px, 1.3vw, 9px);
+    width: 100%;
+    max-width: 330px;
+  }
+
+  #game-canvas.mobile-layout #screen-battle-config .arena-nav-btn {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+  }
+
+  #game-canvas.mobile-layout #screen-battle-config .arena-preview {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 235px;
+    min-width: 0;
+    height: 72px;
   }
 
   .team-select-body {
@@ -737,6 +800,13 @@
     max-height: var(--battle-command-space);
   }
 
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="art_menu"],
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"] {
+    box-sizing: border-box;
+    height: var(--battle-command-space);
+    min-height: var(--battle-command-space);
+  }
+
   .battle-cmd-prompt {
     margin-bottom: 4px;
     font-size: 10px;
@@ -761,7 +831,17 @@
   .art-list {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     max-height: calc(var(--battle-command-space) - 42px);
+    min-height: 0;
     gap: 4px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="art_menu"] .art-list,
+  #game-canvas.mobile-layout #screen-battle .battle-commands[data-phase="skill_menu"] .art-list {
+    flex: 1 1 auto;
+    min-height: 112px;
+    max-height: none;
   }
 
   .art-btn {

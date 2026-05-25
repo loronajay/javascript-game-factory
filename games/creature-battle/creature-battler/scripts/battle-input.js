@@ -587,6 +587,10 @@ function renderBattleCommandPanel() {
   const el = document.getElementById('battle-commands');
   if (!el) return;
   _hideCBTooltip();
+  const battleScreen = document.getElementById('screen-battle');
+  const commandPhase = inputState.active ? inputState.phase : 'playback';
+  el.dataset.phase = commandPhase;
+  if (battleScreen) battleScreen.dataset.commandPhase = commandPhase;
 
   if (!inputState.active) {
     el.innerHTML = `
