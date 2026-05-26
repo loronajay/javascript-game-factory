@@ -5,6 +5,7 @@ import { createAudioController }    from './scripts/audio.js';
 import { createControlsScreen }     from './scripts/controls-screen.js';
 import { createInput }              from './scripts/input.js';
 import { createLobbyUi }            from './scripts/lobby-ui.js';
+import { getHumanInputBindings, isMobileControllerMounted } from './scripts/mobile-input-routing.js';
 import {
   ACTIONS, ACTION_LABELS, DEFAULT_P1, DEFAULT_P2,
   formatKeyCode, loadBindings, saveBindings,
@@ -1055,19 +1056,29 @@ function _boot(sounds) {
 
 
   function tickActive() {
+    const mobileControlsActive = isMobileControllerMounted(document);
     if (!isOnline) {
       const p1In = (botConfig.enabled && botConfig.side === 'p1')
         ? tickBot(botState, gameState, 'p1', botConfig.difficulty)
-        : input.getSnapshot(bindings.p1);
+        : input.getSnapshot(getHumanInputBindings('p1', bindings, {
+            mobileControlsActive,
+            defaultMobileBindings: DEFAULT_P1,
+          }));
       const p2In = (botConfig.enabled && botConfig.side === 'p2')
         ? tickBot(botState, gameState, 'p2', botConfig.difficulty)
-        : input.getSnapshot(bindings.p2);
+        : input.getSnapshot(getHumanInputBindings('p2', bindings, {
+            mobileControlsActive,
+            defaultMobileBindings: DEFAULT_P1,
+          }));
       input.flush();
       _tickSim(p1In, p2In);
       return;
     }
 
-    const localIn = input.getSnapshot(bindings[onlineSide]);
+    const localIn = input.getSnapshot(getHumanInputBindings(onlineSide, bindings, {
+      mobileControlsActive,
+      defaultMobileBindings: DEFAULT_P1,
+    }));
     input.flush();
 
     const slot = rbLocalFrame % ROLLBACK_WINDOW;

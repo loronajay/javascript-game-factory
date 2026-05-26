@@ -5,6 +5,7 @@ import { createAudioController } from '../scripts/audio.js';
 import { swapBindingForSide } from '../scripts/controls-screen.js';
 import { spawnBloodEffect, spawnChingEffect, tickEffects } from '../scripts/effects.js';
 import { createLobbyUi, queueHintText, sideLockedText } from '../scripts/lobby-ui.js';
+import { getHumanInputBindings, isMobileControllerMounted } from '../scripts/mobile-input-routing.js';
 import { drawOnlineCountdown, EMPTY_INPUT, inputsDiffer, pickOnlineStage } from '../scripts/online-match-view.js';
 import { loadGameState, saveGameState } from '../scripts/rollback-state.js';
 import { setupCanvasViewport } from '../scripts/viewport.js';
@@ -304,6 +305,35 @@ test('swapBindingForSide preserves the controls screen auto-swap behavior', () =
     up: 'KeyS',
   });
 });
+
+test('mobile input routing uses the default mobile key profile for either human side', () => {
+  const bindings = {
+    p1: { left: 'KeyA' },
+    p2: { left: 'KeyM' },
+  };
+  const defaultMobileBindings = { left: 'KeyA' };
+
+  assert.deepEqual(
+    getHumanInputBindings('p2', bindings, { mobileControlsActive: true, defaultMobileBindings }),
+    defaultMobileBindings,
+  );
+  assert.equal(
+    getHumanInputBindings('p2', bindings, { mobileControlsActive: false, defaultMobileBindings }),
+    bindings.p2,
+  );
+});
+
+test('mobile input routing detects the mounted Sumorai shared controller', () => {
+  const doc = {
+    querySelector(selector) {
+      return selector === '[data-mobile-controller-root="sumorai-touch"]' ? {} : null;
+    },
+  };
+
+  assert.equal(isMobileControllerMounted(doc), true);
+  assert.equal(isMobileControllerMounted({ querySelector: () => null }), false);
+});
+
 
 function makeClassList(initial) {
   const classes = new Set(initial);
