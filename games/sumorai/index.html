@@ -283,7 +283,7 @@
       glow: '#f2c15f',
       dpadLabel: 'MOVE',
       dpad: { up: KEY.w, down: KEY.s, left: KEY.a, right: KEY.d },
-      directionMode: 'cardinal',
+      directionMode: 'eight-way',
       buttons: [
         { id: 'attack', label: 'ATTACK', key: KEY.c },
         { id: 'dash', label: 'DASH', key: KEY.v },
@@ -293,7 +293,10 @@
 
     const forceMobileControls = new URLSearchParams(window.location.search).has('forceMobileControls');
     initMobileLandscapeGate({ force: forceMobileControls });
-    mountMobileController({ profile: SUMORAI_MOBILE_PROFILE, force: forceMobileControls });
+    const mobileController = mountMobileController({ profile: SUMORAI_MOBILE_PROFILE, force: forceMobileControls });
+    if (mobileController) {
+      document.getElementById('btn-local')?.setAttribute('hidden', '');
+    }
     initGame();
   </script>
 </body>

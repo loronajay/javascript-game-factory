@@ -30,12 +30,15 @@ test('index mounts the shared mobile controller before game init', () => {
   assert(source.includes("from '../../js/mobile-controller.mjs'"), 'expected shared mobile controller import');
   assert(source.includes("from './scripts/mobile-ui.js'"), 'expected Sumorai mobile UI import');
   assert(source.includes("id: 'sumorai-touch'"), 'expected Sumorai-specific mobile profile');
+  assert(source.includes("directionMode: 'eight-way'"), 'expected diagonal dpad movement for jump-forward/back');
   assert(
     source.indexOf("id: 'attack'") < source.indexOf("id: 'dash'") &&
       source.indexOf("id: 'dash'") < source.indexOf("id: 'throw'"),
     'expected default Sumorai mobile button order: attack, dash, throw',
   );
   assert(source.includes('forceMobileControls'), 'expected desktop QA force switch');
+  assert(source.includes('const mobileController = mountMobileController'), 'expected mounted controller handle');
+  assert(source.includes("document.getElementById('btn-local')?.setAttribute('hidden', '')"), 'expected local multiplayer hidden on mobile');
   const gateCall = source.indexOf('initMobileLandscapeGate({ force: forceMobileControls })');
   const controllerCall = source.indexOf('mountMobileController({ profile: SUMORAI_MOBILE_PROFILE, force: forceMobileControls })');
   const initCall = source.indexOf('initGame();');
