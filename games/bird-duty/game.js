@@ -11,6 +11,12 @@ import {
   MENU_ACTIONS,
   resolveMenuActionAtCanvasPoint,
 } from "./scripts/menu-input.js";
+import {
+  createJoinCodeInput,
+  focusJoinCodeInput,
+  setJoinCodeInputActive,
+  syncJoinCodeInputValue,
+} from "./scripts/mobile-join-code-input.js";
 import { createBirdDutyRenderer } from "./scripts/renderer.js";
 import { createSoundController } from "./scripts/sounds.js";
 import { applyMenuAction, createInitialState, SCREEN } from "./scripts/state.js";
@@ -30,6 +36,7 @@ import {
   getOnlineActionSettings,
   normalizeJoinCodeInput,
   resolveOnlineActionAtCanvasPoint,
+  resolveOnlineJoinCodeInputAtCanvasPoint,
 } from "./scripts/online-menu.js";
 import {
   addScore,
@@ -102,6 +109,7 @@ export async function initGame() {
     let lastOnlineScoreTotal = 0;
     let lastTime = null;
     let accumulator = 0;
+    let joinCodeInput = null;
 
     function createHotseatNpcState(session = hotseatSession) {
       return createNpcState({ round: session.round });
@@ -409,6 +417,7 @@ export async function initGame() {
     async function joinOnlineRoom(roomCode) {
       const normalized = normalizeJoinCodeInput(roomCode);
       if (!normalized) return false;
+      syncJoinCodeInputValue(joinCodeInput, normalized);
       gameState = { ...gameState, screen: SCREEN.ONLINE_LOBBY, mode: "online" };
       onlineLobby = {
         status: "Connecting...",
@@ -433,6 +442,7 @@ export async function initGame() {
       if (action === ONLINE_ACTIONS.JOIN) {
         onlineJoinCode = "";
         gameState = applyMenuAction(gameState, action);
+        setJoinCodeInputActive(joinCodeInput, true, onlineJoinCode);
         return true;
       } else {
         gameState = applyMenuAction(gameState, action);
@@ -464,6 +474,14 @@ export async function initGame() {
         && gameState.screen !== SCREEN.ONLINE_LOBBY
       ) return;
       const action = actionFromEvent(event);
+      if (!action && gameState.screen === SCREEN.ONLINE_JOIN) {
+        const point = canvasPointFromEvent(event);
+        if (resolveOnlineJoinCodeInputAtCanvasPoint(point.x, point.y)) {
+          event.preventDefault();
+          focusJoinCodeInput(joinCodeInput);
+        }
+        return;
+      }
       if (!action) return;
       event.preventDefault();
       sounds.playButtonClick();
@@ -491,6 +509,7 @@ export async function initGame() {
         if (action === ONLINE_ACTIONS.JOIN_BACK) {
           onlineJoinCode = "";
           gameState = applyMenuAction(gameState, action);
+          setJoinCodeInputActive(joinCodeInput, false, onlineJoinCode);
           canvas.classList.remove("is-menu-hot");
         } else if (action === ONLINE_ACTIONS.JOIN_SUBMIT) {
           joinOnlineRoom(onlineJoinCode);
@@ -506,6 +525,9 @@ export async function initGame() {
           return;
         }
         startOnlineAction(action);
+        if (action === ONLINE_ACTIONS.JOIN) {
+          focusJoinCodeInput(joinCodeInput);
+        }
         canvas.classList.remove("is-menu-hot");
         return;
       }
@@ -538,6 +560,7 @@ export async function initGame() {
     }
 
     function tick() {
+      setJoinCodeInputActive(joinCodeInput, gameState.screen === SCREEN.ONLINE_JOIN, onlineJoinCode);
       menuBirdState = advanceMenuBirdState(menuBirdState);
       if (gameState.screen === SCREEN.ONLINE_PLAY) {
         if (onlineMatchSession?.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
@@ -741,6 +764,7 @@ export async function initGame() {
           event.preventDefault();
           onlineJoinCode = "";
           gameState = applyMenuAction(gameState, ONLINE_ACTIONS.JOIN_BACK);
+          setJoinCodeInputActive(joinCodeInput, false, onlineJoinCode);
           return;
         }
         if (event.key === "Enter") {
@@ -751,11 +775,13 @@ export async function initGame() {
         if (event.key === "Backspace") {
           event.preventDefault();
           onlineJoinCode = onlineJoinCode.slice(0, -1);
+          syncJoinCodeInputValue(joinCodeInput, onlineJoinCode);
           return;
         }
         if (/^[a-z0-9]$/i.test(event.key)) {
           event.preventDefault();
           onlineJoinCode = normalizeJoinCodeInput(`${onlineJoinCode}${event.key}`);
+          syncJoinCodeInputValue(joinCodeInput, onlineJoinCode);
           return;
         }
       }
@@ -811,11 +837,25 @@ export async function initGame() {
         onlineJoinCode,
         onlineMatch: onlineMatchSession,
         onlineClientId: onlineClient?.clientId || null,
+        mobileControlsActive: Boolean(document.querySelector('[data-mobile-controller-root="bird-duty-touch"]')),
       });
       requestAnimationFrame(loop);
     }
 
     if (status) status.hidden = true;
+    joinCodeInput = createJoinCodeInput({
+      onInput(value) {
+        onlineJoinCode = value;
+      },
+      onSubmit() {
+        joinOnlineRoom(onlineJoinCode);
+      },
+      onEscape() {
+        onlineJoinCode = "";
+        gameState = applyMenuAction(gameState, ONLINE_ACTIONS.JOIN_BACK);
+        setJoinCodeInputActive(joinCodeInput, false, onlineJoinCode);
+      },
+    });
     canvas.addEventListener("pointermove", updateMenuHover);
     canvas.addEventListener("pointerleave", () => {
       menuInteractionState = createMenuInteractionState(menuInteractionState, null);
@@ -839,6 +879,7 @@ export async function initGame() {
       onlineJoinCode,
       onlineMatch: onlineMatchSession,
       onlineClientId: onlineClient?.clientId || null,
+      mobileControlsActive: Boolean(document.querySelector('[data-mobile-controller-root="bird-duty-touch"]')),
     });
     requestAnimationFrame(loop);
   } catch (error) {

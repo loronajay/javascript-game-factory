@@ -170,23 +170,7 @@ function directionCenter(direction) {
 }
 
 function angleToDirection(angle, mode = 'eight-way') {
-  const zones = mode === 'cardinal'
-    ? [
-        ['right', 0, 44],
-        ['down', 90, 44],
-        ['left', 180, 44],
-        ['up', 270, 44],
-      ]
-    : [
-        ['right', 0, 26],
-        ['down-right', 45, 18],
-        ['down', 90, 26],
-        ['down-left', 135, 18],
-        ['left', 180, 26],
-        ['up-left', 225, 18],
-        ['up', 270, 26],
-        ['up-right', 315, 18],
-      ];
+  const zones = getPadZones(mode).map((zone) => [zone.direction, zone.center, zone.half]);
 
   let bestDirection = null;
   let bestDistance = Infinity;
@@ -424,16 +408,22 @@ function positionControl(el, placement) {
   });
 }
 
-function createPad(doc, dispatcher, padConfig, placement) {
-  const pad = doc.createElement('div');
-  pad.className = 'mobile-controller__pad';
-  positionControl(pad, placement);
-
-  const ringSize = 220;
-  const center = ringSize / 2;
-  const outerRadius = ringSize * 0.485;
-  const innerRadius = ringSize * 0.20;
-  const zones = [
+function getPadZones(mode = 'eight-way') {
+  if (mode === 'horizontal') {
+    return [
+      { direction: 'right', center: 0, half: 62, rotation: 90 },
+      { direction: 'left', center: 180, half: 62, rotation: 270 },
+    ];
+  }
+  if (mode === 'cardinal') {
+    return [
+      { direction: 'right', center: 0, half: 44, rotation: 90 },
+      { direction: 'down', center: 90, half: 44, rotation: 180 },
+      { direction: 'left', center: 180, half: 44, rotation: 270 },
+      { direction: 'up', center: 270, half: 44, rotation: 0 },
+    ];
+  }
+  return [
     { direction: 'right', center: 0, half: 26, rotation: 90 },
     { direction: 'down-right', center: 45, half: 18, rotation: 135 },
     { direction: 'down', center: 90, half: 26, rotation: 180 },
@@ -443,6 +433,18 @@ function createPad(doc, dispatcher, padConfig, placement) {
     { direction: 'up', center: 270, half: 26, rotation: 0 },
     { direction: 'up-right', center: 315, half: 18, rotation: 45 },
   ];
+}
+
+function createPad(doc, dispatcher, padConfig, placement) {
+  const pad = doc.createElement('div');
+  pad.className = 'mobile-controller__pad';
+  positionControl(pad, placement);
+
+  const ringSize = 220;
+  const center = ringSize / 2;
+  const outerRadius = ringSize * 0.485;
+  const innerRadius = ringSize * 0.20;
+  const zones = getPadZones(padConfig.directionMode);
 
   const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.classList.add('mobile-controller__ring');
@@ -481,6 +483,7 @@ function createPad(doc, dispatcher, padConfig, placement) {
     const point = polarPoint(50, 50, 31, zone.center);
     const arrow = doc.createElement('div');
     arrow.className = 'mobile-controller__arrow';
+    arrow.dataset.direction = zone.direction;
     arrow.style.left = `calc(${point.x}% - 9px)`;
     arrow.style.top = `calc(${point.y}% - 9px)`;
     arrow.style.transform = `rotate(${zone.rotation}deg)`;
@@ -637,6 +640,7 @@ function mountMobileController(options = {}) {
     root.appendChild(createPad(doc, dispatcher, {
       label: profile.dpadLabel,
       dpad: profile.dpad,
+      directionMode: profile.directionMode,
     }, { left: '18px', bottom: '18px' }));
 
     const buttons = profile.buttons || [];
@@ -665,6 +669,7 @@ export {
   CONTROL_KEY_SPECS,
   MOBILE_CONTROL_PROFILES,
   createKeyboardDispatcher,
+  getPadZones,
   getDirectionKeys,
   isMobileLike,
   mountMobileController,

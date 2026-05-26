@@ -183,6 +183,7 @@ function _boot(sounds) {
     showScreen,
     startMatch,
     stopAmbient,
+    playSound,
   });
 
   createControlsScreen({
@@ -197,6 +198,7 @@ function _boot(sounds) {
     setBindings: next => { bindings = next; },
     saveBindings,
     showScreen,
+    playSound,
   }).wire();
 
   // Online lobby wiring
@@ -348,6 +350,7 @@ function _boot(sounds) {
     stopSearchDots: _stopSearchDots,
     stopWaitingDots: _stopWaitingDots,
     updateQueueHint: _updateQueueHint,
+    playSound,
   });
 
 

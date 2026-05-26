@@ -171,6 +171,7 @@ test('online helper stage picking and input comparison stay deterministic', () =
 
 test('drawOnlineCountdown preserves the original draw sequence', () => {
   const calls = [];
+  const sounds = [];
   const ctx = {
     save: () => calls.push(['save']),
     restore: () => calls.push(['restore']),
@@ -516,6 +517,7 @@ test('online lobby event wiring preserves side, matchmaking, room, and menu acti
     },
   };
   const calls = [];
+  const sounds = [];
   const client = {
     cancelRoom: () => calls.push(['cancelRoom']),
     cancelSearch: () => calls.push(['cancelSearch']),
@@ -548,6 +550,7 @@ test('online lobby event wiring preserves side, matchmaking, room, and menu acti
     stopSearchDots: () => calls.push(['stopSearchDots']),
     stopWaitingDots: () => calls.push(['stopWaitingDots']),
     updateQueueHint: () => calls.push(['updateQueueHint']),
+    playSound: sound => sounds.push(sound),
   });
 
   sideCards[1].click();
@@ -594,6 +597,7 @@ test('online lobby event wiring preserves side, matchmaking, room, and menu acti
     ['showScreen', 'screen-online-lobby'],
     ['showLobbyPhase', 'main'],
   ]);
+  assert.deepEqual(sounds, ['ching', 'ching', 'ching', 'ching', 'swing', 'ching']);
 });
 
 test('setup event wiring preserves local, CPU, setup, and result menu actions', () => {
@@ -646,6 +650,7 @@ test('setup event wiring preserves local, CPU, setup, and result menu actions', 
     },
   };
   const calls = [];
+  const sounds = [];
   const gameState = { p1: { wins: 2 }, p2: { wins: 1 }, roundTarget: 0 };
   let botConfig = { enabled: false, side: 'p2', difficulty: 'hard' };
   let selectedRounds = 3;
@@ -669,6 +674,7 @@ test('setup event wiring preserves local, CPU, setup, and result menu actions', 
     showScreen: screen => calls.push(['showScreen', screen]),
     startMatch: () => calls.push(['startMatch']),
     stopAmbient: () => calls.push(['stopAmbient']),
+    playSound: sound => sounds.push(sound),
   });
 
   elements.get('btn-local').click();
@@ -710,6 +716,20 @@ test('setup event wiring preserves local, CPU, setup, and result menu actions', 
   assert.equal(gameState.p1.wins, 0);
   assert.equal(gameState.p2.wins, 0);
   assert.deepEqual(calls.slice(-2), [['stopAmbient'], ['showScreen', 'screen-menu']]);
+  assert.deepEqual(sounds, [
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'ching',
+    'swing',
+  ]);
 });
 
 test('online callbacks preserve queue, match-ready, remote input, and disconnect behavior', () => {

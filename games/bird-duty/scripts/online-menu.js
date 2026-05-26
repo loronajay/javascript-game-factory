@@ -103,6 +103,13 @@ export const ONLINE_JOIN_BUTTONS = Object.freeze([
   },
 ]);
 
+export const ONLINE_JOIN_CODE_INPUT = Object.freeze({
+  x: 0,
+  y: -11,
+  width: 264,
+  height: 62,
+});
+
 export function isPublicOnlineAction(action) {
   return action === ONLINE_ACTIONS.PUBLIC_2
     || action === ONLINE_ACTIONS.PUBLIC_3
@@ -143,6 +150,14 @@ export function resolveOnlineActionAtScratchPoint(point, buttons = ONLINE_MENU_B
 
 export function resolveOnlineActionAtCanvasPoint(x, y, buttons = ONLINE_MENU_BUTTONS) {
   return resolveOnlineActionAtScratchPoint(canvasToScratchPoint(x, y), buttons);
+}
+
+export function resolveOnlineJoinCodeInputAtScratchPoint(point) {
+  return pointInScratchButton(point, ONLINE_JOIN_CODE_INPUT);
+}
+
+export function resolveOnlineJoinCodeInputAtCanvasPoint(x, y) {
+  return resolveOnlineJoinCodeInputAtScratchPoint(canvasToScratchPoint(x, y));
 }
 
 export function getOnlineButtonByAction(action, buttons = ONLINE_MENU_BUTTONS) {

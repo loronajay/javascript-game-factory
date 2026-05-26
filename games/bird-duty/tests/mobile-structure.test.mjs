@@ -30,6 +30,7 @@ test("index mounts the shared mobile controller before game init", () => {
   assert(source.includes("from './scripts/mobile-ui.js'"), "expected Bird Duty mobile UI import");
   assert(source.includes("id: 'bird-duty-touch'"), "expected Bird Duty-specific mobile profile");
   assert(source.includes("forceMobileControls"), "expected desktop QA force switch");
+  assert(source.includes("directionMode: 'horizontal'"), "expected left/right-only mobile movement pad");
   assert(source.includes("{ id: 'drop', label: 'DROP', key: KEY.space }"), "expected drop button to emit Space");
 
   const gateCall = source.indexOf("initMobileLandscapeGate({ force: forceMobileControls })");
@@ -54,6 +55,14 @@ test("mobile styles include landscape gate and shared controller overrides", () 
   assert(source.includes("(pointer: coarse)"), "expected touch-specific media query");
   assert(source.includes('data-mobile-controller-root="bird-duty-touch"'), "expected Bird Duty controller overrides");
   assert(source.includes("env(safe-area-inset-bottom)"), "expected safe-area inset handling");
+});
+
+test("game wires the focusable join-code input for mobile keyboards", () => {
+  const source = read("game.js");
+  assert(source.includes("createJoinCodeInput"), "expected join-code input helper");
+  assert(source.includes("setJoinCodeInputActive"), "expected join-code active state sync");
+  assert(source.includes("focusJoinCodeInput"), "expected mobile keyboard focus path");
+  assert(source.includes("resolveOnlineJoinCodeInputAtCanvasPoint"), "expected tappable join-code box");
 });
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);

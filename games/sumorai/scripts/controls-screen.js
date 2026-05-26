@@ -21,6 +21,7 @@ function createControlsScreen({
   setBindings,
   saveBindings,
   showScreen,
+  playSound = () => {},
 }) {
   let workingBindings = null;
   let listeningState = null;
@@ -44,7 +45,10 @@ function createControlsScreen({
       keyBtn.textContent = formatKeyCode(workingBindings[side][action]);
       keyBtn.dataset.side = side;
       keyBtn.dataset.action = action;
-      keyBtn.addEventListener('click', () => startListening(side, action, keyBtn));
+      keyBtn.addEventListener('click', () => {
+        playSound('ching');
+        startListening(side, action, keyBtn);
+      });
 
       keyTd.appendChild(keyBtn);
       tr.appendChild(labelTd);
@@ -85,6 +89,7 @@ function createControlsScreen({
   }
 
   function open() {
+    playSound('ching');
     const bindings = getBindings();
     workingBindings = { p1: { ...bindings.p1 }, p2: { ...bindings.p2 } };
     buildControlsTable('p1');
@@ -93,12 +98,14 @@ function createControlsScreen({
   }
 
   function resetSide(side) {
+    playSound('ching');
     if (listeningState?.side === side) cancelListening();
     workingBindings[side] = side === 'p1' ? { ...defaultP1 } : { ...defaultP2 };
     buildControlsTable(side);
   }
 
   function done() {
+    playSound('swing');
     if (listeningState) cancelListening();
     saveBindings(workingBindings.p1, workingBindings.p2);
     setBindings({ ...workingBindings });

@@ -1,7 +1,9 @@
 import {
   ONLINE_ACTIONS,
+  ONLINE_JOIN_CODE_INPUT,
   getOnlineActionSettings,
   normalizeJoinCodeInput,
+  resolveOnlineJoinCodeInputAtScratchPoint,
   resolveOnlineActionAtScratchPoint,
   shouldShowJoinCodeCursor,
 } from "../scripts/online-menu.js";
@@ -46,6 +48,17 @@ test("online join code panel resolves submit and back", () => {
 
   assertEqual(resolveOnlineActionAtScratchPoint({ x: -65, y: -140 }, buttons), ONLINE_ACTIONS.JOIN_SUBMIT);
   assertEqual(resolveOnlineActionAtScratchPoint({ x: 65, y: -140 }, buttons), ONLINE_ACTIONS.JOIN_BACK);
+});
+
+test("online join code input panel resolves the visible code box", () => {
+  assertEqual(resolveOnlineJoinCodeInputAtScratchPoint({
+    x: ONLINE_JOIN_CODE_INPUT.x,
+    y: ONLINE_JOIN_CODE_INPUT.y,
+  }), true);
+  assertEqual(resolveOnlineJoinCodeInputAtScratchPoint({
+    x: ONLINE_JOIN_CODE_INPUT.x,
+    y: ONLINE_JOIN_CODE_INPUT.y - ONLINE_JOIN_CODE_INPUT.height,
+  }), false);
 });
 
 test("online menu rejects empty space", () => {

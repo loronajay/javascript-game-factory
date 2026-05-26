@@ -188,6 +188,31 @@ body {
   letter-spacing: 0;
 }
 
+.bird-duty-join-code-input {
+  position: fixed;
+  z-index: 999910;
+  left: 50%;
+  top: 50%;
+  width: min(36vw, 264px);
+  min-width: 180px;
+  height: 48px;
+  transform: translate(-50%, 15px);
+  border: 2px solid rgba(184, 255, 0, 0.86);
+  border-radius: 4px;
+  background: rgba(20, 8, 16, 0.86);
+  color: #ffffff;
+  font: 700 24px Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+  caret-color: #b8ff00;
+  opacity: 0.02;
+}
+
+.bird-duty-join-code-input.is-active {
+  pointer-events: auto;
+}
+
 @media (hover: none), (pointer: coarse), (max-width: 720px) {
   body {
     touch-action: none;

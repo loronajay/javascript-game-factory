@@ -303,18 +303,25 @@ export async function createBirdDutyRenderer(canvas, manifest) {
     ctx.restore();
   }
 
-  function drawMainMenuControls() {
+  function drawMainMenuControls({ mobileControlsActive = false } = {}) {
+    const controlsText = mobileControlsActive
+      ? "TAP PAD: LEFT / RIGHT   DROP BUTTON"
+      : "MOVE: ARROWS / A-D   DROP: SPACE";
+    const controlsY = mobileControlsActive ? 334 : 348;
+    const boxY = mobileControlsActive ? 318 : 330;
+    const boxH = mobileControlsActive ? 30 : 34;
+
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 2;
-    ctx.fillRect(202, 330, 263, 34);
-    ctx.strokeRect(202, 330, 263, 34);
-    ctx.font = `16px ${HUD_VALUE_FONT}`;
+    ctx.fillRect(186, boxY, 294, boxH);
+    ctx.strokeRect(186, boxY, 294, boxH);
+    ctx.font = `${mobileControlsActive ? 13 : 16}px ${HUD_VALUE_FONT}`;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("MOVE: ARROWS / A-D   DROP: SPACE", SCRATCH_STAGE.width / 2, 348);
+    ctx.fillText(controlsText, SCRATCH_STAGE.width / 2, controlsY);
     ctx.restore();
   }
 
@@ -539,7 +546,7 @@ export async function createBirdDutyRenderer(canvas, manifest) {
       drawMenuBird(frame, placement);
     }
     drawMenuPersonalBest(state.personalBest);
-    drawMainMenuControls();
+    drawMainMenuControls({ mobileControlsActive: state.mobileControlsActive === true });
   }
 
   function renderTwoPlayerMenu(state = {}) {
