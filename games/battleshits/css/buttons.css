@@ -3,6 +3,7 @@
   padding: 12px 26px;
   border: 3px solid #0e0e0f;
   cursor: pointer;
+  touch-action: manipulation;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 900;

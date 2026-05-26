@@ -102,6 +102,70 @@ test('battle board sizing is viewport-aware and stacks before boards are crushed
   );
 });
 
+test('mobile landscape keeps the battle boards side by side with compact chrome', () => {
+  assertMatches(
+    files.responsive,
+    /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\),\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*landscape\),\s*\(max-height:\s*520px\)\s*and\s*\(min-width:\s*700px\)\s*\{/,
+    'Expected a landscape-first mobile media query matching the other recent cabinets.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.screen-battle\s*\{[\s\S]*--bowl-size:\s*min\(31vw,\s*58svh,\s*260px\);/,
+    'Expected compact mobile landscape battle bowls sized from width and dynamic viewport height.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.battle-boards\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+clamp\(54px,\s*7vw,\s*78px\)\s+minmax\(0,\s*1fr\);/,
+    'Expected mobile landscape battle boards to remain side by side with a compact center column.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.screen-battle #fleet-ships-status,\s*\n\s*\.screen-battle #opponent-ships-status\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\);/,
+    'Expected fleet status panels to compress into a single scan row instead of hiding.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.screen-battle \.emote-bubble\s*\{[\s\S]*position:\s*absolute;/,
+    'Expected mobile landscape emotes to overlay boards instead of reserving vertical layout space.',
+  );
+});
+
+test('mobile portrait shows the landscape gate instead of crushing the boards', () => {
+  assertMatches(
+    files.responsive,
+    /\.mobile-landscape-gate\s*\{[\s\S]*position:\s*fixed;[\s\S]*env\(safe-area-inset-top\)[\s\S]*env\(safe-area-inset-left\)/,
+    'Expected mobile landscape gate to cover the viewport and respect safe-area insets.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.mobile-landscape-gate\.is-visible\s*\{[\s\S]*display:\s*flex;/,
+    'Expected the gate to become visible when mobile-ui marks it active.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.mobile-play-gated \.game-shell\s*\{[\s\S]*filter:\s*blur\(2px\) brightness\(0\.55\);/,
+    'Expected the game shell to dim behind the orientation gate.',
+  );
+});
+
+test('mobile landscape menu remains centered with a fully visible title stack', () => {
+  assertMatches(
+    files.responsive,
+    /\.menu-stage\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/,
+    'Expected mobile landscape menu to keep the centered menu stack instead of a side-column layout.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.menu-title-frame \.game-title\s*\{[\s\S]*font-size:\s*clamp\(1\.35rem,\s*3\.8vw,\s*2\.1rem\);/,
+    'Expected mobile landscape title sizing to fit inside the frame.',
+  );
+  assertMatches(
+    files.responsive,
+    /\.menu-buttons\s*\{[\s\S]*margin-top:\s*clamp\(-150px,\s*-34svh,\s*-110px\);/,
+    'Expected mobile landscape buttons to sit over the toilet area while the whole menu stays centered.',
+  );
+});
+
 test('fleet status panel owns layout space instead of overlapping the fleet bowl', () => {
   assertMatches(
     files.battle,
@@ -130,7 +194,7 @@ test('fleet status panel owns layout space instead of overlapping the fleet bowl
   );
   assertNotMatches(
     files.responsive,
-    /@media\s*\(max-width:\s*1280px\)\s*\{[\s\S]*\.screen-battle #(fleet-ships-status|opponent-ships-status)\s*\{[\s\S]*display:\s*none;/,
+    /@media\s*\(max-width:\s*1280px\)\s*\{[\s\S]*?\.screen-battle #(fleet-ships-status|opponent-ships-status)\s*\{[^}]*display:\s*none;/,
     'Fleet status panels are important battle UI and should stay visible on narrower screens.',
   );
 });
