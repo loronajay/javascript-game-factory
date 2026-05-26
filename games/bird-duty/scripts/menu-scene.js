@@ -5,7 +5,6 @@ const MENU_TARGET_NAMES = Object.freeze([
   "SINGLE PLAYER",
   "MULTIPLAYER",
   "reset pb",
-  "Back to Homepage",
   "Back to Arcade",
 ]);
 
@@ -13,8 +12,11 @@ const MENU_TARGET_ACTIONS = Object.freeze({
   "SINGLE PLAYER": MENU_ACTIONS.SINGLE_PLAYER,
   MULTIPLAYER: MENU_ACTIONS.TWO_PLAYERS,
   "reset pb": MENU_ACTIONS.RESET_SCORE,
-  "Back to Homepage": MENU_ACTIONS.BACK_HOME,
   "Back to Arcade": MENU_ACTIONS.BACK_ARCADE,
+});
+
+const MENU_TARGET_OVERRIDES = Object.freeze({
+  "Back to Arcade": { x: -255, y: -155 },
 });
 
 const JAYARCADE_SHELL_TARGETS = Object.freeze([
@@ -37,12 +39,15 @@ export function buildMenuSprites(manifest) {
   return MENU_TARGET_NAMES
     .map((name) => manifest.targets.find((target) => target.name === name))
     .filter(Boolean)
-    .map((target) => ({
+    .map((target) => {
+      const override = MENU_TARGET_OVERRIDES[target.name] || {};
+      return {
       targetName: target.name,
-      x: target.x || 0,
-      y: target.y || 0,
+      x: override.x ?? target.x ?? 0,
+      y: override.y ?? target.y ?? 0,
       size: target.size || 100,
       costumeName: target.costumes[target.currentCostume || 0]?.name || "",
       action: MENU_TARGET_ACTIONS[target.name] || null,
-    }));
+      };
+    });
 }

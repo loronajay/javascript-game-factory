@@ -3,7 +3,6 @@ import { canvasToScratchPoint } from "./coordinates.js";
 export const MENU_ACTIONS = Object.freeze({
   SINGLE_PLAYER: "single-player",
   TWO_PLAYERS: "two-players",
-  BACK_HOME: "back-home",
   BACK_ARCADE: "back-arcade",
   RESET_SCORE: "reset-score",
 });
@@ -24,15 +23,8 @@ export const MENU_BUTTONS = Object.freeze([
     height: 56.4,
   },
   {
-    action: MENU_ACTIONS.BACK_HOME,
-    x: -255,
-    y: -155,
-    width: 85.6,
-    height: 37.6,
-  },
-  {
     action: MENU_ACTIONS.BACK_ARCADE,
-    x: -165,
+    x: -255,
     y: -155,
     width: 85.6,
     height: 37.6,

@@ -32,8 +32,8 @@ test("menu hitboxes resolve mode buttons in Scratch coordinates", () => {
 });
 
 test("menu hitboxes resolve bottom navigation buttons in Scratch coordinates", () => {
-  assertEqual(resolveMenuActionAtScratchPoint({ x: -255, y: -155 }), MENU_ACTIONS.BACK_HOME);
-  assertEqual(resolveMenuActionAtScratchPoint({ x: -165, y: -155 }), MENU_ACTIONS.BACK_ARCADE);
+  assertEqual(resolveMenuActionAtScratchPoint({ x: -255, y: -155 }), MENU_ACTIONS.BACK_ARCADE);
+  assertEqual(resolveMenuActionAtScratchPoint({ x: -165, y: -155 }), null);
   assertEqual(resolveMenuActionAtScratchPoint({ x: 255, y: -155 }), MENU_ACTIONS.RESET_SCORE);
 });
 

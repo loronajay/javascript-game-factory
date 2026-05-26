@@ -47,7 +47,7 @@ test("menu scene includes the Bird Duty menu sprites", () => {
 
   assert(names.includes("SINGLE PLAYER"), "expected single-player button");
   assert(names.includes("MULTIPLAYER"), "expected multiplayer button");
-  assert(names.includes("Back to Homepage"), "expected canon homepage button art");
+  assert(!names.includes("Back to Homepage"), "expected homepage button art to be removed");
   assert(names.includes("Back to Arcade"), "expected canon arcade button art");
   assert(names.includes("reset pb"), "expected reset score button art");
 });
@@ -96,6 +96,15 @@ test("buildMenuSprites annotates actionable buttons", () => {
   assertEqual(sprites.find((sprite) => sprite.targetName === "SINGLE PLAYER").action, MENU_ACTIONS.SINGLE_PLAYER);
   assertEqual(sprites.find((sprite) => sprite.targetName === "MULTIPLAYER").action, MENU_ACTIONS.TWO_PLAYERS);
   assertEqual(sprites.find((sprite) => sprite.targetName === "reset pb").action, MENU_ACTIONS.RESET_SCORE);
+});
+
+test("buildMenuSprites moves the arcade button into the old homepage slot", () => {
+  const manifest = createManifest(getBirdDutyMenuTargetNames());
+  const arcade = buildMenuSprites(manifest).find((sprite) => sprite.targetName === "Back to Arcade");
+
+  assertEqual(arcade.x, -255);
+  assertEqual(arcade.y, -155);
+  assertEqual(arcade.action, MENU_ACTIONS.BACK_ARCADE);
 });
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);

@@ -490,10 +490,6 @@ export async function initGame() {
         window.location.href = "../../grid.html";
         return;
       }
-      if (action === MENU_ACTIONS.BACK_HOME) {
-        window.location.href = "../../index.html";
-        return;
-      }
       if (gameState.screen === SCREEN.ONLINE_LOBBY) {
         if (action === ONLINE_ACTIONS.LOBBY_BACK) {
           leaveOnlineLobby();
