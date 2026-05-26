@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Mobile Drawing Engine</title>
-  <link rel="stylesheet" href="./css/styles.css" />
+  <title>Mobile Drawing Engine Fill Prototype</title>
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <main id="game" aria-label="Mobile drawing engine">
+  <main id="game" aria-label="Mobile drawing engine prototype">
     <div id="camera">
       <div id="floor">
         <canvas id="draw-canvas"></canvas>
         <div id="cursor-anchor"></div>
 
-        <div id="player" class="facing-down tool-pencil" aria-label="Player drawing avatar">
+        <div id="player" class="facing-down tool-pencil" aria-label="Player drawing prototype">
           <div class="shadow"></div>
+          <div class="hurtbox"></div>
+          <div class="tip-dot"></div>
           <div class="sprite">
             <div class="head">
               <div class="face">
@@ -22,9 +24,7 @@
                 <div class="eye right"></div>
               </div>
             </div>
-
             <div class="body"><div class="torso-mark"></div></div>
-
             <div class="arm left"><div class="hand"></div><div class="forearm"></div></div>
             <div class="arm right"><div class="hand"></div><div class="forearm"></div></div>
 
@@ -43,7 +43,7 @@
               </div>
             </div>
 
-            <div class="tool-hand"></div>
+            <div class="pencil-hand"></div>
             <div class="leg left"><div class="foot"></div></div>
             <div class="leg right"><div class="foot"></div></div>
           </div>
@@ -52,10 +52,10 @@
     </div>
 
     <section id="hud">
-      <strong>Drawing Engine</strong><br />
-      Visible anchor = actual draw point.<br />
+      <strong>Drawing Engine Fill</strong><br />
+      Draw anchor is now visible.<br />
       Raw keeps crisp corners. Smooth rounds finished strokes.<br />
-      Spray now behaves like a dense airbrush.
+      Shape mode anchors on press. Fill uses the cursor position and current line color.
     </section>
 
     <section id="minimap" aria-label="World minimap">
@@ -72,6 +72,14 @@
       <button class="tool-button" data-tool="brush" type="button">Brush</button>
       <button class="tool-button" data-tool="spray" type="button">Spray</button>
       <button class="tool-button" data-tool="eraser" type="button">Erase</button>
+      <button class="tool-button" data-tool="shape" type="button">Shape</button>
+    </section>
+
+    <section class="shape-panel" id="shape-panel">
+      <button class="shape-button active" data-shape="line" type="button">Line</button>
+      <button class="shape-button" data-shape="rect" type="button">Rect</button>
+      <button class="shape-button" data-shape="ellipse" type="button">Ellipse</button>
+      <button class="shape-button" data-shape="triangle" type="button">Tri</button>
     </section>
 
     <section class="color-panel">
@@ -94,13 +102,14 @@
       <button id="undo-button" type="button" disabled>Undo</button>
       <button id="clear-button" type="button">Clear</button>
       <button id="full-view-button" type="button">Full View</button>
+      <button id="fill-button" type="button">Fill</button>
       <button id="draw-button" type="button">Draw</button>
     </section>
 
     <section id="setup-overlay" aria-label="Canvas setup">
       <div class="setup-card">
         <h1>New Canvas</h1>
-        <p>Choose a canvas size and floor preset. Medium is the safest default for mobile testing.</p>
+        <p>Choose a canvas size and a floor preset before entering the drawing space. Medium is the safest default for phone performance.</p>
 
         <div class="setup-row">
           <label for="size-select">Canvas Size</label>
@@ -115,7 +124,7 @@
           <label>Floor Preset</label>
           <div class="preset-swatches">
             <button class="preset-swatch active" data-preset="slate" type="button" style="background: linear-gradient(180deg, #334155, #1f2937);"><span>Slate</span></button>
-            <button class="preset-swatch" data-preset="paper" type="button" style="background: linear-gradient(180deg, #f8fafc, #d7dde8);"><span class="dark-label">Paper</span></button>
+            <button class="preset-swatch" data-preset="paper" type="button" style="background: linear-gradient(180deg, #f8fafc, #d7dde8);"><span style="color:#111827;text-shadow:none;">Paper</span></button>
             <button class="preset-swatch" data-preset="concrete" type="button" style="background: linear-gradient(180deg, #9ca3af, #6b7280);"><span>Gray</span></button>
             <button class="preset-swatch" data-preset="grass" type="button" style="background: linear-gradient(180deg, #84cc16, #4d7c0f);"><span>Grass</span></button>
             <button class="preset-swatch" data-preset="sand" type="button" style="background: linear-gradient(180deg, #f1c27d, #b78339);"><span>Sand</span></button>
@@ -127,6 +136,6 @@
     </section>
   </main>
 
-  <script type="module" src="./js/main.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

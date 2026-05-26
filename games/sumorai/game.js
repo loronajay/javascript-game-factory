@@ -1,12 +1,16 @@
 import { loadAssets, getSound }      from './scripts/assets.js';
 import { createBotState, tickBot }  from './scripts/bot.js';
 import { loadFactoryProfile }       from '../../js/platform/identity/factory-profile.mjs';
+import { createAudioController }    from './scripts/audio.js';
+import { createControlsScreen }     from './scripts/controls-screen.js';
 import { createInput }              from './scripts/input.js';
+import { createLobbyUi }            from './scripts/lobby-ui.js';
 import {
   ACTIONS, ACTION_LABELS, DEFAULT_P1, DEFAULT_P2,
   formatKeyCode, loadBindings, saveBindings,
 } from './scripts/controls.js';
 import { createPlayer, resetPlayer, stepAnimation } from './scripts/player.js';
+import { spawnBloodEffect, spawnChingEffect, tickEffects as tickVisualEffects } from './scripts/effects.js';
 import { applyPhysics }            from './scripts/physics.js';
 import { resolveHits, getAttackHitbox, getDashHitbox, isAttackActive, isDashAttackActive } from './scripts/combat.js';
 import { createGridlockState, tickGridlock } from './scripts/gridlock.js';
@@ -14,9 +18,12 @@ import { createProjectile, tickProjectile, checkProjectileVsPlayer, checkProject
 import { createCamera, updateCamera, resetCamera } from './scripts/camera.js';
 import { render, setScaleFactor }  from './scripts/renderer.js';
 import { VIEWPORT_W, VIEWPORT_H }  from './scripts/stage.js';
+import { setupCanvasViewport }     from './scripts/viewport.js';
 import { createPlatforms, updatePlatforms } from './scripts/platforms.js';
 import { createOnlineClient, getCountdownSecondsRemaining } from './scripts/online.js';
 import { buildOnlineIdentity } from './scripts/online-identity.js';
+import { drawOnlineCountdown, EMPTY_INPUT, inputsDiffer, pickOnlineStage } from './scripts/online-match-view.js';
+import { loadGameState, saveGameState } from './scripts/rollback-state.js';
 import { publishSumoraiMatchActivity } from '../../js/platform/activity/activity.mjs';
 import { createPlatformApiClient } from '../../js/platform/api/platform-api.mjs';
 
@@ -31,15 +38,13 @@ function _boot(sounds) {
   const canvas = document.getElementById('game-canvas');
   const ctx    = canvas.getContext('2d');
 
-  // ── Resize ─────────────────────────────────────────────────────────────────
-  function resize() {
-    canvas.width  = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const sf = Math.min(canvas.width / VIEWPORT_W, canvas.height / VIEWPORT_H);
-    setScaleFactor(sf);
-  }
-  window.addEventListener('resize', resize);
-  resize();
+  setupCanvasViewport({
+    canvas,
+    window,
+    viewportWidth: VIEWPORT_W,
+    viewportHeight: VIEWPORT_H,
+    setScaleFactor,
+  });
 
   // Warn before leaving the page during an active online match (forfeit guard)
   window.addEventListener('beforeunload', (e) => {
@@ -53,7 +58,6 @@ function _boot(sounds) {
     e.returnValue = '';  // triggers browser's native "Leave site?" dialog
   });
 
-  // ── State ──────────────────────────────────────────────────────────────────
   const input  = createInput();
   const camera = createCamera();
 
@@ -93,7 +97,6 @@ function _boot(sounds) {
   let botConfig = { enabled: false, side: 'p2', difficulty: 'hard' };
   let botState  = createBotState();
 
-  // ── Online state ───────────────────────────────────────────────────────────
   let onlineClient         = null;
   let onlineIdentity       = null;
   let onlineSide           = 'p1';
@@ -113,96 +116,36 @@ function _boot(sounds) {
   let onlinePartnerEnd        = null;
   let onlinePartnerGraceTicks = 0;
 
-  // ── Rollback state ─────────────────────────────────────────────────────────
   let rbLocalFrame  = 0;
   let rbStateBuffer = new Array(ROLLBACK_WINDOW);   // gameState snapshot before frame F
   let rbLocalInputs = new Array(ROLLBACK_WINDOW);   // local input used at frame F
   let rbPredicted   = new Array(ROLLBACK_WINDOW);   // remote input used (predicted or confirmed)
   let resimulating  = false;
+  const { playSound, startAmbient, stopAmbient } = createAudioController(getSound, {
+    isMuted: () => resimulating,
+  });
 
-  // ── Network health tracking ─────────────────────────────────────────────────
   let rbRollbacksThisSec  = 0;   // incremented each resimulate() call
   let rbDisplayRollbacks  = 0;   // snapshot shown in HUD (updated each second)
   let rbSecStartFrame     = 0;   // rbLocalFrame value at last second boundary
 
-  let _searchDotsInterval     = null;
-  let _waitingDotsInterval  = null;
+  const {
+    showScreen,
+    showLobbyPhase,
+    stopSearchDots: _stopSearchDots,
+    startSearchDots: _startSearchDots,
+    stopWaitingDots: _stopWaitingDots,
+    startWaitingDots: _startWaitingDots,
+    updateQueueHint: _updateQueueHint,
+    setSideLocked: _setSideLocked,
+  } = createLobbyUi({
+    document,
+    getOnlineSide: () => onlineSide,
+    getQueueCounts: () => onlineQueueCounts,
+    setLobbyPhase: phase => { onlineLobbyPhase = phase; },
+  });
 
-  // ── Screen helpers ─────────────────────────────────────────────────────────
-  function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('screen--active'));
-    document.getElementById(id).classList.add('screen--active');
-  }
-
-  // ── Online lobby helpers ───────────────────────────────────────────────────
-  const _LOBBY_PHASE_IDS = {
-    side_select:    'lobby-phase-side-select',
-    main:           'lobby-phase-main',
-    searching:      'lobby-phase-searching',
-    friend_options: 'lobby-phase-friend-options',
-    create:         'lobby-phase-create',
-    join:           'lobby-phase-join',
-  };
-
-  function showLobbyPhase(phase) {
-    document.querySelectorAll('.lobby-phase').forEach(el => { el.hidden = true; });
-    document.getElementById(_LOBBY_PHASE_IDS[phase]).hidden = false;
-    onlineLobbyPhase = phase;
-  }
-
-  function _stopSearchDots() {
-    if (_searchDotsInterval) { clearInterval(_searchDotsInterval); _searchDotsInterval = null; }
-  }
-
-  function _startSearchDots(baseText = 'Searching') {
-    _stopSearchDots();
-    let tick = 0;
-    const el = document.getElementById('searching-label');
-    _searchDotsInterval = setInterval(() => {
-      if (el) el.textContent = baseText + '.'.repeat(tick % 4);
-      tick++;
-    }, 400);
-  }
-
-  function _stopWaitingDots() {
-    if (_waitingDotsInterval) { clearInterval(_waitingDotsInterval); _waitingDotsInterval = null; }
-  }
-
-  function _startWaitingDots() {
-    _stopWaitingDots();
-    let tick = 0;
-    const el = document.getElementById('room-waiting-text');
-    _waitingDotsInterval = setInterval(() => {
-      if (el) el.textContent = 'Waiting for partner' + '.'.repeat(tick % 4);
-      tick++;
-    }, 400);
-  }
-
-  function _updateQueueHint() {
-    const el = document.getElementById('queue-hint');
-    if (!el) return;
-    if (!onlineQueueCounts) { el.textContent = ''; return; }
-    const other = onlineSide === 'p1' ? 'p2' : 'p1';
-    const n = onlineQueueCounts[other];
-    if (!Number.isFinite(n)) { el.textContent = ''; return; }
-    el.textContent = n === 0 ? 'No opponents searching yet'
-                              : `${n} ${n === 1 ? 'player' : 'players'} searching`;
-  }
-
-  function _setSideLocked(elId) {
-    const el = document.getElementById(elId);
-    if (el) el.textContent = onlineSide === 'p1' ? 'Playing as P1 (Left)' : 'Playing as P2 (Right)';
-  }
-
-  // ── Online game helpers ────────────────────────────────────────────────────
-
-  const EMPTY_INPUT = { left: false, right: false, up: false, down: false, attack: false, dash: false, projectile: false, attackJustPressed: false };
-
-  function pickOnlineStage(seed, roundNum) {
-    const stages = ['single', 'battlefield', 'battlefield', 'moving', 'none'];
-    const idx = Math.abs(Math.floor(seed * 9301 + roundNum * 49297)) % stages.length;
-    return stages[idx];
-  }
+  // Online game helpers
 
   function _drainRemoteInput() {
     const keys = Object.keys(onlineRemoteInputBuf).map(Number).sort((a, b) => a - b);
@@ -214,81 +157,14 @@ function _boot(sounds) {
     return snap;
   }
 
-  function _drawOnlineCountdown(ctx, canvas) {
-    const secsLeft = getCountdownSecondsRemaining(onlineStartAt, onlineClockOffset);
-    const sf = Math.min(canvas.width / VIEWPORT_W, canvas.height / VIEWPORT_H);
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    ctx.fillStyle = '#0a0608';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255,255,255,0.38)';
-    ctx.font = `${Math.round(15 * sf)}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.fillText(`${p1Label}  vs  ${p2Label}`, cx, cy - Math.round(68 * sf));
-    ctx.fillStyle = '#e05a50';
-    ctx.font = `bold ${Math.round(88 * sf)}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.fillText(secsLeft > 0 ? String(secsLeft) : '!', cx, cy);
-    ctx.fillStyle = 'rgba(255,255,255,0.42)';
-    ctx.font = `${Math.round(13 * sf)}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.fillText('Get Ready', cx, cy + Math.round(58 * sf));
-    ctx.restore();
-  }
-
-  // ── Rollback helpers ───────────────────────────────────────────────────────
-
-  function saveState() {
-    const { p1, p2 } = gameState;
-    return {
-      phase:          gameState.phase,
-      roundNum:       gameState.roundNum,
-      roundStartTick: gameState.roundStartTick,
-      clashFlash:     gameState.clashFlash,
-      deathFlash:     gameState.deathFlash,
-      platforms:      gameState.platforms.map(p => ({ ...p })),
-      p1Proj:         gameState.p1Projectile ? { ...gameState.p1Projectile } : null,
-      p2Proj:         gameState.p2Projectile ? { ...gameState.p2Projectile } : null,
-      gridlock:       gameState.gridlock     ? { ...gameState.gridlock }     : null,
-      effects:        gameState.effects.map(e => ({ ...e })),
-      roundEnd:       gameState.roundEnd     ? { ...gameState.roundEnd }     : null,
-      p1: { ...p1, platformRef: null, _platIdx: p1.platformRef ? gameState.platforms.indexOf(p1.platformRef) : -1 },
-      p2: { ...p2, platformRef: null, _platIdx: p2.platformRef ? gameState.platforms.indexOf(p2.platformRef) : -1 },
-    };
-  }
-
-  function loadState(snap) {
-    if (!snap) return;
-    gameState.phase          = snap.phase;
-    gameState.roundNum       = snap.roundNum;
-    gameState.roundStartTick = snap.roundStartTick;
-    gameState.clashFlash     = snap.clashFlash;
-    gameState.deathFlash     = snap.deathFlash;
-    gameState.platforms      = snap.platforms.map(p => ({ ...p }));
-    gameState.p1Projectile   = snap.p1Proj ? { ...snap.p1Proj } : null;
-    gameState.p2Projectile   = snap.p2Proj ? { ...snap.p2Proj } : null;
-    gameState.gridlock       = snap.gridlock ? { ...snap.gridlock } : null;
-    gameState.effects        = snap.effects.map(e => ({ ...e }));
-    gameState.roundEnd       = snap.roundEnd ? { ...snap.roundEnd } : null;
-    Object.assign(gameState.p1, snap.p1);
-    gameState.p1.platformRef = snap.p1._platIdx >= 0 ? gameState.platforms[snap.p1._platIdx] : null;
-    Object.assign(gameState.p2, snap.p2);
-    gameState.p2.platformRef = snap.p2._platIdx >= 0 ? gameState.platforms[snap.p2._platIdx] : null;
-  }
-
-  function _inputsDiffer(a, b) {
-    return a.left !== b.left || a.right !== b.right || a.up !== b.up ||
-           a.down !== b.down || a.attack !== b.attack || a.dash !== b.dash ||
-           a.projectile !== b.projectile || a.attackJustPressed !== b.attackJustPressed;
-  }
 
   function resimulate(fromFrame) {
     rbRollbacksThisSec++;
-    loadState(rbStateBuffer[fromFrame % ROLLBACK_WINDOW]);
+    loadGameState(gameState, rbStateBuffer[fromFrame % ROLLBACK_WINDOW]);
     resimulating = true;
     for (let f = fromFrame; f < rbLocalFrame; f++) {
       if (gameState.phase !== 'active') break;
-      rbStateBuffer[f % ROLLBACK_WINDOW] = saveState();
+      rbStateBuffer[f % ROLLBACK_WINDOW] = saveGameState(gameState);
       const localIn  = rbLocalInputs[f % ROLLBACK_WINDOW] ?? EMPTY_INPUT;
       const remoteIn = rbPredicted[f  % ROLLBACK_WINDOW]  ?? onlineRemoteLastInput ?? EMPTY_INPUT;
       _tickSim(
@@ -299,7 +175,6 @@ function _boot(sounds) {
     resimulating = false;
   }
 
-  // ── Menu wiring ────────────────────────────────────────────────────────────
   document.getElementById('btn-local').addEventListener('click', () => {
     botConfig.enabled = false;
     p1Label = factoryName;
@@ -391,113 +266,21 @@ function _boot(sounds) {
     showScreen('screen-menu');
   });
 
-  // ── Controls screen ────────────────────────────────────────────────────────
+  createControlsScreen({
+    document,
+    window,
+    actions: ACTIONS,
+    actionLabels: ACTION_LABELS,
+    defaultP1: DEFAULT_P1,
+    defaultP2: DEFAULT_P2,
+    formatKeyCode,
+    getBindings: () => bindings,
+    setBindings: next => { bindings = next; },
+    saveBindings,
+    showScreen,
+  }).wire();
 
-  let workingBindings = null;   // editable copy while controls screen is open
-  let listeningState  = null;   // { side, action, btn, prevKey }
-
-  function _keyBtnEl(side, action) {
-    return document.querySelector(`#controls-table-${side} [data-action="${action}"]`);
-  }
-
-  function _buildControlsTable(side) {
-    const table = document.getElementById(`controls-table-${side}`);
-    table.innerHTML = '';
-    for (const action of ACTIONS) {
-      const tr      = document.createElement('tr');
-      const labelTd = document.createElement('td');
-      labelTd.className   = 'controls-label';
-      labelTd.textContent = ACTION_LABELS[action];
-
-      const keyTd  = document.createElement('td');
-      const keyBtn = document.createElement('button');
-      keyBtn.className       = 'key-btn';
-      keyBtn.textContent     = formatKeyCode(workingBindings[side][action]);
-      keyBtn.dataset.side    = side;
-      keyBtn.dataset.action  = action;
-      keyBtn.addEventListener('click', () => _startListening(side, action, keyBtn));
-
-      keyTd.appendChild(keyBtn);
-      tr.appendChild(labelTd);
-      tr.appendChild(keyTd);
-      table.appendChild(tr);
-    }
-  }
-
-  function _startListening(side, action, btn) {
-    if (listeningState) _cancelListening();
-    listeningState = { side, action, btn, prevKey: workingBindings[side][action] };
-    btn.textContent = '…';
-    btn.classList.add('key-btn--listening');
-  }
-
-  function _cancelListening() {
-    if (!listeningState) return;
-    const { btn, prevKey } = listeningState;
-    btn.textContent = formatKeyCode(prevKey);
-    btn.classList.remove('key-btn--listening');
-    btn.classList.remove('key-btn--conflict');
-    listeningState = null;
-  }
-
-  function _commitListening(code) {
-    if (!listeningState) return;
-    const { side, action, btn } = listeningState;
-
-    // Auto-swap: if this key is already bound to another action on the same side, swap them
-    for (const other of ACTIONS) {
-      if (other === action) continue;
-      if (workingBindings[side][other] === code) {
-        const displaced = _keyBtnEl(side, other);
-        workingBindings[side][other] = workingBindings[side][action];
-        if (displaced) displaced.textContent = formatKeyCode(workingBindings[side][other]);
-        break;
-      }
-    }
-
-    workingBindings[side][action] = code;
-    btn.textContent = formatKeyCode(code);
-    btn.classList.remove('key-btn--listening');
-    btn.classList.remove('key-btn--conflict');
-    listeningState = null;
-  }
-
-  // Global keydown handler for capture mode — always registered, no-ops when not listening
-  window.addEventListener('keydown', (e) => {
-    if (!listeningState) return;
-    e.preventDefault();
-    if (e.code === 'Escape') { _cancelListening(); return; }
-    _commitListening(e.code);
-  });
-
-  document.getElementById('btn-controls').addEventListener('click', () => {
-    workingBindings = { p1: { ...bindings.p1 }, p2: { ...bindings.p2 } };
-    _buildControlsTable('p1');
-    _buildControlsTable('p2');
-    showScreen('screen-controls');
-  });
-
-  document.getElementById('controls-reset-p1').addEventListener('click', () => {
-    if (listeningState?.side === 'p1') _cancelListening();
-    workingBindings.p1 = { ...DEFAULT_P1 };
-    _buildControlsTable('p1');
-  });
-
-  document.getElementById('controls-reset-p2').addEventListener('click', () => {
-    if (listeningState?.side === 'p2') _cancelListening();
-    workingBindings.p2 = { ...DEFAULT_P2 };
-    _buildControlsTable('p2');
-  });
-
-  document.getElementById('controls-done').addEventListener('click', () => {
-    if (listeningState) _cancelListening();
-    saveBindings(workingBindings.p1, workingBindings.p2);
-    bindings = { ...workingBindings };
-    workingBindings = null;
-    showScreen('screen-menu');
-  });
-
-  // ── Online lobby wiring ────────────────────────────────────────────────────
+  // Online lobby wiring
 
   function enterOnlineFlow() {
     onlineSide = 'p1';
@@ -570,7 +353,7 @@ function _boot(sounds) {
 
       const slot      = frame % ROLLBACK_WINDOW;
       const predicted = rbPredicted[slot];
-      if (predicted && _inputsDiffer(predicted, snap)) {
+      if (predicted && inputsDiffer(predicted, snap)) {
         rbPredicted[slot] = { ...snap };
         resimulate(frame);
       }
@@ -727,7 +510,6 @@ function _boot(sounds) {
     startAmbient();
   }
 
-  // ── Online lobby button wiring ─────────────────────────────────────────────
 
   // Side-select cards
   document.querySelectorAll('.side-card').forEach(btn => {
@@ -872,57 +654,16 @@ function _boot(sounds) {
     showScreen('screen-menu');
   });
 
-  // ── Clash effects ──────────────────────────────────────────────────────────
 
   function spawnChing(x, y) {
-    gameState.clashFlash = 1;
-    gameState.effects.push({ type: 'ching', x, y, frame: 0, timer: 0, maxFrames: 5, ticksPerFrame: 1 });
+    spawnChingEffect(gameState, x, y);
     playSound('ching');
   }
 
   function spawnBlood(x, y, flip) {
-    gameState.effects.push({ type: 'blood', x, y, frame: 0, timer: 0, maxFrames: 8, flip });
+    spawnBloodEffect(gameState, x, y, flip);
   }
 
-  // ── Sound helpers ──────────────────────────────────────────────────────────
-  function playSound(name) {
-    if (resimulating) return;
-    const audio = getSound(name);
-    if (!audio) return;
-    const clone = audio.cloneNode();
-    clone.volume = 0.4;
-    clone.play().catch(() => {});
-  }
-
-  let ambientAudio = null;
-  function startAmbient() {
-    if (ambientAudio) return;
-    const audio = getSound('bg_music');
-    if (!audio) return;
-    audio.loop        = true;
-    audio.volume      = 0.35;
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-    ambientAudio = audio;
-  }
-  function stopAmbient() {
-    if (!ambientAudio) return;
-    ambientAudio.pause();
-    ambientAudio.currentTime = 0;
-    ambientAudio = null;
-  }
-
-  function tickEffects() {
-    gameState.clashFlash = Math.max(0, gameState.clashFlash - 0.14);
-    gameState.deathFlash = Math.max(0, gameState.deathFlash - 0.06);
-    for (const fx of gameState.effects) {
-      fx.timer++;
-      if (fx.timer % (fx.ticksPerFrame ?? 3) === 0) fx.frame++;
-    }
-    gameState.effects = gameState.effects.filter(fx => fx.frame < fx.maxFrames);
-  }
-
-  // ── Match flow ─────────────────────────────────────────────────────────────
   function startMatch() {
     gameState.p1.wins = 0;
     gameState.p2.wins = 0;
@@ -954,7 +695,6 @@ function _boot(sounds) {
     showScreen('screen-game');
   }
 
-  // ── Round end sequence ─────────────────────────────────────────────────────
 
   function triggerRoundEnd(winner, isBlastKill = false) {
     gameState.phase        = 'round_end';
@@ -1020,7 +760,7 @@ function _boot(sounds) {
   function tickRoundEnd() {
     const re = gameState.roundEnd;
     updatePlatforms(gameState.platforms);
-    tickEffects();
+    tickVisualEffects(gameState);
 
     // Keep gravity + floor collision running — inputs locked so no movement, just fall
     const noInputs = {
@@ -1083,7 +823,6 @@ function _boot(sounds) {
     }
   }
 
-  // ── Round-start banner sequence ───────────────────────────────────────────
 
   function tickRoundStart() {
     gameState.roundStartTick++;
@@ -1102,7 +841,6 @@ function _boot(sounds) {
     }
   }
 
-  // ── Online countdown phase ─────────────────────────────────────────────────
 
   function tickOnlineCountdown() {
     const secsLeft = getCountdownSecondsRemaining(onlineStartAt, onlineClockOffset);
@@ -1116,7 +854,6 @@ function _boot(sounds) {
     }
   }
 
-  // ── Game loop ──────────────────────────────────────────────────────────────
   let lastTime = null;
   let accum    = 0;
 
@@ -1127,12 +864,10 @@ function _boot(sounds) {
     else if (gameState.phase === 'online_countdown') tickOnlineCountdown();
   }
 
-  // ── Core simulation tick (input-agnostic; called by tickActive + resimulate) ─
 
   function _tickSim(p1In, p2In) {
-    // ── Gridlock path ──────────────────────────────────────────────────────────
     if (gameState.gridlock) {
-      tickEffects();
+      tickVisualEffects(gameState);
       const result = tickGridlock(gameState.gridlock, gameState.p1, gameState.p2, p1In, p2In);
       stepAnimation(gameState.p1);
       stepAnimation(gameState.p2);
@@ -1148,8 +883,7 @@ function _boot(sounds) {
       return;
     }
 
-    // ── Normal active path ─────────────────────────────────────────────────────
-    tickEffects();
+    tickVisualEffects(gameState);
     updatePlatforms(gameState.platforms);
 
     const p1WasCharging  = gameState.p1.dashCharge > 0;
@@ -1173,7 +907,6 @@ function _boot(sounds) {
     if (!p1WasDashAtk && isDashAttackActive(gameState.p1)) playSound('swing');
     if (!p2WasDashAtk && isDashAttackActive(gameState.p2)) playSound('swing');
 
-    // ── Projectile spawning ──────────────────────────────────────────────────
     if (gameState.p1.wantsProjectile && !gameState.p1Projectile) {
       gameState.p1Projectile = createProjectile('p1', gameState.p1.x + gameState.p1.facing * 24, gameState.p1.y, gameState.p1.facing);
     }
@@ -1181,11 +914,9 @@ function _boot(sounds) {
       gameState.p2Projectile = createProjectile('p2', gameState.p2.x + gameState.p2.facing * 24, gameState.p2.y, gameState.p2.facing);
     }
 
-    // ── Projectile movement ──────────────────────────────────────────────────
     if (gameState.p1Projectile?.active) tickProjectile(gameState.p1Projectile);
     if (gameState.p2Projectile?.active) tickProjectile(gameState.p2Projectile);
 
-    // ── Projectile clash ─────────────────────────────────────────────────────
     if (checkProjectileClash(gameState.p1Projectile, gameState.p2Projectile)) {
       spawnChing(
         (gameState.p1Projectile.x + gameState.p2Projectile.x) / 2,
@@ -1195,7 +926,6 @@ function _boot(sounds) {
       gameState.p2Projectile.active = false;
     }
 
-    // ── Sword deflection ─────────────────────────────────────────────────────
     const p1Box = isAttackActive(gameState.p1)    ? getAttackHitbox(gameState.p1)
                 : isDashAttackActive(gameState.p1) ? getDashHitbox(gameState.p1)
                 : null;
@@ -1211,7 +941,6 @@ function _boot(sounds) {
       gameState.p1Projectile.active = false;
     }
 
-    // ── Projectile vs player ─────────────────────────────────────────────────
     let projKillP1 = false;
     if (gameState.p2Projectile?.active) {
       const facing = gameState.p2Projectile.facing;
@@ -1246,7 +975,6 @@ function _boot(sounds) {
       }
     }
 
-    // ── Melee hit resolution ─────────────────────────────────────────────────
     const combatResult = resolveHits(gameState.p1, gameState.p2);
 
     if (combatResult && !combatResult.gridlock) {
@@ -1279,11 +1007,9 @@ function _boot(sounds) {
 
     updateCamera(camera, gameState.p1, gameState.p2);
 
-    // ── Clean up inactive projectiles ────────────────────────────────────────
     if (gameState.p1Projectile && !gameState.p1Projectile.active) gameState.p1Projectile = null;
     if (gameState.p2Projectile && !gameState.p2Projectile.active) gameState.p2Projectile = null;
 
-    // ── Gridlock entry ───────────────────────────────────────────────────────
     if (combatResult?.gridlock) {
       spawnChing(
         (gameState.p1.x + gameState.p2.x) / 2,
@@ -1302,7 +1028,6 @@ function _boot(sounds) {
       return;
     }
 
-    // ── Death resolution ─────────────────────────────────────────────────────
     const p1Dead = p1Result === 'dead' || combatResult?.p1Killed || projKillP1;
     const p2Dead = p2Result === 'dead' || combatResult?.p2Killed || projKillP2;
 
@@ -1328,7 +1053,6 @@ function _boot(sounds) {
     }
   }
 
-  // ── Active tick: gather inputs, drive rollback, call _tickSim ─────────────
 
   function tickActive() {
     if (!isOnline) {
@@ -1343,12 +1067,11 @@ function _boot(sounds) {
       return;
     }
 
-    // ── Online: rollback path ─────────────────────────────────────────────────
     const localIn = input.getSnapshot(bindings[onlineSide]);
     input.flush();
 
     const slot = rbLocalFrame % ROLLBACK_WINDOW;
-    rbStateBuffer[slot] = saveState();
+    rbStateBuffer[slot] = saveGameState(gameState);
     rbLocalInputs[slot] = { ...localIn };
     rbPredicted[slot]   = { ...(onlineRemoteLastInput ?? EMPTY_INPUT) };
 
@@ -1380,7 +1103,14 @@ function _boot(sounds) {
     lastTime = ts;
 
     if (gameState.phase === 'online_countdown') {
-      _drawOnlineCountdown(ctx, canvas);
+      drawOnlineCountdown({
+        ctx,
+        canvas,
+        viewportWidth: VIEWPORT_W,
+        viewportHeight: VIEWPORT_H,
+        labels: { p1: p1Label, p2: p2Label },
+        secondsRemaining: getCountdownSecondsRemaining(onlineStartAt, onlineClockOffset),
+      });
     } else if (gameState.phase === 'active'      ||
                gameState.phase === 'round_end'   ||
                gameState.phase === 'round_start' ||
