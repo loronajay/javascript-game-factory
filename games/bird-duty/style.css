@@ -98,6 +98,112 @@ body {
   opacity: 0.7;
 }
 
+.mobile-landscape-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 999950;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 0%, rgba(98, 214, 255, 0.22), transparent 42%),
+    rgba(4, 8, 12, 0.88);
+  color: #fff5c4;
+}
+
+.mobile-landscape-gate.is-visible {
+  display: flex;
+}
+
+.mobile-play-gated .bird-duty-shell {
+  filter: blur(2px) brightness(0.52);
+  pointer-events: none;
+}
+
+.mobile-landscape-gate-card {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+  padding: 24px 26px;
+  border: 1px solid rgba(255, 224, 106, 0.42);
+  border-radius: 10px;
+  background: rgba(8, 12, 16, 0.92);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.mobile-landscape-gate-kicker {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: rgba(98, 214, 255, 0.76);
+}
+
+.mobile-landscape-gate-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffe06a;
+}
+
+.mobile-landscape-gate-copy {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.mobile-landscape-gate-btn {
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 1px solid rgba(255, 224, 106, 0.62);
+  border-radius: 8px;
+  background: rgba(255, 224, 106, 0.15);
+  color: #ffe06a;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mobile-controller[data-mobile-controller-root="bird-duty-touch"] {
+  z-index: 999920;
+}
+
+.mobile-controller[data-mobile-controller-root="bird-duty-touch"] .mobile-controller__pad {
+  left: max(14px, env(safe-area-inset-left)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="bird-duty-touch"] .mobile-controller__button {
+  right: max(18px, env(safe-area-inset-right)) !important;
+  bottom: max(18px, env(safe-area-inset-bottom)) !important;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+@media (hover: none), (pointer: coarse), (max-width: 720px) {
+  body {
+    touch-action: none;
+  }
+
+  .back-link {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+  }
+
+  .selection-line,
+  .status-line {
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
 [hidden] {
   display: none !important;
 }

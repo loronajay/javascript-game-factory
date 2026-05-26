@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Bird Duty | Javascript Game Factory</title>
   <link rel="stylesheet" href="style.css">
   <script src="../../js/platform-config.js"></script>
@@ -14,6 +14,34 @@
     <p id="bird-duty-selection" class="selection-line" aria-live="polite"></p>
     <p id="bird-duty-status" class="status-line">Loading Bird Duty...</p>
   </main>
-  <script type="module" src="game.js"></script>
+  <script type="module">
+    import { mountMobileController } from '../../js/mobile-controller.mjs';
+    import { initMobileLandscapeGate } from './scripts/mobile-ui.js';
+    import { initGame } from './game.js';
+
+    const KEY = {
+      a: { key: 'a', code: 'KeyA' },
+      d: { key: 'd', code: 'KeyD' },
+      space: { key: ' ', code: 'Space' },
+    };
+
+    const BIRD_DUTY_MOBILE_PROFILE = {
+      id: 'bird-duty-touch',
+      layout: 'dpad-buttons',
+      accent: '#ffe06a',
+      glow: '#62d6ff',
+      dpadLabel: 'FLY',
+      dpad: { left: KEY.a, right: KEY.d },
+      directionMode: 'cardinal',
+      buttons: [
+        { id: 'drop', label: 'DROP', key: KEY.space },
+      ],
+    };
+
+    const forceMobileControls = new URLSearchParams(window.location.search).has('forceMobileControls');
+    initMobileLandscapeGate({ force: forceMobileControls });
+    mountMobileController({ profile: BIRD_DUTY_MOBILE_PROFILE, force: forceMobileControls });
+    initGame();
+  </script>
 </body>
 </html>
