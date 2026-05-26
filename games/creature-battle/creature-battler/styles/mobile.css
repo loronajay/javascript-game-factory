@@ -147,6 +147,149 @@
     min-width: 0;
   }
 
+  #game-canvas.mobile-layout #screen-online-lobby {
+    align-items: stretch;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-wrap {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-header,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-section,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-actions,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-hint,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-searching-status,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-room-code,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-code-input-wrap {
+    flex-shrink: 0;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-title {
+    font-size: 22px;
+    margin-bottom: 2px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-eyebrow,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-section-label {
+    font-size: 9px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-section {
+    gap: 6px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-row,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-level-row,
+  #game-canvas.mobile-layout #screen-online-lobby .arena-navigator,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-code-input-wrap {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-row,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-level-row {
+    gap: 6px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-card {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 58px;
+    gap: 3px;
+    padding: 9px 10px;
+    border-radius: 8px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-label {
+    font-size: 13px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-sub {
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-level-chip {
+    min-height: 40px;
+    padding: 5px 9px;
+    border-radius: 7px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lvl-chip-label {
+    font-size: 11px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lvl-chip-sub {
+    font-size: 9px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .arena-navigator {
+    justify-content: center;
+    gap: 7px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .arena-preview--compact {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 240px;
+    min-width: 0;
+    height: 58px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    width: 100%;
+    padding: 2px 0;
+    background: linear-gradient(180deg, rgba(1, 17, 31, 0), rgba(1, 17, 31, 0.92) 42%);
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-actions--stack {
+    gap: 8px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-btn {
+    width: min(220px, 86vw);
+    min-width: 0;
+    min-height: 40px;
+    padding: 9px 16px;
+    font-size: 12px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-room-code {
+    font-size: 38px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-code-input {
+    box-sizing: border-box;
+    width: min(260px, 86vw);
+    padding: 9px 12px;
+    font-size: 22px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-hint,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-settings-summary,
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-searching-status {
+    font-size: 10px;
+    text-align: center;
+  }
+
   .control-hint-desktop {
     display: none;
   }
@@ -572,6 +715,70 @@
 
   .mode-select-hint {
     margin-top: 8px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-wrap {
+    gap: 6px;
+    padding: 8px 14px 6px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-title {
+    font-size: 18px;
+    margin-bottom: 0;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-eyebrow {
+    margin-bottom: 1px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-section {
+    gap: 4px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-card {
+    min-height: 44px;
+    padding: 6px 9px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-pick-sub {
+    display: none;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-level-chip {
+    min-height: 34px;
+    padding: 4px 8px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .arena-nav-btn {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .arena-preview--compact {
+    max-width: 220px;
+    height: 48px;
+    padding-bottom: 6px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .arena-preview--compact .arena-preview-name {
+    font-size: 10px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-btn {
+    width: min(196px, 70vw);
+    min-height: 34px;
+    padding: 7px 14px;
+    font-size: 11px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-room-code {
+    font-size: 32px;
+  }
+
+  #game-canvas.mobile-layout #screen-online-lobby .lobby-code-input {
+    padding: 7px 10px;
+    font-size: 19px;
   }
 
   .battle-config-header,
