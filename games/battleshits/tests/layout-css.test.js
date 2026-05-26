@@ -11,6 +11,7 @@ const files = {
   shell: readFileSync(join(root, 'css', 'shell.css'), 'utf8'),
   board: readFileSync(join(root, 'css', 'board.css'), 'utf8'),
   battle: readFileSync(join(root, 'css', 'battle.css'), 'utf8'),
+  buttons: readFileSync(join(root, 'css', 'buttons.css'), 'utf8'),
   responsive: readFileSync(join(root, 'css', 'responsive.css'), 'utf8'),
 };
 
@@ -219,6 +220,19 @@ test('missed shots animate as splash and ripple impacts on both boards', () => {
     files.board,
     /@keyframes\s+miss-splash-ripple\s*\{/,
     'Expected splash ripple keyframes to exist.',
+  );
+});
+
+test('hidden result-screen buttons are removed from layout', () => {
+  assertMatches(
+    files.index,
+    /id="btn-change-difficulty"[\s\S]*class="btn btn-secondary hidden"/,
+    'Expected Change Difficulty to start hidden so online results can suppress it.',
+  );
+  assertMatches(
+    files.buttons,
+    /\.btn\.hidden\s*\{[\s\S]*display:\s*none;/,
+    'Expected hidden buttons to be removed from the result-screen action row.',
   );
 });
 

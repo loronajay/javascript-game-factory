@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mobile Drawing Engine</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <main id="game" aria-label="Mobile drawing engine">
+    <div id="camera">
+      <div id="floor">
+        <canvas id="draw-canvas"></canvas>
+        <div id="cursor-anchor"></div>
+
+        <div id="player" class="facing-down tool-pencil" aria-label="Player drawing avatar">
+          <div class="shadow"></div>
+          <div class="sprite">
+            <div class="head">
+              <div class="face">
+                <div class="eye left"></div>
+                <div class="eye right"></div>
+              </div>
+            </div>
+
+            <div class="body"><div class="torso-mark"></div></div>
+
+            <div class="arm left"><div class="hand"></div><div class="forearm"></div></div>
+            <div class="arm right"><div class="hand"></div><div class="forearm"></div></div>
+
+            <div class="tool-wrap">
+              <div class="tool pencil">
+                <div class="shaft"></div><div class="tip"></div><div class="lead"></div>
+              </div>
+              <div class="tool brush">
+                <div class="handle"></div><div class="ferrule"></div><div class="bristles"></div>
+              </div>
+              <div class="tool spray">
+                <div class="cap"></div><div class="can"></div><div class="nozzle"></div>
+              </div>
+              <div class="tool eraser">
+                <div class="block"></div>
+              </div>
+            </div>
+
+            <div class="tool-hand"></div>
+            <div class="leg left"><div class="foot"></div></div>
+            <div class="leg right"><div class="foot"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="hud">
+      <strong>Drawing Engine</strong><br />
+      Visible anchor = actual draw point.<br />
+      Raw keeps crisp corners. Smooth rounds finished strokes.<br />
+      Spray now behaves like a dense airbrush.
+    </section>
+
+    <section id="minimap" aria-label="World minimap">
+      <div id="minimap-view"></div>
+      <div id="minimap-player"></div>
+    </section>
+
+    <div id="joystick" aria-label="Virtual joystick">
+      <div id="knob"></div>
+    </div>
+
+    <section class="toolbox">
+      <button class="tool-button active" data-tool="pencil" type="button">Pencil</button>
+      <button class="tool-button" data-tool="brush" type="button">Brush</button>
+      <button class="tool-button" data-tool="spray" type="button">Spray</button>
+      <button class="tool-button" data-tool="eraser" type="button">Erase</button>
+    </section>
+
+    <section class="color-panel">
+      <label class="color-control">
+        <span class="swatch" id="line-swatch"></span>
+        <span class="color-label">Line</span>
+        <input id="line-color" type="color" value="#ecf1ff" aria-label="Line color" />
+      </label>
+
+      <label class="color-control">
+        <span class="swatch" id="floor-swatch"></span>
+        <span class="color-label">Floor</span>
+        <input id="floor-color" type="color" value="#1f2937" aria-label="Floor color" />
+      </label>
+
+      <button id="smooth-toggle" type="button">Mode: Raw</button>
+    </section>
+
+    <section class="button-cluster">
+      <button id="undo-button" type="button" disabled>Undo</button>
+      <button id="clear-button" type="button">Clear</button>
+      <button id="full-view-button" type="button">Full View</button>
+      <button id="draw-button" type="button">Draw</button>
+    </section>
+
+    <section id="setup-overlay" aria-label="Canvas setup">
+      <div class="setup-card">
+        <h1>New Canvas</h1>
+        <p>Choose a canvas size and floor preset. Medium is the safest default for mobile testing.</p>
+
+        <div class="setup-row">
+          <label for="size-select">Canvas Size</label>
+          <select id="size-select">
+            <option value="small">Small — 1200 × 900</option>
+            <option value="medium" selected>Medium — 1800 × 1350</option>
+            <option value="large">Large — 2400 × 1800</option>
+          </select>
+        </div>
+
+        <div class="setup-row">
+          <label>Floor Preset</label>
+          <div class="preset-swatches">
+            <button class="preset-swatch active" data-preset="slate" type="button" style="background: linear-gradient(180deg, #334155, #1f2937);"><span>Slate</span></button>
+            <button class="preset-swatch" data-preset="paper" type="button" style="background: linear-gradient(180deg, #f8fafc, #d7dde8);"><span class="dark-label">Paper</span></button>
+            <button class="preset-swatch" data-preset="concrete" type="button" style="background: linear-gradient(180deg, #9ca3af, #6b7280);"><span>Gray</span></button>
+            <button class="preset-swatch" data-preset="grass" type="button" style="background: linear-gradient(180deg, #84cc16, #4d7c0f);"><span>Grass</span></button>
+            <button class="preset-swatch" data-preset="sand" type="button" style="background: linear-gradient(180deg, #f1c27d, #b78339);"><span>Sand</span></button>
+          </div>
+        </div>
+
+        <button id="start-button" type="button">Start Canvas</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

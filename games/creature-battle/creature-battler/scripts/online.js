@@ -15,6 +15,7 @@ function createCbOnlineClient() {
   let _inRoom        = false;
   let _isCoordinator = false;
   let _mySide        = null;
+  let _pendingSends  = [];
 
   const cb = {
     onConnected:     null, // ()
@@ -27,7 +28,21 @@ function createCbOnlineClient() {
   };
 
   function _send(payload) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      return true;
+    }
+    _pendingSends.push(payload);
+    return false;
+  }
+
+  function _flushPendingSends() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const sends = _pendingSends;
+    _pendingSends = [];
+    for (const payload of sends) {
+      ws.send(JSON.stringify(payload));
+    }
   }
 
   function _roomMsg(messageType, value) {
@@ -53,6 +68,15 @@ function createCbOnlineClient() {
 
       case 'searching':
         cb.onSearching?.();
+        break;
+
+      case 'error':
+      case 'match_error':
+      case 'room_error':
+        cb.onError?.(
+          msg.code ?? msg.errorCode ?? 'online_error',
+          msg.message ?? msg.error ?? 'The online service could not complete that request.'
+        );
         break;
 
       case 'match_ready':
@@ -87,6 +111,7 @@ function createCbOnlineClient() {
     connect() {
       if (ws) return;
       ws = new WebSocket(CB_WS_URL);
+      ws.addEventListener('open', _flushPendingSends);
       ws.addEventListener('message', e => _handle(e.data));
       ws.addEventListener('close', () => {
         if (_inRoom) { _inRoom = false; cb.onPartnerLeft?.(); }
@@ -122,6 +147,7 @@ function createCbOnlineClient() {
     disconnect() {
       _inRoom = false;
       _isCoordinator = false;
+      _pendingSends = [];
       ws?.close();
       ws = null;
     },

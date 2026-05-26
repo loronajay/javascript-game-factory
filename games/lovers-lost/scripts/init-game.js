@@ -18,6 +18,7 @@ import { loadGameAssets } from './game-assets.js';
 import { applyRemoteSnapshot } from './remote-snapshot.js';
 import { createRenderer } from './renderer.js';
 import { createInput, keyToAction } from './input.js';
+import { createMobileNameInputBridge } from './mobile-name-input.js';
 import { createSounds } from './sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './online.js';
 import { evaluateRun } from './scoring.js';
@@ -149,7 +150,7 @@ function _initWithAssets(images, emoteImages) {
       return;
     }
     if (gs.phase === 'online_name_entry') {
-      if (e.key === 'Escape')     { onlineNameError = ''; gs = { ...gs, phase: 'online_side_select' }; return; }
+      if (e.key === 'Escape')     { _cancelNameEntry(); return; }
       if (e.key === 'Backspace')  { onlineNameInput = onlineNameInput.slice(0, -1); onlineNameError = ''; return; }
       if (e.key === 'Enter')      { _tryContinueNameEntry(); return; }
       if (e.key.length === 1)     { onlineNameInput = sanitizeOnlineDisplayName(onlineNameInput + e.key); onlineNameError = ''; return; }
@@ -257,6 +258,13 @@ function _initWithAssets(images, emoteImages) {
   function _tryJoinRoom()  { if (onlineCodeInput.length > 0) onlineClient.joinRoom(onlineSide, onlineCodeInput); }
   function _cancelSearch() { onlineClient.cancelSearch(); }
   function _cancelRoom()   { onlineRoomCode = ''; onlineClient.cancelRoom(); }
+  function _cancelNameEntry() { onlineNameError = ''; gs = { ...gs, phase: 'online_side_select' }; }
+  function _enterOnlineNameEntry(side) {
+    onlineSide = side;
+    onlineNameError = '';
+    gs = { ...gs, phase: 'online_name_entry' };
+    mobileNameInput.show(onlineNameInput, { focus: true });
+  }
   function _tryContinueNameEntry() {
     const displayName = sanitizeOnlineDisplayName(onlineNameInput);
     if (!isValidOnlineDisplayName(displayName)) { onlineNameError = 'NAME REQUIRED'; return; }
@@ -270,6 +278,20 @@ function _initWithAssets(images, emoteImages) {
     onlineLobbyPhase = 'main';
     gs = { ...gs, phase: 'online_lobby' };
   }
+
+  const mobileNameInput = createMobileNameInputBridge({
+    onInput(value) {
+      onlineNameInput = sanitizeOnlineDisplayName(value);
+      onlineNameError = '';
+      mobileNameInput.setValue(onlineNameInput);
+    },
+    onSubmit() {
+      _tryContinueNameEntry();
+    },
+    onCancel() {
+      _cancelNameEntry();
+    },
+  });
 
   canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
@@ -335,12 +357,13 @@ function _initWithAssets(images, emoteImages) {
     }
     if (gs.phase === 'online_side_select') {
       const r = getOnlineSideSelectRects();
-      if (_inRect(cx, cy, r.boy))  { onlineSide = 'boy';  onlineNameError = ''; gs = { ...gs, phase: 'online_name_entry' }; }
-      if (_inRect(cx, cy, r.girl)) { onlineSide = 'girl'; onlineNameError = ''; gs = { ...gs, phase: 'online_name_entry' }; }
+      if (_inRect(cx, cy, r.boy))  _enterOnlineNameEntry('boy');
+      if (_inRect(cx, cy, r.girl)) _enterOnlineNameEntry('girl');
       return;
     }
     if (gs.phase === 'online_name_entry') {
       if (_inRect(cx, cy, getOnlineNameEntryButtonRects().continue)) _tryContinueNameEntry();
+      else mobileNameInput.focus();
       return;
     }
     if (gs.phase === 'online_lobby') {
@@ -552,6 +575,10 @@ function _initWithAssets(images, emoteImages) {
     } : null;
 
     const elapsed = gs.elapsed / 60;
+    mobileNameInput.update({
+      active: gs.phase === 'online_name_entry',
+      value: onlineNameInput,
+    });
 
     if      (gs.phase === 'menu')              renderer.renderMenu(debugState, menuBtn0Hovered, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
     else if (gs.phase === 'solo_side_select')  renderer.renderSoloSideSelect(soloSideBoyHov, soloSideGirlHov);

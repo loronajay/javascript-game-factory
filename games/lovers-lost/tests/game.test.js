@@ -2081,6 +2081,95 @@ test('normalizeQueueCounts accepts nested queueCounts payloads', () => {
 
 console.log('\nsounds');
 
+test('createSounds lazily creates audio elements only when a sound is used', () => {
+  const originalAudio = globalThis.Audio;
+  const createdSrcs = [];
+
+  class FakeAudio {
+    constructor(src = '') {
+      this.src = src;
+      this.preload = '';
+      this.loop = false;
+      createdSrcs.push(src);
+    }
+
+    cloneNode() {
+      return {
+        src: this.src,
+        play() {
+          return Promise.resolve();
+        },
+        addEventListener() {},
+      };
+    }
+
+    play() {
+      return Promise.resolve();
+    }
+  }
+
+  globalThis.Audio = FakeAudio;
+
+  try {
+    const sounds = createSounds();
+    assertEq(createdSrcs.length, 0, 'createSounds should not allocate every audio asset up front');
+
+    sounds.play('jump');
+    assertEq(createdSrcs.length, 1, 'first SFX play should create only that SFX audio element');
+    assertEq(createdSrcs[0], 'sounds/jump.mp3');
+
+    sounds.playMusic('bg-music-menu');
+    assertEq(createdSrcs.length, 2, 'first music play should create only the requested track');
+    assertEq(createdSrcs[1], 'sounds/bg-music-menu.mp3');
+  } finally {
+    globalThis.Audio = originalAudio;
+  }
+});
+
+test('createSounds reuses a bounded pool for repeated overlapping SFX', () => {
+  const originalAudio = globalThis.Audio;
+  let cloneCount = 0;
+
+  class FakeAudio {
+    constructor(src = '') {
+      this.src = src;
+      this.preload = '';
+    }
+
+    cloneNode() {
+      cloneCount++;
+      return {
+        src: this.src,
+        currentTime: 0,
+        paused: true,
+        playCalls: 0,
+        play() {
+          this.paused = false;
+          this.playCalls++;
+          return Promise.resolve();
+        },
+        pause() {
+          this.paused = true;
+        },
+        addEventListener() {},
+      };
+    }
+  }
+
+  globalThis.Audio = FakeAudio;
+
+  try {
+    const sounds = createSounds({ sfxPoolSize: 2 });
+    sounds.play('player-hit');
+    sounds.play('player-hit');
+    sounds.play('player-hit');
+
+    assertEq(cloneCount, 2, 'repeated SFX should reuse the configured audio pool instead of cloning without bound');
+  } finally {
+    globalThis.Audio = originalAudio;
+  }
+});
+
 test('createSounds can stop active run-end music without touching other sounds', () => {
   const originalAudio = globalThis.Audio;
   const played = [];
@@ -2118,9 +2207,9 @@ test('createSounds can stop active run-end music without touching other sounds',
     sounds.stop('run-success');
     sounds.stop('run-failed');
 
-    const success = played.find(audio => audio.src.endsWith('run-success.wav'));
-    const fail = played.find(audio => audio.src.endsWith('run-failed.wav'));
-    const jump = played.find(audio => audio.src.endsWith('jump.wav'));
+    const success = played.find(audio => audio.src.endsWith('run-success.mp3'));
+    const fail = played.find(audio => audio.src.endsWith('run-failed.mp3'));
+    const jump = played.find(audio => audio.src.endsWith('jump.mp3'));
 
     assert(success, 'expected run-success instance to exist');
     assert(fail, 'expected run-failed instance to exist');

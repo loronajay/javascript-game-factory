@@ -33,6 +33,7 @@ console.log('\nproject structure');
 test('support modules live under scripts/', () => {
   const expected = [
     'scripts/input.js',
+    'scripts/mobile-name-input.js',
     'scripts/mobile-ui.js',
     'scripts/obstacles.js',
     'scripts/player.js',
@@ -121,6 +122,22 @@ test('mobile fullscreen landscape gate is mounted before game init', () => {
   );
 });
 
+test('online name entry has a mobile keyboard bridge', () => {
+  const initSource = fs.readFileSync(path.join(ROOT, 'scripts', 'init-game.js'), 'utf8');
+  assert(
+    initSource.includes("from './mobile-name-input.js'"),
+    'expected init-game to import the mobile name input bridge'
+  );
+  assert(
+    initSource.includes('mobileNameInput.update'),
+    'expected init-game to sync the bridge with the online name-entry phase'
+  );
+  assert(
+    initSource.includes('mobileNameInput.show(onlineNameInput, { focus: true })'),
+    'expected the name input to focus inside the side-card tap gesture'
+  );
+});
+
 test('mobile styles use dynamic fullscreen viewport sizing', () => {
   const styleSource = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8');
   assert(
@@ -168,8 +185,8 @@ test('Lovers Lost mobile controller hides generic arrow glyphs behind action lab
     'expected side labels to sit outside the action wheels'
   );
   assert(
-    /--ll-side-legend-offset:\s*-1%/.test(styleSource),
-    'expected side action labels to be pushed outward from the pad center'
+    /--ll-side-legend-offset:\s*5%/.test(styleSource),
+    'expected side action labels to sit away from the center without hugging the pad edge'
   );
 });
 

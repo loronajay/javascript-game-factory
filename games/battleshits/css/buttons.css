@@ -34,6 +34,10 @@
   cursor: not-allowed;
 }
 
+.btn.hidden {
+  display: none;
+}
+
 .btn-primary,
 .btn-secondary,
 .btn-small {

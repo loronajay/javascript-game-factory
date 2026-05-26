@@ -132,7 +132,7 @@ body {
 }
 
 .mobile-controller[data-mobile-controller-root="lovers-lost-touch"] .mobile-controller__pad {
-  --ll-side-legend-offset: -1%;
+  --ll-side-legend-offset: 5%;
   border-color: rgba(255, 142, 189, 0.82);
   background:
     radial-gradient(circle at 50% 35%, rgba(255, 209, 102, 0.18), transparent 34%),

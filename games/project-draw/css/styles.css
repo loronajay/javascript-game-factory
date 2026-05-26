@@ -1,0 +1,952 @@
+:root {
+  --bg: #111827;
+  --ui: rgba(15, 23, 42, 0.84);
+  --ui-border: rgba(255,255,255,0.18);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.72);
+  --world-edge: rgba(255,255,255,0.14);
+  --grid: rgba(255,255,255,0.045);
+  --floor-a: #1f2937;
+  --floor-b: #334155;
+  --floor-c: #172033;
+  --player: #d8dee9;
+  --player-mid: #aeb8c7;
+  --player-dark: #7b8798;
+  --shadow: rgba(0,0,0,0.32);
+  --stick: rgba(255,255,255,0.20);
+  --stick-knob: rgba(255,255,255,0.78);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: white;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button, input, select {
+  font: inherit;
+  color: inherit;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0c1220;
+}
+
+#camera {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  contain: layout paint size;
+}
+
+#floor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  border: 2px solid var(--world-edge);
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, var(--floor-b) 0%, var(--floor-a) 58%, var(--floor-c) 100%);
+  background-size: 48px 48px, 48px 48px, cover;
+}
+
+#draw-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+
+#cursor-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.92);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.76;
+}
+
+#cursor-anchor::before,
+#cursor-anchor::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.82);
+}
+
+#cursor-anchor::before { width: 2px; height: 18px; }
+#cursor-anchor::after { width: 18px; height: 2px; }
+
+#cursor-anchor.active {
+  opacity: 1;
+}
+
+#cursor-anchor.erase {
+  border-style: dashed;
+}
+
+/* Character */
+#player {
+  --face-x: 1;
+  position: absolute;
+  width: 50px;
+  height: 78px;
+  transform: translate(-50%, -50%) scaleX(var(--face-x));
+  transform-origin: center center;
+  z-index: 3;
+  will-change: left, top, transform;
+}
+
+.shadow {
+  position: absolute;
+  left: 8px;
+  bottom: 1px;
+  width: 34px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--shadow);
+  filter: blur(1px);
+  z-index: 0;
+}
+
+.sprite {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  transform-origin: 50% 76%;
+  animation: idleBreath 950ms infinite ease-in-out;
+}
+
+.head {
+  position: absolute;
+  left: 14px;
+  top: 4px;
+  width: 22px;
+  height: 21px;
+  background: var(--player);
+  border-radius: 50% 50% 46% 46%;
+  box-shadow: inset 0 -3px 0 var(--player-mid);
+  z-index: 5;
+}
+
+.face {
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  width: 12px;
+  height: 5px;
+  z-index: 6;
+}
+
+.eye {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 5px;
+  border-radius: 999px;
+  background: #111827;
+}
+
+.eye.left { left: 0; }
+.eye.right { right: 0; }
+
+.body {
+  position: absolute;
+  left: 15px;
+  top: 24px;
+  width: 20px;
+  height: 25px;
+  background: var(--player);
+  border-radius: 8px 8px 6px 6px;
+  box-shadow: inset 0 -5px 0 var(--player-mid);
+  z-index: 4;
+}
+
+.torso-mark {
+  position: absolute;
+  left: 7px;
+  top: 4px;
+  width: 6px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.25);
+}
+
+.arm {
+  position: absolute;
+  top: 27px;
+  width: 8px;
+  height: 24px;
+  background: var(--player-dark);
+  border-radius: 6px;
+  z-index: 3;
+  transform-origin: 50% 12%;
+}
+
+.arm.left {
+  left: 8px;
+  transform: rotate(8deg);
+}
+
+.arm.right {
+  right: 8px;
+  transform: rotate(-8deg);
+}
+
+.forearm {
+  position: absolute;
+  left: 1px;
+  top: 13px;
+  width: 7px;
+  height: 17px;
+  background: var(--player-dark);
+  border-radius: 6px;
+  transform-origin: 50% 8%;
+  opacity: 0;
+}
+
+.hand {
+  position: absolute;
+  left: 1px;
+  bottom: -3px;
+  width: 6px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--player-mid);
+}
+
+.tool-wrap {
+  position: absolute;
+  right: 8px;
+  top: 28px;
+  width: 18px;
+  height: 40px;
+  z-index: 8;
+  transform-origin: 50% 10%;
+}
+
+.tool { position: absolute; inset: 0; display: none; }
+
+.tool.pencil .shaft {
+  position: absolute;
+  left: 7px;
+  top: 0;
+  width: 5px;
+  height: 28px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.35), transparent 40%), #d9a441;
+  box-shadow: inset 0 -4px 0 rgba(125, 67, 20, 0.35);
+}
+.tool.pencil .tip {
+  position: absolute;
+  left: 6px;
+  top: 27px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 10px solid #d8c0a2;
+}
+.tool.pencil .lead {
+  position: absolute;
+  left: 8px;
+  top: 34px;
+  width: 3px;
+  height: 6px;
+  background: #0f172a;
+  border-radius: 0 0 2px 2px;
+}
+
+.tool.brush .handle {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  width: 4px;
+  height: 26px;
+  background: #9a6a35;
+  border-radius: 3px;
+}
+.tool.brush .ferrule {
+  position: absolute;
+  left: 6px;
+  top: 24px;
+  width: 8px;
+  height: 6px;
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+.tool.brush .bristles {
+  position: absolute;
+  left: 4px;
+  top: 29px;
+  width: 12px;
+  height: 10px;
+  background: #ecf1ff;
+  border-radius: 0 0 8px 8px;
+}
+
+.tool.spray .can {
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  width: 10px;
+  height: 24px;
+  background: linear-gradient(180deg, #9be37f, #4b8c3e);
+  border-radius: 4px;
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,0.16);
+}
+.tool.spray .cap {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  background: #d1d5db;
+  border-radius: 3px 3px 2px 2px;
+}
+.tool.spray .nozzle {
+  position: absolute;
+  left: 11px;
+  top: 5px;
+  width: 5px;
+  height: 3px;
+  background: #f8fafc;
+  border-radius: 3px;
+}
+
+.tool.eraser .block {
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  width: 12px;
+  height: 16px;
+  background: linear-gradient(180deg, #ffcad9, #f59ab5);
+  border-radius: 4px;
+  transform: rotate(12deg);
+}
+
+#player.tool-pencil .tool.pencil,
+#player.tool-brush .tool.brush,
+#player.tool-spray .tool.spray,
+#player.tool-eraser .tool.eraser { display: block; }
+
+.tool-hand {
+  position: absolute;
+  right: 6px;
+  top: 31px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--player-mid);
+  z-index: 9;
+}
+
+.leg {
+  position: absolute;
+  top: 47px;
+  width: 9px;
+  height: 21px;
+  background: var(--player-dark);
+  border-radius: 5px;
+  z-index: 3;
+  transform-origin: 50% 10%;
+}
+.leg.left { left: 15px; }
+.leg.right { right: 15px; }
+
+.foot {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  width: 13px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--player-mid);
+}
+
+#player.moving:not(.drawing) .sprite { animation: walkBody 260ms infinite ease-in-out; }
+#player.moving:not(.drawing) .arm.left,
+#player.moving:not(.drawing) .leg.right { animation: walkForward 260ms infinite ease-in-out; }
+#player.moving:not(.drawing) .arm.right,
+#player.moving:not(.drawing) .leg.left { animation: walkBack 260ms infinite ease-in-out; }
+#player.moving .shadow { animation: walkShadow 260ms infinite ease-in-out; }
+
+#player.drawing .sprite {
+  animation: drawLean 460ms infinite ease-in-out;
+  transform-origin: 50% 88%;
+}
+#player.drawing .arm.right {
+  right: 10px;
+  top: 29px;
+  height: 17px;
+  transform: rotate(-54deg) translate(2px, 2px);
+  animation: none;
+  z-index: 8;
+}
+#player.drawing .arm.right .hand { opacity: 0; }
+#player.drawing .arm.right .forearm {
+  opacity: 1;
+  transform: rotate(58deg) translate(1px, 1px);
+}
+#player.drawing .arm.left {
+  transform: rotate(16deg) translateY(2px);
+  animation: none;
+}
+#player.drawing .tool-wrap {
+  top: 33px;
+  right: 9px;
+  transform: rotate(6deg);
+}
+#player.tool-eraser.drawing .tool-wrap { transform: rotate(28deg); }
+#player.tool-spray.drawing .tool-wrap {
+  transform: rotate(-18deg);
+  top: 31px;
+  right: 7px;
+}
+#player.drawing .tool-hand {
+  right: 11px;
+  top: 50px;
+  width: 10px;
+  height: 9px;
+}
+
+#player.facing-up .face { display: none; }
+#player.facing-up .head { box-shadow: inset 0 4px 0 var(--player-mid); }
+#player.facing-up .body { box-shadow: inset 0 5px 0 var(--player-mid); }
+#player.facing-left .face,
+#player.facing-right .face {
+  left: 8px;
+  width: 10px;
+}
+#player.facing-left .eye.left,
+#player.facing-right .eye.left { display: none; }
+#player.facing-left .eye.right,
+#player.facing-right .eye.right { right: 2px; }
+
+#game.full-view #player,
+#game.full-view #joystick,
+#game.full-view #draw-button,
+#game.full-view #minimap,
+#game.full-view .toolbox,
+#game.full-view .color-panel,
+#game.full-view #cursor-anchor { display: none; }
+
+@keyframes idleBreath {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(1px) scaleY(0.985); }
+}
+@keyframes walkBody {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-3px) rotate(1deg); }
+}
+@keyframes drawLean {
+  0%, 100% { transform: translateY(4px) rotate(5deg) scaleY(0.955); }
+  50% { transform: translateY(5px) rotate(7deg) scaleY(0.94); }
+}
+@keyframes walkForward {
+  0%, 100% { transform: rotate(-18deg) translateY(1px); }
+  50% { transform: rotate(18deg) translateY(-1px); }
+}
+@keyframes walkBack {
+  0%, 100% { transform: rotate(18deg) translateY(-1px); }
+  50% { transform: rotate(-18deg) translateY(1px); }
+}
+@keyframes walkShadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.32; }
+  50% { transform: scaleX(0.84); opacity: 0.22; }
+}
+
+/* UI */
+#hud {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+  z-index: 20;
+  max-width: 236px;
+}
+
+#minimap {
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  width: 118px;
+  height: 88px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui);
+  overflow: hidden;
+  z-index: 20;
+}
+
+#minimap-player {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.94);
+  box-shadow: 0 0 10px rgba(255,255,255,0.9);
+  transform: translate(-50%, -50%);
+}
+
+#minimap-view {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.08);
+}
+
+#joystick {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  width: 124px;
+  height: 124px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--stick);
+  z-index: 30;
+}
+
+#knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: var(--stick-knob);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.toolbox {
+  position: fixed;
+  left: 12px;
+  bottom: 154px;
+  display: grid;
+  grid-template-columns: 66px 66px;
+  gap: 8px;
+  z-index: 30;
+}
+
+.tool-button,
+#undo-button,
+#clear-button,
+#full-view-button,
+#draw-button,
+.color-control,
+#smooth-toggle {
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui);
+  color: var(--text);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.25);
+}
+
+.tool-button {
+  height: 40px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tool-button.active,
+#smooth-toggle.active {
+  background: rgba(255,255,255,0.82);
+  color: #111827;
+}
+
+.color-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 206px;
+  display: grid;
+  grid-template-columns: 86px;
+  gap: 8px;
+  z-index: 30;
+}
+
+.color-control {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 42px;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.color-control input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.swatch {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.5);
+  transform: translateY(-50%);
+}
+
+.color-label { padding-left: 18px; }
+
+#smooth-toggle {
+  height: 42px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.button-cluster {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  grid-template-columns: 68px 94px;
+  grid-template-rows: 40px 40px 94px;
+  gap: 8px;
+  align-items: end;
+  z-index: 30;
+}
+
+#undo-button,
+#clear-button,
+#full-view-button {
+  height: 40px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+#undo-button { grid-column: 1; grid-row: 1; }
+#clear-button { grid-column: 2; grid-row: 1; }
+#full-view-button { grid-column: 1 / span 2; grid-row: 2; }
+
+#draw-button {
+  grid-column: 2;
+  grid-row: 3;
+  width: 94px;
+  height: 94px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.2);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#draw-button.active {
+  background: rgba(255,255,255,0.78);
+  color: #111827;
+  transform: translateY(2px) scale(0.98);
+}
+
+#undo-button:disabled { opacity: 0.42; }
+
+#setup-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background: rgba(3, 7, 18, 0.88);
+  z-index: 80;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  -webkit-overflow-scrolling: touch;
+}
+
+.setup-card {
+  width: min(420px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.38);
+}
+
+.setup-card h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.setup-card p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.setup-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.setup-row label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setup-row select {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+
+.preset-swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.preset-swatch {
+  height: 42px;
+  border: 2px solid rgba(255,255,255,0.16);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  background: #334155;
+}
+
+.preset-swatch.active {
+  border-color: rgba(255,255,255,0.85);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.18);
+}
+
+.preset-swatch span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.58);
+}
+
+.preset-swatch .dark-label {
+  color: #111827;
+  text-shadow: none;
+}
+
+#start-button {
+  width: 100%;
+  height: 48px;
+  margin-top: 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.86);
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.28);
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  #hud {
+    max-width: 210px;
+    padding: 7px 9px;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  #minimap {
+    width: 96px;
+    height: 62px;
+    right: 8px;
+    top: 8px;
+  }
+
+  #joystick {
+    left: 12px;
+    bottom: 12px;
+    width: 96px;
+    height: 96px;
+  }
+
+  #knob {
+    width: 42px;
+    height: 42px;
+  }
+
+  .toolbox {
+    left: 118px;
+    bottom: 12px;
+    grid-template-columns: repeat(4, 54px);
+    gap: 6px;
+  }
+
+  .tool-button {
+    height: 38px;
+    font-size: 8px;
+    padding: 0 4px;
+  }
+
+  .color-panel {
+    left: 118px;
+    right: auto;
+    bottom: 58px;
+    grid-template-columns: 64px 64px 82px;
+    gap: 6px;
+  }
+
+  .color-control,
+  #smooth-toggle {
+    height: 36px;
+    font-size: 8px;
+    border-radius: 10px;
+  }
+
+  .swatch {
+    left: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+  }
+
+  .color-label {
+    padding-left: 14px;
+  }
+
+  .button-cluster {
+    right: 10px;
+    bottom: 10px;
+    grid-template-columns: 58px 58px 76px;
+    grid-template-rows: 38px 74px;
+    gap: 6px;
+  }
+
+  #undo-button { grid-column: 1; grid-row: 1; }
+  #clear-button { grid-column: 2; grid-row: 1; }
+  #full-view-button { grid-column: 3; grid-row: 1; }
+
+  #draw-button {
+    grid-column: 3;
+    grid-row: 2;
+    width: 76px;
+    height: 74px;
+    font-size: 11px;
+  }
+
+  #undo-button,
+  #clear-button,
+  #full-view-button {
+    height: 38px;
+    font-size: 8px;
+    border-radius: 10px;
+    padding: 0 4px;
+  }
+
+  .setup-card {
+    width: min(620px, 100%);
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .setup-card h1 {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .setup-card p {
+    font-size: 11px;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .setup-row {
+    margin-bottom: 8px;
+    gap: 5px;
+  }
+
+  .setup-row label {
+    font-size: 10px;
+  }
+
+  .setup-row select {
+    height: 36px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .preset-swatches {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .preset-swatch {
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .preset-swatch span {
+    font-size: 8px;
+    bottom: 2px;
+  }
+
+  #start-button {
+    height: 40px;
+    margin-top: 4px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+}

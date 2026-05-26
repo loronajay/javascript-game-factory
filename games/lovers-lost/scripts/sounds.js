@@ -1,7 +1,5 @@
-
-// ─── Sound system ─────────────────────────────────────────────────────────────
-// Loads all game sounds and exposes a play(name) method.
-// Each call to play() clones the audio buffer so overlapping instances work.
+// Sound system. Audio elements are created on first use so mobile startup does
+// not eagerly touch every audio asset.
 
 const SOUND_FILES = [
   'jump',
@@ -18,41 +16,55 @@ const SOUND_FILES = [
 ];
 
 const MUSIC_FILES = ['bg-music-menu', 'bg-music-game'];
+const DEFAULT_SFX_POOL_SIZE = 4;
 
-function createSounds() {
+function createSounds(options = {}) {
   if (typeof Audio === 'undefined') {
     return { play() {}, stop() {}, stopAll() {}, playMusic() {}, stopMusic() {}, retryPendingMusic() {} };
   }
 
   const buffers = {};
+  const pools = {};
+  const poolCursor = {};
   const active = {};
+  const musicTracks = {};
+  const sfxPoolSize = Math.max(1, Math.floor(options.sfxPoolSize || DEFAULT_SFX_POOL_SIZE));
+  let currentMusicName = null;
+  let pendingMusicName = null;
 
-  for (const name of SOUND_FILES) {
-    const audio = new Audio(`sounds/${name}.wav`);
+  function createSourceAudio(name) {
+    const audio = new Audio(`sounds/${name}.mp3`);
     audio.preload = 'auto';
-    buffers[name] = audio;
-    active[name] = new Set();
+    return audio;
   }
 
-  // ── Looping music tracks ─────────────────────────────────────────────────────
-  const musicTracks = {};
-  let currentMusicName = null;
+  function getSourceAudio(name) {
+    if (!SOUND_FILES.includes(name)) return null;
+    if (!buffers[name]) {
+      buffers[name] = createSourceAudio(name);
+      pools[name] = [];
+      poolCursor[name] = 0;
+      active[name] = new Set();
+    }
+    return buffers[name];
+  }
 
-  for (const name of MUSIC_FILES) {
-    const audio = new Audio(`sounds/${name}.wav`);
+  function getMusicTrack(name) {
+    if (!MUSIC_FILES.includes(name)) return null;
+    if (musicTracks[name]) return musicTracks[name];
+    const audio = new Audio(`sounds/${name}.mp3`);
     audio.preload = 'auto';
     audio.loop = true;
     musicTracks[name] = audio;
+    return audio;
   }
-
-  let pendingMusicName = null;
 
   function playMusic(name) {
     if (currentMusicName === name) return;
     stopMusic();
     currentMusicName = name;
     pendingMusicName = null;
-    const track = musicTracks[name];
+    const track = getMusicTrack(name);
     if (!track) return;
     track.play().catch(() => { pendingMusicName = name; });
   }
@@ -60,7 +72,10 @@ function createSounds() {
   function stopMusic() {
     if (!currentMusicName) return;
     const track = musicTracks[currentMusicName];
-    if (track) { track.pause(); track.currentTime = 0; }
+    if (track) {
+      track.pause();
+      track.currentTime = 0;
+    }
     currentMusicName = null;
     pendingMusicName = null;
   }
@@ -71,25 +86,56 @@ function createSounds() {
     if (!pendingMusicName || currentMusicName !== pendingMusicName) return;
     const name = pendingMusicName;
     pendingMusicName = null;
-    const track = musicTracks[name];
+    const track = getMusicTrack(name);
     if (track) track.play().catch(() => { pendingMusicName = name; });
   }
 
-  // ── SFX ─────────────────────────────────────────────────────────────────────
-  function forget(name, instance) {
-    active[name] && active[name].delete(instance);
+  function forget(name, entry) {
+    entry.active = false;
+    active[name] && active[name].delete(entry);
+  }
+
+  function createPoolEntry(name, source) {
+    const audio = source.cloneNode();
+    const entry = { audio, active: false, used: false };
+    if (typeof audio.addEventListener === 'function') {
+      audio.addEventListener('ended', () => forget(name, entry));
+    } else if ('onended' in audio) {
+      audio.onended = () => forget(name, entry);
+    }
+    return entry;
+  }
+
+  function getPoolEntry(name, source) {
+    const pool = pools[name];
+    const inactive = pool.find(entry => !entry.active);
+    if (inactive) return inactive;
+
+    if (pool.length < sfxPoolSize) {
+      const entry = createPoolEntry(name, source);
+      pool.push(entry);
+      return entry;
+    }
+
+    const index = poolCursor[name] % pool.length;
+    poolCursor[name] = (index + 1) % pool.length;
+    const entry = pool[index];
+    if (typeof entry.audio.pause === 'function') entry.audio.pause();
+    if ('currentTime' in entry.audio) entry.audio.currentTime = 0;
+    return entry;
   }
 
   function stop(name) {
     const playing = active[name];
     if (!playing) return;
 
-    for (const instance of playing) {
-      if (typeof instance.pause === 'function') {
-        instance.pause();
+    for (const entry of playing) {
+      entry.active = false;
+      if (typeof entry.audio.pause === 'function') {
+        entry.audio.pause();
       }
-      if ('currentTime' in instance) {
-        instance.currentTime = 0;
+      if ('currentTime' in entry.audio) {
+        entry.audio.currentTime = 0;
       }
     }
 
@@ -97,17 +143,14 @@ function createSounds() {
   }
 
   function play(name) {
-    const src = buffers[name];
+    const src = getSourceAudio(name);
     if (!src) return;
-    // Clone so rapid/overlapping triggers don't cut each other off
-    const instance = src.cloneNode();
-    active[name].add(instance);
-    if (typeof instance.addEventListener === 'function') {
-      instance.addEventListener('ended', () => forget(name, instance), { once: true });
-    } else if ('onended' in instance) {
-      instance.onended = () => forget(name, instance);
-    }
-    instance.play().catch(() => {});
+    const entry = getPoolEntry(name, src);
+    if (entry.used && 'currentTime' in entry.audio) entry.audio.currentTime = 0;
+    entry.used = true;
+    entry.active = true;
+    active[name].add(entry);
+    entry.audio.play().catch(() => { forget(name, entry); });
   }
 
   function stopAll() {

@@ -1,7 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node tests/project-structure.test.js && node tests/mobile-ui.test.js && node tests/player.test.js && node tests/obstacles.test.js && node tests/scoring.test.js && node tests/input.test.js && node tests/game.test.js",
+    "test": "node tests/project-structure.test.js && node tests/mobile-ui.test.js && node tests/mobile-name-input.test.js && node tests/player.test.js && node tests/obstacles.test.js && node tests/scoring.test.js && node tests/input.test.js && node tests/game.test.js",
     "test:structure": "node tests/project-structure.test.js",
     "test:game": "node tests/game.test.js"
   }
