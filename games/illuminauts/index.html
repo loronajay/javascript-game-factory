@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Illuminauts</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -10,8 +10,25 @@
   <a href="../../grid.html" class="back-link">&lt; Back to Arcade</a>
   <canvas id="gameCanvas"></canvas>
   <script type="module">
-    import { mountMobileController } from '../../js/mobile-controller.mjs';
-    mountMobileController({ profileId: 'illuminauts' });
+    import { CONTROL_KEY_SPECS as KEY, mountMobileController } from '../../js/mobile-controller.mjs';
+    import { initMobileLandscapeGate } from './scripts/mobile-ui.js';
+
+    const forceMobileControls = new URLSearchParams(window.location.search).has('mobileControls');
+    const ILLUMINAUTS_MOBILE_PROFILE = {
+      id: 'illuminauts-touch',
+      layout: 'dpad-buttons',
+      accent: '#6ee7d8',
+      glow: '#7c4dff',
+      dpadLabel: 'MOVE',
+      directionMode: 'cardinal',
+      dpad: { up: KEY.KeyW, down: KEY.KeyS, left: KEY.KeyA, right: KEY.KeyD },
+      buttons: [
+        { id: 'sprint', label: 'RUN', key: KEY.ShiftLeft },
+      ],
+    };
+
+    initMobileLandscapeGate({ force: forceMobileControls });
+    mountMobileController({ profile: ILLUMINAUTS_MOBILE_PROFILE, force: forceMobileControls });
   </script>
   <script type="module" src="game.js"></script>
 </body>

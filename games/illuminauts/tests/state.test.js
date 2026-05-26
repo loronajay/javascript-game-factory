@@ -5,11 +5,12 @@ import { createGameState, selectMatchMapIndex, selectRandomMapIndex } from '../s
 
 function testSelectRandomMapIndexUsesAllCatalogSlots() {
   const picks = new Set();
-  for (const randomValue of [0, 0.34, 0.67]) {
+  for (let index = 0; index < MAPS.length; index++) {
+    const randomValue = (index + 0.1) / MAPS.length;
     picks.add(selectRandomMapIndex(() => randomValue, MAPS.length));
   }
 
-  assert.deepEqual([...picks].sort((a, b) => a - b), [0, 1, 2]);
+  assert.deepEqual([...picks].sort((a, b) => a - b), MAPS.map((_, index) => index));
 }
 
 function testSelectRandomMapIndexClampsHighRandomValue() {

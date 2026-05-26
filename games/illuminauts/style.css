@@ -3,6 +3,7 @@
 html, body {
   width: 100%;
   height: 100%;
+  min-height: 100dvh;
   background: #02040a;
   overflow: hidden;
 }
@@ -30,4 +31,129 @@ html, body {
 .back-link:hover,
 .back-link:focus-visible {
   color: #ffffff;
+}
+
+.mobile-landscape-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 999950;
+  display: grid;
+  place-items: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 36%, rgba(118, 244, 255, 0.16), transparent 34%),
+    rgba(2, 4, 10, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.mobile-landscape-gate.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-play-gated #gameCanvas {
+  filter: brightness(0.42) saturate(0.72);
+  pointer-events: none;
+}
+
+.mobile-landscape-gate-card {
+  width: min(420px, 100%);
+  border: 1px solid rgba(118, 244, 255, 0.45);
+  border-radius: 8px;
+  padding: 22px;
+  background: rgba(7, 16, 27, 0.94);
+  box-shadow: 0 0 36px rgba(124, 77, 255, 0.28);
+  color: #dffaff;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+}
+
+.mobile-landscape-gate-kicker {
+  color: #6ee7d8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.mobile-landscape-gate-title {
+  margin-top: 8px;
+  color: #ffffff;
+  font-size: clamp(25px, 7vw, 38px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.mobile-landscape-gate-copy {
+  margin-top: 12px;
+  color: rgba(223, 250, 255, 0.82);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.mobile-landscape-gate-btn {
+  margin-top: 18px;
+  min-height: 46px;
+  min-width: 170px;
+  border: 1px solid rgba(110, 231, 216, 0.82);
+  border-radius: 6px;
+  background: rgba(110, 231, 216, 0.16);
+  color: #ffffff;
+  font: 900 13px/1 system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mobile-controller[data-mobile-controller-root="illuminauts-touch"] {
+  z-index: 999920;
+}
+
+.mobile-controller[data-mobile-controller-root="illuminauts-touch"] .mobile-controller__pad {
+  left: max(16px, env(safe-area-inset-left)) !important;
+  bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  width: min(30vmin, 198px);
+  height: min(30vmin, 198px);
+  min-width: 136px;
+  min-height: 136px;
+}
+
+.mobile-controller[data-mobile-controller-root="illuminauts-touch"] .mobile-controller__button {
+  right: max(22px, env(safe-area-inset-right)) !important;
+  bottom: max(26px, calc(env(safe-area-inset-bottom) + 10px)) !important;
+  width: min(14vmin, 88px);
+  height: min(14vmin, 88px);
+  min-width: 60px;
+  min-height: 60px;
+  font-size: 16px;
+}
+
+@media (hover: none), (pointer: coarse), (max-width: 720px) {
+  html, body {
+    height: 100dvh;
+    touch-action: none;
+  }
+
+  .back-link {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    font-size: 10px;
+  }
+}
+
+@media (hover: none) and (orientation: landscape), (pointer: coarse) and (orientation: landscape), (max-height: 520px) and (min-width: 700px) {
+  .back-link {
+    opacity: 0.46;
+  }
+
+  #gameCanvas {
+    height: 100dvh;
+  }
 }
