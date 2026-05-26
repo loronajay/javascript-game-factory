@@ -65,6 +65,13 @@ function triggerPhaseFlash(kicker, title) {
   el.addEventListener('animationend', () => el.classList.remove('is-playing'), { once: true });
 }
 
+export function shouldPlayPhaseFlash(phase) {
+  return phase === PHASES.OWNER_CREATE_INITIAL
+    || phase === PHASES.OWNER_REPLAY
+    || phase === PHASES.OWNER_APPEND
+    || phase === PHASES.CHALLENGER_COPY;
+}
+
 function playbackIndex(state, now = performance.now()) {
   const playback = state.playback;
   if (!playback || !Array.isArray(playback.sequence)) return -1;
@@ -421,14 +428,7 @@ export function renderMatch(state) {
   initWaveform();
   const [kicker, title, detail] = getPhaseCopy(state);
 
-  const flashPhases = new Set([
-    PHASES.OWNER_CREATE_INITIAL,
-    PHASES.OWNER_REPLAY,
-    PHASES.OWNER_APPEND,
-    PHASES.SIGNAL_PLAYBACK,
-    PHASES.CHALLENGER_COPY,
-  ]);
-  if (state.phase !== _lastFlashedPhase && flashPhases.has(state.phase)) {
+  if (state.phase !== _lastFlashedPhase && shouldPlayPhaseFlash(state.phase)) {
     triggerPhaseFlash(kicker, title);
     _lastFlashedPhase = state.phase;
   }
