@@ -424,8 +424,11 @@
 
 .sequence-slot--hidden.is-complete {
   color: rgba(248, 244, 234, 0.96);
-  background: rgba(255, 255, 255, 0.12);
+  background-color: rgba(255, 255, 255, 0.12);
   border-style: solid;
+  text-shadow:
+    0 0 8px rgba(25, 247, 255, 0.5),
+    0 2px 0 rgba(0, 0, 0, 0.7);
 }
 
 .sequence-slot.is-next {
@@ -633,10 +636,19 @@
   min-width: 0;
   max-width: 56px;
   min-height: clamp(34px, 7vw, 46px);
-  background-color: transparent;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(25, 247, 255, 0.28);
+  background-color: rgba(0, 0, 0, 0.48);
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+  color: rgba(248, 244, 234, 0.82);
+  font-weight: 1000;
+  font-size: clamp(0.78rem, 2vw, 1.1rem);
+  text-shadow:
+    0 0 8px rgba(25, 247, 255, 0.45),
+    0 2px 0 rgba(0, 0, 0, 0.8);
   transition: filter 60ms ease, transform 60ms ease;
 }
 
@@ -652,6 +664,12 @@
   transform: translateY(-5px) scale(1.14);
   filter: brightness(1.45) drop-shadow(0 0 10px rgba(255, 255, 255, 0.65));
   z-index: 1;
+}
+
+.live-signal-box.is-lit {
+  border-color: rgba(255, 122, 24, 0.76);
+  color: #fff7e8;
+  background-color: rgba(255, 122, 24, 0.18);
 }
 
 @keyframes penaltyLetterBurst {

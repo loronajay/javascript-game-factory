@@ -31,6 +31,10 @@ let _waveformReady = false;
 
 function qs(id) { return document.getElementById(id); }
 
+function chipImageUrl(chipKey, state = 'dim') {
+  return `url("assets/input-chips/${chipKey}-${state}.png")`;
+}
+
 function initWaveform() {
   if (_waveformReady) return;
   _waveformReady = true;
@@ -107,6 +111,7 @@ function renderLiveSignal(state) {
       const box = document.createElement('div');
       box.className = 'live-signal-box';
       box.dataset.chipKey = key.toLowerCase();
+      box.textContent = key;
       box.setAttribute('aria-label', `Signal input ${index + 1}: ${key}`);
       strip.appendChild(box);
     });
@@ -115,10 +120,11 @@ function renderLiveSignal(state) {
   Array.from(strip.children).forEach((box, index) => {
     const isCurrent = index === current;
     box.classList.toggle('is-current', isCurrent);
+    box.classList.toggle('is-lit', isCurrent);
     box.classList.toggle('pop', isCurrent);
     const chipKey = box.dataset.chipKey;
     if (chipKey) {
-      box.style.backgroundImage = `url("../assets/input-chips/${chipKey}-${isCurrent ? 'lit' : 'dim'}.png")`;
+      box.style.backgroundImage = chipImageUrl(chipKey, isCurrent ? 'lit' : 'dim');
     }
   });
 }
@@ -190,8 +196,10 @@ function renderSequence(state) {
       slot.classList.add('is-complete');
       const input = state.activeSequence?.[i];
       if (input) {
-        const chipKey = String(input).toLowerCase();
-        slot.style.backgroundImage = `url("../assets/input-chips/${chipKey}-dim.png")`;
+        const key = String(input).toUpperCase();
+        const chipKey = key.toLowerCase();
+        slot.textContent = key;
+        slot.style.backgroundImage = chipImageUrl(chipKey, 'dim');
         slot.style.backgroundSize = '72%';
         slot.style.backgroundRepeat = 'no-repeat';
         slot.style.backgroundPosition = 'center';
