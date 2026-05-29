@@ -1,6 +1,14 @@
 # TypeScript Migration Plan
 
-Status: **Phases 0–5 complete (2026-05-29)** — the entire `js/platform/**` layer (31 `.mts` files) is migrated and **`strict: true` is on**. Typecheck clean (browser + api), all 91 browser test files green. Phase 6 (Page Subsystems) is next. **`strict` is now global**, so all future `.mts` (page subsystems, root pages, backend, games) are strict from the moment they're created — there is no second strictness pass. Game cabinets remain a later, per-cabinet pass.
+Status: **Phases 0–5 complete; Phase 6 in progress (2026-05-29)** — the entire `js/platform/**` layer (31 `.mts`) is migrated and **`strict: true` is on**. Phase 6 (Page Subsystems): **`thoughts-page` done (4 files)**; remaining: `player-page` (9), `profile-editor` (10), `profile-social` (5), `me-page` (12), `gallery-page` (8), `profile-layout` (11, last). Typecheck clean (browser + api), all 91 browser test files green. **`strict` is global** — all future `.mts` are strict from creation; no second strictness pass. Game cabinets remain a later, per-cabinet pass.
+
+### Phase 6 DOM-typing pattern (validated on `thoughts-page`, reuse for every subsystem)
+- **`event.target.closest` / `dataset` / `value`:** add small helpers — `closestEl(event, sel): HTMLElement | null` (`(event.target as Element | null)?.closest<HTMLElement>(sel) ?? null`) and `closestField(event, sel): HTMLTextAreaElement | null` for inputs whose `.value` is read. Avoids repeating casts.
+- **Event handlers:** type params `event: Event`; for submit `form: EventTarget | null` then `const formEl = form as Element` before `.matches()`.
+- **View-model / panel-state interfaces** live in the subsystem (e.g. `actions.mts` owns `SharePanelState`/`CommentPanelState`/`ViewState`); `render.mts` imports them as types and takes `Partial<...>` for optional render-time state. One-directional: `render → view-model` + `render → actions` (types only); no cycles.
+- **`doc.getElementById(...)`** is `HTMLElement | null` — guard before `.innerHTML`. Render fns take `container: HTMLElement | null` and early-return on null.
+- **Cross-boundary to not-yet-migrated `.mjs`:** `allowJs` infers JS signatures, and `= null`/`= {}` defaults often infer too-narrow params (e.g. `apiClient: null`). Cast the call arg `as any` with a one-line comment naming the unmigrated module; remove when that module migrates. (`arcade-session-nav.mjs`, `gallery-page/viewer.mjs` are the common ones.)
+- **strict function-param contravariance:** an option like `rerender?: (feed?: unknown[]) => unknown` must match what the caller actually passes — widen/narrow the declared param to the real value type, don't default to `unknown`.
 
 **Build-output workflow (decided 2026-05-29 — read before migrating any file):** the site is served as raw static files with no bundler. We **commit the tsc-emitted `.mjs` in-place** next to each `.mts` source so the site keeps loading unchanged. Mechanics:
 - `tsconfig.browser.json` emits to a staging `dist/js` (NOT in-place) so `allowJs` can never overwrite the not-yet-migrated `.mjs` SOURCE files.

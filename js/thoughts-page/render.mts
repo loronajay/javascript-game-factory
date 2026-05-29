@@ -1,44 +1,65 @@
 import { loadThoughtFeed } from "../platform/thoughts/thoughts.mjs";
+import type { ThoughtCardItem } from "../platform/thoughts/thoughts.mjs";
 import { buildThoughtsPageViewModel } from "./view-model.mjs";
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
+import type { ThoughtsPageViewModel } from "./view-model.mjs";
+import type { SharePanelState, CommentPanelState } from "./actions.mjs";
+
+interface ShareReference {
+  title?: string;
+  summary?: string;
+  authorLabel?: string;
+  publishedLabel?: string;
 }
-function buildShareReference(item) {
-    if (item?.quotedThought) {
-        return item.quotedThought;
-    }
-    return item
-        ? {
-            title: item.title,
-            summary: item.summary,
-            authorLabel: item.authorLabel,
-            publishedLabel: item.publishedLabel,
-        }
-        : null;
+
+interface RenderThoughtsPageOptions {
+  openReactionThoughtId?: string;
+  sharePanelState?: Partial<SharePanelState>;
+  commentPanelState?: Partial<CommentPanelState>;
 }
-function formatCommentDate(value) {
-    const timestamp = Date.parse((value || ""));
-    if (!timestamp)
-        return "Signal pending";
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    }).format(new Date(timestamp));
+
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
-function renderQuotedThought(reference, mode = "card") {
-    if (!reference)
-        return "";
-    const className = mode === "share-sheet"
-        ? "thought-card__quoted-thought thought-card__quoted-thought--sheet"
-        : "thought-card__quoted-thought";
-    return `
+
+function buildShareReference(item: ThoughtCardItem | null | undefined): ShareReference | null {
+  if (item?.quotedThought) {
+    return item.quotedThought;
+  }
+
+  return item
+    ? {
+        title: item.title,
+        summary: item.summary,
+        authorLabel: item.authorLabel,
+        publishedLabel: item.publishedLabel,
+      }
+    : null;
+}
+
+function formatCommentDate(value: unknown): string {
+  const timestamp = Date.parse((value || "") as string);
+  if (!timestamp) return "Signal pending";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function renderQuotedThought(reference: ShareReference | null, mode = "card"): string {
+  if (!reference) return "";
+
+  const className = mode === "share-sheet"
+    ? "thought-card__quoted-thought thought-card__quoted-thought--sheet"
+    : "thought-card__quoted-thought";
+
+  return `
     <div class="${className}">
       <p class="thought-card__quoted-kicker">Shared Post</p>
       <div class="thought-card__quoted-meta">
@@ -50,13 +71,16 @@ function renderQuotedThought(reference, mode = "card") {
     </div>
   `;
 }
-function renderCommentSheet(item, commentPanelState = {}) {
-    if (item.isPlaceholder || item.id !== commentPanelState?.cardId) {
-        return "";
-    }
-    const comments = Array.isArray(commentPanelState.comments) ? commentPanelState.comments : [];
-    const reference = buildShareReference(item);
-    return `
+
+function renderCommentSheet(item: ThoughtCardItem, commentPanelState: Partial<CommentPanelState> = {}): string {
+  if (item.isPlaceholder || item.id !== commentPanelState?.cardId) {
+    return "";
+  }
+
+  const comments = Array.isArray(commentPanelState.comments) ? commentPanelState.comments : [];
+  const reference = buildShareReference(item);
+
+  return `
     <div class="thought-card__comment-sheet">
       <div class="thought-card__comment-header">
         <p class="thought-card__comment-kicker">Comments</p>
@@ -65,7 +89,7 @@ function renderCommentSheet(item, commentPanelState = {}) {
       ${renderQuotedThought(reference, "share-sheet")}
       <div class="thought-card__comment-thread">
         ${comments.length > 0
-        ? comments.map((comment) => `
+          ? comments.map((comment) => `
             <article class="thought-card__comment">
               <div class="thought-card__comment-meta">
                 <span class="thought-card__comment-author">${escapeHtml(comment.authorDisplayName || "Arcade Pilot")}</span>
@@ -74,7 +98,7 @@ function renderCommentSheet(item, commentPanelState = {}) {
               <p class="thought-card__comment-body">${escapeHtml(comment.text || "")}</p>
             </article>
           `).join("")
-        : `<p class="thought-card__comment-empty">No comments yet. Start the thread.</p>`}
+          : `<p class="thought-card__comment-empty">No comments yet. Start the thread.</p>`}
       </div>
       <form class="thought-card__comment-form" data-comment-form="${escapeHtml(item.commentTargetId || item.id)}" data-comment-card-id="${escapeHtml(item.id)}">
         <label class="thought-card__share-label" for="comment-body-${escapeHtml(item.id)}">Write a comment</label>
@@ -94,10 +118,11 @@ function renderCommentSheet(item, commentPanelState = {}) {
     </div>
   `;
 }
-function renderHeroCard(container, model) {
-    if (!container)
-        return;
-    container.innerHTML = `
+
+function renderHeroCard(container: HTMLElement | null, model: ThoughtsPageViewModel): void {
+  if (!container) return;
+
+  container.innerHTML = `
     <div class="thoughts-hero-card__copy">
       <p class="thoughts-hero-card__kicker">${escapeHtml(model.heroKicker)}</p>
       <h2 class="thoughts-hero-card__title">${escapeHtml(model.heroTitle)}</h2>
@@ -111,25 +136,31 @@ function renderHeroCard(container, model) {
     </div>
   `;
 }
-function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {}, commentPanelState = {}) {
-    if (item.isPlaceholder) {
-        return `<p class="thought-feed__empty">${escapeHtml(item.summary || "No posts yet.")}</p>`;
-    }
-    const actionItems = Array.isArray(item.actionItems) && item.actionItems.length > 0
-        ? item.actionItems
-        : [
-            { label: "Comments" },
-            { label: "Share" },
-            { label: "React" },
-        ];
-    const isReactionPickerOpen = !item.isPlaceholder && item.id === openReactionThoughtId;
-    const isShareSheetOpen = !item.isPlaceholder && item.id === sharePanelState?.cardId;
-    const isShareCaptionOpen = isShareSheetOpen && sharePanelState?.mode === "caption";
-    const isCommentSheetOpen = !item.isPlaceholder && item.id === commentPanelState?.cardId;
-    const shareReference = buildShareReference(item);
-    const actionsHtml = actionItems.map((action) => {
-        if (action.id === "comment" && !item.isPlaceholder) {
-            return `
+
+function renderThoughtCard(
+  item: ThoughtCardItem,
+  openReactionThoughtId = "",
+  sharePanelState: Partial<SharePanelState> = {},
+  commentPanelState: Partial<CommentPanelState> = {},
+): string {
+  if (item.isPlaceholder) {
+    return `<p class="thought-feed__empty">${escapeHtml(item.summary || "No posts yet.")}</p>`;
+  }
+  const actionItems: Array<{ id?: string; label: string; isActive?: boolean }> = Array.isArray(item.actionItems) && item.actionItems.length > 0
+    ? item.actionItems
+    : [
+        { label: "Comments" },
+        { label: "Share" },
+        { label: "React" },
+      ];
+  const isReactionPickerOpen = !item.isPlaceholder && item.id === openReactionThoughtId;
+  const isShareSheetOpen = !item.isPlaceholder && item.id === sharePanelState?.cardId;
+  const isShareCaptionOpen = isShareSheetOpen && sharePanelState?.mode === "caption";
+  const isCommentSheetOpen = !item.isPlaceholder && item.id === commentPanelState?.cardId;
+  const shareReference = buildShareReference(item);
+  const actionsHtml = actionItems.map((action) => {
+    if (action.id === "comment" && !item.isPlaceholder) {
+      return `
         <button
           class="${isCommentSheetOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
           type="button"
@@ -137,9 +168,10 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
           data-comment-card-id="${escapeHtml(item.id)}"
         >${escapeHtml(action.label)}</button>
       `;
-        }
-        if (action.id === "share" && !item.isPlaceholder) {
-            return `
+    }
+
+    if (action.id === "share" && !item.isPlaceholder) {
+      return `
         <button
           class="${action.isActive ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
           type="button"
@@ -147,9 +179,10 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
           data-share-card-id="${escapeHtml(item.id)}"
         >${escapeHtml(action.label)}</button>
       `;
-        }
-        if (action.id === "react" && !item.isPlaceholder) {
-            return `
+    }
+
+    if (action.id === "react" && !item.isPlaceholder) {
+      return `
         <button
           class="${action.isActive || isReactionPickerOpen ? "thought-card__action thought-card__action--active" : "thought-card__action"}"
           type="button"
@@ -157,14 +190,15 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
           aria-expanded="${isReactionPickerOpen ? "true" : "false"}"
         >${escapeHtml(action.label)}</button>
       `;
-        }
-        return `
+    }
+
+    return `
       <span class="thought-card__action">${escapeHtml(action.label)}</span>
     `;
-    }).join("");
-    const reactionPickerHtml = item.isPlaceholder
-        ? ""
-        : `
+  }).join("");
+  const reactionPickerHtml = item.isPlaceholder
+    ? ""
+    : `
       <div class="${isReactionPickerOpen ? "thought-card__reaction-picker" : "thought-card__reaction-picker thought-card__reaction-picker--hidden"}">
         ${item.reactionPickerItems.map((reaction) => `
           <button
@@ -181,25 +215,25 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
         `).join("")}
       </div>
     `;
-    const shareSheetHtml = item.isPlaceholder || !isShareSheetOpen
-        ? ""
-        : `
+  const shareSheetHtml = item.isPlaceholder || !isShareSheetOpen
+    ? ""
+    : `
       <div class="thought-card__share-sheet">
         ${item.actionItems.find((action) => action.id === "share")?.isActive
-            ? `
+          ? `
             <div class="thought-card__share-actions">
               <button class="thought-card__share-button thought-card__share-button--danger" type="button" data-share-now-thought-id="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">Remove Share</button>
               <button class="thought-card__share-button" type="button" data-close-share-sheet="${escapeHtml(item.id)}">Done</button>
             </div>
           `
-            : `
+          : `
             <div class="thought-card__share-actions">
               <button class="thought-card__share-button thought-card__share-button--primary" type="button" data-share-now-thought-id="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">Share Now</button>
               <button class="thought-card__share-button" type="button" data-open-share-caption="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">Write Caption</button>
             </div>
           `}
         ${isShareCaptionOpen
-            ? `
+          ? `
             <form class="thought-card__share-composer" data-share-caption-form="${escapeHtml(item.shareTargetId || item.id)}" data-share-card-id="${escapeHtml(item.id)}">
               <label class="thought-card__share-label" for="share-caption-${escapeHtml(item.id)}">Add your caption</label>
               <textarea
@@ -217,14 +251,15 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
               ${renderQuotedThought(shareReference, "share-sheet")}
             </form>
           `
-            : ""}
+          : ""}
       </div>
     `;
-    const quotedThoughtHtml = item.quotedThought
-        ? renderQuotedThought(item.quotedThought)
-        : "";
-    const commentSheetHtml = renderCommentSheet(item, commentPanelState);
-    return `
+  const quotedThoughtHtml = item.quotedThought
+    ? renderQuotedThought(item.quotedThought)
+    : "";
+  const commentSheetHtml = renderCommentSheet(item, commentPanelState);
+
+  return `
     <article class="thought-card"${item.posterPlayerId ? ` data-poster-id="${escapeHtml(item.posterPlayerId)}"` : ""}>
       <div class="thought-card__signal-line">
         <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
@@ -253,16 +288,28 @@ function renderThoughtCard(item, openReactionThoughtId = "", sharePanelState = {
     </article>
   `;
 }
-export function renderThoughtsPage(doc = globalThis.document, thoughtFeed = loadThoughtFeed(), options = {}) {
-    if (!doc?.getElementById)
-        return null;
-    const model = buildThoughtsPageViewModel(thoughtFeed);
-    renderHeroCard(doc.getElementById("thoughtsHeroCard"), model);
-    const feed = doc.getElementById("thoughtsFeed");
-    if (feed) {
-        feed.innerHTML = model.items
-            .map((item) => renderThoughtCard(item, options?.openReactionThoughtId || "", options?.sharePanelState || {}, options?.commentPanelState || {}))
-            .join("");
-    }
-    return model;
+
+export function renderThoughtsPage(
+  doc: Document = globalThis.document,
+  thoughtFeed: unknown = loadThoughtFeed(),
+  options: RenderThoughtsPageOptions = {},
+): ThoughtsPageViewModel | null {
+  if (!doc?.getElementById) return null;
+
+  const model = buildThoughtsPageViewModel(thoughtFeed);
+  renderHeroCard(doc.getElementById("thoughtsHeroCard"), model);
+
+  const feed = doc.getElementById("thoughtsFeed");
+  if (feed) {
+    feed.innerHTML = model.items
+      .map((item) => renderThoughtCard(
+        item,
+        options?.openReactionThoughtId || "",
+        options?.sharePanelState || {},
+        options?.commentPanelState || {},
+      ))
+      .join("");
+  }
+
+  return model;
 }
