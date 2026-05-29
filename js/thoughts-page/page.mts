@@ -16,9 +16,7 @@ export { renderThoughtsPage } from "./render.mjs";
 const doc = globalThis.document;
 
 if (doc?.getElementById) {
-  // gallery-page/viewer.mjs is not yet migrated; its inferred param types are too
-  // narrow (apiClient defaults to null in JS). Cast until gallery-page is on TS.
-  initPageGalleryViewer({ doc, apiClient: createPlatformApiClient() } as any);
+  initPageGalleryViewer({ doc, apiClient: createPlatformApiClient() });
 
   renderPrimaryAppNav(doc.getElementById("thoughtsPrimaryNav"), {
     basePath: "../",
