@@ -2,9 +2,11 @@
  * Pure HTML template functions for the cassette music player.
  * No DOM access, no logic; only returns markup strings.
  */
+
 import { PROFILE_MUSIC_DEFAULT_VOLUME } from "./constants.mjs";
-export function playerTemplate(uid) {
-    return `
+
+export function playerTemplate(uid: string): string {
+  return `
     <div class="cassette-player cassette-player__surface" data-profile-child-id="playerSurface" role="region" aria-label="Music player"></div>
 
     <div class="cassette-player__viewport" data-profile-child-id="deck">
@@ -42,8 +44,9 @@ export function playerTemplate(uid) {
     </div>
   `;
 }
-export function emptyStateTemplate() {
-    return `
+
+export function emptyStateTemplate(): string {
+  return `
     <div class="cassette-empty" data-profile-child-id="playerSurface">
       <span class="cassette-empty__icon" aria-hidden="true">&#128252;</span>
       <p class="cassette-empty__text">No tape loaded</p>

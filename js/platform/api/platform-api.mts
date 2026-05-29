@@ -156,7 +156,7 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(sanitizeProfileFriendCode(friendCode));
       return encoded ? get(`/players/by-friend-code/${encoded}`, "player") : Promise.resolve(null);
     },
-    savePlayerProfile(playerId: string, patch: Record<string, unknown> = {}) {
+    savePlayerProfile(playerId: string, patch: unknown = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? put(`/players/${encoded}/profile`, patch, "player") : Promise.resolve(null);
     },
@@ -164,7 +164,7 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(playerId);
       return encoded ? get(`/players/${encoded}/metrics`, "metrics") : Promise.resolve(null);
     },
-    savePlayerMetrics(playerId: string, patch: Record<string, unknown> = {}) {
+    savePlayerMetrics(playerId: string, patch: unknown = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? put(`/players/${encoded}/metrics`, patch, "metrics") : Promise.resolve(null);
     },
@@ -172,7 +172,7 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(playerId);
       return encoded ? get(`/players/${encoded}/relationships`, "relationships") : Promise.resolve(null);
     },
-    savePlayerRelationships(playerId: string, patch: Record<string, unknown> = {}) {
+    savePlayerRelationships(playerId: string, patch: unknown = {}) {
       const encoded = encodePathSegment(playerId);
       return encoded ? put(`/players/${encoded}/relationships`, patch, "relationships") : Promise.resolve(null);
     },

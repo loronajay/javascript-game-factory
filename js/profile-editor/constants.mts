@@ -3,7 +3,7 @@ export const PROFILE_LINK_URL_MAX_LENGTH = 280;
 export const FRIEND_RAIL_SLOT_COUNT = 4;
 export const PROFILE_MUSIC_DEFAULT_VOLUME = 0.35;
 export const PROFILE_UPDATED_EVENT = "arcade-profile:updated";
-export const RELATIONSHIP_MODE_OPTIONS = [
-    { value: "auto", label: "Automatic" },
-    { value: "manual", label: "Manual" },
+export const RELATIONSHIP_MODE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "auto", label: "Automatic" },
+  { value: "manual", label: "Manual" },
 ];
