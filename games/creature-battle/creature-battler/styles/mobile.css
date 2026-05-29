@@ -440,6 +440,11 @@
     padding: 9px 7px;
   }
 
+  /* Touch bar handles "Auto All" on mobile — hide the inline desktop row */
+  .cc-auto-all-row {
+    display: none;
+  }
+
   .cc-creature-sprite {
     width: 50px;
     height: 50px;
@@ -620,6 +625,11 @@
   .cc-creature-sprite {
     margin-bottom: 0;
     flex-shrink: 0;
+  }
+
+  /* In portrait the card is horizontal — auto button doesn't fit inline */
+  .cc-auto-btn {
+    display: none;
   }
 
   #game-canvas.mobile-layout #screen-battle {
@@ -939,6 +949,11 @@
   .cc-creature-sprite {
     width: 48px;
     height: 48px;
+  }
+
+  /* Cards are compact in landscape — touch bar "Auto All" covers single-auto need */
+  .cc-auto-btn {
+    display: none;
   }
 
   .cc-browse-body,

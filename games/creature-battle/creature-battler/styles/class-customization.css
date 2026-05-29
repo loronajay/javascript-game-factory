@@ -154,6 +154,57 @@
   text-align: center;
 }
 
+/* ── Auto-allocate button (inside each creature card) ─────────────────────── */
+
+.cc-auto-btn {
+  margin-top: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a878ff;
+  background: rgba(160, 100, 255, 0.1);
+  border: 1px solid rgba(160, 100, 255, 0.28);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+
+.cc-auto-btn:hover,
+.cc-auto-btn:active {
+  background: rgba(160, 100, 255, 0.22);
+  border-color: #a060ff;
+  color: var(--cb-text);
+}
+
+/* ── Auto-allocate all row ────────────────────────────────────────────────── */
+
+.cc-auto-all-row {
+  display: flex;
+  justify-content: center;
+  padding: 0 20px 6px;
+  flex-shrink: 0;
+}
+
+.cc-auto-all-btn {
+  font-size: 12px;
+  padding: 7px 18px;
+  color: #a878ff;
+  border-color: rgba(160, 100, 255, 0.28);
+}
+
+.cc-auto-all-btn:hover,
+.cc-auto-all-btn:active {
+  border-color: #a060ff;
+  color: var(--cb-text);
+  box-shadow: 0 0 12px rgba(160, 100, 255, 0.3);
+}
+
+/* ── Confirm row ──────────────────────────────────────────────────────────── */
+
 .cc-overview-confirm {
   display: flex;
   justify-content: center;

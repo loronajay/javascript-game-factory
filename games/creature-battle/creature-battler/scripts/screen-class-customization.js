@@ -42,6 +42,7 @@ function _renderCCOverview() {
   const configs = _ccConfigs();
   const el = document.getElementById('screen-class-customization');
   const allLocked = cc.locked.every(v => v);
+  const showAutoAll = !state.isOnlineMatch;
 
   el.innerHTML = `
     <div class="cc-header">
@@ -64,9 +65,14 @@ function _renderCCOverview() {
             <span class="element-tag element-${c.element}">${c.element}</span>
             <div class="cc-creature-status ${statusClass}">${statusText}</div>
             ${stub ? `<div class="cc-creature-route-name">${stub.name}</div>` : ''}
+            ${!isLocked && showAutoAll ? `<button class="cc-auto-btn" type="button" data-auto-slot="${i}">Auto</button>` : ''}
           </div>`;
       }).join('')}
     </div>
+    ${showAutoAll ? `
+      <div class="cc-auto-all-row">
+        <button class="btn cc-auto-all-btn" id="cc-auto-all-btn">Auto-Allocate All</button>
+      </div>` : ''}
     ${allLocked ? `
       <div class="cc-overview-confirm">
         <button class="btn primary" id="cc-confirm-btn">
@@ -74,11 +80,15 @@ function _renderCCOverview() {
         </button>
       </div>` : ''}
     <div class="cc-footer">
-      <div class="cc-hint">${renderControlHint(`← → Select · Space / Enter Configure${state.isOnlineMatch ? '' : ' · Esc Back'}`, 'Tap a creature to configure its class')}</div>
+      <div class="cc-hint">${renderControlHint(
+        `← → Select · Space / Enter Configure${showAutoAll ? ' · A Auto All' : ''}${state.isOnlineMatch ? '' : ' · Esc Back'}`,
+        'Tap a creature to configure, or use Auto'
+      )}</div>
       <div class="cc-hint" style="color:var(--cb-accent)">${cc.locked.filter(v=>v).length} / 3 Locked</div>
     </div>
     ${renderTouchActionBar([
       ...(state.isOnlineMatch ? [] : [{ id: 'back', label: 'Back' }]),
+      ...(showAutoAll ? [{ id: 'auto_all', label: 'Auto All' }] : []),
       ...(allLocked ? [{ id: 'confirm', label: state.isOnlineMatch ? 'Lock In' : (cc.teamPhase === 'player' ? 'Next' : 'Battle'), primary: true }] : []),
     ])}
   `;
@@ -92,11 +102,24 @@ function _renderCCOverview() {
     });
   });
 
+  el.querySelectorAll('.cc-auto-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const slot = parseInt(btn.dataset.autoSlot, 10);
+      playClick();
+      _autoAllocateSlot(slot);
+    });
+  });
+
+  const autoAllBtn = el.querySelector('#cc-auto-all-btn');
+  if (autoAllBtn) autoAllBtn.addEventListener('click', () => { playClick(); _autoAllocateAll(); });
+
   const confirmBtn = el.querySelector('#cc-confirm-btn');
   if (confirmBtn) confirmBtn.addEventListener('click', () => { playClick(); _confirmCCPhase(); });
 
   bindTouchActionBar(el, {
     back() { playClick(); _backFromCCOverview(); },
+    auto_all() { playClick(); _autoAllocateAll(); },
     confirm() { playClick(); _confirmCCPhase(); },
   });
 }
@@ -380,6 +403,29 @@ function _lockInCreature() {
   renderClassCustomization();
 }
 
+function _autoAllocateSlot(slotIndex) {
+  const cc = state.classCustom;
+  if (state.isOnlineMatch) return;
+  const team = _ccTeam();
+  const configs = _ccConfigs();
+  const creatureId = team[slotIndex];
+  const level = state.battleConfig.level;
+  const result = autoAllocateCreature(creatureId, level);
+  if (!result.routeId) return;
+  configs[slotIndex].routeId = result.routeId;
+  configs[slotIndex].equippedPassives = result.equippedPassives;
+  cc.locked[slotIndex] = true;
+  renderClassCustomization();
+}
+
+function _autoAllocateAll() {
+  if (state.isOnlineMatch) return;
+  const team = _ccTeam();
+  for (let i = 0; i < team.length; i++) {
+    _autoAllocateSlot(i);
+  }
+}
+
 function _backFromCCOverview() {
   const cc = state.classCustom;
   if (state.isOnlineMatch) return;
@@ -426,6 +472,9 @@ function handleClassCustomKey(key, rawKey) {
   if (cc.view === 'overview') {
     if (key === 'ArrowLeft')  { moveCCOverviewCursor(-1); return; }
     if (key === 'ArrowRight') { moveCCOverviewCursor(1);  return; }
+    if (rawKey === 'a' || rawKey === 'A') {
+      if (!state.isOnlineMatch) { _autoAllocateAll(); return; }
+    }
     if (rawKey === ' ' || rawKey === 'Enter') {
       _enterCCBrowse();
       return;

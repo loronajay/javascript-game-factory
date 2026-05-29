@@ -243,5 +243,5 @@ function renderBattleEndOverlay(winner, reason) {
       <button class="btn primary" id="end-back-btn">Back to Title</button>
     </div>`;
   screen.appendChild(overlay);
-  document.getElementById('end-back-btn')?.addEventListener('click', () => { playClick(); setBattleRng(null); state.isOnlineMatch = false; setScreen('title'); });
+  document.getElementById('end-back-btn')?.addEventListener('click', () => { playClick(); stopResultsMusic(); setBattleRng(null); state.isOnlineMatch = false; setScreen('title'); });
 }

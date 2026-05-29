@@ -199,6 +199,11 @@ function endRound() {
   const end = checkBattleEnd();
   if (end) { showBattleEnd(end); return; }
   const tickResults = applyEndOfRoundStatuses();
+  tickResults.forEach(t => {
+    if (!t.wasKO) return;
+    const creditSide = t.side === 'player' ? 'opponent' : 'player';
+    if (state.battleState.battleStats?.[creditSide]) state.battleState.battleStats[creditSide].kos++;
+  });
   renderBattleHud();
   if (tickResults.length) {
     const tickMsg = tickResults.map(t => {

@@ -128,15 +128,20 @@ function consumeStatus(creature, id) {
 
 function applyEndOfRoundStatuses() {
   const tickResults = [];
-  getAllCreatures().forEach(creature => {
-    if (creature.isKnockedOut) return;
-    ['poison', 'burn'].forEach(statusId => {
-      if (!hasStatus(creature, statusId) || creature.isKnockedOut) return;
-      const dmg = Math.max(1, Math.round(creature.hp.max * 0.06));
-      creature.hp.current = Math.max(0, creature.hp.current - dmg);
-      const wasKO = !creature.isKnockedOut && creature.hp.current <= 0;
-      if (wasKO) { creature.isKnockedOut = true; clearBattleModifiers(creature); }
-      tickResults.push({ creatureName: creature.displayName, statusId, damage: dmg, wasKO });
+  const bs = state.battleState;
+  if (!bs) return tickResults;
+  ['player', 'opponent'].forEach(side => {
+    SLOT_NAMES.forEach(slot => {
+      const creature = bs[side][slot];
+      if (!creature || creature.isKnockedOut) return;
+      ['poison', 'burn'].forEach(statusId => {
+        if (!hasStatus(creature, statusId) || creature.isKnockedOut) return;
+        const dmg = Math.max(1, Math.round(creature.hp.max * 0.06));
+        creature.hp.current = Math.max(0, creature.hp.current - dmg);
+        const wasKO = !creature.isKnockedOut && creature.hp.current <= 0;
+        if (wasKO) { creature.isKnockedOut = true; clearBattleModifiers(creature); }
+        tickResults.push({ creatureName: creature.displayName, side, statusId, damage: dmg, wasKO });
+      });
     });
   });
   return tickResults;
@@ -574,6 +579,18 @@ function resolveAction(action) {
       let statusText = 'BUFF';
       slots.forEach(s => { statusText = applyUtilityMove(move.id, bs[tgtSide][s]) || statusText; });
       return { type: 'utility', actorName: actor.displayName, moveName: move.name, targetName: 'all allies', targetSide: tgtSide, targetSlot: null, statusText };
+    }
+
+    if (move.targeting === 'all_enemies') {
+      const tgtSide = action.actorSide === 'player' ? 'opponent' : 'player';
+      const slots = SLOT_NAMES.filter(s => { const c = bs[tgtSide][s]; return c && !c.isKnockedOut; });
+      if (!slots.length) return { type: 'no_target', actorName: actor.displayName, moveName: move.name };
+      spendMoveCost(actor, move);
+      const didHit = resolveHit(actor, bs[tgtSide][slots[0]], move);
+      if (!didHit) return { type: 'miss', actorName: actor.displayName, moveName: move.name, targetSide: tgtSide, targetSlot: null };
+      let statusText = 'DEBUFF';
+      slots.forEach(s => { statusText = applyUtilityMove(move.id, bs[tgtSide][s]) || statusText; });
+      return { type: 'utility', actorName: actor.displayName, moveName: move.name, targetName: 'all enemies', targetSide: tgtSide, targetSlot: null, statusText };
     }
 
     const targetSide = action.targetSide || action.actorSide;

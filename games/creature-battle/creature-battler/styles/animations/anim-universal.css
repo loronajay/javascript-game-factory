@@ -36,6 +36,81 @@
   animation: hit-recoil-right 310ms ease-out;
 }
 
+/* ── Speed route lunge: snappier travel (reuses cast-lunge-to keyframes) ─── */
+.anim-lunge {
+  animation: cast-lunge-to 260ms cubic-bezier(0.15, 0, 0.5, 1);
+}
+
+/* ── Magic cast pose: float up + brightness pulse (no physical travel) ────── */
+@keyframes cast-magic-pose {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  30%  { transform: translate(-50%, calc(-50% - 6px)) scale(1.05); filter: brightness(1.7) saturate(1.4); }
+  70%  { transform: translate(-50%, calc(-50% - 3px)) scale(1.02); filter: brightness(1.3); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+}
+.anim-cast-magic {
+  animation: cast-magic-pose 380ms ease-out;
+}
+
+/* ── Magic hit: recoil with hue-shifted flash ────────────────────────────── */
+@keyframes hit-magic-recoil-right {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  20%  { transform: translate(calc(-50% + 10px), calc(-50% - 5px)); filter: brightness(3) saturate(0.2) hue-rotate(160deg); }
+  55%  { transform: translate(calc(-50% - 3px),  -50%);             filter: brightness(1.1); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+@keyframes hit-magic-recoil-left {
+  0%   { transform: translate(-50%, -50%);                           filter: brightness(1); }
+  20%  { transform: translate(calc(-50% - 10px), calc(-50% - 5px)); filter: brightness(3) saturate(0.2) hue-rotate(160deg); }
+  55%  { transform: translate(calc(-50% + 3px),  -50%);             filter: brightness(1.1); }
+  100% { transform: translate(-50%, -50%);                          filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-magic   { animation: hit-magic-recoil-left  300ms ease-out; }
+[data-creature^="opponent"].anim-hit-magic { animation: hit-magic-recoil-right 300ms ease-out; }
+
+/* ── Buff cast pose: light upward float + glow ───────────────────────────── */
+@keyframes cast-buff-pose {
+  0%   { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+  35%  { transform: translate(-50%, calc(-50% - 9px)) scale(1.04, 0.97); filter: brightness(1.6) saturate(1.3); }
+  70%  { transform: translate(-50%, calc(-50% - 4px)); filter: brightness(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1);    filter: brightness(1); }
+}
+.anim-cast-buff {
+  animation: cast-buff-pose 340ms ease-out;
+}
+
+/* ── Light physical hit: small recoil (speed route quick strikes) ─────────── */
+@keyframes hit-recoil-right-light {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  20%  { transform: translate(calc(-50% + 7px), calc(-50% - 2px)); filter: brightness(2.5) saturate(0.2); }
+  55%  { transform: translate(calc(-50% - 2px), -50%);             filter: brightness(1); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+@keyframes hit-recoil-left-light {
+  0%   { transform: translate(-50%, -50%);                          filter: brightness(1); }
+  20%  { transform: translate(calc(-50% - 7px), calc(-50% - 2px)); filter: brightness(2.5) saturate(0.2); }
+  55%  { transform: translate(calc(-50% + 2px), -50%);             filter: brightness(1); }
+  100% { transform: translate(-50%, -50%);                         filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-physical-light   { animation: hit-recoil-left-light  220ms ease-out; }
+[data-creature^="opponent"].anim-hit-physical-light { animation: hit-recoil-right-light 220ms ease-out; }
+
+/* ── Heavy physical hit: big recoil with squash (speed route heavy strikes) ─ */
+@keyframes hit-recoil-right-heavy {
+  0%   { transform: translate(-50%, -50%) scale(1);                                    filter: brightness(1); }
+  15%  { transform: translate(calc(-50% + 18px), calc(-50% - 5px)) scale(0.93, 1.07); filter: brightness(5) saturate(0); }
+  45%  { transform: translate(calc(-50% - 5px),  -50%) scale(1.04, 0.95);             filter: brightness(1.4); }
+  100% { transform: translate(-50%, -50%) scale(1);                                    filter: brightness(1); }
+}
+@keyframes hit-recoil-left-heavy {
+  0%   { transform: translate(-50%, -50%) scale(1);                                     filter: brightness(1); }
+  15%  { transform: translate(calc(-50% - 18px), calc(-50% - 5px)) scale(0.93, 1.07);  filter: brightness(5) saturate(0); }
+  45%  { transform: translate(calc(-50% + 5px),  -50%) scale(1.04, 0.95);              filter: brightness(1.4); }
+  100% { transform: translate(-50%, -50%) scale(1);                                     filter: brightness(1); }
+}
+[data-creature^="player"].anim-hit-physical-heavy   { animation: hit-recoil-left-heavy  380ms ease-out; }
+[data-creature^="opponent"].anim-hit-physical-heavy { animation: hit-recoil-right-heavy 380ms ease-out; }
+
 /* ══════════════════════════════════════════════════════════════════════════
    UNIVERSAL CREATURE STATE ANIMATIONS
    Locked after Phase 2. One implementation, all creatures, no overrides.
