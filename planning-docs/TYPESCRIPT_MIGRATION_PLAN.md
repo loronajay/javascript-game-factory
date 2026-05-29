@@ -1,6 +1,6 @@
 # TypeScript Migration Plan
 
-Status: **Phases 0–1 complete (2026-05-29)** — toolchain in place; all 9 platform schema files migrated to `.mts`, typecheck clean (browser + api), all 91 browser test files + 12 platform suites green, backend typecheck clean. Phase 2 (Platform Normalize) is next. Game cabinets remain a later, per-cabinet pass.
+Status: **Phases 0–2 complete (2026-05-29)** — toolchain in place; 9 schema files + 5 normalize files migrated to `.mts` (14 total), typecheck clean (browser + api), all 91 browser test files green. Phase 3 (Platform Store + Builders + Mutations) is next. Game cabinets remain a later, per-cabinet pass.
 
 **Build-output workflow (decided 2026-05-29 — read before migrating any file):** the site is served as raw static files with no bundler. We **commit the tsc-emitted `.mjs` in-place** next to each `.mts` source so the site keeps loading unchanged. Mechanics:
 - `tsconfig.browser.json` emits to a staging `dist/js` (NOT in-place) so `allowJs` can never overwrite the not-yet-migrated `.mjs` SOURCE files.
@@ -363,7 +363,16 @@ export interface Activity {
 
 ---
 
-## Phase 2: Platform Normalize
+## Phase 2: Platform Normalize — DONE (2026-05-29)
+
+**What shipped:** 5 frontend normalize files migrated to `.mts`: `profile/profile`, `activity/activity-normalize`, `thoughts/thoughts-normalize`, `relationships/relationships-normalize`, `profile/friend-preview-enrichment`. (The backend `normalize.mjs` listed below is Phase 9, not Phase 2.)
+
+- `profile.mts` now owns the precise profile-domain shapes: `ProfileFields`, `PlayerProfileView`, `ProfileLink`, `LadderPlacement`, `FriendPreview`, `MusicTrack`, plus `ProfilePresence` / `ProfileLinkKind` / `ProfileBackgroundStyle` unions.
+- **Phase 1 deferrals closed:** `factory-profile.mts` now imports the real profile types — `FactoryProfile`'s `ladderPlacements`/`friendsPreview`/`mainSqueeze`/`links`/`profileMusicPlaylist`/`presence`/`backgroundStyle` are precisely typed and the `backgroundStyle` cast was removed.
+- Normalize input boundaries use the `const x = raw as Record<string, any> | null | undefined` cast pattern (preserves the existing `x?.field` optional-chaining style) and `is`-typed guards for Set membership. `thoughts-normalize` exports `ThoughtPost` (the richer normalized post shape, distinct from the seed `Thought`) and `NormalizedThoughtComment`. `relationships-normalize` exports `ProfileRelationshipsRecord` + `RelationshipSlotMode`.
+- `friend-preview-enrichment.mts` is loosely-typed API-merge glue: the structured parts (relationships record, API client) are typed; the API-shaped friend rows stay `Record<string, any>` by design (commented).
+
+---
 
 **Files**: ~9 normalize files  
 **What these do**: Take raw API responses or user input, validate/sanitize, return typed output

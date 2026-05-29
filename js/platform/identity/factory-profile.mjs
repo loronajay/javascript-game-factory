@@ -80,8 +80,6 @@ export function normalizeFactoryProfile(profile = {}, options = {}) {
         avatarAssetId: profileFields.avatarAssetId,
         avatarUrl: sanitizeCachedUrl(source.avatarUrl),
         backgroundImageUrl: profileFields.backgroundImageUrl,
-        // profile.mjs is still untyped (Phase 2), so its ternary widens to string; the
-        // runtime value is always "static" | "blend". Cast narrows until profile.mts lands.
         backgroundStyle: profileFields.backgroundStyle,
         presence: profileFields.presence,
         favoriteGameSlug: profileFields.favoriteGameSlug,

@@ -7,6 +7,14 @@ import {
 } from "../storage/storage.mjs";
 import type { StorageLike } from "../storage/storage.mjs";
 import { buildDefaultFriendCode, normalizeProfileFields, normalizeProfileMusicPlaylist } from "../profile/profile.mjs";
+import type {
+  LadderPlacement,
+  FriendPreview,
+  ProfileLink,
+  MusicTrack,
+  ProfilePresence,
+  ProfileBackgroundStyle,
+} from "../profile/profile.mjs";
 
 export const FACTORY_PROFILE_VERSION = 1;
 export const FACTORY_PROFILE_STORAGE_KEY = getPlatformStorageKey("factoryProfile");
@@ -23,20 +31,19 @@ export interface FactoryProfile {
   avatarAssetId: string;
   avatarUrl: string;
   backgroundImageUrl: string;
-  backgroundStyle: "static" | "blend";
-  presence: string;
+  backgroundStyle: ProfileBackgroundStyle;
+  presence: ProfilePresence;
   favoriteGameSlug: string;
-  // Profile-domain sub-shapes are owned by profile.mjs and get precise types in Phase 2.
-  ladderPlacements: unknown[];
-  friendsPreview: unknown[];
-  mainSqueeze: unknown;
+  ladderPlacements: LadderPlacement[];
+  friendsPreview: FriendPreview[];
+  mainSqueeze: FriendPreview | null;
   badgeIds: string[];
   favorites: string[];
   friends: string[];
   recentPartners: string[];
-  links: unknown[];
+  links: ProfileLink[];
   preferences: Record<string, unknown>;
-  profileMusicPlaylist: unknown[];
+  profileMusicPlaylist: MusicTrack[];
 }
 
 export interface NormalizeFactoryProfileOptions {
@@ -139,9 +146,7 @@ export function normalizeFactoryProfile(
     avatarAssetId: profileFields.avatarAssetId,
     avatarUrl: sanitizeCachedUrl(source.avatarUrl),
     backgroundImageUrl: profileFields.backgroundImageUrl,
-    // profile.mjs is still untyped (Phase 2), so its ternary widens to string; the
-    // runtime value is always "static" | "blend". Cast narrows until profile.mts lands.
-    backgroundStyle: profileFields.backgroundStyle as FactoryProfile["backgroundStyle"],
+    backgroundStyle: profileFields.backgroundStyle,
     presence: profileFields.presence,
     favoriteGameSlug: profileFields.favoriteGameSlug,
     ladderPlacements: profileFields.ladderPlacements,
