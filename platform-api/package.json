@@ -7,7 +7,9 @@
   "scripts": {
     "migrate": "node ./src/migrate.mjs",
     "start": "node ./src/server.mjs",
-    "test": "node --test ./tests/*.test.mjs"
+    "test": "node --test ./tests/*.test.mjs",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -15,5 +17,8 @@
     "cloudinary": "^2.10.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1"
   }
 }

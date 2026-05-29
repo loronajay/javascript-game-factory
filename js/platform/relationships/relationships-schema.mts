@@ -1,4 +1,5 @@
 import { getPlatformStorageKey } from "../storage/storage.mjs";
+
 export const PROFILE_RELATIONSHIPS_STORAGE_KEY = getPlatformStorageKey("profileRelationships");
 export const PROFILE_RELATIONSHIP_LEDGER_STORAGE_KEY = getPlatformStorageKey("profileRelationshipLedger");
 export const FRIENDSHIP_CREATION_POINTS = 100;

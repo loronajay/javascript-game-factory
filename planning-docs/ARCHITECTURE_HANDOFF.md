@@ -169,6 +169,7 @@ Remaining non-game judgement calls before typing (not blockers, just decisions):
    Next targets:
    - shared frontend cleanup is now far enough along to shift primary attention to the long-lived game hotspots in `games/lovers-lost/` and `games/echo-duel/`
    - after that, reassess whether `js/gallery-page/viewer.mjs` should lose its last leftover inline gallery helper/constants or whether the remaining shared frontend files are clean enough to pause
+   - **missed hotspot (found 2026-05-29 during the TS Phase 0 file audit):** `js/mobile-controller.mjs` (678 LOC) was never tracked here and is genuinely mixed-responsibility — control-profile specs, a keyboard dispatcher, angle/geometry math, SVG path generation, CSS injection (`ensureStyle`), DOM control factory, and the `mountMobileController` entry. Split it (geometry math / style injection / DOM factory seams) when it enters TypeScript Phase 6/7, not before.
 
 4. game architecture cleanup for the long-lived cabinets
    Why before TypeScript:

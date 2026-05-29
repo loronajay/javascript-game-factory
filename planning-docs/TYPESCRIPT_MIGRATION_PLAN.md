@@ -1,6 +1,14 @@
 # TypeScript Migration Plan
 
-Status: non-game cleanup gates met as of the 2026-05-29 audit; ready to start once the docs below are confirmed. Game cabinets remain a later, per-cabinet pass.
+Status: **Phases 0–1 complete (2026-05-29)** — toolchain in place; all 9 platform schema files migrated to `.mts`, typecheck clean (browser + api), all 91 browser test files + 12 platform suites green, backend typecheck clean. Phase 2 (Platform Normalize) is next. Game cabinets remain a later, per-cabinet pass.
+
+**Build-output workflow (decided 2026-05-29 — read before migrating any file):** the site is served as raw static files with no bundler. We **commit the tsc-emitted `.mjs` in-place** next to each `.mts` source so the site keeps loading unchanged. Mechanics:
+- `tsconfig.browser.json` emits to a staging `dist/js` (NOT in-place) so `allowJs` can never overwrite the not-yet-migrated `.mjs` SOURCE files.
+- `scripts/sync-emitted-mjs.mjs` then copies only the `.mjs` that correspond to a real `.mts` source back into `js/`. Hand-written `.mjs` sources are never touched.
+- `npm run build:browser` = tsc emit + sync. `npm run typecheck:browser` = `tsc --noEmit`.
+- For a migrated file, the in-place `.mjs` is **generated build output**, not source — edit the `.mts`. (At the end of the migration we can flip to gitignoring the `.mjs` once a build step is added to dev/deploy.)
+
+**Planned splits to handle inline as their phase arrives** (decided 2026-05-29; split by responsibility, not line count): `js/mobile-controller.mjs` (Phase 6/7 — mixes control specs, keyboard dispatch, geometry math, SVG paths, CSS injection, DOM factory; **not in the original audit**), `platform-api/src/db/profiles.mjs` (Phase 9 — `profiles-domain` split), `js/profile-layout/layout-wire.mjs` and `layout-renderer.mjs` (Phase 6 — drag-preview/controller and renderer view-model seams). All other large files are large-but-cohesive and get typed in place.
 
 **Scope (non-game)**: ~160 source `.mjs` files + 3 classic global `.js` files across the browser platform (`js/`) and Node.js backend (`platform-api/src/`).
 **Scope (games)**: 7 cabinets now exist — `lovers-lost`, `battleshits`, `echo-duel`, `circuit-siege`, `illuminauts`, `sumorai`, `creature-battle` — not the 2 this plan originally assumed. Games are migrated last and only after each cabinet's own seam cleanup; treat each as its own scoped sub-pass rather than expanding this plan to cover all 7 up front.
@@ -128,9 +136,21 @@ Do option 1 in Phase 0 to unblock type-checking, then option 2 as a later cleanu
 
 ---
 
-## Phase 0: Infrastructure Setup
+## Phase 0: Infrastructure Setup — DONE (2026-05-29)
 
 **Goal**: `tsc --noEmit` runs without crashing on the platform layer. No source files changed yet.
+
+**What actually shipped (and where it deviated from the draft below):**
+- Created `tsconfig.base.json`, `tsconfig.browser.json`, `platform-api/tsconfig.json` as specced.
+- Created a root `package.json` (none existed) with `typecheck`, `typecheck:browser`, `build:browser`, `typecheck:api`; `typescript@^5.7` as a root devDep. Installed `@types/node` in `platform-api/`.
+- Added backend `build` + `typecheck` scripts. **Did NOT flip `start` to `./dist/server.mjs`** — nothing is compiled yet, so flipping it now would break the live Railway deploy. That flip is a Phase 9 action.
+- `js/globals.d.ts` written from the real source, not the draft's guesses: `window.PixelText` (`render(el)`, `renderAll(root?)`), `window.ArcadeInput` (`onAction(listener)`). **`platform-config.js` does NOT expose a `PLATFORM_CONFIG` object** — it sets `globalThis.__JGF_PLATFORM_API_URL__` (a single URL string). The Phase 8 section below still describes the imagined `PLATFORM_CONFIG` shape; treat the real global as authoritative.
+- Added `platform-api/src/env.d.ts` (typed `NodeJS.ProcessEnv` for the 10 real env vars in `config.mjs`) so the API tsconfig has an input and starts the Phase 9 env contract.
+- `.gitignore`: added `/dist/`, `platform-api/dist/`, `tsconfig.tsbuildinfo`. Did NOT add the `.mjs`-source ignores yet — those go in file-by-file as each source is migrated.
+- **Game tsconfigs deferred**: the draft lists `lovers-lost`/`battleshits` tsconfigs here, but games are migrated last and per-cabinet, so each cabinet's tsconfig is created when its phase starts (and there are 7 cabinets now, not 2).
+- **Verification**: `npx tsc -p tsconfig.browser.json --noEmit` and `... platform-api/tsconfig.json --noEmit` both exit 0; `--listFilesOnly` confirms each config resolves real project inputs (`js/globals.d.ts`, `platform-api/src/env.d.ts`).
+
+The original draft plan follows unchanged for reference.
 
 ### Files to create
 
@@ -246,7 +266,16 @@ Recommended: keep `.mjs` files committed as source until each one is individuall
 
 ---
 
-## Phase 1: Platform Schemas
+## Phase 1: Platform Schemas — DONE (2026-05-29)
+
+**What shipped:** all 9 files migrated to `.mts`: `activity-schema`, `thoughts-schema`, `relationships-schema`, `storage`, `identity/factory-profile`, `identity/match-identity`, `bulletins/bulletins`, `events/events`, `metrics/metrics`. Pattern used: `as const` value tuples + derived union types (`ActivityTypeValue`, `ThoughtVisibility`, `BulletinStatus`, `EventStatus`, `ProfileOpenSource`, etc.), exported domain interfaces (`Thought`, `ThoughtComment`, `Bulletin`, `GameEvent`, `FactoryProfile`, `MatchIdentity`, `ProfileMetricsRecord`, `StorageLike`). Runtime exports preserved exactly (Sets stay Sets, frozen objects stay frozen). Set membership uses `is`-typed guards rather than `Set.has` narrowing.
+
+**Deviations / notes for later phases:**
+- `metrics.mjs` (328 LOC) and the two identity files are domain modules, not pure constants, but were migrated here per the plan list. Their input-boundary params are typed `unknown` + narrowed; the API-client dependency uses a local minimal `MetricsApiClient` interface (Phase 4 owns the real client type).
+- `FactoryProfile`'s profile-domain sub-shapes (`ladderPlacements`, `friendsPreview`, `mainSqueeze`, `links`, `profileMusicPlaylist`) are typed loosely (`unknown[]` / `unknown`) on purpose — `profile.mjs` owns them and tightens them in **Phase 2**. One cast (`backgroundStyle as ...`) exists for the same reason and should be removed when `profile.mts` lands.
+- No central `js/platform/types.d.ts` was created; domain interfaces are co-located in their schema files and re-exported. Revisit in Phase 5 (barrels) if a shared types module becomes clearly better.
+
+---
 
 **Files**: 9 schema files — pure string/number constants and enum-like objects  
 **Why first**: All downstream modules import from these; typed constants give free inference throughout.

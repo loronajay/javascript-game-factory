@@ -6,6 +6,11 @@ Thumbs.db
 .env.local
 .claude/
 
+# TypeScript compiled output (source stays .mjs until each file is migrated)
+/dist/
+platform-api/dist/
+tsconfig.tsbuildinfo
+
 # planning-docs/*
 # !planning-docs/README.md
 

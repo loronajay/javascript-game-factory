@@ -1,0 +1,16 @@
+{
+  "name": "javascript-games",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Javascript Game Factory — arcade shell, social platform, and game cabinets.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "npm run typecheck:browser && npm run typecheck:api",
+    "typecheck:browser": "tsc -p tsconfig.browser.json --noEmit",
+    "build:browser": "tsc -p tsconfig.browser.json && node scripts/sync-emitted-mjs.mjs",
+    "typecheck:api": "tsc -p platform-api/tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
