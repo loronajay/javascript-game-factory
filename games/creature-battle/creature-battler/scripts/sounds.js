@@ -1,6 +1,10 @@
 const _sfx = {};
 let _battleMusic = null;
 let _battleMusicPlaying = false;
+let _menuMusic = null;
+let _menuMusicPlaying = false;
+let _winnerSfx = null;
+let _loserSfx = null;
 
 function loadSfx(id, src) {
   const a = new Audio(src);
@@ -33,6 +37,11 @@ function initSounds() {
   loadSfx('charge-light', 'creature-battler/assets/sounds/combat-sounds/charge-light.wav');
   loadSfx('beam-light',   'creature-battler/assets/sounds/combat-sounds/beam-light.mp3');
   _battleMusic = loadMusic('creature-battler/assets/sounds/battle-theme.mp3');
+  _menuMusic   = loadMusic('creature-battler/assets/sounds/menu.mp3');
+  _winnerSfx   = loadMusic('creature-battler/assets/sounds/winner.mp3');
+  _winnerSfx.loop = false;
+  _loserSfx    = loadMusic('creature-battler/assets/sounds/loser.wav');
+  _loserSfx.loop = false;
 }
 
 function startBattleMusic() {
@@ -46,6 +55,31 @@ function stopBattleMusic() {
   _battleMusic.pause();
   _battleMusic.currentTime = 0;
   _battleMusicPlaying = false;
+}
+
+function startMenuMusic() {
+  if (!_menuMusic || _menuMusicPlaying) return;
+  _menuMusicPlaying = true;
+  _menuMusic.play().catch(() => { _menuMusicPlaying = false; });
+}
+
+function stopMenuMusic() {
+  if (!_menuMusic) return;
+  _menuMusic.pause();
+  _menuMusic.currentTime = 0;
+  _menuMusicPlaying = false;
+}
+
+function playWinnerMusic() {
+  if (!_winnerSfx) return;
+  _winnerSfx.currentTime = 0;
+  _winnerSfx.play().catch(() => {});
+}
+
+function playLoserMusic() {
+  if (!_loserSfx) return;
+  _loserSfx.currentTime = 0;
+  _loserSfx.play().catch(() => {});
 }
 
 function playClick()       { playSfx('click'); }

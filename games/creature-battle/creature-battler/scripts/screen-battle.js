@@ -172,6 +172,9 @@ function renderBattleEndOverlay(winner, reason) {
   if (typeof window.__publishBattleResult === 'function') {
     window.__publishBattleResult(winner);
   }
+  stopBattleMusic();
+  if (winner === 'player' || reason === 'disconnect') playWinnerMusic();
+  else playLoserMusic();
 
   const screen  = document.getElementById('screen-battle');
   const overlay = document.createElement('div');

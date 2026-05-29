@@ -61,11 +61,17 @@ function registerRenderer(id, fn) {
   SCREEN_RENDERERS[id] = fn;
 }
 
+const _MENU_SCREENS = new Set(['mode-select', 'battle-config', 'team-select', 'class-customization', 'online-lobby', 'blind-pick']);
+
 function setScreen(id) {
   state.screen = id;
   if (typeof startBattleMusic === 'function' && typeof stopBattleMusic === 'function') {
     if (id === 'battle') startBattleMusic();
     else stopBattleMusic();
+  }
+  if (typeof startMenuMusic === 'function' && typeof stopMenuMusic === 'function') {
+    if (_MENU_SCREENS.has(id)) startMenuMusic();
+    else stopMenuMusic();
   }
   for (const el of document.querySelectorAll('.screen')) {
     el.classList.toggle('active', el.id === `screen-${id}`);
