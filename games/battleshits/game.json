@@ -1,9 +1,9 @@
 {
   "title": "Battleshits",
   "tagline": "Sink their fleet. Try not to stink.",
-  "description": "Classic 1v1 Battleship with poop-themed presentation. Place your fleet, alternate fire, and destroy the enemy before they destroy you.",
-  "players": "2",
-  "status": "Online multiplayer — public matchmaking",
+  "description": "Classic Battleship with poop-themed presentation. Place your fleet, alternate fire, and destroy the enemy before they destroy you. Play online 1v1 or solo against the Classic Bot (Easy/Medium/Hard).",
+  "players": "1-2",
+  "status": "Online 1v1 (public matchmaking) + solo bot battle",
   "order": 2,
   "featured": false,
   "theme": "ember",

@@ -10,7 +10,7 @@ After a context clear, read in this order:
 2. `PLATFORM_IMPLEMENTATION_PLAN.md`
 3. `BUGS.md`
 4. `COMMENT_DELETE_PLAN.md` only if working on comment deletion
-5. `TYPESCRIPT_MIGRATION_PLAN.md` only if the work is about future typing
+5. `TYPESCRIPT_MIGRATION_PLAN.md` if starting the typing work — non-game gates are met as of the 2026-05-29 audit
 
 ## Active Docs
 
@@ -18,7 +18,7 @@ After a context clear, read in this order:
 - `PLATFORM_IMPLEMENTATION_PLAN.md` - current shipped-vs-pending platform status
 - `BUGS.md` - active defects
 - `COMMENT_DELETE_PLAN.md` - active implementation plan for the remaining comment-delete gap
-- `TYPESCRIPT_MIGRATION_PLAN.md` - deferred future work, still useful as a staging plan
+- `TYPESCRIPT_MIGRATION_PLAN.md` - re-scoped 2026-05-29; non-game cleanup gates met and the non-game test baseline is green, so Phases 0–9 (platform + backend) are ready to start. Games migrate last, per-cabinet.
 - `badge-plans/javascript_game_factory_canon_badge_batch_1_scope.md` - future badge pass reference
 - `profile-editor-plans/` - historical scope docs; `/me/edit` and `/me/layout` are shipped, with current caveats called out in the handoff README
 - `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md` - active scope for deeper live-preview panel appearance editing, starting with the hero card

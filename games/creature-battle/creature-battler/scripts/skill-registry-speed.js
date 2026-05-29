@@ -12,7 +12,7 @@ registerSkillHandler('quick_strike', {
     const wasKO = _applySkillDamage(target, damage);
     if (isCrit) applyStatModifier(target, 'speed', -1, { duration: 3 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -54,7 +54,7 @@ registerSkillHandler('double_tap', {
     }
     fireOnCritLand(actor, target, isCrit, bs);
     const wasKO = target.isKnockedOut;
-    return { type: 'damage', damage: totalDamage, isCrit, wasKO, hits: 2,
+    return { type: 'damage', amount: totalDamage, isCrit, wasKO, hits: 2,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -68,7 +68,7 @@ registerSkillHandler('low_blow', {
     const wasKO = _applySkillDamage(target, damage);
     fireOnCritLand(actor, target, isCrit, bs);
     if (!wasKO && _battleRng() < 0.40) applyStatus(target, 'slow', actor);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -82,7 +82,7 @@ registerSkillHandler('quick_strike_2', {
     const wasKO = _applySkillDamage(target, damage);
     if (isCrit) applyStatModifier(target, 'speed', -1, { duration: 3 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -106,7 +106,7 @@ registerSkillHandler('blitz', {
     const wasKO = _applySkillDamage(target, damage);
     applyStatModifier(actor, 'speed', -1, { duration: 3 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -170,7 +170,7 @@ registerSkillHandler('flurry', {
     }
     fireOnCritLand(actor, target, isCrit, bs);
     const wasKO = target.isKnockedOut;
-    return { type: 'damage', damage: totalDamage, isCrit, wasKO, hits: 3,
+    return { type: 'damage', amount: totalDamage, isCrit, wasKO, hits: 3,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -208,7 +208,7 @@ registerSkillHandler('quick_strike_3', {
     const wasKO = _applySkillDamage(target, damage);
     if (isCrit) applyStatModifier(target, 'speed', -1, { duration: 3 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -233,7 +233,7 @@ registerSkillHandler('blitz_2', {
     const wasKO = _applySkillDamage(target, damage);
     applyStatModifier(actor, 'speed', -1, { duration: 3 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -253,7 +253,7 @@ registerSkillHandler('flurry_2', {
     }
     fireOnCritLand(actor, target, isCrit, bs);
     const wasKO = target.isKnockedOut;
-    return { type: 'damage', damage: totalDamage, isCrit, wasKO, hits: 4,
+    return { type: 'damage', amount: totalDamage, isCrit, wasKO, hits: 4,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -270,7 +270,7 @@ registerSkillHandler('phantom_drive', {
     const { damage, isCrit } = _calcSpdSkillDamage(actor, target, 38, { extraPower, skillId: 'phantom_drive' });
     const wasKO = _applySkillDamage(target, damage);
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -300,7 +300,7 @@ registerSkillHandler('flurry_3', {
     }
     fireOnCritLand(actor, target, isCrit, bs);
     const wasKO = target.isKnockedOut;
-    return { type: 'damage', damage: totalDamage, isCrit, wasKO, hits: 5,
+    return { type: 'damage', amount: totalDamage, isCrit, wasKO, hits: 5,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -314,7 +314,7 @@ registerSkillHandler('blitz_3', {
     const wasKO = _applySkillDamage(target, damage);
     applyStatModifier(actor, 'speed', -1, { duration: 3 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -329,7 +329,7 @@ registerSkillHandler('tempo_crush', {
     if (!wasKO) applyStatModifier(target, 'speed', -2, { duration: 4 });
     applyStatModifier(actor, 'speed', 1, { duration: 4 });
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -348,7 +348,7 @@ registerSkillHandler('velocity', {
       _applySkillDamage(tgt, hit.damage);
       fireOnCritLand(actor, tgt, hit.isCrit, bs);
     });
-    return { type: 'damage', damage: totalDamage, isCrit, wasKO: false,
+    return { type: 'damage', amount: totalDamage, isCrit, wasKO: false,
       actorName: actor.displayName, moveName: skill.name, targetName: 'all enemies' };
   },
 });
@@ -361,7 +361,7 @@ registerSkillHandler('vault_counter', {
     const { damage, isCrit } = _calcSpdSkillDamage(actor, target, 28, { skillId: 'vault_counter' });
     const wasKO = _applySkillDamage(target, damage);
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });
@@ -374,7 +374,7 @@ registerSkillHandler('dodge_counter_strike', {
     const { damage, isCrit } = _calcSpdSkillDamage(actor, target, 22, { skillId: 'dodge_counter_strike' });
     const wasKO = _applySkillDamage(target, damage);
     fireOnCritLand(actor, target, isCrit, bs);
-    return { type: 'damage', damage, isCrit, wasKO,
+    return { type: 'damage', amount: damage, isCrit, wasKO,
       actorName: actor.displayName, moveName: skill.name, targetName: target.displayName };
   },
 });

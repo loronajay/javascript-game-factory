@@ -47,11 +47,11 @@ registerSkillHandler('shield_bash', {
   },
 });
 
-// Recover — restore 25% max HP; Endurance passive adds a missing-HP bonus, cost 14 MP
+// Recover — restore 5% max HP + SPI bonus; Endurance passive adds a missing-HP bonus, cost 14 MP
 registerSkillHandler('recover', {
   execute(skill, actor) {
     spendSkillCost(skill, actor);
-    let amount = Math.max(1, Math.round(actor.hp.max * 0.08));
+    let amount = Math.max(1, Math.round(actor.hp.max * 0.05 + actor.stats.spirit * 0.015));
     if (actor.equippedPassives?.some(p => p.id === 'endurance')) {
       const missing = actor.hp.max - actor.hp.current;
       amount += Math.max(0, Math.round(missing * 0.05));
@@ -161,11 +161,11 @@ registerSkillHandler('retaliation', {
   },
 });
 
-// Recover II — restore 35% max HP; Endurance bonus applies, cost 14 MP
+// Recover II — restore 8% max HP + SPI bonus; Endurance bonus applies, cost 14 MP
 registerSkillHandler('recover_2', {
   execute(skill, actor) {
     spendSkillCost(skill, actor);
-    let amount = Math.max(1, Math.round(actor.hp.max * 0.12));
+    let amount = Math.max(1, Math.round(actor.hp.max * 0.08 + actor.stats.spirit * 0.02));
     if (actor.equippedPassives?.some(p => p.id === 'endurance')) {
       const missing = actor.hp.max - actor.hp.current;
       amount += Math.max(0, Math.round(missing * 0.07));
@@ -188,11 +188,11 @@ registerSkillHandler('damage_store', {
   },
 });
 
-// Meditate — reduce incoming physical damage 25% this turn AND restore 8% HP now, free
+// Meditate — reduce incoming physical damage 25% this turn AND restore 5% HP now, free
 registerSkillHandler('meditate', {
   execute(skill, actor) {
     actor.meditateActive = true;
-    const amount = Math.max(1, Math.round(actor.hp.max * 0.08));
+    const amount = Math.max(1, Math.round(actor.hp.max * 0.05));
     actor.hp.current = Math.min(actor.hp.max, actor.hp.current + amount);
     return {
       type: 'heal',
@@ -297,11 +297,11 @@ registerSkillHandler('total_defense', {
 
 // ── Defense Tier 5 ───────────────────────────────────────────────────────────
 
-// Recover III — restore 50% max HP; Endurance bonus applies, cost 14 MP
+// Recover III — restore 12% max HP + SPI bonus; Endurance bonus applies, cost 14 MP
 registerSkillHandler('recover_3', {
   execute(skill, actor) {
     spendSkillCost(skill, actor);
-    let amount = Math.max(1, Math.round(actor.hp.max * 0.18));
+    let amount = Math.max(1, Math.round(actor.hp.max * 0.12 + actor.stats.spirit * 0.025));
     if (actor.equippedPassives?.some(p => p.id === 'endurance')) {
       const missing = actor.hp.max - actor.hp.current;
       amount += Math.max(0, Math.round(missing * 0.10));

@@ -19,7 +19,7 @@
 - `src/server.mjs`: runtime entry point
 - `src/app.mjs`: top-level orchestration and route dispatch shell
 - `src/http-utils.mjs`: shared request/response helpers
-- `src/routes/`: route-family modules for auth, players, thoughts, photos, messages, and notifications
+- `src/routes/`: route-family modules for auth, players/relationships, thoughts, photos, messages, notifications, profile layout, and ratings
 - `src/config.mjs`: environment and config loading
 - `src/db/`: data access modules, domain helpers, and SQL migrations
 - `src/normalize.mjs`: thin barrel over domain-specific normalize modules

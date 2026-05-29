@@ -55,3 +55,22 @@ function getClassPassive(passiveId) {
 function getRouteStub(routeId) {
   return ROUTE_STUBS.find(r => r.id === routeId) || null;
 }
+
+// Returns the highest-unlocked tier name for a route at the given level.
+// e.g. Strength at level 30 → "Knight"; Defense at level 20 → "Brolic".
+// Falls back to the stub's first tier name if level is below the first tier threshold.
+function resolveClassName(routeId, level) {
+  const route = getClassRoute(routeId);
+  if (route) {
+    let name = null;
+    for (const tier of route.tiers) {
+      if (level >= tier.levelRange[0]) name = tier.name;
+    }
+    if (name) return name;
+  }
+  const stub = getRouteStub(routeId);
+  if (!stub) return '';
+  const tierBreaks = [10, 20, 30, 40, 50];
+  const idx = tierBreaks.filter(b => level >= b).length - 1;
+  return stub.tiers[Math.max(idx, 0)] || stub.tiers[0] || stub.name;
+}

@@ -1,10 +1,19 @@
 # TypeScript Migration Plan
 
-Status: deferred pending repo-wide architecture cleanup.
+Status: non-game cleanup gates met as of the 2026-05-29 audit; ready to start once the docs below are confirmed. Game cabinets remain a later, per-cabinet pass.
 
-**Scope**: 234 JS/MJS files across browser platform, Node.js backend, and 2 games  
-**Strategy**: Incremental, platform-first, file-by-file using `allowJs` as a bridge  
+**Scope (non-game)**: ~160 source `.mjs` files + 3 classic global `.js` files across the browser platform (`js/`) and Node.js backend (`platform-api/src/`).
+**Scope (games)**: 7 cabinets now exist — `lovers-lost`, `battleshits`, `echo-duel`, `circuit-siege`, `illuminauts`, `sumorai`, `creature-battle` — not the 2 this plan originally assumed. Games are migrated last and only after each cabinet's own seam cleanup; treat each as its own scoped sub-pass rather than expanding this plan to cover all 7 up front.
+**Strategy**: Incremental, platform-first, file-by-file using `allowJs` as a bridge.
 **Order**: Infrastructure → Platform layer → Page subsystems → Backend → Games
+
+## Audit Snapshot (2026-05-29)
+
+Verified before re-confirming this plan:
+- The non-game test baseline is **green (96/96 `.test.mjs` files)**. The per-phase Definition of Done relies on green tests — this is now true. (25 files had rotted against shipped features/extractions and were realigned to current behavior.)
+- `platform-api/src/app.mjs` is **778 LOC** (a dispatch shell plus some player/gesture/avatar logic), not the ~1500 this plan once estimated.
+- All eight backend route families are extracted into `platform-api/src/routes/` (auth, message, notification, thought, photo, player, **layout**, **rating**).
+- The page subsystems that actually exist are: `me-page` (12), `player-page` (9), `thoughts-page` (4), `gallery-page` (8), `profile-editor` (10), `profile-social` (5), `profile-layout` (11), plus `platform` (31). Earlier drafts of Phase 6 omitted `me-page`, `gallery-page`, and `profile-layout` — they are folded in below.
 
 ---
 
@@ -23,11 +32,12 @@ Required cleanup gates:
    - photo routes already extracted into `platform-api/src/routes/photo-routes.mjs`
    - player and relationship routes already extracted into `platform-api/src/routes/player-routes.mjs`
 
-   Follow-on backend cleanup still required before typing:
-   - `platform-api/src/db/relationships.mjs` has been partially modularized by extracting pure state rules into `platform-api/src/db/relationships-domain.mjs`
-   - `platform-api/src/db/thoughts.mjs` has been partially modularized by extracting pure thought/viewer-state helpers into `platform-api/src/db/thoughts-domain.mjs`
-   - `platform-api/src/normalize.mjs` is now a thin barrel over domain modules, which removes it as a major pre-TypeScript hotspot
-   - backend cleanup is now mostly about preserving the new seams and avoiding regressions, not breaking up one remaining giant file
+   Follow-on backend cleanup still required before typing (sizes from the 2026-05-29 audit):
+   - `platform-api/src/db/relationships.mjs` (**625 LOC**) has had its pure state rules extracted into `platform-api/src/db/relationships-domain.mjs` (389); the remaining transaction/query flow is the right ownership boundary for now.
+   - `platform-api/src/db/thoughts.mjs` (**506 LOC**) has had pure thought/viewer-state helpers extracted into `platform-api/src/db/thoughts-domain.mjs` (252); same — query flow stays.
+   - `platform-api/src/db/profiles.mjs` (**449 LOC**) was not previously listed here. It is the third-largest backend file and mixes query + row-shaping; decide before typing whether it needs a `profiles-domain` split or is cohesive enough to type in place.
+   - `platform-api/src/normalize.mjs` is now a thin barrel over domain modules (35 LOC), so it is no longer a pre-TypeScript hotspot.
+   - Otherwise backend cleanup is about preserving the new seams and avoiding regressions, not breaking up one remaining giant file.
 
 2. the largest shared frontend page modules must have clearer ownership boundaries — **COMPLETE**
    All major shared frontend page modules have been resolved. The `js/me-page/` subsystem is now fully extracted (as of 2026-05-09):
@@ -467,8 +477,10 @@ This phase also enables turning `strict: true` on for all `js/platform/**` files
 
 ## Phase 6: Page Subsystems
 
-**Files**: ~35 files across 4 subsystems  
-**Subsystems**: `js/player-page/`, `js/thoughts-page/`, `js/profile-editor/`, `js/profile-social/`
+**Files**: ~59 source files across 7 subsystems
+**Subsystems**: `js/me-page/`, `js/player-page/`, `js/thoughts-page/`, `js/gallery-page/`, `js/profile-editor/`, `js/profile-social/`, `js/profile-layout/`
+
+> Re-scoped 2026-05-29: earlier drafts listed only 4 subsystems and ~35 files. The `me-page`, `gallery-page`, and `profile-layout` subsystems were missing. `profile-layout` in particular is large and DOM/canvas-heavy (`layout-wire.mjs` 872, `layout-renderer.mjs` 768) and should be migrated **last within this phase**, after the simpler subsystems give it typed view-models to lean on.
 
 These are the heaviest migration because they touch the DOM. The main categories of typing work:
 
@@ -517,13 +529,22 @@ export interface PlayerPageViewModel {
 **`js/thoughts-page/`** (4 source files):
 - page.mts, actions.mts, view-model.mts, render.mts
 
-**`js/profile-editor/`** (5 source files):
-- form-fields.mts, constants.mts, view-model.mts, persistence.mts, panel.mts
+**`js/profile-editor/`** (10 source files):
+- form-fields.mts, constants.mts, view-model.mts, persistence.mts, panel.mts, editor-wire.mts, music-editor.mts, music-player.mts, plus the remaining editor modules
 
-**`js/profile-social/`** (3 source files):
-- social-actions.mts, social-view.mts, media-composer-state.mts
+**`js/profile-social/`** (5 source files):
+- social-actions.mts, social-view.mts, social-view-thoughts.mts, social-view-shared.mts, media-composer-state.mts
 
-### Estimated effort: 3–4 days
+**`js/me-page/`** (12 source files):
+- entry.mts, view-model.mts, render.mts, render-sections.mts, wire.mts, page-data.mts, media-actions.mts, friend-code-actions.mts, friend-navigator.mts, music-player.mts, apply-scale.mts, apply-layout.mts (`apply-layout.mjs` is 694 LOC — type its `panel`/`element`/`composition` shapes carefully; it is shared by `/me` and `/player`)
+
+**`js/gallery-page/`** (8 source files):
+- loader.mts, render.mts, wire.mts, viewer.mts, viewer-state.mts, viewer-social.mts, viewer-page-actions.mts, viewer-page-controller.mts
+
+**`js/profile-layout/`** (11 source files) — migrate last in this phase:
+- registry.mts, default-layout.mts, normalize-layout.mts, child-layout.mts, composition-layout.mts, layout-storage.mts, layout-zoom.mts, layout-editor.mts, layout-inspector-view.mts, layout-renderer.mts, layout-wire.mts. Define a shared `LayoutPanel` / `LayoutElement` / `PanelChild` / `PanelStyle` interface set first (in or near `normalize-layout`), since every other file in this subsystem reads those shapes.
+
+### Estimated effort: 5–7 days (was 3–4; reflects the 3 added subsystems, including the large profile-layout editor)
 
 ---
 
@@ -614,7 +635,7 @@ Note: `cloudinary` v2 ships its own types; no `@types/cloudinary` needed.
 
 ### `app.mts` strategy
 
-At ~1500 LOC, `app.mts` is large. Don't split it during migration — just type it. Splitting it is a separate refactor that can follow. The typing pass will naturally surface where the boundaries should be.
+`app.mjs` is **778 LOC** (the route-family extraction already shrank it; it is now a dispatch shell plus some player/gesture/avatar resolution). Don't split it during migration — just type it. The earlier "~1500 LOC, will produce hundreds of errors" warning no longer applies; at this size a straight typing pass with `strict: false` first, then tightening, is realistic without a `@ts-nocheck` quarantine.
 
 ### DB row typing pattern
 
@@ -722,6 +743,8 @@ type WsMessage =
 
 ## File Count Summary
 
+Counts corrected against the 2026-05-29 audit. Phase 6 grew (3 subsystems were missing); the games total is no longer just Lovers Lost + Battleshits.
+
 | Phase | Files | Complexity | Est. Time |
 |-------|-------|-----------|-----------|
 | 0: Infrastructure | 5–8 config files | Low | 2–4 hrs |
@@ -730,13 +753,14 @@ type WsMessage =
 | 3: Platform Store/Builders | 15 | Medium | 1–2 days |
 | 4: Platform API Clients | 6 | Medium | 1 day |
 | 5: Platform Barrels | 9 | Low | 0.5 days |
-| 6: Page Subsystems | 35 | High | 3–4 days |
-| 7: Root Page Entries | 34 | Medium | 2–3 days |
+| 6: Page Subsystems | ~59 (7 subsystems) | High | 5–7 days |
+| 7: Root Page Entries | ~34 | Medium | 2–3 days |
 | 8: Classic Scripts | 3 | Medium | 1 day |
-| 9: Backend | 33 | High | 3–4 days |
-| 10: Lovers Lost | 36 | Medium | 2–3 days |
-| 11: Battleshits | 17 | Medium | 1–2 days |
-| **Total** | **234** | | **~18–27 days** |
+| 9: Backend | ~38 | High | 3–4 days |
+| **Non-game total** | **~160 + 3 classic** | | **~16–24 days** |
+| 10+: Games (per cabinet) | 7 cabinets, scoped individually | Medium each | later, separate passes |
+
+Game phases are intentionally left as per-cabinet sub-passes (each after that cabinet's own seam cleanup), not a single bulk estimate. Lovers Lost and Battleshits are the most migration-ready; `creature-battle`, `echo-duel`, `circuit-siege`, `illuminauts`, and `sumorai` should each be scoped when their turn comes.
 
 ---
 
@@ -754,11 +778,15 @@ TypeScript ESM requires explicit `.mjs` extensions in import paths. Current impo
 
 **Mitigation**: `moduleResolution: "Bundler"` in tsconfig handles some of this; run `tsc --noEmit` after each file migration.
 
-### Risk 3: `platform-api/app.mts` is too large to type safely in one pass
+### Risk 3: backend `app.mts` typing churn
 
-~1500 LOC with many inline type casts could produce hundreds of errors when strict mode is turned on.
+`app.mjs` is 778 LOC (not the ~1500 once assumed), so a single typing pass is tractable. The main friction is the many injected `options` dependency callbacks at the top of `createApp` — type the options object as an explicit interface first, and the rest of the file mostly follows.
 
-**Mitigation**: Type `app.mts` with `strict: false` first (file-level override via `// @ts-nocheck` or tsconfig `exclude` initially), then progressively remove the override section by section.
+**Mitigation**: Type `app.mts` with `strict: false` first, then tighten. A `@ts-nocheck` quarantine should not be necessary at this size; reach for it only if a specific section fights back.
+
+### Railway deploy note (Railway root directory)
+
+There is **no root `package.json`**; `railway.json` uses generic `npm install` / `npm start`, which only resolve because the Railway service's root directory is set to `platform-api` in the Railway dashboard. When you add the backend build step, update the **platform-api** service (`npm run build && npm start`, output `dist/server.mjs`) and keep `/health` as the healthcheck — don't expect the root directory to appear in `railway.json`.
 
 ### Risk 4: Railway deploy breaks after backend migration
 

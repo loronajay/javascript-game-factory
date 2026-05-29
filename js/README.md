@@ -6,7 +6,7 @@ This folder contains the shared frontend JavaScript for the arcade shell.
 
 - top-level `arcade-*.mjs` files: thin compatibility shims and page-level view modules for routes such as activity, bulletins, events, me, notifications, player, search, and thoughts; most real logic lives in the subsystem folders below
 - `platform/`: reusable platform modules for API access, identity, profile data, relationships, activity, thoughts, metrics, storage, and events
-- `me-page/`, `player-page/`, `thoughts-page/`, `gallery-page/`, `profile-editor/`, and `profile-social/`: page-specific subsystem modules split into entry, loader, view-model shaping, rendering, wiring, and actions
+- `me-page/`, `player-page/`, `thoughts-page/`, `gallery-page/`, `profile-editor/`, `profile-social/`, and `profile-layout/`: page-specific subsystem modules split into entry, loader, view-model shaping, rendering, wiring, and actions. `profile-layout/` owns the `/me/layout` editor plus the profile layout renderer/normalizer (its `layout-wire.mjs` and `layout-renderer.mjs` are the two largest frontend files)
 - `tests/`: shared frontend tests
 - `platform-config.js` and utility files such as `arcade-paths.mjs` and `pixel-text.js`: shell-wide helpers and configuration
 

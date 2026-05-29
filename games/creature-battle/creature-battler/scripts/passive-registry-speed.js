@@ -110,7 +110,7 @@ registerPassiveHook('dodge_counter', {
   onEvadePhysicalHit({ evader, attacker, bs }) {
     if (attacker && !attacker.isKnockedOut) {
       evader.pendingAutoAction = {
-        skillId: 'dodge_counter_strike',
+        commandType: 'skill', moveId: 'dodge_counter_strike',
         targetSide: evader._side === 'player' ? 'opponent' : 'player',
         targetSlot: attacker._slot,
       };

@@ -64,7 +64,7 @@ function _renderCCOverview() {
             <div class="cc-creature-name">${c.name}</div>
             <span class="element-tag element-${c.element}">${c.element}</span>
             <div class="cc-creature-status ${statusClass}">${statusText}</div>
-            ${stub ? `<div class="cc-creature-route-name">${stub.name}</div>` : ''}
+            ${stub ? `<div class="cc-creature-route-name">${resolveClassName(cfg.routeId, state.battleConfig.level)}</div>` : ''}
             ${!isLocked && showAutoAll ? `<button class="cc-auto-btn" type="button" data-auto-slot="${i}">Auto</button>` : ''}
           </div>`;
       }).join('')}

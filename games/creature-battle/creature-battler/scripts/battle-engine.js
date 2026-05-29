@@ -279,7 +279,7 @@ function resolveHit(attacker, target, move) {
       target.hasEvadedThisRound = true;
       _fireEvadePassives(target, attacker, state.battleState);
       target.pendingAutoAction = {
-        skillId: 'vault_counter',
+        commandType: 'skill', moveId: 'vault_counter',
         targetSide: target._side === 'player' ? 'opponent' : 'player',
         targetSlot: attacker._slot,
       };
@@ -297,7 +297,7 @@ function resolveHit(attacker, target, move) {
           target.afterimage3Ready = false;
           _fireEvadePassives(target, attacker, state.battleState);
           target.pendingAutoAction = {
-            skillId: 'dodge_counter_strike',
+            commandType: 'skill', moveId: 'dodge_counter_strike',
             targetSide: target._side === 'player' ? 'opponent' : 'player',
             targetSlot: attacker._slot,
           };
@@ -328,11 +328,11 @@ function _fireEvadePassives(evader, attacker, bs) {
   });
 }
 
-function calcDamage(attacker, target, move) {
+function calcDamage(attacker, target, move, hitCount = 1) {
   const offStat  = move.damageClass === 'physical' ? getEffectiveStat(attacker, 'strength') : getEffectiveStat(attacker, 'intelligence');
   const defStat  = move.damageClass === 'physical' ? getEffectiveStat(target, 'defense')    : getEffectiveStat(target, 'spirit');
-  const levelMod = attacker.level * ENGINE.LEVEL_MOD;
-  const pressure = (offStat - defStat) * move.offensiveScaling;
+  const levelMod = (attacker.level * ENGINE.LEVEL_MOD) / hitCount;
+  const pressure = ((offStat - defStat) * move.offensiveScaling) / hitCount;
   const elemMod  = getElementModifier(move.element, target);
 
   if (elemMod === 'absorb') {
@@ -359,7 +359,8 @@ function calcDamage(attacker, target, move) {
 
 function calcHeal(caster, move) {
   const levelMod = caster.level * ENGINE.LEVEL_MOD;
-  const pressure = caster.stats.spirit * move.offensiveScaling;
+  const healStat = caster.stats.spirit * 0.6 + caster.stats.intelligence * 0.4;
+  const pressure = healStat * move.offensiveScaling;
   const randMod  = engineRandom(ENGINE.RANDOM_MIN, ENGINE.RANDOM_MAX);
   return Math.max(1, Math.round(move.basePower + move.movePowerModifier + pressure + levelMod + randMod));
 }
@@ -715,7 +716,7 @@ function resolveAction(action) {
       if (target.isKnockedOut) break;
       const didHit = resolveHit(actor, target, move);
       if (!didHit) { hits.push({ missed: true }); continue; }
-      let { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move);
+      let { damage, healAmount, isCrit, elemMod } = calcDamage(actor, target, move, move.hitCount);
       if (elemMod === 'absorb') {
         target.hp.current = Math.min(target.hp.max, target.hp.current + healAmount);
         hits.push({ healAmount, elemMod: 'absorb', wasKO: false, isCrit: false });

@@ -2,7 +2,13 @@ function selectAiCommands() {
   return SLOT_NAMES
     .map(slot => {
       const c = state.battleState.opponent[slot];
-      return (c && !c.isKnockedOut) ? buildAiAction(c, slot) : null;
+      if (!c || c.isKnockedOut) return null;
+      if (c.pendingAutoAction) {
+        const pa = c.pendingAutoAction;
+        c.pendingAutoAction = null;
+        return { actorSide: 'opponent', actorSlot: slot, commandType: pa.commandType, moveId: pa.moveId, targetSide: pa.targetSide, targetSlot: pa.targetSlot, speed: getEffectiveSpeed(c) };
+      }
+      return buildAiAction(c, slot);
     })
     .filter(Boolean);
 }
@@ -297,10 +303,22 @@ function _pickBestSkillAction(creature, actorSlot, targetSide, dmgScore) {
   return bestAction;
 }
 
-// Evaluate setup/self-buff skills — use proactively early game or when healthy.
-function _pickSetupSkillAction(creature, actorSlot) {
+// Estimated value of a setup buff vs spending that turn attacking.
+// A +1 stat stage is worth roughly ~20 "damage equivalent" — useful early game
+// when many rounds remain, but not worth giving up a real attack most of the time.
+const _SKILL_SETUP_VALUE = 20;
+
+// Evaluate setup/self-buff skills — only worthwhile if it beats the current damage
+// option AND the creature hasn't already stacked a significant buff this battle.
+function _pickSetupSkillAction(creature, actorSlot, dmgScore) {
   const bs = state.battleState;
   if (!creature.classSkills?.length) return null;
+
+  // Never more than one setup action in the first 2 rounds; never after round 3.
+  if (bs.round > 3) return null;
+  // Only spend round 1 on a setup — from round 2 onward only consider it if still
+  // very early AND the damage option is weak (e.g., no advantaged moves).
+  if (bs.round > 1 && dmgScore >= _SKILL_SETUP_VALUE) return null;
 
   const usable = creature.classSkills.filter(s =>
     s.category === 'setup' &&
@@ -309,13 +327,11 @@ function _pickSetupSkillAction(creature, actorSlot) {
   );
   if (!usable.length) return null;
 
-  const isEarlyGame = bs.round <= 2;
-  if (!isEarlyGame && creature.hp.current / creature.hp.max < 0.60) return null;
-
   for (const skill of usable) {
-    // Don't re-buff if the route's primary offensive stat is already at +3 or higher
+    // Stop buffing once the primary offensive stat reaches +1 — further stacking
+    // costs too many turns relative to the marginal damage gain.
     const primaryStat = { strength: 'strength', defense: 'defense', intelligence: 'intelligence', spirit: 'spirit', speed: 'speed' }[skill.classRoute];
-    if (primaryStat && getStatStage(creature, primaryStat) >= 3) continue;
+    if (primaryStat && getStatStage(creature, primaryStat) >= 1) continue;
     const tSlot = skill.targeting === 'all_allies' ? null : actorSlot;
     return { actorSide: 'opponent', actorSlot, commandType: 'skill', moveId: skill.id, targetSide: 'opponent', targetSlot: tSlot, speed: getEffectiveSpeed(creature) };
   }
@@ -398,10 +414,6 @@ function buildAiAction(creature, slot) {
       return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: selfHealMove.id, targetSide: 'opponent', targetSlot: slot, speed: getEffectiveSpeed(creature) };
     }
 
-    // [Chunk 3] Setup self-buff skills — proactive early game or when healthy
-    const setupAction = _pickSetupSkillAction(creature, slot);
-    if (setupAction) return setupAction;
-
     // Ally-heal: use on the most-hurt teammate below 50% HP
     const allyHealMove = creature.moves.find(m => m.damageClass === 'heal' && m.targeting === 'single_ally' && m.mpCost <= creature.mp.current);
     if (allyHealMove) {
@@ -435,6 +447,10 @@ function buildAiAction(creature, slot) {
     if (singleStat) {
       return { actorSide: 'opponent', actorSlot: slot, commandType: 'art', moveId: singleStat.move.id, targetSide: 'player', targetSlot: singleStat.slot, speed: getEffectiveSpeed(creature) };
     }
+
+    // [Chunk 3] Setup self-buff skills — only if still early game and damage option is weak
+    const setupAction = _pickSetupSkillAction(creature, slot, dmgScore);
+    if (setupAction) return setupAction;
   }
 
   // [Chunk 3] Offensive skills competing with best damage move score

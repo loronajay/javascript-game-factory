@@ -1,6 +1,6 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-05-18
+Last updated: 2026-05-29
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 
@@ -22,6 +22,8 @@ Completed:
   - thought endpoints extracted to `platform-api/src/routes/thought-routes.mjs`
   - photo endpoints extracted to `platform-api/src/routes/photo-routes.mjs`
   - player/relationship endpoints extracted to `platform-api/src/routes/player-routes.mjs`
+  - profile-layout endpoints extracted to `platform-api/src/routes/layout-routes.mjs`
+  - rating endpoints extracted to `platform-api/src/routes/rating-routes.mjs`
   - seam coverage added in `platform-api/tests/auth-routes.test.mjs`
   - seam coverage added in `platform-api/tests/message-routes.test.mjs`
   - seam coverage added in `platform-api/tests/notification-routes.test.mjs`
@@ -87,13 +89,16 @@ Completed:
 
 ## Pre-TypeScript Gate
 
-Do not start the repo-wide TypeScript migration yet. The active workstream is still architecture cleanup across the API, shared frontend, and the long-lived game cabinets.
+Status (2026-05-29 audit): the **non-game** exit criteria are met. The non-game TypeScript migration (Phases 0–9 in `TYPESCRIPT_MIGRATION_PLAN.md`) can start. **Game** cabinets remain gated on their own per-cabinet seam cleanup and are migrated last.
 
-Exit criteria before re-scoping TypeScript:
-- `platform-api/src/app.mjs` is mostly orchestration and route dispatch, not a mixed route/business-rule file
-- shared frontend page entries have clearer ownership around `page`, `render`, `wire`, and `actions`
-- the largest shared renderers/controllers are split by responsibility instead of only by file size
-- active game entry points are mostly composition and fixed-timestep orchestration, not the long-term home for UI, network, input, and business rules
+Exit criteria and current state:
+- `platform-api/src/app.mjs` is orchestration + route dispatch (778 LOC, all 8 route families extracted to `src/routes/`) — **met** (a little player/gesture/avatar logic remains inline, acceptable to type in place).
+- shared frontend page entries have clear `page`/`render`/`wire`/`actions` ownership across 7 subsystems incl. `profile-layout` — **met**.
+- the largest shared renderers/controllers are split by responsibility — **met** for the shared platform layer.
+- the non-game test baseline is **green (96/96)** as of this audit, so the migration's per-phase "tests pass" gate is trustworthy — **met**.
+- active game entry points are still the home for UI/network/input/loop together — **not met for games**, which is why game phases stay last.
+
+Remaining non-game judgement calls before typing (not blockers, just decisions): whether `platform-api/src/db/profiles.mjs` (449), `relationships.mjs` (625), and `thoughts.mjs` (506) need a further domain split or get typed in place.
 
 ## Repo-Wide Cleanup Order
 
@@ -108,6 +113,7 @@ Exit criteria before re-scoping TypeScript:
    - thoughts are already extracted
    - photos are already extracted
    - players and relationship mutations are already extracted
+   - profile-layout and rating routes are already extracted (`layout-routes.mjs`, `rating-routes.mjs`)
 
    Next targets:
    - friend requests / challenges if we want a nearly route-only backend shell before switching to domain-module cleanup
@@ -213,13 +219,14 @@ Exit criteria before re-scoping TypeScript:
 All the main page-subsystem folders are now in place. Do not introduce new subsystem folders without stable ownership boundaries.
 
 Canonical subsystem layout:
-- `js/me-page/` — `/me` owner profile page (complete)
-- `js/player-page/` — `/player` public profile page (complete)
-- `js/thoughts-page/` — `/thoughts` feed page (complete)
-- `js/gallery-page/` — gallery viewer (complete)
-- `js/profile-editor/` — profile editor panel (complete)
-- `js/profile-social/` — shared social rendering and actions (complete)
-- `js/platform/` — shared domain/data layer (complete)
+- `js/me-page/` — `/me` owner profile page (complete, 12 files)
+- `js/player-page/` — `/player` public profile page (complete, 9 files)
+- `js/thoughts-page/` — `/thoughts` feed page (complete, 4 files)
+- `js/gallery-page/` — gallery viewer (complete, 8 files)
+- `js/profile-editor/` — profile editor panel + standalone `/me/edit/` (complete, 10 files)
+- `js/profile-social/` — shared social rendering and actions (complete, 5 files)
+- `js/profile-layout/` — `/me/layout/` editor + profile layout renderer/normalize (complete, 11 files; this was built after the original reorg and belongs in the canonical list — `layout-wire.mjs` 872 and `layout-renderer.mjs` 768 are the two largest frontend files)
+- `js/platform/` — shared domain/data layer (complete, 31 files)
 - tests in dedicated `tests/` subfolders, never mixed into source roots
 
 ## Verification Baseline

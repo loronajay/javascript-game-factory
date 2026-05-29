@@ -1,10 +1,10 @@
 {
   "title": "Sumorai",
   "tagline": "Two samurai. One stage. One hit. One winner.",
-  "description": "A 2-player local fighting game ported from the original Turbowarp build. One unblocked hit ends the round. Manage your stamina, master the dash, and ring out your opponent.",
+  "description": "A samurai fighting game ported from the original Turbowarp build. One unblocked hit ends the round. Manage your stamina, master the dash, and ring out your opponent. Play local 2P, vs CPU (Easy/Medium/Hard), or online with casual and ranked (ELO) modes.",
   "players": "1-2",
-  "status": "Playable — local 2P and vs CPU (Easy/Medium/Hard) fully working",
-  "order": 2,
+  "status": "Playable — local 2P, vs CPU, and online casual + ranked (rollback netcode)",
+  "order": 3,
   "featured": false,
   "theme": "blade",
   "accentColor": "#c8943a"

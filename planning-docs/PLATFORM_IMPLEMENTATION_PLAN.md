@@ -113,7 +113,7 @@ Not implemented yet:
 
 ### Architecture cleanup already landed
 
-- `js/platform/activity/`, `js/platform/relationships/`, `js/profile-social/`, `js/profile-editor/`, `js/player-page/`, `js/thoughts-page/`, `js/me-page/`, and `js/gallery-page/` are now real ownership seams rather than one giant page-file sprawl.
+- `js/platform/activity/`, `js/platform/relationships/`, `js/profile-social/`, `js/profile-editor/`, `js/player-page/`, `js/thoughts-page/`, `js/me-page/`, `js/gallery-page/`, and `js/profile-layout/` are now real ownership seams rather than one giant page-file sprawl.
 - `platform-api/src/routes/` now owns the backend route-family split, with `src/app.mjs` acting as the dispatch shell instead of the permanent home for every feature.
 - The test layout has already been moved out of mixed root/source placement into subsystem and page test locations.
 

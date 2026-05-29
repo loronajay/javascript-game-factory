@@ -1,6 +1,6 @@
 # Battleshits
 
-`battleshits/` is an implemented 1v1 online Battleship-style cabinet with a toilet-theme presentation layer over standard Battleship rules.
+`battleshits/` is an implemented Battleship-style cabinet with a toilet-theme presentation layer over standard Battleship rules. It supports 1v1 online play and a solo Classic Bot Battle mode (Easy/Medium/Hard) backed by a local net facade, so the online battle flow is unchanged.
 
 ## What is here
 

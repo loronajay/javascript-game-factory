@@ -1,10 +1,10 @@
 {
   "title": "Echo Duel",
   "tagline": "Build the pattern. Survive the echo.",
-  "description": "A 2-6 player online memory duel where players copy, extend, and survive color-tone patterns.",
-  "players": "2-6",
-  "status": "Prototype",
-  "order": 3,
+  "description": "A 2-6 player online memory duel where players copy, extend, and survive input patterns, plus a solo survival score-attack mode.",
+  "players": "1-6",
+  "status": "Playable — online 2–6P + solo survival",
+  "order": 4,
   "featured": false,
   "theme": "signal",
   "accentColor": "#66f7ff"
