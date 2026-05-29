@@ -29,7 +29,12 @@ function getResultFloatSpecs(result, action) {
   }
 
   if (result.type === 'defend' || result.type === 'utility') {
-    return [targetSpec(result.targetSide || action?.actorSide, result.targetSlot || action?.actorSlot, result.statusText || (result.type === 'defend' ? 'GUARD' : 'BUFF'), 'status')].filter(Boolean);
+    const side = result.targetSide || action?.actorSide;
+    const slot = result.targetSlot || action?.actorSlot;
+    const texts = Array.isArray(result.statusText)
+      ? result.statusText
+      : [result.statusText || (result.type === 'defend' ? 'GUARD' : 'BUFF')];
+    return texts.map(t => targetSpec(side, slot, t, 'status')).filter(Boolean);
   }
 
   if (result.type === 'multi_hit') {

@@ -187,29 +187,78 @@
 }
 
 /* ── Sweep wave ─────────────────────────────────────────────────────────────
-   Expanding elliptical wave that travels from actor toward the target side.
-   JS sets --sweep-tx (signed CSS px travel distance) and --sweep-duration. */
+   Pulse that expands outward from the actor position — no lateral travel.
+   Starts visible at the actor and grows until the wave covers the full field.
+   #battle-field overflow:hidden clips the edges cleanly.
+   JS sets --sweep-duration. */
 
 .anim-sweep-wave {
   position: absolute;
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 50px;
   border-radius: 50%;
   pointer-events: none;
-  animation: sweep-wave-travel var(--sweep-duration, 380ms) ease-out forwards;
+  animation: sweep-wave-travel var(--sweep-duration, 420ms) ease-out forwards;
 }
 
 @keyframes sweep-wave-travel {
   0%   {
-    transform: translate(-50%, -50%) translateX(0px) scaleX(0.25) scaleY(0.35);
+    transform: translate(-50%, -50%) scaleX(0.5) scaleY(0.6);
     opacity: 0.9;
   }
-  25%  { opacity: 0.75; }
+  20%  { opacity: 0.8; }
   65%  { opacity: 0.45; }
   100% {
-    transform: translate(-50%, -50%) translateX(var(--sweep-tx)) scaleX(5.5) scaleY(4);
+    transform: translate(-50%, -50%) scaleX(8) scaleY(6);
     opacity: 0;
   }
+}
+
+/* ── Spinning ring (vortex / whirlpool) ─────────────────────────────────────
+   Two-layer structure: outer handles position + isometric squish,
+   inner rotates. JS sets size, color, spin speed per ring.
+   Multiple rings staggered at different radii create a whirlpool vortex.  */
+
+.anim-spinning-ring-outer {
+  position: absolute;
+  pointer-events: none;
+}
+
+.anim-spinning-ring-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border-style: solid;
+  box-sizing: border-box;
+  animation: spinning-ring var(--ring-spin-ms, 900ms) linear infinite;
+}
+
+@keyframes spinning-ring {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Wall slam (ice wall / earth spikes / etc.) ──────────────────────────────
+   Spawned by animWallSlam. JS sets left/top/width/height/background/border per
+   slab; --wall-duration controls total rise + hold + fade. transform-origin at
+   bottom center so the slab rises upward from its base.                       */
+
+.anim-wall-slab {
+  position: absolute;
+  pointer-events: none;
+  transform-origin: bottom center;
+  border-radius: 3px 3px 0 0;
+}
+
+@keyframes wall-rise {
+  0%   { transform: translateX(-50%) scaleY(0);  opacity: 1; }
+  30%  { transform: translateX(-50%) scaleY(1);  opacity: 1; }
+  75%  { opacity: 0.75; }
+  100% { transform: translateX(-50%) scaleY(1);  opacity: 0; }
+}
+
+.anim-wall-rise {
+  animation: wall-rise var(--wall-duration, 650ms) ease-out forwards;
 }
 
 /* ── Status ring ────────────────────────────────────────────────────────────

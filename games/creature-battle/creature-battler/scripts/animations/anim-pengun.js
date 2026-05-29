@@ -83,20 +83,32 @@ registerMoveAnimations({
   },
 
   // ── glacier_wall ───────────────────────────────────────────────────────────
-  // DEF + SPI self-buff. ❄ drip DOWN as ice plates crystallize over the body;
-  // dual status rings signal both stat raises.
+  // DEF + SPI self-buff. A row of ice slabs erupts from the ground in front of
+  // Pengun. Brief frost build-up on the ground, then the wall SLAMS up with
+  // stutter shake + ice shard burst + shockwave. Dual status rings as the
+  // wall stands.
   glacier_wall: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#aaddff', count:3, interval:88, direction:'down', size:11, duration:480, content:'❄' },
-      { at:0,   type:'creature_tint',   target:'actor',  color:'#55aaff', blend:'screen', opacity:0.22, duration:560 },
+      // Build-up: frost creeps across the ground
       { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-glacier-wall' },
-      { at:0,   type:'preset',          id:'ice_cast_aura', direction:'all', spread:40 },
-      { at:340, type:'impact' },
-      { at:340, type:'field_flash',     color:'#aaddff', opacity:0.14, duration:200 },
-      { at:340, type:'particle_burst',  origin:'actor',  color:'#aaddff', count:6, spread:35, direction:'all', duration:420, content:'❄', size:11 },
-      { at:340, type:'status_ring',     target:'actor',  color:'#4499ff', duration:700 },
-      { at:420, type:'status_ring',     target:'actor',  color:'#88eeff', duration:620 },
+      { at:0,   type:'spinning_ring',   origin:'actor',  radius:24, squish:0.10, color:'#88ccff', thickness:2, spinMs:700, duration:300 },
+      { at:0,   type:'preset',          id:'ice_cast_aura', direction:'down', spread:28 },
+      // Wall erupts — slabs rise, ground impact beat
+      { at:280, type:'sound',           id:'hit-heavy' },
+      { at:280, type:'screen_shake',    intensity:5, duration:260, style:'stutter' },
+      { at:280, type:'impact' },
+      { at:280, type:'field_flash',     color:'#cceeff', opacity:0.30, duration:180 },
+      { at:280, type:'wall_slam',       origin:'actor',  slabs:5, slabWidth:13, slabHeight:72, color:'#aaddff', duration:680, stagger:30, yOffset:22 },
+      { at:280, type:'particle_burst',  origin:'actor',  color:'#ddf4ff', count:12, spread:20, direction:'up', duration:500, content:'❄', size:12 },
+      { at:280, type:'shockwave',       origin:'actor',  size:72, color:'#88ccff', opacity:0.62, thickness:4 },
+      { at:280, type:'creature_tint',   target:'actor',  color:'#aaddff', blend:'screen', opacity:0.40, duration:620 },
+      // Wall crystallizes — ❄ shimmer rising along the face
+      { at:360, type:'shockwave',       origin:'actor',  size:40, color:'#cceeff', opacity:0.36, thickness:2 },
+      { at:300, type:'particle_stream', origin:'actor',  color:'#aaddff', count:3, interval:90, direction:'up', size:11, duration:500, content:'❄' },
+      // Dual status rings — wall is standing
+      { at:340, type:'status_ring',     target:'actor',  color:'#4499ff', duration:760 },
+      { at:440, type:'status_ring',     target:'actor',  color:'#88eeff', duration:660 },
     ],
   },
 
@@ -185,24 +197,34 @@ registerMoveAnimations({
   },
 
   // ── frozen_pulse ───────────────────────────────────────────────────────────
-  // Damage + slow. Heavy ice pulse; shockwave ring and slow status on target.
-  // Dot particles — projectile hit, not a snowfall.
+  // Damage + slow. Not a projectile — a pressure wave of cold that radiates
+  // outward from Pengun and washes over the target. The spinning ring during
+  // cast shows cold energy building; the wave_sweep IS the pulse releasing.
+  // ❄ drifting downward after impact sells the lingering slow.
   frozen_pulse: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#55aaff', count:3, interval:75, direction:'up', duration:140 },
-      { at:0,   type:'creature_tint',   target:'actor',  color:'#2299dd', blend:'screen', opacity:0.25, duration:260 },
-      { at:0,   type:'sound',           id:'beam-light' },
+      // Build-up: frost energy gathers, a ring of ice spins around Pengun
+      { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-frozen-pulse' },
-      { at:0,   type:'preset',          id:'ice_cast_aura', count:6, spread:28 },
-      { at:120, type:'preset',          id:'ice_projectile_heavy', size:18, duration:320 },
-      { at:390, type:'impact' },
-      { at:390, type:'sound',           id:'hit-heavy' },
-      { at:390, type:'creature_anim',   target:'target', class:'anim-hit-ice-heavy' },
-      { at:390, type:'preset',          id:'ice_particle_heavy' },
-      { at:390, type:'preset',          id:'ice_hit_flash_heavy' },
-      { at:390, type:'screen_shake',    intensity:4, duration:220 },
-      { at:390, type:'shockwave',       origin:'target', size:48, color:'#44aaff', opacity:0.62, thickness:3 },
-      { at:390, type:'status_ring',     target:'target', color:'#55ccff', duration:700 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#aaddff', count:3, interval:82, direction:'up', spread:34, duration:300, glow:true, content:'❄', size:11 },
+      { at:0,   type:'creature_tint',   target:'actor',  color:'#44aaff', blend:'screen', opacity:0.28, duration:340 },
+      { at:0,   type:'preset',          id:'ice_cast_aura', count:8, direction:'all', spread:38 },
+      { at:20,  type:'spinning_ring',   origin:'actor',  radius:28, squish:0.35, color:'#88ccff', thickness:2, spinMs:580, duration:340, glow:true },
+      // The pulse releases — cold wave sweeps toward target
+      { at:100, type:'sound',           id:'beam-light' },
+      { at:100, type:'wave_sweep',      color:'#99ddff', duration:280 },
+      // Impact — frost crashes in and settles
+      { at:380, type:'impact' },
+      { at:380, type:'sound',           id:'hit-heavy' },
+      { at:380, type:'creature_anim',   target:'target', class:'anim-hit-ice-heavy' },
+      { at:380, type:'particle_burst',  origin:'target', color:'#aaddff', count:12, spread:52, direction:'all', duration:500, content:'❄', size:11 },
+      { at:380, type:'field_flash',     color:'#aaddff', opacity:0.18, duration:200 },
+      { at:380, type:'creature_tint',   target:'target', color:'#003388', blend:'multiply', opacity:0.24, duration:480 },
+      { at:380, type:'screen_shake',    intensity:3, duration:200 },
+      // Frost creeps downward on target — visual anchor for the slow debuff
+      { at:380, type:'particle_stream', origin:'target', color:'#aaddff', count:3, interval:88, direction:'down', size:10, duration:520, content:'❄' },
+      { at:440, type:'shockwave',       origin:'target', size:46, color:'#88ccff', opacity:0.55, thickness:3 },
+      { at:460, type:'status_ring',     target:'target', color:'#55ccff', duration:700 },
     ],
   },
 

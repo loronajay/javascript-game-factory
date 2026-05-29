@@ -25,6 +25,9 @@
 //   shockwave      — expanding impact ring at actor or target position
 //   creature_tint  — temporary elemental color overlay on a creature sprite
 //   hit_stop       — freeze-frame pause on heavy impacts
+//   spinning_ring  — elliptical spinning ring at origin (vortex / whirlpool)
+//   wall_slam      — row of rising slabs at origin (ice wall / earth spikes)
+//   float_text     — show custom float text on actor or target (text, kind, index)
 // ─────────────────────────────────────────────────────────────────────────
 
 // ── Public coordinate helper ─────────────────────────────────────────────
@@ -50,6 +53,20 @@ function _resolveEl(target, actorSide, actorSlot, targetSide, targetSlot) {
   return null;
 }
 
+// Returns all alive creature elements on a given side. Used to fan out
+// target-referencing effects for AoE moves (targetSide set, targetSlot null).
+// Excludes creatures already marked .ko so previous-round corpses don't receive effects.
+function _resolveAoeTargetEls(targetSide) {
+  return Array.from(document.querySelectorAll(`[data-creature^="${targetSide}-"]`))
+    .filter(el => !el.classList.contains('ko'));
+}
+
+// True when an event field references 'target' and the move is AoE
+// (targetSide known but targetSlot null — the fan-out condition).
+function _isAoeTarget(field, targetSide, targetSlot) {
+  return field === 'target' && !!targetSide && !targetSlot;
+}
+
 function _getTargetCoords(result, action) {
   return {
     side: result.targetSide || action?.targetSide || null,
@@ -71,6 +88,11 @@ function _executeTimelineEvent(event, context) {
   switch (event.type) {
 
     case 'creature_anim': {
+      // AoE fan-out: fire hit animation on every alive target simultaneously.
+      // Lunge is skipped for AoE — there is no single destination to dash toward.
+      if (_isAoeTarget(event.target, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animateEl(el, event.class, event.cssVars)));
+      }
       const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
       if (!el) return Promise.resolve();
       let cssVars = event.cssVars;
@@ -82,18 +104,31 @@ function _executeTimelineEvent(event, context) {
     }
 
     case 'projectile': {
+      // AoE fan-out: a separate projectile flies to each alive target.
+      if (_isAoeTarget(event.to, targetSide, targetSlot)) {
+        const fromEl = _resolveEl(event.from, actorSide, actorSlot, targetSide, targetSlot);
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animProjectile(fromEl, el, event)));
+      }
       const fromEl = _resolveEl(event.from, actorSide, actorSlot, targetSide, targetSlot);
       const toEl   = _resolveEl(event.to,   actorSide, actorSlot, targetSide, targetSlot);
       return animProjectile(fromEl, toEl, event);
     }
 
     case 'beam': {
+      // AoE fan-out: a beam extends to each alive target simultaneously.
+      if (_isAoeTarget(event.to, targetSide, targetSlot)) {
+        const fromEl = _resolveEl(event.from, actorSide, actorSlot, targetSide, targetSlot);
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animBeam(fromEl, el, event)));
+      }
       const fromEl = _resolveEl(event.from, actorSide, actorSlot, targetSide, targetSlot);
       const toEl   = _resolveEl(event.to,   actorSide, actorSlot, targetSide, targetSlot);
       return animBeam(fromEl, toEl, event);
     }
 
     case 'particle_burst': {
+      if (_isAoeTarget(event.origin, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animParticleBurst(el, event)));
+      }
       const originEl = _resolveEl(event.origin, actorSide, actorSlot, targetSide, targetSlot);
       return animParticleBurst(originEl, event);
     }
@@ -102,6 +137,9 @@ function _executeTimelineEvent(event, context) {
     case 'screen_shake':   return animScreenShake(event);
 
     case 'creature_shake': {
+      if (_isAoeTarget(event.target, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animCreatureShake(el, event)));
+      }
       const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
       return animCreatureShake(el, event);
     }
@@ -132,30 +170,76 @@ function _executeTimelineEvent(event, context) {
     }
 
     case 'particle_stream': {
+      // AoE fan-out: non-blocking stream fires at each alive target.
+      if (_isAoeTarget(event.origin, targetSide, targetSlot)) {
+        _resolveAoeTargetEls(targetSide).forEach(el => animParticleStream(el, event));
+        return Promise.resolve();
+      }
       const originEl = _resolveEl(event.origin, actorSide, actorSlot, targetSide, targetSlot);
-      animParticleStream(originEl, event); // non-blocking: fire and move on
+      animParticleStream(originEl, event);
       return Promise.resolve();
     }
 
     case 'shockwave': {
+      if (_isAoeTarget(event.origin, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animShockwave(el, event)));
+      }
       const originEl = _resolveEl(event.origin, actorSide, actorSlot, targetSide, targetSlot);
       return animShockwave(originEl, event);
     }
 
     case 'creature_tint': {
+      if (_isAoeTarget(event.target, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animCreatureTint(el, event)));
+      }
       const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
       return animCreatureTint(el, event);
+    }
+
+    case 'spinning_ring': {
+      if (_isAoeTarget(event.origin, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animSpinningRing(el, event)));
+      }
+      const originEl   = _resolveEl(event.origin,   actorSide, actorSlot, targetSide, targetSlot);
+      const travelToEl = event.travelTo
+        ? _resolveEl(event.travelTo, actorSide, actorSlot, targetSide, targetSlot)
+        : null;
+      return animSpinningRing(originEl, { ...event, travelToEl });
+    }
+
+    case 'wall_slam': {
+      if (_isAoeTarget(event.origin, targetSide, targetSlot)) {
+        return Promise.all(_resolveAoeTargetEls(targetSide).map(el => animWallSlam(el, event)));
+      }
+      const originEl = _resolveEl(event.origin, actorSide, actorSlot, targetSide, targetSlot);
+      return animWallSlam(originEl, event);
     }
 
     case 'hit_stop':
       return animHitStop(event);
 
-    case 'status_ring': {
+    case 'float_text': {
       const el = _resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot);
       if (!el) return Promise.resolve();
-      const ctrl = animStatusRing(el, { color: event.color ?? '#ffffff' });
-      const dur = event.duration ?? 600;
-      setTimeout(() => ctrl.clear(), dur);
+      const creature  = el.dataset.creature;
+      const dashIdx   = creature.indexOf('-');
+      const side      = creature.slice(0, dashIdx);
+      const slot      = creature.slice(dashIdx + 1);
+      showBattleFloatText(side, slot, event.text, event.kind ?? 'status', event.index ?? 0);
+      return Promise.resolve();
+    }
+
+    case 'status_ring': {
+      const wireRing = el => {
+        if (!el) return;
+        const ctrl = animStatusRing(el, { color: event.color ?? '#ffffff' });
+        setTimeout(() => ctrl.clear(), event.duration ?? 600);
+      };
+      if (_isAoeTarget(event.target, targetSide, targetSlot)) {
+        _resolveAoeTargetEls(targetSide).forEach(wireRing);
+        return Promise.resolve();
+      }
+      wireRing(_resolveEl(event.target, actorSide, actorSlot, targetSide, targetSlot));
       return Promise.resolve();
     }
 

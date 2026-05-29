@@ -398,21 +398,20 @@ function animWaveSweep(fromEl, options = {}) {
   const overlay = getAnimOverlay();
   if (!fromEl || !overlay) return Promise.resolve();
 
-  const duration = options.duration  ?? 380;
-  const color    = options.color     ?? '#d4c0a0';
-  const dir      = options.direction ?? 1;
+  const duration = options.duration ?? 420;
+  const color    = options.color    ?? '#d4c0a0';
 
   const center  = getElementCenter(fromEl, overlay);
-  const sweepTx = Math.round(overlay.offsetWidth * 0.38) * dir;
+  // Anchor slightly below sprite center so the pulse reads as a ground-level wave
+  const groundY = center.y + 18;
 
   const wave = document.createElement('div');
   wave.className = 'anim-sweep-wave';
   wave.style.cssText = `
     left: ${center.x}px;
-    top:  ${center.y}px;
-    background: radial-gradient(ellipse at center, ${color}cc 0%, ${color}66 45%, transparent 72%);
-    box-shadow: 0 0 22px ${color}55;
-    --sweep-tx: ${sweepTx}px;
+    top:  ${groundY}px;
+    background: radial-gradient(ellipse at center, ${color}cc 0%, ${color}66 50%, transparent 76%);
+    box-shadow: 0 0 18px ${color}55;
     --sweep-duration: ${duration}ms;
   `;
   overlay.appendChild(wave);
@@ -596,6 +595,145 @@ function getLungeVars(actorEl, targetEl) {
     '--anim-dx': `${Math.round(((tr.left + tr.width  / 2) - (ar.left + ar.width  / 2)) / scale)}px`,
     '--anim-dy': `${Math.round(((tr.top  + tr.height / 2) - (ar.top  + ar.height / 2)) / scale)}px`,
   };
+}
+
+// ── animSpinningRing ─────────────────────────────────────────────────────
+// Spawns an elliptical ring at originEl's center that spins continuously,
+// then fades out. Multiple staggered calls create a whirlpool vortex effect.
+//
+// options:
+//   radius         px           ring half-width (default 30)
+//   squish         0–1          vertical scale for isometric look (default 0.32)
+//   color          css color    (default '#ffffff')
+//   opacity        0–1          peak opacity (default 0.8)
+//   thickness      px           border width (default 3)
+//   spinMs         ms           duration of one full rotation (default 900)
+//   duration       ms           total lifetime before fade-out (default 800)
+//   glow           bool         adds a soft box-shadow glow (default false)
+//   travelToEl     Element|null if set, the ring travels from originEl to travelToEl
+//   travelDuration ms           travel time in ms (default 300); fade never starts mid-travel
+
+function animSpinningRing(originEl, options = {}) {
+  const overlay = getAnimOverlay();
+  if (!originEl || !overlay) return Promise.resolve();
+
+  const center       = getElementCenter(originEl, overlay);
+  const radius       = options.radius       ?? 30;
+  const squish       = options.squish       ?? 0.32;
+  const color        = options.color        ?? '#ffffff';
+  const opacity      = options.opacity      ?? 0.8;
+  const thickness    = options.thickness    ?? 3;
+  const spinMs       = options.spinMs       ?? 900;
+  const duration     = options.duration     ?? 800;
+  const glow         = options.glow         ?? false;
+  const travelToEl   = options.travelToEl   ?? null;
+  const travelDur    = options.travelDuration ?? 300;
+
+  // Outer: handles absolute position + isometric squish + fade
+  const outer = document.createElement('div');
+  outer.className = 'anim-spinning-ring-outer';
+  outer.style.cssText = `
+    left: ${center.x}px;
+    top:  ${center.y}px;
+    width: ${radius * 2}px;
+    height: ${radius * 2}px;
+    transform: translate(-50%, -50%) scaleY(${squish});
+    opacity: ${opacity};
+  `;
+
+  // Inner: spins
+  const inner = document.createElement('div');
+  inner.className = 'anim-spinning-ring-inner';
+  const glowStr = glow ? `box-shadow: 0 0 ${thickness * 3}px ${color}99;` : '';
+  inner.style.cssText = `border: ${thickness}px solid ${color}; ${glowStr} --ring-spin-ms: ${spinMs}ms;`;
+
+  outer.appendChild(inner);
+  overlay.appendChild(outer);
+
+  if (travelToEl) {
+    // Force a reflow so the starting position is committed before the transition fires.
+    overlay.getBoundingClientRect();
+    const toCenter = getElementCenter(travelToEl, overlay);
+    outer.style.transition = `left ${travelDur}ms linear, top ${travelDur}ms linear`;
+    outer.style.left = `${toCenter.x}px`;
+    outer.style.top  = `${toCenter.y}px`;
+  }
+
+  // Never start fading while the ring is still in flight.
+  const fadeStart = travelToEl
+    ? Math.max(travelDur, duration - 220)
+    : Math.max(0, duration - 220);
+
+  setTimeout(() => {
+    outer.style.transition = 'opacity 220ms ease-out';
+    outer.style.opacity = '0';
+  }, fadeStart);
+
+  return new Promise(resolve => {
+    setTimeout(() => { outer.remove(); resolve(); }, duration + 50);
+  });
+}
+
+// ── animWallSlam ─────────────────────────────────────────────────────────
+// Spawns a row of rising slabs at originEl's position (ice wall, earth spikes,
+// etc.). Slabs rise from the bottom of the sprite upward and fade out.
+//
+// options:
+//   slabs      count        number of slabs (default 5)
+//   slabWidth  px           width of each slab (default 13)
+//   slabHeight px           height of the tallest center slab (default 70)
+//   gap        px           gap between slabs (default 3)
+//   color      css color    (default '#aaddff')
+//   duration   ms           rise + hold + fade total lifetime (default 650)
+//   stagger    ms           delay between each slab's rise (default 30)
+//   yOffset    px           shift origin below sprite center (default 20)
+
+function animWallSlam(originEl, options = {}) {
+  const overlay = getAnimOverlay();
+  if (!originEl || !overlay) return Promise.resolve();
+
+  const center     = getElementCenter(originEl, overlay);
+  const slabs      = options.slabs      ?? 5;
+  const slabWidth  = options.slabWidth  ?? 13;
+  const slabHeight = options.slabHeight ?? 70;
+  const gap        = options.gap        ?? 3;
+  const color      = options.color      ?? '#aaddff';
+  const duration   = options.duration   ?? 650;
+  const stagger    = options.stagger    ?? 30;
+  const yOffset    = options.yOffset    ?? 20;
+
+  const totalWidth = slabs * slabWidth + (slabs - 1) * gap;
+  const startX     = center.x - totalWidth / 2 + slabWidth / 2;
+  const baseY      = center.y + yOffset; // anchor = creature feet area
+
+  const promises = [];
+  for (let i = 0; i < slabs; i++) {
+    // Center slabs are tallest; outer slabs ~70% height — arch silhouette
+    const t = Math.abs(i - (slabs - 1) / 2) / ((slabs - 1) / 2);
+    const h = Math.round(slabHeight * (1 - t * 0.3));
+    const x = startX + i * (slabWidth + gap);
+
+    const slab = document.createElement('div');
+    slab.className = 'anim-wall-slab anim-wall-rise';
+    slab.style.cssText = [
+      `left: ${x}px`,
+      `top: ${baseY - h}px`,
+      `width: ${slabWidth}px`,
+      `height: ${h}px`,
+      `background: linear-gradient(to top, ${color} 0%, ${color}bb 55%, ${color}44 100%)`,
+      `border: 1px solid ${color}dd`,
+      `border-bottom: none`,
+      `box-shadow: inset 2px 0 5px rgba(255,255,255,0.35)`,
+      `--wall-duration: ${duration}ms`,
+      `animation-delay: ${i * stagger}ms`,
+    ].join('; ');
+    overlay.appendChild(slab);
+
+    promises.push(new Promise(resolve => {
+      setTimeout(() => { slab.remove(); resolve(); }, duration + i * stagger + 80);
+    }));
+  }
+  return Promise.all(promises);
 }
 
 // ── animStatusRing ───────────────────────────────────────────────────────

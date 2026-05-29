@@ -62,23 +62,31 @@ registerMoveAnimations({
   },
 
   // ── thorn_bind ─────────────────────────────────────────────────────────────
-  // Damage + DEF down. Identity: vine entanglement lingers on target as proof
-  // the bind landed — leaf particles + multiply tint + status ring.
+  // Damage + DEF down. No projectile — thorny vines ERUPT from the ground
+  // around the target. Flor channels energy into the ground; vine stalks rise
+  // at the target's feet and coil upward trapping it.
   thorn_bind: {
     timeline: [
-      { at:0,   type:'particle_stream', origin:'actor',  color:'#558833', count:3, interval:85, direction:'up', duration:160 },
-      { at:0,   type:'sound',           id:'beam-light' },
+      // Flor channels — energy goes INTO the ground (aura directed down)
+      { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-thorn-bind' },
-      { at:0,   type:'preset',          id:'gaia_cast_aura', count:5, spread:25 },
-      { at:110, type:'preset',          id:'gaia_projectile_light', color:'#558833', arc:0, duration:320 },
-      { at:360, type:'impact' },
-      { at:360, type:'sound',           id:'hit-heavy' },
-      { at:360, type:'creature_anim',   target:'target', class:'anim-hit-gaia-heavy' },
-      { at:360, type:'particle_burst',  origin:'target', color:'#336622', count:10, spread:50, direction:'all', duration:540, content:'🍃' },
-      { at:360, type:'preset',          id:'gaia_hit_flash_light' },
-      { at:360, type:'particle_stream', origin:'target', color:'#336622', count:3, interval:90, direction:'all', spread:40, duration:520, content:'🍃' },
-      { at:360, type:'creature_tint',   target:'target', color:'#224411', blend:'multiply', opacity:0.28, duration:560 },
-      { at:360, type:'status_ring',     target:'target', color:'#558833', duration:700 },
+      { at:0,   type:'preset',          id:'gaia_cast_aura', direction:'down', spread:30 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#447722', count:2, interval:100, direction:'down', size:10, duration:240, content:'🌿' },
+      // Earth energy surges underground toward the target
+      { at:80,  type:'wave_sweep',      color:'#2d5c1a', duration:240 },
+      // Vines erupt at the target's feet
+      { at:280, type:'sound',           id:'hit-heavy' },
+      { at:280, type:'screen_shake',    intensity:4, duration:220, style:'stutter' },
+      { at:280, type:'impact' },
+      { at:280, type:'field_flash',     color:'#1a3d0a', opacity:0.22, duration:180 },
+      { at:280, type:'wall_slam',       origin:'target', slabs:5, slabWidth:11, slabHeight:66, color:'#3a6622', duration:720, stagger:28, yOffset:24 },
+      { at:280, type:'particle_burst',  origin:'target', color:'#447722', count:10, spread:35, direction:'up', duration:500, content:'🌿', size:12 },
+      { at:280, type:'creature_shake',  target:'target', intensity:4, duration:300 },
+      { at:280, type:'creature_tint',   target:'target', color:'#1a3d0a', blend:'multiply', opacity:0.30, duration:600 },
+      // Vines coil — 🌿 still rising as the bind locks in
+      { at:320, type:'shockwave',       origin:'target', size:44, color:'#3a6622', opacity:0.55, thickness:3 },
+      { at:300, type:'particle_stream', origin:'target', color:'#336622', count:3, interval:95, direction:'up', size:11, duration:480, content:'🌿' },
+      { at:380, type:'status_ring',     target:'target', color:'#558833', duration:740 },
     ],
   },
 

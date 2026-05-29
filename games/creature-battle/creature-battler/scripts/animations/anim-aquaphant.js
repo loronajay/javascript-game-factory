@@ -164,22 +164,30 @@ registerMoveAnimations({
   },
 
   // ── whirlpool ──────────────────────────────────────────────────────────────
-  // Debuff utility. Swirling water lingers on the target after the hit;
-  // the target looks submerged and darkened.
+  // Debuff utility (slow + accuracy drop). The vortex FORMS on the target rather
+  // than being fired at them — three spinning elliptical rings materialize from
+  // the inside out, the target gets pulled in, then the whirlpool locks in.
   whirlpool: {
     timeline: [
-      { at:0,   type:'sound',           id:'beam-light' },
+      // Actor conjures the vortex from afar — circular cast motion, water swirls around hand
+      { at:0,   type:'sound',           id:'charge-light' },
       { at:0,   type:'creature_anim',   target:'actor',  class:'anim-cast-whirlpool' },
-      { at:0,   type:'preset',          id:'water_cast_aura', direction:'all', spread:38 },
-      { at:100, type:'preset',          id:'water_beam', color:'#44aaee', width:3, duration:320 },
-      { at:260, type:'impact' },
-      { at:260, type:'sound',           id:'hit-light' },
-      { at:260, type:'creature_anim',   target:'target', class:'anim-hit-whirlpool' },
-      { at:260, type:'particle_burst',  origin:'target', color:'#44bbff', count:8, spread:50, direction:'all', duration:460 },
-      { at:260, type:'preset',          id:'water_hit_flash_light' },
-      { at:260, type:'particle_stream', origin:'target', color:'#44aaee', count:4, interval:75, direction:'all', spread:50, duration:500 },
-      { at:260, type:'creature_tint',   target:'target', color:'#0044aa', blend:'multiply', opacity:0.25, duration:480 },
-      { at:260, type:'status_ring',     target:'target', color:'#2266bb', duration:700 },
+      { at:0,   type:'particle_stream', origin:'actor',  color:'#44aaee', count:3, interval:90, direction:'all', spread:28, duration:280 },
+      // Rings materialize at the target from inner to outer (vortex forming)
+      { at:120, type:'spinning_ring',   origin:'target', radius:16, squish:0.30, color:'#44aaee', thickness:2, spinMs:520,  duration:1080, glow:true },
+      { at:200, type:'spinning_ring',   origin:'target', radius:30, squish:0.30, color:'#2277cc', thickness:2, spinMs:760,  duration:900 },
+      { at:270, type:'spinning_ring',   origin:'target', radius:46, squish:0.30, color:'#0055aa', thickness:3, spinMs:1020, duration:720 },
+      { at:240, type:'creature_tint',   target:'target', color:'#001155', blend:'multiply', opacity:0.18, duration:560 },
+      // Impact — vortex locks on, target buffeted by the spinning water
+      { at:380, type:'impact' },
+      { at:380, type:'sound',           id:'hit-light' },
+      { at:380, type:'creature_anim',   target:'target', class:'anim-hit-whirlpool' },
+      { at:380, type:'particle_burst',  origin:'target', color:'#44bbff', count:10, spread:46, direction:'all', duration:440 },
+      { at:380, type:'field_flash',     color:'#002255', opacity:0.20, duration:200 },
+      { at:380, type:'creature_tint',   target:'target', color:'#001144', blend:'multiply', opacity:0.28, duration:500 },
+      { at:380, type:'creature_shake',  target:'target', intensity:3, duration:340 },
+      { at:460, type:'shockwave',       origin:'target', size:38, color:'#2266bb', opacity:0.52, thickness:2 },
+      { at:480, type:'status_ring',     target:'target', color:'#1155bb', duration:700 },
     ],
   },
 

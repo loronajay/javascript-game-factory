@@ -114,7 +114,8 @@ function applyStatModifier(creature, stat, direction, options = {}) {
       }
     }
   }
-  return `${STAT_LABELS[stat] || stat.toUpperCase()} ${normalizedDirection > 0 ? 'UP' : 'DOWN'}`;
+  const label = STAT_LABELS[stat] || stat.toUpperCase();
+  return `${label} ${normalizedDirection > 0 ? '+1' : '-1'}`;
 }
 
 function removeStatus(creature, id) {
@@ -925,126 +926,70 @@ function accumulateBattleStats(result, actorSide) {
 }
 
 function applyUtilityMove(moveId, target) {
-  let text = null;
+  // Track net stat delta per label so multi-stage applications aggregate (e.g. INT+1+1 → INT +2).
+  const statDelta = {};   // { 'INT': 2, 'DEF': -1 }
+  let specialText = null; // non-stat texts like 'CLEANSED'
+
+  function track(stat, dir) {
+    applyStatModifier(target, stat, dir);
+    const label = STAT_LABELS[stat] || stat.toUpperCase();
+    statDelta[label] = (statDelta[label] || 0) + (dir >= 0 ? 1 : -1);
+  }
+
   switch (moveId) {
-    case 'cold_feet':    text = applyStatModifier(target, 'speed', -1); break;
-    case 'snow_blind':   text = applyStatModifier(target, 'accuracy', -1); break;
-    case 'heat_haze':    text = applyStatModifier(target, 'evasion', 1); break;
-    case 'ash_veil':     text = applyStatModifier(target, 'spirit', 1); break;
-    case 'soak_hide':    text = applyStatModifier(target, 'defense', 1); break;
+    case 'cold_feet':    track('speed', -1); break;
+    case 'snow_blind':   track('accuracy', -1); break;
+    case 'heat_haze':    track('evasion', 1); break;
+    case 'ash_veil':     track('spirit', 1); break;
+    case 'soak_hide':    track('defense', 1); break;
     case 'verdant_guard':
-    case 'natures_ward': text = applyStatModifier(target, 'spirit', 1); break;
-    case 'bloom_surge': {
-      applyStatModifier(target, 'intelligence', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
+    case 'natures_ward': track('spirit', 1); break;
+    case 'bloom_surge':  track('intelligence', 1); track('spirit', 1); break;
     case 'hydro_skin':
-    case 'glacier_wall': {
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
-    case 'boulder_wall': {
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'defense', 1);
-      break;
-    }
-    case 'earthen_shell': {
-      applyStatModifier(target, 'defense', 1);
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
-    case 'tailwind': {
-      applyStatModifier(target, 'speed', 1);
-      text = applyStatModifier(target, 'speed', 1);
-      break;
-    }
-    case 'slipstream': {
-      applyStatModifier(target, 'speed', 1);
-      text = applyStatModifier(target, 'evasion', 1);
-      break;
-    }
-    case 'dodge_step': {
-      applyStatModifier(target, 'evasion', 1);
-      text = applyStatModifier(target, 'evasion', 1);
-      break;
-    }
-    case 'phase_shift': {
-      applyStatModifier(target, 'evasion', 1);
-      text = applyStatModifier(target, 'speed', 1);
-      break;
-    }
-    case 'whirlpool': {
-      applyStatModifier(target, 'speed', -1);
-      text = applyStatModifier(target, 'accuracy', -1);
-      break;
-    }
+    case 'glacier_wall': track('defense', 1); track('spirit', 1); break;
+    case 'boulder_wall': track('defense', 1); track('defense', 1); break;
+    case 'earthen_shell': track('defense', 1); track('defense', 1); track('spirit', 1); break;
+    case 'tailwind':     track('speed', 1); track('speed', 1); break;
+    case 'slipstream':   track('speed', 1); track('evasion', 1); break;
+    case 'dodge_step':   track('evasion', 1); track('evasion', 1); break;
+    case 'phase_shift':  track('evasion', 1); track('speed', 1); break;
+    case 'whirlpool':    track('speed', -1); track('accuracy', -1); break;
     case 'cleanse': {
       const had = (target.statusEffects || []).length > 0;
       target.statusEffects = [];
-      text = had ? 'CLEANSED' : 'ALL CLEAR';
+      specialText = had ? 'CLEANSED' : 'ALL CLEAR';
       break;
     }
-    case 'clarity': {
-      applyStatModifier(target, 'speed', 1);
-      text = applyStatModifier(target, 'accuracy', 1);
-      break;
-    }
-    case 'holy_ward': {
-      applyStatModifier(target, 'spirit', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
-    case 'shadow_surge': {
-      applyStatModifier(target, 'intelligence', 1);
-      applyStatModifier(target, 'intelligence', 1);
-      text = applyStatModifier(target, 'defense', -1);
-      break;
-    }
-    case 'blaze_stance': {
-      applyStatModifier(target, 'strength', 1);
-      text = applyStatModifier(target, 'strength', 1);
-      break;
-    }
-    case 'brine_shield': {
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
-    case 'barnacle_wall': {
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'defense', 1);
-      break;
-    }
-    case 'tide_wall': {
-      applyStatModifier(target, 'defense', 1);
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
-    case 'overgrowth': {
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'defense', 1);
-      break;
-    }
-    case 'moss_wall': {
-      applyStatModifier(target, 'defense', 1);
-      text = applyStatModifier(target, 'spirit', 1);
-      break;
-    }
+    case 'clarity':      track('speed', 1); track('accuracy', 1); break;
+    case 'holy_ward':    track('spirit', 1); track('spirit', 1); break;
+    case 'shadow_surge': track('intelligence', 1); track('intelligence', 1); track('defense', -1); break;
+    case 'blaze_stance': track('strength', 1); track('strength', 1); break;
+    case 'brine_shield': track('defense', 1); track('spirit', 1); break;
+    case 'barnacle_wall': track('defense', 1); track('defense', 1); break;
+    case 'tide_wall':    track('defense', 1); track('defense', 1); track('spirit', 1); break;
+    case 'overgrowth':   track('defense', 1); track('defense', 1); break;
+    case 'moss_wall':    track('defense', 1); track('spirit', 1); break;
   }
+
   const move = getMoveData(moveId);
   if (move?.applyStatus && !target.isKnockedOut) {
     const { id, duration, permanent, chance = 100 } = move.applyStatus;
     if (!hasStatus(target, id) && _battleRng() * 100 < chance) {
       const label = applyStatus(target, id, { remainingRounds: duration, permanent });
-      if (id === 'burn') applyStatModifier(target, 'defense', -1);
-      text = text ? `${text}! ${label}` : label;
+      if (id === 'burn') track('defense', -1);
+      specialText = specialText ? `${specialText}! ${label}` : label;
     }
   }
-  return text || 'BUFF';
+
+  // Build flat text list: aggregated stat changes + any special text
+  const texts = Object.entries(statDelta)
+    .filter(([, d]) => d !== 0)
+    .map(([label, d]) => `${label} ${d > 0 ? '+' : ''}${d}`);
+  if (specialText) texts.push(specialText);
+
+  if (texts.length === 0) return 'BUFF';
+  if (texts.length === 1) return texts[0];
+  return texts;
 }
 
 function applySecondaryEffect(moveId, target) {

@@ -124,6 +124,10 @@ function aliveTargetSlots() {
 
 function handleBattleKey(key) {
   if (!inputState.active) return;
+  if (isBattleStatsViewerOpen()) {
+    if (key === 'Escape' || key === 'r' || key === 'R') { playClick(); hideBattleStatsViewer(); }
+    return;
+  }
   if (inputState.phase === 'command')            handleCommandKey(key);
   else if (inputState.phase === 'art_menu')      handleArtKey(key);
   else if (inputState.phase === 'skill_menu')    handleSkillKey(key);
@@ -138,6 +142,7 @@ function handleCommandKey(key) {
   if (key === 'ArrowRight') { playClick(); inputState.focusedCommand = (inputState.focusedCommand + 1) % count;          renderBattleCommandPanel(); }
   if (key === 'Enter' || key === ' ') { playClick(); confirmCommand(); }
   if (key === 'Escape' && inputState.queueIndex > 0) { playClick(); undoLast(); }
+  if (key === 'r' || key === 'R') { playClick(); openBattleStatsViewer(); }
 }
 
 const ART_GRID_COLS = 3;
@@ -607,7 +612,7 @@ function renderBattleCommandPanel() {
   if (inputState.phase === 'command') {
     const cmds = getCommandDefs(creature);
     el.innerHTML = `
-      <div class="battle-cmd-prompt"><span class="cmd-actor">${creature.displayName}</span> — Choose Command ${progress}</div>
+      <div class="battle-cmd-prompt"><span class="cmd-actor">${creature.displayName}</span> — Choose Command ${progress}<span class="control-hint-desktop" style="margin-left:8px;font-size:9px;opacity:0.5;font-weight:400">R · Stats</span></div>
       <div class="battle-cmd-row">
         ${cmds.map((c, i) => `
           <div class="command-btn ${!c.enabled ? 'disabled' : ''} ${i === inputState.focusedCommand ? 'focused' : ''}" data-cmd="${i}">
@@ -615,12 +620,16 @@ function renderBattleCommandPanel() {
             <span class="command-label">${c.label}</span>
           </div>`).join('')}
       </div>
-      ${renderTouchActionBar(inputState.queueIndex > 0 ? [{ id: 'undo', label: 'Undo' }] : [])}`;
+      ${renderTouchActionBar([
+        ...(inputState.queueIndex > 0 ? [{ id: 'undo', label: 'Undo' }] : []),
+        { id: 'stats', label: 'Stats' },
+      ])}`;
     el.querySelectorAll('.command-btn:not(.disabled)').forEach(btn =>
       btn.addEventListener('click', () => { playClick(); inputState.focusedCommand = +btn.dataset.cmd; confirmCommand(); })
     );
     bindTouchActionBar(el, {
       undo() { playClick(); undoLast(); },
+      stats() { playClick(); openBattleStatsViewer(); },
     });
 
   } else if (inputState.phase === 'art_menu') {
@@ -779,4 +788,173 @@ function renderBattleCommandPanel() {
       confirm() { playClick(); confirmMultiTarget(); },
     });
   }
+}
+
+// ── Battle Stats Viewer ──────────────────────────────────────────────────────
+
+const _bsvState = { side: 'player', slot: null };
+
+function isBattleStatsViewerOpen() {
+  return !!document.getElementById('battle-stats-viewer');
+}
+
+function hideBattleStatsViewer() {
+  document.getElementById('battle-stats-viewer')?.remove();
+}
+
+function _bsvStatRow(creature, key, label) {
+  const base      = creature.stats[key] ?? 0;
+  const stage     = getStatStage(creature, key);
+  const effective = key === 'speed' ? getEffectiveSpeed(creature) : getEffectiveStat(creature, key);
+  const stageCell = stage !== 0
+    ? `<span class="bsv-stage ${stage > 0 ? 'buff' : 'debuff'}">${stage > 0 ? '+' : ''}${stage}</span>`
+    : `<span class="bsv-stage-empty"></span>`;
+  const totalClass = stage > 0 ? 'buff' : stage < 0 ? 'debuff' : '';
+  return `
+    <div class="bsv-stat-row">
+      <span class="bsv-stat-label">${label}</span>
+      <span class="bsv-stat-base">${base}</span>
+      ${stageCell}
+      <span class="bsv-stat-total ${totalClass}">${effective}</span>
+    </div>`;
+}
+
+function _bsvDetail(side, slot) {
+  const creature = state.battleState?.[side]?.[slot];
+  if (!creature) return '';
+
+  const statKeys = [
+    ['strength', 'STR'], ['defense', 'DEF'],
+    ['intelligence', 'INT'], ['spirit', 'SPR'], ['speed', 'SPD'],
+  ];
+
+  const statusLabels = getCreatureStatusLabels(creature);
+  const hp = Math.max(0, Math.min(100, (creature.hp.current / creature.hp.max) * 100));
+  const mp = Math.max(0, Math.min(100, (creature.mp.current / creature.mp.max) * 100));
+
+  const routeName = creature.classRoute
+    ? (typeof getClassRoute === 'function' ? (getClassRoute(creature.classRoute)?.name ?? creature.classRoute) : creature.classRoute)
+    : null;
+  const classTag = routeName ? `<span class="bsv-class-tag">${routeName}</span>` : '';
+
+  const statusHtml = statusLabels.length
+    ? `<div class="bsv-statuses">${statusLabels.map(s => `<span class="bsv-status-tag ${s.kind}">${s.label}</span>`).join('')}</div>`
+    : '';
+
+  return `
+    <div class="bsv-creature-header">
+      <div class="bsv-sprite-wrap">
+        <img class="bsv-sprite" src="${creature.sprite}" alt="${creature.displayName}">
+        ${creature.isKnockedOut ? '<div class="bsv-ko-badge">KO</div>' : ''}
+      </div>
+      <div class="bsv-creature-identity">
+        <div class="bsv-creature-name">${creature.displayName}</div>
+        <div class="bsv-creature-meta">
+          <span class="element-tag element-${creature.element}">${creature.element}</span>
+          ${classTag}
+        </div>
+        <div class="bsv-creature-role">${creature.role}</div>
+      </div>
+    </div>
+    <div class="bsv-resources">
+      <div class="bsv-resource-row">
+        <span class="bsv-res-label hp">HP</span>
+        <div class="hud-bar-track bsv-bar"><div class="hud-bar-fill hp" style="width:${hp}%"></div></div>
+        <span class="bsv-res-nums">${creature.hp.current}/${creature.hp.max}</span>
+      </div>
+      <div class="bsv-resource-row">
+        <span class="bsv-res-label mp">MP</span>
+        <div class="hud-bar-track bsv-bar"><div class="hud-bar-fill mp" style="width:${mp}%"></div></div>
+        <span class="bsv-res-nums">${creature.mp.current}/${creature.mp.max}</span>
+      </div>
+    </div>
+    ${statusHtml}
+    <div class="bsv-stats-table">
+      <div class="bsv-stats-header-row">
+        <span></span>
+        <span class="bsv-col-lbl">Base</span>
+        <span class="bsv-col-lbl" style="text-align:center">Mod</span>
+        <span class="bsv-col-lbl right">Total</span>
+      </div>
+      ${statKeys.map(([k, lbl]) => _bsvStatRow(creature, k, lbl)).join('')}
+    </div>`;
+}
+
+function _bsvSelectorCard(side, slot) {
+  const c = state.battleState?.[side]?.[slot];
+  if (!c) return `<div class="bsv-sel-card empty"></div>`;
+  const isSelected = _bsvState.side === side && _bsvState.slot === slot;
+  const hp = Math.max(0, Math.min(100, (c.hp.current / c.hp.max) * 100));
+  return `
+    <div class="bsv-sel-card ${isSelected ? 'selected' : ''} ${c.isKnockedOut ? 'ko' : ''}"
+         data-bsv-side="${side}" data-bsv-slot="${slot}">
+      <img class="bsv-sel-sprite" src="${c.sprite}" alt="${c.displayName}">
+      <div class="bsv-sel-name">${c.displayName}</div>
+      <div class="hud-bar-track bsv-sel-bar"><div class="hud-bar-fill hp" style="width:${hp}%"></div></div>
+      ${c.isKnockedOut ? '<div class="bsv-sel-ko">KO</div>' : ''}
+    </div>`;
+}
+
+function openBattleStatsViewer(defaultSide, defaultSlot) {
+  if (!state.battleState) return;
+  _bsvState.side = defaultSide ?? 'player';
+  _bsvState.slot = defaultSlot ?? (inputState.queue?.[inputState.queueIndex] ?? SLOT_NAMES[0]);
+  hideBattleStatsViewer();
+
+  const viewer = document.createElement('div');
+  viewer.id = 'battle-stats-viewer';
+  viewer.className = 'battle-stats-viewer';
+
+  function renderViewer() {
+    viewer.innerHTML = `
+      <div class="bsv-panel">
+        <div class="bsv-header">
+          <span class="bsv-title">Battle Stats</span>
+          <button class="bsv-x-btn" id="bsv-x" type="button">✕</button>
+        </div>
+        <div class="bsv-selector">
+          <div class="bsv-sel-group">
+            <div class="bsv-sel-group-label player-label">Your Team</div>
+            <div class="bsv-sel-row">
+              ${SLOT_NAMES.map(s => _bsvSelectorCard('player', s)).join('')}
+            </div>
+          </div>
+          <div class="bsv-sel-group">
+            <div class="bsv-sel-group-label opp-label">Opponent</div>
+            <div class="bsv-sel-row">
+              ${SLOT_NAMES.map(s => _bsvSelectorCard('opponent', s)).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="bsv-detail">
+          ${_bsvDetail(_bsvState.side, _bsvState.slot)}
+        </div>
+        <div class="bsv-footer">
+          ${renderControlHint('R or Esc — Close', '')}
+          <button class="bsv-footer-close" type="button" id="bsv-close">Close</button>
+        </div>
+      </div>`;
+
+    viewer.querySelectorAll('[data-bsv-side]').forEach(card => {
+      card.addEventListener('click', e => {
+        e.stopPropagation();
+        playClick();
+        _bsvState.side = card.dataset.bsvSide;
+        _bsvState.slot = card.dataset.bsvSlot;
+        renderViewer();
+      });
+    });
+    viewer.querySelector('#bsv-x')?.addEventListener('click', e => {
+      e.stopPropagation(); playClick(); hideBattleStatsViewer();
+    });
+    viewer.querySelector('#bsv-close')?.addEventListener('click', e => {
+      e.stopPropagation(); playClick(); hideBattleStatsViewer();
+    });
+  }
+
+  renderViewer();
+  viewer.addEventListener('click', e => {
+    if (e.target === viewer) { playClick(); hideBattleStatsViewer(); }
+  });
+  document.getElementById('screen-battle').appendChild(viewer);
 }

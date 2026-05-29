@@ -671,3 +671,266 @@
   text-align: center;
   white-space: nowrap;
 }
+
+/* ── Battle Stats Viewer ─────────────────────────────────────────────────── */
+.battle-stats-viewer {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(2, 8, 20, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+.bsv-panel {
+  background: var(--cb-panel-bg);
+  border: 2px solid var(--cb-accent);
+  border-radius: 12px;
+  box-shadow: 0 0 32px rgba(39,202,255,0.18);
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.bsv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--cb-border);
+  flex-shrink: 0;
+}
+.bsv-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cb-accent);
+  text-transform: uppercase;
+}
+.bsv-x-btn {
+  background: none;
+  border: 1px solid var(--cb-border);
+  border-radius: 5px;
+  color: var(--cb-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 1px 7px;
+  line-height: 1.4;
+}
+.bsv-x-btn:hover { color: var(--cb-text); border-color: var(--cb-accent); }
+
+/* Creature selector */
+.bsv-selector {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--cb-border);
+  flex-shrink: 0;
+}
+.bsv-sel-group { flex: 1; min-width: 0; }
+.bsv-sel-group-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.bsv-sel-group-label.player-label { color: var(--cb-accent); }
+.bsv-sel-group-label.opp-label { color: var(--cb-enemy-accent, #ff6a2a); }
+.bsv-sel-row { display: flex; gap: 4px; }
+.bsv-sel-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 3px 4px;
+  background: rgba(3,31,68,0.6);
+  border: 1px solid rgba(39,202,255,0.15);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.1s, box-shadow 0.1s;
+  gap: 2px;
+}
+.bsv-sel-card:hover:not(.ko) { border-color: var(--cb-accent); }
+.bsv-sel-card.selected {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 8px rgba(39,202,255,0.3);
+  background: rgba(39,202,255,0.07);
+}
+.bsv-sel-card.ko { opacity: 0.4; }
+.bsv-sel-card.ko.selected { opacity: 0.7; }
+.bsv-sel-sprite { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
+.bsv-sel-name {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--cb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
+}
+.bsv-sel-bar { width: 100%; height: 3px; margin-top: 1px; }
+.bsv-sel-ko { font-size: 8px; font-weight: 900; color: var(--cb-enemy-accent, #ff6a2a); letter-spacing: 0.04em; }
+
+/* Creature detail */
+.bsv-detail { padding: 10px 14px; flex: 1; }
+.bsv-creature-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.bsv-sprite-wrap { position: relative; flex-shrink: 0; }
+.bsv-sprite { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.bsv-ko-badge {
+  position: absolute;
+  top: 0; right: 0;
+  background: var(--cb-enemy-accent, #ff6a2a);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.3;
+}
+.bsv-creature-identity { flex: 1; min-width: 0; }
+.bsv-creature-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--cb-text);
+  margin-bottom: 3px;
+}
+.bsv-creature-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
+}
+.bsv-class-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--cb-muted);
+  background: rgba(168,216,239,0.09);
+  border: 1px solid rgba(168,216,239,0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.bsv-creature-role { font-size: 10px; color: var(--cb-muted); }
+
+/* Resources */
+.bsv-resources { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.bsv-resource-row { display: flex; align-items: center; gap: 6px; }
+.bsv-res-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  width: 18px;
+  flex-shrink: 0;
+}
+.bsv-res-label.hp { color: var(--cb-hp); }
+.bsv-res-label.mp { color: var(--cb-mp); }
+.bsv-bar { flex: 1; height: 6px; }
+.bsv-res-nums { font-size: 10px; color: var(--cb-text); white-space: nowrap; min-width: 64px; text-align: right; }
+
+/* Status tags */
+.bsv-statuses { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 9px; }
+.bsv-status-tag {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.bsv-status-tag.buff { background: rgba(39,202,255,0.13); color: var(--cb-accent); border: 1px solid rgba(39,202,255,0.32); }
+.bsv-status-tag.debuff { background: rgba(255,106,42,0.13); color: var(--cb-enemy-accent, #ff6a2a); border: 1px solid rgba(255,106,42,0.32); }
+.bsv-status-tag.poison,
+.bsv-status-tag.burn,
+.bsv-status-tag.stun,
+.bsv-status-tag.blind,
+.bsv-status-tag.slow,
+.bsv-status-tag.silence { background: rgba(180,80,200,0.13); color: #c882e0; border: 1px solid rgba(180,80,200,0.32); }
+
+/* Stats table */
+.bsv-stats-table {
+  background: rgba(3,18,40,0.5);
+  border: 1px solid var(--cb-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.bsv-stats-header-row,
+.bsv-stat-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 48px 48px;
+  gap: 4px;
+  padding: 5px 10px;
+  align-items: center;
+}
+.bsv-stats-header-row {
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--cb-border);
+}
+.bsv-col-lbl {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--cb-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.bsv-col-lbl.right { text-align: right; }
+.bsv-stat-row + .bsv-stat-row { border-top: 1px solid rgba(39,202,255,0.06); }
+.bsv-stat-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--cb-muted);
+  letter-spacing: 0.07em;
+}
+.bsv-stat-base { font-size: 12px; font-weight: 600; color: var(--cb-text); }
+.bsv-stage {
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.bsv-stage.buff  { color: #5de8a8; }
+.bsv-stage.debuff { color: #ff7070; }
+.bsv-stage-empty { display: block; }
+.bsv-stat-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cb-text);
+  text-align: right;
+}
+.bsv-stat-total.buff   { color: #5de8a8; }
+.bsv-stat-total.debuff { color: #ff7070; }
+
+/* Footer */
+.bsv-footer {
+  padding: 7px 14px;
+  border-top: 1px solid var(--cb-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.bsv-footer .control-hint-desktop { font-size: 10px; color: var(--cb-muted); }
+.bsv-footer-close {
+  background: rgba(39,202,255,0.08);
+  border: 1px solid rgba(39,202,255,0.3);
+  border-radius: 6px;
+  color: var(--cb-text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+}
+.bsv-footer-close:hover { background: rgba(39,202,255,0.16); border-color: var(--cb-accent); }
