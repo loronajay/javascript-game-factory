@@ -1,6 +1,6 @@
 # TypeScript Migration Plan
 
-Status: **Phases 0–2 complete (2026-05-29)** — toolchain in place; 9 schema files + 5 normalize files migrated to `.mts` (14 total), typecheck clean (browser + api), all 91 browser test files green. Phase 3 (Platform Store + Builders + Mutations) is next. Game cabinets remain a later, per-cabinet pass.
+Status: **Phases 0–5 complete (2026-05-29)** — the entire `js/platform/**` layer (31 `.mts` files) is migrated and **`strict: true` is on**. Typecheck clean (browser + api), all 91 browser test files green. Phase 6 (Page Subsystems) is next. **`strict` is now global**, so all future `.mts` (page subsystems, root pages, backend, games) are strict from the moment they're created — there is no second strictness pass. Game cabinets remain a later, per-cabinet pass.
 
 **Build-output workflow (decided 2026-05-29 — read before migrating any file):** the site is served as raw static files with no bundler. We **commit the tsc-emitted `.mjs` in-place** next to each `.mts` source so the site keeps loading unchanged. Mechanics:
 - `tsconfig.browser.json` emits to a staging `dist/js` (NOT in-place) so `allowJs` can never overwrite the not-yet-migrated `.mjs` SOURCE files.
@@ -420,7 +420,17 @@ return {
 
 ---
 
-## Phase 3: Platform Store + Builders + Mutations
+## Phase 3: Platform Store + Builders + Mutations — DONE (2026-05-29)
+
+**What shipped (6 files, not ~15 — the original estimate over-counted):** `activity/activity-store`, `activity/activity-builders`, `thoughts/thoughts-store`, `relationships/relationships-store`, `relationships/relationships-slots`, `relationships/relationships-mutations`.
+
+- `relationships-store` exports `ProfileRelationshipLedger`; `relationships-slots` exports `ResolvedFriendSlots` (+ internal `FriendCandidate`/`ResolvedFriendCandidate`).
+- `relationships-mutations` (the 435-LOC file): its dynamic `record[field]` map mutators are typed with `CountMapField` / `TimestampMapField` key unions so `record[field]` stays a precise `Record<string, number|string>` — strict-safe for Phase 5, no `@ts-ignore`. Pair/result shapes typed (`PairRecords`, `PairResult`, `RemoveFriendResult`); the injected backend client is a local `RelationshipsMutationApiClient` (Phase 4 owns the real one).
+- Store CRUD returns typed arrays (`ThoughtPost[]`, `ActivityItem[]`, etc.); sort comparators use a structural `{ createdAt; authorDisplayName }` type so they serve both posts and comments.
+- The generic `storage.mts` get/set helpers from the plan below were already added in Phase 1 (`StorageLike` + typed read/write); not re-done here.
+- Compiled clean on first build (one earlier `reduce` generic fix aside); typecheck + all 91 browser tests green.
+
+---
 
 **Files**: ~15 files  
 **Dependencies**: Phase 1 types, Phase 2 normalize functions
@@ -461,7 +471,17 @@ export function setStored<T>(key: string, value: T): void {
 
 ---
 
-## Phase 4: Platform API Clients
+## Phase 4: Platform API Clients — DONE (2026-05-29)
+
+**What shipped (7 files):** `api/platform-api`, `api/auth-token`, `api/auth-api`, `api/notifications-api`, `api/messages-api`, plus the two domain sync modules `activity/activity-api` and `thoughts/thoughts-api`.
+
+- `platform-api.mts` exports `PlatformApiClient = ReturnType<typeof createPlatformApiClient>` and `PlatformApiClientOptions`. Internal `get/put/post/del` helpers + `fetchImpl` (`typeof fetch | null`) + `RequestInit` options are typed; method params are typed (ids `string`, JSON bodies `unknown`/`Record`). Response payloads stay `Promise<any>` by design — the backend JSON contract isn't typed until the responses are modeled (a later concern; the client surface is what callers depend on).
+- `auth-api` exports `AuthResult`; `notifications-api` has an internal `RequestEnvelope`. The `*-api` clients import `PlatformApiClientOptions` for their factory options.
+- **Decision — kept the minimal local API-client interfaces** in `metrics.mts` (`MetricsApiClient`), `relationships-mutations.mts` (`RelationshipsMutationApiClient`), and `friend-preview-enrichment.mts` rather than swapping them for the full `PlatformApiClient`. They're interface-segregation stubs (each module declares only the methods it calls) and `PlatformApiClient` satisfies them structurally, so no coupling to the whole client is needed. The earlier "Phase 4 owns the real one" notes are superseded by this.
+- **Two contract gaps the types caught:** (1) `ActivityPublishOptions`/`ThoughtApiOptions` now `extends PlatformApiClientOptions` so option objects can legitimately carry `fetchImpl`/`baseUrl` through to `createPlatformApiClient` (was a weak-type error); (2) `MutationOptions` gained `sharedThoughtId?`/`reactionId?` — interaction-context keys `thoughts-api` was already passing into `recordDirectInteractionBetweenPlayers` (now type-checked through the barrel re-export to the typed `.mts`).
+- Two `id as string` casts in `thoughts-api` (`deleteThought`/`shareThought`) where an `unknown` param meets a `string`-typed client method.
+
+---
 
 **Files**: 6 files  
 **Dependencies**: Phase 1–3 types
@@ -491,7 +511,15 @@ Write an `ApiError` class with a typed `status: number` and `body: unknown`.
 
 ---
 
-## Phase 5: Platform Barrels
+## Phase 5: Platform Barrels — DONE (2026-05-29)
+
+**What shipped (4 files):** the 3 domain barrels `activity/activity`, `relationships/relationships`, `thoughts/thoughts` (now re-export types alongside values via `export type {...}`), plus `thoughts/thoughts-cards` (the card view-model builder — exports `ThoughtCardItem`/`ThoughtCardOptions`/`ThoughtCardActionItem`/`ThoughtCardQuoted`). bulletins/events/metrics/storage/identity/profile/api are single-file or already-typed domains with no separate barrel.
+
+- **`strict: true` enabled globally** in `tsconfig.base.json`. Because every `.mts` at this point lives in `js/platform/**`, this is effectively "platform strict" as the plan intended — but it is NOT scoped by path, so it stays on for all later phases. Decision: that's desirable (no second strictness migration); write Phase 6+ files strict from the start.
+- The strict flip surfaced exactly **2 errors**, both in `profile.mts`: the avatar resolver local is `((assetId: string) => unknown) | null` but the param type used `| undefined`. Fixed with an `AvatarUrlResolver = ... | null | undefined` alias on the `resolveNestedAvatar` overloads. No other migrated file needed changes — validation that the `unknown`-at-boundaries discipline held.
+- `strictNullChecks` is the meaningful new constraint going forward; explicit `any` casts remain legal under strict and are unaffected.
+
+---
 
 **Files**: ~9 barrel `*.mjs` files (one per platform domain)  
 **Work**: Update exports to re-export types alongside values

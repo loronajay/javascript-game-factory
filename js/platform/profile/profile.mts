@@ -95,6 +95,8 @@ export interface BuildPlayerProfileViewOptions {
   avatarUrlResolver?: (assetId: string) => unknown;
 }
 
+type AvatarUrlResolver = ((assetId: string) => unknown) | null | undefined;
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -367,9 +369,9 @@ export function normalizeProfileFields(profile: unknown = {}): ProfileFields {
   };
 }
 
-function resolveNestedAvatar(entry: FriendPreview, resolver: BuildPlayerProfileViewOptions["avatarUrlResolver"]): FriendPreview;
-function resolveNestedAvatar(entry: FriendPreview | null, resolver: BuildPlayerProfileViewOptions["avatarUrlResolver"]): FriendPreview | null;
-function resolveNestedAvatar(entry: FriendPreview | null, resolver: BuildPlayerProfileViewOptions["avatarUrlResolver"]): FriendPreview | null {
+function resolveNestedAvatar(entry: FriendPreview, resolver: AvatarUrlResolver): FriendPreview;
+function resolveNestedAvatar(entry: FriendPreview | null, resolver: AvatarUrlResolver): FriendPreview | null;
+function resolveNestedAvatar(entry: FriendPreview | null, resolver: AvatarUrlResolver): FriendPreview | null {
   if (!entry) return entry;
   const resolvedAvatarUrl = entry.avatarAssetId && resolver
     ? String(resolver(entry.avatarAssetId) || "")
