@@ -3,7 +3,6 @@ import type { CommentLike, SharePanelState, CommentPanelState, SocialViewState }
 interface ProfileLike {
   playerId?: string;
   profileName?: string;
-  [key: string]: unknown;
 }
 
 export interface ProfileSocialActionsOptions {

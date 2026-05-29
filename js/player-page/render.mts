@@ -1,61 +1,77 @@
-import { createProfileSocialViewRenderer, escapeCssUrl, escapeHtml, } from "../profile-social/social-view.mjs";
+import {
+  createProfileSocialViewRenderer,
+  escapeCssUrl,
+  escapeHtml,
+} from "../profile-social/social-view.mjs";
+import type { PlayerPageViewModel } from "./view-model.mjs";
+
 const DEFAULT_PROFILE_PICTURE_SRC = "../images/default/profile-picture/default.png";
 const socialView = createProfileSocialViewRenderer({
-    pageKey: "player",
-    panelPrefix: "player",
-    thoughtsFeedClass: "player-thoughts-feed",
-    ownerGalleryEmptyText: "No photos yet.",
-    viewerGalleryEmptyText: "No photos yet.",
+  pageKey: "player",
+  panelPrefix: "player",
+  thoughtsFeedClass: "player-thoughts-feed",
+  ownerGalleryEmptyText: "No photos yet.",
+  viewerGalleryEmptyText: "No photos yet.",
 });
-function renderPageHeader(doc, model) {
-    if (!doc?.getElementById)
-        return;
-    const title = doc.getElementById("playerStageTitle");
-    const subtitle = doc.getElementById("playerStageSubtitle");
-    if (title)
-        title.textContent = model.pageTitle;
-    if (subtitle)
-        subtitle.textContent = model.pageSubtitle;
-    if (doc && "title" in doc) {
-        doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
-    }
-    if (title)
-        globalThis.PixelText?.render?.(title);
-    const stage = doc.querySelector?.(".player-stage");
-    const body = doc.body;
-    if (model.backgroundImageUrl && model.backgroundStyle === 'static') {
-        body?.style.setProperty("--profile-static-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
-        body?.classList.add("player-page-shell--bg-static");
-        if (stage) {
-            stage.style.removeProperty("--player-stage-bg-image");
-            stage.classList.remove("player-stage--custom-bg");
-        }
-    }
-    else {
-        body?.style.removeProperty("--profile-static-bg-image");
-        body?.classList.remove("player-page-shell--bg-static");
-        if (stage) {
-            if (model.backgroundImageUrl) {
-                stage.style.setProperty("--player-stage-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
-                stage.classList.add("player-stage--custom-bg");
-            }
-            else {
-                stage.style.removeProperty("--player-stage-bg-image");
-                stage.classList.remove("player-stage--custom-bg");
-            }
-        }
-    }
+
+interface RenderPlayerPageViewOptions {
+  openReactionThoughtId?: string;
+  sharePanelState?: any;
+  commentPanelState?: any;
+  thoughtComposerState?: any;
+  galleryPhotos?: any[];
+  isOwner?: boolean;
+  galleryPlayerId?: string;
 }
-function renderHeroCard(container, model) {
-    if (!container)
-        return;
-    const statsHtml = (Array.isArray(model.heroStats) ? model.heroStats : []).map((item) => `
+
+function renderPageHeader(doc: Document, model: PlayerPageViewModel): void {
+  if (!doc?.getElementById) return;
+
+  const title = doc.getElementById("playerStageTitle");
+  const subtitle = doc.getElementById("playerStageSubtitle");
+
+  if (title) title.textContent = model.pageTitle;
+  if (subtitle) subtitle.textContent = model.pageSubtitle;
+  if (doc && "title" in doc) {
+    doc.title = `${model.pageTitle} | Jay's Javascript Arcade`;
+  }
+  if (title) globalThis.PixelText?.render?.(title);
+
+  const stage = doc.querySelector?.(".player-stage") as HTMLElement | null;
+  const body = doc.body;
+  if (model.backgroundImageUrl && model.backgroundStyle === 'static') {
+    body?.style.setProperty("--profile-static-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+    body?.classList.add("player-page-shell--bg-static");
+    if (stage) {
+      stage.style.removeProperty("--player-stage-bg-image");
+      stage.classList.remove("player-stage--custom-bg");
+    }
+  } else {
+    body?.style.removeProperty("--profile-static-bg-image");
+    body?.classList.remove("player-page-shell--bg-static");
+    if (stage) {
+      if (model.backgroundImageUrl) {
+        stage.style.setProperty("--player-stage-bg-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+        stage.classList.add("player-stage--custom-bg");
+      } else {
+        stage.style.removeProperty("--player-stage-bg-image");
+        stage.classList.remove("player-stage--custom-bg");
+      }
+    }
+  }
+}
+
+function renderHeroCard(container: HTMLElement | null, model: PlayerPageViewModel): void {
+  if (!container) return;
+
+  const statsHtml = (Array.isArray(model.heroStats) ? model.heroStats : []).map((item) => `
     <article class="player-hero-card__metrics-stat">
       <p class="player-hero-card__metrics-stat-label">${escapeHtml(item.label)}</p>
       <p class="player-hero-card__metrics-stat-value">${escapeHtml(item.value)}</p>
     </article>
   `).join("");
-    container.innerHTML = `
+
+  container.innerHTML = `
     <div class="player-hero-card__backdrop" aria-hidden="true"></div>
     <section class="player-hero-card__portrait-panel player-hero-card__child" data-profile-child-id="portrait">
       <div class="player-hero-card__portrait" aria-hidden="true">
@@ -80,80 +96,89 @@ function renderHeroCard(container, model) {
       </div>
     </section>
   `;
-    const backdrop = container.querySelector(".player-hero-card__backdrop");
-    const hasCustomBackdrop = !!model.backgroundImageUrl;
-    if (backdrop) {
-        if (hasCustomBackdrop) {
-            backdrop.style.setProperty("--player-profile-backdrop-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
-        }
-        else {
-            backdrop.style.removeProperty("--player-profile-backdrop-image");
-        }
+
+  const backdrop = container.querySelector<HTMLElement>(".player-hero-card__backdrop");
+  const hasCustomBackdrop = !!model.backgroundImageUrl;
+  if (backdrop) {
+    if (hasCustomBackdrop) {
+      backdrop.style.setProperty("--player-profile-backdrop-image", `url("${escapeCssUrl(model.backgroundImageUrl)}")`);
+    } else {
+      backdrop.style.removeProperty("--player-profile-backdrop-image");
     }
-    container.classList.toggle("player-hero-card--default-backdrop", !hasCustomBackdrop);
-    container.classList.toggle("player-hero-card--custom-backdrop", hasCustomBackdrop);
-    const hasCustomAvatar = !!model.avatarSrc && model.avatarSrc !== DEFAULT_PROFILE_PICTURE_SRC;
-    container.classList.toggle("player-hero-card--default-avatar", !hasCustomAvatar);
-    container.classList.toggle("player-hero-card--custom-avatar", hasCustomAvatar);
-    const portraitImage = container.querySelector(".player-hero-card__portrait-image");
-    if (!portraitImage)
-        return;
-    function showFallback() {
-        container.classList.add("player-hero-card--avatar-fallback");
+  }
+
+  container.classList.toggle("player-hero-card--default-backdrop", !hasCustomBackdrop);
+  container.classList.toggle("player-hero-card--custom-backdrop", hasCustomBackdrop);
+
+  const hasCustomAvatar = !!model.avatarSrc && model.avatarSrc !== DEFAULT_PROFILE_PICTURE_SRC;
+  container.classList.toggle("player-hero-card--default-avatar", !hasCustomAvatar);
+  container.classList.toggle("player-hero-card--custom-avatar", hasCustomAvatar);
+
+  const portraitImage = container.querySelector<HTMLImageElement>(".player-hero-card__portrait-image");
+  if (!portraitImage) return;
+
+  function showFallback() {
+    container!.classList.add("player-hero-card--avatar-fallback");
+  }
+
+  function showImage() {
+    container!.classList.remove("player-hero-card--avatar-fallback");
+  }
+
+  portraitImage.addEventListener("error", showFallback, { once: true });
+  portraitImage.addEventListener("load", showImage, { once: true });
+
+  if (portraitImage.complete) {
+    if (portraitImage.naturalWidth > 0) {
+      showImage();
+    } else {
+      showFallback();
     }
-    function showImage() {
-        container.classList.remove("player-hero-card--avatar-fallback");
-    }
-    portraitImage.addEventListener("error", showFallback, { once: true });
-    portraitImage.addEventListener("load", showImage, { once: true });
-    if (portraitImage.complete) {
-        if (portraitImage.naturalWidth > 0) {
-            showImage();
-        }
-        else {
-            showFallback();
-        }
-    }
-    else {
-        showFallback();
-    }
+  } else {
+    showFallback();
+  }
 }
-function renderIdentityPanel(container, model) {
-    if (!container)
-        return;
-    const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
-    const realNameValue = model.heroRealName || "Not shared";
-    const pageViewCount = model.pageViewCount || "0";
-    const isUnfriendMode = model.friendAction?.mode === "unfriend";
-    const linksHtml = model.identityLinkItems.map((item) => {
-        const itemClass = item.isPlaceholder ? "player-identity-link player-identity-link--placeholder" : "player-identity-link";
-        const labelHtml = item.isPlaceholder ? "" : `<span class="player-identity-link__label">${escapeHtml(item.label)}</span>`;
-        const valueHtml = item.isPlaceholder
-            ? `<p class="player-identity-link__value">${escapeHtml(item.value)}</p>`
-            : `<a class="player-identity-link__value" href="${escapeHtml(item.value)}" target="_blank" rel="noreferrer">${escapeHtml(item.value)}</a>`;
-        return `
+
+function renderIdentityPanel(container: HTMLElement | null, model: PlayerPageViewModel): void {
+  if (!container) return;
+
+  const factoryId = model.heroMeta.find((item) => item.label === "Factory ID")?.value || "PENDING-ID";
+  const realNameValue = model.heroRealName || "Not shared";
+  const pageViewCount = model.pageViewCount || "0";
+  const isUnfriendMode = model.friendAction?.mode === "unfriend";
+
+  const linksHtml = model.identityLinkItems.map((item) => {
+    const itemClass = item.isPlaceholder ? "player-identity-link player-identity-link--placeholder" : "player-identity-link";
+    const labelHtml = item.isPlaceholder ? "" : `<span class="player-identity-link__label">${escapeHtml(item.label)}</span>`;
+    const valueHtml = item.isPlaceholder
+      ? `<p class="player-identity-link__value">${escapeHtml(item.value)}</p>`
+      : `<a class="player-identity-link__value" href="${escapeHtml(item.value)}" target="_blank" rel="noreferrer">${escapeHtml(item.value)}</a>`;
+    return `
       <article class="${itemClass}">
         ${labelHtml}
         ${valueHtml}
       </article>
     `;
-    }).join("");
-    const friendActionHtml = model.friendAction?.enabled
-        ? `
+  }).join("");
+
+  const friendActionHtml = model.friendAction?.enabled
+    ? `
       <div class="player-hero-card__social-action" data-profile-action-id="friendAction">
         <button
           class="${isUnfriendMode ? "player-hero-card__friend-action player-hero-card__friend-action--unfriend" : "player-hero-card__friend-action"}"
           type="button"
           ${isUnfriendMode
             ? `data-unfriend="${escapeHtml(model.friendAction.playerId || "")}"`
-            : `data-add-friend="${escapeHtml(model.friendAction.playerId || "")}"`}
+            : `data-add-friend="${escapeHtml(model.friendAction.playerId || "")}"`
+          }
         >${escapeHtml(model.friendAction.label || "Add Friend")}</button>
         <p class="player-hero-card__friend-flash" aria-live="polite">${escapeHtml(model.friendAction.flashMessage || "")}</p>
       </div>
     `
-        : "";
-    const challengePickerHtml = model.gestureAction?.challengePickerOpen
-        ? `
+    : "";
+
+  const challengePickerHtml = model.gestureAction?.challengePickerOpen
+    ? `
       <div class="player-hero-card__challenge-picker">
         <p class="player-hero-card__challenge-picker-label">Choose a game to challenge them to:</p>
         <div class="player-hero-card__challenge-games">
@@ -163,16 +188,17 @@ function renderIdentityPanel(container, model) {
               type="button"
               data-challenge-game="${escapeHtml(g.slug)}"
               data-challenge-game-title="${escapeHtml(g.title)}"
-              data-challenge-target="${escapeHtml(model.gestureAction.playerId || "")}"
+              data-challenge-target="${escapeHtml(model.gestureAction!.playerId || "")}"
             >${escapeHtml(g.title)}</button>
           `).join("")}
         </div>
         <button class="player-hero-card__challenge-cancel" type="button" data-challenge-picker-cancel>Cancel</button>
       </div>
     `
-        : "";
-    const messageActionHtml = model.messageAction?.enabled
-        ? `
+    : "";
+
+  const messageActionHtml = model.messageAction?.enabled
+    ? `
       <div class="player-hero-card__social-action" data-profile-action-id="messageAction">
         <button
           class="player-hero-card__friend-action player-hero-card__friend-action--message"
@@ -182,9 +208,10 @@ function renderIdentityPanel(container, model) {
         >Message 💬</button>
       </div>
     `
-        : "";
-    const gestureActionHtml = model.gestureAction?.enabled
-        ? `
+    : "";
+
+  const gestureActionHtml = model.gestureAction?.enabled
+    ? `
       <div class="player-hero-card__gesture-rail" data-profile-action-id="gestureActions">
         <p class="player-hero-card__gesture-label">Send a gesture</p>
         <div class="player-hero-card__gesture-buttons">
@@ -193,7 +220,7 @@ function renderIdentityPanel(container, model) {
               class="player-hero-card__gesture-btn"
               type="button"
               data-gesture="${escapeHtml(g.type)}"
-              data-gesture-target="${escapeHtml(model.gestureAction.playerId || "")}"
+              data-gesture-target="${escapeHtml(model.gestureAction!.playerId || "")}"
             >${escapeHtml(g.label)}</button>
           `).join("")}
           <button
@@ -206,8 +233,9 @@ function renderIdentityPanel(container, model) {
         <p class="player-hero-card__gesture-flash" aria-live="polite">${escapeHtml(model.gestureAction.flashMessage || "")}</p>
       </div>
     `
-        : "";
-    container.innerHTML = `
+    : "";
+
+  container.innerHTML = `
     <div class="player-panel__header"><h2 class="player-panel__title">Player Profile</h2></div>
     <div class="player-identity-panel__fields">
       <div class="player-hero-card__identity-field" data-profile-child-id="name">
@@ -237,35 +265,40 @@ function renderIdentityPanel(container, model) {
     ${gestureActionHtml}
   `;
 }
-function renderRailPanel(container, title, items, renderItem) {
-    if (!container)
-        return;
-    container.hidden = false;
-    const itemsHtml = items.map(renderItem).join("");
-    container.innerHTML = `
+
+function renderRailPanel(container: HTMLElement | null, title: string, items: any[], renderItem: (item: any) => string): void {
+  if (!container) return;
+  container.hidden = false;
+
+  const itemsHtml = items.map(renderItem).join("");
+  container.innerHTML = `
     <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     <div class="player-hero-card__rail-list">
       ${itemsHtml}
     </div>
   `;
 }
-function renderPanel(container, title, items, formatter) {
-    if (!container)
-        return;
-    const itemsHtml = items.map(formatter).join("");
-    container.innerHTML = `
+
+function renderPanel(container: HTMLElement | null, title: string, items: any[], formatter: (item: any) => string): void {
+  if (!container) return;
+
+  const itemsHtml = items.map(formatter).join("");
+
+  container.innerHTML = `
     <div class="player-panel__header"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     ${itemsHtml}
   `;
 }
-function renderCardItem(item) {
-    const itemClass = item.isPlaceholder ? "player-card-item player-card-item--placeholder" : "player-card-item";
-    const titleHtml = item.isPlaceholder ? "" : `<p class="player-card-item__title">${escapeHtml(item.title || item.label)}</p>`;
-    const valueHtml = item.href
-        ? `<a class="player-card-item__link" href="${escapeHtml(item.href)}">${escapeHtml(item.linkLabel || item.value)}</a>`
-        : `<p class="player-card-item__value">${escapeHtml(item.value)}</p>`;
-    const metaHtml = item.meta ? `<p class="player-card-item__meta">${escapeHtml(item.meta)}</p>` : "";
-    return `
+
+function renderCardItem(item: any): string {
+  const itemClass = item.isPlaceholder ? "player-card-item player-card-item--placeholder" : "player-card-item";
+  const titleHtml = item.isPlaceholder ? "" : `<p class="player-card-item__title">${escapeHtml(item.title || item.label)}</p>`;
+  const valueHtml = item.href
+    ? `<a class="player-card-item__link" href="${escapeHtml(item.href)}">${escapeHtml(item.linkLabel || item.value)}</a>`
+    : `<p class="player-card-item__value">${escapeHtml(item.value)}</p>`;
+  const metaHtml = item.meta ? `<p class="player-card-item__meta">${escapeHtml(item.meta)}</p>` : "";
+
+  return `
     <article class="${itemClass}">
       ${titleHtml}
       ${valueHtml}
@@ -273,12 +306,13 @@ function renderCardItem(item) {
     </article>
   `;
 }
-function renderFavoritePanel(container, title, item) {
-    if (!container)
-        return;
-    const favorite = item || {};
-    const cardHtml = favorite.isPlaceholder
-        ? `
+
+function renderFavoritePanel(container: HTMLElement | null, title: string, item: any): void {
+  if (!container) return;
+
+  const favorite = item || {};
+  const cardHtml = favorite.isPlaceholder
+    ? `
       <article class="game-card featured player-featured-cabinet__card game-card--placeholder" aria-disabled="true">
         <div class="game-card-preview">
           <div class="game-thumb player-featured-cabinet__thumb player-featured-cabinet__thumb--placeholder"></div>
@@ -288,7 +322,7 @@ function renderFavoritePanel(container, title, item) {
         </div>
       </article>
     `
-        : `
+    : `
       <a class="game-card featured player-featured-cabinet__card" href="${escapeHtml(favorite.href)}">
         <div class="game-card-preview">
           <div class="game-thumb player-featured-cabinet__thumb">
@@ -300,50 +334,65 @@ function renderFavoritePanel(container, title, item) {
         </div>
       </a>
     `;
-    container.innerHTML = `
+
+  container.innerHTML = `
     <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     <div class="player-featured-cabinet" data-profile-child-id="content">
       ${cardHtml}
     </div>
   `;
 }
-function renderAboutPanel(container, title, text) {
-    if (!container)
-        return;
-    container.innerHTML = `
+
+function renderAboutPanel(container: HTMLElement | null, title: string, text: string): void {
+  if (!container) return;
+
+  container.innerHTML = `
     <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     <div class="player-about-copy-wrap" data-profile-child-id="text">
       <p class="player-about-copy">${escapeHtml(text)}</p>
     </div>
   `;
 }
-function renderBadgesPanel(container, title, items) {
-    if (!container)
-        return;
-    const badgesHtml = items[0]?.isPlaceholder
-        ? `<p class="player-badge-empty">${escapeHtml(items[0].label)}</p>`
-        : `<div class="player-badge-list">${items.map((item) => `<span class="player-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
-    container.innerHTML = `
+
+function renderBadgesPanel(container: HTMLElement | null, title: string, items: any[]): void {
+  if (!container) return;
+
+  const badgesHtml = items[0]?.isPlaceholder
+    ? `<p class="player-badge-empty">${escapeHtml(items[0].label)}</p>`
+    : `<div class="player-badge-list">${items.map((item) => `<span class="player-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
+
+  container.innerHTML = `
     <div class="player-panel__header" data-profile-child-id="title"><h2 class="player-panel__title">${escapeHtml(title)}</h2></div>
     <div class="player-badge-box" data-profile-child-id="content">
       ${badgesHtml}
     </div>
   `;
 }
-export function renderPlayerPageView(doc, model, options = {}) {
-    if (!doc?.getElementById)
-        return;
-    renderPageHeader(doc, model);
-    renderHeroCard(doc.getElementById("playerHeroCard"), model);
-    renderIdentityPanel(doc.getElementById("playerIdentityPanel"), model);
-    socialView.renderThoughtsPanel(doc.getElementById("playerThoughtsPanel"), "Player Feed", model.thoughtItems, model.thoughtComposer, {
-        openReactionThoughtId: options?.openReactionThoughtId || "",
-        sharePanelState: options?.sharePanelState || {},
-        commentPanelState: options?.commentPanelState || {},
-        composerState: options?.thoughtComposerState || {},
-    });
-    renderFavoritePanel(doc.getElementById("playerFavoritePanel"), "Favorite Game", model.favoriteGameItems[0]);
-    renderRailPanel(doc.getElementById("playerRankingsPanel"), "Top Ladder Rankings", model.rankingItems, (item) => `
+
+export function renderPlayerPageView(doc: Document, model: PlayerPageViewModel, options: RenderPlayerPageViewOptions = {}): void {
+  if (!doc?.getElementById) return;
+
+  renderPageHeader(doc, model);
+  renderHeroCard(doc.getElementById("playerHeroCard"), model);
+  renderIdentityPanel(doc.getElementById("playerIdentityPanel"), model);
+  socialView.renderThoughtsPanel(
+    doc.getElementById("playerThoughtsPanel"),
+    "Player Feed",
+    model.thoughtItems,
+    model.thoughtComposer,
+    {
+      openReactionThoughtId: options?.openReactionThoughtId || "",
+      sharePanelState: options?.sharePanelState || {},
+      commentPanelState: options?.commentPanelState || {},
+      composerState: options?.thoughtComposerState || {},
+    },
+  );
+  renderFavoritePanel(doc.getElementById("playerFavoritePanel"), "Favorite Game", model.favoriteGameItems[0]);
+  renderRailPanel(
+    doc.getElementById("playerRankingsPanel"),
+    "Top Ladder Rankings",
+    model.rankingItems,
+    (item) => `
       <article class="${item.isPlaceholder ? "player-hero-card__rail-item player-hero-card__rail-item--placeholder" : "player-hero-card__rail-item"}">
         ${item.isPlaceholder ? "" : `<p class="player-hero-card__rail-title">${escapeHtml(item.title || item.label)}</p>`}
         <div class="player-hero-card__rail-value-row">
@@ -351,12 +400,17 @@ export function renderPlayerPageView(doc, model, options = {}) {
           ${item.meta ? `<span class="player-hero-card__rail-meta">${escapeHtml(item.meta)}</span>` : ""}
         </div>
       </article>
-    `);
-    renderRailPanel(doc.getElementById("playerFriendsPanel"), "Top Friends", model.friendItems, (item) => {
-        const cardClass = item.isPlaceholder
-            ? "player-hero-card__friend-card player-hero-card__friend-card--placeholder"
-            : "player-hero-card__friend-card";
-        const inner = `
+    `,
+  );
+  renderRailPanel(
+    doc.getElementById("playerFriendsPanel"),
+    "Top Friends",
+    model.friendItems,
+    (item) => {
+      const cardClass = item.isPlaceholder
+        ? "player-hero-card__friend-card player-hero-card__friend-card--placeholder"
+        : "player-hero-card__friend-card";
+      const inner = `
         <div class="player-hero-card__friend-avatar" aria-hidden="true">
           <img class="player-hero-card__friend-avatar-img" src="${escapeHtml(item.avatarSrc || DEFAULT_PROFILE_PICTURE_SRC)}" alt="" loading="lazy">
         </div>
@@ -366,17 +420,18 @@ export function renderPlayerPageView(doc, model, options = {}) {
           <p class="player-hero-card__friend-points">${escapeHtml(item.meta || "Friendship points pending")}</p>
         </div>
       `;
-        if (!item.isPlaceholder && item.playerId) {
-            return `<a class="${cardClass}" href="../player/index.html?id=${encodeURIComponent(item.playerId)}">${inner}</a>`;
-        }
-        return `<article class="${cardClass}">${inner}</article>`;
-    });
-    socialView.renderGalleryPanel(doc.getElementById("playerGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
-        isOwner: !!options?.isOwner,
-        childLayout: true,
-        previewCap: 8,
-        viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
-    });
-    renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", model.aboutText);
-    renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", model.badgeItems);
+      if (!item.isPlaceholder && item.playerId) {
+        return `<a class="${cardClass}" href="../player/index.html?id=${encodeURIComponent(item.playerId)}">${inner}</a>`;
+      }
+      return `<article class="${cardClass}">${inner}</article>`;
+    },
+  );
+  socialView.renderGalleryPanel(doc.getElementById("playerGalleryPanel"), "Photo Gallery", options?.galleryPhotos || [], {
+    isOwner: !!options?.isOwner,
+    childLayout: true,
+    previewCap: 8,
+    viewAllHref: options?.galleryPlayerId ? `../gallery/index.html?id=${encodeURIComponent(options.galleryPlayerId)}` : "",
+  });
+  renderAboutPanel(doc.getElementById("playerAboutPanel"), "About Me", model.aboutText);
+  renderBadgesPanel(doc.getElementById("playerBadgesPanel"), "Badges", model.badgeItems);
 }

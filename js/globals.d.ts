@@ -23,6 +23,7 @@ interface ArcadeInputApi {
 declare var PixelText: PixelTextApi;
 declare var ArcadeInput: ArcadeInputApi;
 declare var __JGF_PLATFORM_API_URL__: string | undefined;
+declare var __JGF_LAST_FRIEND_REQUEST_ERROR__: string | undefined;
 
 interface Window {
   PixelText: PixelTextApi;
