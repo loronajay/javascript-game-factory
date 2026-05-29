@@ -1,44 +1,95 @@
 import { renderThoughtItem } from "./social-view-thoughts.mjs";
 import { escapeCssUrl, escapeHtml } from "./social-view-shared.mjs";
+import type { SharePanelState, CommentPanelState } from "./social-view-shared.mjs";
+import type { ThoughtCardItem } from "../platform/thoughts/thoughts.mjs";
+import type { ThoughtPhotoState, GalleryUploadState } from "./media-composer-state.mjs";
+
 export { escapeCssUrl, escapeHtml };
-function buildGalleryItemCounts(photo) {
-    const totals = photo?.reactionTotals;
-    const reactionCount = totals && typeof totals === "object"
-        ? Object.values(totals).reduce((sum, n) => sum + (Math.floor(Number(n)) || 0), 0)
-        : 0;
-    const commentCount = Math.max(0, Math.floor(Number(photo?.commentCount)) || 0);
-    if (reactionCount === 0 && commentCount === 0)
-        return "";
-    const reactionBadge = reactionCount > 0 ? `<span class="gallery-item__count">❤️ ${reactionCount}</span>` : "";
-    const commentBadge = commentCount > 0 ? `<span class="gallery-item__count">💬 ${commentCount}</span>` : "";
-    return `<div class="gallery-item__counts">${reactionBadge}${commentBadge}</div>`;
+
+interface PhotoLike {
+  id?: string;
+  imageUrl?: string;
+  caption?: string;
+  reactionTotals?: unknown;
+  commentCount?: unknown;
 }
+
+interface GalleryPanelOptions {
+  isOwner?: boolean;
+  previewCap?: number;
+  viewAllHref?: string;
+  childLayout?: boolean;
+  uploadState?: Partial<GalleryUploadState>;
+}
+
+interface ComposerConfig {
+  enabled?: boolean;
+  subjectPlaceholder?: string;
+  textPlaceholder?: string;
+  submitLabel?: string;
+  flashMessage?: string;
+}
+
+interface ThoughtsPanelOptions {
+  composerState?: Partial<ThoughtPhotoState>;
+  childLayout?: boolean;
+  openReactionThoughtId?: string;
+  sharePanelState?: Partial<SharePanelState>;
+  commentPanelState?: Partial<CommentPanelState>;
+}
+
+interface ProfileSocialViewRendererOptions {
+  pageKey?: string;
+  panelPrefix?: string;
+  thoughtsFeedClass?: string;
+  ownerGalleryEmptyText?: string;
+  viewerGalleryEmptyText?: string;
+}
+
+function buildGalleryItemCounts(photo: PhotoLike): string {
+  const totals = photo?.reactionTotals;
+  const reactionCount = totals && typeof totals === "object"
+    ? Object.values(totals).reduce<number>((sum, n) => sum + (Math.floor(Number(n)) || 0), 0)
+    : 0;
+  const commentCount = Math.max(0, Math.floor(Number(photo?.commentCount)) || 0);
+  if (reactionCount === 0 && commentCount === 0) return "";
+  const reactionBadge = reactionCount > 0 ? `<span class="gallery-item__count">❤️ ${reactionCount}</span>` : "";
+  const commentBadge = commentCount > 0 ? `<span class="gallery-item__count">💬 ${commentCount}</span>` : "";
+  return `<div class="gallery-item__counts">${reactionBadge}${commentBadge}</div>`;
+}
+
 // Shared feed/gallery renderer used by both /me and /player profile surfaces.
-export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = pageKey, thoughtsFeedClass = `${pageKey}-thoughts-feed`, ownerGalleryEmptyText = "No photos yet.", viewerGalleryEmptyText = "No photos yet.", } = {}) {
-    function renderGalleryPanel(container, title, photos = [], options = {}) {
-        if (!container)
-            return;
-        const isOwner = !!options?.isOwner;
-        const previewCap = options?.previewCap ? Number(options.previewCap) : 0;
-        const viewAllHref = options?.viewAllHref || "";
-        const useChildLayout = !!options?.childLayout;
-        const isPreview = previewCap > 0;
-        const visiblePhotos = isPreview ? photos.slice(0, previewCap) : photos;
-        const uploadState = options?.uploadState || {};
-        const isUploading = !!uploadState.isUploading;
-        const uploadLabel = isUploading
-            ? "Upload In Progress"
-            : (uploadState.previewUrl ? "Choose Different Photo" : "Upload Photo");
-        const submitLabel = isUploading ? "Uploading..." : "Save Photo";
-        const uploadHtml = isOwner && !isPreview
-            ? `
+export function createProfileSocialViewRenderer({
+  pageKey = "me",
+  panelPrefix = pageKey,
+  thoughtsFeedClass = `${pageKey}-thoughts-feed`,
+  ownerGalleryEmptyText = "No photos yet.",
+  viewerGalleryEmptyText = "No photos yet.",
+}: ProfileSocialViewRendererOptions = {}) {
+  function renderGalleryPanel(container: HTMLElement | null, title: unknown, photos: PhotoLike[] = [], options: GalleryPanelOptions = {}): void {
+    if (!container) return;
+
+    const isOwner = !!options?.isOwner;
+    const previewCap = options?.previewCap ? Number(options.previewCap) : 0;
+    const viewAllHref = options?.viewAllHref || "";
+    const useChildLayout = !!options?.childLayout;
+    const isPreview = previewCap > 0;
+    const visiblePhotos = isPreview ? photos.slice(0, previewCap) : photos;
+    const uploadState = options?.uploadState || {};
+    const isUploading = !!uploadState.isUploading;
+    const uploadLabel = isUploading
+      ? "Upload In Progress"
+      : (uploadState.previewUrl ? "Choose Different Photo" : "Upload Photo");
+    const submitLabel = isUploading ? "Uploading..." : "Save Photo";
+    const uploadHtml = isOwner && !isPreview
+      ? `
         <div class="gallery-upload">
           <input id="${pageKey}GalleryFileInput" type="file" accept="image/jpeg,image/png,image/webp" class="gallery-upload__input" aria-label="Upload a photo"${isUploading ? " disabled" : ""}>
           <label for="${pageKey}GalleryFileInput" class="gallery-upload__label"${isUploading ? ' aria-disabled="true"' : ""}>${uploadLabel}</label>
           <p id="${pageKey}GalleryUploadStatus" class="gallery-upload__status" aria-live="polite">${escapeHtml(uploadState.statusMessage || "")}</p>
         </div>
         ${uploadState.previewUrl
-                ? `
+          ? `
             <form id="${pageKey}GalleryUploadForm" class="gallery-upload__composer">
               <div class="gallery-upload__preview">
                 <img class="gallery-upload__preview-img" src="${escapeHtml(uploadState.previewUrl)}" alt="${escapeHtml(uploadState.fileName || "Selected photo preview")}">
@@ -75,12 +126,13 @@ export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = 
               </div>
             </form>
           `
-                : ""}
+          : ""}
       `
-            : "";
-        const emptyText = isOwner ? ownerGalleryEmptyText : viewerGalleryEmptyText;
-        const gridHtml = visiblePhotos.length > 0
-            ? visiblePhotos.map((photo) => `
+      : "";
+
+    const emptyText = isOwner ? ownerGalleryEmptyText : viewerGalleryEmptyText;
+    const gridHtml = visiblePhotos.length > 0
+      ? visiblePhotos.map((photo) => `
           <div class="gallery-item" data-photo-id="${escapeHtml(photo.id)}">
             <div class="gallery-item__img-frame">
               <img class="gallery-item__img" src="${escapeHtml(photo.imageUrl)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
@@ -90,11 +142,13 @@ export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = 
             ${isOwner && !isPreview ? `<button class="gallery-item__delete" type="button" data-delete-photo-id="${escapeHtml(photo.id)}" aria-label="Delete photo">Remove</button>` : ""}
           </div>
         `).join("")
-            : `<p class="${panelPrefix}-panel__empty">${escapeHtml(emptyText)}</p>`;
-        const viewAllHtml = viewAllHref
-            ? `<a class="gallery-view-all" href="${escapeHtml(viewAllHref)}">View All Photos &rarr;</a>`
-            : "";
-        container.innerHTML = `
+      : `<p class="${panelPrefix}-panel__empty">${escapeHtml(emptyText)}</p>`;
+
+    const viewAllHtml = viewAllHref
+      ? `<a class="gallery-view-all" href="${escapeHtml(viewAllHref)}">View All Photos &rarr;</a>`
+      : "";
+
+    container.innerHTML = `
       <div class="${panelPrefix}-panel__header"${useChildLayout ? ' data-profile-child-id="title"' : ""}><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
       ${uploadHtml}
       <div class="gallery-panel__content"${useChildLayout ? ' data-profile-child-id="content" data-profile-child-scale="none"' : ""}>
@@ -102,14 +156,15 @@ export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = 
         ${viewAllHtml}
       </div>
     `;
-    }
-    function renderThoughtsPanel(container, title, items, composer = null, options = {}) {
-        if (!container)
-            return;
-        const composerState = options?.composerState || {};
-        const useChildLayout = !!options?.childLayout;
-        const composerHtml = composer?.enabled
-            ? `
+  }
+
+  function renderThoughtsPanel(container: HTMLElement | null, title: unknown, items: ThoughtCardItem[], composer: ComposerConfig | null = null, options: ThoughtsPanelOptions = {}): void {
+    if (!container) return;
+
+    const composerState = options?.composerState || {};
+    const useChildLayout = !!options?.childLayout;
+    const composerHtml = composer?.enabled
+      ? `
         <form id="${pageKey}ThoughtComposer" class="thought-composer thought-composer--owner"${useChildLayout ? ' data-profile-child-id="composer"' : ""}>
           <input
             id="${pageKey}ThoughtSubject"
@@ -129,7 +184,7 @@ export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = 
             placeholder="${escapeHtml(composer.textPlaceholder || "Share a thought.")}"
           >${escapeHtml(composerState.text || "")}</textarea>
           ${composerState.previewUrl
-                ? `
+            ? `
               <div class="thought-composer__photo-card">
                 <div class="thought-composer__photo-preview">
                   <img
@@ -168,7 +223,7 @@ export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = 
                 </div>
               </div>
             `
-                : ""}
+            : ""}
           <div class="thought-composer__actions">
             <button class="thought-composer__submit" type="submit">${escapeHtml(composer.submitLabel || "Post Thought")}</button>
             <label class="thought-composer__attach-label" for="${pageKey}ThoughtPhotoInput" title="Attach photo">
@@ -180,23 +235,25 @@ export function createProfileSocialViewRenderer({ pageKey = "me", panelPrefix = 
           </div>
         </form>
       `
-            : "";
-        container.innerHTML = `
+      : "";
+
+    container.innerHTML = `
       <div class="${panelPrefix}-panel__header"${useChildLayout ? ' data-profile-child-id="title"' : ""}><h2 class="${panelPrefix}-panel__title">${escapeHtml(title)}</h2></div>
       ${composerHtml}
       <div class="${thoughtsFeedClass} thoughts-feed"${useChildLayout ? ' data-profile-child-id="feed" data-profile-child-scroll="true"' : ""}>
         ${items.map((item) => renderThoughtItem({
-            item,
-            openReactionThoughtId: options?.openReactionThoughtId || "",
-            sharePanelState: options?.sharePanelState || {},
-            commentPanelState: options?.commentPanelState || {},
-            pageKey,
+          item,
+          openReactionThoughtId: options?.openReactionThoughtId || "",
+          sharePanelState: options?.sharePanelState || {},
+          commentPanelState: options?.commentPanelState || {},
+          pageKey,
         })).join("")}
       </div>
     `;
-    }
-    return {
-        renderGalleryPanel,
-        renderThoughtsPanel,
-    };
+  }
+
+  return {
+    renderGalleryPanel,
+    renderThoughtsPanel,
+  };
 }
