@@ -1,0 +1,374 @@
+import { PROFILE_UPDATED_EVENT } from "../arcade-profile.mjs";
+import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
+import {
+  syncThoughtPostCountWithApi,
+} from "../platform/metrics/metrics.mjs";
+import {
+  buildPlayerThoughtFeed,
+  commentOnThoughtPostWithApi,
+  deleteThoughtPostWithApi,
+  loadThoughtFeed,
+  loadThoughtComments,
+  publishThoughtPostWithApi,
+  reactToThoughtPostWithApi,
+  shareThoughtPostWithApi,
+  syncThoughtCommentsFromApi,
+  syncThoughtFeedFromApi,
+} from "../platform/thoughts/thoughts.mjs";
+import { createMediaComposerState } from "../profile-social/media-composer-state.mjs";
+import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
+import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
+import { createFriendNavigatorController } from "./friend-navigator.mjs";
+import { createMePageDataController } from "./page-data.mjs";
+import {
+  submitGalleryUpload,
+  uploadPendingThoughtPhoto,
+} from "./media-actions.mjs";
+import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
+import { applyMeLayout } from "./apply-layout.mjs";
+import { applyMeScaling } from "./apply-scale.mjs";
+import type { PlatformApiClient } from "../platform/api/platform-api.mjs";
+import type { StorageLike } from "../platform/storage/storage.mjs";
+
+interface WireMePageConfig {
+  storage: StorageLike | null;
+  apiClient: PlatformApiClient;
+  savedLayout?: any;
+}
+
+export function wireMePage(
+  doc: Document,
+  renderPage: (doc: Document, profile?: any, options?: any) => any,
+  addFriendByCode: (friendCode: string, options?: any) => Promise<any>,
+  { storage, apiClient, savedLayout = null }: WireMePageConfig,
+): void {
+  let currentLayout = savedLayout;
+  initPageGalleryViewer({ doc, apiClient });
+  let musicPlayer: any = null;
+  const friendNavigator = createFriendNavigatorController();
+  const pageData = createMePageDataController({ storage, apiClient });
+  const mediaComposer = createMediaComposerState({
+    doc,
+    thoughtPhotoNameId: "meThoughtPhotoName",
+    thoughtPhotoInputId: "meThoughtPhotoInput",
+  });
+
+  const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
+    const renderState = await pageData.loadRenderState({ shouldHydrate });
+
+    const socialViewState = socialActions.getViewState();
+    renderPage(doc, renderState.profile, {
+      thoughtFeed: renderState.thoughtFeed,
+      thoughtComposerFlash,
+      friendCodeFlash,
+      metricsRecord: renderState.metricsRecord,
+      relationshipsRecord: renderState.relationshipsRecord,
+      openReactionThoughtId: socialViewState.openReactionThoughtId,
+      sharePanelState: socialViewState.sharePanelState,
+      commentPanelState: socialViewState.commentPanelState,
+      galleryPhotos: renderState.galleryPhotos,
+      thoughtComposerState: mediaComposer.getThoughtPhotoState(),
+      galleryUploadState: mediaComposer.getGalleryUploadState(),
+      friendNavigatorExpanded: friendNavigator.getViewState().expanded,
+      friendNavigatorSearchQuery: friendNavigator.getViewState().searchQuery,
+    });
+    (globalThis as any).__JGF_ME_GALLERY_DEBUG__ = {
+      photos: Array.isArray(renderState.galleryPhotos) ? renderState.galleryPhotos.length : 0,
+      photoIds: Array.isArray(renderState.galleryPhotos) ? renderState.galleryPhotos.map((photo: any) => photo?.id || "") : [],
+      galleryElements: Array.isArray(currentLayout?.desktop?.elements)
+        ? currentLayout.desktop.elements
+          .filter((element: any) => element?.category === "gallery" && element.enabled !== false)
+          .map((element: any) => ({
+            id: element.id,
+            x: element.x,
+            y: element.y,
+            w: element.w,
+            h: element.h,
+          }))
+        : [],
+    };
+    if (currentLayout) {
+      applyMeLayout(doc, currentLayout, { galleryPhotos: renderState.galleryPhotos });
+      requestAnimationFrame(() => applyMeScaling(doc, currentLayout));
+      doc.querySelectorAll<HTMLImageElement>(".me-layout img").forEach((img) => {
+        if (!img.complete) {
+          img.addEventListener("load", () => applyMeScaling(doc, currentLayout), { once: true });
+        }
+      });
+    }
+    friendNavigator.applyFilter(doc);
+  };
+
+  const socialActions = createProfileSocialActions({
+    loadCurrentProfile() {
+      return loadFactoryProfile(storage);
+    },
+    loadThoughtComments(thoughtId) {
+      return loadThoughtComments(thoughtId, storage);
+    },
+    async syncThoughtComments(thoughtId) {
+      return syncThoughtCommentsFromApi(thoughtId, storage, apiClient);
+    },
+    async commentOnThought(thoughtId, currentProfile, text) {
+      return commentOnThoughtPostWithApi(thoughtId, {
+        playerId: currentProfile.playerId,
+        profileName: currentProfile.profileName || "UNNAMED PILOT",
+      }, text, storage, { apiClient });
+    },
+    async shareThought(thoughtId, currentProfile, caption = "") {
+      return shareThoughtPostWithApi(thoughtId, {
+        playerId: currentProfile.playerId,
+        profileName: currentProfile.profileName || "UNNAMED PILOT",
+      }, storage, { apiClient, caption });
+    },
+    async reactToThought(thoughtId, reactionId, currentProfile) {
+      return reactToThoughtPostWithApi(thoughtId, currentProfile.playerId, reactionId, storage, { apiClient });
+    },
+    async deleteThought(thoughtId) {
+      return deleteThoughtPostWithApi(thoughtId, storage, { apiClient });
+    },
+    async rerenderView() {
+      return rerender();
+    },
+    async rerenderPanels() {
+      return rerender();
+    },
+    async afterDelete(_thoughtId, currentProfile) {
+      const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile?.playerId).length;
+      syncThoughtPostCountWithApi(currentProfile?.playerId, updatedThoughtCount, storage, apiClient);
+    },
+  });
+
+  void pageData.loadGallery().then(() => rerender("", true)).then(() => {
+    const profile = loadFactoryProfile(storage);
+    musicPlayer = initProfileMusicPlayer("meMusicPanel", profile?.profileMusicPlaylist || [], { doc });
+  });
+
+  doc.addEventListener(PROFILE_UPDATED_EVENT, (event) => {
+    pageData.clearCachedHydration();
+    void rerender();
+    const updatedPlaylist = (event as CustomEvent)?.detail?.profile?.profileMusicPlaylist;
+    if (updatedPlaylist !== undefined) {
+      musicPlayer?.destroy?.();
+      musicPlayer = initProfileMusicPlayer("meMusicPanel", updatedPlaylist, { doc });
+    }
+  });
+
+  doc.addEventListener("submit", async (event) => {
+    const form = event.target as Element | null;
+
+    if (form?.matches?.("[data-comment-form]") || form?.matches?.("[data-share-caption-form]")) {
+      event.preventDefault();
+      if (await socialActions.handleSubmit(form)) {
+        return;
+      }
+    }
+
+    const formEl = event.target as HTMLElement | null;
+    if (formEl && typeof formEl === "object" && formEl.id === "meFriendCodeForm") {
+      event.preventDefault();
+      const input = doc.getElementById("meFriendCodeInput") as HTMLInputElement | null;
+      const outcome = await addFriendByCode(input?.value || "", { storage, apiClient });
+      void rerender("", false, outcome.message);
+      return;
+    }
+
+    if (formEl && typeof formEl === "object" && formEl.id === "meGalleryUploadForm") {
+      event.preventDefault();
+      const currentProfile = loadFactoryProfile(storage);
+      const galleryUploadState = mediaComposer.getGalleryUploadState();
+      if (galleryUploadState?.isUploading) return;
+      await rerender();
+      const galleryUploadResult = await submitGalleryUpload({
+        currentProfile,
+        mediaComposer,
+        apiClient,
+        loadGallery: () => pageData.loadGallery(),
+        async onUploadStart() {
+          await rerender();
+        },
+      });
+      if (!galleryUploadResult.ok) {
+        if (!galleryUploadResult.skipped) {
+          void rerender();
+        }
+        return;
+      }
+
+      const postedToFeed = !!galleryUploadResult.thought;
+      if (postedToFeed) {
+        await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
+        const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+        syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      }
+      void rerender();
+      return;
+    }
+
+    if (!formEl || typeof formEl !== "object" || formEl.id !== "meThoughtComposer") {
+      return;
+    }
+
+    event.preventDefault();
+    const currentProfile = loadFactoryProfile(storage);
+    const subjectInput = doc.getElementById("meThoughtSubject") as HTMLInputElement | null;
+    const bodyInput = doc.getElementById("meThoughtBody") as HTMLTextAreaElement | null;
+    const thoughtPhotoState = mediaComposer.getThoughtPhotoState();
+    const subject = subjectInput?.value ?? thoughtPhotoState.subject ?? "";
+    const text = bodyInput?.value ?? thoughtPhotoState.text ?? "";
+    const photoResult = await uploadPendingThoughtPhoto({
+      currentProfile,
+      mediaComposer,
+      apiClient,
+      loadGallery: () => pageData.loadGallery(),
+      subject,
+      text,
+    });
+
+    if (photoResult.thought) {
+      await syncThoughtFeedFromApi(storage, apiClient, currentProfile.playerId);
+      const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+      syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+      mediaComposer.closeThoughtPhotoComposer();
+      mediaComposer.clearThoughtDraft();
+      void rerender("Thought posted.");
+      return;
+    }
+
+    const saved = await publishThoughtPostWithApi({
+      authorPlayerId: currentProfile.playerId,
+      authorDisplayName: currentProfile.profileName || "UNNAMED PILOT",
+      subject,
+      text,
+      visibility: photoResult.visibility || "public",
+      imageUrl: photoResult.imageUrl,
+    }, storage, { apiClient });
+
+    if (!saved) {
+      void rerender("Write a thought before posting.");
+      return;
+    }
+
+    const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile.playerId).length;
+    syncThoughtPostCountWithApi(currentProfile.playerId, updatedThoughtCount, storage, apiClient);
+    mediaComposer.closeThoughtPhotoComposer();
+    mediaComposer.clearThoughtDraft();
+    void rerender("Thought posted.");
+  });
+
+  doc.addEventListener("click", async (event) => {
+    const target = event.target as Element | null;
+    const toggleFriendsButton = target?.closest("#meFriendsToggle");
+    if (toggleFriendsButton) {
+      friendNavigator.toggleExpanded();
+      void rerender();
+      return;
+    }
+
+    const openFavoritePickerButton = target?.closest("[data-open-favorite-picker]");
+    if (openFavoritePickerButton) {
+      window.location.href = "edit/#playerProfileFavoriteGame";
+      return;
+    }
+
+    if (await socialActions.handleClick(event)) {
+      return;
+    }
+  });
+
+  doc.addEventListener("click", (event) => {
+    const target = event.target as Element | null;
+    const clearThoughtPhotoButton = target?.closest("[data-clear-thought-photo]");
+    if (clearThoughtPhotoButton) {
+      mediaComposer.closeThoughtPhotoComposer();
+      void rerender();
+      return;
+    }
+
+    const cancelGalleryButton = target?.closest("[data-cancel-gallery-upload]");
+    if (!cancelGalleryButton) return;
+    mediaComposer.closeGalleryComposer("");
+    void rerender();
+  });
+
+  doc.addEventListener("change", async (event) => {
+    const targetEl = event.target as HTMLInputElement | null;
+    if (targetEl?.id === "meThoughtPhotoInput") {
+      const file = targetEl.files?.[0] || null;
+      if (!file) {
+        mediaComposer.closeThoughtPhotoComposer();
+        void rerender();
+        return;
+      }
+      mediaComposer.applyThoughtPhotoFile(file);
+      void rerender();
+      return;
+    }
+
+    if (targetEl?.id === "meThoughtVisibility") {
+      mediaComposer.setThoughtPhotoField("visibility", targetEl.value || "public");
+      return;
+    }
+
+    if (targetEl?.id === "meThoughtSaveToGallery") {
+      mediaComposer.setThoughtPhotoField("saveToGallery", !!targetEl.checked);
+      return;
+    }
+
+    if (targetEl?.id === "meGalleryFileInput") {
+      const file = targetEl.files?.[0] || null;
+      if (!file) return;
+      mediaComposer.applyGalleryPhotoFile(file);
+      void rerender();
+    }
+
+    if (targetEl?.id === "meGalleryVisibility") {
+      mediaComposer.setGalleryUploadField("visibility", targetEl.value || "public");
+      return;
+    }
+
+    if (targetEl?.id === "meGalleryPostToFeed") {
+      mediaComposer.setGalleryUploadField("postToFeed", !!targetEl.checked);
+    }
+  });
+
+  doc.addEventListener("click", (event) => {
+    const deleteBtn = (event.target as Element | null)?.closest<HTMLElement>("[data-delete-photo-id]");
+    if (deleteBtn) {
+      const photoId = deleteBtn.dataset.deletePhotoId;
+      const currentProfile = loadFactoryProfile(storage);
+      if (!photoId || !currentProfile?.playerId || !apiClient?.deletePlayerPhoto) return;
+      apiClient.deletePlayerPhoto(currentProfile.playerId, photoId).then(async () => {
+        await pageData.loadGallery();
+        void rerender();
+      }).catch(() => {});
+    }
+  }, true);
+
+  doc.addEventListener("input", (event) => {
+    const targetEl = event.target as HTMLInputElement | null;
+    if (targetEl?.id === "meFriendsSearchInput") {
+      friendNavigator.setSearchQuery(targetEl.value || "");
+      friendNavigator.applyFilter(doc);
+      return;
+    }
+
+    if (socialActions.handleInput(event)) return;
+    if (targetEl?.id === "meThoughtPhotoCaption") {
+      mediaComposer.setThoughtPhotoField("caption", targetEl.value || "");
+      return;
+    }
+    if (targetEl?.id === "meThoughtSubject") {
+      mediaComposer.setThoughtPhotoField("subject", targetEl.value || "");
+      return;
+    }
+    if (targetEl?.id === "meThoughtBody") {
+      mediaComposer.setThoughtPhotoField("text", targetEl.value || "");
+      return;
+    }
+    if (targetEl?.id === "meGalleryCaption") {
+      mediaComposer.setGalleryUploadField("caption", targetEl.value || "");
+      return;
+    }
+  });
+}

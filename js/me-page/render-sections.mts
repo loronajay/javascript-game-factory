@@ -1,24 +1,32 @@
 import { escapeHtml } from "../profile-social/social-view.mjs";
-export function renderRailPanel(container, title, items, renderItem, options = {}) {
-    if (!container)
-        return;
-    container.hidden = false;
-    const itemsHtml = items.map((item, index) => {
-        const html = renderItem(item, index);
-        const childId = options.childIdForItem?.(item, index);
-        return childId ? `<div class="me-hero-card__rail-child" data-profile-child-id="${escapeHtml(childId)}">${html}</div>` : html;
-    }).join("");
-    container.innerHTML = `
+
+export function renderRailPanel(
+  container: HTMLElement | null,
+  title: string,
+  items: any[],
+  renderItem: (item: any, index: number) => string,
+  options: { childIdForItem?: (item: any, index: number) => string | undefined; titleChildId?: string } = {},
+): void {
+  if (!container) return;
+  container.hidden = false;
+
+  const itemsHtml = items.map((item, index) => {
+    const html = renderItem(item, index);
+    const childId = options.childIdForItem?.(item, index);
+    return childId ? `<div class="me-hero-card__rail-child" data-profile-child-id="${escapeHtml(childId)}">${html}</div>` : html;
+  }).join("");
+  container.innerHTML = `
     <div class="me-panel__header"${options.titleChildId ? ` data-profile-child-id="${escapeHtml(options.titleChildId)}"` : ""}><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-hero-card__rail-list">
       ${itemsHtml}
     </div>
   `;
 }
-export function renderFriendCodePanel(container, title, model) {
-    if (!container)
-        return;
-    container.innerHTML = `
+
+export function renderFriendCodePanel(container: HTMLElement | null, title: string, model: any): void {
+  if (!container) return;
+
+  container.innerHTML = `
     <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="friend-code-card" data-profile-child-id="code">
       <p class="friend-code-card__label">Your Friend Code</p>
@@ -44,12 +52,13 @@ export function renderFriendCodePanel(container, title, model) {
     </div>
   `;
 }
-export function renderFavoritePanel(container, title, item) {
-    if (!container)
-        return;
-    const favorite = item || {};
-    const cardHtml = favorite.isPlaceholder
-        ? `
+
+export function renderFavoritePanel(container: HTMLElement | null, title: string, item: any): void {
+  if (!container) return;
+
+  const favorite = item || {};
+  const cardHtml = favorite.isPlaceholder
+    ? `
       <button
         class="game-card featured me-featured-cabinet__card me-featured-cabinet__card--placeholder game-card--placeholder"
         type="button"
@@ -64,7 +73,7 @@ export function renderFavoritePanel(container, title, item) {
         </div>
       </button>
     `
-        : `
+    : `
       <a class="game-card featured me-featured-cabinet__card" href="${escapeHtml(favorite.href)}">
         <div class="game-card-preview">
           <div class="game-thumb me-featured-cabinet__thumb">
@@ -76,27 +85,29 @@ export function renderFavoritePanel(container, title, item) {
         </div>
       </a>
     `;
-    container.innerHTML = `
+
+  container.innerHTML = `
     <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-featured-cabinet" data-profile-child-id="content">
       ${cardHtml}
     </div>
   `;
 }
-export function renderFriendNavigatorPanel(container, title, navigator, options = {}) {
-    if (!container)
-        return;
-    const items = Array.isArray(navigator?.items) ? navigator.items : [];
-    const isExpanded = !!options.expanded;
-    const searchValue = typeof options.searchQuery === "string" ? options.searchQuery : "";
-    const hasItems = items.length > 0;
-    const hideDropdown = isExpanded ? "" : " hidden";
-    const hideSearch = isExpanded && hasItems ? "" : " hidden";
-    const listHtml = items.map((item) => {
-        const avatarHtml = item.avatarSrc
-            ? `<img class="me-friends-navigator__avatar-img" src="${escapeHtml(item.avatarSrc)}" alt="" loading="lazy">`
-            : `<span class="me-friends-navigator__avatar-text" aria-hidden="true">${escapeHtml(item.avatarInitials || "??")}</span>`;
-        const cardBody = `
+
+export function renderFriendNavigatorPanel(container: HTMLElement | null, title: string, navigator: any, options: { expanded?: boolean; searchQuery?: string } = {}): void {
+  if (!container) return;
+
+  const items = Array.isArray(navigator?.items) ? navigator.items : [];
+  const isExpanded = !!options.expanded;
+  const searchValue = typeof options.searchQuery === "string" ? options.searchQuery : "";
+  const hasItems = items.length > 0;
+  const hideDropdown = isExpanded ? "" : " hidden";
+  const hideSearch = isExpanded && hasItems ? "" : " hidden";
+  const listHtml = items.map((item: any) => {
+    const avatarHtml = item.avatarSrc
+      ? `<img class="me-friends-navigator__avatar-img" src="${escapeHtml(item.avatarSrc)}" alt="" loading="lazy">`
+      : `<span class="me-friends-navigator__avatar-text" aria-hidden="true">${escapeHtml(item.avatarInitials || "??")}</span>`;
+    const cardBody = `
       <div class="me-friends-navigator__avatar" aria-hidden="true">
         ${avatarHtml}
       </div>
@@ -107,14 +118,16 @@ export function renderFriendNavigatorPanel(container, title, navigator, options 
         <p class="me-friends-navigator__points">${escapeHtml(item.meta || "0 friendship points")}</p>
       </div>
     `;
-        const attrs = `class="me-friends-navigator__item" data-friend-navigator-item data-friend-search-text="${escapeHtml(item.searchText || "")}"`;
-        if (item.profileHref) {
-            return `<a ${attrs} href="${escapeHtml(item.profileHref)}">${cardBody}</a>`;
-        }
-        return `<article ${attrs}>${cardBody}</article>`;
-    }).join("");
-    container.hidden = false;
-    container.innerHTML = `
+
+    const attrs = `class="me-friends-navigator__item" data-friend-navigator-item data-friend-search-text="${escapeHtml(item.searchText || "")}"`;
+    if (item.profileHref) {
+      return `<a ${attrs} href="${escapeHtml(item.profileHref)}">${cardBody}</a>`;
+    }
+    return `<article ${attrs}>${cardBody}</article>`;
+  }).join("");
+
+  container.hidden = false;
+  container.innerHTML = `
     <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-friends-navigator" data-profile-child-id="navigatorSurface" aria-hidden="true"></div>
     <button
@@ -152,40 +165,45 @@ export function renderFriendNavigatorPanel(container, title, navigator, options 
       </div>
   `;
 }
-export function renderSupportPanel(container, title, items) {
-    if (!container)
-        return;
-    const itemsHtml = items.map((item) => `
+
+export function renderSupportPanel(container: HTMLElement | null, title: string, items: any[]): void {
+  if (!container) return;
+
+  const itemsHtml = items.map((item) => `
     <article class="${item.isPlaceholder ? "me-card-item me-card-item--placeholder" : "me-card-item"}">
       ${item.isPlaceholder ? "" : `<p class="me-card-item__title">${escapeHtml(item.title || item.label)}</p>`}
       <p class="me-card-item__value">${escapeHtml(item.value)}</p>
       ${item.meta ? `<p class="me-card-item__meta">${escapeHtml(item.meta)}</p>` : ""}
     </article>
   `).join("");
-    container.innerHTML = `
+
+  container.innerHTML = `
     <div class="me-panel__header"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-card-item-list">
       ${itemsHtml}
     </div>
   `;
 }
-export function renderAboutPanel(container, title, text) {
-    if (!container)
-        return;
-    container.innerHTML = `
+
+export function renderAboutPanel(container: HTMLElement | null, title: string, text: string): void {
+  if (!container) return;
+
+  container.innerHTML = `
     <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-about-copy-wrap" data-profile-child-id="text">
       <p class="me-about-copy">${escapeHtml(text)}</p>
     </div>
   `;
 }
-export function renderBadgesPanel(container, title, items) {
-    if (!container)
-        return;
-    const badgesHtml = items[0]?.isPlaceholder
-        ? `<p class="me-badge-empty">${escapeHtml(items[0].label)}</p>`
-        : `<div class="me-badge-list">${items.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
-    container.innerHTML = `
+
+export function renderBadgesPanel(container: HTMLElement | null, title: string, items: any[]): void {
+  if (!container) return;
+
+  const badgesHtml = items[0]?.isPlaceholder
+    ? `<p class="me-badge-empty">${escapeHtml(items[0].label)}</p>`
+    : `<div class="me-badge-list">${items.map((item) => `<span class="me-badge-chip">${escapeHtml(item.label)}</span>`).join("")}</div>`;
+
+  container.innerHTML = `
     <div class="me-panel__header" data-profile-child-id="title"><h2 class="me-panel__title">${escapeHtml(title)}</h2></div>
     <div class="me-badge-box" data-profile-child-id="content">
       ${badgesHtml}

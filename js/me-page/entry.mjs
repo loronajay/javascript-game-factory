@@ -12,47 +12,47 @@ import { getDefaultLayout } from "../profile-layout/default-layout.mjs";
 import { normalizeLayout } from "../profile-layout/normalize-layout.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
 import { applyMeScaling } from "./apply-scale.mjs";
-
 const doc = globalThis.document;
-
-if (doc?.getElementById) {
-  renderPrimaryAppNav(doc.getElementById("mePrimaryNav"), {
-    basePath: "../",
-    currentPage: "me",
-    linkClass: "grid-stage__portal",
-    sessionNavId: "meAuthNav",
-  });
-
-  let session = null;
-  try { session = await createAuthApiClient().getSession(); } catch { /* network down */ }
-
-  if (!session?.ok || !session?.playerId) {
-    const signInUrl = new URL(buildAppUrl("sign-in/index.html"));
-    signInUrl.searchParams.set("next", "/me/index.html");
-    window.location.replace(signInUrl.toString());
-  } else {
-    const storage = getDefaultPlatformStorage();
-    bindFactoryProfileToSession(session.playerId, storage);
-    const apiClient = createPlatformApiClient();
-    const rawLayout = await fetchLayout(apiClient);
-    const savedLayout = rawLayout ? normalizeLayout(rawLayout) : getDefaultLayout();
-    const galleryPhotos = session.playerId && apiClient?.listPlayerPhotos
-      ? await apiClient.listPlayerPhotos(session.playerId).catch(() => [])
-      : [];
-    renderMePage(doc, undefined, { galleryPhotos });
-    applyMeLayout(doc, savedLayout, { galleryPhotos });
-    requestAnimationFrame(() => applyMeScaling(doc, savedLayout));
-    doc.querySelectorAll(".me-layout img").forEach((img) => {
-      if (!img.complete) {
-        img.addEventListener("load", () => applyMeScaling(doc, savedLayout), { once: true });
-      }
+if (typeof doc?.getElementById === "function") {
+    renderPrimaryAppNav(doc.getElementById("mePrimaryNav"), {
+        basePath: "../",
+        currentPage: "me",
+        linkClass: "grid-stage__portal",
+        sessionNavId: "meAuthNav",
     });
-    wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, savedLayout });
-    initSessionNav(doc.getElementById("meAuthNav"), {
-      signInPath: "../sign-in/index.html",
-      signUpPath: "../sign-up/index.html",
-      homeOnLogout: "../index.html",
-      preloadedSession: session,
-    });
-  }
+    let session = null;
+    try {
+        session = await createAuthApiClient().getSession();
+    }
+    catch { /* network down */ }
+    if (!session?.ok || !session?.playerId) {
+        const signInUrl = new URL(buildAppUrl("sign-in/index.html"));
+        signInUrl.searchParams.set("next", "/me/index.html");
+        window.location.replace(signInUrl.toString());
+    }
+    else {
+        const storage = getDefaultPlatformStorage();
+        bindFactoryProfileToSession(session.playerId, storage);
+        const apiClient = createPlatformApiClient();
+        const rawLayout = await fetchLayout(apiClient);
+        const savedLayout = rawLayout ? normalizeLayout(rawLayout) : getDefaultLayout();
+        const galleryPhotos = session.playerId && apiClient?.listPlayerPhotos
+            ? await apiClient.listPlayerPhotos(session.playerId).catch(() => [])
+            : [];
+        renderMePage(doc, undefined, { galleryPhotos });
+        applyMeLayout(doc, savedLayout, { galleryPhotos });
+        requestAnimationFrame(() => applyMeScaling(doc, savedLayout));
+        doc.querySelectorAll(".me-layout img").forEach((img) => {
+            if (!img.complete) {
+                img.addEventListener("load", () => applyMeScaling(doc, savedLayout), { once: true });
+            }
+        });
+        wireMePage(doc, renderMePage, addFriendByCode, { storage, apiClient, savedLayout });
+        initSessionNav(doc.getElementById("meAuthNav"), {
+            signInPath: "../sign-in/index.html",
+            signUpPath: "../sign-up/index.html",
+            homeOnLogout: "../index.html",
+            preloadedSession: session,
+        });
+    }
 }
