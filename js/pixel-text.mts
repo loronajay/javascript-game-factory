@@ -1,7 +1,16 @@
+// Pixel-font text renderer. Replaces `.pixel-text` element text with an inline
+// SVG drawn from a 5x7 glyph grid, and exposes `window.PixelText` for pages that
+// render text after load (titles built dynamically).
+//
+// Migrated from the classic `pixel-text.js` in Phase 8 of the TypeScript
+// migration. It is loaded as a module <script> and keeps the same global-attach
+// side effect plus the load-time `renderAll()` pass; the `window.PixelText`
+// shape stays declared in js/globals.d.ts for the global consumers.
+
 (function () {
   if (window.PixelText) return;
 
-  const glyphs = {
+  const glyphs: Record<string, string[]> = {
     A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
     B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
     C: ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
@@ -33,11 +42,11 @@
     " ": ["000", "000", "000", "000", "000", "000", "000"],
   };
 
-  function getGlyph(character) {
+  function getGlyph(character: string): string[] {
     return glyphs[character] || glyphs[" "];
   }
 
-  function buildPixelSvg(text) {
+  function buildPixelSvg(text: string): SVGSVGElement {
     const letters = Array.from(text.toUpperCase(), getGlyph);
     const totalWidth = letters.reduce((sum, glyph, index) => {
       return sum + glyph[0].length + (index < letters.length - 1 ? 1 : 0);
@@ -76,10 +85,10 @@
     return svg;
   }
 
-  function renderElement(element) {
+  function renderElement(element: HTMLElement | null): void {
     if (!element) return;
 
-    const label = element.textContent.trim();
+    const label = (element.textContent || "").trim();
     element.setAttribute("aria-label", label);
     element.textContent = "";
 
@@ -90,8 +99,8 @@
     element.append(srText, buildPixelSvg(label));
   }
 
-  function renderAll(root = document) {
-    root.querySelectorAll(".pixel-text").forEach(renderElement);
+  function renderAll(root: Document | HTMLElement = document): void {
+    root.querySelectorAll<HTMLElement>(".pixel-text").forEach(renderElement);
   }
 
   renderAll();
@@ -101,3 +110,5 @@
     renderAll,
   };
 }());
+
+export {};

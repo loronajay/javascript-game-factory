@@ -176,20 +176,12 @@ export function createOnlineSessionController({
     };
 
     net.cb.onLobbyJoined = (payload) => {
-      if (online.findingPublic && payload.created) {
-        net.leaveLobby?.();
-        online.lobby = null;
-        online.isHost = false;
-        online.startRequested = false;
-        renderPublicSearch("Searching for open public lobbies...");
-        return;
-      }
       stopPublicSearchTicker();
       online.findingPublic = false;
       online.lobby = payload;
       online.isHost = payload.ownerId === net.clientId;
       cacheMyProfile();
-      updateLobbyView(payload.created ? "Lobby created." : "Joined lobby.");
+      updateLobbyView(payload.created ? "Waiting for players..." : "Joined lobby.");
       broadcastProfileSoon();
     };
 

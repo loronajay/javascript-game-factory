@@ -1,12 +1,13 @@
-// Ambient declarations for the 3 classic <script> globals.
-// These files are loaded as non-module scripts and attach to `window`:
-//   - js/pixel-text.js       -> window.PixelText
-//   - js/arcade-input.js     -> window.ArcadeInput
-//   - js/platform-config.js  -> globalThis.__JGF_PLATFORM_API_URL__
+// Ambient declarations for the global APIs that 3 always-on scripts attach to.
+// As of Phase 8 these are typed ES modules (`.mts` -> emitted `.mjs`), loaded as
+// `<script type="module">` on every page before the page entry module:
+//   - js/pixel-text.mts       -> window.PixelText
+//   - js/arcade-input.mts     -> window.ArcadeInput
+//   - js/platform-config.mts  -> globalThis.__JGF_PLATFORM_API_URL__
 //
-// This is a Phase 0 stub so the rest of the platform can type-check while still
-// referencing these globals. Phase 8 converts the source files to ES modules
-// and this file is deleted in favor of real exports.
+// The modules attach their APIs to the global object (rather than exporting
+// values) because every consumer reads the global, not an import. This file
+// stays as the permanent ambient contract for those global reads.
 
 interface PixelTextApi {
   /** Render pixel-font text into a single element. */

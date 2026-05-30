@@ -163,7 +163,7 @@ export function createOnlineClient(gameId = 'echo-duel') {
       minPlayers,
       maxPlayers,
       countdownMs,
-      createIfMissing: false,
+      createIfMissing: true,
       settings: { penaltyWord },
       identity,
     });

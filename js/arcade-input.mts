@@ -1,25 +1,39 @@
+// Unified arcade navigation input: maps keyboard and gamepad into a small set of
+// abstract actions ("left"/"right"/"up"/"down"/"select") and broadcasts them to
+// registered listeners. Exposes `window.ArcadeInput`.
+//
+// Migrated from the classic `arcade-input.js` in Phase 8 of the TypeScript
+// migration. Loaded as a module <script>; keeps the same global-attach side
+// effect and the load-time gamepad poll loop. The `window.ArcadeInput` shape is
+// declared in js/globals.d.ts for the global consumers (grid + home pages).
+
+type ArcadeAction = "left" | "right" | "up" | "down" | "select";
+type ArcadeSource = "keyboard" | "gamepad";
+type ArcadeActionListener = (action: ArcadeAction, source: ArcadeSource) => void;
+
 (function () {
   if (window.ArcadeInput) return;
 
-  const listeners = [];
+  const listeners: ArcadeActionListener[] = [];
 
-  function isEditableTarget(target) {
-    if (!target) return false;
-    if (target.isContentEditable) return true;
+  function isEditableTarget(target: EventTarget | null): boolean {
+    const node = target as (HTMLElement | null);
+    if (!node) return false;
+    if (node.isContentEditable) return true;
 
-    const tagName = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
+    const tagName = typeof node.tagName === "string" ? node.tagName.toUpperCase() : "";
     return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
   }
 
-  function emit(action, source) {
+  function emit(action: ArcadeAction, source: ArcadeSource): void {
     listeners.forEach((listener) => listener(action, source));
   }
 
-  function onAction(listener) {
+  function onAction(listener: ArcadeActionListener): void {
     listeners.push(listener);
   }
 
-  window.addEventListener("keydown", (event) => {
+  window.addEventListener("keydown", (event: KeyboardEvent) => {
     if (event.repeat) return;
 
     if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") emit("left", "keyboard");
@@ -35,17 +49,17 @@
     }
   });
 
-  let lastDirection = null;
+  let lastDirection: ArcadeAction | null = null;
   let lastMoveAt = 0;
   let lastSelectPressed = false;
   const repeatDelayMs = 180;
 
-  function getConnectedPad() {
+  function getConnectedPad(): Gamepad | null {
     const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
     return pads.find((pad) => pad && pad.connected) || null;
   }
 
-  function pollGamepad() {
+  function pollGamepad(): void {
     const pad = getConnectedPad();
 
     if (!pad) {
@@ -64,7 +78,7 @@
     const up = pad.buttons[12]?.pressed || vertical < -0.5;
     const down = pad.buttons[13]?.pressed || vertical > 0.5;
 
-    let direction = null;
+    let direction: ArcadeAction | null = null;
     if (left) direction = "left";
     else if (right) direction = "right";
     else if (up) direction = "up";
@@ -91,3 +105,5 @@
 
   window.ArcadeInput = { onAction };
 })();
+
+export {};
