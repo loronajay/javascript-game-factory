@@ -1,5 +1,1 @@
-export {
-  createProfileSocialViewRenderer,
-  escapeCssUrl,
-  escapeHtml,
-} from "./profile-social/social-view.mjs";
+export { createProfileSocialViewRenderer, escapeCssUrl, escapeHtml, } from "./profile-social/social-view.mjs";

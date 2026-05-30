@@ -165,7 +165,8 @@ function buildFriendSlotRows(relationshipsRecord: ProfileRelationshipsRecord): F
 function buildFavoriteGameOptions(): SelectOption[] {
   return [
     { value: "", label: "No favorite pinned" },
-    ...ARCADE_GAME_SLUGS.map((slug) => {
+    ...ARCADE_GAME_SLUGS.map((slugEntry) => {
+      const slug = typeof slugEntry === "string" ? slugEntry : slugEntry.slug;
       const entry = normalizeGameEntry(slug);
       return {
         value: entry.slug,
