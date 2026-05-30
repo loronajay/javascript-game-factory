@@ -1,0 +1,11 @@
+{
+  "title": "Cockpit Swarm",
+  "tagline": "Strafe the rail. Clear the swarm. Hold the sector.",
+  "description": "A first-person cockpit fixed-shooter: strafe along a rail to dodge incoming fire and shoot down enemy formations advancing from the horizon across five stages, four power-ups, and a three-phase boss.",
+  "players": "1",
+  "status": "Playable — 5-stage campaign + 3-phase boss",
+  "order": 9,
+  "featured": false,
+  "theme": "cockpit",
+  "accentColor": "#34f7ff"
+}

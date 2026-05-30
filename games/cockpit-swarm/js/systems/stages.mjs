@@ -9,6 +9,17 @@ export const STAGES = [
       threeLaneSync: 32
     },
     allowNextRowSupport: false,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 1,
+      spawnOnKillChance: 0.12,
+      allowedTypes: ["holdToShoot", "speedBoost", "healthPack"],
+      weights: {
+        holdToShoot: 35,
+        speedBoost: 35,
+        healthPack: 30
+      }
+    },
     enemyRows: [
       { type: "scout" },
       { types: ["scout", "grunt", "scout", "grunt", "scout"] },
@@ -29,6 +40,17 @@ export const STAGES = [
       allButOneLane: 30
     },
     allowNextRowSupport: false,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 1,
+      spawnOnKillChance: 0.13,
+      allowedTypes: ["splashShot", "speedBoost", "healthPack"],
+      weights: {
+        splashShot: 38,
+        speedBoost: 42,
+        healthPack: 20
+      }
+    },
     enemyRows: [
       { types: ["grunt", "scout", "grunt", "scout", "grunt"] },
       { types: ["grunt", "guard", "grunt", "guard", "grunt"] },
@@ -51,6 +73,18 @@ export const STAGES = [
     },
     allowNextRowSupport: true,
     nextRowSupportStartsWhenActiveCountAtOrBelow: 3,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 1,
+      spawnOnKillChance: 0.14,
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      weights: {
+        holdToShoot: 24,
+        splashShot: 30,
+        speedBoost: 28,
+        healthPack: 18
+      }
+    },
     enemyRows: [
       { types: ["grunt", "jammer", "grunt", "jammer", "grunt"] },
       { types: ["jammer", "guard", "grunt", "guard", "jammer"] },
@@ -71,6 +105,17 @@ export const STAGES = [
       allButOneLane: 36
     },
     allowNextRowSupport: false,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 1,
+      spawnOnKillChance: 0.15,
+      allowedTypes: ["holdToShoot", "splashShot", "healthPack"],
+      weights: {
+        holdToShoot: 38,
+        splashShot: 44,
+        healthPack: 18
+      }
+    },
     enemyRows: [
       { types: ["guard", "grunt", "guard", "grunt", "guard"] },
       { types: ["bruiser", "guard", "grunt", "guard", "bruiser"] },
@@ -93,6 +138,18 @@ export const STAGES = [
     },
     allowNextRowSupport: true,
     nextRowSupportStartsWhenActiveCountAtOrBelow: 4,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 1,
+      spawnOnKillChance: 0.16,
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      weights: {
+        holdToShoot: 28,
+        splashShot: 32,
+        speedBoost: 24,
+        healthPack: 16
+      }
+    },
     enemyRows: [
       { types: ["jammer", "grunt", "guard", "grunt", "jammer"] },
       { types: ["guard", "jammer", "bruiser", "jammer", "guard"] },

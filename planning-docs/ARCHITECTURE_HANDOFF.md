@@ -89,7 +89,7 @@ Completed:
 
 ## Pre-TypeScript Gate
 
-Status (2026-05-29 audit): the **non-game** exit criteria are met. The non-game TypeScript migration (Phases 0–9 in `TYPESCRIPT_MIGRATION_PLAN.md`) can start. **Game** cabinets remain gated on their own per-cabinet seam cleanup and are migrated last.
+Status (updated 2026-05-30): **the non-game TypeScript migration (Phases 0–9 in `TYPESCRIPT_MIGRATION_PLAN.md`) is COMPLETE.** All of `js/**` and `platform-api/src/**` are `.mts` under `strict: true`; typecheck (browser + api) is clean and tests are green (91/91 browser, 116/116 backend). **Game** cabinets remain gated on their own per-cabinet seam cleanup and are migrated last. The exit-criteria checklist below is retained as the historical record of why the gate opened.
 
 Exit criteria and current state:
 - `platform-api/src/app.mjs` is orchestration + route dispatch (778 LOC, all 8 route families extracted to `src/routes/`) — **met** (a little player/gesture/avatar logic remains inline, acceptable to type in place).

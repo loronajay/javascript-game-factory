@@ -18,7 +18,7 @@ After a context clear, read in this order:
 - `PLATFORM_IMPLEMENTATION_PLAN.md` - current shipped-vs-pending platform status
 - `BUGS.md` - active defects
 - `COMMENT_DELETE_PLAN.md` - active implementation plan for the remaining comment-delete gap
-- `TYPESCRIPT_MIGRATION_PLAN.md` - re-scoped 2026-05-29; non-game cleanup gates met and the non-game test baseline is green, so Phases 0–9 (platform + backend) are ready to start. Games migrate last, per-cabinet.
+- `TYPESCRIPT_MIGRATION_PLAN.md` - the non-game migration (Phases 0–9, platform frontend + backend) is **complete as of 2026-05-30**; all of `js/**` and `platform-api/src/**` are `.mts` under `strict: true`. Only game cabinets remain, migrated last per-cabinet.
 - `badge-plans/javascript_game_factory_canon_badge_batch_1_scope.md` - future badge pass reference
 - `profile-editor-plans/` - historical scope docs; `/me/edit` and `/me/layout` are shipped, with current caveats called out in the handoff README
 - `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md` - active scope for deeper live-preview panel appearance editing, starting with the hero card

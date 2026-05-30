@@ -2,7 +2,8 @@ import { STATE } from "./constants.mjs";
 
 export function createGameState() {
   return {
-    state: STATE.PLAYING,
+    state: STATE.MENU,
+    mode: "campaign",     // "campaign" | "bossRush"
     messageTimer: 0,
     hitFreeze: 0,
     shake: 0,
@@ -10,6 +11,10 @@ export function createGameState() {
     combo: 0,
     shotsFired: 0,
     shotsHit: 0,
+
+    menu: {
+      selectedButton: 0
+    },
 
     player: {
       x: 0,
@@ -29,9 +34,21 @@ export function createGameState() {
       stageClearTimer: 0
     },
 
+    powerups: {
+      activePickups: [],
+      effects: {
+        holdToShootMs: 0,
+        speedBoostMs: 0,
+        splashShotCharges: 0
+      },
+      lastPickupId: null
+    },
+
     enemies: [],
     enemyBullets: [],
     explosions: [],
-    stars: []
+    stars: [],
+
+    boss: null
   };
 }

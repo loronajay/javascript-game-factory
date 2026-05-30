@@ -6,6 +6,7 @@ import {
   spawnEnemyBullet
 } from "../entities/enemy.mjs";
 import { getStage } from "./stages.mjs";
+import { sfxEnemyShot } from "./audio.mjs";
 
 const BEHAVIORS = {
   randomActiveFire: {
@@ -107,6 +108,7 @@ function resolvePendingShots(game, dt) {
         if (!enemy.alive || !enemy.canFire) continue;
         if (game.enemyBullets.length >= TUNING.maxEnemyBullets) break;
 
+        sfxEnemyShot();
         game.enemyBullets.push(spawnEnemyBullet(enemy, {
           behaviorId: pending.behaviorId
         }));

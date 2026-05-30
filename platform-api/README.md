@@ -16,6 +16,8 @@
 
 ## Structure
 
+This backend is **TypeScript-sourced** (`strict: true`): every `src/**` file is a `.mts` source that `tsc` emits to a same-named `.mjs` committed in-place. Railway runs the emitted output unchanged (`npm start` → `node ./src/server.mjs`), so a deploy needs no config change. Edit the `.mts` source, then `npm run build` (tsc emit + `scripts/sync-emitted-mjs.mjs`) to regenerate the `.mjs`; `npm run typecheck` checks types without emitting. The files below are listed by their run-time `.mjs` names.
+
 - `src/server.mjs`: runtime entry point
 - `src/app.mjs`: top-level orchestration and route dispatch shell
 - `src/http-utils.mjs`: shared request/response helpers
@@ -40,6 +42,8 @@ From `platform-api/`:
 npm start
 npm run migrate
 npm test
+npm run typecheck
+npm run build
 ```
 
 ## Boundary reminder

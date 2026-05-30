@@ -8,7 +8,11 @@ This folder contains the shared frontend JavaScript for the arcade shell.
 - `platform/`: reusable platform modules for API access, identity, profile data, relationships, activity, thoughts, metrics, storage, and events
 - `me-page/`, `player-page/`, `thoughts-page/`, `gallery-page/`, `profile-editor/`, `profile-social/`, and `profile-layout/`: page-specific subsystem modules split into entry, loader, view-model shaping, rendering, wiring, and actions. `profile-layout/` owns the `/me/layout` editor plus the profile layout renderer/normalizer (its `layout-wire.mjs` and `layout-renderer.mjs` are the two largest frontend files)
 - `tests/`: shared frontend tests
-- `platform-config.js` and utility files such as `arcade-paths.mjs` and `pixel-text.js`: shell-wide helpers and configuration
+- `platform-config.mts`, `pixel-text.mts`, and `arcade-input.mts`: the three always-on global scripts (loaded as `<script type="module">` on every page; they attach `__JGF_PLATFORM_API_URL__` / `window.PixelText` / `window.ArcadeInput` and have an ambient contract in `globals.d.ts`). Plus utility files such as `arcade-paths.mts`: shell-wide helpers and configuration
+
+## Source format
+
+- This folder is **TypeScript-sourced**: every module is a `.mts` source that `tsc` emits to a same-named `.mjs` committed in-place (the statically-served site loads the `.mjs`). Edit the `.mts`, then run `npm run build:browser` (emit + `scripts/sync-emitted-mjs.mjs`) to regenerate the `.mjs`. `npm run typecheck:browser` type-checks without emitting. `globals.d.ts` is the permanent ambient declaration for the three global scripts above. The whole non-game codebase is migrated (`strict: true`); only game cabinets remain on plain JS.
 
 ## Current architecture notes
 
