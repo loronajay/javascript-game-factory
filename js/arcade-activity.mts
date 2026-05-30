@@ -1,0 +1,142 @@
+import { loadActivityFeed, syncActivityFeedFromApi } from "./platform/activity/activity.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
+
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function titleFromSlug(slug: unknown): string {
+  return String(slug || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatActivityDate(value: any): string {
+  const timestamp = Date.parse(value || "");
+  if (!timestamp) return "Signal pending";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function formatVisibilityLabel(value: unknown): string {
+  const label = String(value || "").trim().toLowerCase();
+  if (!label) return "Friends";
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function formatCountLabel(count: number): string {
+  return `${count} SIGNAL${count === 1 ? "" : "S"}`;
+}
+
+export function buildActivityPageViewModel(activityFeed: any = loadActivityFeed()) {
+  const items = Array.isArray(activityFeed) ? activityFeed : [];
+
+  return {
+    heroTitle: "ARCADE ACTIVITY",
+    heroKicker: "FLOOR AFTERGLOW",
+    heroSummary: "Platform-owned activity keeps game results and shared floor signals in one feed without letting individual cabinets invent their own long-term social history.",
+    heroCountLabel: formatCountLabel(items.length),
+    items: items.map((item: any) => ({
+      id: item.id,
+      title: item.actorDisplayName || "ARCADE SIGNAL",
+      summary: item.summary || "Fresh cabinet afterglow incoming.",
+      gameLabel: titleFromSlug(item.gameSlug) || "Arcade Floor",
+      visibilityLabel: formatVisibilityLabel(item.visibility),
+      publishedLabel: formatActivityDate(item.createdAt),
+    })),
+  };
+}
+
+export async function loadActivityPageData(options: any = {}) {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const apiClient = options.apiClient || createPlatformApiClient(options);
+  const activityFeed = Array.isArray(options?.activityFeed)
+    ? options.activityFeed
+    : await syncActivityFeedFromApi(storage, apiClient);
+
+  return {
+    storage,
+    activityFeed,
+  };
+}
+
+function renderHeroCard(container: HTMLElement | null, model: any): void {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="activity-hero-card__copy">
+      <p class="activity-hero-card__kicker">${escapeHtml(model.heroKicker)}</p>
+      <h2 class="activity-hero-card__title">${escapeHtml(model.heroTitle)}</h2>
+      <p class="activity-hero-card__summary">${escapeHtml(model.heroSummary)}</p>
+    </div>
+    <div class="activity-hero-card__meta">
+      <div class="activity-meta-block">
+        <span class="activity-meta-block__label">Feed Status</span>
+        <span class="activity-meta-block__value">${escapeHtml(model.heroCountLabel)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderActivityCard(item: any): string {
+  return `
+    <article class="activity-card">
+      <div class="activity-card__topline">
+        <span class="activity-card__visibility">${escapeHtml(item.visibilityLabel)}</span>
+        <span class="activity-card__date">${escapeHtml(item.publishedLabel)}</span>
+      </div>
+      <h2 class="activity-card__title">${escapeHtml(item.title)}</h2>
+      <p class="activity-card__summary">${escapeHtml(item.summary)}</p>
+      <p class="activity-card__meta">${escapeHtml(item.gameLabel)}</p>
+    </article>
+  `;
+}
+
+export function renderActivityPage(doc: Document = globalThis.document, activityFeed: any = loadActivityFeed()) {
+  if (!doc?.getElementById) return null;
+
+  const model = buildActivityPageViewModel(activityFeed);
+  renderHeroCard(doc.getElementById("activityHeroCard"), model);
+
+  const feed = doc.getElementById("activityFeed");
+  if (feed) {
+    feed.innerHTML = model.items.map(renderActivityCard).join("");
+  }
+
+  return model;
+}
+
+const doc = globalThis.document;
+
+if (typeof doc?.getElementById === "function") {
+  renderPrimaryAppNav(doc.getElementById("activityPrimaryNav"), {
+    basePath: "../",
+    currentPage: "activity",
+    linkClass: "activity-stage__portal",
+    sessionNavId: "activityAuthNav",
+  });
+  void initSessionNav(doc.getElementById("activityAuthNav"), {
+    signInPath: "../sign-in/index.html",
+    signUpPath: "../sign-up/index.html",
+    homeOnLogout: "../index.html",
+  });
+
+  renderActivityPage(doc);
+  void loadActivityPageData().then(({ activityFeed }) => {
+    renderActivityPage(doc, activityFeed);
+  });
+}

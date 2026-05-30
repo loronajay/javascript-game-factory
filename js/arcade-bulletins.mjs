@@ -1,67 +1,62 @@
 import { buildPublicBulletinFeed } from "./platform/bulletins/bulletins.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
-
 function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }
-
 function formatBulletinDate(value) {
-  const timestamp = Date.parse(value || "");
-  if (!timestamp) return "Date pending";
-
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(timestamp));
+    const timestamp = Date.parse(value || "");
+    if (!timestamp)
+        return "Date pending";
+    return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    }).format(new Date(timestamp));
 }
-
 function formatStatusLabel(status) {
-  if (!status) return "Draft";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+    if (!status)
+        return "Draft";
+    return status.charAt(0).toUpperCase() + status.slice(1);
 }
-
 export function buildBulletinsPageViewModel(bulletins = buildPublicBulletinFeed()) {
-  const items = Array.isArray(bulletins) ? bulletins : [];
-
-  return {
-    heroTitle: "ARCADE BULLETINS",
-    heroKicker: "SYSTEM NOTICEBOARD",
-    heroSummary: "Platform notices, event calls, and cabinet-floor updates land here.",
-    heroCountLabel: `${items.length} LIVE`,
-    items: items.length > 0
-      ? items.map((bulletin) => ({
-          id: bulletin.id,
-          title: bulletin.title,
-          summary: bulletin.summary || bulletin.body || "Fresh noticeboard signal incoming.",
-          body: bulletin.body,
-          publishedLabel: formatBulletinDate(bulletin.publishedAt),
-          statusLabel: formatStatusLabel(bulletin.status),
-          createdByLabel: bulletin.createdBy || "system",
-          isPlaceholder: false,
-        }))
-      : [{
-          id: "bulletin-placeholder",
-          title: "Noticeboard Warming Up",
-          summary: "The bulletin board is still warming up. Public notices will appear here once more platform surfaces come online.",
-          body: "",
-          publishedLabel: "Soon",
-          statusLabel: "Standby",
-          createdByLabel: "system",
-          isPlaceholder: true,
-        }],
-  };
+    const items = Array.isArray(bulletins) ? bulletins : [];
+    return {
+        heroTitle: "ARCADE BULLETINS",
+        heroKicker: "SYSTEM NOTICEBOARD",
+        heroSummary: "Platform notices, event calls, and cabinet-floor updates land here.",
+        heroCountLabel: `${items.length} LIVE`,
+        items: items.length > 0
+            ? items.map((bulletin) => ({
+                id: bulletin.id,
+                title: bulletin.title,
+                summary: bulletin.summary || bulletin.body || "Fresh noticeboard signal incoming.",
+                body: bulletin.body,
+                publishedLabel: formatBulletinDate(bulletin.publishedAt),
+                statusLabel: formatStatusLabel(bulletin.status),
+                createdByLabel: bulletin.createdBy || "system",
+                isPlaceholder: false,
+            }))
+            : [{
+                    id: "bulletin-placeholder",
+                    title: "Noticeboard Warming Up",
+                    summary: "The bulletin board is still warming up. Public notices will appear here once more platform surfaces come online.",
+                    body: "",
+                    publishedLabel: "Soon",
+                    statusLabel: "Standby",
+                    createdByLabel: "system",
+                    isPlaceholder: true,
+                }],
+    };
 }
-
 function renderHeroCard(container, model) {
-  if (!container) return;
-
-  container.innerHTML = `
+    if (!container)
+        return;
+    container.innerHTML = `
     <div class="bulletins-hero-card__copy">
       <p class="bulletins-hero-card__kicker">${escapeHtml(model.heroKicker)}</p>
       <h2 class="bulletins-hero-card__title">${escapeHtml(model.heroTitle)}</h2>
@@ -75,11 +70,9 @@ function renderHeroCard(container, model) {
     </div>
   `;
 }
-
 function renderBulletinCard(item) {
-  const cardClass = item.isPlaceholder ? "bulletin-card bulletin-card--placeholder" : "bulletin-card";
-
-  return `
+    const cardClass = item.isPlaceholder ? "bulletin-card bulletin-card--placeholder" : "bulletin-card";
+    return `
     <article class="${cardClass}">
       <div class="bulletin-card__topline">
         <span class="bulletin-card__status">${escapeHtml(item.statusLabel)}</span>
@@ -91,35 +84,29 @@ function renderBulletinCard(item) {
     </article>
   `;
 }
-
 export function renderBulletinsPage(doc = globalThis.document, bulletins = buildPublicBulletinFeed()) {
-  if (!doc?.getElementById) return null;
-
-  const model = buildBulletinsPageViewModel(bulletins);
-  renderHeroCard(doc.getElementById("bulletinsHeroCard"), model);
-
-  const feed = doc.getElementById("bulletinsFeed");
-  if (feed) {
-    feed.innerHTML = model.items.map(renderBulletinCard).join("");
-  }
-
-  return model;
+    if (!doc?.getElementById)
+        return null;
+    const model = buildBulletinsPageViewModel(bulletins);
+    renderHeroCard(doc.getElementById("bulletinsHeroCard"), model);
+    const feed = doc.getElementById("bulletinsFeed");
+    if (feed) {
+        feed.innerHTML = model.items.map(renderBulletinCard).join("");
+    }
+    return model;
 }
-
 const doc = globalThis.document;
-
-if (doc?.getElementById) {
-  renderPrimaryAppNav(doc.getElementById("bulletinsPrimaryNav"), {
-    basePath: "../",
-    currentPage: "bulletins",
-    linkClass: "bulletins-stage__portal",
-    sessionNavId: "bulletinsAuthNav",
-  });
-  void initSessionNav(doc.getElementById("bulletinsAuthNav"), {
-    signInPath: "../sign-in/index.html",
-    signUpPath: "../sign-up/index.html",
-    homeOnLogout: "../index.html",
-  });
-
-  renderBulletinsPage(doc);
+if (typeof doc?.getElementById === "function") {
+    renderPrimaryAppNav(doc.getElementById("bulletinsPrimaryNav"), {
+        basePath: "../",
+        currentPage: "bulletins",
+        linkClass: "bulletins-stage__portal",
+        sessionNavId: "bulletinsAuthNav",
+    });
+    void initSessionNav(doc.getElementById("bulletinsAuthNav"), {
+        signInPath: "../sign-in/index.html",
+        signUpPath: "../sign-up/index.html",
+        homeOnLogout: "../index.html",
+    });
+    renderBulletinsPage(doc);
 }

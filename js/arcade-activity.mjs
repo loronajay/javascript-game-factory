@@ -2,82 +2,73 @@ import { loadActivityFeed, syncActivityFeedFromApi } from "./platform/activity/a
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
-
 function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }
-
 function titleFromSlug(slug) {
-  return String(slug || "")
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    return String(slug || "")
+        .split("-")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
 }
-
 function formatActivityDate(value) {
-  const timestamp = Date.parse(value || "");
-  if (!timestamp) return "Signal pending";
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
+    const timestamp = Date.parse(value || "");
+    if (!timestamp)
+        return "Signal pending";
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    }).format(new Date(timestamp));
 }
-
 function formatVisibilityLabel(value) {
-  const label = String(value || "").trim().toLowerCase();
-  if (!label) return "Friends";
-  return label.charAt(0).toUpperCase() + label.slice(1);
+    const label = String(value || "").trim().toLowerCase();
+    if (!label)
+        return "Friends";
+    return label.charAt(0).toUpperCase() + label.slice(1);
 }
-
 function formatCountLabel(count) {
-  return `${count} SIGNAL${count === 1 ? "" : "S"}`;
+    return `${count} SIGNAL${count === 1 ? "" : "S"}`;
 }
-
 export function buildActivityPageViewModel(activityFeed = loadActivityFeed()) {
-  const items = Array.isArray(activityFeed) ? activityFeed : [];
-
-  return {
-    heroTitle: "ARCADE ACTIVITY",
-    heroKicker: "FLOOR AFTERGLOW",
-    heroSummary: "Platform-owned activity keeps game results and shared floor signals in one feed without letting individual cabinets invent their own long-term social history.",
-    heroCountLabel: formatCountLabel(items.length),
-    items: items.map((item) => ({
-      id: item.id,
-      title: item.actorDisplayName || "ARCADE SIGNAL",
-      summary: item.summary || "Fresh cabinet afterglow incoming.",
-      gameLabel: titleFromSlug(item.gameSlug) || "Arcade Floor",
-      visibilityLabel: formatVisibilityLabel(item.visibility),
-      publishedLabel: formatActivityDate(item.createdAt),
-    })),
-  };
+    const items = Array.isArray(activityFeed) ? activityFeed : [];
+    return {
+        heroTitle: "ARCADE ACTIVITY",
+        heroKicker: "FLOOR AFTERGLOW",
+        heroSummary: "Platform-owned activity keeps game results and shared floor signals in one feed without letting individual cabinets invent their own long-term social history.",
+        heroCountLabel: formatCountLabel(items.length),
+        items: items.map((item) => ({
+            id: item.id,
+            title: item.actorDisplayName || "ARCADE SIGNAL",
+            summary: item.summary || "Fresh cabinet afterglow incoming.",
+            gameLabel: titleFromSlug(item.gameSlug) || "Arcade Floor",
+            visibilityLabel: formatVisibilityLabel(item.visibility),
+            publishedLabel: formatActivityDate(item.createdAt),
+        })),
+    };
 }
-
 export async function loadActivityPageData(options = {}) {
-  const storage = options.storage || getDefaultPlatformStorage();
-  const apiClient = options.apiClient || createPlatformApiClient(options);
-  const activityFeed = Array.isArray(options?.activityFeed)
-    ? options.activityFeed
-    : await syncActivityFeedFromApi(storage, apiClient);
-
-  return {
-    storage,
-    activityFeed,
-  };
+    const storage = options.storage || getDefaultPlatformStorage();
+    const apiClient = options.apiClient || createPlatformApiClient(options);
+    const activityFeed = Array.isArray(options?.activityFeed)
+        ? options.activityFeed
+        : await syncActivityFeedFromApi(storage, apiClient);
+    return {
+        storage,
+        activityFeed,
+    };
 }
-
 function renderHeroCard(container, model) {
-  if (!container) return;
-
-  container.innerHTML = `
+    if (!container)
+        return;
+    container.innerHTML = `
     <div class="activity-hero-card__copy">
       <p class="activity-hero-card__kicker">${escapeHtml(model.heroKicker)}</p>
       <h2 class="activity-hero-card__title">${escapeHtml(model.heroTitle)}</h2>
@@ -91,9 +82,8 @@ function renderHeroCard(container, model) {
     </div>
   `;
 }
-
 function renderActivityCard(item) {
-  return `
+    return `
     <article class="activity-card">
       <div class="activity-card__topline">
         <span class="activity-card__visibility">${escapeHtml(item.visibilityLabel)}</span>
@@ -105,38 +95,32 @@ function renderActivityCard(item) {
     </article>
   `;
 }
-
 export function renderActivityPage(doc = globalThis.document, activityFeed = loadActivityFeed()) {
-  if (!doc?.getElementById) return null;
-
-  const model = buildActivityPageViewModel(activityFeed);
-  renderHeroCard(doc.getElementById("activityHeroCard"), model);
-
-  const feed = doc.getElementById("activityFeed");
-  if (feed) {
-    feed.innerHTML = model.items.map(renderActivityCard).join("");
-  }
-
-  return model;
+    if (!doc?.getElementById)
+        return null;
+    const model = buildActivityPageViewModel(activityFeed);
+    renderHeroCard(doc.getElementById("activityHeroCard"), model);
+    const feed = doc.getElementById("activityFeed");
+    if (feed) {
+        feed.innerHTML = model.items.map(renderActivityCard).join("");
+    }
+    return model;
 }
-
 const doc = globalThis.document;
-
-if (doc?.getElementById) {
-  renderPrimaryAppNav(doc.getElementById("activityPrimaryNav"), {
-    basePath: "../",
-    currentPage: "activity",
-    linkClass: "activity-stage__portal",
-    sessionNavId: "activityAuthNav",
-  });
-  void initSessionNav(doc.getElementById("activityAuthNav"), {
-    signInPath: "../sign-in/index.html",
-    signUpPath: "../sign-up/index.html",
-    homeOnLogout: "../index.html",
-  });
-
-  renderActivityPage(doc);
-  void loadActivityPageData().then(({ activityFeed }) => {
-    renderActivityPage(doc, activityFeed);
-  });
+if (typeof doc?.getElementById === "function") {
+    renderPrimaryAppNav(doc.getElementById("activityPrimaryNav"), {
+        basePath: "../",
+        currentPage: "activity",
+        linkClass: "activity-stage__portal",
+        sessionNavId: "activityAuthNav",
+    });
+    void initSessionNav(doc.getElementById("activityAuthNav"), {
+        signInPath: "../sign-in/index.html",
+        signUpPath: "../sign-up/index.html",
+        homeOnLogout: "../index.html",
+    });
+    renderActivityPage(doc);
+    void loadActivityPageData().then(({ activityFeed }) => {
+        renderActivityPage(doc, activityFeed);
+    });
 }
