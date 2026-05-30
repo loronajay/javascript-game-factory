@@ -3,6 +3,7 @@ export function createInput() {
     left: false,
     right: false,
     fire: false,
+    lob: false,
     up: false,
     down: false,
     escape: false
@@ -11,12 +12,14 @@ export function createInput() {
   const touch = {
     leftPointer: false,
     rightPointer: false,
-    firePointer: false
+    firePointer: false,
+    lobPointer: false
   };
 
   // Edge-triggered presses consumed once per logical action
   const pressed = {
     fire: false,
+    lob: false,
     up: false,
     down: false,
     confirm: false,
@@ -44,6 +47,11 @@ export function createInput() {
         keys.fire = true;
       }
 
+      if (e.code === "KeyK" || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        if (!keys.lob) pressed.lob = true;
+        keys.lob = true;
+      }
+
       if (e.code === "Enter") {
         pressed.confirm = true;
       }
@@ -60,6 +68,7 @@ export function createInput() {
       if (e.code === "ArrowUp"    || e.code === "KeyW") keys.up    = false;
       if (e.code === "ArrowDown"  || e.code === "KeyS") keys.down  = false;
       if (e.code === "Space"      || e.code === "KeyJ") keys.fire  = false;
+      if (e.code === "KeyK" || e.code === "ShiftLeft" || e.code === "ShiftRight") keys.lob = false;
       if (e.code === "Escape")                          keys.escape = false;
     });
   }
@@ -91,6 +100,7 @@ export function createInput() {
     bindTouchButton("leftBtn",  "leftPointer");
     bindTouchButton("rightBtn", "rightPointer");
     bindTouchButton("fireBtn",  "firePointer");
+    bindTouchButton("lobBtn",   "lobPointer");
   }
 
   function bind() {
@@ -111,10 +121,17 @@ export function createInput() {
   function isLeft()      { return keys.left  || touch.leftPointer;  }
   function isRight()     { return keys.right || touch.rightPointer; }
   function isFireHeld()  { return keys.fire  || touch.firePointer;  }
+  function isLobHeld()   { return keys.lob   || touch.lobPointer;   }
 
   function consumeFirePress() {
     if (!pressed.fire) return false;
     pressed.fire = false;
+    return true;
+  }
+
+  function consumeLobPress() {
+    if (!pressed.lob) return false;
+    pressed.lob = false;
     return true;
   }
 
@@ -156,6 +173,7 @@ export function createInput() {
   // in-game inputs can't accidentally trigger button selections.
   function clearMenuPresses() {
     pressed.fire    = false;
+    pressed.lob     = false;
     pressed.up      = false;
     pressed.down    = false;
     pressed.confirm = false;
@@ -172,7 +190,9 @@ export function createInput() {
     isLeft,
     isRight,
     isFireHeld,
+    isLobHeld,
     consumeFirePress,
+    consumeLobPress,
     consumeUp,
     consumeDown,
     consumeConfirm,

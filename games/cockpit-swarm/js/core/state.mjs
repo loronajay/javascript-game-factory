@@ -53,22 +53,44 @@ export function createGameState() {
 
     // ── Multiplayer state ──
     mp: {
-      lobbyPhase:          "main",    // "main" | "searching" | "room_host" | "room_join" | "error"
+      // Lobby
+      lobbyPhase:          "main",
       connected:           false,
-      side:                null,      // "p1" | "p2"
+      side:                null,
       opponentName:        null,
-      queueCounts:         null,      // { p1, p2 } from server
+      queueCounts:         null,
       clockOffsetMs:       0,
       round:               0,
       p1Rounds:            0,
       p2Rounds:            0,
-      startAt:             null,      // server-clock ms for round start
-      matchWinner:         null,      // "p1" | "p2"
+      startAt:             null,
+      matchWinner:         null,
       rematchReady:        false,
       rematchOpponentReady:false,
       disconnected:        false,
       errorMsg:            null,
-      roomCodeInput:       "",    // typed characters in room_join phase
+      roomCode:            null,
+      roomCodeInput:       "",
+      // Phase 2 combat (host-authoritative)
+      opponentX:           0,
+      opponentSpeed:       0,
+      p1hp:                100,
+      p2hp:                100,
+      p1heat:              0,
+      p2heat:              0,
+      p1burn:              false,
+      p2burn:              false,
+      mpBullets:           [],
+      mpTick:              0,
+      mpTimerMs:           45000,
+      suddenDeath:         false,
+      remoteInput:         null,
+      p1LobCd:             0,
+      p2FireCd:            0,
+      p2LobCd:             0,
+      roundEndTimer:       0,
+      roundEnded:          false,
+      roundEndWinner:      null,
     }
   };
 }

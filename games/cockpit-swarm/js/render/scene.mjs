@@ -6,7 +6,7 @@ import { clamp, lerp, rand } from "../core/math.mjs";
 import { project, projectEnemyBullet } from "../systems/projection.mjs";
 import { getStage } from "../systems/stages.mjs";
 import { renderBoss, renderBossHud } from "./boss-scene.mjs";
-import { renderMpLobby, renderMpCountdown, renderMpFighting, renderMpResult } from "./mp-scene.mjs";
+import { renderMpLobby, renderMpCountdown, renderMpWorld, renderMpFighting, renderMpResult } from "./mp-scene.mjs";
 
 // ─── Main render entry ────────────────────────────────────────────────────────
 
@@ -27,6 +27,7 @@ export function renderGame(ctx, game, t) {
     ctx.translate(sx, sy);
     renderBackground(ctx, game, t);
     renderDepthGrid(ctx, game);
+    if (game.state === STATE.MP_FIGHTING) renderMpWorld(ctx, game, t);
     renderCockpit(ctx, game, t);
     ctx.restore();
     if (game.state === STATE.MP_COUNTDOWN) renderMpCountdown(ctx, game, t);

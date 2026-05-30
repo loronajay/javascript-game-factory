@@ -1,6 +1,5 @@
 // mp-controller.mjs — Multiplayer lifecycle for 1v1 Dodgeball.
 // Owns the online client singleton and all MP state transitions.
-// game.mjs routes MP_LOBBY / MP_COUNTDOWN / MP_FIGHTING / MP_RESULT here.
 //
 // Lobby phases (game.mp.lobbyPhase):
 //   "main"       — entry: FIND MATCH / PRIVATE ROOM / JOIN BY CODE / BACK
@@ -9,29 +8,28 @@
 //   "room_join"  — typing a room code to join a partner's private room
 //   "error"      — connection/conflict error with back button
 //
-// Side assignment:
-//   Public  — server auto-assigns; client randomly tries p1 or p2 and
-//             retries the other on SIDE_CONFLICT (transparent to the user).
-//   Private — creator always p1 (host), joiner always p2 (guest).
+// Architecture (Phase 2):
+//   p1 (host)  — runs the authoritative sim for both ships; broadcasts state every tick
+//   p2 (guest) — sends input each frame; receives state and reconciles position
 
-import { STATE, TUNING, MP_LOBBY_BTNS, MP_RESULT_BTNS } from "../core/constants.mjs";
+import { STATE, TUNING, MP_TUNING, MP_LOBBY_BTNS, MP_RESULT_BTNS } from "../core/constants.mjs";
 import { clamp } from "../core/math.mjs";
 import { makeStars } from "../entities/stars.mjs";
 import { createOnlineClient, hasCountdownStarted } from "./online.mjs";
 import { startMenuMusic } from "./audio.mjs";
 
-// ── Client singleton (one connection per match session) ───────────────────────
+// ── Client singleton ──────────────────────────────────────────────────────────
 
-let _client = null;
-
-// For public auto-matchmaking: track which side we tried so we can flip on conflict.
+let _client    = null;
 let _triedSide = null;
-
-// Raw keydown handler for room-code entry (attached/detached with lobby phase).
 let _roomCodeHandler = null;
+let _bulletId  = 0;
 
-// How many ms ahead of serverNow to schedule the fight start.
 const MP_COUNTDOWN_LEAD_MS = 4000;
+
+// z-axis for the duel corridor: Z_NEAR = local player end, Z_FAR = opponent end
+const Z_NEAR = 1.0;
+const Z_FAR  = 7.0;
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -76,41 +74,316 @@ function _unbindRoomCode() {
   }
 }
 
-// ── initMpLobby — called when player selects VS DUEL from main menu ───────────
+// ── Phase 2: combat helpers ───────────────────────────────────────────────────
+
+function _resetRound(game, client) {
+  const isHost = client.isHost();
+  const mp = game.mp;
+
+  game.player.x = isHost ? -TUNING.playerMaxX * 0.85 : TUNING.playerMaxX * 0.85;
+  game.player.speed = 0;
+  game.player.fireCooldown = 0;
+
+  mp.opponentX     = isHost ? TUNING.playerMaxX * 0.85 : -TUNING.playerMaxX * 0.85;
+  mp.opponentSpeed = 0;
+  mp.p1hp          = MP_TUNING.hp;
+  mp.p2hp          = MP_TUNING.hp;
+  mp.p1heat        = 0;
+  mp.p2heat        = 0;
+  mp.p1burn        = false;
+  mp.p2burn        = false;
+  mp.mpBullets     = [];
+  mp.mpTick        = 0;
+  mp.mpTimerMs     = MP_TUNING.roundTimerMs;
+  mp.suddenDeath   = false;
+  mp.remoteInput   = null;
+  mp.p1LobCd       = 0;
+  mp.p2FireCd      = 0;
+  mp.p2LobCd       = 0;
+  mp.roundEndTimer = 0;
+  mp.roundEnded    = false;
+  mp.roundEndWinner = null;
+}
+
+function _decayHeat(mp, dt) {
+  const decay = MP_TUNING.heatDecayPerMs * dt;
+  mp.p1heat = Math.max(0, mp.p1heat - decay);
+  mp.p2heat = Math.max(0, mp.p2heat - decay);
+
+  if (!mp.p1burn && mp.p1heat >= MP_TUNING.burnoutThreshold)    mp.p1burn = true;
+  if (mp.p1burn  && mp.p1heat <= MP_TUNING.burnoutResetThreshold) mp.p1burn = false;
+  if (!mp.p2burn && mp.p2heat >= MP_TUNING.burnoutThreshold)    mp.p2burn = true;
+  if (mp.p2burn  && mp.p2heat <= MP_TUNING.burnoutResetThreshold) mp.p2burn = false;
+}
+
+function _tryFireP1(game, input) {
+  const mp = game.mp;
+  if (mp.p1burn) return;
+
+  if (input.consumeFirePress() && game.player.fireCooldown <= 0) {
+    mp.mpBullets.push({ id: _bulletId++, owner: "p1", x: game.player.x, z: Z_NEAR + 0.15, kind: "laser" });
+    game.player.fireCooldown = MP_TUNING.fireCooldownMs;
+    game.player.muzzleFlash  = 80;
+    mp.p1heat = Math.min(MP_TUNING.burnoutThreshold, mp.p1heat + MP_TUNING.laserHeat);
+  }
+
+  if (input.consumeLobPress && input.consumeLobPress() && mp.p1LobCd <= 0) {
+    mp.mpBullets.push({ id: _bulletId++, owner: "p1", x: game.player.x, z: Z_NEAR + 0.15, kind: "lob" });
+    mp.p1LobCd = MP_TUNING.lobCooldownMs;
+    game.player.muzzleFlash = 140;
+    mp.p1heat = Math.min(MP_TUNING.burnoutThreshold, mp.p1heat + MP_TUNING.lobHeat);
+  }
+}
+
+function _tryFireP2(game, ri) {
+  const mp = game.mp;
+  if (!ri || mp.p2burn) return;
+
+  if (ri.laser && mp.p2FireCd <= 0) {
+    mp.mpBullets.push({ id: _bulletId++, owner: "p2", x: mp.opponentX, z: Z_FAR - 0.15, kind: "laser" });
+    mp.p2FireCd = MP_TUNING.fireCooldownMs;
+    mp.p2heat   = Math.min(MP_TUNING.burnoutThreshold, mp.p2heat + MP_TUNING.laserHeat);
+  }
+
+  if (ri.lob && mp.p2LobCd <= 0) {
+    mp.mpBullets.push({ id: _bulletId++, owner: "p2", x: mp.opponentX, z: Z_FAR - 0.15, kind: "lob" });
+    mp.p2LobCd = MP_TUNING.lobCooldownMs;
+    mp.p2heat  = Math.min(MP_TUNING.burnoutThreshold, mp.p2heat + MP_TUNING.lobHeat);
+  }
+}
+
+function _advanceBullets(mp, dt) {
+  for (const b of mp.mpBullets) {
+    const speed = b.kind === "lob" ? MP_TUNING.lobSpeedZ : MP_TUNING.laserSpeedZ;
+    b.z += (b.owner === "p1" ? speed : -speed) * dt;
+  }
+}
+
+function _applyRoundWin(mp, winner) {
+  if (winner === "p1") mp.p1Rounds++;
+  else if (winner === "p2") mp.p2Rounds++;
+}
+
+function _endRound(game, input, winner, client) {
+  if (game.mp.roundEnded) return;
+  game.mp.roundEnded    = true;
+  game.mp.roundEndWinner = winner;
+  game.mp.mpBullets     = [];
+
+  client.sendRoundEnd(winner);
+  _applyRoundWin(game.mp, winner);
+
+  const matchOver = game.mp.p1Rounds >= MP_TUNING.roundsToWin ||
+                    game.mp.p2Rounds >= MP_TUNING.roundsToWin;
+  if (matchOver) {
+    const matchWinner = game.mp.p1Rounds >= MP_TUNING.roundsToWin ? "p1" : "p2";
+    // Give a moment for the round-end overlay to show before transitioning.
+    setTimeout(() => {
+      if (!_client) return;
+      _client.sendMatchEnd(matchWinner);
+      game.mp.matchWinner = matchWinner;
+      game.state = STATE.MP_RESULT;
+      game.menu.selectedButton = 0;
+      _clearFlashes(game, input);
+    }, 2200);
+  } else {
+    game.mp.roundEndTimer = 2200;
+  }
+}
+
+function _startNextRound(game, input, client) {
+  const nextRound = game.mp.round + 1;
+  const serverNow = Date.now() + game.mp.clockOffsetMs;
+  const startAt   = serverNow + MP_COUNTDOWN_LEAD_MS;
+  client.sendRoundStart(nextRound, startAt);
+  _enterCountdown(game, input, nextRound, startAt);
+}
+
+function _checkHits(game, input, client) {
+  const mp  = game.mp;
+  const p1x = game.player.x;
+  const p2x = mp.opponentX;
+  const surviving = [];
+
+  for (const b of mp.mpBullets) {
+    let keep = true;
+
+    if (b.owner === "p1" && b.z >= Z_FAR - 0.5) {
+      keep = false;
+      if (Math.abs(b.x - p2x) <= MP_TUNING.hitWindowX) {
+        const inSD = mp.suddenDeath && b.kind === "lob";
+        const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
+        mp.p2hp = Math.max(0, mp.p2hp - dmg);
+        if (mp.p2hp <= 0) _endRound(game, input, "p1", client);
+      }
+    } else if (b.owner === "p2" && b.z <= Z_NEAR + 0.5) {
+      keep = false;
+      if (Math.abs(b.x - p1x) <= MP_TUNING.hitWindowX) {
+        const inSD = mp.suddenDeath && b.kind === "lob";
+        const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
+        mp.p1hp = Math.max(0, mp.p1hp - dmg);
+        game.shake = 6;
+        game.player.hurtFlash = 220;
+        if (mp.p1hp <= 0) _endRound(game, input, "p2", client);
+      }
+    } else if (b.z > Z_FAR || b.z < Z_NEAR) {
+      keep = false; // missed
+    }
+
+    if (keep) surviving.push(b);
+  }
+
+  mp.mpBullets = surviving;
+}
+
+function _applyRemoteState(game, snap) {
+  const mp = game.mp;
+  mp.opponentX   = snap.p1x;
+  mp.p1hp        = snap.p1hp;
+  mp.p2hp        = snap.p2hp;
+  mp.p1heat      = snap.p1heat;
+  mp.p2heat      = snap.p2heat;
+  mp.p1burn      = snap.p1burn;
+  mp.p2burn      = snap.p2burn;
+  mp.mpBullets   = snap.bullets.map(b => ({ ...b }));
+  mp.mpTimerMs   = snap.timeMs;
+  mp.suddenDeath = snap.sd;
+
+  // Snap own position if drift is significant
+  if (Math.abs(snap.p2x - game.player.x) > 18) {
+    game.player.x = snap.p2x;
+  }
+}
+
+// ── Host tick (p1 owns the sim) ───────────────────────────────────────────────
+
+function _hostTick(game, input, dt) {
+  const client = getClient();
+  const mp     = game.mp;
+
+  // During round-end delay, count down then start next round.
+  if (mp.roundEnded && mp.roundEndTimer > 0) {
+    mp.roundEndTimer -= dt;
+    if (mp.roundEndTimer <= 0) _startNextRound(game, input, client);
+    return;
+  }
+  if (mp.roundEnded) return; // match-end path handles transition via setTimeout
+
+  mp.mpTick++;
+
+  // Tick cooldowns (game.player.fireCooldown already ticked by _updateLocalPlayer)
+  mp.p1LobCd  = Math.max(0, mp.p1LobCd  - dt);
+  mp.p2FireCd = Math.max(0, mp.p2FireCd - dt);
+  mp.p2LobCd  = Math.max(0, mp.p2LobCd  - dt);
+
+  // P2 movement from remote input
+  const ri = mp.remoteInput;
+  if (ri) {
+    const rail = clamp(ri.railIntent || 0, -1, 1);
+    if (rail < 0)      mp.opponentSpeed -= TUNING.playerAccel * (dt / 16.666);
+    else if (rail > 0) mp.opponentSpeed += TUNING.playerAccel * (dt / 16.666);
+    else               mp.opponentSpeed *= Math.pow(TUNING.playerFriction, dt / 16.666);
+    if (rail !== 0)    mp.opponentSpeed *= Math.pow(0.965, dt / 16.666);
+
+    mp.opponentSpeed = clamp(mp.opponentSpeed, -TUNING.playerMaxSpeed, TUNING.playerMaxSpeed);
+    mp.opponentX    += mp.opponentSpeed * (dt / 16.666);
+    mp.opponentX     = clamp(mp.opponentX, -TUNING.playerMaxX, TUNING.playerMaxX);
+
+    if ((mp.opponentX <= -TUNING.playerMaxX && mp.opponentSpeed < 0) ||
+        (mp.opponentX >=  TUNING.playerMaxX && mp.opponentSpeed > 0)) {
+      mp.opponentSpeed *= -0.16;
+    }
+  }
+
+  _tryFireP1(game, input);
+  _tryFireP2(game, ri);
+  mp.remoteInput = null;
+
+  _advanceBullets(mp, dt);
+  _checkHits(game, input, client);
+  _decayHeat(mp, dt);
+
+  // Timer
+  if (!mp.suddenDeath) {
+    mp.mpTimerMs -= dt;
+    if (mp.mpTimerMs <= 0) { mp.mpTimerMs = 0; mp.suddenDeath = true; }
+  }
+
+  // Broadcast authoritative state to guest
+  client.sendState({
+    tick:    mp.mpTick,
+    p1x:     game.player.x,
+    p2x:     mp.opponentX,
+    p1hp:    mp.p1hp,
+    p2hp:    mp.p2hp,
+    p1heat:  mp.p1heat,
+    p2heat:  mp.p2heat,
+    p1burn:  mp.p1burn,
+    p2burn:  mp.p2burn,
+    bullets: mp.mpBullets,
+    events:  [],
+    round:   mp.round,
+    timeMs:  mp.mpTimerMs,
+    sd:      mp.suddenDeath,
+  });
+}
+
+// ── Guest tick (p2 sends input and reconciles) ────────────────────────────────
+
+function _guestTick(game, input, dt) {
+  const client = getClient();
+  const mp     = game.mp;
+  if (mp.roundEnded) return;
+
+  mp.p2LobCd = Math.max(0, mp.p2LobCd - dt);
+
+  const wantLaser = input.consumeFirePress();
+  const wantLob   = input.consumeLobPress ? input.consumeLobPress() : false;
+
+  const railIntent = (input.isRight() ? 1 : 0) - (input.isLeft() ? 1 : 0);
+  client.sendInput(mp.mpTick, { railIntent, laser: wantLaser, lob: wantLob });
+
+  // Optimistic visual feedback (cooldowns mirror what host will apply)
+  if (wantLaser && !mp.p2burn && game.player.fireCooldown <= 0) {
+    game.player.fireCooldown = MP_TUNING.fireCooldownMs;
+    game.player.muzzleFlash  = 80;
+  }
+  if (wantLob && !mp.p2burn && mp.p2LobCd <= 0) {
+    mp.p2LobCd = MP_TUNING.lobCooldownMs;
+    game.player.muzzleFlash = 140;
+  }
+}
+
+// ── initMpLobby ───────────────────────────────────────────────────────────────
 
 export function initMpLobby(game, input) {
   const client = getClient();
   _triedSide = null;
 
-  // Read factory identity (works even if anonymous)
   try {
     const id   = window.FactoryIdentity?.getPlayerId?.()    ?? "";
     const name = window.FactoryIdentity?.getProfileName?.() ?? "Pilot";
     client.setIdentity({ playerId: id, displayName: name });
   } catch (_) {}
 
-  // ── Wire callbacks ────────────────────────────────────────────────────────
+  client.cb.onConnected = () => { game.mp.connected = true; };
 
-  client.cb.onConnected = () => {
-    game.mp.connected = true;
-  };
-
-  client.cb.onQueueCounts = (counts) => {
-    game.mp.queueCounts = counts;
-  };
+  client.cb.onQueueCounts = (counts) => { game.mp.queueCounts = counts; };
 
   client.cb.onSearching = () => {
-    // Server confirmed we're in the queue.
     game.mp.lobbyPhase = "searching";
+    game.menu.selectedButton = 0;
   };
 
   client.cb.onSearchCancelled = () => {
     game.mp.lobbyPhase = "main";
+    game.menu.selectedButton = 0;
   };
 
   client.cb.onRoomCreated = (code) => {
     game.mp.roomCode   = code;
     game.mp.lobbyPhase = "room_host";
+    game.menu.selectedButton = 0;
   };
 
   client.cb.onRemoteProfile = (profile) => {
@@ -118,37 +391,43 @@ export function initMpLobby(game, input) {
   };
 
   client.cb.onMatchReady = ({ serverNow }) => {
-    // Both sides are in the room. Compute clock offset and schedule fight start.
     game.mp.clockOffsetMs = serverNow - Date.now();
     const startAt = serverNow + MP_COUNTDOWN_LEAD_MS;
-
-    if (client.isHost()) {
-      // p1 owns round_start: broadcast then apply locally.
-      client.sendRoundStart(1, startAt);
-    }
-    // p2 receives round_start via onRoundStart callback below.
-    // p1 applies it directly here.
+    if (client.isHost()) client.sendRoundStart(1, startAt);
     _enterCountdown(game, input, 1, startAt);
   };
 
   client.cb.onRoundStart = ({ round, startAt }) => {
-    // p2 receives this; p1 never gets its own broadcast back.
     _enterCountdown(game, input, round, startAt);
+  };
+
+  // Phase 2 callbacks
+  client.cb.onRemoteInput = (msg) => {
+    game.mp.remoteInput = msg;
+  };
+
+  client.cb.onRemoteState = (snap) => {
+    if (game.state === STATE.MP_FIGHTING) _applyRemoteState(game, snap);
+  };
+
+  client.cb.onRemoteRoundEnd = ({ winner }) => {
+    _applyRoundWin(game.mp, winner);
+    game.mp.roundEnded     = true;
+    game.mp.roundEndWinner = winner;
+    game.mp.mpBullets      = [];
   };
 
   client.cb.onSideConflict = () => {
     if (game.mp.lobbyPhase === "searching") {
-      // Public auto-retry: flip to the other side and re-search.
       const otherSide = _triedSide === "p1" ? "p2" : "p1";
       _triedSide = otherSide;
       game.mp.side = otherSide;
       client.findMatch(otherSide, false);
-      // Stay in "searching" phase — user sees no disruption.
     } else {
-      // Private join: the code they entered is full or the side is taken.
       _unbindRoomCode();
       game.mp.lobbyPhase = "error";
       game.mp.errorMsg   = "ROOM FULL OR SIDE TAKEN — TRY AGAIN";
+      game.menu.selectedButton = 0;
       input.clearMenuPresses();
     }
   };
@@ -156,7 +435,7 @@ export function initMpLobby(game, input) {
   client.cb.onPartnerLeft = () => {
     _unbindRoomCode();
     if (game.state === STATE.MP_FIGHTING || game.state === STATE.MP_COUNTDOWN) {
-      game.mp.matchWinner = game.mp.side;   // we win — they forfeited
+      game.mp.matchWinner  = game.mp.side;
       game.mp.disconnected = true;
       game.state = STATE.MP_RESULT;
       game.menu.selectedButton = 0;
@@ -164,6 +443,7 @@ export function initMpLobby(game, input) {
     } else {
       game.mp.lobbyPhase = "error";
       game.mp.errorMsg   = "OPPONENT LEFT";
+      game.menu.selectedButton = 0;
       input.clearMenuPresses();
     }
   };
@@ -172,6 +452,7 @@ export function initMpLobby(game, input) {
     _unbindRoomCode();
     game.mp.lobbyPhase = "error";
     game.mp.errorMsg   = `CONNECTION ERROR (${code})`;
+    game.menu.selectedButton = 0;
     input.clearMenuPresses();
   };
 
@@ -188,7 +469,7 @@ export function initMpLobby(game, input) {
 
   client.connect();
 
-  // ── Reset mp slice ────────────────────────────────────────────────────────
+  // Reset mp slice
   game.mp.lobbyPhase           = "main";
   game.mp.connected            = false;
   game.mp.side                 = null;
@@ -206,18 +487,13 @@ export function initMpLobby(game, input) {
   game.mp.errorMsg             = null;
   game.mp.roomCode             = null;
   game.mp.roomCodeInput        = "";
+  game.mp.roundEnded           = false;
+  game.mp.roundEndWinner       = null;
+  game.mp.roundEndTimer        = 0;
 
   game.state = STATE.MP_LOBBY;
   game.menu.selectedButton = 0;
   game.stars = makeStars();
-  _clearFlashes(game, input);
-}
-
-function _enterCountdown(game, input, round, startAt) {
-  _unbindRoomCode();
-  game.state      = STATE.MP_COUNTDOWN;
-  game.mp.round   = round;
-  game.mp.startAt = startAt;
   _clearFlashes(game, input);
 }
 
@@ -229,89 +505,105 @@ export function updateMpLobby(game, input) {
 
   // ─ main phase ─
   if (phase === "main") {
-    const click = input.consumeClick();
+    // Hover: [findMatch=0, privateRoom=1, joinByCode=2, back=3]
+    const phaseBtns = [MP_LOBBY_BTNS.findMatch, MP_LOBBY_BTNS.privateRoom, MP_LOBBY_BTNS.joinByCode, MP_LOBBY_BTNS.back];
+    const mp = input.getMousePos();
+    for (let i = 0; i < phaseBtns.length; i++) {
+      const b = phaseBtns[i];
+      if (mp.x >= b.x && mp.x < b.x + b.w && mp.y >= b.y && mp.y < b.y + b.h) {
+        game.menu.selectedButton = i;
+      }
+    }
 
+    const click = input.consumeClick();
     if (click) {
       if (_hit(click, MP_LOBBY_BTNS.findMatch) && game.mp.connected) {
-        // Public auto-matchmaking: pick a random side; retry on SIDE_CONFLICT.
         const side = Math.random() < 0.5 ? "p1" : "p2";
         _triedSide = side;
         game.mp.side = side;
         client.findMatch(side, false);
-        // onSearching callback will advance phase to "searching"
         input.clearMenuPresses();
       }
-
       if (_hit(click, MP_LOBBY_BTNS.privateRoom) && game.mp.connected) {
-        // Create a private room — creator is always host (p1).
         game.mp.side = "p1";
         client.createRoom("p1");
-        // onRoomCreated callback will advance phase to "room_host"
         input.clearMenuPresses();
       }
-
       if (_hit(click, MP_LOBBY_BTNS.joinByCode) && game.mp.connected) {
-        // Join by code — joiner is always guest (p2).
         game.mp.side = "p2";
         game.mp.lobbyPhase = "room_join";
+        game.menu.selectedButton = 0;
         _bindRoomCode(game);
         input.clearMenuPresses();
       }
-
       if (_hit(click, MP_LOBBY_BTNS.back)) {
         teardownMp(game, input);
         return;
       }
     }
-
-    if (input.consumeBack()) {
-      teardownMp(game, input);
-    }
-
+    if (input.consumeBack()) { teardownMp(game, input); }
     return;
   }
 
   // ─ searching phase ─
   if (phase === "searching") {
-    const click = input.consumeClick();
+    const mp = input.getMousePos();
+    const b  = MP_LOBBY_BTNS.cancel;
+    if (mp.x >= b.x && mp.x < b.x + b.w && mp.y >= b.y && mp.y < b.y + b.h) {
+      game.menu.selectedButton = 0;
+    }
 
+    const click = input.consumeClick();
     if ((click && _hit(click, MP_LOBBY_BTNS.cancel)) || input.consumeBack()) {
       client.cancelSearch();
       client.cancelRoom();
       game.mp.lobbyPhase = "main";
       game.mp.side = null;
+      game.menu.selectedButton = 0;
       input.clearMenuPresses();
     }
     return;
   }
 
-  // ─ room_host phase (private, created room, waiting for joiner) ─
+  // ─ room_host phase ─
   if (phase === "room_host") {
-    const click = input.consumeClick();
+    const mp = input.getMousePos();
+    const b  = MP_LOBBY_BTNS.cancel;
+    if (mp.x >= b.x && mp.x < b.x + b.w && mp.y >= b.y && mp.y < b.y + b.h) {
+      game.menu.selectedButton = 0;
+    }
 
+    const click = input.consumeClick();
     if ((click && _hit(click, MP_LOBBY_BTNS.cancel)) || input.consumeBack()) {
       client.cancelRoom();
       game.mp.lobbyPhase = "main";
       game.mp.side = null;
       game.mp.roomCode = null;
+      game.menu.selectedButton = 0;
       input.clearMenuPresses();
     }
     return;
   }
 
-  // ─ room_join phase (private, entering a code) ─
+  // ─ room_join phase ─
   if (phase === "room_join") {
-    // Typing is handled by _roomCodeHandler (raw keydown).
-    const click = input.consumeClick();
-
-    if (click && _hit(click, MP_LOBBY_BTNS.joinSubmit)) {
-      _submitRoomJoin(game);
+    // Hover: [joinSubmit=0, joinBack=1]
+    const mp = input.getMousePos();
+    const joinBtns = [MP_LOBBY_BTNS.joinSubmit, MP_LOBBY_BTNS.joinBack];
+    for (let i = 0; i < joinBtns.length; i++) {
+      const b = joinBtns[i];
+      if (mp.x >= b.x && mp.x < b.x + b.w && mp.y >= b.y && mp.y < b.y + b.h) {
+        game.menu.selectedButton = i;
+      }
     }
 
+    const click = input.consumeClick();
+    if (click && _hit(click, MP_LOBBY_BTNS.joinSubmit)) _submitRoomJoin(game);
     if ((click && _hit(click, MP_LOBBY_BTNS.joinBack)) || input.consumeBack()) {
       _unbindRoomCode();
       game.mp.lobbyPhase = "main";
       game.mp.side = null;
+      game.menu.selectedButton = 0;
       input.clearMenuPresses();
     }
     return;
@@ -319,15 +611,18 @@ export function updateMpLobby(game, input) {
 
   // ─ error phase ─
   if (phase === "error") {
+    const mp = input.getMousePos();
+    const b  = MP_LOBBY_BTNS.back;
+    if (mp.x >= b.x && mp.x < b.x + b.w && mp.y >= b.y && mp.y < b.y + b.h) {
+      game.menu.selectedButton = 0;
+    }
+
     const click = input.consumeClick();
     const dismissed =
       input.consumeBack() ||
       input.consumeConfirm() ||
       (click && _hit(click, MP_LOBBY_BTNS.back));
-
-    if (dismissed) {
-      teardownMp(game, input);
-    }
+    if (dismissed) { teardownMp(game, input); }
     return;
   }
 }
@@ -335,11 +630,10 @@ export function updateMpLobby(game, input) {
 function _submitRoomJoin(game) {
   const code = game.mp.roomCodeInput.trim();
   if (code.length < 4) return;
-  const client = getClient();
-  client.joinRoom("p2", code);
-  // Transition to searching phase while we wait for the room
+  getClient().joinRoom("p2", code);
   _unbindRoomCode();
   game.mp.lobbyPhase = "searching";
+  game.menu.selectedButton = 0;
 }
 
 // ── updateMpCountdown ─────────────────────────────────────────────────────────
@@ -349,32 +643,39 @@ export function updateMpCountdown(game, input) {
     _enterFighting(game, input);
     return;
   }
+  if (input.consumeBack()) { teardownMp(game, input); }
+}
 
-  if (input.consumeBack()) {
-    teardownMp(game, input);
-  }
+function _enterCountdown(game, input, round, startAt) {
+  _unbindRoomCode();
+  game.state      = STATE.MP_COUNTDOWN;
+  game.mp.round   = round;
+  game.mp.startAt = startAt;
+  _clearFlashes(game, input);
 }
 
 function _enterFighting(game, input) {
   const client = getClient();
-  // Start at opposite rail ends: host left, guest right.
-  game.player.x     = client.isHost() ? -TUNING.playerMaxX * 0.85 : TUNING.playerMaxX * 0.85;
-  game.player.speed = 0;
-  game.player.fireCooldown = 0;
-  game.player.muzzleFlash  = 0;
-  game.player.hurtFlash    = 0;
+  game.player.muzzleFlash = 0;
+  game.player.hurtFlash   = 0;
   game.shake = 0;
+  _resetRound(game, client);
   game.state = STATE.MP_FIGHTING;
   client.startPinging();
   input.clearMenuPresses();
 }
 
-// ── updateMpFighting (Phase 1 stub) ──────────────────────────────────────────
-// Phase 1: local player moves, cockpit renders, ESC exits.
-// Phase 2 adds host sim, bidirectional bullets, HP, and round end.
+// ── updateMpFighting ──────────────────────────────────────────────────────────
 
 export function updateMpFighting(game, input, dt) {
   _updateLocalPlayer(game, input, dt);
+
+  const client = getClient();
+  if (client.isHost()) {
+    _hostTick(game, input, dt);
+  } else {
+    _guestTick(game, input, dt);
+  }
 
   if (input.consumeBack()) {
     teardownMp(game, input);
@@ -430,7 +731,6 @@ export function updateMpResult(game, input) {
   if (input.consumeBack())    { teardownMp(game, input); return; }
 
   if (activated === 0) {
-    // Rematch: re-enter lobby (full rematch handshake is Phase 3).
     teardownMp(game, input);
     initMpLobby(game, input);
   } else if (activated === 1) {
@@ -438,7 +738,7 @@ export function updateMpResult(game, input) {
   }
 }
 
-// ── teardownMp — disconnect + return to MENU ──────────────────────────────────
+// ── teardownMp ────────────────────────────────────────────────────────────────
 
 export function teardownMp(game, input) {
   _unbindRoomCode();
