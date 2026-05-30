@@ -157,7 +157,7 @@ export function renderMpLobby(ctx, game, t) {
 
     const codeInput = game.mp.roomCodeInput || "";
     const cursor    = Math.floor(t / 530) % 2 === 0 ? "█" : " ";
-    const display   = codeInput + (codeInput.length < 4 ? cursor : "");
+    const display   = codeInput + (codeInput.length < 5 ? cursor : "");
 
     ctx.fillStyle   = "rgba(4, 14, 26, 0.80)";
     ctx.strokeStyle = "rgba(52, 247, 255, 0.50)";
@@ -169,8 +169,8 @@ export function renderMpLobby(ctx, game, t) {
 
     ctx.font        = "900 44px system-ui, monospace";
     ctx.shadowColor = "#34f7ff";
-    ctx.shadowBlur  = codeInput.length === 4 ? 12 : 0;
-    ctx.fillStyle   = codeInput.length === 4 ? "#d8fbff" : "rgba(216, 251, 255, 0.70)";
+    ctx.shadowBlur  = codeInput.length === 5 ? 12 : 0;
+    ctx.fillStyle   = codeInput.length === 5 ? "#d8fbff" : "rgba(216, 251, 255, 0.70)";
     ctx.textBaseline = "middle";
     ctx.fillText(display, CX, 332);
     ctx.shadowBlur   = 0;
@@ -178,11 +178,11 @@ export function renderMpLobby(ctx, game, t) {
 
     ctx.font      = "500 12px system-ui, sans-serif";
     ctx.fillStyle = "rgba(216, 251, 255, 0.34)";
-    ctx.fillText("Type the 4-character code · Backspace to erase", CX, 378);
+    ctx.fillText("Type the 5-character code · Backspace to erase", CX, 378);
 
     ctx.save();
-    ctx.globalAlpha = codeInput.length === 4 ? 1.0 : 0.38;
-    _drawBtn(ctx, MP_LOBBY_BTNS.joinSubmit, sel === 0 && codeInput.length === 4, t);
+    ctx.globalAlpha = codeInput.length === 5 ? 1.0 : 0.38;
+    _drawBtn(ctx, MP_LOBBY_BTNS.joinSubmit, sel === 0 && codeInput.length === 5, t);
     ctx.restore();
     _drawBtn(ctx, MP_LOBBY_BTNS.joinBack, sel === 1, t);
   }

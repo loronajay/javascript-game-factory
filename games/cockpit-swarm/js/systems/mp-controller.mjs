@@ -64,13 +64,13 @@ function _bindRoomCode(game) {
   el.setAttribute("autocapitalize", "characters");
   el.setAttribute("autocorrect", "off");
   el.setAttribute("spellcheck", "false");
-  el.maxLength = 4;
+  el.maxLength = 5;
   el.style.cssText = "position:fixed;opacity:0;pointer-events:none;top:0;left:0;width:1px;height:1px;";
   document.body.appendChild(el);
   _roomCodeInput = el;
 
   el.addEventListener("input", () => {
-    const v = el.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+    const v = el.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 5).toUpperCase();
     el.value = v;
     game.mp.roomCodeInput = v;
   });
@@ -85,7 +85,7 @@ function _bindRoomCode(game) {
     if (e.key === "Backspace") {
       game.mp.roomCodeInput = game.mp.roomCodeInput.slice(0, -1);
       el.value = game.mp.roomCodeInput;
-    } else if (/^[A-Za-z0-9]$/.test(e.key) && game.mp.roomCodeInput.length < 4) {
+    } else if (/^[A-Za-z0-9]$/.test(e.key) && game.mp.roomCodeInput.length < 5) {
       game.mp.roomCodeInput += e.key.toUpperCase();
       el.value = game.mp.roomCodeInput;
     } else if (e.key === "Enter") {
@@ -431,7 +431,7 @@ export function initMpLobby(game, input) {
   };
 
   client.cb.onMatchReady = ({ serverNow, remoteSide }) => {
-    if (remoteSide) game.mp.side = remoteSide;
+    if (remoteSide) game.mp.side = remoteSide === "p1" ? "p2" : "p1";
     game.mp.clockOffsetMs = serverNow - Date.now();
     const startAt = serverNow + MP_COUNTDOWN_LEAD_MS;
     if (client.isHost()) client.sendRoundStart(1, startAt);
@@ -670,7 +670,7 @@ export function updateMpLobby(game, input) {
 
 function _submitRoomJoin(game) {
   const code = game.mp.roomCodeInput.trim();
-  if (code.length < 4) return;
+  if (code.length < 5) return;
   getClient().joinRoom("p2", code);
   _unbindRoomCode();
   game.mp.lobbyPhase = "searching";
