@@ -46,4 +46,106 @@ canvas {
     0 0 28px rgba(52, 247, 255, 0.22);
 }
 
-/* Mobile controls are injected by mountMobileController() in main.mjs. */
+/* ── Mobile controller — safe area overrides ─────────────────────────────── */
+
+.mobile-controller[data-mobile-controller-root="cockpit-swarm"] .mobile-controller__pad {
+  left:   max(14px, env(safe-area-inset-left))   !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+/* All buttons: respect bottom safe area */
+.mobile-controller[data-mobile-controller-root="cockpit-swarm"] .mobile-controller__button {
+  bottom: max(18px, env(safe-area-inset-bottom)) !important;
+}
+
+/* FIRE button (1st face button = 2nd child div after the d-pad) */
+.mobile-controller[data-mobile-controller-root="cockpit-swarm"] .mobile-controller__button:nth-of-type(2) {
+  right: max(18px, env(safe-area-inset-right)) !important;
+}
+
+/* LOB button (2nd face button) */
+.mobile-controller[data-mobile-controller-root="cockpit-swarm"] .mobile-controller__button:nth-of-type(3) {
+  right: max(96px, calc(env(safe-area-inset-right) + 78px)) !important;
+}
+
+/* ── Landscape gate ───────────────────────────────────────────────────────── */
+
+.mobile-landscape-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 999950;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 0%, rgba(52, 247, 255, 0.14), transparent 42%),
+    rgba(2, 7, 16, 0.90);
+  color: #d8fbff;
+}
+
+.mobile-landscape-gate.is-visible {
+  display: flex;
+}
+
+.mobile-play-gated #gameWrap {
+  filter: blur(2px) brightness(0.45);
+  pointer-events: none;
+}
+
+.mobile-landscape-gate-card {
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+  padding: 24px 26px;
+  border: 1px solid rgba(52, 247, 255, 0.32);
+  border-radius: 10px;
+  background: rgba(2, 7, 16, 0.92);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+.mobile-landscape-gate-kicker {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(52, 247, 255, 0.55);
+}
+
+.mobile-landscape-gate-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #34f7ff;
+  text-shadow: 0 0 18px rgba(52, 247, 255, 0.55);
+}
+
+.mobile-landscape-gate-copy {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(216, 251, 255, 0.62);
+}
+
+.mobile-landscape-gate-btn {
+  min-height: 44px;
+  padding: 11px 20px;
+  border: 1px solid rgba(52, 247, 255, 0.55);
+  border-radius: 8px;
+  background: rgba(52, 247, 255, 0.10);
+  color: #34f7ff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s;
+}
+
+.mobile-landscape-gate-btn:hover {
+  background: rgba(52, 247, 255, 0.18);
+}

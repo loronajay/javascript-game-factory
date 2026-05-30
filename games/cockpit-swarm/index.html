@@ -14,8 +14,10 @@
   <script type="module" src="./js/main.mjs"></script>
   <script type="module">
     import { mountMobileController } from '../../js/mobile-controller.mjs';
+    import { initMobileLandscapeGate } from './js/mobile-gate.mjs';
     const force = new URLSearchParams(location.search).has('forceMobileControls');
     mountMobileController({ profile: 'cockpit-swarm', force });
+    initMobileLandscapeGate({ force });
   </script>
 </body>
 </html>
