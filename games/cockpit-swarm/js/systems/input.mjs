@@ -82,6 +82,9 @@ export function createInput() {
       if (prop === "firePointer" && !touch.firePointer && !keys.fire) {
         pressed.fire = true;
       }
+      if (prop === "lobPointer" && !touch.lobPointer && !keys.lob) {
+        pressed.lob = true;
+      }
       touch[prop] = true;
     };
 

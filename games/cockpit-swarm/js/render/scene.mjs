@@ -7,6 +7,29 @@ import { project, projectEnemyBullet } from "../systems/projection.mjs";
 import { getStage } from "../systems/stages.mjs";
 import { renderBoss, renderBossHud } from "./boss-scene.mjs";
 import { renderMpLobby, renderMpCountdown, renderMpWorld, renderMpFighting, renderMpResult } from "./mp-scene.mjs";
+import { RenderQuality } from "./quality.mjs";
+
+// Offscreen canvas — galaxy + planet cached for mobile to avoid re-rendering
+// complex gradients every frame.  Refreshed every 3 s so the moon still moves.
+let _celestialCanvas = null;
+let _celestialCacheT = -Infinity;
+const CELESTIAL_TTL = 3000;
+
+function getCelestialCache(t) {
+  if (!_celestialCanvas) {
+    _celestialCanvas = document.createElement("canvas");
+    _celestialCanvas.width  = W;
+    _celestialCanvas.height = Math.round(H * 0.74);
+  }
+  if (t - _celestialCacheT > CELESTIAL_TTL) {
+    _celestialCacheT = t;
+    const c = _celestialCanvas.getContext("2d");
+    c.clearRect(0, 0, W, _celestialCanvas.height);
+    drawGalaxy(c, t);
+    drawPlanet(c, t);
+  }
+  return _celestialCanvas;
+}
 
 // ─── Main render entry ────────────────────────────────────────────────────────
 
@@ -406,10 +429,18 @@ function renderBackground(ctx, game, t) {
   ctx.rect(0, 0, W, isMenuState ? H : H * 0.74);
   ctx.clip();
 
-  drawGalaxy(ctx, t);
-  drawPlanet(ctx, t);
+  if (RenderQuality.lowPerf) {
+    ctx.drawImage(getCelestialCache(t), 0, 0);
+  } else {
+    drawGalaxy(ctx, t);
+    drawPlanet(ctx, t);
+  }
 
+  let _starSkip = 0;
   for (const s of game.stars) {
+    // On mobile draw every other star to halve per-frame arc calls
+    if (RenderQuality.lowPerf && _starSkip++ % 2 === 0) continue;
+
     let px, py;
     if (isMenuState) {
       // Stars drift slowly downward — parallax warp approach effect
@@ -606,14 +637,16 @@ function renderMenuAtmosphere(ctx, t) {
 
   ctx.restore();
 
-  // Subtle horizontal scanlines
-  ctx.save();
-  ctx.globalAlpha = 0.035;
-  ctx.fillStyle = "#000";
-  for (let y = 0; y < H; y += 4) {
-    ctx.fillRect(0, y, W, 2);
+  // Subtle horizontal scanlines — skip on mobile (180 fillRects per frame is costly)
+  if (!RenderQuality.lowPerf) {
+    ctx.save();
+    ctx.globalAlpha = 0.035;
+    ctx.fillStyle = "#000";
+    for (let y = 0; y < H; y += 4) {
+      ctx.fillRect(0, y, W, 2);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   // Edge vignette — keeps menu content readable against star field
   ctx.save();

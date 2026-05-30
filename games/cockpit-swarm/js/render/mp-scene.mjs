@@ -276,6 +276,9 @@ export function renderMpWorld(ctx, game, t) {
   _renderOpponentShip(ctx, op, t);
 
   // Bullets
+  const startZ = Z_FAR - 0.2;
+  const hitZ   = Z_NEAR + 0.5;
+
   for (const b of mpBullets) {
     // From P2's perspective, flip z so their own bullets go away and P1's come in
     const viewZ = isP2 ? (Z_NEAR + Z_FAR - b.z) : b.z;
@@ -284,18 +287,28 @@ export function renderMpWorld(ctx, game, t) {
     const isIncoming = (side === "p1" && b.owner === "p2") ||
                        (side === "p2" && b.owner === "p1");
 
-    const raw = project(b.x, 0, viewZ, localPlayerX);
+    const approach = isIncoming ? clamp((startZ - viewZ) / (startZ - hitZ), 0, 1) : 0;
 
-    // Incoming bullets converge toward the reticle as they approach
-    let bulletY = raw.y;
+    const raw = project(b.x, 0, viewZ, localPlayerX);
+    let bx = raw.x;
+    let by = raw.y;
+    if (isIncoming) by = lerp(raw.y, RETICLE_Y, approach * approach);
+
+    // Tail: shift depth slightly away to get the trailing edge position
+    const tailDz     = b.kind === "lob" ? 0.55 : 0.30;
+    const tailViewZ  = isIncoming
+      ? Math.min(viewZ + tailDz, Z_FAR)
+      : Math.max(viewZ - tailDz, Z_NEAR);
+    const tailRaw = project(b.x, 0, tailViewZ, localPlayerX);
+    let tx = tailRaw.x;
+    let ty = tailRaw.y;
     if (isIncoming) {
-      const startZ  = Z_FAR - 0.2;
-      const hitZ    = Z_NEAR + 0.5;
-      const approach = clamp((startZ - viewZ) / (startZ - hitZ), 0, 1);
-      bulletY = lerp(raw.y, RETICLE_Y, approach * approach);
+      const tailApproach = clamp((startZ - tailViewZ) / (startZ - hitZ), 0, 1);
+      ty = lerp(tailRaw.y, RETICLE_Y, tailApproach * tailApproach);
     }
 
-    _renderBullet(ctx, raw.x, bulletY, raw.s, b.kind, isIncoming);
+    const onLane = isIncoming && Math.abs(b.x - localPlayerX) <= MP_TUNING.hitWindowX;
+    _renderBullet(ctx, bx, by, raw.s, tx, ty, b.kind, isIncoming, approach, onLane);
   }
 }
 
@@ -326,21 +339,62 @@ function _renderOpponentShip(ctx, op, t) {
   ctx.restore();
 }
 
-function _renderBullet(ctx, bx, by, s, kind, isIncoming) {
+function _renderBullet(ctx, bx, by, s, tx, ty, kind, isIncoming, approach, onLane) {
   ctx.save();
-  const r = kind === "lob"
-    ? Math.max(2, (isIncoming ? 14 : 7) * s)
-    : Math.max(1, (isIncoming ? 8  : 4) * s);
-  const color = kind === "lob"
-    ? (isIncoming ? "#ff8800" : "#ffcc00")
-    : (isIncoming ? "#ff4040" : "#34f7ff");
 
+  const isLob = kind === "lob";
+  const color  = isLob
+    ? (isIncoming ? "#ff8800" : "#ffcc44")
+    : (isIncoming ? "#ff365d" : "#34f7ff");
+
+  const r = Math.max(1.5, (isLob ? 11 : 5.5) * s * lerp(0.85, 1.55, approach));
+
+  // — Tail trail —
+  ctx.globalAlpha = clamp(0.18 + approach * 0.46, 0.18, 0.74);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = Math.max(1.5, r * (isLob ? 0.30 : 0.16));
+  ctx.lineCap     = "round";
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = 10 + approach * 20;
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(bx, by);
+  ctx.stroke();
+
+  // — Outer glow ring —
+  const ringAlpha = clamp(0.38 + approach * 0.62, 0.38, 1.0);
+  ctx.globalAlpha = ringAlpha;
+  ctx.shadowBlur  = 14 + approach * 34;
+  ctx.shadowColor = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = Math.max(1.5, r * (isLob ? 0.26 : 0.20));
   ctx.beginPath();
   ctx.arc(bx, by, r, 0, Math.PI * 2);
-  ctx.fillStyle   = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur  = isIncoming ? r * 2.5 : r * 1.8;
+  ctx.stroke();
+
+  // — Inner core fill (inherits ringAlpha) —
+  const fillBright = isLob
+    ? (isIncoming ? "rgba(255,136,0,0.40)"  : "rgba(255,204,68,0.22)")
+    : (isIncoming ? "rgba(255,54,93,0.38)"  : "rgba(52,247,255,0.18)");
+  const fillDim = isLob
+    ? (isIncoming ? "rgba(255,136,0,0.22)"  : "rgba(255,204,68,0.12)")
+    : (isIncoming ? "rgba(255,54,93,0.18)"  : "rgba(52,247,255,0.10)");
+  ctx.fillStyle = approach > 0.65 ? fillBright : fillDim;
+  ctx.beginPath();
+  ctx.arc(bx, by, r * 0.44, 0, Math.PI * 2);
   ctx.fill();
+
+  // — Danger ring around reticle for close incoming on-lane bullets —
+  if (onLane && approach > 0.55) {
+    ctx.globalAlpha = 0.16 + approach * 0.34;
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2;
+    ctx.shadowBlur  = 6;
+    ctx.beginPath();
+    ctx.arc(CX, RETICLE_Y, 62, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 

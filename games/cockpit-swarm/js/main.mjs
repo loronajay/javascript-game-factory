@@ -4,9 +4,25 @@ import { createInput } from "./systems/input.mjs";
 import { initMenuState, updateGame } from "./systems/game.mjs";
 import { renderGame } from "./render/scene.mjs";
 import { initAudio, startMenuMusic } from "./systems/audio.mjs";
+import { RenderQuality } from "./render/quality.mjs";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d", { alpha: false });
+
+// Detect mobile/touch hardware and enable low-perf mode.
+// Intercept ctx.shadowBlur at the instance level so all 100+ assignments in the
+// render pipeline become no-ops — no changes required in scene or boss-scene.
+RenderQuality.lowPerf =
+  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  !!window.matchMedia?.("(pointer: coarse)")?.matches;
+
+if (RenderQuality.lowPerf) {
+  try {
+    Object.defineProperty(ctx, "shadowBlur", { get: () => 0, set: () => {} });
+  } catch (_) {
+    // If the browser won't allow it, quality degrades gracefully
+  }
+}
 
 if (!CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
@@ -50,7 +66,9 @@ canvas.addEventListener("touchstart", (e) => {
   if (e.touches.length > 0) {
     const p = toCanvasPos(e.touches[0].clientX, e.touches[0].clientY);
     input.setMousePos(p.x, p.y);
-    input.registerClick(p.x, p.y);
+    // Don't registerClick here — the synthetic 'click' event fires after touchend
+    // and handles both mouse and touch. Registering here too queues two clicks per
+    // tap on mobile, causing the second to bleed through to the next screen.
   }
 }, { passive: true });
 

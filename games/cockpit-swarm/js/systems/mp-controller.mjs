@@ -16,7 +16,7 @@ import { STATE, TUNING, MP_TUNING, MP_LOBBY_BTNS, MP_RESULT_BTNS } from "../core
 import { clamp } from "../core/math.mjs";
 import { makeStars } from "../entities/stars.mjs";
 import { createOnlineClient, hasCountdownStarted } from "./online.mjs";
-import { startMenuMusic } from "./audio.mjs";
+import { startMenuMusic, startGameMusic, sfxShoot, sfxPowerup, sfxPlayerHurt } from "./audio.mjs";
 
 // ── Client singleton ──────────────────────────────────────────────────────────
 
@@ -120,11 +120,12 @@ function _tryFireP1(game, input) {
   const mp = game.mp;
   if (mp.p1burn) return;
 
-  if (input.consumeFirePress() && game.player.fireCooldown <= 0) {
+  if (!mp.suddenDeath && input.consumeFirePress() && game.player.fireCooldown <= 0) {
     mp.mpBullets.push({ id: _bulletId++, owner: "p1", x: game.player.x, z: Z_NEAR + 0.15, kind: "laser" });
     game.player.fireCooldown = MP_TUNING.fireCooldownMs;
     game.player.muzzleFlash  = 80;
     mp.p1heat = Math.min(MP_TUNING.burnoutThreshold, mp.p1heat + MP_TUNING.laserHeat);
+    sfxShoot();
   }
 
   if (input.consumeLobPress && input.consumeLobPress() && mp.p1LobCd <= 0) {
@@ -132,6 +133,7 @@ function _tryFireP1(game, input) {
     mp.p1LobCd = MP_TUNING.lobCooldownMs;
     game.player.muzzleFlash = 140;
     mp.p1heat = Math.min(MP_TUNING.burnoutThreshold, mp.p1heat + MP_TUNING.lobHeat);
+    sfxPowerup();
   }
 }
 
@@ -139,7 +141,7 @@ function _tryFireP2(game, ri) {
   const mp = game.mp;
   if (!ri || mp.p2burn) return;
 
-  if (ri.laser && mp.p2FireCd <= 0) {
+  if (!mp.suddenDeath && ri.laser && mp.p2FireCd <= 0) {
     mp.mpBullets.push({ id: _bulletId++, owner: "p2", x: mp.opponentX, z: Z_FAR - 0.15, kind: "laser" });
     mp.p2FireCd = MP_TUNING.fireCooldownMs;
     mp.p2heat   = Math.min(MP_TUNING.burnoutThreshold, mp.p2heat + MP_TUNING.laserHeat);
@@ -224,6 +226,7 @@ function _checkHits(game, input, client) {
         mp.p1hp = Math.max(0, mp.p1hp - dmg);
         game.shake = 6;
         game.player.hurtFlash = 220;
+        sfxPlayerHurt();
         if (mp.p1hp <= 0) _endRound(game, input, "p2", client);
       }
     } else if (b.z > Z_FAR || b.z < Z_NEAR) {
@@ -341,16 +344,19 @@ function _guestTick(game, input, dt) {
   const wantLob   = input.consumeLobPress ? input.consumeLobPress() : false;
 
   const railIntent = (input.isRight() ? 1 : 0) - (input.isLeft() ? 1 : 0);
-  client.sendInput(mp.mpTick, { railIntent, laser: wantLaser, lob: wantLob });
+  // Suppress laser intent during sudden death; host would ignore it anyway
+  client.sendInput(mp.mpTick, { railIntent, laser: wantLaser && !mp.suddenDeath, lob: wantLob });
 
   // Optimistic visual feedback (cooldowns mirror what host will apply)
-  if (wantLaser && !mp.p2burn && game.player.fireCooldown <= 0) {
+  if (wantLaser && !mp.p2burn && !mp.suddenDeath && game.player.fireCooldown <= 0) {
     game.player.fireCooldown = MP_TUNING.fireCooldownMs;
     game.player.muzzleFlash  = 80;
+    sfxShoot();
   }
   if (wantLob && !mp.p2burn && mp.p2LobCd <= 0) {
     mp.p2LobCd = MP_TUNING.lobCooldownMs;
     game.player.muzzleFlash = 140;
+    sfxPowerup();
   }
 }
 
@@ -663,6 +669,7 @@ function _enterFighting(game, input) {
   game.state = STATE.MP_FIGHTING;
   client.startPinging();
   input.clearMenuPresses();
+  startGameMusic(false);
 }
 
 // ── updateMpFighting ──────────────────────────────────────────────────────────

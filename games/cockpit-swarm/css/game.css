@@ -46,6 +46,32 @@ canvas {
     0 0 28px rgba(52, 247, 255, 0.22);
 }
 
+/* ── Back to Arcade button ───────────────────────────────────────────────── */
+
+.back-btn {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+  padding: 0.55rem 1rem;
+  border: 1px solid rgba(52, 247, 255, 0.40);
+  border-radius: 999px;
+  background: rgba(2, 7, 16, 0.78);
+  color: var(--text);
+  font: 600 12px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 14px rgba(52, 247, 255, 0.12);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.back-btn:hover {
+  border-color: rgba(52, 247, 255, 0.80);
+  box-shadow: 0 0 22px rgba(52, 247, 255, 0.28);
+}
+
 /* ── Mobile controller — safe area overrides ─────────────────────────────── */
 
 .mobile-controller[data-mobile-controller-root="cockpit-swarm"] .mobile-controller__pad {
