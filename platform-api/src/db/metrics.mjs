@@ -1,85 +1,77 @@
-import {
-  buildDefaultProfileMetricsRecord,
-  normalizeProfileMetricsRecord,
-} from "../normalize.mjs";
-
+import { buildDefaultProfileMetricsRecord, normalizeProfileMetricsRecord, } from "../normalize.mjs";
 function sanitizePlayerId(value) {
-  return typeof value === "string" ? value.trim().slice(0, 80) : "";
+    return typeof value === "string" ? value.trim().slice(0, 80) : "";
 }
-
 function ensureJsonObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
-
 function mapRowToMetricsRecord(row = {}, fallbackPlayerId = "") {
-  return normalizeProfileMetricsRecord({
-    playerId: row.player_id || fallbackPlayerId,
-    profileViewCount: row.profile_view_count,
-    thoughtPostCount: row.thought_post_count,
-    activityItemCount: row.activity_item_count,
-    receivedReactionCount: row.received_reaction_count,
-    receivedCommentCount: row.received_comment_count,
-    receivedShareCount: row.received_share_count,
-    mostPlayedGameSlug: row.most_played_game_slug,
-    mostPlayedWithPlayerId: row.most_played_with_player_id,
-    friendCount: row.friend_count,
-    friendPoints: ensureJsonObject(row.friend_points),
-    totalPlaySessionCount: row.total_play_session_count,
-    totalPlayTimeMinutes: row.total_play_time_minutes,
-    uniqueGamesPlayedCount: row.unique_games_played_count,
-    eventParticipationCount: row.event_participation_count,
-    topThreeFinishCount: row.top_three_finish_count,
-    mutualFriendCount: row.mutual_friend_count,
-    sharedGameCount: row.shared_game_count,
-    sharedSessionCount: row.shared_session_count,
-    sharedEventCount: row.shared_event_count,
-    resultsScreenProfileOpenCount: row.results_screen_profile_open_count,
-    resultsScreenAddFriendClickCount: row.results_screen_add_friend_click_count,
-    chatProfileOpenCount: row.chat_profile_open_count,
-    friendRequestSentCount: row.friend_request_sent_count,
-    friendRequestAcceptedCount: row.friend_request_accepted_count,
-    thoughtImpressionCount: row.thought_impression_count,
-    profileOpenSourceBreakdown: ensureJsonObject(row.profile_open_source_breakdown),
-  });
+    return normalizeProfileMetricsRecord({
+        playerId: row.player_id || fallbackPlayerId,
+        profileViewCount: row.profile_view_count,
+        thoughtPostCount: row.thought_post_count,
+        activityItemCount: row.activity_item_count,
+        receivedReactionCount: row.received_reaction_count,
+        receivedCommentCount: row.received_comment_count,
+        receivedShareCount: row.received_share_count,
+        mostPlayedGameSlug: row.most_played_game_slug,
+        mostPlayedWithPlayerId: row.most_played_with_player_id,
+        friendCount: row.friend_count,
+        friendPoints: ensureJsonObject(row.friend_points),
+        totalPlaySessionCount: row.total_play_session_count,
+        totalPlayTimeMinutes: row.total_play_time_minutes,
+        uniqueGamesPlayedCount: row.unique_games_played_count,
+        eventParticipationCount: row.event_participation_count,
+        topThreeFinishCount: row.top_three_finish_count,
+        mutualFriendCount: row.mutual_friend_count,
+        sharedGameCount: row.shared_game_count,
+        sharedSessionCount: row.shared_session_count,
+        sharedEventCount: row.shared_event_count,
+        resultsScreenProfileOpenCount: row.results_screen_profile_open_count,
+        resultsScreenAddFriendClickCount: row.results_screen_add_friend_click_count,
+        chatProfileOpenCount: row.chat_profile_open_count,
+        friendRequestSentCount: row.friend_request_sent_count,
+        friendRequestAcceptedCount: row.friend_request_accepted_count,
+        thoughtImpressionCount: row.thought_impression_count,
+        profileOpenSourceBreakdown: ensureJsonObject(row.profile_open_source_breakdown),
+    });
 }
-
 function buildMetricsParams(playerId, metrics) {
-  return [
-    playerId,
-    metrics.profileViewCount,
-    metrics.thoughtPostCount,
-    metrics.activityItemCount,
-    metrics.receivedReactionCount,
-    metrics.receivedCommentCount,
-    metrics.receivedShareCount,
-    metrics.mostPlayedGameSlug,
-    metrics.mostPlayedWithPlayerId,
-    metrics.friendCount,
-    JSON.stringify(metrics.friendPoints),
-    metrics.totalPlaySessionCount,
-    metrics.totalPlayTimeMinutes,
-    metrics.uniqueGamesPlayedCount,
-    metrics.eventParticipationCount,
-    metrics.topThreeFinishCount,
-    metrics.mutualFriendCount,
-    metrics.sharedGameCount,
-    metrics.sharedSessionCount,
-    metrics.sharedEventCount,
-    metrics.resultsScreenProfileOpenCount,
-    metrics.resultsScreenAddFriendClickCount,
-    metrics.chatProfileOpenCount,
-    metrics.friendRequestSentCount,
-    metrics.friendRequestAcceptedCount,
-    metrics.thoughtImpressionCount,
-    JSON.stringify(metrics.profileOpenSourceBreakdown),
-  ];
+    return [
+        playerId,
+        metrics.profileViewCount,
+        metrics.thoughtPostCount,
+        metrics.activityItemCount,
+        metrics.receivedReactionCount,
+        metrics.receivedCommentCount,
+        metrics.receivedShareCount,
+        metrics.mostPlayedGameSlug,
+        metrics.mostPlayedWithPlayerId,
+        metrics.friendCount,
+        JSON.stringify(metrics.friendPoints),
+        metrics.totalPlaySessionCount,
+        metrics.totalPlayTimeMinutes,
+        metrics.uniqueGamesPlayedCount,
+        metrics.eventParticipationCount,
+        metrics.topThreeFinishCount,
+        metrics.mutualFriendCount,
+        metrics.sharedGameCount,
+        metrics.sharedSessionCount,
+        metrics.sharedEventCount,
+        metrics.resultsScreenProfileOpenCount,
+        metrics.resultsScreenAddFriendClickCount,
+        metrics.chatProfileOpenCount,
+        metrics.friendRequestSentCount,
+        metrics.friendRequestAcceptedCount,
+        metrics.thoughtImpressionCount,
+        JSON.stringify(metrics.profileOpenSourceBreakdown),
+    ];
 }
-
 export async function loadPlayerMetrics(db, playerId) {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  if (!normalizedPlayerId) return buildDefaultProfileMetricsRecord("");
-
-  const result = await db.query(`
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId)
+        return buildDefaultProfileMetricsRecord("");
+    const result = await db.query(`
     select
       player_id,
       profile_view_count,
@@ -112,31 +104,26 @@ export async function loadPlayerMetrics(db, playerId) {
     where player_id = $1
     limit 1
   `, [normalizedPlayerId]);
-
-  if (!result?.rows?.[0]) {
-    return buildDefaultProfileMetricsRecord(normalizedPlayerId);
-  }
-
-  return mapRowToMetricsRecord(result.rows[0], normalizedPlayerId);
+    if (!result?.rows?.[0]) {
+        return buildDefaultProfileMetricsRecord(normalizedPlayerId);
+    }
+    return mapRowToMetricsRecord(result.rows[0], normalizedPlayerId);
 }
-
 export async function savePlayerMetrics(db, playerId, patch = {}) {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  if (!normalizedPlayerId) return null;
-
-  const normalized = normalizeProfileMetricsRecord({
-    ...patch,
-    playerId: normalizedPlayerId,
-  });
-
-  await db.query(`
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId)
+        return null;
+    const normalized = normalizeProfileMetricsRecord({
+        ...patch,
+        playerId: normalizedPlayerId,
+    });
+    await db.query(`
     insert into players (player_id)
     values ($1)
     on conflict (player_id) do update
       set updated_at = now()
   `, [normalizedPlayerId]);
-
-  const result = await db.query(`
+    const result = await db.query(`
     insert into player_metrics (
       player_id,
       profile_view_count,
@@ -226,16 +213,12 @@ export async function savePlayerMetrics(db, playerId, patch = {}) {
       thought_impression_count,
       profile_open_source_breakdown
   `, buildMetricsParams(normalizedPlayerId, normalized));
-
-  const savedRecord = mapRowToMetricsRecord(result?.rows?.[0] || null, normalizedPlayerId);
-
-  // keep player_profiles.thought_count in sync so the public profile endpoint stays accurate
-  await db.query(`
+    const savedRecord = mapRowToMetricsRecord(result?.rows?.[0] || null, normalizedPlayerId);
+    // keep player_profiles.thought_count in sync so the public profile endpoint stays accurate
+    await db.query(`
     update player_profiles
     set thought_count = $1, updated_at = now()
     where player_id = $2
   `, [savedRecord.thoughtPostCount, normalizedPlayerId]).catch(() => null);
-
-  return savedRecord;
+    return savedRecord;
 }
-

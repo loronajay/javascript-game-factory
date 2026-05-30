@@ -1,187 +1,163 @@
-import {
-  buildDefaultFriendCode,
-  normalizeFactoryProfile,
-  sanitizeProfileFriendCode,
-} from "../normalize.mjs";
-
+import { buildDefaultFriendCode, normalizeFactoryProfile, sanitizeProfileFriendCode, } from "../normalize.mjs";
 function sanitizePlayerId(value) {
-  return typeof value === "string" ? value.trim().slice(0, 80) : "";
+    return typeof value === "string" ? value.trim().slice(0, 80) : "";
 }
-
 function sanitizeCount(value) {
-  const number = Math.floor(Number(value) || 0);
-  return Math.max(0, number);
+    const number = Math.floor(Number(value) || 0);
+    return Math.max(0, number);
 }
-
 function ensureJsonArray(value) {
-  return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value : [];
 }
-
 function ensureJsonObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
-
 function normalizeStringList(value) {
-  if (!Array.isArray(value)) return [];
-
-  const seen = new Set();
-  const normalized = [];
-  for (const entry of value) {
-    const item = typeof entry === "string" ? entry.trim() : "";
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    normalized.push(item);
-  }
-  return normalized;
+    if (!Array.isArray(value))
+        return [];
+    const seen = new Set();
+    const normalized = [];
+    for (const entry of value) {
+        const item = typeof entry === "string" ? entry.trim() : "";
+        if (!item || seen.has(item))
+            continue;
+        seen.add(item);
+        normalized.push(item);
+    }
+    return normalized;
 }
-
 function normalizeRecentActivity(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry));
+    if (!Array.isArray(value))
+        return [];
+    return value.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry));
 }
-
 function normalizeStoredProfile(source = {}) {
-  const normalized = normalizeFactoryProfile(source, {
-    playerIdGenerator: () => source.playerId || "",
-  });
-
-  return {
-    ...normalized,
-    featuredGames: normalizeStringList(source.featuredGames),
-    recentActivity: normalizeRecentActivity(source.recentActivity),
-    thoughtCount: sanitizeCount(source.thoughtCount),
-  };
+    const normalized = normalizeFactoryProfile(source, {
+        playerIdGenerator: () => source.playerId || "",
+    });
+    return {
+        ...normalized,
+        featuredGames: normalizeStringList(source.featuredGames),
+        recentActivity: normalizeRecentActivity(source.recentActivity),
+        thoughtCount: sanitizeCount(source.thoughtCount),
+    };
 }
-
 function mapRowToFactoryProfile(row = {}) {
-  if (!row?.player_id) return null;
-
-  const preferences = ensureJsonObject(row.preferences);
-  const discoverable = preferences.discoverable !== false;
-
-  const profile = normalizeStoredProfile({
-    playerId: row.player_id,
-    profileName: row.profile_name,
-    friendCode: row.friend_code,
-    realName: row.real_name,
-    bio: row.bio,
-    tagline: row.tagline,
-    avatarAssetId: row.avatar_asset_id,
-    backgroundImageUrl: row.background_image_url,
-    backgroundStyle: row.background_style || 'blend',
-    presence: row.presence,
-    favoriteGameSlug: row.favorite_game_slug,
-    ladderPlacements: ensureJsonArray(row.ladder_placements),
-    friendsPreview: ensureJsonArray(row.friends_preview),
-    mainSqueeze: ensureJsonObject(row.main_squeeze),
-    badgeIds: ensureJsonArray(row.badge_ids),
-    favorites: ensureJsonArray(row.favorites),
-    friends: ensureJsonArray(row.friends),
-    recentPartners: ensureJsonArray(row.recent_partners),
-    links: ensureJsonArray(row.links),
-    preferences,
-    featuredGames: ensureJsonArray(row.featured_games),
-    recentActivity: ensureJsonArray(row.recent_activity),
-    thoughtCount: Number(row.thought_count) || 0,
-    profileMusicPlaylist: ensureJsonArray(row.profile_music_playlist),
-  });
-
-  profile.hasAccount = Boolean(row.has_account);
-  profile.discoverable = discoverable;
-  return profile;
+    if (!row?.player_id)
+        return null;
+    const preferences = ensureJsonObject(row.preferences);
+    const discoverable = preferences.discoverable !== false;
+    const profile = normalizeStoredProfile({
+        playerId: row.player_id,
+        profileName: row.profile_name,
+        friendCode: row.friend_code,
+        realName: row.real_name,
+        bio: row.bio,
+        tagline: row.tagline,
+        avatarAssetId: row.avatar_asset_id,
+        backgroundImageUrl: row.background_image_url,
+        backgroundStyle: row.background_style || 'blend',
+        presence: row.presence,
+        favoriteGameSlug: row.favorite_game_slug,
+        ladderPlacements: ensureJsonArray(row.ladder_placements),
+        friendsPreview: ensureJsonArray(row.friends_preview),
+        mainSqueeze: ensureJsonObject(row.main_squeeze),
+        badgeIds: ensureJsonArray(row.badge_ids),
+        favorites: ensureJsonArray(row.favorites),
+        friends: ensureJsonArray(row.friends),
+        recentPartners: ensureJsonArray(row.recent_partners),
+        links: ensureJsonArray(row.links),
+        preferences,
+        featuredGames: ensureJsonArray(row.featured_games),
+        recentActivity: ensureJsonArray(row.recent_activity),
+        thoughtCount: Number(row.thought_count) || 0,
+        profileMusicPlaylist: ensureJsonArray(row.profile_music_playlist),
+    });
+    profile.hasAccount = Boolean(row.has_account);
+    profile.discoverable = discoverable;
+    return profile;
 }
-
 function buildProfileParams(playerId, profile) {
-  return [
-    playerId,
-    profile.profileName,
-    profile.friendCode,
-    profile.realName,
-    profile.bio,
-    profile.tagline,
-    profile.avatarAssetId,
-    profile.backgroundImageUrl,
-    profile.backgroundStyle || 'blend',
-    profile.presence,
-    profile.favoriteGameSlug,
-    JSON.stringify(profile.ladderPlacements),
-    JSON.stringify(profile.friendsPreview),
-    profile.mainSqueeze?.playerId || profile.mainSqueeze?.profileName ? JSON.stringify(profile.mainSqueeze) : null,
-    JSON.stringify(profile.badgeIds),
-    JSON.stringify(profile.favorites),
-    JSON.stringify(profile.friends),
-    JSON.stringify(profile.recentPartners),
-    JSON.stringify(profile.links),
-    JSON.stringify(profile.preferences),
-    JSON.stringify(profile.featuredGames || []),
-    JSON.stringify(profile.recentActivity || []),
-    Number(profile.thoughtCount) || 0,
-    JSON.stringify(profile.profileMusicPlaylist || []),
-  ];
+    return [
+        playerId,
+        profile.profileName,
+        profile.friendCode,
+        profile.realName,
+        profile.bio,
+        profile.tagline,
+        profile.avatarAssetId,
+        profile.backgroundImageUrl,
+        profile.backgroundStyle || 'blend',
+        profile.presence,
+        profile.favoriteGameSlug,
+        JSON.stringify(profile.ladderPlacements),
+        JSON.stringify(profile.friendsPreview),
+        profile.mainSqueeze?.playerId || profile.mainSqueeze?.profileName ? JSON.stringify(profile.mainSqueeze) : null,
+        JSON.stringify(profile.badgeIds),
+        JSON.stringify(profile.favorites),
+        JSON.stringify(profile.friends),
+        JSON.stringify(profile.recentPartners),
+        JSON.stringify(profile.links),
+        JSON.stringify(profile.preferences),
+        JSON.stringify(profile.featuredGames || []),
+        JSON.stringify(profile.recentActivity || []),
+        Number(profile.thoughtCount) || 0,
+        JSON.stringify(profile.profileMusicPlaylist || []),
+    ];
 }
-
 async function loadPlayerIdByFriendCode(db, friendCode) {
-  const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
-  if (!normalizedFriendCode) return "";
-
-  const result = await db.query(`
+    const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
+    if (!normalizedFriendCode)
+        return "";
+    const result = await db.query(`
     select player_id
     from player_profiles
     where friend_code = $1
     limit 1
   `, [normalizedFriendCode]);
-
-  return sanitizePlayerId(result?.rows?.[0]?.player_id);
+    return sanitizePlayerId(result?.rows?.[0]?.player_id);
 }
-
 async function claimAvailableFriendCode(db, playerId, preferredFriendCode = "") {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  const preferredCode = sanitizeProfileFriendCode(preferredFriendCode) || buildDefaultFriendCode(normalizedPlayerId);
-
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    const candidate = attempt === 0
-      ? preferredCode
-      : buildDefaultFriendCode(normalizedPlayerId, attempt);
-    const ownerPlayerId = await loadPlayerIdByFriendCode(db, candidate);
-    if (!ownerPlayerId || ownerPlayerId === normalizedPlayerId) {
-      return candidate;
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    const preferredCode = sanitizeProfileFriendCode(preferredFriendCode) || buildDefaultFriendCode(normalizedPlayerId);
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+        const candidate = attempt === 0
+            ? preferredCode
+            : buildDefaultFriendCode(normalizedPlayerId, attempt);
+        const ownerPlayerId = await loadPlayerIdByFriendCode(db, candidate);
+        if (!ownerPlayerId || ownerPlayerId === normalizedPlayerId) {
+            return candidate;
+        }
     }
-  }
-
-  return preferredCode;
+    return preferredCode;
 }
-
 async function ensureStoredFriendCode(db, row = {}) {
-  if (!row || typeof row !== "object") {
-    return null;
-  }
-
-  const normalizedPlayerId = sanitizePlayerId(row.player_id);
-  const storedFriendCode = sanitizeProfileFriendCode(row.friend_code);
-  if (!normalizedPlayerId || storedFriendCode) {
-    return row;
-  }
-
-  const claimedFriendCode = await claimAvailableFriendCode(db, normalizedPlayerId);
-  await db.query(`
+    if (!row || typeof row !== "object") {
+        return null;
+    }
+    const normalizedPlayerId = sanitizePlayerId(row.player_id);
+    const storedFriendCode = sanitizeProfileFriendCode(row.friend_code);
+    if (!normalizedPlayerId || storedFriendCode) {
+        return row;
+    }
+    const claimedFriendCode = await claimAvailableFriendCode(db, normalizedPlayerId);
+    await db.query(`
     update player_profiles
     set friend_code = $2,
         updated_at = now()
     where player_id = $1
       and friend_code = ''
   `, [normalizedPlayerId, claimedFriendCode]);
-
-  return {
-    ...row,
-    friend_code: claimedFriendCode,
-  };
+    return {
+        ...row,
+        friend_code: claimedFriendCode,
+    };
 }
-
 export async function loadPlayerProfile(db, playerId) {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  if (!normalizedPlayerId) return null;
-
-  const result = await db.query(`
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId)
+        return null;
+    const result = await db.query(`
     select
       p.player_id,
       pp.profile_name,
@@ -214,16 +190,14 @@ export async function loadPlayerProfile(db, playerId) {
     where p.player_id = $1
     limit 1
   `, [normalizedPlayerId]);
-
-  const row = await ensureStoredFriendCode(db, result?.rows?.[0] || null);
-  return mapRowToFactoryProfile(row);
+    const row = await ensureStoredFriendCode(db, result?.rows?.[0] || null);
+    return mapRowToFactoryProfile(row);
 }
-
 export async function loadPlayerProfileByFriendCode(db, friendCode) {
-  const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
-  if (!normalizedFriendCode) return null;
-
-  const result = await db.query(`
+    const normalizedFriendCode = sanitizeProfileFriendCode(friendCode);
+    if (!normalizedFriendCode)
+        return null;
+    const result = await db.query(`
     select
       p.player_id,
       pp.profile_name,
@@ -256,18 +230,15 @@ export async function loadPlayerProfileByFriendCode(db, friendCode) {
     where pp.friend_code = $1
     limit 1
   `, [normalizedFriendCode]);
-
-  return mapRowToFactoryProfile(result?.rows?.[0] || null);
+    return mapRowToFactoryProfile(result?.rows?.[0] || null);
 }
-
 export async function searchPlayers(db, query, { limit = 20 } = {}) {
-  const trimmed = typeof query === "string" ? query.trim() : "";
-  if (!trimmed) return [];
-
-  const pattern = `%${trimmed}%`;
-  const safeLimit = Math.min(Math.max(1, Number.isInteger(limit) ? limit : 20), 50);
-
-  const result = await db.query(`
+    const trimmed = typeof query === "string" ? query.trim() : "";
+    if (!trimmed)
+        return [];
+    const pattern = `%${trimmed}%`;
+    const safeLimit = Math.min(Math.max(1, Number.isInteger(limit) ? limit : 20), 50);
+    const result = await db.query(`
     select
       p.player_id,
       pp.profile_name,
@@ -285,45 +256,40 @@ export async function searchPlayers(db, query, { limit = 20 } = {}) {
     order by pp.profile_name asc
     limit $2
   `, [pattern, safeLimit]);
-
-  return (result?.rows || []).map((row) => ({
-    playerId: row.player_id,
-    profileName: row.profile_name || "",
-    friendCode: row.friend_code || "",
-    realName: row.real_name || "",
-    tagline: row.tagline || "",
-    avatarAssetId: row.avatar_asset_id || "",
-    hasAccount: true,
-    discoverable: true,
-  }));
+    return (result?.rows || []).map((row) => ({
+        playerId: row.player_id,
+        profileName: row.profile_name || "",
+        friendCode: row.friend_code || "",
+        realName: row.real_name || "",
+        tagline: row.tagline || "",
+        avatarAssetId: row.avatar_asset_id || "",
+        hasAccount: true,
+        discoverable: true,
+    }));
 }
-
 export async function loadPlayerLayout(db, playerId) {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  if (!normalizedPlayerId) return null;
-
-  const result = await db.query(`
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId)
+        return null;
+    const result = await db.query(`
     select profile_layout
     from player_profiles
     where player_id = $1
     limit 1
   `, [normalizedPlayerId]);
-
-  const raw = result?.rows?.[0]?.profile_layout;
-  return raw && typeof raw === "object" ? raw : null;
+    const raw = result?.rows?.[0]?.profile_layout;
+    return raw && typeof raw === "object" ? raw : null;
 }
-
 export async function savePlayerLayout(db, playerId, layout) {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  if (!normalizedPlayerId || !layout || typeof layout !== "object") return null;
-
-  await db.query(`
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId || !layout || typeof layout !== "object")
+        return null;
+    await db.query(`
     insert into players (player_id)
     values ($1)
     on conflict (player_id) do update set updated_at = now()
   `, [normalizedPlayerId]);
-
-  const result = await db.query(`
+    const result = await db.query(`
     insert into player_profiles (player_id, profile_layout)
     values ($1, $2::jsonb)
     on conflict (player_id) do update
@@ -331,38 +297,30 @@ export async function savePlayerLayout(db, playerId, layout) {
           updated_at = now()
     returning profile_layout
   `, [normalizedPlayerId, JSON.stringify(layout)]);
-
-  const raw = result?.rows?.[0]?.profile_layout;
-  return raw && typeof raw === "object" ? raw : null;
+    const raw = result?.rows?.[0]?.profile_layout;
+    return raw && typeof raw === "object" ? raw : null;
 }
-
 export async function savePlayerProfile(db, playerId, patch = {}) {
-  const normalizedPlayerId = sanitizePlayerId(playerId);
-  if (!normalizedPlayerId) return null;
-
-  const normalized = normalizeFactoryProfile({
-    ...patch,
-    playerId: normalizedPlayerId,
-  });
-  const normalizedProfile = normalizeStoredProfile({
-    ...patch,
-    ...normalized,
-    playerId: normalizedPlayerId,
-  });
-  normalizedProfile.friendCode = await claimAvailableFriendCode(
-    db,
-    normalizedPlayerId,
-    normalizedProfile.friendCode,
-  );
-
-  await db.query(`
+    const normalizedPlayerId = sanitizePlayerId(playerId);
+    if (!normalizedPlayerId)
+        return null;
+    const normalized = normalizeFactoryProfile({
+        ...patch,
+        playerId: normalizedPlayerId,
+    });
+    const normalizedProfile = normalizeStoredProfile({
+        ...patch,
+        ...normalized,
+        playerId: normalizedPlayerId,
+    });
+    normalizedProfile.friendCode = await claimAvailableFriendCode(db, normalizedPlayerId, normalizedProfile.friendCode);
+    await db.query(`
     insert into players (player_id)
     values ($1)
     on conflict (player_id) do update
       set updated_at = now()
   `, [normalizedPlayerId]);
-
-  const result = await db.query(`
+    const result = await db.query(`
     insert into player_profiles (
       player_id,
       profile_name,
@@ -444,6 +402,5 @@ export async function savePlayerProfile(db, playerId, patch = {}) {
       thought_count,
       profile_music_playlist
   `, buildProfileParams(normalizedPlayerId, normalizedProfile));
-
-  return mapRowToFactoryProfile(result?.rows?.[0] || null);
+    return mapRowToFactoryProfile(result?.rows?.[0] || null);
 }
