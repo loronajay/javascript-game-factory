@@ -459,18 +459,13 @@ export function initMpLobby(game, input) {
   };
 
   client.cb.onSideConflict = () => {
-    if (game.mp.lobbyPhase === "searching") {
-      const otherSide = _triedSide === "p1" ? "p2" : "p1";
-      _triedSide = otherSide;
-      game.mp.side = otherSide;
-      client.findMatch(otherSide, false);
-    } else {
-      _unbindRoomCode();
-      game.mp.lobbyPhase = "error";
-      game.mp.errorMsg   = "ROOM FULL OR SIDE TAKEN — TRY AGAIN";
-      game.menu.selectedButton = 0;
-      input.clearMenuPresses();
-    }
+    // Only private room joins can produce SIDE_CONFLICT.
+    // Public matchmaking never fires this — the server auto-balances cockpit-swarm sides.
+    _unbindRoomCode();
+    game.mp.lobbyPhase = "error";
+    game.mp.errorMsg   = "ROOM FULL OR SIDE TAKEN — TRY AGAIN";
+    game.menu.selectedButton = 0;
+    input.clearMenuPresses();
   };
 
   client.cb.onPartnerLeft = () => {
@@ -559,10 +554,11 @@ export function updateMpLobby(game, input) {
     const click = input.consumeClick();
     if (click) {
       if (_hit(click, MP_LOBBY_BTNS.findMatch) && game.mp.connected) {
-        const side = Math.random() < 0.5 ? "p1" : "p2";
-        _triedSide = side;
-        game.mp.side = side;
-        client.findMatch(side, false);
+        // Server auto-balances cockpit-swarm sides; the value we send is ignored.
+        // We still set _triedSide so the private-room SIDE_CONFLICT path has a value.
+        _triedSide = "p1";
+        game.mp.side = "p1";
+        client.findMatch("p1", false);
         input.clearMenuPresses();
       }
       if (_hit(click, MP_LOBBY_BTNS.privateRoom) && game.mp.connected) {
