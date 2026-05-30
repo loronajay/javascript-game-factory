@@ -244,6 +244,7 @@ export function createOnlineClient() {
         return;
       case "match_ready":
         _inRoom = true;
+        if (data.remoteSide) _mySide = data.remoteSide;
         cb.onMatchReady?.({
           seed:       data.seed,
           remoteSide: data.remoteSide || null,

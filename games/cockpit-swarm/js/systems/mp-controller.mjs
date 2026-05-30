@@ -23,6 +23,7 @@ import { startMenuMusic, startGameMusic, sfxShoot, sfxPowerup, sfxPlayerHurt } f
 let _client    = null;
 let _triedSide = null;
 let _roomCodeHandler = null;
+let _roomCodeInput   = null;   // hidden <input> for mobile keyboard
 let _bulletId  = 0;
 
 const MP_COUNTDOWN_LEAD_MS = 4000;
@@ -55,22 +56,55 @@ function _clearFlashes(game, input) {
 function _bindRoomCode(game) {
   _unbindRoomCode();
   game.mp.roomCodeInput = "";
+
+  // Hidden <input> triggers the virtual keyboard on mobile when focused.
+  const el = document.createElement("input");
+  el.type = "text";
+  el.autocomplete = "off";
+  el.setAttribute("autocapitalize", "characters");
+  el.setAttribute("autocorrect", "off");
+  el.setAttribute("spellcheck", "false");
+  el.maxLength = 4;
+  el.style.cssText = "position:fixed;opacity:0;pointer-events:none;top:0;left:0;width:1px;height:1px;";
+  document.body.appendChild(el);
+  _roomCodeInput = el;
+
+  el.addEventListener("input", () => {
+    const v = el.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+    el.value = v;
+    game.mp.roomCodeInput = v;
+  });
+
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); _submitRoomJoin(game); }
+  });
+
+  // Fallback window handler for desktop physical keyboard when focus drifts.
   _roomCodeHandler = (e) => {
+    if (e.target === el) return;
     if (e.key === "Backspace") {
       game.mp.roomCodeInput = game.mp.roomCodeInput.slice(0, -1);
+      el.value = game.mp.roomCodeInput;
     } else if (/^[A-Za-z0-9]$/.test(e.key) && game.mp.roomCodeInput.length < 4) {
       game.mp.roomCodeInput += e.key.toUpperCase();
+      el.value = game.mp.roomCodeInput;
     } else if (e.key === "Enter") {
       _submitRoomJoin(game);
     }
   };
   window.addEventListener("keydown", _roomCodeHandler);
+
+  setTimeout(() => el.focus(), 80);
 }
 
 function _unbindRoomCode() {
   if (_roomCodeHandler) {
     window.removeEventListener("keydown", _roomCodeHandler);
     _roomCodeHandler = null;
+  }
+  if (_roomCodeInput) {
+    _roomCodeInput.remove();
+    _roomCodeInput = null;
   }
 }
 
@@ -396,7 +430,8 @@ export function initMpLobby(game, input) {
     game.mp.opponentName = profile.displayName || "Pilot";
   };
 
-  client.cb.onMatchReady = ({ serverNow }) => {
+  client.cb.onMatchReady = ({ serverNow, remoteSide }) => {
+    if (remoteSide) game.mp.side = remoteSide;
     game.mp.clockOffsetMs = serverNow - Date.now();
     const startAt = serverNow + MP_COUNTDOWN_LEAD_MS;
     if (client.isHost()) client.sendRoundStart(1, startAt);
