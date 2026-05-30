@@ -1,4 +1,5 @@
 import { H, STATE, TUNING, BOSS_EVERY, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
+import { initMpLobby, updateMpLobby, updateMpCountdown, updateMpFighting, updateMpResult } from "./mp-controller.mjs";
 import {
   sfxClick, sfxExplosion, sfxPlayerHurt, sfxShutdown,
   sfxShoot, sfxEnemyDeath,
@@ -112,6 +113,28 @@ export function updateGame(game, input, dt, t) {
     return;
   }
 
+  if (game.state === STATE.MP_LOBBY) {
+    updateMpLobby(game, input);
+    return;
+  }
+
+  if (game.state === STATE.MP_COUNTDOWN) {
+    updateMpCountdown(game, input);
+    return;
+  }
+
+  if (game.state === STATE.MP_FIGHTING) {
+    updateMpFighting(game, input, dt);
+    updateParticles(game, dt);
+    return;
+  }
+
+  if (game.state === STATE.MP_RESULT) {
+    updateMpResult(game, input);
+    updateParticles(game, dt);
+    return;
+  }
+
   if (game.state === STATE.GAME_OVER || game.state === STATE.CLEAR) {
     updateEndScreen(game, input, dt);
     updateParticles(game, dt);
@@ -204,6 +227,9 @@ function updateMenu(game, input) {
     resetGame(game, true, "bossRush");
     input.clearMenuPresses();
   } else if (activated === 2) {
+    sfxClick();
+    initMpLobby(game, input);
+  } else if (activated === 3) {
     sfxClick();
     game.state = STATE.HOW_TO_PLAY;
     game.menu.selectedButton = 0;

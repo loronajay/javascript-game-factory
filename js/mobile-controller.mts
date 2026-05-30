@@ -9,9 +9,26 @@ const CONTROL_KEY_SPECS: Record<string, { key: string; code: string }> = {
   ArrowRight: { key: 'ArrowRight', code: 'ArrowRight' },
   ShiftLeft: { key: 'Shift', code: 'ShiftLeft' },
   Escape: { key: 'Escape', code: 'Escape' },
+  Space: { key: ' ', code: 'Space' },
+  KeyJ: { key: 'j', code: 'KeyJ' },
 };
 
 const MOBILE_CONTROL_PROFILES: Record<string, any> = {
+  'cockpit-swarm': {
+    id: 'cockpit-swarm',
+    layout: 'dpad-buttons',
+    accent: '#34f7ff',
+    glow: '#34f7ff',
+    dpadLabel: 'STRAFE',
+    dpad: {
+      left: CONTROL_KEY_SPECS.KeyA,
+      right: CONTROL_KEY_SPECS.KeyD,
+    },
+    directionMode: 'horizontal',
+    buttons: [
+      { id: 'fire', label: 'FIRE', key: CONTROL_KEY_SPECS.Space },
+    ],
+  },
   illuminauts: {
     id: 'illuminauts',
     layout: 'dpad-buttons',

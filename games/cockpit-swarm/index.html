@@ -11,12 +11,11 @@
     <canvas id="game" width="1280" height="720" aria-label="Cockpit Swarm game canvas"></canvas>
   </div>
 
-  <div id="mobileControls" aria-hidden="true">
-    <div id="leftBtn" class="touchZone">LEFT</div>
-    <div id="rightBtn" class="touchZone">RIGHT</div>
-    <div id="fireBtn" class="touchZone">FIRE</div>
-  </div>
-
   <script type="module" src="./js/main.mjs"></script>
+  <script type="module">
+    import { mountMobileController } from '../../js/mobile-controller.mjs';
+    const force = new URLSearchParams(location.search).has('forceMobileControls');
+    mountMobileController({ profile: 'cockpit-swarm', force });
+  </script>
 </body>
 </html>

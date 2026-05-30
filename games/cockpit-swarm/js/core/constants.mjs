@@ -11,7 +11,12 @@ export const STATE = {
   STAGE_CLEAR: "STAGE_CLEAR",
   BOSS: "BOSS",
   CLEAR: "CLEAR",
-  GAME_OVER: "GAME_OVER"
+  GAME_OVER: "GAME_OVER",
+  // ── Multiplayer (1v1 Dodgeball) ──
+  MP_LOBBY:     "MP_LOBBY",
+  MP_COUNTDOWN: "MP_COUNTDOWN",
+  MP_FIGHTING:  "MP_FIGHTING",
+  MP_RESULT:    "MP_RESULT",
 };
 
 // A boss encounter fires after every Nth stage clear (Boss 01 after stage 5).
@@ -104,10 +109,51 @@ export const BOSS_TUNING = {
 // All positions are in logical canvas space (1280×720).
 
 export const MENU_BTNS = [
-  { id: "campaign",  label: "CAMPAIGN",    x: 470, y: 286, w: 340, h: 58 },
-  { id: "bossRush",  label: "BOSS RUSH",   x: 470, y: 356, w: 340, h: 58 },
-  { id: "howToPlay", label: "HOW TO PLAY", x: 470, y: 426, w: 340, h: 58 },
+  { id: "campaign",  label: "CAMPAIGN",    x: 470, y: 278, w: 340, h: 58 },
+  { id: "bossRush",  label: "BOSS RUSH",   x: 470, y: 340, w: 340, h: 58 },
+  { id: "vsDuel",    label: "VS DUEL",     x: 470, y: 402, w: 340, h: 58 },
+  { id: "howToPlay", label: "HOW TO PLAY", x: 470, y: 464, w: 340, h: 58 },
 ];
+
+// ── Multiplayer lobby buttons (shared by update hit-test + renderer) ──────────
+// Lobby phases: main → searching / room_host / room_join / error
+export const MP_LOBBY_BTNS = {
+  // main phase
+  findMatch:   { id: "findMatch",   label: "FIND MATCH",   x: 470, y: 292, w: 340, h: 56 },
+  privateRoom: { id: "privateRoom", label: "PRIVATE ROOM", x: 470, y: 360, w: 340, h: 56 },
+  joinByCode:  { id: "joinByCode",  label: "JOIN BY CODE", x: 470, y: 428, w: 340, h: 56 },
+  back:        { id: "back",        label: "← BACK",       x: 500, y: 498, w: 280, h: 48 },
+  // searching / room_host phases
+  cancel:      { id: "cancel",      label: "CANCEL",       x: 500, y: 412, w: 280, h: 54 },
+  // room_join phase (code field is drawn above; JOIN sits below it)
+  joinSubmit:  { id: "joinSubmit",  label: "JOIN",         x: 578, y: 418, w: 200, h: 52 },
+  joinBack:    { id: "joinBack",    label: "← BACK",       x: 370, y: 418, w: 180, h: 52 },
+};
+
+export const MP_RESULT_BTNS = [
+  { id: "rematch", label: "REMATCH",   x: 390, y: 452, w: 240, h: 60 },
+  { id: "menu",    label: "MAIN MENU", x: 650, y: 452, w: 240, h: 60 },
+];
+
+// ── Multiplayer tuning (1v1 Dodgeball) ────────────────────────────────────────
+export const MP_TUNING = {
+  hp:                     100,
+  laserDmg:               6,
+  lobDmg:                 22,
+  laserHeat:              18,
+  lobHeat:                8,
+  heatDecayPerMs:         0.035,
+  burnoutThreshold:       100,
+  burnoutResetThreshold:  35,
+  fireCooldownMs:         130,
+  lobCooldownMs:          380,
+  roundTimerMs:           45000,
+  roundsToWin:            2,       // Bo3
+  countdownMs:            4000,    // ms from match_ready to fight start
+  laserSpeedZ:            0.028,
+  lobSpeedZ:              0.009,
+  hitWindowX:             42,
+};
 
 export const HTP_BTNS = [
   { id: "back", label: "← BACK", x: 500, y: 518, w: 280, h: 56 },

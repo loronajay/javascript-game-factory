@@ -6,10 +6,35 @@ import { clamp, lerp, rand } from "../core/math.mjs";
 import { project, projectEnemyBullet } from "../systems/projection.mjs";
 import { getStage } from "../systems/stages.mjs";
 import { renderBoss, renderBossHud } from "./boss-scene.mjs";
+import { renderMpLobby, renderMpCountdown, renderMpFighting, renderMpResult } from "./mp-scene.mjs";
 
 // ─── Main render entry ────────────────────────────────────────────────────────
 
 export function renderGame(ctx, game, t) {
+  // ── Multiplayer screens ───────────────────────────────────────────────────
+  if (game.state === STATE.MP_LOBBY || game.state === STATE.MP_RESULT) {
+    renderBackground(ctx, game, t);
+    renderMenuAtmosphere(ctx, t);
+    if (game.state === STATE.MP_LOBBY) renderMpLobby(ctx, game, t);
+    else renderMpResult(ctx, game, t);
+    return;
+  }
+
+  if (game.state === STATE.MP_COUNTDOWN || game.state === STATE.MP_FIGHTING) {
+    ctx.save();
+    const sx = game.shake ? rand(-game.shake, game.shake) : 0;
+    const sy = game.shake ? rand(-game.shake, game.shake) : 0;
+    ctx.translate(sx, sy);
+    renderBackground(ctx, game, t);
+    renderDepthGrid(ctx, game);
+    renderCockpit(ctx, game, t);
+    ctx.restore();
+    if (game.state === STATE.MP_COUNTDOWN) renderMpCountdown(ctx, game, t);
+    else renderMpFighting(ctx, game, t);
+    return;
+  }
+
+  // ── Campaign / solo screens ───────────────────────────────────────────────
   if (game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY) {
     renderBackground(ctx, game, t);
     renderMenuAtmosphere(ctx, t);
@@ -72,7 +97,7 @@ function renderMenuScreen(ctx, game, t) {
   const cardX = CX - 280;
   const cardY = 96;
   const cardW = 560;
-  const cardH = 452;
+  const cardH = 480;
   ctx.fillStyle = "rgba(2, 7, 16, 0.78)";
   ctx.beginPath();
   ctx.roundRect(cardX, cardY, cardW, cardH, 18);
@@ -365,7 +390,8 @@ function drawMenuButton(ctx, btn, selected, t) {
 // ─── Background ───────────────────────────────────────────────────────────────
 
 function renderBackground(ctx, game, t) {
-  const isMenuState = game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY;
+  const isMenuState = game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY
+    || game.state === STATE.MP_LOBBY || game.state === STATE.MP_RESULT;
   const stage = getStage(game.wave.stageIndex);
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#02030a");
