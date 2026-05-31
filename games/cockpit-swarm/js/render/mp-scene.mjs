@@ -8,6 +8,10 @@ import { getCountdownSecondsRemaining } from "../systems/online.mjs";
 // z-axis constants (must match mp-controller.mjs)
 const Z_NEAR = 1.0;
 const Z_FAR  = 7.0;
+const PROJECTILE_SPAWN_OFFSET_Z = 0.15;
+const OPPONENT_VISUAL_Z = Z_FAR - PROJECTILE_SPAWN_OFFSET_Z;
+const OPPONENT_VISUAL_Y = -30;
+const OPPONENT_SIZE_SCALE = 4.25;
 
 // ─── Shared button helper ─────────────────────────────────────────────────────
 
@@ -268,130 +272,183 @@ export function renderMpCountdown(ctx, game, t) {
 
 export function renderMpWorld(ctx, game, t) {
   const { side, opponentX, mpBullets } = game.mp;
-  const isP2 = side === "p2";
   const localPlayerX = game.player.x;
 
-  // Opponent silhouette at z=1.8 (fixed visual depth — always "across the arena")
-  const op = project(opponentX, -22, 1.8, localPlayerX);
-  _renderOpponentShip(ctx, op, t);
-
-  // Bullets
-  const startZ = Z_FAR - 0.2;
-  const hitZ   = Z_NEAR + 0.5;
+  // Keep opponent projection tied to projectile spawn depth so muzzle origins read correctly.
+  const op = buildMpOpponentView({ opponentX, localPlayerX, t });
+  _renderOpponentShip(ctx, op);
 
   for (const b of mpBullets) {
-    // From P2's perspective, flip z so their own bullets go away and P1's come in
-    const viewZ = isP2 ? (Z_NEAR + Z_FAR - b.z) : b.z;
-    if (viewZ < 0.14) continue;
-
-    const isIncoming = (side === "p1" && b.owner === "p2") ||
-                       (side === "p2" && b.owner === "p1");
-
-    const approach = isIncoming ? clamp((startZ - viewZ) / (startZ - hitZ), 0, 1) : 0;
-
-    const raw = project(b.x, 0, viewZ, localPlayerX);
-    let bx = raw.x;
-    let by = raw.y;
-    if (isIncoming) by = lerp(raw.y, RETICLE_Y, approach * approach);
-
-    // Tail: shift depth slightly away to get the trailing edge position
-    const tailDz     = b.kind === "lob" ? 0.55 : 0.30;
-    const tailViewZ  = isIncoming
-      ? Math.min(viewZ + tailDz, Z_FAR)
-      : Math.max(viewZ - tailDz, Z_NEAR);
-    const tailRaw = project(b.x, 0, tailViewZ, localPlayerX);
-    let tx = tailRaw.x;
-    let ty = tailRaw.y;
-    if (isIncoming) {
-      const tailApproach = clamp((startZ - tailViewZ) / (startZ - hitZ), 0, 1);
-      ty = lerp(tailRaw.y, RETICLE_Y, tailApproach * tailApproach);
-    }
-
-    const onLane = isIncoming && Math.abs(b.x - localPlayerX) <= MP_TUNING.hitWindowX;
-    _renderBullet(ctx, bx, by, raw.s, tx, ty, b.kind, isIncoming, approach, onLane);
+    const bulletView = buildMpBulletView({ bullet: b, side, localPlayerX });
+    if (!bulletView.visible) continue;
+    _renderBullet(ctx, bulletView);
   }
 }
 
-function _renderOpponentShip(ctx, op, t) {
+export function buildMpOpponentView({ opponentX, localPlayerX, t = 0 }) {
+  const projected = project(opponentX, OPPONENT_VISUAL_Y, OPPONENT_VISUAL_Z, localPlayerX);
+  const pulse = Math.sin(t * 0.0018) * 0.08 + 0.92;
+
+  return {
+    ...projected,
+    visualZ: OPPONENT_VISUAL_Z,
+    pulse,
+    size: 28 * projected.s * OPPONENT_SIZE_SCALE,
+    alpha: Math.min(0.96, projected.s * OPPONENT_SIZE_SCALE * 0.72) * pulse,
+  };
+}
+
+export function buildMpBulletView({ bullet, side, localPlayerX }) {
+  const isP2 = side === "p2";
+  const viewZ = isP2 ? (Z_NEAR + Z_FAR - bullet.z) : bullet.z;
+  const visible = viewZ >= 0.14;
+  const isIncoming = (side === "p1" && bullet.owner === "p2") ||
+                     (side === "p2" && bullet.owner === "p1");
+  const startZ = Z_FAR - PROJECTILE_SPAWN_OFFSET_Z;
+  const hitZ = Z_NEAR + 0.5;
+  const approach = isIncoming ? clamp((startZ - viewZ) / (startZ - hitZ), 0, 1) : 0;
+  const raw = project(bullet.x, 0, viewZ, localPlayerX);
+  const tailDz = bullet.kind === "lob" ? 0.55 : 0.30;
+  const tailViewZ = isIncoming
+    ? Math.min(viewZ + tailDz, Z_FAR)
+    : Math.max(viewZ - tailDz, Z_NEAR);
+  const tailRaw = project(bullet.x, 0, tailViewZ, localPlayerX);
+  const tailApproach = isIncoming ? clamp((startZ - tailViewZ) / (startZ - hitZ), 0, 1) : 0;
+  const isLob = bullet.kind === "lob";
+  const onLane = isIncoming && Math.abs(bullet.x - localPlayerX) <= MP_TUNING.hitWindowX;
+
+  return {
+    visible,
+    x: raw.x,
+    y: isIncoming ? lerp(raw.y, RETICLE_Y, approach * approach) : raw.y,
+    s: raw.s,
+    viewZ,
+    tailX: tailRaw.x,
+    tailY: isIncoming ? lerp(tailRaw.y, RETICLE_Y, tailApproach * tailApproach) : tailRaw.y,
+    kind: bullet.kind,
+    isIncoming,
+    approach,
+    onLane,
+    radius: Math.max(1.5, (isLob ? 11 : 5.5) * raw.s * lerp(0.90, 1.72, approach)),
+    threatAlpha: onLane ? clamp((approach - 0.42) / 0.58, 0, 1) * 0.68 : 0,
+    palette: getProjectilePalette(bullet.kind, isIncoming),
+  };
+}
+
+function getProjectilePalette(kind, isIncoming) {
+  const isLob = kind === "lob";
+  if (isIncoming) {
+    return isLob
+      ? { role: "incoming", color: "#ff8a1f", core: "#ffe0a0", dim: "rgba(255,138,31,0.18)" }
+      : { role: "incoming", color: "#ff365d", core: "#ffd1dc", dim: "rgba(255,54,93,0.16)" };
+  }
+  return isLob
+    ? { role: "friendly", color: "#ffcc44", core: "#fff2a6", dim: "rgba(255,204,68,0.12)" }
+    : { role: "friendly", color: "#34f7ff", core: "#d8fbff", dim: "rgba(52,247,255,0.12)" };
+}
+
+function _renderOpponentShip(ctx, op) {
   ctx.save();
-  const { x, y, s } = op;
-  const size  = 28 * s;
-  const pulse = Math.sin(t * 0.0018) * 0.12 + 0.88;
-  ctx.globalAlpha = Math.min(0.90, s * 2.6) * pulse;
+  const { x, y, s, size } = op;
+  ctx.globalAlpha = op.alpha;
+  ctx.shadowColor = "#ff4030";
+  ctx.shadowBlur  = 12 * s * OPPONENT_SIZE_SCALE;
 
   ctx.beginPath();
-  ctx.moveTo(x, y - size * 2.0);
-  ctx.lineTo(x + size * 2.2, y + size * 0.4);
-  ctx.lineTo(x + size * 0.8, y + size * 1.2);
-  ctx.lineTo(x,              y + size * 0.5);
-  ctx.lineTo(x - size * 0.8, y + size * 1.2);
-  ctx.lineTo(x - size * 2.2, y + size * 0.4);
+  ctx.moveTo(x, y - size * 1.28);
+  ctx.lineTo(x + size * 1.90, y + size * 0.10);
+  ctx.lineTo(x + size * 0.82, y + size * 0.44);
+  ctx.lineTo(x + size * 0.44, y + size * 0.95);
+  ctx.lineTo(x,              y + size * 0.56);
+  ctx.lineTo(x - size * 0.44, y + size * 0.95);
+  ctx.lineTo(x - size * 0.82, y + size * 0.44);
+  ctx.lineTo(x - size * 1.90, y + size * 0.10);
   ctx.closePath();
 
-  ctx.fillStyle   = "rgba(255, 64, 48, 0.26)";
+  ctx.fillStyle   = "rgba(255, 64, 48, 0.22)";
   ctx.strokeStyle = "#ff4030";
-  ctx.lineWidth   = Math.max(0.5, 1.5 * s);
-  ctx.shadowColor = "#ff4030";
-  ctx.shadowBlur  = 10 * s;
+  ctx.lineWidth   = Math.max(1, 1.25 * s * OPPONENT_SIZE_SCALE);
   ctx.fill();
   ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(255, 210, 190, 0.72)";
+  ctx.lineWidth = Math.max(0.75, 0.7 * s * OPPONENT_SIZE_SCALE);
+  ctx.beginPath();
+  ctx.moveTo(x, y - size * 0.82);
+  ctx.lineTo(x, y + size * 0.38);
+  ctx.moveTo(x - size * 0.62, y + size * 0.18);
+  ctx.lineTo(x + size * 0.62, y + size * 0.18);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 230, 160, 0.86)";
+  ctx.beginPath();
+  ctx.arc(x, y - size * 0.24, Math.max(1.5, size * 0.13), 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
 
-function _renderBullet(ctx, bx, by, s, tx, ty, kind, isIncoming, approach, onLane) {
+function _renderBullet(ctx, view) {
+  _renderBulletView(ctx, view);
+}
+
+function _renderBulletView(ctx, view) {
   ctx.save();
 
+  const { x, y, tailX, tailY, kind, isIncoming, approach, radius, palette } = view;
   const isLob = kind === "lob";
-  const color  = isLob
-    ? (isIncoming ? "#ff8800" : "#ffcc44")
-    : (isIncoming ? "#ff365d" : "#34f7ff");
+  const color = palette.color;
 
-  const r = Math.max(1.5, (isLob ? 11 : 5.5) * s * lerp(0.85, 1.55, approach));
-
-  // — Tail trail —
-  ctx.globalAlpha = clamp(0.18 + approach * 0.46, 0.18, 0.74);
+  ctx.globalAlpha = clamp(0.22 + approach * 0.50, 0.22, 0.78);
   ctx.strokeStyle = color;
-  ctx.lineWidth   = Math.max(1.5, r * (isLob ? 0.30 : 0.16));
-  ctx.lineCap     = "round";
+  ctx.lineWidth = Math.max(1.5, radius * (isLob ? 0.30 : 0.18));
+  ctx.lineCap = "round";
   ctx.shadowColor = color;
-  ctx.shadowBlur  = 10 + approach * 20;
+  ctx.shadowBlur = 10 + approach * 20;
   ctx.beginPath();
-  ctx.moveTo(tx, ty);
-  ctx.lineTo(bx, by);
+  ctx.moveTo(tailX, tailY);
+  ctx.lineTo(x, y);
   ctx.stroke();
 
-  // — Outer glow ring —
-  const ringAlpha = clamp(0.38 + approach * 0.62, 0.38, 1.0);
-  ctx.globalAlpha = ringAlpha;
-  ctx.shadowBlur  = 14 + approach * 34;
-  ctx.shadowColor = color;
+  if (!isIncoming) {
+    ctx.globalAlpha = isLob ? 0.30 : 0.22;
+    ctx.lineWidth = Math.max(1, radius * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(x - radius * 1.55, y);
+    ctx.lineTo(x + radius * 1.55, y);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = clamp(0.42 + approach * 0.58, 0.42, 1.0);
+  ctx.shadowBlur = 14 + approach * 34;
   ctx.strokeStyle = color;
-  ctx.lineWidth   = Math.max(1.5, r * (isLob ? 0.26 : 0.20));
+  ctx.lineWidth = Math.max(1.5, radius * (isLob ? 0.26 : 0.20));
   ctx.beginPath();
-  ctx.arc(bx, by, r, 0, Math.PI * 2);
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // — Inner core fill (inherits ringAlpha) —
-  const fillBright = isLob
-    ? (isIncoming ? "rgba(255,136,0,0.40)"  : "rgba(255,204,68,0.22)")
-    : (isIncoming ? "rgba(255,54,93,0.38)"  : "rgba(52,247,255,0.18)");
-  const fillDim = isLob
-    ? (isIncoming ? "rgba(255,136,0,0.22)"  : "rgba(255,204,68,0.12)")
-    : (isIncoming ? "rgba(255,54,93,0.18)"  : "rgba(52,247,255,0.10)");
-  ctx.fillStyle = approach > 0.65 ? fillBright : fillDim;
+  ctx.fillStyle = approach > 0.65 ? palette.core : palette.dim;
   ctx.beginPath();
-  ctx.arc(bx, by, r * 0.44, 0, Math.PI * 2);
+  ctx.arc(x, y, radius * 0.44, 0, Math.PI * 2);
   ctx.fill();
 
-  // — Danger ring around reticle for close incoming on-lane bullets —
-  if (onLane && approach > 0.55) {
-    ctx.globalAlpha = 0.16 + approach * 0.34;
+  if (view.threatAlpha > 0) {
+    ctx.globalAlpha = view.threatAlpha;
     ctx.strokeStyle = color;
-    ctx.lineWidth   = 2;
-    ctx.shadowBlur  = 6;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.arc(CX, RETICLE_Y, 62, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = view.threatAlpha * 0.45;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CX - 78, RETICLE_Y);
+    ctx.lineTo(CX + 78, RETICLE_Y);
+    ctx.moveTo(CX, RETICLE_Y - 78);
+    ctx.lineTo(CX, RETICLE_Y + 78);
     ctx.stroke();
   }
 
