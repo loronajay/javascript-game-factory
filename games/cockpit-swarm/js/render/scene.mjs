@@ -15,6 +15,17 @@ let _celestialCanvas = null;
 let _celestialCacheT = -Infinity;
 const CELESTIAL_TTL = 3000;
 
+// Background gradient cache — keyed to stage ID so it rebuilds on stage change.
+let _bgGradKey = "";
+let _bgGrad = null;
+let _nebGrad = null;
+
+// Low-perf cockpit frame cache — replaces ~150 draw calls with one drawImage.
+// Refreshes every LP_COCKPIT_TTL ms so subtle animations still cycle.
+let _lpCockpitCanvas = null;
+let _lpCockpitT = -Infinity;
+const LP_COCKPIT_TTL = 3000;
+
 function getCelestialCache(t) {
   if (!_celestialCanvas) {
     _celestialCanvas = document.createElement("canvas");
@@ -417,11 +428,23 @@ function renderBackground(ctx, game, t) {
   const isMenuState = game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY
     || game.state === STATE.MP_LOBBY || game.state === STATE.MP_RESULT;
   const stage = getStage(game.wave.stageIndex);
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#02030a");
-  g.addColorStop(0.42, stage.id.includes("crossfire") || stage.id.includes("chaos") ? "#170826" : "#06142a");
-  g.addColorStop(1, "#0b111b");
-  ctx.fillStyle = g;
+
+  // Cache sky + nebula gradients — recreating CanvasGradient objects every frame
+  // is measurably expensive on mobile; they only need to change on stage transitions.
+  const stageKey = stage.id;
+  if (_bgGradKey !== stageKey) {
+    _bgGradKey = stageKey;
+    _bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    _bgGrad.addColorStop(0, "#02030a");
+    _bgGrad.addColorStop(0.42, stage.id.includes("crossfire") || stage.id.includes("chaos") ? "#170826" : "#06142a");
+    _bgGrad.addColorStop(1, "#0b111b");
+    _nebGrad = ctx.createRadialGradient(CX, HORIZON_Y + 30, 20, CX, HORIZON_Y, 480);
+    _nebGrad.addColorStop(0, "rgba(52, 247, 255, 0.18)");
+    _nebGrad.addColorStop(0.38, stage.id.includes("safe_lane") || stage.id.includes("armor") ? "rgba(255, 54, 93, 0.10)" : "rgba(133, 61, 255, 0.08)");
+    _nebGrad.addColorStop(1, "rgba(0,0,0,0)");
+  }
+
+  ctx.fillStyle = _bgGrad;
   ctx.fillRect(0, 0, W, H);
 
   ctx.save();
@@ -436,39 +459,53 @@ function renderBackground(ctx, game, t) {
     drawPlanet(ctx, t);
   }
 
-  let _starSkip = 0;
-  for (const s of game.stars) {
-    // On mobile draw every other star to halve per-frame arc calls
-    if (RenderQuality.lowPerf && _starSkip++ % 2 === 0) continue;
-
-    let px, py;
-    if (isMenuState) {
-      // Stars drift slowly downward — parallax warp approach effect
-      const scrollY = (t * 0.014) / s.z;
-      px = CX + s.x / s.z;
-      py = ((s.y / s.z + scrollY) % H + H) % H;
-    } else {
-      px = CX + (s.x - game.player.x * (0.28 / s.z)) / s.z;
-      py = s.y / s.z + Math.sin(t * 0.001 + s.tw) * 0.6;
-    }
-    if (px < -10 || px > W + 10 || py < -10 || py > H) continue;
-
-    const alpha = clamp(0.2 + 0.5 / s.z, 0.2, 0.82);
-    ctx.globalAlpha = alpha;
+  if (RenderQuality.lowPerf) {
+    // Stars as fillRect (faster than arc on mobile) with a single fixed alpha.
+    // Skip every other star to keep the count manageable.
+    ctx.globalAlpha = 0.55;
     ctx.fillStyle = "#d8fbff";
-    ctx.beginPath();
-    ctx.arc(px, py, s.r / s.z, 0, Math.PI * 2);
-    ctx.fill();
+    let _starSkip = 0;
+    for (const s of game.stars) {
+      if (_starSkip++ % 2 === 0) continue;
+      let px, py;
+      if (isMenuState) {
+        const scrollY = (t * 0.014) / s.z;
+        px = CX + s.x / s.z;
+        py = ((s.y / s.z + scrollY) % H + H) % H;
+      } else {
+        px = CX + (s.x - game.player.x * (0.28 / s.z)) / s.z;
+        py = s.y / s.z;
+      }
+      if (px < -10 || px > W + 10 || py < -10 || py > H) continue;
+      const sz = Math.max(1, Math.round(s.r / s.z));
+      ctx.fillRect((px - sz * 0.5) | 0, (py - sz * 0.5) | 0, sz, sz);
+    }
+  } else {
+    let _starSkip = 0;
+    for (const s of game.stars) {
+      let px, py;
+      if (isMenuState) {
+        const scrollY = (t * 0.014) / s.z;
+        px = CX + s.x / s.z;
+        py = ((s.y / s.z + scrollY) % H + H) % H;
+      } else {
+        px = CX + (s.x - game.player.x * (0.28 / s.z)) / s.z;
+        py = s.y / s.z + Math.sin(t * 0.001 + s.tw) * 0.6;
+      }
+      if (px < -10 || px > W + 10 || py < -10 || py > H) continue;
+      const alpha = clamp(0.2 + 0.5 / s.z, 0.2, 0.82);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "#d8fbff";
+      ctx.beginPath();
+      ctx.arc(px, py, s.r / s.z, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
   ctx.globalAlpha = 1;
 
-  const neb = ctx.createRadialGradient(CX, HORIZON_Y + 30, 20, CX, HORIZON_Y, 480);
-  neb.addColorStop(0, "rgba(52, 247, 255, 0.18)");
-  neb.addColorStop(0.38, stage.id.includes("safe_lane") || stage.id.includes("armor") ? "rgba(255, 54, 93, 0.10)" : "rgba(133, 61, 255, 0.08)");
-  neb.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = neb;
+  ctx.fillStyle = _nebGrad;
   ctx.fillRect(0, 0, W, H);
 }
 
@@ -667,8 +704,9 @@ function renderDepthGrid(ctx, game) {
   ctx.shadowBlur = 5;
   ctx.lineWidth = 1.4;
 
-  // Converging vertical rails — slight parallax with player rail offset
+  // Converging vertical rails — on mobile draw every other rail to halve stroke calls
   for (let i = -7; i <= 7; i++) {
+    if (RenderQuality.lowPerf && i !== 0 && i % 2 !== 0) continue;
     const x1 = CX + (i * 88 - game.player.x * 0.18) * 0.2;
     const x2 = CX + (i * 88 - game.player.x) * 1.55;
     ctx.globalAlpha = i === 0 ? 0.55 : 0.34;
@@ -678,10 +716,12 @@ function renderDepthGrid(ctx, game) {
     ctx.stroke();
   }
 
-  // Horizontal depth lines — brighter as they sweep toward the player
+  // Horizontal depth lines — on mobile draw every other one
+  let hIdx = 0;
   for (let z = 1.55; z >= 0.24; z -= 0.12) {
     const y = HORIZON_Y + 80 / z;
     if (y > H * 0.80) break;
+    if (RenderQuality.lowPerf && hIdx++ % 2 !== 0) continue;
     const width = 1180 / z;
     ctx.globalAlpha = clamp(0.10 + (1.55 - z) * 0.24, 0.10, 0.52);
     ctx.beginPath();
@@ -781,7 +821,11 @@ function drawPowerupShape(ctx, shape, size) {
 // ─── Enemies ──────────────────────────────────────────────────────────────────
 
 function renderEnemies(ctx, game) {
-  const ordered = game.enemies.slice().sort((a, b) => b.z - a.z);
+  // Depth sort is a visual nicety (back enemies render behind front ones).
+  // On mobile skip the allocation + sort to save GC pressure.
+  const ordered = RenderQuality.lowPerf
+    ? game.enemies
+    : game.enemies.slice().sort((a, b) => b.z - a.z);
 
   for (const enemy of ordered) {
     if (!enemy.alive) continue;
@@ -955,7 +999,9 @@ function drawEnemyHpBar(ctx, enemy, size) {
 // ─── Enemy bullets ────────────────────────────────────────────────────────────
 
 function renderEnemyBullets(ctx, game) {
-  const ordered = game.enemyBullets.slice().sort((a, b) => b.z - a.z);
+  const ordered = RenderQuality.lowPerf
+    ? game.enemyBullets
+    : game.enemyBullets.slice().sort((a, b) => b.z - a.z);
 
   for (const b of ordered) {
     const p = projectEnemyBullet(b, game.player);
@@ -1080,10 +1126,18 @@ function renderParticles(ctx, game) {
 function renderCockpit(ctx, game, t = 0, showReticle = true) {
   ctx.save();
 
-  drawSideFrames(ctx);
-  drawDashboard(ctx);
-  drawCenterConsole(ctx, t);
-  drawDashInstruments(ctx, game, t);
+  if (RenderQuality.lowPerf) {
+    // Replace ~150 draw calls with one drawImage of the cached cockpit frame.
+    // The cache refreshes every LP_COCKPIT_TTL ms so subtle animations still cycle.
+    ctx.drawImage(getLowPerfCockpitCache(t), 0, 0);
+    // Radar is live (enemy blips are gameplay-relevant) but uses flat fills, no gradients.
+    drawRadarScopeSimple(ctx, game);
+  } else {
+    drawSideFrames(ctx);
+    drawDashboard(ctx);
+    drawCenterConsole(ctx, t);
+    drawDashInstruments(ctx, game, t);
+  }
 
   if (showReticle) drawReticle(ctx, t);
 
@@ -1092,6 +1146,91 @@ function renderCockpit(ctx, game, t = 0, showReticle = true) {
     ctx.fillStyle = "#ff365d";
     ctx.fillRect(0, 0, W, H);
   }
+
+  ctx.restore();
+}
+
+function getLowPerfCockpitCache(t) {
+  if (!_lpCockpitCanvas) {
+    _lpCockpitCanvas = document.createElement("canvas");
+    _lpCockpitCanvas.width = W;
+    _lpCockpitCanvas.height = H;
+  }
+  if (t - _lpCockpitT > LP_COCKPIT_TTL) {
+    _lpCockpitT = t;
+    const c = _lpCockpitCanvas.getContext("2d");
+    c.clearRect(0, 0, W, H);
+    // shadowBlur is NOT intercepted on this offscreen context, so neon glows render
+    // correctly in the cache at the cost of one render every LP_COCKPIT_TTL ms.
+    drawSideFrames(c);
+    drawDashboard(c);
+    drawCenterConsole(c, t);
+    // Button strips and round gauge are decorative and expensive — skip entirely on mobile.
+  }
+  return _lpCockpitCanvas;
+}
+
+// Stripped-down radar for mobile: no gradient objects, just flat fills + enemy blips.
+function drawRadarScopeSimple(ctx, game) {
+  const cx = CX;
+  const cy = H * 0.83;
+  const r = 50;
+  const TAU = Math.PI * 2;
+
+  ctx.save();
+
+  ctx.fillStyle = "#04130b";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 6, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 138, 38, 0.55)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 6, 0, TAU);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(8, 38, 20, 0.7)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.clip();
+
+  ctx.strokeStyle = "rgba(80, 255, 140, 0.5)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.66, 0, TAU);
+  ctx.moveTo(cx + r * 0.33, cy);
+  ctx.arc(cx, cy, r * 0.33, 0, TAU);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - r, cy);
+  ctx.lineTo(cx + r, cy);
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx, cy + r);
+  ctx.stroke();
+
+  for (const e of game.enemies) {
+    if (!e.alive) continue;
+    const zNorm = clamp((e.z - 1) / 3, 0, 1);
+    const bx = cx + clamp(e.x / 200, -1, 1) * r * 0.82;
+    const by = cy + lerp(r * 0.72, -r * 0.72, zNorm);
+    const hot = e.telegraphFlash > 0;
+    ctx.fillStyle = hot ? "#ff5d7a" : "#7dffb0";
+    ctx.beginPath();
+    ctx.arc(bx, by, hot ? 3 : 2, 0, TAU);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  ctx.fillStyle = "#d6ffe4";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, TAU);
+  ctx.fill();
 
   ctx.restore();
 }
