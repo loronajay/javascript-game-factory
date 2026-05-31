@@ -7,7 +7,15 @@ import { spawnBloodEffect, spawnChingEffect, tickEffects } from '../scripts/effe
 import { createLobbyUi, queueHintText, sideLockedText } from '../scripts/lobby-ui.js';
 import { createInitialGameState, prepareRoundState, resetMatchProgress } from '../scripts/match-state.js';
 import { getHumanInputBindings, isMobileControllerMounted } from '../scripts/mobile-input-routing.js';
-import { drawOnlineCountdown, EMPTY_INPUT, inputsDiffer, pickOnlineStage } from '../scripts/online-match-view.js';
+import {
+  buildOnlineStagePlan,
+  drawOnlineCountdown,
+  EMPTY_INPUT,
+  getOnlineStageForRound,
+  inputsDiffer,
+  normalizeOnlineStagePlan,
+  pickOnlineStage,
+} from '../scripts/online-match-view.js';
 import { startOnlineMatchSession } from '../scripts/online-match-start.js';
 import { wireOnlineLobbyEvents } from '../scripts/online-lobby-events.js';
 import { maybeAwardForfeitWin, wireOnlineCallbacks } from '../scripts/online-callbacks.js';
@@ -167,6 +175,26 @@ test('online helper stage picking and input comparison stay deterministic', () =
   assert.equal(pickOnlineStage(0.42, 2), 'single');
   assert.equal(inputsDiffer(EMPTY_INPUT, { ...EMPTY_INPUT }), false);
   assert.equal(inputsDiffer(EMPTY_INPUT, { ...EMPTY_INPUT, attackJustPressed: true }), true);
+});
+
+test('online stage plan pins every round to the authority layout list', () => {
+  const plan = buildOnlineStagePlan(0, 5);
+
+  assert.deepEqual(plan, {
+    seed: 0,
+    stages: ['battlefield', 'none', 'battlefield', 'moving', 'single'],
+  });
+  assert.equal(getOnlineStageForRound(plan, 0.99, 1), 'battlefield');
+  assert.equal(getOnlineStageForRound(plan, 0.99, 4), 'moving');
+  assert.equal(getOnlineStageForRound(null, 0.42, 2), 'single');
+  assert.deepEqual(normalizeOnlineStagePlan({
+    seed: 7,
+    stagePlan: ['battlefield', 'bogus', 'none'],
+  }), {
+    seed: 7,
+    stages: ['battlefield', 'none'],
+  });
+  assert.equal(normalizeOnlineStagePlan({ stagePlan: ['bogus'] }), null);
 });
 
 test('drawOnlineCountdown preserves the original draw sequence', () => {
@@ -763,6 +791,7 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
   let remoteProfile = null;
   let remoteInput = null;
   let partnerEnd = null;
+  let stagePlan = null;
   let isOnline = true;
   const predicted = [];
   predicted[5] = { seq: 5, left: false };
@@ -779,6 +808,7 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
     getOnlineRemoteIdentity: () => ({ playerId: 'remote' }),
     getRollbackFrame: () => 8,
     inputsDiffer: (a, b) => a.left !== b.left,
+    normalizeOnlineStagePlan,
     onlineClient,
     resimulate: frame => calls.push(['resimulate', frame]),
     setIsOnline: value => { isOnline = value; },
@@ -788,6 +818,7 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
     setOnlineQueueCounts: value => { queueCounts = value; },
     setOnlineRemoteIdentity: value => { remoteProfile = value; },
     setOnlineRemoteLastInput: value => { remoteInput = value; },
+    setOnlineStagePlan: value => { stagePlan = value; },
     setOnlineStartAt: value => { startAt = value; },
     showLobbyPhase: phase => calls.push(['showLobbyPhase', phase]),
     showScreen: screen => calls.push(['showScreen', screen]),
@@ -822,11 +853,22 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
   assert.equal(roomCode.textContent, 'ROOM');
   assert.deepEqual(calls.slice(-2), [['startWaitingDots'], ['showLobbyPhase', 'create']]);
 
-  onlineClient.cb.onMatchReady({ seed: 0.5, serverNow: Date.now() + 20, startAt: 1234 });
-  assert.equal(matchSeed, 0.5);
+  onlineClient.cb.onMatchReady({
+    seed: 0.5,
+    matchSettings: { seed: 12345, stagePlan: ['battlefield', 'none'] },
+    serverNow: Date.now() + 20,
+    startAt: 1234,
+  });
+  assert.equal(matchSeed, 12345);
+  assert.deepEqual(stagePlan, { seed: 12345, stages: ['battlefield', 'none'] });
   assert.equal(clockOffset >= 0, true);
   assert.equal(startAt, 1234);
   assert.deepEqual(calls.slice(-3), [['stopSearchDots'], ['stopWaitingDots'], ['startOnlineMatch']]);
+
+  const callCountAfterReady = calls.length;
+  onlineClient.cb.onMatchReady({ seed: 0.5, matchSettings: null, serverNow: Date.now(), startAt: 9999 });
+  assert.equal(calls.length, callCountAfterReady);
+  assert.equal(startAt, 1234);
 
   onlineClient.cb.onRemoteProfile({ playerId: 'remote' });
   assert.deepEqual(remoteProfile, { playerId: 'remote' });

@@ -26,7 +26,13 @@ import { createOnlineClient, getCountdownSecondsRemaining } from './scripts/onli
 import { wireOnlineCallbacks } from './scripts/online-callbacks.js';
 import { buildOnlineIdentity } from './scripts/online-identity.js';
 import { startOnlineMatchSession } from './scripts/online-match-start.js';
-import { drawOnlineCountdown, EMPTY_INPUT, inputsDiffer, pickOnlineStage } from './scripts/online-match-view.js';
+import {
+  drawOnlineCountdown,
+  EMPTY_INPUT,
+  getOnlineStageForRound,
+  inputsDiffer,
+  normalizeOnlineStagePlan,
+} from './scripts/online-match-view.js';
 import { publishOnlineMatchResult, renderOnlineResultRating, renderRankedProfile } from './scripts/online-results.js';
 import {
   renderRankedProfileDefault,
@@ -45,7 +51,7 @@ import { publishSumoraiMatchActivity } from '../../js/platform/activity/activity
 import { createPlatformApiClient } from '../../js/platform/api/platform-api.mjs';
 
 const TICK_MS        = 1000 / 60;
-const ROLLBACK_WINDOW = 12;   // frames of rollback history (~200 ms at 60 hz)
+const ROLLBACK_WINDOW = 60;   // frames of rollback history (~1 second at 60 hz)
 
 function initGame() {
   loadAssets(({ sprites, sounds }) => _boot(sounds));
@@ -109,6 +115,7 @@ function _boot(sounds) {
   let onlineIsRanked       = false;
   let onlineLobbyPhase     = 'side_select';
   let onlineMatchSeed      = 0;
+  let onlineStagePlan      = null;
   let onlineClockOffset    = 0;
   let onlineStartAt        = 0;
   let onlineRemoteIdentity = null;
@@ -205,6 +212,7 @@ function _boot(sounds) {
 
   function enterOnlineFlow() {
     onlineSide = 'p1';
+    onlineStagePlan = null;
     document.querySelectorAll('.side-card').forEach(c => c.classList.remove('side-card--selected'));
     document.getElementById('online-side-p1').classList.add('side-card--selected');
     document.getElementById('side-conflict-error').hidden = true;
@@ -235,6 +243,7 @@ function _boot(sounds) {
       getOnlineRemoteIdentity: () => onlineRemoteIdentity,
       getRollbackFrame: () => rbLocalFrame,
       inputsDiffer,
+      normalizeOnlineStagePlan,
       onlineClient,
       resimulate,
       setIsOnline: value => { isOnline = value; },
@@ -244,6 +253,7 @@ function _boot(sounds) {
       setOnlineQueueCounts: value => { onlineQueueCounts = value; },
       setOnlineRemoteIdentity: value => { onlineRemoteIdentity = value; },
       setOnlineRemoteLastInput: value => { onlineRemoteLastInput = value; },
+      setOnlineStagePlan: value => { onlineStagePlan = value; },
       setOnlineStartAt: value => { onlineStartAt = value; },
       showLobbyPhase,
       showScreen,
@@ -372,12 +382,13 @@ function _boot(sounds) {
 
   function startRound() {
     gameState.roundNum++;
+    const onlineStagePicker = (seed, roundNum) => getOnlineStageForRound(onlineStagePlan, seed, roundNum);
     prepareRoundState(gameState, {
       camera,
       createPlatforms,
       isOnline,
       onlineMatchSeed,
-      pickOnlineStage,
+      pickOnlineStage: onlineStagePicker,
       resetCamera,
       resetPlayer,
       selectedLayout,
@@ -391,6 +402,7 @@ function _boot(sounds) {
   }
 
   function tickRoundEnd() {
+    const onlineStagePicker = (seed, roundNum) => getOnlineStageForRound(onlineStagePlan, seed, roundNum);
     tickRoundEndState({
       applyPhysics,
       camera,
@@ -403,7 +415,7 @@ function _boot(sounds) {
       onlineRemoteIdentity,
       p1Label,
       p2Label,
-      pickOnlineStage,
+      pickOnlineStage: onlineStagePicker,
       publishOnlineMatchResult: _publishOnlineMatchResult,
       resetCamera,
       resetPlayer,

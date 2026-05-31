@@ -65,6 +65,20 @@ function parseRoundEndMessage(value) {
   } catch { return null; }
 }
 
+function parseMatchSettingsPayload(value) {
+  if (!value || typeof value !== 'object') return null;
+  const stagePlan = Array.isArray(value.stagePlan)
+    ? value.stagePlan.filter(stage => typeof stage === 'string' && stage)
+    : [];
+  if (stagePlan.length === 0) return null;
+  return {
+    rulesVersion: typeof value.rulesVersion === 'string' ? value.rulesVersion : '',
+    seed: value.seed,
+    roundTarget: value.roundTarget,
+    stagePlan,
+  };
+}
+
 function _normalizeCountValue(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
@@ -212,6 +226,7 @@ export function createOnlineClient() {
       _inRoom = true;
       cb.onMatchReady?.({
         seed:       data.seed,
+        matchSettings: parseMatchSettingsPayload(data.matchSettings),
         remoteSide: data.remoteSide || null,
         serverNow:  data.serverNow,
         startAt:    data.startAt,
@@ -257,12 +272,12 @@ export function createOnlineClient() {
 
   function createRoom(side) {
     _mySide = side; _coordinator = true;
-    _send({ type: 'create_room', side, ...sanitizeIdentityPayload(_identity) });
+    _send({ type: 'create_room', gameId: 'sumorai', side, ...sanitizeIdentityPayload(_identity) });
   }
 
   function joinRoom(side, code) {
     _mySide = side;
-    _send({ type: 'join_room', roomCode: code.trim().toUpperCase(), side, ...sanitizeIdentityPayload(_identity) });
+    _send({ type: 'join_room', gameId: 'sumorai', roomCode: code.trim().toUpperCase(), side, ...sanitizeIdentityPayload(_identity) });
   }
 
   function setIdentity(identity) {

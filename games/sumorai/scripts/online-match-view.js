@@ -9,10 +9,49 @@ const EMPTY_INPUT = {
   attackJustPressed: false,
 };
 
+const ONLINE_STAGE_ROUNDS = 5;
+const ONLINE_STAGE_KEYS = new Set(['single', 'battlefield', 'moving', 'none']);
+
+function normalizeOnlineSeed(seed) {
+  const n = Number(seed);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function pickOnlineStage(seed, roundNum) {
   const stages = ['single', 'battlefield', 'battlefield', 'moving', 'none'];
-  const idx = Math.abs(Math.floor(seed * 9301 + roundNum * 49297)) % stages.length;
+  const normalizedSeed = normalizeOnlineSeed(seed);
+  const normalizedRound = Math.max(1, Math.floor(Number(roundNum) || 1));
+  const idx = Math.abs(Math.floor(normalizedSeed * 9301 + normalizedRound * 49297)) % stages.length;
   return stages[idx];
+}
+
+function buildOnlineStagePlan(seed, rounds = ONLINE_STAGE_ROUNDS) {
+  const normalizedSeed = normalizeOnlineSeed(seed);
+  const count = Math.max(1, Math.floor(Number(rounds) || ONLINE_STAGE_ROUNDS));
+  return {
+    seed: normalizedSeed,
+    stages: Array.from({ length: count }, (_, index) => pickOnlineStage(normalizedSeed, index + 1)),
+  };
+}
+
+function normalizeOnlineStagePlan(settings, fallbackSeed = 0) {
+  const stages = Array.isArray(settings?.stagePlan)
+    ? settings.stagePlan
+    : Array.isArray(settings?.stages)
+      ? settings.stages
+      : [];
+  const plan = stages.filter(stage => ONLINE_STAGE_KEYS.has(stage));
+  if (plan.length === 0) return null;
+  const seed = Number.isFinite(Number(settings?.seed)) ? Number(settings.seed) : normalizeOnlineSeed(fallbackSeed);
+  return { seed, stages: plan };
+}
+
+function getOnlineStageForRound(stagePlan, seed, roundNum) {
+  const index = Math.max(1, Math.floor(Number(roundNum) || 1)) - 1;
+  const plannedStage = Array.isArray(stagePlan?.stages) ? stagePlan.stages[index] : null;
+  return typeof plannedStage === 'string' && plannedStage
+    ? plannedStage
+    : pickOnlineStage(seed, roundNum);
 }
 
 function inputsDiffer(a, b) {
@@ -49,4 +88,13 @@ function drawOnlineCountdown({
   ctx.restore();
 }
 
-export { drawOnlineCountdown, EMPTY_INPUT, inputsDiffer, pickOnlineStage };
+export {
+  buildOnlineStagePlan,
+  drawOnlineCountdown,
+  EMPTY_INPUT,
+  getOnlineStageForRound,
+  inputsDiffer,
+  normalizeOnlineStagePlan,
+  normalizeOnlineSeed,
+  pickOnlineStage,
+};

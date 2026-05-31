@@ -40,9 +40,10 @@ The local player always uses `bindings[onlineSide]` (their configured controls f
 ## Match Settings (Online)
 
 - **Match length**: Always Best of 5 (3 wins needed). No picker.
-- **Stage**: Random each round, seeded from the `match_ready` seed + round number.
-  - Pool: `['single', 'battlefield', 'moving', 'none']`
-  - Deterministic from seed so both clients pick the same stage independently — no settings message needed.
+- **Stage**: Server-authored at `match_ready` through `matchSettings.stagePlan`.
+  - Pool: `['single', 'battlefield', 'moving', 'none']` (`battlefield` has double weight).
+  - Clients must not start the online countdown without a valid stage plan.
+  - Local deterministic picking remains only as a compatibility/fallback helper; competitive online play uses the server plan.
 
 ```js
 function pickOnlineStage(seed, roundNum) {
@@ -86,7 +87,6 @@ All sent via `room_message`:
 | `round_end` | both → partner    | `{ winner: 'p1'|'p2'|'draw' }` |
 
 Input messages fire every game tick (60/s). Payload is 8 booleans + a sequence number.
-No settings message needed (match length fixed, stage deterministic from seed).
 
 ---
 

@@ -9,6 +9,7 @@ function wireOnlineCallbacks({
   getOnlineRemoteIdentity,
   getRollbackFrame,
   inputsDiffer,
+  normalizeOnlineStagePlan,
   onlineClient,
   resimulate,
   setIsOnline,
@@ -18,6 +19,7 @@ function wireOnlineCallbacks({
   setOnlineQueueCounts,
   setOnlineRemoteIdentity,
   setOnlineRemoteLastInput,
+  setOnlineStagePlan,
   setOnlineStartAt,
   showLobbyPhase,
   showScreen,
@@ -60,10 +62,16 @@ function wireOnlineCallbacks({
     showLobbyPhase('create');
   };
 
-  onlineClient.cb.onMatchReady = ({ seed, serverNow, startAt }) => {
+  onlineClient.cb.onMatchReady = ({ seed, matchSettings, serverNow, startAt }) => {
+    const stagePlan = normalizeOnlineStagePlan(matchSettings, seed);
+    if (!stagePlan) {
+      onlineClient.cb.onError?.('MATCH_SETTINGS_MISSING', 'Server did not provide Sumorai stage settings');
+      return;
+    }
     stopSearchDots();
     stopWaitingDots();
-    setOnlineMatchSeed(seed);
+    setOnlineMatchSeed(stagePlan.seed);
+    setOnlineStagePlan(stagePlan);
     setOnlineClockOffset(serverNow - Date.now());
     setOnlineStartAt(startAt);
     startOnlineMatch();
