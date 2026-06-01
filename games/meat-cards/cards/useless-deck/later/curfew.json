@@ -1,0 +1,18 @@
+{
+  "id": "curfew",
+  "type": "later",
+  "deckId": "useless_deck",
+  "name": "Curfew",
+  "art": "card-art/useless-deck/later/curfew.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 55
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/later/curfew-later.jpg",
+  "rulesText": "Return one of your monsters in play to your hand. Remove all damage from it.",
+  "implementationStatus": "textOnly",
+  "playCostStars": 2,
+  "lifecycle": "instantToGraveyard",
+  "effects": []
+}

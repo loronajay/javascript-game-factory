@@ -1,0 +1,22 @@
+{
+  "id": "polar_shift",
+  "type": "accessory",
+  "deckId": "meat_deck",
+  "name": "Polar Shift",
+  "art": "card-art/meat-deck/accessories/polar-shift.jfif",
+  "referenceArt": "reference-cards/meat-deck/accessories/polar-shift-accessory.jpg",
+  "rulesText": "Change this unit's strength value to its max HP value.",
+  "implementationStatus": "partiallyScripted",
+  "baseEquipCostStars": 1,
+  "effects": [
+    {
+      "family": "strengthChange",
+      "timing": "whileEquipped",
+      "target": "equippedMonster",
+      "duration": "whileEquipped",
+      "payload": {
+        "mode": "setToCurrentMaxHp"
+      }
+    }
+  ]
+}

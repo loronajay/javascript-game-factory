@@ -1,0 +1,39 @@
+{
+  "id": "bob_the_brick",
+  "type": "monster",
+  "deckId": "meat_deck",
+  "name": "Bob the Brick",
+  "art": "card-art/meat-deck/monsters/bob-the-brick.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 63
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/meat-deck/monsters/bob-the-brick.jpg",
+  "rulesText": "Hard: When an enemy monster uses the Attack command against Bob, deal 2 damage to the attacking monster. Excess damage does not carry over.",
+  "implementationStatus": "partiallyScripted",
+  "summonCostStars": 1,
+  "printedHp": 4,
+  "printedStrength": 0,
+  "effectSlots": [
+    {
+      "id": "hard",
+      "kind": "passive",
+      "name": "Hard",
+      "rulesText": "When an enemy monster uses the Attack command against Bob, deal 2 damage to the attacking monster. Excess damage does not carry over.",
+      "effects": [
+        {
+          "family": "damage",
+          "timing": "afterAttacked",
+          "target": "attackingEnemyMonster",
+          "amount": 2,
+          "duration": "instant",
+          "payload": {
+            "overflowDamage": false
+          }
+        }
+      ]
+    }
+  ],
+  "effects": []
+}

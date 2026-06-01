@@ -1,0 +1,31 @@
+{
+  "id": "lawn_chair",
+  "type": "accessory",
+  "deckId": "meat_deck",
+  "name": "Lawn Chair",
+  "art": "card-art/meat-deck/accessories/lawn-chair.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 58
+  },
+  "artZoom": 128,
+  "referenceArt": "reference-cards/meat-deck/accessories/lawn-chair-accessory.jpg",
+  "rulesText": "Equipped monster gains: Do Nothing (costs 1 star).",
+  "implementationStatus": "partiallyScripted",
+  "baseEquipCostStars": 1,
+  "effects": [
+    {
+      "family": "grantAction",
+      "timing": "whileEquipped",
+      "target": "equippedMonster",
+      "duration": "whileEquipped",
+      "payload": {
+        "actionId": "do_nothing",
+        "name": "Do Nothing",
+        "costStars": 1,
+        "oncePerTurn": true,
+        "effects": []
+      }
+    }
+  ]
+}

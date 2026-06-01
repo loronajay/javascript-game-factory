@@ -1,0 +1,37 @@
+{
+  "id": "fat_baby",
+  "type": "monster",
+  "deckId": "useless_deck",
+  "name": "Fat Baby",
+  "art": "card-art/useless-deck/monsters/fat-baby.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 55
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/monsters/fat-baby.jpg",
+  "rulesText": "Poop: Return one enemy monster to its owner's hand. Cry: Choose one monster. That monster cannot use the Attack command against Fat Baby until the end of its controller's next turn.",
+  "implementationStatus": "textOnly",
+  "summonCostStars": 1,
+  "printedHp": 4,
+  "printedStrength": 1,
+  "effectSlots": [
+    {
+      "id": "poop",
+      "kind": "activeAbility",
+      "name": "Poop",
+      "costStars": 3,
+      "rulesText": "Return one enemy monster to its owner's hand.",
+      "effects": []
+    },
+    {
+      "id": "cry",
+      "kind": "activeAbility",
+      "name": "Cry",
+      "costStars": 2,
+      "rulesText": "Choose one monster. That monster cannot use the Attack command against Fat Baby until the end of its controller's next turn.",
+      "effects": []
+    }
+  ],
+  "effects": []
+}

@@ -1,0 +1,27 @@
+{
+  "id": "big_smac",
+  "type": "later",
+  "deckId": "meat_deck",
+  "name": "Big Smac",
+  "art": "card-art/meat-deck/later/big-smac.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 56
+  },
+  "artZoom": 132,
+  "referenceArt": "reference-cards/meat-deck/later/big-smac-later.jpg",
+  "rulesText": "You gain 2 maximum HP. Your current HP increases by 2.",
+  "implementationStatus": "partiallyScripted",
+  "playCostStars": 1,
+  "lifecycle": "instantToGraveyard",
+  "effects": [
+    {
+      "family": "maxHpChange",
+      "timing": "onPlay",
+      "target": "selfPlayer",
+      "amount": 2,
+      "duration": "instant",
+      "currentHpFollowsMaxIncrease": true
+    }
+  ]
+}

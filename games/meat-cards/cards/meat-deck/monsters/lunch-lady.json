@@ -1,0 +1,28 @@
+{
+  "id": "lunch_lady",
+  "type": "monster",
+  "deckId": "meat_deck",
+  "name": "Lunch Lady",
+  "art": "card-art/meat-deck/monsters/lunch-lady.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 63
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/meat-deck/monsters/lunch-lady.jpg",
+  "rulesText": "Players and monsters cannot be healed. This does not prevent maximum HP increases.",
+  "implementationStatus": "textOnly",
+  "summonCostStars": 3,
+  "printedHp": 5,
+  "printedStrength": 3,
+  "effectSlots": [
+    {
+      "id": "spit_in_food",
+      "kind": "passive",
+      "name": "Spit in Food",
+      "rulesText": "Players and monsters cannot be healed. This does not prevent maximum HP increases.",
+      "effects": []
+    }
+  ],
+  "effects": []
+}

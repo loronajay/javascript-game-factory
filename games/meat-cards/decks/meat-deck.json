@@ -1,0 +1,45 @@
+{
+  "id": "meat_deck",
+  "name": "Meat Deck",
+  "status": "draft",
+  "artFolder": "card-art/meat-deck",
+  "referenceFolder": "reference-cards/meat-deck",
+  "entries": [
+    {
+      "cardId": "baseballz",
+      "count": 1
+    },
+    {
+      "cardId": "big_smac",
+      "count": 1
+    },
+    {
+      "cardId": "bob_the_brick",
+      "count": 1
+    },
+    {
+      "cardId": "diamond_ring",
+      "count": 1
+    },
+    {
+      "cardId": "elderly_turtle",
+      "count": 1
+    },
+    {
+      "cardId": "homie",
+      "count": 1
+    },
+    {
+      "cardId": "lawn_chair",
+      "count": 1
+    },
+    {
+      "cardId": "lunch_lady",
+      "count": 1
+    },
+    {
+      "cardId": "polar_shift",
+      "count": 1
+    }
+  ]
+}

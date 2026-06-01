@@ -1,0 +1,17 @@
+{
+  "id": "selfie_stick",
+  "type": "accessory",
+  "deckId": "useless_deck",
+  "name": "Selfie Stick",
+  "art": "card-art/useless-deck/accessories/selfie-stick.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 52
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/accessories/selfie-stick-accesory.jpg",
+  "rulesText": "Equipped monster gains: Selfie Stick (costs 3 stars): You may knock out this monster. You take no damage from it.",
+  "implementationStatus": "textOnly",
+  "baseEquipCostStars": 1,
+  "effects": []
+}

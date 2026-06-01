@@ -1,0 +1,52 @@
+{
+  "id": "elderly_turtle",
+  "type": "monster",
+  "deckId": "meat_deck",
+  "name": "Elderly Turtle",
+  "art": "card-art/meat-deck/monsters/elderly-turtle.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 66
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/meat-deck/monsters/elderly-turtle.jpg",
+  "rulesText": "Retreat: Heal this monster by 2 HP. Insurance: When this monster dies, heal its player by 2 HP.",
+  "implementationStatus": "partiallyScripted",
+  "summonCostStars": 3,
+  "printedHp": 6,
+  "printedStrength": 2,
+  "effectSlots": [
+    {
+      "id": "retreat",
+      "kind": "activeAbility",
+      "name": "Retreat",
+      "costStars": 3,
+      "rulesText": "Heal this monster by 2 HP.",
+      "effects": [
+        {
+          "family": "heal",
+          "timing": "onAbilityUse",
+          "target": "selfMonster",
+          "amount": 2,
+          "duration": "instant"
+        }
+      ]
+    },
+    {
+      "id": "insurance",
+      "kind": "passive",
+      "name": "Insurance",
+      "rulesText": "When this monster dies, heal its player by 2 HP.",
+      "effects": [
+        {
+          "family": "heal",
+          "timing": "onSourceDies",
+          "target": "ownerPlayer",
+          "amount": 2,
+          "duration": "instant"
+        }
+      ]
+    }
+  ],
+  "effects": []
+}

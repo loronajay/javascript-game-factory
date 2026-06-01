@@ -1,0 +1,49 @@
+{
+  "id": "useless_deck",
+  "name": "Useless Deck",
+  "status": "draft",
+  "artFolder": "card-art/useless-deck",
+  "referenceFolder": "reference-cards/useless-deck",
+  "entries": [
+    {
+      "cardId": "conjoined_twins",
+      "count": 1
+    },
+    {
+      "cardId": "curfew",
+      "count": 1
+    },
+    {
+      "cardId": "fat_baby",
+      "count": 1
+    },
+    {
+      "cardId": "garbage_man",
+      "count": 1
+    },
+    {
+      "cardId": "salami",
+      "count": 1
+    },
+    {
+      "cardId": "selfie_stick",
+      "count": 1
+    },
+    {
+      "cardId": "spotlight",
+      "count": 1
+    },
+    {
+      "cardId": "unnecessary_nuke",
+      "count": 1
+    },
+    {
+      "cardId": "useless_dragon",
+      "count": 1
+    },
+    {
+      "cardId": "useless_head",
+      "count": 1
+    }
+  ]
+}

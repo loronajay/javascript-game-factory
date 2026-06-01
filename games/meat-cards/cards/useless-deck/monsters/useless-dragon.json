@@ -1,0 +1,44 @@
+{
+  "id": "useless_dragon",
+  "type": "monster",
+  "deckId": "useless_deck",
+  "name": "Useless Dragon",
+  "art": "card-art/useless-deck/monsters/useless-dragon.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 55
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/monsters/useless-dragon.jpg",
+  "rulesText": "Roar: Does nothing. Grow: Gain 1 HP or strength. Spread: When this monster dies, you may play a Useless Lizard, Useless Snake, or Useless Head from your hand for no cost.",
+  "implementationStatus": "textOnly",
+  "summonCostStars": 4,
+  "printedHp": 4,
+  "printedStrength": 5,
+  "effectSlots": [
+    {
+      "id": "roar",
+      "kind": "activeAbility",
+      "name": "Roar",
+      "costStars": 1,
+      "rulesText": "Does nothing.",
+      "effects": []
+    },
+    {
+      "id": "grow",
+      "kind": "activeAbility",
+      "name": "Grow",
+      "costStars": 3,
+      "rulesText": "Gain 1 HP or strength.",
+      "effects": []
+    },
+    {
+      "id": "spread",
+      "kind": "passive",
+      "name": "Spread",
+      "rulesText": "When this monster dies, you may play a Useless Lizard, Useless Snake, or Useless Head from your hand for no cost.",
+      "effects": []
+    }
+  ],
+  "effects": []
+}

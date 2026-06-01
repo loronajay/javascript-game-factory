@@ -1,0 +1,35 @@
+{
+  "id": "homie",
+  "type": "monster",
+  "deckId": "meat_deck",
+  "name": "Homie",
+  "art": "card-art/meat-deck/monsters/homie.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 58
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/meat-deck/monsters/homie.jpg",
+  "rulesText": "Homie: Whenever another one of your monsters dies while Homie is in play, Homie gains +3 strength. This bonus stacks and lasts until Homie is knocked out or returned to hand. Snacks: At the start of your turn, heal each of your monsters by 1 HP.",
+  "implementationStatus": "textOnly",
+  "summonCostStars": 2,
+  "printedHp": 6,
+  "printedStrength": 0,
+  "effectSlots": [
+    {
+      "id": "homie",
+      "kind": "passive",
+      "name": "Homie",
+      "rulesText": "Whenever another one of your monsters dies while Homie is in play, Homie gains +3 strength. This bonus stacks and lasts until Homie is knocked out or returned to hand.",
+      "effects": []
+    },
+    {
+      "id": "snacks",
+      "kind": "passive",
+      "name": "Snacks",
+      "rulesText": "At the start of your turn, heal each of your monsters by 1 HP.",
+      "effects": []
+    }
+  ],
+  "effects": []
+}

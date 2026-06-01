@@ -1,0 +1,17 @@
+{
+  "id": "salami",
+  "type": "accessory",
+  "deckId": "useless_deck",
+  "name": "Salami",
+  "art": "card-art/useless-deck/accessories/salami.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 53
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/accessories/salami-accessory.jpg",
+  "rulesText": "Equipped monster gets +2 strength.",
+  "implementationStatus": "textOnly",
+  "baseEquipCostStars": 1,
+  "effects": []
+}

@@ -1,0 +1,17 @@
+{
+  "id": "spotlight",
+  "type": "accessory",
+  "deckId": "useless_deck",
+  "name": "Spotlight",
+  "art": "card-art/useless-deck/accessories/spotlight.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 54
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/accessories/spotlight-accesory.jpg",
+  "rulesText": "Equipped monster gains: Caught (costs 3 stars): If your opponent has an unrevealed card in hand, they reveal one. They cannot reveal the same card for this ability twice.",
+  "implementationStatus": "textOnly",
+  "baseEquipCostStars": 1,
+  "effects": []
+}

@@ -1,0 +1,36 @@
+{
+  "id": "garbage_man",
+  "type": "monster",
+  "deckId": "useless_deck",
+  "name": "Garbage Man",
+  "art": "card-art/useless-deck/monsters/garbage-man.jfif",
+  "artPosition": {
+    "x": 50,
+    "y": 56
+  },
+  "artZoom": 112,
+  "referenceArt": "reference-cards/useless-deck/monsters/garbage-man.jpg",
+  "rulesText": "Take Out Trash: Knock out one monster whose strength and HP add up to less than 6. You may choose one of your own monsters. If you do, you take no damage. Life of Garbage: Garbage Man gains +1 strength each time he uses Take Out Trash.",
+  "implementationStatus": "textOnly",
+  "summonCostStars": 4,
+  "printedHp": 8,
+  "printedStrength": 1,
+  "effectSlots": [
+    {
+      "id": "take_out_trash",
+      "kind": "activeAbility",
+      "name": "Take Out Trash",
+      "costStars": 3,
+      "rulesText": "Knock out one monster whose strength and HP add up to less than 6. You may choose one of your own monsters. If you do, you take no damage.",
+      "effects": []
+    },
+    {
+      "id": "life_of_garbage",
+      "kind": "passive",
+      "name": "Life of Garbage",
+      "rulesText": "Garbage Man gains +1 strength each time he uses Take Out Trash.",
+      "effects": []
+    }
+  ],
+  "effects": []
+}

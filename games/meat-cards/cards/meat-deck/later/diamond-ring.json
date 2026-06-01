@@ -1,0 +1,24 @@
+{
+  "id": "diamond_ring",
+  "type": "later",
+  "deckId": "meat_deck",
+  "name": "Diamond Ring",
+  "art": "card-art/meat-deck/later/diamond-ring.jfif",
+  "referenceArt": "reference-cards/meat-deck/later/diamond-ring-later.jpg",
+  "rulesText": "Choose one enemy monster. Until the end of its controller's next turn, that monster cannot take offensive actions.",
+  "implementationStatus": "partiallyScripted",
+  "playCostStars": 1,
+  "lifecycle": "instantToGraveyard",
+  "effects": [
+    {
+      "family": "restriction",
+      "timing": "onPlay",
+      "target": "enemyMonster",
+      "duration": "fixedTurnCount",
+      "payload": {
+        "turns": 1,
+        "blockedActionCategory": "offensive"
+      }
+    }
+  ]
+}
