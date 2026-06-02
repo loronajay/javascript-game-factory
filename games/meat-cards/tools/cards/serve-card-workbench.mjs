@@ -41,6 +41,15 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (pathname === "/api/deck-files") {
+    response.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    response.end(JSON.stringify(listDeckFiles(), null, 2));
+    return;
+  }
+
   const decodedPath = decodeURIComponent(pathname);
   const filePath = path.resolve(root, `.${decodedPath}`);
 
@@ -117,4 +126,15 @@ function listCardFiles() {
       }
     });
   }
+}
+
+function listDeckFiles() {
+  const decksRoot = path.join(root, "decks");
+  if (!fs.existsSync(decksRoot)) return [];
+
+  return fs
+    .readdirSync(decksRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === ".json")
+    .map((entry) => path.relative(root, path.join(decksRoot, entry.name)).replaceAll(path.sep, "/"))
+    .sort((a, b) => a.localeCompare(b));
 }

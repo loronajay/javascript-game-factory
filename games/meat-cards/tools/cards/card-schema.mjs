@@ -156,9 +156,26 @@ function validateCard(card, label, errors) {
     errors.push(`${label}: effects must be an array when present`);
   }
 
+  if (card.tags !== undefined) {
+    validateTags(card.tags, label, errors);
+  }
+
   if (card.type === "monster") validateMonster(card, label, errors);
   if (card.type === "accessory") validateAccessory(card, label, errors);
   if (card.type === "later") validateLater(card, label, errors);
+}
+
+function validateTags(tags, label, errors) {
+  if (!Array.isArray(tags)) {
+    errors.push(`${label}: tags must be an array when present`);
+    return;
+  }
+
+  tags.forEach((tag, index) => {
+    if (!isNonEmptyString(tag)) {
+      errors.push(`${label}: tags[${index}] must be a non-empty string`);
+    }
+  });
 }
 
 function validateMonster(card, label, errors) {

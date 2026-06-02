@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RTS Exploration Engine v0</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app">
+    <canvas id="game" width="1280" height="720" aria-label="RTS Exploration Engine canvas"></canvas>
+    <section id="hud" aria-label="Debug HUD">
+      <div class="hud-title">RTS Exploration Engine v0</div>
+      <div id="hud-lines"></div>
+      <div class="hud-help">
+        <div><b>Left click</b> select unit</div>
+        <div><b>Shift + click</b> add/remove</div>
+        <div><b>Drag</b> box select</div>
+        <div><b>Right click</b> move selected</div>
+        <div><b>WASD / Arrows</b> pan camera</div>
+        <div><b>Space</b> center selected</div>
+        <div><b>Esc</b> clear selection</div>
+        <div><b>F</b> fog debug</div>
+        <div><b>P</b> path debug</div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

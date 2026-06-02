@@ -10,12 +10,22 @@
   },
   "artZoom": 112,
   "referenceArt": "reference-cards/meat-deck/monsters/elderly-turtle.jpg",
-  "rulesText": "Retreat: Heal this monster by 2 HP. Insurance: When this monster dies, heal its player by 2 HP.",
+  "rulesText": "Turtle: This unit is a turtle. Retreat: Heal this monster by 2 HP. Insurance: When this monster dies, heal its player by 2 HP.",
   "implementationStatus": "partiallyScripted",
+  "tags": [
+    "Turtle"
+  ],
   "summonCostStars": 3,
   "printedHp": 6,
   "printedStrength": 2,
   "effectSlots": [
+    {
+      "id": "turtle",
+      "kind": "passive",
+      "name": "Turtle",
+      "rulesText": "This unit is a turtle.",
+      "effects": []
+    },
     {
       "id": "retreat",
       "kind": "activeAbility",
