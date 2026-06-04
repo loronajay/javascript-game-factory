@@ -11,7 +11,7 @@
   "artZoom": 112,
   "referenceArt": "reference-cards/useless-deck/monsters/conjoined-twins.jpg",
   "rulesText": "Two: This monster can have up to 2 accessories equipped. Argue: This monster gains +1 strength.",
-  "implementationStatus": "textOnly",
+  "implementationStatus": "scripted",
   "summonCostStars": 2,
   "printedHp": 4,
   "printedStrength": 2,
@@ -21,15 +21,33 @@
       "kind": "passive",
       "name": "Two",
       "rulesText": "This monster can have up to 2 accessories equipped.",
-      "effects": []
+      "effects": [
+        {
+          "family": "accessorySlotModification",
+          "timing": "whileInPlay",
+          "target": "selfMonster",
+          "payload": {
+            "mode": "setCapacity",
+            "capacity": 2
+          }
+        }
+      ]
     },
     {
       "id": "argue",
       "kind": "activeAbility",
       "name": "Argue",
       "costStars": 2,
+      "oncePerTurn": true,
       "rulesText": "This monster gains +1 strength.",
-      "effects": []
+      "effects": [
+        {
+          "family": "strengthChange",
+          "timing": "onAbilityUse",
+          "target": "selfMonster",
+          "amount": 1
+        }
+      ]
     }
   ],
   "effects": []

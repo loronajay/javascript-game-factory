@@ -11,7 +11,18 @@
   "artZoom": 112,
   "referenceArt": "reference-cards/useless-deck/accessories/salami-accessory.jpg",
   "rulesText": "Equipped monster gets +2 strength.",
-  "implementationStatus": "textOnly",
+  "implementationStatus": "scripted",
   "baseEquipCostStars": 1,
-  "effects": []
+  "effects": [
+    {
+      "family": "strengthChange",
+      "timing": "whileEquipped",
+      "target": "equippedMonster",
+      "duration": "whileEquipped",
+      "payload": {
+        "mode": "add",
+        "amount": 2
+      }
+    }
+  ]
 }

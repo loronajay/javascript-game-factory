@@ -2,20 +2,53 @@ import { createCardPiece } from "./card-piece.mjs";
 import { el } from "./dom.mjs";
 
 export function createBattlefieldLayer(battlefield, handlers) {
-  const layer = el("section", "battlefield-layer", { "aria-label": "Battlefield" });
+  const modeClass = battlefield.mode && battlefield.mode !== "idle" ? ` is-targeting is-${battlefield.mode}-mode` : "";
+  const layer = el("section", `battlefield-layer${modeClass}`, { "aria-label": "Battlefield" });
+  if (battlefield.statusLabel) {
+    layer.append(createBattlefieldStatus(battlefield, handlers));
+  }
   battlefield.rows.forEach((row) => layer.append(createMonsterRow(row, handlers)));
   return layer;
 }
 
+function createBattlefieldStatus(battlefield, handlers) {
+  const status = el("div", "battlefield-status");
+  status.append(el("span", "battlefield-status-label", battlefield.statusLabel));
+  if (battlefield.cancelActionLabel) {
+    const cancel = el(
+      "button",
+      "scene-button battlefield-cancel-action",
+      { type: "button" },
+      battlefield.cancelActionLabel,
+    );
+    cancel.addEventListener("click", () => handlers.onCancelPendingAction?.());
+    status.append(cancel);
+  }
+  return status;
+}
+
 function createMonsterRow(row, handlers) {
-  const rowElement = el("section", `monster-row-layer monster-row-layer--${row.side}`);
+  const rowElement = el(
+    "section",
+    `monster-row-layer monster-row-layer--${row.side}${row.isTargetRow ? " is-target-row" : ""}`,
+  );
   rowElement.append(el("div", "scene-zone-label", row.side === "player" ? "Your Monsters" : "Enemy Monsters"));
   const slots = el("div", "scene-monster-slots");
 
   row.slots.forEach((slotView) => {
-    const slot = el("div", slotView.monster ? "scene-monster-slot is-filled" : "scene-monster-slot", {
+    const slotClasses = [
+      "scene-monster-slot",
+      slotView.monster ? "is-filled" : "",
+      slotView.isSelected ? "is-selected" : "",
+      slotView.isTargeted ? "is-targeted" : "",
+      slotView.isValidTarget ? "is-valid-target" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const slot = el("div", slotClasses, {
       role: "button",
       tabindex: "0",
+      "aria-label": slotView.ariaLabel,
       "data-player-id": slotView.playerId,
       "data-slot-index": String(slotView.slotIndex),
     });
@@ -50,8 +83,13 @@ function createMonsterRow(row, handlers) {
         createCardPiece(slotView.monster, {
           compactStats: `${slotView.monster.strengthLabel} / ${slotView.monster.hpLabel}`,
         }),
-        createAttachedAccessoryTray(slotView, handlers),
       );
+      if (slotView.actionCue) {
+        slot.append(el("span", "slot-action-cue", slotView.actionCue));
+      }
+      slot.append(createAttachedAccessoryTray(slotView, handlers));
+    } else if (slotView.isValidTarget && slotView.actionCue) {
+      slot.append(el("span", "slot-action-cue", slotView.actionCue));
     } else {
       slot.append(el("span", "slot-empty", "Empty"));
     }
@@ -64,9 +102,20 @@ function createMonsterRow(row, handlers) {
 
 function createAttachedAccessoryTray(slotView, handlers) {
   const attachments = slotView.monster.attachments ?? [];
+  const trayClasses = [
+    "attached-accessories",
+    attachments.length ? "" : "attached-accessories--empty",
+    attachments.length > 1 ? "attached-accessories--stacked" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return el(
     "div",
-    attachments.length ? "attached-accessories" : "attached-accessories attached-accessories--empty",
+    trayClasses,
+    {
+      "aria-label": `${slotView.monster.name} equipped accessories`,
+      "data-accessory-count": String(attachments.length),
+    },
     attachments.map((attachment) => {
       const accessory = el(
         "button",
@@ -74,11 +123,11 @@ function createAttachedAccessoryTray(slotView, handlers) {
         {
           type: "button",
           "data-card-instance-id": attachment.instanceId,
+          "aria-label": attachedAccessoryLabel(attachment),
           title: attachment.rulesText || attachment.name,
         },
         [
           el("span", "attached-accessory-name", attachment.name),
-          attachment.rulesText ? el("span", "attached-accessory-rules", attachment.rulesText) : null,
         ],
       );
       accessory.addEventListener("click", (event) => {
@@ -92,6 +141,10 @@ function createAttachedAccessoryTray(slotView, handlers) {
       return accessory;
     }),
   );
+}
+
+function attachedAccessoryLabel(attachment) {
+  return attachment.rulesText ? `${attachment.name}. ${attachment.rulesText}` : attachment.name;
 }
 
 function readDraggedCard(event) {

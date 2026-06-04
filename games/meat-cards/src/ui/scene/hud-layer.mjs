@@ -6,7 +6,7 @@ export function createHudLayer(hud, side) {
     el("div", "scene-hud-name", hud.name),
     el("div", "scene-hud-stats", [
       stat("HP", hud.hpLabel),
-      stat("Stars", hud.starsLabel),
+      stat("★", hud.starsLabel),
     ]),
   );
   return layer;

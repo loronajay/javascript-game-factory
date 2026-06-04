@@ -1,0 +1,126 @@
+.scene-hud {
+  left: 16px;
+  width: min(240px, calc(100vw - 32px));
+  min-height: 82px;
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  border: 3px solid var(--scene-line);
+  background: rgba(255, 248, 232, 0.94);
+  box-shadow: 6px 6px 0 var(--scene-shadow);
+  padding: 8px 10px;
+}
+
+.scene-hud--opponent {
+  top: 14px;
+  border-color: var(--scene-blue);
+}
+
+.scene-hud--player {
+  bottom: 104px;
+  border-color: #bd6a31;
+}
+
+.scene-hud.is-active-turn {
+  outline: 4px solid var(--scene-gold);
+  animation: active-turn-glow 1400ms ease-in-out infinite alternate;
+}
+
+.scene-hud-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-hud-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.scene-stat {
+  min-width: 72px;
+  display: grid;
+  gap: 1px;
+  border: 2px solid var(--scene-line);
+  background: var(--scene-paper);
+  padding: 4px 6px;
+}
+
+.scene-stat-value {
+  font-size: 16px;
+}
+
+.pile-layer {
+  left: 16px;
+  display: flex;
+  gap: 10px;
+}
+
+.pile-layer--opponent {
+  top: 122px;
+}
+
+.pile-layer--player {
+  bottom: 2px;
+}
+
+.card-pile {
+  position: relative;
+  width: 66px;
+  aspect-ratio: 1060 / 1484;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--scene-line);
+  border-radius: 5px;
+  background:
+    linear-gradient(135deg, rgba(85, 114, 143, 0.22) 25%, transparent 25%) 0 0 / 18px 18px,
+    linear-gradient(135deg, transparent 75%, rgba(189, 106, 49, 0.26) 75%) 0 0 / 18px 18px,
+    #efe0c7;
+  box-shadow:
+    5px 5px 0 rgba(33, 29, 23, 0.58),
+    9px 9px 0 rgba(33, 29, 23, 0.3);
+}
+
+.card-pile--graveyard {
+  background: #fffdf4;
+}
+
+.pile-count {
+  position: absolute;
+  right: -8px;
+  top: -10px;
+  min-width: 26px;
+  min-height: 26px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--scene-line);
+  background: var(--scene-gold);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.pile-label {
+  border: 2px solid var(--scene-line);
+  background: rgba(255, 250, 240, 0.88);
+  padding: 3px 5px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+@keyframes active-turn-glow {
+  from {
+    box-shadow: 6px 6px 0 var(--scene-shadow);
+  }
+
+  to {
+    box-shadow:
+      6px 6px 0 var(--scene-shadow),
+      0 0 0 5px rgba(241, 188, 88, 0.28);
+  }
+}

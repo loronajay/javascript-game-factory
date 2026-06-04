@@ -1,5 +1,4 @@
 # Build Buddy — Game Design Document
-
 ## 1. High-Level Concept
 
 **Build Buddy** is a two-player online cooperative platformer built around asymmetric real-time roles.
@@ -11,7 +10,6 @@ The core hook is simultaneous co-op execution. The Runner watches the Builder's 
 A full match is a **10-stage run**. Roles swap after every stage, whether the stage is cleared or failed. At the end of the run, the game displays a 10-card results screen showing the outcome and key metrics for each stage.
 
 ---
-
 ## 2. Platform Fit
 
 Build Buddy is intended for the JavaScript Game Factory platform as an online two-player game.
@@ -37,7 +35,6 @@ The game is valuable to the platform because it exercises reusable systems that 
 Build Buddy should be treated as a real co-op platformer, not a small party-game penalty mode.
 
 ---
-
 ## 3. Match Structure
 
 A match is a **10-stage run**.
@@ -74,7 +71,6 @@ Example role order:
 In a 10-stage run, each player gets exactly 5 Runner stages and 5 Builder stages.
 
 ---
-
 ## 4. Matchmaking
 
 Build Buddy follows the same online two-player structure as the other Jay Arcade online games.
@@ -114,7 +110,6 @@ Expected flow:
 Private lobbies are important because Build Buddy depends heavily on communication and co-op timing.
 
 ---
-
 ## 5. Stage Structure
 
 Stages are side-view platforming stages.
@@ -145,7 +140,6 @@ There is no global fixed timer shared by all stages.
 Stages should include moments where players naturally slow down, pause briefly, plan, refactor tools, and then continue. Build Buddy is not intended to be nonstop sprinting from start to finish. The intended rhythm is fast movement interrupted by route problems that require Builder support and co-op adjustment.
 
 ---
-
 ## 6. Stage Success and Failure
 
 A stage is cleared when the Runner reaches the goal before the timer expires.
@@ -165,8 +159,20 @@ There is no death-based time penalty in the current canon.
 
 The timer itself is the stage pressure.
 
----
+Timeout must be represented as a stage failure reason, not as a Runner death reason.
 
+When the timer reaches zero, the announcement should use language such as:
+
+- `Time Up`
+- `Stage Failed — Time Up`
+
+Timeout should not display as:
+
+- `Hazard Death`
+- `Fall Death`
+- Any other Runner death label
+
+Runner deaths may still be tracked during a stage, but timer failure is a stage outcome event, not a lethal hazard event.
 ## 7. Moment-to-Moment Gameplay
 
 Build Buddy is fully real-time.
@@ -199,7 +205,6 @@ The core co-op loop is simultaneous execution:
 There is no separate planning phase during active stage play.
 
 ---
-
 ## 8. Runner Role
 
 The Runner is the active platforming player.
@@ -218,7 +223,6 @@ The Runner's job is to traverse the stage using:
 The Runner is not passive. If the Builder can solve the entire stage alone, the design has failed.
 
 ---
-
 ## 9. Runner Movement Canon
 
 The Runner uses Sonic-inspired momentum platforming.
@@ -255,7 +259,6 @@ The following are not required for v1:
 These can be scoped later if needed.
 
 ---
-
 ## 10. Running and Braking
 
 The Runner does not instantly reach top speed.
@@ -269,7 +272,6 @@ Pressing the opposite direction while moving quickly causes braking/skid behavio
 The Runner should feel fast and momentum-heavy, but still controllable.
 
 ---
-
 ## 11. Jumping
 
 The Runner's first jump has variable height.
@@ -281,7 +283,6 @@ A longer button hold creates a higher jump up to the jump-height cap.
 Horizontal momentum is preserved during jumps.
 
 ---
-
 ## 12. Double Jump
 
 The Runner has one double jump while airborne.
@@ -297,7 +298,6 @@ The double jump does not restore after bouncing on a spring/trampoline.
 The double jump restores only when the Runner touches valid grounded terrain or another explicitly approved reset surface.
 
 ---
-
 ## 13. Climbing
 
 The Runner has a Knuckles-style climb mechanic.
@@ -326,7 +326,6 @@ The Runner exits climb state when:
 - Losing contact with climbable terrain
 
 ---
-
 ## 14. Hazards and Respawn
 
 Lethal hazards instantly kill the Runner.
@@ -359,7 +358,6 @@ All placed tools remain in the stage after Runner death.
 There is no time penalty on death.
 
 ---
-
 ## 15. Runner Reposition
 
 Runner Reposition exists only as a stuck-state recovery action.
@@ -451,7 +449,6 @@ runnerRepositions: 1
 This metric does not need to appear on the results cards in the current canon.
 
 ---
-
 ## 16. Builder Role
 
 The Builder uses an editor-style interface to place traversal tools into the stage.
@@ -465,20 +462,13 @@ The Builder is not asking the Runner for approval. The Builder acts directly.
 The Builder must read the route, watch the Runner, and make quick placement decisions under timer pressure.
 
 ---
-
 ## 17. Builder Toolkit
 
-All canon tools are available on every stage.
-
-There are no stage-specific toolkit restrictions.
-
-Stages are balanced around the full toolkit being available.
-
-The Builder's toolkit is displayed in a HUD element.
+The Builder uses a toolkit displayed in a HUD element.
 
 Each tool has its own toolkit entry and label.
 
-The current canon toolkit includes:
+The default Builder toolkit includes:
 
 - Standard one-way platform
 - Yellow low-bounce spring
@@ -486,21 +476,39 @@ The current canon toolkit includes:
 - Blue high-bounce spring
 - Builder checkpoint
 
+The standard Build Buddy rule set makes the full toolkit available.
+
+However, stages may define authored **Builder Rules** that override the default toolkit for specific stage challenges.
+
+Builder Rules may:
+
+- Disable specific tools for a stage.
+- Reduce the active cap for specific tools.
+- Reduce the total active tool cap.
+- Apply a named stage quirk label shown in the UI.
+
+Disabled tools should remain visible in the Builder HUD as locked or unavailable tools instead of being silently removed. Players should understand that the stage rule is restricting the tool, not that the interface is broken.
+
+Stage-specific toolkit restrictions are authored exceptions, not the default identity of Build Buddy.
+
+The default game fantasy remains that the Builder supplies the missing infrastructure needed for the Runner to clear the stage.
+
 Additional tools may be scoped later.
-
----
-
 ## 18. Builder Tool Caps
 
 There is no Build Energy budget.
 
-Builder freedom is constrained by active tool caps, placement rules, no-build zones, camera limits, and tool-specific validation.
+Builder freedom is constrained by active tool caps, placement rules, no-build zones, camera limits, tool-specific validation, and stage-specific Builder Rules.
 
-### 18.1 Total Active Tool Cap
+The values below are the **standard default caps**.
 
-The Builder may have up to **20 active placed tools** at once.
+Stages may override these values through their active `builderRules` definition.
 
-The checkpoint does not count against the 20-tool cap.
+### 18.1 Default Total Active Tool Cap
+
+By default, the Builder may have up to **20 active placed tools** at once.
+
+The checkpoint does not count against the 20-tool cap unless a future stage rule explicitly says otherwise.
 
 This cap exists to prevent:
 
@@ -510,13 +518,13 @@ This cap exists to prevent:
 - Abuse cases
 - Stage readability collapse
 
-Stages should be scoped so that 20 active tools is enough to solve the route when used well.
+Stages should be scoped so that their active tool cap is enough to solve the route when used well.
 
-### 18.2 Per-Tool Active Caps
+### 18.2 Default Per-Tool Active Caps
 
-Each individual tool type is capped at **5 active uses at a time**.
+By default, each individual non-checkpoint tool type is capped at **5 active uses at a time**.
 
-Current per-tool caps:
+Default per-tool caps:
 
 | Tool | Active Cap |
 |---|---:|
@@ -526,13 +534,173 @@ Current per-tool caps:
 | Blue high-bounce spring | 5 |
 | Builder checkpoint | 1 per stage |
 
-The checkpoint is separate from the 20-tool cap and cannot be moved, deleted, or re-placed after placement.
+The checkpoint is separate from the default 20-tool cap and cannot be moved, deleted, or re-placed after placement.
 
 Per-tool caps prevent the Builder from solving every stage by flooding one tool type, such as placing 20 platforms.
 
----
+### 18.3 Stage-Overridden Caps
 
-## 19. Builder Placement Interface
+A stage may override the default caps.
+
+Examples:
+
+- `Only 1 of each spring`
+- `No platforms`
+- `Maximum 8 active tools`
+- `No blue springs`
+
+Stage-overridden caps must be enforced by the same validation layer that enforces the default caps.
+
+The Builder HUD, ghost preview, placement validator, and results/debug data must all read from the same active rule set.
+
+Do not let the HUD show a tool as available if validation will reject it.
+
+Do not let validation allow a tool that the HUD marks as locked.
+## 19. Stage Builder Rules
+
+Stage Builder Rules define authored restrictions or quirks for a specific stage.
+
+They exist so stages can create variety without hardcoding special cases into the Builder engine.
+
+Builder Rules should be data-driven and loaded from the active stage definition.
+
+### 19.1 Default Builder Rules
+
+The standard rule set should behave like this:
+
+```js
+builderRules: {
+  ruleId: "standard",
+  ruleLabel: "Standard build rules",
+
+  enabledTools: {
+    platform: true,
+    springYellow: true,
+    springGreen: true,
+    springBlue: true,
+    checkpoint: true
+  },
+
+  activeCaps: {
+    platform: 5,
+    springYellow: 5,
+    springGreen: 5,
+    springBlue: 5,
+    checkpoint: 1
+  },
+
+  totalActiveToolCap: 20,
+
+  checkpoint: {
+    enabled: true,
+    requiredFloorSupport: true,
+    canMoveAfterPlaced: false,
+    canDeleteAfterPlaced: false,
+    canReplaceAfterPlaced: false
+  }
+}
+```
+
+### 19.2 Example Restricted Builder Rules
+
+Example restricted stage:
+
+```js
+builderRules: {
+  ruleId: "no_platforms_one_spring_each",
+  ruleLabel: "No platforms — one spring of each type",
+
+  enabledTools: {
+    platform: false,
+    springYellow: true,
+    springGreen: true,
+    springBlue: true,
+    checkpoint: true
+  },
+
+  activeCaps: {
+    springYellow: 1,
+    springGreen: 1,
+    springBlue: 1,
+    checkpoint: 1
+  },
+
+  totalActiveToolCap: 3
+}
+```
+
+### 19.3 Rule Merging
+
+Stages should not be required to define every rule field.
+
+The engine should merge stage-specific rules over the default rule set.
+
+If a stage does not define `builderRules`, the stage uses the standard default rules.
+
+If a stage defines only one override, all unspecified rules should remain standard.
+
+Example:
+
+```js
+builderRules: {
+  ruleId: "no_blue_spring",
+  ruleLabel: "No blue spring",
+  enabledTools: {
+    springBlue: false
+  }
+}
+```
+
+### 19.4 UI Requirements
+
+The Builder HUD must reflect the active rule set.
+
+The HUD should show:
+
+- Available tools
+- Locked tools
+- Per-tool active caps
+- Total active tool cap
+- The active rule label when the stage has a non-standard rule set
+
+Locked tools should be visible but disabled.
+
+The player should not need to guess whether a missing tool is a bug, a stage rule, or an unfinished feature.
+
+### 19.5 Validation Requirements
+
+Builder Rules must be enforced by placement validation.
+
+The placement validator must reject:
+
+- Disabled tools
+- Tools whose stage-specific cap has been reached
+- Placements that exceed the active total tool cap
+- Checkpoint placement when the checkpoint is disabled
+- Any placement that violates normal collision, no-build, safety-zone, or tool-specific rules
+
+The ghost preview should show invalid placement feedback when a stage rule blocks placement.
+
+When practical, invalid feedback should expose the reason, such as:
+
+- `Tool locked`
+- `Cap reached`
+- `Total cap reached`
+- `Needs floor support`
+- `Blocked zone`
+- `Too close to Runner`
+- `Tool in use`
+
+### 19.6 Design Guidance
+
+Stage Builder Rules are useful, but they should not be overused.
+
+The default Build Buddy experience should preserve the Builder fantasy.
+
+Restricted stages should be authored as challenge stages, teaching stages, or variety stages.
+
+Avoid adding strange rule gimmicks too early, such as random tool locks, timed tool decay, or tools changing mid-stage. Those are later-game modifiers, not v1 engine foundation.
+## 20. Builder Placement Interface
 
 The Builder selects tools from the HUD toolkit.
 
@@ -548,6 +716,19 @@ If the placement is invalid, the preview shows a clear invalid marker, such as a
 
 The invalid marker communicates that the tool cannot be placed at the current location.
 
+When practical, invalid feedback should include a short reason.
+
+Useful invalid reasons include:
+
+- Tool locked
+- Cap reached
+- Total cap reached
+- Needs floor support
+- Blocked zone
+- Too close to Runner
+- Outside stage bounds
+- Tool in use
+
 The Runner can see the Builder preview, but this is informational only. It is not an approval request.
 
 ### 19.1 Grid Visibility
@@ -560,15 +741,22 @@ The Runner sees the Builder cursor/tool hover as a ghosted preview snapped to th
 
 The ghost preview should be simple, semi-transparent, and readable without blocking hazards or Runner movement.
 
----
+### 19.2 Locked Tool Visibility
 
-## 20. Builder Placement Rules
+If a stage-specific Builder Rule disables a tool, the tool should stay visible in the HUD but appear locked, greyed out, or otherwise unavailable.
+
+The Builder should not be able to select and place disabled tools.
+
+The UI should communicate that the restriction is part of the stage rule.
+## 21. Builder Placement Rules
 
 Builder tools use grid placement.
 
 The grid should support clean, readable placement without making the world feel overly restrictive.
 
 Tools must pass placement validation before being placed.
+
+Placement validation must be stage-rule-aware.
 
 General placement restrictions:
 
@@ -579,17 +767,39 @@ General placement restrictions:
 - Tools cannot overlap blocked placement zones.
 - Tools cannot be placed outside stage bounds.
 - Tools cannot violate tool-specific placement rules.
-- Tools cannot exceed the 20 active tool cap.
-- Tools cannot exceed their per-tool active cap.
+- Tools cannot violate active stage-specific Builder Rules.
+- Tools cannot exceed the active total tool cap.
+- Tools cannot exceed their active per-tool cap.
 - Tools cannot be moved or deleted while in use.
 
 Stages may include no-build zones and restricted placement zones where needed.
 
 No-build zones may be used near starts, goals, hazard layouts, tight challenge sections, or areas where Builder placement would break the intended route.
 
----
+### 20.1 Stage-Rule-Aware Validation
 
-## 21. Runner Safety No-Build Zone
+The validator must read the active stage's merged Builder Rules before approving placement.
+
+Disabled tools cannot be placed.
+
+Stage-specific caps override default caps.
+
+The active total cap overrides the default total cap.
+
+Checkpoint availability and checkpoint support rules must come from the active rule set.
+
+### 20.2 Standing Object Placement
+
+Not every Builder tool should be treated as a flat top-left grid tile.
+
+The checkpoint is a standing object.
+
+For v1, checkpoint placement should require valid floor or platform support, but support detection should be forgiving enough to account for checkpoint height and grid snapping.
+
+The checkpoint should snap vertically to a nearby valid support surface when the cursor is close enough and all other placement rules pass.
+
+This prevents valid-looking checkpoint placements from being rejected because the checkpoint's top-left grid coordinate does not perfectly align with the floor surface.
+## 22. Runner Safety No-Build Zone
 
 The Runner has an invisible safety no-build zone around them.
 
@@ -606,8 +816,7 @@ The safety zone exists to prevent stuck states and collision bugs.
 The safety zone is not intended to prevent every bad Builder decision. It is specifically an anti-break and anti-trap system.
 
 ---
-
-## 22. Moving and Deleting Tools
+## 23. Moving and Deleting Tools
 
 Builder tools are not permanent, except for the checkpoint.
 
@@ -633,8 +842,7 @@ The checkpoint is the only placed object that cannot be moved or deleted after p
 Mistakes, bad placements, and accidental deletions are acceptable parts of the game. The design should prevent technical breakage and hard stuck states, not prevent every poor decision.
 
 ---
-
-## 23. Builder Camera
+## 24. Builder Camera
 
 The Runner has the primary gameplay camera.
 
@@ -653,8 +861,7 @@ The Runner's camera does not shift when the Builder looks around.
 The Runner keeps a normal Runner-follow view.
 
 ---
-
-## 24. Respawn Placement Lock
+## 25. Respawn Placement Lock
 
 When the Runner dies and is in the respawn state, Builder placement is paused.
 
@@ -665,12 +872,11 @@ The Builder cannot continue building ahead while the Runner is dead.
 After the Runner respawns and progress resumes, both players continue solving and refactoring the route together from the current visible area.
 
 ---
+## 26. Builder Checkpoint
 
-## 25. Builder Checkpoint
+Each stage gives the Builder exactly one checkpoint placement unless an authored stage rule explicitly disables checkpoints.
 
-Each stage gives the Builder exactly one checkpoint placement.
-
-The checkpoint is available as a Builder tool.
+The checkpoint is available as a Builder tool under the standard rule set.
 
 Once placed, the checkpoint cannot be moved, deleted, refunded, or placed again.
 
@@ -697,12 +903,27 @@ Checkpoint restrictions:
 - Cannot be moved after placement.
 - Cannot be deleted after placement.
 - Cannot be re-placed after placement.
+- Cannot violate active stage Builder Rules.
 
 For v1, the checkpoint should require valid floor or platform support.
 
 Floating checkpoints are not part of the current canon.
 
-### 25.2 Strict Checkpoint Used Flag
+### 25.2 Checkpoint Support Detection
+
+Checkpoint placement should treat the checkpoint as a standing object, not as a flat platform tile.
+
+Because the checkpoint may be taller than the placement grid cell size, raw top-left grid alignment is not enough.
+
+The placement validator should detect nearby valid floor or platform support below the checkpoint's feet.
+
+If the cursor placement is close enough to a valid support surface and all other placement rules pass, the checkpoint may snap vertically so its feet rest on that surface.
+
+This support snapping is only for placement validation and final placement alignment.
+
+It does not change Runner physics.
+
+### 25.3 Strict Checkpoint Used Flag
 
 `checkpointUsed` is flagged strictly by whether the Runner respawned from the Builder checkpoint at least once.
 
@@ -714,7 +935,7 @@ The checkpoint is considered **not used** if:
 
 Only actual respawn from the Builder checkpoint counts as checkpoint use.
 
-### 25.3 Checkpoint Reward
+### 25.4 Checkpoint Reward
 
 If players clear a stage without using the Builder checkpoint as a respawn point, they receive a **-10 second result reward** for that stage.
 
@@ -738,10 +959,7 @@ The display format should include:
 - `Checkpoint used: No -00:10:00`
 
 When the checkpoint is not used, the `-00:10:00` reward text should display in green.
-
----
-
-## 26. Standard Builder Platform Tool
+## 27. Standard Builder Platform Tool
 
 The Builder has one standard platform size.
 
@@ -760,9 +978,10 @@ Stages still contain their own hard-mapped solid terrain and platforms.
 
 Builder platforms are support tools, not replacements for authored level geometry.
 
----
+The standard rule set allows platforms with a default active cap of 5.
 
-## 27. Spring / Trampoline Tools
+Stage-specific Builder Rules may disable platforms or change their active cap for authored challenge reasons.
+## 28. Spring / Trampoline Tools
 
 The Builder has three separate spring/trampoline tools.
 
@@ -798,9 +1017,10 @@ Springs can be moved or deleted only when not in use.
 
 Tool-specific placement and collision rules must prevent springs from being moved into the Runner or placed inside the Runner safety no-build zone.
 
----
+The standard rule set allows each spring type with a default active cap of 5.
 
-## 28. Tool Interaction Rules
+Stage-specific Builder Rules may disable individual spring types or change their active caps for authored challenge reasons.
+## 29. Tool Interaction Rules
 
 Each Builder tool defines its own interaction behavior.
 
@@ -821,8 +1041,7 @@ Avoid vague depth-lane language unless a real depth system is implemented.
 For current canon, describe these as tool-specific collision and pass-through rules.
 
 ---
-
-## 29. Results Screen
+## 30. Results Screen
 
 At the end of the 10-stage run, the game displays the results of each stage.
 
@@ -903,8 +1122,7 @@ Recommended format when checkpoint was not used:
 The checkpoint reward should be reflected in the final stage time.
 
 ---
-
-## 30. Tool Use Count
+## 31. Tool Use Count
 
 The results card tracks `toolUseCount`.
 
@@ -915,8 +1133,7 @@ Moving or deleting a tool should not increase `toolUseCount`.
 Tool moves and deletes may be tracked internally later, but they are not part of the locked results card metrics.
 
 ---
-
-## 31. Suggested Stage Result Data
+## 32. Suggested Stage Result Data
 
 Each stage should produce a result object that supports the final 10-card results screen.
 
@@ -945,7 +1162,25 @@ Suggested shape:
 
   checkpointPlaced: true,
   checkpointActivated: true,
-  checkpointUsedForRespawn: false
+  checkpointUsedForRespawn: false,
+
+  builderRuleId: "standard",
+  builderRuleLabel: "Standard build rules",
+  totalActiveToolCap: 20,
+  activeCapsSnapshot: {
+    platform: 5,
+    springYellow: 5,
+    springGreen: 5,
+    springBlue: 5,
+    checkpoint: 1
+  },
+  enabledToolsSnapshot: {
+    platform: true,
+    springYellow: true,
+    springGreen: true,
+    springBlue: true,
+    checkpoint: true
+  }
 }
 ```
 
@@ -963,9 +1198,10 @@ The reward display should be green.
 
 Runner Reposition usage is tracked internally but does not need to be shown on the results card in the current canon.
 
----
+Builder rule metadata should be stored for debugging, replay inspection, and future challenge-stage result displays.
 
-## 32. Online Sync Requirements
+The result screen does not need to display full rule metadata in v1 unless the stage uses a non-standard rule set.
+## 33. Online Sync Requirements
 
 Build Buddy requires real-time state sync because both players affect the active stage at the same time.
 
@@ -974,6 +1210,12 @@ Authoritative state should include:
 - Match ID
 - Stage ID
 - Stage timer
+- Stage Builder Rules
+- Stage Builder Rule ID
+- Stage Builder Rule label
+- Active enabled-tool map
+- Active per-tool cap map
+- Active total tool cap
 - Role assignment
 - Runner position
 - Runner velocity
@@ -1008,6 +1250,7 @@ Build Buddy should use an authoritative room host/server model for gameplay-crit
 
 Recommended split:
 
+- Stage Builder Rules: authority-owned and loaded from the active stage definition.
 - Builder cursor and ghost preview: high-frequency, non-authoritative visual state.
 - Tool placement/move/delete: reliable ordered events with authoritative validation.
 - Placed tool collision: only active after confirmed authoritative spawn/update.
@@ -1019,9 +1262,12 @@ The client may visually preview a placement immediately, but gameplay collision 
 
 Do not treat ghost previews and real collision tools as the same type of network state.
 
----
+Clients may render locked tools locally from the loaded stage definition, but the authoritative host/server must still reject illegal placements.
 
-## 33. Implementation Risks
+The server/host must be the source of truth for whether a placement is legal.
+
+This prevents client-side HUD mismatch, desync, or cheating.
+## 34. Implementation Risks
 
 ### 33.1 Runtime Collision Mutation
 
@@ -1037,8 +1283,12 @@ There is no Build Energy budget.
 
 Because of that, the following systems are mandatory:
 
-- 20 active tool cap
-- 5 active cap per tool type
+- 20 active default tool cap
+- 5 active default cap per tool type
+- Stage-specific Builder Rules
+- Stage-specific enabled-tool restrictions
+- Stage-specific total active tool caps
+- Stage-specific per-tool caps
 - No-build zones
 - Runner safety no-build zone
 - Tool-specific placement validation
@@ -1075,9 +1325,16 @@ It must not move the Runner forward.
 
 It must not be reusable until the Runner reaches a new valid safe grounded state.
 
----
+### 33.6 Stage Quirks Must Not Undermine Builder Identity
 
-## 34. Current Canon Summary
+Stage Builder Rules are valuable for variety, but they can damage the game if overused.
+
+If too many stages disable core tools, the Builder stops feeling like a Builder and starts feeling like a puzzle modifier.
+
+The standard Build Buddy experience should keep the Builder responsible for creating missing infrastructure.
+
+Restricted stages should be deliberate exceptions.
+## 35. Current Canon Summary
 
 Build Buddy is a two-player online co-op platformer where one player runs and the other builds.
 
@@ -1095,21 +1352,31 @@ The Runner can see the Builder's cursor, selected tool, grid hover, and ghost pr
 
 There is no Runner approval phase.
 
-All tools are available on every stage.
+The standard rule set gives the Builder the full toolkit: standard one-way platform, yellow spring, green spring, blue spring, and Builder checkpoint.
 
-There is no build energy budget.
+There is no Build Energy budget.
 
-The Builder is limited to 20 active tools to prevent abuse and technical issues.
+The standard default Builder cap is 20 active non-checkpoint tools.
 
-Each non-checkpoint tool type is capped at 5 active uses at a time.
+The standard default per-tool cap is 5 active uses per non-checkpoint tool type.
+
+The Builder checkpoint remains 1 per stage by default and does not count against the standard 20-tool cap.
+
+Authored stages may define Stage Builder Rules that disable tools, reduce per-tool caps, or reduce the total active tool cap.
+
+Stage Builder Rules are authored exceptions, not the default identity of the game.
+
+The Builder HUD, ghost preview, placement validator, and authoritative sync model must all read from the same active stage rule set.
 
 The Runner has an invisible safety no-build zone to prevent tool placement traps and collision breakage.
 
 The Runner has a Reposition action that rolls them back to the second most recent valid safe grounded state from a timed safe-state buffer.
 
-The Builder has one checkpoint placement per stage.
+The Builder has one checkpoint placement per stage by default.
 
 The checkpoint is permanent once placed.
+
+Checkpoint placement requires valid support and should snap to nearby valid floor/platform support when appropriate.
 
 Checkpoint use is flagged only if the Runner respawns from it.
 
@@ -1124,5 +1391,7 @@ The Runner's camera is not affected by Builder scouting.
 Stage failure advances the run instead of ending the match.
 
 Runner deaths do not remove Builder tools and do not apply a time penalty.
+
+Timer failure should display as `Time Up` or `Stage Failed — Time Up`, not as a Runner death label.
 
 After 10 stages, the game displays 10 result cards showing clear/fail, roles, time cleared, Runner deaths, tool use count, checkpoint usage result, and final stage time.

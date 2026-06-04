@@ -1,0 +1,112 @@
+:root {
+  color-scheme: light;
+  --scene-ink: #211d17;
+  --scene-muted: #665e53;
+  --scene-line: #2d2822;
+  --scene-panel: #fff8e8;
+  --scene-paper: #fffdf4;
+  --scene-table: #52765d;
+  --scene-table-dark: #315247;
+  --scene-gold: #f1bc58;
+  --scene-red: #b73d3c;
+  --scene-blue: #55728f;
+  --scene-green: #2d7a4f;
+  --scene-shadow: rgba(31, 27, 23, 0.62);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  color: var(--scene-ink);
+  background: #1f1b17;
+  font-family: "Trebuchet MS", Arial, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.app-shell {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.game-stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-width: 320px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.scene-hud,
+.pile-layer,
+.hand-layer,
+.battlefield-layer,
+.turn-layer,
+.event-log-layer,
+.scene-overlay-layer {
+  position: absolute;
+  z-index: 1;
+}
+
+.scene-stat-label,
+.scene-zone-label,
+.turn-label {
+  color: var(--scene-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.scene-zone-label {
+  color: #fffdf4;
+  text-shadow: 2px 2px 0 rgba(33, 29, 23, 0.72);
+}
+
+.scene-button {
+  min-height: 44px;
+  border: 2px solid var(--scene-line);
+  background: var(--scene-paper);
+  color: var(--scene-ink);
+  cursor: pointer;
+  font-weight: 900;
+  padding: 8px 10px;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.scene-button:hover {
+  outline: 3px solid var(--scene-gold);
+  transform: translateY(-1px);
+}
+
+.scene-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.loading,
+.load-error {
+  border: 3px solid var(--scene-line);
+  background: var(--scene-panel);
+  margin: 16px;
+  padding: 18px;
+  font-weight: 900;
+}

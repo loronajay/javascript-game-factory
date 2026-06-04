@@ -1,16 +1,18 @@
-export function buildBoardViewModel(state, cardsById) {
+export function buildBoardViewModel(state, cardsById, { revealOpponentHand = false } = {}) {
   return {
     phase: state.phase,
     currentPlayerId: state.currentPlayerId,
     currentPlayerName: state.players[state.currentPlayerId].name,
-    players: state.playerOrder.map((playerId) =>
-      playerView(state.players[playerId], cardsById, playerId === state.currentPlayerId),
-    ),
+    players: state.playerOrder.map((playerId) => {
+      const isCurrentPlayer = playerId === state.currentPlayerId;
+      const handRevealed = !isCurrentPlayer && revealOpponentHand;
+      return playerView(state.players[playerId], cardsById, isCurrentPlayer, handRevealed);
+    }),
     log: state.log,
   };
 }
 
-function playerView(player, cardsById, isCurrentPlayer) {
+function playerView(player, cardsById, isCurrentPlayer, handRevealed = false) {
   return {
     id: player.id,
     name: player.name,
@@ -21,10 +23,11 @@ function playerView(player, cardsById, isCurrentPlayer) {
     starsAvailable: player.stars.available,
     starsSpent: player.stars.spent,
     starsRemaining: player.stars.available - player.stars.spent,
+    finalCleanupStarted: player.finalCleanupStarted ?? false,
     deckCount: player.deck.length,
     graveyardCount: player.graveyard.length,
     hand: player.hand.map((cardInstance) =>
-      isCurrentPlayer ? cardSummary(cardInstance, cardsById) : hiddenCardSummary(cardInstance),
+      isCurrentPlayer || handRevealed ? cardSummary(cardInstance, cardsById) : hiddenCardSummary(cardInstance),
     ),
     monsterSlots: player.monsterSlots.map((monster) =>
       monster ? monsterSummary(monster, cardsById) : null,
@@ -73,6 +76,9 @@ function monsterSummary(monster, cardsById) {
     name: card?.name ?? monster.cardId,
     art: card?.art ?? "",
     rulesText: card?.rulesText ?? "",
+    summonCostStars: card?.summonCostStars,
+    playCostStars: card?.playCostStars,
+    baseEquipCostStars: card?.baseEquipCostStars,
     effectSlots: card?.effectSlots ?? [],
     hpLabel: `${monster.currentHp}/${monster.maxHp}`,
     strengthLabel: String(monster.currentStrength),

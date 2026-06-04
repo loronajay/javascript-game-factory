@@ -11,7 +11,7 @@
   "artZoom": 112,
   "referenceArt": "reference-cards/useless-deck/monsters/useless-head.jpg",
   "rulesText": "Bark: Does nothing. Grow: Gain 2 HP or strength. Spread: When this monster dies, you may play a Useless Lizard, Useless Snake, or Useless Head from your hand for no cost.",
-  "implementationStatus": "textOnly",
+  "implementationStatus": "partiallyScripted",
   "summonCostStars": 3,
   "printedHp": 3,
   "printedStrength": 3,
@@ -21,6 +21,7 @@
       "kind": "activeAbility",
       "name": "Bark",
       "costStars": 1,
+      "oncePerTurn": false,
       "rulesText": "Does nothing.",
       "effects": []
     },
@@ -29,8 +30,33 @@
       "kind": "activeAbility",
       "name": "Grow",
       "costStars": 3,
+      "oncePerTurn": true,
       "rulesText": "Gain 2 HP or strength.",
-      "effects": []
+      "effects": [],
+      "choiceOptions": [
+        {
+          "id": "hp",
+          "label": "+2 HP",
+          "effects": [
+            {
+              "family": "gainMaxHp",
+              "target": "selfMonster",
+              "amount": 2
+            }
+          ]
+        },
+        {
+          "id": "str",
+          "label": "+2 STR",
+          "effects": [
+            {
+              "family": "strengthChange",
+              "target": "selfMonster",
+              "amount": 2
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "spread",

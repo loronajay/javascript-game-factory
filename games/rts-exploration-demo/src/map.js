@@ -175,6 +175,7 @@ export class GameMap {
     this.addMazeCluster(76, 62, 34, 26);
     this.addDecorPatches(rand);
     this.clearSpawnArea(10, 10, 10);
+    this.clearSpawnArea(116, 116, 10);
 
     this.addAuthoredDestructibleGates();
     this.addAuthoredResourceNodes();
@@ -259,6 +260,13 @@ export class GameMap {
     }
   }
 
+  updateResourceDiscovery(fog) {
+    for (const node of this.resourceNodes) {
+      if (node.discovered) continue;
+      if (fog.isVisible(node.tileX, node.tileY)) node.discovered = true;
+    }
+  }
+
   nearestWalkableTile(tileX, tileY, maxRadius = 14) {
     if (this.isWalkableTile(tileX, tileY)) return { x: tileX, y: tileY };
     for (let r = 1; r <= maxRadius; r++) {
@@ -268,6 +276,33 @@ export class GameMap {
           if (this.isWalkableTile(x, y)) return { x, y };
         }
       }
+    }
+    return null;
+  }
+
+  tileHasClearance(tileX, tileY, radius) {
+    if (!this.isWalkableTile(tileX, tileY)) return false;
+    const center = this.tileCenter(tileX, tileY);
+    return this.isCircleWalkable(center.x, center.y, radius);
+  }
+
+  nearestWalkableTileForRadius(tileX, tileY, radius, maxRadius = 18) {
+    if (this.tileHasClearance(tileX, tileY, radius)) return { x: tileX, y: tileY };
+    let best = null;
+    let bestScore = Infinity;
+    for (let r = 1; r <= maxRadius; r++) {
+      for (let y = tileY - r; y <= tileY + r; y++) {
+        for (let x = tileX - r; x <= tileX + r; x++) {
+          if (Math.abs(x - tileX) !== r && Math.abs(y - tileY) !== r) continue;
+          if (!this.tileHasClearance(x, y, radius)) continue;
+          const score = (x - tileX) * (x - tileX) + (y - tileY) * (y - tileY);
+          if (score < bestScore) {
+            best = { x, y };
+            bestScore = score;
+          }
+        }
+      }
+      if (best) return best;
     }
     return null;
   }

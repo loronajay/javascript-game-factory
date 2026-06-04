@@ -1,0 +1,204 @@
+:root {
+  --bb-bg: #091120;
+  --bb-panel: rgba(7, 11, 20, 0.74);
+  --bb-line: rgba(198, 216, 255, 0.17);
+  --bb-text: #eef3ff;
+  --bb-muted: #aebbd7;
+  --bb-accent: #7fffba;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 18%, #1d2a49 0%, #10192d 40%, var(--bb-bg) 72%),
+    linear-gradient(180deg, #0a1020 0%, #091120 100%);
+  color: var(--bb-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  touch-action: none;
+  user-select: none;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  isolation: isolate;
+}
+
+#app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(0,0,0,0.2) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.018), rgba(0,0,0,0.03));
+  z-index: 5;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  image-rendering: auto;
+  background: #10182a;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+  opacity: 0.94;
+  z-index: 10;
+}
+
+.panel {
+  display: grid;
+  gap: 4px;
+  min-width: 184px;
+  padding: 12px 14px;
+  border: 1px solid var(--bb-line);
+  background: linear-gradient(180deg, rgba(12, 18, 32, 0.8), rgba(7, 11, 20, 0.74));
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--bb-muted);
+  backdrop-filter: blur(10px);
+}
+
+.view-panel {
+  min-width: 145px;
+}
+
+.panel strong {
+  color: var(--bb-text);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.panel span {
+  white-space: nowrap;
+}
+
+#viewModeControls {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 16;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+#viewModeControls button {
+  min-width: 78px;
+  height: 38px;
+  font-size: 12px;
+  border-radius: 13px;
+}
+
+#mobileControls {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: none;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  pointer-events: none;
+  z-index: 15;
+}
+
+.mobile-left,
+.mobile-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 46vw;
+  pointer-events: auto;
+}
+
+.mobile-left {
+  width: 158px;
+}
+
+.mobile-right {
+  justify-content: flex-end;
+}
+
+button {
+  min-width: 50px;
+  height: 50px;
+  border: 1px solid rgba(218, 231, 255, 0.24);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(40, 52, 80, 0.92), rgba(13, 20, 34, 0.88));
+  color: #f4f7ff;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+button:active,
+button.is-held {
+  transform: translateY(1px) scale(0.985);
+  background: linear-gradient(180deg, rgba(75, 91, 132, 0.96), rgba(27, 36, 61, 0.94));
+}
+
+button[data-tool="springYellow"] {
+  color: #ffe588;
+}
+
+button[data-tool="springGreen"] {
+  color: #8dff9e;
+}
+
+button[data-tool="springBlue"] {
+  color: #9cc8ff;
+}
+
+button[data-tool="checkpoint"] {
+  color: var(--bb-accent);
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  #mobileControls {
+    display: flex;
+  }
+
+  #hud {
+    opacity: 0.78;
+    transform: scale(0.86);
+    transform-origin: top left;
+  }
+
+  #viewModeControls {
+    top: 12px;
+    right: 12px;
+    bottom: auto;
+    transform: scale(0.9);
+    transform-origin: top right;
+  }
+}
+
+@media (max-height: 520px) {
+  #hud {
+    display: none;
+  }
+
+  button {
+    min-width: 43px;
+    height: 43px;
+    font-size: 11px;
+  }
+}

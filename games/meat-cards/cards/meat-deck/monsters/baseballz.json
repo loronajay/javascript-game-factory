@@ -11,7 +11,7 @@
   "artZoom": 112,
   "referenceArt": "reference-cards/meat-deck/monsters/baseballz.jpg",
   "rulesText": "Pitch: If your opponent has fewer than 4 monsters in play, look at their hand. Choose a monster card from it and put that monster into play under their control. It cannot take actions until the end of its controller's next turn.",
-  "implementationStatus": "textOnly",
+  "implementationStatus": "scripted",
   "summonCostStars": 2,
   "printedHp": 5,
   "printedStrength": 1,
@@ -22,7 +22,12 @@
       "name": "Pitch",
       "costStars": 4,
       "rulesText": "If your opponent has fewer than 4 monsters in play, look at their hand. Choose a monster card from it and put that monster into play under their control. It cannot take actions until the end of its controller's next turn.",
-      "effects": []
+      "effects": [
+        {
+          "family": "forceSummon",
+          "target": "opponentHandMonster"
+        }
+      ]
     }
   ],
   "effects": []

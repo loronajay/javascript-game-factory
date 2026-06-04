@@ -26,7 +26,7 @@ function createPlayerPanel(player, side, handlers, options = {}) {
       el("div", "player-title", player.name),
       el("div", "player-stats", [
         stat("HP", player.hpLabel),
-        stat("Stars", player.starsLabel),
+        stat("★", player.starsLabel),
         stat("Deck", String(player.deckCount)),
         stat("Grave", String(player.graveyardCount)),
       ]),
@@ -166,7 +166,7 @@ function createCardInspector(selected, currentPlayerId, handlers) {
         el("div", "inspector-type", card.type),
         el("h2", "", card.name),
         createCostLine(card),
-        el("p", "inspector-rules", card.rulesText || "No rules text entered yet."),
+        el("p", "inspector-rules", formatRulesText(card.rulesText || "No rules text entered yet.")),
         ...createEffectSlotList(card),
       ]),
     ]),
@@ -249,10 +249,10 @@ function createMiniCard(card, options = {}) {
 
 function createCostLine(card) {
   const costs = [];
-  if (card.summonCostStars !== undefined) costs.push(`Summon: ${card.summonCostStars} star(s)`);
-  if (card.playCostStars !== undefined) costs.push(`Play: ${card.playCostStars} star(s)`);
-  if (card.baseEquipCostStars !== undefined) costs.push(`Equip: ${card.baseEquipCostStars} star(s)`);
-  return el("div", "inspector-costs", costs.length ? costs.join(" | ") : "No star cost");
+  if (card.summonCostStars !== undefined) costs.push(`Summon: ${starText(card.summonCostStars)}`);
+  if (card.playCostStars !== undefined) costs.push(`Play: ${starText(card.playCostStars)}`);
+  if (card.baseEquipCostStars !== undefined) costs.push(`Equip: ${starText(card.baseEquipCostStars)}`);
+  return el("div", "inspector-costs", costs.length ? costs.join(" | ") : "No cost");
 }
 
 function createEffectSlotList(card) {
@@ -263,8 +263,9 @@ function createEffectSlotList(card) {
       "inspector-slots",
       card.effectSlots.map((slot) =>
         el("div", "inspector-slot", [
-          el("strong", "", `${slot.name} ${slot.kind === "passive" ? "Passive" : `${slot.costStars} star(s)`}`),
-          el("span", "", slot.rulesText),
+          el("strong", "", slot.name),
+          el("span", "inspector-slot-meta", slot.kind === "passive" ? "Passive" : starText(slot.costStars ?? 0)),
+          el("span", "", formatRulesText(slot.rulesText)),
         ]),
       ),
     ),
@@ -301,7 +302,11 @@ function pendingActionDetail(pendingAction) {
 }
 
 function starText(count) {
-  return `${count} star${count === 1 ? "" : "s"}`;
+  return `${count} ★`;
+}
+
+function formatRulesText(text) {
+  return String(text ?? "").replace(/\b(\d+)\s+star(?:\(s\)|s)?\b/gi, "$1 ★");
 }
 
 function stat(label, value) {

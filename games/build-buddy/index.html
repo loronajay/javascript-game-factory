@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Build Buddy Engine Prototype v7</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main id="app">
+    <canvas id="game" width="1280" height="720" aria-label="Build Buddy engine prototype canvas"></canvas>
+
+    <section id="hud" aria-label="Prototype controls">
+      <div class="panel">
+        <strong>Runner</strong>
+        <span>A/D or ←/→ move</span>
+        <span>Space jump / wall-jump</span>
+        <span>W/↑ climb up</span>
+        <span>S/↓ drop/descend</span>
+        <span>R reposition</span>
+      </div>
+      <div class="panel">
+        <strong>Builder</strong>
+        <span>1 Platform</span>
+        <span>2 Yellow Spring</span>
+        <span>3 Green Spring</span>
+        <span>4 Blue Spring</span>
+        <span>5 Checkpoint</span>
+        <span>Left click place / Right click delete</span>
+        <span>Q/E nudge builder camera</span>
+      </div>
+      <div class="panel view-panel">
+        <strong>View</strong>
+        <span>6 Runner view</span>
+        <span>7 Builder view</span>
+        <span>8 Hybrid debug view</span>
+      </div>
+    </section>
+
+    <section id="viewModeControls" aria-label="View mode controls">
+      <button data-view-mode="runner">Runner</button>
+      <button data-view-mode="builder">Builder</button>
+      <button data-view-mode="hybrid">Hybrid</button>
+    </section>
+
+    <section id="mobileControls" aria-label="Temporary mobile controls">
+      <div class="mobile-left">
+        <button data-hold="left">◀</button>
+        <button data-hold="right">▶</button>
+        <button data-hold="up">▲</button>
+        <button data-hold="down">▼</button>
+      </div>
+      <div class="mobile-right">
+        <button data-tap="jump">A</button>
+        <button data-tap="reposition">R</button>
+        <button data-tool="platform">PLAT</button>
+        <button data-tool="springYellow">Y</button>
+        <button data-tool="springGreen">G</button>
+        <button data-tool="springBlue">B</button>
+        <button data-tool="checkpoint">CP</button>
+        <button data-tap="place">PLACE</button>
+        <button data-tap="delete">DEL</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

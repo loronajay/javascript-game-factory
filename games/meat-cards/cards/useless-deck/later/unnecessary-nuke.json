@@ -11,8 +11,17 @@
   "artZoom": 112,
   "referenceArt": "reference-cards/useless-deck/later/unnecessary-nuke-later.jpg",
   "rulesText": "Knock out every monster in play and deal 5 damage to both players. Then the player who had more monsters in play takes 1 extra damage for each extra monster they had.",
-  "implementationStatus": "textOnly",
+  "implementationStatus": "scripted",
   "playCostStars": 3,
   "lifecycle": "instantToGraveyard",
-  "effects": []
+  "effects": [
+    {
+      "family": "massKoWithSplashDamage",
+      "target": "allMonsters",
+      "payload": {
+        "splashDamage": 5,
+        "extraDamagePerExtraMonster": 1
+      }
+    }
+  ]
 }

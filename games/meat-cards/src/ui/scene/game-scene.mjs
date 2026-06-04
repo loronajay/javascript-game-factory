@@ -7,7 +7,8 @@ import { createOverlayLayer } from "./overlay-layer.mjs";
 import { buildSceneLayout } from "./scene-layout.mjs";
 
 export function renderGameScene(root, state, cardsById, handlers = {}, uiState = {}) {
-  const view = buildBoardViewModel(state, cardsById);
+  const revealOpponentHand = uiState.pendingAction?.requiresPitchTargeting === true;
+  const view = buildBoardViewModel(state, cardsById, { revealOpponentHand });
   const scene = buildSceneLayout(view, uiState);
   root.innerHTML = "";
   root.append(createGameScene(scene, handlers));

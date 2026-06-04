@@ -15,7 +15,8 @@
       "target": "equippedMonster",
       "duration": "whileEquipped",
       "payload": {
-        "mode": "setToCurrentMaxHp"
+        "mode": "setToCurrentMaxHp",
+        "requiresCurrentStrengthGreaterThan": 0
       }
     }
   ]

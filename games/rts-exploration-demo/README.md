@@ -1,4 +1,4 @@
-# RTS Exploration Demo v7
+# RTS Exploration Demo v10
 
 Desktop-first modular RTS engine prototype for JavaScript Game Factory.
 
@@ -63,8 +63,7 @@ Neutral Crawlers are larger native alien creatures. They guard future resource l
 - Multiplayer/lobby integration
 - Win/loss conditions
 - Team-vs-team enemy player combat
-- Attack-move, patrol, hold-position, or command queue
-- Minimap tokens for revealed native creatures/resources
+- Patrol, hold-position, or command queue
 - Creature reward buffs/debuffs
 
 ## Tuning notes
@@ -92,3 +91,56 @@ Important values:
 - `UNIT_DEFS.grunt.vision.revealRange`
 
 Wall destruction timing is based on contact time, not travel time. If grunts start far from the target, total time includes pathing to the wall first.
+
+
+## v8 layering patch
+
+- Moved world UI overlays into a dedicated late render pass.
+- Health bars, command acknowledgement rings, attack reticles, move markers, and debug paths now render above units, neutral creatures, walls, and fog-edge overlap.
+- Added selected-target brackets so active attack targets remain readable when units and crawlers overlap.
+
+
+## v9 command architecture patch
+
+- Added `src/commands.js` as the command-system boundary. Player right-click actions now create command objects instead of directly mutating unit orders.
+- Current local commands: `MOVE_UNITS`, `ATTACK_UNIT`, and `ATTACK_DESTRUCTIBLE`.
+- Command objects include `id`, `team`, `unitIds`, `source`, and `issuedAtTick`, which is the shape needed for later AI injection and server-authoritative multiplayer.
+- Added a fixed 60 Hz simulation step in `src/main.js`. Rendering still uses `requestAnimationFrame`, while units/combat/fog advance through simulation ticks.
+- Replaced gameplay timing calls in `src/units.js` with simulation time so attack windup, combat state, and command acknowledgements are no longer tied directly to wall-clock render timing.
+- Added explicit unit-command methods such as `moveUnitsTo`, `attackUnitsUnit`, and `attackUnitsDestructible`; selected-unit wrappers remain for compatibility.
+- Added `src/snapshot.js` and exposed `window.__rtsDebugSnapshot()` for quick plain-data inspection of tick, units, selected IDs, destructibles, and recent commands.
+- HUD now shows simulation tick and command history count.
+
+## Server-authority direction
+
+This build does not integrate with `factory-network-server` yet. It prepares for that integration by making local input produce the same command objects that AI and server-approved multiplayer messages can eventually produce. The intended future flow is:
+
+```text
+input / AI / network -> command system -> fixed-tick simulation -> renderer
+```
+
+For the platform server, the likely path is server-authoritative or host-authoritative command validation, not deterministic lockstep yet.
+
+
+## v10 local command/mode patch
+
+- Added `ATTACK_MOVE_UNITS` and `STOP_UNITS` commands to `src/commands.js`.
+- Added attack-move mode: press `Q`, then left-click ground. Combat-capable selected units move toward the target and acquire hostile/neutral units along the way.
+- Added stop command: press `X` to cancel selected units' current movement/attack orders.
+- Attack-move state is preserved while a unit temporarily breaks off to fight; after the target dies, the unit resumes its attack-move destination.
+- Revealed native crawlers now remain represented on the minimap after discovery. Currently visible crawlers render brighter; previously discovered but not currently visible crawlers render dimmer.
+- Revealed resource landmarks now get minimap tokens after discovery, using distinct colors for biomass and crystal placeholders.
+- Debug snapshots now include unit `attackMoveTarget`, unit `discovered`, and resource discovery state.
+
+Additional controls:
+
+- `Q`: arm/cancel attack-move mode
+- `Q` then left-click ground: attack-move selected combat units
+- `X`: stop selected units
+
+
+## v13 patch notes
+
+- Fixed enemy unit targeting for moving player/AI units. Attack slots against unit targets now follow the moving target instead of staying at the target position from the original click.
+- Grunts now repath when their assigned melee slot moves away from their current path endpoint.
+- Combat-capable non-neutral units can retaliate when damaged, while scouts remain non-combat recon units.

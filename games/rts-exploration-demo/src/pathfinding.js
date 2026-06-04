@@ -50,9 +50,21 @@ function nodeKey(x, y) {
   return y * 100000 + x;
 }
 
-export function findPath(map, startTile, goalTile) {
-  const correctedGoal = map.nearestWalkableTile(goalTile.x, goalTile.y);
-  if (!correctedGoal || !map.isWalkableTile(startTile.x, startTile.y)) return [];
+export function findPath(map, startTile, goalTile, options = {}) {
+  const clearance = Math.max(0, options.clearance ?? 0);
+  const maxGoalSearchRadius = options.maxGoalSearchRadius ?? 18;
+  const passable = (x, y) => {
+    if (!map.isWalkableTile(x, y)) return false;
+    if (clearance <= 0) return true;
+    const c = map.tileCenter(x, y);
+    return map.isCircleWalkable(c.x, c.y, clearance);
+  };
+
+  const correctedGoal = clearance > 0
+    ? map.nearestWalkableTileForRadius(goalTile.x, goalTile.y, clearance, maxGoalSearchRadius)
+    : map.nearestWalkableTile(goalTile.x, goalTile.y, maxGoalSearchRadius);
+
+  if (!correctedGoal || !passable(startTile.x, startTile.y)) return [];
   const goal = correctedGoal;
   if (startTile.x === goal.x && startTile.y === goal.y) return [map.tileCenter(goal.x, goal.y)];
 
@@ -84,9 +96,9 @@ export function findPath(map, startTile, goalTile) {
     for (const [dx, dy] of dirs) {
       const nx = current.x + dx;
       const ny = current.y + dy;
-      if (!map.isWalkableTile(nx, ny)) continue;
+      if (!passable(nx, ny)) continue;
       if (dx !== 0 && dy !== 0) {
-        if (!map.isWalkableTile(current.x + dx, current.y) || !map.isWalkableTile(current.x, current.y + dy)) continue;
+        if (!passable(current.x + dx, current.y) || !passable(current.x, current.y + dy)) continue;
       }
       const nKey = nodeKey(nx, ny);
       if (closed.has(nKey)) continue;

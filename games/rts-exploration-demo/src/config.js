@@ -20,4 +20,8 @@ export const CONFIG = Object.freeze({
   destructibleWallHp: 90,
   minimapSize: 184,
   backgroundTileVariance: 0.08,
+  simHz: 60,
+  localCommandLatencyTicks: 0,
+  aiEnabled: true,
+  aiDecisionHz: 1.5,
 });

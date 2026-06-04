@@ -1,0 +1,52 @@
+.turn-layer {
+  right: 16px;
+  bottom: 104px;
+  width: min(300px, max(220px, calc((100vw - 852px) / 2 - 24px)));
+  display: grid;
+  gap: 8px;
+}
+
+.turn-banner {
+  display: grid;
+  gap: 3px;
+  border: 3px solid var(--scene-line);
+  background: var(--scene-panel);
+  box-shadow: 6px 6px 0 var(--scene-shadow);
+  padding: 10px;
+}
+
+.turn-player {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turn-actions {
+  display: grid;
+}
+
+.pending-action {
+  color: var(--scene-red);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.event-log-layer {
+  right: 16px;
+  top: 14px;
+  width: min(320px, max(220px, calc((100vw - 852px) / 2 - 24px)));
+  height: 104px;
+}
+
+.event-log {
+  height: 100%;
+  margin: 0;
+  overflow: auto;
+  border: 3px solid var(--scene-line);
+  background: rgba(255, 253, 244, 0.92);
+  box-shadow: 6px 6px 0 var(--scene-shadow);
+  padding: 8px 8px 8px 28px;
+  font-size: 13px;
+}

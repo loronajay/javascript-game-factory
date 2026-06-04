@@ -17,26 +17,26 @@ The goal is not to make perfect card scripting on day one. The goal is to create
 
 ## Current Starting Point
 
-Existing assets:
+Card data is split into one file per card under `cards/<deck-name>/<type>/`:
 
-- `blank-cards/blank-monster.png`
-- `blank-cards/blank-accessory.png`
-- `blank-cards/blank-later.png`
-- `reference-cards/monsters/lunch-lady.jpg`
-- `reference-cards/accessories/lawn-chair-accessory.jpg`
-- `reference-cards/later/big-smac-later.jpg`
-- `card-art/meat-deck/monsters/lunch-lady.jfif`
-- `card-art/meat-deck/accessories/lawn-chair.jfif`
-- `card-art/meat-deck/later/big-smac.jfif`
+```
+cards/
+  meat-deck/
+    monsters/   (bob-the-brick, baseballz, elderly-turtle, homie, lunch-lady)
+    accessories/ (lawn-chair, polar-shift)
+    later/      (big-smac, diamond-ring)
+  useless-deck/
+    monsters/   (conjoined-twins, fat-baby, garbage-man, useless-dragon, useless-head)
+    accessories/ (salami, selfie-stick, spotlight)
+    later/      (curfew, unnecessary-nuke)
+decks/
+  meat-deck.json
+  useless-deck.json
+```
 
-Initial card data:
+The card schema discovers all `.json` files under `cards/` automatically. Do not use flat array files.
 
-- `cards/monsters.json`
-- `cards/accessories.json`
-- `cards/later.json`
-- `decks/meat-deck.json`
-
-Initial tools:
+Tools:
 
 - `tools/cards/card-schema.mjs`
 - `tools/cards/validate-cards.mjs`
@@ -212,21 +212,24 @@ Example simple scripted Later card:
   "id": "big_smac",
   "type": "later",
   "name": "Big Smac",
-  "rulesText": "Player gains 2 HP.",
+  "rulesText": "You gain 2 maximum HP. Your current HP increases by 2.",
   "implementationStatus": "partiallyScripted",
-  "playCostStars": 0,
+  "playCostStars": 1,
   "lifecycle": "instantToGraveyard",
   "effects": [
     {
-      "family": "heal",
+      "family": "maxHpChange",
       "timing": "onPlay",
       "target": "selfPlayer",
       "amount": 2,
-      "duration": "instant"
+      "duration": "instant",
+      "currentHpFollowsMaxIncrease": true
     }
   ]
 }
 ```
+
+Note: `maxHpChange` is not blocked by healing-prevention effects because it raises the stat ceiling, not the current HP directly. `currentHpFollowsMaxIncrease: true` means current HP rises alongside the max increase as a side effect of that specific card.
 
 Effect families should stay aligned with `06_effect_system_requirements.md` and `07_digital_data_model_first_pass.md`.
 
@@ -347,57 +350,41 @@ Browser checks are useful for the workbench, but engine correctness should live 
 
 ## Milestones
 
-### Milestone 1: Transcription Ready
+### Milestone 1: Transcription Ready ✓ DONE
 
-Done when:
+- Card JSON files exist, validator passes, workbench opens locally.
 
-- Card JSON files exist.
-- Validator passes.
-- Workbench opens locally.
-- At least the three reference cards are represented.
+### Milestone 2: First Real Batch ✓ DONE
 
-### Milestone 2: First Real Batch
+- 19 cards across two decks (meat-deck and useless-deck) are transcribed.
+- Both deck manifests exist and reference real card ids.
+- Cards are split by deck and type into `cards/<deck>/<type>/`.
 
-Done when:
+### Milestone 3: Engine Skeleton ✓ DONE
 
-- 10 to 20 cards are transcribed.
-- `decks/meat-deck.json` references the cards chosen for the first deck draft.
-- The wording pass has started.
-- Validator checks referenced art files.
-- Cards are grouped cleanly by type.
+- Catalog loading tested via `card-schema.test.mjs`.
+- Core player and turn state (`createMatch`, `startTurn`, `endTurn`) tested in `game-state.test.mjs`.
+- Premade deck can be initialized from card ids; draw rules and hand-limit rules tested.
 
-### Milestone 3: Engine Skeleton
+### Milestone 4: Playable Core Loop ✓ DONE
 
-Done when:
+- Monsters summon, attack with d6 roll, deal damage with overflow, die, move to graveyard.
+- Stars spent; end-turn unused-star penalty applies.
+- Setup-turn offensive restriction enforced.
 
-- Catalog loading is tested.
-- Core player and turn state are tested.
-- A premade deck can be initialized from card ids.
-- Draw and hand-limit rules are tested.
+### Milestone 5: First Scripted Cards ✓ DONE
 
-### Milestone 4: Playable Core Loop
-
-Done when:
-
-- Monsters can be summoned.
-- Monsters can attack.
-- Stars are spent and end-turn penalties apply.
-- Damage, death, overflow, and graveyard movement are tested.
-
-### Milestone 5: First Scripted Cards
-
-Done when:
-
-- At least one Later card executes from structured effects.
-- At least one accessory modifies a monster.
-- At least one monster passive changes legal actions or resolution.
-- `implementationStatus` is meaningful in tests.
+- Multiple Later cards execute from structured effects (Big Smac, Diamond Ring, Curfew, Unnecessary Nuke).
+- Accessories modify monster stats on equip (Salami, Polar Shift) and grant new actions (Selfie Stick, Lawn Chair).
+- Monster passives fire on triggers: start-of-turn heal (Homie Snacks), on-ally-dies strength gain (Homie), on-source-dies player heal (Elderly Turtle Insurance), after-attacked counter-damage (Bob the Brick Hard), after-ability-use strength gain (Garbage Man Life of Garbage).
+- Healing prevention passive works globally (Lunch Lady Spit in Food).
+- `implementationStatus` is enforced in the schema validator.
 
 ### Milestone 6: Two Premade Decks
 
 Done when:
 
-- Two 60-card premade decks validate.
+- Two 60-card premade decks validate (both are currently `draft` with fewer than 60 cards).
 - A full local match can be played through the engine using those decks.
 - Unsupported card effects are clearly listed.
 
@@ -416,9 +403,8 @@ Do not build these until the core loop and first scripted cards are working:
 
 ## Immediate Next Steps
 
-1. Finish the seed pipeline documentation.
-2. Add art-file existence checks to the validator.
-3. Transcribe the next 5 to 10 paper cards.
-4. Normalize wording across those cards.
-5. Choose the first 3 simple cards to drive engine tests.
-6. Start the engine with catalog loading and core state tests.
+1. Finish transcribing remaining paper cards for both decks until each deck reaches 60 cards.
+2. Identify unsupported effects on `partiallyScripted` cards (Useless Dragon/Head Spread passive, Bob the Brick partial, etc.) and add them to `08_open_questions_and_deferred_scope.md`.
+3. Wire engine tests to cover the `useActiveAbility` paths for all `scripted` cards.
+4. Once both decks hit 60 cards, change their status to `ready` and add deck-completeness validation.
+5. Build a minimal two-player match flow in the UI to make the engine playable end-to-end.

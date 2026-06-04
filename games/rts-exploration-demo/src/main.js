@@ -6,6 +6,9 @@ import { FogOfWar } from './fog.js';
 import { InputController } from './input.js';
 import { Renderer } from './renderer.js';
 import { Hud } from './hud.js';
+import { CommandSystem } from './commands.js';
+import { createDebugSnapshot } from './snapshot.js';
+import { AiController } from './ai-controller.js';
 
 const canvas = document.getElementById('game');
 const hudLines = document.getElementById('hud-lines');
@@ -18,12 +21,17 @@ const camera = new Camera({
 });
 const units = new UnitManager(map);
 const fog = new FogOfWar(map);
-const input = new InputController(canvas, camera, units, map);
+let simTick = 0;
+const simStep = 1 / CONFIG.simHz;
+const commands = new CommandSystem({ units, map, getTick: () => simTick });
+const ai = new AiController({ team: 2, units, map, commands });
+const input = new InputController(canvas, camera, units, map, commands, ai);
 const renderer = new Renderer(canvas, map, camera, units, fog, input);
-const hud = new Hud(hudLines, map, camera, units, input);
+const hud = new Hud(hudLines, map, camera, units, input, { commands, ai, getTick: () => simTick });
 
 let lastTime = performance.now();
-let fogTimer = 0;
+let accumulator = 0;
+let fogTickCounter = 0;
 
 function resize() {
   const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -44,24 +52,38 @@ resize();
 const startCenter = units.selectedCenter() ?? { x: 320, y: 320 };
 camera.centerOn(startCenter.x + 250, startCenter.y + 200);
 fog.recompute(units);
+units.updateDiscovery(fog);
+map.updateResourceDiscovery(fog);
 
 function loop(now) {
-  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  const frameDt = Math.min(0.1, (now - lastTime) / 1000);
   lastTime = now;
 
-  input.update(dt);
-  units.update(dt);
-  input.updateCommandMarker(dt);
+  input.update(frameDt);
+  input.updateCommandMarker(frameDt);
 
-  fogTimer += dt;
-  if (fogTimer >= 1 / CONFIG.fogRecomputeHz) {
-    fog.recompute(units);
-    fogTimer = 0;
+  accumulator += frameDt;
+  while (accumulator >= simStep) {
+    simTick += 1;
+    ai.update(simTick);
+    units.update(simStep, simTick * simStep);
+    fogTickCounter += 1;
+    if (fogTickCounter >= Math.max(1, Math.round(CONFIG.simHz / CONFIG.fogRecomputeHz))) {
+      fog.recompute(units);
+      units.updateDiscovery(fog);
+      map.updateResourceDiscovery(fog);
+      fogTickCounter = 0;
+    }
+    accumulator -= simStep;
   }
 
   renderer.render();
-  hud.update(dt);
+  hud.update(frameDt);
   requestAnimationFrame(loop);
 }
+
+window.__rtsDebugSnapshot = () => createDebugSnapshot({ tick: simTick, units, map, commands, ai });
+window.__rtsCommands = commands;
+window.__rtsAi = ai;
 
 requestAnimationFrame(loop);

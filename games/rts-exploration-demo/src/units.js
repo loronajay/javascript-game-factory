@@ -2,31 +2,64 @@ import { CONFIG } from './config.js';
 import { getUnitDef } from './unit-defs.js';
 import { clampMagnitude, distanceSq } from './utils.js';
 import { findPath } from './pathfinding.js';
+import { ReservationManager } from './movement/reservations.js';
+import { buildGroupMovePlan, mergeGroupRouteForUnit } from './movement/group-planner.js';
+import { ChokeMap } from './movement/choke-map.js';
 
 const SLOT_RADIUS_PADDING = 8;
+const MOBILE_ENGAGEMENT_SLOT_COUNT = 10;
+const MOBILE_QUEUE_SPACING = 23;
+
+export const UNIT_STATES = Object.freeze({
+  IDLE: 'idle',
+  MOVING: 'moving',
+  ATTACK_MOVING: 'attack-moving',
+  PURSUING_TARGET: 'pursuing-target',
+  ATTACKING: 'attacking',
+  BLOCKED_REPATHING: 'blocked-repathing',
+  QUEUED_BEHIND_ALLY: 'queued-behind-ally',
+  DEAD: 'dead',
+});
 
 export class UnitManager {
   constructor(map) {
     this.map = map;
     this.units = [];
     this.selectedIds = new Set();
-    this.attackSlotReservations = new Map();
+    this.chokeMap = new ChokeMap(this.map);
+    this.reservations = new ReservationManager({
+      map: this.map,
+      resolveTarget: (targetRef) => this.resolveTarget(targetRef),
+      targetKey: (targetRef) => this.targetKey(targetRef),
+      attackSlotsForTarget: (target, unit) => this.attackSlotsForTarget(target, unit),
+      getUnitDef: (unit) => this.getDef(unit),
+    });
+    this.attackSlotReservations = this.reservations.attackSlotReservations;
+    this.mobileEngagementReservations = this.reservations.mobileEngagementReservations;
+    this.routeReservations = this.reservations.routeReservations;
+    this.nextRouteId = 1;
     this.nextId = 1;
+    this.simTime = 0;
     this.spawnStartingUnits();
     this.spawnNeutralCreatures();
   }
 
   spawnStartingUnits() {
-    const base = this.map.tileCenter(10, 10);
-    const scoutSpacing = 38;
+    this.spawnTeamPackage(1, 10, 10, 1);
+    this.spawnTeamPackage(2, 116, 116, -1);
+  }
+
+  spawnTeamPackage(team, tileX, tileY, direction = 1) {
+    const base = this.map.tileCenter(tileX, tileY);
+    const scoutSpacing = 34;
     for (let i = 0; i < CONFIG.startingScoutsPerPlayer; i++) {
-      this.spawnUnit('scout', 1, base.x + i * scoutSpacing, base.y + (i % 2) * 20);
+      this.spawnUnit('scout', team, base.x + direction * i * scoutSpacing, base.y + (i % 2) * 20);
     }
 
-    const gruntBase = this.map.tileCenter(10, 13);
-    const gruntSpacing = 34;
+    const gruntBase = this.map.tileCenter(tileX, tileY + direction * 3);
+    const gruntSpacing = 30;
     for (let i = 0; i < CONFIG.startingGruntsPerPlayer; i++) {
-      this.spawnUnit('grunt', 1, gruntBase.x + i * gruntSpacing, gruntBase.y + (i % 2) * 22);
+      this.spawnUnit('grunt', team, gruntBase.x + direction * i * gruntSpacing, gruntBase.y + (i % 2) * 22);
     }
   }
 
@@ -62,15 +95,46 @@ export class UnitManager {
 
       selected: false,
       visible: true,
-      state: 'idle',
+      state: UNIT_STATES.IDLE,
+      lastStableState: UNIT_STATES.IDLE,
 
       path: [],
       pathIndex: 0,
       moveTarget: null,
       attackTarget: null,
+      attackMoveTarget: null,
       attackSlot: null,
+      mobileEngagementSlot: null,
       commandAckUntil: -Infinity,
       commandAckKind: null,
+      mobilePursuitRepathAt: 0,
+      routeId: null,
+      routeReservations: [],
+      movementState: {
+        lastX: x,
+        lastY: y,
+        blockedFor: 0,
+        repathAt: 0,
+        sidestepUntil: 0,
+        sidestepSign: 1,
+        lastProgressAt: 0,
+        lastBlockedAt: -Infinity,
+        lastBlockReason: null,
+      },
+      debug: {
+        stateSince: 0,
+        lastWaypoint: null,
+        pathGoal: null,
+        queueAnchor: null,
+        blockerId: null,
+        lastRepathAt: -Infinity,
+        groupRoute: null,
+        formationMode: null,
+        formationSlot: null,
+        engagementSlot: null,
+        lanePriority: 0,
+        chokeReservation: null,
+      },
 
       combatState: {
         targetId: null,
@@ -104,8 +168,23 @@ export class UnitManager {
     return Math.ceil(this.getDef(unit).vision.revealRange / this.map.tileSize);
   }
 
-  update(dt) {
+  setUnitState(unit, state) {
+    if (!unit || unit.state === state) return;
+    unit.state = state;
+    unit.lastStableState = state;
+    if (!unit.debug) unit.debug = {};
+    unit.debug.stateSince = this.simTime;
+  }
+
+  setDebugPathGoal(unit, point) {
+    if (!unit.debug) unit.debug = {};
+    unit.debug.pathGoal = point ? { x: point.x, y: point.y } : null;
+  }
+
+  update(dt, simTime = this.simTime) {
+    this.simTime = simTime;
     this.updateNeutralAggro();
+    this.updatePlayerAttackMoveAggro();
     this.updateCombat(dt);
     this.updateMovement(dt);
     this.applySeparation(dt);
@@ -121,14 +200,26 @@ export class UnitManager {
       const current = this.resolveTarget(unit.attackTarget);
       if (current && this.distanceToTargetEdge(unit, current) <= combat.leashRange) continue;
 
-      const target = this.findNearestEnemyUnit(unit, combat.acquireRange, 1);
+      const target = this.findNearestEnemyUnit(unit, combat.acquireRange, null);
       if (target) {
         this.assignAttackTarget(unit, { kind: 'unit', id: target.id }, false);
       } else if (unit.attackTarget) {
         unit.attackTarget = null;
         this.releaseAttackSlot(unit);
+        this.releaseMobileEngagementSlot(unit);
         unit.combatState.pendingDamage = null;
       }
+    }
+  }
+
+
+  updatePlayerAttackMoveAggro() {
+    for (const unit of this.units) {
+      if (unit.team === 0 || unit.hp <= 0 || !unit.attackMoveTarget) continue;
+      const combat = this.getDef(unit).combat;
+      if (!combat.canAttack || unit.attackTarget) continue;
+      const target = this.findNearestEnemyUnit(unit, combat.acquireRange, null);
+      if (target) this.assignAttackTarget(unit, { kind: 'unit', id: target.id }, true, { preserveAttackMove: true });
     }
   }
 
@@ -160,7 +251,7 @@ export class UnitManager {
 
       if (state.windupRemaining > 0) {
         state.windupRemaining = Math.max(0, state.windupRemaining - dt);
-        unit.state = 'attacking';
+        this.setUnitState(unit, UNIT_STATES.ATTACKING);
         if (state.windupRemaining === 0 && state.pendingDamage) this.resolvePendingDamage(unit);
         continue;
       }
@@ -168,7 +259,7 @@ export class UnitManager {
       if (!combat.canAttack || !unit.attackTarget) continue;
       const target = this.resolveTarget(unit.attackTarget);
       if (!target) {
-        this.clearAttack(unit);
+        this.clearAttack(unit, { preserveAttackMove: unit.team !== 0, resumeAttackMove: unit.team !== 0 });
         continue;
       }
 
@@ -178,29 +269,44 @@ export class UnitManager {
         continue;
       }
 
-      if (unit.attackSlot && !this.isHoldingAttackSlot(unit)) {
-        this.snapToAttackSlotIfClose(unit);
-        if (!this.isHoldingAttackSlot(unit)) {
+      if (target.kind === 'unit') {
+        this.refreshMobileEngagementSlot(unit, target);
+        if (edgeDistance > combat.attackRange) {
+          this.pursueMobileAttackTarget(unit, target);
+          continue;
+        }
+      } else {
+        this.refreshMobileAttackSlot(unit, target);
+        if (unit.attackSlot && !this.isHoldingAttackSlot(unit)) {
+          this.snapToAttackSlotIfClose(unit);
+          if (!this.isHoldingAttackSlot(unit)) {
+            const finalWaypoint = unit.path[unit.path.length - 1];
+            const slotMovedAwayFromPath = finalWaypoint
+              ? Math.hypot(finalWaypoint.x - unit.attackSlot.x, finalWaypoint.y - unit.attackSlot.y) > 18
+              : true;
+            if (unit.path.length === 0 || slotMovedAwayFromPath) this.pathUnitToAttackTarget(unit, target);
+            continue;
+          }
+        }
+
+        if (edgeDistance > combat.attackRange) {
           if (unit.path.length === 0) this.pathUnitToAttackTarget(unit, target);
           continue;
         }
-      }
 
-      if (edgeDistance > combat.attackRange) {
-        if (unit.path.length === 0) this.pathUnitToAttackTarget(unit, target);
-        continue;
+        if (unit.attackSlot) this.snapToAttackSlotIfClose(unit);
       }
-
-      if (unit.attackSlot) this.snapToAttackSlotIfClose(unit);
       unit.path = [];
+      unit.routeId = null;
+      this.reservations.releaseRouteReservations(unit);
       unit.moveTarget = null;
       const center = this.targetCenter(target);
       unit.facing = Math.atan2(center.y - unit.y, center.x - unit.x);
-      unit.state = 'attacking';
-      state.lastCombatTime = performance.now() / 1000;
+      this.setUnitState(unit, UNIT_STATES.ATTACKING);
+      state.lastCombatTime = this.simTime;
 
       if (state.cooldownRemaining === 0 && state.recoveryRemaining === 0) {
-        const now = performance.now() / 1000;
+        const now = this.simTime;
         state.windupRemaining = combat.windupTime;
         state.attackAnimStart = now;
         state.attackAnimDuration = combat.windupTime + combat.recoveryTime + 0.08;
@@ -227,15 +333,16 @@ export class UnitManager {
       if (target && target.hp > 0) {
         const damage = this.calculateDamage(pending.amount, pending.damageType, target);
         target.hp = Math.max(0, target.hp - damage);
-        target.combatState.lastDamagedTime = performance.now() / 1000;
-        target.combatState.lastCombatTime = performance.now() / 1000;
-        if (target.team === 0 && target.hp > 0 && !target.attackTarget) {
-          this.assignAttackTarget(target, { kind: 'unit', id: unit.id }, false);
+        target.combatState.lastDamagedTime = this.simTime;
+        target.combatState.lastCombatTime = this.simTime;
+        const targetCombat = this.getDef(target).combat;
+        if (target.team !== unit.team && target.hp > 0 && targetCombat.canAttack && !target.attackTarget) {
+          this.assignAttackTarget(target, { kind: 'unit', id: unit.id }, target.team !== 0);
         }
       }
     }
 
-    const now = performance.now() / 1000;
+    const now = this.simTime;
     state.impactFlashUntil = now + 0.14;
     const combat = this.getDef(unit).combat;
     state.pendingDamage = null;
@@ -254,22 +361,31 @@ export class UnitManager {
     if (deadIds.size === 0) return;
     for (const unit of this.units) {
       if (deadIds.has(unit.id)) continue;
-      if (unit.attackTarget?.kind === 'unit' && deadIds.has(unit.attackTarget.id)) this.clearAttack(unit);
+      if (unit.attackTarget?.kind === 'unit' && deadIds.has(unit.attackTarget.id)) this.clearAttack(unit, { preserveAttackMove: true, resumeAttackMove: true });
     }
     for (const id of deadIds) this.selectedIds.delete(id);
     this.units = this.units.filter((unit) => unit.hp > 0);
     this.cleanupAttackSlotReservations();
+    this.cleanupMobileEngagementReservations();
+    this.reservations.cleanupRouteReservations(this.simTime, this.units);
   }
 
   updateMovement(dt) {
     for (const unit of this.units) {
       if (unit.path.length === 0) {
-        if (unit.state === 'moving') unit.state = unit.attackTarget ? 'pursuing' : 'idle';
+        this.reservations.releaseRouteReservations(unit);
+        if (unit.state === UNIT_STATES.MOVING || unit.state === UNIT_STATES.ATTACK_MOVING || unit.state === UNIT_STATES.PURSUING_TARGET || unit.state === UNIT_STATES.QUEUED_BEHIND_ALLY) {
+          this.setUnitState(unit, unit.attackTarget ? UNIT_STATES.PURSUING_TARGET : UNIT_STATES.IDLE);
+        }
+        this.updateUnitProgress(unit, dt, false);
         continue;
       }
       if (unit.combatState.windupRemaining > 0) continue;
 
-      unit.state = unit.attackTarget ? 'pursuing' : 'moving';
+      const movingState = unit.attackTarget
+        ? (unit.debug?.queueAnchor ? UNIT_STATES.QUEUED_BEHIND_ALLY : UNIT_STATES.PURSUING_TARGET)
+        : (unit.attackMoveTarget ? UNIT_STATES.ATTACK_MOVING : UNIT_STATES.MOVING);
+      this.setUnitState(unit, movingState);
       const waypoint = unit.path[0];
       const dx = waypoint.x - unit.x;
       const dy = waypoint.y - unit.y;
@@ -277,20 +393,116 @@ export class UnitManager {
       const stopDistance = this.getDef(unit).movement.stopDistance;
       if (dist < stopDistance) {
         unit.path.shift();
+        this.resetMovementState(unit);
         if (unit.path.length === 0 && unit.attackSlot) this.snapToAttackSlotIfClose(unit);
         continue;
       }
+
       const step = Math.min(this.getMoveSpeed(unit) * dt, dist);
-      const nx = unit.x + (dx / dist) * step;
-      const ny = unit.y + (dy / dist) * step;
-      if (this.map.isCircleWalkable(nx, ny, unit.radius + 1)) {
-        unit.x = nx;
-        unit.y = ny;
-      } else {
-        unit.path.shift();
+      const dirX = dx / dist;
+      const dirY = dy / dist;
+      const chokeClaim = this.claimRouteChokeCells(unit, waypoint);
+      if (!chokeClaim.ok) {
+        this.setUnitState(unit, UNIT_STATES.QUEUED_BEHIND_ALLY);
+        if (unit.debug) {
+          const blocker = this.units.find((candidate) => candidate.id === chokeClaim.blockerId);
+          unit.debug.blockerId = chokeClaim.blockerId ?? null;
+          unit.debug.queueAnchor = blocker ? { x: blocker.x, y: blocker.y } : null;
+        }
+        this.updateUnitProgress(unit, dt, false);
+        continue;
       }
+      let moved = this.tryMoveUnit(unit, dirX * step, dirY * step);
+
+      if (!moved) {
+        // Do not immediately discard the waypoint. In chokes that creates
+        // back-and-forth path popping. Try wall-sliding first, then let stuck
+        // detection escalate to a repath/queue behavior.
+        const side = unit.movementState?.sidestepSign ?? 1;
+        moved = this.tryMoveUnit(unit, -dirY * step * 0.7 * side, dirX * step * 0.7 * side)
+          || this.tryMoveUnit(unit, dirX * step * 0.55, 0)
+          || this.tryMoveUnit(unit, 0, dirY * step * 0.55);
+      }
+
       unit.facing = Math.atan2(dy, dx);
+      this.updateUnitProgress(unit, dt, moved);
+      if (!moved) this.handleBlockedUnit(unit);
+      if (unit.debug) unit.debug.lastWaypoint = unit.path[0] ? { x: unit.path[0].x, y: unit.path[0].y } : null;
     }
+  }
+
+  claimRouteChokeCells(unit, waypoint) {
+    if (!this.chokeMap || !waypoint) return { ok: true };
+    const cells = this.chokeMap.sampleChokeCellsAlongSegment(unit.x, unit.y, waypoint.x, waypoint.y, 3);
+    if (!cells.length) return this.reservations.reserveRouteChokeCells(unit, [], this.simTime, unit.routeId ?? null, null);
+    const dx = waypoint.x - unit.x;
+    const dy = waypoint.y - unit.y;
+    const directionKey = `${Math.sign(Math.round(dx))},${Math.sign(Math.round(dy))}`;
+    return this.reservations.reserveRouteChokeCells(unit, cells, this.simTime, unit.routeId ?? null, directionKey);
+  }
+
+  tryMoveUnit(unit, dx, dy) {
+    if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return false;
+    const nx = unit.x + dx;
+    const ny = unit.y + dy;
+    if (!this.map.isCircleWalkable(nx, ny, unit.radius + 1)) return false;
+    unit.x = nx;
+    unit.y = ny;
+    return true;
+  }
+
+  updateUnitProgress(unit, dt, moved) {
+    if (!unit.movementState) this.resetMovementState(unit);
+    const state = unit.movementState;
+    const movedDistance = Math.hypot(unit.x - state.lastX, unit.y - state.lastY);
+    if (moved && movedDistance > 0.35) {
+      state.blockedFor = 0;
+      state.lastX = unit.x;
+      state.lastY = unit.y;
+      state.lastProgressAt = this.simTime;
+      state.lastBlockReason = null;
+      return;
+    }
+    if (unit.path.length > 0) {
+      state.blockedFor += dt;
+      state.lastBlockedAt = this.simTime;
+      state.lastBlockReason = 'no-progress';
+    }
+  }
+
+  handleBlockedUnit(unit) {
+    if (!unit.movementState) this.resetMovementState(unit);
+    const state = unit.movementState;
+    if (state.blockedFor < 0.22 || this.simTime < state.repathAt) return;
+
+    this.setUnitState(unit, UNIT_STATES.BLOCKED_REPATHING);
+    state.repathAt = this.simTime + 0.28;
+    if (unit.debug) unit.debug.lastRepathAt = this.simTime;
+    state.sidestepSign *= -1;
+
+    const target = this.resolveTarget(unit.attackTarget);
+    if (target?.kind === 'unit') {
+      if (this.pursueMobileAttackTarget(unit, target, { forceRepath: true, allowQueue: true })) {
+        state.blockedFor = 0;
+        return;
+      }
+    } else if (target) {
+      if (this.pathUnitToAttackTarget(unit, target)) {
+        state.blockedFor = 0;
+        return;
+      }
+    } else if (unit.moveTarget) {
+      if (this.pathUnitToWorld(unit, unit.moveTarget.x, unit.moveTarget.y)) {
+        state.blockedFor = 0;
+        return;
+      }
+    }
+
+    // Explicit waiting is better than waypoint thrash. The retained attack/move
+    // intent will be retried by combat pursuit or the next blocked escalation.
+    unit.path = [];
+    this.setDebugPathGoal(unit, null);
+    this.setUnitState(unit, unit.attackTarget ? UNIT_STATES.BLOCKED_REPATHING : UNIT_STATES.BLOCKED_REPATHING);
   }
 
   applySeparation(dt) {
@@ -309,10 +521,16 @@ export class UnitManager {
         const dy = a.y - b.y;
         const d2 = dx * dx + dy * dy;
         if (d2 === 0 || d2 > minDist * minDist) continue;
+
+        const aPriority = this.unitMovementPriority(a);
+        const bPriority = this.unitMovementPriority(b);
+        if (aPriority > bPriority + 1) continue;
+
         const d = Math.sqrt(d2);
-        const force = (minDist - d) / minDist;
-        pushX += (dx / d) * force;
-        pushY += (dy / d) * force;
+        const baseForce = (minDist - d) / minDist;
+        const yieldBoost = bPriority > aPriority ? 1.35 : 0.65;
+        pushX += (dx / d) * baseForce * yieldBoost;
+        pushY += (dy / d) * baseForce * yieldBoost;
       }
       const push = clampMagnitude(pushX, pushY, 1);
       const nx = a.x + push.x * CONFIG.separationStrength * dt;
@@ -322,6 +540,37 @@ export class UnitManager {
         a.y = ny;
       }
     }
+  }
+
+  unitMovementPriority(unit) {
+    let priority = 0;
+    if (unit.attackTarget) priority += 3;
+    if (unit.state === UNIT_STATES.ATTACKING) priority += 4;
+    if (unit.mobileEngagementSlot) priority += 2;
+    if (unit.state === UNIT_STATES.QUEUED_BEHIND_ALLY) priority -= 1;
+    if (unit.state === UNIT_STATES.BLOCKED_REPATHING) priority -= 1;
+    if (unit.path.length > 0) priority += 1;
+    const target = this.resolveTarget(unit.attackTarget);
+    if (target) {
+      const edge = this.distanceToTargetEdge(unit, target);
+      const range = this.getDef(unit).combat.attackRange || 0;
+      if (edge <= range + 8) priority += 4;
+    }
+    return priority;
+  }
+
+  resetMovementState(unit) {
+    unit.movementState = {
+      lastX: unit.x,
+      lastY: unit.y,
+      blockedFor: 0,
+      repathAt: 0,
+      sidestepUntil: 0,
+      sidestepSign: unit.movementState?.sidestepSign ?? 1,
+      lastProgressAt: this.simTime,
+      lastBlockedAt: -Infinity,
+      lastBlockReason: null,
+    };
   }
 
   updateVisualFacing(dt) {
@@ -388,37 +637,89 @@ export class UnitManager {
 
   markCommandAck(unit, kind) {
     unit.commandAckKind = kind;
-    unit.commandAckUntil = performance.now() / 1000 + 0.22;
+    unit.commandAckUntil = this.simTime + 0.22;
   }
 
 
   moveSelectedTo(worldX, worldY) {
-    const selected = this.selectedUnits();
-    if (selected.length === 0) return false;
-    const offsets = formationOffsets(selected.length, CONFIG.formationSpacing);
-    let issued = false;
-    selected.forEach((unit, index) => {
+    return this.moveUnitsTo(this.selectedUnitIds(), worldX, worldY);
+  }
+
+  moveUnitsTo(unitIds, worldX, worldY, team = 1) {
+    const units = this.ownedUnitsFromIds(unitIds, team);
+    if (units.length === 0) return false;
+    return this.issueGroupMove(units, worldX, worldY, { kind: 'move' });
+  }
+
+  stopUnits(unitIds, team = 1) {
+    const units = this.ownedUnitsFromIds(unitIds, team);
+    if (units.length === 0) return false;
+    for (const unit of units) {
       this.clearAttack(unit);
-      const offset = offsets[index];
-      const targetTile = this.map.worldToTile(worldX + offset.x, worldY + offset.y);
-      const corrected = this.map.nearestWalkableTile(targetTile.x, targetTile.y);
-      if (!corrected) return;
-      const startTile = this.map.worldToTile(unit.x, unit.y);
-      const path = findPath(this.map, startTile, corrected);
-      if (path.length > 0) {
-        unit.path = path;
-        unit.pathIndex = 0;
-        unit.moveTarget = this.map.tileCenter(corrected.x, corrected.y);
-        this.markCommandAck(unit, 'move');
-        issued = true;
-      }
+      unit.attackMoveTarget = null;
+      unit.path = [];
+      unit.routeId = null;
+      this.reservations.releaseRouteReservations(unit);
+      unit.moveTarget = null;
+      this.setUnitState(unit, UNIT_STATES.IDLE);
+      this.markCommandAck(unit, 'stop');
+    }
+    return true;
+  }
+
+  attackMoveUnitsTo(unitIds, worldX, worldY, team = 1) {
+    const units = this.ownedUnitsFromIds(unitIds, team).filter((unit) => this.getDef(unit).combat.canAttack);
+    if (units.length === 0) return false;
+    return this.issueGroupMove(units, worldX, worldY, { kind: 'attackMove' });
+  }
+
+  issueGroupMove(units, worldX, worldY, options = {}) {
+    const routeId = `route:${this.nextRouteId++}`;
+    const plan = buildGroupMovePlan({
+      units,
+      map: this.map,
+      worldX,
+      worldY,
+      clearanceForUnit: (unit) => this.unitPathClearance(unit),
     });
+    const route = plan.route;
+    const formationMode = plan.formationMode;
+    const columns = plan.columns;
+
+    let issued = false;
+    for (const assignment of plan.assignments) {
+      const unit = assignment.unit;
+      this.clearAttack(unit);
+      if (options.kind !== 'attackMove') unit.attackMoveTarget = null;
+      const planned = this.buildPathToWorld(unit, assignment.targetX, assignment.targetY);
+      if (!planned) continue;
+      unit.path = mergeGroupRouteForUnit({ map: this.map, unit, personalPath: planned.path, groupRoute: route });
+      unit.pathIndex = 0;
+      unit.routeId = routeId;
+      this.reservations.releaseRouteReservations(unit);
+      unit.moveTarget = planned.finalPoint;
+      if (options.kind === 'attackMove') unit.attackMoveTarget = { x: planned.finalPoint.x, y: planned.finalPoint.y };
+      if (unit.debug) {
+        unit.debug.groupRoute = route ? route.map((p) => ({ x: p.x, y: p.y })) : null;
+        unit.debug.formationMode = formationMode;
+        unit.debug.formationSlot = { index: assignment.slotIndex, columns };
+      }
+      this.setDebugPathGoal(unit, planned.finalPoint);
+      this.resetMovementState(unit);
+      this.setUnitState(unit, options.kind === 'attackMove' ? UNIT_STATES.ATTACK_MOVING : UNIT_STATES.MOVING);
+      this.markCommandAck(unit, options.kind === 'attackMove' ? 'attackMove' : 'move');
+      issued = true;
+    }
     return issued;
   }
 
   attackSelectedDestructible(tileX, tileY) {
+    return this.attackUnitsDestructible(this.selectedUnitIds(), tileX, tileY);
+  }
+
+  attackUnitsDestructible(unitIds, tileX, tileY, team = 1) {
     if (!this.map.isDestructibleTile(tileX, tileY)) return false;
-    const selected = this.selectedUnits().filter((unit) => this.getDef(unit).combat.canAttack);
+    const selected = this.ownedUnitsFromIds(unitIds, team).filter((unit) => this.getDef(unit).combat.canAttack);
     if (selected.length === 0) return false;
 
     // Treat adjacent destructible tiles as one gate for command distribution.
@@ -459,16 +760,25 @@ export class UnitManager {
   }
 
   attackSelectedUnit(targetUnit) {
-    if (!targetUnit || targetUnit.team === 1 || targetUnit.hp <= 0) return false;
-    return this.attackSelectedTarget({ kind: 'unit', id: targetUnit.id });
+    return this.attackUnitsUnit(this.selectedUnitIds(), targetUnit);
+  }
+
+  attackUnitsUnit(unitIds, targetUnit, team = 1) {
+    if (!targetUnit || targetUnit.team === team || targetUnit.hp <= 0) return false;
+    return this.attackUnitsTarget(unitIds, { kind: 'unit', id: targetUnit.id }, team);
   }
 
   attackSelectedTarget(targetRef) {
+    return this.attackUnitsTarget(this.selectedUnitIds(), targetRef);
+  }
+
+  attackUnitsTarget(unitIds, targetRef, team = 1) {
     const target = this.resolveTarget(targetRef);
     if (!target) return false;
-    const selected = this.selectedUnits().filter((unit) => this.getDef(unit).combat.canAttack);
+    const selected = this.ownedUnitsFromIds(unitIds, team).filter((unit) => this.getDef(unit).combat.canAttack);
     if (selected.length === 0) return false;
     this.clearReservationsForTarget(this.targetKey(targetRef));
+    this.clearMobileReservationsForTarget(this.targetKey(targetRef));
     const sorted = [...selected].sort((a, b) => distanceSq(a.x, a.y, this.targetCenter(target).x, this.targetCenter(target).y) - distanceSq(b.x, b.y, this.targetCenter(target).x, this.targetCenter(target).y));
     for (const unit of sorted) {
       this.assignAttackTarget(unit, targetRef, true);
@@ -477,25 +787,53 @@ export class UnitManager {
     return true;
   }
 
-  assignAttackTarget(unit, targetRef, reserveSlot = true) {
+  assignAttackTarget(unit, targetRef, reserveSlot = true, options = {}) {
     this.releaseAttackSlot(unit);
+    this.releaseMobileEngagementSlot(unit);
     unit.attackTarget = { ...targetRef };
+    if (!options.preserveAttackMove) unit.attackMoveTarget = null;
     unit.combatState.pendingDamage = null;
     unit.combatState.windupRemaining = 0;
     unit.combatState.recoveryRemaining = 0;
-    if (reserveSlot) this.reserveAttackSlot(unit, targetRef);
+    unit.mobilePursuitRepathAt = 0;
+    this.resetMovementState(unit);
     const target = this.resolveTarget(targetRef);
-    if (target) this.pathUnitToAttackTarget(unit, target);
+    if (reserveSlot && target?.kind !== 'unit') this.reserveAttackSlot(unit, targetRef);
+    if (reserveSlot && target?.kind === 'unit') this.reserveMobileEngagementSlot(unit, target);
+    if (target?.kind === 'unit') this.pursueMobileAttackTarget(unit, target);
+    else if (target) this.pathUnitToAttackTarget(unit, target);
   }
 
-  clearAttack(unit) {
+  clearAttack(unit, options = {}) {
     this.releaseAttackSlot(unit);
+    this.releaseMobileEngagementSlot(unit);
     unit.attackTarget = null;
     unit.combatState.pendingDamage = null;
     unit.combatState.windupRemaining = 0;
+    unit.combatState.recoveryRemaining = 0;
     unit.path = [];
+    unit.routeId = null;
+    this.reservations.releaseRouteReservations(unit);
     unit.moveTarget = null;
-    unit.state = 'idle';
+    unit.mobilePursuitRepathAt = 0;
+    if (unit.debug) {
+      unit.debug.queueAnchor = null;
+      unit.debug.blockerId = null;
+      unit.debug.lastWaypoint = null;
+      unit.debug.pathGoal = null;
+      unit.debug.groupRoute = null;
+      unit.debug.formationMode = null;
+      unit.debug.formationSlot = null;
+      unit.debug.engagementSlot = null;
+      unit.debug.lanePriority = 0;
+    }
+    this.resetMovementState(unit);
+    this.setUnitState(unit, UNIT_STATES.IDLE);
+    if (!options.preserveAttackMove) unit.attackMoveTarget = null;
+    if (options.resumeAttackMove && unit.attackMoveTarget) {
+      this.pathUnitToWorld(unit, unit.attackMoveTarget.x, unit.attackMoveTarget.y);
+      this.setUnitState(unit, UNIT_STATES.ATTACK_MOVING);
+    }
   }
 
   resolveTarget(ref) {
@@ -538,6 +876,24 @@ export class UnitManager {
     return Math.hypot(unit.attackSlot.x - unit.x, unit.attackSlot.y - unit.y);
   }
 
+  refreshMobileAttackSlot(unit, target) {
+    if (!unit.attackSlot || !target || target.kind !== 'unit') return;
+    // Unit targets move. Keep the reserved melee slot attached to the target's
+    // current body instead of sending attackers to the position the target had
+    // when the click happened. Static wall slots intentionally remain fixed.
+    const angle = Number.isFinite(unit.attackSlot.angle)
+      ? unit.attackSlot.angle
+      : Math.atan2(unit.y - target.unit.y, unit.x - target.unit.x);
+    const dist = target.unit.radius + unit.radius + SLOT_RADIUS_PADDING;
+    const x = target.unit.x + Math.cos(angle) * dist;
+    const y = target.unit.y + Math.sin(angle) * dist;
+    if (this.map.isCircleWalkable(x, y, unit.radius + 1)) {
+      unit.attackSlot.x = x;
+      unit.attackSlot.y = y;
+      unit.attackSlot.angle = angle;
+    }
+  }
+
   isHoldingAttackSlot(unit) {
     if (!unit.attackSlot) return false;
     return this.distanceToAttackSlot(unit) <= Math.max(3, this.getDef(unit).movement.stopDistance + 1);
@@ -550,10 +906,170 @@ export class UnitManager {
       unit.x = unit.attackSlot.x;
       unit.y = unit.attackSlot.y;
       unit.path = [];
+      unit.routeId = null;
+      this.reservations.releaseRouteReservations(unit);
       unit.moveTarget = null;
       return true;
     }
     return false;
+  }
+
+  pursueMobileAttackTarget(unit, target, options = {}) {
+    if (!target || target.kind !== 'unit') return false;
+    const combat = this.getDef(unit).combat;
+    const center = this.targetCenter(target);
+    const slot = this.reserveMobileEngagementSlot(unit, target);
+    const dx = unit.x - center.x;
+    const dy = unit.y - center.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const preferredAngle = Number.isFinite(slot?.angle) ? slot.angle : Math.atan2(dy, dx);
+    const desiredCenterDistance = this.targetRadius(target) + Math.max(unit.radius + 4, combat.attackRange * 0.72);
+    const destination = {
+      x: center.x + Math.cos(preferredAngle) * desiredCenterDistance,
+      y: center.y + Math.sin(preferredAngle) * desiredCenterDistance,
+    };
+
+    // Dynamic melee reservations are soft lanes, not hard static waypoints. The
+    // point moves with the target each tick, but each attacker keeps a stable
+    // angular lane so multiple grunts stop fighting for the same approach pixel.
+    if (this.map.isCircleWalkable(destination.x, destination.y, unit.radius + 1) && this.mobileEngagementSlotReachable(unit, destination, target)) {
+      unit.path = [destination];
+      unit.moveTarget = destination;
+      if (unit.debug) {
+        unit.debug.queueAnchor = null;
+        unit.debug.blockerId = null;
+      }
+      this.refreshMobileEngagementSlot(unit, target);
+      this.setDebugPathGoal(unit, destination);
+      this.setUnitState(unit, UNIT_STATES.PURSUING_TARGET);
+      this.resetMovementState(unit);
+      return true;
+    }
+
+    if (!options.forceRepath && unit.path.length > 0 && this.simTime < (unit.mobilePursuitRepathAt ?? 0)) return true;
+
+    const planned = this.findMobileEngagementPath(unit, target, desiredCenterDistance, preferredAngle);
+    if (planned) {
+      unit.path = planned.path;
+      unit.moveTarget = planned.finalPoint;
+      this.refreshMobileEngagementSlot(unit, target);
+      this.setDebugPathGoal(unit, planned.finalPoint);
+      this.setUnitState(unit, UNIT_STATES.PURSUING_TARGET);
+      this.resetMovementState(unit);
+      unit.mobilePursuitRepathAt = this.simTime + 0.24;
+      return true;
+    }
+
+    if (options.allowQueue !== false) {
+      const queued = this.pathUnitToAttackQueue(unit, target);
+      if (queued) {
+        unit.mobilePursuitRepathAt = this.simTime + 0.24;
+        return true;
+      }
+    }
+
+    unit.mobilePursuitRepathAt = this.simTime + 0.24;
+    unit.path = [];
+    unit.moveTarget = null;
+    this.setUnitState(unit, UNIT_STATES.BLOCKED_REPATHING);
+    return false;
+  }
+
+  mobileEngagementSlotReachable(unit, destination, target) {
+    // In open space, direct steering is fine. In a lane, reject lateral jumps
+    // that would cross through the target/frontline and cause units to swap
+    // lanes every frame.
+    const slot = unit.mobileEngagementSlot;
+    if (!slot || !target?.unit) return true;
+    const targetUnit = target.unit;
+    const toUnit = { x: unit.x - targetUnit.x, y: unit.y - targetUnit.y };
+    const toDest = { x: destination.x - targetUnit.x, y: destination.y - targetUnit.y };
+    const unitAngle = Math.atan2(toUnit.y, toUnit.x);
+    const destAngle = Math.atan2(toDest.y, toDest.x);
+    return Math.abs(shortestAngle(unitAngle, destAngle)) < Math.PI * 0.75;
+  }
+
+  pathUnitToAttackQueue(unit, target) {
+    if (!target || target.kind !== 'unit') return false;
+    const targetUnit = target.unit;
+    const slot = this.reserveMobileEngagementSlot(unit, target);
+    const slotAngle = Number.isFinite(slot?.angle) ? slot.angle : Math.atan2(unit.y - targetUnit.y, unit.x - targetUnit.x);
+
+    let blocker = null;
+    let blockerScore = Infinity;
+    for (const ally of this.units) {
+      if (ally === unit || ally.team !== unit.team || ally.hp <= 0) continue;
+      if (ally.attackTarget?.kind !== 'unit' || ally.attackTarget.id !== targetUnit.id) continue;
+      const allyEdge = this.distanceToTargetEdge(ally, target);
+      const unitEdge = this.distanceToTargetEdge(unit, target);
+      if (allyEdge > unitEdge + 8) continue;
+      const allyAngle = ally.mobileEngagementSlot?.angle ?? Math.atan2(ally.y - targetUnit.y, ally.x - targetUnit.x);
+      const lanePenalty = Math.abs(shortestAngle(slotAngle, allyAngle)) * 80;
+      const d2 = distanceSq(unit.x, unit.y, ally.x, ally.y);
+      const score = d2 + lanePenalty;
+      if (score < blockerScore) {
+        blocker = ally;
+        blockerScore = score;
+      }
+    }
+    if (!blocker) return false;
+
+    const awayX = blocker.x - targetUnit.x;
+    const awayY = blocker.y - targetUnit.y;
+    const len = Math.hypot(awayX, awayY) || 1;
+    const queueOrdinal = this.queueOrdinalBehindBlocker(unit, blocker, target);
+    const queueDistance = blocker.radius + unit.radius + MOBILE_QUEUE_SPACING + queueOrdinal * MOBILE_QUEUE_SPACING;
+    const qx = blocker.x + (awayX / len) * queueDistance;
+    const qy = blocker.y + (awayY / len) * queueDistance;
+    if (!this.map.isCircleWalkable(qx, qy, unit.radius + 1)) return false;
+    const ok = this.pathUnitToWorld(unit, qx, qy);
+    if (ok) {
+      if (unit.debug) {
+        unit.debug.queueAnchor = { x: qx, y: qy };
+        unit.debug.blockerId = blocker.id;
+        unit.debug.lanePriority = queueOrdinal + 1;
+      }
+      this.setUnitState(unit, UNIT_STATES.QUEUED_BEHIND_ALLY);
+    }
+    return ok;
+  }
+
+  queueOrdinalBehindBlocker(unit, blocker, target) {
+    let count = 0;
+    for (const ally of this.units) {
+      if (ally === unit || ally === blocker || ally.team !== unit.team || ally.hp <= 0) continue;
+      if (ally.attackTarget?.kind !== 'unit' || ally.attackTarget.id !== target.unit.id) continue;
+      if (ally.debug?.blockerId === blocker.id) count += 1;
+    }
+    return count;
+  }
+
+  findMobileEngagementPath(unit, target, desiredCenterDistance, preferredAngle) {
+    const center = this.targetCenter(target);
+    const angles = [preferredAngle];
+    const samples = MOBILE_ENGAGEMENT_SLOT_COUNT;
+    for (let i = 1; i <= Math.floor(samples / 2); i++) {
+      const step = (Math.PI * 2 * i) / samples;
+      angles.push(preferredAngle + step, preferredAngle - step);
+    }
+
+    let best = null;
+    let bestScore = Infinity;
+    for (const angle of angles) {
+      const x = center.x + Math.cos(angle) * desiredCenterDistance;
+      const y = center.y + Math.sin(angle) * desiredCenterDistance;
+      if (!this.map.isCircleWalkable(x, y, unit.radius + 1)) continue;
+      const planned = this.buildPathToWorld(unit, x, y);
+      if (!planned) continue;
+      const final = planned.finalPoint;
+      const angleCost = Math.abs(shortestAngle(preferredAngle, angle)) * 70;
+      const score = planned.path.length * this.map.tileSize + Math.hypot(final.x - unit.x, final.y - unit.y) + angleCost;
+      if (score < bestScore) {
+        best = planned;
+        bestScore = score;
+      }
+    }
+    return best;
   }
 
   pathUnitToAttackTarget(unit, target) {
@@ -571,57 +1087,43 @@ export class UnitManager {
   }
 
   reserveAttackSlot(unit, targetRef) {
-    const target = this.resolveTarget(targetRef);
-    if (!target) return false;
-    const key = this.targetKey(targetRef);
-    const slots = this.attackSlotsForTarget(target, unit);
-    let reservations = this.attackSlotReservations.get(key);
-    if (!reservations) {
-      reservations = new Map();
-      this.attackSlotReservations.set(key, reservations);
-    }
-
-    const occupied = new Set([...reservations.values()].map((slot) => slot.key));
-    slots.sort((a, b) => {
-      const ad = distanceSq(unit.x, unit.y, a.x, a.y) + (a.diagonal ? 25000 : 0);
-      const bd = distanceSq(unit.x, unit.y, b.x, b.y) + (b.diagonal ? 25000 : 0);
-      return ad - bd;
-    });
-    const chosen = slots.find((slot) => !occupied.has(slot.key)) ?? slots[0];
-    if (!chosen) return false;
-
-    reservations.set(unit.id, chosen);
-    unit.attackSlot = { targetKey: key, ...chosen };
-    return true;
+    return this.reservations.reserveStaticAttackSlot(unit, targetRef);
   }
 
   releaseAttackSlot(unit) {
-    if (!unit.attackSlot) return;
-    const reservations = this.attackSlotReservations.get(unit.attackSlot.targetKey);
-    if (reservations) {
-      reservations.delete(unit.id);
-      if (reservations.size === 0) this.attackSlotReservations.delete(unit.attackSlot.targetKey);
-    }
-    unit.attackSlot = null;
+    this.reservations.releaseStaticAttackSlot(unit);
   }
 
   clearReservationsForTarget(key) {
-    const reservations = this.attackSlotReservations.get(key);
-    if (!reservations) return;
-    for (const unit of this.units) {
-      if (unit.attackSlot?.targetKey === key) unit.attackSlot = null;
-    }
-    this.attackSlotReservations.delete(key);
+    this.reservations.clearStaticReservationsForTarget(key, this.units);
   }
 
   cleanupAttackSlotReservations() {
-    const live = new Set(this.units.map((unit) => unit.id));
-    for (const [key, reservations] of this.attackSlotReservations) {
-      for (const id of reservations.keys()) {
-        if (!live.has(id)) reservations.delete(id);
-      }
-      if (reservations.size === 0) this.attackSlotReservations.delete(key);
-    }
+    this.reservations.cleanupStaticAttackSlots(this.units);
+  }
+
+  reserveMobileEngagementSlot(unit, target) {
+    return this.reservations.reserveMobileEngagementSlot(unit, target);
+  }
+
+  mobileEngagementSlotPoint(unit, target, angle) {
+    return this.reservations.mobileEngagementSlotPoint(unit, target, angle);
+  }
+
+  refreshMobileEngagementSlot(unit, target) {
+    this.reservations.refreshMobileEngagementSlot(unit, target);
+  }
+
+  releaseMobileEngagementSlot(unit) {
+    this.reservations.releaseMobileEngagementSlot(unit);
+  }
+
+  clearMobileReservationsForTarget(key) {
+    this.reservations.clearMobileReservationsForTarget(key, this.units);
+  }
+
+  cleanupMobileEngagementReservations() {
+    this.reservations.cleanupMobileEngagementReservations(this.units);
   }
 
   attackSlotsForTarget(target, unit) {
@@ -700,18 +1202,104 @@ export class UnitManager {
     return false;
   }
 
-  pathUnitToWorld(unit, worldX, worldY) {
+  buildPathToWorld(unit, worldX, worldY) {
     const targetTile = this.map.worldToTile(worldX, worldY);
-    const corrected = this.map.nearestWalkableTile(targetTile.x, targetTile.y);
-    if (!corrected) return false;
+    const clearance = this.unitPathClearance(unit);
+    const corrected = this.map.nearestWalkableTileForRadius(targetTile.x, targetTile.y, clearance);
+    if (!corrected) return null;
     const startTile = this.map.worldToTile(unit.x, unit.y);
-    const path = findPath(this.map, startTile, corrected);
-    if (path.length === 0) return false;
-    path[path.length - 1] = { x: worldX, y: worldY };
-    unit.path = path;
+    const path = findPath(this.map, startTile, corrected, { clearance });
+    if (path.length === 0) return null;
+
+    // Do not force the final waypoint back onto the raw requested point when
+    // that point is not physically reachable by the unit body. The old behavior
+    // could path to a corrected walkable tile, then replace the final waypoint
+    // with an unwalkable point next to/inside a wall or moving target. The unit
+    // would then try to step into blocked space, drop the waypoint, repath, and
+    // repeat forever as visible back-and-forth jitter.
+    const rawPointIsUsable =
+      corrected.x === targetTile.x &&
+      corrected.y === targetTile.y &&
+      this.map.isCircleWalkable(worldX, worldY, unit.radius + 1);
+    const finalPoint = rawPointIsUsable ? { x: worldX, y: worldY } : this.map.tileCenter(corrected.x, corrected.y);
+    path[path.length - 1] = finalPoint;
+    return { path, finalPoint };
+  }
+
+  pathUnitToWorld(unit, worldX, worldY) {
+    const planned = this.buildPathToWorld(unit, worldX, worldY);
+    if (!planned) return false;
+    unit.path = planned.path;
     unit.pathIndex = 0;
-    unit.moveTarget = { x: worldX, y: worldY };
+    unit.routeId = unit.routeId ?? `solo:${unit.id}:${this.nextRouteId++}`;
+    this.reservations.releaseRouteReservations(unit);
+    unit.moveTarget = planned.finalPoint;
+    this.setDebugPathGoal(unit, planned.finalPoint);
+    this.resetMovementState(unit);
     return true;
+  }
+
+  unitPathClearance(unit) {
+    // A* and body movement now agree on the same collision envelope. This
+    // prevents routes through tile centers that a circular unit cannot actually
+    // occupy once wall collision is checked.
+    return unit.radius + 1;
+  }
+
+  updateDiscovery(fog) {
+    for (const unit of this.units) {
+      const tile = this.map.worldToTile(unit.x, unit.y);
+      if (unit.team !== 1 && fog.isVisible(tile.x, tile.y)) unit.discovered = true;
+    }
+  }
+
+  stateCounts() {
+    const counts = new Map();
+    for (const unit of this.units) counts.set(unit.state, (counts.get(unit.state) ?? 0) + 1);
+    return counts;
+  }
+
+  selectedDebugSummary() {
+    const selected = this.selectedUnits();
+    if (selected.length === 0) return 'none';
+    const counts = new Map();
+    for (const unit of selected) counts.set(unit.state, (counts.get(unit.state) ?? 0) + 1);
+    return [...counts.entries()].map(([state, count]) => `${state}:${count}`).join(' ');
+  }
+
+  selectedUnitIds() {
+    return [...this.selectedIds];
+  }
+
+  ownedUnitsFromIds(unitIds, team = 1) {
+    const requested = new Set(unitIds);
+    return this.units.filter((unit) => requested.has(unit.id) && unit.team === team && unit.hp > 0);
+  }
+
+
+  teamUnits(team) {
+    return this.units.filter((unit) => unit.team === team && unit.hp > 0);
+  }
+
+  idleTeamUnits(team, type = null) {
+    return this.teamUnits(team).filter((unit) => {
+      if (type && unit.type !== type) return false;
+      return !unit.attackTarget && unit.path.length === 0 && unit.combatState.windupRemaining === 0 && unit.combatState.recoveryRemaining === 0;
+    });
+  }
+
+  nearestLiveUnit(sourceX, sourceY, predicate) {
+    let best = null;
+    let bestD2 = Infinity;
+    for (const unit of this.units) {
+      if (unit.hp <= 0 || !predicate(unit)) continue;
+      const d2 = distanceSq(sourceX, sourceY, unit.x, unit.y);
+      if (d2 < bestD2) {
+        best = unit;
+        bestD2 = d2;
+      }
+    }
+    return best;
   }
 
   selectedUnits() {
@@ -739,19 +1327,4 @@ function normalizeAngle(angle) {
 
 function shortestAngle(from, to) {
   return normalizeAngle(to - from);
-}
-
-function formationOffsets(count, spacing) {
-  if (count <= 1) return [{ x: 0, y: 0 }];
-  const cols = Math.ceil(Math.sqrt(count));
-  const offsets = [];
-  for (let i = 0; i < count; i++) {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    offsets.push({
-      x: (col - (cols - 1) / 2) * spacing,
-      y: (row - (Math.ceil(count / cols) - 1) / 2) * spacing,
-    });
-  }
-  return offsets;
 }

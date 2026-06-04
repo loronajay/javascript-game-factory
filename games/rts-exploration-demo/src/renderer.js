@@ -17,11 +17,10 @@ export class Renderer {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawMap(ctx);
     this.drawResourceNodes(ctx);
-    this.drawPaths(ctx);
-    this.drawMoveMarker(ctx);
     this.drawUnits(ctx);
-    this.drawSelectionDrag(ctx);
     this.drawFog(ctx);
+    this.drawWorldUiOverlays(ctx);
+    this.drawSelectionDrag(ctx);
     this.drawMinimap(ctx);
   }
 
@@ -171,14 +170,13 @@ export class Renderer {
   }
 
   drawUnits(ctx) {
-    const time = performance.now() / 1000;
+    const time = this.units.simTime;
     for (const unit of this.units.units) {
       const tile = this.map.worldToTile(unit.x, unit.y);
       if (!this.fog.isVisible(tile.x, tile.y) && !this.input.showFogDebug) continue;
       const p = this.camera.worldToScreen(unit.x, unit.y);
       if (p.x < -90 || p.y < -90 || p.x > this.camera.viewportWidth + 90 || p.y > this.camera.viewportHeight + 90) continue;
 
-      this.drawCommandAck(ctx, unit, p.x, p.y, time);
       if (unit.type === 'scout') {
         this.drawAlienScout(ctx, unit, p.x, p.y, time);
       } else if (unit.type === 'grunt') {
@@ -297,7 +295,6 @@ export class Renderer {
     ctx.fill();
 
     ctx.restore();
-    if (shouldShowHealthBar(unit, time)) this.drawHealthBar(ctx, unit, sx, sy - 31);
   }
 
   drawAlienGrunt(ctx, unit, sx, sy, time) {
@@ -393,7 +390,6 @@ export class Renderer {
     }
 
     ctx.restore();
-    if (shouldShowHealthBar(unit, time)) this.drawHealthBar(ctx, unit, sx, sy - 33);
   }
 
   drawNeutralCrawler(ctx, unit, sx, sy, time) {
@@ -475,7 +471,6 @@ export class Renderer {
     }
 
     ctx.restore();
-    if (shouldShowHealthBar(unit, time)) this.drawHealthBar(ctx, unit, sx, sy - 35);
   }
 
   drawFallbackUnit(ctx, unit, sx, sy) {
@@ -494,6 +489,175 @@ export class Renderer {
     ctx.arc(0, 0, unit.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    ctx.restore();
+  }
+
+  drawWorldUiOverlays(ctx) {
+    // World UI draws after all world actors and fog. This keeps command
+    // markers, attack feedback, health bars, and debug paths readable over
+    // neutral monsters, player units, walls, and fog-edge overlap.
+    this.drawPaths(ctx);
+    this.drawMoveMarker(ctx);
+    this.drawAttackTargetMarkers(ctx);
+    this.drawCommandAcks(ctx);
+    this.drawHealthBars(ctx);
+    this.drawMovementDebug(ctx);
+  }
+
+  drawCommandAcks(ctx) {
+    const time = this.units.simTime;
+    for (const unit of this.units.units) {
+      if (!this.shouldRenderUnitOverlay(unit)) continue;
+      const p = this.camera.worldToScreen(unit.x, unit.y);
+      this.drawCommandAck(ctx, unit, p.x, p.y, time);
+    }
+  }
+
+  drawHealthBars(ctx) {
+    const time = this.units.simTime;
+    for (const unit of this.units.units) {
+      if (!this.shouldRenderUnitOverlay(unit)) continue;
+      if (!shouldShowHealthBar(unit, time)) continue;
+      const p = this.camera.worldToScreen(unit.x, unit.y);
+      const yOffset = unit.type === 'neutralCrawler' ? 35 : unit.type === 'grunt' ? 33 : 31;
+      this.drawHealthBar(ctx, unit, p.x, p.y - yOffset);
+    }
+  }
+
+  drawAttackTargetMarkers(ctx) {
+    const time = this.units.simTime;
+    const selectedAttackers = this.units.units.filter((unit) => unit.selected && unit.attackTarget);
+    const drawn = new Set();
+    for (const unit of selectedAttackers) {
+      const target = this.units.resolveTarget(unit.attackTarget);
+      if (!target) continue;
+      const key = this.units.targetKey(unit.attackTarget);
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const center = this.units.targetCenter(target);
+      const p = this.camera.worldToScreen(center.x, center.y);
+      if (p.x < -80 || p.y < -80 || p.x > this.camera.viewportWidth + 80 || p.y > this.camera.viewportHeight + 80) continue;
+      const pulse = 0.5 + Math.sin(time * 8) * 0.5;
+      ctx.save();
+      ctx.globalAlpha = 0.78 + pulse * 0.18;
+      ctx.strokeStyle = '#ff8cff';
+      ctx.lineWidth = 2;
+      const r = target.kind === 'destructibleTile' ? this.map.tileSize * 0.58 : Math.max(18, this.units.targetRadius(target) + 10);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x - r - 7, p.y);
+      ctx.lineTo(p.x - r + 4, p.y);
+      ctx.moveTo(p.x + r - 4, p.y);
+      ctx.lineTo(p.x + r + 7, p.y);
+      ctx.moveTo(p.x, p.y - r - 7);
+      ctx.lineTo(p.x, p.y - r + 4);
+      ctx.moveTo(p.x, p.y + r - 4);
+      ctx.lineTo(p.x, p.y + r + 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  shouldRenderUnitOverlay(unit) {
+    const tile = this.map.worldToTile(unit.x, unit.y);
+    if (!this.fog.isVisible(tile.x, tile.y) && !this.input.showFogDebug) return false;
+    const p = this.camera.worldToScreen(unit.x, unit.y);
+    return !(p.x < -110 || p.y < -110 || p.x > this.camera.viewportWidth + 110 || p.y > this.camera.viewportHeight + 110);
+  }
+
+
+  drawMovementDebug(ctx) {
+    if (!this.input.showMovementDebug) return;
+    ctx.save();
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    for (const unit of this.units.units) {
+      if (!unit.selected && unit.state !== 'blocked-repathing' && unit.state !== 'queued-behind-ally') continue;
+      if (!this.shouldRenderUnitOverlay(unit)) continue;
+      const p = this.camera.worldToScreen(unit.x, unit.y);
+      const team = teamPalette(unit.team);
+      const combat = this.units.getDef(unit).combat;
+
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = unit.state === 'blocked-repathing' ? '#ff5f6d' : unit.state === 'queued-behind-ally' ? '#ffd36d' : team.scan;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, unit.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (unit.selected && combat?.canAttack) {
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = team.impact;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, unit.radius + combat.attackRange, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const target = this.units.resolveTarget(unit.attackTarget);
+      if (target) {
+        const center = this.units.targetCenter(target);
+        const tp = this.camera.worldToScreen(center.x, center.y);
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = team.impact;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(tp.x, tp.y);
+        ctx.stroke();
+      }
+
+      if (unit.debug?.queueAnchor) {
+        const q = this.camera.worldToScreen(unit.debug.queueAnchor.x, unit.debug.queueAnchor.y);
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = '#ffd36d';
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (unit.debug?.engagementSlot) {
+        const e = this.camera.worldToScreen(unit.debug.engagementSlot.x, unit.debug.engagementSlot.y);
+        ctx.globalAlpha = 0.68;
+        ctx.strokeStyle = '#ff9f6d';
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(e.x, e.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (unit.debug?.pathGoal && unit.selected) {
+        const g = this.camera.worldToScreen(unit.debug.pathGoal.x, unit.debug.pathGoal.y);
+        ctx.globalAlpha = 0.72;
+        ctx.strokeStyle = '#9ef7ff';
+        ctx.beginPath();
+        ctx.moveTo(g.x - 5, g.y);
+        ctx.lineTo(g.x + 5, g.y);
+        ctx.moveTo(g.x, g.y - 5);
+        ctx.lineTo(g.x, g.y + 5);
+        ctx.stroke();
+      }
+
+      const blockedFor = unit.movementState?.blockedFor ?? 0;
+      const formation = unit.debug?.formationMode ? ` ${unit.debug.formationMode}` : '';
+      const slot = unit.debug?.engagementSlot ? ` s${unit.debug.engagementSlot.index}` : '';
+      const labelBase = `${unit.state}${formation}${slot}`;
+      const label = blockedFor > 0.05 ? `${labelBase} ${blockedFor.toFixed(1)}s` : labelBase;
+      const y = p.y - unit.selectionRadius - 18;
+      ctx.globalAlpha = 0.82;
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      const w = Math.max(46, ctx.measureText(label).width + 8);
+      ctx.fillRect(Math.round(p.x - w / 2), Math.round(y - 7), w, 14);
+      ctx.fillStyle = '#d9f6ff';
+      ctx.fillText(label, Math.round(p.x - w / 2 + 4), Math.round(y));
+    }
     ctx.restore();
   }
 
@@ -528,6 +692,55 @@ export class Renderer {
       }
       ctx.stroke();
     }
+
+    const selectedWithRoute = this.units.units.find((unit) => unit.selected && unit.debug?.groupRoute?.length);
+    if (selectedWithRoute) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 211, 109, 0.78)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      selectedWithRoute.debug.groupRoute.forEach((wp, index) => {
+        const p = this.camera.worldToScreen(wp.x, wp.y);
+        if (index === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
+
+    const chokeCells = this.units.chokeMap?.debugCells?.(220) ?? [];
+    if (chokeCells.length) {
+      ctx.save();
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#ffd36d';
+      const ts = this.map.tileSize;
+      for (const cell of chokeCells) {
+        const sx = Math.floor(cell.tileX * ts - this.camera.x);
+        const sy = Math.floor(cell.tileY * ts - this.camera.y);
+        if (sx < -ts || sy < -ts || sx > this.camera.viewportWidth + ts || sy > this.camera.viewportHeight + ts) continue;
+        ctx.fillRect(sx + 2, sy + 2, ts - 4, ts - 4);
+      }
+      ctx.restore();
+    }
+
+    const routeReservations = this.units.reservations?.routeReservationSnapshot?.() ?? [];
+    if (routeReservations.length) {
+      ctx.save();
+      ctx.globalAlpha = 0.72;
+      ctx.strokeStyle = '#ff6df2';
+      ctx.lineWidth = 2;
+      const ts = this.map.tileSize;
+      for (const reservation of routeReservations) {
+        const sx = Math.floor(reservation.tileX * ts - this.camera.x);
+        const sy = Math.floor(reservation.tileY * ts - this.camera.y);
+        if (sx < -ts || sy < -ts || sx > this.camera.viewportWidth + ts || sy > this.camera.viewportHeight + ts) continue;
+        ctx.strokeRect(sx + 4.5, sy + 4.5, ts - 9, ts - 9);
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
@@ -535,10 +748,10 @@ export class Renderer {
     const marker = this.input.lastMoveCommand;
     if (!marker) return;
     const p = this.camera.worldToScreen(marker.x, marker.y);
-    const alpha = Math.max(0, marker.ttl / 0.55);
+    const alpha = Math.max(0, Math.min(1, marker.ttl / 0.55));
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = marker.kind === 'attack' ? '#ff8cff' : '#9ef7ff';
+    ctx.strokeStyle = marker.kind === 'attack' ? '#ff8cff' : marker.kind === 'attackMove' ? '#ffd36d' : '#9ef7ff';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(p.x, p.y, 14 + (1 - alpha) * 10, 0, Math.PI * 2);
@@ -610,10 +823,38 @@ export class Renderer {
       }
     }
 
+    for (const node of this.map.resourceNodes) {
+      if (!node.discovered && !this.input.showFogDebug) continue;
+      const visible = this.fog.isVisible(node.tileX, node.tileY) || this.input.showFogDebug;
+      const px = x0 + (node.x / this.map.worldWidth) * size;
+      const py = y0 + (node.y / this.map.worldHeight) * size;
+      ctx.save();
+      ctx.globalAlpha = visible ? 1 : 0.52;
+      ctx.fillStyle = node.kind === 'crystal' ? '#87f7ff' : '#bbff75';
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     for (const unit of this.units.units) {
-      if (unit.team === 0) continue;
       const tile = this.map.worldToTile(unit.x, unit.y);
-      if (!this.fog.isVisible(tile.x, tile.y) && !this.input.showFogDebug) continue;
+      const visible = this.fog.isVisible(tile.x, tile.y) || this.input.showFogDebug;
+      if (unit.team === 0) {
+        if (!unit.discovered && !this.input.showFogDebug) continue;
+        const px = x0 + unit.x / this.map.worldWidth * size;
+        const py = y0 + unit.y / this.map.worldHeight * size;
+        ctx.save();
+        ctx.globalAlpha = visible ? 1 : 0.48;
+        ctx.strokeStyle = '#ffb45f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      if (!visible) continue;
       const team = teamPalette(unit.team);
       ctx.fillStyle = unit.type === 'grunt' ? team.gruntDot : team.eye;
       ctx.fillRect(x0 + unit.x / this.map.worldWidth * size - 2, y0 + unit.y / this.map.worldHeight * size - 2, 4, 4);

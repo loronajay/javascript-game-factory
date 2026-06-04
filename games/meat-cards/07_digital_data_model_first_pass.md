@@ -1,6 +1,6 @@
 # Digital Data Model — First Pass
 
-This is not final implementation. It is a structured first-pass shape based on captured paper rules.
+This document reflects the actual card data and engine shapes as implemented. Update it when new effect families, timings, or targets are introduced by real cards.
 
 ## Card Types
 
@@ -68,10 +68,18 @@ type ActiveMonsterAbility = {
   kind: "activeAbility";
   name: string;
   costStars: number;
-  oncePerTurn: true;
-  targetRule: TargetRule;
+  oncePerTurn?: boolean; // defaults to true in the engine when absent
   effects: EffectDefinition[];
+  choiceOptions?: ChoiceOption[]; // present when the ability offers a player choice
   rulesText: string;
+};
+```
+
+```ts
+type ChoiceOption = {
+  id: string;
+  label: string;
+  effects: EffectDefinition[];
 };
 ```
 
@@ -80,8 +88,6 @@ type MonsterPassive = {
   id: string;
   kind: "passive";
   name: string;
-  activeFromZones: CardZone[];
-  condition?: EffectCondition;
   effects: EffectDefinition[];
   rulesText: string;
 };
@@ -217,15 +223,16 @@ type PendingStarCost = {
 
 ```ts
 type EffectDefinition = {
-  id: string;
   family: EffectFamily;
-  timing: EffectTiming;
-  cost?: EffectCost;
-  target?: TargetRule;
-  rollRule?: RollRule;
+  timing?: EffectTiming;
+  target?: EffectTarget;
   duration?: EffectDuration;
-  payload: Record<string, unknown>;
-  rulesText: string;
+  amount?: number;
+  payload?: Record<string, unknown>;
+  // passive effects that fire after a specific ability use:
+  triggeredByAbilityId?: string;
+  // Big Smac / maxHpChange only — current HP follows max HP increase:
+  currentHpFollowsMaxIncrease?: boolean;
 };
 ```
 
@@ -236,26 +243,44 @@ type RollRule =
   | "cardSpecific";
 ```
 
+## Effect Families
+
+Effect families that are currently scripted in at least one card:
+
 ```ts
 type EffectFamily =
-  | "damage"
+  // Core damage and healing
+  | "damage"                    // deal N damage to target
+  | "heal"                      // restore N HP to target
+  | "maxHpChange"               // change player max HP (currentHpFollowsMaxIncrease flag if HP also rises)
+  | "gainMaxHp"                 // increase monster max HP and current HP by N
+  | "preventHealing"            // while in play, no heals resolve for any target
+  // Stat changes
+  | "strengthChange"            // add N to monster strength; payload.mode controls accessory behavior
+  // Monster removal
+  | "koMonster"                 // knock out target monster with no overflow damage
+  | "conditionalKo"             // knock out target if it meets a condition (payload.condition)
+  | "massKoWithSplashDamage"    // knock out all monsters and deal splash damage to both players
+  | "returnToHand"              // return target monster and its attachments to owner's hand
+  // Summon
+  | "forceSummon"               // force a monster from opponent's hand into play
+  // Restrictions
+  | "restriction"               // prevent a monster from taking a category of actions for N turns
+  | "accessorySlotModification" // change a monster's accessory capacity
+  // Accessory grants
+  | "grantAction";              // while equipped, grant the monster an additional active ability
+```
+
+Effect families known from rules but not yet scripted:
+
+```ts
+type DeferredEffectFamily =
   | "rollRequirement"
   | "rollModification"
-  | "heal"
-  | "statChange"
-  | "maxHpChange"
-  | "strengthChange"
   | "starModification"
   | "draw"
   | "discard"
-  | "summon"
-  | "equip"
-  | "destroy"
-  | "sacrifice"
-  | "deathTrigger"
-  | "restriction"
   | "costModification"
-  | "accessorySlotModification"
   | "attackModification"
   | "overflowModification"
   | "directPlayerDamage"
@@ -266,6 +291,40 @@ type EffectFamily =
   | "lossPrevention"
   | "interrupt";
 ```
+
+## Effect Timings
+
+```ts
+type EffectTiming =
+  | "startOfTurn"          // fires at start of owner's turn (Homie Snacks)
+  | "onAbilityUse"         // fires when the slot's ability is activated
+  | "afterAbilityUse"      // passive that fires after a specific ability (use triggeredByAbilityId)
+  | "onAllyDies"           // passive fires when another allied monster dies
+  | "onSourceDies"         // passive fires when the card itself is knocked out
+  | "afterAttacked"        // passive fires after this monster is attacked
+  | "whileInPlay"          // persistent while the monster is on the board
+  | "whileEquipped"        // persistent while the accessory is attached
+  | "onPlay";              // fires when a Later card is played
+```
+
+## Effect Targets
+
+```ts
+type EffectTarget =
+  | "selfMonster"            // the monster using the ability
+  | "ownerPlayer"            // the player who owns the source card
+  | "selfPlayer"             // the active player playing a Later card
+  | "ownerAlliedMonsters"    // all monsters controlled by the owner
+  | "equippedMonster"        // the monster this accessory is attached to
+  | "enemyMonster"           // an opponent's monster (requires target slot)
+  | "anyMonster"             // any monster on either side (requires target slot)
+  | "attackingEnemyMonster"  // the attacker, used in afterAttacked passives
+  | "opponentHandMonster"    // a card from the opponent's hand
+  | "allMonsters"            // every monster currently in play
+  | "allTargets";            // global — all players and monsters (Lunch Lady)
+```
+
+## Effect Duration
 
 ```ts
 type EffectDuration =
@@ -283,4 +342,52 @@ type EffectDuration =
   | "untilRemovedByEffect";
 ```
 
-This model should stay loose until real card examples are entered.
+## Payload Shapes by Effect Family
+
+These are the payload shapes actually used by scripted cards.
+
+**`strengthChange` on an accessory (`whileEquipped`):**
+```json
+{ "mode": "add", "amount": 2 }
+{ "mode": "setToCurrentMaxHp", "requiresCurrentStrengthGreaterThan": 0 }
+```
+
+**`accessorySlotModification`:**
+```json
+{ "mode": "setCapacity", "capacity": 2 }
+```
+
+**`restriction`:**
+```json
+{ "blockedActionCategory": "offensive", "turns": 1 }
+{ "blockedActionCategory": "specificTarget", "turns": 1 }
+{ "blockedActionCategory": "allActions" }
+```
+
+`specificTarget` blocks attack against the monster that applied the restriction. The engine fills in `blockedTargetPlayerId` and `blockedTargetSlotIndex` at runtime.
+
+**`damage` (afterAttacked, no overflow):**
+```json
+{ "overflowDamage": false }
+```
+
+**`massKoWithSplashDamage`:**
+```json
+{ "splashDamage": 5, "extraDamagePerExtraMonster": 1 }
+```
+
+**`conditionalKo`:**
+```json
+{ "condition": "strengthPlusHpLessThan", "threshold": 6 }
+```
+
+**`grantAction` (accessory grants an ability):**
+```json
+{
+  "actionId": "selfie_stick_ko",
+  "name": "Selfie Stick",
+  "costStars": 3,
+  "oncePerTurn": true,
+  "effects": [{ "family": "koMonster", "target": "selfMonster" }]
+}
+```

@@ -1,12 +1,15 @@
 import { CONFIG } from './config.js';
 import { normalizeRect } from './utils.js';
+import { createAttackDestructibleCommand, createAttackMoveCommand, createAttackUnitCommand, createMoveCommand, createStopCommand } from './commands.js';
 
 export class InputController {
-  constructor(canvas, camera, units, map) {
+  constructor(canvas, camera, units, map, commands, ai = null) {
     this.canvas = canvas;
     this.camera = camera;
     this.units = units;
     this.map = map;
+    this.commands = commands;
+    this.ai = ai;
     this.keys = new Set();
     this.pointer = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
     this.dragStart = null;
@@ -15,7 +18,10 @@ export class InputController {
     this.lastMoveCommand = null;
     this.showFogDebug = false;
     this.showPathDebug = false;
+    this.showMovementDebug = false;
     this.commandState = 'idle';
+    this.pendingCommandMode = null;
+    this.suppressNextPointerUp = false;
     this.install();
   }
 
@@ -30,6 +36,20 @@ export class InputController {
       }
       if (event.key.toLowerCase() === 'f') this.showFogDebug = !this.showFogDebug;
       if (event.key.toLowerCase() === 'p') this.showPathDebug = !this.showPathDebug;
+      if (event.key.toLowerCase() === 'o') this.showMovementDebug = !this.showMovementDebug;
+      if (!event.repeat && event.key.toLowerCase() === 'q') {
+        this.pendingCommandMode = this.pendingCommandMode === 'attackMove' ? null : 'attackMove';
+        this.commandState = this.pendingCommandMode ? 'attack-move armed' : 'idle';
+      }
+      if (!event.repeat && event.key.toLowerCase() === 'b' && this.ai) {
+        const enabled = this.ai.toggle();
+        this.commandState = enabled ? 'AI enabled' : 'AI disabled';
+      }
+      if (event.key.toLowerCase() === 'x') {
+        const result = this.commands.issueLocal(createStopCommand(this.units.selectedUnitIds()));
+        this.pendingCommandMode = null;
+        this.commandState = result.ok ? 'stop issued' : 'no selection';
+      }
     });
     window.addEventListener('keyup', (event) => this.keys.delete(event.key.toLowerCase()));
 
@@ -86,30 +106,39 @@ export class InputController {
     this.updatePointerWorld();
 
     if (event.button === 2) {
+      const selectedIds = this.units.selectedUnitIds();
       const attackableUnit = this.units.hitTestAttackable(this.pointer.worldX, this.pointer.worldY);
       if (attackableUnit) {
-        const issued = this.units.attackSelectedUnit(attackableUnit);
-        if (issued) this.lastMoveCommand = { x: attackableUnit.x, y: attackableUnit.y, ttl: 0.65, kind: 'attack' };
-        this.commandState = issued ? `attack ${attackableUnit.type}` : 'no combat unit selected';
+        const result = this.commands.issueLocal(createAttackUnitCommand(selectedIds, attackableUnit.id));
+        if (result.ok && result.marker) this.lastMoveCommand = { ...result.marker, ttl: 0.65 };
+        this.commandState = result.ok ? `attack ${attackableUnit.type}` : 'no combat unit selected';
         return;
       }
 
       const targetTile = this.map.worldToTile(this.pointer.worldX, this.pointer.worldY);
       if (this.map.isDestructibleTile(targetTile.x, targetTile.y)) {
-        const issued = this.units.attackSelectedDestructible(targetTile.x, targetTile.y);
-        const center = this.map.tileCenter(targetTile.x, targetTile.y);
-        if (issued) this.lastMoveCommand = { x: center.x, y: center.y, ttl: 0.65, kind: 'attack' };
-        this.commandState = issued ? 'attack wall' : 'no combat unit selected';
+        const result = this.commands.issueLocal(createAttackDestructibleCommand(selectedIds, targetTile.x, targetTile.y));
+        if (result.ok && result.marker) this.lastMoveCommand = { ...result.marker, ttl: 0.65 };
+        this.commandState = result.ok ? 'attack wall' : 'no combat unit selected';
         return;
       }
 
-      const issued = this.units.moveSelectedTo(this.pointer.worldX, this.pointer.worldY);
-      if (issued) this.lastMoveCommand = { x: this.pointer.worldX, y: this.pointer.worldY, ttl: 0.55, kind: 'move' };
-      this.commandState = issued ? 'move issued' : 'no selection';
+      const result = this.commands.issueLocal(createMoveCommand(selectedIds, this.pointer.worldX, this.pointer.worldY));
+      if (result.ok && result.marker) this.lastMoveCommand = { ...result.marker, ttl: 0.55 };
+      this.commandState = result.ok ? 'move issued' : 'no selection';
       return;
     }
 
     if (event.button === 0) {
+      if (this.pendingCommandMode === 'attackMove') {
+        const selectedIds = this.units.selectedUnitIds();
+        const result = this.commands.issueLocal(createAttackMoveCommand(selectedIds, this.pointer.worldX, this.pointer.worldY));
+        if (result.ok && result.marker) this.lastMoveCommand = { ...result.marker, ttl: 0.7 };
+        this.pendingCommandMode = null;
+        this.suppressNextPointerUp = true;
+        this.commandState = result.ok ? 'attack-move issued' : 'no combat unit selected';
+        return;
+      }
       this.dragStart = { x: this.pointer.worldX, y: this.pointer.worldY };
       this.dragCurrent = { ...this.dragStart };
       this.selectionDrag = null;
@@ -121,6 +150,13 @@ export class InputController {
     if (!this.pointer.down) return;
     this.pointer.down = false;
     if (event.button !== 0) return;
+    if (this.suppressNextPointerUp) {
+      this.suppressNextPointerUp = false;
+      this.dragStart = null;
+      this.dragCurrent = null;
+      this.selectionDrag = null;
+      return;
+    }
 
     const additive = event.shiftKey;
     if (this.selectionDrag && this.selectionDrag.w > 4 && this.selectionDrag.h > 4) {

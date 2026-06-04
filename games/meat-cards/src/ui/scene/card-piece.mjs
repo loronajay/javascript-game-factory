@@ -38,11 +38,19 @@ export function createCardPiece(card, options = {}) {
 }
 
 export function createCostLine(card) {
-  const costs = [];
-  if (card.summonCostStars !== undefined) costs.push(`Summon: ${card.summonCostStars} star(s)`);
-  if (card.playCostStars !== undefined) costs.push(`Play: ${card.playCostStars} star(s)`);
-  if (card.baseEquipCostStars !== undefined) costs.push(`Equip: ${card.baseEquipCostStars} star(s)`);
-  return el("div", "viewer-costs", costs.length ? costs.join(" | ") : "No star cost");
+  const costs = cardCostItems(card);
+  return el(
+    "div",
+    "viewer-costs",
+    costs.length
+      ? costs.map((cost) =>
+          el("span", "viewer-cost", [
+            el("span", "viewer-cost-label", cost.label),
+            el("span", "viewer-cost-value", cost.value),
+          ]),
+        )
+      : "No cost",
+  );
 }
 
 export function createEffectSlotList(card) {
@@ -53,10 +61,35 @@ export function createEffectSlotList(card) {
       "viewer-slots",
       card.effectSlots.map((slot) =>
         el("div", "viewer-slot", [
-          el("strong", "", `${slot.name} ${slot.kind === "passive" ? "Passive" : `${slot.costStars} star(s)`}`),
-          el("span", "", slot.rulesText),
+          el("div", "viewer-slot-header", [
+            el("strong", "viewer-slot-name", slot.name),
+            el("span", "viewer-slot-meta", formatEffectSlotMeta(slot)),
+          ]),
+          el("span", "viewer-slot-rules", formatRulesText(slot.rulesText)),
         ]),
       ),
     ),
   ];
+}
+
+export function cardCostItems(card) {
+  const costs = [];
+  if (card.summonCostStars !== undefined) costs.push({ label: "Summon", value: formatStarCost(card.summonCostStars) });
+  if (card.playCostStars !== undefined) costs.push({ label: "Play", value: formatStarCost(card.playCostStars) });
+  if (card.baseEquipCostStars !== undefined) {
+    costs.push({ label: "Equip", value: formatStarCost(card.baseEquipCostStars) });
+  }
+  return costs;
+}
+
+export function formatEffectSlotMeta(slot) {
+  return slot.kind === "passive" ? "Passive" : formatStarCost(slot.costStars ?? 0);
+}
+
+export function formatStarCost(count) {
+  return `${count} ★`;
+}
+
+export function formatRulesText(text) {
+  return String(text ?? "").replace(/\b(\d+)\s+star(?:\(s\)|s)?\b/gi, "$1 ★");
 }

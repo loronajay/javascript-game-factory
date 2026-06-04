@@ -11,8 +11,13 @@
   "artZoom": 112,
   "referenceArt": "reference-cards/useless-deck/later/curfew-later.jpg",
   "rulesText": "Return one of your monsters in play to your hand. Remove all damage from it.",
-  "implementationStatus": "textOnly",
+  "implementationStatus": "scripted",
   "playCostStars": 2,
   "lifecycle": "instantToGraveyard",
-  "effects": []
+  "effects": [
+    {
+      "family": "returnToHand",
+      "target": "selfMonster"
+    }
+  ]
 }
