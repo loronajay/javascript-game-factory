@@ -65,6 +65,28 @@ export const ENEMY_TYPES = {
     color: "#ff5f7e",
     shape: "carrier",
     sizeScale: 1.28
+  },
+
+  // Act II enemy types ──────────────────────────────────────────────────────
+
+  // Armored hull — does not fire; soaks shots while active-row teammates shoot.
+  vanguard: {
+    hp: 6,
+    canFire: false,
+    scoreValue: 850,
+    color: "#d4b800",
+    shape: "wide",
+    sizeScale: 1.22
+  },
+
+  // Apex threat — maximum health, fires through all behaviors.
+  titan: {
+    hp: 9,
+    canFire: true,
+    scoreValue: 2000,
+    color: "#ff1133",
+    shape: "carrier",
+    sizeScale: 1.40
   }
 };
 

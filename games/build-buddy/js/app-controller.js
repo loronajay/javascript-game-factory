@@ -13,6 +13,7 @@ import {
   goToModeSelect,
   goToPracticeSelect,
   joinOnlineLobby,
+  localOnlineRole,
   markOnlineReady,
   resetToMainMenu,
   startOnlineSearch,
@@ -130,9 +131,11 @@ export class AppController {
   }
 
   createGame() {
+    const localControlRole = this.state.onlineGameplay ? localOnlineRole(this.state) : 'debug';
     this.game = new Game(this.canvas, {
       initialStageId: this.state.session.currentStageId,
       viewMode: this.state.viewMode,
+      localControlRole,
       onStageClear: (details) => this.submitStageClear(details),
       onStageFailure: (details) => this.submitStageFailure(details.reason, details),
     });
@@ -161,22 +164,7 @@ export class AppController {
   }
 
   localOnlineRole() {
-    const roles = this.state.onlineGameplay?.session
-      ? this.state.onlineGameplay.session.stageIndex % 2 === 0
-        ? {
-          runnerPlayerId: this.state.onlineGameplay.session.players[0].id,
-          builderPlayerId: this.state.onlineGameplay.session.players[1].id,
-        }
-        : {
-          runnerPlayerId: this.state.onlineGameplay.session.players[1].id,
-          builderPlayerId: this.state.onlineGameplay.session.players[0].id,
-        }
-      : null;
-    const localPlayerId = this.state.onlineGameplay?.localPlayerId;
-    if (!roles || !localPlayerId) return '';
-    if (roles.runnerPlayerId === localPlayerId) return 'runner';
-    if (roles.builderPlayerId === localPlayerId) return 'builder';
-    return '';
+    return localOnlineRole(this.state);
   }
 
   sendLocalOnlineCommands() {
@@ -286,7 +274,8 @@ export class AppController {
     this.applyOnce('stage_start', gameplay.lastStageStart, (message) => {
       if (this.state.onlineGameplay?.isHost) return;
       const onlineGameplay = receiveStageStartMessage(this.state.onlineGameplay, message);
-      this.setState({ ...this.state, onlineGameplay, session: onlineGameplay.session });
+      const viewMode = localOnlineRole({ ...this.state, onlineGameplay, session: onlineGameplay.session }) || this.state.viewMode;
+      this.setState({ ...this.state, onlineGameplay, session: onlineGameplay.session, viewMode });
       this.game?.loadStage(message.value.stageId);
     });
     this.applyOnce('runner_input', gameplay.lastRunnerInput, (message) => {
@@ -330,6 +319,7 @@ export class AppController {
         ...this.state,
         session,
         onlineGameplay,
+        viewMode: localOnlineRole({ ...this.state, session, onlineGameplay }) || this.state.viewMode,
         screen: message.value?.phase === 'run_complete' ? APP_SCREENS.RUN_RESULT : this.state.screen,
         runSummary: onlineGameplay.runSummary ?? this.state.runSummary,
       });
@@ -364,7 +354,7 @@ export class AppController {
     this.shellRoot.hidden = this.state.screen === APP_SCREENS.GAMEPLAY;
     this.canvas.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
     this.hudRoot.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
-    this.viewModeControls.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
+    this.viewModeControls.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY || !!this.state.onlineGameplay;
     this.mobileControls.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
 
     if (this.state.screen === APP_SCREENS.MAIN_MENU) this.renderMainMenu();
@@ -482,6 +472,9 @@ export class AppController {
     const players = online?.players?.length ? online.players : [online?.identity].filter(Boolean);
     const readyCount = Object.values(online?.readyByPlayerId ?? {}).filter(Boolean).length;
     const canStart = online?.isOwner && players.length >= 2 && readyCount >= 2;
+    const stageOneRoles = players.length >= 2
+      ? { [players[0].id]: 'Stage 1 Runner', [players[1].id]: 'Stage 1 Builder' }
+      : {};
 
     this.shellRoot.append(
       el('div', { className: 'shell-panel online-panel' }, [
@@ -494,7 +487,12 @@ export class AppController {
         ]),
         el('div', { className: 'player-list' }, players.map((player, index) => el('div', { className: 'player-row' }, [
           el('span', { text: player.displayName || `Player ${index + 1}` }),
-          el('strong', { text: online?.readyByPlayerId?.[player.id] ? 'Ready' : 'Waiting' }),
+          el('strong', {
+            text: [
+              online?.readyByPlayerId?.[player.id] ? 'Ready' : 'Waiting',
+              stageOneRoles[player.id],
+            ].filter(Boolean).join(' - '),
+          }),
         ]))),
         online?.error ? el('p', { className: 'online-error', text: online.error.message }) : el('span'),
         el('div', { className: 'shell-actions' }, [

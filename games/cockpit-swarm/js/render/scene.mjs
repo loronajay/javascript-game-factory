@@ -4,7 +4,7 @@ import {
 } from "../core/constants.mjs";
 import { clamp, lerp, rand } from "../core/math.mjs";
 import { project, projectEnemyBullet } from "../systems/projection.mjs";
-import { getStage } from "../systems/stages.mjs";
+import { getStage, STAGES } from "../systems/stages.mjs";
 import { renderBoss, renderBossHud } from "./boss-scene.mjs";
 import { renderMpLobby, renderMpCountdown, renderMpWorld, renderMpFighting, renderMpResult } from "./mp-scene.mjs";
 import { RenderQuality } from "./quality.mjs";
@@ -167,7 +167,7 @@ function renderMenuScreen(ctx, game, t) {
 
   ctx.font = "500 15px system-ui, sans-serif";
   ctx.fillStyle = "rgba(52, 247, 255, 0.55)";
-  ctx.fillText("SECTOR DEFENSE SYSTEM  ·  5 STAGES", CX, 240);
+  ctx.fillText(`SECTOR DEFENSE SYSTEM  ·  ${STAGES.length} STAGES`, CX, 240);
 
   // Buttons
   for (let i = 0; i < MENU_BTNS.length; i++) {
@@ -350,7 +350,7 @@ function renderEndScreen(ctx, game, t, isGameOver) {
   ctx.textBaseline = "middle";
 
   const stageLabel = isGameOver
-    ? (bossRush ? "BOSS RUSH" : `STAGE ${game.wave.stageIndex + 1} / 5`)
+    ? (bossRush ? "BOSS RUSH" : `STAGE ${game.wave.stageIndex + 1} / ${STAGES.length}`)
     : (bossRush ? "ALL BOSSES DOWN" : "ALL STAGES CLEARED");
 
   drawStatRow(ctx, CX, 370, [

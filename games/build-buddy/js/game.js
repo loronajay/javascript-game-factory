@@ -8,10 +8,32 @@ import { getStageById, getStageSequence } from './stages/stage-registry.js';
 import { normalizeViewMode, VIEW_MODES } from './view-modes.js';
 import { TOOL_DEFS } from './constants.js';
 
+const CONTROL_ROLES = Object.freeze({
+  RUNNER: 'runner',
+  BUILDER: 'builder',
+  DEBUG: 'debug',
+});
+
+const INERT_INPUT = Object.freeze({
+  axisX: () => 0,
+  upHeld: () => false,
+  downHeld: () => false,
+  jumpHeld: () => false,
+  consumeJumpPressed: () => false,
+  consumeReposition: () => false,
+  cameraNudgeX: () => 0,
+});
+
+function normalizeControlRole(value) {
+  if (value === CONTROL_ROLES.RUNNER || value === CONTROL_ROLES.BUILDER) return value;
+  return CONTROL_ROLES.DEBUG;
+}
+
 export class Game {
   constructor(canvas, {
     initialStageId = null,
     viewMode = VIEW_MODES.HYBRID,
+    localControlRole = CONTROL_ROLES.DEBUG,
     onStageClear = null,
     onStageFailure = null,
   } = {}) {
@@ -19,6 +41,7 @@ export class Game {
     this.stageSequence = getStageSequence();
     this.stageIndex = Math.max(0, this.stageSequence.indexOf(initialStageId ?? this.stageSequence[0]));
     this.viewMode = normalizeViewMode(viewMode);
+    this.localControlRole = normalizeControlRole(localControlRole);
     this.onStageClear = onStageClear;
     this.onStageFailure = onStageFailure;
     this.input = new Input(canvas);
@@ -48,8 +71,13 @@ export class Game {
   }
 
   setViewMode(viewMode) {
+    if (this.localControlRole !== CONTROL_ROLES.DEBUG) return;
     this.viewMode = normalizeViewMode(viewMode);
     this.renderer?.setViewMode(this.viewMode);
+  }
+
+  setLocalControlRole(localControlRole) {
+    this.localControlRole = normalizeControlRole(localControlRole);
   }
 
   advanceStage() {
@@ -169,10 +197,13 @@ export class Game {
 
     this.timeRemainingMs = Math.max(0, this.timeRemainingMs - dt * 1000);
     this.elapsedMs += dt * 1000;
-    this.runner.update(dt, this.remoteRunnerInput ?? this.input, this.registry);
+    const runnerInput = this.remoteRunnerInput
+      ?? (this.localControlRole === CONTROL_ROLES.BUILDER ? INERT_INPUT : this.input);
+    const builderInput = this.localControlRole === CONTROL_ROLES.RUNNER ? null : this.input;
+    this.runner.update(dt, runnerInput, this.registry);
     this.registry.markInUse(this.runner);
-    this.camera.update(dt, this.runner, this.input);
-    this.builder.update(dt, this.input, this.camera, this.runner);
+    this.camera.update(dt, this.runner, builderInput ?? INERT_INPUT);
+    if (builderInput) this.builder.update(dt, builderInput, this.camera, this.runner);
 
     if (rectsOverlap(this.runner.rect(), this.stage.goal)) this.endStage('clear');
     if (this.timeRemainingMs <= 0) {

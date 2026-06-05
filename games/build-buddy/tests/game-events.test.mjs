@@ -124,5 +124,31 @@ test("game can drive runner movement from remote runner input", () => {
   assertEqual(game.runner.x > startX, true);
 });
 
+test("online Builder control does not locally drive Runner movement", () => {
+  const game = new Game(createCanvasStub(), {
+    viewMode: VIEW_MODES.BUILDER,
+    localControlRole: "builder",
+  });
+  const startX = game.runner.x;
+  game.input.keys.add("ArrowRight");
+  game.update(1 / 60);
+
+  assertEqual(game.runner.x, startX);
+});
+
+test("online Runner control ignores manual view switching and Builder placement", () => {
+  const game = new Game(createCanvasStub(), {
+    viewMode: VIEW_MODES.RUNNER,
+    localControlRole: "runner",
+  });
+  const before = game.registry.tools.filter((tool) => tool.active).length;
+  game.input.viewModeRequest = VIEW_MODES.HYBRID;
+  game.input.mouse.justClicked = true;
+  game.update(1 / 60);
+
+  assertEqual(game.viewMode, VIEW_MODES.RUNNER);
+  assertEqual(game.registry.tools.filter((tool) => tool.active).length, before);
+});
+
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

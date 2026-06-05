@@ -183,9 +183,18 @@ The current `src/ui/board-renderer.mjs` and `src/ui/game-board.css` can be treat
 - Do not keep a `Start Turn` button.
 - Do not make the battlefield split across distant top/bottom page sections.
 
-## First Implementation Slice
+## Status: Complete
 
-The next chat should start by replacing the board shell with the new scene model.
+The scene architecture and visual overhaul are both shipped.
+
+- `src/ui/scene/` module structure is complete and wired to `game-board-app.mjs`.
+- All absolute-positioned layers are in place: HUD, piles, hand, battlefield, turn, log, overlay.
+- Visual overhaul shipped (2026-06-05): dark tabletop atmosphere, deep green felt with center spotlight, dark semi-transparent HUD panels with per-player color accents and CSS glow animation on active turn, type-colored card headers, gold-on-dark buttons, dark popups throughout, cinematic battle resolution retained.
+- All acceptance criteria below are met.
+
+## First Implementation Slice (archived — done)
+
+This work is complete. Notes preserved for history.
 
 Suggested first slice:
 

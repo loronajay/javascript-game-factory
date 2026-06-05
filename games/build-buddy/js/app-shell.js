@@ -12,6 +12,7 @@ import {
   createDebugSession,
   createLocalRunSession,
   createPracticeSession,
+  getCurrentRoles,
   recordStageClear,
   recordStageFailure,
 } from './session.js';
@@ -89,6 +90,20 @@ function createOnlineState(intent, identity, extra = {}) {
     serverMatchState: null,
     error: null,
   };
+}
+
+export function localOnlineRole(state) {
+  const session = state?.onlineGameplay?.session ?? state?.session;
+  const localPlayerId = state?.onlineGameplay?.localPlayerId ?? state?.online?.identity?.playerId ?? '';
+  if (!session || !localPlayerId) return '';
+  const roles = getCurrentRoles(session);
+  if (roles.runnerPlayerId === localPlayerId) return VIEW_MODES.RUNNER;
+  if (roles.builderPlayerId === localPlayerId) return VIEW_MODES.BUILDER;
+  return '';
+}
+
+export function viewModeForOnlineRole(state) {
+  return localOnlineRole(state) || VIEW_MODES.RUNNER;
 }
 
 function playerFromMember(memberId, profiles, fallbackIndex) {
@@ -221,7 +236,7 @@ export function startOnlineRunFromLobby(state) {
     onlineGameplay: { ...onlineGameplay, session },
     stageResult: null,
     runSummary: null,
-    viewMode: VIEW_MODES.RUNNER,
+    viewMode: viewModeForOnlineRole({ ...state, session, onlineGameplay: { ...onlineGameplay, session } }),
   };
 }
 
@@ -384,6 +399,7 @@ export function continueFromStageResult(state) {
       ...state,
       screen: APP_SCREENS.GAMEPLAY,
       stageResult: null,
+      viewMode: viewModeForOnlineRole(state),
     };
   }
 

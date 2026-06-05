@@ -57,6 +57,55 @@ export const TUNING = {
   hitFreezeMs: 50
 };
 
+// ─── Boss 02 tuning (The Arbiter) ────────────────────────────────────────────
+export const ARBITER_TUNING = {
+  introMs: 2200,
+  transitionMs: 1300,
+  defeatMs: 2600,
+
+  bodyZ: 1.7,
+  bodyY: -130,
+
+  phase1: {
+    hits: 20,
+    chargeMs: 900,
+    fireMs: 220,
+    openMs: 750,
+    resetMs: 500,
+    safeLanes: 1,          // how many safe lanes left uncovered
+    safeHitWindow: 72,     // px from safe lane center to count as dodged
+    coreHitWindow: 60      // px from center to score a core hit
+  },
+
+  phase2: {
+    hits: 22,
+    cannonChargeMs: 1100,
+    cannonFireMs: 250,
+    cannonVulnerableMs: 650,
+    cannonResetMs: 900,
+    rightOffsetMs: 1400,   // right cannon cycle starts this far after the left
+    leftDangerX: -45,      // player.x <= this → in left cannon's kill zone
+    rightDangerX: 45       // player.x >= this → in right cannon's kill zone
+  },
+
+  phase3: {
+    hits: 28,
+    chargeMs: 600,
+    fireMs: 220,
+    openMs: 500,
+    resetMs: 380,
+    safeLanes: 2,
+    safeHitWindow: 72,
+    coreHitWindow: 60,
+    laserChargeMs: 1400,
+    laserLockMs: 480,
+    laserFireMs: 620,
+    laserVulnerableMs: 950,
+    laserCooldownMs: 1300,
+    laserBeamWidth: 65
+  }
+};
+
 // ─── Boss 01 tuning ───────────────────────────────────────────────────────────
 // Hits-to-clear per phase are pre-powerup; splash/rapid naturally shorten them.
 export const BOSS_TUNING = {

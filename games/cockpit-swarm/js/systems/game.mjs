@@ -66,7 +66,8 @@ export function resetGame(game, fromMenu = false, mode = game.mode || "campaign"
 
   game.player.x = 0;
   game.player.speed = 0;
-  game.player.health = game.player.maxHealth;
+  game.player.maxHealth = 3;
+  game.player.health = 3;
   game.player.fireCooldown = 0;
   game.player.muzzleFlash = 0;
   game.player.hurtFlash = 0;
@@ -152,7 +153,18 @@ export function updateGame(game, input, dt, t) {
   updatePowerups(game, dt);
 
   if (game.state === STATE.BOSS) {
-    updateBoss(game, input, dt, t, damagePlayer);
+    updateBoss(game, input, dt, t, damagePlayer, (bossNumber) => {
+      if (game.mode === "campaign") {
+        game.player.maxHealth += 1;
+        game.player.health = Math.min(game.player.health + 1, game.player.maxHealth);
+        const nextStageIndex = bossNumber * BOSS_EVERY;
+        if (hasNextStage(nextStageIndex - 1)) {
+          loadStage(game, nextStageIndex);
+          return;
+        }
+      }
+      game.state = STATE.CLEAR;
+    });
     updatePlayerFire(game, input);
     updateParticles(game, dt);
     return;

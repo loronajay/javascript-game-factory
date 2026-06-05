@@ -1,8 +1,11 @@
-import { CX, RETICLE_Y, BOSS_TUNING } from "../core/constants.mjs";
+import { CX, W, RETICLE_Y, BOSS_TUNING, ARBITER_TUNING, LANES } from "../core/constants.mjs";
 import { clamp, lerp } from "../core/math.mjs";
 import { project } from "../systems/projection.mjs";
-import { getBossLayout, getHandProjection } from "../systems/boss.mjs";
-import { phaseUsesArms, phaseUsesLaser, bossPhaseMax } from "../entities/boss.mjs";
+import { getBossLayout, getHandProjection, getArbiterLayout } from "../systems/boss.mjs";
+import {
+  phaseUsesArms, phaseUsesLaser, bossPhaseMax,
+  phaseUsesVolley, phaseUsesCannons, phaseUsesArbiterLaser
+} from "../entities/boss.mjs";
 
 const BOSS_NAME = "DREADMAW";
 const TAU = Math.PI * 2;
@@ -24,6 +27,11 @@ function lanePlanePoint(laneX, playerX) {
 export function renderBoss(ctx, game, t) {
   const boss = game.boss;
   if (!boss) return;
+
+  if (boss.number === 2) {
+    renderArbiter(ctx, game, t);
+    return;
+  }
 
   const layout = getBossLayout(game);
   const eye = PHASE_EYE[clamp(boss.phase - 1, 0, 2)];
@@ -638,11 +646,12 @@ export function renderBossHud(ctx, game, t) {
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
 
+  const displayName = boss.number === 2 ? "THE ARBITER" : BOSS_NAME;
   ctx.font = "800 22px system-ui, sans-serif";
-  ctx.fillStyle = "#ffd0d8";
-  ctx.shadowColor = "#ff365d";
+  ctx.fillStyle = boss.number === 2 ? "#b0f0ff" : "#ffd0d8";
+  ctx.shadowColor = boss.number === 2 ? "#3af5ff" : "#ff365d";
   ctx.shadowBlur = 10;
-  ctx.fillText(`${BOSS_NAME}`, CX, barY - 6);
+  ctx.fillText(displayName, CX, barY - 6);
   ctx.shadowBlur = 0;
 
   ctx.font = "600 11px system-ui, sans-serif";
@@ -651,7 +660,7 @@ export function renderBossHud(ctx, game, t) {
 
   for (let i = 0; i < 3; i++) {
     const sx = barX + i * (segW + gap);
-    const max = bossPhaseMax(i + 1);
+    const max = bossPhaseMax(boss, i + 1);
     const frac = clamp(boss.hp[i] / max, 0, 1);
     const isCurrent = i === boss.phase - 1;
 
@@ -686,6 +695,367 @@ export function renderBossHud(ctx, game, t) {
     renderBanner(ctx, `PHASE ${boss.phase + 1}`, "", "#ffb347", t);
   } else if (boss.sub === "defeat") {
     renderBanner(ctx, "TARGET DESTROYED", "", "#78ff9d", t);
+  }
+}
+
+// ─── Boss 02: Arbiter render ──────────────────────────────────────────────────
+
+const ARB_BODY    = "#0d1a2c";
+const ARB_MID     = "#182d46";
+const ARB_OUTLINE = "#3af5ff";
+const ARB_ACCENT  = "#1a6aff";
+
+function renderArbiter(ctx, game, t) {
+  const boss = game.boss;
+  const layout = getArbiterLayout(game);
+
+  drawArbiterBody(ctx, boss, layout, t);
+  drawArbiterCannons(ctx, boss, layout, t);
+
+  if (boss.sub === "fighting") {
+    if (phaseUsesVolley(boss)) drawVolleyTelegraph(ctx, game, layout, t);
+    if (phaseUsesVolley(boss) && boss.volley.state === "open") drawArbiterCore(ctx, boss, layout, t);
+    if (phaseUsesArbiterLaser(boss)) renderArbiterLaser(ctx, game, layout, t);
+    if (phaseUsesArbiterLaser(boss) && boss.arbiterLaser.exposed) drawArbiterLaserEmitter(ctx, boss, layout, t);
+  }
+}
+
+function drawArbiterBody(ctx, boss, layout, t) {
+  const { cx, cy, halfW: hw, halfH: hh } = layout;
+  const hit = boss.hitFlashBody > 0;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  ctx.shadowColor = hit ? "#ffffff" : ARB_OUTLINE;
+  ctx.shadowBlur = hit ? 40 : 22;
+
+  const fill = ctx.createLinearGradient(0, -hh, 0, hh * 1.1);
+  fill.addColorStop(0, hit ? "#3a6080" : ARB_MID);
+  fill.addColorStop(0.5, hit ? "#1a3550" : ARB_BODY);
+  fill.addColorStop(1, "#070e18");
+  ctx.fillStyle = fill;
+  arbiterHullPath(ctx, hw, hh);
+  ctx.fill();
+
+  ctx.shadowBlur = hit ? 14 : 7;
+  ctx.shadowColor = hit ? "#ffffff" : ARB_OUTLINE;
+  ctx.strokeStyle = hit ? "#ffffff" : ARB_OUTLINE;
+  ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
+  arbiterHullPath(ctx, hw, hh);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Armor panel lines
+  ctx.strokeStyle = "rgba(50,150,180,0.28)";
+  ctx.lineWidth = 1.5;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(s * hw * 0.18, -hh * 0.7);
+    ctx.lineTo(s * hw * 0.55, hh * 0.0);
+    ctx.lineTo(s * hw * 0.72, hh * 0.55);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s * hw * 0.42, -hh * 0.12);
+    ctx.lineTo(s * hw * 0.85, hh * 0.28);
+    ctx.stroke();
+  }
+
+  // Central reactor pod — pulses brighter each phase
+  const reactorColor = PHASE_EYE[clamp(boss.phase - 1, 0, 2)];
+  const pulse = 0.55 + Math.sin(t * 0.007) * 0.45;
+  const rr = 18 + boss.eyeHeat * 10 + pulse * 8;
+  ctx.shadowColor = reactorColor;
+  ctx.shadowBlur = 18 + pulse * 20;
+  const rg = ctx.createRadialGradient(0, hh * 0.08, 1, 0, hh * 0.08, rr);
+  rg.addColorStop(0, "#ffffff");
+  rg.addColorStop(0.4, reactorColor);
+  rg.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.arc(0, hh * 0.08, rr, 0, TAU);
+  ctx.fill();
+
+  // Sensor visor — a horizontal slit across the upper hull
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = ARB_OUTLINE;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = ARB_OUTLINE;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(-hw * 0.36, -hh * 0.46);
+  ctx.lineTo(hw * 0.36, -hh * 0.46);
+  ctx.stroke();
+  // Visor glow dots
+  for (const s of [-1, -0.5, 0, 0.5, 1]) {
+    ctx.fillStyle = ARB_OUTLINE;
+    ctx.beginPath();
+    ctx.arc(s * hw * 0.28, -hh * 0.46, 3, 0, TAU);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function arbiterHullPath(ctx, hw, hh) {
+  ctx.beginPath();
+  ctx.moveTo(0, -hh * 0.92);
+  ctx.lineTo(hw * 0.22, -hh * 0.52);
+  ctx.lineTo(hw * 0.98, -hh * 0.04);
+  ctx.lineTo(hw * 0.86, hh * 0.38);
+  ctx.lineTo(hw * 0.62, hh * 0.56);
+  ctx.lineTo(hw * 0.28, hh * 0.76);
+  ctx.lineTo(0, hh * 0.88);
+  ctx.lineTo(-hw * 0.28, hh * 0.76);
+  ctx.lineTo(-hw * 0.62, hh * 0.56);
+  ctx.lineTo(-hw * 0.86, hh * 0.38);
+  ctx.lineTo(-hw * 0.98, -hh * 0.04);
+  ctx.lineTo(-hw * 0.22, -hh * 0.52);
+  ctx.closePath();
+}
+
+function drawArbiterCannons(ctx, boss, layout, t) {
+  for (const cannon of boss.cannons) {
+    drawSingleCannon(ctx, boss, cannon, layout, t);
+  }
+}
+
+function drawSingleCannon(ctx, boss, cannon, layout, t) {
+  const pos = cannon.side < 0 ? layout.cannonL : layout.cannonR;
+  const bLen = 68;
+  const bHalf = 11;
+  // Barrel extends further outward from the mount point
+  const mountX = pos.x;
+  const tipX   = pos.x + cannon.side * bLen;
+  const barrelLeft  = Math.min(mountX, tipX);
+  const barrelTop   = pos.y - bHalf;
+
+  const isCharging  = cannon.state === "charging";
+  const isFiring    = cannon.state === "firing";
+  const isVulnerable = cannon.state === "vulnerable";
+  const active      = phaseUsesCannons(boss);
+  const chargeProgress = isCharging
+    ? clamp(1 - cannon.timer / ARBITER_TUNING.phase2.cannonChargeMs, 0, 1)
+    : (isFiring || isVulnerable ? 1 : 0);
+
+  ctx.save();
+
+  // Barrel body
+  ctx.shadowColor = isVulnerable ? "#78ff9d"
+    : (active && (isCharging || isFiring) ? ARB_OUTLINE : "rgba(30,80,120,0.5)");
+  ctx.shadowBlur = isVulnerable ? 18 : (isCharging ? 6 + chargeProgress * 18 : 4);
+  ctx.fillStyle  = isVulnerable ? "#1a4030"
+    : (active && (isCharging || isFiring) ? ARB_MID : "#0a1520");
+  ctx.strokeStyle = isVulnerable ? "#78ff9d"
+    : (active ? ARB_OUTLINE : "rgba(50,120,160,0.4)");
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(barrelLeft, barrelTop, bLen, bHalf * 2, 3);
+  ctx.fill();
+  ctx.stroke();
+
+  // Danger zone overlay during charge/fire (covers the dangerous half of the screen)
+  if (active && (isCharging || isFiring)) {
+    const alpha = isFiring ? 0.5 : chargeProgress * 0.22;
+    ctx.globalAlpha = alpha;
+    const gx0 = cannon.side < 0 ? 0 : W;
+    const gx1 = cannon.side < 0 ? W * 0.5 : W * 0.5;
+    const zoneGrad = ctx.createLinearGradient(gx0, 0, gx1, 0);
+    zoneGrad.addColorStop(0, "rgba(255,30,50,0.85)");
+    zoneGrad.addColorStop(1, "rgba(255,30,50,0)");
+    ctx.fillStyle = zoneGrad;
+    const zx = cannon.side < 0 ? 0 : W * 0.5;
+    ctx.fillRect(zx, RETICLE_Y - 28, W * 0.5, 64);
+    ctx.globalAlpha = 1;
+  }
+
+  // Charge glow at barrel tip
+  if (active && (isCharging || isFiring)) {
+    const gr = 6 + chargeProgress * 16;
+    const gc = ctx.createRadialGradient(tipX, pos.y, 1, tipX, pos.y, gr);
+    gc.addColorStop(0, "#ffffff");
+    gc.addColorStop(0.5, ARB_OUTLINE);
+    gc.addColorStop(1, "rgba(50,200,255,0)");
+    ctx.fillStyle = gc;
+    ctx.shadowColor = ARB_OUTLINE;
+    ctx.shadowBlur = 14 + chargeProgress * 14;
+    ctx.beginPath();
+    ctx.arc(tipX, pos.y, gr, 0, TAU);
+    ctx.fill();
+  }
+
+  // Vulnerable weak spot
+  if (isVulnerable) {
+    const flash = cannon.flash > 0;
+    const pr = 13 + Math.sin(t * 0.016) * 4;
+    ctx.shadowColor = flash ? "#ffffff" : "#78ff9d";
+    ctx.shadowBlur = 18;
+    const wg = ctx.createRadialGradient(tipX, pos.y, 1, tipX, pos.y, pr);
+    wg.addColorStop(0, flash ? "#ffffff" : "#78ff9d");
+    wg.addColorStop(1, "rgba(80,255,120,0)");
+    ctx.fillStyle = wg;
+    ctx.beginPath();
+    ctx.arc(tipX, pos.y, pr, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = flash ? "#ffffff" : WEAK;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tipX, pos.y, pr * 1.9, 0, TAU);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawVolleyTelegraph(ctx, game, layout, t) {
+  const boss = game.boss;
+  const v = boss.volley;
+  if (v.state !== "charging" && v.state !== "firing") return;
+
+  const cfg = boss.phase === 3 ? ARBITER_TUNING.phase3 : ARBITER_TUNING.phase1;
+  const progress = v.state === "firing"
+    ? 1
+    : clamp(1 - v.timer / cfg.chargeMs, 0, 1);
+  const px = game.player.x;
+
+  for (let i = 0; i < 5; i++) {
+    const isSafe = v.safeIndices.includes(i);
+    const pt = lanePlanePoint(LANES[i], px);
+
+    if (isSafe) {
+      ctx.save();
+      ctx.globalAlpha = progress * 0.55;
+      ctx.strokeStyle = "#44ff88";
+      ctx.shadowColor = "#44ff88";
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      drawDiamond(ctx, pt.x, pt.y, 20 + progress * 7);
+      ctx.stroke();
+      ctx.restore();
+    } else if (v.state === "firing") {
+      // Flash beam from boss to player plane
+      const src = project(LANES[i], ARBITER_TUNING.bodyY, ARBITER_TUNING.bodyZ, px);
+      ctx.save();
+      ctx.globalAlpha = 0.82;
+      ctx.strokeStyle = "#ff4466";
+      ctx.shadowColor = "#ff2244";
+      ctx.shadowBlur = 22;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(src.x, src.y);
+      ctx.lineTo(pt.x, pt.y);
+      ctx.stroke();
+      const fl = ctx.createRadialGradient(pt.x, pt.y, 1, pt.x, pt.y, 30);
+      fl.addColorStop(0, "rgba(255,255,255,0.9)");
+      fl.addColorStop(1, "rgba(255,40,60,0)");
+      ctx.fillStyle = fl;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 30, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      // Charging danger diamond — brightens as charge builds
+      ctx.save();
+      ctx.globalAlpha = 0.35 + progress * 0.65;
+      ctx.strokeStyle = "#ff2244";
+      ctx.shadowColor = "#ff2244";
+      ctx.shadowBlur = 8 + progress * 16;
+      ctx.lineWidth = v.state === "firing" ? 3 : 2;
+      ctx.fillStyle = `rgba(255,34,68,${0.1 + progress * 0.2})`;
+      drawDiamond(ctx, pt.x, pt.y, 20 + progress * 12);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function drawDiamond(ctx, x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x + r * 0.62, y);
+  ctx.lineTo(x, y + r);
+  ctx.lineTo(x - r * 0.62, y);
+  ctx.closePath();
+}
+
+function drawArbiterCore(ctx, boss, layout, t) {
+  const { coreX, coreY } = layout;
+  const pulse = 0.6 + Math.sin(t * 0.018) * 0.4;
+  const r = 26 + pulse * 9;
+
+  ctx.save();
+  ctx.shadowColor = WEAK;
+  ctx.shadowBlur = 20 + pulse * 18;
+  const g = ctx.createRadialGradient(coreX, coreY, 1, coreX, coreY, r);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(0.4, WEAK);
+  g.addColorStop(1, "rgba(100,255,120,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(coreX, coreY, r, 0, TAU);
+  ctx.fill();
+
+  ctx.fillStyle = "#1a3010";
+  ctx.beginPath();
+  ctx.arc(coreX, coreY, 7, 0, TAU);
+  ctx.fill();
+
+  ctx.strokeStyle = WEAK;
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  ctx.arc(coreX, coreY, r * 1.55, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawArbiterLaserEmitter(ctx, boss, layout, t) {
+  const { coreX, coreY } = layout;
+  const m = boss.arbiterLaser;
+  const flash = m.flash > 0;
+  const pulse = 0.6 + Math.sin(t * 0.018) * 0.4;
+  const r = 18 + pulse * 7;
+
+  ctx.save();
+  ctx.shadowColor = flash ? "#ffffff" : "#ff8a5a";
+  ctx.shadowBlur = 22;
+  const eg = ctx.createRadialGradient(coreX, coreY, 1, coreX, coreY, r);
+  eg.addColorStop(0, flash ? "#ffffff" : "#ff8a5a");
+  eg.addColorStop(1, "rgba(255,80,40,0)");
+  ctx.fillStyle = eg;
+  ctx.beginPath();
+  ctx.arc(coreX, coreY, r, 0, TAU);
+  ctx.fill();
+
+  ctx.strokeStyle = flash ? "#ffffff" : WEAK;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(coreX, coreY, r * 1.7, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function renderArbiterLaser(ctx, game, layout, t) {
+  const m = game.boss.arbiterLaser;
+  if (m.state === "closed" || m.state === "vulnerable") return;
+
+  const px = game.player.x;
+  const aimX = m.state === "firing" ? m.lockedX : m.targetX;
+  const target = lanePlanePoint(aimX, px);
+  const ox = layout.coreX;
+  const oy = layout.coreY;
+
+  const cfg = ARBITER_TUNING.phase3;
+  if (m.state === "charging") {
+    renderChargeSight(ctx, ox, oy, target, t, false);
+  } else if (m.state === "locked") {
+    renderChargeSight(ctx, ox, oy, target, t, true);
+  } else if (m.state === "firing") {
+    // timer is a countdown; pass elapsed time to renderBeam
+    const elapsed = cfg.laserFireMs - m.timer;
+    renderBeam(ctx, ox, oy, target.x, target.y, elapsed, t);
   }
 }
 

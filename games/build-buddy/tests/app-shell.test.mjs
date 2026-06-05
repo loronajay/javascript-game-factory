@@ -9,6 +9,7 @@ import {
   goToOnlineMenu,
   joinOnlineLobby,
   markOnlineReady,
+  localOnlineRole,
   startOnlineRunFromLobby,
   startOnlineSearch,
   startPrivateLobby,
@@ -240,6 +241,30 @@ test("online lobby can start a host-authoritative online run", () => {
   assertEqual(state.onlineGameplay.isHost, true);
   assertEqual(state.onlineGameplay.authorityPlayerId, "host");
   assertEqual(state.session.currentStageId, "pack_01_stage_01");
+  assertEqual(localOnlineRole(state), "runner");
+  assertEqual(state.viewMode, "runner");
+});
+
+test("online lobby assigns Builder view before gameplay starts for the stage Builder", () => {
+  let state = startPrivateLobby(
+    goToOnlineMenu(createAppShellState({ storage: createMemoryStorage(), stageList })),
+    { playerId: "guest", displayName: "Guest" },
+  );
+  state = applyOnlineClientSnapshot(state, {
+    status: "lobby",
+    clientId: "guest",
+    lobby: { roomCode: "AB12", ownerId: "host", members: ["host", "guest"] },
+    profiles: {
+      host: { playerId: "host", displayName: "Host" },
+      guest: { playerId: "guest", displayName: "Guest" },
+    },
+    readyByPlayerId: { host: true, guest: true },
+  });
+  state = startOnlineRunFromLobby(state);
+
+  assertEqual(state.screen, APP_SCREENS.GAMEPLAY);
+  assertEqual(localOnlineRole(state), "builder");
+  assertEqual(state.viewMode, "builder");
 });
 
 test("online lobby can start a server-authoritative Build Buddy run from match state", () => {
@@ -272,6 +297,8 @@ test("online lobby can start a server-authoritative Build Buddy run from match s
   assertEqual(state.onlineGameplay.isHost, false);
   assertEqual(state.session.currentStageId, "pack_01_stage_02");
   assertEqual(state.session.stageIndex, 1);
+  assertEqual(localOnlineRole(state), "builder");
+  assertEqual(state.viewMode, "builder");
 });
 
 test("guest online run accepts host stage results but cannot submit local results", () => {
@@ -301,6 +328,10 @@ test("guest online run accepts host stage results but cannot submit local result
   assertEqual(state.screen, APP_SCREENS.STAGE_RESULT);
   assertEqual(state.stageResult.outcome, "clear");
   assertEqual(state.session.currentStageId, "pack_01_stage_02");
+  state = continueFromStageResult(state);
+  assertEqual(state.screen, APP_SCREENS.GAMEPLAY);
+  assertEqual(localOnlineRole(state), "runner");
+  assertEqual(state.viewMode, "runner");
 });
 
 test("online run complete and disconnect states return player-facing screens", () => {
