@@ -154,6 +154,16 @@ test("canon clear records a stage result and unlocks that stage for practice", (
   assertEqual(isStageUnlocked(loadProgression(storage), "pack_01", "pack_01_stage_01"), true);
 });
 
+test("canon clear unlocks the next Pack 01 stage for practice", () => {
+  const storage = createMemoryStorage();
+  submitStageClear(
+    startLocalRun(createAppShellState({ storage, stageList })),
+    { elapsedMs: 1200 },
+  );
+
+  assertEqual(isStageUnlocked(loadProgression(storage), "pack_01", "pack_01_stage_02"), true);
+});
+
 test("continuing a non-final stage result advances to the next stage and swaps roles", () => {
   const state = continueFromStageResult(
     submitStageClear(startLocalRun(createAppShellState({ storage: createMemoryStorage(), stageList }))),

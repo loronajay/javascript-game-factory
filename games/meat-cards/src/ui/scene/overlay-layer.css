@@ -6,9 +6,11 @@
 
 .popup-panel {
   pointer-events: auto;
-  border: 3px solid var(--scene-line);
-  background: var(--scene-paper);
-  box-shadow: 8px 8px 0 rgba(33, 29, 23, 0.74);
+  border: 2px solid var(--scene-line);
+  background: rgba(20, 17, 12, 0.97);
+  box-shadow:
+    10px 10px 0 rgba(4, 3, 2, 0.82),
+    0 0 0 1px rgba(255, 248, 220, 0.04);
 }
 
 .popup-header {
@@ -17,10 +19,19 @@
   align-items: center;
   gap: 10px;
   border-bottom: 2px solid var(--scene-line);
-  background: #f1dfbd;
-  padding: 7px 9px;
+  background: rgba(40, 32, 18, 0.98);
+  padding: 7px 10px;
 }
 
+.popup-header h2,
+.popup-header strong {
+  color: var(--scene-gold);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Card viewer popup */
 .card-viewer {
   position: absolute;
   right: 18px;
@@ -41,6 +52,8 @@
   align-items: start;
   overflow: auto;
   padding: 12px;
+  scrollbar-color: rgba(212, 168, 32, 0.3) rgba(4, 3, 2, 0.4);
+  scrollbar-width: thin;
 }
 
 .viewer-card-frame {
@@ -56,6 +69,7 @@
 .viewer-copy h2 {
   margin: 0;
   font-size: 20px;
+  color: var(--scene-ink);
 }
 
 .viewer-type,
@@ -80,13 +94,15 @@
 
 .viewer-cost-value,
 .viewer-slot-meta {
-  color: var(--scene-line);
+  color: var(--scene-ink);
+  opacity: 0.8;
 }
 
 .viewer-rules {
   margin: 0;
   font-size: 14px;
-  line-height: 1.3;
+  line-height: 1.35;
+  color: rgba(240, 232, 216, 0.9);
 }
 
 .viewer-slots {
@@ -96,7 +112,7 @@
 
 .viewer-slot {
   border: 1px solid var(--scene-line);
-  background: #fff4d8;
+  background: rgba(255, 248, 220, 0.05);
   display: grid;
   gap: 2px;
   padding: 5px;
@@ -114,19 +130,22 @@
 .viewer-slot-name {
   min-width: 0;
   font-size: 13px;
+  color: var(--scene-ink);
 }
 
 .viewer-slot-meta {
   border: 1px solid var(--scene-line);
-  background: #fffaf0;
-  padding: 1px 4px;
+  background: rgba(255, 248, 220, 0.08);
+  padding: 1px 5px;
   font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
+  color: var(--scene-muted);
 }
 
 .viewer-slot-rules {
   line-height: 1.25;
+  color: rgba(240, 232, 216, 0.78);
 }
 
 .context-menu {
@@ -134,8 +153,8 @@
   flex-wrap: wrap;
   gap: 8px;
   border-top: 2px solid var(--scene-line);
-  background: #fff7e4;
-  padding: 9px;
+  background: rgba(14, 12, 8, 0.98);
+  padding: 10px;
 }
 
 .context-note {
@@ -144,6 +163,7 @@
   font-weight: 800;
 }
 
+/* Confirmation overlay */
 .pending-confirm {
   position: absolute;
   left: 50%;
@@ -158,10 +178,38 @@
 .pending-confirm.is-blocked {
   border-color: var(--scene-red);
   box-shadow:
-    0 0 0 4px rgba(183, 61, 60, 0.22),
-    8px 8px 0 rgba(33, 29, 23, 0.74);
+    0 0 0 3px rgba(196, 48, 48, 0.2),
+    0 0 24px rgba(196, 48, 48, 0.18),
+    10px 10px 0 rgba(4, 3, 2, 0.82);
 }
 
+.pending-confirm .pending-copy {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--scene-ink);
+}
+
+.pending-warning {
+  border: 2px solid #8a2424;
+  background: rgba(100, 20, 20, 0.6);
+  color: #f09090;
+  font-weight: 900;
+  padding: 9px 10px;
+}
+
+.pending-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 2px solid var(--scene-line);
+  background: rgba(14, 12, 8, 0.98);
+  padding: 10px;
+}
+
+/* Target-selection prompt */
 .target-prompt {
   position: absolute;
   left: 50%;
@@ -172,52 +220,46 @@
   gap: 10px;
   align-items: center;
   transform: translateX(-50%);
-  border-color: var(--scene-gold);
+  border-color: rgba(212, 168, 32, 0.7);
   background:
-    linear-gradient(90deg, rgba(183, 61, 60, 0.12), transparent 34%),
-    #fff7d1;
+    linear-gradient(90deg, rgba(196, 48, 48, 0.1), transparent 30%),
+    rgba(24, 18, 10, 0.96);
   box-shadow:
-    6px 6px 0 rgba(33, 29, 23, 0.62),
-    0 0 0 4px rgba(241, 188, 88, 0.2);
+    6px 6px 0 rgba(4, 3, 2, 0.72),
+    0 0 0 2px rgba(212, 168, 32, 0.16),
+    0 0 20px rgba(212, 168, 32, 0.12);
 }
 
 .target-copy {
   display: grid;
   gap: 3px;
-  padding: 10px 12px;
+  padding: 11px 14px;
   font-size: 14px;
   line-height: 1.25;
+  color: var(--scene-ink);
 }
 
 .target-copy strong {
   font-size: 15px;
+  color: var(--scene-gold);
 }
 
-.pending-confirm .pending-copy {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-  font-size: 14px;
-  line-height: 1.25;
-}
-
-.pending-warning {
-  border: 2px solid var(--scene-red);
-  background: #ffe1dc;
-  color: #7e2020;
+/* Scene-wide notice (error/status bar at top) */
+.scene-notice {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: min(520px, calc(100vw - 36px));
+  transform: translateX(-50%);
+  color: #f07070;
+  font-size: 13px;
   font-weight: 900;
-  padding: 9px 10px;
-}
-
-.pending-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  border-top: 2px solid var(--scene-line);
-  background: #fff7e4;
   padding: 10px;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
+/* Discard / early-end confirms */
 .discard-confirm,
 .early-end-confirm {
   position: absolute;
@@ -233,29 +275,24 @@
   display: grid;
   gap: 7px;
   border-bottom: 2px solid var(--scene-line);
-  background: #fff7e4;
+  background: rgba(20, 17, 12, 0.98);
   padding: 14px;
   font-size: 14px;
   font-weight: 850;
   line-height: 1.25;
+  color: var(--scene-ink);
 }
 
 .cleanup-damage {
-  color: var(--scene-red);
+  color: #f07070;
 }
 
-.scene-notice {
-  position: absolute;
-  left: 50%;
-  top: 18px;
-  width: min(520px, calc(100vw - 36px));
-  transform: translateX(-50%);
-  color: var(--scene-red);
-  font-size: 13px;
-  font-weight: 900;
-  padding: 10px;
-  text-align: center;
-}
+/* ==============================
+   Battle Resolution — cinematic
+   The dim overlay makes the
+   whole screen dark, so the
+   card/die elements stay light
+   ============================== */
 
 .battle-resolution {
   position: absolute;
@@ -270,7 +307,7 @@
 .battle-resolution-dim {
   position: absolute;
   inset: 0;
-  background: rgba(13, 12, 11, 0.76);
+  background: rgba(6, 4, 3, 0.82);
   animation: battle-dim-in 180ms ease-out both;
 }
 
@@ -289,7 +326,7 @@
 .battle-card {
   display: grid;
   gap: 8px;
-  filter: drop-shadow(10px 12px 0 rgba(0, 0, 0, 0.42));
+  filter: drop-shadow(10px 14px 0 rgba(0, 0, 0, 0.56));
 }
 
 .battle-card--attacker {
@@ -309,15 +346,15 @@
 .battle-card-header {
   display: grid;
   gap: 2px;
-  border: 2px solid var(--scene-line);
-  background: #fff7e4;
-  box-shadow: 4px 4px 0 rgba(33, 29, 23, 0.45);
+  border: 2px solid rgba(61, 56, 48, 0.7);
+  background: #f4e8d0;
+  box-shadow: 4px 5px 0 rgba(4, 3, 2, 0.56);
   padding: 6px 8px;
 }
 
 .battle-card-role,
 .battle-card-stats {
-  color: var(--scene-muted);
+  color: rgba(33, 29, 23, 0.62);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
@@ -326,7 +363,7 @@
 .battle-card-name {
   min-width: 0;
   overflow: hidden;
-  color: var(--scene-line);
+  color: #1c1612;
   font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -336,14 +373,16 @@
   display: grid;
   justify-items: center;
   gap: 8px;
-  color: #fff7e4;
+  color: #f0e8d8;
   text-align: center;
 }
 
 .battle-roll-label {
   font-size: 12px;
   font-weight: 900;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--scene-muted);
 }
 
 .battle-die {
@@ -351,11 +390,13 @@
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border: 4px solid #fff7e4;
+  border: 4px solid #f0e8d0;
   border-radius: 8px;
-  background: #f1dfbd;
-  color: var(--scene-line);
-  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.42);
+  background: #e8d8b0;
+  color: #1c1612;
+  box-shadow:
+    6px 7px 0 rgba(0, 0, 0, 0.5),
+    0 0 18px rgba(255, 230, 120, 0.18);
   font-size: 38px;
   font-weight: 950;
   animation: battle-die-roll 860ms steps(6, end) both;
@@ -364,7 +405,7 @@
 .battle-result {
   min-height: 24px;
   border: 2px solid currentColor;
-  background: rgba(255, 247, 228, 0.12);
+  background: rgba(240, 232, 216, 0.1);
   padding: 3px 9px;
   font-size: 16px;
   font-weight: 950;
@@ -373,11 +414,11 @@
 }
 
 .battle-result--hit {
-  color: #f1bc58;
+  color: var(--scene-gold);
 }
 
 .battle-result--miss {
-  color: #fff7e4;
+  color: rgba(240, 232, 216, 0.72);
 }
 
 .battle-target-card-wrap {
@@ -391,8 +432,10 @@
   z-index: 2;
   transform: translate(-50%, -50%);
   border: 3px solid currentColor;
-  background: rgba(255, 247, 228, 0.94);
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.36);
+  background: rgba(20, 16, 10, 0.94);
+  box-shadow:
+    4px 5px 0 rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(212, 168, 32, 0.22);
   padding: 5px 10px;
   font-size: 24px;
   font-weight: 950;
@@ -401,15 +444,16 @@
 }
 
 .battle-float.is-damage {
-  color: var(--scene-red);
+  color: #e84040;
   animation: battle-float-rise 760ms 1620ms ease-out both;
 }
 
 .battle-float.is-miss {
-  color: var(--scene-line);
+  color: rgba(240, 232, 216, 0.72);
   animation: battle-float-rise 760ms 1160ms ease-out both;
 }
 
+/* Keyframes */
 @keyframes battle-dim-in {
   from {
     opacity: 0;
@@ -419,14 +463,14 @@
 @keyframes battle-attacker-enter {
   from {
     opacity: 0;
-    transform: translateX(-42px) scale(0.94);
+    transform: translateX(-48px) scale(0.92);
   }
 }
 
 @keyframes battle-target-enter {
   from {
     opacity: 0;
-    transform: translateX(42px) scale(0.94);
+    transform: translateX(48px) scale(0.92);
   }
 }
 
@@ -435,10 +479,12 @@
     transform: rotate(-18deg) scale(0.78);
     filter: blur(1px);
   }
+
   70% {
-    transform: rotate(380deg) scale(1.08);
+    transform: rotate(380deg) scale(1.1);
     filter: blur(1px);
   }
+
   100% {
     transform: rotate(360deg) scale(1);
     filter: blur(0);
@@ -448,8 +494,9 @@
 @keyframes battle-result-pop {
   from {
     opacity: 0;
-    transform: scale(0.6);
+    transform: scale(0.58);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -461,8 +508,9 @@
   100% {
     transform: translateX(0);
   }
+
   48% {
-    transform: translateX(56px) rotate(2deg) scale(1.04);
+    transform: translateX(60px) rotate(2deg) scale(1.04);
   }
 }
 
@@ -472,23 +520,26 @@
     transform: translateX(0);
     filter: brightness(1);
   }
+
   50% {
     transform: translateX(14px);
-    filter: brightness(1.75);
+    filter: brightness(2.2) saturate(0.4);
   }
 }
 
 @keyframes battle-float-rise {
   0% {
     opacity: 0;
-    transform: translate(-50%, -30%) scale(0.72);
+    transform: translate(-50%, -30%) scale(0.7);
   }
+
   18% {
     opacity: 1;
   }
+
   100% {
     opacity: 1;
-    transform: translate(-50%, -116%) scale(1);
+    transform: translate(-50%, -120%) scale(1);
   }
 }
 

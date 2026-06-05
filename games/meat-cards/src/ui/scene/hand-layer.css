@@ -12,7 +12,7 @@
   min-width: 300px;
   height: 102px;
   align-content: start;
-  opacity: 0.94;
+  opacity: 0.88;
 }
 
 .hand-layer--player {
@@ -28,7 +28,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding: 2px 4px 10px;
-  scrollbar-color: rgba(255, 253, 244, 0.58) rgba(33, 29, 23, 0.3);
+  scrollbar-color: rgba(212, 168, 32, 0.3) rgba(4, 3, 2, 0.5);
   scrollbar-width: thin;
 }
 
@@ -61,12 +61,15 @@
 }
 
 .hand-card-shell:hover {
-  outline: 3px solid var(--scene-gold);
-  transform: translateY(-6px) rotate(-1deg);
+  outline: 2px solid rgba(212, 168, 32, 0.7);
+  transform: translateY(-8px) rotate(-1deg);
   z-index: 2;
+  filter: drop-shadow(0 8px 12px rgba(4, 3, 2, 0.6)) drop-shadow(0 0 10px rgba(212, 168, 32, 0.2));
 }
 
 .hand-card-shell.is-selected {
-  outline: 4px solid var(--scene-green);
-  transform: translateY(-8px);
+  outline: 3px solid var(--scene-green);
+  transform: translateY(-10px);
+  z-index: 3;
+  filter: drop-shadow(0 10px 14px rgba(4, 3, 2, 0.64)) drop-shadow(0 0 14px rgba(58, 136, 80, 0.28));
 }

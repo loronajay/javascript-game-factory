@@ -9,6 +9,7 @@ export const ARCADE_GAME_SLUGS: ReadonlyArray<ArcadeGameSlug> = Object.freeze([
   "illuminauts",
   "sumorai",
   "cockpit-swarm",
+  "build-buddy",
   // slug is the public identity; path is the actual games/ subfolder (umbrella folder differs from game name)
   { slug: "creature-battler", path: "creature-battle" },
 ]);

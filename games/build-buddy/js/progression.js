@@ -71,13 +71,16 @@ export function isStageUnlocked(progression, packId, stageId) {
   return getUnlockedStageIds(progression, packId).includes(stageId);
 }
 
-export function recordCanonStageClear(progression, { packId, stageId, isCanonRun } = {}) {
+export function recordCanonStageClear(progression, { packId, stageId, nextStageId, isCanonRun } = {}) {
   const next = normalizeProgression(progression);
   if (!isCanonRun || !packId || !stageId) return next;
 
   const pack = next.packs[packId] ?? { unlockedStageIds: [] };
+  const stageIdsToUnlock = [stageId];
+  if (typeof nextStageId === 'string' && nextStageId) stageIdsToUnlock.push(nextStageId);
+
   next.packs[packId] = {
-    unlockedStageIds: [...new Set([...pack.unlockedStageIds, stageId])],
+    unlockedStageIds: [...new Set([...pack.unlockedStageIds, ...stageIdsToUnlock])],
   };
   return next;
 }

@@ -1,29 +1,50 @@
+/* Per-player glow color set as a custom property so the shared keyframe works for both */
 .scene-hud {
+  --hud-glow: rgba(212, 168, 32, 0.38);
   left: 16px;
-  width: min(240px, calc(100vw - 32px));
-  min-height: 82px;
+  width: min(256px, calc(100vw - 32px));
+  min-height: 88px;
   display: grid;
-  gap: 6px;
+  gap: 8px;
   align-content: center;
-  border: 3px solid var(--scene-line);
-  background: rgba(255, 248, 232, 0.94);
-  box-shadow: 6px 6px 0 var(--scene-shadow);
-  padding: 8px 10px;
+  border: 2px solid var(--scene-line);
+  background: rgba(20, 17, 12, 0.94);
+  box-shadow:
+    6px 6px 0 var(--scene-shadow),
+    inset 0 1px 0 rgba(255, 248, 220, 0.04);
+  padding: 10px 12px;
 }
 
 .scene-hud--opponent {
   top: 14px;
-  border-color: var(--scene-blue);
+  --hud-glow: rgba(61, 107, 138, 0.48);
+  border-top: 3px solid #3d6b8a;
 }
 
 .scene-hud--player {
   bottom: 104px;
-  border-color: #bd6a31;
+  --hud-glow: rgba(196, 88, 40, 0.5);
+  border-top: 3px solid #c45828;
 }
 
 .scene-hud.is-active-turn {
-  outline: 4px solid var(--scene-gold);
-  animation: active-turn-glow 1400ms ease-in-out infinite alternate;
+  animation: hud-active-pulse 1600ms ease-in-out infinite alternate;
+}
+
+@keyframes hud-active-pulse {
+  from {
+    box-shadow:
+      6px 6px 0 var(--scene-shadow),
+      inset 0 1px 0 rgba(255, 248, 220, 0.04);
+  }
+
+  to {
+    box-shadow:
+      6px 6px 0 var(--scene-shadow),
+      0 0 0 3px var(--hud-glow),
+      0 0 28px var(--hud-glow),
+      inset 0 1px 0 rgba(255, 248, 220, 0.04);
+  }
 }
 
 .scene-hud-name {
@@ -33,6 +54,15 @@
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.scene-hud--opponent .scene-hud-name {
+  color: #8ab4cc;
+}
+
+.scene-hud--player .scene-hud-name {
+  color: #d49068;
 }
 
 .scene-hud-stats {
@@ -43,18 +73,21 @@
 }
 
 .scene-stat {
-  min-width: 72px;
+  min-width: 68px;
   display: grid;
   gap: 1px;
-  border: 2px solid var(--scene-line);
-  background: var(--scene-paper);
-  padding: 4px 6px;
+  border: 1px solid rgba(255, 248, 220, 0.1);
+  background: rgba(255, 248, 220, 0.05);
+  padding: 4px 8px;
 }
 
 .scene-stat-value {
   font-size: 16px;
+  font-weight: 900;
+  color: var(--scene-ink);
 }
 
+/* Card piles */
 .pile-layer {
   left: 16px;
   display: flex;
@@ -75,19 +108,20 @@
   aspect-ratio: 1060 / 1484;
   display: grid;
   place-items: center;
-  border: 3px solid var(--scene-line);
+  border: 2px solid rgba(61, 56, 48, 0.7);
   border-radius: 5px;
   background:
-    linear-gradient(135deg, rgba(85, 114, 143, 0.22) 25%, transparent 25%) 0 0 / 18px 18px,
-    linear-gradient(135deg, transparent 75%, rgba(189, 106, 49, 0.26) 75%) 0 0 / 18px 18px,
-    #efe0c7;
+    linear-gradient(135deg, rgba(85, 114, 143, 0.2) 25%, transparent 25%) 0 0 / 18px 18px,
+    linear-gradient(135deg, transparent 75%, rgba(189, 106, 49, 0.22) 75%) 0 0 / 18px 18px,
+    #28201a;
   box-shadow:
-    5px 5px 0 rgba(33, 29, 23, 0.58),
-    9px 9px 0 rgba(33, 29, 23, 0.3);
+    5px 5px 0 rgba(4, 3, 2, 0.72),
+    9px 9px 0 rgba(4, 3, 2, 0.38);
 }
 
 .card-pile--graveyard {
-  background: #fffdf4;
+  background: #1a1814;
+  opacity: 0.68;
 }
 
 .pile-count {
@@ -98,29 +132,19 @@
   min-height: 26px;
   display: grid;
   place-items: center;
-  border: 2px solid var(--scene-line);
+  border: 2px solid rgba(61, 56, 48, 0.7);
   background: var(--scene-gold);
+  color: #1c1814;
   font-size: 14px;
   font-weight: 900;
 }
 
 .pile-label {
-  border: 2px solid var(--scene-line);
-  background: rgba(255, 250, 240, 0.88);
+  border: 1px solid rgba(61, 56, 48, 0.5);
+  background: rgba(28, 24, 16, 0.9);
+  color: var(--scene-muted);
   padding: 3px 5px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
-}
-
-@keyframes active-turn-glow {
-  from {
-    box-shadow: 6px 6px 0 var(--scene-shadow);
-  }
-
-  to {
-    box-shadow:
-      6px 6px 0 var(--scene-shadow),
-      0 0 0 5px rgba(241, 188, 88, 0.28);
-  }
 }

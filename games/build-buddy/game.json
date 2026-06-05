@@ -1,0 +1,11 @@
+{
+  "title": "Build Buddy",
+  "tagline": "Run the route. Build the way.",
+  "description": "A real-time co-op platformer prototype where one player runs through momentum-heavy stages while the other places platforms, springs, and checkpoints to keep the route alive.",
+  "players": "1-2",
+  "status": "Playable prototype - local runner/builder engine and 10-stage pack structure",
+  "order": 10,
+  "featured": false,
+  "theme": "workshop",
+  "accentColor": "#f5b84b"
+}

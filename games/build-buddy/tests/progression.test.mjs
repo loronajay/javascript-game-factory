@@ -45,15 +45,31 @@ test("canon clears unlock the cleared stage for practice", () => {
   assertEqual(getUnlockedStageIds(progression, "pack_01").includes("pack_01_stage_02"), true);
 });
 
+test("canon clears unlock the next stage when provided", () => {
+  const progression = recordCanonStageClear(
+    loadProgression(createMemoryStorage()),
+    {
+      packId: "pack_01",
+      stageId: "pack_01_stage_01",
+      nextStageId: "pack_01_stage_02",
+      isCanonRun: true,
+    },
+  );
+
+  assertEqual(isStageUnlocked(progression, "pack_01", "pack_01_stage_02"), true);
+});
+
 test("practice and debug clears do not unlock stages", () => {
   let progression = loadProgression(createMemoryStorage());
   progression = recordCanonStageClear(progression, {
     packId: "pack_01",
     stageId: "pack_01_stage_02",
+    nextStageId: "pack_01_stage_03",
     isCanonRun: false,
   });
 
   assertEqual(isStageUnlocked(progression, "pack_01", "pack_01_stage_02"), false);
+  assertEqual(isStageUnlocked(progression, "pack_01", "pack_01_stage_03"), false);
 });
 
 test("progression saves and loads from storage", () => {

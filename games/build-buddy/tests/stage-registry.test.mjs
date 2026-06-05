@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PACK_ID,
   getStageById,
@@ -5,6 +8,9 @@ import {
   listPacks,
   listStages,
 } from "../js/stages/stage-registry.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pack01Dir = join(__dirname, "..", "js", "stages", "packs", "pack-01");
 
 let passed = 0;
 let failed = 0;
@@ -54,6 +60,15 @@ test("pack metadata reports declared and registered stage counts together", () =
   assertEqual(pack.registeredStages, 10);
 });
 
+test("Pack 01 keeps each authored stage in its own stage module", () => {
+  for (let stageNumber = 1; stageNumber <= 10; stageNumber += 1) {
+    const fileName = `pack-01-stage-${String(stageNumber).padStart(2, "0")}.js`;
+    assertEqual(existsSync(join(pack01Dir, fileName)), true, `${fileName} should exist`);
+  }
+
+  assertEqual(existsSync(join(pack01Dir, "pack-01-stage-stubs.js")), false);
+});
+
 test("stage select metadata comes from the registered pack stages", () => {
   const stages = listStages(DEFAULT_PACK_ID);
 
@@ -66,7 +81,7 @@ test("stage select metadata comes from the registered pack stages", () => {
   assertEqual(typeof stages[4].ruleLabel, "string");
 });
 
-test("placeholder stages are full runtime stage records and are cloned on read", () => {
+test("authored stages are full runtime stage records and are cloned on read", () => {
   const stage = getStageById("pack_01_stage_07");
   stage.solids.push({ id: "test_mutation", x: 0, y: 0, w: 1, h: 1 });
   const freshStage = getStageById("pack_01_stage_07");

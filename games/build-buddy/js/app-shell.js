@@ -320,10 +320,12 @@ export function submitStageClear(state, details = {}) {
 
   const session = recordStageClear(state.session, details);
   const result = session.stageResults.find((entry) => entry.stageIndex === session.stageIndex) ?? null;
+  const nextStageId = session.stageSequence[session.stageIndex + 1] ?? null;
   const progression = result
     ? recordCanonStageClear(state.progression, {
       packId: result.packId,
       stageId: result.stageId,
+      nextStageId,
       isCanonRun: session.isCanonRun && session.progressionWritesEnabled,
     })
     : state.progression;
