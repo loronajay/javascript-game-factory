@@ -1,12 +1,18 @@
 # Build Buddy Canon Implementation Scope
 
-Status: planning and handoff scope  
-Date: 2026-06-04  
+Status: Phase 5 Online Gameplay v1 implemented client-side  
+Date: 2026-06-05  
 Repository: `javascript-games/games/build-buddy`
 
 ## Implementation Status
 
 Phase 1 started on 2026-06-04.
+Phase 2 started on 2026-06-04.
+Phase 3 started on 2026-06-04.
+Phase 4 started on 2026-06-04.
+Phase 4.5 stage authoring/readiness pass completed on 2026-06-05.
+
+Current checkpoint: Phase 5 Online Gameplay v1 is implemented client-side on top of the generic Factory Network lobby relay. No `factory-network-server` changes were needed for this slice.
 
 Implemented:
 
@@ -14,13 +20,83 @@ Implemented:
 - `tests/session.test.mjs`
 - `js/progression.js`
 - `tests/progression.test.mjs`
+- `js/app-shell.js`
+- `js/app-controller.js`
+- `js/online-client.js`
+- `tests/online-client.test.mjs`
+- `js/online-gameplay.js`
+- `tests/online-gameplay.test.mjs`
+- `js/stages/stage-authoring.js`
+- `tests/stage-authoring.test.mjs`
+- `js/stages/packs/pack-01/pack-01-stage-stubs.js`
+- `tests/app-shell.test.mjs`
+- `tests/game-events.test.mjs`
+- `tests/stage-registry.test.mjs`
+- Browser shell wiring in `index.html`, `css/style.css`, `js/main.js`, and `js/game.js`
 
 Verified:
 
 - `node .\tests\session.test.mjs`
 - `node .\tests\progression.test.mjs`
+- `node .\tests\app-shell.test.mjs`
+- `node .\tests\game-events.test.mjs`
+- `node .\tests\stage-registry.test.mjs`
+- `node .\tests\online-client.test.mjs`
+- `node .\tests\online-gameplay.test.mjs`
+- `node .\tests\stage-authoring.test.mjs`
 - `node --check .\js\session.js`
 - `node --check .\js\progression.js`
+- `node --check .\js\app-shell.js`
+- `node --check .\js\app-controller.js`
+- `node --check .\js\game.js`
+- `node --check .\js\online-client.js`
+- `node --check .\js\online-gameplay.js`
+
+GDD reconciliation note:
+
+- The Phase 1 session model was rechecked against `BUILD_BUDDY_GDD.md` Sections 1-6, 30-33, and 35.
+- Stage result records now use the GDD result shape more closely: `outcome: "clear" | "fail"`, `failReason: "timer"`, Runner/Builder player ids, `runnerDeaths`, `runnerRepositions`, `toolUseCount`, checkpoint usage/reward fields, final stage time, and Builder rule snapshots.
+- Timer failure data should use `failReason: "timer"`; UI can display that as `Time Up` / `Stage Failed - Time Up`.
+
+Phase 2 notes:
+
+- The app now starts at a shell menu instead of constructing `Game` directly.
+- Local Co-op Run, Practice, and Debug Lab are owned by `js/app-shell.js`.
+- `Game` remains a single-stage runtime and reports clear/failure events upward.
+- Timer expiry now reports a `timer` stage failure to the shell; `js/session.js` preserves `timer` as the canonical failure reason.
+- Debug Lab remains non-canon and launches in hybrid view.
+- Practice stage select uses persisted progression unlocks.
+
+Phase 3 notes:
+
+- Pack 01 now registers a complete 10-stage sequence through `js/stages/packs/pack-01/pack-01-manifest.js`.
+- Stages 02-10 are authored-baseline runtime stages generated from compact blueprints in `js/stages/packs/pack-01/pack-01-stage-stubs.js`.
+- `js/stages/stage-authoring.js` provides a first-pass stage authoring engine: route beats compile into runtime stage records, Builder rule presets keep restrictions data-driven, and pack catalogs are compiled in stage-number order.
+- Stage registry tests verify the 10-stage sequence, pack metadata counts, stage-select metadata, cloned runtime stage reads, and distinct authored archetypes/rule variety across stages 02-10.
+
+Phase 4 notes:
+
+- `js/online-client.js` implements the Build Buddy client side of the Factory Network lobby protocol.
+- Public search, private lobby create/join, room code normalization, owner/player/ready state, and Factory-owned identity passing are covered by `tests/online-client.test.mjs`.
+- Build Buddy still does not own long-term identity or custom auth.
+
+Phase 4.5 notes:
+
+- Added a full real-Pack-01 app-shell test that drives all 10 stages with mixed clear/timer-fail outcomes.
+- The full-run test verifies stage advancement, role swapping after every result, timer failure records, and a 10-result run summary.
+- The stage catalog is now suitable for Phase 5 sync testing without requiring final polished stage content.
+
+Phase 5 notes:
+
+- Added `js/online-gameplay.js` as the first host-authoritative gameplay sync contract.
+- The contract serializes `stage_start`, `runner_input`, `builder_command`, `state_sync`, `stage_result`, and `run_complete` relay payloads.
+- Host-only local result recording is enforced by reducer tests; guest clients reject local result writes and reject stage results from non-authority senders.
+- Authoritative clear and timer-fail results advance the online session and preserve role swapping across the real 10-stage sequence shape.
+- `js/online-client.js` now normalizes outgoing Runner input, Builder commands, and state snapshots through the gameplay contract, and retains incoming stage/state/result/run relay payloads in snapshots for the app layer.
+- `js/app-shell.js` can start online gameplay from a ready lobby, apply host stage results/run-complete messages, and route disconnects back to the online lobby.
+- `js/game.js` exposes runtime sync hooks for host snapshots, guest snapshot application, remote Runner input, and remote Builder commands.
+- `js/app-controller.js` wires lobby start into online gameplay, sends host stage starts/results/state snapshots, sends guest Runner/Builder relay commands, applies host snapshots/results/run-complete messages, and handles disconnect fallback.
+- Phase 5 uses the existing generic Factory Network lobby relay; no server repo changes were required.
 
 ## Purpose
 
@@ -33,7 +109,7 @@ Build Buddy is not greenfield. It already has:
 - A pack/stage registry model in `js/stages/`.
 - Fixed timestep game loop in `js/main.js`.
 - Local view modes: Runner, Builder, Hybrid debug.
-- One registered stage: `pack_01_stage_01`.
+- Pack 01 registered as a 10-stage run structure, with Stage 01 authored and Stages 02-10 authored-baseline blueprint stages.
 
 The next work should turn the engine baseline into a game-shaped shell with canon session flow, then online co-op using existing Factory Network patterns, then polish and production features.
 
@@ -474,6 +550,8 @@ Pings should be lightweight commands over the same online message layer.
 
 ### Phase 0: Documentation and Audit
 
+Status: Complete.
+
 Deliverables:
 
 - This scope document.
@@ -484,12 +562,14 @@ No code behavior changes required.
 
 ### Phase 1: Pure Session and Progression
 
+Status: Complete.
+
 Deliverables:
 
 - `js/session.js`
-- `js/session.test.js`
+- `tests/session.test.mjs`
 - `js/progression.js`
-- `js/progression.test.js`
+- `tests/progression.test.mjs`
 
 Done when:
 
@@ -499,6 +579,8 @@ Done when:
 - Practice/debug progression isolation is tested.
 
 ### Phase 2: Canon Shell v1
+
+Status: Complete.
 
 Deliverables:
 
@@ -518,18 +600,24 @@ Done when:
 
 ### Phase 3: Stage Pack Expansion Baseline
 
+Status: Complete.
+
 Deliverables:
 
-- Enough stage slots/stubs to support a 10-stage run structure.
+- Enough stage slots/authored baselines to support a 10-stage run structure.
 - Pack manifests stay the canonical stage registry.
 - Stage select reads from pack/stage metadata.
+- Compact stage authoring blueprints compile to runtime stage records.
 
 Done when:
 
-- The run layer can represent 10 stages even if later stages are simple placeholders.
+- The run layer can represent 10 stages even if later stages are authored baselines rather than final content.
 - No hardcoded single-stage imports return to `game.js`.
+- Stage authoring is easy enough to grow a larger catalog without hand-maintaining huge stage objects.
 
 ### Phase 4: Online Lobby
+
+Status: Complete for Phase 5 entry.
 
 Deliverables:
 
@@ -545,7 +633,28 @@ Done when:
 - Lobby messages can exchange profile/ready state.
 - No custom auth layer exists in Build Buddy.
 
+### Phase 4.5: Full-Run and Stage Authoring Readiness
+
+Status: Complete.
+
+Deliverables:
+
+- Stage authoring helper for compact blueprints and Builder rule presets.
+- Pack 01 stages 02-10 converted from generic generated stubs to distinct authored-baseline archetypes.
+- Full 10-stage shell test using the real Pack 01 registry.
+- Mixed clear/timer-fail flow coverage.
+
+Done when:
+
+- Pack 01 can run through all 10 registered stages.
+- Clear and timer failure both advance to the next stage.
+- Roles swap after every result.
+- Final run summary contains 10 stage results.
+- The stage data is ready for online sync testing even though final stage polish remains a later content pass.
+
 ### Phase 5: Online Gameplay v1
+
+Status: Complete for client-side v1.
 
 Deliverables:
 
@@ -599,7 +708,7 @@ When resuming after context clear:
 2. Read `BUILD_BUDDY_GDD.md`.
 3. Read this document.
 4. Inspect current `git status --short`.
-5. Check whether Phase 1 files already exist before creating new ones.
+5. Treat Phase 5 as the next implementation phase unless newer notes say otherwise.
 6. Follow TDD for implementation phases.
 7. Do not touch unrelated dirty files outside `games/build-buddy`.
 
@@ -618,20 +727,23 @@ Important constraints:
 
 - Should practice unlock only cleared stages, or also the next stage after a clear?
 - Should Local Co-op Run support two local names before gameplay?
-- Should Pack 01 later stages be placeholders early, or should run mode stop at registered stages until content exists?
 - Should online public search auto-start when two players join, or require both players to ready?
 - Should online authority always be lobby owner, or always server join order client 1?
 - How much guest-side prediction is required when guest is Runner?
 - Should public matchmaking voice default off until moderation/reporting exists?
 
+Resolved for Phase 5 entry:
+
+- Pack 01 uses authored-baseline blueprints for stages 02-10; final stage polish remains a later content pass.
+
 ## Immediate Next Recommendation
 
-Start Phase 1:
+Start Phase 5: Online Gameplay v1.
 
-1. Write `js/session.test.js`.
-2. Implement `js/session.js`.
-3. Write `js/progression.test.js`.
-4. Implement `js/progression.js`.
-5. Run the Node test commands.
+Recommended first slice:
 
-After Phase 1 is passing, wire the menu shell around the tested session model.
+1. Define the online gameplay message contract for `stage_start`, Runner input, Builder commands, host snapshots, `stage_result`, and `run_complete`.
+2. Add tests for host-only stage result authority and guest result rejection.
+3. Start from a single-stage online runtime sync, but keep the real 10-stage Pack 01 sequence in the tests.
+4. Verify both clear and timer failure advance the online session and swap roles.
+5. Keep `Game` as the single-stage runtime; put online authority, serialization, and session advancement outside it.

@@ -116,21 +116,63 @@ export function getCurrentRoles(session) {
 }
 
 function normalizeFailureReason(reason) {
-  if (reason === 'timer' || reason === 'timeout') return 'time_up';
-  return typeof reason === 'string' && reason ? reason : 'failure';
+  if (reason === 'timer' || reason === 'timeout' || reason === 'time_up') return 'timer';
+  return typeof reason === 'string' && reason ? reason : 'softlock';
+}
+
+function normalizeCount(value) {
+  return Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0;
+}
+
+function normalizeMs(value) {
+  return Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : null;
+}
+
+function cloneObject(value) {
+  return value && typeof value === 'object' ? clone(value) : {};
+}
+
+function checkpointUnusedRewardMs(outcome, checkpointUsedForRespawn, explicitReward) {
+  if (outcome !== 'clear') return 0;
+  if (checkpointUsedForRespawn) return 0;
+  return Number.isFinite(Number(explicitReward)) ? Math.max(0, Number(explicitReward)) : 10000;
+}
+
+function finalStageTimeMs(outcome, timeClearedMs, rewardMs) {
+  if (outcome !== 'clear' || timeClearedMs == null) return null;
+  return Math.max(0, timeClearedMs - rewardMs);
 }
 
 function buildStageResult(session, outcome, details = {}) {
+  const roles = getCurrentRoles(session);
+  const timeClearedMs = outcome === 'clear'
+    ? normalizeMs(details.timeClearedMs ?? details.elapsedMs)
+    : null;
+  const usedCheckpoint = details.checkpointUsedForRespawn === true;
+  const rewardMs = checkpointUnusedRewardMs(outcome, usedCheckpoint, details.checkpointUnusedRewardMs);
   return {
     packId: session.packId,
     stageId: session.currentStageId,
     stageIndex: session.stageIndex,
-    roles: getCurrentRoles(session),
+    runnerPlayerId: roles.runnerPlayerId,
+    builderPlayerId: roles.builderPlayerId,
     outcome,
-    reason: outcome === 'failure' ? normalizeFailureReason(details.reason) : null,
-    elapsedMs: Number.isFinite(Number(details.elapsedMs)) ? Number(details.elapsedMs) : null,
-    deaths: Number.isFinite(Number(details.deaths)) ? Math.max(0, Math.floor(Number(details.deaths))) : 0,
-    toolsPlaced: Number.isFinite(Number(details.toolsPlaced)) ? Math.max(0, Math.floor(Number(details.toolsPlaced))) : 0,
+    failReason: outcome === 'fail' ? normalizeFailureReason(details.reason) : null,
+    timeLimitMs: normalizeMs(details.timeLimitMs),
+    timeClearedMs,
+    checkpointUnusedRewardMs: rewardMs,
+    finalStageTimeMs: finalStageTimeMs(outcome, timeClearedMs, rewardMs),
+    runnerDeaths: normalizeCount(details.runnerDeaths ?? details.deaths),
+    runnerRepositions: normalizeCount(details.runnerRepositions),
+    toolUseCount: normalizeCount(details.toolUseCount ?? details.toolsPlaced),
+    checkpointPlaced: details.checkpointPlaced === true,
+    checkpointActivated: details.checkpointActivated === true,
+    checkpointUsedForRespawn: usedCheckpoint,
+    builderRuleId: typeof details.builderRuleId === 'string' && details.builderRuleId ? details.builderRuleId : 'standard',
+    builderRuleLabel: typeof details.builderRuleLabel === 'string' && details.builderRuleLabel ? details.builderRuleLabel : 'Standard build rules',
+    totalActiveToolCap: Number.isFinite(Number(details.totalActiveToolCap)) ? Math.max(0, Math.floor(Number(details.totalActiveToolCap))) : null,
+    activeCapsSnapshot: cloneObject(details.activeCapsSnapshot),
+    enabledToolsSnapshot: cloneObject(details.enabledToolsSnapshot),
   };
 }
 
@@ -149,7 +191,7 @@ export function recordStageClear(session, details = {}) {
 }
 
 export function recordStageFailure(session, reason = 'failure', details = {}) {
-  return recordStageResult(session, 'failure', { ...details, reason });
+  return recordStageResult(session, 'fail', { ...details, reason });
 }
 
 export function advanceSession(session) {
@@ -176,7 +218,7 @@ export function shouldUnlockStage(session, stageId) {
 export function buildRunSummary(session) {
   const results = Array.isArray(session?.stageResults) ? clone(session.stageResults) : [];
   const clearedStages = results.filter((result) => result.outcome === 'clear').length;
-  const failedStages = results.filter((result) => result.outcome === 'failure').length;
+  const failedStages = results.filter((result) => result.outcome === 'fail').length;
   return {
     mode: session?.mode ?? null,
     packId: session?.packId ?? null,

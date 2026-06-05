@@ -53,7 +53,21 @@ test("local canon run starts at stage one with Player A as Runner", () => {
 test("roles swap after stage clear", () => {
   const cleared = recordStageClear(
     createLocalRunSession({ packId: "pack_01", stageSequence, players }),
-    { elapsedMs: 42000, deaths: 1, toolsPlaced: 4 },
+    {
+      timeLimitMs: 90000,
+      timeClearedMs: 42000,
+      runnerDeaths: 1,
+      runnerRepositions: 1,
+      toolUseCount: 4,
+      checkpointPlaced: true,
+      checkpointActivated: true,
+      checkpointUsedForRespawn: false,
+      builderRuleId: "standard",
+      builderRuleLabel: "Standard build rules",
+      totalActiveToolCap: 20,
+      activeCapsSnapshot: { platform: 5 },
+      enabledToolsSnapshot: { platform: true },
+    },
   );
   const advanced = advanceSession(cleared);
 
@@ -62,29 +76,38 @@ test("roles swap after stage clear", () => {
   assertEqual(getCurrentRoles(advanced).builderPlayerId, "player_a");
   assertEqual(advanced.stageResults[0].outcome, "clear");
   assertEqual(advanced.stageResults[0].stageId, "pack_01_stage_01");
+  assertEqual(advanced.stageResults[0].runnerPlayerId, "player_a");
+  assertEqual(advanced.stageResults[0].builderPlayerId, "player_b");
+  assertEqual(advanced.stageResults[0].runnerDeaths, 1);
+  assertEqual(advanced.stageResults[0].runnerRepositions, 1);
+  assertEqual(advanced.stageResults[0].toolUseCount, 4);
+  assertEqual(advanced.stageResults[0].checkpointUnusedRewardMs, 10000);
+  assertEqual(advanced.stageResults[0].finalStageTimeMs, 32000);
+  assertEqual(advanced.stageResults[0].builderRuleId, "standard");
 });
 
 test("failed stages still advance and swap roles", () => {
   const failedSession = recordStageFailure(
     createLocalRunSession({ packId: "pack_01", stageSequence, players }),
-    "time_up",
-    { elapsedMs: 300000, deaths: 2, toolsPlaced: 8 },
+    "timer",
+    { timeLimitMs: 300000, runnerDeaths: 2, toolUseCount: 8 },
   );
   const advanced = advanceSession(failedSession);
 
   assertEqual(advanced.currentStageId, "pack_01_stage_02");
   assertEqual(getCurrentRoles(advanced).runnerPlayerId, "player_b");
-  assertEqual(advanced.stageResults[0].outcome, "failure");
-  assertEqual(advanced.stageResults[0].reason, "time_up");
+  assertEqual(advanced.stageResults[0].outcome, "fail");
+  assertEqual(advanced.stageResults[0].failReason, "timer");
+  assertEqual(advanced.stageResults[0].finalStageTimeMs, null);
 });
 
-test("timeout is recorded as time_up instead of a runner death label", () => {
+test("timeout is recorded as timer instead of a runner death label", () => {
   const session = recordStageFailure(
     createLocalRunSession({ packId: "pack_01", stageSequence, players }),
-    "timer",
+    "time_up",
   );
 
-  assertEqual(session.stageResults[0].reason, "time_up");
+  assertEqual(session.stageResults[0].failReason, "timer");
 });
 
 test("practice and debug sessions are non-canon and do not unlock stages", () => {

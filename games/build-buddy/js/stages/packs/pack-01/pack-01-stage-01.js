@@ -9,7 +9,7 @@ export const pack01Stage01 = {
   start: { x: 220, y: 1240 },
   fallbackCheckpoint: { x: 220, y: 1240 },
   deathY: 1840,
-  timerMs: 300000,
+  timerMs: 60000,
 
   // Stage-specific Builder rule layer. Future stages can override these values
   // without changing Builder validation code.
