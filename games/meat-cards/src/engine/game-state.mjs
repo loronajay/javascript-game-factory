@@ -251,6 +251,13 @@ function applyLaterCardEffects(state, playerId, card, target) {
         applySimpleCardEffects(nextState.players[playerId], { effects: [effect] }),
       );
     }
+    if (effect.family === "damage" && effect.target === "opponentPlayer") {
+      return replacePlayer(
+        nextState,
+        target.targetPlayerId,
+        damagePlayer(nextState.players[target.targetPlayerId], effect.amount ?? 0),
+      );
+    }
     if (effect.family === "returnToHand" && effect.target === "selfMonster") {
       return returnMonsterToHand(nextState, target.targetPlayerId, target.targetSlotIndex);
     }
@@ -321,6 +328,18 @@ function validateLaterTargets(state, playerId, card, target) {
     }
     if (target.targetPlayerId === playerId) throw new Error("Later card must target an enemy monster.");
     requireMonsterSlot(requirePlayer(state, target.targetPlayerId), target.targetSlotIndex);
+  }
+
+  const needsOpponentPlayer = (card.effects ?? []).some((effect) => effect.target === "opponentPlayer");
+  if (needsOpponentPlayer) {
+    if (target.targetPlayerId === undefined) {
+      throw new Error("An opponent player target is required.");
+    }
+    if (target.targetPlayerId === playerId) throw new Error("Later card must target the opponent player.");
+    if (target.targetSlotIndex !== null && target.targetSlotIndex !== undefined) {
+      throw new Error("Player-target Later cards should not include a monster slot.");
+    }
+    requirePlayer(state, target.targetPlayerId);
   }
 
   const needsSelfMonster = (card.effects ?? []).some(

@@ -51,6 +51,13 @@ export function createGameState() {
 
     boss: null,
 
+    runner: {
+      spawnCooldownMs: 30000,
+      active: null,
+      killMessageTimer: 0,
+      killMessage: ""
+    },
+
     // ── Multiplayer state ──
     mp: {
       // Lobby

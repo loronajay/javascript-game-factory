@@ -63,6 +63,28 @@ test("attack resolution preview makes misses obvious without lowering target hp"
   assert.equal(resolution.target.card.currentHp, 4);
 });
 
+test("attack resolution preview supports direct player targets", () => {
+  const resolution = createAttackResolution(directPlayerState(), cardsById, {
+    attackerPlayerId: "p1",
+    attackerSlotIndex: 0,
+    targetPlayerId: "p2",
+    targetSlotIndex: null,
+    roll: 6,
+  });
+
+  assert.equal(resolution.hit, true);
+  assert.equal(resolution.damage, 4);
+  assert.equal(resolution.floatText, "-4 HP");
+  assert.equal(resolution.target.kind, "player");
+  assert.equal(resolution.target.playerId, "p2");
+  assert.equal(resolution.target.slotIndex, null);
+  assert.equal(resolution.target.beforeHp, 20);
+  assert.equal(resolution.target.afterHp, 16);
+  assert.equal(resolution.target.card.type, "player");
+  assert.equal(resolution.target.card.name, "Player Two");
+  assert.equal(resolution.target.card.currentHp, 16);
+});
+
 test("attack resolution preparation rejects offensive restrictions before animation starts", () => {
   const state = playableState({
     attackerOverrides: {
@@ -135,6 +157,22 @@ function testState() {
             attachments: [],
           },
         ],
+      },
+    },
+  };
+}
+
+function directPlayerState() {
+  const state = testState();
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      p2: {
+        ...state.players.p2,
+        currentHp: 20,
+        maxHp: 20,
+        monsterSlots: [null, null, null, null],
       },
     },
   };

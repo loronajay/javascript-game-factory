@@ -24,6 +24,7 @@ function playerView(player, cardsById, isCurrentPlayer, handRevealed = false) {
     starsSpent: player.stars.spent,
     starsRemaining: player.stars.available - player.stars.spent,
     finalCleanupStarted: player.finalCleanupStarted ?? false,
+    turnsStarted: player.turnsStarted,
     deckCount: player.deck.length,
     graveyardCount: player.graveyard.length,
     hand: player.hand.map((cardInstance) =>

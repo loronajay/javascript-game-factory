@@ -18,12 +18,12 @@ function createGameScene(scene, handlers) {
   const stage = el("section", "game-stage", { "aria-label": "Meat Cards game scene" });
   stage.append(
     el("div", "table-background"),
-    createHudLayer(scene.huds.opponent, "opponent"),
+    createHudLayer(scene.huds.opponent, "opponent", handlers),
     createPileLayer(scene.piles.opponent, "opponent"),
     createHandLayer(scene.opponentHand, handlers),
     createBattlefieldLayer(scene.battlefield, handlers),
     createTurnLayer(scene, handlers),
-    createHudLayer(scene.huds.player, "player"),
+    createHudLayer(scene.huds.player, "player", handlers),
     createPileLayer(scene.piles.player, "player"),
     createHandLayer(scene.playerHand, handlers),
     createLogLayer(scene.log),

@@ -633,6 +633,14 @@ function tryDamageArbiter(game) {
       scoreArbiterHit(game);
       return true;
     }
+    // Phase 1 wing cores at lane ±90 — additional targets so the player doesn't
+    // need to be at dead center to deal damage during the open window.
+    if (boss.phase === 1) {
+      if (Math.abs(px - LANES[1]) <= cfg.wingHitWindow || Math.abs(px - LANES[3]) <= cfg.wingHitWindow) {
+        scoreArbiterHit(game);
+        return true;
+      }
+    }
   }
 
   // Cannon vulnerable window (Phase 2)

@@ -51,6 +51,22 @@ export function initAudio() {
   sfxBossHit    = makePool('assets/big-beam.wav', 3);
 }
 
+let _runnerLoop = null;
+
+export function sfxRunnerStart() {
+  if (_runnerLoop) return;
+  _runnerLoop = new Audio('assets/passerby-enemy.wav');
+  _runnerLoop.loop = true;
+  _runnerLoop.volume = 0.42;
+  _runnerLoop.play().catch(() => {});
+}
+
+export function sfxRunnerStop() {
+  if (!_runnerLoop) return;
+  _runnerLoop.pause();
+  _runnerLoop = null;
+}
+
 export function startMenuMusic() {
   stopGameMusic();
   if (_menu && _menu.paused) {

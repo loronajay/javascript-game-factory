@@ -89,6 +89,7 @@ export function renderGame(ctx, game, t) {
 
   if (game.state === STATE.BOSS) {
     renderBoss(ctx, game, t);
+    renderRunners(ctx, game, t);
     renderPlayerFire(ctx, game);
     renderParticles(ctx, game);
     renderCockpit(ctx, game, t);
@@ -101,6 +102,7 @@ export function renderGame(ctx, game, t) {
   } else {
     renderPowerups(ctx, game, t);
     renderEnemies(ctx, game);
+    renderRunners(ctx, game, t);
     renderEnemyBullets(ctx, game);
     renderPlayerFire(ctx, game);
     renderParticles(ctx, game);
@@ -112,6 +114,8 @@ export function renderGame(ctx, game, t) {
   }
 
   ctx.restore(); // end shake transform here — overlays render shake-free
+
+  renderRunnerKillMessage(ctx, game);
 
   if (game.state === STATE.STAGE_CLEAR) {
     const next = game.wave.stageIndex + 2;
@@ -1009,7 +1013,9 @@ function renderEnemyBullets(ctx, game) {
     const wobbleX = Math.sin(b.age * 0.008 + b.wobble) * (1 - closeness) * 8;
     const x = p.x + wobbleX;
     const y = p.y;
-    const r = TUNING.enemyBulletBaseSize * p.s * lerp(0.85, 1.45, closeness);
+    const bColor = b.isRunnerBullet ? "#ff9900" : "#ff365d";
+    const bScale = b.isRunnerBullet ? 1.65 : 1;
+    const r = TUNING.enemyBulletBaseSize * p.s * lerp(0.85, 1.45, closeness) * bScale;
 
     ctx.save();
 
@@ -1019,10 +1025,10 @@ function renderEnemyBullets(ctx, game) {
     b.z = oldZ;
 
     ctx.globalAlpha = clamp(0.20 + closeness * 0.48, 0.20, 0.78);
-    ctx.strokeStyle = "#ff365d";
+    ctx.strokeStyle = bColor;
     ctx.lineWidth = Math.max(2, r * 0.10);
     ctx.shadowBlur = 16 + closeness * 26;
-    ctx.shadowColor = "#ff365d";
+    ctx.shadowColor = bColor;
     ctx.beginPath();
     ctx.moveTo(tail.x, tail.y);
     ctx.lineTo(x, y);
@@ -1030,15 +1036,18 @@ function renderEnemyBullets(ctx, game) {
 
     ctx.globalAlpha = clamp(0.38 + closeness, 0.38, 1);
     ctx.shadowBlur = 16 + closeness * 36;
-    ctx.shadowColor = "#ff365d";
+    ctx.shadowColor = bColor;
 
-    ctx.strokeStyle = "#ff365d";
+    ctx.strokeStyle = bColor;
     ctx.lineWidth = Math.max(2, r * 0.18);
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = closeness > 0.68 ? "rgba(255, 54, 93, 0.38)" : "rgba(255, 54, 93, 0.18)";
+    const fillA = closeness > 0.68 ? "0.38" : "0.18";
+    ctx.fillStyle = b.isRunnerBullet
+      ? `rgba(255, 153, 0, ${fillA})`
+      : `rgba(255, 54, 93, ${fillA})`;
     ctx.beginPath();
     ctx.arc(x, y, r * 0.44, 0, Math.PI * 2);
     ctx.fill();
@@ -1047,7 +1056,7 @@ function renderEnemyBullets(ctx, game) {
       ctx.globalAlpha = 0.18 + closeness * 0.36;
       ctx.beginPath();
       ctx.arc(CX, RETICLE_Y, TUNING.playerHitWindow, 0, Math.PI * 2);
-      ctx.strokeStyle = "#ff365d";
+      ctx.strokeStyle = bColor;
       ctx.lineWidth = 2;
       ctx.stroke();
     }
@@ -1092,6 +1101,114 @@ function renderPlayerFire(ctx, game) {
 }
 
 // ─── Particles ────────────────────────────────────────────────────────────────
+
+// ─── Runner enemy ─────────────────────────────────────────────────────────────
+
+function renderRunners(ctx, game, t) {
+  const runner = game.runner.active;
+  if (!runner) return;
+
+  const p = project(runner.x, runner.y, runner.z, game.player.x);
+  if (p.x < -100 || p.x > W + 100) return;
+
+  const size    = 36 * p.s;
+  const w       = size * 0.85;
+  const h       = size * 0.42;
+  const dir     = runner.vx > 0 ? 1 : -1;
+  const pulse   = 1 + Math.sin(runner.pulse * 0.006) * 0.07;
+  const isFlash = runner.hitFlash > 0;
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(pulse, pulse);
+
+  // Body glow
+  ctx.shadowBlur  = 28 + Math.sin(runner.pulse * 0.004) * 10;
+  ctx.shadowColor = runner.color;
+
+  // Wing silhouette — horizontal arrowhead pointing in travel direction
+  ctx.beginPath();
+  ctx.moveTo(dir * w,          0);        // nose
+  ctx.lineTo(dir * -w * 0.22, -h);        // top wing tip
+  ctx.lineTo(dir * -w * 0.68,  0);        // tail
+  ctx.lineTo(dir * -w * 0.22,  h);        // bottom wing tip
+  ctx.closePath();
+
+  ctx.fillStyle   = isFlash ? "#ffffff" : "rgba(8, 18, 28, 0.84)";
+  ctx.fill();
+  ctx.strokeStyle = isFlash ? "#ffffff" : runner.color;
+  ctx.lineWidth   = Math.max(1.5, size * 0.065);
+  ctx.stroke();
+
+  // Engine glow at tail
+  if (!isFlash) {
+    const enginePulse = 0.55 + Math.sin(runner.pulse * 0.012) * 0.35;
+    ctx.globalAlpha   = enginePulse;
+    ctx.shadowBlur    = 14;
+    ctx.fillStyle     = runner.color;
+    ctx.beginPath();
+    ctx.arc(dir * -w * 0.68, 0, size * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.shadowBlur = 0;
+
+  // HP pip bar (7 dots below the body)
+  const pipR       = Math.max(3, size * 0.115);
+  const pipSpacing = pipR * 2.6;
+  const pipTotalW  = (runner.maxHp - 1) * pipSpacing;
+  const pipY       = h + pipR + Math.max(4, size * 0.18);
+
+  for (let i = 0; i < runner.maxHp; i++) {
+    const px = -pipTotalW * 0.5 + i * pipSpacing;
+    ctx.beginPath();
+    ctx.arc(px, pipY, pipR, 0, Math.PI * 2);
+    if (i < runner.hp) {
+      ctx.fillStyle   = runner.color;
+      ctx.globalAlpha = 0.9;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = runner.color;
+      ctx.lineWidth   = 1;
+      ctx.globalAlpha = 0.28;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Label chip above
+  const labelSize = Math.max(10, size * 0.28);
+  const labelY    = -(h + Math.max(6, size * 0.26));
+  ctx.font         = `700 ${labelSize}px system-ui, sans-serif`;
+  ctx.textAlign    = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle    = runner.color;
+  ctx.globalAlpha  = 0.82 + Math.sin(runner.pulse * 0.007) * 0.18;
+  ctx.fillText(runner.label, 0, labelY);
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+function renderRunnerKillMessage(ctx, game) {
+  const r = game.runner;
+  if (r.killMessageTimer <= 0 || !r.killMessage) return;
+
+  const alpha = Math.min(1, r.killMessageTimer / 380);
+  const color = r.killMessage === "JACKPOT!" ? "#ff2244" : "#44ff88";
+
+  ctx.save();
+  ctx.globalAlpha      = alpha;
+  ctx.textAlign        = "center";
+  ctx.textBaseline     = "middle";
+  ctx.font             = "900 66px system-ui, sans-serif";
+  ctx.shadowColor      = color;
+  ctx.shadowBlur       = 36;
+  ctx.fillStyle        = color;
+  ctx.fillText(r.killMessage, CX, H * 0.21);
+  ctx.restore();
+}
 
 function renderParticles(ctx, game) {
   for (const p of game.explosions) {

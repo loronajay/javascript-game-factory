@@ -715,6 +715,7 @@ function renderArbiter(ctx, game, t) {
   if (boss.sub === "fighting") {
     if (phaseUsesVolley(boss)) drawVolleyTelegraph(ctx, game, layout, t);
     if (phaseUsesVolley(boss) && boss.volley.state === "open") drawArbiterCore(ctx, boss, layout, t);
+    if (boss.phase === 1 && boss.volley.state === "open") drawArbiterWingCores(ctx, game, layout, t);
     if (phaseUsesArbiterLaser(boss)) renderArbiterLaser(ctx, game, layout, t);
     if (phaseUsesArbiterLaser(boss) && boss.arbiterLaser.exposed) drawArbiterLaserEmitter(ctx, boss, layout, t);
   }
@@ -921,7 +922,7 @@ function drawVolleyTelegraph(ctx, game, layout, t) {
 
   for (let i = 0; i < 5; i++) {
     const isSafe = v.safeIndices.includes(i);
-    const pt = lanePlanePoint(LANES[i], px);
+    const pt = project(LANES[i], 55, ARBITER_TUNING.volleyDiamondZ, px);
 
     if (isSafe) {
       ctx.save();
@@ -1009,6 +1010,45 @@ function drawArbiterCore(ctx, boss, layout, t) {
   ctx.arc(coreX, coreY, r * 1.55, 0, TAU);
   ctx.stroke();
   ctx.restore();
+}
+
+// Phase 1 wing cores — two additional shootable targets at lane ±90 so the player
+// doesn't have to scroll all the way to center to deal damage during the open window.
+function drawArbiterWingCores(ctx, game, layout, t) {
+  const px = game.player.x;
+  const pulse = 0.6 + Math.sin(t * 0.018) * 0.4;
+  const r = 18 + pulse * 6;
+
+  for (const laneX of [LANES[1], LANES[3]]) {
+    const pt = project(laneX, ARBITER_TUNING.bodyY, ARBITER_TUNING.bodyZ, px);
+    const wx = pt.x;
+    const wy = pt.y + game.boss.bob + layout.halfH * 0.08;
+
+    ctx.save();
+    ctx.shadowColor = WEAK;
+    ctx.shadowBlur = 16 + pulse * 14;
+    const g = ctx.createRadialGradient(wx, wy, 1, wx, wy, r);
+    g.addColorStop(0, "#ffffff");
+    g.addColorStop(0.4, WEAK);
+    g.addColorStop(1, "rgba(100,255,120,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(wx, wy, r, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = "#1a3010";
+    ctx.beginPath();
+    ctx.arc(wx, wy, 5, 0, TAU);
+    ctx.fill();
+
+    ctx.strokeStyle = WEAK;
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.arc(wx, wy, r * 1.55, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawArbiterLaserEmitter(ctx, boss, layout, t) {

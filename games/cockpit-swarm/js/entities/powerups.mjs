@@ -12,7 +12,7 @@ export const POWERUP_TYPES = {
   splashShot: {
     id: "splashShot",
     label: "SPLASH",
-    charges: 3,
+    charges: 10,
     color: "#4db7ff",
     shape: "triple"
   },

@@ -1,3 +1,6 @@
+const PLAYER_IDLE_AVATAR_SRC = "player-avatars/idle.png";
+const PLAYER_HURT_AVATAR_SRC = "player-avatars/hurt.png";
+
 export function buildSceneLayout(view, uiState = {}) {
   const currentPlayer = view.players.find((player) => player.id === view.currentPlayerId);
   const opponentPlayer = view.players.find((player) => player.id !== view.currentPlayerId);
@@ -8,8 +11,8 @@ export function buildSceneLayout(view, uiState = {}) {
     currentPlayer,
     opponentPlayer,
     huds: {
-      opponent: hudView(opponentPlayer),
-      player: hudView(currentPlayer),
+      opponent: hudView(opponentPlayer, battlefieldInteraction),
+      player: hudView(currentPlayer, battlefieldInteraction),
     },
     piles: {
       opponent: pileViews(opponentPlayer),
@@ -26,7 +29,7 @@ export function buildSceneLayout(view, uiState = {}) {
     playerHand: handView(currentPlayer, "player"),
     turn: {
       playerName: view.currentPlayerName,
-      pendingActionLabel: uiState.pendingAction ? pendingActionLabel(uiState.pendingAction) : "",
+      pendingActionLabel: uiState.pendingAction ? pendingActionLabel(uiState.pendingAction, battlefieldInteraction) : "",
     },
     log: view.log,
     overlays: {
@@ -45,7 +48,7 @@ export function buildSceneLayout(view, uiState = {}) {
   };
 }
 
-function hudView(player) {
+function hudView(player, battlefieldInteraction) {
   return {
     id: player.id,
     name: player.name,
@@ -55,6 +58,23 @@ function hudView(player) {
     starsRemaining: player.starsRemaining,
     deckCount: player.deckCount,
     graveyardCount: player.graveyardCount,
+    playerTarget: playerTargetView(player, battlefieldInteraction),
+  };
+}
+
+function playerTargetView(player, battlefieldInteraction) {
+  const isValidTarget = (battlefieldInteraction.validPlayerTargets ?? []).some(
+    (target) => target.playerId === player.id,
+  );
+  const isTargeted = battlefieldInteraction.targetedPlayer?.playerId === player.id;
+  return {
+    playerId: player.id,
+    idleSrc: PLAYER_IDLE_AVATAR_SRC,
+    hurtSrc: PLAYER_HURT_AVATAR_SRC,
+    isValidTarget,
+    isTargeted,
+    actionCue: isValidTarget ? battlefieldInteraction.playerActionCue : "",
+    ariaLabel: playerTargetAriaLabel(player, battlefieldInteraction, { isValidTarget, isTargeted }),
   };
 }
 
@@ -125,16 +145,18 @@ function selectedCardView(selected, currentPlayerId, currentPlayer, cleanupMode)
   const starsRemaining = currentPlayer?.starsRemaining ?? 0;
   const isHandLimitCleanup = cleanupMode === "handLimit";
   const actionsLocked = Boolean(cleanupMode || currentPlayer?.finalCleanupStarted);
+  const isSetupTurn = currentPlayer?.turnsStarted === 1;
   const canDiscard = isOwnHandCard && (starsRemaining > 0 || isHandLimitCleanup);
   const canAttack =
     isOwnSelection &&
     selected.source === "monster" &&
     !actionsLocked &&
+    !isSetupTurn &&
     !selected.card.hasAttackedThisTurn &&
     !isOffensiveActionBlocked(selected.card);
   const availableAbilities =
     isOwnSelection && selected.source === "monster" && !actionsLocked
-      ? buildAvailableAbilities(selected.card, starsRemaining)
+      ? buildAvailableAbilities(selected.card, starsRemaining, { isSetupTurn })
       : [];
   return {
     ...selected,
@@ -145,15 +167,20 @@ function selectedCardView(selected, currentPlayerId, currentPlayer, cleanupMode)
     canDiscard,
     canAttack,
     availableAbilities,
-    actionBlockedDetail: selected.source === "monster" && isOffensiveActionBlocked(selected.card)
-      ? "This monster is blocked from offensive actions."
-      : "",
+    actionBlockedDetail: actionBlockedDetail(selected, isSetupTurn),
     discardLabel: canDiscard ? "Discard" : "",
     discardDetail: "",
   };
 }
 
-function buildAvailableAbilities(card, starsRemaining) {
+function actionBlockedDetail(selected, isSetupTurn) {
+  if (selected.source !== "monster") return "";
+  if (isSetupTurn) return "Offensive actions are not allowed during setup turn.";
+  if (isOffensiveActionBlocked(selected.card)) return "This monster is blocked from offensive actions.";
+  return "";
+}
+
+function buildAvailableAbilities(card, starsRemaining, { isSetupTurn = false } = {}) {
   const abilities = [];
   const abilityUses = card.abilityUses ?? {};
 
@@ -169,7 +196,7 @@ function buildAvailableAbilities(card, starsRemaining) {
     const requiresPitchTargeting = (slot.effects ?? []).some(
       (e) => e.family === "forceSummon" && e.target === "opponentHandMonster",
     );
-    const isBlocked = (card.actionRestrictions ?? []).some(
+    const isBlocked = (isSetupTurn && isOffensiveAbility(slot)) || (card.actionRestrictions ?? []).some(
       (r) => r.blockedActionCategory === "allActions",
     );
 
@@ -220,7 +247,7 @@ function buildAvailableAbilities(card, starsRemaining) {
       costStars: action.costStars ?? 0,
       alreadyUsed,
       canAfford,
-      isBlocked: allActionsBlocked,
+      isBlocked: allActionsBlocked || (isSetupTurn && isOffensiveAbility(action)),
       requiresEnemyMonsterTarget: false,
       requiresAnyMonsterTarget: false,
       requiresPitchTargeting: false,
@@ -228,6 +255,14 @@ function buildAvailableAbilities(card, starsRemaining) {
   }
 
   return abilities;
+}
+
+function isOffensiveAbility(ability) {
+  const effects = [...(ability.effects ?? [])];
+  for (const option of ability.choiceOptions ?? []) {
+    effects.push(...(option.effects ?? []));
+  }
+  return effects.some((effect) => ["enemyMonster", "anyMonster"].includes(effect.target));
 }
 
 function battlefieldInteractionView(view, uiState) {
@@ -245,8 +280,11 @@ function battlefieldInteractionView(view, uiState) {
       validTargetSlotIndexes: [],
       validEmptyTargets: null,
       allValidTargets: null,
+      validPlayerTargets: [],
+      playerActionCue: "",
       selectedMonster,
       targetedMonster: null,
+      targetedPlayer: null,
     };
   }
 
@@ -260,8 +298,11 @@ function battlefieldInteractionView(view, uiState) {
       validTargetSlotIndexes: [],
       validEmptyTargets: null,
       allValidTargets: null,
+      validPlayerTargets: [],
+      playerActionCue: "",
       selectedMonster: { playerId: pendingAction.playerId, slotIndex: pendingAction.monsterSlotIndex },
       targetedMonster: null,
+      targetedPlayer: null,
     };
   }
 
@@ -282,31 +323,43 @@ function battlefieldInteractionView(view, uiState) {
       validTargetSlotIndexes: [],
       validEmptyTargets,
       allValidTargets: null,
+      validPlayerTargets: [],
+      playerActionCue: "",
       selectedMonster: { playerId: pendingAction.playerId, slotIndex: pendingAction.monsterSlotIndex },
       targetedMonster,
+      targetedPlayer: null,
     };
   }
 
   if (pendingAction.type === "attack" || isEnemyTargetedAction(pendingAction)) {
     const targetPlayerId = view.players.find((player) => player.id !== view.currentPlayerId)?.id ?? null;
     const targetedMonster = targetedMonsterView(pendingAction);
+    const slotTargets = filledSlotIndexes(view, targetPlayerId);
+    const directPlayerTargetAvailable =
+      pendingAction.type === "attack" ? slotTargets.length === 0 : pendingAction.requiresOpponentPlayerTarget === true;
+    const targetedPlayer = directPlayerTargetAvailable ? targetedPlayerView(pendingAction) : null;
     return {
       mode: pendingAction.type,
-      statusLabel: targetedMonster
+      statusLabel: targetedMonster || targetedPlayer
         ? pendingAction.type === "attack"
           ? "Confirm Attack"
           : "Confirm Action"
-        : "Choose Target",
-      cancelActionLabel: targetedMonster ? "" : pendingCancelLabel(pendingAction),
-      actionCue: pendingAction.type === "attack" ? "Attack Target" : "Target",
+        : directPlayerTargetAvailable
+          ? "Choose Player Target"
+          : "Choose Target",
+      cancelActionLabel: targetedMonster || targetedPlayer ? "" : pendingCancelLabel(pendingAction),
+      actionCue: pendingAction.type === "attack" ? "Attack Target" : actionCueForPendingAction(pendingAction),
       targetPlayerId,
-      validTargetSlotIndexes: filledSlotIndexes(view, targetPlayerId),
+      validTargetSlotIndexes: directPlayerTargetAvailable ? [] : slotTargets,
       validEmptyTargets: null,
       allValidTargets: null,
+      validPlayerTargets: directPlayerTargetAvailable && targetPlayerId ? [{ playerId: targetPlayerId }] : [],
+      playerActionCue: pendingAction.type === "attack" ? "Direct Attack" : "Target Player",
       selectedMonster: pendingAction.type === "ability"
         ? { playerId: pendingAction.playerId, slotIndex: pendingAction.monsterSlotIndex }
         : { playerId: pendingAction.attackerPlayerId, slotIndex: pendingAction.attackerSlotIndex },
       targetedMonster,
+      targetedPlayer,
     };
   }
 
@@ -324,8 +377,11 @@ function battlefieldInteractionView(view, uiState) {
       validTargetSlotIndexes: [],
       validEmptyTargets: null,
       allValidTargets,
+      validPlayerTargets: [],
+      playerActionCue: "",
       selectedMonster: { playerId: pendingAction.playerId, slotIndex: pendingAction.monsterSlotIndex },
       targetedMonster,
+      targetedPlayer: null,
     };
   }
 
@@ -343,13 +399,16 @@ function battlefieldInteractionView(view, uiState) {
       mode: pendingAction.type === "equip" ? "equip" : "later",
       statusLabel: chosenTarget ? "Confirm Action" : "Choose Your Monster",
       cancelActionLabel: chosenTarget ? "" : pendingCancelLabel(pendingAction),
-      actionCue: "Target Here",
+      actionCue: actionCueForPendingAction(pendingAction),
       targetPlayerId: view.currentPlayerId,
       validTargetSlotIndexes: filledSlotIndexes(view, view.currentPlayerId),
       validEmptyTargets: null,
       allValidTargets: null,
+      validPlayerTargets: [],
+      playerActionCue: "",
       selectedMonster,
       targetedMonster,
+      targetedPlayer: null,
     };
   }
 
@@ -362,8 +421,11 @@ function battlefieldInteractionView(view, uiState) {
     validTargetSlotIndexes: [],
     validEmptyTargets: null,
     allValidTargets: null,
+    validPlayerTargets: [],
+    playerActionCue: "",
     selectedMonster,
     targetedMonster: null,
+    targetedPlayer: null,
   };
 }
 
@@ -377,6 +439,7 @@ function pendingCancelLabel(pendingAction) {
 
 function isEnemyTargetedAction(pendingAction) {
   if (pendingAction.type === "later" && pendingAction.requiresEnemyMonsterTarget) return true;
+  if (pendingAction.type === "later" && pendingAction.requiresOpponentPlayerTarget) return true;
   if (pendingAction.type === "ability" && pendingAction.requiresEnemyMonsterTarget) return true;
   return false;
 }
@@ -387,7 +450,13 @@ function isOwnMonsterTargetedAction(pendingAction) {
 
 function targetedMonsterView(pendingAction) {
   if (pendingAction.targetPlayerId === undefined || pendingAction.targetSlotIndex === undefined) return null;
+  if (pendingAction.targetSlotIndex === null) return null;
   return { playerId: pendingAction.targetPlayerId, slotIndex: pendingAction.targetSlotIndex };
+}
+
+function targetedPlayerView(pendingAction) {
+  if (pendingAction.targetPlayerId === undefined || pendingAction.targetSlotIndex !== null) return null;
+  return { playerId: pendingAction.targetPlayerId };
 }
 
 function filledSlotIndexes(view, playerId) {
@@ -406,6 +475,19 @@ function slotAriaLabel(monster, battlefieldInteraction, slotState) {
   if (slotState.isValidTarget && battlefieldInteraction.mode === "equip") return `Equip ${summary}`;
   if (slotState.isValidTarget) return `Target ${summary}`;
   return `Inspect ${summary}`;
+}
+
+function playerTargetAriaLabel(player, battlefieldInteraction, targetState) {
+  const hpSummary = `${player.hpLabel} HP`;
+  if (targetState.isTargeted && battlefieldInteraction.mode === "attack") {
+    return `Selected direct attack on ${player.name}, ${hpSummary}`;
+  }
+  if (targetState.isTargeted) return `Selected ${player.name}, ${hpSummary}`;
+  if (targetState.isValidTarget && battlefieldInteraction.mode === "attack") {
+    return `Attack ${player.name} directly, ${hpSummary}`;
+  }
+  if (targetState.isValidTarget) return `Target ${player.name}, ${hpSummary}`;
+  return `Inspect ${player.name}, ${hpSummary}`;
 }
 
 function monsterStatusSummary(monster) {
@@ -454,18 +536,24 @@ function earlyEndConfirmView(confirm) {
   };
 }
 
-export function pendingActionLabel(pendingAction) {
+export function pendingActionLabel(pendingAction, battlefieldInteraction = {}) {
   if (pendingAction.type === "equip") {
     return pendingAction.monsterSlotIndex === undefined
       ? "Choose one of your monsters to equip."
       : "Confirm accessory equip.";
   }
   if (pendingAction.type === "attack") {
-    return pendingAction.targetPlayerId === undefined ? "Choose an enemy monster to attack." : "Confirm attack roll.";
+    if (pendingAction.targetPlayerId === undefined) {
+      return (battlefieldInteraction.validPlayerTargets ?? []).length > 0
+        ? "Choose the enemy player to attack."
+        : "Choose an enemy monster to attack.";
+    }
+    return pendingAction.targetSlotIndex === null ? "Confirm direct attack roll." : "Confirm attack roll.";
   }
   if (pendingAction.type === "summon") return "Confirm battlefield placement.";
   if (pendingAction.type === "later") {
     if (pendingAction.requiresEnemyMonsterTarget && pendingAction.targetPlayerId === undefined) return "Choose an enemy monster.";
+    if (pendingAction.requiresOpponentPlayerTarget && pendingAction.targetPlayerId === undefined) return "Choose the enemy player.";
     if (pendingAction.requiresOwnMonsterTarget && pendingAction.targetPlayerId === undefined) return "Choose one of your monsters.";
     return "Confirm Later card.";
   }
@@ -491,7 +579,7 @@ function isPendingActionTargetReady(pendingAction) {
   if (pendingAction.type === "attack") return pendingAction.targetPlayerId !== undefined;
   if (pendingAction.type === "equip") return pendingAction.monsterSlotIndex !== undefined;
   if (pendingAction.type === "later") {
-    if (pendingAction.requiresEnemyMonsterTarget || pendingAction.requiresOwnMonsterTarget) {
+    if (pendingAction.requiresEnemyMonsterTarget || pendingAction.requiresOwnMonsterTarget || pendingAction.requiresOpponentPlayerTarget) {
       return pendingAction.targetPlayerId !== undefined;
     }
   }
@@ -520,6 +608,9 @@ export function pendingActionDetail(pendingAction, options = {}) {
     if ((pendingAction.requiresEnemyMonsterTarget || pendingAction.requiresOwnMonsterTarget) && pendingAction.targetPlayerId === undefined) {
       return `Choose a target monster. This will spend ${starText(cost)}.${resourceSuffix}`;
     }
+    if (pendingAction.requiresOpponentPlayerTarget && pendingAction.targetPlayerId === undefined) {
+      return `Choose the enemy player. This will spend ${starText(cost)}.${resourceSuffix}`;
+    }
     return `This will spend ${starText(cost)} and move the Later card to the graveyard after resolving.${resourceSuffix}`;
   }
   if (pendingAction.type === "equip" && pendingAction.monsterSlotIndex === undefined) {
@@ -529,7 +620,9 @@ export function pendingActionDetail(pendingAction, options = {}) {
     return `This will spend ${starText(cost)} and attach the accessory.${resourceSuffix}`;
   }
   if (pendingAction.type === "attack" && pendingAction.targetPlayerId === undefined) {
-    return `Choose an enemy monster. This will spend ${starText(cost)}.${resourceSuffix}`;
+    return pendingAction.canTargetOpponentPlayer
+      ? `Choose the enemy player. This will spend ${starText(cost)}.${resourceSuffix}`
+      : `Choose an enemy monster. This will spend ${starText(cost)}.${resourceSuffix}`;
   }
   if (pendingAction.type === "attack") {
     return `This will spend ${starText(cost)} and roll for the attack.${resourceSuffix}`;
@@ -561,6 +654,12 @@ function shouldShowNotice(pendingAction, currentPlayer, notice) {
 
 function starText(count) {
   return `${count} ★`;
+}
+
+function actionCueForPendingAction(pendingAction) {
+  if (pendingAction.type === "later") return "Later Target";
+  if (pendingAction.type === "equip") return "Equip Here";
+  return "Target";
 }
 
 function cardDetailRulesText(card) {

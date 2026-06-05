@@ -425,6 +425,40 @@
   position: relative;
 }
 
+.battle-player-target {
+  min-height: 292px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  border: 3px solid rgba(61, 56, 48, 0.8);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 220, 0.08), rgba(0, 0, 0, 0.16)),
+    #201811;
+  box-shadow:
+    6px 7px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 253, 244, 0.06);
+  image-rendering: pixelated;
+}
+
+.battle-player-avatar {
+  width: 96px;
+  height: 96px;
+  object-fit: none;
+  object-position: left top;
+  image-rendering: pixelated;
+  transform: scale(2.4);
+}
+
+.battle-player-hp {
+  border: 2px solid rgba(212, 168, 32, 0.55);
+  background: rgba(12, 10, 7, 0.86);
+  color: var(--scene-ink);
+  font-size: 18px;
+  font-weight: 950;
+  padding: 5px 10px;
+}
+
 .battle-float {
   position: absolute;
   left: 50%;

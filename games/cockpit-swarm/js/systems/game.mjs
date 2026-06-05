@@ -28,6 +28,7 @@ import {
   tryActivatePowerupInShotLane,
   updatePowerups
 } from "./powerup-system.mjs";
+import { updateRunners, tryHitRunner, resetRunners, clearActiveRunner } from "./runner-system.mjs";
 
 // ─── Menu state init (called on first load) ──────────────────────────────────
 
@@ -63,6 +64,7 @@ export function resetGame(game, fromMenu = false, mode = game.mode || "campaign"
   game.wave.stageClearTimer = 0;
 
   resetPowerups(game);
+  resetRunners(game);
 
   game.player.x = 0;
   game.player.speed = 0;
@@ -151,6 +153,7 @@ export function updateGame(game, input, dt, t) {
 
   updatePlayer(game, input, dt);
   updatePowerups(game, dt);
+  updateRunners(game, dt);
 
   if (game.state === STATE.BOSS) {
     updateBoss(game, input, dt, t, damagePlayer, (bossNumber) => {
@@ -472,6 +475,7 @@ function updatePlayerFire(game, input) {
   // Boss fight: shots can only damage exposed weak spots / open mouth.
   if (game.state === STATE.BOSS) {
     if (tryDamageBossInShotLane(game)) return;
+    if (tryHitRunner(game)) return;
     game.combo = Math.max(0, game.combo - 1);
     return;
   }
@@ -501,6 +505,8 @@ function updatePlayerFire(game, input) {
 
     return;
   }
+
+  if (tryHitRunner(game)) return;
 
   if (tryActivatePowerupInShotLane(game)) {
     game.shotsHit++;
@@ -560,6 +566,7 @@ function checkRowAndEndState(game) {
     game.wave.pendingShots = [];
     game.powerups.activePickups = [];
     game.wave.stageClearTimer = TUNING.stageClearDelayMs;
+    clearActiveRunner(game);
     return;
   }
 

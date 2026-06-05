@@ -75,6 +75,58 @@ test("selected monsters blocked from offensive actions cannot offer attack", () 
   assert.match(scene.overlays.viewer.actionBlockedDetail, /blocked from offensive actions/i);
 });
 
+test("selected monsters cannot offer attack on their controller's setup turn", () => {
+  const scene = buildSceneLayout(testView({ currentPlayerTurnsStarted: 1 }), {
+    selected: {
+      playerId: "p1",
+      source: "monster",
+      slotIndex: 0,
+      card: selectedMonster(),
+    },
+  });
+
+  assert.equal(scene.overlays.viewer.canAttack, false);
+  assert.match(scene.overlays.viewer.actionBlockedDetail, /setup turn/i);
+});
+
+test("selected monsters can offer attack after their controller's setup turn", () => {
+  const scene = buildSceneLayout(testView({ currentPlayerTurnsStarted: 2 }), {
+    selected: {
+      playerId: "p1",
+      source: "monster",
+      slotIndex: 0,
+      card: selectedMonster(),
+    },
+  });
+
+  assert.equal(scene.overlays.viewer.canAttack, true);
+  assert.equal(scene.overlays.viewer.actionBlockedDetail, "");
+});
+
+test("selected monsters cannot offer offensive active abilities on setup turn", () => {
+  const scene = buildSceneLayout(testView({ currentPlayerTurnsStarted: 1 }), {
+    selected: {
+      playerId: "p1",
+      source: "monster",
+      slotIndex: 0,
+      card: {
+        ...selectedMonster(),
+        effectSlots: [
+          {
+            id: "shoot",
+            kind: "activeAbility",
+            name: "Shoot",
+            costStars: 1,
+            effects: [{ family: "damage", target: "enemyMonster", amount: 1 }],
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(scene.overlays.viewer.availableAbilities[0].isBlocked, true);
+});
+
 test("hand lanes reserve room for hovered cards", () => {
   const handCss = readSceneCss("hand-layer.css");
   const responsiveCss = readSceneCss("responsive-scene.css");
@@ -90,7 +142,7 @@ test("hand lanes reserve room for hovered cards", () => {
   assert.match(responsiveCss, /\.hand-layer--player\s*\{[^}]*height:\s*132px;/s);
 });
 
-function testView() {
+function testView({ currentPlayerTurnsStarted = 2 } = {}) {
   return {
     phase: "playerTurn",
     currentPlayerId: "p1",
@@ -104,6 +156,7 @@ function testView() {
         hpLabel: "20",
         starsLabel: "5 / 5",
         starsRemaining: 5,
+        turnsStarted: currentPlayerTurnsStarted,
         deckCount: 10,
         graveyardCount: 0,
         hand: [selectedMonster()],
@@ -116,6 +169,7 @@ function testView() {
         hpLabel: "20",
         starsLabel: "0 / 5",
         starsRemaining: 0,
+        turnsStarted: 0,
         deckCount: 10,
         graveyardCount: 0,
         hand: [],

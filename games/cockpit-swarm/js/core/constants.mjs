@@ -68,6 +68,8 @@ export const ARBITER_TUNING = {
   bodyZ: 1.7,
   bodyY: -130,
 
+  volleyDiamondZ: 0.72,    // Z depth for telegraph diamonds — far enough back to keep all 5 on-screen
+
   phase1: {
     hits: 20,
     chargeMs: 900,
@@ -76,7 +78,8 @@ export const ARBITER_TUNING = {
     resetMs: 500,
     safeLanes: 1,          // how many safe lanes left uncovered
     safeHitWindow: 72,     // px from safe lane center to count as dodged
-    coreHitWindow: 60      // px from center to score a core hit
+    coreHitWindow: 60,     // px from center lane to score a core hit
+    wingHitWindow: 60      // px from lane ±90 to score a wing-core hit (phase 1 only)
   },
 
   phase2: {

@@ -139,7 +139,7 @@ function createBattleResolution(resolution) {
           afterHp: resolution.target.afterHp,
         }),
         el("div", "battle-target-card-wrap", [
-          createCardPiece(resolution.target.card, { large: true }),
+          createBattleTargetPiece(resolution.target.card, resolution.hit),
           el("span", resolution.hit ? "battle-float is-damage" : "battle-float is-miss", resolution.floatText),
         ]),
       ]),
@@ -148,10 +148,29 @@ function createBattleResolution(resolution) {
   return overlay;
 }
 
+function createBattleTargetPiece(card, hit) {
+  if (card.type !== "player") return createCardPiece(card, { large: true });
+  return el("div", "battle-player-target", [
+    el("img", "battle-player-avatar", {
+      src: hit ? `/${card.hurtArt}` : `/${card.art}`,
+      alt: "",
+      draggable: "false",
+    }),
+    el("span", "battle-player-hp", `${card.currentHp}/${card.maxHp} HP`),
+  ]);
+}
+
 function createBattleCardHeader(label, card, hpPreview) {
   const hpLabel = hpPreview
     ? `${hpPreview.beforeHp} -> ${hpPreview.afterHp} HP`
     : `${card.currentHp}/${card.maxHp} HP`;
+  if (card.type === "player") {
+    return el("div", "battle-card-header", [
+      el("span", "battle-card-role", label),
+      el("strong", "battle-card-name", card.name),
+      el("span", "battle-card-stats", hpLabel),
+    ]);
+  }
   return el("div", "battle-card-header", [
     el("span", "battle-card-role", label),
     el("strong", "battle-card-name", card.name),

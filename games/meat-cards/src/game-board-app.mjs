@@ -226,6 +226,28 @@ export async function bootGameBoard(root, playerConfigs = DEFAULT_PLAYER_CONFIGS
         };
         render();
       },
+      onPlayerTarget({ playerId }) {
+        if (playerId === state.currentPlayerId) return;
+
+        if (selection.pendingAction?.type === "attack") {
+          const targetPlayer = state.players[playerId];
+          if (!targetPlayer || targetPlayer.monsterSlots.some(Boolean)) return;
+          selection = {
+            ...selection,
+            pendingAction: { ...selection.pendingAction, targetPlayerId: playerId, targetSlotIndex: null },
+          };
+          render();
+          return;
+        }
+
+        if (selection.pendingAction?.type === "later" && selection.pendingAction.requiresOpponentPlayerTarget) {
+          selection = {
+            ...selection,
+            pendingAction: { ...selection.pendingAction, targetPlayerId: playerId, targetSlotIndex: null },
+          };
+          render();
+        }
+      },
       onAttachedAccessory({ playerId, slotIndex, attachment }) {
         selection = {
           ...selection,
@@ -260,8 +282,9 @@ export async function bootGameBoard(root, playerConfigs = DEFAULT_PLAYER_CONFIGS
         const selected = selection.selected;
         if (!selected || selected.source !== "hand" || selected.playerId !== state.currentPlayerId) return;
         const needsEnemyTarget = requiresEnemyMonsterTarget(selected.card);
+        const needsOpponentPlayerTarget = requiresOpponentPlayerTarget(selected.card);
         const needsOwnTarget = requiresOwnMonsterTarget(selected.card);
-        const needsTarget = needsEnemyTarget || needsOwnTarget;
+        const needsTarget = needsEnemyTarget || needsOpponentPlayerTarget || needsOwnTarget;
         selection = {
           ...selection,
           selected: needsTarget ? null : selection.selected,
@@ -271,6 +294,7 @@ export async function bootGameBoard(root, playerConfigs = DEFAULT_PLAYER_CONFIGS
             handCardInstanceId: selected.card.instanceId,
             costStars: selected.card.playCostStars ?? 0,
             requiresEnemyMonsterTarget: needsEnemyTarget,
+            requiresOpponentPlayerTarget: needsOpponentPlayerTarget,
             requiresOwnMonsterTarget: needsOwnTarget,
             label: `Play ${selected.card.name} for ${starText(selected.card.playCostStars ?? 0)}?`,
           },
@@ -309,6 +333,7 @@ export async function bootGameBoard(root, playerConfigs = DEFAULT_PLAYER_CONFIGS
             attackerPlayerId: selected.playerId,
             attackerSlotIndex: selected.slotIndex,
             costStars: 2,
+            canTargetOpponentPlayer: opponentHasNoMonsters(state),
             label: `Attack with ${selected.card.name} for ${starText(2)}?`,
           },
         };
@@ -581,6 +606,10 @@ export function requiresEnemyMonsterTarget(card) {
   return [...(card.effectSlots ?? []), ...(card.effects ?? [])].some((effect) => effect.target === "enemyMonster");
 }
 
+export function requiresOpponentPlayerTarget(card) {
+  return [...(card.effectSlots ?? []), ...(card.effects ?? [])].some((effect) => effect.target === "opponentPlayer");
+}
+
 function requiresOwnMonsterTarget(card) {
   return (card.effects ?? []).some(
     (e) => e.family === "returnToHand" && e.target === "selfMonster",
@@ -617,6 +646,11 @@ function paintSelection(root, state, selection) {
       )
       ?.classList.add("is-targeted");
   }
+  if (selection.pendingAction?.targetPlayerId !== undefined && selection.pendingAction?.targetSlotIndex === null) {
+    root
+      .querySelector(`[data-player-target-id="${selection.pendingAction.targetPlayerId}"]`)
+      ?.classList.add("is-targeted");
+  }
   if (selection.pendingAction?.monsterSlotIndex !== undefined) {
     root
       .querySelector(
@@ -629,9 +663,21 @@ function paintSelection(root, state, selection) {
 
 function paintValidTargets(root, state, pendingAction) {
   if (!pendingAction) return;
-  if (pendingAction.type === "attack" || (pendingAction.type === "later" && pendingAction.requiresEnemyMonsterTarget)) {
+  if (pendingAction.type === "attack") {
+    const opponentId = state.playerOrder.find((playerId) => playerId !== state.currentPlayerId);
+    if (state.players[opponentId].monsterSlots.some(Boolean)) {
+      paintFilledSlotsForPlayer(root, state.players[opponentId]);
+    } else {
+      paintPlayerTarget(root, opponentId);
+    }
+  }
+  if (pendingAction.type === "later" && pendingAction.requiresEnemyMonsterTarget) {
     const opponentId = state.playerOrder.find((playerId) => playerId !== state.currentPlayerId);
     paintFilledSlotsForPlayer(root, state.players[opponentId]);
+  }
+  if (pendingAction.type === "later" && pendingAction.requiresOpponentPlayerTarget) {
+    const opponentId = state.playerOrder.find((playerId) => playerId !== state.currentPlayerId);
+    paintPlayerTarget(root, opponentId);
   }
   if (pendingAction.type === "equip" || (pendingAction.type === "later" && pendingAction.requiresOwnMonsterTarget)) {
     paintFilledSlotsForPlayer(root, state.players[state.currentPlayerId]);
@@ -648,6 +694,17 @@ function paintValidTargets(root, state, pendingAction) {
   }
 }
 
+function paintPlayerTarget(root, playerId) {
+  root
+    .querySelector(`[data-player-target-id="${playerId}"]`)
+    ?.classList.add("is-valid-target");
+}
+
+function opponentHasNoMonsters(state) {
+  const opponentId = state.playerOrder.find((playerId) => playerId !== state.currentPlayerId);
+  return !state.players[opponentId]?.monsterSlots.some(Boolean);
+}
+
 function paintFilledSlotsForPlayer(root, player) {
   player.monsterSlots.forEach((monster, slotIndex) => {
     if (!monster) return;
@@ -659,7 +716,8 @@ function paintFilledSlotsForPlayer(root, player) {
 
 export function monsterToSelectedCard(monster, cardsById) {
   const card = cardsById[monster.cardId];
-  const grantedActions = monster.attachments.flatMap((attachment) => {
+  const attachments = monster.attachments ?? [];
+  const grantedActions = attachments.flatMap((attachment) => {
     const attachCard = cardsById[attachment.cardId];
     return (attachCard?.effects ?? [])
       .filter((effect) => effect.family === "grantAction")
