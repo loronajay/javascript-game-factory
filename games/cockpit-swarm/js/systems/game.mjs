@@ -1,4 +1,4 @@
-import { H, STATE, TUNING, BOSS_EVERY, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
+import { H, STATE, TUNING, BOSS_EVERY, TOTAL_BOSSES, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
 import { initMpLobby, updateMpLobby, updateMpCountdown, updateMpFighting, updateMpResult } from "./mp-controller.mjs";
 import {
   sfxClick, sfxExplosion, sfxPlayerHurt, sfxShutdown,
@@ -162,6 +162,10 @@ export function updateGame(game, input, dt, t) {
           loadStage(game, nextStageIndex);
           return;
         }
+      }
+      if (game.mode === "bossRush" && bossNumber < TOTAL_BOSSES) {
+        startBossEncounter(game, bossNumber + 1);
+        return;
       }
       game.state = STATE.CLEAR;
     });

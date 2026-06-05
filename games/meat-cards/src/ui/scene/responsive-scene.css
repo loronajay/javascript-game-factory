@@ -34,7 +34,7 @@
   }
 
   .hand-layer--opponent {
-    height: 98px;
+    height: 110px;
   }
 
   .hand-layer--opponent .hand-card-shell {
@@ -43,7 +43,7 @@
   }
 
   .hand-layer--player {
-    height: 126px;
+    height: 138px;
   }
 
   .hand-layer--player .hand-card-shell {
@@ -131,7 +131,7 @@
   }
 
   .hand-layer--player {
-    height: 120px;
+    height: 132px;
   }
 
   .hand-layer--player .hand-card-shell {

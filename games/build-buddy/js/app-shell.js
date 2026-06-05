@@ -79,6 +79,7 @@ function createOnlineState(intent, identity, extra = {}) {
   return {
     intent,
     identity: sanitizeOnlineIdentity(identity),
+    clientId: extra.clientId || '',
     lobbyStatus: extra.lobbyStatus || 'idle',
     requestedRoomCode: normalizeRoomCode(extra.requestedRoomCode),
     roomCode: normalizeRoomCode(extra.roomCode),
@@ -93,8 +94,15 @@ function createOnlineState(intent, identity, extra = {}) {
 }
 
 export function localOnlineRole(state) {
+  const serverRoles = state?.online?.serverMatchState?.stage?.roles;
+  const localNetworkId = state?.online?.clientId ?? '';
+  if (serverRoles && localNetworkId) {
+    if (serverRoles.runnerPlayerId === localNetworkId) return VIEW_MODES.RUNNER;
+    if (serverRoles.builderPlayerId === localNetworkId) return VIEW_MODES.BUILDER;
+  }
+
   const session = state?.onlineGameplay?.session ?? state?.session;
-  const localPlayerId = state?.onlineGameplay?.localPlayerId ?? state?.online?.identity?.playerId ?? '';
+  const localPlayerId = state?.onlineGameplay?.localPlayerId ?? state?.online?.clientId ?? state?.online?.identity?.playerId ?? '';
   if (!session || !localPlayerId) return '';
   const roles = getCurrentRoles(session);
   if (roles.runnerPlayerId === localPlayerId) return VIEW_MODES.RUNNER;
@@ -112,6 +120,31 @@ function playerFromMember(memberId, profiles, fallbackIndex) {
     id: profile.playerId || memberId || `online_player_${fallbackIndex + 1}`,
     displayName: profile.displayName || `Player ${fallbackIndex + 1}`,
   };
+}
+
+function playersFromServerMatch(matchState, fallbackPlayers) {
+  const serverPlayers = Array.isArray(matchState?.players) ? matchState.players.slice(0, 2) : [];
+  if (serverPlayers.length >= 2) {
+    return serverPlayers.map((player, index) => ({
+      id: typeof player?.clientId === 'string' && player.clientId
+        ? player.clientId
+        : (typeof player?.id === 'string' && player.id ? player.id : `online_player_${index + 1}`),
+      displayName: typeof player?.name === 'string' && player.name
+        ? player.name
+        : (typeof player?.displayName === 'string' && player.displayName ? player.displayName : `Player ${index + 1}`),
+    }));
+  }
+
+  const roles = matchState?.stage?.roles;
+  if (roles?.runnerPlayerId && roles?.builderPlayerId) {
+    const fallbackById = new Map((fallbackPlayers ?? []).map((player) => [player.id, player]));
+    return [roles.runnerPlayerId, roles.builderPlayerId].map((id, index) => ({
+      id,
+      displayName: fallbackById.get(id)?.displayName ?? `Player ${index + 1}`,
+    }));
+  }
+
+  return fallbackPlayers;
 }
 
 export function createAppShellState({
@@ -197,6 +230,7 @@ export function applyOnlineClientSnapshot(state, snapshot = {}) {
     online: {
       ...state.online,
       lobbyStatus: snapshot.status || state.online.lobbyStatus,
+      clientId: snapshot.clientId || state.online.clientId,
       roomCode: normalizeRoomCode(roomCode),
       ownerId,
       isOwner: !!ownerId && ownerId === (snapshot.clientId || state.online.identity.playerId),
@@ -214,11 +248,17 @@ export function startOnlineRunFromLobby(state) {
   const authorityPlayerId = state.online.authorityMode === 'server'
     ? 'server'
     : state.online.ownerId || state.online.players[0].id;
+  const players = state.online.authorityMode === 'server'
+    ? playersFromServerMatch(state.online.serverMatchState, state.online.players)
+    : state.online.players;
+  const localPlayerId = state.online.authorityMode === 'server'
+    ? state.online.clientId || state.online.identity.playerId
+    : state.online.identity.playerId;
   const onlineGameplay = createOnlineGameplayState({
     packId: state.packId,
     stageSequence: sequenceForPack(state.stageList, state.packId),
-    players: state.online.players,
-    localPlayerId: state.online.identity.playerId,
+    players,
+    localPlayerId,
     authorityPlayerId,
   });
   const serverStage = state.online.serverMatchState?.stage;

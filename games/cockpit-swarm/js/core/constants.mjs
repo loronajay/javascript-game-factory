@@ -21,6 +21,8 @@ export const STATE = {
 
 // A boss encounter fires after every Nth stage clear (Boss 01 after stage 5).
 export const BOSS_EVERY = 5;
+// Total number of authored bosses — update when adding a new boss.
+export const TOTAL_BOSSES = 2;
 
 export const LANES = [-180, -90, 0, 90, 180];
 

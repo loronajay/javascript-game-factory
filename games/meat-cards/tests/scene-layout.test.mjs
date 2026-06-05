@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { buildSceneLayout } from "../src/ui/scene/scene-layout.mjs";
 
+const sceneCssDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/ui/scene");
 const firstAbilityRules = "Whenever another one of your monsters dies, this monster gains +3 strength.";
 const secondAbilityRules = "At the start of your turn, heal each of your monsters by 1 HP.";
 
@@ -71,6 +75,21 @@ test("selected monsters blocked from offensive actions cannot offer attack", () 
   assert.match(scene.overlays.viewer.actionBlockedDetail, /blocked from offensive actions/i);
 });
 
+test("hand lanes reserve room for hovered cards", () => {
+  const handCss = readSceneCss("hand-layer.css");
+  const responsiveCss = readSceneCss("responsive-scene.css");
+  const rowRule = handCss.match(/\.hand-card-row\s*\{[^}]+\}/)?.[0] ?? "";
+  const opponentRowRule = handCss.match(/\.hand-layer--opponent\s+\.hand-card-row\s*\{[^}]+\}/)?.[0] ?? "";
+
+  assert.match(rowRule, /padding:\s*14px 4px 10px;/);
+  assert.doesNotMatch(opponentRowRule, /mask-image:/);
+  assert.match(handCss, /\.hand-layer--opponent\s*\{[^}]*height:\s*116px;/s);
+  assert.match(handCss, /\.hand-layer--player\s*\{[^}]*height:\s*170px;/s);
+  assert.match(responsiveCss, /\.hand-layer--opponent\s*\{[^}]*height:\s*110px;/s);
+  assert.match(responsiveCss, /\.hand-layer--player\s*\{[^}]*height:\s*138px;/s);
+  assert.match(responsiveCss, /\.hand-layer--player\s*\{[^}]*height:\s*132px;/s);
+});
+
 function testView() {
   return {
     phase: "playerTurn",
@@ -132,4 +151,8 @@ function selectedMonster() {
       },
     ],
   };
+}
+
+function readSceneCss(fileName) {
+  return fs.readFileSync(path.join(sceneCssDir, fileName), "utf8");
 }

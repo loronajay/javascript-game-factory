@@ -150,5 +150,22 @@ test("online Runner control ignores manual view switching and Builder placement"
   assertEqual(game.registry.tools.filter((tool) => tool.active).length, before);
 });
 
+test("unknown online control role is inert instead of debug", () => {
+  const game = new Game(createCanvasStub(), {
+    viewMode: VIEW_MODES.RUNNER,
+    localControlRole: "",
+  });
+  const startX = game.runner.x;
+  const before = game.registry.tools.filter((tool) => tool.active).length;
+  game.input.keys.add("ArrowRight");
+  game.input.mouse.justClicked = true;
+  game.input.viewModeRequest = VIEW_MODES.HYBRID;
+  game.update(1 / 60);
+
+  assertEqual(game.runner.x, startX);
+  assertEqual(game.registry.tools.filter((tool) => tool.active).length, before);
+  assertEqual(game.viewMode, VIEW_MODES.RUNNER);
+});
+
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -12,6 +12,7 @@ const CONTROL_ROLES = Object.freeze({
   RUNNER: 'runner',
   BUILDER: 'builder',
   DEBUG: 'debug',
+  INERT: 'inert',
 });
 
 const INERT_INPUT = Object.freeze({
@@ -26,7 +27,8 @@ const INERT_INPUT = Object.freeze({
 
 function normalizeControlRole(value) {
   if (value === CONTROL_ROLES.RUNNER || value === CONTROL_ROLES.BUILDER) return value;
-  return CONTROL_ROLES.DEBUG;
+  if (value === CONTROL_ROLES.DEBUG) return value;
+  return CONTROL_ROLES.INERT;
 }
 
 export class Game {
@@ -198,8 +200,8 @@ export class Game {
     this.timeRemainingMs = Math.max(0, this.timeRemainingMs - dt * 1000);
     this.elapsedMs += dt * 1000;
     const runnerInput = this.remoteRunnerInput
-      ?? (this.localControlRole === CONTROL_ROLES.BUILDER ? INERT_INPUT : this.input);
-    const builderInput = this.localControlRole === CONTROL_ROLES.RUNNER ? null : this.input;
+      ?? (this.localControlRole === CONTROL_ROLES.BUILDER || this.localControlRole === CONTROL_ROLES.INERT ? INERT_INPUT : this.input);
+    const builderInput = this.localControlRole === CONTROL_ROLES.RUNNER || this.localControlRole === CONTROL_ROLES.INERT ? null : this.input;
     this.runner.update(dt, runnerInput, this.registry);
     this.registry.markInUse(this.runner);
     this.camera.update(dt, this.runner, builderInput ?? INERT_INPUT);
