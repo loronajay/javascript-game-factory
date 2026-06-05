@@ -3,22 +3,36 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <title>Build Buddy Engine Prototype v7</title>
+  <title>Build Buddy</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <svg class="visual-filters" width="0" height="0" aria-hidden="true" focusable="false">
+    <filter id="bb-paper-grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.78" numOctaves="3" seed="31" result="noise" />
+      <feColorMatrix in="noise" type="saturate" values="0" result="mono" />
+      <feComponentTransfer in="mono">
+        <feFuncA type="table" tableValues="0 0.18" />
+      </feComponentTransfer>
+    </filter>
+    <filter id="bb-soft-warp">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.055" numOctaves="2" seed="9" result="turbulence" />
+      <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
   <main id="app">
     <section id="shell" aria-label="Build Buddy menu"></section>
 
-    <canvas id="game" width="1280" height="720" aria-label="Build Buddy engine prototype canvas"></canvas>
+    <canvas id="game" width="1280" height="720" aria-label="Build Buddy game canvas"></canvas>
 
-    <section id="hud" aria-label="Prototype controls">
+    <section id="hud" aria-label="Build Buddy controls">
       <div class="panel">
         <strong>Runner</strong>
-        <span>A/D or ←/→ move</span>
+        <span>A/D or &larr;/&rarr; move</span>
         <span>Space jump / wall-jump</span>
-        <span>W/↑ climb up</span>
-        <span>S/↓ drop/descend</span>
+        <span>W/&uarr; climb up</span>
+        <span>S/&darr; drop/descend</span>
         <span>R reposition</span>
       </div>
       <div class="panel">
@@ -45,12 +59,12 @@
       <button data-view-mode="hybrid">Hybrid</button>
     </section>
 
-    <section id="mobileControls" aria-label="Temporary mobile controls">
+    <section id="mobileControls" aria-label="Mobile controls">
       <div class="mobile-left">
-        <button data-hold="left">◀</button>
-        <button data-hold="right">▶</button>
-        <button data-hold="up">▲</button>
-        <button data-hold="down">▼</button>
+        <button data-hold="left">&larr;</button>
+        <button data-hold="right">&rarr;</button>
+        <button data-hold="up">&uarr;</button>
+        <button data-hold="down">&darr;</button>
       </div>
       <div class="mobile-right">
         <button data-tap="jump">A</button>

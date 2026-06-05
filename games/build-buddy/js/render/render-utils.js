@@ -13,18 +13,25 @@ export function roundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
 
 export function panel(ctx, x, y, w, h) {
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.28)';
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 8;
+  ctx.shadowColor = 'rgba(24, 32, 54, 0.28)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 10;
   const grd = ctx.createLinearGradient(0, y, 0, y + h);
-  grd.addColorStop(0, 'rgba(9, 14, 27, 0.80)');
-  grd.addColorStop(1, 'rgba(5, 9, 18, 0.76)');
+  grd.addColorStop(0, 'rgba(255, 249, 229, 0.88)');
+  grd.addColorStop(0.52, 'rgba(255, 219, 142, 0.78)');
+  grd.addColorStop(1, 'rgba(255, 142, 90, 0.72)');
   ctx.fillStyle = grd;
-  roundRect(ctx, x, y, w, h, 15, true, false);
+  roundRect(ctx, x, y, w, h, 6, true, false);
   ctx.shadowColor = 'transparent';
-  ctx.strokeStyle = 'rgba(198,216,255,0.18)';
+  ctx.strokeStyle = 'rgba(31, 40, 70, 0.58)';
+  ctx.lineWidth = 2;
+  roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 6, false, true);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.44)';
   ctx.lineWidth = 1;
-  roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 15, false, true);
+  ctx.beginPath();
+  ctx.moveTo(x + 13, y + 10);
+  ctx.lineTo(x + w - 13, y + 10);
+  ctx.stroke();
   ctx.restore();
 }
 

@@ -16,26 +16,37 @@ import { renderGameScene } from "./ui/scene/game-scene.mjs";
 
 const HAND_LIMIT = 7;
 
-const PLAYER_CONFIGS = [
+const DEFAULT_PLAYER_CONFIGS = [
   { id: "p1", name: "Player One", deckId: "meat_deck" },
   { id: "p2", name: "Player Two", deckId: "useless_deck" },
 ];
 
-export async function bootGameBoard(root) {
+export async function bootGameBoard(root, playerConfigs = DEFAULT_PLAYER_CONFIGS, { onMatchEnd } = {}) {
   const data = await loadCardGameData();
   let state = startTurn(createMatch({
     cardsById: data.cardsById,
-    players: PLAYER_CONFIGS.map((player) => ({
+    players: playerConfigs.map((player) => ({
       id: player.id,
       name: player.name,
       deck: data.decksById[player.deckId],
     })),
   }));
   let selection = emptySelection();
+  let matchEnded = false;
+
+  const stats = {
+    turnsPlayed: 0,
+    byPlayer: Object.fromEntries(
+      playerConfigs.map((p) => [p.id, { monstersKilled: 0, damageDealt: 0, cardsPlayed: 0, starsSpent: 0 }]),
+    ),
+  };
+
+  checkWin(state);
 
   render();
 
   function render() {
+    if (matchEnded) return;
     renderGameScene(root, state, data.cardsById, {
       onEndTurn() {
         try {
@@ -363,9 +374,18 @@ export async function bootGameBoard(root) {
             beginAttackResolution(selection.pendingAction);
             return;
           }
+          const prevState = state;
+          const actionType = selection.pendingAction?.type;
           state = applyPendingAction(state, selection.pendingAction);
-          selection = emptySelection();
-          advanceTurnIfReady();
+          if (actionType && ["summon", "later", "equip"].includes(actionType)) {
+            stats.byPlayer[prevState.currentPlayerId].cardsPlayed++;
+          }
+          diffStateForStats(prevState, state, prevState.currentPlayerId);
+          checkWin(state);
+          if (!matchEnded) {
+            selection = emptySelection();
+            advanceTurnIfReady();
+          }
         } catch (error) {
           selection = { ...selection, notice: error.message };
         }
@@ -384,8 +404,12 @@ export async function bootGameBoard(root) {
   }
 
   function passTurn() {
+    const endingPlayerId = state.currentPlayerId;
+    stats.byPlayer[endingPlayerId].starsSpent += state.players[endingPlayerId].stars.spent;
+    stats.turnsPlayed++;
     state = startTurn(endTurn(state));
     selection = emptySelection();
+    checkWin(state);
   }
 
   function advanceTurnIfReady() {
@@ -412,20 +436,52 @@ export async function bootGameBoard(root) {
   }
 
   function beginAttackResolution(pendingAction) {
+    const prevState = state;
     const attackAction = { ...pendingAction, roll: rollD6() };
     const { battleResolution, nextState } = prepareAttackResolution(state, data.cardsById, attackAction);
     selection = { ...emptySelection(), battleResolution };
     render();
     setTimeout(() => {
       try {
+        stats.byPlayer[prevState.currentPlayerId].cardsPlayed++;
+        diffStateForStats(prevState, nextState, prevState.currentPlayerId);
         state = nextState;
-        selection = emptySelection();
-        advanceTurnIfReady();
+        checkWin(state);
+        if (!matchEnded) {
+          selection = emptySelection();
+          advanceTurnIfReady();
+        }
       } catch (error) {
-        selection = { ...emptySelection(), notice: error.message };
+        if (!matchEnded) {
+          selection = { ...emptySelection(), notice: error.message };
+        }
       }
       render();
     }, battleResolution.durationMs);
+  }
+
+  function checkWin(currentState) {
+    if (matchEnded) return;
+    for (const playerId of currentState.playerOrder) {
+      if (currentState.players[playerId].currentHp <= 0) {
+        matchEnded = true;
+        const winnerId = currentState.playerOrder.find((id) => id !== playerId);
+        const winnerName = currentState.players[winnerId].name;
+        onMatchEnd?.({ winnerId, winnerName, stats: { ...stats, byPlayer: { ...stats.byPlayer } } });
+        return;
+      }
+    }
+  }
+
+  function diffStateForStats(prev, next, actingPlayerId) {
+    const opponentId = prev.playerOrder.find((id) => id !== actingPlayerId);
+    const hpLoss = prev.players[opponentId].currentHp - next.players[opponentId].currentHp;
+    if (hpLoss > 0) stats.byPlayer[actingPlayerId].damageDealt += hpLoss;
+    prev.players[opponentId].monsterSlots.forEach((prevMonster, i) => {
+      if (prevMonster && !next.players[opponentId].monsterSlots[i]) {
+        stats.byPlayer[actingPlayerId].monstersKilled++;
+      }
+    });
   }
 }
 

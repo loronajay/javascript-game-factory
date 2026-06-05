@@ -30,23 +30,23 @@ export class HudRenderer {
     const h = compact ? 122 : 150;
     panel(ctx, x, y, w, h);
 
-    ctx.fillStyle = '#eef3ff';
+    ctx.fillStyle = '#182036';
     ctx.font = '800 13px system-ui';
     ctx.fillText(`BUILD BUDDY // ${viewMode.toUpperCase()}`, x + 16, y + 24);
 
-    ctx.fillStyle = '#f6fbff';
+    ctx.fillStyle = '#11182c';
     ctx.font = '900 28px system-ui';
     ctx.fillText(formatMs(game.timeRemainingMs), x + 16, y + 60);
 
     ctx.font = '13px system-ui';
-    ctx.fillStyle = '#cbd6ee';
+    ctx.fillStyle = '#2f395c';
     ctx.fillText(`Stage ${this.stage.id}`, x + 16, y + 84);
     ctx.fillText(`Deaths ${this.runner.deaths}   Repositions ${this.runner.repositions}`, x + 16, y + 106);
 
     if (!compact) {
       const rules = resolveBuilderRules(this.stage);
       ctx.fillText(`Selected ${TOOL_DEFS[this.builder.selectedTool].label}`, x + 16, y + 126);
-      ctx.fillStyle = '#aebad4';
+      ctx.fillStyle = '#4f5b7c';
       ctx.fillText(`Tools ${this.registry.countTotalNonCheckpoint()}/${rules.totalActiveToolCap}`, x + 16, y + 144);
       ctx.fillText(rules.ruleLabel, x + 126, y + 144);
     }
@@ -68,16 +68,16 @@ export class HudRenderer {
 
       ctx.save();
       ctx.globalAlpha = enabled ? 1 : 0.42;
-      ctx.fillStyle = selected ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.045)';
-      ctx.strokeStyle = selected ? 'rgba(226,241,255,0.36)' : 'rgba(190,212,255,0.12)';
-      ctx.lineWidth = 1;
-      roundRect(ctx, bx, y + 8, 108, 34, 10, true, true);
+      ctx.fillStyle = selected ? 'rgba(36,198,168,0.24)' : 'rgba(255,255,255,0.34)';
+      ctx.strokeStyle = selected ? 'rgba(24,32,54,0.72)' : 'rgba(24,32,54,0.22)';
+      ctx.lineWidth = selected ? 2 : 1;
+      roundRect(ctx, bx, y + 8, 108, 34, 4, true, true);
 
       this.drawToolChip(ctx, key, bx + 8, y + 13, enabled ? def.color : '#747f92');
-      ctx.fillStyle = '#eef3ff';
+      ctx.fillStyle = '#182036';
       ctx.font = '800 10px system-ui';
       ctx.fillText(this.toolLabel(key, i + 1, enabled), bx + 31, y + 23);
-      ctx.fillStyle = '#aebad4';
+      ctx.fillStyle = '#4f5b7c';
       ctx.font = '10px system-ui';
       ctx.fillText(enabled ? `cap ${cap}` : 'locked', bx + 31, y + 35);
       ctx.restore();
@@ -127,7 +127,7 @@ export class HudRenderer {
     const msg = this.builder.messageTime > 0 ? this.builder.message : (this.runner.messageTime > 0 ? this.runner.message : '');
     if (!msg) return;
     panel(ctx, VIEW.width / 2 - 220, 22, 440, 48);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = '#182036';
     ctx.font = '800 18px system-ui';
     ctx.textAlign = 'center';
     ctx.fillText(msg, VIEW.width / 2, 53);
@@ -136,11 +136,11 @@ export class HudRenderer {
 
   drawClearCard(ctx) {
     panel(ctx, VIEW.width / 2 - 230, VIEW.height / 2 - 86, 460, 172);
-    ctx.fillStyle = '#7fffba';
+    ctx.fillStyle = '#095e55';
     ctx.font = '900 30px system-ui';
     ctx.textAlign = 'center';
     ctx.fillText('STAGE CLEAR', VIEW.width / 2, VIEW.height / 2 - 28);
-    ctx.fillStyle = '#eef3ff';
+    ctx.fillStyle = '#182036';
     ctx.font = '16px system-ui';
     ctx.fillText('Enter/R restart prototype   N next stage', VIEW.width / 2, VIEW.height / 2 + 17);
     ctx.textAlign = 'left';
