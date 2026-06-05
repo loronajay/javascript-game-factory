@@ -35,7 +35,7 @@ export const POWERUP_TYPES = {
 
   overcharge: {
     id: "overcharge",
-    label: "OVCHG",
+    label: "DMG",
     durationMs: 7000,
     color: "#ff6b35",
     shape: "bolt"
