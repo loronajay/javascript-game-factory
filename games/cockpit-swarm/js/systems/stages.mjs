@@ -13,11 +13,12 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.12,
-      allowedTypes: ["holdToShoot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 35,
-        speedBoost: 35,
-        healthPack: 30
+        holdToShoot: 28,
+        speedBoost: 28,
+        healthPack: 22,
+        overcharge: 22
       }
     },
     enemyRows: [
@@ -44,11 +45,12 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.13,
-      allowedTypes: ["splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        splashShot: 38,
-        speedBoost: 42,
-        healthPack: 20
+        splashShot: 28,
+        speedBoost: 30,
+        healthPack: 16,
+        overcharge: 26
       }
     },
     enemyRows: [
@@ -77,12 +79,13 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.14,
-      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 24,
-        splashShot: 30,
-        speedBoost: 28,
-        healthPack: 18
+        holdToShoot: 20,
+        splashShot: 24,
+        speedBoost: 22,
+        healthPack: 14,
+        overcharge: 20
       }
     },
     enemyRows: [
@@ -109,11 +112,12 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.15,
-      allowedTypes: ["holdToShoot", "splashShot", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 38,
-        splashShot: 44,
-        healthPack: 18
+        holdToShoot: 30,
+        splashShot: 34,
+        healthPack: 14,
+        overcharge: 22
       }
     },
     enemyRows: [
@@ -142,12 +146,13 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.16,
-      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 28,
-        splashShot: 32,
-        speedBoost: 24,
-        healthPack: 16
+        holdToShoot: 22,
+        splashShot: 26,
+        speedBoost: 18,
+        healthPack: 12,
+        overcharge: 22
       }
     },
     enemyRows: [
@@ -176,12 +181,13 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.14,
-      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 30,
-        splashShot: 28,
-        speedBoost: 26,
-        healthPack: 16
+        holdToShoot: 24,
+        splashShot: 22,
+        speedBoost: 20,
+        healthPack: 12,
+        overcharge: 22
       }
     },
     enemyRows: [
@@ -210,12 +216,13 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 1,
       spawnOnKillChance: 0.14,
-      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 32,
-        splashShot: 32,
-        speedBoost: 20,
-        healthPack: 16
+        holdToShoot: 26,
+        splashShot: 26,
+        speedBoost: 14,
+        healthPack: 12,
+        overcharge: 22
       }
     },
     enemyRows: [
@@ -244,12 +251,13 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 2,
       spawnOnKillChance: 0.15,
-      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 34,
-        splashShot: 34,
-        speedBoost: 18,
-        healthPack: 14
+        holdToShoot: 26,
+        splashShot: 26,
+        speedBoost: 14,
+        healthPack: 10,
+        overcharge: 24
       }
     },
     enemyRows: [
@@ -278,12 +286,13 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 2,
       spawnOnKillChance: 0.16,
-      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 38,
-        splashShot: 36,
-        speedBoost: 14,
-        healthPack: 12
+        holdToShoot: 28,
+        splashShot: 26,
+        speedBoost: 10,
+        healthPack: 10,
+        overcharge: 26
       }
     },
     enemyRows: [
@@ -312,11 +321,12 @@ export const STAGES = [
       enabled: true,
       maxActivePickups: 2,
       spawnOnKillChance: 0.17,
-      allowedTypes: ["holdToShoot", "splashShot", "healthPack"],
+      allowedTypes: ["holdToShoot", "splashShot", "healthPack", "overcharge"],
       weights: {
-        holdToShoot: 42,
-        splashShot: 42,
-        healthPack: 16
+        holdToShoot: 32,
+        splashShot: 32,
+        healthPack: 12,
+        overcharge: 24
       }
     },
     enemyRows: [
@@ -325,6 +335,184 @@ export const STAGES = [
       { types: ["carrier", "titan",    "bruiser", "titan",    "carrier"] },
       { types: ["titan",   "carrier",  "vanguard","carrier",  "titan"]   },
       { types: ["vanguard","titan",    "carrier", "titan",    "vanguard"]}
+    ]
+  },
+
+  // ── Act III — post-Boss 02 ────────────────────────────────────────────────
+
+  {
+    id: "stage_11_ghost_net",
+    name: "GHOST NET",
+    subtitle: "Phantoms debut — shooting the phased form curses the cockpit",
+    allowedBehaviors: ["randomActiveFire", "threeLaneSync", "allButOneLane", "nextRowSupportFire"],
+    behaviorWeights: {
+      randomActiveFire: 30,
+      threeLaneSync: 28,
+      allButOneLane: 24,
+      nextRowSupportFire: 18
+    },
+    allowNextRowSupport: true,
+    nextRowSupportStartsWhenActiveCountAtOrBelow: 3,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 2,
+      spawnOnKillChance: 0.15,
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
+      weights: {
+        holdToShoot: 22,
+        splashShot: 22,
+        speedBoost: 16,
+        healthPack: 18,
+        overcharge: 22
+      }
+    },
+    enemyRows: [
+      { types: ["phantom", "grunt",   "phantom",  "grunt",   "phantom"] },
+      { types: ["grunt",   "phantom", "guard",    "phantom", "grunt"]   },
+      { types: ["phantom", "guard",   "jammer",   "guard",   "phantom"] },
+      { types: ["guard",   "jammer",  "bruiser",  "jammer",  "guard"]   },
+      { types: ["jammer",  "bruiser", "carrier",  "bruiser", "jammer"]  }
+    ]
+  },
+
+  {
+    id: "stage_12_bloom_field",
+    name: "BLOOM FIELD",
+    subtitle: "Casters fire slow shells that split into three fragments on approach",
+    allowedBehaviors: ["randomActiveFire", "threeLaneSync", "allButOneLane", "pincerFire"],
+    behaviorWeights: {
+      randomActiveFire: 26,
+      threeLaneSync: 26,
+      allButOneLane: 24,
+      pincerFire: 24
+    },
+    allowNextRowSupport: false,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 2,
+      spawnOnKillChance: 0.15,
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
+      weights: {
+        holdToShoot: 24,
+        splashShot: 26,
+        speedBoost: 16,
+        healthPack: 12,
+        overcharge: 22
+      }
+    },
+    enemyRows: [
+      { types: ["caster",  "guard",   "caster",   "guard",   "caster"]  },
+      { types: ["guard",   "caster",  "bruiser",  "caster",  "guard"]   },
+      { types: ["bruiser", "guard",   "caster",   "guard",   "bruiser"] },
+      { types: ["caster",  "bruiser", "carrier",  "bruiser", "caster"]  },
+      { types: ["carrier", "caster",  "bruiser",  "caster",  "carrier"] }
+    ]
+  },
+
+  {
+    id: "stage_13_tracer_hunt",
+    name: "TRACER HUNT",
+    subtitle: "Homing bullets track your position — keep moving",
+    allowedBehaviors: ["randomActiveFire", "threeLaneSync", "allButOneLane", "pincerFire", "convergeFire"],
+    behaviorWeights: {
+      randomActiveFire: 20,
+      threeLaneSync: 20,
+      allButOneLane: 20,
+      pincerFire: 22,
+      convergeFire: 18
+    },
+    allowNextRowSupport: false,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 2,
+      spawnOnKillChance: 0.16,
+      allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
+      weights: {
+        holdToShoot: 20,
+        splashShot: 24,
+        speedBoost: 22,
+        healthPack: 12,
+        overcharge: 22
+      }
+    },
+    enemyRows: [
+      { types: ["tracer",  "guard",   "tracer",   "guard",   "tracer"]  },
+      { types: ["guard",   "tracer",  "caster",   "tracer",  "guard"]   },
+      { types: ["tracer",  "bruiser", "tracer",   "bruiser", "tracer"]  },
+      { types: ["bruiser", "tracer",  "carrier",  "tracer",  "bruiser"] },
+      { types: ["carrier", "bruiser", "tracer",   "bruiser", "carrier"] }
+    ]
+  },
+
+  {
+    id: "stage_14_convergence",
+    name: "CONVERGENCE",
+    subtitle: "Regenerators anchor the back rows — prioritise or watch them refill",
+    allowedBehaviors: ["randomActiveFire", "threeLaneSync", "allButOneLane", "nextRowSupportFire", "pincerFire", "convergeFire"],
+    behaviorWeights: {
+      randomActiveFire: 16,
+      threeLaneSync: 18,
+      allButOneLane: 18,
+      nextRowSupportFire: 18,
+      pincerFire: 16,
+      convergeFire: 14
+    },
+    allowNextRowSupport: true,
+    nextRowSupportStartsWhenActiveCountAtOrBelow: 4,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 2,
+      spawnOnKillChance: 0.16,
+      allowedTypes: ["holdToShoot", "splashShot", "healthPack", "overcharge"],
+      weights: {
+        holdToShoot: 26,
+        splashShot: 28,
+        healthPack: 22,
+        overcharge: 24
+      }
+    },
+    enemyRows: [
+      { types: ["phantom",     "tracer",  "caster",  "tracer",  "phantom"]     },
+      { types: ["tracer",      "phantom", "bruiser", "phantom", "tracer"]      },
+      { types: ["caster",      "bruiser", "phantom", "bruiser", "caster"]      },
+      { types: ["regenerator", "caster",  "titan",   "caster",  "regenerator"] },
+      { types: ["titan",  "regenerator",  "carrier", "regenerator", "titan"]   }
+    ]
+  },
+
+  {
+    id: "stage_15_voidwatch",
+    name: "VOIDWATCH",
+    subtitle: "The Overseer watches from the back — its laser fires between waves",
+    allowedBehaviors: ["randomActiveFire", "threeLaneSync", "allButOneLane", "nextRowSupportFire", "pincerFire", "convergeFire"],
+    behaviorWeights: {
+      randomActiveFire: 14,
+      threeLaneSync: 16,
+      allButOneLane: 18,
+      nextRowSupportFire: 20,
+      pincerFire: 16,
+      convergeFire: 16
+    },
+    allowNextRowSupport: true,
+    nextRowSupportStartsWhenActiveCountAtOrBelow: 5,
+    powerupRules: {
+      enabled: true,
+      maxActivePickups: 2,
+      spawnOnKillChance: 0.17,
+      allowedTypes: ["holdToShoot", "splashShot", "healthPack", "overcharge"],
+      weights: {
+        holdToShoot: 28,
+        splashShot: 30,
+        healthPack: 16,
+        overcharge: 26
+      }
+    },
+    enemyRows: [
+      { types: ["phantom",  "tracer",   "caster",       "tracer",   "phantom"]  },
+      { types: ["tracer",   "caster",   "phantom",      "caster",   "tracer"]   },
+      { types: ["caster",   "phantom",  "titan",        "phantom",  "caster"]   },
+      { types: ["titan",    "caster",   "regenerator",  "caster",   "titan"]    },
+      { types: ["titan",    "phantom",  "overseer",     "phantom",  "titan"]    }
     ]
   }
 ];

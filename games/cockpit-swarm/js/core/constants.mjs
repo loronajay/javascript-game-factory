@@ -22,7 +22,7 @@ export const STATE = {
 // A boss encounter fires after every Nth stage clear (Boss 01 after stage 5).
 export const BOSS_EVERY = 5;
 // Total number of authored bosses — update when adding a new boss.
-export const TOTAL_BOSSES = 2;
+export const TOTAL_BOSSES = 3;
 
 export const LANES = [-180, -90, 0, 90, 180];
 
@@ -56,7 +56,37 @@ export const TUNING = {
 
   starCount: 120,
   cockpitShakeDecay: 0.84,
-  hitFreezeMs: 50
+  hitFreezeMs: 50,
+
+  // ── Curse (phantom backfire) ──────────────────────────────────────────────
+  curseDurationMs: 4000,
+  curseSpeedMultiplier: 0.55,
+  curseFireMultiplier: 2.0,
+
+  // ── Phantom phase cycle ───────────────────────────────────────────────────
+  phantomMaterialMs: 4200,
+  phantomPhasingOutMs: 340,
+  phantomInvisMs: 1800,
+  phantomPhasingInMs: 260,
+
+  // ── Tracer homing ─────────────────────────────────────────────────────────
+  homingStrength: 0.038,
+
+  // ── Caster bloom ─────────────────────────────────────────────────────────
+  bloomDetonateZ: 1.05,
+  bloomSpeedMult: 0.60,
+  bloomFragmentSpeedMult: 1.25,
+
+  // ── Overseer sub-boss laser ───────────────────────────────────────────────
+  overseerChargeMs: 1400,
+  overseerLockMs: 500,
+  overseerFireMs: 600,
+  overseerVulnerableMs: 900,
+  overseerCooldownMs: 2000,
+  overseerBeamWidth: 70,
+
+  // ── Regenerator ───────────────────────────────────────────────────────────
+  regenIntervalMs: 3500
 };
 
 // ─── Boss 02 tuning (The Arbiter) ────────────────────────────────────────────
@@ -84,13 +114,13 @@ export const ARBITER_TUNING = {
 
   phase2: {
     hits: 22,
-    cannonChargeMs: 1100,
-    cannonFireMs: 250,
-    cannonVulnerableMs: 650,
-    cannonResetMs: 900,
-    rightOffsetMs: 1400,   // right cannon cycle starts this far after the left
-    leftDangerX: -45,      // player.x <= this → in left cannon's kill zone
-    rightDangerX: 45       // player.x >= this → in right cannon's kill zone
+    chargeMs: 1050,        // how long the column fills build up before firing
+    fireMs: 300,           // duration of the actual cannon blast
+    openMs: 860,           // punish window — generous so far-lane dodge + center dash is always fair
+    resetMs: 520,          // cooldown before next barrage
+    safeLanes: 1,
+    safeHitWindow: 72,
+    coreHitWindow: 60
   },
 
   phase3: {
@@ -157,6 +187,62 @@ export const BOSS_TUNING = {
     armCadenceMs: 2100,
     laserCooldownMs: 1500
   }
+};
+
+// ─── Boss 03 tuning (ECLIPSIS) ────────────────────────────────────────────────
+export const ECLIPSIS_TUNING = {
+  introMs:      2400,
+  transitionMs: 1400,
+  defeatMs:     2800,
+
+  bodyZ: 1.75,
+  bodyY: -115,
+
+  eyeHitWindow:   68,   // px from world x=0 for eye hit (phases 2+)
+  panelHitWindow: 180,  // generous — panels span the whole body (phase 1)
+
+  phase1: { hits: 15 },
+  phase2: { hits: 18 },
+  phase3: { hits: 20 },
+  phase4: { hits: 24 },
+  phase5: { hits: 30 },
+
+  // ── Mechanic A — Sweeping Beam ────────────────────────────────────────────
+  beamChargeMs:       900,   // eye charges + direction cue
+  beamSweepMsPerLane: 240,   // time spent per lane during sweep
+  beamVulnMs:         1100,  // vulnerable window immediately after sweep
+  beamHalfWidth:      58,    // world-x proximity to current lane = hit
+  // idle cooldown before next beam, indexed by phase-1:
+  beamCadenceMs: [3000, 2600, 2200, 1800, 1400],
+
+  // ── Mechanic B — Reflective Phase ─────────────────────────────────────────
+  reflectImmuneMs: 2000,
+  reflectVulnMs:   1100,
+  reflectCadenceMs: [99999, 4000, 3500, 3000, 2200],
+
+  // ── Mechanic C — Gravity Tether ───────────────────────────────────────────
+  tetherTelegraphMs: 700,
+  tetherSpeedZ:      0.0055,  // z-units per ms
+  tetherDetonateZ:   0.18,
+  tetherHitWindow:   58,      // lane window to shoot projectile down
+  tetherDragForce:   0.38,    // speed-units/frame bias toward target lane
+  tetherDurationMs:  3000,
+  tetherCadenceMs: [99999, 99999, 5000, 4000, 3000],
+
+  // ── Mechanic D — Zone Denial Shot ─────────────────────────────────────────
+  zoneChargeTelegraphMs: 1100,
+  zoneSpeedZ:            0.0045,
+  zoneDetonateZ:         0.19,
+  zoneLaneHalfWidth:     45,  // per-lane hit window on detonation
+  zoneAftermathMs:       900,
+  zoneCadenceMs: [99999, 99999, 99999, 5500, 3500],
+
+  // ── Direct shots ──────────────────────────────────────────────────────────
+  shotCadenceMs: [2500, 2200, 1800, 1400, 1000],
+
+  // ── Shared windows ────────────────────────────────────────────────────────
+  eyeVulnMs:   1100,  // how long eye stays exposed (phases 2+)
+  panelVulnMs: 1000   // how long panels stay exposed (phase 1)
 };
 
 // Button layout — shared by render and game hit-testing so coords stay in sync.

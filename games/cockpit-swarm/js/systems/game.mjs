@@ -1,11 +1,11 @@
-import { H, STATE, TUNING, BOSS_EVERY, TOTAL_BOSSES, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
+import { H, LANES, STATE, TUNING, ECLIPSIS_TUNING, BOSS_EVERY, TOTAL_BOSSES, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
 import { initMpLobby, updateMpLobby, updateMpCountdown, updateMpFighting, updateMpResult } from "./mp-controller.mjs";
 import {
   sfxClick, sfxExplosion, sfxPlayerHurt, sfxShutdown,
   sfxShoot, sfxEnemyDeath,
   startMenuMusic, startGameMusic
 } from "./audio.mjs";
-import { clamp } from "../core/math.mjs";
+import { clamp, rand } from "../core/math.mjs";
 import {
   advanceActiveRow,
   getActiveEnemies,
@@ -22,6 +22,7 @@ import { startBossEncounter, updateBoss, tryDamageBossInShotLane } from "./boss.
 import {
   applySplashShotDamage,
   canHoldToShoot,
+  getPlayerShotDamage,
   getSpeedMultiplier,
   maybeSpawnPowerupFromEnemyKill,
   resetPowerups,
@@ -73,6 +74,9 @@ export function resetGame(game, fromMenu = false, mode = game.mode || "campaign"
   game.player.fireCooldown = 0;
   game.player.muzzleFlash = 0;
   game.player.hurtFlash = 0;
+  game.player.curseTimer = 0;
+  game.player.tetherTimer = 0;
+  game.player.tetherTargetX = 0;
 
   game.stars = makeStars();
 
@@ -157,6 +161,7 @@ export function updateGame(game, input, dt, t) {
 
   if (game.state === STATE.BOSS) {
     updateBoss(game, input, dt, t, damagePlayer, (bossNumber) => {
+      resetPowerups(game); // clears the frozen easter-egg effects that carried through the fight
       if (game.mode === "campaign") {
         game.player.maxHealth += 1;
         game.player.health = Math.min(game.player.health + 1, game.player.maxHealth);
@@ -190,6 +195,7 @@ export function updateGame(game, input, dt, t) {
   }
 
   updateEnemies(game, dt, t);
+  updateOverseerLaser(game, input, dt);
   updateWaveBehavior(game, dt);
   updateEnemyBullets(game, input, dt);
   updatePlayerFire(game, input);
@@ -200,6 +206,7 @@ export function updateGame(game, input, dt, t) {
 // ─── Shared menu transition helper ───────────────────────────────────────────
 
 function goToMenu(game, input) {
+  clearActiveRunner(game);
   game.state = STATE.MENU;
   game.menu.selectedButton = 0;
   game.player.hurtFlash = 0;
@@ -357,7 +364,8 @@ function updatePlayer(game, input, dt) {
   const player = game.player;
   const left = input.isLeft();
   const right = input.isRight();
-  const speedMultiplier = getSpeedMultiplier(game);
+  const cursePenalty = player.curseTimer > 0 ? TUNING.curseSpeedMultiplier : 1.0;
+  const speedMultiplier = getSpeedMultiplier(game) * cursePenalty;
 
   if (left && !right) player.speed -= TUNING.playerAccel * speedMultiplier * (dt / 16.666);
   if (right && !left) player.speed += TUNING.playerAccel * speedMultiplier * (dt / 16.666);
@@ -378,9 +386,17 @@ function updatePlayer(game, input, dt) {
     player.speed *= -0.16;
   }
 
+  // Gravity tether drag (ECLIPSIS mechanic)
+  if (player.tetherTimer > 0) {
+    const dx = player.tetherTargetX - player.x;
+    player.speed += Math.sign(dx) * ECLIPSIS_TUNING.tetherDragForce * (dt / 16.666);
+    player.tetherTimer = Math.max(0, player.tetherTimer - dt);
+  }
+
   player.fireCooldown = Math.max(0, player.fireCooldown - dt);
   player.muzzleFlash  = Math.max(0, player.muzzleFlash  - dt);
   player.hurtFlash    = Math.max(0, player.hurtFlash    - dt);
+  player.curseTimer   = Math.max(0, player.curseTimer   - dt);
   game.shake *= Math.pow(TUNING.cockpitShakeDecay, dt / 16.666);
 }
 
@@ -400,6 +416,46 @@ function updateEnemies(game, dt, t) {
     enemy.rot = Math.sin(t * 0.002 + enemy.driftPhase) * 0.08;
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
     enemy.telegraphFlash = Math.max(0, enemy.telegraphFlash - dt);
+
+    // Phantom phase cycling
+    if (enemy.type === "phantom" && enemy.phaseState !== undefined) {
+      enemy.phaseTimer -= dt;
+      if (enemy.phaseTimer <= 0) {
+        switch (enemy.phaseState) {
+          case "material":
+            enemy.phaseState = "phasing_out";
+            enemy.phaseTimer = TUNING.phantomPhasingOutMs;
+            break;
+          case "phasing_out":
+            enemy.phaseState = "invisible";
+            enemy.phaseTimer = TUNING.phantomInvisMs;
+            enemy.phased = true;
+            break;
+          case "invisible":
+            enemy.phaseState = "phasing_in";
+            enemy.phaseTimer = TUNING.phantomPhasingInMs;
+            enemy.phased = false;
+            break;
+          case "phasing_in":
+            enemy.phaseState = "material";
+            enemy.phaseTimer = rand(TUNING.phantomMaterialMs, TUNING.phantomMaterialMs * 1.3);
+            break;
+        }
+      }
+    }
+
+    // Regenerator HP regen (active row only)
+    if (enemy.type === "regenerator" && enemy.active && enemy.regenTimer !== undefined) {
+      enemy.regenTimer -= dt;
+      if (enemy.regenTimer <= 0) {
+        enemy.regenTimer = TUNING.regenIntervalMs;
+        if (enemy.hp < enemy.maxHp) {
+          enemy.hp = Math.min(enemy.maxHp, enemy.hp + 1);
+          enemy.regenFlash = 280;
+        }
+      }
+      enemy.regenFlash = Math.max(0, enemy.regenFlash - dt);
+    }
   }
 }
 
@@ -407,12 +463,49 @@ function updateEnemies(game, dt, t) {
 
 function updateEnemyBullets(game, input, dt) {
   const step = dt / 16.666;
+  const newBullets = [];
 
   for (const b of game.enemyBullets) {
     if (!b.alive) continue;
 
     b.age += dt;
     b.z -= b.speedZ * step;
+
+    // Homing: drift X toward locked target position
+    if (b.isHoming) {
+      b.x += (b.targetX - b.x) * TUNING.homingStrength * step;
+    }
+
+    // Bloom: detonate into three fragments before reaching the player
+    if (b.isBloom && !b.bloomed && b.z <= TUNING.bloomDetonateZ) {
+      b.bloomed = true;
+      b.alive = false;
+      for (let offset = -1; offset <= 1; offset++) {
+        const li = b.sourceLaneIndex + offset;
+        if (li < 0 || li >= LANES.length) continue;
+        newBullets.push({
+          x: LANES[li],
+          laneIndex: li,
+          sourceRowIndex: b.sourceRowIndex,
+          behaviorId: b.behaviorId,
+          startY: b.startY,
+          z: b.z,
+          startZ: b.z,
+          speedZ: TUNING.enemyBulletSpeedZ * TUNING.bloomFragmentSpeedMult * rand(0.92, 1.08),
+          wobble: rand(0, Math.PI * 2),
+          alive: true,
+          age: 0,
+          resolved: false,
+          isFragment: true,
+          isHoming: false,
+          isBloom: false,
+          bloomed: false,
+          targetX: LANES[li],
+          sourceLaneIndex: li
+        });
+      }
+      continue;
+    }
 
     const p = projectEnemyBullet(b, game.player);
 
@@ -429,7 +522,7 @@ function updateEnemyBullets(game, input, dt) {
     }
   }
 
-  game.enemyBullets = game.enemyBullets.filter(b => b.alive);
+  game.enemyBullets = game.enemyBullets.filter(b => b.alive).concat(newBullets);
 }
 
 function damagePlayer(game, input) {
@@ -466,7 +559,7 @@ function updatePlayerFire(game, input) {
   if (!wantsShot) return;
   if (player.fireCooldown > 0) return;
 
-  player.fireCooldown = TUNING.fireCooldownMs;
+  player.fireCooldown = TUNING.fireCooldownMs * (player.curseTimer > 0 ? TUNING.curseFireMultiplier : 1.0);
   player.muzzleFlash  = 70;
   game.shotsFired++;
 
@@ -495,8 +588,18 @@ function updatePlayerFire(game, input) {
   }
 
   if (best) {
-    const killed = damageEnemy(game, best);
-    applySplashShotDamage(game, best, (enemy, options) => damageEnemy(game, enemy, options));
+    // Phased phantom backfire: curse the player instead of dealing damage
+    if (best.type === "phantom" && best.phased) {
+      game.player.curseTimer = Math.max(game.player.curseTimer, TUNING.curseDurationMs);
+      const pp = project(best.x, best.y, best.z, game.player.x);
+      game.explosions.push({ x: pp.x, y: pp.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, r: 10, life: 320, maxLife: 320, kind: "curse" });
+      game.combo = Math.max(0, game.combo - 1);
+      return;
+    }
+
+    const shotDamage = getPlayerShotDamage(game);
+    const killed = damageEnemy(game, best, { damage: shotDamage });
+    applySplashShotDamage(game, best, (enemy, options) => damageEnemy(game, enemy, { ...options, damage: shotDamage }));
 
     if (killed) {
       const stage = getStage(game.wave.stageIndex);
@@ -506,6 +609,7 @@ function updatePlayerFire(game, input) {
     return;
   }
 
+  if (tryHitOverseer(game)) return;
   if (tryHitRunner(game)) return;
 
   if (tryActivatePowerupInShotLane(game)) {
@@ -519,7 +623,7 @@ function updatePlayerFire(game, input) {
 function damageEnemy(game, enemy, options = {}) {
   if (!enemy.alive) return false;
 
-  enemy.hp -= 1;
+  enemy.hp -= options.damage ?? 1;
   enemy.hitFlash = 120;
   game.shotsHit++;
   game.combo++;
@@ -540,6 +644,81 @@ function damageEnemy(game, enemy, options = {}) {
   }
 
   return false;
+}
+
+// ─── Overseer sub-boss laser ──────────────────────────────────────────────────
+
+function tryHitOverseer(game) {
+  const shotX = getPlayerShotWorldX(game.player);
+  for (const enemy of game.enemies) {
+    if (!enemy.alive || enemy.type !== "overseer" || !enemy.laser?.exposed) continue;
+    if (Math.abs(enemy.x - shotX) <= TUNING.enemyBulletLaneHitWindow) {
+      damageEnemy(game, enemy);
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateOverseerLaser(game, input, dt) {
+  for (const enemy of game.enemies) {
+    if (!enemy.alive || enemy.type !== "overseer" || !enemy.laser) continue;
+
+    const laser = enemy.laser;
+
+    switch (laser.state) {
+      case "idle":
+        laser.timer -= dt;
+        if (laser.timer <= 0) {
+          laser.state = "charging";
+          laser.timer = 0;
+          laser.resolved = false;
+          laser.exposed = false;
+        }
+        break;
+
+      case "charging":
+        laser.timer += dt;
+        laser.targetX = game.player.x;
+        if (laser.timer >= TUNING.overseerChargeMs) {
+          laser.state = "locked";
+          laser.timer = 0;
+          laser.lockedX = laser.targetX;
+        }
+        break;
+
+      case "locked":
+        laser.timer += dt;
+        if (laser.timer >= TUNING.overseerLockMs) {
+          laser.state = "firing";
+          laser.timer = 0;
+          game.shake = Math.max(game.shake, 6);
+          if (Math.abs(laser.lockedX - game.player.x) <= TUNING.overseerBeamWidth) {
+            damagePlayer(game, input);
+          }
+        }
+        break;
+
+      case "firing":
+        laser.timer += dt;
+        if (laser.timer >= TUNING.overseerFireMs) {
+          laser.state = "vulnerable";
+          laser.timer = 0;
+          laser.exposed = true;
+        }
+        break;
+
+      case "vulnerable":
+        laser.timer += dt;
+        laser.exposed = true;
+        if (laser.timer >= TUNING.overseerVulnerableMs) {
+          laser.state = "idle";
+          laser.timer = TUNING.overseerCooldownMs;
+          laser.exposed = false;
+        }
+        break;
+    }
+  }
 }
 
 // ─── Particles ────────────────────────────────────────────────────────────────

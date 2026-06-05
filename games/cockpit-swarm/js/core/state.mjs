@@ -23,7 +23,10 @@ export function createGameState() {
       maxHealth: 3,
       fireCooldown: 0,
       muzzleFlash: 0,
-      hurtFlash: 0
+      hurtFlash: 0,
+      curseTimer: 0,
+      tetherTimer: 0,
+      tetherTargetX: 0
     },
 
     wave: {
@@ -39,7 +42,8 @@ export function createGameState() {
       effects: {
         holdToShootMs: 0,
         speedBoostMs: 0,
-        splashShotCharges: 0
+        splashShotCharges: 0,
+        overchargeMs: 0
       },
       lastPickupId: null
     },

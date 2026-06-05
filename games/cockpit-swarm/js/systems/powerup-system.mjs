@@ -1,4 +1,4 @@
-import { TUNING } from "../core/constants.mjs";
+import { TUNING, STATE } from "../core/constants.mjs";
 import { makePowerup, getPowerupDefinition, isPowerupInShotLane } from "../entities/powerups.mjs";
 import { spawnExplosion } from "../entities/particles.mjs";
 import { sfxPowerup } from "./audio.mjs";
@@ -7,12 +7,13 @@ const DEFAULT_RULES = {
   enabled: true,
   maxActivePickups: 1,
   spawnOnKillChance: 0.12,
-  allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack"],
+  allowedTypes: ["holdToShoot", "splashShot", "speedBoost", "healthPack", "overcharge"],
   weights: {
-    holdToShoot: 25,
-    splashShot: 25,
-    speedBoost: 25,
-    healthPack: 25
+    holdToShoot: 20,
+    splashShot: 20,
+    speedBoost: 20,
+    healthPack: 20,
+    overcharge: 20
   }
 };
 
@@ -21,14 +22,21 @@ export function resetPowerups(game) {
   game.powerups.effects.holdToShootMs = 0;
   game.powerups.effects.speedBoostMs = 0;
   game.powerups.effects.splashShotCharges = 0;
+  game.powerups.effects.overchargeMs = 0;
   game.powerups.lastPickupId = null;
 }
 
 export function updatePowerups(game, dt) {
   const effects = game.powerups.effects;
 
-  effects.holdToShootMs = Math.max(0, effects.holdToShootMs - dt);
-  effects.speedBoostMs = Math.max(0, effects.speedBoostMs - dt);
+  // Easter egg: power-ups carried into a boss fight freeze for the duration.
+  // splashShotCharges never drain either (boss shot path never calls applySplashShotDamage).
+  // All effects clear on boss defeat via resetPowerups in game.mjs.
+  if (game.state !== STATE.BOSS) {
+    effects.holdToShootMs = Math.max(0, effects.holdToShootMs - dt);
+    effects.speedBoostMs = Math.max(0, effects.speedBoostMs - dt);
+    effects.overchargeMs = Math.max(0, effects.overchargeMs - dt);
+  }
 
   for (const pickup of game.powerups.activePickups) {
     if (!pickup.active) continue;
@@ -117,6 +125,10 @@ export function canHoldToShoot(game) {
   return game.powerups.effects.holdToShootMs > 0;
 }
 
+export function getPlayerShotDamage(game) {
+  return game.powerups.effects.overchargeMs > 0 ? 2 : 1;
+}
+
 function applyPowerup(game, type) {
   const def = getPowerupDefinition(type);
 
@@ -147,6 +159,14 @@ function applyPowerup(game, type) {
     } else {
       game.score += 500;
     }
+    return;
+  }
+
+  if (type === "overcharge") {
+    game.powerups.effects.overchargeMs = Math.max(
+      game.powerups.effects.overchargeMs,
+      def.durationMs
+    );
   }
 }
 

@@ -44,6 +44,24 @@ const BEHAVIORS = {
     cooldownMs: [1650, 2600],
     rowSource: "next",
     pattern: "randomSingle"
+  },
+
+  pincerFire: {
+    id: "pincerFire",
+    minShooters: 2,
+    telegraphMs: 680,
+    cooldownMs: [2000, 3000],
+    rowSource: "active",
+    pattern: "outerPair"
+  },
+
+  convergeFire: {
+    id: "convergeFire",
+    minShooters: 3,
+    telegraphMs: 750,
+    cooldownMs: [2400, 3500],
+    rowSource: "active",
+    pattern: "alternatingThree"
   }
 };
 
@@ -109,8 +127,18 @@ function resolvePendingShots(game, dt) {
         if (game.enemyBullets.length >= TUNING.maxEnemyBullets) break;
 
         sfxEnemyShot();
+        const extraOpts = {};
+        if (enemy.type === "tracer") {
+          extraOpts.isHoming = true;
+          extraOpts.targetX = game.player.x;
+        }
+        if (enemy.type === "caster") {
+          extraOpts.isBloom = true;
+          extraOpts.sourceLaneIndex = enemy.laneIndex;
+        }
         game.enemyBullets.push(spawnEnemyBullet(enemy, {
-          behaviorId: pending.behaviorId
+          behaviorId: pending.behaviorId,
+          ...extraOpts
         }));
       }
     }
@@ -182,6 +210,19 @@ function chooseShootersForBehavior(game, stage, behavior) {
 
   if (behavior.pattern === "allButOne") {
     return chooseAllButOneLane(eligible, behavior.minShooters);
+  }
+
+  if (behavior.pattern === "outerPair") {
+    const sorted = eligible.slice().sort((a, b) => a.laneIndex - b.laneIndex);
+    if (sorted.length < 2) return [];
+    return [sorted[0], sorted[sorted.length - 1]];
+  }
+
+  if (behavior.pattern === "alternatingThree") {
+    const sorted = eligible.slice().sort((a, b) => a.laneIndex - b.laneIndex);
+    if (sorted.length < 3) return [];
+    const mid = Math.floor(sorted.length / 2);
+    return [sorted[0], sorted[mid], sorted[sorted.length - 1]];
   }
 
   return [];

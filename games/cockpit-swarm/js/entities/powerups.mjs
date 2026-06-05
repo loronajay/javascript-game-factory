@@ -31,6 +31,14 @@ export const POWERUP_TYPES = {
     heal: 1,
     color: "#eafff1",
     shape: "cross"
+  },
+
+  overcharge: {
+    id: "overcharge",
+    label: "OVCHG",
+    durationMs: 7000,
+    color: "#ff6b35",
+    shape: "bolt"
   }
 };
 

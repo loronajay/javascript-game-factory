@@ -79,7 +79,7 @@ export function tryHitRunner(game) {
   const runner = game.runner.active;
   if (!runner) return false;
 
-  if (Math.abs(runner.x - game.player.x) > TUNING.enemyBulletLaneHitWindow) return false;
+  if (Math.abs(runner.x - game.player.x) > TUNING.reticleHitWindowX) return false;
 
   runner.hp--;
   runner.hitFlash = 120;
@@ -108,6 +108,7 @@ function applyRunnerKill(game, runner) {
     fx.holdToShootMs     = Math.max(fx.holdToShootMs, 15000);
     fx.speedBoostMs      = Math.max(fx.speedBoostMs,  15000);
     fx.splashShotCharges += 20;
+    fx.overchargeMs      = Math.max(fx.overchargeMs,  15000);
     game.runner.killMessage = "JACKPOT!";
   } else {
     const wasAlreadyFull = game.player.health >= game.player.maxHealth;

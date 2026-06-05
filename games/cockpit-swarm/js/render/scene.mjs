@@ -102,6 +102,7 @@ export function renderGame(ctx, game, t) {
   } else {
     renderPowerups(ctx, game, t);
     renderEnemies(ctx, game);
+    renderOverseerLasers(ctx, game, t);
     renderRunners(ctx, game, t);
     renderEnemyBullets(ctx, game);
     renderPlayerFire(ctx, game);
@@ -819,6 +820,17 @@ function drawPowerupShape(ctx, shape, size) {
     return;
   }
 
+  if (shape === "bolt") {
+    ctx.moveTo(size * 0.18, -size * 0.54);
+    ctx.lineTo(-size * 0.14, -size * 0.04);
+    ctx.lineTo(size * 0.10, -size * 0.04);
+    ctx.lineTo(-size * 0.18, size * 0.54);
+    ctx.lineTo(size * 0.14, size * 0.04);
+    ctx.lineTo(-size * 0.10, size * 0.04);
+    ctx.closePath();
+    return;
+  }
+
   ctx.arc(0, 0, size * 0.45, 0, Math.PI * 2);
 }
 
@@ -845,16 +857,28 @@ function renderEnemies(ctx, game) {
 function drawEnemy(ctx, x, y, size, rot, enemy) {
   const telegraphing = enemy.telegraphFlash > 0;
   const hitFlash = enemy.hitFlash > 0;
+  const regenFlashing = (enemy.regenFlash ?? 0) > 0;
+  const overseerExposed = enemy.type === "overseer" && enemy.laser?.exposed;
+
+  // Phantom phase rendering
+  const phased = enemy.phased ?? false;
+  const phasingOut = enemy.phaseState === "phasing_out";
+  const phasingIn  = enemy.phaseState === "phasing_in";
 
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rot);
 
-  ctx.shadowBlur = hitFlash ? 28 : telegraphing ? 30 : 16;
-  ctx.shadowColor = hitFlash ? "#ffffff" : telegraphing ? "#ff365d" : enemy.color;
+  if (phased) {
+    ctx.globalAlpha = 0.06 + Math.random() * 0.05;
+  } else if (phasingOut || phasingIn) {
+    ctx.globalAlpha = Math.random() < 0.45 ? 0.12 : 0.88;
+  }
 
-  ctx.fillStyle = hitFlash ? "#ffffff" : telegraphing ? "#ff365d" : enemy.color;
-  ctx.strokeStyle = telegraphing ? "#ffd1dc" : "#b9fbff";
+  ctx.shadowBlur  = hitFlash ? 28 : regenFlashing ? 32 : overseerExposed ? 36 : telegraphing ? 30 : 16;
+  ctx.shadowColor = hitFlash ? "#ffffff" : regenFlashing ? "#44ddcc" : overseerExposed ? "#78ff9d" : telegraphing ? "#ff365d" : enemy.color;
+  ctx.fillStyle   = hitFlash ? "#ffffff" : regenFlashing ? "#44ddcc" : telegraphing ? "#ff365d" : enemy.color;
+  ctx.strokeStyle = regenFlashing ? "#44ddcc" : overseerExposed ? "#78ff9d" : telegraphing ? "#ffd1dc" : "#b9fbff";
   ctx.lineWidth = Math.max(2, size * 0.05);
 
   drawEnemyShape(ctx, enemy.shape ?? "fighter", size);
@@ -932,6 +956,52 @@ function drawEnemyShape(ctx, shape, size) {
     return;
   }
 
+  if (shape === "phantom") {
+    ctx.moveTo(0, -size * 0.70);
+    ctx.lineTo(size * 0.18, -size * 0.28);
+    ctx.lineTo(size * 0.52, size * 0.10);
+    ctx.lineTo(size * 0.26, size * 0.08);
+    ctx.lineTo(size * 0.10, size * 0.54);
+    ctx.lineTo(0, size * 0.36);
+    ctx.lineTo(-size * 0.10, size * 0.54);
+    ctx.lineTo(-size * 0.26, size * 0.08);
+    ctx.lineTo(-size * 0.52, size * 0.10);
+    ctx.lineTo(-size * 0.18, -size * 0.28);
+    ctx.closePath();
+    return;
+  }
+
+  if (shape === "tracer") {
+    ctx.moveTo(0, -size * 0.82);
+    ctx.lineTo(size * 0.11, -size * 0.10);
+    ctx.lineTo(size * 0.44, size * 0.32);
+    ctx.lineTo(size * 0.08, size * 0.14);
+    ctx.lineTo(0, size * 0.52);
+    ctx.lineTo(-size * 0.08, size * 0.14);
+    ctx.lineTo(-size * 0.44, size * 0.32);
+    ctx.lineTo(-size * 0.11, -size * 0.10);
+    ctx.closePath();
+    return;
+  }
+
+  if (shape === "caster") {
+    ctx.arc(0, 0, size * 0.52, 0, Math.PI * 2);
+    return;
+  }
+
+  if (shape === "overseer") {
+    ctx.moveTo(0, -size * 0.76);
+    ctx.lineTo(size * 0.54, -size * 0.30);
+    ctx.lineTo(size * 0.72, size * 0.18);
+    ctx.lineTo(size * 0.36, size * 0.52);
+    ctx.lineTo(0, size * 0.72);
+    ctx.lineTo(-size * 0.36, size * 0.52);
+    ctx.lineTo(-size * 0.72, size * 0.18);
+    ctx.lineTo(-size * 0.54, -size * 0.30);
+    ctx.closePath();
+    return;
+  }
+
   ctx.moveTo(0, -size * 0.58);
   ctx.lineTo(size * 0.52, size * 0.34);
   ctx.lineTo(size * 0.18, size * 0.24);
@@ -971,6 +1041,45 @@ function drawEnemyCore(ctx, shape, size) {
     return;
   }
 
+  if (shape === "caster") {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(170,255,68,0.7)";
+    ctx.lineWidth = Math.max(1.5, size * 0.04);
+    ctx.shadowColor = "#aaff44";
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.68, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    return;
+  }
+
+  if (shape === "overseer") {
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.10, size * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,100,0,0.9)";
+    ctx.lineWidth = Math.max(2, size * 0.06);
+    ctx.shadowColor = "#ff6600";
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.10, size * 0.13, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    return;
+  }
+
+  if (shape === "phantom" || shape === "tracer") {
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.08, size * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
   ctx.beginPath();
   ctx.arc(0, -size * 0.1, size * 0.13, 0, Math.PI * 2);
   ctx.fill();
@@ -1000,6 +1109,74 @@ function drawEnemyHpBar(ctx, enemy, size) {
   ctx.strokeRect(x, y, w, h);
 }
 
+// ─── Overseer sub-boss laser ──────────────────────────────────────────────────
+
+function renderOverseerLasers(ctx, game, t) {
+  for (const enemy of game.enemies) {
+    if (!enemy.alive || enemy.type !== "overseer" || !enemy.laser) continue;
+
+    const laser = enemy.laser;
+    if (laser.state === "idle" || laser.state === "vulnerable") continue;
+
+    const ep = project(enemy.x, enemy.y, enemy.z, game.player.x);
+
+    if (laser.state === "charging") {
+      const tx = CX + (laser.targetX - game.player.x) / Math.max(0.12, TUNING.enemyBulletHitDepth);
+      const pulse = 0.28 + Math.sin(t * 0.014) * 0.14;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = "#ff6600";
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = "#ff6600";
+      ctx.shadowBlur = 8;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(ep.x, ep.y);
+      ctx.lineTo(CX + (laser.targetX - game.player.x), RETICLE_Y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    if (laser.state === "locked") {
+      const pulse = 0.55 + Math.sin(t * 0.028) * 0.30;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = "#ff2200";
+      ctx.lineWidth = 4;
+      ctx.shadowColor = "#ff2200";
+      ctx.shadowBlur = 22;
+      ctx.beginPath();
+      ctx.moveTo(ep.x, ep.y);
+      ctx.lineTo(CX + (laser.lockedX - game.player.x), RETICLE_Y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (laser.state === "firing") {
+      const lx = CX + (laser.lockedX - game.player.x);
+      ctx.save();
+      ctx.globalAlpha = 0.88;
+      ctx.strokeStyle = "#ff6600";
+      ctx.lineWidth = 10;
+      ctx.shadowColor = "#ff9900";
+      ctx.shadowBlur = 44;
+      ctx.beginPath();
+      ctx.moveTo(ep.x, ep.y);
+      ctx.lineTo(lx, RETICLE_Y);
+      ctx.stroke();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(ep.x, ep.y);
+      ctx.lineTo(lx, RETICLE_Y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
 // ─── Enemy bullets ────────────────────────────────────────────────────────────
 
 function renderEnemyBullets(ctx, game) {
@@ -1013,8 +1190,12 @@ function renderEnemyBullets(ctx, game) {
     const wobbleX = Math.sin(b.age * 0.008 + b.wobble) * (1 - closeness) * 8;
     const x = p.x + wobbleX;
     const y = p.y;
-    const bColor = b.isRunnerBullet ? "#ff9900" : "#ff365d";
-    const bScale = b.isRunnerBullet ? 1.65 : 1;
+    let bColor = "#ff365d";
+    let bScale = 1;
+    if (b.isRunnerBullet) { bColor = "#ff9900"; bScale = 1.65; }
+    else if (b.isHoming)  { bColor = "#ff2db5"; bScale = 1.10; }
+    else if (b.isBloom)   { bColor = "#aaff44"; bScale = 1.45; }
+    else if (b.isFragment){ bColor = "#aaff44"; bScale = 0.90; }
     const r = TUNING.enemyBulletBaseSize * p.s * lerp(0.85, 1.45, closeness) * bScale;
 
     ctx.save();
@@ -1223,6 +1404,9 @@ function renderParticles(ctx, game) {
     } else if (p.kind === "miss") {
       ctx.fillStyle = "#6ab7c4";
       ctx.shadowColor = "#6ab7c4";
+    } else if (p.kind === "curse") {
+      ctx.fillStyle = "#b44dff";
+      ctx.shadowColor = "#b44dff";
     } else if (p.kind === "powerup") {
       ctx.fillStyle = "#4db7ff";
       ctx.shadowColor = "#4db7ff";
@@ -1261,6 +1445,13 @@ function renderCockpit(ctx, game, t = 0, showReticle = true) {
   if (game.player.hurtFlash > 0) {
     ctx.globalAlpha = game.player.hurtFlash / 260 * 0.4;
     ctx.fillStyle = "#ff365d";
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  if (game.player.curseTimer > 0) {
+    const intensity = Math.min(1, game.player.curseTimer / 4000);
+    ctx.globalAlpha = (0.10 + Math.sin(t * 0.006) * 0.04) * intensity;
+    ctx.fillStyle = "#8800ff";
     ctx.fillRect(0, 0, W, H);
   }
 
@@ -1834,6 +2025,16 @@ function drawPowerupHud(ctx, game, x, y) {
   ctx.font = "700 18px system-ui, sans-serif";
   ctx.fillStyle = items.length ? "#d8fbff" : "rgba(216,251,255,0.32)";
   ctx.fillText(items.length ? items.join("  |  ") : "NONE", x, y + 6);
+
+  if (game.player.curseTimer > 0) {
+    ctx.font = "700 16px system-ui, sans-serif";
+    ctx.fillStyle = "#b44dff";
+    ctx.shadowColor = "#b44dff";
+    ctx.shadowBlur = 8;
+    ctx.fillText(`CURSED  ${Math.ceil(game.player.curseTimer / 1000)}s`, x, y + 30);
+    ctx.shadowBlur = 0;
+  }
+
   ctx.restore();
 }
 

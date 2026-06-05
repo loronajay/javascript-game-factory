@@ -1,8 +1,9 @@
-import { BOSS_TUNING, ARBITER_TUNING } from "../core/constants.mjs";
+import { BOSS_TUNING, ARBITER_TUNING, ECLIPSIS_TUNING } from "../core/constants.mjs";
 
 // ─── Boss factory ─────────────────────────────────────────────────────────────
 
 export function makeBoss(number = 1) {
+  if (number === 3) return makeEclipsis();
   return number === 2 ? makeArbiter() : makeDreadmaw();
 }
 
@@ -79,12 +80,10 @@ function makeVolley() {
 }
 
 function makeCannon(side) {
-  // Right cannon starts offset so they fire out of sync.
-  const initDelay = side < 0 ? 400 : ARBITER_TUNING.phase2.rightOffsetMs + 400;
   return {
     side,
     state: "idle",
-    timer: initDelay,
+    timer: 0,
     exposed: false,
     flash: 0
   };
@@ -102,6 +101,66 @@ function makeArbiterLaser() {
   };
 }
 
+// ─── Boss 03: ECLIPSIS ────────────────────────────────────────────────────────
+
+function makeEclipsis() {
+  return {
+    number: 3,
+    phase: 1,
+    sub: "intro",
+    timer: ECLIPSIS_TUNING.introMs,
+    hp: [
+      ECLIPSIS_TUNING.phase1.hits,
+      ECLIPSIS_TUNING.phase2.hits,
+      ECLIPSIS_TUNING.phase3.hits,
+      ECLIPSIS_TUNING.phase4.hits,
+      ECLIPSIS_TUNING.phase5.hits
+    ],
+    shellCrack: 0,          // 0–1; drives crystal→organic visual layering
+    eyeHeat: 0,
+    bob: 0,
+    hitFlashBody: 0,
+    eyeFlash: 0,
+    panelFlash: 0,
+    eyeExposed: false,
+    eyeExposedTimer: 0,
+    panelExposed: false,
+    panelExposedTimer: 0,
+    beam: {
+      state: "idle",
+      timer: ECLIPSIS_TUNING.beamCadenceMs[0] * 0.5,  // first beam comes in sooner
+      dir: 1,
+      laneIndex: 0,
+      laneProgress: 0,
+      damagedThisLane: false,
+      reversed: false
+    },
+    reflect: {
+      state: "idle",
+      timer: 99999  // inactive in phase 1
+    },
+    tether: {
+      state: "idle",
+      timer: 99999, // inactive in phases 1-2
+      active: false,
+      worldX: 0,
+      z: 2.5,
+      targetLaneIndex: 2
+    },
+    zone: {
+      state: "idle",
+      timer: 99999, // inactive in phases 1-3
+      active: false,
+      worldX: 0,
+      z: 2.5,
+      startLane: 0
+    },
+    shot: {
+      timer: ECLIPSIS_TUNING.shotCadenceMs[0]
+    }
+  };
+}
+
 // ─── Phase helpers ────────────────────────────────────────────────────────────
 
 // Boss 01 helpers — called with boss.phase (a number).
@@ -115,11 +174,12 @@ export function phaseUsesLaser(phase) {
 
 // Boss 02 helpers — called with the full boss object.
 export function phaseUsesVolley(boss) {
-  return boss.number === 2 && (boss.phase === 1 || boss.phase === 3);
+  return boss.number === 2 && (boss.phase === 1 || boss.phase === 2 || boss.phase === 3);
 }
 
-export function phaseUsesCannons(boss) {
-  return boss.number === 2 && boss.phase === 2;
+export function phaseUsesCannons(_boss) {
+  // Cannons are now visual-only decorations driven by the volley state in phase 2.
+  return false;
 }
 
 export function phaseUsesArbiterLaser(boss) {
@@ -129,6 +189,13 @@ export function phaseUsesArbiterLaser(boss) {
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
 export function bossPhaseMax(boss, phase) {
+  if (boss.number === 3) {
+    const table = [
+      ECLIPSIS_TUNING.phase1.hits, ECLIPSIS_TUNING.phase2.hits, ECLIPSIS_TUNING.phase3.hits,
+      ECLIPSIS_TUNING.phase4.hits, ECLIPSIS_TUNING.phase5.hits
+    ];
+    return table[phase - 1] ?? ECLIPSIS_TUNING.phase5.hits;
+  }
   if (boss.number === 2) {
     if (phase === 1) return ARBITER_TUNING.phase1.hits;
     if (phase === 2) return ARBITER_TUNING.phase2.hits;

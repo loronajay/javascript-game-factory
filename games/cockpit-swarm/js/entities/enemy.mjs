@@ -87,13 +87,65 @@ export const ENEMY_TYPES = {
     color: "#ff1133",
     shape: "carrier",
     sizeScale: 1.40
+  },
+
+  // Act III enemy types ─────────────────────────────────────────────────────
+
+  // Phases in/out of reality — shooting it while phased curses the player.
+  phantom: {
+    hp: 4,
+    canFire: true,
+    scoreValue: 700,
+    color: "#b44dff",
+    shape: "phantom",
+    sizeScale: 0.95
+  },
+
+  // Fires homing bullets that drift toward the player's locked position.
+  tracer: {
+    hp: 3,
+    canFire: true,
+    scoreValue: 650,
+    color: "#ff2db5",
+    shape: "tracer",
+    sizeScale: 0.90
+  },
+
+  // Fires slow bloom shells that split into three fragments on approach.
+  caster: {
+    hp: 4,
+    canFire: true,
+    scoreValue: 850,
+    color: "#aaff44",
+    shape: "caster",
+    sizeScale: 1.05
+  },
+
+  // Slowly regenerates HP while active — must be prioritised.
+  regenerator: {
+    hp: 8,
+    canFire: true,
+    scoreValue: 1100,
+    color: "#44ddcc",
+    shape: "shield",
+    sizeScale: 1.15
+  },
+
+  // Sub-boss anchor in the back row — fires an independent lock-on laser.
+  overseer: {
+    hp: 14,
+    canFire: false,
+    scoreValue: 2400,
+    color: "#ff6600",
+    shape: "overseer",
+    sizeScale: 1.35
   }
 };
 
 export function makeEnemy(x, y, z, phase, rowIndex = 0, laneIndex = 0, type = "grunt") {
   const def = ENEMY_TYPES[type] ?? ENEMY_TYPES.grunt;
 
-  return {
+  const enemy = {
     originX: x,
     targetOriginX: x,
 
@@ -123,6 +175,30 @@ export function makeEnemy(x, y, z, phase, rowIndex = 0, laneIndex = 0, type = "g
     telegraphFlash: 0,
     rot: 0
   };
+
+  if (type === "phantom") {
+    enemy.phaseState = "material";
+    enemy.phaseTimer = rand(1500, 4000);
+    enemy.phased = false;
+  }
+
+  if (type === "regenerator") {
+    enemy.regenTimer = TUNING.regenIntervalMs;
+    enemy.regenFlash = 0;
+  }
+
+  if (type === "overseer") {
+    enemy.laser = {
+      state: "idle",
+      timer: 2200,
+      targetX: 0,
+      lockedX: 0,
+      exposed: false,
+      resolved: false
+    };
+  }
+
+  return enemy;
 }
 
 export function makeFormation(stage) {
@@ -214,6 +290,11 @@ export function advanceActiveRow(enemies) {
 }
 
 export function spawnEnemyBullet(enemy, options = {}) {
+  const isBloom = options.isBloom ?? false;
+  const baseSpeed = isBloom
+    ? TUNING.enemyBulletSpeedZ * TUNING.bloomSpeedMult
+    : (options.speedZ ?? TUNING.enemyBulletSpeedZ);
+
   return {
     x: enemy.x,
     laneIndex: enemy.laneIndex,
@@ -222,10 +303,16 @@ export function spawnEnemyBullet(enemy, options = {}) {
     startY: enemy.y,
     z: enemy.z,
     startZ: enemy.z,
-    speedZ: (options.speedZ ?? TUNING.enemyBulletSpeedZ) * rand(0.94, 1.08),
+    speedZ: baseSpeed * rand(0.94, 1.08),
     wobble: rand(0, Math.PI * 2),
     alive: true,
     age: 0,
-    resolved: false
+    resolved: false,
+    isHoming: options.isHoming ?? false,
+    targetX: options.targetX ?? enemy.x,
+    isBloom,
+    bloomed: false,
+    sourceLaneIndex: options.sourceLaneIndex ?? enemy.laneIndex,
+    isFragment: false
   };
 }
