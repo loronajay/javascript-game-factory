@@ -58,6 +58,14 @@ test("battle resolution overlay is exposed while attacks play out", () => {
   assert.equal(scene.overlays.battleResolution, attackResolution);
 });
 
+test("battle resolution animations avoid paint-heavy filter effects", () => {
+  const overlayCss = readSceneCss("overlay-layer.css");
+  const battleCss = overlayCss.slice(overlayCss.indexOf(".battle-resolution"));
+
+  assert.doesNotMatch(battleCss, /filter:/);
+  assert.doesNotMatch(battleCss, /drop-shadow\(/);
+});
+
 test("selected monsters blocked from offensive actions cannot offer attack", () => {
   const scene = buildSceneLayout(testView(), {
     selected: {
@@ -140,6 +148,19 @@ test("hand lanes reserve room for hovered cards", () => {
   assert.match(responsiveCss, /\.hand-layer--opponent\s*\{[^}]*height:\s*110px;/s);
   assert.match(responsiveCss, /\.hand-layer--player\s*\{[^}]*height:\s*138px;/s);
   assert.match(responsiveCss, /\.hand-layer--player\s*\{[^}]*height:\s*132px;/s);
+});
+
+test("battlefield row labels stay out of card slots while player targets stay grouped", () => {
+  const battlefieldCss = readSceneCss("battlefield-layer.css");
+  const responsiveCss = readSceneCss("responsive-scene.css");
+  const rowRule = battlefieldCss.match(/\.monster-row-layer\s*\{[^}]+\}/)?.[0] ?? "";
+  const bodyRule = battlefieldCss.match(/\.monster-row-body\s*\{[^}]+\}/)?.[0] ?? "";
+
+  assert.match(rowRule, /grid-template-columns:\s*96px minmax\(0,\s*1fr\);/);
+  assert.match(rowRule, /grid-template-rows:\s*minmax\(0,\s*1fr\);/);
+  assert.match(bodyRule, /grid-template-columns:\s*auto 74px;/);
+  assert.match(bodyRule, /justify-content:\s*center;/);
+  assert.match(responsiveCss, /@media \(max-width: 620px\)\s*\{[\s\S]*\.monster-row-layer\s*\{[^}]*grid-template-columns:\s*1fr;/);
 });
 
 function testView({ currentPlayerTurnsStarted = 2 } = {}) {

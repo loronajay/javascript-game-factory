@@ -11,8 +11,8 @@ export function buildSceneLayout(view, uiState = {}) {
     currentPlayer,
     opponentPlayer,
     huds: {
-      opponent: hudView(opponentPlayer, battlefieldInteraction),
-      player: hudView(currentPlayer, battlefieldInteraction),
+      opponent: hudView(opponentPlayer),
+      player: hudView(currentPlayer),
     },
     piles: {
       opponent: pileViews(opponentPlayer),
@@ -48,7 +48,7 @@ export function buildSceneLayout(view, uiState = {}) {
   };
 }
 
-function hudView(player, battlefieldInteraction) {
+function hudView(player) {
   return {
     id: player.id,
     name: player.name,
@@ -58,7 +58,6 @@ function hudView(player, battlefieldInteraction) {
     starsRemaining: player.starsRemaining,
     deckCount: player.deckCount,
     graveyardCount: player.graveyardCount,
-    playerTarget: playerTargetView(player, battlefieldInteraction),
   };
 }
 
@@ -84,6 +83,7 @@ function monsterRowView(player, side, battlefieldInteraction) {
     playerName: player.name,
     side,
     isTargetRow: battlefieldInteraction.targetPlayerId === player.id,
+    playerTarget: playerTargetView(player, battlefieldInteraction),
     slots: player.monsterSlots.map((monster, slotIndex) =>
       monsterSlotView(player.id, slotIndex, monster, battlefieldInteraction),
     ),

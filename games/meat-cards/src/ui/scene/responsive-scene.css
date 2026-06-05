@@ -90,8 +90,22 @@
     padding: 10px;
   }
 
+  .monster-row-layer {
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 8px;
+  }
+
   .scene-monster-slots {
     gap: 8px;
+  }
+
+  .monster-row-body {
+    grid-template-columns: auto 60px;
+    gap: 8px;
+  }
+
+  .player-target {
+    width: 52px;
   }
 
   .scene-monster-slot {
@@ -110,9 +124,38 @@
     grid-template-rows: 1fr 1fr;
   }
 
+  .monster-row-layer {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .monster-row-layer > .scene-zone-label {
+    padding-top: 0;
+    white-space: nowrap;
+  }
+
   .scene-monster-slots {
     display: grid;
-    grid-template-columns: repeat(4, minmax(66px, 1fr));
+    grid-template-columns: repeat(4, minmax(48px, 1fr));
+  }
+
+  .monster-row-body {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    justify-content: stretch;
+    gap: 6px;
+  }
+
+  .player-target {
+    width: 44px;
+  }
+
+  .player-avatar-sprite {
+    transform: scale(1.15);
+  }
+
+  .player-target-cue {
+    display: none;
   }
 
   .scene-hud--player {

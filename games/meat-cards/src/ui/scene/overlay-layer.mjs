@@ -151,13 +151,17 @@ function createBattleResolution(resolution) {
 function createBattleTargetPiece(card, hit) {
   if (card.type !== "player") return createCardPiece(card, { large: true });
   return el("div", "battle-player-target", [
-    el("img", "battle-player-avatar", {
-      src: hit ? `/${card.hurtArt}` : `/${card.art}`,
-      alt: "",
-      draggable: "false",
+    el("span", "battle-player-avatar", {
+      "aria-hidden": "true",
+      style: battlePlayerAvatarStyle(card, hit),
     }),
     el("span", "battle-player-hp", `${card.currentHp}/${card.maxHp} HP`),
   ]);
+}
+
+function battlePlayerAvatarStyle(card, hit) {
+  const imageSrc = hit ? card.hurtArt : card.art;
+  return imageSrc ? `--battle-player-avatar-image: url("/${imageSrc}");` : "";
 }
 
 function createBattleCardHeader(label, card, hpPreview) {

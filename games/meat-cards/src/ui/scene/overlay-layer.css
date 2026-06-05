@@ -326,7 +326,8 @@
 .battle-card {
   display: grid;
   gap: 8px;
-  filter: drop-shadow(10px 14px 0 rgba(0, 0, 0, 0.56));
+  box-shadow: 10px 14px 0 rgba(0, 0, 0, 0.38);
+  will-change: transform, opacity;
 }
 
 .battle-card--attacker {
@@ -341,6 +342,17 @@
   animation:
     battle-target-enter 420ms ease-out both,
     battle-target-hit 420ms 1580ms steps(2, end) both;
+}
+
+.battle-resolution.is-hit .battle-target-card-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid rgba(255, 248, 220, 0.72);
+  background: rgba(255, 248, 220, 0.26);
+  opacity: 0;
+  pointer-events: none;
+  animation: battle-target-flash 420ms 1580ms steps(2, end) both;
 }
 
 .battle-card-header {
@@ -400,6 +412,7 @@
   font-size: 38px;
   font-weight: 950;
   animation: battle-die-roll 860ms steps(6, end) both;
+  will-change: transform;
 }
 
 .battle-result {
@@ -444,10 +457,11 @@
 .battle-player-avatar {
   width: 96px;
   height: 96px;
-  object-fit: none;
-  object-position: left top;
+  background-image: var(--battle-player-avatar-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 90px 96px;
   image-rendering: pixelated;
-  transform: scale(2.4);
 }
 
 .battle-player-hp {
@@ -511,17 +525,14 @@
 @keyframes battle-die-roll {
   0% {
     transform: rotate(-18deg) scale(0.78);
-    filter: blur(1px);
   }
 
   70% {
     transform: rotate(380deg) scale(1.1);
-    filter: blur(1px);
   }
 
   100% {
     transform: rotate(360deg) scale(1);
-    filter: blur(0);
   }
 }
 
@@ -552,12 +563,21 @@
   0%,
   100% {
     transform: translateX(0);
-    filter: brightness(1);
   }
 
   50% {
     transform: translateX(14px);
-    filter: brightness(2.2) saturate(0.4);
+  }
+}
+
+@keyframes battle-target-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 

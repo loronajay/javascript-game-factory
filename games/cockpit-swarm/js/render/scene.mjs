@@ -95,7 +95,7 @@ export function renderGame(ctx, game, t) {
     renderCockpit(ctx, game, t);
     // Player essentials (hull/power/score/rail) stay visible; boss bar sits up top.
     drawHealth(ctx, game, 34, H - 82);
-    drawPowerupHud(ctx, game, 200, H - 90);
+    drawPowerupHud(ctx, game, 34, H - 155);
     drawScore(ctx, game);
     drawRailGauge(ctx, game);
     renderBossHud(ctx, game, t);
@@ -1775,7 +1775,7 @@ function renderHud(ctx, game) {
 
   drawStageBadge(ctx, game, stage);
   drawHealth(ctx, game, 34, H - 82);
-  drawPowerupHud(ctx, game, 200, H - 90);
+  drawPowerupHud(ctx, game, 34, H - 155);
   drawScore(ctx, game);
   drawRailGauge(ctx, game);
 

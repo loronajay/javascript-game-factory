@@ -33,6 +33,7 @@ function createMonsterRow(row, handlers) {
     `monster-row-layer monster-row-layer--${row.side}${row.isTargetRow ? " is-target-row" : ""}`,
   );
   rowElement.append(el("div", "scene-zone-label", row.side === "player" ? "Your Monsters" : "Enemy Monsters"));
+  const rowBody = el("div", "monster-row-body");
   const slots = el("div", "scene-monster-slots");
 
   row.slots.forEach((slotView) => {
@@ -96,8 +97,45 @@ function createMonsterRow(row, handlers) {
     slots.append(slot);
   });
 
-  rowElement.append(slots);
+  rowBody.append(slots, createPlayerTarget(row.playerTarget, handlers));
+  rowElement.append(rowBody);
   return rowElement;
+}
+
+function createPlayerTarget(playerTarget, handlers) {
+  const classes = [
+    "player-target",
+    playerTarget?.isValidTarget ? "is-valid-target" : "",
+    playerTarget?.isTargeted ? "is-targeted" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const target = el(
+    "button",
+    classes,
+    {
+      type: "button",
+      "aria-label": playerTarget?.ariaLabel ?? "Player",
+      "data-player-target-id": playerTarget?.playerId,
+    },
+    [
+      el("span", "player-avatar-sprite", {
+        "aria-hidden": "true",
+        style: playerAvatarStyle(playerTarget),
+      }),
+      playerTarget?.actionCue ? el("span", "player-target-cue", playerTarget.actionCue) : null,
+    ],
+  );
+  target.addEventListener("click", () => {
+    if (!playerTarget?.playerId) return;
+    handlers.onPlayerTarget?.({ playerId: playerTarget.playerId });
+  });
+  return target;
+}
+
+function playerAvatarStyle(playerTarget) {
+  const imageSrc = playerTarget?.isTargeted ? playerTarget?.hurtSrc : playerTarget?.idleSrc;
+  return imageSrc ? `--player-avatar-image: url("/${imageSrc}");` : "";
 }
 
 function createAttachedAccessoryTray(slotView, handlers) {

@@ -1,15 +1,12 @@
 import { el } from "./dom.mjs";
 
-export function createHudLayer(hud, side, handlers = {}) {
+export function createHudLayer(hud, side) {
   const layer = el("section", `scene-hud scene-hud--${side}${hud.isCurrentPlayer ? " is-active-turn" : ""}`);
   layer.append(
-    createPlayerTarget(hud.playerTarget, handlers),
-    el("div", "scene-hud-copy", [
-      el("div", "scene-hud-name", hud.name),
-      el("div", "scene-hud-stats", [
-        stat("HP", hud.hpLabel),
-        stat("★", hud.starsLabel),
-      ]),
+    el("div", "scene-hud-name", hud.name),
+    el("div", "scene-hud-stats", [
+      stat("HP", hud.hpLabel),
+      stat("★", hud.starsLabel),
     ]),
   );
   return layer;
@@ -26,42 +23,6 @@ export function createPileLayer(piles, side) {
     );
   });
   return layer;
-}
-
-function createPlayerTarget(playerTarget, handlers = {}) {
-  const classes = [
-    "player-target",
-    playerTarget?.isValidTarget ? "is-valid-target" : "",
-    playerTarget?.isTargeted ? "is-targeted" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const target = el(
-    "button",
-    classes,
-    {
-      type: "button",
-      "aria-label": playerTarget?.ariaLabel ?? "Player",
-      "data-player-target-id": playerTarget?.playerId,
-    },
-    [
-      el("span", "player-avatar-sprite", {
-        "aria-hidden": "true",
-        style: playerAvatarStyle(playerTarget),
-      }),
-      playerTarget?.actionCue ? el("span", "player-target-cue", playerTarget.actionCue) : null,
-    ],
-  );
-  target.addEventListener("click", () => {
-    if (!playerTarget?.playerId) return;
-    handlers.onPlayerTarget?.({ playerId: playerTarget.playerId });
-  });
-  return target;
-}
-
-function playerAvatarStyle(playerTarget) {
-  const imageSrc = playerTarget?.isTargeted ? playerTarget?.hurtSrc : playerTarget?.idleSrc;
-  return imageSrc ? `--player-avatar-image: url("/${imageSrc}");` : "";
 }
 
 function stat(label, value) {
