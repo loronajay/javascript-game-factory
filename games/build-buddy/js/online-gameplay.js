@@ -192,6 +192,23 @@ export function createBuilderCommandMessage(command = {}) {
   };
 }
 
+export function createStageCompleteRequestMessage(state, details = {}) {
+  return {
+    messageType: 'stage_complete_request',
+    value: {
+      protocolVersion: ONLINE_GAMEPLAY_PROTOCOL_VERSION,
+      runId: state.runId,
+      stageId: state.session.currentStageId,
+      stageIndex: state.session.stageIndex,
+      outcome: details.outcome === 'fail' ? 'fail' : 'clear',
+      failReason: details.failReason ?? details.reason ?? null,
+      elapsedMs: Number.isFinite(Number(details.elapsedMs ?? details.timeClearedMs))
+        ? Math.max(0, Number(details.elapsedMs ?? details.timeClearedMs))
+        : 0,
+    },
+  };
+}
+
 export function createStateSyncMessage(snapshot = {}) {
   const runner = snapshot.runner && typeof snapshot.runner === 'object'
     ? {

@@ -96,6 +96,7 @@ function createInitialSnapshot() {
       lastStateSync: null,
       lastStageResult: null,
       lastRunComplete: null,
+      lastMatchState: null,
     },
     error: null,
   };
@@ -168,7 +169,7 @@ export function createOnlineClient(input = {}) {
 
   function applyLobbyMessage(data) {
     const senderId = typeof data.senderId === 'string' ? data.senderId : '';
-    const gameplayMessageTypes = new Set(['stage_start', 'runner_input', 'builder_command', 'state_sync', 'stage_result', 'run_complete']);
+    const gameplayMessageTypes = new Set(['stage_start', 'runner_input', 'builder_command', 'state_sync', 'stage_result', 'run_complete', 'match_state', 'match_ended']);
     if (!senderId || (senderId === snapshot.clientId && !gameplayMessageTypes.has(data.messageType))) return;
 
     const value = parseJson(data.value);
@@ -236,6 +237,14 @@ export function createOnlineClient(input = {}) {
         },
       });
     }
+    if (data.messageType === 'match_state' || data.messageType === 'match_ended') {
+      emit({
+        onlineGameplay: {
+          ...snapshot.onlineGameplay,
+          lastMatchState: { senderId, value },
+        },
+      });
+    }
   }
 
   function handleEvent(data) {
@@ -252,7 +261,12 @@ export function createOnlineClient(input = {}) {
       return;
     }
     if (data.event === 'lobby_started') {
-      emit({ status: 'started' });
+      emit({
+        status: 'started',
+        onlineGameplay: data.matchState
+          ? { ...snapshot.onlineGameplay, lastMatchState: { senderId: 'server', value: data.matchState } }
+          : snapshot.onlineGameplay,
+      });
       return;
     }
     if (data.event === 'lobby_left') {

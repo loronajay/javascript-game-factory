@@ -232,6 +232,38 @@ test("online lobby can start a host-authoritative online run", () => {
   assertEqual(state.session.currentStageId, "pack_01_stage_01");
 });
 
+test("online lobby can start a server-authoritative Build Buddy run from match state", () => {
+  let state = startPrivateLobby(
+    goToOnlineMenu(createAppShellState({ storage: createMemoryStorage(), stageList })),
+    { playerId: "host", displayName: "Host" },
+  );
+  state = applyOnlineClientSnapshot(state, {
+    status: "started",
+    clientId: "host",
+    lobby: { roomCode: "AB12", ownerId: "host", members: ["host", "guest"] },
+    profiles: {
+      host: { playerId: "host", displayName: "Host" },
+      guest: { playerId: "guest", displayName: "Guest" },
+    },
+    onlineGameplay: {
+      lastMatchState: {
+        senderId: "server",
+        value: {
+          network: { authorityMode: "server" },
+          stage: { stageId: "pack_01_stage_02", stageIndex: 1 },
+        },
+      },
+    },
+  });
+  state = startOnlineRunFromLobby(state);
+
+  assertEqual(state.screen, APP_SCREENS.GAMEPLAY);
+  assertEqual(state.onlineGameplay.authorityPlayerId, "server");
+  assertEqual(state.onlineGameplay.isHost, false);
+  assertEqual(state.session.currentStageId, "pack_01_stage_02");
+  assertEqual(state.session.stageIndex, 1);
+});
+
 test("guest online run accepts host stage results but cannot submit local results", () => {
   let state = startPrivateLobby(
     goToOnlineMenu(createAppShellState({ storage: createMemoryStorage(), stageList })),

@@ -2,6 +2,7 @@ import {
   createBuilderCommandMessage,
   createOnlineGameplayState,
   createRunnerInputMessage,
+  createStageCompleteRequestMessage,
   createStageStartMessage,
   createStateSyncMessage,
   markOnlineGameplayDisconnected,
@@ -120,6 +121,27 @@ test("builder command serialization normalizes placement and deletion commands",
   assertEqual(del.value.toolType, null);
   assertEqual(del.value.gridX, 0);
   assertEqual(del.value.commandId.length > 0, true);
+});
+
+test("stage completion requests include the current stage identity for server validation", () => {
+  const state = createOnlineGameplayState({
+    packId: "pack_01",
+    stageSequence,
+    players,
+    localPlayerId: "host",
+    authorityPlayerId: "server",
+    runId: "run-123",
+  });
+  const message = createStageCompleteRequestMessage(state, {
+    outcome: "clear",
+    elapsedMs: 1234,
+  });
+
+  assertEqual(message.messageType, "stage_complete_request");
+  assertEqual(message.value.stageId, "pack_01_stage_01");
+  assertEqual(message.value.stageIndex, 0);
+  assertEqual(message.value.outcome, "clear");
+  assertEqual(message.value.elapsedMs, 1234);
 });
 
 test("host state snapshots expose only sync-safe runtime fields", () => {

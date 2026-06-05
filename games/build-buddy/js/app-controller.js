@@ -28,6 +28,7 @@ import { createOnlineClient } from './online-client.js';
 import {
   createBuilderCommandMessage,
   createRunnerInputMessage,
+  createStageCompleteRequestMessage,
   createStageStartMessage,
   receiveStageStartMessage,
 } from './online-gameplay.js';
@@ -78,6 +79,7 @@ export class AppController {
     this.onlineTick = 0;
     this.onlineSnapshotTick = 0;
     this.sentOnlineMessageCount = 0;
+    this.appliedServerCommandSeq = 0;
     this.processedOnlineMessages = new Set();
 
     this.onlineClient.subscribe?.((snapshot) => {
@@ -152,6 +154,9 @@ export class AppController {
       return;
     }
 
+    if (this.state.onlineGameplay.authorityPlayerId === 'server') {
+      this.game?.update(FIXED_DT);
+    }
     this.sendLocalOnlineCommands();
   }
 
@@ -223,17 +228,32 @@ export class AppController {
   }
 
   submitStageClear(details) {
+    if (this.state.onlineGameplay?.authorityPlayerId === 'server') {
+      this.onlineClient.sendOnlineGameplayMessage?.(createStageCompleteRequestMessage(this.state.onlineGameplay, {
+        outcome: 'clear',
+        elapsedMs: details.elapsedMs ?? details.timeClearedMs,
+      }));
+      return;
+    }
     this.setState(submitStageClear(this.state, details));
     this.flushOnlineOutboundMessages();
   }
 
   submitStageFailure(reason, details) {
+    if (this.state.onlineGameplay?.authorityPlayerId === 'server') {
+      this.onlineClient.sendOnlineGameplayMessage?.(createStageCompleteRequestMessage(this.state.onlineGameplay, {
+        outcome: 'fail',
+        failReason: reason,
+        elapsedMs: details.elapsedMs ?? details.timeClearedMs,
+      }));
+      return;
+    }
     this.setState(submitStageFailure(this.state, reason, details));
     this.flushOnlineOutboundMessages();
   }
 
   broadcastOnlineStageStart() {
-    if (!this.state.onlineGameplay?.isHost) return;
+    if (!this.state.onlineGameplay?.isHost || this.state.onlineGameplay.authorityPlayerId === 'server') return;
     this.onlineClient.sendOnlineGameplayMessage?.(createStageStartMessage(this.state.onlineGameplay, {
       seed: this.state.onlineGameplay.session.stageIndex,
       startAt: Date.now() + 1200,
@@ -241,6 +261,7 @@ export class AppController {
   }
 
   flushOnlineOutboundMessages() {
+    if (this.state.onlineGameplay?.authorityPlayerId === 'server') return;
     const messages = this.state.onlineGameplay?.outboundMessages ?? [];
     for (const message of messages.slice(this.sentOnlineMessageCount)) {
       this.onlineClient.sendOnlineGameplayMessage?.(message);
@@ -283,8 +304,58 @@ export class AppController {
     this.applyOnce('run_complete', gameplay.lastRunComplete, (message) => {
       this.setState(applyOnlineRunComplete(this.state, message));
     });
+    this.applyOnce('match_state', gameplay.lastMatchState, (message) => {
+      const stage = message.value?.stage;
+      if (!stage || this.state.onlineGameplay?.authorityPlayerId !== 'server') return;
+      const session = {
+        ...this.state.session,
+        stageIndex: Number(stage.stageIndex) || 0,
+        currentStageId: stage.stageId,
+      };
+      const onlineGameplay = {
+        ...this.state.onlineGameplay,
+        session,
+        runSummary: message.value?.phase === 'run_complete' ? {
+          mode: 'online_run',
+          packId: message.value.packId,
+          totalStages: message.value.stageSequence?.length ?? 10,
+          completedStages: message.value.stageResults?.length ?? 0,
+          clearedStages: (message.value.stageResults ?? []).filter((result) => result.outcome === 'clear').length,
+          failedStages: (message.value.stageResults ?? []).filter((result) => result.outcome === 'fail').length,
+          isComplete: true,
+          results: message.value.stageResults ?? [],
+        } : null,
+      };
+      this.setState({
+        ...this.state,
+        session,
+        onlineGameplay,
+        screen: message.value?.phase === 'run_complete' ? APP_SCREENS.RUN_RESULT : this.state.screen,
+        runSummary: onlineGameplay.runSummary ?? this.state.runSummary,
+      });
+      if (stage.stageId && this.game?.currentStageId?.() !== stage.stageId) this.game?.loadStage(stage.stageId);
+      this.applyServerCommands(message.value?.commands);
+    });
     if (snapshot.status === 'idle') {
       this.setState(applyOnlineGameplayDisconnect(this.state, this.state.onlineGameplay.authorityPlayerId));
+    }
+  }
+
+  applyServerCommands(commands = {}) {
+    if (!commands || this.state.onlineGameplay?.authorityPlayerId !== 'server') return;
+    const localPlayerId = this.state.onlineGameplay.localPlayerId;
+    const merged = [
+      ...(Array.isArray(commands.runnerInputs) ? commands.runnerInputs.map((command) => ({ kind: 'runner', ...command })) : []),
+      ...(Array.isArray(commands.builderCommands) ? commands.builderCommands.map((command) => ({ kind: 'builder', ...command })) : []),
+    ].sort((left, right) => Number(left.seq || 0) - Number(right.seq || 0));
+
+    for (const command of merged) {
+      const seq = Number(command.seq || 0);
+      if (seq <= this.appliedServerCommandSeq) continue;
+      this.appliedServerCommandSeq = seq;
+      if (command.clientId === localPlayerId) continue;
+      if (command.kind === 'runner') this.game?.applyRunnerInputCommand(command);
+      if (command.kind === 'builder') this.game?.applyBuilderCommand(command);
     }
   }
 

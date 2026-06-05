@@ -85,6 +85,8 @@ function createOnlineState(intent, identity, extra = {}) {
     isOwner: false,
     players: [],
     readyByPlayerId: {},
+    authorityMode: 'client_host',
+    serverMatchState: null,
     error: null,
   };
 }
@@ -185,6 +187,8 @@ export function applyOnlineClientSnapshot(state, snapshot = {}) {
       isOwner: !!ownerId && ownerId === (snapshot.clientId || state.online.identity.playerId),
       players,
       readyByPlayerId: { ...(snapshot.readyByPlayerId ?? state.online.readyByPlayerId) },
+      authorityMode: snapshot.onlineGameplay?.lastMatchState?.value?.network?.authorityMode || state.online.authorityMode,
+      serverMatchState: snapshot.onlineGameplay?.lastMatchState?.value ?? state.online.serverMatchState,
       error: snapshot.error ?? null,
     },
   };
@@ -192,7 +196,9 @@ export function applyOnlineClientSnapshot(state, snapshot = {}) {
 
 export function startOnlineRunFromLobby(state) {
   if (!state.online || state.online.players.length < 2) return state;
-  const authorityPlayerId = state.online.ownerId || state.online.players[0].id;
+  const authorityPlayerId = state.online.authorityMode === 'server'
+    ? 'server'
+    : state.online.ownerId || state.online.players[0].id;
   const onlineGameplay = createOnlineGameplayState({
     packId: state.packId,
     stageSequence: sequenceForPack(state.stageList, state.packId),
@@ -200,11 +206,19 @@ export function startOnlineRunFromLobby(state) {
     localPlayerId: state.online.identity.playerId,
     authorityPlayerId,
   });
+  const serverStage = state.online.serverMatchState?.stage;
+  const session = serverStage?.stageId
+    ? {
+      ...onlineGameplay.session,
+      stageIndex: Number(serverStage.stageIndex) || 0,
+      currentStageId: serverStage.stageId,
+    }
+    : onlineGameplay.session;
   return {
     ...state,
     screen: APP_SCREENS.GAMEPLAY,
-    session: onlineGameplay.session,
-    onlineGameplay,
+    session,
+    onlineGameplay: { ...onlineGameplay, session },
     stageResult: null,
     runSummary: null,
     viewMode: VIEW_MODES.RUNNER,

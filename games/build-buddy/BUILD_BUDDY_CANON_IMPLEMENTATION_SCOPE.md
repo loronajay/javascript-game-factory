@@ -12,7 +12,7 @@ Phase 3 started on 2026-06-04.
 Phase 4 started on 2026-06-04.
 Phase 4.5 stage authoring/readiness pass completed on 2026-06-05.
 
-Current checkpoint: Phase 5 Online Gameplay v1 is implemented client-side on top of the generic Factory Network lobby relay. No `factory-network-server` changes were needed for this slice.
+Current checkpoint: Phase 5 Online Gameplay v1 now has a server-authoritative Factory Network path. The earlier host-authoritative client path remains useful only as a private/prototype fallback; public matchmaking should use `factory-network-server` authority.
 
 Implemented:
 
@@ -96,7 +96,10 @@ Phase 5 notes:
 - `js/app-shell.js` can start online gameplay from a ready lobby, apply host stage results/run-complete messages, and route disconnects back to the online lobby.
 - `js/game.js` exposes runtime sync hooks for host snapshots, guest snapshot application, remote Runner input, and remote Builder commands.
 - `js/app-controller.js` wires lobby start into online gameplay, sends host stage starts/results/state snapshots, sends guest Runner/Builder relay commands, applies host snapshots/results/run-complete messages, and handles disconnect fallback.
-- Phase 5 uses the existing generic Factory Network lobby relay; no server repo changes were required.
+- Correction: public Build Buddy matchmaking should not trust a lobby owner as match authority. `factory-network-server` now has Build Buddy server authority helpers/tests, emits `authorityMode: "server"` match state on lobby start, accepts role-appropriate Runner/Builder commands, rejects client-authored `state_sync`, `stage_result`, `run_complete`, and closes the run on disconnect.
+- Build Buddy client code now recognizes server-authoritative `matchState`/`match_state` payloads and avoids broadcasting client-owned authoritative state/results when `authorityPlayerId === "server"`.
+- Playability pass: `factory-network-server` now sequences accepted Build Buddy Runner/Builder commands into server `match_state.commands`, accepts current-Runner/current-stage `stage_complete_request` messages, advances stages on the server, and broadcasts `stage_start`/`match_ended` snapshots.
+- Build Buddy clients now send server completion requests on local clear/fail in server-authoritative matches and replay accepted remote server commands exactly once by sequence number.
 
 ## Purpose
 
