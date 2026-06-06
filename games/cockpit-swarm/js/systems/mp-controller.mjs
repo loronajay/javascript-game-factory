@@ -277,6 +277,7 @@ function _checkHits(game, input, client) {
 
 function _applyRemoteState(game, snap) {
   const mp = game.mp;
+  const prevP1hp = mp.p1hp;
   const prevP2hp = mp.p2hp;
 
   mp.opponentX   = snap.p1x;
@@ -295,6 +296,11 @@ function _applyRemoteState(game, snap) {
     game.player.hurtFlash = 220;
     game.shake = 6;
     sfxPlayerHurt();
+  }
+
+  // Guest: trigger opponent hit flash when the authoritative state confirms p1 took damage.
+  if (snap.p1hp < prevP1hp) {
+    mp.opponentHitFlash = 240;
   }
 
   // Snap own position if drift is significant
@@ -320,10 +326,9 @@ function _hostTick(game, input, dt) {
   mp.mpTick++;
 
   // Tick cooldowns (game.player.fireCooldown already ticked by _updateLocalPlayer)
-  mp.p1LobCd          = Math.max(0, mp.p1LobCd  - dt);
-  mp.p2FireCd         = Math.max(0, mp.p2FireCd - dt);
-  mp.p2LobCd          = Math.max(0, mp.p2LobCd  - dt);
-  mp.opponentHitFlash = Math.max(0, mp.opponentHitFlash - dt);
+  mp.p1LobCd  = Math.max(0, mp.p1LobCd  - dt);
+  mp.p2FireCd = Math.max(0, mp.p2FireCd - dt);
+  mp.p2LobCd  = Math.max(0, mp.p2LobCd  - dt);
 
   // P2 movement from remote input
   const ri = mp.remoteInput;
@@ -719,6 +724,7 @@ function _enterFighting(game, input) {
 
 export function updateMpFighting(game, input, dt) {
   _updateLocalPlayer(game, input, dt);
+  game.mp.opponentHitFlash = Math.max(0, game.mp.opponentHitFlash - dt);
 
   const client = getClient();
   if (client.isHost()) {

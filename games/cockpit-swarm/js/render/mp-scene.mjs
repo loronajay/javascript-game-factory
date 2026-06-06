@@ -371,8 +371,8 @@ export function buildMpBulletView({ bullet, side, localPlayerX }) {
 
   // ── Incoming bullets: use Z_NEAR as the visual convergence target (not hitZ) so
   //    bullets reach RETICLE_Y exactly at Z_NEAR, then overshoot past the player.
-  const rawVisualApp     = isIncoming ? (startZ - viewZ)     / Math.max(0.001, startZ - Z_NEAR) : 0;
-  const tailRawVisualApp = isIncoming ? (startZ - tailViewZ) / Math.max(0.001, startZ - Z_NEAR) : 0;
+  const rawVisualApp     = isIncoming ? (startZ - viewZ)     / Math.max(0.001, startZ - hitZ) : 0;
+  const tailRawVisualApp = isIncoming ? (startZ - tailViewZ) / Math.max(0.001, startZ - hitZ) : 0;
 
   // Allow overshoot past 1.0 — bullet rushes through the reticle, then fades fast.
   const overshoot     = Math.max(0, rawVisualApp - 1.0);
