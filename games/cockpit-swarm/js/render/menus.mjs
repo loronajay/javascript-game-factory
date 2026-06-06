@@ -149,7 +149,7 @@ export function renderHowToPlayScreen(ctx, game, t) {
   const px = CX - 440;
   const py = 122;
   const pw = 880;
-  const ph = 378;
+  const ph = 400;
   ctx.fillStyle = "rgba(3, 11, 20, 0.82)";
   ctx.beginPath();
   ctx.roundRect(px, py, pw, ph, 12);
@@ -199,12 +199,13 @@ export function renderHowToPlayScreen(ctx, game, t) {
     ["RAPID", "hold fire for full-auto"],
     ["SPLASH", "shot hits nearby enemies"],
     ["BOOST", "move at double speed"],
-    ["HEALTH", "restores one hull point"],
+    ["HULL", "restores one hull point"],
+    ["DMG", "boosts cannon damage"],
   ];
 
   ctx.font = "500 16px system-ui, sans-serif";
   for (let i = 0; i < tips.length; i++) {
-    const y = py + 68 + i * 52;
+    const y = py + 68 + i * 48;
     const tip = tips[i];
     if (Array.isArray(tip)) {
       ctx.fillStyle = "#78ff9d";
