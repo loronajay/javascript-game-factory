@@ -18,7 +18,7 @@ export function viewModeConfig(viewMode) {
     showToolStrip: mode === VIEW_MODES.BUILDER || mode === VIEW_MODES.HYBRID,
     showBuilderZones: mode === VIEW_MODES.BUILDER || mode === VIEW_MODES.HYBRID,
     showSafetyZone: mode === VIEW_MODES.BUILDER || mode === VIEW_MODES.HYBRID,
-    showGhost: mode === VIEW_MODES.BUILDER || mode === VIEW_MODES.HYBRID,
+    showGhost: true,
     showPlacementGrid: mode === VIEW_MODES.BUILDER || mode === VIEW_MODES.HYBRID,
     showRunner: true,
   };

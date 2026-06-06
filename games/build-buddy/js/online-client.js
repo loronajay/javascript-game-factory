@@ -97,6 +97,8 @@ function createInitialSnapshot() {
       lastStageResult: null,
       lastRunComplete: null,
       lastMatchState: null,
+      lastRunnerState: null,
+      lastBuilderCursor: null,
     },
     error: null,
   };
@@ -242,6 +244,22 @@ export function createOnlineClient(input = {}) {
         onlineGameplay: {
           ...snapshot.onlineGameplay,
           lastMatchState: { senderId, value },
+        },
+      });
+    }
+    if (data.messageType === 'runner_state') {
+      emit({
+        onlineGameplay: {
+          ...snapshot.onlineGameplay,
+          lastRunnerState: { senderId, value },
+        },
+      });
+    }
+    if (data.messageType === 'builder_cursor') {
+      emit({
+        onlineGameplay: {
+          ...snapshot.onlineGameplay,
+          lastBuilderCursor: { senderId, value },
         },
       });
     }

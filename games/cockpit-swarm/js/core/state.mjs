@@ -102,6 +102,7 @@ export function createGameState() {
       roundEndTimer:       0,
       roundEnded:          false,
       roundEndWinner:      null,
+      opponentHitFlash:    0,
     }
   };
 }

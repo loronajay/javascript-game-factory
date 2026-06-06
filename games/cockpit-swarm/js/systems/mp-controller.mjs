@@ -134,9 +134,10 @@ function _resetRound(game, client) {
   mp.p1LobCd       = 0;
   mp.p2FireCd      = 0;
   mp.p2LobCd       = 0;
-  mp.roundEndTimer = 0;
-  mp.roundEnded    = false;
-  mp.roundEndWinner = null;
+  mp.roundEndTimer     = 0;
+  mp.roundEnded        = false;
+  mp.roundEndWinner    = null;
+  mp.opponentHitFlash  = 0;
 }
 
 function _decayHeat(mp, dt) {
@@ -250,6 +251,7 @@ function _checkHits(game, input, client) {
         const inSD = mp.suddenDeath && b.kind === "lob";
         const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
         mp.p2hp = Math.max(0, mp.p2hp - dmg);
+        mp.opponentHitFlash = 240;
         if (mp.p2hp <= 0) _endRound(game, input, "p1", client);
       }
     } else if (b.owner === "p2" && b.z <= Z_NEAR + 0.5) {
@@ -275,6 +277,8 @@ function _checkHits(game, input, client) {
 
 function _applyRemoteState(game, snap) {
   const mp = game.mp;
+  const prevP2hp = mp.p2hp;
+
   mp.opponentX   = snap.p1x;
   mp.p1hp        = snap.p1hp;
   mp.p2hp        = snap.p2hp;
@@ -285,6 +289,13 @@ function _applyRemoteState(game, snap) {
   mp.mpBullets   = snap.bullets.map(b => ({ ...b }));
   mp.mpTimerMs   = snap.timeMs;
   mp.suddenDeath = snap.sd;
+
+  // Guest: apply hurt feedback when the authoritative state confirms a hit.
+  if (snap.p2hp < prevP2hp) {
+    game.player.hurtFlash = 220;
+    game.shake = 6;
+    sfxPlayerHurt();
+  }
 
   // Snap own position if drift is significant
   if (Math.abs(snap.p2x - game.player.x) > 18) {
@@ -309,9 +320,10 @@ function _hostTick(game, input, dt) {
   mp.mpTick++;
 
   // Tick cooldowns (game.player.fireCooldown already ticked by _updateLocalPlayer)
-  mp.p1LobCd  = Math.max(0, mp.p1LobCd  - dt);
-  mp.p2FireCd = Math.max(0, mp.p2FireCd - dt);
-  mp.p2LobCd  = Math.max(0, mp.p2LobCd  - dt);
+  mp.p1LobCd          = Math.max(0, mp.p1LobCd  - dt);
+  mp.p2FireCd         = Math.max(0, mp.p2FireCd - dt);
+  mp.p2LobCd          = Math.max(0, mp.p2LobCd  - dt);
+  mp.opponentHitFlash = Math.max(0, mp.opponentHitFlash - dt);
 
   // P2 movement from remote input
   const ri = mp.remoteInput;

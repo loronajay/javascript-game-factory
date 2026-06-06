@@ -48,6 +48,7 @@ export class Game {
     this.onStageFailure = onStageFailure;
     this.input = new Input(canvas);
     this.remoteRunnerInput = null;
+    this.remoteBuilderCursor = null;
     this.loadStage(this.stageSequence[this.stageIndex]);
   }
 
@@ -70,6 +71,11 @@ export class Game {
     this.elapsedMs = 0;
     this.cleared = false;
     this.stageEnded = false;
+    this.remoteBuilderCursor = null;
+  }
+
+  setRemoteBuilderCursor(cursor = null) {
+    this.remoteBuilderCursor = cursor ? { ...cursor } : null;
   }
 
   setViewMode(viewMode) {
@@ -128,7 +134,7 @@ export class Game {
       this.runner.vy = Number(snapshot.runner.vy) || 0;
       this.runner.dead = snapshot.runner.dead === true;
     }
-    if (Number.isFinite(Number(snapshot.timerMs))) {
+    if (snapshot.timerMs !== undefined && Number.isFinite(Number(snapshot.timerMs))) {
       this.timeRemainingMs = Math.max(0, Number(snapshot.timerMs));
     }
     if (Array.isArray(snapshot.tools)) {

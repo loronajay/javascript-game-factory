@@ -28,7 +28,9 @@ import {
 import { createOnlineClient } from './online-client.js';
 import {
   createBuilderCommandMessage,
+  createBuilderCursorMessage,
   createRunnerInputMessage,
+  createRunnerStateMessage,
   createStageCompleteRequestMessage,
   createStageStartMessage,
   receiveStageStartMessage,
@@ -82,6 +84,8 @@ export class AppController {
     this.sentOnlineMessageCount = 0;
     this.appliedServerCommandSeq = 0;
     this.processedOnlineMessages = new Set();
+    this.lastAppliedRunnerStateTick = -1;
+    this.lastAppliedBuilderCursorTick = -1;
 
     this.onlineClient.subscribe?.((snapshot) => {
       if (this.state.screen === APP_SCREENS.ONLINE_LOBBY) {
@@ -180,9 +184,35 @@ export class AppController {
         jump: input?.jumpHeld(),
         reposition: input?.consumeReposition?.(),
       }));
+      // Send runner position every 3 ticks so the builder has an authoritative sync point
+      if (this.onlineTick % 3 === 0 && this.game?.runner) {
+        const r = this.game.runner;
+        this.onlineClient.sendOnlineGameplayMessage?.(createRunnerStateMessage({
+          tick: this.onlineTick,
+          x: r.x,
+          y: r.y,
+          vx: r.vx,
+          vy: r.vy,
+          dead: r.dead,
+        }));
+      }
       input?.endFrame?.();
     }
     if (role === 'builder') {
+      // Send cursor position every tick so the runner sees the ghost preview
+      if (this.game) {
+        const input = this.game.input;
+        const world = this.game.camera.screenToWorld(input.mouse.x, input.mouse.y);
+        const gridX = Math.round(world.x / 40) * 40;
+        const gridY = Math.round(world.y / 40) * 40;
+        this.onlineClient.sendOnlineGameplayMessage?.(createBuilderCursorMessage({
+          tick: this.onlineTick,
+          gridX,
+          gridY,
+          selectedTool: input.selectedTool,
+          valid: this.game.builder?.hover?.valid === true,
+        }));
+      }
       const command = this.consumeLocalBuilderCommand();
       if (command) this.onlineClient.sendOnlineGameplayMessage?.(command);
       this.game?.input?.endFrame?.();
@@ -326,6 +356,26 @@ export class AppController {
       if (stage.stageId && this.game?.currentStageId?.() !== stage.stageId) this.game?.loadStage(stage.stageId);
       this.applyServerCommands(message.value?.commands);
     });
+    // Runner state snapshots: builder applies the runner's actual position to correct its local simulation
+    const runnerState = gameplay.lastRunnerState;
+    if (runnerState && this.localOnlineRole() === 'builder') {
+      const tick = runnerState.value?.tick ?? 0;
+      if (tick > this.lastAppliedRunnerStateTick) {
+        this.lastAppliedRunnerStateTick = tick;
+        this.game?.applyStateSnapshot({ runner: runnerState.value });
+      }
+    }
+
+    // Builder cursor: runner receives the ghost preview position so both players share intent
+    const builderCursor = gameplay.lastBuilderCursor;
+    if (builderCursor && this.localOnlineRole() === 'runner') {
+      const tick = builderCursor.value?.tick ?? 0;
+      if (tick > this.lastAppliedBuilderCursorTick) {
+        this.lastAppliedBuilderCursorTick = tick;
+        this.game?.setRemoteBuilderCursor(builderCursor.value);
+      }
+    }
+
     if (snapshot.status === 'idle') {
       this.setState(applyOnlineGameplayDisconnect(this.state, this.state.onlineGameplay.authorityPlayerId));
     }

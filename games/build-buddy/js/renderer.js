@@ -44,7 +44,7 @@ export class Renderer {
     this.terrain.draw(ctx, this.tools);
     this.tools.draw(ctx);
     this.goal.draw(ctx);
-    if (cfg.showGhost) this.ghost.draw(ctx);
+    this.ghost.draw(ctx, game.remoteBuilderCursor ?? null);
     if (cfg.showRunner) this.runnerRenderer.draw(ctx, { showSafetyZone: cfg.showSafetyZone });
     ctx.restore();
 

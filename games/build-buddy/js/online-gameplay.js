@@ -172,6 +172,33 @@ export function createRunnerInputMessage(input = {}) {
   };
 }
 
+export function createRunnerStateMessage(runner = {}) {
+  return {
+    messageType: 'runner_state',
+    value: {
+      tick: normalizeTick(runner.tick),
+      x: Number(runner.x) || 0,
+      y: Number(runner.y) || 0,
+      vx: Number(runner.vx) || 0,
+      vy: Number(runner.vy) || 0,
+      dead: runner.dead === true,
+    },
+  };
+}
+
+export function createBuilderCursorMessage(cursor = {}) {
+  return {
+    messageType: 'builder_cursor',
+    value: {
+      tick: normalizeTick(cursor.tick),
+      gridX: normalizeCoordinate(cursor.gridX),
+      gridY: normalizeCoordinate(cursor.gridY),
+      selectedTool: typeof cursor.selectedTool === 'string' ? cursor.selectedTool : '',
+      valid: cursor.valid === true,
+    },
+  };
+}
+
 export function createBuilderCommandMessage(command = {}) {
   const tick = normalizeTick(command.tick);
   const action = normalizeAction(command.action);

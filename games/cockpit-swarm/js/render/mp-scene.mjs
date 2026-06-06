@@ -271,11 +271,11 @@ export function renderMpCountdown(ctx, game, t) {
 // Called INSIDE the shake transform, before renderCockpit.
 
 export function renderMpWorld(ctx, game, t) {
-  const { side, opponentX, mpBullets } = game.mp;
+  const { side, opponentX, mpBullets, opponentHitFlash = 0 } = game.mp;
   const localPlayerX = game.player.x;
 
   // Keep opponent projection tied to projectile spawn depth so muzzle origins read correctly.
-  const op = buildMpOpponentView({ opponentX, localPlayerX, t });
+  const op = buildMpOpponentView({ opponentX, localPlayerX, t, hitFlash: opponentHitFlash });
   _renderOpponentShip(ctx, op);
 
   for (const b of mpBullets) {
@@ -285,9 +285,12 @@ export function renderMpWorld(ctx, game, t) {
   }
 }
 
-export function buildMpOpponentView({ opponentX, localPlayerX, t = 0 }) {
+export function buildMpOpponentView({ opponentX, localPlayerX, t = 0, hitFlash = 0 }) {
   const projected = project(opponentX, OPPONENT_VISUAL_Y, OPPONENT_VISUAL_Z, localPlayerX);
   const pulse = Math.sin(t * 0.0018) * 0.08 + 0.92;
+  const dist  = Math.abs(localPlayerX - opponentX);
+  const onTarget = dist <= MP_TUNING.hitWindowX;
+  const lockFrac = onTarget ? clamp(1 - dist / MP_TUNING.hitWindowX, 0, 1) : 0;
 
   return {
     ...projected,
@@ -295,6 +298,9 @@ export function buildMpOpponentView({ opponentX, localPlayerX, t = 0 }) {
     pulse,
     size: 28 * projected.s * OPPONENT_SIZE_SCALE,
     alpha: Math.min(0.96, projected.s * OPPONENT_SIZE_SCALE * 0.72) * pulse,
+    onTarget,
+    lockFrac,
+    hitFlash,
   };
 }
 
@@ -317,6 +323,13 @@ export function buildMpBulletView({ bullet, side, localPlayerX }) {
   const isLob = bullet.kind === "lob";
   const onLane = isIncoming && Math.abs(bullet.x - localPlayerX) <= MP_TUNING.hitWindowX;
 
+  // Outgoing bullets shrink to near-invisible at far depth — boost their minimum size and glow.
+  const outgoingFarFrac = !isIncoming
+    ? clamp((viewZ - 3.5) / (OPPONENT_VISUAL_Z - 3.5), 0, 1)
+    : 0;
+  const minRadius     = !isIncoming ? lerp(1.5, 4.0, outgoingFarFrac) : 1.5;
+  const outgoingGlowBoost = outgoingFarFrac;
+
   return {
     visible,
     x: raw.x,
@@ -329,7 +342,8 @@ export function buildMpBulletView({ bullet, side, localPlayerX }) {
     isIncoming,
     approach,
     onLane,
-    radius: Math.max(1.5, (isLob ? 11 : 5.5) * raw.s * lerp(0.90, 1.72, approach)),
+    radius: Math.max(minRadius, (isLob ? 11 : 5.5) * raw.s * lerp(0.90, 1.72, approach)),
+    outgoingGlowBoost,
     threatAlpha: onLane ? clamp((approach - 0.42) / 0.58, 0, 1) * 0.68 : 0,
     palette: getProjectilePalette(bullet.kind, isIncoming),
   };
@@ -350,6 +364,22 @@ function getProjectilePalette(kind, isIncoming) {
 function _renderOpponentShip(ctx, op) {
   ctx.save();
   const { x, y, s, size } = op;
+
+  // ── Hit flash: bright burst behind ship when opponent absorbs a shot ─────────
+  if (op.hitFlash > 0) {
+    const ff = op.hitFlash / 240;
+    ctx.globalAlpha = ff * 0.55;
+    ctx.shadowColor = "#ff8866";
+    ctx.shadowBlur  = 28 * ff;
+    ctx.fillStyle   = "#ff7755";
+    ctx.beginPath();
+    ctx.arc(x, y, size * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Ship silhouette ──────────────────────────────────────────────────────────
   ctx.globalAlpha = op.alpha;
   ctx.shadowColor = "#ff4030";
   ctx.shadowBlur  = 12 * s * OPPONENT_SIZE_SCALE;
@@ -359,7 +389,7 @@ function _renderOpponentShip(ctx, op) {
   ctx.lineTo(x + size * 1.90, y + size * 0.10);
   ctx.lineTo(x + size * 0.82, y + size * 0.44);
   ctx.lineTo(x + size * 0.44, y + size * 0.95);
-  ctx.lineTo(x,              y + size * 0.56);
+  ctx.lineTo(x,               y + size * 0.56);
   ctx.lineTo(x - size * 0.44, y + size * 0.95);
   ctx.lineTo(x - size * 0.82, y + size * 0.44);
   ctx.lineTo(x - size * 1.90, y + size * 0.10);
@@ -371,9 +401,9 @@ function _renderOpponentShip(ctx, op) {
   ctx.fill();
   ctx.stroke();
 
-  ctx.shadowBlur = 0;
+  ctx.shadowBlur  = 0;
   ctx.strokeStyle = "rgba(255, 210, 190, 0.72)";
-  ctx.lineWidth = Math.max(0.75, 0.7 * s * OPPONENT_SIZE_SCALE);
+  ctx.lineWidth   = Math.max(0.75, 0.7 * s * OPPONENT_SIZE_SCALE);
   ctx.beginPath();
   ctx.moveTo(x, y - size * 0.82);
   ctx.lineTo(x, y + size * 0.38);
@@ -386,6 +416,52 @@ function _renderOpponentShip(ctx, op) {
   ctx.arc(x, y - size * 0.24, Math.max(1.5, size * 0.13), 0, Math.PI * 2);
   ctx.fill();
 
+  // ── Lock-on brackets: appear when local player is within hit range ───────────
+  if (op.onTarget) {
+    const lockR    = Math.max(10, size * 1.68);
+    const arm      = lockR * 0.38;
+    const bW       = Math.max(1.2, 1.8 * s * OPPONENT_SIZE_SCALE);
+    const lkAlpha  = (0.28 + op.lockFrac * 0.58) * op.alpha;
+
+    ctx.globalAlpha = lkAlpha;
+    ctx.strokeStyle = "#ff4030";
+    ctx.lineWidth   = bW;
+    ctx.shadowColor = "#ff4030";
+    ctx.shadowBlur  = 6 + op.lockFrac * 12;
+    ctx.lineCap     = "square";
+
+    ctx.beginPath();
+    // top-left
+    ctx.moveTo(x - lockR + arm, y - lockR);
+    ctx.lineTo(x - lockR,       y - lockR);
+    ctx.lineTo(x - lockR,       y - lockR + arm);
+    // top-right
+    ctx.moveTo(x + lockR - arm, y - lockR);
+    ctx.lineTo(x + lockR,       y - lockR);
+    ctx.lineTo(x + lockR,       y - lockR + arm);
+    // bottom-left
+    ctx.moveTo(x - lockR + arm, y + lockR);
+    ctx.lineTo(x - lockR,       y + lockR);
+    ctx.lineTo(x - lockR,       y + lockR - arm);
+    // bottom-right
+    ctx.moveTo(x + lockR - arm, y + lockR);
+    ctx.lineTo(x + lockR,       y + lockR);
+    ctx.lineTo(x + lockR,       y + lockR - arm);
+    ctx.stroke();
+
+    // Central dot when fully locked
+    if (op.lockFrac > 0.55) {
+      const dotFrac = clamp((op.lockFrac - 0.55) / 0.45, 0, 1);
+      ctx.globalAlpha = dotFrac * 0.72 * op.alpha;
+      ctx.shadowBlur  = 10;
+      ctx.fillStyle   = "#ff4030";
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1.5, size * 0.20), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
   ctx.restore();
 }
 
@@ -396,23 +472,28 @@ function _renderBullet(ctx, view) {
 function _renderBulletView(ctx, view) {
   ctx.save();
 
-  const { x, y, tailX, tailY, kind, isIncoming, approach, radius, palette } = view;
+  const { x, y, tailX, tailY, kind, isIncoming, approach, radius, palette, outgoingGlowBoost = 0 } = view;
   const isLob = kind === "lob";
   const color = palette.color;
 
-  ctx.globalAlpha = clamp(0.22 + approach * 0.50, 0.22, 0.78);
+  // Outgoing bullets at far depth: boost alpha and glow so they stay readable
+  const baseAlpha = isIncoming
+    ? clamp(0.22 + approach * 0.50, 0.22, 0.78)
+    : clamp(0.32 + outgoingGlowBoost * 0.42, 0.32, 0.74);
+
+  ctx.globalAlpha = baseAlpha;
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1.5, radius * (isLob ? 0.30 : 0.18));
   ctx.lineCap = "round";
   ctx.shadowColor = color;
-  ctx.shadowBlur = 10 + approach * 20;
+  ctx.shadowBlur = 10 + approach * 20 + outgoingGlowBoost * 24;
   ctx.beginPath();
   ctx.moveTo(tailX, tailY);
   ctx.lineTo(x, y);
   ctx.stroke();
 
   if (!isIncoming) {
-    ctx.globalAlpha = isLob ? 0.30 : 0.22;
+    ctx.globalAlpha = isLob ? 0.30 : clamp(0.22 + outgoingGlowBoost * 0.28, 0.22, 0.50);
     ctx.lineWidth = Math.max(1, radius * 0.12);
     ctx.beginPath();
     ctx.moveTo(x - radius * 1.55, y);
@@ -420,8 +501,10 @@ function _renderBulletView(ctx, view) {
     ctx.stroke();
   }
 
-  ctx.globalAlpha = clamp(0.42 + approach * 0.58, 0.42, 1.0);
-  ctx.shadowBlur = 14 + approach * 34;
+  ctx.globalAlpha = isIncoming
+    ? clamp(0.42 + approach * 0.58, 0.42, 1.0)
+    : clamp(0.48 + outgoingGlowBoost * 0.44, 0.48, 0.92);
+  ctx.shadowBlur = 14 + approach * 34 + outgoingGlowBoost * 24;
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1.5, radius * (isLob ? 0.26 : 0.20));
   ctx.beginPath();
