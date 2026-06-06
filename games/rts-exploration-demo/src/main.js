@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
-import { GameMap } from './map.js';
+import { buildGameMap } from './map.js';
+import { level01 } from './maps/level-01.js';
 import { Camera } from './camera.js';
 import { UnitManager } from './units.js';
 import { FogOfWar } from './fog.js';
@@ -12,14 +13,18 @@ import { AiController } from './ai-controller.js';
 
 const canvas = document.getElementById('game');
 const hudLines = document.getElementById('hud-lines');
-const map = new GameMap(CONFIG.mapWidth, CONFIG.mapHeight, CONFIG.tileSize);
+
+const map = buildGameMap(level01);
 const camera = new Camera({
   worldWidth: map.worldWidth,
   worldHeight: map.worldHeight,
   viewportWidth: CONFIG.canvasWidth,
   viewportHeight: CONFIG.canvasHeight,
 });
+
 const units = new UnitManager(map);
+units.spawnFromDef(level01.spawns);
+
 const fog = new FogOfWar(map);
 let simTick = 0;
 const simStep = 1 / CONFIG.simHz;

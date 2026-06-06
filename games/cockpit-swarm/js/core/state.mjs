@@ -3,7 +3,8 @@ import { STATE } from "./constants.mjs";
 export function createGameState() {
   return {
     state: STATE.MENU,
-    mode: "campaign",     // "campaign" | "bossRush"
+    mode: "campaign",     // "campaign" | "bossRush" | "bossPractice"
+    bossPracticeNumber: 1,
     messageTimer: 0,
     hitFreeze: 0,
     shake: 0,

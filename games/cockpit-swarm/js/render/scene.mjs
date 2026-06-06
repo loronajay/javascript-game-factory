@@ -3,7 +3,7 @@ import { rand } from "../core/math.mjs";
 import { renderBoss, renderBossHud } from "./boss-scene.mjs";
 import { renderMpLobby, renderMpCountdown, renderMpWorld, renderMpFighting, renderMpResult } from "./mp-scene.mjs";
 import { renderBackground, renderDepthGrid, renderMenuAtmosphere } from "./background.mjs";
-import { renderMenuScreen, renderHowToPlayScreen, renderEndScreen } from "./menus.mjs";
+import { renderMenuScreen, renderHowToPlayScreen, renderEndScreen, renderBossPracticeSelectScreen } from "./menus.mjs";
 import { renderEnemies, renderOverseerLasers, renderEnemyBullets } from "./enemies.mjs";
 import { renderPowerups, renderPlayerFire, renderParticles } from "./world.mjs";
 import { renderRunners, renderRunnerKillMessage } from "./runners.mjs";
@@ -36,11 +36,12 @@ export function renderGame(ctx, game, t) {
   }
 
   // ── Campaign / solo screens ───────────────────────────────────────────────
-  if (game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY) {
+  if (game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY || game.state === STATE.BOSS_PRACTICE_SELECT) {
     renderBackground(ctx, game, t);
     renderMenuAtmosphere(ctx, t);
     if (game.state === STATE.MENU) renderMenuScreen(ctx, game, t);
-    else renderHowToPlayScreen(ctx, game, t);
+    else if (game.state === STATE.HOW_TO_PLAY) renderHowToPlayScreen(ctx, game, t);
+    else renderBossPracticeSelectScreen(ctx, game, t);
     return;
   }
 

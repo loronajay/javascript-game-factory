@@ -29,6 +29,7 @@ function getCelestialCache(t) {
 
 export function renderBackground(ctx, game, t) {
   const isMenuState = game.state === STATE.MENU || game.state === STATE.HOW_TO_PLAY
+    || game.state === STATE.BOSS_PRACTICE_SELECT
     || game.state === STATE.MP_LOBBY || game.state === STATE.MP_RESULT;
   const stage = getStage(game.wave.stageIndex);
 

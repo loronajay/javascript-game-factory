@@ -45,3 +45,13 @@ export function clampMagnitude(x, y, maxLength) {
   const scale = maxLength / len;
   return { x: x * scale, y: y * scale };
 }
+
+export function normalizeAngle(angle) {
+  while (angle <= -Math.PI) angle += Math.PI * 2;
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  return angle;
+}
+
+export function shortestAngle(from, to) {
+  return normalizeAngle(to - from);
+}

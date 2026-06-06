@@ -1,4 +1,4 @@
-import { H, LANES, STATE, TUNING, ECLIPSIS_TUNING, BOSS_EVERY, TOTAL_BOSSES, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
+import { H, LANES, STATE, TUNING, ECLIPSIS_TUNING, BOSS_EVERY, TOTAL_BOSSES, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR, BOSS_PRACTICE_BTNS } from "../core/constants.mjs";
 import { initMpLobby, updateMpLobby, updateMpCountdown, updateMpFighting, updateMpResult } from "./mp-controller.mjs";
 import {
   sfxClick, sfxExplosion, sfxPlayerHurt, sfxShutdown,
@@ -117,6 +117,11 @@ export function updateGame(game, input, dt, t) {
 
   if (game.state === STATE.HOW_TO_PLAY) {
     updateHowToPlay(game, input);
+    return;
+  }
+
+  if (game.state === STATE.BOSS_PRACTICE_SELECT) {
+    updateBossPracticeSelect(game, input);
     return;
   }
 
@@ -254,8 +259,13 @@ function updateMenu(game, input) {
     input.clearMenuPresses();
   } else if (activated === 2) {
     sfxClick();
-    initMpLobby(game, input);
+    game.state = STATE.BOSS_PRACTICE_SELECT;
+    game.menu.selectedButton = 0;
+    input.clearMenuPresses();
   } else if (activated === 3) {
+    sfxClick();
+    initMpLobby(game, input);
+  } else if (activated === 4) {
     sfxClick();
     game.state = STATE.HOW_TO_PLAY;
     game.menu.selectedButton = 0;
@@ -284,6 +294,82 @@ function updateHowToPlay(game, input) {
     sfxClick();
     goToMenu(game, input);
   }
+}
+
+// ─── Boss Practice select screen ─────────────────────────────────────────────
+
+function updateBossPracticeSelect(game, input) {
+  const btns = BOSS_PRACTICE_BTNS;
+  const bossCount = btns.length - 1; // last button is "back"
+
+  if (input.consumeUp())   game.menu.selectedButton = Math.max(0, game.menu.selectedButton - 1);
+  if (input.consumeDown()) game.menu.selectedButton = Math.min(btns.length - 1, game.menu.selectedButton + 1);
+
+  const mp = input.getMousePos();
+  for (let i = 0; i < btns.length; i++) {
+    const b = btns[i];
+    if (mp.x >= b.x && mp.x < b.x + b.w && mp.y >= b.y && mp.y < b.y + b.h) {
+      game.menu.selectedButton = i;
+    }
+  }
+
+  let activated = -1;
+  const click = input.consumeClick();
+  if (click) {
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      if (click.x >= b.x && click.x < b.x + b.w && click.y >= b.y && click.y < b.y + b.h) {
+        activated = i;
+      }
+    }
+  }
+  if (input.consumeConfirm() || input.consumeFirePress()) activated = game.menu.selectedButton;
+  if (input.consumeBack()) { sfxClick(); goToMenu(game, input); return; }
+
+  if (activated >= 0 && activated < bossCount) {
+    sfxClick();
+    startBossPractice(game, input, activated + 1);
+  } else if (activated === bossCount) {
+    sfxClick();
+    goToMenu(game, input);
+  }
+}
+
+function startBossPractice(game, input, bossNumber) {
+  startGameMusic(true);
+  game.mode = "bossPractice";
+  game.bossPracticeNumber = bossNumber;
+  game.score = 0;
+  game.combo = 0;
+  game.shotsFired = 0;
+  game.shotsHit = 0;
+  game.enemyBullets = [];
+  game.explosions = [];
+  game.boss = null;
+  game.messageTimer = 0;
+  game.hitFreeze = 0;
+  game.shake = 0;
+  game.menu.selectedButton = 0;
+  game.wave.stageIndex = 0;
+  game.wave.behaviorCooldown = 0;
+  game.wave.pendingShots = [];
+  game.wave.lastBehaviorId = null;
+  game.wave.stageClearTimer = 0;
+  resetPowerups(game);
+  resetRunners(game);
+  game.player.x = 0;
+  game.player.speed = 0;
+  game.player.maxHealth = 3;
+  game.player.health = 3;
+  game.player.fireCooldown = 0;
+  game.player.muzzleFlash = 0;
+  game.player.hurtFlash = 0;
+  game.player.curseTimer = 0;
+  game.player.tetherTimer = 0;
+  game.player.tetherTargetX = 0;
+  game.stars = makeStars();
+  startBossEncounter(game, bossNumber);
+  input.clearMenuPresses();
 }
 
 // ─── End screen (game over / sector clear) ────────────────────────────────────
@@ -323,8 +409,12 @@ function updateEndScreen(game, input, dt) {
 
   if (activated === 0) {
     sfxClick();
-    resetGame(game);
-    input.clearMenuPresses();
+    if (game.mode === "bossPractice") {
+      startBossPractice(game, input, game.bossPracticeNumber);
+    } else {
+      resetGame(game);
+      input.clearMenuPresses();
+    }
   } else if (activated === 1) {
     sfxClick();
     goToMenu(game, input);

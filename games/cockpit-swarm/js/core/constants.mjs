@@ -7,6 +7,7 @@ export const RETICLE_Y = H * 0.49;
 export const STATE = {
   MENU: "MENU",
   HOW_TO_PLAY: "HOW_TO_PLAY",
+  BOSS_PRACTICE_SELECT: "BOSS_PRACTICE_SELECT",
   PLAYING: "PLAYING",
   STAGE_CLEAR: "STAGE_CLEAR",
   BOSS: "BOSS",
@@ -249,10 +250,18 @@ export const ECLIPSIS_TUNING = {
 // All positions are in logical canvas space (1280×720).
 
 export const MENU_BTNS = [
-  { id: "campaign",  label: "CAMPAIGN",    x: 470, y: 278, w: 340, h: 58 },
-  { id: "bossRush",  label: "BOSS RUSH",   x: 470, y: 340, w: 340, h: 58 },
-  { id: "vsDuel",    label: "VS DUEL",     x: 470, y: 402, w: 340, h: 58 },
-  { id: "howToPlay", label: "HOW TO PLAY", x: 470, y: 464, w: 340, h: 58 },
+  { id: "campaign",      label: "CAMPAIGN",       x: 470, y: 258, w: 340, h: 50 },
+  { id: "bossRush",      label: "BOSS RUSH",      x: 470, y: 312, w: 340, h: 50 },
+  { id: "bossPractice",  label: "BOSS PRACTICE",  x: 470, y: 366, w: 340, h: 50 },
+  { id: "vsDuel",        label: "VS DUEL",        x: 470, y: 420, w: 340, h: 50 },
+  { id: "howToPlay",     label: "HOW TO PLAY",    x: 470, y: 474, w: 340, h: 50 },
+];
+
+export const BOSS_PRACTICE_BTNS = [
+  { id: "boss1", label: "BOSS 01  ·  DREADMAW",     x: 440, y: 260, w: 400, h: 58 },
+  { id: "boss2", label: "BOSS 02  ·  THE ARBITER",  x: 440, y: 328, w: 400, h: 58 },
+  { id: "boss3", label: "BOSS 03  ·  ECLIPSIS",     x: 440, y: 396, w: 400, h: 58 },
+  { id: "back",  label: "← BACK",                   x: 500, y: 476, w: 280, h: 48 },
 ];
 
 // ── Multiplayer lobby buttons (shared by update hit-test + renderer) ──────────

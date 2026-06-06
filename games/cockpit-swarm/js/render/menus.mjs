@@ -1,4 +1,4 @@
-import { W, H, CX, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR } from "../core/constants.mjs";
+import { W, H, CX, MENU_BTNS, HTP_BTNS, END_BTNS_GAMEOVER, END_BTNS_CLEAR, BOSS_PRACTICE_BTNS } from "../core/constants.mjs";
 import { STAGES } from "../systems/stages.mjs";
 
 export function renderMenuScreen(ctx, game, t) {
@@ -55,6 +55,81 @@ export function renderMenuScreen(ctx, game, t) {
   ctx.fillStyle = "rgba(216, 251, 255, 0.28)";
   ctx.textBaseline = "bottom";
   ctx.fillText("↑ ↓  NAVIGATE    ENTER  CONFIRM    MOUSE  CLICK", CX, cardY + cardH - 12);
+
+  ctx.restore();
+}
+
+const BOSS_NAMES = ["", "DREADMAW", "THE ARBITER", "ECLIPSIS"];
+const BOSS_DESCS = [
+  "",
+  "Phase 1: Dodge the lunging arms · Phase 2: Shoot the open mouth · Phase 3: Both",
+  "Phase 1: Core hits only · Phase 2: Cannon barrages · Phase 3: Combined assault",
+  "Phase 1: Ablative panels · Phase 2: Sweeping eye beam · Phase 3–5: All mechanics",
+];
+
+export function renderBossPracticeSelectScreen(ctx, game, t) {
+  ctx.save();
+
+  const cardX = CX - 300;
+  const cardY = 88;
+  const cardW = 600;
+  const cardH = 508;
+  ctx.fillStyle = "rgba(2, 7, 16, 0.82)";
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 100, 60, 0.28)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 100, 60, 0.20)";
+  ctx.fillRect(cardX + 60, cardY, cardW - 120, 2);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  const glow = 12 + Math.sin(t * 0.0014) * 6;
+  ctx.font = "900 52px system-ui, sans-serif";
+  ctx.shadowColor = "#ff643c";
+  ctx.shadowBlur = glow;
+  ctx.fillStyle = "#ffd8c8";
+  ctx.fillText("BOSS PRACTICE", CX, 118);
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(255, 100, 60, 0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cardX + 40, 196);
+  ctx.lineTo(cardX + cardW - 40, 196);
+  ctx.stroke();
+
+  ctx.font = "500 14px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255, 100, 60, 0.55)";
+  ctx.fillText("SELECT A BOSS TO FIGHT  ·  FULL HEALTH  ·  NO SCORE PRESSURE", CX, 210);
+
+  for (let i = 0; i < BOSS_PRACTICE_BTNS.length; i++) {
+    drawMenuButton(ctx, BOSS_PRACTICE_BTNS[i], game.menu.selectedButton === i, t, "#ff643c");
+
+    // Description line under each boss button (not the back button)
+    if (i < BOSS_PRACTICE_BTNS.length - 1 && BOSS_DESCS[i + 1]) {
+      ctx.font = "400 11px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255, 180, 140, 0.48)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(BOSS_DESCS[i + 1], CX, BOSS_PRACTICE_BTNS[i].y + BOSS_PRACTICE_BTNS[i].h + 4);
+    }
+  }
+
+  ctx.strokeStyle = "rgba(255, 100, 60, 0.12)";
+  ctx.beginPath();
+  ctx.moveTo(cardX + 40, cardY + cardH - 44);
+  ctx.lineTo(cardX + cardW - 40, cardY + cardH - 44);
+  ctx.stroke();
+
+  ctx.font = "500 12px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255, 216, 200, 0.28)";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("↑ ↓  NAVIGATE    ENTER  CONFIRM    ESC  BACK", CX, cardY + cardH - 12);
 
   ctx.restore();
 }
@@ -171,9 +246,10 @@ export function renderEndScreen(ctx, game, t, isGameOver) {
   ctx.textBaseline = "top";
 
   const bossRush = game.mode === "bossRush";
+  const bossPractice = game.mode === "bossPractice";
   const title = isGameOver
     ? "COCKPIT BREACHED"
-    : (bossRush ? "BOSS RUSH CLEAR" : "SECTOR CLEAR");
+    : (bossPractice ? "BOSS DEFEATED" : bossRush ? "BOSS RUSH CLEAR" : "SECTOR CLEAR");
   const accentColor = isGameOver ? "#ff365d" : "#78ff9d";
   ctx.font = "900 64px system-ui, sans-serif";
   ctx.shadowColor = accentColor;
@@ -203,9 +279,12 @@ export function renderEndScreen(ctx, game, t, isGameOver) {
   ctx.fillStyle = "#6ab7c4";
   ctx.textBaseline = "middle";
 
-  const stageLabel = isGameOver
-    ? (bossRush ? "BOSS RUSH" : `STAGE ${game.wave.stageIndex + 1} / ${STAGES.length}`)
-    : (bossRush ? "ALL BOSSES DOWN" : "ALL STAGES CLEARED");
+  const bossNames = ["", "DREADMAW", "THE ARBITER", "ECLIPSIS"];
+  const stageLabel = bossPractice
+    ? bossNames[game.bossPracticeNumber] || `BOSS ${game.bossPracticeNumber}`
+    : isGameOver
+      ? (bossRush ? "BOSS RUSH" : `STAGE ${game.wave.stageIndex + 1} / ${STAGES.length}`)
+      : (bossRush ? "ALL BOSSES DOWN" : "ALL STAGES CLEARED");
 
   drawStatRow(ctx, CX, 370, [
     ["COMBO",    String(game.combo)],
@@ -244,17 +323,24 @@ function drawStatRow(ctx, cx, y, stats) {
   }
 }
 
-export function drawMenuButton(ctx, btn, selected, t) {
+export function drawMenuButton(ctx, btn, selected, t, accentColor = "#34f7ff") {
   ctx.save();
 
   const pulse = selected ? (Math.sin(t * 0.004) * 0.5 + 0.5) : 0;
 
+  // Parse the hex accent into rgba components for use at varying opacities
+  const isOrange = accentColor === "#ff643c";
+  const fillSelRgb  = isOrange ? "255, 100, 60" : "52, 247, 255";
+  const strokeDefRgb = isOrange ? "255, 100, 60" : "52, 247, 255";
+  const textColor   = isOrange ? "#ffd8c8" : "#d8fbff";
+  const textDimColor = isOrange ? "rgba(255, 216, 200, 0.44)" : "rgba(216, 251, 255, 0.44)";
+
   ctx.shadowBlur  = selected ? 14 + pulse * 10 : 0;
-  ctx.shadowColor = "#34f7ff";
-  ctx.fillStyle   = selected ? "rgba(52, 247, 255, 0.13)" : "rgba(4, 14, 26, 0.68)";
+  ctx.shadowColor = accentColor;
+  ctx.fillStyle   = selected ? `rgba(${fillSelRgb}, 0.13)` : "rgba(4, 14, 26, 0.68)";
   ctx.strokeStyle = selected
-    ? `rgba(52, 247, 255, ${0.68 + pulse * 0.32})`
-    : "rgba(52, 247, 255, 0.26)";
+    ? `rgba(${strokeDefRgb}, ${0.68 + pulse * 0.32})`
+    : `rgba(${strokeDefRgb}, 0.26)`;
   ctx.lineWidth = selected ? 2 : 1;
 
   ctx.beginPath();
@@ -264,7 +350,7 @@ export function drawMenuButton(ctx, btn, selected, t) {
 
   ctx.shadowBlur = selected ? 6 : 0;
   ctx.font = `${selected ? "700" : "600"} 20px system-ui, sans-serif`;
-  ctx.fillStyle = selected ? "#d8fbff" : "rgba(216, 251, 255, 0.44)";
+  ctx.fillStyle = selected ? textColor : textDimColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(btn.label, btn.x + btn.w * 0.5, btn.y + btn.h * 0.5);
