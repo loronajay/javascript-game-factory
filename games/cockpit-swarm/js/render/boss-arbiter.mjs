@@ -224,7 +224,7 @@ function drawVolleyTelegraph(ctx, game, layout, t) {
       ctx.restore();
     } else if (v.state === "firing") {
       const src    = project(LANES[i], ARBITER_TUNING.bodyY, ARBITER_TUNING.bodyZ, px);
-      const nearPt = project(LANES[i], 55, 0.20, px);
+      const nearPt = project(LANES[i], 55, 0.50, px);
 
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
@@ -286,7 +286,7 @@ function drawCannonColumnFills(ctx, game, layout, t) {
   const px = game.player.x;
 
   const topZ = 1.52;
-  const botZ = 0.28;
+  const botZ = 0.65;
   const topHW = 20;
   const botHW = 90;
 
@@ -388,7 +388,7 @@ function drawCannonBeams(ctx, game, layout, v, px) {
     if (v.safeIndices.includes(i)) continue;
     const laneX = LANES[i];
     const cannon   = laneX <= 0 ? layout.cannonL : layout.cannonR;
-    const impactPt = project(laneX, 110, 0.26, px);
+    const impactPt = project(laneX, 110, 0.65, px);
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
