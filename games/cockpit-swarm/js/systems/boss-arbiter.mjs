@@ -88,6 +88,7 @@ function updateVolley(game, input, dt, damagePlayer) {
         v.hitResolved = false;
         v.state = "charging";
         v.timer = cfg.chargeMs;
+        sfxBossCharge();
       }
       break;
 
@@ -142,6 +143,7 @@ function updateArbiterLaserP3(game, input, dt, damagePlayer) {
         m.state = "locked";
         m.timer = cfg.laserLockMs;
         m.lockedX = m.targetX;
+        sfxBossRoar();
       }
       break;
 

@@ -126,7 +126,7 @@ export const ARBITER_TUNING = {
 
   phase3: {
     hits: 28,
-    chargeMs: 600,
+    chargeMs: 760,
     fireMs: 220,
     openMs: 500,
     resetMs: 380,
@@ -134,7 +134,7 @@ export const ARBITER_TUNING = {
     safeHitWindow: 72,
     coreHitWindow: 60,
     laserChargeMs: 1400,
-    laserLockMs: 480,
+    laserLockMs: 680,
     laserFireMs: 620,
     laserVulnerableMs: 950,
     laserCooldownMs: 1300,
@@ -258,10 +258,10 @@ export const MENU_BTNS = [
 ];
 
 export const BOSS_PRACTICE_BTNS = [
-  { id: "boss1", label: "BOSS 01  ·  DREADMAW",     x: 440, y: 260, w: 400, h: 58 },
-  { id: "boss2", label: "BOSS 02  ·  THE ARBITER",  x: 440, y: 328, w: 400, h: 58 },
-  { id: "boss3", label: "BOSS 03  ·  ECLIPSIS",     x: 440, y: 396, w: 400, h: 58 },
-  { id: "back",  label: "← BACK",                   x: 500, y: 476, w: 280, h: 48 },
+  { id: "boss1", label: "BOSS 01  ·  DREADMAW",     x: 440, y: 230, w: 400, h: 56 },
+  { id: "boss2", label: "BOSS 02  ·  THE ARBITER",  x: 440, y: 320, w: 400, h: 56 },
+  { id: "boss3", label: "BOSS 03  ·  ECLIPSIS",     x: 440, y: 410, w: 400, h: 56 },
+  { id: "back",  label: "← BACK",                   x: 500, y: 500, w: 280, h: 46 },
 ];
 
 // ── Multiplayer lobby buttons (shared by update hit-test + renderer) ──────────
