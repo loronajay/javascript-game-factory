@@ -35,6 +35,8 @@ export const TUNING = {
   playerHitWindow: 62,
 
   fireCooldownMs: 130,
+  lobCooldownMs: 650,
+  lobDamage: 3,
   reticleHitWindowX: 54,
 
   enemyBaseSize: 48,

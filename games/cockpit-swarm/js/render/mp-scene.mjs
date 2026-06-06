@@ -1,6 +1,6 @@
 // mp-scene.mjs — All multiplayer rendering: lobby, countdown, world (opponent + bullets), fighting HUD, result.
 
-import { CX, H, W, RETICLE_Y, MP_LOBBY_BTNS, MP_RESULT_BTNS, MP_TUNING } from "../core/constants.mjs";
+import { CX, H, W, HORIZON_Y, RETICLE_Y, MP_LOBBY_BTNS, MP_RESULT_BTNS, MP_TUNING } from "../core/constants.mjs";
 import { clamp, lerp } from "../core/math.mjs";
 import { project } from "../systems/projection.mjs";
 import { getCountdownSecondsRemaining } from "../systems/online.mjs";
@@ -9,9 +9,18 @@ import { getCountdownSecondsRemaining } from "../systems/online.mjs";
 const Z_NEAR = 1.0;
 const Z_FAR  = 7.0;
 const PROJECTILE_SPAWN_OFFSET_Z = 0.15;
-const OPPONENT_VISUAL_Z = Z_FAR - PROJECTILE_SPAWN_OFFSET_Z;
+const SPAWN_Z = Z_NEAR + PROJECTILE_SPAWN_OFFSET_Z;          // 1.15 — z where bullets are born
+const OPPONENT_VISUAL_Z = Z_FAR - PROJECTILE_SPAWN_OFFSET_Z; // 6.85
 const OPPONENT_VISUAL_Y = -30;
 const OPPONENT_SIZE_SCALE = 4.25;
+
+// worldY for the gun muzzle: the value that projects to RETICLE_Y at SPAWN_Z depth.
+// (RETICLE_Y - HORIZON_Y) * SPAWN_Z  →  at z=SPAWN_Z, y = HORIZON_Y + worldY/z = RETICLE_Y
+const GUN_MUZZLE_WORLD_Y = (RETICLE_Y - HORIZON_Y) * SPAWN_Z; // ≈ 100
+// depth span for outgoing bullet worldY interpolation
+const OUTGOING_DEPTH_SPAN = OPPONENT_VISUAL_Z - SPAWN_Z;       // ≈ 5.70
+// vertical screen span from horizon to reticle (used for incoming y-approach math)
+const DHEIGHT = RETICLE_Y - HORIZON_Y;                         // ≈ 87
 
 // ─── Shared button helper ─────────────────────────────────────────────────────
 
@@ -274,6 +283,29 @@ export function renderMpWorld(ctx, game, t) {
   const { side, opponentX, mpBullets, opponentHitFlash = 0 } = game.mp;
   const localPlayerX = game.player.x;
 
+  // ── Muzzle flash when the local player fires ─────────────────────────────────
+  if (game.player.muzzleFlash > 0) {
+    const a = game.player.muzzleFlash / 140;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = "#34f7ff";
+    ctx.shadowColor = "#34f7ff";
+    ctx.shadowBlur  = 28 + a * 14;
+    ctx.lineWidth   = 3 + a * 2;
+    ctx.lineCap     = "round";
+    ctx.beginPath();
+    ctx.moveTo(CX, RETICLE_Y + 10);
+    ctx.lineTo(CX, HORIZON_Y - 20);
+    ctx.stroke();
+    ctx.globalAlpha = a * 0.50;
+    ctx.fillStyle   = "#d8fbff";
+    ctx.shadowBlur  = 20;
+    ctx.beginPath();
+    ctx.arc(CX, RETICLE_Y, 14 + a * 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   // Keep opponent projection tied to projectile spawn depth so muzzle origins read correctly.
   const op = buildMpOpponentView({ opponentX, localPlayerX, t, hitFlash: opponentHitFlash });
   _renderOpponentShip(ctx, op);
@@ -310,38 +342,65 @@ export function buildMpBulletView({ bullet, side, localPlayerX }) {
   const visible = viewZ >= 0.14;
   const isIncoming = (side === "p1" && bullet.owner === "p2") ||
                      (side === "p2" && bullet.owner === "p1");
-  const startZ = Z_FAR - PROJECTILE_SPAWN_OFFSET_Z;
-  const hitZ = Z_NEAR + 0.5;
+  const startZ = OPPONENT_VISUAL_Z;
+  const hitZ   = Z_NEAR + 0.5;
   const approach = isIncoming ? clamp((startZ - viewZ) / (startZ - hitZ), 0, 1) : 0;
-  const raw = project(bullet.x, 0, viewZ, localPlayerX);
+
+  // ── Outgoing bullets: interpolate worldY from gun muzzle (reticle height at SPAWN_Z)
+  //    to opponent worldY — gives correct 3-D arc from reticle into the distance.
+  const outgoingDepthFrac = !isIncoming
+    ? clamp((viewZ - SPAWN_Z) / OUTGOING_DEPTH_SPAN, 0, 1)
+    : 0;
+  const bulletWorldY = !isIncoming
+    ? lerp(GUN_MUZZLE_WORLD_Y, OPPONENT_VISUAL_Y, outgoingDepthFrac)
+    : 0;
+  const raw = project(bullet.x, bulletWorldY, viewZ, localPlayerX);
+
   const tailDz = bullet.kind === "lob" ? 0.55 : 0.30;
   const tailViewZ = isIncoming
     ? Math.min(viewZ + tailDz, Z_FAR)
     : Math.max(viewZ - tailDz, Z_NEAR);
-  const tailRaw = project(bullet.x, 0, tailViewZ, localPlayerX);
-  const tailApproach = isIncoming ? clamp((startZ - tailViewZ) / (startZ - hitZ), 0, 1) : 0;
+
+  const tailDepthFrac = !isIncoming
+    ? clamp((tailViewZ - SPAWN_Z) / OUTGOING_DEPTH_SPAN, 0, 1)
+    : 0;
+  const tailWorldY = !isIncoming
+    ? lerp(GUN_MUZZLE_WORLD_Y, OPPONENT_VISUAL_Y, tailDepthFrac)
+    : 0;
+  const tailRaw = project(bullet.x, tailWorldY, tailViewZ, localPlayerX);
+
+  // ── Incoming bullets: use Z_NEAR as the visual convergence target (not hitZ) so
+  //    bullets reach RETICLE_Y exactly at Z_NEAR, then overshoot past the player.
+  const rawVisualApp     = isIncoming ? (startZ - viewZ)     / Math.max(0.001, startZ - Z_NEAR) : 0;
+  const tailRawVisualApp = isIncoming ? (startZ - tailViewZ) / Math.max(0.001, startZ - Z_NEAR) : 0;
+
+  // Allow overshoot past 1.0 — bullet rushes through the reticle, then fades fast.
+  const overshoot     = Math.max(0, rawVisualApp - 1.0);
+  const overshootFade = overshoot > 0 ? Math.max(0, 1 - overshoot * 3.5) : 1.0;
+
+  const yApp     = isIncoming ? Math.min(rawVisualApp,     1.40) : 0;
+  const tailYApp = isIncoming ? Math.min(tailRawVisualApp, 1.40) : 0;
+
   const isLob = bullet.kind === "lob";
   const onLane = isIncoming && Math.abs(bullet.x - localPlayerX) <= MP_TUNING.hitWindowX;
 
-  // Outgoing bullets shrink to near-invisible at far depth — boost their minimum size and glow.
-  const outgoingFarFrac = !isIncoming
-    ? clamp((viewZ - 3.5) / (OPPONENT_VISUAL_Z - 3.5), 0, 1)
-    : 0;
-  const minRadius     = !isIncoming ? lerp(1.5, 4.0, outgoingFarFrac) : 1.5;
+  const outgoingFarFrac   = !isIncoming ? clamp((viewZ - 3.5) / (OPPONENT_VISUAL_Z - 3.5), 0, 1) : 0;
+  const minRadius         = !isIncoming ? lerp(1.5, 4.0, outgoingFarFrac) : 1.5;
   const outgoingGlowBoost = outgoingFarFrac;
 
   return {
     visible,
-    x: raw.x,
-    y: isIncoming ? lerp(raw.y, RETICLE_Y, approach * approach) : raw.y,
-    s: raw.s,
+    x:     raw.x,
+    y:     isIncoming ? HORIZON_Y + yApp     * yApp     * DHEIGHT : raw.y,
+    s:     raw.s,
     viewZ,
     tailX: tailRaw.x,
-    tailY: isIncoming ? lerp(tailRaw.y, RETICLE_Y, tailApproach * tailApproach) : tailRaw.y,
-    kind: bullet.kind,
+    tailY: isIncoming ? HORIZON_Y + tailYApp * tailYApp * DHEIGHT : tailRaw.y,
+    kind:  bullet.kind,
     isIncoming,
     approach,
     onLane,
+    overshootFade,
     radius: Math.max(minRadius, (isLob ? 11 : 5.5) * raw.s * lerp(0.90, 1.72, approach)),
     outgoingGlowBoost,
     threatAlpha: onLane ? clamp((approach - 0.42) / 0.58, 0, 1) * 0.68 : 0,
@@ -472,13 +531,14 @@ function _renderBullet(ctx, view) {
 function _renderBulletView(ctx, view) {
   ctx.save();
 
-  const { x, y, tailX, tailY, kind, isIncoming, approach, radius, palette, outgoingGlowBoost = 0 } = view;
+  const { x, y, tailX, tailY, kind, isIncoming, approach, radius, palette, outgoingGlowBoost = 0, overshootFade = 1 } = view;
   const isLob = kind === "lob";
   const color = palette.color;
 
-  // Outgoing bullets at far depth: boost alpha and glow so they stay readable
+  // Outgoing bullets at far depth: boost alpha and glow so they stay readable.
+  // Incoming bullets fade quickly once they overshoot past the reticle (overshootFade → 0).
   const baseAlpha = isIncoming
-    ? clamp(0.22 + approach * 0.50, 0.22, 0.78)
+    ? clamp(0.22 + approach * 0.50, 0.22, 0.78) * overshootFade
     : clamp(0.32 + outgoingGlowBoost * 0.42, 0.32, 0.74);
 
   ctx.globalAlpha = baseAlpha;
@@ -502,7 +562,7 @@ function _renderBulletView(ctx, view) {
   }
 
   ctx.globalAlpha = isIncoming
-    ? clamp(0.42 + approach * 0.58, 0.42, 1.0)
+    ? clamp(0.42 + approach * 0.58, 0.42, 1.0) * overshootFade
     : clamp(0.48 + outgoingGlowBoost * 0.44, 0.48, 0.92);
   ctx.shadowBlur = 14 + approach * 34 + outgoingGlowBoost * 24;
   ctx.strokeStyle = color;
@@ -663,7 +723,7 @@ export function renderMpFighting(ctx, game, t) {
     ctx.textBaseline = "bottom";
     ctx.font         = "500 11px system-ui, sans-serif";
     ctx.fillStyle    = "rgba(216, 251, 255, 0.20)";
-    ctx.fillText("A/D  MOVE    SPACE  LASER    K/SHIFT  LOB    ESC  EXIT", CX, H - 8);
+    ctx.fillText("A/D  MOVE    SPACE  LASER    K/L  LOB    ESC  EXIT", CX, H - 8);
   }
 
   ctx.restore();

@@ -178,6 +178,7 @@ export function renderHowToPlayScreen(ctx, game, t) {
     ["← / A",     "Strafe left"],
     ["→ / D",     "Strafe right"],
     ["SPACE / J", "Fire cannon"],
+    ["K / L",     "Heavy lob (3× damage)"],
     ["ESC",       "Return to menu"],
   ];
 

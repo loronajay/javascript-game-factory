@@ -23,6 +23,7 @@ export function createGameState() {
       health: 3,
       maxHealth: 3,
       fireCooldown: 0,
+      lobCooldown: 0,
       muzzleFlash: 0,
       hurtFlash: 0,
       curseTimer: 0,

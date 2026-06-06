@@ -47,7 +47,7 @@ export function createInput() {
         keys.fire = true;
       }
 
-      if (e.code === "KeyK" || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+      if (e.code === "KeyK" || e.code === "KeyL") {
         if (!keys.lob) pressed.lob = true;
         keys.lob = true;
       }
@@ -68,7 +68,7 @@ export function createInput() {
       if (e.code === "ArrowUp"    || e.code === "KeyW") keys.up    = false;
       if (e.code === "ArrowDown"  || e.code === "KeyS") keys.down  = false;
       if (e.code === "Space"      || e.code === "KeyJ") keys.fire  = false;
-      if (e.code === "KeyK" || e.code === "ShiftLeft" || e.code === "ShiftRight") keys.lob = false;
+      if (e.code === "KeyK" || e.code === "KeyL") keys.lob = false;
       if (e.code === "Escape")                          keys.escape = false;
     });
   }

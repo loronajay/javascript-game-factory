@@ -2,7 +2,7 @@ import { H, LANES, STATE, TUNING, ECLIPSIS_TUNING, BOSS_EVERY, TOTAL_BOSSES, MEN
 import { initMpLobby, updateMpLobby, updateMpCountdown, updateMpFighting, updateMpResult } from "./mp-controller.mjs";
 import {
   sfxClick, sfxExplosion, sfxPlayerHurt, sfxShutdown,
-  sfxShoot, sfxEnemyDeath,
+  sfxShoot, sfxEnemyDeath, sfxPowerup,
   startMenuMusic, startGameMusic
 } from "./audio.mjs";
 import { clamp, rand } from "../core/math.mjs";
@@ -72,6 +72,7 @@ export function resetGame(game, fromMenu = false, mode = game.mode || "campaign"
   game.player.maxHealth = 3;
   game.player.health = 3;
   game.player.fireCooldown = 0;
+  game.player.lobCooldown = 0;
   game.player.muzzleFlash = 0;
   game.player.hurtFlash = 0;
   game.player.curseTimer = 0;
@@ -362,6 +363,7 @@ function startBossPractice(game, input, bossNumber) {
   game.player.maxHealth = 3;
   game.player.health = 3;
   game.player.fireCooldown = 0;
+  game.player.lobCooldown = 0;
   game.player.muzzleFlash = 0;
   game.player.hurtFlash = 0;
   game.player.curseTimer = 0;
@@ -484,6 +486,7 @@ function updatePlayer(game, input, dt) {
   }
 
   player.fireCooldown = Math.max(0, player.fireCooldown - dt);
+  player.lobCooldown  = Math.max(0, player.lobCooldown  - dt);
   player.muzzleFlash  = Math.max(0, player.muzzleFlash  - dt);
   player.hurtFlash    = Math.max(0, player.hurtFlash    - dt);
   player.curseTimer   = Math.max(0, player.curseTimer   - dt);
@@ -642,9 +645,15 @@ function damagePlayer(game, input) {
 function updatePlayerFire(game, input) {
   const player = game.player;
 
+  const wantsLob      = input.consumeLobPress();
   const wantsTapShot  = input.consumeFirePress();
   const wantsHeldShot = canHoldToShoot(game) && input.isFireHeld();
   const wantsShot     = wantsTapShot || wantsHeldShot;
+
+  if (wantsLob && player.lobCooldown <= 0) {
+    _fireLob(game);
+    return;
+  }
 
   if (!wantsShot) return;
   if (player.fireCooldown > 0) return;
@@ -696,6 +705,62 @@ function updatePlayerFire(game, input) {
       maybeSpawnPowerupFromEnemyKill(game, best, stage);
     }
 
+    return;
+  }
+
+  if (tryHitOverseer(game)) return;
+  if (tryHitRunner(game)) return;
+
+  if (tryActivatePowerupInShotLane(game)) {
+    game.shotsHit++;
+    return;
+  }
+
+  game.combo = Math.max(0, game.combo - 1);
+}
+
+function _fireLob(game) {
+  const player = game.player;
+  player.lobCooldown = TUNING.lobCooldownMs;
+  player.muzzleFlash = 140;
+  game.shotsFired++;
+
+  sfxPowerup();
+
+  if (game.state === STATE.BOSS) {
+    if (tryDamageBossInShotLane(game)) return;
+    if (tryHitRunner(game)) return;
+    game.combo = Math.max(0, game.combo - 1);
+    return;
+  }
+
+  const shotX = getPlayerShotWorldX(player);
+  let best = null;
+  let bestLaneDistance = Infinity;
+
+  for (const enemy of getActiveEnemies(game.enemies)) {
+    const dx = Math.abs(enemy.x - shotX);
+    if (dx <= TUNING.enemyBulletLaneHitWindow && dx < bestLaneDistance) {
+      best = enemy;
+      bestLaneDistance = dx;
+    }
+  }
+
+  if (best) {
+    if (best.type === "phantom" && best.phased) {
+      game.player.curseTimer = Math.max(game.player.curseTimer, TUNING.curseDurationMs);
+      const pp = project(best.x, best.y, best.z, game.player.x);
+      game.explosions.push({ x: pp.x, y: pp.y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, r: 10, life: 320, maxLife: 320, kind: "curse" });
+      game.combo = Math.max(0, game.combo - 1);
+      return;
+    }
+
+    const killed = damageEnemy(game, best, { damage: TUNING.lobDamage });
+    applySplashShotDamage(game, best, (enemy, options) => damageEnemy(game, enemy, { ...options, damage: TUNING.lobDamage }));
+    if (killed) {
+      const stage = getStage(game.wave.stageIndex);
+      maybeSpawnPowerupFromEnemyKill(game, best, stage);
+    }
     return;
   }
 
