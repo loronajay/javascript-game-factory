@@ -144,23 +144,24 @@ function updateEclipsisBeam(game, input, dt, damagePlayer) {
         beam.laneProgress = 0;
         beam.laneIndex += beam.dir;
         beam.damagedThisLane = false;
-        const out = beam.laneIndex < 0 || beam.laneIndex > 4;
-        if (out) {
-          if (boss.phase === 5 && !beam.reversed && Math.random() < 0.55) {
-            beam.reversed = true;
-            beam.laneIndex = clamp(beam.laneIndex, 0, 4);
-            beam.dir = -beam.dir;
+
+        // Beam sweeps 3 lanes (stops at center, lane 2). Phase 5 can extend into safe side.
+        const partialOut = !beam.reversed && (beam.dir > 0 ? beam.laneIndex > 2 : beam.laneIndex < 2);
+        const fullOut    = beam.laneIndex < 0 || beam.laneIndex > 4;
+        const extend     = partialOut && boss.phase === 5 && Math.random() < 0.55;
+
+        if ((fullOut || partialOut) && !extend) {
+          beam.state = "cooldown";
+          beam.timer = ECLIPSIS_TUNING.beamVulnMs;
+          if (boss.phase >= 2) {
+            boss.eyeExposed = true;
+            boss.eyeExposedTimer = ECLIPSIS_TUNING.eyeVulnMs;
           } else {
-            beam.state = "cooldown";
-            beam.timer = ECLIPSIS_TUNING.beamVulnMs;
-            if (boss.phase >= 2) {
-              boss.eyeExposed = true;
-              boss.eyeExposedTimer = ECLIPSIS_TUNING.eyeVulnMs;
-            } else {
-              boss.panelExposed = true;
-              boss.panelExposedTimer = ECLIPSIS_TUNING.panelVulnMs;
-            }
+            boss.panelExposed = true;
+            boss.panelExposedTimer = ECLIPSIS_TUNING.panelVulnMs;
           }
+        } else if (extend) {
+          beam.reversed = true; // continues into the safe side — partialOut won't re-trigger
         }
       }
       break;

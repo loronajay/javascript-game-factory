@@ -324,21 +324,29 @@ function renderEclipsisBeamVisual(ctx, game, boss, layout, t) {
     ctx.setLineDash([]);
     ctx.restore();
 
-    // Arrow on the side pointing inward
-    const arrowX = fromLeft ? 44 : W - 44;
-    const arrowDir = fromLeft ? 1 : -1;
-    ctx.save();
-    ctx.globalAlpha = 0.55 + pulse * 0.40;
-    ctx.fillStyle = `rgb(${colorRGB})`;
-    ctx.shadowColor = `rgb(${colorRGB})`;
-    ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.moveTo(arrowX + arrowDir * 22, RETICLE_Y);
-    ctx.lineTo(arrowX - arrowDir * 12, RETICLE_Y - 20);
-    ctx.lineTo(arrowX - arrowDir * 12, RETICLE_Y + 20);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    // Green safe-zone markers on the 2 clear lanes (opposite side from beam origin)
+    const safeLanes = fromLeft ? [LANES[3], LANES[4]] : [LANES[0], LANES[1]];
+    for (const lx of safeLanes) {
+      const sp = project(lx, 0, 0.38, px);
+      ctx.save();
+      ctx.globalAlpha = 0.30 + chargeFrac * 0.50;
+      ctx.strokeStyle = "#40ff80";
+      ctx.shadowColor = "#40ff80";
+      ctx.shadowBlur = 10 + pulse * 8;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(sp.x, H); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.45 + chargeFrac * 0.40;
+      ctx.fillStyle = "#40ff80";
+      ctx.shadowColor = "#40ff80";
+      ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(sp.x, RETICLE_Y, 7, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
 
     return;
   }
@@ -397,6 +405,19 @@ function renderEclipsisBeamVisual(ctx, game, boss, layout, t) {
     ctx.beginPath(); ctx.moveTo(mx - ms, my - ms); ctx.lineTo(mx + ms, my + ms); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(mx + ms, my - ms); ctx.lineTo(mx - ms, my + ms); ctx.stroke();
     ctx.restore();
+
+    // Subtle green tint on the safe side (not shown when beam has extended into it in phase 5)
+    if (!beam.reversed) {
+      const safeX0 = beam.dir > 0 ? W * 0.52 : 0;
+      const safeX1 = beam.dir > 0 ? W        : W * 0.48;
+      const safeG = ctx.createLinearGradient(safeX0, 0, safeX1, 0);
+      safeG.addColorStop(0, "rgba(64,255,128,0)");
+      safeG.addColorStop(1, "rgba(64,255,128,0.09)");
+      ctx.save();
+      ctx.fillStyle = safeG;
+      ctx.fillRect(safeX0, HORIZON_Y, safeX1 - safeX0, H - HORIZON_Y);
+      ctx.restore();
+    }
   }
 }
 
