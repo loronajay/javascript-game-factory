@@ -384,7 +384,9 @@ function confirmTarget() {
 
 function lockAction(action) {
   inputState.lockedActions.push(action);
-  inputState.queueIndex++;
+  // Use lockedActions.length (not ++) so the index correctly skips auto-locked
+  // slots (stun/pendingAutoAction) that were pre-loaded before user input began.
+  inputState.queueIndex = inputState.lockedActions.length;
 
   // Re-sync queue against live state in case anything changed
   const remaining = alivePlayerSlots().filter(
