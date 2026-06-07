@@ -192,14 +192,14 @@ export class Game {
     else this.onStageFailure?.(result);
   }
 
-  update(dt) {
+  update(dt, { skipEndFrame = false } = {}) {
     const requestedViewMode = this.input.consumeViewModeRequest();
     if (requestedViewMode) this.setViewMode(requestedViewMode);
 
     if (this.stageEnded || this.cleared) {
       if (this.input.keys.has('Enter') || this.input.consumeReposition()) this.resetRuntime();
       if (this.input.keys.has('KeyN')) this.advanceStage();
-      this.input.endFrame();
+      if (!skipEndFrame) this.input.endFrame();
       return;
     }
 
@@ -219,7 +219,7 @@ export class Game {
       this.endStage('fail', { reason: 'timer' });
     }
 
-    this.input.endFrame();
+    if (!skipEndFrame) this.input.endFrame();
   }
 
   render() {

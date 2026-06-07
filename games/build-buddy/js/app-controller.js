@@ -162,7 +162,8 @@ export class AppController {
     }
 
     if (this.state.onlineGameplay.authorityPlayerId === 'server') {
-      this.game?.update(FIXED_DT);
+      // sendLocalOnlineCommands() calls endFrame(); skip it here so justClicked survives to consumeLocalBuilderCommand().
+      this.game?.update(FIXED_DT, { skipEndFrame: true });
     } else if (this.localOnlineRole() === 'builder' && this.game) {
       // Builder is non-host: update camera to follow the synced runner position,
       // then update the hover ghost so it tracks the mouse in the correct world region.
