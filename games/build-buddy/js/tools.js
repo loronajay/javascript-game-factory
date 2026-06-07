@@ -231,7 +231,7 @@ export class BuilderController {
     this.messageTime = 0;
   }
 
-  update(dt, input, camera, runner) {
+  updateHover(input, camera, runner) {
     this.selectedTool = input.selectedTool;
     if (!this.registry.toolEnabled(this.selectedTool)) {
       const firstEnabled = ['platform', 'springYellow', 'springGreen', 'springBlue', 'checkpoint'].find(t => this.registry.toolEnabled(t));
@@ -241,10 +241,8 @@ export class BuilderController {
     const rawX = Math.round(world.x / GRID.size) * GRID.size;
     const rawY = Math.round(world.y / GRID.size) * GRID.size;
     const placement = this.registry.normalizePlacement(this.selectedTool, rawX, rawY);
-
     this.hover.x = placement.x;
     this.hover.y = placement.y;
-
     const validation = this.registry.validatePlacement(this.selectedTool, this.hover.x, this.hover.y, runner);
     this.hover.valid = validation.valid;
     this.hover.reason = validation.reason;
@@ -252,7 +250,12 @@ export class BuilderController {
       this.hover.x = validation.x;
       this.hover.y = validation.y;
     }
+  }
 
+  update(dt, input, camera, runner) {
+    this.updateHover(input, camera, runner);
+
+    const world = camera.screenToWorld(input.mouse.x, input.mouse.y);
     if (input.consumePlace()) {
       const res = this.registry.add(this.selectedTool, this.hover.x, this.hover.y, runner);
       this.toast(res.valid ? `${TOOL_DEFS[this.selectedTool].label} placed` : res.reason);

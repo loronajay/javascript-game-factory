@@ -163,6 +163,11 @@ export class AppController {
 
     if (this.state.onlineGameplay.authorityPlayerId === 'server') {
       this.game?.update(FIXED_DT);
+    } else if (this.localOnlineRole() === 'builder' && this.game) {
+      // Builder is non-host: update camera to follow the synced runner position,
+      // then update the hover ghost so it tracks the mouse in the correct world region.
+      this.game.camera.update(FIXED_DT, this.game.runner, this.game.input);
+      this.game.builder?.updateHover(this.game.input, this.game.camera, this.game.runner);
     }
     this.sendLocalOnlineCommands();
   }

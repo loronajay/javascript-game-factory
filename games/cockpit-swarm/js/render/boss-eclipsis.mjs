@@ -1,4 +1,4 @@
-import { ECLIPSIS_TUNING, LANES, W, H, HORIZON_Y, RETICLE_Y } from "../core/constants.mjs";
+import { ECLIPSIS_TUNING, LANES, W, H, CX, HORIZON_Y, RETICLE_Y } from "../core/constants.mjs";
 import { clamp } from "../core/math.mjs";
 import { project } from "../systems/projection.mjs";
 import { getEclipsisLayout } from "../systems/boss.mjs";
@@ -295,15 +295,51 @@ function renderEclipsisBeamVisual(ctx, game, boss, layout, t) {
   if (beam.state === "charging") {
     const fromLeft = beam.dir > 0;
     const pulse = 0.3 + 0.5 * Math.sin(t * 0.018);
+    const chargeFrac = clamp(1 - beam.timer / ECLIPSIS_TUNING.beamChargeMs, 0, 1);
+
+    // Strong side glow
     ctx.save();
     const gx0 = fromLeft ? 0 : W;
-    const gx1 = fromLeft ? W * 0.45 : W * 0.55;
+    const gx1 = fromLeft ? W * 0.55 : W * 0.45;
     const g = ctx.createLinearGradient(gx0, 0, gx1, 0);
-    g.addColorStop(0, `rgba(${colorRGB},${pulse * 0.28})`);
+    g.addColorStop(0, `rgba(${colorRGB},${0.18 + pulse * 0.38})`);
     g.addColorStop(1, `rgba(${colorRGB},0)`);
     ctx.fillStyle = g;
-    ctx.fillRect(fromLeft ? 0 : W * 0.55, HORIZON_Y, W * 0.45, H - HORIZON_Y);
+    ctx.fillRect(fromLeft ? 0 : W * 0.45, HORIZON_Y, W * 0.55, H - HORIZON_Y);
     ctx.restore();
+
+    // Dashed danger stripe at the starting lane — grows brighter as charge builds
+    const startPt = project(LANES[fromLeft ? 0 : 4], 0, 0.22, px);
+    ctx.save();
+    ctx.globalAlpha = 0.25 + chargeFrac * 0.55;
+    ctx.strokeStyle = `rgb(${colorRGB})`;
+    ctx.shadowColor = `rgb(${colorRGB})`;
+    ctx.shadowBlur = 16 + pulse * 12;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 6]);
+    ctx.beginPath();
+    ctx.moveTo(startPt.x, startPt.y);
+    ctx.lineTo(startPt.x, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Arrow on the side pointing inward
+    const arrowX = fromLeft ? 44 : W - 44;
+    const arrowDir = fromLeft ? 1 : -1;
+    ctx.save();
+    ctx.globalAlpha = 0.55 + pulse * 0.40;
+    ctx.fillStyle = `rgb(${colorRGB})`;
+    ctx.shadowColor = `rgb(${colorRGB})`;
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(arrowX + arrowDir * 22, RETICLE_Y);
+    ctx.lineTo(arrowX - arrowDir * 12, RETICLE_Y - 20);
+    ctx.lineTo(arrowX - arrowDir * 12, RETICLE_Y + 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
     return;
   }
 
@@ -314,13 +350,13 @@ function renderEclipsisBeamVisual(ctx, game, boss, layout, t) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
 
+    // Original beam from boss down to near-z
     ctx.beginPath();
     ctx.moveTo(bossProj.x - 14, bossProj.y);
     ctx.lineTo(bossProj.x + 14, bossProj.y);
     ctx.lineTo(nearProj.x + 88, nearProj.y);
     ctx.lineTo(nearProj.x - 88, nearProj.y);
     ctx.closePath();
-
     const gBeam = ctx.createLinearGradient(bossProj.x, bossProj.y, nearProj.x, nearProj.y);
     gBeam.addColorStop(0,   `rgba(${colorRGB},0.04)`);
     gBeam.addColorStop(0.4, `rgba(${colorRGB},0.28)`);
@@ -330,6 +366,36 @@ function renderEclipsisBeamVisual(ctx, game, boss, layout, t) {
     ctx.shadowBlur  = 40;
     ctx.fill();
 
+    // Danger column — extends the beam all the way to the bottom of the screen
+    ctx.beginPath();
+    ctx.moveTo(nearProj.x - 88, nearProj.y);
+    ctx.lineTo(nearProj.x + 88, nearProj.y);
+    ctx.lineTo(nearProj.x + 116, H);
+    ctx.lineTo(nearProj.x - 116, H);
+    ctx.closePath();
+    const gFloor = ctx.createLinearGradient(0, nearProj.y, 0, H);
+    gFloor.addColorStop(0, `rgba(${colorRGB},0.62)`);
+    gFloor.addColorStop(1, `rgba(${colorRGB},0.12)`);
+    ctx.fillStyle = gFloor;
+    ctx.shadowBlur = 28;
+    ctx.fill();
+
+    ctx.restore();
+
+    // X danger marker at reticle level — flashes on the dangerous lane
+    const dangerPulse = 0.5 + 0.5 * Math.sin(t * 0.025);
+    const mx = nearProj.x;
+    const my = RETICLE_Y - 6;
+    const ms = 20;
+    ctx.save();
+    ctx.globalAlpha = 0.75 + dangerPulse * 0.25;
+    ctx.strokeStyle = "#ff2020";
+    ctx.shadowColor = "#ff4020";
+    ctx.shadowBlur = 20;
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(mx - ms, my - ms); ctx.lineTo(mx + ms, my + ms); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx + ms, my - ms); ctx.lineTo(mx - ms, my + ms); ctx.stroke();
     ctx.restore();
   }
 }
