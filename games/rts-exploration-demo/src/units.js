@@ -222,6 +222,15 @@ export class UnitManager {
     return this.units.find((u) => u.id === id);
   }
 
+  getDef(type) {
+    return getUnitDef(type);
+  }
+
+  resolveTarget(ref)       { return resolveTarget(ref, this.map, (id) => this.units.find((u) => u.id === id)); }
+  targetKey(ref)           { return targetKey(ref); }
+  targetCenter(target)     { return targetCenter(target, this.map); }
+  targetRadius(target)     { return targetRadius(target, this.map); }
+
   teamUnits(team) {
     return this.units.filter((u) => u.team === team && u.hp > 0);
   }

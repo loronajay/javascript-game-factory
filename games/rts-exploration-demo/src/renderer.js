@@ -578,7 +578,7 @@ export class Renderer {
       if (!this.shouldRenderUnitOverlay(unit)) continue;
       const p = this.camera.worldToScreen(unit.x, unit.y);
       const team = teamPalette(unit.team);
-      const combat = this.units.getDef(unit).combat;
+      const combat = this.units.getDef(unit.type).combat;
 
       ctx.globalAlpha = 0.8;
       ctx.strokeStyle = unit.state === 'blocked-repathing' ? '#ff5f6d' : unit.state === 'queued-behind-ally' ? '#ffd36d' : team.scan;

@@ -58,7 +58,7 @@ function summarizeSelection(selected, units) {
   const counts = new Map();
   for (const unit of selected) counts.set(unit.type, (counts.get(unit.type) ?? 0) + 1);
   const parts = [...counts.entries()].map(([type, count]) => {
-    const def = units.getDef({ type });
+    const def = units.getDef(type);
     return `${count} ${def.name}${count === 1 ? '' : 's'}`;
   });
   return parts.join(', ');
