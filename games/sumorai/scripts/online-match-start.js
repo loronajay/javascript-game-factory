@@ -1,5 +1,4 @@
 function startOnlineMatchSession({
-  ROLLBACK_WINDOW,
   factoryName,
   gameState,
   onlineClient,
@@ -8,12 +7,6 @@ function startOnlineMatchSession({
   onlineSide,
   setIsOnline,
   setLabels,
-  setOnlinePartnerEnd,
-  setOnlinePartnerGraceTicks,
-  setOnlineRemoteLastInput,
-  setResimulating,
-  setRollbackCounters,
-  setRollbackState,
   showScreen,
   startAmbient,
 }) {
@@ -25,23 +18,11 @@ function startOnlineMatchSession({
   });
 
   gameState.roundTarget = 3;
+  gameState.pendingRoundEnd = null;
   setIsOnline(true);
-  setOnlineRemoteLastInput(null);
-  setOnlinePartnerEnd(null);
-  setOnlinePartnerGraceTicks(0);
-  setRollbackState({
-    localFrame: 0,
-    stateBuffer: new Array(ROLLBACK_WINDOW),
-    localInputs: new Array(ROLLBACK_WINDOW),
-    predicted: new Array(ROLLBACK_WINDOW),
-  });
-  setResimulating(false);
-  setRollbackCounters({
-    rollbacksThisSec: 0,
-    displayRollbacks: 0,
-    secStartFrame: 0,
-  });
 
+  // The rollback session itself is armed per round (see _ensureOnlineSession in game.js);
+  // this helper only handles match-level setup: labels, format, ambient audio, and ping.
   onlineClient.startPinging();
   gameState.phase = 'online_countdown';
   showScreen('screen-game');

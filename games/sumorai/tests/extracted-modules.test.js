@@ -789,15 +789,14 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
   let clockOffset = 0;
   let startAt = 0;
   let remoteProfile = null;
-  let remoteInput = null;
-  let partnerEnd = null;
   let stagePlan = null;
   let isOnline = true;
-  const predicted = [];
-  predicted[5] = { seq: 5, left: false };
+  const remoteInputs = [];
+  const fakeSession = {
+    onRemoteInput: (frame, snap, adv, epoch) => remoteInputs.push({ frame, snap, adv, epoch }),
+  };
 
   wireOnlineCallbacks({
-    ROLLBACK_WINDOW: 12,
     buildForfeitSessionId: seed => `sumorai:${seed}:forfeit`,
     createPlatformApiClient: () => ({ updateGameRating: () => Promise.resolve() }),
     document: documentLike,
@@ -806,18 +805,14 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
     getOnlineIsRanked: () => true,
     getOnlineMatchSeed: () => matchSeed,
     getOnlineRemoteIdentity: () => ({ playerId: 'remote' }),
-    getRollbackFrame: () => 8,
-    inputsDiffer: (a, b) => a.left !== b.left,
+    getOnlineSession: () => fakeSession,
     normalizeOnlineStagePlan,
     onlineClient,
-    resimulate: frame => calls.push(['resimulate', frame]),
     setIsOnline: value => { isOnline = value; },
     setOnlineClockOffset: value => { clockOffset = value; },
     setOnlineMatchSeed: value => { matchSeed = value; },
-    setOnlinePartnerEnd: value => { partnerEnd = value; },
     setOnlineQueueCounts: value => { queueCounts = value; },
     setOnlineRemoteIdentity: value => { remoteProfile = value; },
-    setOnlineRemoteLastInput: value => { remoteInput = value; },
     setOnlineStagePlan: value => { stagePlan = value; },
     setOnlineStartAt: value => { startAt = value; },
     showLobbyPhase: phase => calls.push(['showLobbyPhase', phase]),
@@ -828,11 +823,6 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
     stopAmbient: () => calls.push(['stopAmbient']),
     stopSearchDots: () => calls.push(['stopSearchDots']),
     stopWaitingDots: () => calls.push(['stopWaitingDots']),
-    updatePredictedInput: (slot, snap, differs) => {
-      const changed = differs(predicted[slot], snap);
-      if (changed) predicted[slot] = { ...snap };
-      return changed;
-    },
     updateQueueHint: () => calls.push(['updateQueueHint']),
     setSideLocked: id => calls.push(['setSideLocked', id]),
   });
@@ -873,12 +863,13 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
   onlineClient.cb.onRemoteProfile({ playerId: 'remote' });
   assert.deepEqual(remoteProfile, { playerId: 'remote' });
 
-  onlineClient.cb.onRemoteInput({ seq: 5, left: true });
-  assert.deepEqual(remoteInput, { seq: 5, left: true });
-  assert.deepEqual(calls.at(-1), ['resimulate', 5]);
-
-  onlineClient.cb.onRemoteRoundEnd({ winner: 'p2' });
-  assert.deepEqual(partnerEnd, { winner: 'p2' });
+  onlineClient.cb.onRemoteInput({ seq: 5, adv: 3, epoch: 1, left: true });
+  assert.deepEqual(remoteInputs, [{
+    frame: 5,
+    snap: { seq: 5, adv: 3, epoch: 1, left: true },
+    adv: 3,
+    epoch: 1,
+  }]);
 
   onlineClient.cb.onSideConflict();
   assert.equal(sideConflict.hidden, false);
@@ -1010,20 +1001,13 @@ test('online result helpers publish activity, ranked ratings, and profile states
   assert.deepEqual(calls.slice(-3).map(call => call[0]), ['showScreen', 'loading', 'default']);
 });
 
-test('online match start helper resets labels and rollback session state', () => {
+test('online match start helper resets labels and match-level state', () => {
   const calls = [];
-  const gameState = { phase: 'menu', roundTarget: 0 };
+  const gameState = { phase: 'menu', roundTarget: 0, pendingRoundEnd: { winner: 'p1' } };
   let labels = null;
   let isOnline = false;
-  let remoteLastInput = {};
-  let partnerEnd = {};
-  let partnerGraceTicks = 4;
-  let rollbackState = null;
-  let resimulating = true;
-  let rollbackCounters = null;
 
   startOnlineMatchSession({
-    ROLLBACK_WINDOW: 12,
     factoryName: 'Akira',
     gameState,
     onlineClient: { startPinging: () => calls.push(['startPinging']) },
@@ -1032,12 +1016,6 @@ test('online match start helper resets labels and rollback session state', () =>
     onlineSide: 'p2',
     setIsOnline: value => { isOnline = value; },
     setLabels: value => { labels = value; },
-    setOnlinePartnerEnd: value => { partnerEnd = value; },
-    setOnlinePartnerGraceTicks: value => { partnerGraceTicks = value; },
-    setOnlineRemoteLastInput: value => { remoteLastInput = value; },
-    setResimulating: value => { resimulating = value; },
-    setRollbackCounters: value => { rollbackCounters = value; },
-    setRollbackState: value => { rollbackState = value; },
     showScreen: screen => calls.push(['showScreen', screen]),
     startAmbient: () => calls.push(['startAmbient']),
   });
@@ -1045,20 +1023,8 @@ test('online match start helper resets labels and rollback session state', () =>
   assert.deepEqual(labels, { p1: 'Remote', p2: 'Akira Online' });
   assert.equal(gameState.roundTarget, 3);
   assert.equal(gameState.phase, 'online_countdown');
+  assert.equal(gameState.pendingRoundEnd, null);
   assert.equal(isOnline, true);
-  assert.equal(remoteLastInput, null);
-  assert.equal(partnerEnd, null);
-  assert.equal(partnerGraceTicks, 0);
-  assert.equal(rollbackState.localFrame, 0);
-  assert.equal(rollbackState.stateBuffer.length, 12);
-  assert.equal(rollbackState.localInputs.length, 12);
-  assert.equal(rollbackState.predicted.length, 12);
-  assert.equal(resimulating, false);
-  assert.deepEqual(rollbackCounters, {
-    rollbacksThisSec: 0,
-    displayRollbacks: 0,
-    secStartFrame: 0,
-  });
   assert.deepEqual(calls, [
     ['startPinging'],
     ['showScreen', 'screen-game'],
@@ -1277,14 +1243,12 @@ test('simulation step resolves gridlock without running normal combat', () => {
   assert.deepEqual(sounds, ['gridlock_end']);
 });
 
-test('simulation step handles projectile clash and remote round-end grace', () => {
+test('simulation step handles projectile clash', () => {
   const chings = [];
-  const roundEnds = [];
-  let partnerEnd = { winner: 'p2' };
-  let partnerGrace = 7;
   const state = {
     gridlock: null,
     platforms: [],
+    pendingRoundEnd: null,
     p1: makeSimulationPlayer('p1', { x: 10, y: 10 }),
     p2: makeSimulationPlayer('p2', { x: 30, y: 10 }),
     p1Projectile: { active: true, x: 8, y: 6, facing: 1 },
@@ -1294,30 +1258,20 @@ test('simulation step handles projectile clash and remote round-end grace', () =
   tickSimulationStep({
     ...makeSimulationDeps(state),
     checkProjectileClash: () => true,
-    isOnline: true,
-    onlineClient: { sendRoundEnd: winner => roundEnds.push(winner) },
-    onlinePartnerEnd: partnerEnd,
-    onlinePartnerGraceTicks: partnerGrace,
-    setOnlinePartnerEnd: value => { partnerEnd = value; },
-    setOnlinePartnerGraceTicks: value => { partnerGrace = value; },
     spawnChing: (...args) => chings.push(args),
-    triggerRoundEnd: (...args) => roundEnds.push(args),
   });
 
   assert.equal(state.p1Projectile, null);
   assert.equal(state.p2Projectile, null);
   assert.deepEqual(chings, [[10, 8]]);
-  assert.deepEqual(roundEnds, ['p2', ['p2', false]]);
-  assert.equal(partnerEnd, null);
-  assert.equal(partnerGrace, 0);
 });
 
-test('simulation step sends local round end when physics kills a player online', () => {
-  const sent = [];
+test('simulation step defers the round end to the rollback session when online', () => {
   const triggered = [];
   const state = {
     gridlock: null,
     platforms: [],
+    pendingRoundEnd: null,
     p1: makeSimulationPlayer('p1'),
     p2: makeSimulationPlayer('p2'),
     p1Projectile: null,
@@ -1328,14 +1282,38 @@ test('simulation step sends local round end when physics kills a player online',
     ...makeSimulationDeps(state),
     applyPhysics: player => (player.side === 'p2' ? 'dead' : null),
     isOnline: true,
-    onlineClient: { sendRoundEnd: winner => sent.push(winner) },
     triggerRoundEnd: (...args) => triggered.push(args),
   });
 
-  assert.deepEqual(sent, ['p1']);
-  assert.deepEqual(triggered, [['p1', true]]);
+  // Online: no immediate transition — the session commits it once the frame is confirmed.
+  // The kill is captured as pendingRoundEnd (frame stamped later by the session).
+  assert.deepEqual(triggered, []);
+  assert.deepEqual(state.pendingRoundEnd, { winner: 'p1', isBlastKill: true, frame: null });
   assert.equal(state.p2.dead, true);
   assert.equal(state.p2.inputsLocked, true);
+});
+
+test('simulation step triggers the round end immediately when offline', () => {
+  const triggered = [];
+  const state = {
+    gridlock: null,
+    platforms: [],
+    pendingRoundEnd: null,
+    p1: makeSimulationPlayer('p1'),
+    p2: makeSimulationPlayer('p2'),
+    p1Projectile: null,
+    p2Projectile: null,
+  };
+
+  tickSimulationStep({
+    ...makeSimulationDeps(state),
+    applyPhysics: player => (player.side === 'p2' ? 'dead' : null),
+    isOnline: false,
+    triggerRoundEnd: (...args) => triggered.push(args),
+  });
+
+  assert.deepEqual(triggered, [['p1', true]]);
+  assert.equal(state.pendingRoundEnd, null);
 });
 
 
@@ -1407,16 +1385,10 @@ function makeSimulationDeps(gameState) {
     isAttackActive: () => false,
     isDashAttackActive: () => false,
     isOnline: false,
-    onlineClient: { sendRoundEnd: () => {} },
-    onlinePartnerEnd: null,
-    onlinePartnerGraceTicks: 0,
     p1In: {},
     p2In: {},
     playSound: () => {},
     resolveHits: () => null,
-    resimulating: false,
-    setOnlinePartnerEnd: () => {},
-    setOnlinePartnerGraceTicks: () => {},
     spawnChing: () => {},
     stepAnimation: () => {},
     tickGridlock: () => null,

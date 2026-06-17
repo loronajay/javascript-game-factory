@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs && node tests/combat.test.mjs && node tests/architecture.test.mjs"
+  }
+}

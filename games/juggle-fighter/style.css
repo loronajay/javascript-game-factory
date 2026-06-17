@@ -1,0 +1,72 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #070a10;
+  color: #f5f7fb;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.cabinet {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+canvas {
+  width: min(100vw, 960px);
+  height: auto;
+  image-rendering: pixelated;
+  border: 2px solid #31425d;
+  background: #10151f;
+}
+
+.controls {
+  margin: 0;
+  color: #9fb0c8;
+  font-size: 14px;
+}
+
+.controller-panel {
+  display: grid;
+  gap: 8px;
+  width: min(100vw, 960px);
+  color: #dbe7ff;
+  font-size: 13px;
+}
+
+.controller-panel__status,
+.controller-panel__bindings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.controller-panel__status span,
+.controller-panel__bindings button {
+  border: 1px solid #31425d;
+  background: #10151f;
+  color: #dbe7ff;
+  padding: 6px 8px;
+}
+
+.controller-panel__bindings button[data-listening="true"] {
+  border-color: #f0c84b;
+  color: #fff2a0;
+}
+
+.controller-panel p {
+  margin: 0;
+  color: #9fb0c8;
+}

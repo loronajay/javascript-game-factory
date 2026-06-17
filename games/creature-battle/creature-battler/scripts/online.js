@@ -16,6 +16,18 @@ function createCbOnlineClient() {
   let _isCoordinator = false;
   let _mySide        = null;
   let _pendingSends  = [];
+  let _heartbeatTimer = null;
+
+  function _startHeartbeat() {
+    _stopHeartbeat();
+    _heartbeatTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+    }, 20000);
+  }
+
+  function _stopHeartbeat() {
+    if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+  }
 
   const cb = {
     onConnected:     null, // ()
@@ -81,6 +93,7 @@ function createCbOnlineClient() {
 
       case 'match_ready':
         _inRoom = true;
+        _startHeartbeat();
         // Server assigned sides; derive ours from remoteSide so both players agree.
         if (msg.remoteSide) _mySide = msg.remoteSide === 'alpha' ? 'beta' : 'alpha';
         if (_mySide) _isCoordinator = (_mySide === 'alpha');
@@ -114,6 +127,7 @@ function createCbOnlineClient() {
       ws.addEventListener('open', _flushPendingSends);
       ws.addEventListener('message', e => _handle(e.data));
       ws.addEventListener('close', () => {
+        _stopHeartbeat();
         if (_inRoom) { _inRoom = false; cb.onPartnerLeft?.(); }
         ws = null;
       });
@@ -145,6 +159,7 @@ function createCbOnlineClient() {
     send(messageType, value) { _roomMsg(messageType, value); },
 
     disconnect() {
+      _stopHeartbeat();
       _inRoom = false;
       _isCoordinator = false;
       _pendingSends = [];

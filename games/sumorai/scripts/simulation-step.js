@@ -13,16 +13,10 @@ function tickSimulationStep({
   isAttackActive,
   isDashAttackActive,
   isOnline,
-  onlineClient,
-  onlinePartnerEnd,
-  onlinePartnerGraceTicks,
   p1In,
   p2In,
   playSound,
   resolveHits,
-  resimulating,
-  setOnlinePartnerEnd,
-  setOnlinePartnerGraceTicks,
   spawnChing,
   stepAnimation,
   tickGridlock,
@@ -197,7 +191,7 @@ function tickSimulationStep({
   const p1Dead = p1Result === 'dead' || combatResult?.p1Killed || projKillP1;
   const p2Dead = p2Result === 'dead' || combatResult?.p2Killed || projKillP2;
 
-  if (p1Dead || p2Dead) {
+  if ((p1Dead || p2Dead) && !gameState.pendingRoundEnd) {
     if (p1Dead) {
       gameState.p1.dead = p1Result === 'dead';
       gameState.p1.inputsLocked = true;
@@ -210,18 +204,15 @@ function tickSimulationStep({
       : (p1Dead && !p2Dead) ? 'p2'
         : 'draw';
     const isBlastKill = (p1Dead && p1Result === 'dead') || (p2Dead && p2Result === 'dead');
-    setOnlinePartnerEnd(null);
-    setOnlinePartnerGraceTicks(0);
-    if (!resimulating && isOnline) onlineClient.sendRoundEnd(winner);
-    triggerRoundEnd(winner, isBlastKill);
-  } else if (onlinePartnerEnd) {
-    const nextGraceTicks = onlinePartnerGraceTicks + 1;
-    setOnlinePartnerGraceTicks(nextGraceTicks);
-    if (nextGraceTicks >= 8) {
-      setOnlinePartnerGraceTicks(0);
-      if (!resimulating && isOnline) onlineClient.sendRoundEnd(onlinePartnerEnd.winner);
-      triggerRoundEnd(onlinePartnerEnd.winner, false);
-      setOnlinePartnerEnd(null);
+    if (isOnline) {
+      // Online: defer the irreversible round-end transition to the rollback session, which
+      // commits only once this kill frame is confirmed by both peers (see rollback-session.js).
+      // The session stamps `frame`; both peers then commit the identical outcome on the
+      // identical frame, so no round_end network message is needed and the old 8-tick grace
+      // band-aid is gone. A kill detected from a misprediction is simply rolled back.
+      gameState.pendingRoundEnd = { winner, isBlastKill, frame: null };
+    } else {
+      triggerRoundEnd(winner, isBlastKill);
     }
   }
 }

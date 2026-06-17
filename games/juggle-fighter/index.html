@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Juggle Fighter</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <main class="cabinet">
+      <canvas data-game-canvas width="960" height="540" aria-label="Juggle Fighter"></canvas>
+      <section class="controller-panel" aria-label="Controller mapping">
+        <div class="controller-panel__status">
+          <strong>Controller</strong>
+          <span data-controller-status>No controller detected</span>
+          <span data-controller-buttons>Buttons: none</span>
+        </div>
+        <div class="controller-panel__bindings">
+          <button type="button" data-map-action="attack">Map Attack</button>
+          <button type="button" data-map-action="special">Map Special</button>
+          <button type="button" data-map-action="jump">Map Jump</button>
+          <button type="button" data-map-action="shield">Map Shield</button>
+          <button type="button" data-map-action="grab">Map Grab</button>
+        </div>
+        <p data-controller-mapping>Press a map button, then press the matching controller button.</p>
+      </section>
+      <p class="controls">P1 WASD/J/K/L · P2 arrows/numpad 1/2/3 · GameCube adapter: stick/A/B/X/Y/L/R/Z/C-stick</p>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

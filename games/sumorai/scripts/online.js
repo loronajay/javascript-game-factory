@@ -41,8 +41,11 @@ function parseInputMessage(value) {
     if (!p || typeof p !== 'object') return null;
     const seq = Number(p.seq);
     if (!Number.isFinite(seq)) return null;
+    const adv = Number(p.adv);
     return {
       seq:               Math.floor(seq),
+      adv:               Number.isFinite(adv) ? Math.floor(adv) : 0,
+      epoch:             Number.isFinite(Number(p.epoch)) ? Math.floor(Number(p.epoch)) : 0,
       left:              !!p.left,
       right:             !!p.right,
       up:                !!p.up,
@@ -52,16 +55,6 @@ function parseInputMessage(value) {
       projectile:        !!p.projectile,
       attackJustPressed: !!p.attackJustPressed,
     };
-  } catch { return null; }
-}
-
-function parseRoundEndMessage(value) {
-  if (typeof value !== 'string' || !value) return null;
-  try {
-    const p = JSON.parse(value);
-    if (!p || typeof p !== 'object') return null;
-    if (p.winner !== 'p1' && p.winner !== 'p2' && p.winner !== 'draw') return null;
-    return { winner: p.winner };
   } catch { return null; }
 }
 
@@ -128,8 +121,7 @@ export function createOnlineClient() {
     onRoomCreated:     null,  // (code)
     onMatchReady:      null,  // ({ seed, remoteSide, serverNow, startAt })
     onRemoteProfile:   null,  // ({ playerId, displayName, side })
-    onRemoteInput:     null,  // (inputSnapshot) — fired each game tick
-    onRemoteRoundEnd:  null,  // ({ winner })
+    onRemoteInput:     null,  // (inputSnapshot) — fired per remote frame
     onSideConflict:    null,  // ()
     onPartnerLeft:     null,  // ()
     onError:           null,  // (code, message)
@@ -157,11 +149,6 @@ export function createOnlineClient() {
     if (messageType === 'input') {
       const snap = parseInputMessage(value);
       if (snap) cb.onRemoteInput?.(snap);
-      return;
-    }
-    if (messageType === 'round_end') {
-      const re = parseRoundEndMessage(value);
-      if (re) cb.onRemoteRoundEnd?.(re);
       return;
     }
     if (messageType === 'profile') {
@@ -300,12 +287,8 @@ export function createOnlineClient() {
     _roomCode = null; _inRoom = false; _coordinator = false;
   }
 
-  function sendInput(seq, snapshot) {
-    _roomMsg('input', JSON.stringify({ seq, ...snapshot }));
-  }
-
-  function sendRoundEnd(winner) {
-    _roomMsg('round_end', JSON.stringify({ winner }));
+  function sendInput(seq, snapshot, adv = 0, epoch = 0) {
+    _roomMsg('input', JSON.stringify({ seq, adv, epoch, ...snapshot }));
   }
 
   function startPinging() {
@@ -336,7 +319,7 @@ export function createOnlineClient() {
 
   return {
     connect, findMatch, createRoom, joinRoom, requestQueueStatus,
-    cancelSearch, cancelRoom, sendInput, sendRoundEnd, setIdentity,
+    cancelSearch, cancelRoom, sendInput, setIdentity,
     startPinging, stopPinging, getLatencyMs,
     disconnect, reset, cb,
   };

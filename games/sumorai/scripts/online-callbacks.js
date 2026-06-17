@@ -1,5 +1,4 @@
 function wireOnlineCallbacks({
-  ROLLBACK_WINDOW,
   buildForfeitSessionId,
   createPlatformApiClient,
   gameState,
@@ -7,18 +6,14 @@ function wireOnlineCallbacks({
   getOnlineIsRanked,
   getOnlineMatchSeed,
   getOnlineRemoteIdentity,
-  getRollbackFrame,
-  inputsDiffer,
+  getOnlineSession,
   normalizeOnlineStagePlan,
   onlineClient,
-  resimulate,
   setIsOnline,
   setOnlineClockOffset,
   setOnlineMatchSeed,
-  setOnlinePartnerEnd,
   setOnlineQueueCounts,
   setOnlineRemoteIdentity,
-  setOnlineRemoteLastInput,
   setOnlineStagePlan,
   setOnlineStartAt,
   showLobbyPhase,
@@ -29,7 +24,6 @@ function wireOnlineCallbacks({
   stopAmbient,
   stopSearchDots,
   stopWaitingDots,
-  updatePredictedInput,
   updateQueueHint,
   setSideLocked,
   document,
@@ -82,22 +76,11 @@ function wireOnlineCallbacks({
   };
 
   onlineClient.cb.onRemoteInput = (snap) => {
-    const frame = snap.seq;
-    const age = getRollbackFrame() - frame;
-    setOnlineRemoteLastInput(snap);
-
-    if (age <= 0 || age > ROLLBACK_WINDOW) return;
-
-    const slot = frame % ROLLBACK_WINDOW;
-    if (updatePredictedInput(slot, snap, inputsDiffer)) {
-      resimulate(frame);
-    }
-  };
-
-  onlineClient.cb.onRemoteRoundEnd = (roundEnd) => {
-    if (gameState.phase === 'active') {
-      setOnlinePartnerEnd(roundEnd);
-    }
+    // The rollback session owns prediction, misprediction detection, and resimulation. It
+    // also rejects inputs tagged with a different round (epoch), so a late input from the
+    // previous round cannot corrupt this round's confirmed-frame tracking.
+    const session = getOnlineSession();
+    if (session) session.onRemoteInput(snap.seq, snap, snap.adv, snap.epoch);
   };
 
   onlineClient.cb.onSideConflict = () => {

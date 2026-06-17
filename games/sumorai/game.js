@@ -44,6 +44,7 @@ import {
 } from './scripts/ranked-ui.js';
 import { wireOnlineLobbyEvents } from './scripts/online-lobby-events.js';
 import { loadGameState, saveGameState } from './scripts/rollback-state.js';
+import { createRollbackSession } from './scripts/rollback-session.js';
 import { tickRoundEndState, tickRoundStartState, triggerRoundEndState } from './scripts/round-lifecycle.js';
 import { tickSimulationStep } from './scripts/simulation-step.js';
 import { wireSetupEvents } from './scripts/setup-events.js';
@@ -121,23 +122,16 @@ function _boot(sounds) {
   let onlineRemoteIdentity = null;
   let onlineQueueCounts    = null;
   let isOnline             = false;
-  // Input sync buffers (wired in next phase with full game loop integration)
-  let onlineRemoteLastInput = null;
-  let onlinePartnerEnd        = null;
-  let onlinePartnerGraceTicks = 0;
 
-  let rbLocalFrame  = 0;
-  let rbStateBuffer = new Array(ROLLBACK_WINDOW);   // gameState snapshot before frame F
-  let rbLocalInputs = new Array(ROLLBACK_WINDOW);   // local input used at frame F
-  let rbPredicted   = new Array(ROLLBACK_WINDOW);   // remote input used (predicted or confirmed)
-  let resimulating  = false;
+  // Rollback session — owns frame counter, snapshot buffers, prediction, resimulation, and
+  // peer time-synchronization. Recreated each round (see _ensureOnlineSession). All the rb*
+  // bookkeeping that used to live inline here now lives in scripts/rollback-session.js, which
+  // is exercised headlessly by tests/online-sync.test.js.
+  let onlineSession = null;
+
   const { playSound, startAmbient, stopAmbient } = createAudioController(getSound, {
-    isMuted: () => resimulating,
+    isMuted: () => !!onlineSession && onlineSession.isResimulating(),
   });
-
-  let rbRollbacksThisSec  = 0;   // incremented each resimulate() call
-  let rbDisplayRollbacks  = 0;   // snapshot shown in HUD (updated each second)
-  let rbSecStartFrame     = 0;   // rbLocalFrame value at last second boundary
 
   const {
     showScreen,
@@ -157,21 +151,34 @@ function _boot(sounds) {
 
   // Online game helpers
 
-  function resimulate(fromFrame) {
-    rbRollbacksThisSec++;
-    loadGameState(gameState, rbStateBuffer[fromFrame % ROLLBACK_WINDOW]);
-    resimulating = true;
-    for (let f = fromFrame; f < rbLocalFrame; f++) {
-      if (gameState.phase !== 'active') break;
-      rbStateBuffer[f % ROLLBACK_WINDOW] = saveGameState(gameState);
-      const localIn  = rbLocalInputs[f % ROLLBACK_WINDOW] ?? EMPTY_INPUT;
-      const remoteIn = rbPredicted[f  % ROLLBACK_WINDOW]  ?? onlineRemoteLastInput ?? EMPTY_INPUT;
-      _tickSim(
-        onlineSide === 'p1' ? localIn : remoteIn,
-        onlineSide === 'p2' ? localIn : remoteIn,
-      );
+  // A fresh rollback session for the current round. Both peers tag inputs with the round
+  // number (epoch) so a late input from the previous round can never be misread as a
+  // confirmed input for this one.
+  function _createOnlineSession() {
+    return createRollbackSession({
+      localSide: onlineSide,
+      gameState,
+      epoch: gameState.roundNum,
+      rollbackWindow: ROLLBACK_WINDOW,
+      tickSim: (p1In, p2In) => _tickSim(p1In, p2In),
+      saveState: () => saveGameState(gameState),
+      loadState: (snap) => loadGameState(gameState, snap),
+      inputsDiffer,
+      emptyInput: EMPTY_INPUT,
+      send: (frame, snap, advantage, epoch) => onlineClient.sendInput(frame, snap, advantage, epoch),
+      commitRoundEnd: (pending) => {
+        triggerRoundEnd(pending.winner, pending.isBlastKill);
+        gameState.pendingRoundEnd = null;
+      },
+    });
+  }
+
+  // Ensure the session matches the current round. Called from round_start (so it exists
+  // before active begins and can buffer the peer's early inputs) and defensively from active.
+  function _ensureOnlineSession() {
+    if (!onlineSession || onlineSession.epoch !== gameState.roundNum) {
+      onlineSession = _createOnlineSession();
     }
-    resimulating = false;
   }
 
   wireSetupEvents({
@@ -232,7 +239,6 @@ function _boot(sounds) {
 
   function _wireOnlineCallbacks() {
     wireOnlineCallbacks({
-      ROLLBACK_WINDOW,
       buildForfeitSessionId: seed => `sumorai:${seed}:forfeit`,
       createPlatformApiClient,
       document,
@@ -241,18 +247,14 @@ function _boot(sounds) {
       getOnlineIsRanked: () => onlineIsRanked,
       getOnlineMatchSeed: () => onlineMatchSeed,
       getOnlineRemoteIdentity: () => onlineRemoteIdentity,
-      getRollbackFrame: () => rbLocalFrame,
-      inputsDiffer,
+      getOnlineSession: () => onlineSession,
       normalizeOnlineStagePlan,
       onlineClient,
-      resimulate,
       setIsOnline: value => { isOnline = value; },
       setOnlineClockOffset: value => { onlineClockOffset = value; },
       setOnlineMatchSeed: value => { onlineMatchSeed = value; },
-      setOnlinePartnerEnd: value => { onlinePartnerEnd = value; },
       setOnlineQueueCounts: value => { onlineQueueCounts = value; },
       setOnlineRemoteIdentity: value => { onlineRemoteIdentity = value; },
-      setOnlineRemoteLastInput: value => { onlineRemoteLastInput = value; },
       setOnlineStagePlan: value => { onlineStagePlan = value; },
       setOnlineStartAt: value => { onlineStartAt = value; },
       showLobbyPhase,
@@ -263,12 +265,6 @@ function _boot(sounds) {
       stopAmbient,
       stopSearchDots: _stopSearchDots,
       stopWaitingDots: _stopWaitingDots,
-      updatePredictedInput: (slot, snap, differs) => {
-        const predicted = rbPredicted[slot];
-        if (!predicted || !differs(predicted, snap)) return false;
-        rbPredicted[slot] = { ...snap };
-        return true;
-      },
       updateQueueHint: _updateQueueHint,
       setSideLocked: _setSideLocked,
     });
@@ -312,8 +308,8 @@ function _boot(sounds) {
     });
   }
   function _startOnlineMatch() {
+    onlineSession = null;   // a fresh per-round session is armed when round_start begins
     startOnlineMatchSession({
-      ROLLBACK_WINDOW,
       factoryName,
       gameState,
       onlineClient,
@@ -322,21 +318,6 @@ function _boot(sounds) {
       onlineSide,
       setIsOnline: value => { isOnline = value; },
       setLabels: labels => { p1Label = labels.p1; p2Label = labels.p2; },
-      setOnlinePartnerEnd: value => { onlinePartnerEnd = value; },
-      setOnlinePartnerGraceTicks: value => { onlinePartnerGraceTicks = value; },
-      setOnlineRemoteLastInput: value => { onlineRemoteLastInput = value; },
-      setResimulating: value => { resimulating = value; },
-      setRollbackCounters: counters => {
-        rbRollbacksThisSec = counters.rollbacksThisSec;
-        rbDisplayRollbacks = counters.displayRollbacks;
-        rbSecStartFrame = counters.secStartFrame;
-      },
-      setRollbackState: rollbackState => {
-        rbLocalFrame = rollbackState.localFrame;
-        rbStateBuffer = rollbackState.stateBuffer;
-        rbLocalInputs = rollbackState.localInputs;
-        rbPredicted = rollbackState.predicted;
-      },
       showScreen,
       startAmbient,
     });
@@ -432,6 +413,7 @@ function _boot(sounds) {
 
 
   function tickRoundStart() {
+    if (isOnline) _ensureOnlineSession();   // arm this round's session before play begins
     tickRoundStartState({
       camera,
       gameState,
@@ -477,16 +459,10 @@ function _boot(sounds) {
       isAttackActive,
       isDashAttackActive,
       isOnline,
-      onlineClient,
-      onlinePartnerEnd,
-      onlinePartnerGraceTicks,
       p1In,
       p2In,
       playSound,
       resolveHits,
-      resimulating,
-      setOnlinePartnerEnd: value => { onlinePartnerEnd = value; },
-      setOnlinePartnerGraceTicks: value => { onlinePartnerGraceTicks = value; },
       spawnChing,
       stepAnimation,
       tickGridlock,
@@ -517,32 +493,21 @@ function _boot(sounds) {
       return;
     }
 
+    _ensureOnlineSession();
+
+    // If we are running ahead of the peer, wait this frame instead of predicting further —
+    // and crucially do NOT consume input, so a tap during the stall is applied on the next
+    // advanced frame rather than being silently dropped.
+    if (onlineSession.framesToStall() > 0) return;
+
     const localIn = input.getSnapshot(getHumanInputBindings(onlineSide, bindings, {
       mobileControlsActive,
       defaultMobileBindings: DEFAULT_P1,
     }));
     input.flush();
 
-    const slot = rbLocalFrame % ROLLBACK_WINDOW;
-    rbStateBuffer[slot] = saveGameState(gameState);
-    rbLocalInputs[slot] = { ...localIn };
-    rbPredicted[slot]   = { ...(onlineRemoteLastInput ?? EMPTY_INPUT) };
-
-    onlineClient.sendInput(rbLocalFrame, localIn);
-
-    _tickSim(
-      onlineSide === 'p1' ? localIn         : rbPredicted[slot],
-      onlineSide === 'p2' ? localIn         : rbPredicted[slot],
-    );
-
-    rbLocalFrame++;
-
-    // Snapshot rollback counter once per second (60 frames)
-    if (rbLocalFrame - rbSecStartFrame >= 60) {
-      rbDisplayRollbacks = rbRollbacksThisSec;
-      rbRollbacksThisSec = 0;
-      rbSecStartFrame    = rbLocalFrame;
-    }
+    // The session owns snapshot/predict/send/simulate/rollback/commit for this frame.
+    onlineSession.tick(localIn);
   }
 
   function loop(ts) {
@@ -570,7 +535,7 @@ function _boot(sounds) {
                gameState.phase === 'match_end') {
       const netInfo = isOnline ? {
         latencyMs:       onlineClient.getLatencyMs(),
-        rollbacksPerSec: rbDisplayRollbacks,
+        rollbacksPerSec: onlineSession ? onlineSession.getRollbacksPerSecond() : 0,
       } : null;
       render(ctx, canvas, gameState, camera, netInfo);
     }

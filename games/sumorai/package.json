@@ -1,6 +1,6 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node tests/extracted-modules.test.js && node tests/mobile-ui.test.js && node tests/mobile-structure.test.js"
+    "test": "node tests/extracted-modules.test.js && node tests/online-sync.test.js && node tests/mobile-ui.test.js && node tests/mobile-structure.test.js"
   }
 }

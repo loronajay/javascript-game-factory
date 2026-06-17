@@ -13,6 +13,7 @@ function createInitialGameState({ createPlayer, createPlatforms, defaultLayout =
     deathFlash: 0,
     roundStartTick: 0,
     roundEnd: null,
+    pendingRoundEnd: null,
     platforms: createPlatforms(defaultLayout),
   };
 }
@@ -22,6 +23,7 @@ function resetMatchProgress(gameState) {
   gameState.p2.wins = 0;
   gameState.roundNum = 0;
   gameState.roundEnd = null;
+  gameState.pendingRoundEnd = null;
 }
 
 function prepareRoundState(gameState, {
@@ -45,6 +47,7 @@ function prepareRoundState(gameState, {
   gameState.effects = [];
   gameState.clashFlash = 0;
   gameState.deathFlash = 0;
+  gameState.pendingRoundEnd = null;
   resetPlayer(gameState.p1);
   resetPlayer(gameState.p2);
   gameState.p1.inputsLocked = true;
