@@ -57,6 +57,25 @@ test('renderer scene stack lives behind a dedicated module seam', () => {
   );
 });
 
+test('init-game delegates online wiring, keyboard, and pointer routing to dedicated seams', () => {
+  const initSource = fs.readFileSync(path.join(ROOT, 'scripts', 'init-game.js'), 'utf8');
+  assert(exists('scripts/online-wiring.js'), 'missing scripts/online-wiring.js');
+  assert(exists('scripts/keyboard-router.js'), 'missing scripts/keyboard-router.js');
+  assert(exists('scripts/menu-interaction.js'), 'missing scripts/menu-interaction.js');
+  assert(
+    initSource.includes("from './online-wiring.js'"),
+    'expected init-game to import the online-wiring seam'
+  );
+  assert(
+    initSource.includes("from './keyboard-router.js'"),
+    'expected init-game to import the keyboard-router seam'
+  );
+  assert(
+    initSource.includes("from './menu-interaction.js'"),
+    'expected init-game to import the menu-interaction seam'
+  );
+});
+
 test('node tests live under tests/', () => {
   const expected = [
     'tests/game.test.js',

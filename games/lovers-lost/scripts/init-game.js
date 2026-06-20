@@ -1,7 +1,5 @@
 import {
   createGameState, tickFrame, advancePhaseState,
-  shouldHandleScoreScreenKeydown,
-  shouldHandleMappedKeyLocally,
 } from './game-tick.js';
 import { RUN_DISTANCE } from './player.js';
 import { buildDebugCollisionSnapshot } from './collision.js';
@@ -10,23 +8,23 @@ import { createLaneInputHandler } from './lane-input.js';
 import {
   sanitizeOnlineDisplayName, isValidOnlineDisplayName,
   buildOnlineIdentity, deriveOnlineRunOverrideName,
-  attachOnlineResultIdentities, sanitizeOnlinePlayerId,
+  attachOnlineResultIdentities,
 } from './online-identity.js';
-import { getOnlineSideSelectRects, getOnlineNameEntryButtonRects, getOnlineLobbyButtonRects } from './lobby-ui.js';
-import { debugEnabledFromSearch, debugObstacleTypeFromSearch, toggleDebugHotkey, DEBUG_OBSTACLE_LABELS } from './debug-flags.js';
+import { debugEnabledFromSearch, debugObstacleTypeFromSearch, DEBUG_OBSTACLE_LABELS } from './debug-flags.js';
 import { loadGameAssets } from './game-assets.js';
-import { applyRemoteSnapshot } from './remote-snapshot.js';
 import { createRenderer } from './renderer.js';
-import { createInput, keyToAction } from './input.js';
+import { createInput } from './input.js';
 import { createMobileNameInputBridge } from './mobile-name-input.js';
 import { createSounds } from './sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './online.js';
-import { evaluateRun } from './scoring.js';
 import { updatePersonalBest } from './personal-best.js';
 import { publishLoversLostRunActivity } from '../../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile } from '../../../js/platform/identity/factory-profile.mjs';
 import { createOnlineIdentityPayload } from '../../../js/platform/identity/match-identity.mjs';
 import { updateScoreOverlay } from './score-overlay.js';
+import { wireOnlineClient } from './online-wiring.js';
+import { createKeyboardRouter } from './keyboard-router.js';
+import { createMenuInteraction } from './menu-interaction.js';
 import {
   getDefaultPlatformStorage,
   getPlatformStorageKey,
@@ -36,194 +34,34 @@ import {
 
 const LEGACY_ONLINE_NAME_STORAGE_KEY = getPlatformStorageKey('loversLostLegacyOnlineName');
 
-const EMOTE_BINDINGS = {
-  jump:   'heart',
-  crouch: 'middle-finger',
-  attack: 'smile',
-  block:  'crying',
-};
-const EMOTE_COOLDOWN_MS = 1000;
-
 function initGame() {
   loadGameAssets((images, emoteImages) => _initWithAssets(images, emoteImages));
 }
 
 function _initWithAssets(images, emoteImages) {
-  // ── Sounds ───────────────────────────────────────────────────────────────────
-  const sounds = createSounds();
-
-  // ── Online client ────────────────────────────────────────────────────────────
+  // ── Services ───────────────────────────────────────────────────────────────────
+  const sounds       = createSounds();
   const onlineClient = createOnlineClient();
+  const canvas       = document.getElementById('gameCanvas');
+  const renderer     = createRenderer(canvas, images, emoteImages);
+  const inp          = createInput();
+
+  const search   = window.location && window.location.search;
+  const debugObstacleType = debugObstacleTypeFromSearch(search);
+  let   debugEnabled      = debugEnabledFromSearch(search);
+
+  const storage            = getDefaultPlatformStorage(window);
+  const legacyDisplayName  = sanitizeOnlineDisplayName(readStorageText(storage, LEGACY_ONLINE_NAME_STORAGE_KEY) || '');
+  const factoryProfile     = loadFactoryProfile(storage, { seedProfileName: legacyDisplayName });
+  if (legacyDisplayName) removeStorageText(storage, LEGACY_ONLINE_NAME_STORAGE_KEY);
+
+  // ── Online session state ─────────────────────────────────────────────────────
   let onlineRemoteSide     = null;
   let onlineRemoteIdentity = null;
   let onlineCountdown      = null;
   let onlineQueueCounts    = null;
   let onlineSnapshotSeq    = 0;
   const remoteLaneSeq      = { boy: -1, girl: -1 };
-  const storage            = getDefaultPlatformStorage(window);
-  const legacyDisplayName  = sanitizeOnlineDisplayName(readStorageText(storage, LEGACY_ONLINE_NAME_STORAGE_KEY) || '');
-  const factoryProfile     = loadFactoryProfile(storage, { seedProfileName: legacyDisplayName });
-  if (legacyDisplayName) removeStorageText(storage, LEGACY_ONLINE_NAME_STORAGE_KEY);
-
-  onlineClient.cb.onConnected   = () => { onlineClient.requestQueueStatus('lovers-lost'); };
-  onlineClient.cb.onQueueCounts = (counts) => { onlineQueueCounts = counts; };
-  onlineClient.cb.onRemoteProfile = (profile) => {
-    onlineRemoteIdentity = {
-      playerId:    sanitizeOnlinePlayerId(profile?.playerId    || ''),
-      displayName: sanitizeOnlineDisplayName(profile?.displayName || ''),
-    };
-    if (!onlineRemoteSide && (profile?.side === 'boy' || profile?.side === 'girl')) onlineRemoteSide = profile.side;
-  };
-  onlineClient.cb.onSearching       = () => {};
-  onlineClient.cb.onSearchCancelled = () => { onlineLobbyPhase = 'main'; };
-  onlineClient.cb.onRoomCreated     = (code) => { onlineRoomCode = code; };
-  onlineClient.cb.onSideConflict    = () => {
-    onlineRoomCode = ''; onlineRemoteSide = null; onlineRemoteIdentity = null;
-    onlineCountdown = null; onlineQueueCounts = null; onlineLobbyPhase = 'main';
-    gs = { ...gs, phase: 'online_lobby' };
-  };
-  onlineClient.cb.onError = (code, msg) => { console.warn('[online]', code, msg); };
-
-  onlineClient.cb.onMatchReady = ({ seed, remoteSide, serverNow, startAt }) => {
-    onlineRemoteSide = remoteSide;
-    onlineCountdown  = { seed, startAt, clockOffsetMs: serverNow - Date.now() };
-    gs = { ...gs, phase: 'online_countdown' };
-    inp.tick();
-  };
-
-  onlineClient.cb.onRemoteAction = () => {};
-
-  onlineClient.cb.onRemoteEmote = (type) => {
-    renderer.addEmote(onlineSide, type);
-  };
-
-  onlineClient.cb.onPartnerLeft = () => {
-    if (gs.phase === 'online_countdown') {
-      onlineRemoteSide = null; onlineRemoteIdentity = null; onlineCountdown = null;
-      onlineRoomCode = ''; onlineQueueCounts = null; onlineLobbyPhase = 'main';
-      gs = { ...gs, phase: 'online_lobby' };
-      return;
-    }
-    if (gs.phase === 'playing') {
-      const summary = attachOnlineResultIdentities(
-        { ...evaluateRun(gs.boy, gs.girl, gs.elapsed), disconnectNote: true },
-        onlineSide, onlineIdentity, onlineRemoteSide, onlineRemoteIdentity
-      );
-      gs = { ...gs, phase: 'gameover', phaseFrames: 0, runSummary: summary };
-      sounds.stopMusic();
-      sounds.play('run-failed');
-    }
-  };
-
-  // ── Canvas + renderer ────────────────────────────────────────────────────────
-  const canvas   = document.getElementById('gameCanvas');
-  const renderer = createRenderer(canvas, images, emoteImages);
-  const search   = window.location && window.location.search;
-  const debugObstacleType = debugObstacleTypeFromSearch(search);
-  let debugEnabled = debugEnabledFromSearch(search);
-
-  // ── Input ────────────────────────────────────────────────────────────────────
-  const inp = createInput();
-  window.addEventListener('keydown', e => {
-    sounds.retryPendingMusic();
-    if (shouldHandleScoreScreenKeydown(gs.phase, e.key)) {
-      returnToMenu();
-      return;
-    }
-    if (gs.phase === 'menu_help') {
-      gs = { ...gs, phase: 'menu' }; inp.tick(); return;
-    }
-    if (gs.phase === 'solo_side_select') {
-      if (e.key === 'Escape') { gs = { ...gs, phase: 'menu' }; }
-      return;
-    }
-    if (gs.phase === 'solo_countdown') {
-      if (e.key === 'Escape') { soloMode = false; gs = { ...gs, phase: 'menu' }; }
-      return;
-    }
-    if (gs.phase === 'local_countdown') {
-      if (e.key === 'Escape') { gs = { ...gs, phase: 'menu' }; }
-      return;
-    }
-    if (gs.phase === 'online_side_select') {
-      if (e.key === 'Escape') { onlineClient.disconnect(); onlineQueueCounts = null; gs = { ...gs, phase: 'menu' }; }
-      return;
-    }
-    if (gs.phase === 'online_name_entry') {
-      if (e.key === 'Escape')     { _cancelNameEntry(); return; }
-      if (e.key === 'Backspace')  { onlineNameInput = onlineNameInput.slice(0, -1); onlineNameError = ''; return; }
-      if (e.key === 'Enter')      { _tryContinueNameEntry(); return; }
-      if (e.key.length === 1)     { onlineNameInput = sanitizeOnlineDisplayName(onlineNameInput + e.key); onlineNameError = ''; return; }
-      return;
-    }
-    if (gs.phase === 'online_countdown') {
-      if (e.key === 'Escape') {
-        onlineClient.disconnect(); onlineClient.reset();
-        onlineRemoteSide = null; onlineRemoteIdentity = null; onlineCountdown = null;
-        onlineRoomCode = ''; onlineQueueCounts = null; onlineLobbyPhase = 'main';
-        gs = { ...gs, phase: 'menu' };
-      }
-      return;
-    }
-    if (gs.phase === 'online_lobby') {
-      if (onlineLobbyPhase === 'join') {
-        if (e.key === 'Backspace') { onlineCodeInput = onlineCodeInput.slice(0, -1); return; }
-        if (e.key === 'Enter')     { _tryJoinRoom(); return; }
-        if (e.key === 'Escape')    { onlineLobbyPhase = 'friend_options'; return; }
-        if (e.key.length === 1)    { if (onlineCodeInput.length < 8) onlineCodeInput += e.key.toUpperCase(); return; }
-        return;
-      }
-      if (e.key === 'Escape') {
-        if (onlineLobbyPhase === 'main')           { onlineClient.disconnect(); onlineQueueCounts = null; onlineRemoteIdentity = null; gs = { ...gs, phase: 'online_side_select' }; }
-        else if (onlineLobbyPhase === 'searching') { _cancelSearch(); onlineLobbyPhase = 'main'; }
-        else if (onlineLobbyPhase === 'friend_options') onlineLobbyPhase = 'main';
-        else if (onlineLobbyPhase === 'create' || onlineLobbyPhase === 'join') { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
-      }
-      return;
-    }
-    const toggle = toggleDebugHotkey(debugEnabled, e.key);
-    if (toggle.handled) {
-      debugEnabled = toggle.enabled;
-      if (typeof e.preventDefault === 'function') e.preventDefault();
-      return;
-    }
-    if (keyToAction(e.key) && typeof e.preventDefault === 'function') e.preventDefault();
-    const mapped = keyToAction(e.key);
-    if (gs.mode === 'online' && mapped && mapped.side !== onlineSide &&
-        (gs.phase === 'playing' || gs.phase === 'reunion')) {
-      const emoteType = EMOTE_BINDINGS[mapped.action];
-      if (emoteType) {
-        const now = Date.now();
-        if (now - lastEmoteSentAt >= EMOTE_COOLDOWN_MS) {
-          lastEmoteSentAt = now;
-          onlineClient.sendEmote(emoteType);
-          renderer.addEmote(onlineRemoteSide, emoteType);
-        }
-      }
-      return;
-    }
-    if (!shouldHandleMappedKeyLocally(gs.mode, onlineSide, mapped && mapped.side)) return;
-    inp.keydown(e.key);
-  });
-
-  window.addEventListener('keyup', e => {
-    const mapped = keyToAction(e.key);
-    if (!shouldHandleMappedKeyLocally(gs.mode, onlineSide, mapped && mapped.side)) return;
-    inp.keyup(e.key);
-  });
-
-  // Menu button bounds (canvas space)
-  const MENU_BTN0_X = 300, MENU_BTN0_Y = 148, MENU_BTN0_W = 360, MENU_BTN0_H = 56; // SINGLE PLAYER
-  const MENU_BTN_X  = 300, MENU_BTN_Y  = 216, MENU_BTN_W  = 360, MENU_BTN_H  = 56; // LOCAL MULTIPLAYER
-  const MENU_BTN2_X = 300, MENU_BTN2_Y = 284, MENU_BTN2_W = 360, MENU_BTN2_H = 56; // ONLINE MULTIPLAYER
-  const MENU_BTN3_X = 360, MENU_BTN3_Y = 360, MENU_BTN3_W = 240, MENU_BTN3_H = 44; // HOW TO PLAY
-  let menuBtn0Hovered = false;
-  let menuBtnHovered  = false;
-  let menuBtn2Hovered = false;
-  let menuBtn3Hovered = false;
-
-  function _inBtn(cx, cy, bx, by, bw, bh) { return cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bh; }
-  function _inRect(cx, cy, rect) { return !!rect && _inBtn(cx, cy, rect.x, rect.y, rect.w, rect.h); }
 
   // ── Solo state ───────────────────────────────────────────────────────────────
   let soloMode          = false;
@@ -231,30 +69,45 @@ function _initWithAssets(images, emoteImages) {
   let soloPbResult      = null;
   let soloCountdownTick = 0;
   let localCountdownTick = 0;
-  let soloSideBoyHov    = false;
-  let soloSideGirlHov   = false;
-  const SOLO_COUNTDOWN_TICKS = 180;
+  const SOLO_COUNTDOWN_TICKS  = 180;
   const LOCAL_COUNTDOWN_TICKS = 180;
 
   // ── Online UI state ──────────────────────────────────────────────────────────
-  let lastEmoteSentAt      = 0;
-  let onlineSide           = 'boy';
+  let lastEmoteSentAt       = 0;
+  let onlineSide            = 'boy';
   let onlineRunOverrideName = '';
-  let onlineIdentity       = buildOnlineIdentity(factoryProfile, onlineRunOverrideName);
-  let onlineNameInput      = onlineIdentity.displayName;
-  let onlineNameError      = '';
-  let onlineLobbyPhase     = 'main';
-  let onlineCodeInput      = '';
-  let onlineRoomCode       = '';
-  let onlineSearchTick     = 0;
+  let onlineIdentity        = buildOnlineIdentity(factoryProfile, onlineRunOverrideName);
+  let onlineNameInput       = onlineIdentity.displayName;
+  let onlineNameError       = '';
+  let onlineLobbyPhase      = 'main';
+  let onlineCodeInput       = '';
+  let onlineRoomCode        = '';
+  let onlineSearchTick      = 0;
 
-  let onlineSideBoyHov = false, onlineSideGirlHov = false;
-  let onlineNameContinueHov = false;
-  let onlineFindMatchHov = false, onlinePlayFriendHov = false;
-  let onlineCancelHov = false;
-  let onlineCreateHov = false, onlineJoinHov = false;
-  let onlineJoinSubmitHov = false;
+  // Pointer hover flags (written by menu-interaction, read by the renderer dispatch).
+  const hover = {
+    menu0: false, menu1: false, menu2: false, menu3: false,
+    soloBoy: false, soloGirl: false,
+    onlineBoy: false, onlineGirl: false,
+    nameContinue: false,
+    findMatch: false, playFriend: false, cancel: false,
+    create: false, join: false, joinSubmit: false,
+  };
 
+  // ── Game state ───────────────────────────────────────────────────────────────
+  let gs = createGameState('single', Date.now() >>> 0, { debugObstacleType });
+  let prevPhase      = gs.phase;
+  let lastMusicPhase = null;
+
+  const TICK_MS = 1000 / 60;
+  let loopLastTime    = null;
+  let loopAccumulator = 0;
+
+  let boyAnim  = { state: 'running', actionTick: 0 };
+  let girlAnim = { state: 'running', actionTick: 0 };
+  const handleSideInput = createLaneInputHandler(inp, renderer, sounds);
+
+  // ── Online lobby actions ───────────────────────────────────────────────────────
   function _tryJoinRoom()  { if (onlineCodeInput.length > 0) onlineClient.joinRoom(onlineSide, onlineCodeInput); }
   function _cancelSearch() { onlineClient.cancelSearch(); }
   function _cancelRoom()   { onlineRoomCode = ''; onlineClient.cancelRoom(); }
@@ -285,127 +138,11 @@ function _initWithAssets(images, emoteImages) {
       onlineNameError = '';
       mobileNameInput.setValue(onlineNameInput);
     },
-    onSubmit() {
-      _tryContinueNameEntry();
-    },
-    onCancel() {
-      _cancelNameEntry();
-    },
+    onSubmit() { _tryContinueNameEntry(); },
+    onCancel() { _cancelNameEntry(); },
   });
 
-  canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
-    const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
-
-    if (gs.phase === 'menu') {
-      menuBtn0Hovered = _inBtn(cx, cy, MENU_BTN0_X, MENU_BTN0_Y, MENU_BTN0_W, MENU_BTN0_H);
-      menuBtnHovered  = _inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H);
-      menuBtn2Hovered = _inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H);
-      menuBtn3Hovered = _inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H);
-    } else { menuBtn0Hovered = menuBtnHovered = menuBtn2Hovered = menuBtn3Hovered = false; }
-
-    if (gs.phase === 'solo_side_select') {
-      const r = getOnlineSideSelectRects();
-      soloSideBoyHov  = _inRect(cx, cy, r.boy);
-      soloSideGirlHov = _inRect(cx, cy, r.girl);
-    } else { soloSideBoyHov = soloSideGirlHov = false; }
-
-    if (gs.phase === 'online_side_select') {
-      const r = getOnlineSideSelectRects();
-      onlineSideBoyHov  = _inRect(cx, cy, r.boy);
-      onlineSideGirlHov = _inRect(cx, cy, r.girl);
-    } else { onlineSideBoyHov = onlineSideGirlHov = false; }
-
-    if (gs.phase === 'online_name_entry') {
-      onlineNameContinueHov = _inRect(cx, cy, getOnlineNameEntryButtonRects().continue);
-    } else { onlineNameContinueHov = false; }
-
-    if (gs.phase === 'online_lobby') {
-      const r = getOnlineLobbyButtonRects(onlineLobbyPhase);
-      onlineFindMatchHov  = _inRect(cx, cy, r.findMatch);
-      onlinePlayFriendHov = _inRect(cx, cy, r.playFriend);
-      onlineCancelHov     = _inRect(cx, cy, r.cancel);
-      onlineCreateHov     = _inRect(cx, cy, r.create);
-      onlineJoinHov       = _inRect(cx, cy, r.join);
-      onlineJoinSubmitHov = _inRect(cx, cy, r.joinSubmit);
-    } else {
-      onlineFindMatchHov = onlinePlayFriendHov = onlineCancelHov =
-        onlineCreateHov = onlineJoinHov = onlineJoinSubmitHov = false;
-    }
-  });
-
-  canvas.addEventListener('click', e => {
-    sounds.retryPendingMusic();
-    if (gs.phase === 'menu_help') { gs = { ...gs, phase: 'menu' }; return; }
-    const rect = canvas.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * (canvas.width  / rect.width);
-    const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
-
-    if (gs.phase === 'menu') {
-      if      (_inBtn(cx, cy, MENU_BTN0_X, MENU_BTN0_Y, MENU_BTN0_W, MENU_BTN0_H)) { soloCountdownTick = 0; gs = { ...gs, phase: 'solo_side_select' }; }
-      else if (_inBtn(cx, cy, MENU_BTN_X,  MENU_BTN_Y,  MENU_BTN_W,  MENU_BTN_H))  { localCountdownTick = 0; gs = { ...gs, phase: 'local_countdown' }; }
-      else if (_inBtn(cx, cy, MENU_BTN2_X, MENU_BTN2_Y, MENU_BTN2_W, MENU_BTN2_H)) { onlineSide = 'boy'; onlineLobbyPhase = 'main'; gs = { ...gs, phase: 'online_side_select' }; }
-      else if (_inBtn(cx, cy, MENU_BTN3_X, MENU_BTN3_Y, MENU_BTN3_W, MENU_BTN3_H)) gs = { ...gs, phase: 'menu_help' };
-      return;
-    }
-    if (gs.phase === 'solo_side_select') {
-      const r = getOnlineSideSelectRects();
-      if (_inRect(cx, cy, r.boy))  { soloSide = 'boy';  soloCountdownTick = 0; gs = { ...gs, phase: 'solo_countdown' }; }
-      if (_inRect(cx, cy, r.girl)) { soloSide = 'girl'; soloCountdownTick = 0; gs = { ...gs, phase: 'solo_countdown' }; }
-      return;
-    }
-    if (gs.phase === 'online_side_select') {
-      const r = getOnlineSideSelectRects();
-      if (_inRect(cx, cy, r.boy))  _enterOnlineNameEntry('boy');
-      if (_inRect(cx, cy, r.girl)) _enterOnlineNameEntry('girl');
-      return;
-    }
-    if (gs.phase === 'online_name_entry') {
-      if (_inRect(cx, cy, getOnlineNameEntryButtonRects().continue)) _tryContinueNameEntry();
-      else mobileNameInput.focus();
-      return;
-    }
-    if (gs.phase === 'online_lobby') {
-      const r = getOnlineLobbyButtonRects(onlineLobbyPhase);
-      if (onlineLobbyPhase === 'main') {
-        if (_inRect(cx, cy, r.findMatch))  { onlineLobbyPhase = 'searching'; onlineSearchTick = 0; onlineClient.findMatch(onlineSide); }
-        if (_inRect(cx, cy, r.playFriend)) { onlineLobbyPhase = 'friend_options'; }
-      } else if (onlineLobbyPhase === 'searching') {
-        if (_inRect(cx, cy, r.cancel)) { _cancelSearch(); onlineLobbyPhase = 'main'; }
-      } else if (onlineLobbyPhase === 'friend_options') {
-        if (_inRect(cx, cy, r.create)) { onlineLobbyPhase = 'create'; onlineSearchTick = 0; onlineClient.createRoom(onlineSide); }
-        if (_inRect(cx, cy, r.join))   { onlineLobbyPhase = 'join'; onlineCodeInput = ''; }
-      } else if (onlineLobbyPhase === 'create') {
-        if (_inRect(cx, cy, r.cancel)) { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
-      } else if (onlineLobbyPhase === 'join') {
-        if (_inRect(cx, cy, r.joinSubmit)) _tryJoinRoom();
-        if (_inRect(cx, cy, r.cancel))     { _cancelRoom(); onlineLobbyPhase = 'friend_options'; }
-      }
-      return;
-    }
-  });
-
-  // ── Game state ───────────────────────────────────────────────────────────────
-  let gs = createGameState('single', Date.now() >>> 0, { debugObstacleType });
-  let prevPhase      = gs.phase;
-  let lastMusicPhase = null;
-
-  const TICK_MS = 1000 / 60;
-  let loopLastTime    = null;
-  let loopAccumulator = 0;
-
-  let boyAnim  = { state: 'running', actionTick: 0 };
-  let girlAnim = { state: 'running', actionTick: 0 };
-  const handleSideInput = createLaneInputHandler(inp, renderer, sounds);
-
-  onlineClient.cb.onRemoteSnapshot = (snapshot) => {
-    if (!onlineRemoteSide || !snapshot) return;
-    const result = applyRemoteSnapshot({ gs, boyAnim, girlAnim, remoteLaneSeq }, renderer, onlineRemoteSide, snapshot);
-    if (result) { gs = result.gs; boyAnim = result.boyAnim; girlAnim = result.girlAnim; }
-  };
-
-  // ── State machine ────────────────────────────────────────────────────────────
+  // ── State machine transitions ──────────────────────────────────────────────────
   function startPlaying() {
     sounds.stop('run-success'); sounds.stop('run-failed');
     gs = { ...createGameState('local', Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
@@ -459,6 +196,51 @@ function _initWithAssets(images, emoteImages) {
     girlAnim = { state: 'running', actionTick: 0 };
     inp.tick();
   }
+
+  // ── Shared accessor bridge for the extracted input/wiring modules ──────────────
+  // The main loop below keeps using the local variables directly; the extracted
+  // modules read and write the same state through these accessors so the hot
+  // loop stays untouched.
+  const host = {
+    inp, renderer, sounds, onlineClient, mobileNameInput, remoteLaneSeq, hover,
+    returnToMenu,
+    cancelNameEntry:      _cancelNameEntry,
+    tryContinueNameEntry: _tryContinueNameEntry,
+    tryJoinRoom:          _tryJoinRoom,
+    cancelSearch:         _cancelSearch,
+    cancelRoom:           _cancelRoom,
+    enterOnlineNameEntry: _enterOnlineNameEntry,
+    get gs() { return gs; }, set gs(v) { gs = v; },
+    get boyAnim() { return boyAnim; }, set boyAnim(v) { boyAnim = v; },
+    get girlAnim() { return girlAnim; }, set girlAnim(v) { girlAnim = v; },
+    get debugEnabled() { return debugEnabled; }, set debugEnabled(v) { debugEnabled = v; },
+    get soloMode() { return soloMode; }, set soloMode(v) { soloMode = v; },
+    get soloSide() { return soloSide; }, set soloSide(v) { soloSide = v; },
+    get soloCountdownTick() { return soloCountdownTick; }, set soloCountdownTick(v) { soloCountdownTick = v; },
+    get localCountdownTick() { return localCountdownTick; }, set localCountdownTick(v) { localCountdownTick = v; },
+    get lastEmoteSentAt() { return lastEmoteSentAt; }, set lastEmoteSentAt(v) { lastEmoteSentAt = v; },
+    get onlineSide() { return onlineSide; }, set onlineSide(v) { onlineSide = v; },
+    get onlineIdentity() { return onlineIdentity; },
+    get onlineRemoteSide() { return onlineRemoteSide; }, set onlineRemoteSide(v) { onlineRemoteSide = v; },
+    get onlineRemoteIdentity() { return onlineRemoteIdentity; }, set onlineRemoteIdentity(v) { onlineRemoteIdentity = v; },
+    get onlineCountdown() { return onlineCountdown; }, set onlineCountdown(v) { onlineCountdown = v; },
+    get onlineQueueCounts() { return onlineQueueCounts; }, set onlineQueueCounts(v) { onlineQueueCounts = v; },
+    get onlineRoomCode() { return onlineRoomCode; }, set onlineRoomCode(v) { onlineRoomCode = v; },
+    get onlineLobbyPhase() { return onlineLobbyPhase; }, set onlineLobbyPhase(v) { onlineLobbyPhase = v; },
+    get onlineCodeInput() { return onlineCodeInput; }, set onlineCodeInput(v) { onlineCodeInput = v; },
+    get onlineNameInput() { return onlineNameInput; }, set onlineNameInput(v) { onlineNameInput = v; },
+    get onlineNameError() { return onlineNameError; }, set onlineNameError(v) { onlineNameError = v; },
+    get onlineSearchTick() { return onlineSearchTick; }, set onlineSearchTick(v) { onlineSearchTick = v; },
+  };
+
+  // ── Wire inputs and the online client through the shared bridge ────────────────
+  wireOnlineClient(onlineClient, host);
+
+  const keyboard = createKeyboardRouter(host);
+  window.addEventListener('keydown', keyboard.onKeyDown);
+  window.addEventListener('keyup', keyboard.onKeyUp);
+
+  createMenuInteraction(canvas, host);
 
   // ── Main loop ────────────────────────────────────────────────────────────────
   function loop(timestamp) {
@@ -580,16 +362,16 @@ function _initWithAssets(images, emoteImages) {
       value: onlineNameInput,
     });
 
-    if      (gs.phase === 'menu')              renderer.renderMenu(debugState, menuBtn0Hovered, menuBtnHovered, menuBtn2Hovered, menuBtn3Hovered);
-    else if (gs.phase === 'solo_side_select')  renderer.renderSoloSideSelect(soloSideBoyHov, soloSideGirlHov);
+    if      (gs.phase === 'menu')              renderer.renderMenu(debugState, hover.menu0, hover.menu1, hover.menu2, hover.menu3);
+    else if (gs.phase === 'solo_side_select')  renderer.renderSoloSideSelect(hover.soloBoy, hover.soloGirl);
     else if (gs.phase === 'solo_countdown')    renderer.renderSoloCountdown(soloSide, Math.ceil((SOLO_COUNTDOWN_TICKS - soloCountdownTick) / 60));
     else if (gs.phase === 'local_countdown')   renderer.renderLocalCountdown(Math.ceil((LOCAL_COUNTDOWN_TICKS - localCountdownTick) / 60));
-    else if (gs.phase === 'online_side_select') renderer.renderOnlineSideSelect(onlineSideBoyHov, onlineSideGirlHov, onlineSide);
-    else if (gs.phase === 'online_name_entry')  renderer.renderOnlineNameEntry(onlineSide, onlineNameInput, onlineNameError, { continue: onlineNameContinueHov });
+    else if (gs.phase === 'online_side_select') renderer.renderOnlineSideSelect(hover.onlineBoy, hover.onlineGirl, onlineSide);
+    else if (gs.phase === 'online_name_entry')  renderer.renderOnlineNameEntry(onlineSide, onlineNameInput, onlineNameError, { continue: hover.nameContinue });
     else if (gs.phase === 'online_lobby') {
       onlineSearchTick++;
       renderer.renderOnlineLobby(onlineSide, onlineLobbyPhase, onlineRoomCode, onlineCodeInput, onlineSearchTick,
-        { findMatch: onlineFindMatchHov, playFriend: onlinePlayFriendHov, cancel: onlineCancelHov, create: onlineCreateHov, join: onlineJoinHov, joinSubmit: onlineJoinSubmitHov },
+        { findMatch: hover.findMatch, playFriend: hover.playFriend, cancel: hover.cancel, create: hover.create, join: hover.join, joinSubmit: hover.joinSubmit },
         onlineQueueCounts, onlineIdentity, onlineRemoteIdentity);
     }
     else if (gs.phase === 'online_countdown') {
