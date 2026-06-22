@@ -17,6 +17,7 @@ export class Renderer {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawMap(ctx);
     this.drawResourceNodes(ctx);
+    this.drawLandmarks(ctx);
     this.drawUnits(ctx);
     this.drawFog(ctx);
     this.drawWorldUiOverlays(ctx);
@@ -90,6 +91,17 @@ export class Renderer {
   drawDestructibleTile(ctx, x, y, sx, sy, ts, variance) {
     const wall = this.map.getDestructible(x, y);
     const hpPct = wall ? Math.max(0, Math.min(1, wall.hp / wall.maxHp)) : 0;
+    if (wall?.kind === 'naturalWall' || wall?.kind === 'transitWall' || wall?.kind === 'objectiveWall') {
+      ctx.fillStyle = wall.kind === 'objectiveWall'
+        ? (variance > 0.5 ? '#60646b' : '#4d5158')
+        : (variance > 0.5 ? '#979ba1' : '#747980');
+      ctx.fillRect(sx, sy, ts, ts);
+      ctx.fillStyle = 'rgba(255,255,255,0.14)';
+      ctx.fillRect(sx, sy, ts, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.fillRect(sx, sy + ts - 3, ts, 3);
+      return;
+    }
     ctx.fillStyle = variance > 0.5 ? '#492a58' : '#3b224b';
     ctx.fillRect(sx, sy, ts, ts);
     ctx.fillStyle = 'rgba(238, 109, 255, 0.18)';
@@ -123,6 +135,17 @@ export class Renderer {
       ctx.fillRect(sx + 4, sy + 4, ts - 8, 4);
       ctx.fillStyle = hpPct > 0.45 ? '#f48cff' : '#ff5f8f';
       ctx.fillRect(sx + 5, sy + 5, Math.round((ts - 10) * hpPct), 2);
+    }
+  }
+
+  drawLandmarks(ctx) {
+    for (const landmark of this.map.landmarks) {
+      const p = this.camera.worldToScreen(
+        (landmark.tileX + 0.5) * this.map.tileSize,
+        (landmark.tileY + 0.5) * this.map.tileSize,
+      );
+      if (p.x < -42 || p.y < -42 || p.x > this.camera.viewportWidth + 42 || p.y > this.camera.viewportHeight + 42) continue;
+      drawMapLandmark(ctx, landmark, p.x, p.y);
     }
   }
 
@@ -181,8 +204,8 @@ export class Renderer {
         this.drawAlienScout(ctx, unit, p.x, p.y, time);
       } else if (unit.type === 'grunt') {
         this.drawAlienGrunt(ctx, unit, p.x, p.y, time);
-      } else if (unit.type === 'neutralCrawler') {
-        this.drawNeutralCrawler(ctx, unit, p.x, p.y, time);
+      } else if (unit.type === 'drifter') {
+        this.drawDrifter(ctx, unit, p.x, p.y, time);
       } else {
         this.drawFallbackUnit(ctx, unit, p.x, p.y);
       }
@@ -392,7 +415,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawNeutralCrawler(ctx, unit, sx, sy, time) {
+  drawDrifter(ctx, unit, sx, sy, time) {
     const team = teamPalette(unit.team);
     const attack = attackAnimation(unit, time);
     const throb = attack.active ? attack.strike : 0;
@@ -519,7 +542,7 @@ export class Renderer {
       if (!this.shouldRenderUnitOverlay(unit)) continue;
       if (!shouldShowHealthBar(unit, time)) continue;
       const p = this.camera.worldToScreen(unit.x, unit.y);
-      const yOffset = unit.type === 'neutralCrawler' ? 35 : unit.type === 'grunt' ? 33 : 31;
+      const yOffset = unit.type === 'drifter' ? 35 : unit.type === 'grunt' ? 33 : 31;
       this.drawHealthBar(ctx, unit, p.x, p.y - yOffset);
     }
   }
@@ -874,6 +897,51 @@ export class Renderer {
     ctx.fillText('MINIMAP', x0, y0 + size + 15);
     ctx.restore();
   }
+}
+
+function drawMapLandmark(ctx, landmark, x, y) {
+  const style = {
+    nexus: { color: landmark.team === 1 ? '#123cff' : '#ff111c', shape: 'circle', size: 42 },
+    behemothCamp: { color: '#04d9e8', shape: 'square', size: 27, filled: true },
+    zombieWormCamp: { color: '#13db08', shape: 'square', size: 27, filled: true },
+    drifter: { color: '#ffc300', shape: 'circle', size: 18 },
+    spaceDragon: { color: '#7b14c2', shape: 'square', size: 28, filled: true },
+    smallCrystalDeposit: { color: '#12dbe5', shape: 'circle', size: 18 },
+    smallBiomassDeposit: { color: '#13db08', shape: 'circle', size: 18 },
+    postDragonDeposit: {
+      color: landmark.resourceKind === 'organicCrystal' ? '#04d9e8' : '#13db08',
+      shape: 'square',
+      size: 27,
+      filled: false,
+    },
+  }[landmark.kind];
+  if (!style) return;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.strokeStyle = '#020407';
+  ctx.lineWidth = 5;
+  if (style.shape === 'circle') {
+    ctx.beginPath();
+    ctx.arc(x, y, style.size / 2 + 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = style.color;
+    ctx.beginPath();
+    ctx.arc(x, y, style.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const half = style.size / 2;
+    ctx.fillRect(x - half - 3, y - half - 3, style.size + 6, style.size + 6);
+    ctx.strokeRect(x - half - 3, y - half - 3, style.size + 6, style.size + 6);
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = 4;
+    if (style.filled) {
+      ctx.fillStyle = style.color;
+      ctx.fillRect(x - half, y - half, style.size, style.size);
+    } else ctx.strokeRect(x - half, y - half, style.size, style.size);
+  }
+  ctx.restore();
 }
 
 function teamPalette(team) {

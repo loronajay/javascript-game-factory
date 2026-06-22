@@ -5,7 +5,9 @@ export function resolveTarget(ref, map, getById) {
   if (!ref) return null;
   if (ref.kind === 'destructibleTile') {
     const wall = map.getDestructible(ref.x, ref.y);
-    return wall ? { kind: 'destructibleTile', ...wall } : null;
+    // Wall material (`naturalWall`, `membrane`, etc.) is separate from the
+    // combat target category. Keep the latter authoritative at this boundary.
+    return wall ? { ...wall, kind: 'destructibleTile' } : null;
   }
   if (ref.kind === 'unit') {
     const unit = getById(ref.id);

@@ -9,7 +9,7 @@ export class UnitFactory {
     this.nextId = 1;
   }
 
-  create(type, team, x, y) {
+  create(type, team, x, y, options = {}) {
     const def = this.ctx.getDef(type);
     return {
       id: this.nextId++,
@@ -88,6 +88,13 @@ export class UnitFactory {
       },
 
       modifiers: [],
+      neutralPatrol: Array.isArray(options.patrol) && options.patrol.length >= 2
+        ? {
+            waypoints: options.patrol.map((waypoint) => ({ x: waypoint.x, y: waypoint.y })),
+            nextWaypointIndex: 0,
+            lastIssuedAt: -Infinity,
+          }
+        : null,
     };
   }
 
@@ -112,7 +119,10 @@ export class UnitFactory {
     if (spawnsDef.team2) this.spawnTeamPackage({ ...spawnsDef.team2, team: 2 }, spawnFn);
     for (const neutral of (spawnsDef.neutral ?? [])) {
       const center = this.ctx.map.tileCenter(neutral.tileX, neutral.tileY);
-      spawnFn(neutral.type, 0, center.x, center.y);
+      const patrol = Array.isArray(neutral.patrol)
+        ? neutral.patrol.map((waypoint) => this.ctx.map.tileCenter(waypoint.tileX, waypoint.tileY))
+        : null;
+      spawnFn(neutral.type, 0, center.x, center.y, { patrol });
     }
   }
 }

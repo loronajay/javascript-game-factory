@@ -1,7 +1,24 @@
-// Level 01 map definition.
-// Layers are applied in order; later layers can overwrite earlier ones.
-// Gates define a wall segment, an optional carved gap, and the destructible tiles that fill it.
-// Spawns describe where each team's units and neutral creatures begin.
+// Level 01 is traced from map-reference.png on the 128 x 128 simulation grid.
+// Geometry belongs here, not in the generator: this is the stable collision and
+// navigation contract that later mechanics will build on.
+
+const p = (x, y) => ({ x, y });
+const transitWall = (...points) => ({
+  type: 'naturalWallPath',
+  kind: 'transitWall',
+  width: 1,
+  hp: 24,
+  rotational: true,
+  points: points.map(([x, y]) => p(x, y)),
+});
+const objectiveWall = (...points) => ({
+  type: 'naturalWallPath',
+  kind: 'objectiveWall',
+  width: 3,
+  hp: 180,
+  rotational: true,
+  points: points.map(([x, y]) => p(x, y)),
+});
 
 export const level01 = {
   id: 'level-01',
@@ -12,73 +29,73 @@ export const level01 = {
 
   layers: [
     { type: 'fill' },
-    { type: 'border' },
 
-    // Interior wall geometry
-    { type: 'rect', x: 20, y: 16, w: 8,  h: 34 },
-    { type: 'rect', x: 32, y: 28, w: 28, h: 5  },
-    { type: 'rect', x: 46, y: 34, w: 6,  h: 24 },
-    { type: 'rect', x: 16, y: 70, w: 42, h: 5  },
-    { type: 'rect', x: 70, y: 14, w: 5,  h: 48 },
-    { type: 'rect', x: 82, y: 30, w: 24, h: 5  },
-    { type: 'rect', x: 98, y: 35, w: 5,  h: 30 },
-    { type: 'rect', x: 68, y: 78, w: 38, h: 5  },
-    { type: 'rect', x: 58, y: 92, w: 6,  h: 23 },
-    { type: 'rect', x: 86, y: 98, w: 26, h: 5  },
+    // Perimeter fragments and long transit walls.
+    transitWall([0, 18], [10, 18], [16, 12], [16, 0]),
+    transitWall([19, 0], [19, 10]),
+    transitWall([32, 0], [32, 13], [14, 31], [0, 31]),
+    transitWall([48, 0], [48, 8], [35, 21], [35, 27]),
+    objectiveWall([75, 0], [75, 10], [69, 18], [57, 18], [51, 12], [51, 0]),
+    transitWall([86, 0], [86, 21], [73, 40], [73, 47], [87, 62], [112, 43], [128, 43]),
+    transitWall([96, 0], [96, 12], [106, 22], [111, 22], [117, 29], [128, 29]),
+    transitWall([0, 40], [12, 40], [25, 29], [29, 29], [38, 39], [38, 48], [29, 57], [20, 57]),
+    objectiveWall([0, 49], [11, 49], [20, 58], [20, 73], [13, 80], [0, 80]),
+    transitWall([57, 40], [72, 40], [86, 55], [86, 71], [72, 85], [56, 85], [42, 72]),
+    transitWall([128, 49], [116, 49], [108, 56], [108, 72], [116, 80], [128, 80]),
+    transitWall([0, 91], [17, 91], [33, 77], [42, 86], [54, 86], [39, 106], [39, 128]),
+    transitWall([0, 100], [11, 100], [21, 110], [31, 119], [31, 128]),
+    transitWall([128, 88], [116, 88], [103, 101], [92, 112], [81, 112], [81, 128]),
+    transitWall([128, 98], [116, 98], [108, 106], [108, 128]),
+    transitWall([109, 119], [109, 128]),
 
-    // Carved passages through the walls above
-    { type: 'gap', x: 20, y: 25, w: 8, h: 3 },
-    { type: 'gap', x: 38, y: 28, w: 5, h: 5 },
-    { type: 'gap', x: 46, y: 45, w: 6, h: 4 },
-    { type: 'gap', x: 30, y: 70, w: 5, h: 5 },
-    { type: 'gap', x: 70, y: 36, w: 5, h: 5 },
-    { type: 'gap', x: 93, y: 30, w: 4, h: 5 },
-    { type: 'gap', x: 98, y: 52, w: 5, h: 5 },
-    { type: 'gap', x: 80, y: 78, w: 6, h: 5 },
-    { type: 'gap', x: 58, y: 104, w: 6, h: 4 },
-    { type: 'gap', x: 96, y: 98, w: 5, h: 5 },
+    // Large reference cells: upper-green, central-purple, and lower-right cyan.
+    transitWall([47, 19], [51, 19], [56, 24], [56, 31], [51, 37], [46, 37], [35, 27], [35, 21], [40, 16], [47, 16]),
+    objectiveWall([59, 47], [69, 47], [79, 57], [79, 69], [70, 79], [58, 79], [48, 69], [48, 57]),
+    transitWall([95, 70], [101, 70], [109, 78], [109, 86], [101, 95], [95, 95], [89, 89], [89, 78]),
 
-    // Maze obstacle clusters in the mid-map open areas
-    { type: 'maze', x: 42, y: 48, w: 30, h: 24 },
-    { type: 'maze', x: 76, y: 62, w: 34, h: 26 },
+    // Smaller reference cells and the incomplete bottom cell.
+    transitWall([25, 30], [29, 30], [37, 39], [37, 48], [29, 56], [25, 56], [19, 49], [19, 45]),
+    transitWall([78, 91], [82, 88], [89, 96], [89, 104], [82, 111], [76, 111], [72, 107], [72, 97]),
+    transitWall([58, 109], [69, 109], [75, 115], [75, 128]),
 
-    { type: 'decor', count: 420, density: 0.55 },
+    // The reference is clean dark terrain; decoration will return only when it
+    // has an authored visual role instead of obscuring navigation readability.
   ],
 
-  clearSpawns: [
-    { x: 10,  y: 10,  radius: 10 },
-    { x: 116, y: 116, radius: 10 },
+  // This is the reference legend expressed as durable map data. It is the
+  // source of truth for the later deposit, guardian, objective, and respawn
+  // systems; no generic resource node or placeholder creature stands in for it.
+  landmarks: [
+    { kind: 'nexus', team: 1, tileX: 7, tileY: 6 },
+    { kind: 'nexus', team: 2, tileX: 121, tileY: 121 },
+    { kind: 'spaceDragon', tileX: 64, tileY: 64 },
+    { kind: 'behemothCamp', tileX: 6, tileY: 62, guardian: 'behemoth', resourceKind: 'organicCrystal', size: 'large' },
+    { kind: 'behemothCamp', tileX: 121, tileY: 62, guardian: 'behemoth', resourceKind: 'organicCrystal', size: 'large' },
+    { kind: 'zombieWormCamp', tileX: 64, tileY: 7, guardian: 'zombieWorm', resourceKind: 'organicBiomass', size: 'large' },
+    { kind: 'zombieWormCamp', tileX: 64, tileY: 119, guardian: 'zombieWorm', resourceKind: 'organicBiomass', size: 'large' },
+    { kind: 'postDragonDeposit', tileX: 102, tileY: 33, resourceKind: 'organicCrystal', size: 'large', active: false },
+    { kind: 'postDragonDeposit', tileX: 22, tileY: 94, resourceKind: 'organicCrystal', size: 'large', active: false },
+    { kind: 'postDragonDeposit', tileX: 94, tileY: 20, resourceKind: 'organicBiomass', size: 'large', active: false },
+    { kind: 'postDragonDeposit', tileX: 35, tileY: 106, resourceKind: 'organicBiomass', size: 'large', active: false },
+    { kind: 'smallCrystalDeposit', tileX: 120, tileY: 14 },
+    { kind: 'smallCrystalDeposit', tileX: 29, tileY: 47 },
+    { kind: 'smallCrystalDeposit', tileX: 98, tileY: 79 },
+    { kind: 'smallCrystalDeposit', tileX: 6, tileY: 112 },
+    { kind: 'smallBiomassDeposit', tileX: 111, tileY: 6 },
+    { kind: 'smallBiomassDeposit', tileX: 47, tileY: 26 },
+    { kind: 'smallBiomassDeposit', tileX: 80, tileY: 101 },
+    { kind: 'smallBiomassDeposit', tileX: 15, tileY: 121 },
+    { kind: 'drifter', tileX: 43, tileY: 44 },
+    { kind: 'drifter', tileX: 84, tileY: 83 },
   ],
 
-  // Each gate: optional wall/carve to set up the passage, then the destructible block.
-  gates: [
-    // East spawn gate — blocks the first direct route out of the safe hive pocket.
-    { wall: { x: 22, y: 5, w: 1, h: 22 }, carve: { x: 22, y: 14, w: 1, h: 3 }, x: 22, y: 14, w: 1, h: 3 },
-    // South spawn gate — second lane, gives an immediate combat introduction.
-    { wall: { x: 6, y: 28, w: 22, h: 1 }, carve: { x: 14, y: 28, w: 3, h: 1 }, x: 14, y: 28, w: 3, h: 1 },
-    // Mid-corridor gates using existing carved passage positions.
-    { x: 38, y: 30, w: 3, h: 1 },
-    { x: 47, y: 45, w: 3, h: 1 },
-    { x: 71, y: 37, w: 3, h: 2 },
-    { x: 99, y: 53, w: 3, h: 2 },
-  ],
-
-  resources: [
-    { x: 31,  y: 21, kind: 'biomass' },
-    { x: 44,  y: 42, kind: 'biomass' },
-    { x: 84,  y: 44, kind: 'crystal' },
-    { x: 103, y: 57, kind: 'crystal' },
-  ],
-
-  // Spawn definitions read by UnitManager.spawnFromDef().
+  // The blue and red circles in the reference establish opposing start corners.
   spawns: {
-    team1: { tileX: 10,  tileY: 10,  direction:  1 },
-    team2: { tileX: 116, tileY: 116, direction: -1 },
+    team1: { tileX: 7, tileY: 6, direction: 1 },
+    team2: { tileX: 121, tileY: 121, direction: -1 },
     neutral: [
-      { type: 'neutralCrawler', tileX: 29,  tileY: 20 },
-      { type: 'neutralCrawler', tileX: 44,  tileY: 40 },
-      { type: 'neutralCrawler', tileX: 82,  tileY: 42 },
-      { type: 'neutralCrawler', tileX: 101, tileY: 55 },
+      { type: 'drifter', tileX: 43, tileY: 44, patrol: [{ tileX: 43, tileY: 37 }, { tileX: 43, tileY: 52 }] },
+      { type: 'drifter', tileX: 84, tileY: 83, patrol: [{ tileX: 84, tileY: 90 }, { tileX: 84, tileY: 75 }] },
     ],
   },
 };

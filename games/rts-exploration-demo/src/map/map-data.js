@@ -21,6 +21,10 @@ export class MapData {
     this.variance = new Float32Array(width * height);
     this.destructibles = new Map();
     this.resourceNodes = [];
+    // Authored map entities are declarative. Systems may later turn these into
+    // live structures, deposits, or neutral units without rediscovering intent
+    // from renderer-only coordinates.
+    this.landmarks = [];
   }
 
   index(x, y) { return y * this.width + x; }
@@ -68,12 +72,16 @@ export class MapData {
     return this.destructibles.get(this.index(x, y)) ?? null;
   }
 
-  addDestructibleRect(x, y, w, h, hp = CONFIG.destructibleWallHp) {
+  addDestructibleTile(x, y, hp = CONFIG.destructibleWallHp, kind = 'membrane') {
+    if (!this.inBounds(x, y)) return;
+    this.set(x, y, TILE.DESTRUCTIBLE);
+    this.destructibles.set(this.index(x, y), { x, y, hp, maxHp: hp, kind });
+  }
+
+  addDestructibleRect(x, y, w, h, hp = CONFIG.destructibleWallHp, kind = 'membrane') {
     for (let yy = y; yy < y + h; yy++) {
       for (let xx = x; xx < x + w; xx++) {
-        if (!this.inBounds(xx, yy)) continue;
-        this.set(xx, yy, TILE.DESTRUCTIBLE);
-        this.destructibles.set(this.index(xx, yy), { x: xx, y: yy, hp, maxHp: hp });
+        this.addDestructibleTile(xx, yy, hp, kind);
       }
     }
   }
@@ -107,6 +115,21 @@ export class MapData {
     };
     this.resourceNodes.push(node);
     return node;
+  }
+
+  addLandmark(def) {
+    if (!this.inBounds(def.tileX, def.tileY)) return null;
+    const landmark = Object.freeze({
+      ...def,
+      id: def.id ?? `landmark_${this.landmarks.length + 1}`,
+      kind: def.kind,
+      tileX: def.tileX,
+      tileY: def.tileY,
+      team: def.team ?? null,
+      active: def.active ?? true,
+    });
+    this.landmarks.push(landmark);
+    return landmark;
   }
 
   worldToTile(x, y) {

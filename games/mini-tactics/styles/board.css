@@ -1,0 +1,179 @@
+.tile {
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+
+.tile:hover {
+  filter: brightness(1.15);
+}
+
+.tile-face {
+  stroke: rgba(0, 0, 0, .52);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.tile-light {
+  fill: #cfd3d8;
+}
+
+.tile-dark {
+  fill: #4a505a;
+}
+
+.tile-side-a {
+  fill: #242933;
+}
+
+.tile-side-b {
+  fill: #181c24;
+}
+
+.tile.selected .tile-face {
+  stroke: var(--gold);
+  stroke-width: 3;
+}
+
+.tile.legal-move .tile-face {
+  fill: #3d8aaf;
+  animation: legal-pulse 1.15s ease-in-out infinite alternate;
+}
+
+.tile.legal-attack .tile-face {
+  fill: #a3424e;
+  animation: attack-pulse .7s ease-in-out infinite alternate;
+}
+
+.tile.legal-heal .tile-face {
+  fill: #36855c;
+  animation: heal-tile-pulse .9s ease-in-out infinite alternate;
+}
+
+.unit {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.unit .shadow {
+  fill: rgba(0, 0, 0, .36);
+  filter: blur(2px);
+}
+
+.unit .base-side {
+  fill: #222a35;
+}
+
+.unit .base-top {
+  stroke: rgba(255, 255, 255, .24);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.unit.p1 .base-top {
+  fill: #237ca6;
+}
+
+.unit.p2 .base-top {
+  fill: #a93a4a;
+}
+
+.unit .rim {
+  fill: none;
+  stroke-width: 3;
+  opacity: .9;
+  vector-effect: non-scaling-stroke;
+}
+
+.unit.p1 .rim {
+  stroke: var(--p1);
+}
+
+.unit.p2 .rim {
+  stroke: var(--p2);
+}
+
+.unit .icon {
+  fill: #f7f9fc;
+  stroke: #11151c;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.unit .hp-back {
+  fill: rgba(0, 0, 0, .55);
+}
+
+.unit .hp-front {
+  fill: #72e4a3;
+  transition: width .2s ease;
+}
+
+.unit .spent-mark {
+  opacity: 0;
+}
+
+.unit.spent {
+  opacity: .46;
+  filter: grayscale(.55);
+}
+
+.unit.spent .spent-mark {
+  opacity: 1;
+}
+
+.unit.active {
+  filter: drop-shadow(0 0 10px rgba(255, 210, 106, .8));
+}
+
+.unit.active .rim {
+  stroke: var(--gold);
+  stroke-dasharray: 9 5;
+  animation: rim-spin 1.2s linear infinite;
+}
+
+.shield-ring {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2.2;
+  stroke-dasharray: 8 5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  vector-effect: non-scaling-stroke;
+}
+
+.unit.defending .shield-ring {
+  opacity: 1;
+  animation: shield-orbit 1.6s linear infinite;
+}
+
+.unit.idle:not(.spent) .body-group {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: idle-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes legal-pulse {
+  to { filter: brightness(1.28); }
+}
+
+@keyframes attack-pulse {
+  to { filter: brightness(1.32) saturate(1.2); }
+}
+
+@keyframes heal-tile-pulse {
+  to { filter: brightness(1.25); }
+}
+
+@keyframes shield-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rim-spin {
+  to { stroke-dashoffset: -28; }
+}
+
+@keyframes idle-bob {
+  50% { transform: translateY(-2px); }
+}

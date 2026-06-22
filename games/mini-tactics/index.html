@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Isometric Squad Tactics</title>
+
+  <link rel="stylesheet" href="./styles/tokens.css">
+  <link rel="stylesheet" href="./styles/layout.css">
+  <link rel="stylesheet" href="./styles/board.css">
+  <link rel="stylesheet" href="./styles/effects.css">
+  <link rel="stylesheet" href="./styles/responsive.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">Isometric Squad Tactics</div>
+
+      <div class="turn-banner">
+        <div id="turnTitle" class="turn-title">Player 1 squad turn</div>
+        <div id="turnSub" class="turn-sub">Select an unspent piece</div>
+      </div>
+
+      <div class="top-actions">
+        <button id="rulesBtn">Rules</button>
+        <button id="restartBtn" class="danger">Restart</button>
+      </div>
+    </header>
+
+    <main id="stageWrap">
+      <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Isometric tactics board">
+        <defs>
+          <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="5" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#6da4ff" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="#6da4ff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <ellipse cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
+        <g id="boardLayer"></g>
+        <g id="overlayLayer"></g>
+        <g id="unitsLayer"></g>
+        <g id="fxLayer"></g>
+      </svg>
+
+      <div id="message" role="status" aria-live="polite"></div>
+
+      <div id="diceOverlay" aria-hidden="true">
+        <div class="die" id="dieFace">1</div>
+      </div>
+    </main>
+
+    <footer class="hud">
+      <section class="panel squad-panel">
+        <div class="panel-title">Player 1 squad</div>
+        <div id="p1Squad" class="squad-list"></div>
+      </section>
+
+      <section class="panel">
+        <div id="unitCard" class="unit-card">
+          <div class="unit-emblem">?</div>
+          <div>
+            <div class="unit-name">No piece selected</div>
+            <div class="unit-meta">Choose an unspent unit on the board.</div>
+            <div class="hpbar"><div class="hpfill" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="panel-title panel-title-actions">Actions</div>
+
+        <div class="actions">
+          <button id="moveBtn" class="primary" disabled>Move</button>
+          <button id="attackBtn" disabled>Attack</button>
+          <button id="healBtn" disabled>Heal</button>
+          <button id="defendBtn" disabled>Defend</button>
+          <button id="cancelMoveBtn" class="cancel" disabled>Cancel Move</button>
+          <button id="finishBtn" disabled>Finish</button>
+        </div>
+
+        <div id="actionHelp" class="action-help">
+          A piece cannot finish after moving alone; it must attack, heal, or defend.
+        </div>
+      </section>
+
+      <section class="panel squad-panel">
+        <div class="panel-title">Player 2 squad</div>
+        <div id="p2Squad" class="squad-list"></div>
+      </section>
+    </footer>
+
+    <div id="rulesModal">
+      <div class="modal-card">
+        <h2>Prototype rules</h2>
+
+        <ul>
+          <li>Each player activates every living piece once, then the squad turn changes.</li>
+          <li>Warrior moves 3 orthogonal tiles. Tank, ranger, and medic move 2.</li>
+          <li>Attack range includes diagonals with no penalty: warrior/tank 1, medic 3, ranger 4.</li>
+          <li>Ranger shots are blocked by any piece between ranger and target.</li>
+          <li>Attack/heal roll: 1 misses, 6 crits.</li>
+          <li>Critical attacks add 1 damage. Critical heals restore 4 instead of 3.</li>
+          <li>Warrior deals 3, but only 2 to tanks. Tank deals 2. Ranger deals 2, or 3 to another ranger. Medic deals 1.</li>
+          <li>Defending reduces each incoming hit by 1, including to zero, and expires when that piece is next selected to act.</li>
+          <li>Move must be paired with attack, heal, or defend. Attack/heal may happen before or after movement.</li>
+          <li>Last squad standing wins.</li>
+        </ul>
+
+        <p><strong>Current configurable assumption:</strong> medic heal range is 3.</p>
+
+        <div class="modal-row">
+          <label>
+            Board size
+            <select id="boardSizeSelect">
+              <option value="10">10×10</option>
+              <option value="13">13×13</option>
+            </select>
+          </label>
+
+          <button id="closeRulesBtn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

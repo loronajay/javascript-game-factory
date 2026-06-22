@@ -1,0 +1,51 @@
+@media (max-width: 820px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .brand {
+    display: none;
+  }
+
+  .turn-banner {
+    text-align: left;
+  }
+
+  .hud {
+    grid-template-columns: 1fr;
+    max-height: 42dvh;
+    overflow: auto;
+  }
+
+  .squad-panel {
+    display: none;
+  }
+
+  .actions {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .panel {
+    padding: .55rem;
+  }
+
+  .unit-card {
+    min-height: 54px;
+  }
+
+  .unit-emblem {
+    width: 40px;
+    height: 40px;
+    font-size: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

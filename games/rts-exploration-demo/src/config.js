@@ -18,6 +18,8 @@ export const CONFIG = Object.freeze({
   separationRadius: 17,
   separationStrength: 34,
   destructibleWallHp: 90,
+  transitWallHp: 24,
+  objectiveWallHp: 180,
   minimapSize: 184,
   backgroundTileVariance: 0.08,
   simHz: 60,

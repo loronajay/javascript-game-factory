@@ -31,6 +31,8 @@ export class MapGenerator {
     for (const r of (def.resources ?? [])) {
       this.map.addResourceNode(r.x, r.y, r.kind ?? 'biomass');
     }
+
+    for (const landmark of (def.landmarks ?? [])) this.map.addLandmark(landmark);
   }
 
   applyLayer(layer, rand) {
@@ -39,6 +41,18 @@ export class MapGenerator {
       case 'border': this.addBorder(); break;
       case 'rect':   this.addRect(layer.x, layer.y, layer.w, layer.h); break;
       case 'gap':    this.carveGap(layer.x, layer.y, layer.w, layer.h); break;
+      case 'path':   this.addWallPath(layer.points, layer.width ?? 1); break;
+      case 'naturalWallPath':
+        this.addNaturalWallPath(layer.points, layer.width ?? 1, layer.hp, layer.kind);
+        if (layer.rotational) {
+          this.addNaturalWallPath(
+            layer.points.map((point) => ({ x: this.map.width - 1 - point.x, y: this.map.height - 1 - point.y })),
+            layer.width ?? 1,
+            layer.hp,
+            layer.kind,
+          );
+        }
+        break;
       case 'maze':   this.addMazeCluster(layer.x, layer.y, layer.w, layer.h); break;
       case 'decor':  this.addDecorPatches(rand, layer.count ?? 420, layer.density ?? 0.55); break;
     }
@@ -65,6 +79,69 @@ export class MapGenerator {
   carveGap(x, y, w, h) {
     for (let yy = y; yy < y + h; yy++) {
       for (let xx = x; xx < x + w; xx++) this.map.set(xx, yy, TILE.FLOOR);
+    }
+  }
+
+  // An authored, grid-snapped wall run. This keeps visual reference geometry
+  // (diagonals and octagons) in the level definition rather than burying it in
+  // a procedural maze algorithm.
+  addWallPath(points, width = 1) {
+    if (!Array.isArray(points) || points.length < 2) return;
+    for (let i = 1; i < points.length; i++) {
+      const from = points[i - 1];
+      const to = points[i];
+      this.addWallLine(from.x, from.y, to.x, to.y, width);
+    }
+  }
+
+  addWallLine(x0, y0, x1, y1, width) {
+    let x = x0;
+    let y = y0;
+    const dx = Math.abs(x1 - x0);
+    const sx = x0 < x1 ? 1 : -1;
+    const dy = -Math.abs(y1 - y0);
+    const sy = y0 < y1 ? 1 : -1;
+    let error = dx + dy;
+    const radius = Math.max(0, Math.floor((width - 1) / 2));
+
+    while (true) {
+      for (let oy = -radius; oy <= radius; oy++) {
+        for (let ox = -radius; ox <= radius; ox++) this.map.set(x + ox, y + oy, TILE.WALL);
+      }
+      if (x === x1 && y === y1) break;
+      const twiceError = error * 2;
+      if (twiceError >= dy) { error += dy; x += sx; }
+      if (twiceError <= dx) { error += dx; y += sy; }
+    }
+  }
+
+  addNaturalWallPath(points, width = 1, hp = CONFIG.destructibleWallHp, kind = 'naturalWall') {
+    if (!Array.isArray(points) || points.length < 2) return;
+    for (let i = 1; i < points.length; i++) {
+      const from = points[i - 1];
+      const to = points[i];
+      this.addNaturalWallLine(from.x, from.y, to.x, to.y, width, hp, kind);
+    }
+  }
+
+  addNaturalWallLine(x0, y0, x1, y1, width, hp, kind) {
+    let x = x0;
+    let y = y0;
+    const dx = Math.abs(x1 - x0);
+    const sx = x0 < x1 ? 1 : -1;
+    const dy = -Math.abs(y1 - y0);
+    const sy = y0 < y1 ? 1 : -1;
+    let error = dx + dy;
+    const radius = Math.max(0, Math.floor((width - 1) / 2));
+
+    while (true) {
+      for (let oy = -radius; oy <= radius; oy++) {
+        for (let ox = -radius; ox <= radius; ox++) this.map.addDestructibleTile(x + ox, y + oy, hp, kind);
+      }
+      if (x === x1 && y === y1) break;
+      const twiceError = error * 2;
+      if (twiceError >= dy) { error += dy; x += sx; }
+      if (twiceError <= dx) { error += dx; y += sy; }
     }
   }
 

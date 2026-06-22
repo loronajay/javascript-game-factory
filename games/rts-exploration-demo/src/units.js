@@ -10,6 +10,7 @@ import { CombatSystem } from './units/combat-system.js';
 import { MovementSystem } from './units/movement-system.js';
 import { SeparationSystem } from './units/separation-system.js';
 import { SelectionSystem } from './units/selection-system.js';
+import { DrifterPatrolController } from './neutral/drifter-patrol-controller.js';
 
 export { UNIT_STATES };
 
@@ -58,6 +59,11 @@ export class UnitManager {
     this.separation = new SeparationSystem(ctx);
     this.movement   = new MovementSystem(ctx);
     this.combat     = new CombatSystem(ctx);
+    this.drifterPatrol = new DrifterPatrolController({
+      getUnits: () => this.units,
+      movement: this.movement,
+      getSimTime: () => this.simTime,
+    });
 
     // Wire cross-system refs now that all instances exist.
     ctx.combat   = this.combat;
@@ -71,6 +77,7 @@ export class UnitManager {
 
   update(dt, simTime = this.simTime) {
     this.simTime = simTime;
+    this.drifterPatrol.update();
     this.combat.update(dt);
     this.movement.update(dt);
     this.separation.update(dt);
@@ -95,15 +102,15 @@ export class UnitManager {
 
   // ── Spawning ────────────────────────────────────────────────────────────────
 
-  spawnUnit(type, team, x, y) {
-    const unit = this.factory.create(type, team, x, y);
+  spawnUnit(type, team, x, y, options = {}) {
+    const unit = this.factory.create(type, team, x, y, options);
     this.units.push(unit);
     return unit;
   }
 
   // Apply the spawn definitions from a level def (see maps/level-01.js → spawns).
   spawnFromDef(spawnsDef) {
-    this.factory.applySpawnDef(spawnsDef, (type, team, x, y) => this.spawnUnit(type, team, x, y));
+    this.factory.applySpawnDef(spawnsDef, (type, team, x, y, options) => this.spawnUnit(type, team, x, y, options));
   }
 
   // ── Discovery ───────────────────────────────────────────────────────────────

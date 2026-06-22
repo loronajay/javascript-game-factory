@@ -99,10 +99,10 @@ export const UNIT_DEFS = Object.freeze({
     tags: Object.freeze(['organic', 'light', 'combat', 'melee', 'physical']),
   }),
 
-  neutralCrawler: Object.freeze({
-    id: 'neutralCrawler',
-    name: 'Crawler',
-    role: 'native_guardian',
+  drifter: Object.freeze({
+    id: 'drifter',
+    name: 'Drifter',
+    role: 'wandering_neutral',
 
     body: Object.freeze({
       radius: 19,
@@ -147,7 +147,7 @@ export const UNIT_DEFS = Object.freeze({
     }),
 
     onDeathRewards: Object.freeze([]),
-    tags: Object.freeze(['neutral', 'organic', 'creature', 'melee', 'guardian']),
+    tags: Object.freeze(['neutral', 'organic', 'creature', 'melee', 'drifter']),
   }),
 });
 

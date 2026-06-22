@@ -1,0 +1,378 @@
+import { gridToScreen } from "../geometry/isometric.js";
+import { createSvgElement } from "./svg.js";
+
+export class EffectsRenderer {
+  constructor({ unitsLayer, effectsLayer, diceOverlay, dieFace, metrics }) {
+    this.unitsLayer = unitsLayer;
+    this.effectsLayer = effectsLayer;
+    this.diceOverlay = diceOverlay;
+    this.dieFace = dieFace;
+    this.metrics = metrics;
+  }
+
+  setMetrics(metrics) {
+    this.metrics = metrics;
+  }
+
+  async rollDie(rollResult) {
+    this.diceOverlay.classList.add("show", "rolling");
+
+    for (let index = 0; index < 8; index += 1) {
+      this.dieFace.textContent = String(1 + Math.floor(Math.random() * 6));
+      await sleep(42);
+    }
+
+    this.dieFace.textContent = String(rollResult);
+    await sleep(300);
+    this.diceOverlay.classList.remove("rolling");
+    await sleep(200);
+    this.diceOverlay.classList.remove("show");
+  }
+
+  async animateMovement(unit, from, to) {
+    const point = gridToScreen(this.metrics, to.x, to.y);
+    const element = this.unitsLayer.querySelector(`[data-id="${unit.id}"]`);
+
+    if (!element) {
+      return;
+    }
+
+    const fromPoint = gridToScreen(this.metrics, from.x, from.y);
+    const dx = fromPoint.x - point.x;
+    const dy = fromPoint.y - point.y;
+    const baseY = point.y + this.metrics.tileHeight * 0.45;
+
+    await element.animate(
+      [
+        {
+          transform:
+            `translate(${point.x + dx}px ${baseY + dy}px) scale(1)`
+        },
+        {
+          transform:
+            `translate(${point.x}px ${baseY - 12}px) scale(1.08)`,
+          offset: 0.55
+        },
+        {
+          transform:
+            `translate(${point.x}px ${baseY}px) scale(1)`
+        }
+      ],
+      {
+        duration: 420,
+        easing: "cubic-bezier(.2,.8,.2,1)"
+      }
+    ).finished.catch(() => {});
+  }
+
+  async animateAttack(attacker, target) {
+    const attackerPoint = gridToScreen(
+      this.metrics,
+      attacker.x,
+      attacker.y
+    );
+    const targetPoint = gridToScreen(
+      this.metrics,
+      target.x,
+      target.y
+    );
+
+    if (attacker.type === "warrior" || attacker.type === "tank") {
+      await this.animateMeleeLunge(attacker, attackerPoint, targetPoint);
+      return;
+    }
+
+    const attackColor =
+      attacker.type === "ranger" ? "#f7e27d" : "#9ef6d0";
+
+    const path = createSvgElement("path", {
+      d:
+        `M ${attackerPoint.x} ${attackerPoint.y + 8} ` +
+        `Q ${(attackerPoint.x + targetPoint.x) / 2} ` +
+        `${Math.min(attackerPoint.y, targetPoint.y) - 45} ` +
+        `${targetPoint.x} ${targetPoint.y + 8}`,
+      class: "fx-line",
+      stroke: attackColor,
+      "stroke-width": attacker.type === "ranger" ? 5 : 7,
+      filter: "url(#softGlow)"
+    });
+
+    path.style.strokeDasharray = "14 10";
+    this.effectsLayer.appendChild(path);
+
+    await path.animate(
+      [
+        { strokeDashoffset: "70", opacity: 0 },
+        { strokeDashoffset: "0", opacity: 1, offset: 0.25 },
+        { strokeDashoffset: "-50", opacity: 0 }
+      ],
+      {
+        duration: 420,
+        easing: "ease-out"
+      }
+    ).finished.catch(() => {});
+
+    path.remove();
+  }
+
+  async animateHealBeam(medic, target) {
+    const source = gridToScreen(this.metrics, medic.x, medic.y);
+    const destination = gridToScreen(this.metrics, target.x, target.y);
+
+    const line = createSvgElement("path", {
+      d:
+        `M ${source.x} ${source.y + 8} ` +
+        `C ${source.x} ${source.y - 45}, ` +
+        `${destination.x} ${destination.y - 45}, ` +
+        `${destination.x} ${destination.y + 8}`,
+      class: "fx-line",
+      stroke: "#74f0ac",
+      "stroke-width": 8,
+      filter: "url(#softGlow)"
+    });
+
+    this.effectsLayer.appendChild(line);
+
+    await line.animate(
+      [
+        {
+          strokeDasharray: "1 120",
+          strokeDashoffset: "0",
+          opacity: 0.2
+        },
+        {
+          strokeDasharray: "70 40",
+          strokeDashoffset: "-90",
+          opacity: 1
+        },
+        {
+          strokeDasharray: "1 120",
+          strokeDashoffset: "-180",
+          opacity: 0
+        }
+      ],
+      {
+        duration: 520,
+        easing: "ease-in-out"
+      }
+    ).finished.catch(() => {});
+
+    line.remove();
+  }
+
+  async animateHit(target, damage, critical) {
+    const point = gridToScreen(this.metrics, target.x, target.y);
+    const ring = createSvgElement("circle", {
+      class: "fx-ring",
+      cx: point.x,
+      cy: point.y + 8,
+      r: 8,
+      stroke: critical ? "#ffd26a" : "#ff7684",
+      filter: "url(#softGlow)"
+    });
+
+    this.effectsLayer.appendChild(ring);
+
+    const animations = [
+      ring.animate(
+        [
+          { r: 8, opacity: 1, strokeWidth: 5 },
+          { r: 44, opacity: 0, strokeWidth: 1 }
+        ],
+        {
+          duration: 420,
+          easing: "ease-out"
+        }
+      ).finished.catch(() => {})
+    ];
+
+    const unitElement =
+      this.unitsLayer.querySelector(`[data-id="${target.id}"]`);
+
+    if (unitElement) {
+      const baseY = point.y + this.metrics.tileHeight * 0.45;
+
+      animations.push(
+        unitElement.animate(
+          [
+            { transform: `translate(${point.x}px ${baseY}px)` },
+            {
+              transform:
+                `translate(${point.x - 8}px ${baseY}px) rotate(-5deg)`
+            },
+            {
+              transform:
+                `translate(${point.x + 7}px ${baseY}px) rotate(4deg)`
+            },
+            { transform: `translate(${point.x}px ${baseY}px)` }
+          ],
+          {
+            duration: 330,
+            easing: "ease-out"
+          }
+        ).finished.catch(() => {})
+      );
+    }
+
+    await Promise.all(animations);
+    ring.remove();
+
+    await this.floatText(
+      target,
+      damage === 0 ? "0" : `-${damage}`,
+      critical ? "#ffd26a" : "#ff7684"
+    );
+  }
+
+  async animateHeal(target, amount, critical) {
+    const point = gridToScreen(this.metrics, target.x, target.y);
+    const ring = createSvgElement("circle", {
+      class: "fx-ring",
+      cx: point.x,
+      cy: point.y + 8,
+      r: 10,
+      stroke: critical ? "#eaff95" : "#73e6a6",
+      filter: "url(#softGlow)"
+    });
+
+    this.effectsLayer.appendChild(ring);
+
+    await ring.animate(
+      [
+        { r: 10, opacity: 0.2, strokeWidth: 10 },
+        { r: 40, opacity: 1, strokeWidth: 4, offset: 0.45 },
+        { r: 58, opacity: 0, strokeWidth: 1 }
+      ],
+      {
+        duration: 560,
+        easing: "ease-out"
+      }
+    ).finished.catch(() => {});
+
+    ring.remove();
+    await this.floatText(target, `+${amount}`, "#73e6a6");
+  }
+
+  async animateDeath(target) {
+    const point = gridToScreen(this.metrics, target.x, target.y);
+    const element =
+      this.unitsLayer.querySelector(`[data-id="${target.id}"]`);
+
+    if (!element) {
+      return;
+    }
+
+    const baseY = point.y + this.metrics.tileHeight * 0.45;
+
+    await element.animate(
+      [
+        {
+          transform:
+            `translate(${point.x}px ${baseY}px) scale(1)`,
+          opacity: 1
+        },
+        {
+          transform:
+            `translate(${point.x}px ${baseY + 8}px) ` +
+            "scale(1.12,.7) rotate(8deg)",
+          opacity: 0.75
+        },
+        {
+          transform:
+            `translate(${point.x}px ${baseY + 24}px) ` +
+            "scale(.2) rotate(30deg)",
+          opacity: 0
+        }
+      ],
+      {
+        duration: 620,
+        easing: "cubic-bezier(.3,.7,.3,1)"
+      }
+    ).finished.catch(() => {});
+  }
+
+  async floatText(unit, text, color) {
+    const point = gridToScreen(this.metrics, unit.x, unit.y);
+    const element = createSvgElement("text", {
+      class: "float-text",
+      x: point.x,
+      y: point.y - 2,
+      "text-anchor": "middle",
+      fill: color,
+      text
+    });
+
+    this.effectsLayer.appendChild(element);
+
+    await element.animate(
+      [
+        {
+          transform: "translateY(8px) scale(.7)",
+          opacity: 0
+        },
+        {
+          transform: "translateY(-5px) scale(1.15)",
+          opacity: 1,
+          offset: 0.25
+        },
+        {
+          transform: "translateY(-42px) scale(1)",
+          opacity: 0
+        }
+      ],
+      {
+        duration: 720,
+        easing: "ease-out"
+      }
+    ).finished.catch(() => {});
+
+    element.remove();
+  }
+
+  async animateMeleeLunge(attacker, attackerPoint, targetPoint) {
+    const element =
+      this.unitsLayer.querySelector(`[data-id="${attacker.id}"]`);
+
+    if (!element) {
+      return;
+    }
+
+    const deltaX = (targetPoint.x - attackerPoint.x) * 0.18;
+    const deltaY = (targetPoint.y - attackerPoint.y) * 0.18;
+    const baseY =
+      attackerPoint.y + this.metrics.tileHeight * 0.45;
+
+    await element.animate(
+      [
+        {
+          transform:
+            `translate(${attackerPoint.x}px ${baseY}px)`
+        },
+        {
+          transform:
+            `translate(${attackerPoint.x - deltaX * 0.3}px ` +
+            `${baseY - deltaY * 0.3}px)`
+        },
+        {
+          transform:
+            `translate(${attackerPoint.x + deltaX}px ` +
+            `${baseY + deltaY}px) scale(1.12)`
+        },
+        {
+          transform:
+            `translate(${attackerPoint.x}px ${baseY}px)`
+        }
+      ],
+      {
+        duration: 360,
+        easing: "cubic-bezier(.2,.75,.2,1)"
+      }
+    ).finished.catch(() => {});
+  }
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
