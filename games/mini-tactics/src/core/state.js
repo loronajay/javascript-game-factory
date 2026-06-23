@@ -26,6 +26,10 @@ export function createMatchState({
   teams = null,
   colors = null,
   teamColors = null,
+  // Optional display-only custom team/player names keyed by team id. Purely
+  // cosmetic — naming never affects rule resolution. Falls back to "Team N" /
+  // "Player N" wherever an entry is missing (see render/labels.js).
+  teamNames = null,
 } = {}) {
   const boardSize = Number(size);
 
@@ -47,6 +51,7 @@ export function createMatchState({
     // `format` ("ffa" | "teams") is carried so UI surfaces can word victory as a
     // team or a player. It does not affect rule resolution — team membership does.
     format,
+    teamNames: normalizeTeamNames(teamNames),
     // Authoritative seating: `players` is the roster, `turnOrder` is the seat
     // sequence the reducer walks (skipping eliminated players).
     players: roster,
@@ -58,6 +63,19 @@ export function createMatchState({
     victoryReason: null,
     rngState: createRngState(seed),
   };
+}
+
+// Keep only non-empty, trimmed, length-capped names keyed by numeric team id.
+// Returns null when nothing usable is supplied so the default labels apply.
+const MAX_TEAM_NAME_LENGTH = 20;
+function normalizeTeamNames(names) {
+  if (!names || typeof names !== "object") return null;
+  const cleaned = {};
+  for (const [key, value] of Object.entries(names)) {
+    const trimmed = String(value ?? "").trim().slice(0, MAX_TEAM_NAME_LENGTH);
+    if (trimmed) cleaned[key] = trimmed;
+  }
+  return Object.keys(cleaned).length ? cleaned : null;
 }
 
 // Deep clone of the mutable parts. The reducer always works on a clone so a

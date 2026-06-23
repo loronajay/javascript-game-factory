@@ -81,9 +81,13 @@
   display: inline-flex;
   gap: .5rem;
   align-items: center;
+  max-width: 100%;
+  overflow: hidden;
   font-size: .98rem;
   font-weight: 850;
   letter-spacing: .03em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Leading dot reflects whose squad turn it is at a glance. */
@@ -102,9 +106,12 @@
 
 .turn-sub {
   margin-top: .12rem;
+  overflow: hidden;
   color: var(--muted);
   font-size: .72rem;
   letter-spacing: .02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .top-actions {
@@ -284,12 +291,16 @@
 /* ----------------------------------------------------------------------- */
 /* Selected-unit dossier                                                   */
 /* ----------------------------------------------------------------------- */
+/* Fixed height so the dossier's content (name length, stat-pill count, the
+   2-line empty-state caption) can never resize the HUD row and shove the
+   battlefield. Overflow is clipped rather than allowed to grow the box. */
 .unit-card {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: .7rem;
   align-items: center;
-  min-height: 60px;
+  height: 60px;
+  overflow: hidden;
 }
 
 /* Hexagonal portrait emblem. */
@@ -328,12 +339,15 @@
   font-size: .75rem;
 }
 
-/* Stat readout as discrete pills instead of a dot-joined string. */
+/* Stat readout as discrete pills instead of a dot-joined string. Kept on a
+   single row (no wrap) so adding the Defending/Spent pills can't grow the
+   dossier height; the row clips horizontally instead. */
 .unit-stats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: .3rem;
   margin-top: .35rem;
+  overflow: hidden;
 }
 
 .stat-pill {
@@ -419,11 +433,15 @@
 #cancelMoveBtn { border-bottom: 2px solid rgba(255, 176, 77, .5); }
 #finishBtn { border-bottom: 2px solid rgba(182, 194, 212, .5); }
 
+/* Fixed two-line height: the help copy changes length as the activation
+   progresses, so a reserved height (clipping the rare overflow) keeps the HUD
+   row — and therefore the board — from shifting. */
 .action-help {
   display: flex;
   gap: .4rem;
   align-items: flex-start;
-  min-height: 2.4em;
+  height: calc(2.7em + .9rem);
+  overflow: hidden;
   margin-top: .65rem;
   padding: .45rem .55rem;
   border: 1px solid var(--console-edge-soft);

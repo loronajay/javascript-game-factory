@@ -16,6 +16,7 @@ Open <http://localhost:8080>.
 
 - Select and move Scouts and Grunts.
 - Attack breakable grey walls and the two Drifters.
+- Each player starts with three Harvesters. Select them and right-click a weak-steel drop left by a broken natural wall to collect and deliver it to your Nexus.
 - Attack the opposing Nexus; it is now a live owned structure with health (the final win/loss flow is still pending).
 - Watch Drifters patrol their authored up/down routes; they stop patrolling while fighting.
 - Explore through fog of war using the authored Level 01 reference map.

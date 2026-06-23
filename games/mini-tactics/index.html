@@ -36,12 +36,42 @@
         <h2 class="menu-heading">Main Menu</h2>
 
         <div class="menu-buttons">
-          <button class="menu-btn" disabled>Single Player <span class="soon">Soon</span></button>
-          <button data-nav="hsSetup" class="primary menu-btn">Hot Seat</button>
+          <button data-nav="spSetup" class="primary menu-btn">Single Player</button>
+          <button data-nav="hsSetup" class="menu-btn">Hot Seat</button>
           <button class="menu-btn" disabled>Online Versus <span class="soon">Soon</span></button>
           <button data-action="rules" class="menu-btn">How to Play</button>
           <button class="menu-btn" disabled>Settings <span class="soon">Soon</span></button>
           <button data-nav="title" class="menu-btn ghost">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== SINGLE PLAYER SETUP ====================== -->
+    <section class="screen menu-screen" data-screen="spSetup">
+      <div class="menu-card">
+        <h2 class="menu-heading">Single Player</h2>
+        <p class="menu-note">You command Player 1. The CPU commands Player 2.</p>
+
+        <div class="setup-field">
+          <span class="setup-label">Board size</span>
+          <div class="segmented" data-field="boardSize">
+            <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
+            <button type="button" class="seg" data-size="13">13 × 13</button>
+          </div>
+        </div>
+
+        <div class="setup-field">
+          <span class="setup-label">CPU difficulty</span>
+          <div class="segmented" data-field="difficulty">
+            <button type="button" class="seg" data-difficulty="easy">Easy</button>
+            <button type="button" class="seg is-selected" data-difficulty="normal">Normal</button>
+            <button type="button" class="seg" data-difficulty="hard">Hard</button>
+          </div>
+        </div>
+
+        <div class="menu-buttons">
+          <button data-action="startSingle" class="primary menu-btn">Start Match</button>
+          <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
         </div>
       </div>
     </section>
@@ -69,15 +99,37 @@
           </div>
         </div>
 
+        <div class="setup-field" data-group="teamNames" hidden>
+          <span class="setup-label">Team names</span>
+          <div class="team-names">
+            <input
+              type="text"
+              class="team-name-input"
+              data-team-name="1"
+              maxlength="20"
+              placeholder="Team 1"
+              aria-label="Team 1 name"
+            />
+            <input
+              type="text"
+              class="team-name-input"
+              data-team-name="2"
+              maxlength="20"
+              placeholder="Team 2"
+              aria-label="Team 2 name"
+            />
+          </div>
+        </div>
+
         <div class="setup-field" data-group="teamColors" hidden>
           <span class="setup-label">Team colors</span>
           <div class="team-colors">
             <div class="team-color" data-team="1">
-              <span class="team-color-name">Team 1</span>
+              <span class="team-color-name" data-team-color-name="1">Team 1</span>
               <div class="swatches" data-swatches="1"></div>
             </div>
             <div class="team-color" data-team="2">
-              <span class="team-color-name">Team 2</span>
+              <span class="team-color-name" data-team-color-name="2">Team 2</span>
               <div class="swatches" data-swatches="2"></div>
             </div>
           </div>

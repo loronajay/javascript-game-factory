@@ -99,6 +99,61 @@ export const UNIT_DEFS = Object.freeze({
     tags: Object.freeze(['organic', 'light', 'combat', 'melee', 'physical']),
   }),
 
+  harvester: Object.freeze({
+    id: 'harvester',
+    name: 'Harvester',
+    role: 'resource_collector',
+
+    body: Object.freeze({
+      radius: 10,
+      selectionRadius: 17,
+    }),
+
+    vitals: Object.freeze({
+      maxHp: 45,
+    }),
+
+    movement: Object.freeze({
+      moveSpeed: 104,
+      turnSpeed: 8,
+      acceleration: 650,
+      stopDistance: 5,
+    }),
+
+    vision: Object.freeze({
+      sightRange: 144,
+      revealRange: 144,
+    }),
+
+    combat: Object.freeze({
+      canAttack: false,
+      attackDelivery: 'none',
+      damageType: 'none',
+      targetMode: 'none',
+      attackRange: 0,
+      acquireRange: 0,
+      leashRange: 0,
+      baseDamage: 0,
+      attackCooldown: 0,
+      windupTime: 0,
+      recoveryTime: 0,
+    }),
+
+    harvest: Object.freeze({
+      capacity: 1,
+      gatherTime: 0.5,
+      gatherRange: 20,
+      deliveryRange: 30,
+    }),
+
+    defenses: Object.freeze({
+      armor: 0,
+      magicResist: 0,
+    }),
+
+    tags: Object.freeze(['organic', 'light', 'non-combat', 'harvester']),
+  }),
+
   drifter: Object.freeze({
     id: 'drifter',
     name: 'Drifter',

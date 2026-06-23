@@ -13,7 +13,8 @@ import { createDebugSnapshot } from './snapshot.js';
 import { AiController } from './ai-controller.js';
 
 const canvas = document.getElementById('game');
-const hudLines = document.getElementById('hud-lines');
+const hudRoot = document.getElementById('hud');
+const debugLines = document.getElementById('debug-lines');
 
 const map = buildGameMap(level01);
 const camera = new Camera({
@@ -35,7 +36,7 @@ const commands = new CommandSystem({ units, map, getTick: () => simTick });
 const ai = new AiController({ team: 2, units, map, commands });
 const input = new InputController(canvas, camera, units, map, commands, ai, entities);
 const renderer = new Renderer(canvas, map, camera, units, fog, input, entities);
-const hud = new Hud(hudLines, map, camera, units, input, { commands, ai, getTick: () => simTick, entities });
+const hud = new Hud(hudRoot, debugLines, map, camera, units, input, { commands, ai, getTick: () => simTick, entities });
 
 let lastTime = performance.now();
 let accumulator = 0;

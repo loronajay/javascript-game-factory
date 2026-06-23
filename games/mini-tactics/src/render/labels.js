@@ -4,10 +4,18 @@
 
 import { colorOf } from "../state/gameState.js";
 
-// How a victorious team is named. In team play it is "Team N"; in free-for-all,
-// where each player is its own team, it reads as that player.
-export function winnerLabel(state, teamId) {
+// Display name for a team. A custom lobby-entered name wins; otherwise it is
+// "Team N" in team play or "Player N" in free-for-all (where each player is its
+// own team). Single source of truth for team naming across every UI surface.
+export function teamLabel(state, teamId) {
+  const custom = state.teamNames?.[teamId];
+  if (custom) return custom;
   return state.format === "teams" ? `Team ${teamId}` : `Player ${teamId}`;
+}
+
+// How a victorious team is named — the same naming as everywhere else.
+export function winnerLabel(state, teamId) {
+  return teamLabel(state, teamId);
 }
 
 // The display hue for a team: the full-shade color of its first roster member.

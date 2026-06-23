@@ -11,6 +11,7 @@ import { MovementSystem } from './units/movement-system.js';
 import { SeparationSystem } from './units/separation-system.js';
 import { SelectionSystem } from './units/selection-system.js';
 import { DrifterPatrolController } from './neutral/drifter-patrol-controller.js';
+import { HarvestSystem } from './economy/harvest-system.js';
 
 export { UNIT_STATES };
 
@@ -71,6 +72,14 @@ export class UnitManager {
     // Wire cross-system refs now that all instances exist.
     ctx.combat   = this.combat;
     ctx.movement = this.movement;
+    this.harvesting = new HarvestSystem({
+      map,
+      entities: this.entities,
+      movement: this.movement,
+      combat: this.combat,
+      getDef: getUnitDef,
+      getSimTime: () => this.simTime,
+    });
 
     this.simTime = 0;
     this._nextRouteId = 1;
@@ -84,6 +93,7 @@ export class UnitManager {
     this.combat.update(dt);
     this.movement.update(dt);
     this.separation.update(dt);
+    this.harvesting.update(this.units, dt);
     this.removeDeadUnits();
   }
 
@@ -146,6 +156,7 @@ export class UnitManager {
   moveUnitsTo(unitIds, worldX, worldY, team = 1) {
     const units = this.ownedUnitsFromIds(unitIds, team);
     if (units.length === 0) return false;
+    this.clearHarvestOrders(units);
     return this.movement.issueGroupMove(units, worldX, worldY, { kind: 'move' });
   }
 
@@ -153,6 +164,7 @@ export class UnitManager {
     const units = this.ownedUnitsFromIds(unitIds, team);
     if (units.length === 0) return false;
     for (const unit of units) {
+      this.harvesting.clear(unit);
       this.combat.clearAttack(unit);
       unit.attackMoveTarget = null;
       unit.path = [];
@@ -168,6 +180,7 @@ export class UnitManager {
   attackMoveUnitsTo(unitIds, worldX, worldY, team = 1) {
     const units = this.ownedUnitsFromIds(unitIds, team).filter((u) => getUnitDef(u.type).combat.canAttack);
     if (units.length === 0) return false;
+    this.clearHarvestOrders(units);
     return this.movement.issueGroupMove(units, worldX, worldY, { kind: 'attackMove' });
   }
 
@@ -179,6 +192,7 @@ export class UnitManager {
     if (!this.map.isDestructibleTile(tileX, tileY)) return false;
     const selected = this.ownedUnitsFromIds(unitIds, team).filter((u) => getUnitDef(u.type).combat.canAttack);
     if (selected.length === 0) return false;
+    this.clearHarvestOrders(selected);
 
     const gateTiles = this.findConnectedDestructibleTiles(tileX, tileY);
     const targetCenter = this.map.tileCenter(tileX, tileY);
@@ -224,6 +238,7 @@ export class UnitManager {
     if (!target) return false;
     const selected = this.ownedUnitsFromIds(unitIds, team).filter((u) => getUnitDef(u.type).combat.canAttack);
     if (selected.length === 0) return false;
+    this.clearHarvestOrders(selected);
     const key = targetKey(targetRef);
     this._reservations.clearStaticReservationsForTarget(key, this.units);
     this._reservations.clearMobileReservationsForTarget(key, this.units);
@@ -234,6 +249,18 @@ export class UnitManager {
       this._markCommandAck(unit, 'attack');
     }
     return true;
+  }
+
+  harvestSelectedResource(resourceId) {
+    return this.harvestUnitsResource(this.selectedUnitIds(), resourceId);
+  }
+
+  harvestUnitsResource(unitIds, resourceId, team = 1) {
+    const harvesters = this.ownedUnitsFromIds(unitIds, team).filter((unit) => unit.type === 'harvester');
+    if (harvesters.length === 0) return false;
+    const issued = this.harvesting.issue(harvesters, resourceId);
+    if (issued) for (const harvester of harvesters) this._markCommandAck(harvester, 'harvest');
+    return issued;
   }
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -288,6 +315,14 @@ export class UnitManager {
     return counts;
   }
 
+  resourceAmount(team, kind) {
+    return this.harvesting.resourceAmount(team, kind);
+  }
+
+  resourceStockpile(team) {
+    return this.harvesting.resourceStockpile(team);
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   findConnectedDestructibleTiles(tileX, tileY) {
@@ -304,6 +339,10 @@ export class UnitManager {
       queue.push({ x: cur.x + 1, y: cur.y }, { x: cur.x - 1, y: cur.y }, { x: cur.x, y: cur.y + 1 }, { x: cur.x, y: cur.y - 1 });
     }
     return out.length > 0 ? out : [{ x: tileX, y: tileY }];
+  }
+
+  clearHarvestOrders(units) {
+    for (const unit of units) this.harvesting.clear(unit);
   }
 
   _markCommandAck(unit, kind) {

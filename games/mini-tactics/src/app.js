@@ -13,6 +13,7 @@ import { GameController } from "./game/GameController.js";
 import { ScreenManager } from "./ui/screens/screenManager.js";
 import { createTitleScreen } from "./ui/screens/titleScreen.js";
 import { createMainMenuScreen } from "./ui/screens/mainMenuScreen.js";
+import { createSinglePlayerSetupScreen } from "./ui/screens/singlePlayerSetupScreen.js";
 import { createHotSeatSetupScreen } from "./ui/screens/hotSeatSetupScreen.js";
 import { createMatchScreen } from "./ui/screens/matchScreen.js";
 import { createResultsScreen } from "./ui/screens/resultsScreen.js";
@@ -43,6 +44,7 @@ export function createApp(documentRef = document) {
   manager
     .register("title", createTitleScreen(ctx))
     .register("mainMenu", createMainMenuScreen(ctx))
+    .register("spSetup", createSinglePlayerSetupScreen(ctx))
     .register("hsSetup", createHotSeatSetupScreen(ctx))
     .register("match", createMatchScreen({ ...ctx, controller }))
     .register("results", createResultsScreen(ctx));

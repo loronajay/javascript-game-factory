@@ -14,6 +14,12 @@ const REASON_LABELS = {
   timeout: "Timeout",
 };
 
+const DIFFICULTY_LABELS = {
+  easy: "Easy",
+  normal: "Normal",
+  hard: "Hard",
+};
+
 // Results screen: populated on entry from the controller's match summary. Rematch
 // re-enters the match screen with the same mode and board size.
 export function createResultsScreen(ctx) {
@@ -33,6 +39,8 @@ export function createResultsScreen(ctx) {
         playerCount: lastSummary.playerCount,
         format: lastSummary.format,
         teamColors: lastSummary.teamColors,
+        teamNames: lastSummary.teamNames,
+        difficulty: lastSummary.difficulty,
       });
     }
   });
@@ -49,6 +57,9 @@ export function createResultsScreen(ctx) {
 
     statsEl.innerHTML = "";
     addStat(statsEl, "Mode", MODE_LABELS[summary.mode] ?? summary.mode);
+    if (summary.mode === "single") {
+      addStat(statsEl, "CPU", DIFFICULTY_LABELS[summary.difficulty] ?? summary.difficulty);
+    }
     addStat(
       statsEl,
       "Players",

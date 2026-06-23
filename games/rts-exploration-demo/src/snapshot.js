@@ -6,7 +6,16 @@ export function createDebugSnapshot({ tick, units, map, commands, ai, entities =
       height: map.height,
       tileSize: map.tileSize,
       destructibleCount: map.destructibles?.size ?? 0,
-      resourceNodes: map.resourceNodes?.map((node) => ({ id: node.id, kind: node.kind, discovered: !!node.discovered, tileX: node.tileX, tileY: node.tileY })) ?? [],
+      resourceNodes: map.resourceNodes?.map((node) => ({
+        id: node.id,
+        kind: node.kind,
+        amount: node.amount,
+        dropped: !!node.dropped,
+        sourceKind: node.sourceKind ?? null,
+        discovered: !!node.discovered,
+        tileX: node.tileX,
+        tileY: node.tileY,
+      })) ?? [],
     },
     units: units.units.map((unit) => ({
       id: unit.id,
@@ -37,6 +46,8 @@ export function createDebugSnapshot({ tick, units, map, commands, ai, entities =
       lanePriority: unit.debug?.lanePriority ?? 0,
       chokeReservation: unit.debug?.chokeReservation ? { ...unit.debug.chokeReservation } : null,
       routeId: unit.routeId ?? null,
+      cargo: unit.cargo ? { ...unit.cargo } : null,
+      harvestState: unit.harvestState ? { ...unit.harvestState } : null,
     })),
     entities: (entities?.entities ?? []).map((entity) => ({
       id: entity.id,
@@ -49,6 +60,10 @@ export function createDebugSnapshot({ tick, units, map, commands, ai, entities =
       discovered: !!entity.discovered,
     })),
     selectedIds: [...units.selectedIds],
+    resources: {
+      team1: units.resourceStockpile?.(1) ?? {},
+      team2: units.resourceStockpile?.(2) ?? {},
+    },
     routeReservations: units.reservations?.routeReservationSnapshot?.().map((r) => ({ ...r, expiresAt: round(r.expiresAt) })) ?? [],
     chokeCells: units.chokeMap?.debugCells?.(120) ?? [],
     ai: ai?.snapshot?.() ?? null,

@@ -1,9 +1,11 @@
 import { CONFIG } from '../config.js';
-import { clampMagnitude } from '../utils.js';
 import { UNIT_STATES } from './unit-states.js';
 
 // Pushes overlapping units apart each tick.
-// Priority rules prevent moving units from being bumped by idle ones.
+// Several short positional passes make a compact group slide apart promptly
+// without turning unit movement into hard collision/deadlock behaviour.
+const SEPARATION_PASSES = 3;
+
 export class SeparationSystem {
   constructor(ctx) {
     this.ctx = ctx; // { getUnits, map, getDef, getSimTime }
@@ -11,13 +13,12 @@ export class SeparationSystem {
 
   update(dt) {
     const units = this.ctx.getUnits();
-    for (let i = 0; i < units.length; i++) {
-      const a = units[i];
-      if (a.combatState.windupRemaining > 0 || this._isHoldingSlot(a)) continue;
-      let pushX = 0;
-      let pushY = 0;
-      for (let j = 0; j < units.length; j++) {
-        if (i === j) continue;
+    const maxCorrection = CONFIG.separationStrength * dt;
+    for (let pass = 0; pass < SEPARATION_PASSES; pass++) {
+      for (let i = 0; i < units.length; i++) {
+        const a = units[i];
+        if (a.combatState.windupRemaining > 0 || this._isHoldingSlot(a)) continue;
+        for (let j = i + 1; j < units.length; j++) {
         const b = units[j];
         if (b.combatState.windupRemaining > 0 || this._isHoldingSlot(b)) continue;
         if (a.attackSlot?.targetKey && a.attackSlot.targetKey === b.attackSlot?.targetKey) continue;
@@ -25,26 +26,29 @@ export class SeparationSystem {
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const d2 = dx * dx + dy * dy;
-        if (d2 === 0 || d2 > minDist * minDist) continue;
+        if (d2 >= minDist * minDist) continue;
 
         const aPriority = this._movementPriority(a);
         const bPriority = this._movementPriority(b);
-        if (aPriority > bPriority + 1) continue;
-
         const d = Math.sqrt(d2);
-        const baseForce = (minDist - d) / minDist;
-        const yieldBoost = bPriority > aPriority ? 1.35 : 0.65;
-        pushX += (dx / d) * baseForce * yieldBoost;
-        pushY += (dy / d) * baseForce * yieldBoost;
-      }
-      const push = clampMagnitude(pushX, pushY, 1);
-      const nx = a.x + push.x * CONFIG.separationStrength * dt;
-      const ny = a.y + push.y * CONFIG.separationStrength * dt;
-      if (this.ctx.map.isCircleWalkable(nx, ny, a.radius + 1)) {
-        a.x = nx;
-        a.y = ny;
+        const direction = d > 0.001 ? { x: dx / d, y: dy / d } : this._overlapDirection(a, b);
+        const correction = Math.min(minDist - d, maxCorrection);
+        const aShare = aPriority < bPriority ? 0.8 : aPriority > bPriority ? 0.2 : 0.5;
+        const bShare = 1 - aShare;
+
+        this._moveIfWalkable(a, direction.x * correction * aShare, direction.y * correction * aShare);
+        this._moveIfWalkable(b, -direction.x * correction * bShare, -direction.y * correction * bShare);
+        }
       }
     }
+  }
+
+  _moveIfWalkable(unit, dx, dy) {
+    const x = unit.x + dx;
+    const y = unit.y + dy;
+    if (!this.ctx.map.isCircleWalkable(x, y, unit.radius + 1)) return;
+    unit.x = x;
+    unit.y = y;
   }
 
   _isHoldingSlot(unit) {
@@ -71,5 +75,15 @@ export class SeparationSystem {
       }
     }
     return priority;
+  }
+
+  _overlapDirection(a, b) {
+    // A stable ID-derived axis gives perfectly coincident units a direction to
+    // separate without introducing random, frame-dependent jitter.
+    const lowId = Math.min(a.id, b.id);
+    const highId = Math.max(a.id, b.id);
+    const angle = ((lowId * 73856093 + highId * 19349663) % 360) * (Math.PI / 180);
+    const sign = a.id === lowId ? 1 : -1;
+    return { x: Math.cos(angle) * sign, y: Math.sin(angle) * sign };
   }
 }

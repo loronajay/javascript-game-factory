@@ -61,6 +61,11 @@ export class CommandSystem {
         const center = this.map.tileCenter(command.tile.x, command.tile.y);
         return { ok, command, marker: ok ? { kind: 'attack', x: center.x, y: center.y } : null };
       }
+      case 'HARVEST_RESOURCE': {
+        const node = this.map.getResourceNode(command.resourceId);
+        const ok = this.units.harvestUnitsResource(command.unitIds, command.resourceId, command.team);
+        return { ok, command, marker: ok && node ? { kind: 'harvest', x: node.x, y: node.y } : null };
+      }
       case 'ATTACK_MOVE_UNITS': {
         const ok = this.units.attackMoveUnitsTo(command.unitIds, command.target.x, command.target.y, command.team);
         return { ok, command, marker: ok ? { kind: 'attackMove', x: command.target.x, y: command.target.y } : null };
@@ -101,6 +106,10 @@ export function createAttackEntityCommand(unitIds, targetId) {
 
 export function createAttackDestructibleCommand(unitIds, x, y) {
   return { type: 'ATTACK_DESTRUCTIBLE', unitIds, tile: { x, y } };
+}
+
+export function createHarvestResourceCommand(unitIds, resourceId) {
+  return { type: 'HARVEST_RESOURCE', unitIds, resourceId };
 }
 
 export function createAttackMoveCommand(unitIds, x, y) {

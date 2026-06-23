@@ -36,6 +36,7 @@ import {
 import { applyCommand } from "../core/reducer.js";
 import { EVENTS } from "../core/events.js";
 import * as cmd from "../core/commands.js";
+import { chooseActivation, cpuRng } from "../ai/cpuController.js";
 import { winnerLabel, teamColor } from "../render/labels.js";
 import { BoardRenderer } from "../render/boardRenderer.js";
 import { UnitRenderer } from "../render/unitRenderer.js";
@@ -62,7 +63,13 @@ export class GameController {
       playerCount: 2,
       format: "ffa",
       teamColors: null,
+      teamNames: null,
+      difficulty: "normal",
     };
+
+    // CPU control for single-player. Null in hot-seat/online; in single-player it
+    // names the difficulty and which seats the computer drives (P2 in v1).
+    this.cpu = null;
 
     this.match = createMatchState({ size: DEFAULT_BOARD_SIZE, seed: newSeed() });
     this.ui = createUiState();
@@ -105,12 +112,21 @@ export class GameController {
     playerCount = 2,
     format = "ffa",
     teamColors = null,
+    teamNames = null,
+    difficulty = "normal",
   } = {}) {
     this.mode = mode;
-    this.matchConfig = { size, playerCount, format, teamColors };
+    this.matchConfig = { size, playerCount, format, teamColors, teamNames, difficulty };
+    // Single-player drives Player 2 with the CPU; every other mode is human-only.
+    this.cpu = mode === "single" ? { difficulty, players: new Set([2]) } : null;
     this.startedAt = Date.now();
     this.applyRestartVisibility();
     this.reset();
+  }
+
+  // True when the given seat is computer-controlled this match.
+  isCpu(player) {
+    return Boolean(this.cpu?.players.has(player));
   }
 
   // Restart the current match: same mode and roster, fresh seed.
@@ -126,7 +142,7 @@ export class GameController {
   }
 
   reset() {
-    const { size, playerCount, format, teamColors } = this.matchConfig;
+    const { size, playerCount, format, teamColors, teamNames } = this.matchConfig;
     const boardSize = Number(size);
 
     if (!BOARD_SIZES.includes(boardSize)) {
@@ -140,6 +156,7 @@ export class GameController {
       playerCount,
       format,
       teamColors,
+      teamNames,
     });
     this.ui = createUiState();
     this.metrics = createBoardMetrics(this.match.size);
@@ -588,6 +605,181 @@ export class GameController {
     if (turnChanged) {
       this.messages.show(`Player ${turnChanged.player} squad turn.`);
     }
+
+    // In single-player, when the human hands the turn to the computer, let it
+    // take its whole squad turn before input returns.
+    if (
+      turnChanged &&
+      this.match.phase === "playing" &&
+      this.isCpu(this.match.currentPlayer)
+    ) {
+      void this.runCpuTurn();
+    }
+  }
+
+  // Drive the CPU's full squad turn: ask the AI for one activation at a time and
+  // animate each through the same reducer + renderers a human's moves use. Input
+  // is locked for the duration; control returns to the human when the turn passes
+  // back or the match ends.
+  async runCpuTurn() {
+    this.ui.locked = true;
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.renderDynamic();
+    this.messages.show(`Player ${this.match.currentPlayer} (CPU) is planning…`);
+    await sleep(CPU_TURN_LEAD_MS);
+
+    // The guard is a belt-and-braces stop against a planning bug; the AI always
+    // returns at least a defend plan, so a living squad cannot truly stall.
+    let guard = 0;
+    while (
+      this.match.phase === "playing" &&
+      this.isCpu(this.match.currentPlayer) &&
+      guard < CPU_MAX_ACTIVATIONS
+    ) {
+      guard += 1;
+      const commands = chooseActivation(this.match, {
+        difficulty: this.cpu.difficulty,
+        cpuPlayer: this.match.currentPlayer,
+        rng: cpuRng(this.match),
+      });
+      if (!commands || commands.length === 0) break;
+
+      for (const command of commands) {
+        const applied = await this.applyCpuCommand(command);
+        if (!applied || this.match.phase === "complete") break;
+      }
+
+      if (this.match.phase === "complete") break;
+      await sleep(CPU_ACTIVATION_GAP_MS);
+    }
+
+    this.ui.locked = false;
+
+    if (this.match.phase === "complete") {
+      this.handleMatchComplete();
+      return;
+    }
+
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.renderDynamic();
+    this.messages.show("Your squad turn. Select an unspent piece.");
+  }
+
+  // Apply one CPU command authoritatively and animate the events it produced.
+  // Returns false (stopping the driver) if the reducer rejects it — that would be
+  // an AI bug, never a normal player action, so it fails safe instead of looping.
+  async applyCpuCommand(command) {
+    const result = applyCommand(this.match, command);
+    if (!result.accepted) {
+      console.warn("CPU command rejected:", command.type, result.errorCode);
+      return false;
+    }
+
+    this.match = result.nextState;
+    await this.animateCpuEvents(result.events);
+    return true;
+  }
+
+  async animateCpuEvents(events) {
+    for (const event of events) {
+      switch (event.type) {
+        case EVENTS.ACTIVATION_BEGAN: {
+          this.ui.selectedId = event.unitId;
+          this.renderDynamic();
+          const unit = findUnit(this.match, event.unitId);
+          if (unit) {
+            this.messages.show(
+              `Player ${unit.player} (CPU) activates its ${UNIT_TYPES[unit.type].name}.`,
+            );
+          }
+          await sleep(CPU_STEP_MS);
+          break;
+        }
+        case EVENTS.UNIT_MOVED: {
+          const unit = findUnit(this.match, event.unitId);
+          this.unitRenderer.render(this.view());
+          if (unit) {
+            await this.effectsRenderer.animateMovement(unit, event.from, event.to);
+          }
+          break;
+        }
+        case EVENTS.ATTACK_RESOLVED:
+          await this.animateAttackEvent(event);
+          break;
+        case EVENTS.HEAL_RESOLVED:
+          await this.animateHealEvent(event);
+          break;
+        case EVENTS.UNIT_DEFENDED: {
+          const unit = findUnit(this.match, event.unitId);
+          this.renderDynamic();
+          if (unit) {
+            this.messages.show(`${UNIT_TYPES[unit.type].name} braces to defend.`);
+          }
+          await sleep(CPU_STEP_MS);
+          break;
+        }
+        case EVENTS.UNIT_ELIMINATED: {
+          // The dead unit still exists in state (HP 0) until the next render, so
+          // its element is present for the death animation. Re-rendering happens
+          // after the loop, which clears it.
+          const unit = findUnit(this.match, event.unitId);
+          if (unit) {
+            await this.effectsRenderer.animateDeath(unit);
+            this.messages.show(`${UNIT_TYPES[unit.type].name} was eliminated.`);
+          }
+          break;
+        }
+        // ACTIVATION_FINISHED / TURN_CHANGED / MATCH_COMPLETE need no animation.
+        default:
+          break;
+      }
+    }
+
+    this.renderDynamic();
+  }
+
+  async animateAttackEvent(event) {
+    const attacker = findUnit(this.match, event.actorId);
+    const target = findUnit(this.match, event.targetId);
+    if (!attacker || !target) return;
+
+    await this.effectsRenderer.animateAttack(attacker, target);
+    await this.effectsRenderer.rollDie(event.roll);
+
+    if (!event.hit) {
+      await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
+      this.messages.show(`${UNIT_TYPES[attacker.type].name} missed.`);
+      return;
+    }
+
+    await this.effectsRenderer.animateHit(target, event.damage, event.critical);
+    const criticalText = event.critical ? " Critical hit." : "";
+    this.messages.show(
+      `${UNIT_TYPES[attacker.type].name} dealt ${event.damage} damage.${criticalText}`,
+    );
+  }
+
+  async animateHealEvent(event) {
+    const medic = findUnit(this.match, event.actorId);
+    const target = findUnit(this.match, event.targetId);
+    if (!medic || !target) return;
+
+    await this.effectsRenderer.animateHealBeam(medic, target);
+    await this.effectsRenderer.rollDie(event.roll);
+
+    if (!event.hit) {
+      await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
+      this.messages.show("The heal failed.");
+      return;
+    }
+
+    await this.effectsRenderer.animateHeal(target, event.healing, event.critical);
+    this.messages.show(
+      `${UNIT_TYPES[target.type].name} recovered ${event.healing} HP` +
+        `${event.critical ? " on a critical heal" : ""}.`,
+    );
   }
 
   // After a move or primary action resolves, either auto-finish a completed
@@ -624,11 +816,25 @@ export class GameController {
       size: this.match.size,
       playerCount: this.match.players?.length ?? 2,
       teamColors: this.matchConfig.teamColors,
+      teamNames: this.matchConfig.teamNames,
       turns: this.match.turnNumber,
       victoryReason: this.match.victoryReason ?? "elimination",
       durationMs: this.startedAt ? Date.now() - this.startedAt : 0,
+      difficulty: this.cpu?.difficulty ?? this.matchConfig.difficulty,
     };
   }
+}
+
+// Pacing for the CPU's turn so it reads as a deliberate opponent rather than an
+// instant state jump. Tuned for watchability, never for correctness — the rules
+// never depend on these.
+const CPU_TURN_LEAD_MS = 480; //   pause before the CPU's first move
+const CPU_ACTIVATION_GAP_MS = 360; // between one unit finishing and the next
+const CPU_STEP_MS = 220; //        small beat on selection / brace
+const CPU_MAX_ACTIVATIONS = 64; //  guard against a runaway planning loop
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function createUiState() {

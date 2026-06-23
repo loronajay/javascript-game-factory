@@ -20,3 +20,22 @@ export function bindCommonControls(root, { nav, openRules }) {
     btn.addEventListener("click", () => openRules());
   });
 }
+
+// Wire a segmented (radio-style) control: clicking a `.seg` inside
+// `[data-field="<field>"]` marks it selected and reports the chosen button. Skips
+// disabled segments. Shared by the setup screens.
+export function bindSegmented(root, field, onPick) {
+  root.querySelectorAll(`[data-field="${field}"] .seg`).forEach((seg) => {
+    seg.addEventListener("click", () => {
+      if (seg.disabled) return;
+      selectSeg(root, field, (candidate) => candidate === seg);
+      onPick(seg);
+    });
+  });
+}
+
+export function selectSeg(root, field, isChosen) {
+  root.querySelectorAll(`[data-field="${field}"] .seg`).forEach((seg) => {
+    seg.classList.toggle("is-selected", isChosen(seg));
+  });
+}

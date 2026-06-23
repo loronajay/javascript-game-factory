@@ -38,6 +38,8 @@ export class UnitFactory {
       moveTarget: null,
       attackTarget: null,
       attackMoveTarget: null,
+      cargo: null,
+      harvestState: null,
       attackSlot: null,
       mobileEngagementSlot: null,
       commandAckUntil: -Infinity,
@@ -104,18 +106,22 @@ export class UnitFactory {
     const base = this.ctx.map.tileCenter(tileX, tileY);
     // Starting squads exit beside their Nexus instead of spawning inside its
     // collision circle. The offset is intentionally shared by both teams.
-    const exitOffset = 78;
-    const scoutSpacing = 30;
+    const exitOffset = 90;
+    const scoutSpacing = 28;
     for (let i = 0; i < CONFIG.startingScoutsPerPlayer; i++) {
-      spawnFn('scout', spawnDef.team, base.x + direction * (exitOffset + i * scoutSpacing), base.y + (i - 1) * 24);
+      spawnFn('scout', spawnDef.team, base.x + direction * exitOffset, base.y + (i - 1) * scoutSpacing);
     }
     const gruntBase = {
-      x: base.x + direction * (exitOffset + 54),
-      y: base.y + direction * 26,
+      x: base.x + direction * (exitOffset + 42),
+      y: base.y,
     };
-    const gruntSpacing = 30;
+    const gruntSpacing = 25;
     for (let i = 0; i < CONFIG.startingGruntsPerPlayer; i++) {
-      spawnFn('grunt', spawnDef.team, gruntBase.x + direction * i * gruntSpacing, gruntBase.y + (i % 2) * 22);
+      spawnFn('grunt', spawnDef.team, gruntBase.x, gruntBase.y + (i - 1) * gruntSpacing);
+    }
+    const harvesterOffsetY = 60;
+    for (let i = 0; i < CONFIG.startingHarvestersPerPlayer; i++) {
+      spawnFn('harvester', spawnDef.team, base.x + direction * exitOffset, base.y + harvesterOffsetY + i * 24);
     }
   }
 

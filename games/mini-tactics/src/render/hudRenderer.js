@@ -5,7 +5,7 @@ import {
   livingUnits,
   teamOf
 } from "../state/gameState.js";
-import { winnerLabel, teamColor } from "./labels.js";
+import { winnerLabel, teamColor, teamLabel } from "./labels.js";
 import { hpClass } from "./hp.js";
 
 export class HudRenderer {
@@ -129,7 +129,9 @@ export class HudRenderer {
     }
 
     const teamTag =
-      state.format === "teams" ? ` · Team ${teamOf(state, slot.id)}` : "";
+      state.format === "teams"
+        ? ` · ${teamLabel(state, teamOf(state, slot.id))}`
+        : "";
 
     const title = document.createElement("div");
     title.className = "panel-title";

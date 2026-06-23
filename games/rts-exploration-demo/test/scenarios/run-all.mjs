@@ -2,8 +2,11 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const scenarios = [
+  'hud_contract.mjs',
+  'minimap_layout.mjs',
   'mobile_engagement_slots.mjs',
   'group_move_plan.mjs',
+  'unit_spacing.mjs',
   'choke_map_classification.mjs',
   'level01_reference_layout.mjs',
   'level01_wall_topology.mjs',
@@ -13,6 +16,10 @@ const scenarios = [
   'nexus_collision_and_landmarks.mjs',
   'drifter_patrol_routes.mjs',
   'natural_wall_attack_target.mjs',
+  'natural_wall_weak_steel_drop.mjs',
+  'harvester_weak_steel_delivery.mjs',
+  'harvester_cargo_gate.mjs',
+  'harvester_starting_squad.mjs',
   'choke_move_6_grunts.mjs',
   'reservation_cleanup_on_death.mjs',
 ];

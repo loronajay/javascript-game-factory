@@ -1,4 +1,4 @@
-import { bindCommonControls, screenRoot } from "./common.js";
+import { bindCommonControls, bindSegmented, screenRoot, selectSeg } from "./common.js";
 import { BOARD_SIZES, PLAYER_COLORS } from "../../config.js";
 
 // Hot Seat setup: choose player count (2-4), format (free-for-all or 2v2 teams,
@@ -22,10 +22,13 @@ export function createHotSeatSetupScreen(ctx) {
     format: "ffa",
     size: 10,
     teamColors: { 1: PLAYER_COLORS[1], 2: PLAYER_COLORS[4] },
+    // Optional custom team names; empty falls back to "Team 1"/"Team 2".
+    teamNames: { 1: "", 2: "" },
   };
 
   const groups = {
     format: el.querySelector('[data-group="format"]'),
+    teamNames: el.querySelector('[data-group="teamNames"]'),
     teamColors: el.querySelector('[data-group="teamColors"]'),
   };
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
@@ -53,6 +56,16 @@ export function createHotSeatSetupScreen(ctx) {
   buildSwatches(el, 1, state, renderSwatches);
   buildSwatches(el, 2, state, renderSwatches);
 
+  // Custom team names are optional; the field is only visible/used in 2v2 teams.
+  // Typing a name also relabels that team's color row so the two stay in sync.
+  el.querySelectorAll(".team-name-input").forEach((input) => {
+    input.addEventListener("input", () => {
+      const team = input.dataset.teamName;
+      state.teamNames[team] = input.value;
+      syncTeamColorLabel(team);
+    });
+  });
+
   el.querySelector('[data-action="startHotSeat"]').addEventListener("click", () => {
     ctx.nav("match", {
       mode: "hotseat",
@@ -60,6 +73,7 @@ export function createHotSeatSetupScreen(ctx) {
       playerCount: state.playerCount,
       format: state.format,
       teamColors: state.format === "teams" ? { ...state.teamColors } : null,
+      teamNames: state.format === "teams" ? { ...state.teamNames } : null,
     });
   });
 
@@ -80,9 +94,18 @@ export function createHotSeatSetupScreen(ctx) {
   }
 
   function syncVisibility() {
+    const teams = state.playerCount === 4 && state.format === "teams";
     groups.format.hidden = state.playerCount !== 4;
-    groups.teamColors.hidden = !(state.playerCount === 4 && state.format === "teams");
+    groups.teamNames.hidden = !teams;
+    groups.teamColors.hidden = !teams;
     renderSwatches();
+  }
+
+  // The color row's label echoes the typed team name (or the default placeholder
+  // text) so it is clear which swatch row belongs to which named team.
+  function syncTeamColorLabel(team) {
+    const label = el.querySelector(`[data-team-color-name="${team}"]`);
+    if (label) label.textContent = state.teamNames[team].trim() || `Team ${team}`;
   }
 
   function renderSwatches() {
@@ -103,22 +126,6 @@ export function createHotSeatSetupScreen(ctx) {
   syncVisibility();
 
   return { el };
-}
-
-function bindSegmented(root, field, onPick) {
-  root.querySelectorAll(`[data-field="${field}"] .seg`).forEach((seg) => {
-    seg.addEventListener("click", () => {
-      if (seg.disabled) return;
-      selectSeg(root, field, (candidate) => candidate === seg);
-      onPick(seg);
-    });
-  });
-}
-
-function selectSeg(root, field, isChosen) {
-  root.querySelectorAll(`[data-field="${field}"] .seg`).forEach((seg) => {
-    seg.classList.toggle("is-selected", isChosen(seg));
-  });
 }
 
 function buildSwatches(root, team, state, onChange) {

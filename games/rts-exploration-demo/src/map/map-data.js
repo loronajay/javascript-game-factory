@@ -108,6 +108,7 @@ export class MapData {
     if (wall.hp <= 0) {
       this.destructibles.delete(key);
       this.set(x, y, TILE.FLOOR);
+      if (isNaturalWallKind(wall.kind)) this.addWeakSteelDrop(x, y, wall.kind);
       return true;
     }
     return false;
@@ -115,20 +116,60 @@ export class MapData {
 
   destructibleCount() { return this.destructibles.size; }
 
-  addResourceNode(tileX, tileY, kind = 'biomass') {
+  addResourceNode(tileX, tileY, kind = 'biomass', options = {}) {
     if (!this.inBounds(tileX, tileY) || !this.isWalkableTile(tileX, tileY)) return null;
     const center = this.tileCenter(tileX, tileY);
     const node = {
       id: `res_${this.resourceNodes.length + 1}`,
       kind,
+      amount: options.amount ?? 1,
       tileX,
       tileY,
       x: center.x,
       y: center.y,
       discovered: false,
+      dropped: options.dropped ?? false,
+      sourceKind: options.sourceKind ?? null,
     };
     this.resourceNodes.push(node);
     return node;
+  }
+
+  addWeakSteelDrop(tileX, tileY, sourceKind) {
+    return this.addResourceNode(tileX, tileY, 'weakSteel', {
+      amount: 1,
+      dropped: true,
+      sourceKind,
+    });
+  }
+
+  getResourceNode(id) {
+    return this.resourceNodes.find((node) => node.id === id) ?? null;
+  }
+
+  takeResourceNode(id, amount) {
+    const index = this.resourceNodes.findIndex((node) => node.id === id);
+    if (index < 0 || amount <= 0) return null;
+    const node = this.resourceNodes[index];
+    const taken = Math.min(amount, node.amount ?? 1);
+    node.amount = Math.max(0, (node.amount ?? 1) - taken);
+    if (node.amount === 0) this.resourceNodes.splice(index, 1);
+    return { kind: node.kind, amount: taken };
+  }
+
+  hitTestResourceNode(worldX, worldY, radius = this.tileSize * 0.55) {
+    let best = null;
+    let bestDistanceSq = radius * radius;
+    for (const node of this.resourceNodes) {
+      const dx = node.x - worldX;
+      const dy = node.y - worldY;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq < bestDistanceSq) {
+        best = node;
+        bestDistanceSq = distanceSq;
+      }
+    }
+    return best;
   }
 
   addLandmark(def) {
@@ -206,4 +247,8 @@ export class MapData {
     }
     return null;
   }
+}
+
+function isNaturalWallKind(kind) {
+  return kind === 'naturalWall' || kind === 'transitWall' || kind === 'objectiveWall';
 }

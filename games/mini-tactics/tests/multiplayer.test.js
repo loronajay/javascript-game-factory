@@ -5,6 +5,7 @@ import { createMatchState } from "../src/core/state.js";
 import { createRoster, FORMATS } from "../src/core/roster.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { teamOf, sameTeam } from "../src/state/gameState.js";
+import { teamLabel, winnerLabel } from "../src/render/labels.js";
 import { createRngState, rollD6 } from "../src/core/rng.js";
 import { ERR } from "../src/core/errors.js";
 import { EVENTS } from "../src/core/events.js";
@@ -295,4 +296,46 @@ test("conceding down to one surviving team ends the match", () => {
   assert.equal(result.nextState.phase, "complete");
   assert.equal(result.nextState.winner, 1);
   assert.equal(result.nextState.victoryReason, "concede");
+});
+
+// --- custom team names -------------------------------------------------------
+
+test("custom team names override the default Team N label", () => {
+  const state = createMatchState({
+    size: 13,
+    playerCount: 4,
+    format: "teams",
+    teamNames: { 1: "Crimson Vipers", 2: "Azure Wolves" },
+  });
+  assert.equal(teamLabel(state, 1), "Crimson Vipers");
+  assert.equal(teamLabel(state, 2), "Azure Wolves");
+  assert.equal(winnerLabel(state, 1), "Crimson Vipers");
+});
+
+test("blank / whitespace team names fall back to the default label", () => {
+  const state = createMatchState({
+    size: 13,
+    playerCount: 4,
+    format: "teams",
+    teamNames: { 1: "  ", 2: "" },
+  });
+  assert.equal(state.teamNames, null); // nothing usable was supplied
+  assert.equal(teamLabel(state, 1), "Team 1");
+  assert.equal(teamLabel(state, 2), "Team 2");
+});
+
+test("custom names are trimmed and length-capped", () => {
+  const state = createMatchState({
+    size: 13,
+    playerCount: 4,
+    format: "teams",
+    teamNames: { 1: "  Spaced Out  ", 2: "x".repeat(40) },
+  });
+  assert.equal(state.teamNames[1], "Spaced Out");
+  assert.equal(state.teamNames[2].length, 20);
+});
+
+test("free-for-all without names still reads as Player N", () => {
+  const state = createMatchState({ size: 13, playerCount: 3, format: "ffa" });
+  assert.equal(teamLabel(state, 2), "Player 2");
 });

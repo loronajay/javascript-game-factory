@@ -223,10 +223,10 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(2, 10, 16, 7, 0, 0, Math.PI * 2);
       ctx.fill();
-      const color = node.kind === 'crystal' ? '#87f7ff' : '#bbff75';
+      const color = resourceColor(node.kind);
       ctx.shadowColor = color;
       ctx.shadowBlur = 10 + pulse * 8;
-      ctx.fillStyle = node.kind === 'crystal' ? '#4bcfe8' : '#7ed957';
+      ctx.fillStyle = node.kind === 'crystal' ? '#4bcfe8' : node.kind === 'weakSteel' ? '#98a7bd' : '#7ed957';
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -236,6 +236,12 @@ export class Renderer {
         ctx.lineTo(5, 14);
         ctx.lineTo(-8, 12);
         ctx.lineTo(-11, -3);
+      } else if (node.kind === 'weakSteel') {
+        ctx.moveTo(0, -13);
+        ctx.lineTo(11, -6);
+        ctx.lineTo(8, 9);
+        ctx.lineTo(-8, 9);
+        ctx.lineTo(-11, -6);
       } else {
         ctx.ellipse(0, 0, 12, 15, 0.35, 0, Math.PI * 2);
       }
@@ -264,6 +270,8 @@ export class Renderer {
         this.drawAlienScout(ctx, unit, p.x, p.y, time);
       } else if (unit.type === 'grunt') {
         this.drawAlienGrunt(ctx, unit, p.x, p.y, time);
+      } else if (unit.type === 'harvester') {
+        this.drawHarvester(ctx, unit, p.x, p.y, time);
       } else if (unit.type === 'drifter') {
         this.drawDrifter(ctx, unit, p.x, p.y, time);
       } else {
@@ -556,6 +564,156 @@ export class Renderer {
     ctx.restore();
   }
 
+  drawHarvester(ctx, unit, sx, sy, time) {
+    const team = teamPalette(unit.team);
+    const loaded = Boolean(unit.cargo);
+    const harvesting = unit.harvestState?.phase === 'gathering';
+    const pulse = 0.5 + Math.sin(time * (harvesting ? 11 : 4) + unit.id) * 0.5;
+    const cargoColor = loaded ? resourceColor(unit.cargo.kind) : '#334055';
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.fillStyle = 'rgba(0,0,0,0.46)';
+    ctx.beginPath();
+    ctx.ellipse(2, 11, 21, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (unit.selected) {
+      ctx.strokeStyle = team.selection;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 23, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.rotate(unit.visualFacing ?? unit.facing);
+
+    // Four squat legs make the harvester read as a load-bearing worker rather
+    // than a recoloured combat blob.
+    ctx.strokeStyle = '#070b12';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    for (const x of [-10, 7]) {
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(x, side * 7);
+        ctx.lineTo(x - 4, side * 14);
+        ctx.lineTo(x + 4, side * 17);
+        ctx.stroke();
+      }
+    }
+
+    // Rear cargo hopper: dark when empty, bright and pulsing when loaded.
+    ctx.fillStyle = '#090f19';
+    ctx.strokeStyle = '#02050a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(-18, -10, 15, 20, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = loaded ? 0.72 + pulse * 0.28 : 0.75;
+    ctx.shadowColor = cargoColor;
+    ctx.shadowBlur = loaded ? 10 + pulse * 8 : 0;
+    ctx.fillStyle = cargoColor;
+    ctx.fillRect(-15, -6, 9, 12);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-15.5, -6.5, 10, 13);
+
+    const body = ctx.createLinearGradient(-10, -13, 19, 13);
+    body.addColorStop(0, '#121c2b');
+    body.addColorStop(0.52, '#31455d');
+    body.addColorStop(1, '#0b111b');
+    ctx.fillStyle = body;
+    ctx.strokeStyle = '#040811';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(19, 0);
+    ctx.lineTo(10, -13);
+    ctx.lineTo(-6, -12);
+    ctx.lineTo(-12, 0);
+    ctx.lineTo(-6, 12);
+    ctx.lineTo(10, 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // A glowing collector eye and paired grabber arms establish its job at a glance.
+    ctx.shadowColor = team.glow;
+    ctx.shadowBlur = 9 + pulse * 4;
+    ctx.fillStyle = team.eye;
+    ctx.beginPath();
+    ctx.ellipse(11, 0, 5, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#07101a';
+    ctx.lineWidth = 3;
+    for (const side of [-1, 1]) {
+      const reach = harvesting ? 5 + pulse * 3 : 0;
+      ctx.beginPath();
+      ctx.moveTo(12, side * 6);
+      ctx.lineTo(21 + reach, side * 11);
+      ctx.lineTo(25 + reach, side * 6);
+      ctx.stroke();
+      ctx.strokeStyle = team.core;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(19 + reach, side * 10);
+      ctx.lineTo(25 + reach, side * 6);
+      ctx.stroke();
+      ctx.strokeStyle = '#07101a';
+      ctx.lineWidth = 3;
+    }
+
+    ctx.fillStyle = 'rgba(210, 240, 255, 0.34)';
+    ctx.fillRect(-3, -7, 6, 2);
+    ctx.fillRect(-3, 5, 6, 2);
+    ctx.restore();
+
+    if (loaded) this.drawCarriedResource(ctx, unit, sx, sy, pulse);
+  }
+
+  drawCarriedResource(ctx, unit, sx, sy, pulse) {
+    const color = resourceColor(unit.cargo.kind);
+    ctx.save();
+    ctx.translate(sx, sy - 27);
+    ctx.fillStyle = 'rgba(1, 4, 9, 0.72)';
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10 + pulse * 8;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#06101d';
+    ctx.lineWidth = 1.5;
+    if (unit.cargo.kind === 'weakSteel') {
+      // A stack of ingots deliberately sits above the worker, instead of being
+      // absorbed into the chassis, so a loaded Harvester reads at a glance.
+      for (const [x, y, width] of [[-8, 1, 16], [-6, -3, 12], [-4, -7, 8]]) {
+        ctx.fillRect(x, y, width, 4);
+        ctx.strokeRect(x + 0.5, y + 0.5, width - 1, 3);
+      }
+    } else if (unit.cargo.kind === 'crystal' || unit.cargo.kind === 'organicCrystal') {
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(8, -2);
+      ctx.lineTo(4, 8);
+      ctx.lineTo(-6, 7);
+      ctx.lineTo(-8, -2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, -1, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   drawFallbackUnit(ctx, unit, sx, sy) {
     const team = teamPalette(unit.team);
     ctx.save();
@@ -602,7 +760,7 @@ export class Renderer {
       if (!this.shouldRenderUnitOverlay(unit)) continue;
       if (!shouldShowHealthBar(unit, time)) continue;
       const p = this.camera.worldToScreen(unit.x, unit.y);
-      const yOffset = unit.type === 'drifter' ? 35 : unit.type === 'grunt' ? 33 : 31;
+      const yOffset = unit.type === 'drifter' ? 35 : unit.type === 'harvester' && unit.cargo ? 52 : unit.type === 'grunt' || unit.type === 'harvester' ? 33 : 31;
       this.drawHealthBar(ctx, unit, p.x, p.y - yOffset);
     }
   }
@@ -877,10 +1035,7 @@ export class Renderer {
   }
 
   drawMinimap(ctx) {
-    const size = CONFIG.minimapSize;
-    const pad = 14;
-    const x0 = this.camera.viewportWidth - size - pad;
-    const y0 = pad;
+    const { size, x0, y0 } = getMinimapLayout(this.camera.viewportWidth, this.camera.viewportHeight);
     const sx = size / this.map.width;
     const sy = size / this.map.height;
 
@@ -913,7 +1068,7 @@ export class Renderer {
       const py = y0 + (node.y / this.map.worldHeight) * size;
       ctx.save();
       ctx.globalAlpha = visible ? 1 : 0.52;
-      ctx.fillStyle = node.kind === 'crystal' ? '#87f7ff' : '#bbff75';
+      ctx.fillStyle = resourceColor(node.kind);
       ctx.beginPath();
       ctx.arc(px, py, 2.5, 0, Math.PI * 2);
       ctx.fill();
@@ -959,10 +1114,37 @@ export class Renderer {
   }
 }
 
+// The DOM HUD occupies the left side of small screens. Keep the minimap in a
+// predictable top-right corner, but shrink it before it crowds that space.
+export function getMinimapLayout(viewportWidth, viewportHeight) {
+  const pad = 14;
+  const mobile = viewportWidth <= 520;
+  const widthLimit = mobile ? Math.floor(viewportWidth * 0.35) : CONFIG.minimapSize;
+  // Mobile selection UI occupies the lower 193px (105px panel + 88px command
+  // clearance). Reserve an 8px gutter before it so the two interfaces never
+  // collide, even on a very short viewport.
+  const heightLimit = mobile
+    ? Math.max(0, viewportHeight - 215)
+    : Math.max(0, viewportHeight - pad * 2 - 16);
+  const size = Math.max(0, Math.min(CONFIG.minimapSize, widthLimit, heightLimit));
+  return {
+    size,
+    pad,
+    x0: viewportWidth - size - pad,
+    y0: pad,
+  };
+}
+
 export function shouldRenderMapLandmark(landmark) {
   // These are now live world actors. Their authored landmarks remain map data
   // for spawning and future systems, but rendering them again is duplicate UI.
   return landmark.kind !== 'nexus' && landmark.kind !== 'drifter';
+}
+
+function resourceColor(kind) {
+  if (kind === 'crystal') return '#87f7ff';
+  if (kind === 'weakSteel') return '#c2cedd';
+  return '#bbff75';
 }
 
 function drawMapLandmark(ctx, landmark, x, y) {

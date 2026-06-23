@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { normalizeRect } from './utils.js';
-import { createAttackDestructibleCommand, createAttackEntityCommand, createAttackMoveCommand, createAttackUnitCommand, createMoveCommand, createStopCommand } from './commands.js';
+import { createAttackDestructibleCommand, createAttackEntityCommand, createAttackMoveCommand, createAttackUnitCommand, createHarvestResourceCommand, createMoveCommand, createStopCommand } from './commands.js';
 
 export class InputController {
   constructor(canvas, camera, units, map, commands, ai = null, entities = null) {
@@ -20,6 +20,7 @@ export class InputController {
     this.showFogDebug = false;
     this.showPathDebug = false;
     this.showMovementDebug = false;
+    this.showDebugHud = false;
     this.commandState = 'idle';
     this.pendingCommandMode = null;
     this.suppressNextPointerUp = false;
@@ -38,6 +39,10 @@ export class InputController {
       if (event.key.toLowerCase() === 'f') this.showFogDebug = !this.showFogDebug;
       if (event.key.toLowerCase() === 'p') this.showPathDebug = !this.showPathDebug;
       if (event.key.toLowerCase() === 'o') this.showMovementDebug = !this.showMovementDebug;
+      if (event.key === 'F3') {
+        event.preventDefault();
+        this.showDebugHud = !this.showDebugHud;
+      }
       if (!event.repeat && event.key.toLowerCase() === 'q') {
         this.pendingCommandMode = this.pendingCommandMode === 'attackMove' ? null : 'attackMove';
         this.commandState = this.pendingCommandMode ? 'attack-move armed' : 'idle';
@@ -108,6 +113,13 @@ export class InputController {
 
     if (event.button === 2) {
       const selectedIds = this.units.selectedUnitIds();
+      const resourceNode = this.map.hitTestResourceNode(this.pointer.worldX, this.pointer.worldY);
+      if (resourceNode) {
+        const result = this.commands.issueLocal(createHarvestResourceCommand(selectedIds, resourceNode.id));
+        if (result.ok && result.marker) this.lastMoveCommand = { ...result.marker, ttl: 0.65 };
+        this.commandState = result.ok ? `harvest ${resourceNode.kind}` : 'no harvester selected';
+        return;
+      }
       const attackableEntity = this.entities?.hitTestAttackable(this.pointer.worldX, this.pointer.worldY, 1);
       if (attackableEntity) {
         const result = this.commands.issueLocal(createAttackEntityCommand(selectedIds, attackableEntity.id));
