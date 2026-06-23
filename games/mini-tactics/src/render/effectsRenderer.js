@@ -1,12 +1,16 @@
 import { gridToScreen } from "../geometry/isometric.js";
 import { createSvgElement } from "./svg.js";
+import { prefersReducedMotion } from "./motion.js";
 
 export class EffectsRenderer {
-  constructor({ unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio }) {
+  constructor({ unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio, svg }) {
     this.unitsLayer = unitsLayer;
     this.effectsLayer = effectsLayer;
     this.diceOverlay = diceOverlay;
     this.dieFace = dieFace;
+    // The board SVG is the camera surface for screen-shake. Optional so the
+    // renderer still constructs in isolation / headless smoke.
+    this.svg = svg ?? null;
     this.metrics = metrics;
     // Sounds that ARE the animation (dice rattle, footstep, projectile whoosh).
     // Outcome sounds (hit/miss/crit/heal) stay with the controller, which reads
@@ -16,6 +20,69 @@ export class EffectsRenderer {
 
   setMetrics(metrics) {
     this.metrics = metrics;
+  }
+
+  // Camera punch. Jolts the board SVG a few pixels and settles, scaled by
+  // `magnitude` (≈ pixels of throw). Fire-and-forget: the caller does not await
+  // it, so the hit's float text rises while the board is still shivering. Skipped
+  // entirely under reduced-motion (no transform left behind).
+  shake(magnitude = 6) {
+    if (!this.svg || prefersReducedMotion()) {
+      return;
+    }
+
+    const throwTo = (m) => {
+      const angle = Math.random() * Math.PI * 2;
+      return `translate(${Math.cos(angle) * m}px, ${Math.sin(angle) * m}px)`;
+    };
+
+    this.svg.animate(
+      [
+        { transform: "translate(0, 0)" },
+        { transform: throwTo(magnitude) },
+        { transform: throwTo(magnitude * 0.6) },
+        { transform: throwTo(magnitude * 0.3) },
+        { transform: "translate(0, 0)" },
+      ],
+      { duration: 260, easing: "ease-out" },
+    );
+  }
+
+  // Whole-board white bloom for a critical hit — the highlight-reel flash. A
+  // viewBox-filling rect in the fx layer pops bright and clears fast.
+  critFlash() {
+    if (prefersReducedMotion() || !this.svg) {
+      return;
+    }
+
+    const box = this.svg.viewBox.baseVal;
+    const flash = createSvgElement("rect", {
+      class: "fx-critflash",
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+      fill: "#fff6e0",
+    });
+
+    this.effectsLayer.appendChild(flash);
+    flash
+      .animate(
+        [{ opacity: 0.55 }, { opacity: 0 }],
+        { duration: 220, easing: "ease-out" },
+      )
+      .finished.catch(() => {})
+      .then(() => flash.remove());
+  }
+
+  // A brief held beat at the moment of impact so a hit lands with weight instead
+  // of flowing straight into the next animation. Honors reduced-motion by not
+  // stalling. Presentation only — never gates rules.
+  async holdFrame(ms) {
+    if (prefersReducedMotion()) {
+      return;
+    }
+    await sleep(ms);
   }
 
   async rollDie(rollResult) {
@@ -176,6 +243,17 @@ export class EffectsRenderer {
   async animateHit(target, damage, critical) {
     const point = gridToScreen(this.metrics, target.x, target.y);
 
+    // Camera reacts to the blow: a crit throws the board hard and flashes white;
+    // an ordinary hit gives a small jolt scaled by how much it hurt. A pure 0
+    // (fully defended) barely registers. Fired, not awaited, so the board shivers
+    // under the rest of the impact animation.
+    if (critical) {
+      this.critFlash();
+      this.shake(11);
+    } else {
+      this.shake(Math.min(8, 2.5 + damage * 1.4));
+    }
+
     // Brief impact flash for punch — pops bright and clears fast under the ring.
     const flash = createSvgElement("circle", {
       class: "fx-flash",
@@ -250,6 +328,10 @@ export class EffectsRenderer {
     await Promise.all(animations);
     ring.remove();
 
+    // Hit-stop: a held beat at the moment of contact gives the blow weight. A
+    // crit lingers a touch longer for emphasis.
+    await this.holdFrame(critical ? 110 : 70);
+
     await this.floatText(
       target,
       damage === 0 ? "0" : `-${damage}`,
@@ -297,6 +379,12 @@ export class EffectsRenderer {
 
     const baseY = point.y + this.metrics.tileHeight * 0.45;
 
+    // A deactivated holo-token shatters: a burst of team-colored shards flung
+    // from the unit point. Color is read off the element's own --team so it
+    // stays faithful to the roster hue without the renderer needing match state.
+    this.shatterBurst(point.x, baseY - 8, element.style.getPropertyValue("--team"));
+    this.shake(6);
+
     await element.animate(
       [
         {
@@ -322,6 +410,54 @@ export class EffectsRenderer {
         easing: "cubic-bezier(.3,.7,.3,1)"
       }
     ).finished.catch(() => {});
+  }
+
+  // Fling a handful of small shards outward from (x, y) in the given hue. Pure
+  // decoration over the death dissolve; skipped under reduced-motion. Each shard
+  // removes itself when its flight finishes.
+  shatterBurst(x, y, color) {
+    if (prefersReducedMotion()) {
+      return;
+    }
+
+    const hue = color?.trim() || "#f7f9fc";
+    const count = 11;
+
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const distance = 26 + Math.random() * 30;
+      const size = 2.5 + Math.random() * 3.5;
+      const shard = createSvgElement("rect", {
+        class: "fx-shard",
+        x: x - size / 2,
+        y: y - size / 2,
+        width: size,
+        height: size,
+        rx: 1,
+        fill: hue,
+        filter: "url(#softGlow)",
+      });
+
+      this.effectsLayer.appendChild(shard);
+
+      const driftX = Math.cos(angle) * distance;
+      const driftY = Math.sin(angle) * distance - 10; // bias upward a little
+      shard
+        .animate(
+          [
+            { transform: "translate(0,0) scale(1)", opacity: 1 },
+            {
+              transform:
+                `translate(${driftX}px, ${driftY + 18}px) ` +
+                `rotate(${(Math.random() - 0.5) * 220}deg) scale(.4)`,
+              opacity: 0,
+            },
+          ],
+          { duration: 480 + Math.random() * 220, easing: "cubic-bezier(.2,.7,.3,1)" },
+        )
+        .finished.catch(() => {})
+        .then(() => shard.remove());
+    }
   }
 
   async floatText(unit, text, color) {

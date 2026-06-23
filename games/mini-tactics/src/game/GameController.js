@@ -28,8 +28,9 @@ import {
   getHealRangeTiles,
   getLegalAttackTargets,
   getLegalHealTargets,
+  getThreatTiles,
 } from "../rules/combat.js";
-import { unitAt } from "../state/gameState.js";
+import { colorOf, unitAt } from "../state/gameState.js";
 import {
   createMatchState,
   findUnit,
@@ -43,13 +44,18 @@ import { winnerLabel, teamColor } from "../render/labels.js";
 import { BoardRenderer } from "../render/boardRenderer.js";
 import { UnitRenderer } from "../render/unitRenderer.js";
 import { OverlayRenderer } from "../render/overlayRenderer.js";
+import { ForecastRenderer } from "../render/forecastRenderer.js";
 import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
+import { renderAmbient } from "../render/ambient.js";
 
 export class GameController {
-  constructor({ elements, messages, audio, confirm, onMatchComplete }) {
+  constructor({ elements, messages, audio, confirm, onMatchComplete, turnAnnouncer }) {
     this.elements = elements;
     this.messages = messages;
+    // Presentation-only turn-change sweep. Defaults to a no-op so the controller
+    // stays usable headlessly / in isolation.
+    this.turnAnnouncer = turnAnnouncer ?? { announce() {} };
     // Presentation-only sound service. Defaults to a silent stub so the
     // controller stays usable headlessly / in isolation (and in node smoke runs).
     this.audio = audio ?? { play() {}, setEnabled() {} };
@@ -96,6 +102,10 @@ export class GameController {
     });
 
     this.overlayRenderer = new OverlayRenderer(elements.boardLayer);
+    this.forecastRenderer = new ForecastRenderer({
+      forecastLayer: elements.forecastLayer,
+      metrics: this.metrics,
+    });
     this.hudRenderer = new HudRenderer(elements);
     this.effectsRenderer = new EffectsRenderer({
       unitsLayer: elements.unitsLayer,
@@ -104,6 +114,7 @@ export class GameController {
       dieFace: elements.dieFace,
       metrics: this.metrics,
       audio: this.audio,
+      svg: elements.svg,
     });
   }
 
@@ -175,6 +186,7 @@ export class GameController {
     this.applyViewBox();
 
     this.renderAll();
+    this.announceTurn(this.match.currentPlayer);
     this.messages.show("Player 1 begins. Select any unspent piece.");
   }
 
@@ -187,8 +199,26 @@ export class GameController {
       mode: this.ui.actionMode,
       legalTiles: this.ui.legalTiles,
       rangeTiles: this.ui.rangeTiles,
+      threatTiles: this.threatTilesForView(),
       locked: this.ui.locked,
     };
+  }
+
+  // The danger overlay (tiles enemies can already strike) is shown while a
+  // friendly piece is selected and the player is reading the board — neutral or
+  // choosing a move. It is suppressed during Attack/Heal targeting so the red
+  // attack radius and target highlights are not muddied by red danger marks.
+  threatTilesForView() {
+    if (
+      !this.ui.selectedId ||
+      this.ui.locked ||
+      this.isCpu(this.match.currentPlayer) ||
+      this.ui.actionMode === ACTION_MODES.ATTACK ||
+      this.ui.actionMode === ACTION_MODES.HEAL
+    ) {
+      return EMPTY_THREAT;
+    }
+    return getThreatTiles(this.match, this.match.currentPlayer);
   }
 
   // Submit a command to the authoritative reducer. On accept, swap in the new
@@ -259,11 +289,16 @@ export class GameController {
       glow.setAttribute("rx", String((bounds.maxX - bounds.minX) / 2 + 40));
       glow.setAttribute("ry", String((bounds.maxY - bounds.minY) / 2 + 30));
     }
+
+    // Scatter the ambient mote field across the fresh viewBox so it tracks the
+    // board's real bounds at either size.
+    renderAmbient(this.elements.ambientLayer, view);
   }
 
   updateRendererMetrics() {
     this.boardRenderer.setMetrics(this.metrics);
     this.unitRenderer.setMetrics(this.metrics);
+    this.forecastRenderer.setMetrics(this.metrics);
     this.effectsRenderer.setMetrics(this.metrics);
   }
 
@@ -276,7 +311,11 @@ export class GameController {
     const view = this.view();
     this.unitRenderer.render(view);
     this.overlayRenderer.render(view);
+    this.forecastRenderer.render(view);
     this.hudRenderer.render(view);
+    // Spotlight: dim the static board while a piece is selected so the active
+    // unit and its highlighted tiles read first. Purely a CSS hook.
+    this.elements.svg.classList.toggle("board-focused", Boolean(this.ui.selectedId));
   }
 
   // Keep the UI's selected unit in sync with the authoritative activation.
@@ -395,8 +434,11 @@ export class GameController {
         this.ui.legalTiles = new Set();
     }
 
-    this.overlayRenderer.render(this.view());
-    this.hudRenderer.render(this.view());
+    const view = this.view();
+    this.overlayRenderer.render(view);
+    this.overlayRenderer.playReveal(view);
+    this.forecastRenderer.render(view);
+    this.hudRenderer.render(view);
 
     if (this.ui.legalTiles.size === 0) {
       const emptyLabel = {
@@ -468,6 +510,7 @@ export class GameController {
     this.ui.locked = true;
     this.clearMode();
     this.overlayRenderer.render(this.view());
+    this.forecastRenderer.render(this.view());
     this.hudRenderer.render(this.view());
 
     const attacker = findUnit(this.match, actorId);
@@ -534,6 +577,7 @@ export class GameController {
     this.ui.locked = true;
     this.clearMode();
     this.overlayRenderer.render(this.view());
+    this.forecastRenderer.render(this.view());
     this.hudRenderer.render(this.view());
 
     const medic = findUnit(this.match, actorId);
@@ -628,6 +672,7 @@ export class GameController {
     );
     if (turnChanged) {
       this.messages.show(`Player ${turnChanged.player} squad turn.`);
+      this.announceTurn(turnChanged.player);
     }
 
     // In single-player, when the human hands the turn to the computer, let it
@@ -699,6 +744,7 @@ export class GameController {
     );
     if (turnChanged) {
       this.messages.show(`Player ${turnChanged.player} squad turn.`);
+      this.announceTurn(turnChanged.player);
       if (
         this.match.phase === "playing" &&
         this.isCpu(this.match.currentPlayer)
@@ -758,7 +804,25 @@ export class GameController {
     this.ui.selectedId = null;
     this.clearMode();
     this.renderDynamic();
+    this.announceTurn(this.match.currentPlayer);
     this.messages.show("Your squad turn. Select an unspent piece.");
+  }
+
+  // Fire the turn-change sweep for the seat now on the clock, tinted to its
+  // roster color. Sub-line adapts to who is holding the device.
+  announceTurn(player) {
+    const cpu = this.isCpu(player);
+    const sub = cpu
+      ? "CPU is planning"
+      : this.mode === "hotseat"
+        ? "Pass the device"
+        : "Your move";
+
+    this.turnAnnouncer.announce({
+      title: cpu ? `Player ${player} · CPU` : `Player ${player}`,
+      sub,
+      color: colorOf(this.match, player),
+    });
   }
 
   // Apply one CPU command authoritatively and animate the events it produced.
@@ -950,6 +1014,9 @@ const CPU_MAX_ACTIVATIONS = 64; //  guard against a runaway planning loop
 function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
+
+// Shared empty set for the suppressed danger overlay — never mutated.
+const EMPTY_THREAT = new Set();
 
 function createUiState() {
   return {

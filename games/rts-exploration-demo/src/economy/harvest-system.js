@@ -11,27 +11,33 @@ export class HarvestSystem {
     this.getDef = getDef;
     this.getSimTime = getSimTime;
     this.stockpiles = new Map();
+    this.resourceReservations = new Map();
   }
 
   issue(units, resourceId) {
     const node = this.map.getResourceNode(resourceId);
-    if (!node) return false;
-    let issued = false;
-    for (const unit of units) {
+    if (!node) return [];
+    const assigned = [];
+    const sortedUnits = [...units].sort((a, b) => distanceToNodeSq(a, node) - distanceToNodeSq(b, node));
+    for (const unit of sortedUnits) {
       const harvest = this.harvestDef(unit);
       // A Harvester carries exactly one resource unit. Do not let a new order
       // overwrite that cargo or interrupt its return-to-Nexus trip.
       if (!harvest || unit.cargo) continue;
+      this.clear(unit);
+      const reservedAmount = this.reserveResource(node, unit, harvest.capacity);
+      if (reservedAmount <= 0) continue;
       this.combat.clearAttack(unit);
       unit.harvestState = {
         resourceId: node.id,
+        reservedAmount,
         phase: 'to-resource',
         gatherRemaining: harvest.gatherTime,
       };
-      if (this.movement.pathUnitToWorld(unit, node.x, node.y)) issued = true;
-      else unit.harvestState = null;
+      if (this.movement.pathUnitToWorld(unit, node.x, node.y)) assigned.push(unit);
+      else this.clear(unit);
     }
-    return issued;
+    return assigned;
   }
 
   update(units, dt) {
@@ -41,9 +47,17 @@ export class HarvestSystem {
     }
   }
 
-  clear(unit) {
+  clear(unit, { cancelMovement = false } = {}) {
     if (!unit) return;
+    this.releaseReservation(unit.id);
     unit.harvestState = null;
+    if (!cancelMovement) return;
+    unit.path = [];
+    unit.moveTarget = null;
+    unit.routeId = null;
+    this.movement.ctx.reservations.releaseRouteReservations(unit);
+    this.movement.resetMovementState(unit);
+    setUnitState(unit, UNIT_STATES.IDLE, this.getSimTime());
   }
 
   resourceAmount(team, kind) {
@@ -61,7 +75,7 @@ export class HarvestSystem {
 
     if (state.phase === 'to-resource' || state.phase === 'gathering') {
       const node = this.map.getResourceNode(state.resourceId);
-      if (!node) return this.clear(unit);
+      if (!node) return this.clear(unit, { cancelMovement: true });
       const distance = Math.hypot(unit.x - node.x, unit.y - node.y);
       if (distance > harvest.gatherRange) {
         state.phase = 'to-resource';
@@ -76,7 +90,8 @@ export class HarvestSystem {
       state.gatherRemaining = Math.max(0, state.gatherRemaining - dt);
       if (state.gatherRemaining > 0) return;
 
-      const cargo = this.map.takeResourceNode(node.id, harvest.capacity);
+      const reservedAmount = this.releaseReservation(unit.id, node.id);
+      const cargo = this.map.takeResourceNode(node.id, reservedAmount);
       if (!cargo) return this.clear(unit);
       unit.cargo = cargo;
       state.phase = 'to-nexus';
@@ -115,4 +130,33 @@ export class HarvestSystem {
     stockpile[kind] = (stockpile[kind] ?? 0) + amount;
     this.stockpiles.set(team, stockpile);
   }
+
+  reserveResource(node, unit, capacity) {
+    const available = Math.max(0, (node.amount ?? 0) - this.reservedAmountForNode(node.id));
+    const amount = Math.min(capacity, available);
+    if (amount <= 0) return 0;
+    this.resourceReservations.set(unit.id, { resourceId: node.id, amount });
+    return amount;
+  }
+
+  releaseReservation(unitId, resourceId = null) {
+    const reservation = this.resourceReservations.get(unitId);
+    if (!reservation || (resourceId && reservation.resourceId !== resourceId)) return 0;
+    this.resourceReservations.delete(unitId);
+    return reservation.amount;
+  }
+
+  reservedAmountForNode(resourceId) {
+    let total = 0;
+    for (const reservation of this.resourceReservations.values()) {
+      if (reservation.resourceId === resourceId) total += reservation.amount;
+    }
+    return total;
+  }
+}
+
+function distanceToNodeSq(unit, node) {
+  const dx = unit.x - node.x;
+  const dy = unit.y - node.y;
+  return dx * dx + dy * dy;
 }

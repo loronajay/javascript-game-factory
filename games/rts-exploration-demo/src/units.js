@@ -100,6 +100,7 @@ export class UnitManager {
   removeDeadUnits() {
     const deadIds = new Set(this.units.filter((u) => u.hp <= 0).map((u) => u.id));
     if (deadIds.size === 0) return;
+    for (const unit of this.units) if (deadIds.has(unit.id)) this.harvesting.clear(unit);
     for (const unit of this.units) {
       if (deadIds.has(unit.id)) continue;
       if (unit.attackTarget?.kind === 'unit' && deadIds.has(unit.attackTarget.id)) {
@@ -258,9 +259,9 @@ export class UnitManager {
   harvestUnitsResource(unitIds, resourceId, team = 1) {
     const harvesters = this.ownedUnitsFromIds(unitIds, team).filter((unit) => unit.type === 'harvester');
     if (harvesters.length === 0) return false;
-    const issued = this.harvesting.issue(harvesters, resourceId);
-    if (issued) for (const harvester of harvesters) this._markCommandAck(harvester, 'harvest');
-    return issued;
+    const assigned = this.harvesting.issue(harvesters, resourceId);
+    if (assigned.length > 0) for (const harvester of assigned) this._markCommandAck(harvester, 'harvest');
+    return assigned.length > 0;
   }
 
   // ── Queries ─────────────────────────────────────────────────────────────────

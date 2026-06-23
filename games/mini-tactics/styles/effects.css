@@ -308,6 +308,198 @@ select {
   background: #0c1119;
 }
 
+/* --- Impact particles ----------------------------------------------------- */
+/* Death-shatter shard. Positioned by its x/y; transform-box anchors the spin and
+   shrink to the shard's own center so it tumbles in place instead of swinging
+   around the viewBox corner. */
+.fx-shard {
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Whole-board white bloom on a critical hit. Just opacity is animated in JS. */
+.fx-critflash {
+  pointer-events: none;
+}
+
+/* --- Combat forecast badges ---------------------------------------------- */
+.forecast-badge {
+  pointer-events: none;
+  transform-box: fill-box;
+  animation: fc-pop .18s ease-out;
+}
+
+.forecast-badge .fc-bg {
+  fill: rgba(10, 13, 19, .92);
+  stroke: var(--console-edge);
+  stroke-width: 1;
+}
+
+.forecast-badge .fc-text {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, .82);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  fill: var(--text);
+}
+
+.fc-attack .fc-bg {
+  stroke: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+
+.fc-attack .fc-text {
+  fill: #ffd0d5;
+}
+
+.fc-heal .fc-bg {
+  stroke: color-mix(in srgb, var(--good) 60%, transparent);
+}
+
+.fc-heal .fc-text {
+  fill: #b6f5d2;
+}
+
+/* Can crit-kill: a gold rim hint, still showing the normal number. */
+.fc-critlethal .fc-bg {
+  stroke: color-mix(in srgb, var(--gold) 70%, transparent);
+}
+
+/* Lethal on any hit: a charged gold badge that gently pulses. */
+.fc-lethal .fc-bg {
+  fill: rgba(58, 30, 8, .95);
+  stroke: var(--gold);
+  stroke-width: 1.6;
+}
+
+.fc-lethal .fc-text {
+  fill: var(--gold);
+}
+
+.fc-lethal {
+  animation: fc-pop .18s ease-out, fc-lethal-pulse .9s ease-in-out .18s infinite;
+}
+
+@keyframes fc-pop {
+  from { opacity: 0; transform: translateY(5px) scale(.7); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fc-lethal-pulse {
+  50% { filter: drop-shadow(0 0 8px rgba(255, 210, 106, .75)); }
+}
+
+/* --- Turn-change sweep ---------------------------------------------------- */
+#turnFlash {
+  position: absolute;
+  z-index: 25;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .26s ease;
+}
+
+#turnFlash.show {
+  opacity: 1;
+}
+
+.turn-flash-card {
+  position: relative;
+  padding: .85rem 2.6rem;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--team, var(--p1)) 55%, transparent);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(22, 28, 41, .94), rgba(9, 12, 19, .94));
+  box-shadow:
+    inset 0 0 34px color-mix(in srgb, var(--team, var(--p1)) 22%, transparent),
+    0 20px 55px rgba(0, 0, 0, .55);
+  backdrop-filter: blur(8px);
+  transform: translateY(10px) scale(.95);
+  transition: transform .32s cubic-bezier(.2, .85, .25, 1);
+}
+
+#turnFlash.show .turn-flash-card {
+  transform: translateY(0) scale(1);
+}
+
+/* Faction accent bar across the top of the card. */
+.turn-flash-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--team, var(--p1));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--team, var(--p1)) 85%, transparent);
+}
+
+.turn-flash-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  color: var(--text);
+}
+
+.turn-flash-sub {
+  margin-top: .22rem;
+  font-size: .74rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  color: color-mix(in srgb, var(--team, var(--p1)) 70%, var(--muted));
+}
+
+/* --- Stage vignette ------------------------------------------------------- */
+/* Seats the board in space: darkens the stage edges so the diamond reads as
+   sitting in a pool of light rather than floating on flat black. */
+#stageWrap::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(3, 5, 9, .55) 100%);
+}
+
+/* --- Victory confetti ----------------------------------------------------- */
+.victory-burst {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The results card sits above the confetti so the readout stays clean. */
+[data-screen="results"] .menu-card {
+  position: relative;
+  z-index: 1;
+}
+
+.confetti {
+  position: absolute;
+  top: -8%;
+  width: var(--size, 8px);
+  height: calc(var(--size, 8px) * .5);
+  border-radius: 1px;
+  opacity: 0;
+  animation: confetti-fall var(--dur, 2.4s) linear var(--delay, 0s) forwards;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(var(--drift, 0), 110vh) rotate(var(--spin, 360deg)); opacity: .9; }
+}
+
 @keyframes dice-roll {
   0% {
     filter: blur(5px);

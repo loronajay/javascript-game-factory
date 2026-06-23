@@ -153,6 +153,27 @@ export function getLegalHealTargets(state, medic) {
   return legal;
 }
 
+// Every tile any living enemy of `forPlayer` could strike from where it stands
+// right now — the union of their attack radii (ranger line-of-sight honored).
+// This is the "danger" overlay: presentation only, it shows the player which
+// tiles are already under threat so positioning reads at a glance. It is the
+// immediate threat (current positions), not a move-plus-reach projection, to
+// keep the overlay legible rather than blanketing the board.
+export function getThreatTiles(state, forPlayer) {
+  const threatened = new Set();
+
+  for (const enemy of livingUnits(state)) {
+    if (sameTeam(state, enemy.player, forPlayer)) {
+      continue;
+    }
+    for (const key of getAttackRangeTiles(state, enemy)) {
+      threatened.add(key);
+    }
+  }
+
+  return threatened;
+}
+
 export function rollD6(random = Math.random) {
   return 1 + Math.floor(random() * 6);
 }

@@ -57,14 +57,15 @@ body {
   position: absolute;
   top: 14px;
   left: 14px;
-  min-width: 340px;
+  width: min(620px, calc(100vw - 228px));
+  min-width: 0;
   height: 44px;
-  padding: 0 14px;
+  padding: 0 0 0 14px;
   border-radius: 7px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 28px;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .hud-brand {
@@ -97,6 +98,9 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
   color: #94b2c3;
   font-size: 11px;
   white-space: nowrap;
@@ -169,12 +173,12 @@ body {
 }
 
 .hud-resource-strip {
-  position: absolute;
-  top: 14px;
-  left: 370px;
   display: flex;
+  flex: 0 0 auto;
+  align-self: stretch;
   overflow: hidden;
-  border-radius: 7px;
+  border-left: 1px solid rgba(116, 190, 226, 0.22);
+  background: rgba(5, 20, 30, 0.48);
 }
 
 .hud-resource-strip > div {
@@ -273,18 +277,18 @@ body {
 .debug-row strong { max-width: 142px; overflow: hidden; color: #f6eddc; font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 760px) {
-  .hud-topbar { min-width: 0; right: auto; width: 340px; gap: 10px; }
+  .hud-topbar { width: min(460px, calc(100vw - 228px)); gap: 8px; }
   .hud-brand small, .hud-resource-label, .hud-command small { display: none; }
-  .hud-resource-strip { top: 70px; left: 14px; }
-  .debug-hud { top: 122px; }
+  .debug-hud { top: 70px; }
   .hud-command-bar { left: auto; right: 14px; transform: none; }
   .hud-command { min-width: auto; padding: 0 9px; }
   .hud-command span b { font-size: 10px; }
 }
 
 @media (max-width: 520px) {
-  .hud-topbar { display: none; }
-  .hud-resource-strip { top: 14px; left: 14px; }
+  .hud-topbar { width: auto; height: 36px; padding-left: 0; }
+  .hud-brand, .hud-status { display: none; }
+  .hud-resource-strip { border-left: 0; }
   .hud-resource-strip > div { min-height: 36px; padding: 0 9px; }
   .hud-resource-strip strong { font-size: 13px; }
   .hud-resource-icon { font-size: 12px; }
@@ -293,5 +297,4 @@ body {
   .hud-command-bar { left: 14px; right: 14px; bottom: 14px; justify-content: space-around; }
   .hud-command { min-width: 0; padding: 0 6px; }
   .hud-command span b { display: none; }
-}
 }

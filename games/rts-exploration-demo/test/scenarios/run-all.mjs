@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const scenarios = [
   'hud_contract.mjs',
+  'hud_markup_layout.mjs',
   'minimap_layout.mjs',
   'mobile_engagement_slots.mjs',
   'group_move_plan.mjs',
@@ -19,6 +20,7 @@ const scenarios = [
   'natural_wall_weak_steel_drop.mjs',
   'harvester_weak_steel_delivery.mjs',
   'harvester_cargo_gate.mjs',
+  'harvester_single_drop_assignment.mjs',
   'harvester_starting_squad.mjs',
   'choke_move_6_grunts.mjs',
   'reservation_cleanup_on_death.mjs',

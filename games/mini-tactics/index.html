@@ -152,6 +152,7 @@
 
     <!-- ============================ RESULTS ============================= -->
     <section class="screen menu-screen" data-screen="results">
+      <div class="victory-burst" data-results="burst" aria-hidden="true"></div>
       <div class="menu-card">
         <h2 class="menu-heading" data-results="title">Victory</h2>
         <p class="results-winner" data-results="winner"></p>
@@ -201,9 +202,11 @@
           </defs>
 
           <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
+          <g id="ambientLayer" aria-hidden="true"></g>
           <g id="boardLayer"></g>
           <g id="overlayLayer"></g>
           <g id="unitsLayer"></g>
+          <g id="forecastLayer" aria-hidden="true"></g>
           <g id="fxLayer"></g>
         </svg>
 
@@ -216,6 +219,16 @@
 
         <div id="diceOverlay" aria-hidden="true">
           <div class="die" id="dieFace">1</div>
+        </div>
+
+        <!-- Turn-change announcement. A brief faction-tinted sweep fired by the
+             controller on every TURN_CHANGED so passing the squad reads as a beat
+             (especially hot-seat "pass the device"). Presentation only. -->
+        <div id="turnFlash" aria-hidden="true">
+          <div class="turn-flash-card">
+            <div class="turn-flash-title"></div>
+            <div class="turn-flash-sub"></div>
+          </div>
         </div>
       </main>
 

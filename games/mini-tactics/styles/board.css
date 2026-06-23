@@ -190,6 +190,47 @@
   animation: idle-bob 2.4s ease-in-out infinite;
 }
 
+/* Danger overlay: tiles already inside an enemy's reach. Painted as a muted red
+   wash on plain tiles so the threat zone reads at a glance without screaming.
+   Tones are tunable — kept subtle on purpose so a wide threat map stays legible. */
+.tile.threatened .tile-face {
+  fill: color-mix(in srgb, var(--danger) 30%, #2f3744);
+  stroke: color-mix(in srgb, var(--danger) 55%, transparent);
+  stroke-width: 1.2;
+}
+
+/* "Reachable but exposed": a legal move tile that is also threatened keeps its
+   blue move fill but gains a dashed danger border so the risk is unmistakable.
+   Two-class specificity beats the single-class legal-move stroke above. */
+.tile.legal-move.threatened .tile-face {
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+/* Selection spotlight: while a piece is active, dim the static, uninvolved board
+   so the selected unit and its highlighted tiles carry the eye. Highlighted and
+   threatened tiles are excluded so they stay at full strength. */
+.board-focused .tile:not(.selected):not(.legal-move):not(.legal-attack):not(.legal-heal):not(.attack-range):not(.heal-range):not(.threatened) .tile-face {
+  filter: brightness(.72) saturate(.85);
+  transition: filter .2s ease;
+}
+
+/* Ambient dust drifting in the space around the board (rendered behind the
+   tiles). Slow, asynchronous, and faint — the global reduced-motion rule stills
+   it automatically. */
+.mote {
+  fill: rgba(185, 210, 250, .5);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mote-drift var(--dur, 9s) ease-in-out var(--delay, 0s) infinite;
+}
+
+@keyframes mote-drift {
+  0%, 100% { transform: translateY(0); opacity: .1; }
+  50% { transform: translateY(var(--rise, -24px)); opacity: .5; }
+}
+
 @keyframes legal-pulse {
   to { filter: brightness(1.28); }
 }

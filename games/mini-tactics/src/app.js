@@ -9,6 +9,7 @@
 import { getUiElements } from "./ui/elements.js";
 import { AudioManager } from "./audio/sounds.js";
 import { MessageController } from "./ui/messageController.js";
+import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { ConfirmDialog } from "./ui/confirmDialog.js";
 import { GameController } from "./game/GameController.js";
@@ -35,6 +36,7 @@ export function createApp(documentRef = document) {
   });
 
   const messages = new MessageController(elements.message);
+  const turnAnnouncer = new TurnAnnouncer(elements.turnFlash);
 
   const rules = new RulesModal(
     documentRef.getElementById("rulesModal"),
@@ -57,6 +59,7 @@ export function createApp(documentRef = document) {
     elements,
     messages,
     audio,
+    turnAnnouncer,
     confirm: (options) => confirmDialog.ask(options),
     onMatchComplete: (summary) => ctx.nav("results", summary),
   });

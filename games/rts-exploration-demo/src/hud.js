@@ -20,27 +20,7 @@ export class Hud {
   }
 
   mount() {
-    this.root.innerHTML = `
-      <header class="hud-topbar hud-surface">
-        <div class="hud-brand"><span class="hud-brand-mark">◆</span><span>RTS Exploration</span><small>Prototype</small></div>
-        <div class="hud-status" aria-live="polite"><span id="hud-fps">-- FPS</span><span class="hud-status-dot"></span><span id="hud-command-state">Standing by</span></div>
-      </header>
-      <section class="hud-selection hud-surface" aria-label="Selection">
-        <div class="hud-section-kicker">Selection</div>
-        <div id="hud-selection-title" class="hud-selection-title">No selection</div>
-        <div id="hud-selection-detail" class="hud-selection-detail">Select a unit or drag a squad.</div>
-        <div class="hud-health"><div class="hud-health-track"><div id="hud-selection-health-fill" class="hud-health-fill"></div></div><span id="hud-selection-health">--</span></div>
-      </section>
-      <section class="hud-resource-strip hud-surface" aria-label="Player resources">
-        <div><span class="hud-resource-icon">⬡</span><span class="hud-resource-label">Weak steel</span><strong id="hud-weak-steel">0</strong></div>
-        <div><span class="hud-resource-icon">◉</span><span class="hud-resource-label">Field units</span><strong id="hud-field-units">0</strong></div>
-      </section>
-      <nav class="hud-command-bar hud-surface" aria-label="Command hotkeys">
-        <div id="hud-command-attack" class="hud-command"><kbd>Q</kbd><span><b>Attack move</b><small>Arm command</small></span></div>
-        <div id="hud-command-stop" class="hud-command"><kbd>X</kbd><span><b>Stop</b><small>Clear orders</small></span></div>
-        <div class="hud-command"><kbd>Space</kbd><span><b>Center</b><small>Selected squad</small></span></div>
-        <div class="hud-command hud-command-muted"><kbd>F3</kbd><span><b>Diagnostics</b><small>Toggle overlay</small></span></div>
-      </nav>`;
+    this.root.innerHTML = buildHudMarkup();
     this.refs = {
       fps: this.root.querySelector('#hud-fps'),
       commandState: this.root.querySelector('#hud-command-state'),
@@ -117,6 +97,30 @@ export class Hud {
       row('Movement debug', this.input.showMovementDebug ? 'on' : 'off'),
     ].join('');
   }
+}
+
+export function buildHudMarkup() {
+  return `
+      <header class="hud-topbar hud-surface">
+        <div class="hud-brand"><span class="hud-brand-mark">◆</span><span>RTS Exploration</span><small>Prototype</small></div>
+        <div class="hud-status" aria-live="polite"><span id="hud-fps">-- FPS</span><span class="hud-status-dot"></span><span id="hud-command-state">Standing by</span></div>
+        <section class="hud-resource-strip" aria-label="Player resources">
+          <div><span class="hud-resource-icon">⬡</span><span class="hud-resource-label">Weak steel</span><strong id="hud-weak-steel">0</strong></div>
+          <div><span class="hud-resource-icon">◉</span><span class="hud-resource-label">Field units</span><strong id="hud-field-units">0</strong></div>
+        </section>
+      </header>
+      <section class="hud-selection hud-surface" aria-label="Selection">
+        <div class="hud-section-kicker">Selection</div>
+        <div id="hud-selection-title" class="hud-selection-title">No selection</div>
+        <div id="hud-selection-detail" class="hud-selection-detail">Select a unit or drag a squad.</div>
+        <div class="hud-health"><div class="hud-health-track"><div id="hud-selection-health-fill" class="hud-health-fill"></div></div><span id="hud-selection-health">--</span></div>
+      </section>
+      <nav class="hud-command-bar hud-surface" aria-label="Command hotkeys">
+        <div id="hud-command-attack" class="hud-command"><kbd>Q</kbd><span><b>Attack move</b><small>Arm command</small></span></div>
+        <div id="hud-command-stop" class="hud-command"><kbd>X</kbd><span><b>Stop</b><small>Clear orders</small></span></div>
+        <div class="hud-command"><kbd>Space</kbd><span><b>Center</b><small>Selected squad</small></span></div>
+        <div class="hud-command hud-command-muted"><kbd>F3</kbd><span><b>Diagnostics</b><small>Toggle overlay</small></span></div>
+      </nav>`;
 }
 
 export function buildHudModel({ units, input, fps = 0, tick = 0, entities = null }) {
