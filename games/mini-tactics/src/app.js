@@ -9,6 +9,7 @@
 import { getUiElements } from "./ui/elements.js";
 import { MessageController } from "./ui/messageController.js";
 import { RulesModal } from "./ui/rulesModal.js";
+import { ConfirmDialog } from "./ui/confirmDialog.js";
 import { GameController } from "./game/GameController.js";
 import { ScreenManager } from "./ui/screens/screenManager.js";
 import { createTitleScreen } from "./ui/screens/titleScreen.js";
@@ -27,6 +28,10 @@ export function createApp(documentRef = document) {
     documentRef.getElementById("closeRulesBtn"),
   );
 
+  const confirmDialog = new ConfirmDialog(
+    documentRef.getElementById("confirmModal"),
+  );
+
   const manager = new ScreenManager();
 
   // The single navigation seam handed to every screen.
@@ -38,6 +43,7 @@ export function createApp(documentRef = document) {
   const controller = new GameController({
     elements,
     messages,
+    confirm: (options) => confirmDialog.ask(options),
     onMatchComplete: (summary) => ctx.nav("results", summary),
   });
 

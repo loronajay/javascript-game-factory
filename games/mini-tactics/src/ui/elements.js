@@ -20,7 +20,8 @@ export function getUiElements(documentRef = document) {
     cancelMoveBtn: required(documentRef, "cancelMoveBtn"),
     finishBtn: required(documentRef, "finishBtn"),
     squadOverlays: required(documentRef, "squadOverlays"),
-    restartBtn: required(documentRef, "restartBtn")
+    restartBtn: required(documentRef, "restartBtn"),
+    concedeBtn: required(documentRef, "concedeBtn")
   };
 }
 

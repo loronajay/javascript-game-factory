@@ -177,6 +177,7 @@
 
         <div class="top-actions">
           <button id="rulesBtn">Rules</button>
+          <button id="concedeBtn" class="cancel">Concede</button>
           <button id="restartBtn" class="danger">Restart</button>
           <button id="quitBtn">Menu</button>
         </div>
@@ -265,6 +266,20 @@
 
         <div class="modal-row">
           <button id="closeRulesBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generic stylized confirm dialog (concede, and any future destructive
+         action). Driven by ui/confirmDialog.js; labels/copy are set per call. -->
+    <div id="confirmModal">
+      <div class="modal-card confirm-card">
+        <h2 data-confirm="title">Confirm</h2>
+        <p data-confirm="body"></p>
+
+        <div class="modal-row confirm-actions">
+          <button data-confirm="cancel" class="ghost">Cancel</button>
+          <button data-confirm="ok" class="danger">Confirm</button>
         </div>
       </div>
     </div>

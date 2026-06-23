@@ -45,9 +45,12 @@ import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
 
 export class GameController {
-  constructor({ elements, messages, onMatchComplete }) {
+  constructor({ elements, messages, confirm, onMatchComplete }) {
     this.elements = elements;
     this.messages = messages;
+    // Stylized in-game confirm prompt (Promise<boolean>). Defaults to auto-confirm
+    // so the controller stays usable headlessly / in isolation.
+    this.confirm = confirm ?? (async () => true);
     // Routed to the results screen when a match ends. Defaults to a no-op so the
     // controller stays usable headlessly / in isolation.
     this.onMatchComplete = onMatchComplete ?? (() => {});
@@ -120,7 +123,7 @@ export class GameController {
     // Single-player drives Player 2 with the CPU; every other mode is human-only.
     this.cpu = mode === "single" ? { difficulty, players: new Set([2]) } : null;
     this.startedAt = Date.now();
-    this.applyRestartVisibility();
+    this.applyLocalControlVisibility();
     this.reset();
   }
 
@@ -134,11 +137,13 @@ export class GameController {
     this.startMatch({ mode: this.mode, ...this.matchConfig });
   }
 
-  // Restart is a local-only affordance. Online clients cannot unilaterally reset
-  // a shared match, so it is hidden outside single-player and hot-seat play.
-  applyRestartVisibility() {
+  // Restart and Concede are local-only affordances. Online clients cannot
+  // unilaterally reset a shared match, and conceding online will route through
+  // the host instead, so both are hidden outside single-player and hot-seat.
+  applyLocalControlVisibility() {
     const local = this.mode === "single" || this.mode === "hotseat";
     this.elements.restartBtn.hidden = !local;
+    this.elements.concedeBtn.hidden = !local;
   }
 
   reset() {
@@ -222,6 +227,10 @@ export class GameController {
     this.elements.restartBtn.addEventListener(
       "click",
       () => this.restart(),
+    );
+    this.elements.concedeBtn.addEventListener(
+      "click",
+      () => void this.concedeCurrentPlayer(),
     );
   }
 
@@ -614,6 +623,76 @@ export class GameController {
       this.isCpu(this.match.currentPlayer)
     ) {
       void this.runCpuTurn();
+    }
+  }
+
+  // Concede on behalf of the player whose squad turn it is — in hot-seat that is
+  // whoever holds the device, in single-player it is always the human (P1, since
+  // input is locked during the CPU's turn). The core treats concede as a drop-out:
+  // a duel ends, a 3-4 player game plays on with the conceder's squad removed.
+  async concedeCurrentPlayer() {
+    if (this.ui.locked || this.match.winner) {
+      return;
+    }
+
+    const player = this.match.currentPlayer;
+    const confirmed = await this.confirm({
+      title: `Player ${player} — concede?`,
+      body:
+        "Your squad is removed from the match and you are out. " +
+        "This cannot be undone.",
+      confirmLabel: "Concede",
+      cancelLabel: "Keep playing",
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    const result = this.dispatch(cmd.concede(player));
+    if (!result) {
+      return;
+    }
+
+    // Drop the dossier/targeting before animating, then play each unit's death
+    // while its element is still on the board (renderAll below clears them).
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.ui.locked = true;
+
+    for (const event of result.events) {
+      if (event.type === EVENTS.UNIT_ELIMINATED) {
+        const unit = findUnit(this.match, event.unitId);
+        if (unit) {
+          await this.effectsRenderer.animateDeath(unit);
+        }
+      }
+    }
+
+    this.ui.locked = false;
+    this.renderAll();
+
+    if (this.match.phase === "complete") {
+      this.handleMatchComplete();
+      return;
+    }
+
+    // Free-for-all / teams: the match continues. The core has already passed the
+    // turn on to the next surviving player; mirror finishActivation's hand-off,
+    // including kicking off a CPU turn if that next seat is computer-controlled.
+    const turnChanged = result.events.find(
+      (event) => event.type === EVENTS.TURN_CHANGED,
+    );
+    if (turnChanged) {
+      this.messages.show(`Player ${turnChanged.player} squad turn.`);
+      if (
+        this.match.phase === "playing" &&
+        this.isCpu(this.match.currentPlayer)
+      ) {
+        void this.runCpuTurn();
+      }
+    } else {
+      this.messages.show(`Player ${player} conceded.`);
+      this.renderDynamic();
     }
   }
 

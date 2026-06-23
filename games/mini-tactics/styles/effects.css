@@ -112,6 +112,39 @@
   display: grid;
 }
 
+/* Generic confirm dialog — same overlay/card language as the rules modal, but
+   sized for a short prompt and stacked above it. */
+#confirmModal {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: none;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, .64);
+  backdrop-filter: blur(8px);
+}
+
+#confirmModal.open {
+  display: grid;
+}
+
+.modal-card.confirm-card {
+  width: min(420px, 94vw);
+}
+
+.confirm-card .modal-row.confirm-actions {
+  justify-content: flex-end;
+}
+
+button.ghost {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 45%),
+    rgba(255, 255, 255, .03);
+  border-color: var(--console-edge-soft);
+  color: var(--muted);
+}
+
 .modal-card {
   width: min(680px, 96vw);
   max-height: min(82vh, 760px);
