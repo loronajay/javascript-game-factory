@@ -7,22 +7,19 @@
     display: none;
   }
 
-  .turn-banner {
-    text-align: left;
-  }
-
-  .hud {
-    grid-template-columns: 1fr;
-    max-height: 42dvh;
-    overflow: auto;
-  }
-
-  .squad-panel {
+  /* Squad overlays crowd a small board — drop back to the dossier + menu only. */
+  .squad-overlay {
     display: none;
   }
 
+  /* Command strip stacks: dossier, then the battle menu, then help. */
+  .command-console {
+    grid-template-columns: 1fr;
+    gap: .5rem;
+  }
+
   .actions {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .panel {
@@ -30,13 +27,25 @@
   }
 
   .unit-card {
-    min-height: 54px;
+    min-height: 52px;
   }
 
   .unit-emblem {
-    width: 40px;
-    height: 40px;
-    font-size: 1.15rem;
+    width: 44px;
+    height: 44px;
+    font-size: 1.25rem;
+  }
+
+  .turn-banner {
+    min-width: 0;
+    padding: .35rem .9rem;
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

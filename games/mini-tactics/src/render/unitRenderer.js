@@ -1,5 +1,7 @@
 import { gridToScreen } from "../geometry/isometric.js";
+import { colorOf } from "../state/gameState.js";
 import { createSvgElement } from "./svg.js";
+import { hpClass } from "./hp.js";
 
 export class UnitRenderer {
   constructor({ unitsLayer, metrics, onUnitClick }) {
@@ -36,6 +38,7 @@ export class UnitRenderer {
     const group = createSvgElement("g", {
       class: classes.join(" "),
       "data-id": unit.id,
+      style: `--team:${colorOf(state, unit.player)}`,
       transform: `translate(${point.x} ${renderY})`
     });
 
@@ -95,7 +98,7 @@ export class UnitRenderer {
         rx: 2.5
       }),
       createSvgElement("rect", {
-        class: "hp-front",
+        class: `hp-front ${hpClass(unit.hp, unit.maxHp)}`,
         x: -25,
         y: 27,
         width: 50 * unit.hp / unit.maxHp,

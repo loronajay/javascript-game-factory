@@ -8,6 +8,7 @@
 
 import { BOARD_SIZES, DEFAULT_BOARD_SIZE } from "../config.js";
 import { createInitialUnits } from "../state/gameState.js";
+import { createRoster } from "./roster.js";
 import { createRngState } from "./rng.js";
 
 export const SCHEMA_VERSION = 1;
@@ -17,12 +18,23 @@ export function createMatchState({
   seed = 1,
   mode = "local",
   matchId = null,
+  // Roster controls: supply an explicit `players` roster, or describe the match
+  // and let createRoster build it. Defaults reproduce the classic two-player duel.
+  players = null,
+  playerCount = 2,
+  format = "ffa",
+  teams = null,
+  colors = null,
+  teamColors = null,
 } = {}) {
   const boardSize = Number(size);
 
   if (!BOARD_SIZES.includes(boardSize)) {
     throw new Error(`Unsupported board size: ${size}`);
   }
+
+  const roster =
+    players ?? createRoster({ playerCount, format, teams, colors, teamColors });
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -32,8 +44,15 @@ export function createMatchState({
     phase: "playing",
     revision: 0,
     turnNumber: 1,
-    currentPlayer: 1,
-    units: createInitialUnits(boardSize),
+    // `format` ("ffa" | "teams") is carried so UI surfaces can word victory as a
+    // team or a player. It does not affect rule resolution — team membership does.
+    format,
+    // Authoritative seating: `players` is the roster, `turnOrder` is the seat
+    // sequence the reducer walks (skipping eliminated players).
+    players: roster,
+    turnOrder: roster.map((slot) => slot.id),
+    currentPlayer: roster[0].id,
+    units: createInitialUnits(boardSize, roster),
     activation: null,
     winner: null,
     victoryReason: null,

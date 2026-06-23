@@ -385,9 +385,15 @@ test("eliminating the last enemy unit ends the match", () => {
 });
 
 test("commands are rejected after the match is complete", () => {
-  let state = makeMatch([unit("p1-warrior", 1, "warrior", 1, 1)]);
+  // Conceding drops the player's units; with only the opponent left standing,
+  // the surviving team wins and further commands are rejected.
+  let state = makeMatch([
+    unit("p1-warrior", 1, "warrior", 1, 1),
+    unit("p2-warrior", 2, "warrior", 8, 8),
+  ]);
   state = must(state, cmd.concede(1));
   assert.equal(state.winner, 2);
+  assert.equal(state.phase, "complete");
 
   const result = applyCommand(state, cmd.beginActivation(1, "p1-warrior"));
   assert.equal(result.accepted, false);

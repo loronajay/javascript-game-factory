@@ -102,11 +102,17 @@ export class UnitFactory {
   spawnTeamPackage(spawnDef, spawnFn) {
     const { tileX, tileY, direction } = spawnDef;
     const base = this.ctx.map.tileCenter(tileX, tileY);
-    const scoutSpacing = 34;
+    // Starting squads exit beside their Nexus instead of spawning inside its
+    // collision circle. The offset is intentionally shared by both teams.
+    const exitOffset = 78;
+    const scoutSpacing = 30;
     for (let i = 0; i < CONFIG.startingScoutsPerPlayer; i++) {
-      spawnFn('scout', spawnDef.team, base.x + direction * i * scoutSpacing, base.y + (i % 2) * 20);
+      spawnFn('scout', spawnDef.team, base.x + direction * (exitOffset + i * scoutSpacing), base.y + (i - 1) * 24);
     }
-    const gruntBase = this.ctx.map.tileCenter(tileX, tileY + direction * 3);
+    const gruntBase = {
+      x: base.x + direction * (exitOffset + 54),
+      y: base.y + direction * 26,
+    };
     const gruntSpacing = 30;
     for (let i = 0; i < CONFIG.startingGruntsPerPlayer; i++) {
       spawnFn('grunt', spawnDef.team, gruntBase.x + direction * i * gruntSpacing, gruntBase.y + (i % 2) * 22);

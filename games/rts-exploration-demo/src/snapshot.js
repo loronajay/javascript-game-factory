@@ -1,4 +1,4 @@
-export function createDebugSnapshot({ tick, units, map, commands, ai }) {
+export function createDebugSnapshot({ tick, units, map, commands, ai, entities = null }) {
   return {
     tick,
     map: {
@@ -37,6 +37,16 @@ export function createDebugSnapshot({ tick, units, map, commands, ai }) {
       lanePriority: unit.debug?.lanePriority ?? 0,
       chokeReservation: unit.debug?.chokeReservation ? { ...unit.debug.chokeReservation } : null,
       routeId: unit.routeId ?? null,
+    })),
+    entities: (entities?.entities ?? []).map((entity) => ({
+      id: entity.id,
+      kind: entity.kind,
+      team: entity.team,
+      x: round(entity.x),
+      y: round(entity.y),
+      hp: round(entity.hp),
+      maxHp: entity.maxHp,
+      discovered: !!entity.discovered,
     })),
     selectedIds: [...units.selectedIds],
     routeReservations: units.reservations?.routeReservationSnapshot?.().map((r) => ({ ...r, expiresAt: round(r.expiresAt) })) ?? [],

@@ -1,7 +1,7 @@
 // Pure functions for resolving, identifying, and measuring targets.
 // Shared by CombatSystem and MovementSystem via the system context.
 
-export function resolveTarget(ref, map, getById) {
+export function resolveTarget(ref, map, getById, getEntityById = () => null) {
   if (!ref) return null;
   if (ref.kind === 'destructibleTile') {
     const wall = map.getDestructible(ref.x, ref.y);
@@ -13,6 +13,10 @@ export function resolveTarget(ref, map, getById) {
     const unit = getById(ref.id);
     return unit && unit.hp > 0 ? { kind: 'unit', unit } : null;
   }
+  if (ref.kind === 'entity') {
+    const entity = getEntityById(ref.id);
+    return entity && entity.hp > 0 ? { kind: 'entity', entity } : null;
+  }
   return null;
 }
 
@@ -20,16 +24,19 @@ export function targetKey(ref) {
   if (!ref) return '';
   if (ref.kind === 'destructibleTile') return `tile:${ref.x},${ref.y}`;
   if (ref.kind === 'unit') return `unit:${ref.id}`;
+  if (ref.kind === 'entity') return `entity:${ref.id}`;
   return '';
 }
 
 export function targetCenter(target, map) {
   if (target.kind === 'destructibleTile') return map.tileCenter(target.x, target.y);
+  if (target.kind === 'entity') return { x: target.entity.x, y: target.entity.y };
   return { x: target.unit.x, y: target.unit.y };
 }
 
 export function targetRadius(target, map) {
   if (target.kind === 'destructibleTile') return map.tileSize * 0.5;
+  if (target.kind === 'entity') return target.entity.radius;
   return target.unit.radius;
 }
 

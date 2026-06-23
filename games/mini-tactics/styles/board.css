@@ -1,51 +1,64 @@
 .tile {
   cursor: pointer;
-  transition: filter .15s ease;
-}
-
-.tile:hover {
-  filter: brightness(1.15);
 }
 
 .tile-face {
-  stroke: rgba(0, 0, 0, .52);
+  stroke: rgba(8, 12, 20, .55);
   stroke-width: 1;
+  transition: fill .12s ease;
   vector-effect: non-scaling-stroke;
 }
 
+.tile:hover .tile-face {
+  fill: #e8edf4;
+}
+
+.tile:hover .tile-dark {
+  fill: #5b6678;
+}
+
+/* Cool slate checker with extra contrast so the iso grid reads cleanly. */
 .tile-light {
-  fill: #cfd3d8;
+  fill: #d4dae3;
 }
 
 .tile-dark {
-  fill: #4a505a;
+  fill: #444c5b;
 }
 
+/* Extruded skirt: left face catches light, right face falls into shadow. */
 .tile-side-a {
-  fill: #242933;
+  fill: #2a313e;
 }
 
 .tile-side-b {
-  fill: #181c24;
+  fill: #161b23;
 }
 
 .tile.selected .tile-face {
   stroke: var(--gold);
   stroke-width: 3;
+  filter: drop-shadow(0 0 5px rgba(255, 210, 106, .7));
 }
 
 .tile.legal-move .tile-face {
-  fill: #3d8aaf;
+  fill: #3f9fce;
+  stroke: #9bdcf7;
+  stroke-width: 2;
   animation: legal-pulse 1.15s ease-in-out infinite alternate;
 }
 
 .tile.legal-attack .tile-face {
-  fill: #a3424e;
+  fill: #c2495a;
+  stroke: #ff9aa6;
+  stroke-width: 2;
   animation: attack-pulse .7s ease-in-out infinite alternate;
 }
 
 .tile.legal-heal .tile-face {
-  fill: #36855c;
+  fill: #3ba170;
+  stroke: #93f0bf;
+  stroke-width: 2;
   animation: heal-tile-pulse .9s ease-in-out infinite alternate;
 }
 
@@ -70,12 +83,10 @@
   vector-effect: non-scaling-stroke;
 }
 
-.unit.p1 .base-top {
-  fill: #237ca6;
-}
-
-.unit.p2 .base-top {
-  fill: #a93a4a;
+/* Piece color is driven by --team (set per unit from the roster color), so it is
+   never tied to the slot number. The base disc is a darkened mix of that hue. */
+.unit .base-top {
+  fill: color-mix(in srgb, var(--team, var(--p1)) 42%, #0b0f17);
 }
 
 .unit .rim {
@@ -83,14 +94,7 @@
   stroke-width: 3;
   opacity: .9;
   vector-effect: non-scaling-stroke;
-}
-
-.unit.p1 .rim {
-  stroke: var(--p1);
-}
-
-.unit.p2 .rim {
-  stroke: var(--p2);
+  stroke: var(--team, var(--p1));
 }
 
 .unit .icon {
@@ -101,12 +105,27 @@
 }
 
 .unit .hp-back {
-  fill: rgba(0, 0, 0, .55);
+  fill: rgba(0, 0, 0, .58);
+  stroke: rgba(0, 0, 0, .45);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .unit .hp-front {
-  fill: #72e4a3;
-  transition: width .2s ease;
+  fill: var(--hp-high);
+  transition: width .2s ease, fill .2s ease;
+}
+
+.unit .hp-front.hp-high {
+  fill: var(--hp-high);
+}
+
+.unit .hp-front.hp-mid {
+  fill: var(--hp-mid);
+}
+
+.unit .hp-front.hp-low {
+  fill: var(--hp-low);
 }
 
 .unit .spent-mark {

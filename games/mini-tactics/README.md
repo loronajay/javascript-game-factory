@@ -77,7 +77,7 @@ tests/
 
 ## Responsibility boundaries
 
-- `config.js`: balance values and explicit assumptions.
+- `config.js`: balance values.
 - `core/`: the authoritative, headless engine. `reducer.js` is the single
   validator/mutator every mode submits commands to; it owns dice via the seeded
   `rng.js` and returns events. No DOM, no `Math.random` in authoritative play.
@@ -117,9 +117,9 @@ tests/
 - Medic may heal itself.
 - Eliminate the opposing squad to win.
 
-## Explicit assumption
+## Heal range
 
-`MEDIC_HEAL_RANGE` is currently `3` in `src/config.js`. Change that value when the final heal range is decided.
+Medic heal range is `3` (canonical), defined as `MEDIC_HEAL_RANGE` in `src/config.js`.
 
 ## Integration direction
 

@@ -27,10 +27,11 @@ import {
 } from "../rules/combat.js";
 import {
   determineWinner,
+  nextActivePlayer,
   playerHasUnspentUnits,
   preparePlayerTurn,
 } from "../rules/turns.js";
-import { unitAt } from "../state/gameState.js";
+import { sameTeam, unitAt } from "../state/gameState.js";
 import { cloneState, findUnit } from "./state.js";
 import { rollD6 } from "./rng.js";
 import { COMMANDS } from "./commands.js";
@@ -323,7 +324,7 @@ function finishActivation(state, command) {
   const events = [{ type: EVENTS.ACTIVATION_FINISHED, unitId: nextUnit.id }];
 
   if (!playerHasUnspentUnits(next, next.currentPlayer)) {
-    next.currentPlayer = next.currentPlayer === 1 ? 2 : 1;
+    next.currentPlayer = nextActivePlayer(next, next.currentPlayer);
     next.turnNumber += 1;
     // Reset the incoming squad so each living unit can activate again.
     preparePlayerTurn(next, next.currentPlayer);
@@ -338,31 +339,63 @@ function finishActivation(state, command) {
 }
 
 function concede(state, command) {
-  // Concede is legal on either side's turn — a player may resign at any time.
-  if (command.player !== 1 && command.player !== 2) {
+  // Concede is legal at any time — a player may resign on or off their turn.
+  if (!Number.isInteger(command.player) || command.player < 1) {
     return reject(ERR.INVALID_COMMAND);
   }
 
+  const conceding = command.player;
   const next = cloneState(state);
-  next.phase = "complete";
-  next.winner = command.player === 1 ? 2 : 1;
-  next.victoryReason = VICTORY_REASON.CONCEDE;
-  next.activation = null;
+  const events = [];
 
-  return accept(next, [
-    {
+  // The conceding player forfeits: every one of their units drops out. In a
+  // duel this hands victory to the opponent; in a 3-4 player game the others
+  // play on, and in team play an ally can fight without their downed partner.
+  for (const unit of next.units) {
+    if (unit.player === conceding && unit.hp > 0) {
+      unit.hp = 0;
+      events.push({ type: EVENTS.UNIT_ELIMINATED, unitId: unit.id });
+    }
+  }
+  events.push({ type: EVENTS.PLAYER_CONCEDED, player: conceding });
+
+  const winner = determineWinner(next);
+  if (winner) {
+    next.phase = "complete";
+    next.winner = winner;
+    next.victoryReason = VICTORY_REASON.CONCEDE;
+    next.activation = null;
+    events.push({
       type: EVENTS.MATCH_COMPLETE,
-      winner: next.winner,
+      winner,
       victoryReason: next.victoryReason,
-    },
-  ]);
+    });
+    return accept(next, events);
+  }
+
+  // Match continues. If the player on the clock conceded, pass the turn to the
+  // next surviving player and reset their squad. An open activation always
+  // belongs to the current player, so it is only cleared in that case.
+  if (next.currentPlayer === conceding) {
+    next.activation = null;
+    next.currentPlayer = nextActivePlayer(next, conceding);
+    next.turnNumber += 1;
+    preparePlayerTurn(next, next.currentPlayer);
+    events.push({
+      type: EVENTS.TURN_CHANGED,
+      player: next.currentPlayer,
+      turnNumber: next.turnNumber,
+    });
+  }
+
+  return accept(next, events);
 }
 
 // Shared target validation. Returns an error code, or null when legal. Splitting
 // the failure reason out of getLegalAttackTargets keeps the legal-tile helper
 // reusable while still giving the caller a precise rejection.
 function validateAttackTarget(state, actor, target) {
-  if (target.player === actor.player) return ERR.INVALID_TARGET;
+  if (sameTeam(state, actor, target)) return ERR.INVALID_TARGET;
 
   const range = UNIT_TYPES[actor.type].attackRange;
   if (chebyshevDistance(actor, target) > range) return ERR.TARGET_OUT_OF_RANGE;
@@ -379,7 +412,7 @@ function validateAttackTarget(state, actor, target) {
 
 function validateHealTarget(state, actor, target) {
   if (actor.type !== "medic") return ERR.INVALID_TARGET;
-  if (target.player !== actor.player) return ERR.INVALID_TARGET;
+  if (!sameTeam(state, actor, target)) return ERR.INVALID_TARGET;
   if (target.hp >= target.maxHp) return ERR.INVALID_TARGET;
 
   if (chebyshevDistance(actor, target) > MEDIC_HEAL_RANGE) {

@@ -14,10 +14,12 @@
 import {
   ACTION_MODES,
   BOARD_SIZES,
+  DEFAULT_BOARD_SIZE,
   UNIT_TYPES,
 } from "../config.js";
 import {
   createBoardMetrics,
+  createBoardViewBox,
   tileKey,
 } from "../geometry/isometric.js";
 import { getLegalMoves } from "../rules/movement.js";
@@ -34,6 +36,7 @@ import {
 import { applyCommand } from "../core/reducer.js";
 import { EVENTS } from "../core/events.js";
 import * as cmd from "../core/commands.js";
+import { winnerLabel, teamColor } from "../render/labels.js";
 import { BoardRenderer } from "../render/boardRenderer.js";
 import { UnitRenderer } from "../render/unitRenderer.js";
 import { OverlayRenderer } from "../render/overlayRenderer.js";
@@ -41,11 +44,27 @@ import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
 
 export class GameController {
-  constructor({ elements, messages }) {
+  constructor({ elements, messages, onMatchComplete }) {
     this.elements = elements;
     this.messages = messages;
+    // Routed to the results screen when a match ends. Defaults to a no-op so the
+    // controller stays usable headlessly / in isolation.
+    this.onMatchComplete = onMatchComplete ?? (() => {});
 
-    this.match = createMatchState({ size: 10, seed: newSeed() });
+    // Current match framing. `mode` drives mode-specific chrome (e.g. the Restart
+    // button only exists for local play); `startedAt` backs the results duration.
+    this.mode = "hotseat";
+    this.startedAt = 0;
+    // Roster framing for the current match, reused by restart/rematch. Populated
+    // by startMatch; defaults to the classic two-player free-for-all duel.
+    this.matchConfig = {
+      size: DEFAULT_BOARD_SIZE,
+      playerCount: 2,
+      format: "ffa",
+      teamColors: null,
+    };
+
+    this.match = createMatchState({ size: DEFAULT_BOARD_SIZE, seed: newSeed() });
     this.ui = createUiState();
     this.metrics = createBoardMetrics(this.match.size);
 
@@ -72,27 +91,60 @@ export class GameController {
     });
   }
 
+  // Wire static controls once. A match is not started here — the screen manager
+  // calls startMatch() when the match screen is entered.
   start() {
     this.bindControls();
-    this.reset(10);
   }
 
-  reset(size = this.match.size) {
+  // Begin a match for a given mode + roster framing. Called by the match
+  // screen's onEnter (fresh match and rematch both route through here).
+  startMatch({
+    mode = "hotseat",
+    size = DEFAULT_BOARD_SIZE,
+    playerCount = 2,
+    format = "ffa",
+    teamColors = null,
+  } = {}) {
+    this.mode = mode;
+    this.matchConfig = { size, playerCount, format, teamColors };
+    this.startedAt = Date.now();
+    this.applyRestartVisibility();
+    this.reset();
+  }
+
+  // Restart the current match: same mode and roster, fresh seed.
+  restart() {
+    this.startMatch({ mode: this.mode, ...this.matchConfig });
+  }
+
+  // Restart is a local-only affordance. Online clients cannot unilaterally reset
+  // a shared match, so it is hidden outside single-player and hot-seat play.
+  applyRestartVisibility() {
+    const local = this.mode === "single" || this.mode === "hotseat";
+    this.elements.restartBtn.hidden = !local;
+  }
+
+  reset() {
+    const { size, playerCount, format, teamColors } = this.matchConfig;
     const boardSize = Number(size);
 
     if (!BOARD_SIZES.includes(boardSize)) {
       throw new Error(`Unsupported board size: ${size}`);
     }
 
-    this.match = createMatchState({ size: boardSize, seed: newSeed() });
+    this.match = createMatchState({
+      size: boardSize,
+      seed: newSeed(),
+      mode: this.mode,
+      playerCount,
+      format,
+      teamColors,
+    });
     this.ui = createUiState();
     this.metrics = createBoardMetrics(this.match.size);
     this.updateRendererMetrics();
-    this.elements.boardSizeSelect.value = String(this.match.size);
-    this.elements.svg.setAttribute(
-      "viewBox",
-      `0 0 1200 ${this.metrics.viewHeight}`,
-    );
+    this.applyViewBox();
 
     this.renderAll();
     this.messages.show("Player 1 begins. Select any unspent piece.");
@@ -152,21 +204,28 @@ export class GameController {
     );
     this.elements.restartBtn.addEventListener(
       "click",
-      () => this.reset(this.match.size),
+      () => this.restart(),
     );
-    this.elements.rulesBtn.addEventListener(
-      "click",
-      () => this.elements.rulesModal.classList.add("open"),
+  }
+
+  // Wrap the viewBox tightly around the board so it scales up to fill the stage,
+  // and re-center the decorative aura glow on the new board bounds.
+  applyViewBox() {
+    const view = createBoardViewBox(this.metrics, this.match.size);
+
+    this.elements.svg.setAttribute(
+      "viewBox",
+      `${view.x} ${view.y} ${view.width} ${view.height}`,
     );
-    this.elements.closeRulesBtn.addEventListener(
-      "click",
-      () => this.closeRules(),
-    );
-    this.elements.rulesModal.addEventListener("click", (event) => {
-      if (event.target === this.elements.rulesModal) {
-        this.elements.rulesModal.classList.remove("open");
-      }
-    });
+
+    const glow = this.elements.svg.querySelector("#boardGlow");
+    if (glow) {
+      const { bounds } = view;
+      glow.setAttribute("cx", String((bounds.minX + bounds.maxX) / 2));
+      glow.setAttribute("cy", String((bounds.minY + bounds.maxY) / 2));
+      glow.setAttribute("rx", String((bounds.maxX - bounds.minX) / 2 + 40));
+      glow.setAttribute("ry", String((bounds.maxY - bounds.minY) / 2 + 30));
+    }
   }
 
   updateRendererMetrics() {
@@ -185,15 +244,6 @@ export class GameController {
     this.unitRenderer.render(view);
     this.overlayRenderer.render(view);
     this.hudRenderer.render(view);
-  }
-
-  closeRules() {
-    const requestedSize = Number(this.elements.boardSizeSelect.value);
-    this.elements.rulesModal.classList.remove("open");
-
-    if (requestedSize !== this.match.size) {
-      this.reset(requestedSize);
-    }
   }
 
   // Keep the UI's selected unit in sync with the authoritative activation.
@@ -559,7 +609,25 @@ export class GameController {
     this.ui.selectedId = null;
     this.clearMode();
     this.renderAll();
-    this.messages.show(`Player ${this.match.winner} wins.`);
+    this.messages.show(`${winnerLabel(this.match, this.match.winner)} wins.`);
+    this.onMatchComplete(this.buildMatchSummary());
+  }
+
+  // Snapshot the finished match for the results screen.
+  buildMatchSummary() {
+    return {
+      winner: this.match.winner,
+      winnerLabel: winnerLabel(this.match, this.match.winner),
+      winnerColor: teamColor(this.match, this.match.winner),
+      mode: this.mode,
+      format: this.match.format,
+      size: this.match.size,
+      playerCount: this.match.players?.length ?? 2,
+      teamColors: this.matchConfig.teamColors,
+      turns: this.match.turnNumber,
+      victoryReason: this.match.victoryReason ?? "elimination",
+      durationMs: this.startedAt ? Date.now() - this.startedAt : 0,
+    };
   }
 }
 

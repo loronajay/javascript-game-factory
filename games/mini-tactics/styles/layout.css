@@ -1,10 +1,20 @@
 #app {
   position: relative;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100dvh;
+  overflow: hidden;
 }
 
+/* The match screen owns the original three-row board layout. Menu screens use
+   their own centered layout (styles/menus.css). */
+.match-screen.is-active {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Command header                                                          */
+/* ----------------------------------------------------------------------- */
 .topbar {
   z-index: 10;
   display: grid;
@@ -12,33 +22,89 @@
   gap: .75rem;
   align-items: center;
   padding:
-    .7rem max(.8rem, env(safe-area-inset-right))
-    .7rem max(.8rem, env(safe-area-inset-left));
+    .65rem max(.9rem, env(safe-area-inset-right))
+    .65rem max(.9rem, env(safe-area-inset-left));
   border-bottom: 1px solid var(--panel-line);
-  background: rgba(8, 10, 15, .82);
+  background:
+    linear-gradient(180deg, rgba(20, 26, 38, .9), rgba(8, 10, 15, .82));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
   backdrop-filter: blur(16px);
 }
 
 .brand {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
   font-size: .82rem;
   font-weight: 850;
-  letter-spacing: .08em;
+  letter-spacing: .14em;
   text-transform: uppercase;
+  color: #cdd6e4;
 }
 
+.brand::before {
+  content: "";
+  width: .82rem;
+  height: .82rem;
+  border-radius: 3px;
+  background: conic-gradient(from 45deg, var(--p1), var(--gold), var(--p2), var(--p1));
+  box-shadow: 0 0 12px rgba(255, 210, 106, .45);
+  transform: rotate(45deg);
+}
+
+/* The turn banner is now a faction-tinted command plate, not plain text. */
 .turn-banner {
+  position: relative;
+  min-width: min(58vw, 360px);
+  padding: .4rem 1.4rem;
   text-align: center;
+  border: 1px solid var(--console-edge);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, rgba(26, 33, 47, .95), rgba(12, 16, 24, .95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .1),
+    0 6px 18px rgba(0, 0, 0, .4);
+  transition: box-shadow .3s ease, border-color .3s ease;
+}
+
+/* The banner tints itself from --team (set per turn from the roster color). */
+.turn-banner[style*="--team"] {
+  border-color: color-mix(in srgb, var(--team) 50%, transparent);
+  box-shadow:
+    inset 0 0 22px color-mix(in srgb, var(--team) 18%, transparent),
+    0 6px 22px rgba(0, 0, 0, .45);
 }
 
 .turn-title {
-  font-size: .92rem;
-  font-weight: 800;
+  display: inline-flex;
+  gap: .5rem;
+  align-items: center;
+  font-size: .98rem;
+  font-weight: 850;
+  letter-spacing: .03em;
+}
+
+/* Leading dot reflects whose squad turn it is at a glance. */
+.turn-title::before {
+  content: "";
+  width: .62rem;
+  height: .62rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.turn-title[style*="--team"]::before {
+  background: var(--team);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--team) 85%, transparent);
 }
 
 .turn-sub {
-  margin-top: .1rem;
+  margin-top: .12rem;
   color: var(--muted);
   font-size: .72rem;
+  letter-spacing: .02em;
 }
 
 .top-actions {
@@ -47,6 +113,16 @@
   justify-content: flex-end;
 }
 
+.top-actions button {
+  font-size: .78rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Board stage                                                             */
+/* ----------------------------------------------------------------------- */
 #stageWrap {
   position: relative;
   min-height: 0;
@@ -63,71 +139,187 @@
   -webkit-user-select: none;
 }
 
+/* ----------------------------------------------------------------------- */
+/* HUD — short docked command strip + floating squad overlays              */
+/* ----------------------------------------------------------------------- */
 .hud {
   z-index: 10;
-  display: grid;
-  grid-template-columns: minmax(190px, 1fr) minmax(250px, 1.4fr) minmax(190px, 1fr);
-  gap: .65rem;
-  align-items: stretch;
+  display: block;
   padding:
-    .65rem max(.7rem, env(safe-area-inset-right))
-    calc(.65rem + env(safe-area-inset-bottom))
-    max(.7rem, env(safe-area-inset-left));
+    .55rem max(.8rem, env(safe-area-inset-right))
+    calc(.55rem + env(safe-area-inset-bottom))
+    max(.8rem, env(safe-area-inset-left));
   border-top: 1px solid var(--panel-line);
-  background: rgba(8, 10, 15, .88);
+  background:
+    linear-gradient(0deg, rgba(20, 26, 38, .9), rgba(8, 10, 15, .86));
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, .4);
   backdrop-filter: blur(16px);
 }
 
+/* One short horizontal strip: dossier · battle menu · help. */
+.panel.command-console {
+  display: grid;
+  grid-template-columns: minmax(210px, 280px) auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  padding: .65rem .8rem;
+}
+
+/* Squad overlays float in the board's empty corner triangles, costing the
+   battlefield no vertical space. The renderer builds one panel per player. */
+.squad-overlays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.panel.squad-overlay {
+  position: absolute;
+  width: clamp(150px, 16vw, 196px);
+  padding: .6rem .6rem .55rem;
+  pointer-events: auto;
+}
+
+/* Seat → screen corner: 1 bottom-left, 2 bottom-right, 3 top-left, 4 top-right. */
+.squad-overlay.slot-1 { bottom: 12px; left: 12px; }
+.squad-overlay.slot-2 { bottom: 12px; right: 12px; }
+.squad-overlay.slot-3 { top: 12px; left: 12px; }
+.squad-overlay.slot-4 { top: 12px; right: 12px; }
+
+/* The active player's roster lifts and brightens its frame. */
+.squad-overlay.is-active {
+  border-color: color-mix(in srgb, var(--team) 60%, transparent);
+  box-shadow:
+    var(--console-shadow),
+    0 0 18px color-mix(in srgb, var(--team) 25%, transparent);
+}
+
+.squad-overlay .panel-title {
+  margin-bottom: .5rem;
+}
+
+.squad-overlay .squad-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Beveled console plate with tactical corner brackets. */
 .panel {
+  position: relative;
   min-width: 0;
-  padding: .7rem;
-  border: 1px solid var(--panel-line);
-  border-radius: 14px;
-  background: var(--panel);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+  padding: .8rem;
+  border: 1px solid var(--console-edge);
+  border-radius: var(--radius-console);
+  background: var(--console-fill);
+  box-shadow: var(--console-shadow);
+}
+
+.panel::before,
+.panel::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: .55;
+}
+
+.panel::before {
+  top: 7px;
+  left: 7px;
+  border-top: 2px solid var(--console-edge);
+  border-left: 2px solid var(--console-edge);
+  border-top-left-radius: 6px;
+}
+
+.panel::after {
+  right: 7px;
+  bottom: 7px;
+  border-right: 2px solid var(--console-edge);
+  border-bottom: 2px solid var(--console-edge);
+  border-bottom-right-radius: 6px;
+}
+
+/* Faction wash + colored bracket accents, tinted from each panel's --team. */
+.squad-panel {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--team, transparent) 16%, transparent), transparent 40%),
+    var(--console-fill);
+}
+
+.squad-panel::before,
+.squad-panel::after {
+  border-color: color-mix(in srgb, var(--team, var(--console-edge)) 65%, transparent);
+  opacity: .8;
 }
 
 .panel-title {
-  margin-bottom: .5rem;
+  display: flex;
+  gap: .45rem;
+  align-items: center;
+  margin-bottom: .6rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--console-edge-soft);
   color: var(--muted);
-  font-size: .65rem;
-  font-weight: 800;
-  letter-spacing: .1em;
+  font-size: .64rem;
+  font-weight: 850;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
 
-.panel-title-actions {
-  margin-top: .65rem;
+.panel-title::before {
+  content: "";
+  width: 3px;
+  height: .8rem;
+  border-radius: 2px;
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(255, 210, 106, .5);
 }
 
+.squad-panel[style*="--team"] .panel-title::before {
+  background: var(--team);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--team) 60%, transparent);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Selected-unit dossier                                                   */
+/* ----------------------------------------------------------------------- */
 .unit-card {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: .7rem;
   align-items: center;
-  min-height: 68px;
+  min-height: 60px;
 }
 
+/* Hexagonal portrait emblem. */
 .unit-emblem {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 1px solid rgba(255, 255, 255, .16);
-  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(255, 255, 255, .18);
   background:
     radial-gradient(
       circle at 35% 25%,
-      rgba(255, 255, 255, .20),
+      rgba(255, 255, 255, .22),
       rgba(255, 255, 255, .03) 58%,
-      rgba(0, 0, 0, .25)
+      rgba(0, 0, 0, .35)
     );
-  font-size: 1.45rem;
+  font-size: 1.7rem;
   font-weight: 900;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .5);
 }
 
 .unit-name {
+  font-size: 1rem;
   font-weight: 850;
+  letter-spacing: .01em;
+}
+
+.unit-card[style*="--team"] .unit-name {
+  color: color-mix(in srgb, var(--team) 55%, #ffffff);
 }
 
 .unit-meta {
@@ -136,78 +328,204 @@
   font-size: .75rem;
 }
 
+/* Stat readout as discrete pills instead of a dot-joined string. */
+.unit-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin-top: .35rem;
+}
+
+.stat-pill {
+  padding: .14rem .42rem;
+  border: 1px solid var(--console-edge-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  color: #c7d0dd;
+  font-size: .66rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.stat-pill.hp { color: #eaf0f7; }
+.stat-pill.on { color: var(--gold); border-color: rgba(255, 210, 106, .5); background: rgba(255, 210, 106, .1); }
+.stat-pill.spent { color: var(--muted); opacity: .8; }
+
 .hpbar {
-  height: 7px;
-  margin-top: .45rem;
+  height: 8px;
+  margin-top: .5rem;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .08);
+  background: rgba(0, 0, 0, .45);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .5);
 }
 
 .hpfill {
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #4fd18a, #9bf2bd);
-  transition: width .25s ease;
+  background: var(--hp-high);
+  transition: width .25s ease, background .2s ease;
 }
 
+.hpfill.hp-high { background: linear-gradient(90deg, #3fbf86, var(--hp-high)); }
+.hpfill.hp-mid { background: linear-gradient(90deg, #e0ab3c, var(--hp-mid)); }
+.hpfill.hp-low { background: linear-gradient(90deg, #e0566a, var(--hp-low)); }
+
+/* ----------------------------------------------------------------------- */
+/* Battle menu — command tiles                                             */
+/* ----------------------------------------------------------------------- */
 .actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(56px, 74px));
   gap: .45rem;
 }
 
 .actions button {
-  padding: .65rem .3rem;
-  font-size: .78rem;
-  font-weight: 750;
+  display: flex;
+  flex-direction: column;
+  gap: .12rem;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 54px;
+  padding: .45rem .25rem;
+  border-radius: var(--radius-tile);
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: .02em;
+  text-transform: uppercase;
 }
 
+/* Icon glyph stacked above each command label. */
+.actions button::before {
+  font-size: 1.2rem;
+  line-height: 1;
+  font-weight: 400;
+}
+
+#moveBtn::before { content: "➜"; color: var(--act-move); }
+#attackBtn::before { content: "⚔"; color: var(--act-attack); }
+#healBtn::before { content: "✚"; color: var(--act-heal); }
+#defendBtn::before { content: "◈"; color: var(--act-defend); }
+#cancelMoveBtn::before { content: "↺"; color: var(--act-cancel); }
+#finishBtn::before { content: "✓"; color: var(--act-finish); }
+
+/* Tile bottom accent bar tinted per command. */
+#moveBtn { border-bottom: 2px solid rgba(93, 180, 255, .5); }
+#attackBtn { border-bottom: 2px solid rgba(255, 111, 126, .5); }
+#healBtn { border-bottom: 2px solid rgba(95, 227, 156, .5); }
+#defendBtn { border-bottom: 2px solid rgba(255, 210, 106, .5); }
+#cancelMoveBtn { border-bottom: 2px solid rgba(255, 176, 77, .5); }
+#finishBtn { border-bottom: 2px solid rgba(182, 194, 212, .5); }
+
 .action-help {
-  min-height: 2em;
-  margin-top: .5rem;
-  color: var(--muted);
+  display: flex;
+  gap: .4rem;
+  align-items: flex-start;
+  min-height: 2.4em;
+  margin-top: .65rem;
+  padding: .45rem .55rem;
+  border: 1px solid var(--console-edge-soft);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, .25);
+  color: #b6bfcd;
   font-size: .72rem;
   line-height: 1.35;
 }
 
+.action-help::before {
+  content: "›";
+  color: var(--gold);
+  font-weight: 900;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Squad roster chips                                                       */
+/* ----------------------------------------------------------------------- */
 .squad-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: .4rem;
+  gap: .45rem;
 }
 
 .squad-chip {
+  position: relative;
   min-width: 0;
-  padding: .45rem .35rem;
+  padding: .5rem .35rem .45rem;
   border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .035);
-  font-size: .68rem;
+  border-top: 2px solid rgba(255, 255, 255, .12);
+  border-radius: var(--radius-tile);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 60%),
+    rgba(10, 13, 20, .55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  font-size: .66rem;
+  font-weight: 700;
   text-align: center;
 }
 
+/* Chips inherit --team from their squad panel, so the top accent matches the
+   player's roster color in every mode. */
+.squad-panel .squad-chip {
+  border-top-color: var(--team, rgba(255, 255, 255, .12));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--team, #ffffff) 25%, transparent);
+}
+
+.chip-bar {
+  height: 5px;
+  margin: .34rem 0 .24rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .5);
+}
+
+.chip-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--hp-high);
+  transition: width .2s ease, background .2s ease;
+}
+
+.chip-bar-fill.hp-high { background: var(--hp-high); }
+.chip-bar-fill.hp-mid { background: var(--hp-mid); }
+.chip-bar-fill.hp-low { background: var(--hp-low); }
+
 .squad-chip.spent {
-  opacity: .35;
+  opacity: .4;
   filter: grayscale(.6);
 }
 
+/* Spent stamp in the corner. */
+.squad-chip.spent::after {
+  content: "✓";
+  position: absolute;
+  top: .25rem;
+  right: .32rem;
+  color: var(--muted);
+  font-size: .6rem;
+  font-weight: 900;
+}
+
 .squad-chip.dead {
-  opacity: .2;
+  opacity: .22;
   text-decoration: line-through;
 }
 
 .squad-chip.defending {
-  box-shadow: inset 0 0 0 1px rgba(255, 210, 106, .6);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 210, 106, .6),
+    0 0 12px rgba(255, 210, 106, .2);
 }
 
 .squad-chip .chip-icon {
   display: block;
-  margin-bottom: .1rem;
-  font-size: 1rem;
+  margin-bottom: .12rem;
+  font-size: 1.05rem;
 }
 
 .squad-chip .chip-hp {
   color: var(--muted);
   font-size: .62rem;
+  font-variant-numeric: tabular-nums;
 }

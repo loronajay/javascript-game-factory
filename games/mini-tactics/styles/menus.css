@@ -1,0 +1,275 @@
+/* =======================================================================
+   Screen system + menu / setup / results screens.
+
+   The screen manager (src/ui/screens/screenManager.js) toggles `.is-active`
+   on exactly one `.screen` at a time. Base screens are hidden; the active one
+   is shown with its own layout (`.match-screen` keeps the board grid in
+   layout.css; `.menu-screen` centers a card here).
+   ======================================================================= */
+
+.screen {
+  display: none;
+}
+
+.menu-screen.is-active {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding:
+    max(1.2rem, env(safe-area-inset-top))
+    max(1.2rem, env(safe-area-inset-right))
+    max(1.2rem, env(safe-area-inset-bottom))
+    max(1.2rem, env(safe-area-inset-left));
+  overflow: auto;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Menu card — shared shell for title, menu, setup, and results            */
+/* ----------------------------------------------------------------------- */
+.menu-card {
+  width: min(440px, 100%);
+  padding: 1.8rem 1.6rem 1.6rem;
+  border: 1px solid var(--console-edge);
+  border-radius: var(--radius-console);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 22%),
+    linear-gradient(180deg, rgba(24, 30, 43, .96), rgba(11, 15, 23, .97));
+  box-shadow: var(--console-shadow);
+  text-align: center;
+}
+
+.title-card {
+  padding-top: 2.2rem;
+}
+
+/* Faceted brand emblem, echoing the topbar brand mark. */
+.title-mark {
+  width: 3.2rem;
+  height: 3.2rem;
+  margin: 0 auto 1rem;
+  border-radius: 9px;
+  background: conic-gradient(from 45deg, var(--p1), var(--gold), var(--p2), var(--p1));
+  box-shadow: 0 0 26px rgba(255, 210, 106, .4);
+  transform: rotate(45deg);
+}
+
+.title-name {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.title-sub {
+  margin: .35rem 0 1.6rem;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.menu-heading {
+  margin: 0 0 .4rem;
+  font-size: 1.4rem;
+  font-weight: 850;
+  letter-spacing: .04em;
+}
+
+.menu-note {
+  margin: 0 0 1.3rem;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Stacked menu buttons                                                    */
+/* ----------------------------------------------------------------------- */
+.menu-buttons {
+  display: grid;
+  gap: .6rem;
+  margin-top: 1.4rem;
+}
+
+.menu-btn {
+  width: 100%;
+  padding: .8rem 1rem;
+  font-size: .92rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+
+.menu-btn.ghost {
+  background: rgba(255, 255, 255, .03);
+  border-color: var(--console-edge-soft);
+  color: var(--muted);
+}
+
+/* "Soon" badge on disabled, not-yet-built modes. */
+.soon {
+  margin-left: .5rem;
+  padding: .12rem .42rem;
+  border: 1px solid var(--console-edge-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .06);
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Setup fields + segmented controls                                       */
+/* ----------------------------------------------------------------------- */
+.setup-field {
+  display: grid;
+  gap: .55rem;
+  margin: 1.2rem 0 .4rem;
+  text-align: left;
+}
+
+.setup-label {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: .4rem;
+  padding: .35rem;
+  border: 1px solid var(--console-edge-soft);
+  border-radius: var(--radius-tile);
+  background: rgba(0, 0, 0, .28);
+}
+
+.segmented .seg {
+  padding: .6rem .5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+
+.segmented .seg.is-selected {
+  border-color: rgba(103, 199, 255, .55);
+  background:
+    linear-gradient(180deg, rgba(103, 199, 255, .16), rgba(103, 199, 255, .04));
+  color: var(--text);
+  box-shadow: inset 0 0 14px rgba(103, 199, 255, .14);
+}
+
+.segmented .seg:disabled {
+  cursor: not-allowed;
+  opacity: .3;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Team color pickers                                                      */
+/* ----------------------------------------------------------------------- */
+.team-colors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .6rem;
+}
+
+.team-color {
+  display: grid;
+  gap: .4rem;
+  padding: .55rem .5rem;
+  border: 1px solid var(--console-edge-soft);
+  border-radius: var(--radius-tile);
+  background: rgba(0, 0, 0, .28);
+}
+
+.team-color-name {
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.swatches {
+  display: flex;
+  gap: .4rem;
+}
+
+.swatch {
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, .14);
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .25);
+}
+
+.swatch:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.swatch.is-selected {
+  border-color: #fff;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, .4),
+    0 0 12px color-mix(in srgb, var(--swatch) 70%, transparent);
+}
+
+.swatch:disabled {
+  cursor: not-allowed;
+  opacity: .28;
+  filter: grayscale(.5);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Results screen                                                          */
+/* ----------------------------------------------------------------------- */
+.results-winner {
+  margin: .2rem 0 1.2rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.results-winner[style*="--team"] {
+  color: color-mix(in srgb, var(--team) 55%, #ffffff);
+}
+
+.results-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .5rem 1rem;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--console-edge-soft);
+  border-radius: var(--radius-tile);
+  background: rgba(0, 0, 0, .25);
+  text-align: left;
+}
+
+.results-stats dt {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.results-stats dd {
+  margin: 0;
+  font-size: .82rem;
+  font-weight: 700;
+  text-align: right;
+}

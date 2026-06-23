@@ -20,6 +20,7 @@ export class MapData {
     this.tiles = new Uint8Array(width * height);
     this.variance = new Float32Array(width * height);
     this.destructibles = new Map();
+    this.staticColliders = new Map();
     this.resourceNodes = [];
     // Authored map entities are declarative. Systems may later turn these into
     // live structures, deposits, or neutral units without rediscovering intent
@@ -61,6 +62,19 @@ export class MapData {
         if (dx * dx + dy * dy < radius * radius) return false;
       }
     }
+    for (const collider of this.staticColliders.values()) {
+      if (collider.blocksMovement === false) continue;
+      const dx = worldX - collider.x;
+      const dy = worldY - collider.y;
+      const minDistance = radius + collider.radius;
+      if (dx * dx + dy * dy < minDistance * minDistance) return false;
+    }
+    return true;
+  }
+
+  addStaticCollider(collider) {
+    if (!collider?.id || !Number.isFinite(collider.x) || !Number.isFinite(collider.y) || !Number.isFinite(collider.radius)) return false;
+    this.staticColliders.set(collider.id, collider);
     return true;
   }
 

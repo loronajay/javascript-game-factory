@@ -2,7 +2,7 @@ import { CONFIG } from './config.js';
 import { TILE } from './map.js';
 
 export class Renderer {
-  constructor(canvas, map, camera, units, fog, input) {
+  constructor(canvas, map, camera, units, fog, input, entities = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.map = map;
@@ -10,6 +10,7 @@ export class Renderer {
     this.units = units;
     this.fog = fog;
     this.input = input;
+    this.entities = entities;
   }
 
   render() {
@@ -17,6 +18,7 @@ export class Renderer {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawMap(ctx);
     this.drawResourceNodes(ctx);
+    this.drawEntities(ctx);
     this.drawLandmarks(ctx);
     this.drawUnits(ctx);
     this.drawFog(ctx);
@@ -140,6 +142,7 @@ export class Renderer {
 
   drawLandmarks(ctx) {
     for (const landmark of this.map.landmarks) {
+      if (!shouldRenderMapLandmark(landmark)) continue;
       const p = this.camera.worldToScreen(
         (landmark.tileX + 0.5) * this.map.tileSize,
         (landmark.tileY + 0.5) * this.map.tileSize,
@@ -147,6 +150,63 @@ export class Renderer {
       if (p.x < -42 || p.y < -42 || p.x > this.camera.viewportWidth + 42 || p.y > this.camera.viewportHeight + 42) continue;
       drawMapLandmark(ctx, landmark, p.x, p.y);
     }
+  }
+
+  drawEntities(ctx) {
+    if (!this.entities) return;
+    for (const entity of this.entities.entities) {
+      if (entity.kind !== 'nexus') continue;
+      if (entity.team !== 1 && !entity.discovered && !this.input.showFogDebug) continue;
+      const tile = this.map.worldToTile(entity.x, entity.y);
+      if (!this.fog.isVisible(tile.x, tile.y) && entity.team !== 1 && !this.input.showFogDebug) continue;
+      const p = this.camera.worldToScreen(entity.x, entity.y);
+      if (p.x < -80 || p.y < -80 || p.x > this.camera.viewportWidth + 80 || p.y > this.camera.viewportHeight + 80) continue;
+      this.drawNexus(ctx, entity, p.x, p.y);
+    }
+  }
+
+  drawNexus(ctx, entity, sx, sy) {
+    const friendly = entity.team === 1;
+    const core = friendly ? '#246bff' : '#f04458';
+    const glow = friendly ? 'rgba(62, 139, 255, 0.85)' : 'rgba(255, 80, 96, 0.85)';
+    const hpPct = Math.max(0, Math.min(1, entity.hp / entity.maxHp));
+    const pulse = 0.5 + Math.sin(this.units.simTime * 2.3) * 0.5;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.fillStyle = 'rgba(0,0,0,0.48)';
+    ctx.beginPath();
+    ctx.ellipse(3, 16, 42, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 15 + pulse * 10;
+    ctx.fillStyle = '#07101e';
+    ctx.beginPath();
+    ctx.arc(0, 0, entity.radius + 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = core;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, entity.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = core;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(0, 0, entity.radius * 0.56, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#e8f8ff';
+    ctx.beginPath();
+    ctx.arc(-8, -8, 7, 0, Math.PI * 2);
+    ctx.arc(9, 5, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(-34, -entity.radius - 16, 68, 6);
+    ctx.fillStyle = hpPct > 0.4 ? core : '#ffbd5d';
+    ctx.fillRect(-33, -entity.radius - 15, 66 * hpPct, 4);
+    ctx.restore();
   }
 
   drawResourceNodes(ctx) {
@@ -897,6 +957,12 @@ export class Renderer {
     ctx.fillText('MINIMAP', x0, y0 + size + 15);
     ctx.restore();
   }
+}
+
+export function shouldRenderMapLandmark(landmark) {
+  // These are now live world actors. Their authored landmarks remain map data
+  // for spawning and future systems, but rendering them again is duplicate UI.
+  return landmark.kind !== 'nexus' && landmark.kind !== 'drifter';
 }
 
 function drawMapLandmark(ctx, landmark, x, y) {

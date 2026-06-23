@@ -51,6 +51,11 @@ export class CommandSystem {
         const ok = this.units.attackUnitsUnit(command.unitIds, target, command.team);
         return { ok, command, marker: ok && target ? { kind: 'attack', x: target.x, y: target.y } : null };
       }
+      case 'ATTACK_ENTITY': {
+        const target = this.units.getEntityById(command.targetId);
+        const ok = this.units.attackUnitsEntity(command.unitIds, command.targetId, command.team);
+        return { ok, command, marker: ok && target ? { kind: 'attack', x: target.x, y: target.y } : null };
+      }
       case 'ATTACK_DESTRUCTIBLE': {
         const ok = this.units.attackUnitsDestructible(command.unitIds, command.tile.x, command.tile.y, command.team);
         const center = this.map.tileCenter(command.tile.x, command.tile.y);
@@ -88,6 +93,10 @@ export function createMoveCommand(unitIds, x, y) {
 
 export function createAttackUnitCommand(unitIds, targetId) {
   return { type: 'ATTACK_UNIT', unitIds, targetId };
+}
+
+export function createAttackEntityCommand(unitIds, targetId) {
+  return { type: 'ATTACK_ENTITY', unitIds, targetId };
 }
 
 export function createAttackDestructibleCommand(unitIds, x, y) {

@@ -1,16 +1,51 @@
 :root {
   color-scheme: dark;
 
-  --bg: #090b10;
+  --bg: #070910;
   --panel: rgba(18, 22, 31, .92);
   --panel-line: rgba(255, 255, 255, .12);
   --text: #f2f4f8;
   --muted: #9ea7b5;
   --p1: #67c7ff;
   --p2: #ff6c7c;
+  --p3: #6ddf7a;
+  --p4: #ffac5c;
   --gold: #ffd26a;
   --good: #73e6a6;
   --danger: #ff7684;
+
+  /* Health tones — shared by board pieces, the unit card, and squad chips. */
+  --hp-high: #5fe39c;
+  --hp-mid: #ffcf5e;
+  --hp-low: #ff6f7e;
+
+  /* --- Command-console material system ---------------------------------- */
+  /* Layered "brushed panel" fill: top sheen, body, deep base. Reused by every
+     console plate so the HUD reads as one machined surface. */
+  --console-fill:
+    linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0) 18%),
+    linear-gradient(180deg, rgba(28, 35, 49, .96), rgba(12, 16, 24, .97));
+  --console-edge: rgba(120, 145, 185, .28);
+  --console-edge-soft: rgba(255, 255, 255, .06);
+  --console-shadow:
+    0 18px 40px rgba(0, 0, 0, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    inset 0 0 0 1px rgba(8, 11, 18, .6);
+
+  /* Faction wash applied behind the two squad consoles. */
+  --p1-wash: rgba(60, 140, 210, .16);
+  --p2-wash: rgba(210, 70, 90, .16);
+
+  /* Per-action command accents for the battle menu. */
+  --act-move: #5db4ff;
+  --act-attack: #ff6f7e;
+  --act-heal: #5fe39c;
+  --act-defend: #ffd26a;
+  --act-cancel: #ffb04d;
+  --act-finish: #b6c2d4;
+
+  --radius-console: 16px;
+  --radius-tile: 11px;
 }
 
 * {
@@ -28,8 +63,9 @@ body {
   color: var(--text);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 50% 35%, rgba(65, 83, 122, .18), transparent 42%),
-    linear-gradient(180deg, #0c1018 0%, #07090e 100%);
+    radial-gradient(circle at 50% 30%, rgba(70, 95, 145, .22), transparent 45%),
+    radial-gradient(circle at 50% 120%, rgba(40, 30, 60, .25), transparent 55%),
+    linear-gradient(180deg, #0c1018 0%, #05070b 100%);
 }
 
 button,
@@ -38,44 +74,65 @@ select {
   color: inherit;
 }
 
+/* Base command button: machined plate with a bright top bevel. */
 button {
+  position: relative;
   padding: .62rem .8rem;
   cursor: pointer;
   touch-action: manipulation;
-  border: 1px solid rgba(255, 255, 255, .15);
+  border: 1px solid var(--console-edge);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .04));
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: .02em;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, rgba(40, 49, 66, .95), rgba(16, 21, 30, .96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    0 4px 10px rgba(0, 0, 0, .35);
+  transition: transform .1s ease, border-color .15s ease, box-shadow .15s ease, filter .15s ease;
 }
 
 button:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, .35);
+  border-color: rgba(180, 205, 245, .55);
+  filter: brightness(1.12);
   transform: translateY(-1px);
 }
 
 button:active:not(:disabled) {
   transform: translateY(0);
+  filter: brightness(.96);
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: .35;
+  opacity: .32;
+  filter: saturate(.5);
 }
 
 button.primary {
-  border-color: rgba(103, 199, 255, .55);
-  box-shadow: inset 0 0 20px rgba(103, 199, 255, .07);
+  border-color: rgba(103, 199, 255, .6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .14),
+    inset 0 0 18px rgba(103, 199, 255, .12),
+    0 4px 10px rgba(0, 0, 0, .35);
 }
 
 button.danger {
-  border-color: rgba(255, 108, 124, .55);
+  border-color: rgba(255, 108, 124, .6);
 }
 
 button.cancel {
-  border-color: rgba(255, 184, 77, .55);
-  box-shadow: inset 0 0 20px rgba(255, 184, 77, .06);
+  border-color: rgba(255, 184, 77, .6);
 }
 
+/* Active command tile: charged gold frame so the chosen action is unmistakable. */
 button.active {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 0 0 1px var(--gold),
+    inset 0 0 22px rgba(255, 210, 106, .28),
+    0 0 18px rgba(255, 210, 106, .35);
+  filter: brightness(1.08);
 }

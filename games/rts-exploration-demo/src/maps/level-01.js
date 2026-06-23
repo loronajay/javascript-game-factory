@@ -41,7 +41,6 @@ export const level01 = {
     transitWall([0, 40], [12, 40], [25, 29], [29, 29], [38, 39], [38, 48], [29, 57], [20, 57]),
     objectiveWall([0, 49], [11, 49], [20, 58], [20, 73], [13, 80], [0, 80]),
     transitWall([57, 40], [72, 40], [86, 55], [86, 71], [72, 85], [56, 85], [42, 72]),
-    transitWall([128, 49], [116, 49], [108, 56], [108, 72], [116, 80], [128, 80]),
     transitWall([0, 91], [17, 91], [33, 77], [42, 86], [54, 86], [39, 106], [39, 128]),
     transitWall([0, 100], [11, 100], [21, 110], [31, 119], [31, 128]),
     transitWall([128, 88], [116, 88], [103, 101], [92, 112], [81, 112], [81, 128]),
@@ -53,10 +52,9 @@ export const level01 = {
     objectiveWall([59, 47], [69, 47], [79, 57], [79, 69], [70, 79], [58, 79], [48, 69], [48, 57]),
     transitWall([95, 70], [101, 70], [109, 78], [109, 86], [101, 95], [95, 95], [89, 89], [89, 78]),
 
-    // Smaller reference cells and the incomplete bottom cell.
+    // Smaller reference cells.
     transitWall([25, 30], [29, 30], [37, 39], [37, 48], [29, 56], [25, 56], [19, 49], [19, 45]),
     transitWall([78, 91], [82, 88], [89, 96], [89, 104], [82, 111], [76, 111], [72, 107], [72, 97]),
-    transitWall([58, 109], [69, 109], [75, 115], [75, 128]),
 
     // The reference is clean dark terrain; decoration will return only when it
     // has an authored visual role instead of obscuring navigation readability.

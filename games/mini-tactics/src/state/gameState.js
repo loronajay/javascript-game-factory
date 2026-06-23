@@ -1,18 +1,55 @@
-import { DEFAULT_BOARD_SIZE, MAX_HP } from "../config.js";
+import { DEFAULT_BOARD_SIZE, MAX_HP, PLAYER_COLORS } from "../config.js";
 
-export function createInitialUnits(size) {
+// The four board corners, indexed 0-3. A roster entry carries a corner index
+// (assigned in core/roster.js); this table is the single place those indices
+// resolve to coordinates. Index order is also the default free-for-all seat
+// order, and 0/1 reproduce the original P1/P2 placement exactly.
+//   0: (0,   max)   1: (max, 0)   2: (0,   0)   3: (max, max)
+function cornerAnchors(size) {
   const max = size - 1;
+  return [
+    { cx: 0, cy: max },
+    { cx: max, cy: 0 },
+    { cx: 0, cy: 0 },
+    { cx: max, cy: max }
+  ];
+}
+
+// Default roster shape used when no explicit roster is supplied (the classic
+// two-player duel). Kept here so createInitialUnits(size) stays a drop-in.
+const DEFAULT_TWO_PLAYER_ROSTER = Object.freeze([
+  Object.freeze({ id: 1, corner: 0 }),
+  Object.freeze({ id: 2, corner: 1 })
+]);
+
+// Each squad spawns as a 2x2 block tucked into its corner. The melee/support
+// pair (tank + medic) takes the inner edge facing board center; warrior + ranger
+// shelter behind on the outer edge. Driven by the roster so 1-4 squads place
+// from the same rule.
+export function createInitialUnits(size, roster = DEFAULT_TWO_PLAYER_ROSTER) {
+  const anchors = cornerAnchors(size);
+  const units = [];
+
+  for (const slot of roster) {
+    units.push(...createSquad(slot.id, anchors[slot.corner]));
+  }
+
+  return units;
+}
+
+function createSquad(playerId, { cx, cy }) {
+  // Step one tile inward (toward board center) on each axis. The inner column
+  // is the front line; the outer column (the literal corner) is the back line.
+  const inwardX = cx === 0 ? 1 : -1;
+  const inwardY = cy === 0 ? 1 : -1;
+  const innerCol = cx + inwardX;
+  const innerRow = cy + inwardY;
 
   return [
-    createUnit("p1-warrior", 1, "warrior", 1, max - 1),
-    createUnit("p1-tank", 1, "tank", 0, max),
-    createUnit("p1-ranger", 1, "ranger", 2, max),
-    createUnit("p1-medic", 1, "medic", 3, max),
-
-    createUnit("p2-warrior", 2, "warrior", max - 1, 1),
-    createUnit("p2-tank", 2, "tank", max, 0),
-    createUnit("p2-ranger", 2, "ranger", max - 2, 0),
-    createUnit("p2-medic", 2, "medic", max - 3, 0)
+    createUnit(`p${playerId}-tank`, playerId, "tank", innerCol, innerRow),
+    createUnit(`p${playerId}-medic`, playerId, "medic", innerCol, cy),
+    createUnit(`p${playerId}-warrior`, playerId, "warrior", cx, innerRow),
+    createUnit(`p${playerId}-ranger`, playerId, "ranger", cx, cy)
   ];
 }
 
@@ -62,4 +99,36 @@ export function unitAt(state, x, y) {
   return state.units.find(
     (unit) => unit.hp > 0 && unit.x === x && unit.y === y
   ) ?? null;
+}
+
+// Team identity is the single source of truth for friend/foe across every mode.
+// In free-for-all (and the legacy two-player duel) each player is its own team,
+// so when no roster is present we fall back to "player is its own team" — which
+// keeps the old player=== comparisons behaving identically.
+export function teamOf(state, player) {
+  const roster = state.players;
+  if (Array.isArray(roster)) {
+    const entry = roster.find((slot) => slot.id === player);
+    if (entry) return entry.team;
+  }
+  return player;
+}
+
+// Accepts unit objects or raw player ids on either side.
+export function sameTeam(state, a, b) {
+  const playerA = a !== null && typeof a === "object" ? a.player : a;
+  const playerB = b !== null && typeof b === "object" ? b.player : b;
+  return teamOf(state, playerA) === teamOf(state, playerB);
+}
+
+// The authoritative display color for a player, read from the roster so renderers
+// never derive color from the slot number. Falls back to the static slot palette
+// for roster-less states (the prototype createGameState path).
+export function colorOf(state, player) {
+  const roster = state.players;
+  if (Array.isArray(roster)) {
+    const entry = roster.find((slot) => slot.id === player);
+    if (entry?.color) return entry.color;
+  }
+  return PLAYER_COLORS[player] ?? PLAYER_COLORS[1];
 }

@@ -8,6 +8,7 @@ export function getUiElements(documentRef = document) {
     message: required(documentRef, "message"),
     diceOverlay: required(documentRef, "diceOverlay"),
     dieFace: required(documentRef, "dieFace"),
+    turnBanner: required(documentRef, "turnBanner"),
     turnTitle: required(documentRef, "turnTitle"),
     turnSub: required(documentRef, "turnSub"),
     unitCard: required(documentRef, "unitCard"),
@@ -18,13 +19,8 @@ export function getUiElements(documentRef = document) {
     defendBtn: required(documentRef, "defendBtn"),
     cancelMoveBtn: required(documentRef, "cancelMoveBtn"),
     finishBtn: required(documentRef, "finishBtn"),
-    p1Squad: required(documentRef, "p1Squad"),
-    p2Squad: required(documentRef, "p2Squad"),
-    restartBtn: required(documentRef, "restartBtn"),
-    rulesBtn: required(documentRef, "rulesBtn"),
-    rulesModal: required(documentRef, "rulesModal"),
-    closeRulesBtn: required(documentRef, "closeRulesBtn"),
-    boardSizeSelect: required(documentRef, "boardSizeSelect")
+    squadOverlays: required(documentRef, "squadOverlays"),
+    restartBtn: required(documentRef, "restartBtn")
   };
 }
 

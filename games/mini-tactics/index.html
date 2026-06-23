@@ -3,102 +3,200 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Isometric Squad Tactics</title>
+  <title>Mini-Tactics</title>
 
   <link rel="stylesheet" href="./styles/tokens.css">
   <link rel="stylesheet" href="./styles/layout.css">
+  <link rel="stylesheet" href="./styles/menus.css">
   <link rel="stylesheet" href="./styles/board.css">
   <link rel="stylesheet" href="./styles/effects.css">
   <link rel="stylesheet" href="./styles/responsive.css">
 </head>
 <body>
   <div id="app">
-    <header class="topbar">
-      <div class="brand">Isometric Squad Tactics</div>
 
-      <div class="turn-banner">
-        <div id="turnTitle" class="turn-title">Player 1 squad turn</div>
-        <div id="turnSub" class="turn-sub">Select an unspent piece</div>
+    <!-- ============================== TITLE ============================== -->
+    <section class="screen menu-screen" data-screen="title">
+      <div class="menu-card title-card">
+        <div class="title-mark"></div>
+        <h1 class="title-name">Mini-Tactics</h1>
+        <p class="title-sub">Isometric Squad Tactics</p>
+
+        <div class="menu-buttons">
+          <button data-nav="mainMenu" class="primary menu-btn">Continue</button>
+          <button data-action="rules" class="menu-btn">How to Play</button>
+          <button class="menu-btn" disabled>Settings <span class="soon">Soon</span></button>
+        </div>
       </div>
+    </section>
 
-      <div class="top-actions">
-        <button id="rulesBtn">Rules</button>
-        <button id="restartBtn" class="danger">Restart</button>
+    <!-- ============================ MAIN MENU =========================== -->
+    <section class="screen menu-screen" data-screen="mainMenu">
+      <div class="menu-card">
+        <h2 class="menu-heading">Main Menu</h2>
+
+        <div class="menu-buttons">
+          <button class="menu-btn" disabled>Single Player <span class="soon">Soon</span></button>
+          <button data-nav="hsSetup" class="primary menu-btn">Hot Seat</button>
+          <button class="menu-btn" disabled>Online Versus <span class="soon">Soon</span></button>
+          <button data-action="rules" class="menu-btn">How to Play</button>
+          <button class="menu-btn" disabled>Settings <span class="soon">Soon</span></button>
+          <button data-nav="title" class="menu-btn ghost">Back</button>
+        </div>
       </div>
-    </header>
+    </section>
 
-    <main id="stageWrap">
-      <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Isometric tactics board">
-        <defs>
-          <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="5" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
+    <!-- ========================= HOT SEAT SETUP ========================= -->
+    <section class="screen menu-screen" data-screen="hsSetup">
+      <div class="menu-card">
+        <h2 class="menu-heading">Hot Seat</h2>
+        <p class="menu-note">One screen. Pass the device at each squad turn.</p>
 
-          <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#6da4ff" stop-opacity=".18"/>
-            <stop offset="100%" stop-color="#6da4ff" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-
-        <ellipse cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
-        <g id="boardLayer"></g>
-        <g id="overlayLayer"></g>
-        <g id="unitsLayer"></g>
-        <g id="fxLayer"></g>
-      </svg>
-
-      <div id="message" role="status" aria-live="polite"></div>
-
-      <div id="diceOverlay" aria-hidden="true">
-        <div class="die" id="dieFace">1</div>
-      </div>
-    </main>
-
-    <footer class="hud">
-      <section class="panel squad-panel">
-        <div class="panel-title">Player 1 squad</div>
-        <div id="p1Squad" class="squad-list"></div>
-      </section>
-
-      <section class="panel">
-        <div id="unitCard" class="unit-card">
-          <div class="unit-emblem">?</div>
-          <div>
-            <div class="unit-name">No piece selected</div>
-            <div class="unit-meta">Choose an unspent unit on the board.</div>
-            <div class="hpbar"><div class="hpfill" style="width:0%"></div></div>
+        <div class="setup-field">
+          <span class="setup-label">Players</span>
+          <div class="segmented" data-field="playerCount">
+            <button type="button" class="seg is-selected" data-count="2">2</button>
+            <button type="button" class="seg" data-count="3">3</button>
+            <button type="button" class="seg" data-count="4">4</button>
           </div>
         </div>
 
-        <div class="panel-title panel-title-actions">Actions</div>
-
-        <div class="actions">
-          <button id="moveBtn" class="primary" disabled>Move</button>
-          <button id="attackBtn" disabled>Attack</button>
-          <button id="healBtn" disabled>Heal</button>
-          <button id="defendBtn" disabled>Defend</button>
-          <button id="cancelMoveBtn" class="cancel" disabled>Cancel Move</button>
-          <button id="finishBtn" disabled>Finish</button>
+        <div class="setup-field" data-group="format" hidden>
+          <span class="setup-label">Format</span>
+          <div class="segmented" data-field="format">
+            <button type="button" class="seg is-selected" data-format="ffa">Free-for-all</button>
+            <button type="button" class="seg" data-format="teams">Teams · 2v2</button>
+          </div>
         </div>
 
-        <div id="actionHelp" class="action-help">
-          A piece cannot finish after moving alone; it must attack, heal, or defend.
+        <div class="setup-field" data-group="teamColors" hidden>
+          <span class="setup-label">Team colors</span>
+          <div class="team-colors">
+            <div class="team-color" data-team="1">
+              <span class="team-color-name">Team 1</span>
+              <div class="swatches" data-swatches="1"></div>
+            </div>
+            <div class="team-color" data-team="2">
+              <span class="team-color-name">Team 2</span>
+              <div class="swatches" data-swatches="2"></div>
+            </div>
+          </div>
         </div>
-      </section>
 
-      <section class="panel squad-panel">
-        <div class="panel-title">Player 2 squad</div>
-        <div id="p2Squad" class="squad-list"></div>
-      </section>
-    </footer>
+        <div class="setup-field">
+          <span class="setup-label">Board size</span>
+          <div class="segmented" data-field="boardSize">
+            <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
+            <button type="button" class="seg" data-size="13">13 × 13</button>
+          </div>
+        </div>
 
+        <div class="menu-buttons">
+          <button data-action="startHotSeat" class="primary menu-btn">Start Match</button>
+          <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ RESULTS ============================= -->
+    <section class="screen menu-screen" data-screen="results">
+      <div class="menu-card">
+        <h2 class="menu-heading" data-results="title">Victory</h2>
+        <p class="results-winner" data-results="winner"></p>
+
+        <dl class="results-stats" data-results="stats"></dl>
+
+        <div class="menu-buttons">
+          <button data-action="rematch" class="primary menu-btn">Rematch</button>
+          <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================= MATCH ============================== -->
+    <section class="screen match-screen" data-screen="match">
+      <header class="topbar">
+        <div class="brand">Mini-Tactics</div>
+
+        <div id="turnBanner" class="turn-banner">
+          <div id="turnTitle" class="turn-title">Player 1 squad turn</div>
+          <div id="turnSub" class="turn-sub">Select an unspent piece</div>
+        </div>
+
+        <div class="top-actions">
+          <button id="rulesBtn">Rules</button>
+          <button id="restartBtn" class="danger">Restart</button>
+          <button id="quitBtn">Menu</button>
+        </div>
+      </header>
+
+      <main id="stageWrap">
+        <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Mini-Tactics board">
+          <defs>
+            <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur stdDeviation="5" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+
+            <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#6da4ff" stop-opacity=".18"/>
+              <stop offset="100%" stop-color="#6da4ff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
+          <g id="boardLayer"></g>
+          <g id="overlayLayer"></g>
+          <g id="unitsLayer"></g>
+          <g id="fxLayer"></g>
+        </svg>
+
+        <!-- Squad rosters float over the empty corner triangles of the iso diamond
+             so they cost the battlefield no vertical space. The HUD renderer builds
+             one panel per player (2-4) into this layer from the live roster. -->
+        <div id="squadOverlays" class="squad-overlays"></div>
+
+        <div id="message" role="status" aria-live="polite"></div>
+
+        <div id="diceOverlay" aria-hidden="true">
+          <div class="die" id="dieFace">1</div>
+        </div>
+      </main>
+
+      <footer class="hud">
+        <section class="panel command-console">
+          <div id="unitCard" class="unit-card">
+            <div class="unit-emblem">?</div>
+            <div>
+              <div class="unit-name">No piece selected</div>
+              <div class="unit-meta">Choose an unspent unit on the board.</div>
+              <div class="hpbar"><div class="hpfill" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="moveBtn" class="primary" disabled>Move</button>
+            <button id="attackBtn" disabled>Attack</button>
+            <button id="healBtn" disabled>Heal</button>
+            <button id="defendBtn" disabled>Defend</button>
+            <button id="cancelMoveBtn" class="cancel" disabled>Cancel Move</button>
+            <button id="finishBtn" disabled>Finish</button>
+          </div>
+
+          <div id="actionHelp" class="action-help">
+            A piece cannot finish after moving alone; it must attack, heal, or defend.
+          </div>
+        </section>
+      </footer>
+    </section>
+
+    <!-- Global rules overlay — reachable from the title, main menu, and match. -->
     <div id="rulesModal">
       <div class="modal-card">
-        <h2>Prototype rules</h2>
+        <h2>How to play</h2>
 
         <ul>
           <li>Each player activates every living piece once, then the squad turn changes.</li>
@@ -113,17 +211,7 @@
           <li>Last squad standing wins.</li>
         </ul>
 
-        <p><strong>Current configurable assumption:</strong> medic heal range is 3.</p>
-
         <div class="modal-row">
-          <label>
-            Board size
-            <select id="boardSizeSelect">
-              <option value="10">10×10</option>
-              <option value="13">13×13</option>
-            </select>
-          </label>
-
           <button id="closeRulesBtn">Close</button>
         </div>
       </div>

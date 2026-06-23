@@ -1,16 +1,46 @@
 export function createBoardMetrics(size) {
   const tileWidth = size >= 13 ? 58 : 68;
   const tileHeight = tileWidth / 2;
-  const boardPixelHeight = size * tileHeight;
 
   return {
     tileWidth,
     tileHeight,
     depth: Math.max(8, tileHeight * 0.28),
     originX: 600,
-    originY: 75 + (size >= 13 ? 5 : 15),
-    viewHeight: Math.max(700, 145 + boardPixelHeight + 150)
+    originY: 75 + (size >= 13 ? 5 : 15)
   };
+}
+
+// Tight pixel bounds of the rendered board (top tile faces plus the depth
+// skirt on the bottom tiles). The viewBox is built from this so the board fills
+// the stage instead of floating inside a fixed oversized canvas.
+export function createBoardBounds(metrics, size) {
+  const { tileWidth, tileHeight, depth, originX, originY } = metrics;
+  const halfWidth = tileWidth / 2;
+  const span = (size - 1) * halfWidth;
+
+  return {
+    minX: originX - span - halfWidth,
+    maxX: originX + span + halfWidth,
+    minY: originY,
+    maxY: originY + (size - 1) * tileHeight + tileHeight + depth
+  };
+}
+
+// Bounds expanded with breathing room for effects (rising float text, expanding
+// hit rings, lobbed attack arcs), returned as an SVG viewBox string.
+export function createBoardViewBox(metrics, size) {
+  const bounds = createBoardBounds(metrics, size);
+  const padX = 34;
+  const padTop = 64;
+  const padBottom = 34;
+
+  const x = bounds.minX - padX;
+  const y = bounds.minY - padTop;
+  const width = bounds.maxX - bounds.minX + padX * 2;
+  const height = bounds.maxY - bounds.minY + padTop + padBottom;
+
+  return { x, y, width, height, bounds };
 }
 
 export function gridToScreen(metrics, x, y) {

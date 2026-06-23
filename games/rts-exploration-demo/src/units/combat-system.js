@@ -166,6 +166,8 @@ export class CombatSystem {
           this.assignAttackTarget(target, { kind: 'unit', id: unit.id }, target.team !== 0);
         }
       }
+    } else if (pending.kind === 'entity') {
+      this.ctx.damageEntity(pending.id, pending.amount);
     }
 
     const simTime = this.ctx.getSimTime();
@@ -238,7 +240,22 @@ export class CombatSystem {
 
   attackSlotsForTarget(target, unit) {
     if (target.kind === 'destructibleTile') return this.attackSlotsForTile(target.x, target.y, unit);
+    if (target.kind === 'entity') return this.attackSlotsForStaticEntity(target.entity, unit);
     return this.attackSlotsForUnit(target.unit, unit);
+  }
+
+  attackSlotsForStaticEntity(entity, attacker) {
+    const slots = [];
+    const count = 12;
+    const dist = entity.radius + attacker.radius + SLOT_RADIUS_PADDING;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count;
+      const x = entity.x + Math.cos(angle) * dist;
+      const y = entity.y + Math.sin(angle) * dist;
+      if (!this.ctx.map.isCircleWalkable(x, y, attacker.radius + 1)) continue;
+      slots.push({ key: `${entity.id}:${i}`, x, y, angle, entityId: entity.id });
+    }
+    return slots;
   }
 
   attackSlotsForTile(tileX, tileY, unit) {

@@ -7,6 +7,7 @@ export class Hud {
     this.input = input;
     this.commands = debug.commands ?? null;
     this.ai = debug.ai ?? null;
+    this.entities = debug.entities ?? null;
     this.getTick = debug.getTick ?? (() => 0);
     this.fps = 0;
     this.accum = 0;
@@ -40,6 +41,7 @@ export class Hud {
       row('Team 1 units', this.units.units.filter((unit) => unit.team === 1).length),
       row('Team 2 AI units', this.units.units.filter((unit) => unit.team === 2).length),
       row('Native creatures', this.units.units.filter((unit) => unit.team === 0).length),
+      row('Nexus', nexusSummary(this.entities)),
       row('Resource markers', this.map.resourceNodes.length),
       row('Command', this.input.commandState),
       row('Hotkeys', 'Q attack-move, X stop, F fog, P paths, O movement'),
@@ -74,4 +76,10 @@ function summarizeStates(counts) {
 
 function row(label, value) {
   return `<div class="hud-row"><span>${label}</span><strong>${value}</strong></div>`;
+}
+
+function nexusSummary(entities) {
+  const nexuses = entities?.entities?.filter((entity) => entity.kind === 'nexus') ?? [];
+  if (nexuses.length === 0) return 'not spawned';
+  return nexuses.map((entity) => `T${entity.team} ${Math.ceil(entity.hp)}/${entity.maxHp}`).join(' · ');
 }

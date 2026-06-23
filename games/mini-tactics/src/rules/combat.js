@@ -9,6 +9,7 @@ import {
 } from "../geometry/isometric.js";
 import {
   livingUnits,
+  sameTeam,
   unitAt
 } from "../state/gameState.js";
 
@@ -40,7 +41,7 @@ export function getLegalAttackTargets(state, attacker) {
   const range = UNIT_TYPES[attacker.type].attackRange;
 
   for (const target of livingUnits(state)) {
-    if (target.player === attacker.player) {
+    if (sameTeam(state, attacker, target)) {
       continue;
     }
 
@@ -68,7 +69,12 @@ export function getLegalHealTargets(state, medic) {
     return legal;
   }
 
-  for (const target of livingUnits(state, medic.player)) {
+  // Heals reach any teammate (including allies owned by a different player slot
+  // in team play) and the medic itself, never an enemy.
+  for (const target of livingUnits(state)) {
+    if (!sameTeam(state, medic, target)) {
+      continue;
+    }
     if (target.hp >= target.maxHp) {
       continue;
     }

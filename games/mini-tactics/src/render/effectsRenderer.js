@@ -162,6 +162,26 @@ export class EffectsRenderer {
 
   async animateHit(target, damage, critical) {
     const point = gridToScreen(this.metrics, target.x, target.y);
+
+    // Brief impact flash for punch — pops bright and clears fast under the ring.
+    const flash = createSvgElement("circle", {
+      class: "fx-flash",
+      cx: point.x,
+      cy: point.y + 8,
+      r: 6,
+      fill: critical ? "#fff0c2" : "#ffd7dc",
+      filter: "url(#softGlow)"
+    });
+
+    this.effectsLayer.appendChild(flash);
+    flash.animate(
+      [
+        { r: 6, opacity: .95 },
+        { r: critical ? 30 : 24, opacity: 0 }
+      ],
+      { duration: 200, easing: "ease-out" }
+    ).finished.catch(() => {}).then(() => flash.remove());
+
     const ring = createSvgElement("circle", {
       class: "fx-ring",
       cx: point.x,

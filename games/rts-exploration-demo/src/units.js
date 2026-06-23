@@ -15,8 +15,9 @@ import { DrifterPatrolController } from './neutral/drifter-patrol-controller.js'
 export { UNIT_STATES };
 
 export class UnitManager {
-  constructor(map) {
+  constructor(map, entities = null) {
     this.map = map;
+    this.entities = entities;
     this.units = [];
     this.selectedIds = new Set();
 
@@ -27,13 +28,15 @@ export class UnitManager {
       map,
       getUnits:  () => this.units,
       getById:   (id) => this.units.find((u) => u.id === id),
+      getEntityById: (id) => this.entities?.getById(id) ?? null,
+      damageEntity: (id, amount) => this.entities?.damage(id, amount) ?? false,
       getDef:    (type) => getUnitDef(type),
       selectedIds: this.selectedIds,
       getSimTime: () => this.simTime,
       nextRouteId: () => `${this._nextRouteId++}`,
 
       // Target resolution helpers (shared by combat + movement + separation)
-      resolveTarget:       (ref) => resolveTarget(ref, map, (id) => this.units.find((u) => u.id === id)),
+      resolveTarget:       (ref) => resolveTarget(ref, map, (id) => this.units.find((u) => u.id === id), (id) => this.entities?.getById(id) ?? null),
       targetKey:           (ref) => targetKey(ref),
       targetCenter:        (target) => targetCenter(target, map),
       targetRadius:        (target) => targetRadius(target, map),
@@ -197,6 +200,16 @@ export class UnitManager {
     return this.attackUnitsUnit(this.selectedUnitIds(), targetUnit);
   }
 
+  attackSelectedEntity(entity) {
+    return this.attackUnitsEntity(this.selectedUnitIds(), entity?.id);
+  }
+
+  attackUnitsEntity(unitIds, entityId, team = 1) {
+    const entity = this.entities?.getById(entityId);
+    if (!entity || entity.team === team || entity.hp <= 0) return false;
+    return this.attackUnitsTarget(unitIds, { kind: 'entity', id: entity.id }, team);
+  }
+
   attackUnitsUnit(unitIds, targetUnit, team = 1) {
     if (!targetUnit || targetUnit.team === team || targetUnit.hp <= 0) return false;
     return this.attackUnitsTarget(unitIds, { kind: 'unit', id: targetUnit.id }, team);
@@ -233,7 +246,8 @@ export class UnitManager {
     return getUnitDef(type);
   }
 
-  resolveTarget(ref)       { return resolveTarget(ref, this.map, (id) => this.units.find((u) => u.id === id)); }
+  resolveTarget(ref)       { return resolveTarget(ref, this.map, (id) => this.units.find((u) => u.id === id), (id) => this.entities?.getById(id) ?? null); }
+  getEntityById(id)        { return this.entities?.getById(id) ?? null; }
   targetKey(ref)           { return targetKey(ref); }
   targetCenter(target)     { return targetCenter(target, this.map); }
   targetRadius(target)     { return targetRadius(target, this.map); }

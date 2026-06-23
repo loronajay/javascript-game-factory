@@ -1,15 +1,16 @@
 import { CONFIG } from './config.js';
 import { normalizeRect } from './utils.js';
-import { createAttackDestructibleCommand, createAttackMoveCommand, createAttackUnitCommand, createMoveCommand, createStopCommand } from './commands.js';
+import { createAttackDestructibleCommand, createAttackEntityCommand, createAttackMoveCommand, createAttackUnitCommand, createMoveCommand, createStopCommand } from './commands.js';
 
 export class InputController {
-  constructor(canvas, camera, units, map, commands, ai = null) {
+  constructor(canvas, camera, units, map, commands, ai = null, entities = null) {
     this.canvas = canvas;
     this.camera = camera;
     this.units = units;
     this.map = map;
     this.commands = commands;
     this.ai = ai;
+    this.entities = entities;
     this.keys = new Set();
     this.pointer = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
     this.dragStart = null;
@@ -107,6 +108,13 @@ export class InputController {
 
     if (event.button === 2) {
       const selectedIds = this.units.selectedUnitIds();
+      const attackableEntity = this.entities?.hitTestAttackable(this.pointer.worldX, this.pointer.worldY, 1);
+      if (attackableEntity) {
+        const result = this.commands.issueLocal(createAttackEntityCommand(selectedIds, attackableEntity.id));
+        if (result.ok && result.marker) this.lastMoveCommand = { ...result.marker, ttl: 0.65 };
+        this.commandState = result.ok ? `attack ${attackableEntity.kind}` : 'no combat unit selected';
+        return;
+      }
       const attackableUnit = this.units.hitTestAttackable(this.pointer.worldX, this.pointer.worldY);
       if (attackableUnit) {
         const result = this.commands.issueLocal(createAttackUnitCommand(selectedIds, attackableUnit.id));
