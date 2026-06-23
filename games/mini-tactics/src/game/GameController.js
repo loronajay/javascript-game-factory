@@ -24,6 +24,8 @@ import {
 } from "../geometry/isometric.js";
 import { getLegalMoves } from "../rules/movement.js";
 import {
+  getAttackRangeTiles,
+  getHealRangeTiles,
   getLegalAttackTargets,
   getLegalHealTargets,
 } from "../rules/combat.js";
@@ -45,9 +47,12 @@ import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
 
 export class GameController {
-  constructor({ elements, messages, confirm, onMatchComplete }) {
+  constructor({ elements, messages, audio, confirm, onMatchComplete }) {
     this.elements = elements;
     this.messages = messages;
+    // Presentation-only sound service. Defaults to a silent stub so the
+    // controller stays usable headlessly / in isolation (and in node smoke runs).
+    this.audio = audio ?? { play() {}, setEnabled() {} };
     // Stylized in-game confirm prompt (Promise<boolean>). Defaults to auto-confirm
     // so the controller stays usable headlessly / in isolation.
     this.confirm = confirm ?? (async () => true);
@@ -98,6 +103,7 @@ export class GameController {
       diceOverlay: elements.diceOverlay,
       dieFace: elements.dieFace,
       metrics: this.metrics,
+      audio: this.audio,
     });
   }
 
@@ -180,6 +186,7 @@ export class GameController {
       selectedId: this.ui.selectedId,
       mode: this.ui.actionMode,
       legalTiles: this.ui.legalTiles,
+      rangeTiles: this.ui.rangeTiles,
       locked: this.ui.locked,
     };
   }
@@ -280,6 +287,7 @@ export class GameController {
   clearMode() {
     this.ui.actionMode = null;
     this.ui.legalTiles = new Set();
+    this.ui.rangeTiles = new Set();
   }
 
   handleUnitClick(id) {
@@ -367,6 +375,7 @@ export class GameController {
     }
 
     this.ui.actionMode = mode;
+    this.ui.rangeTiles = new Set();
 
     switch (mode) {
       case ACTION_MODES.MOVE:
@@ -374,9 +383,13 @@ export class GameController {
         break;
       case ACTION_MODES.ATTACK:
         this.ui.legalTiles = getLegalAttackTargets(this.match, unit);
+        // Show the whole reachable attack radius behind the bright target tiles.
+        this.ui.rangeTiles = getAttackRangeTiles(this.match, unit);
         break;
       case ACTION_MODES.HEAL:
         this.ui.legalTiles = getLegalHealTargets(this.match, unit);
+        // Show the whole heal radius behind the bright injured-ally tiles.
+        this.ui.rangeTiles = getHealRangeTiles(this.match, unit);
         break;
       default:
         this.ui.legalTiles = new Set();
@@ -465,6 +478,7 @@ export class GameController {
 
     await this.effectsRenderer.animateAttack(attacker, target);
     await this.effectsRenderer.rollDie(resolved.roll);
+    this.audio.play(this.attackSoundKey(resolved, attacker));
 
     if (!resolved.hit) {
       await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
@@ -530,6 +544,7 @@ export class GameController {
 
     await this.effectsRenderer.animateHealBeam(medic, target);
     await this.effectsRenderer.rollDie(resolved.roll);
+    this.audio.play(this.healSoundKey(resolved));
 
     if (!resolved.hit) {
       await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
@@ -826,6 +841,7 @@ export class GameController {
 
     await this.effectsRenderer.animateAttack(attacker, target);
     await this.effectsRenderer.rollDie(event.roll);
+    this.audio.play(this.attackSoundKey(event, attacker));
 
     if (!event.hit) {
       await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
@@ -847,6 +863,7 @@ export class GameController {
 
     await this.effectsRenderer.animateHealBeam(medic, target);
     await this.effectsRenderer.rollDie(event.roll);
+    this.audio.play(this.healSoundKey(event));
 
     if (!event.hit) {
       await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
@@ -859,6 +876,24 @@ export class GameController {
       `${UNIT_TYPES[target.type].name} recovered ${event.healing} HP` +
         `${event.critical ? " on a critical heal" : ""}.`,
     );
+  }
+
+  // Outcome sound for a resolved ATTACK. The renderer already played the launch
+  // (arrow/medic whoosh) and the dice rattle; this is the impact. A crit reads as
+  // a crit even when also defended; otherwise a reduced hit reads as defended;
+  // otherwise the ranger gets its arrow thunk and everyone else the generic hit.
+  attackSoundKey(event, attacker) {
+    if (!event.hit) return "miss";
+    if (event.critical) return "criticalHit";
+    if (event.defended) return "defendedHit";
+    if (attacker?.type === "ranger") return "arrowHit";
+    return "attackHit";
+  }
+
+  // Outcome sound for a resolved HEAL. A failed heal shares the universal miss.
+  healSoundKey(event) {
+    if (!event.hit) return "miss";
+    return event.critical ? "healCrit" : "heal";
   }
 
   // After a move or primary action resolves, either auto-finish a completed
@@ -921,6 +956,7 @@ function createUiState() {
     selectedId: null,
     actionMode: null,
     legalTiles: new Set(),
+    rangeTiles: new Set(),
     locked: false,
   };
 }

@@ -2,12 +2,16 @@ import { gridToScreen } from "../geometry/isometric.js";
 import { createSvgElement } from "./svg.js";
 
 export class EffectsRenderer {
-  constructor({ unitsLayer, effectsLayer, diceOverlay, dieFace, metrics }) {
+  constructor({ unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio }) {
     this.unitsLayer = unitsLayer;
     this.effectsLayer = effectsLayer;
     this.diceOverlay = diceOverlay;
     this.dieFace = dieFace;
     this.metrics = metrics;
+    // Sounds that ARE the animation (dice rattle, footstep, projectile whoosh).
+    // Outcome sounds (hit/miss/crit/heal) stay with the controller, which reads
+    // the resolved event. Defaults to a silent stub for headless use.
+    this.audio = audio ?? { play() {} };
   }
 
   setMetrics(metrics) {
@@ -15,6 +19,7 @@ export class EffectsRenderer {
   }
 
   async rollDie(rollResult) {
+    this.audio.play("diceRoll");
     this.diceOverlay.classList.add("show", "rolling");
 
     for (let index = 0; index < 8; index += 1) {
@@ -36,6 +41,8 @@ export class EffectsRenderer {
     if (!element) {
       return;
     }
+
+    this.audio.play("unitMove");
 
     const fromPoint = gridToScreen(this.metrics, from.x, from.y);
     const dx = fromPoint.x - point.x;
@@ -81,6 +88,12 @@ export class EffectsRenderer {
       await this.animateMeleeLunge(attacker, attackerPoint, targetPoint);
       return;
     }
+
+    // Ranged launch whoosh — the impact sound is played by the controller once
+    // the roll resolves. Ranger and medic each have their own projectile.
+    this.audio.play(
+      attacker.type === "ranger" ? "arrowAirborne" : "medicAttackAirborne",
+    );
 
     const attackColor =
       attacker.type === "ranger" ? "#f7e27d" : "#9ef6d0";

@@ -48,11 +48,28 @@
   animation: legal-pulse 1.15s ease-in-out infinite alternate;
 }
 
+/* The attack radius: every reachable tile, painted a calm translucent red so the
+   range reads at a glance without competing with the pulsing legal-target tiles. */
+.tile.attack-range .tile-face {
+  fill: #8a3742;
+  stroke: #c2495a;
+  stroke-width: 1.5;
+}
+
 .tile.legal-attack .tile-face {
   fill: #c2495a;
   stroke: #ff9aa6;
   stroke-width: 2;
   animation: attack-pulse .7s ease-in-out infinite alternate;
+}
+
+/* The heal radius: every tile in the medic's reach, painted a calm translucent
+   green so the range reads at a glance without competing with the pulsing
+   injured-ally tiles. */
+.tile.heal-range .tile-face {
+  fill: #2c6b4f;
+  stroke: #3ba170;
+  stroke-width: 1.5;
 }
 
 .tile.legal-heal .tile-face {

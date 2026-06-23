@@ -246,26 +246,83 @@
       </footer>
     </section>
 
-    <!-- Global rules overlay — reachable from the title, main menu, and match. -->
+    <!-- Global reference overlay — reachable from the title, main menu, and match.
+         Three tabs: Basics (onboarding), Units (cheat sheet), Advanced (strategy).
+         Tab switching is wired in ui/rulesModal.js. -->
     <div id="rulesModal">
       <div class="modal-card">
-        <h2>How to play</h2>
+        <h2>How to Play</h2>
 
-        <ul>
-          <li>Each player activates every living piece once, then the squad turn changes.</li>
-          <li>Warrior moves 3 orthogonal tiles. Tank, ranger, and medic move 2.</li>
-          <li>Attack range includes diagonals with no penalty: warrior/tank 1, medic 3, ranger 4.</li>
-          <li>Ranger shots are blocked by any piece between ranger and target.</li>
-          <li>Attack/heal roll: 1 misses, 6 crits.</li>
-          <li>Critical attacks add 1 damage. Critical heals restore 4 instead of 3.</li>
-          <li>Warrior deals 3, but only 2 to tanks. Tank deals 2. Ranger deals 2, or 3 to another ranger. Medic deals 1.</li>
-          <li>Defending reduces each incoming hit by 1, including to zero, and expires when that piece is next selected to act.</li>
-          <li>Move must be paired with attack, heal, or defend. Attack/heal may happen before or after movement.</li>
-          <li>Last squad standing wins.</li>
-        </ul>
+        <div class="ref-tabs" role="tablist">
+          <button class="ref-tab is-active" data-tab="basics" type="button">Basics</button>
+          <button class="ref-tab" data-tab="units" type="button">Units</button>
+          <button class="ref-tab" data-tab="advanced" type="button">Advanced</button>
+        </div>
+
+        <!-- Basics: onboarding rules. -->
+        <div class="ref-panel is-active" data-panel="basics">
+          <ul>
+            <li>Each player activates every living piece once, then the squad turn changes.</li>
+            <li>A piece may move then act, or act then move — but a move alone is illegal. Every activation must end in an attack, heal, or defend.</li>
+            <li>Movement is orthogonal: warrior 3 tiles, tank/ranger/medic 2. Pieces block movement.</li>
+            <li>Attack range includes diagonals with no penalty: warrior/tank 1, medic 3, ranger 4.</li>
+            <li>Ranger shots are blocked by any piece between ranger and target — including your own.</li>
+            <li>Attack/heal roll: 1 misses, 6 crits. Crit attacks add 1 damage; crit heals restore 4 instead of 3.</li>
+            <li>Defending reduces each incoming hit by 1 (down to zero) and expires when that piece is next selected to act.</li>
+            <li>Cancel Move undoes an uncommitted move before the piece attacks, heals, or defends.</li>
+            <li>Last squad standing wins.</li>
+          </ul>
+        </div>
+
+        <!-- Units: stats cheat sheet. Numbers mirror config.js (ranges) and
+             rules/combat.js getBaseDamage (damage incl. matchup exceptions). -->
+        <div class="ref-panel" data-panel="units">
+          <table class="ref-table">
+            <thead>
+              <tr><th>Unit</th><th>Move</th><th>Range</th><th>Damage</th><th>Role</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="ref-icon">⚔</span> Warrior</td>
+                <td>3</td><td>1</td><td>3 <span class="ref-exc">(2 vs Tank)</span></td>
+                <td>Fast closer; best into squishies</td>
+              </tr>
+              <tr>
+                <td><span class="ref-icon">⬢</span> Tank</td>
+                <td>2</td><td>1</td><td>2</td>
+                <td>Wall &amp; blocker; soaks the Warrior</td>
+              </tr>
+              <tr>
+                <td><span class="ref-icon">➶</span> Ranger</td>
+                <td>2</td><td>4</td><td>2 <span class="ref-exc">(3 vs Ranger)</span></td>
+                <td>Sniper; shots need clear line of sight</td>
+              </tr>
+              <tr>
+                <td><span class="ref-icon">✚</span> Medic</td>
+                <td>2</td><td>3</td><td>Heal 3 <span class="ref-exc">(crit 4)</span></td>
+                <td>Heals self/allies; can poke for 1</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="ref-note">Every piece has <strong>10 HP</strong>. Dice: roll <strong>1 misses</strong>, roll <strong>6 crits</strong>. Defend cuts each incoming hit by 1 (to zero) until that piece next acts.</p>
+        </div>
+
+        <!-- Advanced: strategy depth (condensed from STRATEGY.md). -->
+        <div class="ref-panel" data-panel="advanced">
+          <ul class="ref-tips">
+            <li><strong>Focus fire beats heals.</strong> A medic heals about one Warrior's worth per turn. Pile 2+ attackers on one target so the heal can't keep up — spread chip damage just gets topped off.</li>
+            <li><strong>Burst before they heal.</strong> Squads act as a block, so your whole turn lands before the enemy medic responds. Damage that kills <em>this turn</em> can't be undone. Set up the kill; don't chip.</li>
+            <li><strong>Know the matchups.</strong> Warriors hit Tanks for only 2 — send them at Rangers and Medics instead. Your Ranger does +1 to the enemy Ranger: use it as a counter-sniper.</li>
+            <li><strong>Kill or pin the Medic.</strong> A medic only one attacker can reach is nearly unkillable (it out-heals a single attacker). Get two threats on it, or pressure two targets so its one heal can't cover both.</li>
+            <li><strong>Mind line of sight.</strong> Ranger shots stop on any body, including your own. Keep your lanes clear, and park units in the enemy Ranger's lanes to block it.</li>
+            <li><strong>Defend the chip, not the crit.</strong> Defend only removes 1 — huge against Tank/Ranger/Medic pokes, minor against a Warrior. Time it to cover the enemy's whole turn.</li>
+            <li><strong>Threat = move + reach.</strong> A Warrior threatens 4 tiles away. Keep your Ranger and Medic outside every enemy's move-plus-reach box, not just their current tile.</li>
+            <li><strong>Scout with Cancel Move.</strong> Move a piece to see its highlights and line of sight, then Cancel if the angle is wrong — free board reading before you commit.</li>
+          </ul>
+        </div>
 
         <div class="modal-row">
-          <button id="closeRulesBtn">Close</button>
+          <button id="closeRulesBtn" type="button">Close</button>
         </div>
       </div>
     </div>

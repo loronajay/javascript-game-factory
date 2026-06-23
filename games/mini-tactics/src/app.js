@@ -7,6 +7,7 @@
 // entered with a { mode, size }.
 
 import { getUiElements } from "./ui/elements.js";
+import { AudioManager } from "./audio/sounds.js";
 import { MessageController } from "./ui/messageController.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { ConfirmDialog } from "./ui/confirmDialog.js";
@@ -21,6 +22,18 @@ import { createResultsScreen } from "./ui/screens/resultsScreen.js";
 
 export function createApp(documentRef = document) {
   const elements = getUiElements(documentRef);
+  const audio = new AudioManager();
+
+  // One delegated click hit for every button on every screen (menus, setup,
+  // in-game HUD, modals). The first such click is also the user gesture that
+  // unlocks audio playback, so combat/UI sounds work for the rest of the session.
+  documentRef.addEventListener("click", (event) => {
+    const button = event.target.closest?.("button");
+    if (button && !button.disabled) {
+      audio.play("buttonClick");
+    }
+  });
+
   const messages = new MessageController(elements.message);
 
   const rules = new RulesModal(
@@ -43,6 +56,7 @@ export function createApp(documentRef = document) {
   const controller = new GameController({
     elements,
     messages,
+    audio,
     confirm: (options) => confirmDialog.ask(options),
     onMatchComplete: (summary) => ctx.nav("results", summary),
   });

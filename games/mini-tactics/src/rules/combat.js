@@ -62,6 +62,72 @@ export function getLegalAttackTargets(state, attacker) {
   return legal;
 }
 
+// Every on-board tile the attacker could strike, independent of whether a target
+// stands there — this is the "attack radius" overlay. It is presentation only:
+// the reducer still re-validates the actual chosen target. Ranger tiles behind an
+// intervening piece are dropped so the shown radius reflects real line of sight.
+export function getAttackRangeTiles(state, attacker) {
+  const tiles = new Set();
+  const range = UNIT_TYPES[attacker.type].attackRange;
+  const max = state.size - 1;
+
+  for (let dx = -range; dx <= range; dx += 1) {
+    for (let dy = -range; dy <= range; dy += 1) {
+      if (dx === 0 && dy === 0) {
+        continue;
+      }
+
+      const x = attacker.x + dx;
+      const y = attacker.y + dy;
+      if (x < 0 || y < 0 || x > max || y > max) {
+        continue;
+      }
+
+      if (
+        attacker.type === "ranger" &&
+        isRangerShotBlocked(state, attacker, { x, y })
+      ) {
+        continue;
+      }
+
+      tiles.add(tileKey(x, y));
+    }
+  }
+
+  return tiles;
+}
+
+// Every on-board tile within the medic's heal range — the "heal radius" overlay.
+// Presentation only, like getAttackRangeTiles. Heals are never blocked by pieces,
+// so this is a straight square of tiles around the medic, clipped to the board.
+export function getHealRangeTiles(state, medic) {
+  const tiles = new Set();
+
+  if (medic.type !== "medic") {
+    return tiles;
+  }
+
+  const max = state.size - 1;
+
+  for (let dx = -MEDIC_HEAL_RANGE; dx <= MEDIC_HEAL_RANGE; dx += 1) {
+    for (let dy = -MEDIC_HEAL_RANGE; dy <= MEDIC_HEAL_RANGE; dy += 1) {
+      if (dx === 0 && dy === 0) {
+        continue;
+      }
+
+      const x = medic.x + dx;
+      const y = medic.y + dy;
+      if (x < 0 || y < 0 || x > max || y > max) {
+        continue;
+      }
+
+      tiles.add(tileKey(x, y));
+    }
+  }
+
+  return tiles;
+}
+
 export function getLegalHealTargets(state, medic) {
   const legal = new Set();
 
