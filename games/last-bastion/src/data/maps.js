@@ -2,7 +2,6 @@ import {
   BASE,
   DEPLOY_ZONE,
   ENEMY_PATHS,
-  MAP_LABELS,
   ROUTE_SEGMENTS,
   TERRAIN,
   WORLD,
@@ -31,7 +30,8 @@ function deriveRouteSegments(paths) {
 }
 
 // This is the map-authoring boundary. A new battlefield only needs its geometry,
-// spawn lanes, labels, and a visual palette; route traces are derived automatically.
+// spawn lanes, terrain, and a visual palette; route data is derived automatically
+// for simulation, while each battlefield decides whether it is visible.
 export function defineBattlefield(definition) {
   return Object.freeze({
     ...definition,
@@ -42,12 +42,13 @@ export function defineBattlefield(definition) {
       ...path,
       points: Object.freeze(path.points.map((point) => Object.freeze({ ...point }))),
     }))),
-    labels: Object.freeze(definition.labels.map((label) => Object.freeze({ ...label }))),
+    labels: Object.freeze((definition.labels ?? []).map((label) => Object.freeze({ ...label }))),
     terrain: Object.freeze(definition.terrain.map((feature) => Object.freeze({
       ...feature,
       polygon: Object.freeze(feature.polygon.map((point) => Object.freeze({ ...point }))),
     }))),
     palette: Object.freeze({ ...definition.palette }),
+    renderRoutes: definition.renderRoutes ?? false,
     routeSegments: Object.freeze(deriveRouteSegments(definition.enemyPaths)),
   });
 }
@@ -59,8 +60,8 @@ export const BLACKGLASS_PLATEAU = defineBattlefield({
   base: BASE,
   deployZone: DEPLOY_ZONE,
   enemyPaths: ENEMY_PATHS,
-  labels: MAP_LABELS,
   terrain: TERRAIN,
+  renderRoutes: false,
   palette: {
     top: '#263c70',
     middle: '#18254d',
@@ -119,12 +120,6 @@ export const CINDER_PASS = defineBattlefield({
       ],
     },
   ],
-  labels: [
-    { x: 500, y: 1190, text: 'ASH GATES' },
-    { x: 500, y: 870, text: 'CINDER FORK' },
-    { x: 500, y: 625, text: 'EMBER PASS' },
-    { x: 500, y: 270, text: 'CORE ASCENT' },
-  ],
   terrain: [
     {
       id: 'west-caldera-wall', type: 'cliff', polygon: [
@@ -157,6 +152,7 @@ export const CINDER_PASS = defineBattlefield({
       ],
     },
   ],
+  renderRoutes: false,
   palette: {
     top: '#8a3034',
     middle: '#4e1d35',

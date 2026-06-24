@@ -7,6 +7,8 @@ const assert = (condition, message) => {
 
 for (const battlefield of BATTLEFIELDS) {
   const { palette } = battlefield;
+  assert(battlefield.labels.length === 0, `${battlefield.name} should not place text labels over the terrain`);
+  assert(battlefield.renderRoutes === false, `${battlefield.name} should not render route roads over the terrain`);
   for (const key of ['sky', 'terrain', 'routeGlow', 'danger', 'accent', 'grid']) {
     assert(palette[key], `${battlefield.name} needs a ${key} art colour`);
   }

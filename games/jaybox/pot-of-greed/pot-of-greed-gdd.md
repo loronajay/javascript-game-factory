@@ -1,23 +1,23 @@
-# JAYBOX: POT OF GREED
+# POT OF GREED
 
 **Document Version:** 1.0  
 **Status:** Prototype Scope  
-**Platform:** Web browser  
+**Host Platform:** Jaybox  
 **Player Count:** 4–8  
 **Input Model:** Shared display plus one phone per player  
 **Target Match Length:** 15–25 minutes  
 
 ---
 
-## 1. Product Overview
+## 1. Game Overview
 
-Jaybox is a browser-based party game platform built around one shared public display and private mobile controllers.
+Pot of Greed is a browser-based social deduction party game for one shared public display and private mobile controllers.
 
-Pot of Greed is the first and currently only game available in Jaybox.
+It is the first cabinet available in Jaybox. Jaybox provides the room, display, and private controller sessions; this document defines the game that runs inside that session.
 
-Players join a room from their phones using a room code. The shared display presents public game information, timers, vault audits, balance checks, vote results, player lockouts, and final results.
+The shared display presents public game information, timers, vault audits, balance checks, vote results, player lockouts, and final results. Each player uses a phone as a private controller.
 
-The first prototype does not require player accounts.
+For the platform responsibilities and room lifecycle that precede this game, see the [Jaybox GDD](../jaybox-gdd.md).
 
 ---
 
@@ -502,7 +502,7 @@ Players may:
 
 The game does not verify verbal claims.
 
-Jaybox does not provide built-in voice chat for the prototype.
+The prototype assumes discussion happens in the room; it does not include built-in voice chat.
 
 ---
 
@@ -779,100 +779,34 @@ The prototype may use a shared victory immediately if the full tiebreak system i
 
 ---
 
-## 23. Jaybox Platform Flow
+## Jaybox Integration Boundary
 
-### 23.1 Home Screen
+Jaybox owns game discovery, room creation, player sessions, the shared-display and phone-controller connection, lobby behavior, reconnect windows, and canonical player identity. Pot of Greed receives a locked match roster after the host launches this game.
 
-Jaybox initially contains one game:
+Pot of Greed owns the rules that begin with match initialization: assigning initial balances, enforcing the four-to-eight player rule, selecting phases, resolving actions, and presenting all game-specific information.
 
-```text
-POT OF GREED
-```
+Jaybox must provide Pot of Greed with a room identifier, stable match-scoped player identifiers, a host designation, connected/disconnected/reconnected/left events, a locked roster at launch, one public-display channel, and private controller channels.
 
-The home screen includes:
+Pot of Greed returns game state and game-specific display/controller models. It must not create a second durable player profile or take ownership of room membership.
 
-- Jaybox branding.
-- Pot of Greed title.
-- Short description.
-- Create Room.
-- Join Room.
 
-A multi-game carousel is unnecessary while only one game exists.
 
-### 23.2 Room Creation
+### Launch Requirement
 
-The host creates a room from the shared display.
+Pot of Greed accepts a Jaybox roster of four to eight players. Jaybox locks joining and player names before launching the game; Pot of Greed then assigns initial balances and starts the first Hidden Cycle.
 
-The server generates a five-character room code.
+### In-Match Connection Behavior
 
-### 23.3 Phone Joining
+While Jaybox applies its reconnect window, Pot of Greed preserves the player's balance, pending investment, and active-or-jury state. Timers continue and already submitted actions remain valid.
 
-Players enter:
-
-- Room code.
-- Display name.
-
-The phone becomes their private controller.
-
-### 23.4 Lobby
-
-The shared display shows:
-
-- Room code.
-- Connected players.
-- Player count.
-- Host-controlled Start button.
-
-The host is also a player and uses a phone.
-
-The shared display is not assigned a balance, action, or vote.
-
-### 23.5 Match Start
-
-The host may start when 4–8 players are connected.
-
-After the match starts:
-
-- Joining closes.
-- Player names lock.
-- Initial balances are assigned.
-- The first Hidden Cycle begins.
+When Jaybox reports that the reconnect window has expired, an active player automatically Passes during vault phases and abstains from voting. The player remains eligible to reconnect later.
 
 ---
 
-## 24. Disconnect Rules
-
-### 24.1 Lobby Disconnect
-
-The player is removed and their seat becomes available.
-
-### 24.2 In-Match Disconnect
-
-The player receives a 30-second reconnect window.
-
-During this period:
-
-- Their state remains preserved.
-- Timers continue.
-- Submitted actions remain valid.
-
-After the reconnect window:
-
-- An active player automatically Passes during vault phases.
-- A disconnected player abstains from voting.
-- The player remains eligible to reconnect later.
-- Their balance, pending investment, and active or jury state remain preserved.
-
-The prototype should not permanently remove disconnected players unless they explicitly leave the room.
-
----
-
-## 25. Server Authority
+## 23. Game Server Authority
 
 The server owns:
 
-- Room membership.
-- Player identity.
 - Active and jury state.
 - Personal balances.
 - Vault balance.
@@ -899,10 +833,9 @@ Clients do not calculate authoritative economic results.
 
 ---
 
-## 26. Match State Machine
+## 24. Match State Machine
 
 ```text
-LOBBY
 MATCH_INTRO
 
 HIDDEN_VAULT_ACTION
@@ -934,13 +867,11 @@ The server alternates Hidden and Show phase groups until no active players remai
 
 ---
 
-## 27. Core Phone Interfaces
+## 25. Core Phone Game Interfaces
 
 The phone client requires:
 
 ```text
-JoinRoomForm
-LobbyScreen
 PrivateBalanceDisplay
 CycleStatusDisplay
 VaultActionSelection
@@ -958,7 +889,6 @@ RewardNotice
 PenaltyNotice
 JuryStatusScreen
 PersonalFinalResults
-ReconnectScreen
 ```
 
 Jury players continue to see:
@@ -973,13 +903,11 @@ They do not see vault action controls.
 
 ---
 
-## 28. Core Shared-Screen Interfaces
+## 26. Core Shared-Screen Game Interfaces
 
 The shared display requires:
 
 ```text
-JayboxHome
-RoomLobby
 MatchIntro
 CycleIntroduction
 ActiveAndJuryPlayerList
@@ -1000,7 +928,7 @@ WinnerScreen
 
 ---
 
-## 29. Configuration
+## 27. Game Configuration
 
 The following values must be stored in one shared configuration source:
 
@@ -1019,7 +947,6 @@ vaultActionDuration
 discussionDuration
 voteDuration
 runoffVoteDuration
-reconnectGracePeriod
 ```
 
 The server is the authoritative consumer of all economic configuration.
@@ -1028,43 +955,27 @@ Clients may receive read-only values for display.
 
 ---
 
-## 30. Prototype Acceptance Criteria
+## 28. Prototype Acceptance Criteria
 
 The prototype is complete when:
 
-1. Four to eight players can join by phone.
-2. One shared display controls public presentation.
-3. Every player receives a private gold balance.
-4. Hidden and Show Cycles alternate correctly.
-5. Investments are available only during Hidden Cycles.
-6. Investments mature during the following Show Cycle.
-7. Active players can steal during both cycle types.
-8. Active players can Pass during both cycle types.
-9. Vault actions resolve simultaneously and server-side.
-10. The vault audit shows only before, after, and net change.
-11. Public balances appear only during Show Cycles.
-12. All connected active and jury players can vote.
-13. Only active players can be targeted.
-14. Voted players become jury players.
-15. Jury players continue discussing and voting.
-16. Correct voters receive gold.
-17. Incorrect voters lose gold.
-18. Wrongfully removed players receive compensation.
-19. Correctly identified thieves pay a configurable partial fine.
-20. The fine is based only on actual current-cycle theft.
-21. The fine is returned to the vault.
-22. A caught thief keeps the unfined portion of stolen gold.
-23. Jury players can still win.
-24. Pending investments survive player lockout.
-25. Runoff votes resolve ties.
-26. The game ends when nobody has vault access.
-27. Final settlement pays all pending investments.
-28. Final transaction histories explain every balance.
-29. A rematch can begin without requiring players to rejoin.
+1. Given a Jaybox session of four to eight players, every player receives a private gold balance.
+2. Hidden and Show Cycles alternate correctly.
+3. Investments are available only during Hidden Cycles and mature during the following Show Cycle.
+4. Active players can steal or Pass during both cycle types.
+5. Vault actions resolve simultaneously and server-side.
+6. The vault audit shows only before, after, and net change.
+7. Public balances appear only during Show Cycles.
+8. All connected active and jury players can vote, and only active players can be targeted.
+9. Voted players become jury players; jury players continue discussing and voting.
+10. Correct voters receive gold, incorrect voters lose gold, and wrongfully removed players receive compensation.
+11. Correctly identified thieves pay a configurable partial fine based only on actual current-cycle theft; the fine returns to the vault and the thief keeps the unfined amount.
+12. Jury players can still win, pending investments survive player lockout, and runoff votes resolve ties.
+13. The game ends when nobody has vault access; final settlement pays pending investments and transaction histories explain every balance.
 
 ---
 
-## 31. Out of Scope for the First Prototype
+## 29. Out of Scope for the First Prototype
 
 Do not add:
 
@@ -1077,17 +988,13 @@ Do not add:
 - Loans.
 - Dynamic interest rates.
 - Side minigames.
-- Public matchmaking.
 - Audience mode.
 - Spectator voting.
-- Persistent currency.
-- Account requirements.
 - Cosmetics.
 - AI players.
 - Text chat.
 - Voice chat.
 - User-generated rules.
-- Additional Jaybox games.
 - Retroactive fines for earlier theft.
 - Complete confiscation of caught theft.
 - Elimination from discussion or voting.
@@ -1108,7 +1015,7 @@ final wealth victory
 
 ---
 
-## 32. Values Requiring Playtesting
+## 30. Values Requiring Playtesting
 
 The following values are structurally supported but not final:
 

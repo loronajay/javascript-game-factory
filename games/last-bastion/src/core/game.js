@@ -552,7 +552,7 @@ export class Game {
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
     this.drawMapSurface(ctx);
-    this.drawRouteTraces(ctx);
+    if (this.map.renderRoutes) this.drawRouteTraces(ctx);
     this.drawDeployZone(ctx);
     this.drawThreatEntrances(ctx);
     this.drawTerrain(ctx);
@@ -667,19 +667,6 @@ export class Game {
     }
     ctx.setLineDash([]);
 
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#f7e7c2';
-    ctx.font = '800 12px system-ui';
-    ctx.letterSpacing = '1.8px';
-    ctx.textAlign = 'center';
-    for (const label of this.map.labels) {
-      const width = ctx.measureText(label.text).width + 22;
-      ctx.fillStyle = 'rgba(8, 8, 22, .62)';
-      ctx.roundRect(label.x - width / 2, label.y - 16, width, 23, 8);
-      ctx.fill();
-      ctx.fillStyle = '#f7e7c2';
-      ctx.fillText(label.text, label.x, label.y);
-    }
     ctx.restore();
   }
 

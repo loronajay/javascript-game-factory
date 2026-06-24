@@ -97,13 +97,6 @@ export const ROUTE_SEGMENTS = (() => {
   return segments;
 })();
 
-export const MAP_LABELS = [
-  { x: 500, y: 1185, text: 'LOWER FORK' },
-  { x: 500, y: 930, text: 'CROSSROADS' },
-  { x: 500, y: 690, text: 'SPLIT RIDGE' },
-  { x: 500, y: 268, text: 'FINAL APPROACH' },
-];
-
 export const TERRAIN = [
   {
     id: 'upper-west-escarpment',

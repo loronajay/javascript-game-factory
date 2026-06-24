@@ -26,7 +26,7 @@ const MOBILE_CONTROL_PROFILES = {
         directionMode: 'horizontal',
         buttons: [
             { id: 'fire', label: 'FIRE', key: CONTROL_KEY_SPECS.Space },
-            { id: 'lob',  label: 'LOB',  key: CONTROL_KEY_SPECS.ShiftLeft },
+            { id: 'lob', label: 'LOB', key: CONTROL_KEY_SPECS.ShiftLeft },
         ],
     },
     illuminauts: {

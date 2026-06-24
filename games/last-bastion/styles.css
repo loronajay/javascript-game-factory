@@ -56,7 +56,7 @@ button:disabled { opacity: .45; cursor: default; }
 }
 
 .stat { min-width: 0; display: flex; flex-direction: column; line-height: 1.05; }
-.stat { padding: 7px 8px; border-left: 2px solid rgba(255,209,102,.60); background: linear-gradient(90deg, rgba(255,209,102,.09), transparent); }
+.stat { padding: 7px 8px; border-left: 2px solid rgba(196, 221, 255, .18); background: rgba(255,255,255,.025); }
 .stat .label { font-size: 9px; font-weight: 800; letter-spacing: .16em; color: #cbb6ca; }
 .stat strong { margin-top: 4px; font-size: 19px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -373,6 +373,104 @@ button:disabled { opacity: .45; cursor: default; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .hidden { display: none !important; }
 
+/* Battlefield controls use a hard-edged command-console skin. The combat UI
+   should feel like equipment mounted around the field, not a stack of web cards. */
+.top-hud,
+.unit-tray,
+.command-panel,
+.interaction-banner {
+  border-radius: 7px;
+  border-color: rgba(255, 203, 99, .32);
+  background-color: rgba(9, 7, 19, .91);
+  background-image: linear-gradient(135deg, rgba(65, 32, 77, .95), rgba(9, 7, 20, .98) 45%, rgba(31, 19, 48, .94));
+  box-shadow: 0 18px 42px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.07), 0 0 0 1px rgba(255, 99, 137, .05);
+}
+.top-hud,
+.unit-tray { overflow: hidden; }
+.top-hud::before,
+.unit-tray::before {
+  position: absolute;
+  top: 9px;
+  left: 12px;
+  color: #ffe4a0;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .22em;
+}
+.top-hud::before { content: 'BASTION  /  COMMAND'; }
+.unit-tray::before { content: 'FIELD ASSETS'; }
+.top-hud {
+  width: 212px;
+  gap: 3px;
+  padding: 30px 9px 9px;
+}
+.unit-tray {
+  width: 232px;
+  gap: 5px;
+  padding: 30px 7px 7px;
+}
+.top-hud .stat {
+  min-height: 42px;
+  padding: 6px 8px;
+  border-left: 2px solid rgba(196, 221, 255, .22);
+  background: rgba(255,255,255,.025);
+}
+.top-hud .stat strong { font-size: 20px; color: #fff4dd; }
+.top-hud #gold { color: #ffd166; }
+.top-hud #wave { color: #91f7e9; }
+.top-hud #nextWave { color: #ffabbc; font-size: 14px; }
+.top-hud .icon-button {
+  height: 34px;
+  border-radius: 4px;
+  border-color: rgba(255, 209, 102, .28);
+  color: #ffedc2;
+  background: rgba(255, 209, 102, .08);
+  font-size: 13px;
+  font-weight: 900;
+}
+.top-hud .icon-button:hover:not(:disabled) { background: rgba(255, 209, 102, .18); border-color: rgba(255, 209, 102, .75); }
+.unit-card { 
+  height: 62px;
+  border-radius: 4px;
+  border-color: rgba(255, 255, 255, .10);
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 7px;
+  padding: 6px 34px 6px 7px;
+  background: linear-gradient(90deg, rgba(255,255,255,.07), rgba(255,255,255,.025) 32%, rgba(255,255,255,.012));
+}
+.unit-card:hover { transform: translateX(-2px); background: linear-gradient(90deg, rgba(160,230,255,.13), rgba(255,255,255,.045) 38%, rgba(255,255,255,.012)); }
+.unit-card.selected { box-shadow: 0 0 0 1px rgba(148, 240, 229, .62), inset 0 0 24px rgba(88, 223, 207, .11); }
+.unit-icon { width: 36px; height: 40px; color: #ffe3a1; }
+.unit-name { font-size: 12px; letter-spacing: .01em; }
+.unit-role { color: #baaac1; }
+.unit-cost { color: #ffcf67; font-size: 11px; }
+.unit-card-info { border-radius: 3px; border-color: rgba(255, 209, 102, .25); color: #ffe19a; background: rgba(7, 5, 16, .88); }
+.command-panel { width: 232px; padding: 30px 8px 8px; }
+.command-panel::before {
+  content: 'UNIT CONTROL';
+  position: absolute;
+  top: 10px;
+  left: 13px;
+  color: #ffe4a0;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .22em;
+}
+.command-unit { padding: 5px 4px 10px; }
+.command-icon { border-radius: 5px; color: #ffe4a0; background: rgba(255, 209, 102, .11); border-color: rgba(255, 209, 102, .35); }
+.command-kicker { color: #ffcf67; }
+.command-grid { gap: 4px; }
+.command-grid button {
+  min-height: 54px;
+  border-radius: 4px;
+  border-color: rgba(255,255,255,.10);
+  background: rgba(255,255,255,.035);
+}
+.command-grid button:hover { border-color: rgba(255,209,102,.58); background: rgba(255,209,102,.10); }
+.interaction-banner { border-radius: 5px; background-image: linear-gradient(135deg, rgba(63, 31, 72, .98), rgba(11, 8, 23, .99)); }
+.interaction-banner strong { color: #ffe19a; }
+.interaction-banner .small-button { border-radius: 4px; border-color: rgba(255,209,102,.34); background: rgba(255,209,102,.09); }
+
 #app[data-screen="menu"] .top-hud,
 #app[data-screen="menu"] .unit-tray,
 #app[data-screen="menu"] .interaction-banner,
@@ -467,4 +565,11 @@ button:disabled { opacity: .45; cursor: default; }
   .command-panel { bottom: calc(5px + var(--safe-bottom)); }
   .command-unit { display: none; }
   .command-grid button { min-height: 46px; }
+}
+
+@media (max-width: 959px) {
+  .top-hud { padding: 27px 10px 8px; }
+  .unit-tray { padding: 28px 7px 7px; }
+  .unit-tray::before { top: 8px; }
+  .command-panel { padding-top: 29px; }
 }
