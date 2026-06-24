@@ -11,6 +11,8 @@ import { AudioManager } from "./audio/sounds.js";
 import { MessageController } from "./ui/messageController.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { RulesModal } from "./ui/rulesModal.js";
+import { SettingsModal } from "./ui/settingsModal.js";
+import { loadSettings, applySettings } from "./ui/settings.js";
 import { ConfirmDialog } from "./ui/confirmDialog.js";
 import { GameController } from "./game/GameController.js";
 import { ScreenManager } from "./ui/screens/screenManager.js";
@@ -25,6 +27,11 @@ import { createResultsScreen } from "./ui/screens/resultsScreen.js";
 export function createApp(documentRef = document) {
   const elements = getUiElements(documentRef);
   const audio = new AudioManager();
+
+  // Load saved presentation preferences and apply them before the first render,
+  // so theme / reduced-motion / colorblind / audio levels / animation speed are
+  // all in effect from the title screen on (no flash of defaults).
+  const settings = applySettings(loadSettings(), { audio, documentRef });
 
   // One delegated click hit for every button on every screen (menus, setup,
   // in-game HUD, modals). The first such click is also the user gesture that
@@ -44,6 +51,11 @@ export function createApp(documentRef = document) {
     documentRef.getElementById("closeRulesBtn"),
   );
 
+  const settingsModal = new SettingsModal(
+    documentRef.getElementById("settingsModal"),
+    { settings, audio, documentRef },
+  );
+
   const confirmDialog = new ConfirmDialog(
     documentRef.getElementById("confirmModal"),
   );
@@ -54,6 +66,7 @@ export function createApp(documentRef = document) {
   const ctx = {
     nav: (name, params) => manager.show(name, params),
     openRules: () => rules.open(),
+    openSettings: () => settingsModal.open(),
   };
 
   const controller = new GameController({

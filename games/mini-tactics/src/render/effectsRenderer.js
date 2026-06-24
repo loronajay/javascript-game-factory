@@ -1,6 +1,7 @@
 import { gridToScreen } from "../geometry/isometric.js";
 import { createSvgElement } from "./svg.js";
 import { prefersReducedMotion } from "./motion.js";
+import { scale } from "./timing.js";
 
 export class EffectsRenderer {
   constructor({ unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio, svg }) {
@@ -44,7 +45,7 @@ export class EffectsRenderer {
         { transform: throwTo(magnitude * 0.3) },
         { transform: "translate(0, 0)" },
       ],
-      { duration: 260, easing: "ease-out" },
+      { duration: scale(260), easing: "ease-out" },
     );
   }
 
@@ -69,7 +70,7 @@ export class EffectsRenderer {
     flash
       .animate(
         [{ opacity: 0.55 }, { opacity: 0 }],
-        { duration: 220, easing: "ease-out" },
+        { duration: scale(220), easing: "ease-out" },
       )
       .finished.catch(() => {})
       .then(() => flash.remove());
@@ -82,7 +83,7 @@ export class EffectsRenderer {
     if (prefersReducedMotion()) {
       return;
     }
-    await sleep(ms);
+    await sleep(scale(ms));
   }
 
   async rollDie(rollResult) {
@@ -91,13 +92,13 @@ export class EffectsRenderer {
 
     for (let index = 0; index < 8; index += 1) {
       this.dieFace.textContent = String(1 + Math.floor(Math.random() * 6));
-      await sleep(42);
+      await sleep(scale(42));
     }
 
     this.dieFace.textContent = String(rollResult);
-    await sleep(300);
+    await sleep(scale(300));
     this.diceOverlay.classList.remove("rolling");
-    await sleep(200);
+    await sleep(scale(200));
     this.diceOverlay.classList.remove("show");
   }
 
@@ -133,7 +134,7 @@ export class EffectsRenderer {
         }
       ],
       {
-        duration: 420,
+        duration: scale(420),
         easing: "cubic-bezier(.2,.8,.2,1)"
       }
     ).finished.catch(() => {});
@@ -187,7 +188,7 @@ export class EffectsRenderer {
         { strokeDashoffset: "-50", opacity: 0 }
       ],
       {
-        duration: 420,
+        duration: scale(420),
         easing: "ease-out"
       }
     ).finished.catch(() => {});
@@ -232,7 +233,7 @@ export class EffectsRenderer {
         }
       ],
       {
-        duration: 520,
+        duration: scale(520),
         easing: "ease-in-out"
       }
     ).finished.catch(() => {});
@@ -270,7 +271,7 @@ export class EffectsRenderer {
         { r: 6, opacity: .95 },
         { r: critical ? 30 : 24, opacity: 0 }
       ],
-      { duration: 200, easing: "ease-out" }
+      { duration: scale(200), easing: "ease-out" }
     ).finished.catch(() => {}).then(() => flash.remove());
 
     const ring = createSvgElement("circle", {
@@ -291,7 +292,7 @@ export class EffectsRenderer {
           { r: 44, opacity: 0, strokeWidth: 1 }
         ],
         {
-          duration: 420,
+          duration: scale(420),
           easing: "ease-out"
         }
       ).finished.catch(() => {})
@@ -318,7 +319,7 @@ export class EffectsRenderer {
             { transform: `translate(${point.x}px ${baseY}px)` }
           ],
           {
-            duration: 330,
+            duration: scale(330),
             easing: "ease-out"
           }
         ).finished.catch(() => {})
@@ -359,7 +360,7 @@ export class EffectsRenderer {
         { r: 58, opacity: 0, strokeWidth: 1 }
       ],
       {
-        duration: 560,
+        duration: scale(560),
         easing: "ease-out"
       }
     ).finished.catch(() => {});
@@ -406,7 +407,7 @@ export class EffectsRenderer {
         }
       ],
       {
-        duration: 620,
+        duration: scale(620),
         easing: "cubic-bezier(.3,.7,.3,1)"
       }
     ).finished.catch(() => {});
@@ -453,7 +454,7 @@ export class EffectsRenderer {
               opacity: 0,
             },
           ],
-          { duration: 480 + Math.random() * 220, easing: "cubic-bezier(.2,.7,.3,1)" },
+          { duration: scale(480 + Math.random() * 220), easing: "cubic-bezier(.2,.7,.3,1)" },
         )
         .finished.catch(() => {})
         .then(() => shard.remove());
@@ -490,7 +491,7 @@ export class EffectsRenderer {
         }
       ],
       {
-        duration: 720,
+        duration: scale(720),
         easing: "ease-out"
       }
     ).finished.catch(() => {});
@@ -533,7 +534,7 @@ export class EffectsRenderer {
         }
       ],
       {
-        duration: 360,
+        duration: scale(360),
         easing: "cubic-bezier(.2,.75,.2,1)"
       }
     ).finished.catch(() => {});

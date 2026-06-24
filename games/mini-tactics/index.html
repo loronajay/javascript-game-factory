@@ -32,7 +32,7 @@
         <div class="menu-buttons">
           <button data-nav="mainMenu" class="primary menu-btn">Continue</button>
           <button data-action="rules" class="menu-btn">How to Play</button>
-          <button class="menu-btn" disabled>Settings <span class="soon">Soon</span></button>
+          <button data-action="settings" class="menu-btn">Settings</button>
         </div>
       </div>
     </section>
@@ -47,7 +47,7 @@
           <button data-nav="hsSetup" class="menu-btn">Hot Seat</button>
           <button data-nav="onlineSetup" class="menu-btn">Online Versus</button>
           <button data-action="rules" class="menu-btn">How to Play</button>
-          <button class="menu-btn" disabled>Settings <span class="soon">Soon</span></button>
+          <button data-action="settings" class="menu-btn">Settings</button>
           <button data-nav="title" class="menu-btn ghost">Back</button>
         </div>
       </div>
@@ -243,6 +243,7 @@
 
         <div class="top-actions">
           <button id="rulesBtn">Rules</button>
+          <button id="settingsBtn">Settings</button>
           <button id="concedeBtn" class="cancel">Concede</button>
           <button id="restartBtn" class="danger">Restart</button>
           <button id="quitBtn">Menu</button>
@@ -353,7 +354,7 @@
           <ul>
             <li>Each player activates every living piece once, then the squad turn changes.</li>
             <li>A piece may move then act, or act then move — but a move alone is illegal. Every activation must end in an attack, heal, or defend.</li>
-            <li>Movement is orthogonal: warrior 3 tiles, tank/ranger/medic 2. Pieces block movement.</li>
+            <li>Movement is orthogonal: warrior &amp; tank 3 tiles, ranger/medic 2. Pieces block movement.</li>
             <li>Attack range includes diagonals with no penalty: warrior/tank 1, medic 3, ranger 4.</li>
             <li>Ranger shots are blocked by any piece between ranger and target — including your own.</li>
             <li>Attack/heal roll: 1 misses, 6 crits. Crit attacks add 1 damage; crit heals restore 4 instead of 3.</li>
@@ -395,11 +396,11 @@
                 </div>
                 <div class="ug-stats">
                   <span class="ug-stat"><b>10</b><i>HP</i></span>
-                  <span class="ug-stat"><b>2</b><i>Move</i></span>
+                  <span class="ug-stat"><b>3</b><i>Move</i></span>
                   <span class="ug-stat"><b>1</b><i>Range</i></span>
                   <span class="ug-stat"><b>2</b><i>Damage</i></span>
                 </div>
-                <p class="ug-role">Wall and blocker. Bodies plug lanes and soak the Warrior, who only does 2 back to it.</p>
+                <p class="ug-role">Wall and blocker with a Warrior's stride. Bodies plug lanes and soak the Warrior, who only does 2 back to it.</p>
               </div>
             </article>
 
@@ -457,6 +458,81 @@
 
         <div class="modal-row">
           <button id="closeRulesBtn" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings overlay — presentation-only preferences (audio levels, animation
+         speed, motion, colorblind palette, theme). Reachable from title, main
+         menu, and the in-match toolbar. Driven by ui/settingsModal.js; values
+         persist to localStorage and apply live. -->
+    <div id="settingsModal">
+      <div class="modal-card settings-card">
+        <h2>Settings</h2>
+
+        <div class="settings-section">
+          <h3 class="settings-heading">Audio</h3>
+
+          <label class="setting-row">
+            <span class="setting-label">Master volume</span>
+            <input type="range" data-setting="master" min="0" max="100" step="1" aria-label="Master volume" />
+            <span class="setting-readout" data-readout>100%</span>
+          </label>
+
+          <label class="setting-row">
+            <span class="setting-label">Sound effects</span>
+            <input type="range" data-setting="sfx" min="0" max="100" step="1" aria-label="Sound effects volume" />
+            <span class="setting-readout" data-readout>80%</span>
+          </label>
+
+          <label class="setting-row">
+            <span class="setting-label">Music</span>
+            <input type="range" data-setting="music" min="0" max="100" step="1" aria-label="Music volume" />
+            <span class="setting-readout" data-readout>35%</span>
+          </label>
+        </div>
+
+        <div class="settings-section">
+          <h3 class="settings-heading">Display</h3>
+
+          <div class="setting-row">
+            <span class="setting-label">Animation speed</span>
+            <div class="segmented" data-field="animSpeed">
+              <button type="button" class="seg" data-value="slow">Slow</button>
+              <button type="button" class="seg is-selected" data-value="normal">Normal</button>
+              <button type="button" class="seg" data-value="fast">Fast</button>
+              <button type="button" class="seg" data-value="instant">Instant</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">Reduce motion</span>
+            <div class="segmented" data-field="reduceMotion">
+              <button type="button" class="seg is-selected" data-value="off">Off</button>
+              <button type="button" class="seg" data-value="on">On</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">Colorblind palette</span>
+            <div class="segmented" data-field="colorblind">
+              <button type="button" class="seg is-selected" data-value="off">Off</button>
+              <button type="button" class="seg" data-value="on">On</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">Theme</span>
+            <div class="segmented" data-field="theme">
+              <button type="button" class="seg is-selected" data-value="dark">Dark</button>
+              <button type="button" class="seg" data-value="light">Light</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-row settings-actions">
+          <button type="button" class="ghost" data-action="resetSettings">Reset to defaults</button>
+          <button type="button" data-action="closeSettings">Close</button>
         </div>
       </div>
     </div>

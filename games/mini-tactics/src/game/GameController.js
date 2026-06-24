@@ -14,6 +14,8 @@
 import {
   ACTION_MODES,
   BOARD_SIZES,
+  COLORBLIND_PLAYER_COLORS,
+  COLORBLIND_TEAM_COLORS,
   DEFAULT_BOARD_SIZE,
   MAX_HP,
   UNIT_TYPES,
@@ -48,6 +50,7 @@ import { ForecastRenderer } from "../render/forecastRenderer.js";
 import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
 import { renderAmbient } from "../render/ambient.js";
+import { scale } from "../render/timing.js";
 
 export class GameController {
   constructor({ elements, messages, audio, confirm, onMatchComplete, turnAnnouncer }) {
@@ -188,6 +191,16 @@ export class GameController {
       throw new Error(`Unsupported board size: ${size}`);
     }
 
+    // Colorblind palette is a presentation swap applied at creation: per-seat hues
+    // for duel/FFA, or the two-team variant for 2v2 when the lobby didn't pick
+    // explicit team colors. Color is not hashed, so this is safe per-client online.
+    // (A mid-match toggle applies to the next match, since hues bake in here.)
+    const colorblind = colorblindActive();
+    const colors = colorblind && format !== "teams" ? COLORBLIND_PLAYER_COLORS : null;
+    const effectiveTeamColors = colorblind && format === "teams"
+      ? (teamColors ?? COLORBLIND_TEAM_COLORS)
+      : teamColors;
+
     this.match = createMatchState({
       // Online uses the relay-provided shared seed so both clients run the same
       // dice stream; local play picks a fresh seed each match.
@@ -196,7 +209,8 @@ export class GameController {
       mode: this.mode,
       playerCount,
       format,
-      teamColors,
+      colors,
+      teamColors: effectiveTeamColors,
       teamNames,
     });
     this.ui = createUiState();
@@ -1350,8 +1364,19 @@ const CPU_ACTIVATION_GAP_MS = 360; // between one unit finishing and the next
 const CPU_STEP_MS = 220; //        small beat on selection / brace
 const CPU_MAX_ACTIVATIONS = 64; //  guard against a runaway planning loop
 
+// CPU pacing only. Scaled by the Settings "Animation speed" lever so a fast/instant
+// game speeds the opponent's deliberation to match — presentation, never rules.
 function sleep(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+  return new Promise((resolve) => window.setTimeout(resolve, scale(ms)));
+}
+
+// Reads the live colorblind preference off the root attribute Settings maintains.
+// Guarded so the controller stays harmless if ever constructed off-DOM.
+function colorblindActive() {
+  return (
+    typeof document !== "undefined" &&
+    document.documentElement?.getAttribute("data-colorblind") === "on"
+  );
 }
 
 function createUiState() {

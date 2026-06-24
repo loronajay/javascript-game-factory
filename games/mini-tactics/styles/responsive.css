@@ -58,3 +58,14 @@
     transition-duration: .01ms !important;
   }
 }
+
+/* Settings "Reduce motion" toggle — forces the same neutralization on top of
+   the OS preference (the scripted Web-Animations juice consults the matching
+   data attribute via render/motion.js). */
+:root[data-reduce-motion="on"] *,
+:root[data-reduce-motion="on"] *::before,
+:root[data-reduce-motion="on"] *::after {
+  animation-duration: .01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important;
+}

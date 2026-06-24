@@ -12,6 +12,7 @@ export function createMatchScreen(ctx) {
   const el = screenRoot("match");
 
   el.querySelector("#rulesBtn").addEventListener("click", () => ctx.openRules());
+  el.querySelector("#settingsBtn").addEventListener("click", () => ctx.openSettings());
   el.querySelector("#quitBtn").addEventListener("click", () => {
     // Quitting an online match abandons it — drop the socket so the opponent is
     // told cleanly (they see a disconnect end). No-op for local play.

@@ -97,7 +97,7 @@ tests/
 - 10×10 or 13×13 board.
 - Four pieces per player: warrior, tank, ranger, medic.
 - Every piece starts at 10 HP.
-- Warrior movement 3; all others movement 2.
+- Warrior and tank movement 3; ranger and medic movement 2.
 - Movement is orthogonal.
 - Attacks include diagonals without range penalty.
 - Warrior/tank range 1; medic range 3; ranger range 4.

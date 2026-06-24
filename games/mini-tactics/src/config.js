@@ -16,7 +16,7 @@ export const UNIT_TYPES = Object.freeze({
   tank: Object.freeze({
     name: "Tank",
     icon: "⬢",
-    moveRange: 2,
+    moveRange: 3,
     attackRange: 1
   }),
   ranger: Object.freeze({
@@ -44,6 +44,25 @@ export const PLAYER_COLORS = Object.freeze({
   2: "#c4463f",
   3: "#62a04e",
   4: "#d68d37"
+});
+
+// Colorblind-safe faction palette (Settings "Colorblind palette"). Drops the
+// default red/green pairing — the hardest for the common deuter/protan types —
+// for an Okabe-Ito-derived blue / vermillion / reddish-purple / yellow set that
+// stays distinct across the major CVD types and against the ivory pieces. This
+// is presentation only: it is substituted for PLAYER_COLORS at match creation
+// (color is not part of the state hash), so the swap is safe per-client online.
+export const COLORBLIND_PLAYER_COLORS = Object.freeze({
+  1: "#2b7fd4", /* strong blue       */
+  2: "#e07b39", /* vermillion-orange */
+  3: "#b85bb0", /* reddish purple    */
+  4: "#e6cf33"  /* yellow            */
+});
+
+// Two-team variant (2v2): the two most-separable hues from the same set.
+export const COLORBLIND_TEAM_COLORS = Object.freeze({
+  1: "#2b7fd4",
+  2: "#e07b39"
 });
 
 export const ACTION_MODES = Object.freeze({

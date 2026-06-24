@@ -41,6 +41,14 @@ assert(getMissionById('missing-stage') === null, 'Unknown stages should not sile
 assert(getNextMission('missing-stage') === null, 'Unknown stages should not have a next stage');
 
 assert(BATTLEFIELDS.length >= 2, 'Campaign map authoring should support multiple battlefields');
+const expandedBattlefieldIds = ['ironwood-bridge', 'reactor-shards'];
+for (const mapId of expandedBattlefieldIds) {
+  assert(getBattlefieldById(mapId), `Expanded campaign should include ${mapId}`);
+  assert(
+    CAMPAIGN.some((mission) => mission.mapId === mapId),
+    `Expanded battlefield ${mapId} should have a campaign operation`,
+  );
+}
 for (const map of BATTLEFIELDS) {
   assert(map.world.width > 0 && map.world.height > 0, `${map.id} needs world dimensions`);
   assert(map.enemyPaths.length > 0, `${map.id} needs authored enemy paths`);

@@ -169,7 +169,185 @@ export const CINDER_PASS = defineBattlefield({
   },
 });
 
-export const BATTLEFIELDS = Object.freeze([BLACKGLASS_PLATEAU, CINDER_PASS]);
+// A broad southern approach collapses into one exposed span. The player can
+// spread to catch the early routes, but the bridge itself becomes the natural
+// place to make a costly, memorable last stand.
+export const IRONWOOD_BRIDGE = defineBattlefield({
+  id: 'ironwood-bridge',
+  name: 'Ironwood Span',
+  world: { width: 1000, height: 1400 },
+  base: { x: 500, y: 108, radius: 54 },
+  deployZone: { minX: 54, maxX: 946, minY: 176, maxY: 1050 },
+  enemyPaths: [
+    {
+      id: 'west-road',
+      label: 'West Road',
+      points: [
+        { x: 96, y: 1360 }, { x: 178, y: 1180 }, { x: 278, y: 1000 }, { x: 360, y: 816 },
+        { x: 432, y: 670 }, { x: 500, y: 500 }, { x: 500, y: 108 },
+      ],
+    },
+    {
+      id: 'causeway',
+      label: 'Central Causeway',
+      points: [
+        { x: 500, y: 1360 }, { x: 500, y: 1130 }, { x: 500, y: 910 }, { x: 500, y: 670 },
+        { x: 500, y: 500 }, { x: 500, y: 108 },
+      ],
+    },
+    {
+      id: 'east-road',
+      label: 'East Road',
+      points: [
+        { x: 904, y: 1360 }, { x: 822, y: 1180 }, { x: 722, y: 1000 }, { x: 640, y: 816 },
+        { x: 568, y: 670 }, { x: 500, y: 500 }, { x: 500, y: 108 },
+      ],
+    },
+  ],
+  terrain: [
+    {
+      id: 'west-ironwood', type: 'cliff', polygon: [
+        { x: 28, y: 170 }, { x: 286, y: 180 }, { x: 324, y: 420 }, { x: 290, y: 662 },
+        { x: 182, y: 742 }, { x: 28, y: 702 },
+      ],
+    },
+    {
+      id: 'east-ironwood', type: 'cliff', polygon: [
+        { x: 972, y: 170 }, { x: 714, y: 180 }, { x: 676, y: 420 }, { x: 710, y: 662 },
+        { x: 818, y: 742 }, { x: 972, y: 702 },
+      ],
+    },
+    {
+      id: 'west-floodplain', type: 'ruin', polygon: [
+        { x: 34, y: 854 }, { x: 176, y: 824 }, { x: 252, y: 902 }, { x: 214, y: 1074 },
+        { x: 74, y: 1118 }, { x: 28, y: 1008 },
+      ],
+    },
+    {
+      id: 'east-floodplain', type: 'ruin', polygon: [
+        { x: 966, y: 854 }, { x: 824, y: 824 }, { x: 748, y: 902 }, { x: 786, y: 1074 },
+        { x: 926, y: 1118 }, { x: 972, y: 1008 },
+      ],
+    },
+    {
+      id: 'west-south-ridge', type: 'mesa', polygon: [
+        { x: 286, y: 1160 }, { x: 424, y: 1148 }, { x: 452, y: 1270 }, { x: 416, y: 1364 },
+        { x: 300, y: 1372 }, { x: 256, y: 1270 },
+      ],
+    },
+    {
+      id: 'east-south-ridge', type: 'mesa', polygon: [
+        { x: 714, y: 1160 }, { x: 576, y: 1148 }, { x: 548, y: 1270 }, { x: 584, y: 1364 },
+        { x: 700, y: 1372 }, { x: 744, y: 1270 },
+      ],
+    },
+  ],
+  renderRoutes: false,
+  palette: {
+    top: '#285463', middle: '#183747', bottom: '#091a29', screenCenter: '#1f5265', sky: '#8ed6cc',
+    terrain: '#285461', terrainEdge: '#a5e6d4', ruin: '#475c5a', routeGlow: '#ffd772',
+    danger: '#ff5e6c', accent: '#78f5d0', grid: '#8ac8c8',
+  },
+});
+
+// Five short approach lanes make this map a reserve-management puzzle. The
+// shard walls keep a unit committed to one chamber for just long enough that
+// timing a retreat or an interceptor matters more than raw unit count.
+export const REACTOR_SHARDS = defineBattlefield({
+  id: 'reactor-shards',
+  name: 'Reactor Shards',
+  world: { width: 1000, height: 1400 },
+  base: { x: 500, y: 108, radius: 54 },
+  deployZone: { minX: 54, maxX: 946, minY: 176, maxY: 1040 },
+  enemyPaths: [
+    {
+      id: 'west-shard', label: 'West Shard',
+      points: [
+        { x: 72, y: 1280 }, { x: 190, y: 1110 }, { x: 282, y: 916 }, { x: 364, y: 720 },
+        { x: 438, y: 510 }, { x: 500, y: 332 }, { x: 500, y: 108 },
+      ],
+    },
+    {
+      id: 'west-relay', label: 'West Relay',
+      points: [
+        { x: 286, y: 1360 }, { x: 332, y: 1170 }, { x: 398, y: 964 }, { x: 364, y: 720 },
+        { x: 438, y: 510 }, { x: 500, y: 332 }, { x: 500, y: 108 },
+      ],
+    },
+    {
+      id: 'core-seam', label: 'Core Seam',
+      points: [
+        { x: 500, y: 1360 }, { x: 500, y: 1120 }, { x: 500, y: 862 }, { x: 500, y: 646 },
+        { x: 500, y: 332 }, { x: 500, y: 108 },
+      ],
+    },
+    {
+      id: 'east-relay', label: 'East Relay',
+      points: [
+        { x: 714, y: 1360 }, { x: 668, y: 1170 }, { x: 602, y: 964 }, { x: 636, y: 720 },
+        { x: 562, y: 510 }, { x: 500, y: 332 }, { x: 500, y: 108 },
+      ],
+    },
+    {
+      id: 'east-shard', label: 'East Shard',
+      points: [
+        { x: 928, y: 1280 }, { x: 810, y: 1110 }, { x: 718, y: 916 }, { x: 636, y: 720 },
+        { x: 562, y: 510 }, { x: 500, y: 332 }, { x: 500, y: 108 },
+      ],
+    },
+  ],
+  terrain: [
+    {
+      id: 'upper-west-shard', type: 'mesa', polygon: [
+        { x: 76, y: 204 }, { x: 340, y: 184 }, { x: 394, y: 306 }, { x: 346, y: 474 },
+        { x: 196, y: 524 }, { x: 68, y: 432 },
+      ],
+    },
+    {
+      id: 'upper-east-shard', type: 'mesa', polygon: [
+        { x: 924, y: 204 }, { x: 660, y: 184 }, { x: 606, y: 306 }, { x: 654, y: 474 },
+        { x: 804, y: 524 }, { x: 932, y: 432 },
+      ],
+    },
+    {
+      id: 'west-inner-shard', type: 'cliff', polygon: [
+        { x: 54, y: 620 }, { x: 254, y: 590 }, { x: 308, y: 698 }, { x: 272, y: 850 },
+        { x: 126, y: 896 }, { x: 28, y: 806 },
+      ],
+    },
+    {
+      id: 'east-inner-shard', type: 'cliff', polygon: [
+        { x: 946, y: 620 }, { x: 746, y: 590 }, { x: 692, y: 698 }, { x: 728, y: 850 },
+        { x: 874, y: 896 }, { x: 972, y: 806 },
+      ],
+    },
+    {
+      id: 'southwest-broken-reactor', type: 'ruin', polygon: [
+        { x: 42, y: 1002 }, { x: 180, y: 968 }, { x: 248, y: 1066 }, { x: 216, y: 1236 },
+        { x: 64, y: 1262 }, { x: 28, y: 1136 },
+      ],
+    },
+    {
+      id: 'southeast-broken-reactor', type: 'ruin', polygon: [
+        { x: 958, y: 1002 }, { x: 820, y: 968 }, { x: 752, y: 1066 }, { x: 784, y: 1236 },
+        { x: 936, y: 1262 }, { x: 972, y: 1136 },
+      ],
+    },
+  ],
+  renderRoutes: false,
+  palette: {
+    top: '#4d2d7b', middle: '#2a1c56', bottom: '#0b0b24', screenCenter: '#3f286f', sky: '#c08cff',
+    terrain: '#42306d', terrainEdge: '#d1a7ff', ruin: '#59416e', routeGlow: '#ffe37b',
+    danger: '#ff5276', accent: '#86f6ff', grid: '#a997ec',
+  },
+});
+
+export const BATTLEFIELDS = Object.freeze([
+  BLACKGLASS_PLATEAU,
+  CINDER_PASS,
+  IRONWOOD_BRIDGE,
+  REACTOR_SHARDS,
+]);
 
 export function getBattlefieldById(id) {
   return BATTLEFIELDS.find((map) => map.id === id) ?? null;

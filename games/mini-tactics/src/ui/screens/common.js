@@ -9,15 +9,20 @@ export function screenRoot(name, documentRef = document) {
 }
 
 // Wire the navigation-only controls every screen shares: `[data-nav]` buttons
-// jump to another screen; `[data-action="rules"]` opens the How-to-Play overlay.
-// Screen-specific actions are wired by each screen module itself.
-export function bindCommonControls(root, { nav, openRules }) {
+// jump to another screen; `[data-action="rules"]` opens the How-to-Play overlay;
+// `[data-action="settings"]` opens the Settings overlay. Screen-specific actions
+// are wired by each screen module itself.
+export function bindCommonControls(root, { nav, openRules, openSettings }) {
   root.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => nav(btn.dataset.nav));
   });
 
   root.querySelectorAll('[data-action="rules"]').forEach((btn) => {
     btn.addEventListener("click", () => openRules());
+  });
+
+  root.querySelectorAll('[data-action="settings"]').forEach((btn) => {
+    btn.addEventListener("click", () => openSettings?.());
   });
 }
 

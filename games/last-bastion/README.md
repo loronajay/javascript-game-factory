@@ -1,6 +1,6 @@
 # Last Bastion
 
-Last Bastion is a tactical defense game about turning a collapsing battlefield into a defensible frontline. Read the enemy approaches, choose the right counter units, and hold Blackglass Plateau long enough to secure the core.
+Last Bastion is a tactical defense game about turning a collapsing battlefield into a defensible frontline. Read the enemy approaches, choose the right counter units, and hold the frontier long enough to secure the core.
 
 ## Current play loop
 
@@ -21,6 +21,7 @@ Last Bastion is a tactical defense game about turning a collapsing battlefield i
 - `src/data/maps.js` holds authored battlefields. Use `defineBattlefield()` to add world bounds, terrain, deployment zone, enemy paths, labels, and palette; route traces are derived from the paths.
 - `src/data/missions.js` holds campaign stages. Each stage selects a `mapId` and uses `defineWaves()` for its timed spawn groups.
 - Campaign stage selection, unlocking, and saved progress are handled by the game layer, so a new stage is normally just data: add a map (or reuse one), add its waves, and append the stage to `CAMPAIGN`.
+- The current five-operation path includes the wide, converging lanes of **Ironwood Span** and the five-chamber reserve puzzle of **Reactor Shards**.
 
 ## Matchup model
 

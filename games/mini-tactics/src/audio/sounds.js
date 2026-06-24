@@ -47,8 +47,13 @@ const MUSIC = Object.freeze({
 const SOUNDS_BASE = new URL("../../sounds/", import.meta.url);
 
 export class AudioManager {
-  constructor({ enabled = true, volume = 0.8, musicVolume = 0.35 } = {}) {
+  constructor({ enabled = true, masterVolume = 1, volume = 0.8, musicVolume = 0.35 } = {}) {
     this.enabled = enabled;
+    // Three independent levels, all 0..1. `volume` is the SFX bus, `musicVolume`
+    // the music bus, and `masterVolume` multiplies both — so the Settings panel's
+    // Master / SFX / Music sliders map straight onto these. Effective level is
+    // always master × bus; see effectiveVolume()/effectiveMusicVolume().
+    this.masterVolume = masterVolume;
     this.volume = volume;
     this.musicVolume = musicVolume;
     // Decoded template per key. Cloning these to play reuses the cached buffer
@@ -74,6 +79,37 @@ export class AudioManager {
     }
   }
 
+  // Live volume setters for the Settings sliders. Each clamps to 0..1 and, for
+  // anything that affects music, re-applies the level to the currently-playing
+  // track so a drag is heard immediately without restarting the loop.
+  setMasterVolume(value) {
+    this.masterVolume = clamp01(value);
+    this.applyMusicVolume();
+  }
+
+  setVolume(value) {
+    this.volume = clamp01(value);
+  }
+
+  setMusicVolume(value) {
+    this.musicVolume = clamp01(value);
+    this.applyMusicVolume();
+  }
+
+  effectiveVolume() {
+    return this.masterVolume * this.volume;
+  }
+
+  effectiveMusicVolume() {
+    return this.masterVolume * this.musicVolume;
+  }
+
+  applyMusicVolume() {
+    if (this.currentMusic) {
+      this.currentMusic.volume = this.effectiveMusicVolume();
+    }
+  }
+
   // Fire-and-forget. Unknown keys, disabled audio, and blocked/failed playback
   // are all silent no-ops — callers never need to guard or await.
   play(key) {
@@ -87,7 +123,7 @@ export class AudioManager {
     }
 
     const node = template.cloneNode(true);
-    node.volume = this.volume;
+    node.volume = this.effectiveVolume();
 
     const played = node.play();
     if (played && typeof played.catch === "function") {
@@ -120,7 +156,7 @@ export class AudioManager {
       this.musicTracks.set(key, track);
     }
 
-    track.volume = this.musicVolume;
+    track.volume = this.effectiveMusicVolume();
     track.currentTime = 0;
     this.currentMusic = track;
 
@@ -144,4 +180,12 @@ export class AudioManager {
       // Best-effort — pausing a never-started element can throw; ignore.
     }
   }
+}
+
+function clamp01(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, n));
 }

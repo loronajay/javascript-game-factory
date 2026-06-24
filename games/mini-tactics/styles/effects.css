@@ -136,6 +136,120 @@
   justify-content: flex-end;
 }
 
+/* Settings overlay — same parchment-scroll language as the rules modal, stacked
+   above the board so it can be opened mid-match. */
+#settingsModal {
+  position: absolute;
+  z-index: 55;
+  inset: 0;
+  display: none;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, .64);
+  backdrop-filter: blur(8px);
+}
+
+#settingsModal.open {
+  display: grid;
+}
+
+.modal-card.settings-card {
+  width: min(520px, 96vw);
+}
+
+.settings-section {
+  margin-top: 1rem;
+}
+
+.settings-section + .settings-section {
+  margin-top: 1.3rem;
+}
+
+/* Boxed section label so "Audio" / "Display" read as container headers, not body. */
+.settings-heading {
+  margin: 0 0 .7rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--parchment-edge);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: 132px 1fr auto;
+  align-items: center;
+  gap: .85rem;
+  margin: .7rem 0;
+}
+
+.setting-label {
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* Segmented controls have no readout column — let them span to the row's edge.
+   minmax(0, 1fr) (not the default 1fr, whose min is min-content) keeps the four
+   tracks equal and shrinkable so a long option like "Instant" can't push the
+   selected plaque past the slot's rounded edge. */
+.setting-row .segmented {
+  grid-column: 2 / -1;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+/* Keep each option on one line and let it ride its track width, so the selected
+   brass plaque stays inside its cell at the tighter 4-up animation-speed row. */
+.settings-card .segmented .seg {
+  min-width: 0;
+  padding-inline: .35rem;
+  font-size: .82rem;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.setting-row input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--brass);
+  cursor: pointer;
+}
+
+.setting-readout {
+  min-width: 3ch;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: .85rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.settings-actions {
+  margin-top: 1.3rem;
+  padding-top: .9rem;
+  border-top: 1px solid var(--parchment-edge);
+}
+
+@media (max-width: 480px) {
+  .setting-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .setting-row .setting-label {
+    grid-column: 1 / -1;
+  }
+
+  .setting-row .segmented {
+    grid-column: 1 / -1;
+  }
+}
+
 button.ghost {
   border-color: rgba(140, 104, 46, .55);
   background:

@@ -99,6 +99,72 @@
   --radius-tile: 9px;
 }
 
+/* =======================================================================
+   COLORBLIND PALETTE (Settings → data-colorblind="on")
+   The live unit hues are swapped in JS at match creation (config.js
+   COLORBLIND_PLAYER_COLORS), but the chrome that reads the --p1..--p4
+   tokens directly (turn dot, squad accents, washes, var(--p1) fallbacks)
+   must match — so mirror the same Okabe-Ito-derived set here.
+   ======================================================================= */
+:root[data-colorblind="on"] {
+  --p1: #2b7fd4; /* strong blue       */
+  --p2: #e07b39; /* vermillion-orange */
+  --p3: #b85bb0; /* reddish purple    */
+  --p4: #e6cf33; /* yellow            */
+
+  --p1-wash: rgba(43, 127, 212, .18);
+  --p2-wash: rgba(224, 123, 57, .18);
+}
+
+/* =======================================================================
+   LIGHT THEME (Settings → data-theme="light")
+   A daylight war table: the same brass + heraldic accents, but the dark
+   oak/leather surfaces lift to light oak and bright parchment with dark
+   ink text. Token-only override — the cascade re-skins from here. First
+   pass; visual QA across HUD/board still pending (see SETTINGS_SCOPE.md).
+   ======================================================================= */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #d9c6a1;
+  --wood: #c3a978;
+  --wood-deep: #a98c5a;
+  --leather: #b89b6c;
+
+  --parchment: #f2e8cd;
+  --parchment-hi: #fdf7e6;
+  --parchment-lo: #e2cfa3;
+  --parchment-edge: #b29760;
+
+  /* HUD/chrome surfaces are now light, so the "text on dark wood" tokens
+     flip to dark ink for contrast. */
+  --text: #2f2415;
+  --muted: #6b5839;
+
+  /* Light oak plate for the HUD/chrome surface. */
+  --console-fill:
+    linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, 0) 18%),
+    repeating-linear-gradient(91deg, rgba(120, 86, 40, .05) 0 3px, rgba(120, 86, 40, 0) 3px 7px),
+    linear-gradient(180deg, #e8d6ad, #cdb583);
+  --console-edge-soft: rgba(140, 104, 46, .4);
+  --console-shadow:
+    0 14px 30px rgba(80, 56, 24, .28),
+    inset 0 1px 0 rgba(255, 255, 255, .5),
+    inset 0 0 0 1px rgba(120, 88, 40, .22);
+
+  --p1-wash: rgba(82, 136, 198, .22);
+  --p2-wash: rgba(196, 70, 63, .22);
+}
+
+/* Daylight pours over the table instead of a single candle. */
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 244, 208, .75), transparent 52%),
+    radial-gradient(circle at 50% 118%, rgba(150, 118, 74, .35), transparent 60%),
+    repeating-linear-gradient(92deg, rgba(120, 86, 40, .04) 0 4px, rgba(120, 86, 40, 0) 4px 9px),
+    linear-gradient(180deg, #ead9b6 0%, #d3be93 100%);
+}
+
 * {
   box-sizing: border-box;
 }
