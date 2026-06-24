@@ -9,8 +9,12 @@ import { winnerLabel, teamColor, teamLabel } from "./labels.js";
 import { hpClass } from "./hp.js";
 
 export class HudRenderer {
-  constructor(elements) {
+  // `onUnitClick` (optional) lets the squad-panel chips act as a roster picker:
+  // clicking a selectable chip routes to the same selection path a board click
+  // uses. Defaults to undefined so the HUD stays usable headlessly / in isolation.
+  constructor(elements, { onUnitClick } = {}) {
     this.elements = elements;
+    this.onUnitClick = onUnitClick ?? null;
   }
 
   render(state) {
@@ -141,7 +145,18 @@ export class HudRenderer {
     const list = document.createElement("div");
     list.className = "squad-list";
     for (const unit of state.units.filter((u) => u.player === slot.id)) {
-      list.appendChild(buildSquadChip(unit));
+      // A chip is a live selection target only for the active player's own
+      // unspent, living pieces — the same set a board click could begin an
+      // activation on. The reducer still re-validates the chosen unit.
+      const selectable = Boolean(
+        this.onUnitClick &&
+        !state.winner &&
+        !state.locked &&
+        slot.id === state.currentPlayer &&
+        unit.hp > 0 &&
+        !unit.spent
+      );
+      list.appendChild(buildSquadChip(unit, selectable, this.onUnitClick));
     }
     panel.appendChild(list);
 
@@ -203,7 +218,7 @@ export class HudRenderer {
   }
 }
 
-function buildSquadChip(unit) {
+function buildSquadChip(unit, selectable = false, onSelect = null) {
   const definition = UNIT_TYPES[unit.type];
   const hp = Math.max(0, unit.hp);
   const chip = document.createElement("div");
@@ -212,6 +227,11 @@ function buildSquadChip(unit) {
   if (unit.spent) chip.classList.add("spent");
   if (unit.hp <= 0) chip.classList.add("dead");
   if (unit.defending) chip.classList.add("defending");
+
+  if (selectable && onSelect) {
+    chip.classList.add("selectable");
+    chip.addEventListener("click", () => onSelect(unit.id));
+  }
 
   chip.innerHTML = `
     <span class="chip-icon">${definition.icon}</span>

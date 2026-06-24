@@ -82,11 +82,29 @@ export class UnitRenderer {
       })
     );
 
-    const iconWrapper = createSvgElement("g", {
+    // Struck-coin emblem: the same silhouette is stacked three deep — a dark
+    // copy nudged down-right (the shadow the relief casts), a light copy nudged
+    // up-left (the lit bevel edge), and the gradient-filled face on top. The
+    // thin sliver of each offset copy that the face doesn't cover is what reads
+    // as an engraved metal bevel. All three colors are CSS-driven so the paths
+    // stay pure geometry. See #pewter in index.html and .emblem in board.css.
+    const emblem = createSvgElement("g", {
+      class: "emblem",
       transform: "translate(0 -10) scale(.72)"
     });
-    iconWrapper.appendChild(createUnitIcon(unit.type));
-    body.appendChild(iconWrapper);
+
+    const face = createUnitIcon(unit.type);
+
+    const bevelShadow = face.cloneNode(true);
+    bevelShadow.setAttribute("class", "icon-shadow");
+    bevelShadow.setAttribute("transform", "translate(1.4 1.9)");
+
+    const bevelHighlight = face.cloneNode(true);
+    bevelHighlight.setAttribute("class", "icon-highlight");
+    bevelHighlight.setAttribute("transform", "translate(-1.2 -1.5)");
+
+    emblem.append(bevelShadow, bevelHighlight, face);
+    body.appendChild(emblem);
 
     body.append(
       createSvgElement("rect", {
@@ -129,6 +147,31 @@ export class UnitRenderer {
     );
 
     body.appendChild(spentMark);
+
+    // Defend badge: a clear shield emblem in the top-left corner whenever a unit
+    // is braced. Reads at a glance alongside the orbiting shield-ring (CSS shows
+    // it only on .defending). Mirrors the spent-mark's corner-badge construction.
+    const defendMark = createSvgElement("g", {
+      class: "defend-mark",
+      transform: "translate(-18 -18)"
+    });
+
+    defendMark.append(
+      createSvgElement("circle", {
+        cx: 0,
+        cy: 0,
+        r: 9,
+        fill: "rgba(20,16,8,.82)",
+        stroke: "var(--gold)",
+        "stroke-width": 1.4
+      }),
+      createSvgElement("path", {
+        class: "defend-shield",
+        d: "M 0 -6 L 5 -3.5 L 5 1 Q 5 5 0 7 Q -5 5 -5 1 L -5 -3.5 Z"
+      })
+    );
+
+    body.appendChild(defendMark);
     group.append(shadow, body);
 
     group.addEventListener("click", (event) => {
@@ -145,47 +188,59 @@ function createUnitIcon(type) {
 
   switch (type) {
     case "warrior":
+      // Broadsword: chunkier blade with a defined fuller-tip and a wide,
+      // squared crossguard so it reads as a weapon, not a plus sign.
       group.append(
         createSvgElement("path", {
-          d: "M -3 -18 L 3 -18 L 3 8 L 10 8 L 10 12 L 3 12 L 3 19 L -3 19 L -3 12 L -10 12 L -10 8 L -3 8 Z"
+          d: "M -4 -16 L 4 -16 L 4 7 L 12 7 L 12 12 L 4 12 L 4 20 L -4 20 L -4 12 L -12 12 L -12 7 L -4 7 Z"
         }),
         createSvgElement("path", {
-          d: "M -5 -19 L 0 -26 L 5 -19 Z"
+          d: "M -6 -17 L 0 -27 L 6 -17 Z"
         })
       );
       break;
 
     case "tank":
+      // Tower shield with a raised central boss — the boss is a separate disc
+      // so the bevel layers give it its own ring of relief.
       group.append(
         createSvgElement("path", {
-          d: "M 0 -24 L 17 -14 L 13 9 Q 10 21 0 27 Q -10 21 -13 9 L -17 -14 Z"
+          d: "M 0 -25 L 18 -14 L 14 9 Q 11 22 0 28 Q -11 22 -14 9 L -18 -14 Z"
+        }),
+        createSvgElement("circle", {
+          class: "emblem-boss",
+          cx: 0,
+          cy: -1,
+          r: 6
         })
       );
       break;
 
     case "ranger":
+      // Recurve bow drawn, arrow nocked. Bowstring + shaft inherit the emblem
+      // treatment (no inline color) so the bevel clones recolor them cleanly.
       group.append(
         createSvgElement("path", {
-          d: "M -17 14 Q 0 -1 -17 -17 L -13 -20 Q 9 -1 -13 18 Z"
+          d: "M -17 15 Q 1 -1 -17 -18 L -12 -21 Q 11 -1 -12 19 Z"
         }),
         createSvgElement("line", {
+          class: "emblem-line",
           x1: -15,
-          y1: -18,
+          y1: -19,
           x2: -15,
-          y2: 16,
-          stroke: "#f7f9fc",
-          "stroke-width": 2.5
+          y2: 17,
+          "stroke-width": 2
         }),
         createSvgElement("line", {
+          class: "emblem-line",
           x1: -13,
           y1: -2,
-          x2: 17,
+          x2: 18,
           y2: -2,
-          stroke: "#f7f9fc",
           "stroke-width": 3
         }),
         createSvgElement("path", {
-          d: "M 17 -2 L 9 -7 L 9 3 Z"
+          d: "M 18 -2 L 9 -7 L 9 3 Z"
         })
       );
       break;

@@ -24,32 +24,39 @@
   padding:
     .65rem max(.9rem, env(safe-area-inset-right))
     .65rem max(.9rem, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--panel-line);
+  border-bottom: 2px solid var(--brass);
   background:
-    linear-gradient(180deg, rgba(20, 26, 38, .9), rgba(8, 10, 15, .82));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
-  backdrop-filter: blur(16px);
+    linear-gradient(180deg, rgba(255, 224, 168, .06), rgba(255, 224, 168, 0) 30%),
+    linear-gradient(180deg, #382716, #1d1208);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, .5),
+    0 8px 24px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(8px);
 }
 
 .brand {
   display: flex;
-  gap: .5rem;
+  gap: .55rem;
   align-items: center;
+  font-family: var(--font-display);
   font-size: .82rem;
-  font-weight: 850;
-  letter-spacing: .14em;
+  font-weight: 800;
+  letter-spacing: .16em;
   text-transform: uppercase;
-  color: #cdd6e4;
+  color: var(--brass-hi);
 }
 
+/* Brass seal medallion echoing the title mark. */
 .brand::before {
   content: "";
-  width: .82rem;
-  height: .82rem;
-  border-radius: 3px;
-  background: conic-gradient(from 45deg, var(--p1), var(--gold), var(--p2), var(--p1));
-  box-shadow: 0 0 12px rgba(255, 210, 106, .45);
-  transform: rotate(45deg);
+  width: .9rem;
+  height: .9rem;
+  border-radius: 50%;
+  border: 1px solid var(--brass-lo);
+  background: radial-gradient(circle at 38% 30%, var(--brass-hi), var(--brass) 55%, var(--brass-lo));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 244, 214, .5),
+    0 0 10px rgba(230, 192, 101, .4);
 }
 
 /* The turn banner is now a faction-tinted command plate, not plain text. */
@@ -58,14 +65,15 @@
   min-width: min(58vw, 360px);
   padding: .4rem 1.4rem;
   text-align: center;
-  border: 1px solid var(--console-edge);
+  border: 1px solid var(--brass);
   border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 50%),
-    linear-gradient(180deg, rgba(26, 33, 47, .95), rgba(12, 16, 24, .95));
+    linear-gradient(180deg, rgba(255, 224, 168, .1), rgba(255, 224, 168, 0) 52%),
+    linear-gradient(180deg, #3a2817, #1e1308);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .1),
-    0 6px 18px rgba(0, 0, 0, .4);
+    inset 0 1px 0 rgba(255, 224, 168, .2),
+    inset 0 0 0 1px rgba(0, 0, 0, .35),
+    0 6px 18px rgba(0, 0, 0, .45);
   transition: box-shadow .3s ease, border-color .3s ease;
 }
 
@@ -83,9 +91,11 @@
   align-items: center;
   max-width: 100%;
   overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-display);
   font-size: .98rem;
-  font-weight: 850;
-  letter-spacing: .03em;
+  font-weight: 800;
+  letter-spacing: .05em;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -156,17 +166,23 @@
     .55rem max(.8rem, env(safe-area-inset-right))
     calc(.55rem + env(safe-area-inset-bottom))
     max(.8rem, env(safe-area-inset-left));
-  border-top: 1px solid var(--panel-line);
+  border-top: 2px solid var(--brass);
   background:
-    linear-gradient(0deg, rgba(20, 26, 38, .9), rgba(8, 10, 15, .86));
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, .4);
-  backdrop-filter: blur(16px);
+    linear-gradient(0deg, rgba(255, 224, 168, .04), rgba(255, 224, 168, 0) 30%),
+    linear-gradient(0deg, #382716, #1c1108);
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, .5),
+    0 -8px 24px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(8px);
 }
 
 /* One short horizontal strip: dossier · battle menu · help. */
 .panel.command-console {
   display: grid;
-  grid-template-columns: minmax(210px, 280px) auto minmax(0, 1fr);
+  /* The dossier (col 1) holds a unit name plus up to five stat pills on a single
+     clipped row, so it needs more width than the action-help "announcement" box
+     (col 3) — give it the room and let the 1fr help column absorb the rest. */
+  grid-template-columns: minmax(270px, 360px) auto minmax(0, 1fr);
   gap: 1rem;
   align-items: center;
   padding: .65rem .8rem;
@@ -267,10 +283,11 @@
   margin-bottom: .6rem;
   padding-bottom: .4rem;
   border-bottom: 1px solid var(--console-edge-soft);
-  color: var(--muted);
-  font-size: .64rem;
-  font-weight: 850;
-  letter-spacing: .16em;
+  color: var(--brass-hi);
+  font-family: var(--font-display);
+  font-size: .66rem;
+  font-weight: 700;
+  letter-spacing: .18em;
   text-transform: uppercase;
 }
 
@@ -280,7 +297,7 @@
   height: .8rem;
   border-radius: 2px;
   background: var(--gold);
-  box-shadow: 0 0 8px rgba(255, 210, 106, .5);
+  box-shadow: 0 0 8px rgba(230, 192, 101, .5);
 }
 
 .squad-panel[style*="--team"] .panel-title::before {
@@ -309,28 +326,29 @@
   place-items: center;
   width: 56px;
   height: 56px;
-  border: 1px solid rgba(255, 255, 255, .18);
+  border: 1px solid var(--brass);
   background:
     radial-gradient(
       circle at 35% 25%,
-      rgba(255, 255, 255, .22),
-      rgba(255, 255, 255, .03) 58%,
-      rgba(0, 0, 0, .35)
+      rgba(255, 224, 168, .28),
+      rgba(255, 224, 168, .04) 58%,
+      rgba(0, 0, 0, .4)
     );
   font-size: 1.7rem;
   font-weight: 900;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, .5);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .6);
 }
 
 .unit-name {
-  font-size: 1rem;
-  font-weight: 850;
-  letter-spacing: .01em;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: .02em;
 }
 
 .unit-card[style*="--team"] .unit-name {
-  color: color-mix(in srgb, var(--team) 55%, #ffffff);
+  color: color-mix(in srgb, var(--team) 50%, #f3e8cf);
 }
 
 .unit-meta {
@@ -404,10 +422,11 @@
   min-height: 54px;
   padding: .45rem .25rem;
   border-radius: var(--radius-tile);
-  font-size: .62rem;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: .6rem;
+  font-weight: 700;
   line-height: 1.08;
-  letter-spacing: .02em;
+  letter-spacing: .04em;
   text-transform: uppercase;
 }
 
@@ -416,6 +435,27 @@
   font-size: 1.2rem;
   line-height: 1;
   font-weight: 400;
+}
+
+/* Keyboard-shortcut badge stacked under each command label. */
+.actions button .key {
+  margin-top: .1rem;
+  padding: 0 .3rem;
+  min-width: 1.05rem;
+  border: 1px solid rgba(255, 224, 168, .28);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .35);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .56rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.actions button:not(:disabled):hover .key,
+.actions button.active .key {
+  color: var(--text);
+  border-color: rgba(255, 224, 168, .5);
 }
 
 #moveBtn::before { content: "➜"; color: var(--act-move); }
@@ -443,18 +483,21 @@
   height: calc(2.7em + .9rem);
   overflow: hidden;
   margin-top: .65rem;
-  padding: .45rem .55rem;
-  border: 1px solid var(--console-edge-soft);
-  border-radius: 9px;
-  background: rgba(0, 0, 0, .25);
-  color: #b6bfcd;
-  font-size: .72rem;
-  line-height: 1.35;
+  padding: .5rem .6rem;
+  border: 1px solid var(--parchment-edge);
+  border-radius: 7px;
+  background: var(--parchment-fill);
+  box-shadow: inset 0 0 18px rgba(120, 88, 40, .14);
+  color: var(--ink-soft);
+  font-size: .78rem;
+  font-style: italic;
+  line-height: 1.38;
 }
 
 .action-help::before {
-  content: "›";
-  color: var(--gold);
+  content: "\276F";
+  color: var(--brass-lo);
+  font-style: normal;
   font-weight: 900;
 }
 
@@ -475,9 +518,9 @@
   border-top: 2px solid rgba(255, 255, 255, .12);
   border-radius: var(--radius-tile);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 60%),
-    rgba(10, 13, 20, .55);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+    linear-gradient(180deg, rgba(255, 224, 168, .08), rgba(255, 224, 168, 0) 60%),
+    rgba(38, 25, 13, .6);
+  box-shadow: inset 0 1px 0 rgba(255, 224, 168, .08);
   font-size: .66rem;
   font-weight: 700;
   text-align: center;
@@ -488,6 +531,21 @@
 .squad-panel .squad-chip {
   border-top-color: var(--team, rgba(255, 255, 255, .12));
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--team, #ffffff) 25%, transparent);
+}
+
+/* A chip the active player can click to begin an activation. Reads as a button
+   and lifts on hover so the roster panel doubles as a unit picker. */
+.squad-chip.selectable {
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.squad-chip.selectable:hover {
+  transform: translateY(-2px);
+  border-color: var(--team, rgba(255, 255, 255, .35));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--team, #ffffff) 35%, transparent),
+    0 0 14px color-mix(in srgb, var(--team, #ffffff) 30%, transparent);
 }
 
 .chip-bar {

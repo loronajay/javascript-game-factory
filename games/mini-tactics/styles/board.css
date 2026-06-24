@@ -3,78 +3,78 @@
 }
 
 .tile-face {
-  stroke: rgba(8, 12, 20, .55);
+  stroke: rgba(38, 26, 12, .5);
   stroke-width: 1;
   transition: fill .12s ease;
   vector-effect: non-scaling-stroke;
 }
 
 .tile:hover .tile-face {
-  fill: #e8edf4;
+  fill: #efe6cc;
 }
 
 .tile:hover .tile-dark {
-  fill: #5b6678;
+  fill: #877653;
 }
 
-/* Cool slate checker with extra contrast so the iso grid reads cleanly. */
+/* Flagstone war-map checker: warm sandstone vs mossy earth-stone, so the iso
+   grid reads as a campaign map on the table rather than a sci-fi floor. */
 .tile-light {
-  fill: #d4dae3;
+  fill: #d8caa1;
 }
 
 .tile-dark {
-  fill: #444c5b;
+  fill: #6f6044;
 }
 
-/* Extruded skirt: left face catches light, right face falls into shadow. */
+/* Extruded skirt: left face catches candlelight, right face falls to shadow. */
 .tile-side-a {
-  fill: #2a313e;
+  fill: #483a26;
 }
 
 .tile-side-b {
-  fill: #161b23;
+  fill: #281b10;
 }
 
 .tile.selected .tile-face {
   stroke: var(--gold);
   stroke-width: 3;
-  filter: drop-shadow(0 0 5px rgba(255, 210, 106, .7));
+  filter: drop-shadow(0 0 5px rgba(230, 192, 101, .75));
 }
 
 .tile.legal-move .tile-face {
-  fill: #3f9fce;
-  stroke: #9bdcf7;
+  fill: #4a7fb8;
+  stroke: #a6cdef;
   stroke-width: 2;
   animation: legal-pulse 1.15s ease-in-out infinite alternate;
 }
 
-/* The attack radius: every reachable tile, painted a calm translucent red so the
-   range reads at a glance without competing with the pulsing legal-target tiles. */
+/* The attack radius: every reachable tile, washed a calm translucent gules so
+   the range reads at a glance without competing with the pulsing targets. */
 .tile.attack-range .tile-face {
-  fill: #8a3742;
-  stroke: #c2495a;
+  fill: #8a3e37;
+  stroke: #b8564c;
   stroke-width: 1.5;
 }
 
 .tile.legal-attack .tile-face {
-  fill: #c2495a;
-  stroke: #ff9aa6;
+  fill: #b8564c;
+  stroke: #ef9f95;
   stroke-width: 2;
   animation: attack-pulse .7s ease-in-out infinite alternate;
 }
 
-/* The heal radius: every tile in the medic's reach, painted a calm translucent
-   green so the range reads at a glance without competing with the pulsing
-   injured-ally tiles. */
+/* The heal radius: the medic's reach, washed a calm translucent vert so the
+   range reads at a glance without competing with the pulsing injured allies. */
 .tile.heal-range .tile-face {
-  fill: #2c6b4f;
-  stroke: #3ba170;
+  fill: #366b48;
+  stroke: #4f9468;
   stroke-width: 1.5;
 }
 
 .tile.legal-heal .tile-face {
-  fill: #3ba170;
-  stroke: #93f0bf;
+  fill: #4f9468;
+  stroke: #9fe6bb;
   stroke-width: 2;
   animation: heal-tile-pulse .9s ease-in-out infinite alternate;
 }
@@ -86,44 +86,78 @@
 }
 
 .unit .shadow {
-  fill: rgba(0, 0, 0, .36);
+  fill: rgba(0, 0, 0, .4);
   filter: blur(2px);
 }
 
+/* Carved wooden plinth under each figurine. */
 .unit .base-side {
-  fill: #222a35;
+  fill: #2a1c10;
 }
 
 .unit .base-top {
-  stroke: rgba(255, 255, 255, .24);
+  stroke: rgba(255, 224, 168, .3);
   stroke-width: 1.2;
   vector-effect: non-scaling-stroke;
 }
 
-/* Piece color is driven by --team (set per unit from the roster color), so it is
-   never tied to the slot number. The base disc is a darkened mix of that hue. */
+/* Piece color is driven by --team (set per unit from the roster color), so it
+   is never tied to the slot number. The plinth top is a darkened mix of the
+   banner hue over dark wood. */
 .unit .base-top {
-  fill: color-mix(in srgb, var(--team, var(--p1)) 42%, #0b0f17);
+  fill: color-mix(in srgb, var(--team, var(--p1)) 40%, #160d04);
 }
 
+/* The banner-colored ring around the base is the figurine's standard. */
 .unit .rim {
   fill: none;
   stroke-width: 3;
-  opacity: .9;
+  opacity: .92;
   vector-effect: non-scaling-stroke;
   stroke: var(--team, var(--p1));
 }
 
-.unit .icon {
-  fill: #f7f9fc;
-  stroke: #11151c;
-  stroke-width: 1.5;
+/* Struck-pewter emblem. The face carries the cast-metal gradient and a fine
+   dark outline; the two offset clones beneath it (built in unitRenderer) supply
+   the engraved bevel — a lit edge up-left, a cast shadow down-right. */
+.unit .emblem .icon {
+  fill: url(#pewter);
+  stroke: #2a1808;
+  stroke-width: 1;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
+/* The shield's central boss: a touch brighter than the face so it reads as a
+   raised dome catching the same light. */
+.unit .emblem .icon .emblem-boss {
+  fill: #f4ead0;
+}
+
+/* Bowstring / arrow shaft inherit the emblem ink so the bevel clones recolor
+   them without inline overrides. */
+.unit .emblem .icon .emblem-line {
+  stroke: #2a1808;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Bevel clones: every descendant is flooded one tone so only the offset sliver
+   peeking past the face shows. Down-right = cast shadow, up-left = lit edge. */
+.unit .icon-shadow,
+.unit .icon-shadow * {
+  fill: rgba(26, 15, 5, .55);
+  stroke: rgba(26, 15, 5, .55);
+}
+
+.unit .icon-highlight,
+.unit .icon-highlight * {
+  fill: rgba(255, 251, 238, .9);
+  stroke: rgba(255, 251, 238, .9);
+}
+
 .unit .hp-back {
-  fill: rgba(0, 0, 0, .58);
-  stroke: rgba(0, 0, 0, .45);
+  fill: rgba(0, 0, 0, .62);
+  stroke: rgba(0, 0, 0, .5);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -151,7 +185,7 @@
 
 .unit.spent {
   opacity: .46;
-  filter: grayscale(.55);
+  filter: grayscale(.55) sepia(.25);
 }
 
 .unit.spent .spent-mark {
@@ -159,7 +193,7 @@
 }
 
 .unit.active {
-  filter: drop-shadow(0 0 10px rgba(255, 210, 106, .8));
+  filter: drop-shadow(0 0 10px rgba(230, 192, 101, .85));
 }
 
 .unit.active .rim {
@@ -184,51 +218,57 @@
   animation: shield-orbit 1.6s linear infinite;
 }
 
+/* Defend badge: hidden by default, shown as a steady shield emblem on braced
+   units so "this piece is defending" reads at a glance, not just from the ring. */
+.unit .defend-mark {
+  opacity: 0;
+}
+
+.unit.defending .defend-mark {
+  opacity: 1;
+}
+
+.defend-mark .defend-shield {
+  fill: var(--gold);
+  stroke: rgba(20, 16, 8, .6);
+  stroke-width: .8;
+}
+
+/* A braced unit is usually also spent (defend ends the activation). The heavy
+   spent dim would bury the shield right when it matters — on the opponent's
+   turn — so defending takes visual precedence and stays legible. */
+.unit.spent.defending {
+  opacity: .9;
+  filter: none;
+}
+
 .unit.idle:not(.spent) .body-group {
   transform-box: fill-box;
   transform-origin: center bottom;
   animation: idle-bob 2.4s ease-in-out infinite;
 }
 
-/* Danger overlay: tiles already inside an enemy's reach. Painted as a muted red
-   wash on plain tiles so the threat zone reads at a glance without screaming.
-   Tones are tunable — kept subtle on purpose so a wide threat map stays legible. */
-.tile.threatened .tile-face {
-  fill: color-mix(in srgb, var(--danger) 30%, #2f3744);
-  stroke: color-mix(in srgb, var(--danger) 55%, transparent);
-  stroke-width: 1.2;
-}
-
-/* "Reachable but exposed": a legal move tile that is also threatened keeps its
-   blue move fill but gains a dashed danger border so the risk is unmistakable.
-   Two-class specificity beats the single-class legal-move stroke above. */
-.tile.legal-move.threatened .tile-face {
-  stroke: var(--danger);
-  stroke-width: 2;
-  stroke-dasharray: 4 3;
-}
-
 /* Selection spotlight: while a piece is active, dim the static, uninvolved board
-   so the selected unit and its highlighted tiles carry the eye. Highlighted and
-   threatened tiles are excluded so they stay at full strength. */
-.board-focused .tile:not(.selected):not(.legal-move):not(.legal-attack):not(.legal-heal):not(.attack-range):not(.heal-range):not(.threatened) .tile-face {
-  filter: brightness(.72) saturate(.85);
+   so the selected unit and its highlighted tiles carry the eye. Highlighted
+   tiles are excluded so they stay at full strength. */
+.board-focused .tile:not(.selected):not(.legal-move):not(.legal-attack):not(.legal-heal):not(.attack-range):not(.heal-range) .tile-face {
+  filter: brightness(.7) saturate(.85);
   transition: filter .2s ease;
 }
 
-/* Ambient dust drifting in the space around the board (rendered behind the
+/* Embers drifting in the candlelit air around the board (rendered behind the
    tiles). Slow, asynchronous, and faint — the global reduced-motion rule stills
-   it automatically. */
+   them automatically. */
 .mote {
-  fill: rgba(185, 210, 250, .5);
+  fill: rgba(255, 196, 120, .55);
   transform-box: fill-box;
   transform-origin: center;
   animation: mote-drift var(--dur, 9s) ease-in-out var(--delay, 0s) infinite;
 }
 
 @keyframes mote-drift {
-  0%, 100% { transform: translateY(0); opacity: .1; }
-  50% { transform: translateY(var(--rise, -24px)); opacity: .5; }
+  0%, 100% { transform: translateY(0); opacity: .08; }
+  50% { transform: translateY(var(--rise, -24px)); opacity: .55; }
 }
 
 @keyframes legal-pulse {

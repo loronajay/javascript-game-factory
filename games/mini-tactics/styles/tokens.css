@@ -1,51 +1,102 @@
+/* =======================================================================
+   MINI-TACTICS — FANTASY WAR-TABLE THEME
+   A campaign map spread on an oak table by candlelight: aged parchment,
+   brass fittings, dark wood & leather, heraldic banner colors.
+
+   Everything downstream is token-driven, so the historic variable NAMES
+   are preserved (--console-fill, --console-edge, --act-*, --radius-*) and
+   only their VALUES changed — re-skinning the whole UI from this one file.
+   New fantasy tokens are added alongside them.
+   ======================================================================= */
 :root {
   color-scheme: dark;
 
-  --bg: #070910;
-  --panel: rgba(18, 22, 31, .92);
-  --panel-line: rgba(255, 255, 255, .12);
-  --text: #f2f4f8;
-  --muted: #9ea7b5;
-  --p1: #67c7ff;
-  --p2: #ff6c7c;
-  --p3: #6ddf7a;
-  --p4: #ffac5c;
-  --gold: #ffd26a;
-  --good: #73e6a6;
-  --danger: #ff7684;
+  /* --- Typography ------------------------------------------------------- */
+  /* Cinzel = engraved Roman capitals (banners, headings, command labels).
+     Spectral = a warm readable serif (body, HUD readouts). Both degrade to
+     a system serif when offline, so the theme never collapses to sans. */
+  --font-display: "Cinzel", "Trajan Pro", "Bookman Old Style", Georgia, serif;
+  --font-body: "Spectral", "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+
+  /* --- Surfaces --------------------------------------------------------- */
+  --bg: #140d06;
+  --wood: #3c2a18;
+  --wood-deep: #20140a;
+  --leather: #2a1c10;
+
+  /* --- Parchment (light panels / scrolls) ------------------------------- */
+  --parchment: #e9dcbb;
+  --parchment-hi: #f6edd4;
+  --parchment-lo: #d3bd91;
+  --parchment-edge: #b29760;
+
+  /* --- Ink (text on parchment) ------------------------------------------ */
+  --ink: #2e2113;
+  --ink-soft: #5d4a30;
+  --ink-faint: #897154;
+
+  /* --- Brass / gold fittings -------------------------------------------- */
+  --brass: #b98c3e;
+  --brass-hi: #f0d089;
+  --brass-lo: #6d4d1f;
+  --gold: #e6c065;
+
+  /* --- Text on dark wood ------------------------------------------------ */
+  --text: #f3e8cf;
+  --muted: #b6a585;
+
+  /* --- Heraldic banner / faction colors --------------------------------- */
+  --p1: #5288c6; /* azure   */
+  --p2: #c4463f; /* gules   */
+  --p3: #62a04e; /* vert    */
+  --p4: #d68d37; /* or      */
+
+  --good: #74b25c;
+  --danger: #c4463f;
 
   /* Health tones — shared by board pieces, the unit card, and squad chips. */
-  --hp-high: #5fe39c;
-  --hp-mid: #ffcf5e;
-  --hp-low: #ff6f7e;
+  --hp-high: #74b25c;
+  --hp-mid: #e3ab40;
+  --hp-low: #cd4d44;
 
-  /* --- Command-console material system ---------------------------------- */
-  /* Layered "brushed panel" fill: top sheen, body, deep base. Reused by every
-     console plate so the HUD reads as one machined surface. */
+  /* --- Material system (NAMES preserved, VALUES re-skinned) -------------- */
+  /* Carved oak plate with a brass-lit top edge — the HUD/chrome surface. */
   --console-fill:
-    linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0) 18%),
-    linear-gradient(180deg, rgba(28, 35, 49, .96), rgba(12, 16, 24, .97));
-  --console-edge: rgba(120, 145, 185, .28);
-  --console-edge-soft: rgba(255, 255, 255, .06);
+    linear-gradient(180deg, rgba(255, 224, 168, .07), rgba(255, 224, 168, 0) 16%),
+    repeating-linear-gradient(91deg, rgba(0, 0, 0, .05) 0 3px, rgba(0, 0, 0, 0) 3px 7px),
+    linear-gradient(180deg, #422f1b, #261707);
+  --console-edge: var(--brass);
+  --console-edge-soft: rgba(185, 140, 62, .32);
   --console-shadow:
-    0 18px 40px rgba(0, 0, 0, .5),
-    inset 0 1px 0 rgba(255, 255, 255, .08),
-    inset 0 0 0 1px rgba(8, 11, 18, .6);
+    0 18px 40px rgba(0, 0, 0, .55),
+    inset 0 1px 0 rgba(255, 224, 168, .16),
+    inset 0 0 0 1px rgba(0, 0, 0, .42);
 
-  /* Faction wash applied behind the two squad consoles. */
-  --p1-wash: rgba(60, 140, 210, .16);
-  --p2-wash: rgba(210, 70, 90, .16);
+  /* Aged-paper fill for parchment scrolls (menus, dossier, insets). */
+  --parchment-fill:
+    radial-gradient(135% 90% at 50% -10%, var(--parchment-hi), transparent 58%),
+    radial-gradient(120% 120% at 12% 115%, color-mix(in srgb, var(--parchment-lo) 70%, #6b4f22), transparent 50%),
+    radial-gradient(120% 120% at 92% 110%, color-mix(in srgb, var(--parchment-lo) 70%, #6b4f22), transparent 52%),
+    linear-gradient(180deg, var(--parchment), var(--parchment-lo));
+  --parchment-shadow:
+    0 22px 48px rgba(0, 0, 0, .55),
+    inset 0 0 0 1px rgba(255, 252, 240, .35),
+    inset 0 0 38px rgba(120, 88, 40, .18);
+
+  /* Faction wash applied behind the squad consoles. */
+  --p1-wash: rgba(82, 136, 198, .18);
+  --p2-wash: rgba(196, 70, 63, .18);
 
   /* Per-action command accents for the battle menu. */
-  --act-move: #5db4ff;
-  --act-attack: #ff6f7e;
-  --act-heal: #5fe39c;
-  --act-defend: #ffd26a;
-  --act-cancel: #ffb04d;
-  --act-finish: #b6c2d4;
+  --act-move: #6aa6e0;
+  --act-attack: #d05a52;
+  --act-heal: #74b25c;
+  --act-defend: #e6c065;
+  --act-cancel: #d68d37;
+  --act-finish: #cdbf9d;
 
-  --radius-console: 16px;
-  --radius-tile: 11px;
+  --radius-console: 14px;
+  --radius-tile: 9px;
 }
 
 * {
@@ -61,11 +112,14 @@ body {
 body {
   overflow: hidden;
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  /* The war table: a pool of candlelight on dark oak & leather, edges falling
+     into shadow so the board reads as the lit centre of the table. */
   background:
-    radial-gradient(circle at 50% 30%, rgba(70, 95, 145, .22), transparent 45%),
-    radial-gradient(circle at 50% 120%, rgba(40, 30, 60, .25), transparent 55%),
-    linear-gradient(180deg, #0c1018 0%, #05070b 100%);
+    radial-gradient(circle at 50% 22%, rgba(120, 86, 40, .30), transparent 46%),
+    radial-gradient(circle at 50% 118%, rgba(40, 22, 10, .55), transparent 60%),
+    repeating-linear-gradient(92deg, rgba(0, 0, 0, .05) 0 4px, rgba(0, 0, 0, 0) 4px 9px),
+    linear-gradient(180deg, #281a0e 0%, #120b05 100%);
 }
 
 button,
@@ -74,65 +128,91 @@ select {
   color: inherit;
 }
 
-/* Base command button: machined plate with a bright top bevel. */
+/* Base command control: a brass-rimmed dark-oak plaque with an engraved
+   gold serif label — reads the same nailed to a parchment scroll or a wooden
+   console, so menus and the battle HUD share one button language. */
 button {
   position: relative;
-  padding: .62rem .8rem;
+  padding: .62rem .85rem;
   cursor: pointer;
   touch-action: manipulation;
-  border: 1px solid var(--console-edge);
-  border-radius: 10px;
-  color: var(--text);
+  border: 1px solid var(--brass);
+  border-radius: 9px;
+  color: var(--gold);
+  font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: .02em;
+  letter-spacing: .04em;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 45%),
-    linear-gradient(180deg, rgba(40, 49, 66, .95), rgba(16, 21, 30, .96));
+    linear-gradient(180deg, rgba(255, 226, 170, .18), rgba(255, 226, 170, 0) 46%),
+    linear-gradient(180deg, #4a341d, #271708);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .6);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .12),
-    0 4px 10px rgba(0, 0, 0, .35);
+    inset 0 1px 0 rgba(255, 226, 170, .25),
+    inset 0 0 0 1px rgba(0, 0, 0, .35),
+    0 4px 10px rgba(0, 0, 0, .4);
   transition: transform .1s ease, border-color .15s ease, box-shadow .15s ease, filter .15s ease;
 }
 
 button:hover:not(:disabled) {
-  border-color: rgba(180, 205, 245, .55);
+  border-color: var(--brass-hi);
   filter: brightness(1.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 170, .3),
+    inset 0 0 0 1px rgba(0, 0, 0, .35),
+    0 6px 16px rgba(0, 0, 0, .45),
+    0 0 16px rgba(230, 192, 101, .28);
   transform: translateY(-1px);
 }
 
 button:active:not(:disabled) {
   transform: translateY(0);
-  filter: brightness(.96);
+  filter: brightness(.95);
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: .32;
-  filter: saturate(.5);
+  opacity: .36;
+  filter: saturate(.45);
 }
 
+/* Primary call-to-action: a richer struck-brass plaque. */
 button.primary {
-  border-color: rgba(103, 199, 255, .6);
+  border-color: var(--brass-hi);
+  color: #2a1c0b;
+  background:
+    linear-gradient(180deg, var(--brass-hi), var(--brass) 52%, var(--brass-lo));
+  text-shadow: 0 1px 0 rgba(255, 244, 214, .5);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .14),
-    inset 0 0 18px rgba(103, 199, 255, .12),
-    0 4px 10px rgba(0, 0, 0, .35);
+    inset 0 1px 0 rgba(255, 248, 222, .6),
+    inset 0 -2px 4px rgba(80, 52, 16, .5),
+    0 5px 14px rgba(0, 0, 0, .45);
+}
+
+button.primary:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 222, .65),
+    inset 0 -2px 4px rgba(80, 52, 16, .5),
+    0 6px 18px rgba(0, 0, 0, .5),
+    0 0 22px rgba(240, 208, 137, .55);
 }
 
 button.danger {
-  border-color: rgba(255, 108, 124, .6);
+  border-color: color-mix(in srgb, var(--danger) 75%, #000);
+  color: #f3c9c5;
 }
 
 button.cancel {
-  border-color: rgba(255, 184, 77, .6);
+  border-color: color-mix(in srgb, var(--act-cancel) 75%, #000);
+  color: #f3d7b3;
 }
 
-/* Active command tile: charged gold frame so the chosen action is unmistakable. */
+/* Active command: a charged gold sigil so the chosen action is unmistakable. */
 button.active {
   border-color: var(--gold);
+  color: var(--brass-hi);
   box-shadow:
     inset 0 0 0 1px var(--gold),
-    inset 0 0 22px rgba(255, 210, 106, .28),
-    0 0 18px rgba(255, 210, 106, .35);
+    inset 0 0 22px rgba(230, 192, 101, .3),
+    0 0 20px rgba(230, 192, 101, .4);
   filter: brightness(1.08);
 }

@@ -18,6 +18,7 @@ import { createTitleScreen } from "./ui/screens/titleScreen.js";
 import { createMainMenuScreen } from "./ui/screens/mainMenuScreen.js";
 import { createSinglePlayerSetupScreen } from "./ui/screens/singlePlayerSetupScreen.js";
 import { createHotSeatSetupScreen } from "./ui/screens/hotSeatSetupScreen.js";
+import { createOnlineSetupScreen } from "./ui/screens/onlineSetupScreen.js";
 import { createMatchScreen } from "./ui/screens/matchScreen.js";
 import { createResultsScreen } from "./ui/screens/resultsScreen.js";
 
@@ -69,7 +70,8 @@ export function createApp(documentRef = document) {
     .register("mainMenu", createMainMenuScreen(ctx))
     .register("spSetup", createSinglePlayerSetupScreen(ctx))
     .register("hsSetup", createHotSeatSetupScreen(ctx))
-    .register("match", createMatchScreen({ ...ctx, controller }))
+    .register("onlineSetup", createOnlineSetupScreen(ctx))
+    .register("match", createMatchScreen({ ...ctx, controller, audio }))
     .register("results", createResultsScreen(ctx));
 
   return {

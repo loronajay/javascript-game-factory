@@ -22,6 +22,9 @@ const FILES = Object.freeze({
   attackHit: "universal/attack-hit.wav",
   criticalHit: "universal/critical-hit.wav",
   defendedHit: "universal/defended-hit.wav",
+  // Sound for *initiating* a defend (a unit bracing). Shares the shield/block clip
+  // with defendedHit for now; give it its own file later by swapping this path only.
+  defend: "universal/defended-hit.wav",
   miss: "universal/miss.wav",
 
   // Ranger.
@@ -34,12 +37,20 @@ const FILES = Object.freeze({
   medicAttackAirborne: "medic/medic-attack-airborne.wav",
 });
 
+// Looping background tracks. These are NOT in FILES — music is a single,
+// long-lived, looping element per key (no per-play cloning), so it lives in its
+// own map with its own start/stop lifecycle.
+const MUSIC = Object.freeze({
+  battle: "battle.mp3",
+});
+
 const SOUNDS_BASE = new URL("../../sounds/", import.meta.url);
 
 export class AudioManager {
-  constructor({ enabled = true, volume = 0.8 } = {}) {
+  constructor({ enabled = true, volume = 0.8, musicVolume = 0.35 } = {}) {
     this.enabled = enabled;
     this.volume = volume;
+    this.musicVolume = musicVolume;
     // Decoded template per key. Cloning these to play reuses the cached buffer
     // and lets overlapping copies run without stealing each other's playhead.
     this.templates = new Map();
@@ -49,10 +60,18 @@ export class AudioManager {
       audio.preload = "auto";
       this.templates.set(key, audio);
     }
+
+    // One persistent, looping element per music key. Built lazily on first
+    // start so the (large) file isn't fetched until a match actually begins.
+    this.musicTracks = new Map();
+    this.currentMusic = null;
   }
 
   setEnabled(enabled) {
     this.enabled = Boolean(enabled);
+    if (!this.enabled) {
+      this.stopMusic();
+    }
   }
 
   // Fire-and-forget. Unknown keys, disabled audio, and blocked/failed playback
@@ -73,6 +92,56 @@ export class AudioManager {
     const played = node.play();
     if (played && typeof played.catch === "function") {
       played.catch(() => {});
+    }
+  }
+
+  // Start a looping background track, restarting it from the top. Switching to a
+  // new track stops the old one first, so only one loop ever plays. Unknown
+  // keys and disabled audio are silent no-ops, like play().
+  startMusic(key) {
+    if (!this.enabled) {
+      return;
+    }
+
+    const file = MUSIC[key];
+    if (!file) {
+      return;
+    }
+
+    if (this.currentMusic && this.currentMusic !== this.musicTracks.get(key)) {
+      this.stopMusic();
+    }
+
+    let track = this.musicTracks.get(key);
+    if (!track) {
+      track = new Audio(new URL(file, SOUNDS_BASE).href);
+      track.loop = true;
+      track.preload = "auto";
+      this.musicTracks.set(key, track);
+    }
+
+    track.volume = this.musicVolume;
+    track.currentTime = 0;
+    this.currentMusic = track;
+
+    const played = track.play();
+    if (played && typeof played.catch === "function") {
+      played.catch(() => {});
+    }
+  }
+
+  // Stop the active background track (if any) and rewind it.
+  stopMusic() {
+    const track = this.currentMusic;
+    this.currentMusic = null;
+    if (!track) {
+      return;
+    }
+    try {
+      track.pause();
+      track.currentTime = 0;
+    } catch {
+      // Best-effort — pausing a never-started element can throw; ignore.
     }
   }
 }

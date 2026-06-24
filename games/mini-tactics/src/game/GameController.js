@@ -15,6 +15,7 @@ import {
   ACTION_MODES,
   BOARD_SIZES,
   DEFAULT_BOARD_SIZE,
+  MAX_HP,
   UNIT_TYPES,
 } from "../config.js";
 import {
@@ -28,9 +29,8 @@ import {
   getHealRangeTiles,
   getLegalAttackTargets,
   getLegalHealTargets,
-  getThreatTiles,
 } from "../rules/combat.js";
-import { colorOf, unitAt } from "../state/gameState.js";
+import { colorOf, teamOf, unitAt } from "../state/gameState.js";
 import {
   createMatchState,
   findUnit,
@@ -40,7 +40,7 @@ import { applyCommand } from "../core/reducer.js";
 import { EVENTS } from "../core/events.js";
 import * as cmd from "../core/commands.js";
 import { chooseActivation, cpuRng } from "../ai/cpuController.js";
-import { winnerLabel, teamColor } from "../render/labels.js";
+import { winnerLabel, teamColor, teamLabel } from "../render/labels.js";
 import { BoardRenderer } from "../render/boardRenderer.js";
 import { UnitRenderer } from "../render/unitRenderer.js";
 import { OverlayRenderer } from "../render/overlayRenderer.js";
@@ -85,6 +85,11 @@ export class GameController {
     // names the difficulty and which seats the computer drives (P2 in v1).
     this.cpu = null;
 
+    // Online session (onlineSession.js) when mode === "online"; null otherwise.
+    // Owns the relay link; the controller only calls a couple of small hooks on
+    // it and reads `mySeat`/`remoteName`. See applyRemoteCommand / dispatch.
+    this.net = null;
+
     this.match = createMatchState({ size: DEFAULT_BOARD_SIZE, seed: newSeed() });
     this.ui = createUiState();
     this.metrics = createBoardMetrics(this.match.size);
@@ -106,7 +111,9 @@ export class GameController {
       forecastLayer: elements.forecastLayer,
       metrics: this.metrics,
     });
-    this.hudRenderer = new HudRenderer(elements);
+    this.hudRenderer = new HudRenderer(elements, {
+      onUnitClick: (id) => this.handleUnitClick(id),
+    });
     this.effectsRenderer = new EffectsRenderer({
       unitsLayer: elements.unitsLayer,
       effectsLayer: elements.effectsLayer,
@@ -134,11 +141,18 @@ export class GameController {
     teamColors = null,
     teamNames = null,
     difficulty = "normal",
+    // Online only: the live onlineSession and the relay-provided shared seed. Both
+    // clients build the match from the same seed so the seeded core runs in
+    // lockstep. `seed` is null for local play (reset() picks a fresh one).
+    net = null,
+    seed = null,
   } = {}) {
     this.mode = mode;
-    this.matchConfig = { size, playerCount, format, teamColors, teamNames, difficulty };
+    this.net = mode === "online" ? net : null;
+    this.matchConfig = { size, playerCount, format, teamColors, teamNames, difficulty, seed };
     // Single-player drives Player 2 with the CPU; every other mode is human-only.
     this.cpu = mode === "single" ? { difficulty, players: new Set([2]) } : null;
+    this._onlineEnded = false;
     this.startedAt = Date.now();
     this.applyLocalControlVisibility();
     this.reset();
@@ -159,12 +173,15 @@ export class GameController {
   // the host instead, so both are hidden outside single-player and hot-seat.
   applyLocalControlVisibility() {
     const local = this.mode === "single" || this.mode === "hotseat";
+    // Restart never makes sense online — a shared match can't be unilaterally
+    // reset. Concede stays available online; it routes through the normal command
+    // broadcast (the conceding player drops, the duel ends).
     this.elements.restartBtn.hidden = !local;
-    this.elements.concedeBtn.hidden = !local;
+    this.elements.concedeBtn.hidden = !(local || this.mode === "online");
   }
 
   reset() {
-    const { size, playerCount, format, teamColors, teamNames } = this.matchConfig;
+    const { size, playerCount, format, teamColors, teamNames, seed } = this.matchConfig;
     const boardSize = Number(size);
 
     if (!BOARD_SIZES.includes(boardSize)) {
@@ -172,8 +189,10 @@ export class GameController {
     }
 
     this.match = createMatchState({
+      // Online uses the relay-provided shared seed so both clients run the same
+      // dice stream; local play picks a fresh seed each match.
+      seed: seed ?? newSeed(),
       size: boardSize,
-      seed: newSeed(),
       mode: this.mode,
       playerCount,
       format,
@@ -181,13 +200,25 @@ export class GameController {
       teamNames,
     });
     this.ui = createUiState();
+    // Per-seat battle tally for the results "battle report". Presentation only —
+    // accumulated from the same authoritative events the renderer animates, never
+    // read by the rules. Keyed by player (seat) id; teams are summed at report time.
+    this.stats = {};
     this.metrics = createBoardMetrics(this.match.size);
     this.updateRendererMetrics();
     this.applyViewBox();
 
     this.renderAll();
     this.announceTurn(this.match.currentPlayer);
-    this.messages.show("Player 1 begins. Select any unspent piece.");
+
+    if (this.mode === "online") {
+      // Register with the relay session (flushes any commands buffered during the
+      // lobby → match handoff) and lock input unless we move first.
+      this.net?.bind(this);
+      this.applyOnlineTurnLock();
+    } else {
+      this.messages.show("Player 1 begins. Select any unspent piece.");
+    }
   }
 
   // Render-facing view: authoritative state plus the local UI fields the
@@ -199,26 +230,8 @@ export class GameController {
       mode: this.ui.actionMode,
       legalTiles: this.ui.legalTiles,
       rangeTiles: this.ui.rangeTiles,
-      threatTiles: this.threatTilesForView(),
       locked: this.ui.locked,
     };
-  }
-
-  // The danger overlay (tiles enemies can already strike) is shown while a
-  // friendly piece is selected and the player is reading the board — neutral or
-  // choosing a move. It is suppressed during Attack/Heal targeting so the red
-  // attack radius and target highlights are not muddied by red danger marks.
-  threatTilesForView() {
-    if (
-      !this.ui.selectedId ||
-      this.ui.locked ||
-      this.isCpu(this.match.currentPlayer) ||
-      this.ui.actionMode === ACTION_MODES.ATTACK ||
-      this.ui.actionMode === ACTION_MODES.HEAL
-    ) {
-      return EMPTY_THREAT;
-    }
-    return getThreatTiles(this.match, this.match.currentPlayer);
   }
 
   // Submit a command to the authoritative reducer. On accept, swap in the new
@@ -233,6 +246,15 @@ export class GameController {
     }
 
     this.match = result.nextState;
+    this.recordStats(result.events);
+
+    // Online: a locally-accepted command is broadcast so the opponent replays it
+    // through the same seeded reducer. Remote commands arrive via
+    // applyRemoteCommand (which calls applyCommand directly, not dispatch), so
+    // they never loop back through here.
+    if (this.mode === "online" && this.net) {
+      this.net.onLocalCommandApplied(command);
+    }
     return result;
   }
 
@@ -269,6 +291,80 @@ export class GameController {
       "click",
       () => void this.concedeCurrentPlayer(),
     );
+
+    document.addEventListener("keydown", (event) => this.handleHotkey(event));
+  }
+
+  // Keyboard shortcuts mirror the action toolbar: 1 Move, 2 Attack, 3 Heal,
+  // 4 Defend, F/Enter Finish, C Cancel Move, Escape exit targeting. Each action
+  // key gates on the *same* disabled state the HUD already computes for its
+  // button, so the keyboard can never trigger something the button wouldn't.
+  handleHotkey(event) {
+    // Only while the board is the active screen, and never on top of a modal or
+    // a text field, or while a key combo is in flight.
+    const matchScreen = document.querySelector('[data-screen="match"]');
+    if (!matchScreen?.classList.contains("is-active")) return;
+    if (document.querySelector(".modal.open")) return;
+    if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+
+    const tag = event.target?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || event.target?.isContentEditable) {
+      return;
+    }
+
+    const el = this.elements;
+    let handled = true;
+    // Did the key actually trigger an action (not a disabled/no-op key)? Only
+    // then do we echo the toolbar's click sound, so the keyboard feels identical
+    // to pressing the on-screen button.
+    let fired = false;
+
+    switch (event.key) {
+      case "1":
+        if (!el.moveBtn.disabled) { this.setMode(ACTION_MODES.MOVE); fired = true; }
+        break;
+      case "2":
+        if (!el.attackBtn.disabled) { this.setMode(ACTION_MODES.ATTACK); fired = true; }
+        break;
+      case "3":
+        if (!el.healBtn.disabled) { this.setMode(ACTION_MODES.HEAL); fired = true; }
+        break;
+      case "4":
+        if (!el.defendBtn.disabled) { this.defendSelected(); fired = true; }
+        break;
+      case "f":
+      case "F":
+      case "Enter":
+        if (!el.finishBtn.disabled) { this.finishActivation(); fired = true; }
+        break;
+      case "c":
+      case "C":
+        if (!el.cancelMoveBtn.disabled) { this.cancelMove(); fired = true; }
+        break;
+      case "Escape":
+        if (!this.ui.locked && this.ui.actionMode) {
+          this.exitActionMode();
+          fired = true;
+        }
+        break;
+      default:
+        handled = false;
+    }
+
+    if (handled) event.preventDefault();
+    // Echo the toolbar's click sound, exactly as clicking the button would (the
+    // Defend key also fires its own brace sound via defendSelected — same as
+    // clicking the Defend button, which gets both the click and the brace).
+    if (fired) this.audio.play("buttonClick");
+  }
+
+  // Drop an in-progress targeting/move highlight without spending the piece,
+  // returning to the neutral "piece selected, choose an action" state.
+  exitActionMode() {
+    if (this.ui.locked || !this.ui.actionMode) return;
+    this.clearMode();
+    this.renderDynamic();
+    this.messages.show("Action cancelled. Choose an action.");
   }
 
   // Wrap the viewBox tightly around the board so it scales up to fill the stage,
@@ -626,6 +722,7 @@ export class GameController {
 
     this.clearMode();
     this.renderDynamic();
+    this.audio.play("defend");
     this.messages.show(`${UNIT_TYPES[unit.type].name} is defending.`);
     // Defend always completes the activation immediately.
     this.finishActivation();
@@ -683,6 +780,12 @@ export class GameController {
       this.isCpu(this.match.currentPlayer)
     ) {
       void this.runCpuTurn();
+    }
+
+    // Online: handing the turn to the opponent locks our input until their
+    // command stream passes the turn back (see applyRemoteCommand).
+    if (turnChanged && this.mode === "online" && this.match.phase === "playing") {
+      this.applyOnlineTurnLock();
     }
   }
 
@@ -812,17 +915,125 @@ export class GameController {
   // roster color. Sub-line adapts to who is holding the device.
   announceTurn(player) {
     const cpu = this.isCpu(player);
-    const sub = cpu
-      ? "CPU is planning"
-      : this.mode === "hotseat"
-        ? "Pass the device"
-        : "Your move";
+    const online = this.mode === "online";
+    const mine = online && player === this.net?.mySeat;
+
+    let sub;
+    if (cpu) sub = "CPU is planning";
+    else if (online) sub = mine ? "Your move" : "Opponent's move";
+    else if (this.mode === "hotseat") sub = "Pass the device";
+    else sub = "Your move";
+
+    let title = `Player ${player}`;
+    if (cpu) title = `Player ${player} · CPU`;
+    else if (online && !mine) title = `Player ${player} · ${this.remoteSquadLabel()}`;
 
     this.turnAnnouncer.announce({
-      title: cpu ? `Player ${player} · CPU` : `Player ${player}`,
+      title,
       sub,
       color: colorOf(this.match, player),
     });
+  }
+
+  // ── Online (deterministic lockstep) ──────────────────────────────────────
+  // Apply a command the OPPONENT issued. It is replayed through the same seeded
+  // reducer our own commands use, so the dice match without being sent. Reuses
+  // the CPU animation path (animateCpuEvents handles every event type). Called,
+  // serialized, by the online session. Returns a promise the session awaits so
+  // animations never overlap.
+  async applyRemoteCommand(command) {
+    if (this.match.phase === "complete" || this._onlineEnded) return false;
+
+    const result = applyCommand(this.match, command);
+    if (!result.accepted) {
+      // A remote command our reducer rejects means the two states diverged —
+      // there is no safe local recovery, so end the match cleanly.
+      console.warn("Remote command rejected:", command.type, result.errorCode);
+      this.endOnDesync();
+      return false;
+    }
+
+    this.match = result.nextState;
+    this.recordStats(result.events);
+    await this.animateCpuEvents(result.events);
+
+    if (this.match.phase === "complete") {
+      this.handleMatchComplete();
+      return true;
+    }
+
+    const turnChanged = result.events.find(
+      (event) => event.type === EVENTS.TURN_CHANGED,
+    );
+    if (turnChanged) {
+      this.announceTurn(turnChanged.player);
+      this.applyOnlineTurnLock();
+    }
+    return true;
+  }
+
+  // Lock or unlock local input based on whose squad turn it is online. Uses the
+  // exact `ui.locked` gate every input handler already respects (same mechanism
+  // the CPU turn uses), so no per-handler online checks are needed.
+  applyOnlineTurnLock() {
+    if (this.mode !== "online" || !this.net || this._onlineEnded) return;
+    const mine = this.match.currentPlayer === this.net.mySeat;
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.ui.locked = !mine;
+    this.renderDynamic();
+    this.messages.show(
+      mine
+        ? "Your squad turn. Select an unspent piece."
+        : `Waiting for ${this.remoteSquadLabel()}…`,
+    );
+  }
+
+  // Connection desync (mismatched state hash, or a rejected remote command):
+  // there is no safe recovery in v1, so stop accepting input and surface the
+  // termination to the results screen (scope §11.4).
+  endOnDesync() {
+    if (this._onlineEnded || this.match.phase === "complete") return;
+    this._onlineEnded = true;
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.ui.locked = true;
+    this.renderDynamic();
+    this.messages.show("Connection desynced — the match was ended.");
+    this.net?.dispose();
+    this.onMatchComplete(
+      this.buildMatchSummary({ terminated: "desync", terminationReason: "Connection desynced." }),
+    );
+  }
+
+  // Opponent left / socket closed mid-match. Display the reason and return
+  // cleanly via the results screen (scope §11.4 — v1 has no reconnect).
+  endOnDisconnect(reason) {
+    if (this._onlineEnded || this.match.phase === "complete") return;
+    this._onlineEnded = true;
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.ui.locked = true;
+    this.renderDynamic();
+    const message = reason || "Your opponent disconnected.";
+    this.messages.show(message);
+    this.net?.dispose();
+    this.onMatchComplete(
+      this.buildMatchSummary({ terminated: "disconnect", terminationReason: message }),
+    );
+  }
+
+  // Read-only state accessor the online session uses for hashing. Never mutate.
+  getMatchState() {
+    return this.match;
+  }
+
+  // Label for the non-local squad in messages: "CPU" in single-player, the
+  // opponent's name (or "Opponent") online.
+  remoteSquadLabel() {
+    if (this.cpu) return "CPU";
+    if (this.mode === "online") return this.net?.remoteName || "Opponent";
+    return "Opponent";
   }
 
   // Apply one CPU command authoritatively and animate the events it produced.
@@ -836,6 +1047,7 @@ export class GameController {
     }
 
     this.match = result.nextState;
+    this.recordStats(result.events);
     await this.animateCpuEvents(result.events);
     return true;
   }
@@ -849,7 +1061,7 @@ export class GameController {
           const unit = findUnit(this.match, event.unitId);
           if (unit) {
             this.messages.show(
-              `Player ${unit.player} (CPU) activates its ${UNIT_TYPES[unit.type].name}.`,
+              `Player ${unit.player} (${this.remoteSquadLabel()}) activates its ${UNIT_TYPES[unit.type].name}.`,
             );
           }
           await sleep(CPU_STEP_MS);
@@ -872,6 +1084,7 @@ export class GameController {
         case EVENTS.UNIT_DEFENDED: {
           const unit = findUnit(this.match, event.unitId);
           this.renderDynamic();
+          this.audio.play("defend");
           if (unit) {
             this.messages.show(`${UNIT_TYPES[unit.type].name} braces to defend.`);
           }
@@ -980,11 +1193,135 @@ export class GameController {
     this.clearMode();
     this.renderAll();
     this.messages.show(`${winnerLabel(this.match, this.match.winner)} wins.`);
+    // Online: keep the socket alive briefly so the opponent can also reach this
+    // completion before our eventual close would read as a disconnect.
+    if (this.mode === "online" && !this._onlineEnded) {
+      this._onlineEnded = true;
+      this.net?.endMatch();
+    }
     this.onMatchComplete(this.buildMatchSummary());
   }
 
+  // Lazily fetch the running tally for a seat.
+  statsFor(player) {
+    let entry = this.stats[player];
+    if (!entry) {
+      entry = this.stats[player] = {
+        hits: 0,
+        misses: 0,
+        crits: 0,
+        damageDealt: 0,
+        kills: 0,
+        healingDone: 0,
+      };
+    }
+    return entry;
+  }
+
+  // Fold a batch of accepted events into the per-seat battle tally. A kill is
+  // attributed to the most recent attacker in the same batch, so a concede's
+  // UNIT_ELIMINATED (no preceding attack) is correctly never counted as a kill.
+  recordStats(events) {
+    let lastAttacker = null;
+    for (const event of events) {
+      switch (event.type) {
+        case EVENTS.ATTACK_RESOLVED: {
+          const attacker = findUnit(this.match, event.actorId);
+          lastAttacker = attacker?.player ?? null;
+          if (lastAttacker == null) break;
+          const s = this.statsFor(lastAttacker);
+          if (event.hit) {
+            s.hits += 1;
+            s.damageDealt += event.damage;
+            if (event.critical) s.crits += 1;
+          } else {
+            s.misses += 1;
+          }
+          break;
+        }
+        case EVENTS.HEAL_RESOLVED: {
+          const healer = findUnit(this.match, event.actorId);
+          if (healer && event.hit) {
+            this.statsFor(healer.player).healingDone += event.healing;
+          }
+          lastAttacker = null;
+          break;
+        }
+        case EVENTS.UNIT_ELIMINATED: {
+          if (lastAttacker != null) {
+            this.statsFor(lastAttacker).kills += 1;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+  }
+
+  // One battle-report row per team (FFA: one team per player). Survivor/HP figures
+  // come from the final authoritative state; damage/kills/healing from the tally.
+  // Sorted winner-first, then by surviving HP, so the readout reads top-down.
+  buildTeamReports() {
+    const match = this.match;
+    const teamIds = [];
+    for (const id of match.turnOrder) {
+      const team = teamOf(match, id);
+      if (!teamIds.includes(team)) teamIds.push(team);
+    }
+
+    const reports = teamIds.map((teamId) => {
+      const memberIds = match.players
+        .filter((slot) => slot.team === teamId)
+        .map((slot) => slot.id);
+      const unitsTotal = memberIds.length * 4;
+
+      let unitsAlive = 0;
+      let hpRemaining = 0;
+      for (const unit of match.units) {
+        if (memberIds.includes(unit.player) && unit.hp > 0) {
+          unitsAlive += 1;
+          hpRemaining += unit.hp;
+        }
+      }
+
+      let damageDealt = 0;
+      let kills = 0;
+      let healingDone = 0;
+      for (const pid of memberIds) {
+        const s = this.stats[pid];
+        if (!s) continue;
+        damageDealt += s.damageDealt;
+        kills += s.kills;
+        healingDone += s.healingDone;
+      }
+
+      return {
+        teamId,
+        label: teamLabel(match, teamId),
+        color: teamColor(match, teamId),
+        isWinner: teamId === match.winner,
+        unitsAlive,
+        unitsTotal,
+        hpRemaining,
+        hpTotal: unitsTotal * MAX_HP,
+        damageDealt,
+        kills,
+        healingDone,
+      };
+    });
+
+    reports.sort(
+      (a, b) =>
+        Number(b.isWinner) - Number(a.isWinner) || b.hpRemaining - a.hpRemaining,
+    );
+    return reports;
+  }
+
   // Snapshot the finished match for the results screen.
-  buildMatchSummary() {
+  // `extra` carries online termination info (terminated/terminationReason) when a
+  // match ends without a clean winner (desync/disconnect); empty for normal ends.
+  buildMatchSummary(extra = {}) {
     return {
       winner: this.match.winner,
       winnerLabel: winnerLabel(this.match, this.match.winner),
@@ -999,6 +1336,8 @@ export class GameController {
       victoryReason: this.match.victoryReason ?? "elimination",
       durationMs: this.startedAt ? Date.now() - this.startedAt : 0,
       difficulty: this.cpu?.difficulty ?? this.matchConfig.difficulty,
+      teams: this.buildTeamReports(),
+      ...extra,
     };
   }
 }
@@ -1014,9 +1353,6 @@ const CPU_MAX_ACTIVATIONS = 64; //  guard against a runaway planning loop
 function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
-
-// Shared empty set for the suppressed danger overlay — never mutated.
-const EMPTY_THREAT = new Set();
 
 function createUiState() {
   return {

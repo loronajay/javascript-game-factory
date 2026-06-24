@@ -37,11 +37,13 @@ export const UNIT_TYPES = Object.freeze({
 // orange) come online for 3-4 player free-for-all and team play. These are
 // defaults only — the authoritative per-match color lives on each roster entry
 // (core/roster.js) so a lobby can reassign hues without touching slot identity.
+// Heraldic banner hues — azure / gules / vert / or — mirroring the --p1..--p4
+// tokens in styles/tokens.css.
 export const PLAYER_COLORS = Object.freeze({
-  1: "#67c7ff",
-  2: "#ff6c7c",
-  3: "#6ddf7a",
-  4: "#ffac5c"
+  1: "#5288c6",
+  2: "#c4463f",
+  3: "#62a04e",
+  4: "#d68d37"
 });
 
 export const ACTION_MODES = Object.freeze({

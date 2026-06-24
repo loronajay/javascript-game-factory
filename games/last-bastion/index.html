@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#09131a" />
+  <title>Last Bastion</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app" aria-label="Last Bastion defense game">
+    <canvas id="game" aria-label="Tactical battlefield"></canvas>
+
+    <section id="topHud" class="hud-panel top-hud">
+      <div class="stat"><span class="label">CORE</span><strong id="baseHp">100</strong></div>
+      <div class="stat"><span class="label">GOLD</span><strong id="gold">0</strong></div>
+      <div class="stat"><span class="label">WAVE</span><strong id="wave">1 / 1</strong></div>
+      <div class="stat next-wave"><span class="label">NEXT CONTACT</span><strong id="nextWave">--</strong></div>
+      <button id="intelBtn" class="icon-button" type="button" aria-label="Open unit guide">?</button>
+      <button id="pauseBtn" class="icon-button" type="button" aria-label="Pause">&#10074;&#10074;</button>
+      <button id="speedBtn" class="icon-button" type="button" aria-label="Toggle speed">1&times;</button>
+    </section>
+
+    <section id="interactionBanner" class="interaction-banner hidden" aria-live="polite">
+      <div>
+        <strong id="interactionTitle">TACTICAL PAUSE</strong>
+        <span id="interactionHint"></span>
+      </div>
+      <button id="interactionCancel" class="small-button" type="button">Cancel</button>
+    </section>
+
+    <section id="commandPanel" class="command-panel hidden" aria-label="Selected unit commands">
+      <div class="command-unit">
+        <span id="commandIcon" class="command-icon"></span>
+        <div>
+          <span class="command-kicker">SELECTED UNIT</span>
+          <strong id="commandName">Striker</strong>
+          <span id="commandStatus">78 / 78 HP &middot; Holding</span>
+          <span id="commandStats" class="command-detail"></span>
+          <span id="commandMatchup" class="command-detail matchup"></span>
+        </div>
+      </div>
+      <div class="command-grid">
+        <button type="button" data-command="move"><strong>Move</strong><span>Go to position</span></button>
+        <button type="button" data-command="attack"><strong>Attack</strong><span>Select an enemy</span></button>
+        <button type="button" data-command="hold"><strong>Hold</strong><span>Defend this point</span></button>
+        <button type="button" data-command="guard"><strong>Guard</strong><span>Protect an ally</span></button>
+        <button type="button" data-command="retreat"><strong>Retreat</strong><span>Return to core</span></button>
+        <button type="button" data-command="info"><strong>Unit Info</strong><span>Stats and counters</span></button>
+        <button type="button" data-command="cancel"><strong>Cancel</strong><span>Resume battle</span></button>
+      </div>
+    </section>
+
+    <section id="unitTray" class="unit-tray" aria-label="Unit deployment"></section>
+
+
+    <section id="intelPanel" class="intel-panel hidden" role="dialog" aria-modal="true" aria-label="Unit guide">
+      <div class="intel-card">
+        <div class="intel-header">
+          <div>
+            <span class="eyebrow">TACTICAL DATABASE</span>
+            <h2>Units and Matchups</h2>
+          </div>
+          <button id="intelClose" class="small-button" type="button">Close</button>
+        </div>
+        <p class="intel-rule">Counters matter: winning matchups hit harder, losing matchups hit softer. Armor reduces each hit after the matchup is applied.</p>
+        <div id="intelRoster" class="intel-roster"></div>
+      </div>
+    </section>
+
+    <section id="messagePanel" class="message-panel hidden" role="dialog" aria-modal="true">
+      <div class="message-card">
+        <div class="message-sigil" aria-hidden="true"><span></span></div>
+        <p id="messageEyebrow" class="eyebrow">MISSION 01</p>
+        <h1 id="messageTitle">Hold Blackglass Plateau</h1>
+        <p id="messageBody"></p>
+        <div id="modeList" class="mode-list hidden" aria-label="Game modes"></div>
+        <div id="stageList" class="stage-list hidden" aria-label="Campaign stages"></div>
+        <div id="messageActions" class="message-actions">
+          <button id="messageButton" class="primary-button" type="button">Begin Defense</button>
+          <button id="messageSecondary" class="secondary-button hidden" type="button">Campaign Map</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

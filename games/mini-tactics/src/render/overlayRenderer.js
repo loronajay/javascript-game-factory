@@ -13,7 +13,6 @@ export class OverlayRenderer {
   render(state) {
     const selected = getSelectedUnit(state);
     const rangeTiles = state.rangeTiles ?? EMPTY_SET;
-    const threatTiles = state.threatTiles ?? EMPTY_SET;
 
     for (const tile of this.boardLayer.querySelectorAll(".tile")) {
       tile.classList.remove(
@@ -22,8 +21,7 @@ export class OverlayRenderer {
         "legal-attack",
         "legal-heal",
         "attack-range",
-        "heal-range",
-        "threatened"
+        "heal-range"
       );
 
       const x = Number(tile.dataset.x);
@@ -35,13 +33,6 @@ export class OverlayRenderer {
       }
 
       const isLegal = state.legalTiles.has(key);
-
-      // Danger overlay: tiles already under an enemy's reach. Painted beneath the
-      // action overlays so a legal move tile that is also threatened still shows
-      // its move highlight, with the danger marker layered behind it.
-      if (threatTiles.has(key)) {
-        tile.classList.add("threatened");
-      }
 
       // The range overlay paints every reachable tile faintly; the bright
       // legal-target highlight wins on tiles that actually hold a target.

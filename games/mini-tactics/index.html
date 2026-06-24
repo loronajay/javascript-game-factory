@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Mini-Tactics</title>
 
+  <!-- Engraved display (Cinzel) + warm body serif (Spectral). Degrades to a
+       system serif when offline, so the fantasy war-table theme never falls
+       back to a generic sans. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap">
+
   <link rel="stylesheet" href="./styles/tokens.css">
   <link rel="stylesheet" href="./styles/layout.css">
   <link rel="stylesheet" href="./styles/menus.css">
@@ -38,7 +45,7 @@
         <div class="menu-buttons">
           <button data-nav="spSetup" class="primary menu-btn">Single Player</button>
           <button data-nav="hsSetup" class="menu-btn">Hot Seat</button>
-          <button class="menu-btn" disabled>Online Versus <span class="soon">Soon</span></button>
+          <button data-nav="onlineSetup" class="menu-btn">Online Versus</button>
           <button data-action="rules" class="menu-btn">How to Play</button>
           <button class="menu-btn" disabled>Settings <span class="soon">Soon</span></button>
           <button data-nav="title" class="menu-btn ghost">Back</button>
@@ -150,12 +157,70 @@
       </div>
     </section>
 
+    <!-- ========================= ONLINE SETUP ========================= -->
+    <section class="screen menu-screen" data-screen="onlineSetup">
+      <div class="menu-card">
+        <h2 class="menu-heading">Online Versus</h2>
+        <p class="menu-note">Two commanders, one board. Same rules as hot seat.</p>
+
+        <p class="online-status" data-online="status">Connecting to the network…</p>
+
+        <!-- IDLE: pick a board size and choose how to pair -->
+        <div data-online-panel="idle" hidden>
+          <div class="setup-field">
+            <span class="setup-label">Board size <em class="setup-hint">(host sets it)</em></span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
+              <button type="button" class="seg" data-size="13">13 × 13</button>
+            </div>
+          </div>
+
+          <div class="menu-buttons">
+            <button type="button" data-action="quickMatch" class="primary menu-btn">Quick Match</button>
+            <button type="button" data-action="createRoom" class="menu-btn">Create Private Room</button>
+          </div>
+
+          <div class="setup-field online-join">
+            <span class="setup-label">Join with a code</span>
+            <div class="online-join-row">
+              <input
+                type="text"
+                class="online-code-input"
+                data-online="codeInput"
+                maxlength="5"
+                placeholder="ABCDE"
+                aria-label="Room code"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" data-action="joinRoom" class="menu-btn">Join</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WAITING: searching for a match, or hosting a private room -->
+        <div data-online-panel="waiting" hidden>
+          <p class="online-wait" data-online="waitText">Searching for an opponent…</p>
+          <p class="online-roomcode" data-online="roomCode" hidden></p>
+          <div class="menu-buttons">
+            <button type="button" data-action="cancelOnline" class="menu-btn ghost">Cancel</button>
+          </div>
+        </div>
+
+        <div class="menu-buttons">
+          <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ============================ RESULTS ============================= -->
     <section class="screen menu-screen" data-screen="results">
       <div class="victory-burst" data-results="burst" aria-hidden="true"></div>
-      <div class="menu-card">
+      <div class="menu-card results-card">
         <h2 class="menu-heading" data-results="title">Victory</h2>
         <p class="results-winner" data-results="winner"></p>
+
+        <div class="results-report" data-results="report"></div>
 
         <dl class="results-stats" data-results="stats"></dl>
 
@@ -196,9 +261,20 @@
             </filter>
 
             <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#6da4ff" stop-opacity=".18"/>
-              <stop offset="100%" stop-color="#6da4ff" stop-opacity="0"/>
+              <stop offset="0%" stop-color="#f0c878" stop-opacity=".22"/>
+              <stop offset="100%" stop-color="#f0c878" stop-opacity="0"/>
             </radialGradient>
+
+            <!-- Struck-pewter fill for the unit emblems: lit ivory at the top
+                 falling to warm cast-metal shadow at the foot, mapped per-shape
+                 via objectBoundingBox so every emblem catches the candlelight
+                 from the same angle. Paired with the bevel layers built in
+                 unitRenderer for the engraved-coin read. -->
+            <linearGradient id="pewter" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fdf8ea"/>
+              <stop offset="42%" stop-color="#ece1c4"/>
+              <stop offset="100%" stop-color="#bba87f"/>
+            </linearGradient>
           </defs>
 
           <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
@@ -244,12 +320,12 @@
           </div>
 
           <div class="actions">
-            <button id="moveBtn" class="primary" disabled>Move</button>
-            <button id="attackBtn" disabled>Attack</button>
-            <button id="healBtn" disabled>Heal</button>
-            <button id="defendBtn" disabled>Defend</button>
-            <button id="cancelMoveBtn" class="cancel" disabled>Cancel Move</button>
-            <button id="finishBtn" disabled>Finish</button>
+            <button id="moveBtn" class="primary" disabled>Move<kbd class="key">1</kbd></button>
+            <button id="attackBtn" disabled>Attack<kbd class="key">2</kbd></button>
+            <button id="healBtn" disabled>Heal<kbd class="key">3</kbd></button>
+            <button id="defendBtn" disabled>Defend<kbd class="key">4</kbd></button>
+            <button id="cancelMoveBtn" class="cancel" disabled>Cancel Move<kbd class="key">C</kbd></button>
+            <button id="finishBtn" disabled>Finish<kbd class="key">F</kbd></button>
           </div>
 
           <div id="actionHelp" class="action-help">
@@ -287,37 +363,82 @@
           </ul>
         </div>
 
-        <!-- Units: stats cheat sheet. Numbers mirror config.js (ranges) and
-             rules/combat.js getBaseDamage (damage incl. matchup exceptions). -->
+        <!-- Units: stats cheat sheet as cards. Numbers mirror config.js (move/
+             range) and rules/combat.js getBaseDamage (attack damage incl. matchup
+             exceptions). The Damage stat is always the unit's ATTACK damage — the
+             medic's healing is called out separately so the columns stay consistent. -->
         <div class="ref-panel" data-panel="units">
-          <table class="ref-table">
-            <thead>
-              <tr><th>Unit</th><th>Move</th><th>Range</th><th>Damage</th><th>Role</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span class="ref-icon">⚔</span> Warrior</td>
-                <td>3</td><td>1</td><td>3 <span class="ref-exc">(2 vs Tank)</span></td>
-                <td>Fast closer; best into squishies</td>
-              </tr>
-              <tr>
-                <td><span class="ref-icon">⬢</span> Tank</td>
-                <td>2</td><td>1</td><td>2</td>
-                <td>Wall &amp; blocker; soaks the Warrior</td>
-              </tr>
-              <tr>
-                <td><span class="ref-icon">➶</span> Ranger</td>
-                <td>2</td><td>4</td><td>2 <span class="ref-exc">(3 vs Ranger)</span></td>
-                <td>Sniper; shots need clear line of sight</td>
-              </tr>
-              <tr>
-                <td><span class="ref-icon">✚</span> Medic</td>
-                <td>2</td><td>3</td><td>Heal 3 <span class="ref-exc">(crit 4)</span></td>
-                <td>Heals self/allies; can poke for 1</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="ref-note">Every piece has <strong>10 HP</strong>. Dice: roll <strong>1 misses</strong>, roll <strong>6 crits</strong>. Defend cuts each incoming hit by 1 (to zero) until that piece next acts.</p>
+          <div class="unit-guide">
+            <article class="unit-guide-card" style="--unit: var(--act-attack)">
+              <div class="ug-emblem">⚔</div>
+              <div class="ug-body">
+                <div class="ug-head">
+                  <span class="ug-name">Warrior</span>
+                  <span class="ug-tag">Striker</span>
+                </div>
+                <div class="ug-stats">
+                  <span class="ug-stat"><b>10</b><i>HP</i></span>
+                  <span class="ug-stat"><b>3</b><i>Move</i></span>
+                  <span class="ug-stat"><b>1</b><i>Range</i></span>
+                  <span class="ug-stat"><b>3</b><i>Damage</i></span>
+                </div>
+                <p class="ug-role">Fast closer with the longest stride. Hits for 3 — but only <strong>2 against a Tank</strong>, so aim it at Rangers and Medics.</p>
+              </div>
+            </article>
+
+            <article class="unit-guide-card" style="--unit: var(--act-move)">
+              <div class="ug-emblem">⬢</div>
+              <div class="ug-body">
+                <div class="ug-head">
+                  <span class="ug-name">Tank</span>
+                  <span class="ug-tag">Anchor</span>
+                </div>
+                <div class="ug-stats">
+                  <span class="ug-stat"><b>10</b><i>HP</i></span>
+                  <span class="ug-stat"><b>2</b><i>Move</i></span>
+                  <span class="ug-stat"><b>1</b><i>Range</i></span>
+                  <span class="ug-stat"><b>2</b><i>Damage</i></span>
+                </div>
+                <p class="ug-role">Wall and blocker. Bodies plug lanes and soak the Warrior, who only does 2 back to it.</p>
+              </div>
+            </article>
+
+            <article class="unit-guide-card" style="--unit: var(--gold)">
+              <div class="ug-emblem">➶</div>
+              <div class="ug-body">
+                <div class="ug-head">
+                  <span class="ug-name">Ranger</span>
+                  <span class="ug-tag">Sniper</span>
+                </div>
+                <div class="ug-stats">
+                  <span class="ug-stat"><b>10</b><i>HP</i></span>
+                  <span class="ug-stat"><b>2</b><i>Move</i></span>
+                  <span class="ug-stat"><b>4</b><i>Range</i></span>
+                  <span class="ug-stat"><b>2</b><i>Damage</i></span>
+                </div>
+                <p class="ug-role">Reaches 4 tiles, but shots are <strong>blocked by any body in the way</strong> — including your own. Does <strong>3 to an enemy Ranger</strong>.</p>
+              </div>
+            </article>
+
+            <article class="unit-guide-card is-support" style="--unit: var(--act-heal)">
+              <div class="ug-emblem">+</div>
+              <div class="ug-body">
+                <div class="ug-head">
+                  <span class="ug-name">Medic</span>
+                  <span class="ug-tag">Support</span>
+                </div>
+                <div class="ug-stats">
+                  <span class="ug-stat"><b>10</b><i>HP</i></span>
+                  <span class="ug-stat"><b>2</b><i>Move</i></span>
+                  <span class="ug-stat"><b>3</b><i>Range</i></span>
+                  <span class="ug-stat"><b>1</b><i>Damage</i></span>
+                </div>
+                <p class="ug-role"><span class="ug-heal">Heals 3 HP</span> (4 on a crit) to a teammate or itself within range 3. Its attack is just a weak <strong>1-damage</strong> poke — heal, don't trade.</p>
+              </div>
+            </article>
+          </div>
+
+          <p class="ref-note">Every unit has <strong>10 HP</strong>. On an attack roll, <strong>1 misses</strong> and <strong>6 crits</strong> (+1 damage; a Medic crit heals 4). <strong>Defend</strong> cuts each incoming hit by 1 (to zero) until that unit next acts.</p>
         </div>
 
         <!-- Advanced: strategy depth (condensed from STRATEGY.md). -->
