@@ -144,6 +144,10 @@ export class GameController {
     teamColors = null,
     teamNames = null,
     difficulty = "normal",
+    // Optional custom squad compositions keyed by seat id. Null = the classic
+    // one-of-each squad. Carried verbatim into createMatchState so restart and
+    // rematch reuse the same squads.
+    compositions = null,
     // Online only: the live onlineSession and the relay-provided shared seed. Both
     // clients build the match from the same seed so the seeded core runs in
     // lockstep. `seed` is null for local play (reset() picks a fresh one).
@@ -152,7 +156,7 @@ export class GameController {
   } = {}) {
     this.mode = mode;
     this.net = mode === "online" ? net : null;
-    this.matchConfig = { size, playerCount, format, teamColors, teamNames, difficulty, seed };
+    this.matchConfig = { size, playerCount, format, teamColors, teamNames, compositions, difficulty, seed };
     // Single-player drives Player 2 with the CPU; every other mode is human-only.
     this.cpu = mode === "single" ? { difficulty, players: new Set([2]) } : null;
     this._onlineEnded = false;
@@ -184,7 +188,7 @@ export class GameController {
   }
 
   reset() {
-    const { size, playerCount, format, teamColors, teamNames, seed } = this.matchConfig;
+    const { size, playerCount, format, teamColors, teamNames, compositions, seed } = this.matchConfig;
     const boardSize = Number(size);
 
     if (!BOARD_SIZES.includes(boardSize)) {
@@ -212,6 +216,7 @@ export class GameController {
       colors,
       teamColors: effectiveTeamColors,
       teamNames,
+      compositions,
     });
     this.ui = createUiState();
     // Per-seat battle tally for the results "battle report". Presentation only —
@@ -1346,6 +1351,7 @@ export class GameController {
       playerCount: this.match.players?.length ?? 2,
       teamColors: this.matchConfig.teamColors,
       teamNames: this.matchConfig.teamNames,
+      compositions: this.matchConfig.compositions,
       turns: this.match.turnNumber,
       victoryReason: this.match.victoryReason ?? "elimination",
       durationMs: this.startedAt ? Date.now() - this.startedAt : 0,

@@ -9,6 +9,7 @@
 import { BOARD_SIZES, DEFAULT_BOARD_SIZE } from "../config.js";
 import { createInitialUnits } from "../state/gameState.js";
 import { createRoster } from "./roster.js";
+import { normalizeCompositions } from "./composition.js";
 import { createRngState } from "./rng.js";
 
 export const SCHEMA_VERSION = 1;
@@ -30,6 +31,11 @@ export function createMatchState({
   // cosmetic — naming never affects rule resolution. Falls back to "Team N" /
   // "Player N" wherever an entry is missing (see render/labels.js).
   teamNames = null,
+  // Optional custom squad compositions keyed by seat id: a 4-type array per
+  // player in spawn-slot order. Absent/null reproduces the classic one-of-each
+  // squad. Affects authoritative state (unit ids/types), so both online clients
+  // must build from the same exchanged compositions.
+  compositions = null,
 } = {}) {
   const boardSize = Number(size);
 
@@ -57,7 +63,11 @@ export function createMatchState({
     players: roster,
     turnOrder: roster.map((slot) => slot.id),
     currentPlayer: roster[0].id,
-    units: createInitialUnits(boardSize, roster),
+    units: createInitialUnits(
+      boardSize,
+      roster,
+      normalizeCompositions(compositions)
+    ),
     activation: null,
     winner: null,
     victoryReason: null,

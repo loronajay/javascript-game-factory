@@ -1,7 +1,9 @@
 import { bindCommonControls, bindSegmented, screenRoot } from "./common.js";
-import { BOARD_SIZES } from "../../config.js";
+import { BOARD_SIZES, PLAYER_COLORS } from "../../config.js";
 import { createOnlineClient } from "../../online/onlineClient.js";
 import { createOnlineSession } from "../../online/onlineSession.js";
+import { createSquadPicker } from "./squadBuilder.js";
+import { DEFAULT_COMPOSITION } from "../../core/composition.js";
 
 // Online Versus lobby. Owns the relay client for the whole lobby phase: connects
 // on entry, runs quick-match / private-room pairing, and once both players are
@@ -16,6 +18,12 @@ import { createOnlineSession } from "../../online/onlineSession.js";
 // The authoritative side always comes from match_ready.remoteSide, never a local
 // claim. p1 = host (seat 1) and chooses the board size; p2 = guest (seat 2) and
 // adopts it from the host's `setup` message.
+//
+// Squads are a blind pick: each player builds their own squad here, and on
+// match_ready BOTH sides broadcast a `setup` message carrying their composition
+// (the host's also carries the board size). The match builds only once each side
+// holds the seed, the board size, AND both compositions — so neither squad is
+// revealed until the board renders.
 export function createOnlineSetupScreen(ctx) {
   const el = screenRoot("onlineSetup");
   bindCommonControls(el, ctx);
@@ -29,19 +37,39 @@ export function createOnlineSetupScreen(ctx) {
 
   let client = null;
   let chosenSize = 10; // host's board choice
+  let customSquads = false; // local Standard/Custom toggle
   let handedOff = false; // true once the match screen owns the socket
 
-  // Match-start staging — filled from match_ready (+ the host's setup message)
-  // and consumed exactly once by tryStart().
+  // Match-start staging — filled from match_ready (+ both setup messages) and
+  // consumed exactly once by tryStart().
   let seed = null;
   let boardSize = null;
   let mySeat = null;
   let isHost = false;
+  let myComposition = null; // our chosen squad, captured at match_ready
+  let peerComposition = null; // the opponent's squad, from their setup message
+
+  // The local player's squad picker. Standard keeps the classic one-of-each
+  // squad; the value is read at match_ready time.
+  const squadHost = el.querySelector("[data-squad-pickers]");
+  const squadHint = el.querySelector("[data-squad-hint]");
+  const squadPicker = createSquadPicker({ title: "Your squad", accent: PLAYER_COLORS[1] });
 
   bindSegmented(el, "boardSize", (seg) => {
     const chosen = Number(seg.dataset.size);
     if (BOARD_SIZES.includes(chosen)) chosenSize = chosen;
   });
+
+  bindSegmented(el, "squadMode", (seg) => {
+    customSquads = seg.dataset.squad === "custom";
+    syncSquads();
+  });
+
+  function syncSquads() {
+    squadHost.hidden = !customSquads;
+    squadHint.hidden = !customSquads;
+    if (customSquads) squadHost.replaceChildren(squadPicker.el);
+  }
 
   function setPanel(name) {
     idlePanel.hidden = name !== "idle";
@@ -57,6 +85,8 @@ export function createOnlineSetupScreen(ctx) {
     boardSize = null;
     mySeat = null;
     isHost = false;
+    myComposition = null;
+    peerComposition = null;
   }
 
   function identity() {
@@ -70,14 +100,22 @@ export function createOnlineSetupScreen(ctx) {
     }
   }
 
-  // Build the session and hand off to the match — only once both the shared seed
-  // and the (host-chosen) board size are known. The host knows the size
-  // immediately; the guest waits for the host's setup message.
+  // Build the session and hand off to the match — only once the shared seed, the
+  // (host-chosen) board size, and BOTH squad compositions are known. Each side
+  // captures its own squad at match_ready and waits for the peer's setup message.
   function tryStart() {
     if (seed == null || boardSize == null || handedOff) return;
+    if (myComposition == null || peerComposition == null) return;
     const session = createOnlineSession({ client, mySeat, isHost, size: boardSize, seed });
     handedOff = true; // onExit must NOT disconnect — the match owns the client now
-    ctx.nav("match", { mode: "online", net: session, seed, size: boardSize });
+    // Key by seat so both clients build the identical { 1: p1Squad, 2: p2Squad }
+    // map — the authoritative state must match for lockstep.
+    const peerSeat = mySeat === 1 ? 2 : 1;
+    const compositions = {
+      [mySeat]: myComposition,
+      [peerSeat]: peerComposition,
+    };
+    ctx.nav("match", { mode: "online", net: session, seed, size: boardSize, compositions });
   }
 
   function wireLobby() {
@@ -120,17 +158,28 @@ export function createOnlineSetupScreen(ctx) {
       isHost = client.isHost();
       mySeat = isHost ? 1 : 2;
       seed = matchSeed;
+      // Capture our own squad now: the picker's value in Custom, the default
+      // one-of-each squad in Standard. Always a concrete 4-type array so it can
+      // double as the "captured" signal and travel intact to the peer.
+      myComposition = customSquads
+        ? squadPicker.getComposition()
+        : [...DEFAULT_COMPOSITION];
       waitTextEl.textContent = "Opponent found — starting…";
       if (isHost) {
-        // Host's choice is canonical; publish it so the guest builds the same board.
+        // Host's choice of board size is canonical; the guest adopts it.
         boardSize = chosenSize;
-        client.sendSetup(boardSize);
+        client.sendSetup({ size: chosenSize, composition: myComposition });
+      } else {
+        client.sendSetup({ composition: myComposition });
       }
-      tryStart(); // host starts now; guest waits for onRemoteSetup
+      tryStart(); // both sides wait for the peer's setup (board size + squad)
     };
 
-    cb.onRemoteSetup = ({ size }) => {
+    cb.onRemoteSetup = ({ size, composition }) => {
       if (BOARD_SIZES.includes(size)) boardSize = size;
+      // The peer always sends a concrete squad array; receiving it is what lets
+      // tryStart() proceed (a still-null peerComposition means "not yet").
+      if (Array.isArray(composition)) peerComposition = composition;
       tryStart();
     };
   }
@@ -165,6 +214,7 @@ export function createOnlineSetupScreen(ctx) {
   function onEnter() {
     handedOff = false;
     resetStaging();
+    syncSquads();
     setPanel("none");
     setStatus("Connecting to the network…");
     client = createOnlineClient();

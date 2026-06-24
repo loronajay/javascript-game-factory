@@ -83,9 +83,18 @@ async function takeSquadTurn(actor, peer, latency) {
   assert.ok(guard < 64, "squad turn terminated");
 }
 
-async function playLockstepMatch({ seed, size, latency = false }) {
-  const host = { seat: 1, match: createMatchState({ size, seed, mode: "online" }) };
-  const guest = { seat: 2, match: createMatchState({ size, seed, mode: "online" }) };
+async function playLockstepMatch({ seed, size, latency = false, compositions = null }) {
+  // Both clients build from the SAME { seat: composition } map — exactly what the
+  // lobby's two-way blind-pick exchange produces (each side keys its own squad and
+  // the peer's by seat). Asymmetric squads must not break determinism.
+  const host = {
+    seat: 1,
+    match: createMatchState({ size, seed, mode: "online", compositions }),
+  };
+  const guest = {
+    seat: 2,
+    match: createMatchState({ size, seed, mode: "online", compositions }),
+  };
 
   // Same starting position on both clients before a single command is exchanged.
   assert.equal(hashState(host.match), hashState(guest.match), "initial state hash");
@@ -130,6 +139,43 @@ for (const { size, seed } of [{ size: 10, seed: 31337 }]) {
     await playLockstepMatch({ seed, size, latency: true });
   });
 }
+
+// Blind-pick custom squads: asymmetric compositions exchanged over the relay must
+// stay in perfect lockstep just like the classic mirror. Each pairing is keyed by
+// seat (1 = host, 2 = guest) and handed to BOTH clients, modelling the post-
+// exchange state. Aggressive comps so matches resolve decisively within the guard.
+const CUSTOM_PAIRINGS = [
+  { 1: ["ranger", "ranger", "warrior", "tank"], 2: ["tank", "warrior", "warrior", "ranger"] },
+  { 1: ["warrior", "warrior", "warrior", "warrior"], 2: ["ranger", "ranger", "tank", "tank"] },
+  { 1: ["ranger", "tank", "warrior", "medic"], 2: ["medic", "warrior", "tank", "ranger"] },
+];
+
+for (const size of [10, 13]) {
+  CUSTOM_PAIRINGS.forEach((compositions, index) => {
+    test(`online lockstep stays in sync with custom squads (size ${size}, pairing ${index})`, async () => {
+      await playLockstepMatch({ seed: 42, size, compositions });
+    });
+  });
+}
+
+test("a custom squad actually spawns its chosen units in the synced state", () => {
+  const compositions = { 1: ["ranger", "ranger", "ranger", "warrior"] };
+  const host = createMatchState({ size: 10, seed: 1, mode: "online", compositions });
+  const guest = createMatchState({ size: 10, seed: 1, mode: "online", compositions });
+  // The custom squad is present (not silently dropped) and identical on both sides.
+  const p1Rangers = host.units.filter((u) => u.player === 1 && u.type === "ranger");
+  assert.equal(p1Rangers.length, 3, "host built the 3-ranger squad");
+  assert.equal(hashState(host), hashState(guest), "both clients agree on the custom squad");
+});
+
+test("custom squads survive jittered network latency in lockstep", async () => {
+  await playLockstepMatch({
+    seed: 31337,
+    size: 13,
+    latency: true,
+    compositions: CUSTOM_PAIRINGS[0],
+  });
+});
 
 // Determinism guarantee the lockstep relies on: the very same seed + the very
 // same command stream reproduces the exact same final state hash, independent of

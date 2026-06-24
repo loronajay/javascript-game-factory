@@ -5,7 +5,7 @@ import {
   livingUnits,
   teamOf
 } from "../state/gameState.js";
-import { winnerLabel, teamColor, teamLabel } from "./labels.js";
+import { winnerLabel, teamColor, teamLabel, unitLabel } from "./labels.js";
 import { hpClass } from "./hp.js";
 
 export class HudRenderer {
@@ -94,7 +94,7 @@ export class HudRenderer {
       </div>
       <div>
         <div class="unit-name">
-          Player ${selected.player} ${definition.name}
+          Player ${selected.player} ${unitLabel(selected)}
         </div>
         <div class="unit-stats">${pills}</div>
         <div class="hpbar">
@@ -235,7 +235,7 @@ function buildSquadChip(unit, selectable = false, onSelect = null) {
 
   chip.innerHTML = `
     <span class="chip-icon">${definition.icon}</span>
-    ${definition.name}
+    ${unitLabel(unit)}
     <div class="chip-bar">
       <div
         class="chip-bar-fill ${hpClass(hp, unit.maxHp)}"

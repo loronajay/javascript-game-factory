@@ -15,7 +15,10 @@
 // the lobby.
 //
 // room_message contract (all `value`s are JSON strings):
-//   host  -> guest : setup    { size }            once, right after match_ready
+//   either -> other: setup    { size?, composition }  once, right after match_ready
+//                                                      (host carries size + its
+//                                                      squad; guest carries only
+//                                                      its squad — blind pick)
 //   either -> other: command  { command }         an ACCEPTED core command object
 //   host  -> guest : hash     { revision, hash }   desync check after a command batch
 //   either         : profile  { playerId, displayName, side }   name exchange
@@ -62,9 +65,19 @@ function parseSetupMessage(value) {
   try {
     const p = JSON.parse(value);
     if (!p || typeof p !== "object") return null;
+    // Both fields are optional: the host's setup carries size + its squad, the
+    // guest's carries only its squad. The composition is normalized to a valid
+    // 4-type squad at match build (core/composition.js); here we only confirm the
+    // wire shape (an array of type strings).
+    const out = {};
     const size = Number(p.size);
-    if (!Number.isFinite(size)) return null;
-    return { size: Math.floor(size) };
+    if (Number.isFinite(size)) out.size = Math.floor(size);
+    if (Array.isArray(p.composition)) {
+      out.composition = p.composition
+        .slice(0, 4)
+        .map((type) => (typeof type === "string" ? type : null));
+    }
+    return Object.keys(out).length ? out : null;
   } catch {
     return null;
   }
@@ -137,7 +150,7 @@ export function createOnlineClient() {
     onRoomCreated: null, // (code)
     onMatchReady: null, // ({ seed, remoteSide, serverNow, startAt })
     onRemoteProfile: null, // ({ playerId, displayName, side })
-    onRemoteSetup: null, // ({ size })
+    onRemoteSetup: null, // ({ size?, composition? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
     onLatency: null, // (ms)
@@ -328,8 +341,13 @@ export function createOnlineClient() {
   }
 
   // ── Outbound gameplay messages ──
-  function sendSetup(size) {
-    _roomMsg("setup", JSON.stringify({ size }));
+  // Host sends { size, composition }; guest sends { composition } (size is the
+  // host's call). Omitted fields are simply absent from the payload.
+  function sendSetup({ size = null, composition = null } = {}) {
+    const payload = {};
+    if (size != null) payload.size = size;
+    if (composition != null) payload.composition = composition;
+    _roomMsg("setup", JSON.stringify(payload));
   }
   function sendCommand(command) {
     _roomMsg("command", JSON.stringify({ command }));

@@ -1,4 +1,5 @@
 import { DEFAULT_BOARD_SIZE, MAX_HP, PLAYER_COLORS } from "../config.js";
+import { DEFAULT_COMPOSITION, normalizeComposition } from "../core/composition.js";
 
 // The four board corners, indexed 0-3. A roster entry carries a corner index
 // (assigned in core/roster.js); this table is the single place those indices
@@ -22,22 +23,29 @@ const DEFAULT_TWO_PLAYER_ROSTER = Object.freeze([
   Object.freeze({ id: 2, corner: 1 })
 ]);
 
-// Each squad spawns as a 2x2 block tucked into its corner. The melee/support
-// pair (tank + medic) takes the inner edge facing board center; warrior + ranger
-// shelter behind on the outer edge. Driven by the roster so 1-4 squads place
-// from the same rule.
-export function createInitialUnits(size, roster = DEFAULT_TWO_PLAYER_ROSTER) {
+// Each squad spawns as a 2x2 block tucked into its corner. The four spawn tiles
+// are filled in composition order (front-inner, inner-side, outer-side, corner);
+// the default composition reproduces the classic tank/medic/warrior/ranger
+// placement exactly. Driven by the roster so 1-4 squads place from one rule, and
+// optionally by a `{ seat: composition }` map for custom squads.
+export function createInitialUnits(
+  size,
+  roster = DEFAULT_TWO_PLAYER_ROSTER,
+  compositions = null
+) {
   const anchors = cornerAnchors(size);
   const units = [];
 
   for (const slot of roster) {
-    units.push(...createSquad(slot.id, anchors[slot.corner]));
+    units.push(
+      ...createSquad(slot.id, anchors[slot.corner], compositions?.[slot.id])
+    );
   }
 
   return units;
 }
 
-function createSquad(playerId, { cx, cy }) {
+function createSquad(playerId, { cx, cy }, composition = DEFAULT_COMPOSITION) {
   // Step one tile inward (toward board center) on each axis. The inner column
   // is the front line; the outer column (the literal corner) is the back line.
   const inwardX = cx === 0 ? 1 : -1;
@@ -45,12 +53,35 @@ function createSquad(playerId, { cx, cy }) {
   const innerCol = cx + inwardX;
   const innerRow = cy + inwardY;
 
-  return [
-    createUnit(`p${playerId}-tank`, playerId, "tank", innerCol, innerRow),
-    createUnit(`p${playerId}-medic`, playerId, "medic", innerCol, cy),
-    createUnit(`p${playerId}-warrior`, playerId, "warrior", cx, innerRow),
-    createUnit(`p${playerId}-ranger`, playerId, "ranger", cx, cy)
+  // Spawn tiles in composition-index order. Index 0/1 are the inner (front)
+  // edge, 2/3 the outer (corner) edge — the same tiles the classic squad used,
+  // so the default composition is byte-identical to the original placement.
+  const positions = [
+    { x: innerCol, y: innerRow },
+    { x: innerCol, y: cy },
+    { x: cx, y: innerRow },
+    { x: cx, y: cy }
   ];
+
+  const types = normalizeComposition(composition);
+
+  // A type that appears once keeps its bare id (`p1-tank`) so the classic squad
+  // and existing fixtures are unchanged; duplicated types get a 1-based ordinal
+  // suffix (`p1-ranger-1`, `p1-ranger-2`) so ids stay unique and the HUD can
+  // derive "Ranger 1 / Ranger 2" labels straight from the id.
+  const totalByType = {};
+  for (const type of types) totalByType[type] = (totalByType[type] ?? 0) + 1;
+  const seenByType = {};
+
+  return types.map((type, index) => {
+    const ordinal = (seenByType[type] = (seenByType[type] ?? 0) + 1);
+    const id =
+      totalByType[type] > 1
+        ? `p${playerId}-${type}-${ordinal}`
+        : `p${playerId}-${type}`;
+    const { x, y } = positions[index];
+    return createUnit(id, playerId, type, x, y);
+  });
 }
 
 function createUnit(id, player, type, x, y) {

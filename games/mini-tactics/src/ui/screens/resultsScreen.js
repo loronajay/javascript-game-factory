@@ -51,6 +51,7 @@ export function createResultsScreen(ctx) {
       format: lastSummary.format,
       teamColors: lastSummary.teamColors,
       teamNames: lastSummary.teamNames,
+      compositions: lastSummary.compositions,
       difficulty: lastSummary.difficulty,
     });
   });

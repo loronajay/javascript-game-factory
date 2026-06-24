@@ -344,6 +344,95 @@
 }
 
 /* ----------------------------------------------------------------------- */
+/* Squad builder (custom squads)                                           */
+/* ----------------------------------------------------------------------- */
+.setup-hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+.setup-hint[hidden] {
+  display: none;
+}
+
+.squad-pickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: .6rem;
+}
+
+.squad-pickers[hidden] {
+  display: none;
+}
+
+/* One player's squad: a titled card holding the 2x2 slot grid. The seat hue
+   rides in on --team so each card reads as belonging to that player. */
+.squad-picker {
+  display: grid;
+  gap: .45rem;
+  padding: .55rem .5rem;
+  border: 1px solid var(--parchment-edge);
+  border-top: 3px solid var(--team, var(--brass));
+  border-radius: var(--radius-tile);
+  background: rgba(74, 52, 24, .12);
+  box-shadow: inset 0 2px 5px rgba(74, 52, 24, .2);
+}
+
+.squad-picker-title {
+  color: color-mix(in srgb, var(--team, var(--ink-soft)) 55%, var(--ink-soft));
+  font-family: var(--font-display);
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.squad-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .35rem;
+}
+
+/* A slot button: tap to cycle the unit type. The back row is tinted slightly
+   recessed so the front/back split reads at a glance. */
+.squad-cell {
+  display: grid;
+  gap: .15rem;
+  justify-items: center;
+  padding: .4rem .25rem;
+  border: 1px solid var(--parchment-edge);
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(255, 248, 222, .55), rgba(255, 244, 214, .3));
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.squad-cell.row-back {
+  background: linear-gradient(180deg, rgba(74, 52, 24, .14), rgba(74, 52, 24, .08));
+}
+
+.squad-cell:hover {
+  border-color: var(--brass);
+  filter: brightness(1.05);
+}
+
+.squad-cell-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--team, var(--ink)) 45%, var(--ink));
+}
+
+.squad-cell-name {
+  font-family: var(--font-display);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+/* ----------------------------------------------------------------------- */
 /* Results screen                                                          */
 /* ----------------------------------------------------------------------- */
 .results-card {

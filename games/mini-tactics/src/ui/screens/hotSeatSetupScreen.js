@@ -1,5 +1,6 @@
 import { bindCommonControls, bindSegmented, screenRoot, selectSeg } from "./common.js";
 import { BOARD_SIZES, PLAYER_COLORS } from "../../config.js";
+import { createSquadPicker } from "./squadBuilder.js";
 
 // Hot Seat setup: choose player count (2-4), format (free-for-all or 2v2 teams,
 // teams only when 4 players), per-team colors, and board size, then start the
@@ -24,6 +25,10 @@ export function createHotSeatSetupScreen(ctx) {
     teamColors: { 1: PLAYER_COLORS[1], 2: PLAYER_COLORS[4] },
     // Optional custom team names; empty falls back to "Team 1"/"Team 2".
     teamNames: { 1: "", 2: "" },
+    // Custom squads are off by default — Standard keeps the one-click classic
+    // path (compositions stay null). Each seat keeps its own live picker so
+    // toggling Standard/Custom or changing player count never loses a choice.
+    customSquads: false,
   };
 
   const groups = {
@@ -33,12 +38,24 @@ export function createHotSeatSetupScreen(ctx) {
   };
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
 
+  // One squad picker per seat (1-4), built lazily and kept alive across toggles.
+  // The host shows only the pickers for the currently selected player count.
+  const squadHost = el.querySelector("[data-squad-pickers]");
+  const squadHint = el.querySelector("[data-squad-hint]");
+  const pickers = new Map();
+
   bindSegmented(el, "playerCount", (seg) => {
     state.playerCount = Number(seg.dataset.count);
     if (state.playerCount !== 4) state.format = "ffa";
     syncFormat();
     syncBoardSize();
     syncVisibility();
+    syncSquads();
+  });
+
+  bindSegmented(el, "squadMode", (seg) => {
+    state.customSquads = seg.dataset.squad === "custom";
+    syncSquads();
   });
 
   bindSegmented(el, "format", (seg) => {
@@ -74,8 +91,44 @@ export function createHotSeatSetupScreen(ctx) {
       format: state.format,
       teamColors: state.format === "teams" ? { ...state.teamColors } : null,
       teamNames: state.format === "teams" ? { ...state.teamNames } : null,
+      compositions: collectCompositions(),
     });
   });
+
+  // Build the { seat: composition } map for the active player count, or null in
+  // Standard mode so the classic one-of-each squad path is used unchanged.
+  function collectCompositions() {
+    if (!state.customSquads) return null;
+    const compositions = {};
+    for (let seat = 1; seat <= state.playerCount; seat += 1) {
+      compositions[seat] = ensurePicker(seat).getComposition();
+    }
+    return compositions;
+  }
+
+  function ensurePicker(seat) {
+    let picker = pickers.get(seat);
+    if (!picker) {
+      picker = createSquadPicker({
+        title: `Player ${seat}`,
+        accent: PLAYER_COLORS[seat],
+      });
+      pickers.set(seat, picker);
+    }
+    return picker;
+  }
+
+  // Show the Custom pickers (one per active seat) only when Custom is selected.
+  function syncSquads() {
+    const custom = state.customSquads;
+    squadHost.hidden = !custom;
+    squadHint.hidden = !custom;
+    if (!custom) return;
+    squadHost.replaceChildren();
+    for (let seat = 1; seat <= state.playerCount; seat += 1) {
+      squadHost.appendChild(ensurePicker(seat).el);
+    }
+  }
 
   function syncFormat() {
     selectSeg(el, "format", (seg) => seg.dataset.format === state.format);
@@ -124,6 +177,7 @@ export function createHotSeatSetupScreen(ctx) {
   // Initial sync so the screen opens in a consistent state.
   syncBoardSize();
   syncVisibility();
+  syncSquads();
 
   return { el };
 }
