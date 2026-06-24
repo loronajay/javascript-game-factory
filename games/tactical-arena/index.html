@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101822">
+    <title>Tactical Arena</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Prototype Cabinet · Version One</p>
+          <h1>Tactical Arena</h1>
+        </div>
+        <div class="turn-readout" id="turn-readout"></div>
+        <button class="reset-button" id="reset-button" type="button">Reset Duel</button>
+      </header>
+
+      <section class="battle-layout">
+        <aside class="unit-panel" aria-live="polite">
+          <p class="panel-kicker">Selected combatant</p>
+          <div id="unit-card"></div>
+          <div class="action-stack" id="actions"></div>
+          <p class="message" id="message">Select the glowing unit to begin.</p>
+        </aside>
+
+        <section class="arena-wrap" aria-label="Tactical Arena board">
+          <div class="board-frame">
+            <div id="board" class="board" role="grid" aria-label="Eight by eight tactics board"></div>
+          </div>
+          <div class="legend">
+            <span><i class="key move-key"></i> Move</span>
+            <span><i class="key attack-key"></i> Attack</span>
+            <span><i class="key art-key"></i> Footwork path</span>
+          </div>
+        </section>
+
+        <aside class="rules-panel">
+          <p class="panel-kicker">First slice rules</p>
+          <ul>
+            <li>Move, then attack or defend.</li>
+            <li>Physical attacks use STR − DEF (minimum 1).</li>
+            <li>Defend halves physical and magic damage.</li>
+            <li>True damage bypasses all mitigation.</li>
+            <li>ARTS spend the unit immediately.</li>
+            <li>RAGE ART appears at 5 HP or lower.</li>
+          </ul>
+        </aside>
+      </section>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

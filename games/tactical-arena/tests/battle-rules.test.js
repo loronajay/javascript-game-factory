@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { UNIT_TYPES } from "../src/core/unitCatalog.js";
+import { getAvailableArts, getEffectiveStats, UNIT_TYPES } from "../src/core/unitCatalog.js";
+import { getFootworkSteps } from "../src/rules/arts.js";
 import { resolveDamage } from "../src/rules/damage.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
@@ -24,6 +25,44 @@ test("swordsman owns the specified core stat line and four ART slots", () => {
   });
   assert.equal(UNIT_TYPES.swordsman.arts.length, 4);
   assert.equal(UNIT_TYPES.swordsman.arts[0].id, "footwork");
+  assert.deepEqual(UNIT_TYPES.swordsman.arts.map((art) => art.id), [
+    "footwork", "moonstrike", "mage-killer", "life-sap"
+  ]);
+  assert.equal(UNIT_TYPES.swordsman.rageArt.name, "Quick");
+  const [footwork, moonstrike, mageKiller, lifeSap] = UNIT_TYPES.swordsman.arts;
+  assert.equal(footwork.mpCost, 4);
+  assert.equal(moonstrike.mpCost, 5);
+  assert.deepEqual(moonstrike.effect, {
+    type: "status", status: "blind", chance: 0.7, durationTurns: null
+  });
+  assert.deepEqual(mageKiller.effect, {
+    type: "status", status: "silence", chance: 0.7, durationTurns: null
+  });
+  assert.deepEqual(lifeSap.effect, {
+    type: "heal", chance: 0.7, amount: "damageDealt"
+  });
+});
+
+test("RAGE ART becomes available automatically at five HP or below", () => {
+  assert.equal(getAvailableArts({ type: "swordsman", hp: 6 }).some((art) => art.id === "swordsman-rage"), false);
+  assert.equal(getAvailableArts({ type: "swordsman", hp: 5 }).some((art) => art.id === "swordsman-rage"), true);
+});
+
+test("Swordsman low-health passive and RAGE passive stack as derived stats", () => {
+  assert.deepEqual(getEffectiveStats({ type: "swordsman", hp: 6 }), {
+    moveRange: 3, attackRange: 1, strength: 10, defense: 5, maxHp: 26, maxMp: 15
+  });
+  assert.equal(getEffectiveStats({ type: "swordsman", hp: 3 }).strength, 11);
+  assert.deepEqual(getEffectiveStats({ type: "swordsman", hp: 5 }), {
+    moveRange: 6, attackRange: 1, strength: 11, defense: 5, maxHp: 26, maxMp: 15
+  });
+  assert.equal(getEffectiveStats({ type: "swordsman", hp: 2 }).strength, 14);
+});
+
+test("Footwork uses all current movement plus three, including RAGE and future movement buffs", () => {
+  assert.equal(getFootworkSteps({ type: "swordsman", hp: 26 }), 6);
+  assert.equal(getFootworkSteps({ type: "swordsman", hp: 5 }), 9);
+  assert.equal(getFootworkSteps({ type: "swordsman", hp: 26, statModifiers: { moveRange: 2 } }), 8);
 });
 
 test("physical damage uses strength minus defense, with defend halving the result", () => {
@@ -120,6 +159,25 @@ test("Footwork requires six sequential unique steps, crosses enemies for true da
   assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-b").hp, 24);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").mp, 11);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").spent, true);
+});
+
+test("RAGE extends Footwork to nine tiles in the authoritative reducer", () => {
+  const initial = createBattleState({
+    size: 10,
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", hp: 5, x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 9, y: 9 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-swordsman", "footwork", [
+    { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 },
+    { x: 4, y: 0 }, { x: 5, y: 0 }, { x: 6, y: 0 },
+    { x: 7, y: 0 }, { x: 8, y: 0 }, { x: 9, y: 0 }
+  ]));
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(result.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 9, y: 0 });
 });
 
 test("Footwork rejects repeated tiles and a final occupied tile", () => {
