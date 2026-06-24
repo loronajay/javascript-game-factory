@@ -1,57 +1,78 @@
 // onlineSession.js — bridge between the relay client (onlineClient.js) and the
-// GameController. The controller stays networking-agnostic: it dispatches and
-// animates exactly as it does offline, and calls a couple of small hooks on
-// `this.net`. Everything relay-specific lives here.
+// GameController for 2-4 player online. The controller stays networking-agnostic:
+// it dispatches and animates exactly as it does offline, and calls a couple of
+// small hooks on `this.net`. Everything relay-specific lives here.
 //
 // Authority = deterministic lockstep (see onlineClient.js header):
-//   - Each side applies its own accepted command locally, then broadcasts it.
-//   - The other side replays the command through the SAME seeded reducer, so the
+//   - The active player applies its own accepted command locally, then broadcasts it.
+//   - Every other client replays the command through the SAME seeded reducer, so the
 //     dice match without ever being sent.
-//   - The host (p1) broadcasts its state hash after every applied command; the
-//     guest verifies its own hash for that revision and ends cleanly on mismatch.
+//   - The lobby OWNER broadcasts its state hash after every applied command; the
+//     non-owners verify their own hash for that revision and end cleanly on mismatch.
+//   - A player leaving mid-match is handled by the (current) OWNER injecting a
+//     `concede` command for that seat into the same ordered command stream, so the
+//     match continues deterministically (or ends if one team remains). Ownership can
+//     transfer to us if the previous owner is the one who left.
 //
-// The session is created by the lobby once it knows seed/size/side, BEFORE the
-// GameController exists, so remote commands that arrive during the screen handoff
-// are buffered and flushed on bind().
+// The session is created by the lobby on `lobby_started`, BEFORE the GameController
+// exists, so remote commands that arrive during the screen handoff are buffered and
+// flushed on bind().
 
 import { hashState } from "../core/state-hash.js";
 
-// How long to keep the socket alive after a clean match end, so the peer can also
+// How long to keep the socket alive after a clean match end, so peers can also
 // finish animating the final command before our close would look like a drop.
 const CLEAN_CLOSE_GRACE_MS = 2500;
 
-export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
+export function createOnlineSession({ client, mySeat, isOwner, members, seed, size }) {
   let _controller = null;
-  let remoteName = null;
   let latencyMs = null;
   let _ended = false;
+  let _owner = !!isOwner;
+
+  // The ordered clientId list from lobby_started: seat = index + 1, identical on
+  // every client. Lets us map a departed clientId back to its seat.
+  const membersAtStart = Array.isArray(members) ? members.slice() : [];
+  const myClientId = client.getClientId();
+
+  // Per-seat display names from the `profile` exchange (for HUD strings).
+  const nameBySeat = new Map();
+  // Seats we have already conceded on disconnect, so a re-fired left event (or a
+  // second owner) never double-concedes.
+  const handledDrops = new Set();
 
   // Remote commands that arrive before the controller binds, kept in order.
   const _pending = [];
-  // Serialize remote applies so their (async) animations never overlap.
+  // Serialize remote applies (and owner-authored concedes) so their async
+  // animations never overlap.
   let _applyChain = Promise.resolve();
 
-  // Host hashes keyed by revision (guest side); our own hashes keyed by revision.
-  // We compare lazily: whichever arrives second triggers the check.
-  const _hostHashByRevision = new Map();
+  // Owner hashes keyed by revision (verified by non-owners); our own hashes keyed
+  // by revision. Whichever arrives second triggers the comparison.
+  const _ownerHashByRevision = new Map();
   const _myHashByRevision = new Map();
+
+  function seatForClientId(clientId) {
+    const idx = membersAtStart.indexOf(clientId);
+    return idx >= 0 ? idx + 1 : null;
+  }
 
   function _checkHash(revision) {
     const mine = _myHashByRevision.get(revision);
-    const host = _hostHashByRevision.get(revision);
-    if (mine == null || host == null) return;
-    if (mine !== host && !_ended) {
+    const owner = _ownerHashByRevision.get(revision);
+    if (mine == null || owner == null) return;
+    if (mine !== owner && !_ended) {
       _ended = true;
       _controller?.endOnDesync?.();
     }
   }
 
-  // Record our post-apply hash for a revision (both sides). On the guest this
-  // feeds the desync check; on the host it is the value we broadcast.
+  // Record our post-apply hash for a revision (every client). On a non-owner this
+  // feeds the desync check; on the owner it is the value we broadcast.
   function _recordLocalHash(match) {
     if (!match) return;
     _myHashByRevision.set(match.revision, hashState(match));
-    if (!isHost) _checkHash(match.revision);
+    if (!_owner) _checkHash(match.revision);
   }
 
   function _enqueueRemote(command) {
@@ -59,10 +80,10 @@ export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
       if (_ended || !_controller) return;
       await _controller.applyRemoteCommand(command);
       const match = _controller.getMatchState?.();
-      // After applying a command that originated on the guest, the host is now at
-      // the canonical revision — broadcast that hash so the guest can verify.
+      // After applying a command, the owner is at the canonical revision —
+      // broadcast that hash so non-owners can verify.
       if (match) {
-        if (isHost) client.sendHash(match.revision, hashState(match));
+        if (_owner) client.sendHash(match.revision, hashState(match));
         _recordLocalHash(match);
       }
     });
@@ -76,13 +97,13 @@ export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
   };
 
   client.cb.onRemoteHash = ({ revision, hash }) => {
-    _hostHashByRevision.set(revision, hash);
-    if (!isHost) _checkHash(revision);
+    _ownerHashByRevision.set(revision, hash);
+    if (!_owner) _checkHash(revision);
   };
 
-  client.cb.onRemoteProfile = ({ displayName }) => {
-    if (typeof displayName === "string" && displayName.trim()) {
-      remoteName = displayName.trim();
+  client.cb.onRemoteProfile = ({ displayName, seat }) => {
+    if (typeof displayName === "string" && displayName.trim() && seat) {
+      nameBySeat.set(seat, displayName.trim());
     }
   };
 
@@ -90,22 +111,39 @@ export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
     latencyMs = ms;
   };
 
-  client.cb.onPartnerLeft = () => {
+  // A player left the lobby mid-match. The relay reports the new owner; if that is
+  // us, we take over hash authority AND the disconnect concede. The concede is
+  // serialized on the apply chain so it never overlaps an in-flight animation; the
+  // controller broadcasts it (and the owner's hash) through the normal command path.
+  client.cb.onPlayerLeft = ({ clientId, ownerId }) => {
+    if (_ended) return;
+    if (ownerId && ownerId === myClientId) _owner = true;
+    const seat = seatForClientId(clientId);
+    if (seat == null || handledDrops.has(seat)) return;
+    handledDrops.add(seat);
+    if (!_owner) return; // non-owners simply replay the owner's concede command
+    _applyChain = _applyChain.then(async () => {
+      if (_ended || !_controller) return;
+      await _controller.applyOwnerConcede(seat);
+    });
+  };
+
+  client.cb.onClosed = () => {
     if (_ended) return;
     _ended = true;
-    _controller?.endOnDisconnect?.("Your opponent left the match.");
+    _controller?.endOnDisconnect?.("You lost connection to the match.");
   };
 
   // ── surface used by the GameController ──
 
   // Called by the controller after a LOCAL command is accepted and applied.
-  // Broadcast it so the opponent replays it; the host also publishes its hash.
+  // Broadcast it so the others replay it; the owner also publishes its hash.
   function onLocalCommandApplied(command) {
     if (_ended) return;
     client.sendCommand(command);
     const match = _controller?.getMatchState?.();
     if (match) {
-      if (isHost) client.sendHash(match.revision, hashState(match));
+      if (_owner) client.sendHash(match.revision, hashState(match));
       _recordLocalHash(match);
     }
   }
@@ -120,9 +158,8 @@ export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
     client.startPinging();
   }
 
-  // Match ended cleanly (a winner, or a concede). Stop treating the peer as
-  // present, but keep the socket open briefly so the OTHER client can also reach
-  // completion before our close would otherwise read as a disconnect to them.
+  // Match ended cleanly (a winner, or a concede). Keep the socket open briefly so
+  // peers can also reach completion before our close would read as a disconnect.
   function endMatch() {
     if (_ended) return;
     _ended = true;
@@ -134,8 +171,8 @@ export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
     }
   }
 
-  // Tear down immediately (quit / abandon / desync). The peer will see this as a
-  // disconnect, which is the correct outcome for an abandoned match.
+  // Tear down immediately (quit / abandon / desync). Peers see a disconnect, which
+  // is the correct outcome for an abandoned match.
   function dispose() {
     _ended = true;
     client.stopPinging();
@@ -145,11 +182,13 @@ export function createOnlineSession({ client, mySeat, isHost, size, seed }) {
   return {
     // identity / config the controller and HUD read
     mySeat,
-    isHost,
-    size,
+    get isOwner() {
+      return _owner;
+    },
     seed,
-    get remoteName() {
-      return remoteName;
+    size,
+    nameForSeat(seat) {
+      return nameBySeat.get(seat) || null;
     },
     get latencyMs() {
       return latencyMs;

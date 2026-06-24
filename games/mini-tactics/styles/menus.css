@@ -697,3 +697,79 @@
   letter-spacing: .12em;
   text-align: center;
 }
+
+/* Lobby roster: one row per joined commander, accented by their banner color. */
+.lobby-roster {
+  display: grid;
+  gap: .4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lobby-roster-item {
+  --team: var(--brass);
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .4rem .55rem;
+  border: 1px solid var(--parchment-edge);
+  border-left: 4px solid var(--team);
+  border-radius: var(--radius-tile);
+  background: rgba(74, 52, 24, .1);
+  box-shadow: inset 0 1px 3px rgba(74, 52, 24, .18);
+}
+
+.lobby-seat {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--team);
+  color: #fff8e7;
+  font-family: var(--font-display);
+  font-size: .8rem;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+}
+
+.lobby-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-tags {
+  display: flex;
+  flex-shrink: 0;
+  gap: .3rem;
+}
+
+.lobby-tag {
+  padding: .12rem .4rem;
+  border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-display);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.lobby-tag.host {
+  background: color-mix(in srgb, var(--brass) 30%, transparent);
+  color: var(--brass-hi, var(--ink));
+}
+
+.lobby-tag.you {
+  background: rgba(74, 52, 24, .18);
+  color: var(--ink-soft);
+}
+
+.lobby-tag.team {
+  background: color-mix(in srgb, var(--team) 30%, transparent);
+  color: var(--ink);
+}

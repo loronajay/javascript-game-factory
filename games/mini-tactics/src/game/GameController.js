@@ -90,7 +90,7 @@ export class GameController {
 
     // Online session (onlineSession.js) when mode === "online"; null otherwise.
     // Owns the relay link; the controller only calls a couple of small hooks on
-    // it and reads `mySeat`/`remoteName`. See applyRemoteCommand / dispatch.
+    // it and reads `mySeat`/`nameForSeat`. See applyRemoteCommand / dispatch.
     this.net = null;
 
     this.match = createMatchState({ size: DEFAULT_BOARD_SIZE, seed: newSeed() });
@@ -945,7 +945,7 @@ export class GameController {
 
     let title = `Player ${player}`;
     if (cpu) title = `Player ${player} · CPU`;
-    else if (online && !mine) title = `Player ${player} · ${this.remoteSquadLabel()}`;
+    else if (online && !mine) title = `Player ${player} · ${this.remoteSquadLabel(player)}`;
 
     this.turnAnnouncer.announce({
       title,
@@ -991,6 +991,47 @@ export class GameController {
     return true;
   }
 
+  // A player left the match (online). The lobby OWNER is the single authority for
+  // the drop: it dispatches a `concede` for that seat — which broadcasts the command
+  // through the normal path so every other client replays it in the same global
+  // order — and animates the forfeited squad's elimination. The reducer continues
+  // the match (or ends it when one team remains). Called, serialized, by the session.
+  async applyOwnerConcede(seat) {
+    if (this.mode !== "online" || !this.net || this._onlineEnded) return;
+    if (this.match.phase === "complete" || this.match.winner) return;
+
+    const result = this.dispatch(cmd.concede(seat));
+    if (!result) return;
+
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.ui.locked = true;
+    this.renderDynamic();
+
+    const label = this.net?.nameForSeat?.(seat) || `Player ${seat}`;
+    this.messages.show(`${label} left the match — their squad forfeits.`);
+
+    for (const event of result.events) {
+      if (event.type === EVENTS.UNIT_ELIMINATED) {
+        const unit = findUnit(this.match, event.unitId);
+        if (unit) await this.effectsRenderer.animateDeath(unit);
+      }
+    }
+
+    this.ui.locked = false;
+    this.renderAll();
+
+    if (this.match.phase === "complete") {
+      this.handleMatchComplete();
+      return;
+    }
+
+    // The match continues. Re-establish the turn lock — the seat on the clock may
+    // have changed if the player who left was the active one.
+    this.announceTurn(this.match.currentPlayer);
+    this.applyOnlineTurnLock();
+  }
+
   // Lock or unlock local input based on whose squad turn it is online. Uses the
   // exact `ui.locked` gate every input handler already respects (same mechanism
   // the CPU turn uses), so no per-handler online checks are needed.
@@ -1004,7 +1045,7 @@ export class GameController {
     this.messages.show(
       mine
         ? "Your squad turn. Select an unspent piece."
-        : `Waiting for ${this.remoteSquadLabel()}…`,
+        : `Waiting for ${this.remoteSquadLabel(this.match.currentPlayer)}…`,
     );
   }
 
@@ -1047,11 +1088,12 @@ export class GameController {
     return this.match;
   }
 
-  // Label for the non-local squad in messages: "CPU" in single-player, the
-  // opponent's name (or "Opponent") online.
-  remoteSquadLabel() {
+  // Label for a non-local squad in messages: "CPU" in single-player, otherwise the
+  // named seat online (per-seat name from the profile exchange, or "Opponent").
+  // Defaults to the seat currently on the clock when none is given.
+  remoteSquadLabel(seat = this.match.currentPlayer) {
     if (this.cpu) return "CPU";
-    if (this.mode === "online") return this.net?.remoteName || "Opponent";
+    if (this.mode === "online") return this.net?.nameForSeat?.(seat) || "Opponent";
     return "Opponent";
   }
 
@@ -1080,7 +1122,7 @@ export class GameController {
           const unit = findUnit(this.match, event.unitId);
           if (unit) {
             this.messages.show(
-              `Player ${unit.player} (${this.remoteSquadLabel()}) activates its ${UNIT_TYPES[unit.type].name}.`,
+              `Player ${unit.player} (${this.remoteSquadLabel(unit.player)}) activates its ${UNIT_TYPES[unit.type].name}.`,
             );
           }
           await sleep(CPU_STEP_MS);

@@ -185,32 +185,12 @@
     <section class="screen menu-screen" data-screen="onlineSetup">
       <div class="menu-card">
         <h2 class="menu-heading">Online Versus</h2>
-        <p class="menu-note">Two commanders, one board. Same rules as hot seat.</p>
+        <p class="menu-note">2–4 commanders, one board. Same rules as hot seat.</p>
 
         <p class="online-status" data-online="status">Connecting to the network…</p>
 
-        <!-- IDLE: pick a board size and choose how to pair -->
+        <!-- IDLE: choose how to pair -->
         <div data-online-panel="idle" hidden>
-          <div class="setup-field">
-            <span class="setup-label">Board size <em class="setup-hint">(host sets it)</em></span>
-            <div class="segmented" data-field="boardSize">
-              <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
-              <button type="button" class="seg" data-size="13">13 × 13</button>
-            </div>
-          </div>
-
-          <div class="setup-field" data-group="squads">
-            <span class="setup-label">Your squad <em class="setup-hint">(blind pick — hidden until the match starts)</em></span>
-            <div class="segmented" data-field="squadMode">
-              <button type="button" class="seg is-selected" data-squad="standard">Standard</button>
-              <button type="button" class="seg" data-squad="custom">Custom</button>
-            </div>
-            <p class="setup-hint" data-squad-hint hidden>
-              Tap a slot to change its unit. Top row is the front line, bottom row the back.
-            </p>
-            <div class="squad-pickers" data-squad-pickers hidden></div>
-          </div>
-
           <div class="menu-buttons">
             <button type="button" data-action="quickMatch" class="primary menu-btn">Quick Match</button>
             <button type="button" data-action="createRoom" class="menu-btn">Create Private Room</button>
@@ -232,19 +212,91 @@
               <button type="button" data-action="joinRoom" class="menu-btn">Join</button>
             </div>
           </div>
-        </div>
 
-        <!-- WAITING: searching for a match, or hosting a private room -->
-        <div data-online-panel="waiting" hidden>
-          <p class="online-wait" data-online="waitText">Searching for an opponent…</p>
-          <p class="online-roomcode" data-online="roomCode" hidden></p>
           <div class="menu-buttons">
-            <button type="button" data-action="cancelOnline" class="menu-btn ghost">Cancel</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
           </div>
         </div>
 
-        <div class="menu-buttons">
-          <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+        <!-- LOBBY: roster + (host) match config + your squad + start -->
+        <div data-online-panel="lobby" hidden>
+          <p class="online-roomcode" data-online="roomCode" hidden></p>
+
+          <div class="setup-field">
+            <span class="setup-label">Players <em class="setup-hint" data-online="rosterCount"></em></span>
+            <ul class="lobby-roster" data-online="roster"></ul>
+          </div>
+
+          <div class="setup-field" data-group="size">
+            <span class="setup-label">Board size <em class="setup-hint" data-online="hostHint"></em></span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
+              <button type="button" class="seg" data-size="13">13 × 13</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="format" hidden>
+            <span class="setup-label">Format <em class="setup-hint">(teams need 4 players)</em></span>
+            <div class="segmented" data-field="format">
+              <button type="button" class="seg is-selected" data-format="ffa">Free-for-all</button>
+              <button type="button" class="seg" data-format="teams">Teams · 2v2</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="teamNames" hidden>
+            <span class="setup-label">Team names</span>
+            <div class="team-names">
+              <input
+                type="text"
+                class="team-name-input"
+                data-team-name="1"
+                maxlength="20"
+                placeholder="Team 1"
+                aria-label="Team 1 name"
+              />
+              <input
+                type="text"
+                class="team-name-input"
+                data-team-name="2"
+                maxlength="20"
+                placeholder="Team 2"
+                aria-label="Team 2 name"
+              />
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="teamColors" hidden>
+            <span class="setup-label">Team colors</span>
+            <div class="team-colors">
+              <div class="team-color" data-team="1">
+                <span class="team-color-name" data-team-color-name="1">Team 1</span>
+                <div class="swatches" data-swatches="1"></div>
+              </div>
+              <div class="team-color" data-team="2">
+                <span class="team-color-name" data-team-color-name="2">Team 2</span>
+                <div class="swatches" data-swatches="2"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Your squad <em class="setup-hint">(blind pick — hidden until the match starts)</em></span>
+            <div class="segmented" data-field="squadMode">
+              <button type="button" class="seg is-selected" data-squad="standard">Standard</button>
+              <button type="button" class="seg" data-squad="custom">Custom</button>
+            </div>
+            <p class="setup-hint" data-squad-hint hidden>
+              Tap a slot to change its unit. Top row is the front line, bottom row the back.
+            </p>
+            <div class="squad-pickers" data-squad-pickers hidden></div>
+          </div>
+
+          <p class="online-wait" data-online="lobbyHint" hidden></p>
+
+          <div class="menu-buttons">
+            <button type="button" data-action="startMatch" class="primary menu-btn" data-online="startBtn">Start Match</button>
+            <button type="button" data-action="leaveLobby" class="menu-btn ghost">Leave</button>
+          </div>
         </div>
       </div>
     </section>

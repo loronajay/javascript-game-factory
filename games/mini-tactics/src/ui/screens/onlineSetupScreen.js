@@ -1,63 +1,121 @@
-import { bindCommonControls, bindSegmented, screenRoot } from "./common.js";
+import {
+  bindCommonControls,
+  bindSegmented,
+  buildSwatchRow,
+  paintSwatchRow,
+  screenRoot,
+  selectSeg,
+} from "./common.js";
 import { BOARD_SIZES, PLAYER_COLORS } from "../../config.js";
 import { createOnlineClient } from "../../online/onlineClient.js";
 import { createOnlineSession } from "../../online/onlineSession.js";
 import { createSquadPicker } from "./squadBuilder.js";
 import { DEFAULT_COMPOSITION } from "../../core/composition.js";
 
-// Online Versus lobby. Owns the relay client for the whole lobby phase: connects
-// on entry, runs quick-match / private-room pairing, and once both players are
-// paired AND the host's board size has been exchanged, builds the onlineSession
-// and hands off to the match screen. The match then owns the live socket — so
-// onExit only tears the client down when we leave WITHOUT starting a match.
+// Online Versus lobby (2-4 players, FFA + 2v2 teams). Owns the relay client for the
+// whole lobby phase: connects on entry, runs quick-match / private-room pairing, and
+// once the lobby owner starts AND every player's squad has been exchanged, builds the
+// onlineSession and hands off to the match screen. The match then owns the live socket
+// — so onExit only tears the client down when we leave WITHOUT starting a match.
 //
-// Pairing model (see onlineClient.js / the server game definition):
-//   - Quick Match  → find_match; the relay auto-balances p1/p2 (symmetric seats).
-//   - Create Room  → create_room as p1 (host); share the 5-char code.
-//   - Join Room    → join_room as p2 (guest) with a code.
-// The authoritative side always comes from match_ready.remoteSide, never a local
-// claim. p1 = host (seat 1) and chooses the board size; p2 = guest (seat 2) and
-// adopts it from the host's `setup` message.
-//
-// Squads are a blind pick: each player builds their own squad here, and on
-// match_ready BOTH sides broadcast a `setup` message carrying their composition
-// (the host's also carries the board size). The match builds only once each side
-// holds the seed, the board size, AND both compositions — so neither squad is
-// revealed until the board renders.
+// Authority model (see onlineClient.js / onlineSession.js): deterministic lockstep over
+// the generic v2 lobby. `lobby_started` hands every client an identical ordered
+// `members` array + a shared `seed`; seat = index in members + 1. The lobby OWNER owns
+// the match framing (board size, format, team colors/names), broadcast in-band via a
+// `config` lobby_message so every client renders and builds it identically. Squads are a
+// blind pick: each player builds its own and broadcasts a `setup` message on start, and
+// the match builds only once every seat's squad is in.
+
+const HUES = [PLAYER_COLORS[1], PLAYER_COLORS[2], PLAYER_COLORS[3], PLAYER_COLORS[4]];
+
 export function createOnlineSetupScreen(ctx) {
   const el = screenRoot("onlineSetup");
   bindCommonControls(el, ctx);
 
   const statusEl = el.querySelector('[data-online="status"]');
   const idlePanel = el.querySelector('[data-online-panel="idle"]');
-  const waitPanel = el.querySelector('[data-online-panel="waiting"]');
-  const waitTextEl = el.querySelector('[data-online="waitText"]');
-  const roomCodeEl = el.querySelector('[data-online="roomCode"]');
+  const lobbyPanel = el.querySelector('[data-online-panel="lobby"]');
   const codeInput = el.querySelector('[data-online="codeInput"]');
+  const roomCodeEl = el.querySelector('[data-online="roomCode"]');
+  const rosterEl = el.querySelector('[data-online="roster"]');
+  const rosterCountEl = el.querySelector('[data-online="rosterCount"]');
+  const hostHintEl = el.querySelector('[data-online="hostHint"]');
+  const lobbyHintEl = el.querySelector('[data-online="lobbyHint"]');
+  const startBtn = el.querySelector('[data-online="startBtn"]');
+
+  const groups = {
+    format: el.querySelector('[data-group="format"]'),
+    teamNames: el.querySelector('[data-group="teamNames"]'),
+    teamColors: el.querySelector('[data-group="teamColors"]'),
+  };
+  const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
 
   let client = null;
-  let chosenSize = 10; // host's board choice
-  let customSquads = false; // local Standard/Custom toggle
-  let handedOff = false; // true once the match screen owns the socket
+  let handedOff = false;
 
-  // Match-start staging — filled from match_ready (+ both setup messages) and
-  // consumed exactly once by tryStart().
-  let seed = null;
-  let boardSize = null;
-  let mySeat = null;
-  let isHost = false;
-  let myComposition = null; // our chosen squad, captured at match_ready
-  let peerComposition = null; // the opponent's squad, from their setup message
+  // Lobby snapshot + identity.
+  let lobby = null; // latest normalized lobby payload
+  let myClientId = null;
+  let isOwner = false;
 
-  // The local player's squad picker. Standard keeps the classic one-of-each
-  // squad; the value is read at match_ready time.
+  // Owner-authored match framing (mirrored live to every client via `config`).
+  const config = {
+    size: 10,
+    format: "ffa",
+    teamColors: { 1: PLAYER_COLORS[1], 2: PLAYER_COLORS[4] },
+    teamNames: { 1: "", 2: "" },
+  };
+  // The config a non-owner adopts from the owner's `config` message.
+  let receivedConfig = null;
+
+  // Local squad pick (Standard keeps the classic one-of-each squad).
+  let customSquads = false;
   const squadHost = el.querySelector("[data-squad-pickers]");
   const squadHint = el.querySelector("[data-squad-hint]");
   const squadPicker = createSquadPicker({ title: "Your squad", accent: PLAYER_COLORS[1] });
 
+  // Match-start staging — filled from lobby_started (+ setup messages), consumed once.
+  let seed = null;
+  let mySeat = null;
+  let membersAtStart = null;
+  const compositionsBySeat = {};
+
+  // ── owner config controls ──────────────────────────────────────────────────
   bindSegmented(el, "boardSize", (seg) => {
+    if (!isOwner) return;
     const chosen = Number(seg.dataset.size);
-    if (BOARD_SIZES.includes(chosen)) chosenSize = chosen;
+    if (BOARD_SIZES.includes(chosen) && !seg.disabled) {
+      config.size = chosen;
+      pushConfig();
+    }
+  });
+
+  bindSegmented(el, "format", (seg) => {
+    if (!isOwner) return;
+    config.format = seg.dataset.format;
+    syncConfigUI();
+    pushConfig();
+  });
+
+  for (const team of [1, 2]) {
+    buildSwatchRow(el, team, HUES, (hue) => {
+      if (!isOwner) return;
+      const other = team === 1 ? 2 : 1;
+      if (hue === config.teamColors[other]) return;
+      config.teamColors[team] = hue;
+      renderSwatches();
+      pushConfig();
+    });
+  }
+
+  el.querySelectorAll(".team-name-input").forEach((input) => {
+    input.addEventListener("input", () => {
+      if (!isOwner) return;
+      const team = input.dataset.teamName;
+      config.teamNames[team] = input.value;
+      syncTeamColorLabel(team);
+      pushConfig();
+    });
   });
 
   bindSegmented(el, "squadMode", (seg) => {
@@ -65,28 +123,34 @@ export function createOnlineSetupScreen(ctx) {
     syncSquads();
   });
 
-  function syncSquads() {
-    squadHost.hidden = !customSquads;
-    squadHint.hidden = !customSquads;
-    if (customSquads) squadHost.replaceChildren(squadPicker.el);
-  }
+  // ── pairing actions ──────────────────────────────────────────────────────
+  el.querySelector('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby());
+  el.querySelector('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby());
+  el.querySelector('[data-action="joinRoom"]').addEventListener("click", () => {
+    const code = codeInput.value.trim().toUpperCase();
+    if (code.length < 4) {
+      setStatus("Enter the room code to join.");
+      return;
+    }
+    client?.joinLobby(code);
+  });
+  el.querySelector('[data-action="startMatch"]').addEventListener("click", () => {
+    if (isOwner) client?.startLobby();
+  });
+  el.querySelector('[data-action="leaveLobby"]').addEventListener("click", () => {
+    client?.leaveLobby();
+    resetLobbyState();
+    setPanel("idle");
+    setStatus("Connected. Choose how to play.");
+  });
 
+  // ── view helpers ───────────────────────────────────────────────────────────
   function setPanel(name) {
     idlePanel.hidden = name !== "idle";
-    waitPanel.hidden = name !== "waiting";
+    lobbyPanel.hidden = name !== "lobby";
   }
-
   function setStatus(text) {
     statusEl.textContent = text;
-  }
-
-  function resetStaging() {
-    seed = null;
-    boardSize = null;
-    mySeat = null;
-    isHost = false;
-    myComposition = null;
-    peerComposition = null;
   }
 
   function identity() {
@@ -100,24 +164,129 @@ export function createOnlineSetupScreen(ctx) {
     }
   }
 
-  // Build the session and hand off to the match — only once the shared seed, the
-  // (host-chosen) board size, and BOTH squad compositions are known. Each side
-  // captures its own squad at match_ready and waits for the peer's setup message.
-  function tryStart() {
-    if (seed == null || boardSize == null || handedOff) return;
-    if (myComposition == null || peerComposition == null) return;
-    const session = createOnlineSession({ client, mySeat, isHost, size: boardSize, seed });
-    handedOff = true; // onExit must NOT disconnect — the match owns the client now
-    // Key by seat so both clients build the identical { 1: p1Squad, 2: p2Squad }
-    // map — the authoritative state must match for lockstep.
-    const peerSeat = mySeat === 1 ? 2 : 1;
-    const compositions = {
-      [mySeat]: myComposition,
-      [peerSeat]: peerComposition,
-    };
-    ctx.nav("match", { mode: "online", net: session, seed, size: boardSize, compositions });
+  function activeConfig() {
+    return isOwner ? config : receivedConfig;
   }
 
+  function playerCount() {
+    return lobby?.players?.length ?? 0;
+  }
+
+  // Broadcast the owner's framing so every client renders + builds it identically.
+  function pushConfig() {
+    client?.sendConfig({
+      size: config.size,
+      format: config.format,
+      teamColors: { ...config.teamColors },
+      teamNames: { ...config.teamNames },
+    });
+  }
+
+  function renderRoster() {
+    rosterEl.replaceChildren();
+    const players = lobby?.players ?? [];
+    const teams = activeConfig()?.format === "teams" && players.length === 4;
+    for (const p of players) {
+      const li = document.createElement("li");
+      li.className = "lobby-roster-item";
+      const tags = [];
+      if (p.id === lobby?.ownerId) tags.push('<span class="lobby-tag host">Host</span>');
+      if (p.id === myClientId) tags.push('<span class="lobby-tag you">You</span>');
+      if (teams) {
+        const teamId = p.seat % 2 === 1 ? 1 : 2;
+        li.style.setProperty("--team", config.teamColors[teamId] ?? HUES[0]);
+        tags.push(`<span class="lobby-tag team">Team ${teamId}</span>`);
+      } else {
+        li.style.setProperty("--team", PLAYER_COLORS[p.seat] ?? HUES[0]);
+      }
+      li.innerHTML =
+        `<span class="lobby-seat">${p.seat}</span>` +
+        `<span class="lobby-name">${escapeHtml(p.name)}</span>` +
+        `<span class="lobby-tags">${tags.join("")}</span>`;
+      rosterEl.appendChild(li);
+    }
+    rosterCountEl.textContent = `${players.length}/4`;
+  }
+
+  // Board size follows the locked rule (3-4 players force 13×13); format "teams"
+  // needs exactly 4 players. Owner edits live; non-owners see it read-only.
+  function syncConfigUI() {
+    const cfg = activeConfig() ?? config;
+    const count = playerCount();
+    const multi = count > 2;
+    if (multi) cfg.size = 13;
+
+    selectSeg(el, "boardSize", (seg) => Number(seg.dataset.size) === cfg.size);
+    for (const seg of sizeSegs) {
+      const value = Number(seg.dataset.size);
+      seg.disabled = !isOwner || (multi && value === 10);
+    }
+
+    // Format is offered only at exactly 4 players; otherwise force FFA.
+    const teamsAllowed = count === 4;
+    if (!teamsAllowed && cfg.format === "teams") cfg.format = "ffa";
+    groups.format.hidden = !teamsAllowed;
+    selectSeg(el, "format", (seg) => seg.dataset.format === cfg.format);
+    for (const seg of groups.format.querySelectorAll(".seg")) seg.disabled = !isOwner;
+
+    const teams = cfg.format === "teams" && teamsAllowed;
+    groups.teamNames.hidden = !teams;
+    groups.teamColors.hidden = !teams;
+    el.querySelectorAll(".team-name-input").forEach((input) => {
+      input.disabled = !isOwner;
+      const team = input.dataset.teamName;
+      if (!isOwner) input.value = cfg.teamNames?.[team] ?? "";
+      syncTeamColorLabel(team);
+    });
+    renderSwatches();
+
+    hostHintEl.textContent = isOwner ? "(you set it)" : "(set by host)";
+    renderRoster();
+    syncStart();
+  }
+
+  function renderSwatches() {
+    const cfg = activeConfig() ?? config;
+    for (const team of [1, 2]) {
+      const other = team === 1 ? 2 : 1;
+      paintSwatchRow(el, team, {
+        selected: cfg.teamColors?.[team],
+        taken: cfg.teamColors?.[other],
+        locked: !isOwner,
+      });
+    }
+  }
+
+  function syncTeamColorLabel(team) {
+    const cfg = activeConfig() ?? config;
+    const label = el.querySelector(`[data-team-color-name="${team}"]`);
+    if (label) label.textContent = (cfg.teamNames?.[team] || "").trim() || `Team ${team}`;
+  }
+
+  function syncSquads() {
+    squadHost.hidden = !customSquads;
+    squadHint.hidden = !customSquads;
+    if (customSquads) squadHost.replaceChildren(squadPicker.el);
+  }
+
+  // The owner starts; everyone else waits. Teams needs the full 4 players.
+  function syncStart() {
+    const count = playerCount();
+    const cfg = activeConfig() ?? config;
+    const teamsReady = cfg.format !== "teams" || count === 4;
+    startBtn.hidden = !isOwner;
+    startBtn.disabled = !(isOwner && count >= 2 && teamsReady);
+    if (isOwner) {
+      lobbyHintEl.hidden = count >= 2 && teamsReady;
+      lobbyHintEl.textContent =
+        count < 2 ? "Waiting for another player to join…" : "Need 4 players for 2v2 teams.";
+    } else {
+      lobbyHintEl.hidden = false;
+      lobbyHintEl.textContent = "Waiting for the host to start…";
+    }
+  }
+
+  // ── client wiring ────────────────────────────────────────────────────────
   function wireLobby() {
     const cb = client.cb;
 
@@ -126,94 +295,124 @@ export function createOnlineSetupScreen(ctx) {
       setPanel("idle");
     };
 
-    cb.onSearching = () => {
-      setPanel("waiting");
-      waitTextEl.textContent = "Searching for an opponent…";
-      roomCodeEl.hidden = true;
-    };
-
-    cb.onSearchCancelled = () => {
-      setPanel("idle");
-      setStatus("Search cancelled.");
-    };
-
-    cb.onRoomCreated = (code) => {
-      setPanel("waiting");
-      waitTextEl.textContent = "Waiting for a player to join…";
+    cb.onLobbyJoined = (snapshot, { created }) => {
+      lobby = snapshot;
+      myClientId = client.getClientId();
+      isOwner = lobby.ownerId === myClientId;
+      setPanel("lobby");
+      setStatus(isOwner ? "Your lobby — invite players, then start." : "Joined the lobby.");
       roomCodeEl.hidden = false;
-      roomCodeEl.textContent = `Room code: ${code}`;
+      roomCodeEl.textContent = `Room code: ${lobby.roomCode}`;
+      syncConfigUI();
+      syncSquads();
+      if (isOwner) pushConfig(); // seed every (future) joiner with the framing
+      void created;
     };
 
-    cb.onSideConflict = () => {
-      setPanel("idle");
-      setStatus("That room is full or unavailable.");
+    cb.onLobbyUpdated = (snapshot) => {
+      lobby = snapshot;
+      const wasOwner = isOwner;
+      isOwner = lobby.ownerId === myClientId;
+      // Promoted to owner (previous host left): adopt the last shared config so our
+      // edits continue from what everyone already sees.
+      if (isOwner && !wasOwner && receivedConfig) Object.assign(config, receivedConfig);
+      syncConfigUI();
+    };
+
+    cb.onRemoteConfig = (cfg) => {
+      if (isOwner) return;
+      receivedConfig = { ...receivedConfig, ...cfg };
+      syncConfigUI();
+      tryStart();
+    };
+
+    cb.onLobbyStarted = ({ seed: matchSeed, members, myClientId: id }) => {
+      myClientId = id ?? myClientId;
+      membersAtStart = Array.isArray(members) ? members.slice() : [];
+      mySeat = membersAtStart.indexOf(myClientId) + 1;
+      isOwner = lobby?.ownerId === myClientId;
+      seed = matchSeed;
+      setStatus("Match starting…");
+
+      const composition = customSquads ? squadPicker.getComposition() : [...DEFAULT_COMPOSITION];
+      compositionsBySeat[mySeat] = composition;
+      client.sendSetup({ seat: mySeat, composition });
+      if (isOwner) pushConfig(); // ensure late joiners hold the final framing
+      tryStart();
+    };
+
+    cb.onRemoteSetup = ({ seat, composition }) => {
+      if (!seat) return;
+      compositionsBySeat[seat] = Array.isArray(composition) ? composition : [...DEFAULT_COMPOSITION];
+      tryStart();
     };
 
     cb.onError = (_code, message) => {
-      setPanel("idle");
       setStatus(message || "Connection problem. Try again.");
     };
 
-    cb.onMatchReady = ({ seed: matchSeed }) => {
-      isHost = client.isHost();
-      mySeat = isHost ? 1 : 2;
-      seed = matchSeed;
-      // Capture our own squad now: the picker's value in Custom, the default
-      // one-of-each squad in Standard. Always a concrete 4-type array so it can
-      // double as the "captured" signal and travel intact to the peer.
-      myComposition = customSquads
-        ? squadPicker.getComposition()
-        : [...DEFAULT_COMPOSITION];
-      waitTextEl.textContent = "Opponent found — starting…";
-      if (isHost) {
-        // Host's choice of board size is canonical; the guest adopts it.
-        boardSize = chosenSize;
-        client.sendSetup({ size: chosenSize, composition: myComposition });
-      } else {
-        client.sendSetup({ composition: myComposition });
-      }
-      tryStart(); // both sides wait for the peer's setup (board size + squad)
-    };
-
-    cb.onRemoteSetup = ({ size, composition }) => {
-      if (BOARD_SIZES.includes(size)) boardSize = size;
-      // The peer always sends a concrete squad array; receiving it is what lets
-      // tryStart() proceed (a still-null peerComposition means "not yet").
-      if (Array.isArray(composition)) peerComposition = composition;
-      tryStart();
+    cb.onClosed = () => {
+      if (handedOff) return;
+      setPanel("idle");
+      setStatus("Disconnected. Try again.");
+      resetLobbyState();
     };
   }
 
-  el.querySelector('[data-action="quickMatch"]').addEventListener("click", () => {
-    // Side is server-balanced for symmetric games; the value sent is just a hint.
-    client?.findMatch("p1");
-  });
-
-  el.querySelector('[data-action="createRoom"]').addEventListener("click", () => {
-    client?.createRoom("p1"); // creator hosts as p1
-  });
-
-  el.querySelector('[data-action="joinRoom"]').addEventListener("click", () => {
-    const code = codeInput.value.trim().toUpperCase();
-    if (code.length < 4) {
-      setStatus("Enter the room code to join.");
-      return;
+  // Build the session and hand off — only once the shared seed, the owner's config,
+  // the ordered roster, and EVERY seat's squad are known.
+  function tryStart() {
+    if (handedOff || seed == null || mySeat < 1 || !membersAtStart) return;
+    const cfg = activeConfig();
+    if (!cfg) return;
+    const count = membersAtStart.length;
+    for (let seat = 1; seat <= count; seat += 1) {
+      if (!compositionsBySeat[seat]) return; // a squad is still missing
     }
-    client?.joinRoom("p2", code); // joiner is the guest, p2
-  });
 
-  el.querySelector('[data-action="cancelOnline"]').addEventListener("click", () => {
-    // Cancel whichever wait we're in (queue or hosted room) and return to idle.
-    client?.cancelSearch();
-    client?.cancelRoom();
-    resetStaging();
-    setPanel("idle");
-    setStatus("Connected. Choose how to play.");
-  });
+    const session = createOnlineSession({
+      client,
+      mySeat,
+      isOwner,
+      members: membersAtStart,
+      seed,
+      size: cfg.size,
+    });
+    handedOff = true; // onExit must NOT disconnect — the match owns the client now
+
+    const compositions = {};
+    for (let seat = 1; seat <= count; seat += 1) compositions[seat] = compositionsBySeat[seat];
+
+    ctx.nav("match", {
+      mode: "online",
+      net: session,
+      seed,
+      size: cfg.size,
+      playerCount: count,
+      format: cfg.format,
+      teamColors: cfg.format === "teams" ? { ...cfg.teamColors } : null,
+      teamNames: cfg.format === "teams" ? { ...cfg.teamNames } : null,
+      compositions,
+    });
+  }
+
+  function resetLobbyState() {
+    lobby = null;
+    isOwner = false;
+    receivedConfig = null;
+    seed = null;
+    mySeat = null;
+    membersAtStart = null;
+    for (const key of Object.keys(compositionsBySeat)) delete compositionsBySeat[key];
+    roomCodeEl.hidden = true;
+  }
 
   function onEnter() {
     handedOff = false;
-    resetStaging();
+    myClientId = null;
+    customSquads = false;
+    resetLobbyState();
+    selectSeg(el, "squadMode", (seg) => seg.dataset.squad === "standard");
     syncSquads();
     setPanel("none");
     setStatus("Connecting to the network…");
@@ -224,11 +423,17 @@ export function createOnlineSetupScreen(ctx) {
   }
 
   function onExit() {
-    // Leaving the lobby without starting a match: drop the connection. After a
-    // successful handoff the match screen owns the socket, so leave it alone.
+    // Leaving without starting a match: drop the connection. After a successful
+    // handoff the match screen owns the socket, so leave it alone.
     if (client && !handedOff) client.disconnect();
     client = null;
   }
 
   return { el, onEnter, onExit };
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (c) => {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
 }
