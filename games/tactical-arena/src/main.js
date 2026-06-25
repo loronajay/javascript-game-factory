@@ -7,6 +7,9 @@ import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "./rule
 import { applyCommand } from "./core/reducer.js";
 import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
+import { TurnAnnouncer } from "./ui/turnFlash.js";
+import { createMenuFlow } from "./ui/menuFlow.js";
+import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
 import { AudioManager } from "./audio/sounds.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -40,8 +43,91 @@ const audio = new AudioManager({ enabled: true, masterVolume: 1, volume: 0.85, m
 let muted = false;
 let audioUnlocked = false;
 
-// Presentation-only combat effects (dice reveal, impact, float text, shake).
-const effects = createEffects({ board, effectsLayer, diceOverlay, dieFace, audio });
+// Presentation-only combat effects (unit motion, dice reveal, impact, float text).
+const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
+// Turn-change / victory banner. Fired whenever the squad hand-off changes the
+// active player so passing the device reads as a deliberate beat.
+const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
+
+// Menu / screen flow (title → main menu → hot-seat setup → match → results). It
+// owns everything outside the match; the match-build entry point is startMatch.
+const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex });
+
+// Per-match bookkeeping, used to build the results summary at the end.
+let matchConfig = null;
+let matchStartedAt = 0;
+let initialHpByPlayer = { 1: 0, 2: 0 };
+let resultsTimer = 0;
+
+// Map two squad compositions onto the corner spawn blocks and start a fresh
+// match. Slot 0 is the front line (inner edge), slot 1 the back (the corner) —
+// the same layout the squad builder previews.
+function buildRoster(squads, size) {
+  const slots = {
+    1: [{ x: 1, y: size - 1 }, { x: 0, y: size - 2 }],
+    2: [{ x: size - 2, y: 0 }, { x: size - 1, y: 1 }]
+  };
+  const units = [];
+  for (const player of [1, 2]) {
+    squads[player].forEach((type, i) => {
+      units.push({ id: `p${player}-${i}-${type}`, player, type, x: slots[player][i].x, y: slots[player][i].y });
+    });
+  }
+  return units;
+}
+
+function startMatch(config) {
+  window.clearTimeout(resultsTimer);
+  state = createBattleState({ size: config.size, units: buildRoster(config.squads, config.size) });
+  matchConfig = config;
+  matchStartedAt = Date.now();
+  initialHpByPlayer = { 1: hpRemaining(1), 2: hpRemaining(2) };
+  selectedId = null;
+  mode = null;
+  footworkPath = [];
+  volleyShotOrigin = null;
+  resolving = false;
+  turnFlash.clear();
+  setMessage("Player 1 opens the battle.");
+  menu.show("match");
+  render();
+  announceTurn(state.currentPlayer);
+}
+
+function hpRemaining(player) {
+  return state.units.filter((unit) => unit.player === player).reduce((sum, unit) => sum + Math.max(0, unit.hp), 0);
+}
+
+// Assemble the per-player battle report + match meta the results screen renders.
+function buildSummary() {
+  const teams = [1, 2].map((player) => {
+    const units = state.units.filter((unit) => unit.player === player);
+    const opponent = player === 1 ? 2 : 1;
+    return {
+      player,
+      label: `Player ${player}`,
+      color: teamColor(player),
+      isWinner: player === state.winner,
+      unitsAlive: units.filter((unit) => unit.hp > 0).length,
+      unitsTotal: units.length,
+      hpRemaining: hpRemaining(player),
+      hpTotal: initialHpByPlayer[player],
+      damageDealt: Math.max(0, initialHpByPlayer[opponent] - hpRemaining(opponent)),
+      kills: state.units.filter((unit) => unit.player === opponent && unit.hp <= 0).length
+    };
+  }).sort((a, b) => Number(b.isWinner) - Number(a.isWinner));
+  return { winner: state.winner, size: state.size, turns: state.turnNumber, durationMs: Date.now() - matchStartedAt, teams };
+}
+
+// Announce the active player's hand-off (or the win) as a tinted sweep. Called
+// from the command paths after a player change is detected, never per-action.
+function announceTurn(player, { hold = false } = {}) {
+  if (state.phase === "complete") {
+    turnFlash.announce({ title: `Player ${state.winner} wins`, sub: "Victory", color: teamColor(state.winner), hold: true });
+    return;
+  }
+  turnFlash.announce({ title: `Player ${player} squad turn`, sub: "Pass the device", color: teamColor(player), hold });
+}
 // While an attack/ART is animating (roll reveal → impact), input is locked so the
 // player can't double-resolve or act mid-animation.
 let resolving = false;
@@ -82,6 +168,26 @@ const refModal = document.querySelector("#refModal");
 document.querySelector("#refCloseBtn").addEventListener("click", closeCodex);
 refModal.addEventListener("click", (event) => { if (event.target === refModal) closeCodex(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !refModal.hidden) closeCodex(); });
+
+// Action hotkeys — make the on-screen kbd hints (1/2/3/A/F) real by routing to the
+// matching command button, so the keyboard feels identical to clicking it (the
+// button's own click handler runs, including its sound and mode toggle).
+const HOTKEY_ACTIONS = { "1": "move", "2": "attack", "3": "defend", a: "footwork", A: "footwork", f: "finish", F: "finish", Enter: "finish" };
+document.addEventListener("keydown", (event) => {
+  if (!refModal.hidden || resolving) return;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+  const tag = event.target?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || event.target?.isContentEditable) return;
+  // Escape drops the current targeting/move highlight without spending the piece.
+  if (event.key === "Escape") {
+    if (mode) { mode = null; footworkPath = []; volleyShotOrigin = null; setMessage("Action cancelled. Choose an action."); render(); event.preventDefault(); }
+    return;
+  }
+  const action = HOTKEY_ACTIONS[event.key];
+  if (!action) return;
+  const button = actions.querySelector(`button[data-action="${action}"]`);
+  if (button && !button.disabled) { button.click(); event.preventDefault(); }
+});
 
 function openCodex() {
   document.querySelector("#refBody").innerHTML = buildCodex();
@@ -129,13 +235,7 @@ function buildCodex() {
 }
 
 function resetBattle() {
-  state = createBattleState();
-  selectedId = null;
-  mode = null;
-  footworkPath = [];
-  volleyShotOrigin = null;
-  setMessage("Fresh duel. Player 1 opens the battle.");
-  render();
+  startMatch(matchConfig ?? { size: 10, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
 }
 
 function setMessage(text, isError = false) {
@@ -149,6 +249,7 @@ function dispatch(command) {
     setMessage(readableError(result.errorCode), true);
     return false;
   }
+  const prevPlayer = state.currentPlayer;
   state = result.nextState;
   playEventSounds(result.events ?? []);
   if (!state.activation) {
@@ -157,7 +258,22 @@ function dispatch(command) {
     footworkPath = [];
     volleyShotOrigin = null;
   }
+  announceTurnChange(prevPlayer);
   return true;
+}
+
+// Fire the turn/victory banner when (and only when) a command flipped the active
+// player or ended the match. Shared by the sync `dispatch` and async `resolveCombat`.
+// On a win, the victory sweep reads first, then the results screen slides in.
+function announceTurnChange(prevPlayer) {
+  if (state.phase === "complete") {
+    announceTurn(state.winner);
+    const summary = buildSummary();
+    window.clearTimeout(resultsTimer);
+    resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
+  } else if (state.currentPlayer !== prevPlayer) {
+    announceTurn(state.currentPlayer);
+  }
 }
 
 // Async resolution for the ROLLED actions — basic ATTACK and the targeted ARTS.
@@ -176,22 +292,29 @@ async function resolveCombat(command) {
   const rolled = events.find((event) =>
     (event.type === "ATTACK_RESOLVED" || event.type === "ART_RESOLVED") && "hit" in event);
 
+  const prevPlayer = state.currentPlayer;
   resolving = true;
-  if (rolled) await effects.rollReveal({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) });
-
-  // Target screen point is captured before the commit, but its tile never moves,
-  // so the post-commit state still resolves the same spot for the impact.
-  const metrics = createBoardMetrics(state.size);
-  const targetBefore = rolled ? findUnit(state, rolled.targetId) : null;
-
-  state = result.nextState;
-  playEventSounds(events);
-  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+  // Clear the targeting highlights but keep every figurine where it stands: the
+  // state isn't committed yet, so this re-render leaves the live attacker/target
+  // tokens on the board for the unit-element animations to play against (Mini-
+  // Tactics order — the unit layer is re-rendered LAST, after the sequence).
+  mode = null; footworkPath = []; volleyShotOrigin = null;
   render();
 
-  if (rolled && targetBefore) {
+  const metrics = createBoardMetrics(state.size);
+  const attackerBefore = rolled ? findUnit(state, rolled.actorId) : null;
+  const targetBefore = rolled ? findUnit(state, rolled.targetId) : null;
+
+  if (rolled && attackerBefore && targetBefore) {
+    const ranged = attackerBefore.type === "archer";
     const screen = gridToScreen(metrics, targetBefore.position.x, targetBefore.position.y);
     const center = { x: screen.x, y: screen.y + metrics.tileHeight * 0.45 };
+
+    // 1. The attacker commits (melee lunge or arrow arc), 2. then the dice resolve.
+    await effects.animateAttack(attackerBefore, targetBefore, ranged);
+    await effects.rollReveal({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) });
+    playAttackImpactSound(rolled, ranged);
+
     if (rolled.missed) {
       await effects.floatText(center, "MISS", "#cbb78b");
     } else {
@@ -199,34 +322,52 @@ async function resolveCombat(command) {
       if (rolled.critical) { effects.critFlash(); effects.shake(11); }
       else effects.shake(Math.min(8, 2.5 + dmg * 1.4));
       effects.impact(center, Boolean(rolled.critical));
-      const targetAfter = findUnit(state, rolled.targetId);
-      if (!targetAfter || targetAfter.hp <= 0) effects.deathBurst(center, teamColor(targetBefore.player));
+      // 3. The target reels, 4. takes its damage number, 5. and dissolves if slain —
+      // all on the live token, BEFORE we commit + re-render.
+      await effects.hitRecoil(targetBefore.id, targetBefore.position, Boolean(rolled.critical));
       await effects.floatText(center, rolled.critical ? `✦ ${dmg}` : `-${dmg}`, rolled.critical ? "#ffd26a" : "#ff7684");
+      const slain = findUnit(result.nextState, rolled.targetId);
+      if (!slain || slain.hp <= 0) await effects.deathDissolve(targetBefore.id, targetBefore.position, teamColor(targetBefore.player));
     }
   }
 
+  // Commit + final render: removes the slain unit, updates HP bars, advances turn.
+  state = result.nextState;
+  playEventSounds(events);
+  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+  render();
+  announceTurnChange(prevPlayer);
+
   resolving = false;
   return true;
+}
+
+// The hit/miss impact sound for a rolled strike, played right as the dice land
+// (the launch whoosh already fired inside animateAttack). Mirrors playEventSounds'
+// outcome logic but without the airborne launch, so the two never double up.
+function playAttackImpactSound(rolled, ranged) {
+  if (rolled.missed) { audio.play("miss"); return; }
+  if (rolled.defended) { audio.play("defendedHit"); return; }
+  if (rolled.effect?.applied && rolled.artId === "life-sap") audio.play("heal");
+  audio.play(ranged ? "arrowHit" : "attackHit");
 }
 
 // Map authoritative events onto reused Mini-Tactics audio. Outcome-driven, so a
 // CPU or networked actor would sound identical with no extra wiring.
 function playEventSounds(events) {
   for (const event of events) {
+    // Rolled strikes (basic attack + targeted ARTS) are voiced by resolveCombat as
+    // the animation plays — launch whoosh in animateAttack, impact in
+    // playAttackImpactSound — so skip them here to avoid a double hit.
+    if ("hit" in event) continue;
     if (event.type === "UNIT_MOVED") audio.play("unitMove");
     else if (event.type === "UNIT_DEFENDED") audio.play("defend");
-    else if (event.type === "ATTACK_RESOLVED") {
+    else if (event.type === "ART_RESOLVED") {
+      // Only the non-rolled ARTS reach here: Footwork (a dash) and Volley Shot (a cone).
       const ranged = findUnit(state, event.actorId)?.type === "archer";
-      if (event.missed) audio.play("miss");
-      else if (event.defended) audio.play("defendedHit");
-      else { if (ranged) audio.play("arrowAirborne"); audio.play(ranged ? "arrowHit" : "attackHit"); }
-    } else if (event.type === "ART_RESOLVED") {
-      const actor = findUnit(state, event.actorId);
-      const ranged = actor?.type === "archer";
       if (event.artId === "footwork") audio.play("unitMove");
       else if (ranged) { audio.play("arrowAirborne"); audio.play("arrowHit"); }
       else audio.play("attackHit");
-      if (event.effect?.applied && event.artId === "life-sap") audio.play("heal");
     }
   }
 }
@@ -296,9 +437,16 @@ async function handleTile(position) {
     return;
   }
   if (mode === "move") {
+    const from = { ...unit.position };
     if (dispatch(moveUnit(state.currentPlayer, unit.id, position.x, position.y))) {
       mode = null;
       setMessage("Moved. Now attack or defend to finish.");
+      // Render the unit at its destination, then slide it in from the old tile.
+      resolving = true;
+      render();
+      await effects.animateMovement(unit.id, from, position);
+      resolving = false;
+      return;
     }
   } else if (mode === "attack") {
     const target = unitAt(state, position);
@@ -604,7 +752,7 @@ function createUnitFigure(metrics, unit, isTarget = false) {
   if (unit.defending) classes.push("defending");
   if (unit.id === selectedId) classes.push("active");
   if (isTarget) classes.push("targetable");
-  const token = svgElement("g", { class: classes.join(" "), "data-key": positionKey(unit.position), transform: `translate(${point.x} ${point.y + metrics.tileHeight * .45})` });
+  const token = svgElement("g", { class: classes.join(" "), "data-id": unit.id, "data-key": positionKey(unit.position), transform: `translate(${point.x} ${point.y + metrics.tileHeight * .45})` });
   const body = svgElement("g", { class: "body-group" });
   body.append(svgElement("ellipse", { class: "base-side", cx: 0, cy: 9, rx: 25, ry: 12 }), svgElement("ellipse", { class: "base-top", cx: 0, cy: 2, rx: 25, ry: 12 }), svgElement("ellipse", { class: "rim", cx: 0, cy: 2, rx: 20, ry: 9 }), svgElement("circle", { class: "shield-ring", cx: 0, cy: -2, r: 31 }));
   const emblem = svgElement("g", { class: "emblem", transform: "translate(0 -10) scale(.72)" });
@@ -636,4 +784,5 @@ function createUnitIcon(type) {
   return icon;
 }
 
-render();
+// Boot into the title screen; the match is built only when a setup screen starts one.
+menu.show("title");

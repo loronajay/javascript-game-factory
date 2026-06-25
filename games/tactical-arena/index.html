@@ -9,10 +9,100 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500,600&display=swap">
     <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="./menus.css">
   </head>
   <body>
     <div id="app">
-      <section class="match-screen is-active">
+
+      <!-- ============================== TITLE ============================== -->
+      <section class="screen menu-screen is-active" data-screen="title">
+        <div class="menu-card title-card">
+          <div class="title-mark"></div>
+          <h1 class="title-name">Tactical Arena</h1>
+          <p class="title-sub">Isometric Squad Tactics</p>
+          <div class="menu-buttons">
+            <button data-nav="mainMenu" class="primary menu-btn">Continue</button>
+            <button data-action="rules" class="menu-btn">How to Play</button>
+            <button data-action="settings" class="menu-btn">Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ MAIN MENU =========================== -->
+      <section class="screen menu-screen" data-screen="mainMenu">
+        <div class="menu-card">
+          <h2 class="menu-heading">Main Menu</h2>
+          <div class="menu-buttons">
+            <button class="menu-btn" disabled>Single Player<span class="soon">Soon</span></button>
+            <button data-nav="hsSetup" class="primary menu-btn">Hot Seat</button>
+            <button class="menu-btn" disabled>Online Versus<span class="soon">Soon</span></button>
+            <button data-action="rules" class="menu-btn">How to Play</button>
+            <button data-action="settings" class="menu-btn">Settings</button>
+            <button data-nav="title" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= HOT SEAT SETUP ========================= -->
+      <section class="screen menu-screen" data-screen="hsSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Hot Seat</h2>
+          <p class="menu-note">One screen. Pass the device at each squad turn.</p>
+
+          <div class="setup-field">
+            <span class="setup-label">Players</span>
+            <div class="segmented" data-field="playerCount">
+              <button type="button" class="seg is-selected" data-count="2">2</button>
+              <button type="button" class="seg" data-count="3" disabled>3</button>
+              <button type="button" class="seg" data-count="4" disabled>4</button>
+            </div>
+            <p class="setup-hint">More commanders arrive as new units are forged.</p>
+          </div>
+
+          <div class="setup-field">
+            <span class="setup-label">Board size</span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
+              <button type="button" class="seg" data-size="13">13 × 13</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Squads</span>
+            <div class="segmented" data-field="squadMode">
+              <button type="button" class="seg is-selected" data-squad="standard">Standard</button>
+              <button type="button" class="seg" data-squad="custom">Custom</button>
+            </div>
+            <p class="setup-hint" data-squad-hint hidden>
+              Tap a slot to change its unit. Top row is the front line, bottom row the back.
+            </p>
+            <div class="squad-pickers" data-squad-pickers hidden></div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-action="startHotSeat" class="primary menu-btn">Start Match</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ RESULTS ============================= -->
+      <section class="screen menu-screen" data-screen="results">
+        <div class="victory-burst" data-results="burst" aria-hidden="true"></div>
+        <div class="menu-card results-card">
+          <h2 class="menu-heading" data-results="title">Victory</h2>
+          <p class="results-winner" data-results="winner"></p>
+          <div class="results-report" data-results="report"></div>
+          <dl class="results-stats" data-results="stats"></dl>
+          <div class="menu-buttons">
+            <button data-action="rematch" class="primary menu-btn">Rematch</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================= MATCH ============================== -->
+      <section class="screen match-screen" data-screen="match">
         <header class="topbar">
           <div class="brand">Tactical Arena</div>
           <div id="turnBanner" class="turn-banner">
@@ -22,7 +112,8 @@
           <div class="top-actions">
             <button id="muteBtn" type="button" aria-pressed="false" title="Toggle sound">Sound</button>
             <button id="rulesBtn" type="button">Codex</button>
-            <button id="restartBtn" class="danger" type="button">Restart</button>
+            <button id="restartBtn" type="button">Restart</button>
+            <button data-nav="mainMenu" type="button">Menu</button>
           </div>
         </header>
 
@@ -48,6 +139,14 @@
             <g id="effectsLayer"></g>
           </svg>
           <div id="diceOverlay" aria-hidden="true"><div id="dieFace" class="die">⚔</div></div>
+          <!-- Turn-change announcement. A brief faction-tinted sweep fired on every
+               squad hand-off (and reused for the victory banner). Presentation only. -->
+          <div id="turnFlash" aria-hidden="true">
+            <div class="turn-flash-card">
+              <div class="turn-flash-title"></div>
+              <div class="turn-flash-sub"></div>
+            </div>
+          </div>
           <div id="squadOverlays" class="squad-overlays"></div>
           <div id="message" role="status" aria-live="polite">Select an unspent piece.</div>
         </main>
@@ -67,7 +166,7 @@
 
     <!-- Field codex — stats, passives, ARTS, and status glossary for every unit.
          Built from the unit catalog in main.js so it never drifts from balance
-         data. Reachable from the topbar "Codex" button. -->
+         data. Reachable from the topbar "Codex" button and every "How to Play". -->
     <div id="refModal" class="ref-modal" hidden>
       <div class="ref-card">
         <header class="ref-head">
@@ -75,6 +174,30 @@
           <button id="refCloseBtn" class="ref-close" type="button" aria-label="Close">✕</button>
         </header>
         <div id="refBody" class="ref-body"></div>
+      </div>
+    </div>
+
+    <!-- Settings — presentation-only audio preferences. -->
+    <div id="settingsModal" class="ref-modal" hidden>
+      <div class="ref-card settings-card">
+        <header class="ref-head">
+          <h2>Settings</h2>
+          <button id="setCloseBtn" class="ref-close" type="button" aria-label="Close">✕</button>
+        </header>
+        <div class="ref-body settings-body">
+          <label class="set-row">
+            <span class="set-label">Sound</span>
+            <input id="setSoundToggle" type="checkbox" checked>
+          </label>
+          <label class="set-row">
+            <span class="set-label">Effects volume</span>
+            <input id="setSfxVolume" type="range" min="0" max="100" value="85">
+          </label>
+          <label class="set-row">
+            <span class="set-label">Music volume</span>
+            <input id="setMusicVolume" type="range" min="0" max="100" value="32">
+          </label>
+        </div>
       </div>
     </div>
 
