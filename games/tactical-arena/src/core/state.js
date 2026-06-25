@@ -17,13 +17,40 @@ function createUnit(spec) {
   };
 }
 
+const DEFAULT_ROSTER = [
+  { id: "swordsman", type: "swordsman" },
+  { id: "archer", type: "archer" },
+  { id: "mystic", type: "mystic" },
+  { id: "swordsman-2", type: "swordsman" }
+];
+
+function defaultRoster(size) {
+  const slots = {
+    1: [
+      { x: 1, y: size - 1 },
+      { x: 0, y: size - 2 },
+      { x: 0, y: size - 1 },
+      { x: 1, y: size - 2 }
+    ],
+    2: [
+      { x: size - 2, y: 0 },
+      { x: size - 1, y: 1 },
+      { x: size - 1, y: 0 },
+      { x: size - 2, y: 1 }
+    ]
+  };
+
+  return [1, 2].flatMap((player) => DEFAULT_ROSTER.map(({ id, type }, i) => ({
+    id: `p${player}-${id}`,
+    player,
+    type,
+    x: slots[player][i].x,
+    y: slots[player][i].y
+  })));
+}
+
 export function createBattleState({ size = 10, units, seed } = {}) {
-  const roster = units ?? [
-    { id: "p1-swordsman", player: 1, type: "swordsman", x: 1, y: size - 1 },
-    { id: "p1-archer", player: 1, type: "archer", x: 0, y: size - 2 },
-    { id: "p2-swordsman", player: 2, type: "swordsman", x: size - 2, y: 0 },
-    { id: "p2-archer", player: 2, type: "archer", x: size - 1, y: 1 }
-  ];
+  const roster = units ?? defaultRoster(size);
 
   return {
     size,

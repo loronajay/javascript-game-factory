@@ -74,7 +74,7 @@
               <button type="button" class="seg" data-squad="custom">Custom</button>
             </div>
             <p class="setup-hint" data-squad-hint hidden>
-              Tap a slot to change its unit. Top row is the front line, bottom row the back.
+              Tap a slot to change its unit. Each squad deploys four pieces.
             </p>
             <div class="squad-pickers" data-squad-pickers hidden></div>
           </div>
@@ -125,11 +125,11 @@
                 <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
               </filter>
               <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#f0c878" stop-opacity=".22"/>
-                <stop offset="100%" stop-color="#f0c878" stop-opacity="0"/>
+                <stop offset="0%" stop-color="#70aed8" stop-opacity=".18"/>
+                <stop offset="100%" stop-color="#70aed8" stop-opacity="0"/>
               </radialGradient>
               <linearGradient id="pewter" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#fdf8ea"/><stop offset="42%" stop-color="#ece1c4"/><stop offset="100%" stop-color="#bba87f"/>
+                <stop offset="0%" stop-color="#e0eef8"/><stop offset="42%" stop-color="#a8c4dc"/><stop offset="100%" stop-color="#6888a0"/>
               </linearGradient>
             </defs>
             <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
@@ -164,16 +164,56 @@
       </section>
     </div>
 
-    <!-- Field codex — stats, passives, ARTS, and status glossary for every unit.
-         Built from the unit catalog in main.js so it never drifts from balance
-         data. Reachable from the topbar "Codex" button and every "How to Play". -->
+    <!-- Field Manual — three-tab reference overlay reachable from the title,
+         main menu, and in-match topbar. Basics and Advanced are static content;
+         the Codex tab is populated dynamically by rulesModal.js. When opened
+         from a live match, the Codex tab is filtered to units in that battle. -->
     <div id="refModal" class="ref-modal" hidden>
       <div class="ref-card">
         <header class="ref-head">
-          <h2>Field Codex</h2>
-          <button id="refCloseBtn" class="ref-close" type="button" aria-label="Close">✕</button>
+          <div class="ref-head-title">
+            <h2>Field Manual</h2>
+            <button id="refCloseBtn" class="ref-close" type="button" aria-label="Close">✕</button>
+          </div>
+          <nav class="ref-tabs" role="tablist">
+            <button class="ref-tab is-active" data-tab="basics" type="button">Basics</button>
+            <button class="ref-tab" data-tab="codex" type="button">Codex</button>
+            <button class="ref-tab" data-tab="advanced" type="button">Advanced</button>
+          </nav>
         </header>
-        <div id="refBody" class="ref-body"></div>
+
+        <!-- Basics: onboarding rules. -->
+        <div class="ref-panel is-active" data-panel="basics">
+          <ul class="ref-rules">
+            <li>Each player activates every living piece once per squad turn. <strong>Last squad standing wins.</strong></li>
+            <li>A piece may move then act, or act then move — but <strong>a move-alone activation is not allowed.</strong> Every activation must end with an attack, ART, or Defend.</li>
+            <li>An <strong>ART replaces the whole activation</strong> and cannot be used after moving or attacking. ARTS spend MP; MP never auto-recovers.</li>
+            <li>Physical damage = <strong>max(1, STR − DEF)</strong>. Magic ignores DEF. True damage bypasses both DEF and Defend.</li>
+            <li>Attack rolls: <strong>10% miss, 15% critical</strong> (×1.5 damage). Blind units always miss. Attacking ARTS roll twice — first to hit, then for their status or heal effect. A missed swing lands no effect.</li>
+            <li><strong>Defend</strong> halves all incoming physical and magic damage (rounded up) until the unit next activates.</li>
+            <li><strong>RAGE</strong> triggers automatically at 5 HP or lower. Read each unit's Codex entry for its specific bonus.</li>
+            <li>Volley Shot and Footwork deal <strong>true damage</strong> and never roll to hit.</li>
+          </ul>
+        </div>
+
+        <!-- Codex: unit data — built from the catalog in rulesModal.js. -->
+        <div class="ref-panel" data-panel="codex">
+          <div id="refBody"></div>
+        </div>
+
+        <!-- Advanced: strategy tips. -->
+        <div class="ref-panel" data-panel="advanced">
+          <ul class="ref-tips">
+            <li><strong>Kill before spreading.</strong> A dead unit can't act — focus fire one target completely rather than chipping multiple enemies.</li>
+            <li><strong>Time your debuffs.</strong> Blind and Silence last only 1 turn — cast them right before the enemy's activation for maximum disruption.</li>
+            <li><strong>Poison is permanent.</strong> Unlike Blind and Silence, Poison never fades. Stack it on high-HP targets who will take many activation-start ticks before they fall.</li>
+            <li><strong>Respect RAGE.</strong> Units at 5 HP or below become more dangerous. Finish low-HP targets rather than leaving them to activate with RAGE bonuses.</li>
+            <li><strong>Defend is timing-based.</strong> It halves all hits until the unit next acts. Use it when multiple enemies will attack before your next squad turn.</li>
+            <li><strong>Footwork is a traversal tool.</strong> It passes through enemies for 2 true damage each tile — use it to reach a backline target and chip the frontline in the same activation.</li>
+            <li><strong>MP is scarce.</strong> ARTS never recover MP. Save it for activations where it changes the outcome, not just any time you can afford the cost.</li>
+            <li><strong>Volley Shot punishes clusters.</strong> Aim the cone to hit multiple enemies. Close Shot bonuses still apply per target — the Archer can hit harder up close than expected.</li>
+          </ul>
+        </div>
       </div>
     </div>
 

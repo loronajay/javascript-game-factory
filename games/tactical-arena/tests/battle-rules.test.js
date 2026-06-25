@@ -40,11 +40,11 @@ test("swordsman owns the specified core stat line and four ART slots", () => {
   assert.deepEqual(moonstrike.effect, {
     type: "status", status: "blind", chance: 0.7, durationTurns: 1
   });
-  assert.deepEqual(moonstrike.immuneTypes, ["paladin"]);
+  assert.equal("immuneTypes" in moonstrike, false);
   assert.deepEqual(mageKiller.effect, {
     type: "status", status: "silence", chance: 0.7, durationTurns: 1
   });
-  assert.deepEqual(mageKiller.immuneTypes, ["mystic", "paladin"]);
+  assert.equal("immuneTypes" in mageKiller, false);
   assert.deepEqual(lifeSap.effect, {
     type: "heal", chance: 0.7, amount: "halfDamageDealtRounded"
   });
@@ -85,6 +85,40 @@ test("archer is available with the canonical core stat line and ART roster", () 
   assert.equal(UNIT_TYPES.archer.rageArt.combat.criticalChance, 0.5);
 });
 
+test("mystic is available with healing ARTS, Silence, Guardian, and RAGE data", () => {
+  assert.deepEqual(UNIT_TYPES.mystic.stats, {
+    moveRange: 2,
+    attackRange: 5,
+    strength: 5,
+    defense: 3,
+    maxHp: 23,
+    maxMp: 38
+  });
+  assert.equal(UNIT_TYPES.mystic.passive.name, "Anointed");
+  assert.deepEqual(UNIT_TYPES.mystic.passive.effect, {
+    type: "immunity", statuses: ["silence"]
+  });
+  assert.deepEqual(UNIT_TYPES.mystic.arts.map((art) => art.name), [
+    "Pray", "Wish", "Silence", "Guardian"
+  ]);
+  assert.deepEqual(UNIT_TYPES.mystic.arts.map((art) => art.mpCost), [4, 2, 3, null]);
+  assert.deepEqual(UNIT_TYPES.mystic.arts.find((art) => art.id === "pray").effect, {
+    type: "healAllies", amount: 3, radius: 3
+  });
+  assert.deepEqual(UNIT_TYPES.mystic.arts.find((art) => art.id === "wish").effect, {
+    type: "healAllies", amount: 1, global: true
+  });
+  assert.deepEqual(UNIT_TYPES.mystic.arts.find((art) => art.id === "silence").effect, {
+    type: "status", status: "silence", chance: 0.7, durationTurns: 1
+  });
+  assert.deepEqual(UNIT_TYPES.mystic.arts.find((art) => art.id === "guardian").effect, {
+    type: "teamAura", stats: { defense: 1 }
+  });
+  assert.deepEqual(UNIT_TYPES.mystic.rageArt.effect, {
+    type: "statModifiers", stats: { moveRange: 6 }, defending: true
+  });
+});
+
 test("RAGE ART becomes available automatically at five HP or below", () => {
   assert.equal(getAvailableArts({ type: "swordsman", hp: 6 }).some((art) => art.id === "swordsman-rage"), false);
   assert.equal(getAvailableArts({ type: "swordsman", hp: 5 }).some((art) => art.id === "swordsman-rage"), true);
@@ -105,6 +139,44 @@ test("Archer RAGE derives its strength and range bonuses", () => {
   const stats = getEffectiveStats({ type: "archer", hp: 5 });
   assert.equal(stats.strength, 9);
   assert.equal(stats.attackRange, 6);
+});
+
+test("Mystic Guardian adds team defense while the Mystic is alive", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-mystic", player: 1, type: "mystic", x: 0, y: 0 },
+      { id: "p1-archer", player: 1, type: "archer", x: 1, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 7, y: 7 }
+    ]
+  });
+
+  assert.equal(getEffectiveStats(state.units.find((unit) => unit.id === "p1-mystic"), state).defense, 4);
+  assert.equal(getEffectiveStats(state.units.find((unit) => unit.id === "p1-archer"), state).defense, 5);
+
+  const defeated = {
+    ...state,
+    units: state.units.map((unit) => unit.id === "p1-mystic" ? { ...unit, hp: 0 } : unit)
+  };
+  assert.equal(getEffectiveStats(defeated.units.find((unit) => unit.id === "p1-archer"), defeated).defense, 4);
+});
+
+test("Mystic RAGE adds movement and passively defends incoming physical damage", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-mystic", player: 2, type: "mystic", hp: 5, x: 1, y: 0 }
+    ]
+  });
+  assert.equal(getEffectiveStats(state.units.find((unit) => unit.id === "p2-mystic"), state).moveRange, 8);
+
+  const selected = applyCommand(state, beginActivation(1, "p1-swordsman"));
+  const result = applyCommand(selected.nextState, attack(1, "p1-swordsman", "p2-mystic", NORMAL_HIT));
+  const target = result.nextState.units.find((unit) => unit.id === "p2-mystic");
+
+  assert.equal(result.events[0].baseDamage, 6); // 10 STR - (3 DEF + Guardian)
+  assert.equal(result.events[0].damage, 3);
+  assert.equal(result.events[0].defended, true);
+  assert.equal(target.hp, 2);
 });
 
 test("Footwork uses all current movement plus three, including RAGE and future movement buffs", () => {
@@ -157,6 +229,40 @@ test("defend is a primary action and clears when that unit begins its next activ
     beginActivation(1, "p1-swordsman")
   );
   assert.equal(reset.nextState.units[0].defending, false);
+});
+
+test("a unit stays active after moving and can immediately defend", () => {
+  const initial = createBattleState();
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 9));
+
+  assert.equal(moved.nextState.activation.unitId, "p1-swordsman");
+  assert.equal(moved.nextState.activation.moved, true);
+  assert.equal(moved.nextState.activation.primaryUsed, false);
+
+  const defended = applyCommand(moved.nextState, defend(1, "p1-swordsman"));
+  assert.equal(defended.accepted, true);
+  assert.equal(defended.nextState.activation.unitId, "p1-swordsman");
+  assert.equal(defended.nextState.activation.primaryUsed, true);
+  assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-swordsman").defending, true);
+});
+
+test("a unit can attack first and still use its movement", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const attacked = applyCommand(selected.nextState, attack(1, "p1-swordsman", "p2-swordsman", NORMAL_HIT));
+  const moved = applyCommand(attacked.nextState, moveUnit(1, "p1-swordsman", 0, 1));
+
+  assert.equal(moved.accepted, true);
+  assert.equal(moved.nextState.activation.unitId, "p1-swordsman");
+  assert.equal(moved.nextState.activation.primaryUsed, true);
+  assert.equal(moved.nextState.activation.moved, true);
+  assert.deepEqual(moved.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 0, y: 1 });
 });
 
 test("ARTS are unavailable after moving or attacking", () => {
@@ -259,7 +365,7 @@ test("Poison Arrow resolves a normal attack, spends the Archer, and applies perm
   assert.equal(result.accepted, true);
   const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
   const actor = result.nextState.units.find((unit) => unit.id === "p1-archer");
-  assert.equal(target.hp, 22);
+  assert.equal(target.hp, 20);
   assert.deepEqual(target.statuses, [{ type: "poison", duration: "permanent", turnStartDamage: 1 }]);
   assert.equal(actor.mp, 18);
   assert.equal(actor.spent, true);
@@ -280,9 +386,27 @@ test("Emblem prevents Poison Arrow from adding poison but does not prevent its a
 
   assert.equal(result.accepted, true);
   const target = result.nextState.units.find((unit) => unit.id === "p2-archer");
-  assert.equal(target.hp, 20);
+  assert.equal(target.hp, 18);
   assert.deepEqual(target.statuses, []);
   assert.equal(result.events[0].effect.applied, false);
+  assert.equal(result.events[0].effect.reason, "IMMUNE");
+});
+
+test("status immunities come from passive unit data instead of ART-specific target lists", () => {
+  assert.equal("immuneTypes" in UNIT_TYPES.archer.arts.find((art) => art.id === "poison-arrow"), false);
+  assert.equal("immuneTypes" in UNIT_TYPES.archer.arts.find((art) => art.id === "leg-shot"), false);
+
+  const initial = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-archer", player: 2, type: "archer", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "poison-arrow", {
+    targetId: "p2-archer", effectRoll: 0, ...NORMAL_HIT
+  }));
+
   assert.equal(result.events[0].effect.reason, "IMMUNE");
 });
 
@@ -348,7 +472,7 @@ test("failed status rolls still resolve the ART attack and report no effect", ()
   }));
 
   assert.equal(result.accepted, true);
-  assert.equal(result.nextState.units.find((unit) => unit.id === "p2-swordsman").hp, 22);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p2-swordsman").hp, 20);
   assert.deepEqual(result.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, []);
   assert.deepEqual(result.events[0].effect, { attempted: true, applied: false, reason: "ROLL_FAILED" });
 });
@@ -403,7 +527,7 @@ test("blind makes a normal ATTACK miss but still consumes the primary action", (
   assert.equal(result.events[0].hit, false);
 });
 
-test("Close Shot adds damage only to the Archer's normal ATTACK at close range", () => {
+test("Close Shot adds damage to the Archer's normal ATTACK and strike ARTS at close range", () => {
   const adjacent = createBattleState({
     units: [
       { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
@@ -423,6 +547,18 @@ test("Close Shot adds damage only to the Archer's normal ATTACK at close range",
   const distantSelected = applyCommand(distant, beginActivation(1, "p1-archer"));
   const distantAttack = applyCommand(distantSelected.nextState, attack(1, "p1-archer", "p2-distant", NORMAL_HIT));
   assert.equal(distantAttack.nextState.units.find((unit) => unit.id === "p2-distant").hp, 21);
+
+  const art = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-art-target", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const artSelected = applyCommand(art, beginActivation(1, "p1-archer"));
+  const legShot = applyCommand(artSelected.nextState, useArt(1, "p1-archer", "leg-shot", {
+    targetId: "p2-art-target", effectRoll: 0.9, ...NORMAL_HIT
+  }));
+  assert.equal(legShot.nextState.units.find((unit) => unit.id === "p2-art-target").hp, 20);
 });
 
 test("Volley Shot damages every enemy in its five-deep expanding cone", () => {
@@ -443,11 +579,18 @@ test("Volley Shot damages every enemy in its five-deep expanding cone", () => {
   }));
 
   assert.equal(result.accepted, true);
-  for (const id of ["depth-one", "depth-two-left", "depth-two-right", "depth-five-edge"]) {
-    assert.equal(result.nextState.units.find((unit) => unit.id === id).hp, 23);
-  }
+  assert.equal(result.nextState.units.find((unit) => unit.id === "depth-one").hp, 21);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "depth-two-left").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "depth-two-right").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "depth-five-edge").hp, 23);
   assert.equal(result.nextState.units.find((unit) => unit.id === "outside-cone").hp, 25);
   assert.deepEqual(result.events[0].targetIds.sort(), ["depth-five-edge", "depth-one", "depth-two-left", "depth-two-right"]);
+  assert.deepEqual(result.events[0].damageByTarget, {
+    "depth-one": 4,
+    "depth-two-left": 2,
+    "depth-two-right": 2,
+    "depth-five-edge": 2
+  });
 });
 
 test("Mage Killer silence prevents the afflicted unit from starting an ART", () => {
@@ -483,4 +626,80 @@ test("Life Sap restores half of the damage dealt, rounded to the nearest HP", ()
   assert.equal(result.accepted, true);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").hp, 23);
   assert.equal(result.events[0].effect.healing, 3);
+});
+
+test("Pray heals nearby friendly units and spends Mystic's activation", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-mystic", player: 1, type: "mystic", hp: 19, x: 0, y: 0 },
+      { id: "p1-near", player: 1, type: "swordsman", hp: 20, x: 3, y: 0 },
+      { id: "p1-far", player: 1, type: "archer", hp: 20, x: 4, y: 0 },
+      { id: "p2-enemy", player: 2, type: "swordsman", hp: 20, x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-mystic"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-mystic", "pray"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").hp, 22);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-near").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-far").hp, 20);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p2-enemy").hp, 20);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").mp, 34);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").spent, true);
+  assert.deepEqual(result.events[0].healingByTarget, { "p1-mystic": 3, "p1-near": 3 });
+});
+
+test("Wish heals every friendly unit by one regardless of distance", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-mystic", player: 1, type: "mystic", hp: 22, x: 0, y: 0 },
+      { id: "p1-far", player: 1, type: "archer", hp: 20, x: 9, y: 9 },
+      { id: "p2-enemy", player: 2, type: "swordsman", hp: 20, x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-mystic"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-mystic", "wish"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-far").hp, 21);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p2-enemy").hp, 20);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").mp, 36);
+  assert.deepEqual(result.events[0].healingByTarget, { "p1-mystic": 1, "p1-far": 1 });
+});
+
+test("Mystic Silence is a status cast that deals no damage and respects immunity", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-mystic", player: 1, type: "mystic", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 5, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-mystic"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-mystic", "silence", {
+    targetId: "p2-swordsman", effectRoll: 0
+  }));
+  const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
+
+  assert.equal(result.accepted, true);
+  assert.equal(target.hp, 25);
+  assert.deepEqual(target.statuses, [{ type: "silence", duration: 1 }]);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").mp, 35);
+  assert.deepEqual(result.events[0].effect, { attempted: true, applied: true, status: "silence" });
+
+  const immuneState = createBattleState({
+    units: [
+      { id: "p1-mystic", player: 1, type: "mystic", x: 0, y: 0 },
+      { id: "p2-mystic", player: 2, type: "mystic", x: 5, y: 0 }
+    ]
+  });
+  const immuneSelected = applyCommand(immuneState, beginActivation(1, "p1-mystic"));
+  const immune = applyCommand(immuneSelected.nextState, useArt(1, "p1-mystic", "silence", {
+    targetId: "p2-mystic", effectRoll: 0
+  }));
+
+  assert.equal(immune.accepted, true);
+  assert.deepEqual(immune.nextState.units.find((unit) => unit.id === "p2-mystic").statuses, []);
+  assert.equal(immune.events[0].effect.reason, "IMMUNE");
 });

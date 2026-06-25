@@ -22,7 +22,7 @@ export function chebyshevDistance(a, b) {
 }
 
 export function getLegalMoves(state, unit) {
-  const maxSteps = getEffectiveStats(unit).moveRange;
+  const maxSteps = getEffectiveStats(unit, state).moveRange;
   const queue = [{ ...unit.position, distance: 0 }];
   const visited = new Set([positionKey(unit.position)]);
   const legal = new Set();

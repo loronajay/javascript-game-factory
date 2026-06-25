@@ -2,7 +2,7 @@ import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
-import { resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { getProximityBonus, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import { resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
@@ -103,7 +103,7 @@ function attack(state, command) {
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
   const target = findUnit(state, command.targetId);
   if (!target || target.hp <= 0 || !areEnemies(result.unit, target)) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit).attackRange) {
+  if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
 
@@ -119,13 +119,14 @@ function attack(state, command) {
   if (swing.missed) {
     return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }]);
   }
-  // Basic ATTACK is eligible for the proximity passive (Close Shot); ARTS are not.
-  const damage = resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical });
+  // Basic ATTACK is eligible for proximity passives such as Close Shot.
+  const damage = resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical, state: next });
   nextTarget.hp = Math.max(0, nextTarget.hp - damage.damage);
   resolveVictory(next);
+  const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
-    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, ...damage
+    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, ...damageFields
   }]);
 }
 
@@ -139,14 +140,23 @@ function defend(state, command) {
   return accept(next, [{ type: "UNIT_DEFENDED", unitId: command.unitId }]);
 }
 
+// New art mechanics register here instead of adding branches to useArt.
+// Default (targeted attack + optional status/heal effect) needs no entry.
+const ART_RESOLVERS = new Map([
+  ["footwork", resolveFootwork],
+  ["volley-shot", resolveVolleyShot],
+  ["pray", resolveHealAllies],
+  ["wish", resolveHealAllies],
+  ["silence", resolveStatusCast]
+]);
+
 function useArt(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
   if (!canUseArt(state, result.unit, command.artId)) return reject(ERR.ART_NOT_AVAILABLE);
   const art = getArt(result.unit.type, command.artId);
-  if (art.id === "footwork") return resolveFootwork(state, command, art);
-  if (art.id === "volley-shot") return resolveVolleyShot(state, command, art);
-  return resolveTargetedArt(state, command, art);
+  const resolver = ART_RESOLVERS.get(art.id) ?? resolveTargetedArt;
+  return resolver(state, command, art);
 }
 
 function resolveFootwork(state, command, art) {
@@ -181,7 +191,7 @@ function resolveTargetedArt(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState).attackRange) {
+  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
 
@@ -200,15 +210,16 @@ function resolveTargetedArt(state, command, art) {
     return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost, hit: false, missed: true, roll: swing.hitRoll }]);
   }
 
-  // Targeted ARTS deal the same physical strike but never the proximity bonus.
-  const damage = resolvePhysicalStrike(actor, target, { proximity: false, critical: swing.critical });
+  // Targeted attack ARTS deal the same physical strike and inherit proximity
+  // passives such as Close Shot; status/heal chances stay on their own roll.
+  const damage = resolvePhysicalStrike(actor, target, { proximity: true, critical: swing.critical, state: next });
   target.hp = Math.max(0, target.hp - damage.damage);
 
   let effect = null;
   if (art.effect?.type === "status" && target.hp > 0) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
-    effect = resolveStatusEffect(target, art.effect, roll.value, { immuneTypes: art.immuneTypes });
+    effect = resolveStatusEffect(target, art.effect, roll.value);
     if (effect.statuses) target.statuses = effect.statuses;
     delete effect.statuses;
   } else if (art.effect?.type === "heal") {
@@ -216,7 +227,7 @@ function resolveTargetedArt(state, command, art) {
     next.rngState = roll.rngState;
     const successful = roll.value >= 0 && roll.value < art.effect.chance;
     const healing = successful ? Math.round(damage.damage / 2) : 0;
-    actor.hp = Math.min(getEffectiveStats(actor).maxHp, actor.hp + healing);
+    actor.hp = Math.min(getEffectiveStats(actor, next).maxHp, actor.hp + healing);
     effect = { attempted: true, applied: successful, healing };
   }
 
@@ -236,6 +247,65 @@ function resolveTargetedArt(state, command, art) {
   }]);
 }
 
+function resolveHealAllies(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  actor.mp -= art.mpCost;
+  const healingByTarget = {};
+  const targetIds = [];
+  const amount = Math.max(0, Number(art.effect.amount) || 0);
+
+  for (const target of livingUnits(next, actor.player)) {
+    if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
+    const before = target.hp;
+    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + amount);
+    const healed = target.hp - before;
+    if (healed <= 0) continue;
+    targetIds.push(target.id);
+    healingByTarget[target.id] = healed;
+  }
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetIds,
+    healingByTarget,
+    mpCost: art.mpCost
+  }]);
+}
+
+function resolveStatusCast(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  actor.mp -= art.mpCost;
+
+  const roll = drawValue(next.rngState, command.effectRoll);
+  next.rngState = roll.rngState;
+  const effect = resolveStatusEffect(target, art.effect, roll.value);
+  if (effect.statuses) target.statuses = effect.statuses;
+  delete effect.statuses;
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    mpCost: art.mpCost,
+    effect: { ...effect, status: art.effect.status }
+  }]);
+}
+
 function resolveVolleyShot(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const cells = getVolleyShotCells(state, actorState, command.targetPosition);
@@ -244,11 +314,14 @@ function resolveVolleyShot(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const targetIds = [];
+  const damageByTarget = {};
   for (const position of cells) {
     const target = unitAt(next, position);
     if (!target || !areEnemies(actor, target)) continue;
-    target.hp = Math.max(0, target.hp - art.damage.amount);
+    const damage = art.damage.amount + getProximityBonus(actor, target);
+    target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
+    damageByTarget[target.id] = damage;
   }
   actor.mp -= art.mpCost;
   spendAndAdvance(next, actor);
@@ -259,6 +332,7 @@ function resolveVolleyShot(state, command, art) {
     actorId: actor.id,
     targetPosition: { ...command.targetPosition },
     targetIds,
+    damageByTarget,
     mpCost: art.mpCost
   }]);
 }

@@ -2,8 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createBattleState } from "../src/core/state.js";
+import { canMoveInActivation } from "../src/ui/hud.js";
+import { isTargetedMode } from "../src/ui/boardRenderer.js";
+import { buildCodex } from "../src/ui/codex.js";
 
-test("the default duel uses Mini Tactics' ten-tile map and opposite-corner staging", () => {
+test("the default duel uses Mini Tactics' ten-tile map and four-unit corner staging", () => {
   const state = createBattleState();
   assert.equal(state.size, 10);
   assert.deepEqual(
@@ -11,8 +14,35 @@ test("the default duel uses Mini Tactics' ten-tile map and opposite-corner stagi
     [
       ["p1-swordsman", { x: 1, y: 9 }],
       ["p1-archer", { x: 0, y: 8 }],
+      ["p1-mystic", { x: 0, y: 9 }],
+      ["p1-swordsman-2", { x: 1, y: 8 }],
       ["p2-swordsman", { x: 8, y: 0 }],
-      ["p2-archer", { x: 9, y: 1 }]
+      ["p2-archer", { x: 9, y: 1 }],
+      ["p2-mystic", { x: 9, y: 0 }],
+      ["p2-swordsman-2", { x: 8, y: 1 }]
     ]
   );
+});
+
+test("the action bar keeps Move available after attacking if movement is unused", () => {
+  assert.equal(canMoveInActivation({ moved: false, primaryUsed: true }), true);
+  assert.equal(canMoveInActivation({ moved: true, primaryUsed: false }), false);
+  assert.equal(canMoveInActivation({ moved: true, primaryUsed: true }), false);
+});
+
+test("the board only treats attack and enemy-target ARTS as targeted modes", () => {
+  const actor = { type: "mystic" };
+
+  assert.equal(isTargetedMode("attack", actor), true);
+  assert.equal(isTargetedMode("art:silence", actor), true);
+  assert.equal(isTargetedMode("art:pray", actor), false);
+  assert.equal(isTargetedMode("art:wish", actor), false);
+  assert.equal(isTargetedMode("art:volley-shot", { type: "archer" }), false);
+});
+
+test("the codex describes either-order movement and primary actions", () => {
+  const html = buildCodex();
+
+  assert.match(html, /Move and act in either order/);
+  assert.doesNotMatch(html, /Move, then attack or defend/);
 });

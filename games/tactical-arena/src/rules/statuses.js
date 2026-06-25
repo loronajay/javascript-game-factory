@@ -8,15 +8,15 @@ export function statusImmunities(unit) {
   ));
 }
 
-export function applyStatus(unit, status, { immuneTypes = [] } = {}) {
-  if (statusImmunities(unit).has(status.type) || immuneTypes.includes(unit.type)) {
+export function applyStatus(unit, status) {
+  if (statusImmunities(unit).has(status.type)) {
     return { applied: false, reason: "IMMUNE", statuses: [...unit.statuses] };
   }
   const existing = unit.statuses.filter((entry) => entry.type !== status.type);
   return { applied: true, statuses: [...existing, { ...status }] };
 }
 
-export function resolveStatusEffect(unit, effect, effectRoll, options) {
+export function resolveStatusEffect(unit, effect, effectRoll) {
   if (!Number.isFinite(effectRoll) || effectRoll < 0 || effectRoll >= 1) {
     return { attempted: false, applied: false, reason: "INVALID_ROLL" };
   }
@@ -28,7 +28,7 @@ export function resolveStatusEffect(unit, effect, effectRoll, options) {
     ...(effect.statModifiers ? { statModifiers: { ...effect.statModifiers } } : {}),
     ...(Number.isFinite(effect.turnStartDamage) ? { turnStartDamage: effect.turnStartDamage } : {})
   };
-  const result = applyStatus(unit, status, options);
+  const result = applyStatus(unit, status);
   return { attempted: true, applied: result.applied, ...(result.reason ? { reason: result.reason } : {}), statuses: result.statuses };
 }
 

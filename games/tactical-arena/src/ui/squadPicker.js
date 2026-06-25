@@ -1,15 +1,13 @@
 // Squad builder: a small front/back unit picker shared by the setup screen. It
-// mirrors the real spawn block — the top cell is the FRONT line (slot 0, the
-// inner edge facing board center) and the bottom cell is the BACK line (slot 1,
-// the corner). Each cell click cycles the unit type. Presentation only: it
-// produces a normalized 2-type squad array the setup screen threads into the
-// match config; it never touches the engine.
+// mirrors the real four-unit corner spawn block. Each cell click cycles the unit
+// type. Presentation only: it produces a normalized squad array the setup screen
+// threads into the match config; it never touches the engine.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 
 export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES);
-export const DEFAULT_SQUAD = ["swordsman", "archer"];
+export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "swordsman"];
 
-// Force any input into a valid 2-slot squad of known unit types.
+// Force any input into a valid 4-slot squad of known unit types.
 export function normalizeSquad(squad) {
   const out = [];
   for (let i = 0; i < DEFAULT_SQUAD.length; i += 1) {
@@ -21,7 +19,9 @@ export function normalizeSquad(squad) {
 
 const SLOT_LAYOUT = [
   { index: 0, row: "front" },
-  { index: 1, row: "back" }
+  { index: 1, row: "front" },
+  { index: 2, row: "back" },
+  { index: 3, row: "back" }
 ];
 
 export function createSquadPicker({ title = "Squad", initial = null, accent = null } = {}) {

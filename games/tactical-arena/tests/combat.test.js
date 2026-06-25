@@ -21,13 +21,13 @@ test("resolvePhysicalStrike folds STR, DEF, and Defend halving (rounded up)", ()
   assert.equal(resolvePhysicalStrike(attacker, target).damage, 3); // ceil(5 / 2)
 });
 
-test("proximity passive adds bonus only when the strike is eligible for it", () => {
+test("proximity passive adds bonus when a physical strike opts into ART scaling", () => {
   const archer = { type: "archer", hp: 24, position: { x: 0, y: 0 } };
   const adjacent = { type: "swordsman", hp: 25, defending: false, position: { x: 1, y: 0 } };
 
   assert.equal(getProximityBonus(archer, adjacent), 2);
   assert.equal(resolvePhysicalStrike(archer, adjacent, { proximity: true }).damage, 5); // 8-5 +2
-  assert.equal(resolvePhysicalStrike(archer, adjacent, { proximity: false }).damage, 3); // ART path: no bonus
+  assert.equal(resolvePhysicalStrike(archer, adjacent, { proximity: false }).damage, 3); // caller can still opt out
 
   const twoAway = { type: "swordsman", hp: 25, defending: false, position: { x: 2, y: 0 } };
   assert.equal(getProximityBonus(archer, twoAway), 1);
@@ -55,7 +55,7 @@ test("the forecast number equals the damage the reducer actually deals (basic AT
   assert.equal(predicted, actualDamage);
 });
 
-test("the forecast number equals the damage the reducer deals through a targeted ART (no proximity)", () => {
+test("the forecast number equals the damage the reducer deals through a targeted ART with proximity", () => {
   const state = createBattleState({
     units: [
       { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
@@ -64,7 +64,7 @@ test("the forecast number equals the damage the reducer deals through a targeted
   });
   const actor = state.units.find((u) => u.id === "p1-archer");
   const target = state.units.find((u) => u.id === "p2-swordsman");
-  const predicted = resolvePhysicalStrike(actor, target, { proximity: false }).damage;
+  const predicted = resolvePhysicalStrike(actor, target, { proximity: true }).damage;
 
   const selected = applyCommand(state, beginActivation(1, "p1-archer"));
   const resolved = applyCommand(selected.nextState, useArt(1, "p1-archer", "leg-shot", {

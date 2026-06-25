@@ -1,4 +1,4 @@
-import { getEffectiveStats, getUnitType, isRaging } from "../core/unitCatalog.js";
+import { getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
 
@@ -73,12 +73,12 @@ export function getProximityBonus(attacker, target) {
 // Crit is deliberately excluded: it is a post-selection d6=6 and can never be
 // guaranteed before the roll, so a forecast must show the normal-hit number.
 //
-// `proximity` gates the proximity passive because the as-built reducer applies it to
-// the basic ATTACK only, not to targeted ARTS. Pass it to match the calling path.
-export function resolvePhysicalStrike(attacker, target, { proximity = false, critical = false } = {}) {
+// `proximity` gates the proximity passive for callers that represent attacks. The
+// current Archer kit opts in for basic ATTACK, targeted attack ARTS, and Volley Shot.
+export function resolvePhysicalStrike(attacker, target, { proximity = false, critical = false, state = null } = {}) {
   const result = resolveDamage({
-    attacker: getEffectiveStats(attacker),
-    defender: { ...getEffectiveStats(target), defending: target.defending },
+    attacker: getEffectiveStats(attacker, state),
+    defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
     type: "physical",
     critical
   });
@@ -86,9 +86,8 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   return { ...result, critical, proximityBonus, damage: result.damage + proximityBonus };
 }
 
-// A blinded unit's basic ATTACK is a guaranteed miss (ARTS are unaffected). Both the
-// reducer and the attack-mode forecast read this so the preview can honestly show a
-// miss before the swing.
+// A blinded unit's attack roll is a guaranteed miss unless a combat override (the
+// raging Archer's never-miss) says otherwise.
 export function isBlinded(unit) {
   return (unit.statuses ?? []).some((status) => status.type === "blind");
 }

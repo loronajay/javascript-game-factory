@@ -97,7 +97,11 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
   // ── Global delegated wiring (nav + actions + segmented controls) ──────────
   document.addEventListener("click", (event) => {
     const navBtn = event.target.closest("[data-nav]");
-    if (navBtn && !navBtn.disabled) { screens.show(navBtn.dataset.nav); return; }
+    if (navBtn && !navBtn.disabled) {
+      if (navBtn.dataset.nav !== "match") audio.stopMusic();
+      screens.show(navBtn.dataset.nav);
+      return;
+    }
 
     const seg = event.target.closest(".seg");
     if (seg && !seg.disabled) {

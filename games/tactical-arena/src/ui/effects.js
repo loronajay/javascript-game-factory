@@ -6,6 +6,7 @@
 // goes silent (no transform left behind) under prefers-reduced-motion.
 
 import { gridToScreen } from "./isometric.js";
+import { getAbilityVfx, getStatusVfx } from "./vfxCatalog.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -21,6 +22,10 @@ function reducedMotion() {
 
 function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function waitForAnimation(animation) {
+  return animation.finished.catch(() => {});
 }
 
 export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio }) {
@@ -40,6 +45,11 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
   function unitElement(unitId) {
     return unitsLayer?.querySelector(`[data-id="${unitId}"]`);
+  }
+
+  function effectPoint(position, lift = 0) {
+    const base = unitBase(position);
+    return { x: base.x, y: base.y - lift };
   }
 
   // Camera punch: jolt the board SVG a few pixels and settle, scaled by how much
@@ -63,7 +73,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   function critFlash() {
     if (!board || reducedMotion()) return;
     const box = board.viewBox.baseVal;
-    const flash = svg("rect", { class: "fx-critflash", x: box.x, y: box.y, width: box.width, height: box.height, fill: "#fff6e0" });
+    const flash = svg("rect", { class: "fx-critflash", x: box.x, y: box.y, width: box.width, height: box.height, fill: "#e8f4ff" });
     effectsLayer.appendChild(flash);
     flash.animate([{ opacity: 0.5 }, { opacity: 0 }], { duration: 220, easing: "ease-out" })
       .finished.catch(() => {}).then(() => flash.remove());
@@ -72,14 +82,35 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   // Brief impact pop + expanding ring at the point of contact.
   function impact(point, critical) {
     if (reducedMotion()) return;
-    const flash = svg("circle", { class: "fx-flash", cx: point.x, cy: point.y + 8, r: 6, fill: critical ? "#fff0c2" : "#ffd7dc", filter: "url(#softGlow)" });
+    const flash = svg("circle", { class: "fx-flash", cx: point.x, cy: point.y + 8, r: 6, fill: critical ? "#c8e8ff" : "#c0d8f0", filter: "url(#softGlow)" });
     effectsLayer.appendChild(flash);
     flash.animate([{ r: 6, opacity: 0.95 }, { r: critical ? 30 : 24, opacity: 0 }], { duration: 200, easing: "ease-out" })
       .finished.catch(() => {}).then(() => flash.remove());
-    const ring = svg("circle", { class: "fx-ring", cx: point.x, cy: point.y + 8, r: 8, stroke: critical ? "#ffd26a" : "#ff7684", filter: "url(#softGlow)" });
+    const ring = svg("circle", { class: "fx-ring", cx: point.x, cy: point.y + 8, r: 8, stroke: critical ? "#80c8f0" : "#ff7684", filter: "url(#softGlow)" });
     effectsLayer.appendChild(ring);
     ring.animate([{ r: 8, opacity: 1, strokeWidth: 5 }, { r: 44, opacity: 0, strokeWidth: 1 }], { duration: 420, easing: "ease-out" })
       .finished.catch(() => {}).then(() => ring.remove());
+  }
+
+  function statusBurst(unit, status) {
+    if (reducedMotion()) return;
+    const visual = getStatusVfx(status);
+    if (!visual) return;
+    const point = effectPoint(unit.position, 35);
+    const pulse = svg("circle", {
+      class: "fx-status-burst",
+      cx: point.x,
+      cy: point.y,
+      r: 10,
+      fill: visual.color,
+      stroke: visual.color,
+      filter: "url(#softGlow)"
+    });
+    effectsLayer.appendChild(pulse);
+    pulse.animate([
+      { r: 10, opacity: 0.85, strokeWidth: 5 },
+      { r: 34, opacity: 0, strokeWidth: 1 }
+    ], { duration: 460, easing: "ease-out" }).finished.catch(() => {}).then(() => pulse.remove());
   }
 
   // Rising combat number (or "MISS"). Awaited so the resolver paces on it.
@@ -93,6 +124,293 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       { transform: "translateY(-42px) scale(1)", opacity: 0 }
     ], { duration: 720, easing: "ease-out" }).finished.catch(() => {});
     element.remove();
+  }
+
+  async function projectileFan(actor, targets, targetPosition, vfx) {
+    sound.play("arrowAirborne");
+    if (reducedMotion()) return;
+    const from = effectPoint(actor.position, 12);
+    const fallback = targetPosition ? effectPoint(targetPosition, 12) : from;
+    const endpoints = targets.length ? targets.map((target) => effectPoint(target.position, 12)) : [fallback];
+    const count = vfx.projectileCount ?? endpoints.length;
+    const animations = [];
+    for (let i = 0; i < count; i += 1) {
+      const target = endpoints[i % endpoints.length];
+      const lane = i - (count - 1) / 2;
+      const end = { x: target.x + lane * 3.5, y: target.y - Math.abs(lane) * 1.5 };
+      const control = {
+        x: (from.x + end.x) / 2 + lane * (vfx.spread ?? 24) * 0.35,
+        y: Math.min(from.y, end.y) - (vfx.arcHeight ?? 58) - Math.abs(lane) * 3
+      };
+      const path = svg("path", {
+        d: `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
+        class: "fx-line fx-projectile-fan",
+        stroke: i % 2 ? vfx.colors.trail : vfx.colors.core,
+        "stroke-width": i % 3 === 0 ? 4 : 3,
+        filter: "url(#softGlow)"
+      });
+      path.style.strokeDasharray = "11 12";
+      effectsLayer.appendChild(path);
+      const animation = path.animate([
+        { strokeDashoffset: "80", opacity: 0 },
+        { strokeDashoffset: "20", opacity: 1, offset: 0.24 },
+        { strokeDashoffset: "-55", opacity: 0 }
+      ], {
+        duration: vfx.durationMs ?? 520,
+        delay: i * (vfx.staggerMs ?? 36),
+        easing: "ease-out"
+      });
+      animations.push(waitForAnimation(animation).then(() => path.remove()));
+    }
+    await Promise.all(animations);
+    for (const target of endpoints) impact({ x: target.x, y: target.y }, false);
+  }
+
+  async function drain(actor, target, vfx) {
+    if (reducedMotion()) return;
+    const from = effectPoint(target.position, 14);
+    const to = effectPoint(actor.position, 20);
+    const count = vfx.particleCount ?? 14;
+    const animations = [];
+    for (let i = 0; i < count; i += 1) {
+      const drift = (i - (count - 1) / 2) * 1.9;
+      const particle = svg("circle", {
+        class: "fx-drain-particle",
+        cx: from.x,
+        cy: from.y,
+        r: i % 3 === 0 ? 3.2 : 2.2,
+        fill: i % 2 ? vfx.colors.trail : vfx.colors.core,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(particle);
+      const animation = particle.animate([
+        { transform: "translate(0,0) scale(.5)", opacity: 0 },
+        { transform: `translate(${drift * 4}px ${-12 - Math.abs(drift)}px) scale(1)`, opacity: 0.95, offset: 0.22 },
+        { transform: `translate(${to.x - from.x + drift}px ${to.y - from.y}px) scale(.45)`, opacity: 0 }
+      ], {
+        duration: vfx.durationMs ?? 680,
+        delay: i * (vfx.staggerMs ?? 18),
+        easing: "cubic-bezier(.25,.8,.25,1)"
+      });
+      animations.push(waitForAnimation(animation).then(() => particle.remove()));
+    }
+    await Promise.all(animations);
+    impact({ x: to.x, y: to.y }, false);
+  }
+
+  async function healPulse(actor, targets, vfx) {
+    sound.play("heal");
+    if (reducedMotion()) return;
+    const recipients = targets.length ? targets : [actor];
+    const animations = [];
+    for (const target of recipients) {
+      const point = effectPoint(target.position, 18);
+      const ring = svg("circle", {
+        class: "fx-ring",
+        cx: point.x,
+        cy: point.y,
+        r: 8,
+        stroke: vfx.colors.trail,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(ring);
+      animations.push(waitForAnimation(ring.animate([
+        { r: 8, opacity: 0, strokeWidth: 5 },
+        { r: vfx.radius ?? 28, opacity: 0.95, strokeWidth: 3, offset: 0.35 },
+        { r: (vfx.radius ?? 28) + 12, opacity: 0, strokeWidth: 1 }
+      ], { duration: vfx.durationMs ?? 560, easing: "ease-out" })).then(() => ring.remove()));
+
+      for (let i = 0; i < (vfx.particleCount ?? 8); i += 1) {
+        const angle = (Math.PI * 2 * i) / (vfx.particleCount ?? 8);
+        const mote = svg("circle", {
+          class: "fx-mote",
+          cx: point.x,
+          cy: point.y,
+          r: 2.4 + (i % 2),
+          fill: i % 2 ? vfx.colors.impact : vfx.colors.core,
+          filter: "url(#softGlow)"
+        });
+        effectsLayer.appendChild(mote);
+        const animation = mote.animate([
+          { transform: "translate(0,0) scale(.45)", opacity: 0 },
+          { transform: `translate(${Math.cos(angle) * 12}px ${Math.sin(angle) * 8 - 8}px) scale(1)`, opacity: 0.9, offset: 0.28 },
+          { transform: `translate(${Math.cos(angle) * 22}px ${Math.sin(angle) * 16 - 26}px) scale(.3)`, opacity: 0 }
+        ], { duration: vfx.durationMs ?? 560, delay: i * 12, easing: "ease-out" });
+        animations.push(waitForAnimation(animation).then(() => mote.remove()));
+      }
+    }
+    await Promise.all(animations);
+  }
+
+  async function dashTrail(actor, path, targets, vfx) {
+    if (!path?.length) return;
+    sound.play("unitMove");
+    if (reducedMotion()) return;
+    const bases = [actor.position, ...path].map((position) => unitBase(position));
+    const lifted = bases.map((point) => ({ x: point.x, y: point.y - 7 }));
+    const trailPath = lifted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+    const trail = svg("path", {
+      d: trailPath,
+      class: "fx-line fx-dash-trail",
+      stroke: vfx.colors.trail,
+      "stroke-width": 7,
+      filter: "url(#softGlow)"
+    });
+    trail.style.strokeDasharray = "18 12";
+    effectsLayer.appendChild(trail);
+
+    const trailAnimation = trail.animate([
+      { strokeDashoffset: "80", opacity: 0 },
+      { strokeDashoffset: "0", opacity: 0.92, offset: 0.25 },
+      { strokeDashoffset: "-80", opacity: 0 }
+    ], { duration: vfx.durationMs ?? 760, easing: "cubic-bezier(.2,.8,.2,1)" });
+
+    const token = unitElement(actor.id);
+    // Relative offsets from bases[0] (the actor's SVG attribute position).
+    const originX = bases[0].x;
+    const originY = bases[0].y;
+    const tokenAnimation = token?.animate(bases.map((point, index) => ({
+      transform: `translate(${point.x - originX}px ${point.y - originY - (index % 2 ? 12 : 0)}px) scale(${index === bases.length - 1 ? 1.08 : 1})`,
+      offset: bases.length === 1 ? 1 : index / (bases.length - 1)
+    })), { duration: vfx.durationMs ?? 760, easing: "cubic-bezier(.17,.84,.28,1)", fill: "forwards" });
+
+    for (let i = 1; i < lifted.length; i += 1) {
+      const point = lifted[i];
+      const afterimage = svg("circle", {
+        class: "fx-afterimage",
+        cx: point.x,
+        cy: point.y + 8,
+        r: 5 + (i % 2) * 2,
+        fill: vfx.colors.core,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(afterimage);
+      afterimage.animate([
+        { transform: "scale(.7)", opacity: 0.7 },
+        { transform: "scale(2.3)", opacity: 0 }
+      ], { duration: 420, delay: i * 48, easing: "ease-out" }).finished.catch(() => {}).then(() => afterimage.remove());
+    }
+
+    for (const target of targets) {
+      const point = effectPoint(target.position, 8);
+      for (let i = 0; i < (vfx.sparkCount ?? 8); i += 1) {
+        const angle = (Math.PI * 2 * i) / (vfx.sparkCount ?? 8);
+        const spark = svg("rect", {
+          class: "fx-spark",
+          x: point.x - 2,
+          y: point.y - 2,
+          width: 4,
+          height: 4,
+          rx: 1,
+          fill: vfx.colors.impact,
+          filter: "url(#softGlow)"
+        });
+        effectsLayer.appendChild(spark);
+        spark.animate([
+          { transform: "translate(0,0) rotate(0deg)", opacity: 0.95 },
+          { transform: `translate(${Math.cos(angle) * 24}px ${Math.sin(angle) * 18}px) rotate(160deg)`, opacity: 0 }
+        ], { duration: 430, delay: 220 + i * 10, easing: "ease-out" }).finished.catch(() => {}).then(() => spark.remove());
+      }
+    }
+
+    await Promise.all([
+      waitForAnimation(trailAnimation).then(() => trail.remove()),
+      tokenAnimation ? waitForAnimation(tokenAnimation) : Promise.resolve()
+    ]);
+  }
+
+  async function statusStrike(actor, target, vfx) {
+    if (!target) return;
+    if (reducedMotion()) return;
+    const point = effectPoint(target.position, 30);
+    const base = effectPoint(target.position, 2);
+    const animations = [];
+
+    if (vfx.motif === "venom") {
+      for (let i = 0; i < (vfx.particleCount ?? 12); i += 1) {
+        const angle = (Math.PI * 2 * i) / (vfx.particleCount ?? 12);
+        const mote = svg("circle", { class: "fx-mote", cx: point.x, cy: point.y, r: 2.2 + (i % 3), fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
+        effectsLayer.appendChild(mote);
+        const animation = mote.animate([
+          { transform: "translate(0,0) scale(.5)", opacity: 0 },
+          { transform: `translate(${Math.cos(angle) * 14}px ${Math.sin(angle) * 8}px) scale(1)`, opacity: 0.9, offset: 0.25 },
+          { transform: `translate(${Math.cos(angle) * 30}px ${Math.sin(angle) * 22 - 18}px) scale(.35)`, opacity: 0 }
+        ], { duration: 520, delay: i * 14, easing: "ease-out" });
+        animations.push(waitForAnimation(animation).then(() => mote.remove()));
+      }
+    } else if (vfx.motif === "snare") {
+      for (let i = 0; i < (vfx.ringCount ?? 3); i += 1) {
+        const ring = svg("ellipse", { class: "fx-snare-ring", cx: base.x, cy: base.y + 10, rx: 14, ry: 6, fill: "none", stroke: vfx.colors.core, "stroke-width": 3, filter: "url(#softGlow)" });
+        effectsLayer.appendChild(ring);
+        const animation = ring.animate([
+          { rx: 9, ry: 4, opacity: 0 },
+          { rx: 24 + i * 4, ry: 10 + i * 2, opacity: 0.95, offset: 0.35 },
+          { rx: 10, ry: 3, opacity: 0 }
+        ], { duration: 520, delay: i * 90, easing: "cubic-bezier(.25,.8,.25,1)" });
+        animations.push(waitForAnimation(animation).then(() => ring.remove()));
+      }
+    } else if (vfx.motif === "moon") {
+      for (let i = 0; i < (vfx.particleCount ?? 8); i += 1) {
+        const offset = i - ((vfx.particleCount ?? 8) - 1) / 2;
+        const shard = svg("path", {
+          class: "fx-rune",
+          d: `M ${point.x - 8 + offset * 4} ${point.y - 28} Q ${point.x + offset * 2} ${point.y - 10} ${point.x + 8 + offset * 4} ${point.y - 28}`,
+          stroke: vfx.colors.core,
+          "stroke-width": 2.4,
+          filter: "url(#softGlow)"
+        });
+        effectsLayer.appendChild(shard);
+        const animation = shard.animate([
+          { transform: "translateY(-12px) scale(.7)", opacity: 0 },
+          { transform: "translateY(0) scale(1)", opacity: 0.95, offset: 0.35 },
+          { transform: "translateY(24px) scale(.85)", opacity: 0 }
+        ], { duration: 560, delay: i * 22, easing: "ease-out" });
+        animations.push(waitForAnimation(animation).then(() => shard.remove()));
+      }
+    } else if (vfx.motif === "silenceRune") {
+      const ring = svg("circle", { class: "fx-rune", cx: point.x, cy: point.y, r: 11, fill: "none", stroke: vfx.colors.core, "stroke-width": 3, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(ring);
+      animations.push(waitForAnimation(ring.animate([{ r: 11, opacity: 0 }, { r: 30, opacity: 0.95, offset: 0.38 }, { r: 18, opacity: 0 }], { duration: 560, easing: "ease-out" })).then(() => ring.remove()));
+      for (let i = 0; i < (vfx.runeCount ?? 4); i += 1) {
+        const angle = (Math.PI * 2 * i) / (vfx.runeCount ?? 4);
+        const mark = svg("line", { class: "fx-rune", x1: point.x - 18, y1: point.y, x2: point.x + 18, y2: point.y, stroke: vfx.colors.core, "stroke-width": 3, filter: "url(#softGlow)" });
+        mark.setAttribute("transform", `rotate(${angle * 180 / Math.PI} ${point.x} ${point.y})`);
+        effectsLayer.appendChild(mark);
+        const animation = mark.animate([
+          { opacity: 0, transform: `rotate(${angle}rad) scale(.4)` },
+          { opacity: 0.9, transform: `rotate(${angle}rad) scale(1)`, offset: 0.35 },
+          { opacity: 0, transform: `rotate(${angle}rad) scale(1.25)` }
+        ], { duration: 520, delay: i * 45, easing: "ease-out" });
+        animations.push(waitForAnimation(animation).then(() => mark.remove()));
+      }
+    }
+
+    statusBurst(target, vfx.status);
+    await Promise.all(animations);
+  }
+
+  async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect } = {}) {
+    const vfx = getAbilityVfx(artId);
+    if (!vfx || !actor) return;
+    if (vfx.type === "dashTrail") {
+      await dashTrail(actor, path, targets, vfx);
+      return;
+    }
+    if (vfx.type === "projectileFan") {
+      await projectileFan(actor, targets, targetPosition, vfx);
+      return;
+    }
+    if (vfx.type === "drain" && target && effect?.applied) {
+      await drain(actor, target, vfx);
+      return;
+    }
+    if (vfx.type === "healPulse") {
+      await healPulse(actor, targets, vfx);
+      return;
+    }
+    if (vfx.type === "statusStrike" && target && effect?.applied) {
+      await statusStrike(actor, target, { ...vfx, status: effect.status ?? vfx.status });
+    }
   }
 
   // A defeated figurine bursts into team-colored shards at its tile.
@@ -125,17 +443,21 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
   // Slide a unit from its old tile to its new tile. Called after the board has
   // re-rendered the token at its DESTINATION, so we animate from the old point in.
+  // Keyframes use relative offsets (delta from the SVG attribute position) because
+  // WAAPI CSS transforms stack on top of the SVG `transform` attribute rather than
+  // replacing it — using absolute SVG coordinates here would double the offset.
   async function animateMovement(unitId, from, to) {
     const element = unitElement(unitId);
     if (!element || reducedMotion()) return;
     const fromBase = unitBase(from);
     const toBase = unitBase(to);
+    // SVG attr is already at toBase; dx/dy is the vector back to the old position.
     const dx = fromBase.x - toBase.x;
     const dy = fromBase.y - toBase.y;
     await element.animate([
-      { transform: `translate(${toBase.x + dx}px ${toBase.y + dy}px) scale(1)` },
-      { transform: `translate(${toBase.x}px ${toBase.y - 12}px) scale(1.08)`, offset: 0.55 },
-      { transform: `translate(${toBase.x}px ${toBase.y}px) scale(1)` }
+      { transform: `translate(${dx}px ${dy}px) scale(1)` },
+      { transform: `translate(0px -12px) scale(1.08)`, offset: 0.55 },
+      { transform: `translate(0px 0px) scale(1)` }
     ], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" }).finished.catch(() => {});
   }
 
@@ -148,13 +470,14 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     if (!ranged) {
       const element = unitElement(attacker.id);
       if (!element || reducedMotion()) return;
+      // Relative offsets: SVG attr is already at fromBase; delta is a fraction toward target.
       const deltaX = (toBase.x - fromBase.x) * 0.18;
       const deltaY = (toBase.y - fromBase.y) * 0.18;
       await element.animate([
-        { transform: `translate(${fromBase.x}px ${fromBase.y}px)` },
-        { transform: `translate(${fromBase.x - deltaX * 0.3}px ${fromBase.y - deltaY * 0.3}px)` },
-        { transform: `translate(${fromBase.x + deltaX}px ${fromBase.y + deltaY}px) scale(1.12)` },
-        { transform: `translate(${fromBase.x}px ${fromBase.y}px)` }
+        { transform: `translate(0px 0px)` },
+        { transform: `translate(${-deltaX * 0.3}px ${-deltaY * 0.3}px)` },
+        { transform: `translate(${deltaX}px ${deltaY}px) scale(1.12)` },
+        { transform: `translate(0px 0px)` }
       ], { duration: 360, easing: "cubic-bezier(.2,.75,.2,1)" }).finished.catch(() => {});
       return;
     }
@@ -181,12 +504,12 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   async function hitRecoil(unitId, position, critical) {
     const element = unitElement(unitId);
     if (element && !reducedMotion()) {
-      const base = unitBase(position);
+      // Relative offsets: SVG attr already positions the token; we just wobble it.
       await element.animate([
-        { transform: `translate(${base.x}px ${base.y}px)` },
-        { transform: `translate(${base.x - 8}px ${base.y}px) rotate(-5deg)` },
-        { transform: `translate(${base.x + 7}px ${base.y}px) rotate(4deg)` },
-        { transform: `translate(${base.x}px ${base.y}px)` }
+        { transform: `translate(0px 0px)` },
+        { transform: `translate(-8px 0px) rotate(-5deg)` },
+        { transform: `translate(7px 0px) rotate(4deg)` },
+        { transform: `translate(0px 0px)` }
       ], { duration: 330, easing: "ease-out" }).finished.catch(() => {});
     }
     if (!reducedMotion()) await sleep(critical ? 110 : 70);
@@ -200,30 +523,31 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     shake(6);
     const element = unitElement(unitId);
     if (!element || reducedMotion()) return;
+    // Relative offsets: SVG attr already positions the token at `base`.
     await element.animate([
-      { transform: `translate(${base.x}px ${base.y}px) scale(1)`, opacity: 1 },
-      { transform: `translate(${base.x}px ${base.y + 8}px) scale(1.12,.7) rotate(8deg)`, opacity: 0.75 },
-      { transform: `translate(${base.x}px ${base.y + 24}px) scale(.2) rotate(30deg)`, opacity: 0 }
+      { transform: `translate(0px 0px) scale(1)`, opacity: 1 },
+      { transform: `translate(0px 8px) scale(1.12,.7) rotate(8deg)`, opacity: 0.75 },
+      { transform: `translate(0px 24px) scale(.2) rotate(30deg)`, opacity: 0 }
     ], { duration: 620, easing: "cubic-bezier(.3,.7,.3,1)" }).finished.catch(() => {});
   }
 
-  // The roll reveal. The engine rolls a probability, not a literal d6, so the
-  // token tumbles cosmetic glyphs and then lands on the *outcome* — HIT / MISS /
-  // CRIT — which is the honest thing it resolved. Awaited so the strike lands
-  // after the roll, never before.
-  async function rollReveal(outcome) {
+  // The roll reveal. Tumbles die faces then settles on an icon + label.
+  // Pass a custom `label` for a second effect roll (e.g. "BLINDED", "RESISTED").
+  async function rollReveal(outcome, label = null) {
     if (!diceOverlay || !dieFace) return;
     sound.play("diceRoll");
     diceOverlay.classList.add("show", "rolling");
     dieFace.className = "die";
-    const tumble = ["⚔", "✦", "✘", "✔", "✶", "●"];
+    const faces = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
     if (!reducedMotion()) {
       for (let i = 0; i < 7; i += 1) {
-        dieFace.textContent = tumble[Math.floor(Math.random() * tumble.length)];
+        dieFace.textContent = faces[Math.floor(Math.random() * faces.length)];
         await sleep(46);
       }
     }
-    dieFace.textContent = outcome.missed ? "MISS" : outcome.critical ? "CRIT!" : "HIT";
+    const glyph = outcome.missed ? "✘" : outcome.critical ? "✦" : "⚔";
+    const text = label ?? (outcome.missed ? "MISS" : outcome.critical ? "CRIT" : "HIT");
+    dieFace.innerHTML = `<span class="die-glyph">${glyph}</span><span class="die-label">${text}</span>`;
     dieFace.classList.add(outcome.missed ? "die-miss" : outcome.critical ? "die-crit" : "die-hit");
     diceOverlay.classList.remove("rolling");
     await sleep(reducedMotion() ? 140 : 380);
@@ -231,5 +555,5 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     await sleep(120);
   }
 
-  return { setMetrics, shake, critFlash, impact, floatText, deathBurst, animateMovement, animateAttack, hitRecoil, deathDissolve, rollReveal };
+  return { setMetrics, shake, critFlash, impact, statusBurst, floatText, deathBurst, animateMovement, animateAttack, hitRecoil, deathDissolve, rollReveal, playAbilityVfx };
 }
