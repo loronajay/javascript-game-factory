@@ -1,9 +1,11 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, validateFootworkPath } from "../rules/arts.js";
-import { resolveDamage } from "../rules/damage.js";
+import { canUseArt, FOOTWORK_DAMAGE, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
+import { resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
+import { resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 
 const ERR = Object.freeze({
   INVALID_COMMAND: "INVALID_COMMAND",
@@ -66,6 +68,11 @@ function beginActivation(state, command) {
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
+  const statusEvents = resolveTurnStartStatuses(unit);
+  if (unit.hp <= 0) {
+    resolveVictory(next);
+    return accept(next, statusEvents);
+  }
   unit.defending = false;
   next.activation = {
     unitId: unit.id,
@@ -73,7 +80,7 @@ function beginActivation(state, command) {
     moved: false,
     primaryUsed: false
   };
-  return accept(next, [{ type: "ACTIVATION_BEGAN", unitId: unit.id }]);
+  return accept(next, [...statusEvents, { type: "ACTIVATION_BEGAN", unitId: unit.id }]);
 }
 
 function moveUnit(state, command) {
@@ -96,22 +103,30 @@ function attack(state, command) {
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
   const target = findUnit(state, command.targetId);
   if (!target || target.hp <= 0 || !areEnemies(result.unit, target)) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(result.unit.position, target.position) > getUnitType(result.unit.type).stats.attackRange) {
+  if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
 
   const next = cloneState(state);
   const actor = findUnit(next, command.actorId);
   const nextTarget = findUnit(next, command.targetId);
-  const damage = resolveDamage({
-    attacker: getEffectiveStats(actor),
-    defender: { ...getEffectiveStats(nextTarget), defending: nextTarget.defending },
-    type: "physical"
-  });
-  nextTarget.hp = Math.max(0, nextTarget.hp - damage.damage);
   next.activation.primaryUsed = true;
+
+  // To-hit roll first (miss/crit). Blind and the raging Archer's never-miss are
+  // folded into the chance, so a guaranteed miss reads through the same path.
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }]);
+  }
+  // Basic ATTACK is eligible for the proximity passive (Close Shot); ARTS are not.
+  const damage = resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical });
+  nextTarget.hp = Math.max(0, nextTarget.hp - damage.damage);
   resolveVictory(next);
-  return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, ...damage }]);
+  return accept(next, [{
+    type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
+    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, ...damage
+  }]);
 }
 
 function defend(state, command) {
@@ -129,7 +144,14 @@ function useArt(state, command) {
   if (result.error) return reject(result.error);
   if (!canUseArt(state, result.unit, command.artId)) return reject(ERR.ART_NOT_AVAILABLE);
   const art = getArt(result.unit.type, command.artId);
-  if (art.id !== "footwork" || !validateFootworkPath(state, result.unit, command.path)) return reject(ERR.INVALID_ART_PATH);
+  if (art.id === "footwork") return resolveFootwork(state, command, art);
+  if (art.id === "volley-shot") return resolveVolleyShot(state, command, art);
+  return resolveTargetedArt(state, command, art);
+}
+
+function resolveFootwork(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  if (!validateFootworkPath(state, actorState, command.path)) return reject(ERR.INVALID_ART_PATH);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
@@ -155,6 +177,92 @@ function useArt(state, command) {
   }]);
 }
 
+function resolveTargetedArt(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState).attackRange) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  actor.mp -= art.mpCost;
+
+  // ART attacks roll to-hit like a basic attack (the ART's own status/heal check is
+  // a SECOND, separate roll below). A missed swing deals no damage and lands no
+  // effect, but the ART is still spent — you committed the activation and the MP.
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost, hit: false, missed: true, roll: swing.hitRoll }]);
+  }
+
+  // Targeted ARTS deal the same physical strike but never the proximity bonus.
+  const damage = resolvePhysicalStrike(actor, target, { proximity: false, critical: swing.critical });
+  target.hp = Math.max(0, target.hp - damage.damage);
+
+  let effect = null;
+  if (art.effect?.type === "status" && target.hp > 0) {
+    const roll = drawValue(next.rngState, command.effectRoll);
+    next.rngState = roll.rngState;
+    effect = resolveStatusEffect(target, art.effect, roll.value, { immuneTypes: art.immuneTypes });
+    if (effect.statuses) target.statuses = effect.statuses;
+    delete effect.statuses;
+  } else if (art.effect?.type === "heal") {
+    const roll = drawValue(next.rngState, command.effectRoll);
+    next.rngState = roll.rngState;
+    const successful = roll.value >= 0 && roll.value < art.effect.chance;
+    const healing = successful ? Math.round(damage.damage / 2) : 0;
+    actor.hp = Math.min(getEffectiveStats(actor).maxHp, actor.hp + healing);
+    effect = { attempted: true, applied: successful, healing };
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    mpCost: art.mpCost,
+    hit: true,
+    critical: swing.critical,
+    roll: swing.hitRoll,
+    damage,
+    ...(effect ? { effect } : {})
+  }]);
+}
+
+function resolveVolleyShot(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const cells = getVolleyShotCells(state, actorState, command.targetPosition);
+  if (!cells) return reject(ERR.INVALID_TARGET);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const targetIds = [];
+  for (const position of cells) {
+    const target = unitAt(next, position);
+    if (!target || !areEnemies(actor, target)) continue;
+    target.hp = Math.max(0, target.hp - art.damage.amount);
+    targetIds.push(target.id);
+  }
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetPosition: { ...command.targetPosition },
+    targetIds,
+    mpCost: art.mpCost
+  }]);
+}
+
 function finishActivation(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
@@ -166,6 +274,7 @@ function finishActivation(state, command) {
 }
 
 function spendAndAdvance(state, unit) {
+  unit.statuses = tickStatuses(unit.statuses);
   unit.spent = true;
   state.activation = null;
   if (livingUnits(state, state.currentPlayer).some((member) => !member.spent)) return;

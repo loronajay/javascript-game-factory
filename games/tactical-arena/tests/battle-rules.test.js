@@ -10,9 +10,14 @@ import {
   attack,
   beginActivation,
   defend,
+  finishActivation,
   moveUnit,
   useArt
 } from "../src/core/commands.js";
+
+// Combat now rolls to-hit (10% miss) and crit (15%). These pins force a clean
+// normal hit so the rules below stay deterministic; live play draws from the seed.
+const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 
 test("swordsman owns the specified core stat line and four ART slots", () => {
   assert.deepEqual(UNIT_TYPES.swordsman.stats, {
@@ -20,8 +25,8 @@ test("swordsman owns the specified core stat line and four ART slots", () => {
     attackRange: 1,
     strength: 10,
     defense: 5,
-    maxHp: 26,
-    maxMp: 15
+    maxHp: 25,
+    maxMp: 20
   });
   assert.equal(UNIT_TYPES.swordsman.arts.length, 4);
   assert.equal(UNIT_TYPES.swordsman.arts[0].id, "footwork");
@@ -33,14 +38,51 @@ test("swordsman owns the specified core stat line and four ART slots", () => {
   assert.equal(footwork.mpCost, 4);
   assert.equal(moonstrike.mpCost, 5);
   assert.deepEqual(moonstrike.effect, {
-    type: "status", status: "blind", chance: 0.7, durationTurns: null
+    type: "status", status: "blind", chance: 0.7, durationTurns: 1
   });
+  assert.deepEqual(moonstrike.immuneTypes, ["paladin"]);
   assert.deepEqual(mageKiller.effect, {
-    type: "status", status: "silence", chance: 0.7, durationTurns: null
+    type: "status", status: "silence", chance: 0.7, durationTurns: 1
   });
+  assert.deepEqual(mageKiller.immuneTypes, ["mystic", "paladin"]);
   assert.deepEqual(lifeSap.effect, {
-    type: "heal", chance: 0.7, amount: "damageDealt"
+    type: "heal", chance: 0.7, amount: "halfDamageDealtRounded"
   });
+});
+
+test("archer is available with the canonical core stat line and ART roster", () => {
+  assert.deepEqual(UNIT_TYPES.archer.stats, {
+    moveRange: 2,
+    attackRange: 5,
+    strength: 8,
+    defense: 4,
+    maxHp: 24,
+    maxMp: 22
+  });
+  assert.equal(UNIT_TYPES.archer.passive.name, "Close Shot");
+  assert.deepEqual(UNIT_TYPES.archer.arts.map((art) => art.name), [
+    "Volley Shot", "Poison Arrow", "Leg Shot", "Emblem"
+  ]);
+  assert.equal(UNIT_TYPES.archer.arts[3].kind, "passive");
+  assert.deepEqual(UNIT_TYPES.archer.arts[0].targeting, { shape: "cone", range: 5 });
+  assert.deepEqual(UNIT_TYPES.archer.arts[0].damage, { type: "true", amount: 2 });
+  assert.deepEqual(UNIT_TYPES.archer.arts[1].effect, {
+    type: "status", status: "poison", chance: 0.6, duration: "permanent", turnStartDamage: 1
+  });
+  assert.deepEqual(UNIT_TYPES.archer.arts[2].effect, {
+    type: "status", status: "slow", chance: 0.6, durationTurns: 3,
+    statModifiers: { moveRange: -1 }
+  });
+  assert.deepEqual(UNIT_TYPES.archer.arts[3].effect, {
+    type: "immunity", statuses: ["poison"]
+  });
+  assert.deepEqual(UNIT_TYPES.archer.passive.effect, {
+    type: "proximityDamage",
+    metric: "euclidean",
+    bands: [{ maxDistance: 1, bonusDamage: 2 }, { maxDistance: 2, bonusDamage: 1 }]
+  });
+  assert.equal(UNIT_TYPES.archer.rageArt.combat.neverMiss, true);
+  assert.equal(UNIT_TYPES.archer.rageArt.combat.criticalChance, 0.5);
 });
 
 test("RAGE ART becomes available automatically at five HP or below", () => {
@@ -50,13 +92,19 @@ test("RAGE ART becomes available automatically at five HP or below", () => {
 
 test("Swordsman low-health passive and RAGE passive stack as derived stats", () => {
   assert.deepEqual(getEffectiveStats({ type: "swordsman", hp: 6 }), {
-    moveRange: 3, attackRange: 1, strength: 10, defense: 5, maxHp: 26, maxMp: 15
+    moveRange: 3, attackRange: 1, strength: 10, defense: 5, maxHp: 25, maxMp: 20
   });
   assert.equal(getEffectiveStats({ type: "swordsman", hp: 3 }).strength, 11);
   assert.deepEqual(getEffectiveStats({ type: "swordsman", hp: 5 }), {
-    moveRange: 6, attackRange: 1, strength: 11, defense: 5, maxHp: 26, maxMp: 15
+    moveRange: 6, attackRange: 1, strength: 11, defense: 5, maxHp: 25, maxMp: 20
   });
   assert.equal(getEffectiveStats({ type: "swordsman", hp: 2 }).strength, 14);
+});
+
+test("Archer RAGE derives its strength and range bonuses", () => {
+  const stats = getEffectiveStats({ type: "archer", hp: 5 });
+  assert.equal(stats.strength, 9);
+  assert.equal(stats.attackRange, 6);
 });
 
 test("Footwork uses all current movement plus three, including RAGE and future movement buffs", () => {
@@ -112,9 +160,14 @@ test("defend is a primary action and clears when that unit begins its next activ
 });
 
 test("ARTS are unavailable after moving or attacking", () => {
-  const initial = createBattleState();
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 9, y: 9 }
+    ]
+  });
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
-  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 1, 0));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 0, 1));
   const artAfterMove = applyCommand(moved.nextState, useArt(1, "p1-swordsman", "footwork", []));
 
   assert.equal(artAfterMove.accepted, false);
@@ -155,9 +208,9 @@ test("Footwork requires six sequential unique steps, crosses enemies for true da
 
   assert.equal(result.accepted, true);
   assert.deepEqual(result.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 6, y: 0 });
-  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-a").hp, 24);
-  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-b").hp, 24);
-  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").mp, 11);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-a").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-b").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").mp, 16);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").spent, true);
 });
 
@@ -189,4 +242,245 @@ test("Footwork rejects repeated tiles and a final occupied tile", () => {
   ]));
   assert.equal(repeated.accepted, false);
   assert.equal(repeated.errorCode, "INVALID_ART_PATH");
+});
+
+test("Poison Arrow resolves a normal attack, spends the Archer, and applies permanent poison on a successful roll", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "poison-arrow", {
+    targetId: "p2-swordsman", effectRoll: 0.2, ...NORMAL_HIT
+  }));
+
+  assert.equal(result.accepted, true);
+  const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
+  const actor = result.nextState.units.find((unit) => unit.id === "p1-archer");
+  assert.equal(target.hp, 22);
+  assert.deepEqual(target.statuses, [{ type: "poison", duration: "permanent", turnStartDamage: 1 }]);
+  assert.equal(actor.mp, 18);
+  assert.equal(actor.spent, true);
+  assert.equal(result.events[0].effect.applied, true);
+});
+
+test("Emblem prevents Poison Arrow from adding poison but does not prevent its attack", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-archer", player: 2, type: "archer", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "poison-arrow", {
+    targetId: "p2-archer", effectRoll: 0, ...NORMAL_HIT
+  }));
+
+  assert.equal(result.accepted, true);
+  const target = result.nextState.units.find((unit) => unit.id === "p2-archer");
+  assert.equal(target.hp, 20);
+  assert.deepEqual(target.statuses, []);
+  assert.equal(result.events[0].effect.applied, false);
+  assert.equal(result.events[0].effect.reason, "IMMUNE");
+});
+
+test("poison damages its owner at the beginning of that unit's activation, defaulting to one damage", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-poisoned", player: 1, type: "swordsman", hp: 5, x: 0, y: 0, statuses: [{ type: "poison", duration: "permanent" }] },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 7, y: 7 }
+    ]
+  });
+  const result = applyCommand(initial, beginActivation(1, "p1-poisoned"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 4);
+  assert.deepEqual(result.events[0], { type: "STATUS_DAMAGE", unitId: "p1-poisoned", status: "poison", damage: 1 });
+});
+
+test("an ability can specify a stronger poison tick", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-poisoned", player: 1, type: "swordsman", hp: 5, x: 0, y: 0, statuses: [{ type: "poison", duration: "permanent", turnStartDamage: 3 }] },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 7, y: 7 }
+    ]
+  });
+  const result = applyCommand(initial, beginActivation(1, "p1-poisoned"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 2);
+  assert.equal(result.events[0].damage, 3);
+});
+
+test("Moonstrike applies a one-turn status that expires after the afflicted unit completes an activation", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const moonstrike = applyCommand(selected.nextState, useArt(1, "p1-swordsman", "moonstrike", {
+    targetId: "p2-swordsman", effectRoll: 0, ...NORMAL_HIT
+  }));
+  assert.deepEqual(moonstrike.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, [
+    { type: "blind", duration: 1 }
+  ]);
+
+  const enemySelected = applyCommand(moonstrike.nextState, beginActivation(2, "p2-swordsman"));
+  const enemyDefended = applyCommand(enemySelected.nextState, defend(2, "p2-swordsman"));
+  const finished = applyCommand(enemyDefended.nextState, finishActivation(2, "p2-swordsman"));
+  assert.deepEqual(finished.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, []);
+});
+
+test("failed status rolls still resolve the ART attack and report no effect", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "leg-shot", {
+    targetId: "p2-swordsman", effectRoll: 0.9, ...NORMAL_HIT
+  }));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p2-swordsman").hp, 22);
+  assert.deepEqual(result.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, []);
+  assert.deepEqual(result.events[0].effect, { attempted: true, applied: false, reason: "ROLL_FAILED" });
+});
+
+test("Leg Shot applies a three-turn Slow that reduces the target's MOVE by one", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "leg-shot", {
+    targetId: "p2-swordsman", effectRoll: 0, ...NORMAL_HIT
+  }));
+  const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
+
+  assert.deepEqual(target.statuses, [{ type: "slow", duration: 3, statModifiers: { moveRange: -1 } }]);
+  assert.equal(getEffectiveStats(target).moveRange, 2);
+});
+
+test("status-provided movement modifiers stack from their own definitions but cannot reduce MOVE below one", () => {
+  const stats = getEffectiveStats({
+    type: "archer",
+    hp: 24,
+    statuses: [
+      { type: "tarred", duration: 2, statModifiers: { moveRange: -1 } },
+      { type: "crippled", duration: 1, statModifiers: { moveRange: -8 } }
+    ]
+  });
+
+  assert.equal(stats.moveRange, 1);
+});
+
+test("blind makes a normal ATTACK miss but still consumes the primary action", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0, statuses: [{ type: "blind", duration: 1 }] },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const result = applyCommand(selected.nextState, attack(1, "p1-swordsman", "p2-swordsman"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p2-swordsman").hp, 25);
+  assert.equal(result.nextState.activation.primaryUsed, true);
+  assert.equal(result.events[0].type, "ATTACK_RESOLVED");
+  assert.equal(result.events[0].actorId, "p1-swordsman");
+  assert.equal(result.events[0].targetId, "p2-swordsman");
+  assert.equal(result.events[0].missed, true);
+  assert.equal(result.events[0].hit, false);
+});
+
+test("Close Shot adds damage only to the Archer's normal ATTACK at close range", () => {
+  const adjacent = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-adjacent", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const adjacentSelected = applyCommand(adjacent, beginActivation(1, "p1-archer"));
+  const adjacentAttack = applyCommand(adjacentSelected.nextState, attack(1, "p1-archer", "p2-adjacent", NORMAL_HIT));
+  assert.equal(adjacentAttack.nextState.units.find((unit) => unit.id === "p2-adjacent").hp, 20);
+
+  const distant = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-distant", player: 2, type: "swordsman", x: 2, y: 0 }
+    ]
+  });
+  const distantSelected = applyCommand(distant, beginActivation(1, "p1-archer"));
+  const distantAttack = applyCommand(distantSelected.nextState, attack(1, "p1-archer", "p2-distant", NORMAL_HIT));
+  assert.equal(distantAttack.nextState.units.find((unit) => unit.id === "p2-distant").hp, 21);
+});
+
+test("Volley Shot damages every enemy in its five-deep expanding cone", () => {
+  const initial = createBattleState({
+    size: 10,
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 4, y: 5 },
+      { id: "depth-one", player: 2, type: "swordsman", x: 4, y: 4 },
+      { id: "depth-two-left", player: 2, type: "swordsman", x: 3, y: 3 },
+      { id: "depth-two-right", player: 2, type: "swordsman", x: 5, y: 3 },
+      { id: "depth-five-edge", player: 2, type: "swordsman", x: 0, y: 0 },
+      { id: "outside-cone", player: 2, type: "swordsman", x: 8, y: 3 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "volley-shot", {
+    targetPosition: { x: 4, y: 4 }
+  }));
+
+  assert.equal(result.accepted, true);
+  for (const id of ["depth-one", "depth-two-left", "depth-two-right", "depth-five-edge"]) {
+    assert.equal(result.nextState.units.find((unit) => unit.id === id).hp, 23);
+  }
+  assert.equal(result.nextState.units.find((unit) => unit.id === "outside-cone").hp, 25);
+  assert.deepEqual(result.events[0].targetIds.sort(), ["depth-five-edge", "depth-one", "depth-two-left", "depth-two-right"]);
+});
+
+test("Mage Killer silence prevents the afflicted unit from starting an ART", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const mageKiller = applyCommand(selected.nextState, useArt(1, "p1-swordsman", "mage-killer", {
+    targetId: "p2-swordsman", effectRoll: 0, ...NORMAL_HIT
+  }));
+  const enemySelected = applyCommand(mageKiller.nextState, beginActivation(2, "p2-swordsman"));
+  const blocked = applyCommand(enemySelected.nextState, useArt(2, "p2-swordsman", "footwork", []));
+
+  assert.equal(blocked.accepted, false);
+  assert.equal(blocked.errorCode, "ART_NOT_AVAILABLE");
+});
+
+test("Life Sap restores half of the damage dealt, rounded to the nearest HP", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", hp: 20, x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-swordsman", "life-sap", {
+    targetId: "p2-swordsman", effectRoll: 0, ...NORMAL_HIT
+  }));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").hp, 23);
+  assert.equal(result.events[0].effect.healing, 3);
 });

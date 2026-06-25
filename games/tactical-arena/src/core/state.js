@@ -1,4 +1,5 @@
 import { getUnitType } from "./unitCatalog.js";
+import { createRngState } from "./rng.js";
 
 function createUnit(spec) {
   const definition = getUnitType(spec.type);
@@ -10,15 +11,18 @@ function createUnit(spec) {
     hp: spec.hp ?? definition.stats.maxHp,
     mp: spec.mp ?? definition.stats.maxMp,
     statModifiers: { ...(spec.statModifiers ?? {}) },
+    statuses: (spec.statuses ?? []).map((status) => ({ ...status })),
     defending: false,
     spent: false
   };
 }
 
-export function createBattleState({ size = 8, units } = {}) {
+export function createBattleState({ size = 10, units, seed } = {}) {
   const roster = units ?? [
-    { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
-    { id: "p2-swordsman", player: 2, type: "swordsman", x: size - 1, y: size - 1 }
+    { id: "p1-swordsman", player: 1, type: "swordsman", x: 1, y: size - 1 },
+    { id: "p1-archer", player: 1, type: "archer", x: 0, y: size - 2 },
+    { id: "p2-swordsman", player: 2, type: "swordsman", x: size - 2, y: 0 },
+    { id: "p2-archer", player: 2, type: "archer", x: size - 1, y: 1 }
   ];
 
   return {
@@ -28,7 +32,11 @@ export function createBattleState({ size = 8, units } = {}) {
     turnNumber: 1,
     activation: null,
     winner: null,
-    phase: "playing"
+    phase: "playing",
+    // Authoritative roll seed lives in match state so every actor draws identical
+    // rolls from the same seed + command stream. A fresh match varies; an online
+    // or replay match is handed a fixed seed.
+    rngState: createRngState(seed ?? (Date.now() & 0xffffffff))
   };
 }
 
@@ -38,7 +46,8 @@ export function cloneState(state) {
     units: state.units.map((unit) => ({
       ...unit,
       position: { ...unit.position },
-      statModifiers: { ...unit.statModifiers }
+      statModifiers: { ...unit.statModifiers },
+      statuses: unit.statuses.map((status) => ({ ...status }))
     })),
     activation: state.activation ? {
       ...state.activation,

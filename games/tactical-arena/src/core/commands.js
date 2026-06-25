@@ -9,7 +9,13 @@ export const COMMANDS = Object.freeze({
 
 export const beginActivation = (player, unitId) => ({ type: COMMANDS.BEGIN_ACTIVATION, player, unitId });
 export const moveUnit = (player, unitId, x, y) => ({ type: COMMANDS.MOVE_UNIT, player, unitId, position: { x, y } });
-export const attack = (player, actorId, targetId) => ({ type: COMMANDS.ATTACK, player, actorId, targetId });
+// `rolls` optionally pins the to-hit/crit draws ({ attackRoll, critRoll }) for
+// deterministic tests and recorded replay; live play omits it and the reducer
+// draws from the authoritative seed.
+export const attack = (player, actorId, targetId, rolls = {}) => ({ type: COMMANDS.ATTACK, player, actorId, targetId, ...rolls });
 export const defend = (player, unitId) => ({ type: COMMANDS.DEFEND, player, unitId });
-export const useArt = (player, unitId, artId, path = []) => ({ type: COMMANDS.USE_ART, player, unitId, artId, path });
+export const useArt = (player, unitId, artId, options = []) => {
+  const targeting = Array.isArray(options) ? { path: options } : options;
+  return { type: COMMANDS.USE_ART, player, unitId, artId, ...targeting };
+};
 export const finishActivation = (player, unitId) => ({ type: COMMANDS.FINISH_ACTIVATION, player, unitId });

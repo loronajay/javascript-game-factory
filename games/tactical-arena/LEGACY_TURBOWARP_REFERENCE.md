@@ -1,8 +1,8 @@
 # Legacy TurboWarp reference
 
-Source inspected: `tactical-arena.sb3` (TurboWarp/Scratch project). This is a
-design reference only. Its rules and numbers are **not** canonical where they
-conflict with `GDD.md` or later design decisions.
+Source inspected: `tactical-arena.sb3` (TurboWarp/Scratch project). Its unit
+data and mechanics are canonical for this rebuild, except where the user makes
+an explicit later refinement.
 
 ## Recovered roster data
 
@@ -16,10 +16,9 @@ conflict with `GDD.md` or later design decisions.
 | Paladin | 26 | 3 | 1 | 10 | 5 | 24 | Hand of Life | Lightseeker; Heaven's Realm (passive); Chosen (passive) |
 | Sniper | 23 | 2 | 6 | 8 | 3 | 18 | Rifle Powered | Smoke Bomb; Build Cover; Throw Cigar |
 
-The new Swordsman numbers already supersede the legacy values: 26 HP and 15 MP
-are authoritative in the new cabinet. The legacy project calls the Swordsman
-passive **Final Strike**; its old behavior still needs confirmation before that
-name is adopted in the new source of truth.
+The Swordsman's legacy 25 HP and 20 MP are authoritative in the new cabinet.
+The original passive name was **Final Strike**, but the canonical new name is
+**Last Stand**.
 
 ## Engine evidence worth carrying forward
 
@@ -32,6 +31,20 @@ name is adopted in the new source of truth.
 - **Stat modifications:** the project had STR, DEF, move-speed, and range
   boosts/debuffs. The new runtime `statModifiers` seam deliberately supports
   this direction.
+
+## Archer behavior recovered from scripts
+
+- **Close Shot:** adds 1 damage within two tiles and 2 damage at adjacent
+  range (the original uses pixel distance, so diagonal-edge behavior will be
+  normalized explicitly when implemented).
+- **Rain Shot:** 5 MP, target a range-5 cone, and deal 2 direct damage to each
+  enemy in the cone.
+- **Poison Arrow:** 4 MP, normal attack plus a 60% poison check. Archer and
+  Paladin are immune in the original project. Poison is canonically permanent
+  until removed or cleansed by an ability.
+- **Leg Shot:** 4 MP, normal attack plus a 60% Slow check. Paladin is immune;
+  Slow has a two-turn timer measured on the affected unit's own turns.
+- **Emblem:** passive immunity to poison.
 
 ## Not carried over
 

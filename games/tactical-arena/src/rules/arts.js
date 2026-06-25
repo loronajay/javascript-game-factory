@@ -1,6 +1,6 @@
 import { areEnemies, unitAt } from "../core/state.js";
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
-import { isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
+import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 
 export const FOOTWORK_DAMAGE = 2;
 
@@ -47,14 +47,41 @@ export function getFootworkStepOptions(state, actor, path) {
   return options;
 }
 
+export function getVolleyShotAimOptions(state, actor) {
+  return ORTHOGONAL_DIRECTIONS
+    .map((direction) => ({ x: actor.position.x + direction.x, y: actor.position.y + direction.y }))
+    .filter((position) => isOnBoard(state, position));
+}
+
+// The selected origin is the first cell in the rain. Each further row widens
+// one tile to either side: 1, 3, 5, 7, then 9 cells across.
+export function getVolleyShotCells(state, actor, origin) {
+  if (!origin || !isOnBoard(state, origin) || !isOrthogonallyAdjacent(actor.position, origin)) return null;
+  const direction = { x: origin.x - actor.position.x, y: origin.y - actor.position.y };
+  const perpendicular = { x: -direction.y, y: direction.x };
+  const cells = [];
+
+  for (let depth = 1; depth <= 5; depth += 1) {
+    for (let offset = -(depth - 1); offset <= depth - 1; offset += 1) {
+      const position = {
+        x: actor.position.x + direction.x * depth + perpendicular.x * offset,
+        y: actor.position.y + direction.y * depth + perpendicular.y * offset
+      };
+      if (isOnBoard(state, position)) cells.push(position);
+    }
+  }
+  return cells;
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   return Boolean(
-    art?.implemented &&
+    art?.implemented && art.kind === "active" &&
     state.activation?.unitId === actor.id &&
     !state.activation.moved &&
     !state.activation.primaryUsed &&
     !actor.spent &&
+    !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= art.mpCost
   );
 }
