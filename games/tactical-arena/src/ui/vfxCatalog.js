@@ -107,6 +107,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   lightseeker: Object.freeze({
     type: "magicBurst",
+    soundKey: "lightseeker",
     particleCount: 14,
     radius: 44,
     durationMs: 560,
@@ -114,10 +115,19 @@ const ABILITY_VFX = Object.freeze({
   }),
   darkseeker: Object.freeze({
     type: "magicBurst",
+    soundKey: "darkseeker",
     particleCount: 16,
     radius: 50,
     durationMs: 620,
     colors: Object.freeze({ core: "#9b8cff", trail: "#38256f", impact: "#d6c8ff" })
+  }),
+  "hand-of-life": Object.freeze({
+    type: "healPulse",
+    soundKey: "handOfLife",
+    particleCount: 9,
+    radius: 30,
+    durationMs: 560,
+    colors: Object.freeze({ core: "#f7e27d", trail: "#c8962a", impact: "#fffbe0" })
   }),
   pray: Object.freeze({
     type: "healPulse",

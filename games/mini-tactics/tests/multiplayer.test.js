@@ -42,6 +42,7 @@ function unit(id, player, type, x, y, extra = {}) {
     maxHp: 10,
     spent: false,
     defending: false,
+    guardTargetId: null,
     ...extra,
   };
 }
@@ -64,7 +65,7 @@ function must(state, command) {
 // Spend a player's whole (single-unit) turn so the clock advances.
 function takeTurn(state, player) {
   state = must(state, cmd.beginActivation(player, `p${player}-tank`));
-  state = must(state, cmd.defend(player, `p${player}-tank`));
+  state = must(state, cmd.guard(player, `p${player}-tank`, `p${player}-tank`));
   state = must(state, cmd.finishActivation(player, `p${player}-tank`));
   return state;
 }

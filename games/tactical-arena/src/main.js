@@ -207,6 +207,23 @@ async function resolveCombat(command) {
     }
   }
 
+  const handOfLifeEvent = events.find((e) => e.type === "HAND_OF_LIFE");
+  if (handOfLifeEvent) {
+    const paladinBefore = findUnit(state, handOfLifeEvent.actorId);
+    const healedUnitsBefore = Object.keys(handOfLifeEvent.healingByTarget)
+      .map((id) => findUnit(state, id))
+      .filter(Boolean);
+    if (paladinBefore && healedUnitsBefore.length) {
+      await effects.playAbilityVfx("hand-of-life", { actor: paladinBefore, targets: healedUnitsBefore });
+      await Promise.all(healedUnitsBefore.map((unit) => {
+        const healed = handOfLifeEvent.healingByTarget[unit.id] ?? 0;
+        return healed > 0
+          ? effects.floatText(unitCenter(metrics, unit), `+${healed}`, "#f7e27d")
+          : Promise.resolve();
+      }));
+    }
+  }
+
   state = result.nextState;
   playEventSounds(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }

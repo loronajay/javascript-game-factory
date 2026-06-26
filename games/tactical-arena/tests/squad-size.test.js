@@ -7,7 +7,7 @@ import { DEFAULT_SQUAD, normalizeSquad } from "../src/ui/squadPicker.js";
 
 test("standard squads contain four units per team", () => {
   assert.equal(DEFAULT_SQUAD.length, 4);
-  assert.deepEqual(DEFAULT_SQUAD, ["swordsman", "archer", "mystic", "swordsman"]);
+  assert.deepEqual(DEFAULT_SQUAD, ["swordsman", "archer", "mystic", "magician"]);
 });
 
 test("squad normalization preserves four slots and repairs bad entries", () => {
@@ -15,7 +15,7 @@ test("squad normalization preserves four slots and repairs bad entries", () => {
     normalizeSquad(["mystic", "archer", "nope", "swordsman", "archer"]),
     ["mystic", "archer", "mystic", "swordsman"]
   );
-  assert.deepEqual(normalizeSquad(["archer"]), ["archer", "archer", "mystic", "swordsman"]);
+  assert.deepEqual(normalizeSquad(["archer"]), ["archer", "archer", "mystic", "magician"]);
 });
 
 test("custom rosters spawn four units for each player in opposite corner blocks", () => {
@@ -48,11 +48,11 @@ test("the default battle state is a four-unit mirror match", () => {
       ["p1-swordsman", 1, "swordsman", { x: 1, y: 9 }],
       ["p1-archer", 1, "archer", { x: 0, y: 8 }],
       ["p1-mystic", 1, "mystic", { x: 0, y: 9 }],
-      ["p1-swordsman-2", 1, "swordsman", { x: 1, y: 8 }],
+      ["p1-magician", 1, "magician", { x: 1, y: 8 }],
       ["p2-swordsman", 2, "swordsman", { x: 8, y: 0 }],
       ["p2-archer", 2, "archer", { x: 9, y: 1 }],
       ["p2-mystic", 2, "mystic", { x: 9, y: 0 }],
-      ["p2-swordsman-2", 2, "swordsman", { x: 8, y: 1 }]
+      ["p2-magician", 2, "magician", { x: 8, y: 1 }]
     ]
   );
 });

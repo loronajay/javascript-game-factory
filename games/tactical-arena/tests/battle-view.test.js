@@ -16,11 +16,11 @@ test("the default duel uses Mini Tactics' ten-tile map and four-unit corner stag
       ["p1-swordsman", { x: 1, y: 9 }],
       ["p1-archer", { x: 0, y: 8 }],
       ["p1-mystic", { x: 0, y: 9 }],
-      ["p1-swordsman-2", { x: 1, y: 8 }],
+      ["p1-magician", { x: 1, y: 8 }],
       ["p2-swordsman", { x: 8, y: 0 }],
       ["p2-archer", { x: 9, y: 1 }],
       ["p2-mystic", { x: 9, y: 0 }],
-      ["p2-swordsman-2", { x: 8, y: 1 }]
+      ["p2-magician", { x: 8, y: 1 }]
     ]
   );
 });
