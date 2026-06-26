@@ -1,10 +1,10 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 
 export const STAT_GLOSSARY = [
-  ["Blind", "Afflicted unit's next attack automatically misses. Lasts 1 turn."],
-  ["Silence", "Afflicted unit cannot use ARTS. Lasts 1 turn."],
-  ["Poison", "1 damage at the start of each activation. Permanent until cleansed."],
-  ["Slow", "−1 MOVE. Lasts 3 of the affected unit's turns."]
+  ["Blind", "Afflicted unit's next attack automatically misses. Duration set per ability."],
+  ["Silence", "Afflicted unit cannot use ARTS. Duration set per ability."],
+  ["Poison", "Damage at the start of each activation. Permanent until cleansed; amount set per ability."],
+  ["Slow", "Reduces MOVE. Duration and amount set per ability."]
 ];
 
 // ── Private helpers ──────────────────────────────────────────────────────────

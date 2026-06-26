@@ -3,11 +3,13 @@
 import { SWORDSMAN } from "./units/swordsman.js";
 import { ARCHER } from "./units/archer.js";
 import { MYSTIC } from "./units/mystic.js";
+import { MAGICIAN } from "./units/magician.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
   archer: ARCHER,
-  mystic: MYSTIC
+  mystic: MYSTIC,
+  magician: MAGICIAN
 });
 
 export function getUnitType(type) {
@@ -56,7 +58,12 @@ export function getEffectiveStats(unit, state = null) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
 
-  if (unit.hp > 0 && unit.hp < 3) stats.strength += 3;
+  const passiveEffect = getUnitType(unit.type).passive?.effect;
+  if (passiveEffect?.type === "thresholdBoost" && unit.hp > 0 && unit.hp < passiveEffect.hpBelow) {
+    for (const [name, value] of Object.entries(passiveEffect.stats ?? {})) {
+      if (name in stats && Number.isFinite(value)) stats[name] += value;
+    }
+  }
   if (isRaging(unit)) {
     for (const [name, value] of Object.entries(getUnitType(unit.type).rageArt.effect?.stats ?? {})) {
       if (name in stats && Number.isFinite(value)) stats[name] += value;

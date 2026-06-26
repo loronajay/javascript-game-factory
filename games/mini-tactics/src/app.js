@@ -13,6 +13,7 @@ import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { SettingsModal } from "./ui/settingsModal.js";
 import { loadSettings, applySettings } from "./ui/settings.js";
+import { applyMobileViewport } from "./ui/mobileViewport.js";
 import { ConfirmDialog } from "./ui/confirmDialog.js";
 import { GameController } from "./game/GameController.js";
 import { ScreenManager } from "./ui/screens/screenManager.js";
@@ -27,6 +28,7 @@ import { createResultsScreen } from "./ui/screens/resultsScreen.js";
 export function createApp(documentRef = document) {
   const elements = getUiElements(documentRef);
   const audio = new AudioManager();
+  applyMobileViewport({ documentRef, windowRef: documentRef.defaultView ?? globalThis.window });
 
   // Load saved presentation preferences and apply them before the first render,
   // so theme / reduced-motion / colorblind / audio levels / animation speed are

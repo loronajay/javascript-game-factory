@@ -1,7 +1,7 @@
 import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { createBattleState, findUnit, unitAt } from "./core/state.js";
-import { canUseArt, getFootworkStepOptions, getFootworkSteps, getVolleyShotAimOptions } from "./rules/arts.js";
+import { canUseArt, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getVolleyShotAimOptions, getVolleyShotCells } from "./rules/arts.js";
 import { positionKey } from "./rules/movement.js";
 import { applyCommand } from "./core/reducer.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
@@ -159,7 +159,7 @@ async function resolveCombat(command) {
   const targetBefore = rolled ? findUnit(state, rolled.targetId) : null;
 
   if (rolled && attackerBefore && targetBefore) {
-    const ranged = attackerBefore.type === "archer";
+    const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
     const center = unitCenter(metrics, targetBefore);
 
     await effects.animateAttack(attackerBefore, targetBefore, ranged);
@@ -246,15 +246,39 @@ async function resolveInstantArt(command) {
     }));
   } else if (resolved?.artId === "volley-shot" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
+    const coneCells = getVolleyShotCells(state, actorBefore, resolved.targetPosition) ?? [];
     await effects.playAbilityVfx("volley-shot", {
       actor: actorBefore,
       targets: targetsBefore,
-      targetPosition: resolved.targetPosition
+      targetPosition: resolved.targetPosition,
+      coneCells
     });
     await Promise.all(targetsBefore.map(async (target) => {
       const center = unitCenter(metrics, target);
       await effects.hitRecoil(target.id, target.position, false);
       await effects.floatText(center, "-2", "#ff7684");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+  } else if (resolved?.artId === "flee" && actorBefore) {
+    await effects.playAbilityVfx("flee", {
+      actor: actorBefore,
+      targets: [],
+      path: resolved.path ?? [actorBefore.position]
+    });
+  } else if (resolved?.damageByTarget && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx(resolved.artId, {
+      actor: actorBefore,
+      targets: targetsBefore
+    });
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#c89cff");
+      }
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
@@ -272,13 +296,20 @@ async function resolveInstantArt(command) {
     }));
   } else if (resolved?.effect && actorBefore) {
     const targetBefore = targetsBefore[0];
-    if (targetBefore && resolved.effect.applied) {
-      await effects.playAbilityVfx(resolved.artId, {
-        actor: actorBefore,
-        target: targetBefore,
-        effect: resolved.effect
-      });
-      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), resolved.effect.status?.toUpperCase() ?? "STATUS", "#c89cff");
+    if (targetBefore && resolved.effect.attempted) {
+      const statusLabel = resolved.effect.status?.toUpperCase() ?? "STATUS";
+      await effects.rollReveal(
+        { missed: !resolved.effect.applied, critical: false },
+        resolved.effect.applied ? statusLabel : "RESISTED"
+      );
+      if (resolved.effect.applied) {
+        await effects.playAbilityVfx(resolved.artId, {
+          actor: actorBefore,
+          target: targetBefore,
+          effect: resolved.effect
+        });
+        await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), statusLabel, "#c89cff");
+      }
     }
   }
 
@@ -332,7 +363,7 @@ function playEventSounds(events) {
     else if (event.type === "UNIT_DEFENDED") audio.play("defend");
     else if (event.type === "ART_RESOLVED") {
       const ranged = findUnit(state, event.actorId)?.type === "archer";
-      if (event.artId === "footwork") continue;
+      if (event.artId === "footwork" || event.artId === "flee" || event.artId === "nuke") continue;
       else if (event.healingByTarget) audio.play("heal");
       else if (event.artId === "volley-shot") audio.play("arrowHit");
       else if (event.effect?.status === "silence") audio.play("attackHit");
@@ -407,6 +438,14 @@ async function handleTile(position) {
         setMessage(`Footwork: choose step ${footworkPath.length + 1} of ${steps}.`);
       }
     }
+  } else if (mode === "art:flee") {
+    const fleeLegal = getLegalFleeTiles(state, unit);
+    if (!fleeLegal.has(positionKey(position))) {
+      setMessage("Flee: choose a highlighted empty tile to teleport to.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "flee", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Flee complete. This unit's activation is complete.");
+    }
   } else if (mode === "art:volley-shot") {
     if (!getVolleyShotAimOptions(state, unit).some((c) => positionKey(c) === positionKey(position))) {
       setMessage("Hover a highlighted direction to preview the cone, then click to fire.", true);
@@ -416,13 +455,23 @@ async function handleTile(position) {
   } else if (mode?.startsWith("art:")) {
     const artId = mode.slice("art:".length);
     const art = getAvailableArts(unit).find((a) => a.id === artId);
-    const target = unitAt(state, position);
-    const resolved = art?.resolution === "statusCast"
-      ? target && await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }))
-      : target && await resolveCombat(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }));
-    if (resolved) {
-      const artName = art?.name ?? artId;
-      setMessage(`${artName} resolved. This unit's activation is complete.`);
+    if (art?.effect?.type === "healAllies") {
+      const clickedAlly = unitAt(state, position);
+      if (!clickedAlly || clickedAlly.player !== unit.player) {
+        setMessage("Click a highlighted ally to confirm.", true);
+      } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
+        mode = null;
+        setMessage(`${art.name} resolved. This unit's activation is complete.`);
+      }
+    } else {
+      const target = unitAt(state, position);
+      const resolved = art?.resolution === "statusCast"
+        ? target && await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }))
+        : target && await resolveCombat(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }));
+      if (resolved) {
+        const artName = art?.name ?? artId;
+        setMessage(`${artName} resolved. This unit's activation is complete.`);
+      }
     }
   } else {
     const clicked = unitAt(state, position);
@@ -463,7 +512,7 @@ async function handleActionClick(action, unit) {
     } else if (action.startsWith("art:")) {
       const artId = action.slice(4);
       const art = getAvailableArts(unit).find((a) => a.id === artId);
-      if (art?.effect?.type === "healAllies") {
+      if (art?.selfCast) {
         if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
           setMessage(`${art.name} resolved. This unit's activation is complete.`);
         }
@@ -472,9 +521,13 @@ async function handleActionClick(action, unit) {
       }
       const lead = action === "art:volley-shot"
         ? "Hover a direction to preview the cone, then click to fire."
-        : art?.resolution === "statusCast"
-          ? "Choose a highlighted enemy target."
-          : "Choose a highlighted enemy target.";
+        : action === "art:flee"
+          ? "Choose a highlighted empty tile to teleport to."
+          : art?.effect?.type === "healAllies"
+            ? "Click any highlighted ally to confirm."
+            : art?.resolution === "statusCast"
+              ? "Choose a highlighted enemy target."
+              : "Choose a highlighted enemy target.";
       setMessage(`${art.name} (${art.mpCost} MP): ${art.description} ${lead}`);
     } else {
       setMessage(`Choose a highlighted ${action} tile.`);

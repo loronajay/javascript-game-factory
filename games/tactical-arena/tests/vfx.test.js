@@ -21,28 +21,32 @@ test("ability VFX are reusable templates that can be retuned per ability", () =>
   assert.equal(lifeSap.colors.core, "#8cf0a4");
 });
 
-test("Volley Shot declares a fan of recolorable projectiles", () => {
+test("Volley Shot declares a cone rain of recolorable projectiles", () => {
   const volley = getAbilityVfx("volley-shot");
-  assert.equal(volley.type, "projectileFan");
-  assert.equal(volley.projectileCount, 7);
+  assert.equal(volley.type, "volleyRain");
   assert.equal(volley.colors.core, "#f7e27d");
-  assert.ok(volley.spread > 0);
+  assert.ok(volley.staggerMs > 0);
+  assert.ok(volley.durationMs > 0);
 });
 
 test("every implemented active ART declares a distinct VFX recipe", () => {
   assert.deepEqual(
-    ["footwork", "moonstrike", "mage-killer", "life-sap", "volley-shot", "poison-arrow", "leg-shot", "pray", "wish", "silence"].map((id) => [id, getAbilityVfx(id)?.type]),
+    ["footwork", "moonstrike", "mage-killer", "life-sap", "volley-shot", "poison-arrow", "leg-shot", "pray", "wish", "silence", "spark", "flee", "banish", "nuke"].map((id) => [id, getAbilityVfx(id)?.type]),
     [
       ["footwork", "dashTrail"],
       ["moonstrike", "statusStrike"],
       ["mage-killer", "statusStrike"],
       ["life-sap", "drain"],
-      ["volley-shot", "projectileFan"],
+      ["volley-shot", "volleyRain"],
       ["poison-arrow", "statusStrike"],
       ["leg-shot", "statusStrike"],
       ["pray", "healPulse"],
       ["wish", "healPulse"],
-      ["silence", "statusStrike"]
+      ["silence", "statusStrike"],
+      ["spark", "projectileFan"],
+      ["flee", "dashTrail"],
+      ["banish", "statusStrike"],
+      ["nuke", "magicBurst"]
     ]
   );
   assert.equal(getAbilityVfx("moonstrike").motif, "moon");

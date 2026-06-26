@@ -1,8 +1,9 @@
 import { areEnemies, unitAt } from "../core/state.js";
-import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
+import { getArt, getEffectiveStats, isRaging } from "../core/unitCatalog.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 
 export const FOOTWORK_DAMAGE = 2;
+export const FLEE_RANGE_BONUS = 2;
 
 export function getFootworkSteps(actor) {
   const footwork = getArt(actor.type, "footwork");
@@ -73,6 +74,21 @@ export function getVolleyShotCells(state, actor, origin) {
   return cells;
 }
 
+export function getLegalFleeTiles(state, actor) {
+  const range = getEffectiveStats(actor).moveRange + FLEE_RANGE_BONUS;
+  const legal = new Set();
+  for (let dx = -range; dx <= range; dx += 1) {
+    for (let dy = -range; dy <= range; dy += 1) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > range) continue;
+      if (dx === 0 && dy === 0) continue;
+      const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+      if (!isOnBoard(state, pos) || unitAt(state, pos)) continue;
+      legal.add(positionKey(pos));
+    }
+  }
+  return legal;
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   return Boolean(
@@ -82,6 +98,7 @@ export function canUseArt(state, actor, artId) {
     !state.activation.primaryUsed &&
     !actor.spent &&
     !actor.statuses?.some((status) => status.type === "silence") &&
-    actor.mp >= art.mpCost
+    actor.mp >= art.mpCost &&
+    (!art.rageLocked || isRaging(actor))
   );
 }

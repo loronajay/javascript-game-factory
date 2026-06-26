@@ -1,8 +1,9 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getEffectiveStats, getUnitType } from "./unitCatalog.js";
+import { getArt, getEffectiveStats, getUnitType, isDefending } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
-import { getProximityBonus, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
+import { getProximityBonus, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import { resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
@@ -78,7 +79,8 @@ function beginActivation(state, command) {
     unitId: unit.id,
     origin: { ...unit.position },
     moved: false,
-    primaryUsed: false
+    primaryUsed: false,
+    spellUsed: false
   };
   return accept(next, [...statusEvents, { type: "ACTIVATION_BEGAN", unitId: unit.id }]);
 }
@@ -119,7 +121,6 @@ function attack(state, command) {
   if (swing.missed) {
     return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }]);
   }
-  // Basic ATTACK is eligible for proximity passives such as Close Shot.
   const damage = resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical, state: next });
   nextTarget.hp = Math.max(0, nextTarget.hp - damage.damage);
   resolveVictory(next);
@@ -147,7 +148,9 @@ const ART_RESOLVERS = new Map([
   ["volley-shot", resolveVolleyShot],
   ["pray", resolveHealAllies],
   ["wish", resolveHealAllies],
-  ["silence", resolveStatusCast]
+  ["silence", resolveStatusCast],
+  ["flee", resolveFlee],
+  ["nuke", resolveNuke]
 ]);
 
 function useArt(state, command) {
@@ -210,9 +213,11 @@ function resolveTargetedArt(state, command, art) {
     return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost, hit: false, missed: true, roll: swing.hitRoll }]);
   }
 
-  // Targeted attack ARTS deal the same physical strike and inherit proximity
-  // passives such as Close Shot; status/heal chances stay on their own roll.
-  const damage = resolvePhysicalStrike(actor, target, { proximity: true, critical: swing.critical, state: next });
+  if (art.damageType === "magic") next.activation.spellUsed = true;
+
+  // Targeted attack ARTS resolve via the attacker's base strike type. `art.damageType`
+  // overrides to magic for ARTS like Spark and Banish (magic ignores proximity bonuses).
+  const damage = resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null });
   target.hp = Math.max(0, target.hp - damage.damage);
 
   let effect = null;
@@ -244,6 +249,58 @@ function resolveTargetedArt(state, command, art) {
     roll: swing.hitRoll,
     damage,
     ...(effect ? { effect } : {})
+  }]);
+}
+
+function resolveFlee(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const legal = getLegalFleeTiles(state, actorState);
+  if (!command.targetPosition || !legal.has(positionKey(command.targetPosition))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const from = { ...actor.position };
+  actor.position = { ...command.targetPosition };
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    path: [from, { ...command.targetPosition }],
+    mpCost: art.mpCost
+  }]);
+}
+
+function resolveNuke(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const radius = art.targeting.radius;
+  const damageByTarget = {};
+  const targetIds = [];
+
+  for (const target of livingUnits(next)) {
+    if (!areEnemies(actor, target)) continue;
+    if (chebyshevDistance(actor.position, target.position) > radius) continue;
+    const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
+    const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
+    target.hp = Math.max(0, target.hp - result.damage);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = result.damage;
+  }
+
+  actor.mp -= art.mpCost;
+  next.activation.spellUsed = true;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetIds,
+    damageByTarget,
+    mpCost: art.mpCost
   }]);
 }
 
@@ -350,6 +407,22 @@ function finishActivation(state, command) {
 function spendAndAdvance(state, unit) {
   unit.statuses = tickStatuses(unit.statuses);
   unit.spent = true;
+
+  const spellUsed = state.activation?.spellUsed ?? false;
+  const passive = getUnitType(unit.type)?.passive;
+  if (passive?.effect?.type === "mpRegen") {
+    if (spellUsed) {
+      unit.mageChargeCount = 0;
+    } else {
+      unit.mageChargeCount = (unit.mageChargeCount ?? 0) + 1;
+      if (unit.mageChargeCount >= passive.effect.interval) {
+        const maxMp = getEffectiveStats(unit, state).maxMp;
+        unit.mp = Math.min(maxMp, unit.mp + passive.effect.amount);
+        unit.mageChargeCount = 0;
+      }
+    }
+  }
+
   state.activation = null;
   if (livingUnits(state, state.currentPlayer).some((member) => !member.spent)) return;
   state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;

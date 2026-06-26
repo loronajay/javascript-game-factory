@@ -50,6 +50,14 @@ export class UnitRenderer {
       ry: 8
     });
 
+    const tapTarget = createSvgElement("ellipse", {
+      class: "tap-target",
+      cx: 0,
+      cy: 0,
+      rx: 42,
+      ry: 54
+    });
+
     const body = createSvgElement("g", { class: "body-group" });
 
     body.append(
@@ -172,7 +180,7 @@ export class UnitRenderer {
     );
 
     body.appendChild(defendMark);
-    group.append(shadow, body);
+    group.append(tapTarget, shadow, body);
 
     group.addEventListener("click", (event) => {
       event.stopPropagation();

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1116" />
+  <title>Game Sound Factory v3</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <p class="eyebrow">HYBRID PROCEDURAL GAME AUDIO</p>
+      <h1>Game Sound Factory <span>v3</span></h1>
+    </div>
+
+    <div class="top-selection" aria-live="polite">
+      <span class="muted-label">Selected</span>
+      <strong id="topSelectedName">Warrior Hit</strong>
+      <span id="topSelectedPath">Mini-Tactics Hybrid / Warrior</span>
+    </div>
+
+    <div class="top-actions">
+      <label class="master-control">
+        <span>Master</span>
+        <input id="masterVolume" type="range" min="0" max="1" step="0.01" value="0.78" />
+      </label>
+      <button id="topPlaySelected" class="secondary compact" type="button">Play</button>
+      <button id="topDownloadWav" class="render-button compact" type="button">Render WAV</button>
+      <button id="stopAll" class="secondary compact" type="button">Stop</button>
+    </div>
+  </header>
+
+  <main class="app-frame">
+    <aside class="library-pane panel">
+      <div class="pane-header">
+        <div>
+          <p class="eyebrow">PROJECT BROWSER</p>
+          <h2>Sound Library</h2>
+        </div>
+        <span id="libraryTotal" class="count-badge">0</span>
+      </div>
+
+      <label class="search-field">
+        <span>Search files</span>
+        <input id="search" type="search" placeholder="warrior, hit, ranger..." />
+      </label>
+
+      <nav id="libraryTree" class="library-tree" aria-label="Sound library folders"></nav>
+
+      <div class="library-legend">
+        <div><span class="legend-dot hybrid"></span>Hybrid production patches</div>
+        <div><span class="legend-dot reference"></span>Raw reference WAVs</div>
+        <div><span class="legend-dot retro"></span>Retro proof-of-concept bank</div>
+      </div>
+    </aside>
+
+    <section class="browser-pane panel">
+      <div class="browser-header">
+        <div>
+          <div id="breadcrumbs" class="breadcrumbs"></div>
+          <p id="folderDescription">All available sound patches.</p>
+        </div>
+
+        <div class="browser-actions">
+          <span id="visibleCount" class="count-badge">0 files</span>
+          <select id="sortOrder" aria-label="Sort sound files">
+            <option value="name">Sort: Name</option>
+            <option value="category">Sort: Category</option>
+            <option value="bank">Sort: Bank</option>
+          </select>
+          <button id="viewToggle" class="secondary compact" type="button">List view</button>
+          <button id="playRandom" class="secondary compact" type="button">Random</button>
+        </div>
+      </div>
+
+      <div id="soundboard" class="sound-grid" aria-live="polite"></div>
+    </section>
+
+    <aside class="inspector-pane panel">
+      <div class="inspector-sticky">
+        <div class="selected-file-heading">
+          <div>
+            <p class="eyebrow">SELECTED SOUND FILE</p>
+            <h2 id="selectedName">Warrior Hit</h2>
+            <div id="selectedMeta" class="selected-meta"></div>
+          </div>
+          <button id="playSelected" class="secondary square-button" type="button" title="Play selected sound" aria-label="Play selected sound">▶</button>
+        </div>
+
+        <label class="output-name-field">
+          <span>Rendered filename</span>
+          <div>
+            <input id="outputFilename" type="text" value="warrior-hit" autocomplete="off" spellcheck="false" />
+            <span>.wav</span>
+          </div>
+        </label>
+
+        <button id="downloadWav" class="render-button full-width" type="button">Render selected WAV</button>
+        <p id="renderHint" class="render-hint">Current mixer settings are included in the export.</p>
+      </div>
+
+      <div class="inspector-scroll">
+        <section class="control-section">
+          <div class="section-title">
+            <h3>Variation</h3>
+            <button id="resetMixer" class="text-button" type="button">Reset controls</button>
+          </div>
+
+          <label>
+            <span>Variation <output id="variationValue">5%</output></span>
+            <input id="variation" type="range" min="0" max="0.22" step="0.01" value="0.05" />
+          </label>
+
+          <label>
+            <span>Pitch <output id="pitchValue">1.00×</output></span>
+            <input id="pitch" type="range" min="0.72" max="1.35" step="0.01" value="1" />
+          </label>
+        </section>
+
+        <section class="control-section">
+          <h3>Physical layer mixer</h3>
+
+          <label>
+            <span>Air / motion <output id="airValue">1.00×</output></span>
+            <input id="airGain" type="range" min="0" max="1.8" step="0.01" value="1" />
+          </label>
+
+          <label>
+            <span>Contact <output id="contactValue">1.00×</output></span>
+            <input id="contactGain" type="range" min="0" max="1.8" step="0.01" value="1" />
+          </label>
+
+          <label>
+            <span>Low body <output id="bodyValue">1.00×</output></span>
+            <input id="bodyGain" type="range" min="0" max="1.8" step="0.01" value="1" />
+          </label>
+
+          <label>
+            <span>Resonance <output id="resonanceValue">1.00×</output></span>
+            <input id="resonanceGain" type="range" min="0" max="1.8" step="0.01" value="1" />
+          </label>
+        </section>
+
+        <details class="patch-details">
+          <summary>Patch JSON</summary>
+
+          <label class="json-label">
+            <span>Advanced patch editor</span>
+            <textarea id="patchEditor" spellcheck="false"></textarea>
+          </label>
+
+          <p id="editorStatus" class="status" aria-live="polite"></p>
+
+          <div class="editor-actions">
+            <button id="applyPatch" type="button">Apply patch</button>
+            <button id="resetPatch" class="secondary" type="button">Reset patch</button>
+            <button id="duplicatePatch" class="secondary" type="button">Duplicate</button>
+            <button id="downloadJson" class="secondary" type="button">Download JSON</button>
+          </div>
+        </details>
+
+        <details class="patch-details">
+          <summary>Layer reference</summary>
+          <p><code>sample</code>, <code>noise</code>, <code>oscillator</code>, <code>impactBody</code>, and <code>resonatorBank</code>.</p>
+          <p>Physical roles are mixed independently: <code>air</code>, <code>contact</code>, <code>body</code>, and <code>resonance</code>.</p>
+        </details>
+      </div>
+    </aside>
+  </main>
+
+  <div class="statusbar">
+    <span id="audioState">Audio: idle</span>
+    <span id="preloadState">Reference files load on first playback.</span>
+    <span>Render shortcut: Alt+R</span>
+  </div>
+
+  <div class="mobile-action-dock">
+    <div>
+      <strong id="mobileSelectedName">Warrior Hit</strong>
+      <span id="mobileOutputName">warrior-hit.wav</span>
+    </div>
+    <button id="mobilePlaySelected" class="secondary compact" type="button">Play</button>
+    <button id="mobileDownloadWav" class="render-button compact" type="button">Render WAV</button>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

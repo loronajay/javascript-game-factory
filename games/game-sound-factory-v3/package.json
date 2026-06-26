@@ -1,0 +1,7 @@
+{
+  "name": "game-sound-factory-v3",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "description": "Organized hybrid game sound editor with pseudo filesystem and persistent WAV rendering controls"
+}

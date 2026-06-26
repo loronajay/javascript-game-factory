@@ -4,7 +4,7 @@ import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } 
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
 import { unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { getFootworkStepOptions, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
+import { getFootworkStepOptions, getLegalFleeTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
 
 function createTile(metrics, position, { selected, legal, targetKind, path, range }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -31,7 +31,7 @@ export function isTargetedMode(mode, actor) {
   if (mode === "attack") return true;
   if (!actor || !mode?.startsWith("art:") || mode === "art:volley-shot") return false;
   const art = getArt(actor.type, mode.slice("art:".length));
-  return Boolean(art && art.effect?.type !== "healAllies");
+  return Boolean(art && art.effect?.type !== "healAllies" && art.resolution !== "flee");
 }
 
 // Hovering a Volley direction lights that cone's tiles so the player sees the
@@ -95,6 +95,33 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   }
 
   if (actor && mode === "footwork") legal = getFootworkStepOptions(state, actor, footworkPath);
+  if (actor && mode === "art:flee") legal = getLegalFleeTiles(state, actor);
+
+  let isHealArt = false;
+  if (actor && mode?.startsWith("art:")) {
+    const healArt = getArt(actor.type, mode.slice("art:".length));
+    if (healArt?.effect?.type === "healAllies") {
+      isHealArt = true;
+      if (healArt.targeting?.shape === "selfAura") {
+        const radius = healArt.targeting.radius ?? healArt.effect.radius ?? 3;
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          for (let dy = -radius; dy <= radius; dy += 1) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
+            const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+            if (isOnBoard(state, pos)) range.add(positionKey(pos));
+          }
+        }
+        for (const u of state.units) {
+          if (u.hp > 0 && u.player === actor.player && chebyshevDistance(actor.position, u.position) <= radius)
+            legal.add(positionKey(u.position));
+        }
+      } else {
+        for (const u of state.units) {
+          if (u.hp > 0 && u.player === actor.player) legal.add(positionKey(u.position));
+        }
+      }
+    }
+  }
 
   const path = new Set(footworkPath.map(positionKey));
   const metrics = createBoardMetrics(state.size);
@@ -115,9 +142,9 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       const tile = createTile(metrics, position, {
         selected: unitAt(state, position)?.id === selectedId,
         legal: isLegal,
-        targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : "art",
+        targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art",
         path: path.has(key),
-        range: !isLegal && range.has(key) ? (mode === "attack" ? "attack" : "art") : null
+        range: !isLegal && range.has(key) ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null
       });
       tile.addEventListener("click", () => onTileClick(position));
       boardLayer.append(tile);

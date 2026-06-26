@@ -13,6 +13,7 @@ export const SWORDSMAN = Object.freeze({
   passive: Object.freeze({
     id: "last-stand",
     name: "Last Stand",
+    effect: Object.freeze({ type: "thresholdBoost", hpBelow: 3, stats: Object.freeze({ strength: 3 }) }),
     description: "Below 3 HP, gain +3 STR.",
     implemented: true
   }),

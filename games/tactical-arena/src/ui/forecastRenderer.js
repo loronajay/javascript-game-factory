@@ -3,7 +3,7 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
-import { getMissChance, resolvePhysicalStrike } from "../rules/combat.js";
+import { getMissChance, resolveBaseStrike } from "../rules/combat.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
@@ -25,7 +25,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   const isAttack = mode === "attack";
   const artId = mode?.startsWith("art:") ? mode.slice(4) : null;
   const art = artId ? getArt(actor.type, artId) : null;
-  const isStrikeArt = Boolean(artId) && mode !== "art:volley-shot" && art?.resolution !== "statusCast";
+  const isStrikeArt = Boolean(artId) && mode !== "art:volley-shot" && art?.resolution !== "statusCast" && art?.resolution !== "flee" && art?.effect?.type !== "healAllies";
   if (!isAttack && !isStrikeArt) return;
 
   const metrics = createBoardMetrics(state.size);
@@ -39,7 +39,8 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
       drawForecastBadge(forecastLayer, metrics, target, "miss", "fc-miss");
       continue;
     }
-    const strike = resolvePhysicalStrike(actor, target, { proximity: true, state });
+    const artDamageType = art?.damageType ?? null;
+    const strike = resolveBaseStrike(actor, target, { proximity: true, state, damageType: artDamageType });
     const lethal = strike.damage >= target.hp;
     drawForecastBadge(forecastLayer, metrics, target, lethal ? `☠ ${strike.damage}` : `-${strike.damage}`, lethal ? "fc-lethal" : "fc-attack");
   }

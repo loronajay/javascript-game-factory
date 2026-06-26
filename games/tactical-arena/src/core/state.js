@@ -13,7 +13,8 @@ function createUnit(spec) {
     statModifiers: { ...(spec.statModifiers ?? {}) },
     statuses: (spec.statuses ?? []).map((status) => ({ ...status })),
     defending: false,
-    spent: false
+    spent: false,
+    mageChargeCount: 0
   };
 }
 

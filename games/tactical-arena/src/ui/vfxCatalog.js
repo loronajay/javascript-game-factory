@@ -14,14 +14,11 @@ const ABILITY_VFX = Object.freeze({
     colors: Object.freeze({ core: "#f8f2c0", trail: "#7fd7ff", impact: "#fff1a6" })
   }),
   "volley-shot": Object.freeze({
-    type: "projectileFan",
-    projectileCount: 7,
-    spread: 34,
-    arcHeight: 78,
-    staggerMs: 42,
-    durationMs: 520,
-    impactRadius: 22,
-    colors: Object.freeze({ core: "#f7e27d", trail: "#f2b84b", impact: "#fff1a6" })
+    type: "volleyRain",
+    staggerMs: 65,
+    durationMs: 380,
+    arcHeight: 60,
+    colors: Object.freeze({ core: "#f7e27d", trail: "#8aacac", impact: "#fff1a6" })
   }),
   "life-sap": Object.freeze({
     type: "drain",
@@ -65,6 +62,37 @@ const ABILITY_VFX = Object.freeze({
     motif: "silenceRune",
     runeCount: 5,
     colors: Object.freeze({ core: "#c89cff", trail: "#553276", impact: "#ead6ff" })
+  }),
+  spark: Object.freeze({
+    type: "projectileFan",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 52,
+    staggerMs: 0,
+    durationMs: 400,
+    impactRadius: 20,
+    colors: Object.freeze({ core: "#a0c8ff", trail: "#4488dd", impact: "#d8eeff" })
+  }),
+  flee: Object.freeze({
+    type: "dashTrail",
+    durationMs: 380,
+    afterimageCount: 2,
+    sparkCount: 8,
+    colors: Object.freeze({ core: "#e0c0ff", trail: "#9958d8", impact: "#f0e0ff" })
+  }),
+  banish: Object.freeze({
+    type: "statusStrike",
+    status: "silence",
+    motif: "banish",
+    particleCount: 14,
+    colors: Object.freeze({ core: "#9966ff", trail: "#4422aa", impact: "#ccaaff" })
+  }),
+  nuke: Object.freeze({
+    type: "magicBurst",
+    particleCount: 20,
+    radius: 48,
+    durationMs: 680,
+    colors: Object.freeze({ core: "#9966ff", trail: "#4422aa", impact: "#ccaaff" })
   }),
   pray: Object.freeze({
     type: "healPulse",

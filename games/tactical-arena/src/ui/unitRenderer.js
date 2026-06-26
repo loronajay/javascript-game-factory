@@ -9,7 +9,8 @@ import { getUnitStatusVfx } from "./vfxCatalog.js";
 const ICON_BUILDERS = new Map([
   ["swordsman", buildSwordsmanIcon],
   ["archer", buildArcherIcon],
-  ["mystic", buildMysticIcon]
+  ["mystic", buildMysticIcon],
+  ["magician", buildMagicianIcon]
 ]);
 
 function buildSwordsmanIcon(icon) {
@@ -36,6 +37,13 @@ function buildMysticIcon(icon) {
   );
 }
 
+function buildMagicianIcon(icon) {
+  icon.append(
+    svgElement("path", { d: "M 0 -26 L 4 -16 L 14 -12 L 4 -8 L 0 2 L -4 -8 L -14 -12 L -4 -16 Z" }),
+    svgElement("line", { class: "emblem-line", x1: 0, y1: -1, x2: 0, y2: 22, "stroke-width": 5, "stroke-linecap": "round" })
+  );
+}
+
 export function createUnitIcon(type) {
   const icon = svgElement("g", { class: "icon" });
   ICON_BUILDERS.get(type)?.(icon);
@@ -45,16 +53,17 @@ export function createUnitIcon(type) {
 function createStatusBadges(unit) {
   const visuals = getUnitStatusVfx(unit.statuses);
   if (!visuals.length) return null;
-  const group = svgElement("g", { class: "status-stack", transform: `translate(${-((visuals.length - 1) * 12)} -48)` });
+  const spacing = 20;
+  const group = svgElement("g", { class: "status-stack", transform: `translate(${-((visuals.length - 1) * (spacing / 2))} -48)` });
   visuals.forEach((visual, index) => {
     const badge = svgElement("g", {
       class: `status-badge status-${visual.type} status-ring-${visual.ring}`,
-      transform: `translate(${index * 24} 0)`,
+      transform: `translate(${index * spacing} 0)`,
       style: `--status:${visual.color};--status-glow:${visual.glow};`
     });
     badge.append(
-      svgElement("circle", { class: "status-halo", cx: 0, cy: 0, r: 12 }),
-      svgElement("circle", { class: "status-core", cx: 0, cy: 0, r: 8 }),
+      svgElement("circle", { class: "status-halo", cx: 0, cy: 0, r: 10 }),
+      svgElement("circle", { class: "status-core", cx: 0, cy: 0, r: 7 }),
       svgElement("text", { class: "status-label", x: 0, y: 3, "text-anchor": "middle" })
     );
     badge.querySelector(".status-label").textContent = visual.label;

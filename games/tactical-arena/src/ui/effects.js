@@ -166,6 +166,49 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     for (const target of endpoints) impact({ x: target.x, y: target.y }, false);
   }
 
+  async function volleyRain(actor, coneCells, targets, targetPosition, vfx) {
+    sound.play("arrowAirborne");
+    if (reducedMotion() || !coneCells?.length) return;
+    const from = effectPoint(actor.position, 18);
+    const hitSet = new Set(targets.map((t) => `${t.position.x},${t.position.y}`));
+    const dir = targetPosition
+      ? { x: targetPosition.x - actor.position.x, y: targetPosition.y - actor.position.y }
+      : { x: 0, y: 1 };
+    const animations = [];
+    for (const cell of coneCells) {
+      const key = `${cell.x},${cell.y}`;
+      const isHit = hitSet.has(key);
+      const to = effectPoint(cell, isHit ? 12 : 4);
+      const depth = Math.round((cell.x - actor.position.x) * dir.x + (cell.y - actor.position.y) * dir.y);
+      const ctrl = {
+        x: (from.x + to.x) / 2 + (Math.random() - 0.5) * 10,
+        y: Math.min(from.y, to.y) - (vfx.arcHeight ?? 60) - depth * 7
+      };
+      const path = svg("path", {
+        d: `M ${from.x} ${from.y} Q ${ctrl.x} ${ctrl.y} ${to.x} ${to.y}`,
+        class: "fx-line",
+        stroke: isHit ? vfx.colors.core : vfx.colors.trail,
+        "stroke-width": isHit ? 3 : 2,
+        filter: "url(#softGlow)"
+      });
+      path.style.strokeDasharray = "8 12";
+      path.style.opacity = isHit ? "1" : "0.45";
+      effectsLayer.appendChild(path);
+      const delay = Math.max(0, depth - 1) * (vfx.staggerMs ?? 65);
+      const duration = (vfx.durationMs ?? 380) + depth * 18;
+      const anim = path.animate([
+        { strokeDashoffset: "60", opacity: 0 },
+        { strokeDashoffset: "16", opacity: isHit ? 1 : 0.45, offset: 0.28 },
+        { strokeDashoffset: "-40", opacity: 0 }
+      ], { duration, delay, easing: "ease-in" });
+      animations.push(waitForAnimation(anim).then(() => {
+        path.remove();
+        if (isHit) impact({ x: to.x, y: to.y }, false);
+      }));
+    }
+    await Promise.all(animations);
+  }
+
   async function drain(actor, target, vfx) {
     if (reducedMotion()) return;
     const from = effectPoint(target.position, 14);
@@ -389,11 +432,79 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     await Promise.all(animations);
   }
 
-  async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect } = {}) {
+  async function magicBurst(actor, targets, vfx) {
+    sound.play("attackHit");
+    if (reducedMotion()) return;
+    const center = effectPoint(actor.position, 18);
+    const animations = [];
+
+    // Expanding ring centred on the caster
+    const ring = svg("circle", {
+      class: "fx-ring",
+      cx: center.x,
+      cy: center.y,
+      r: 10,
+      stroke: vfx.colors.core,
+      filter: "url(#softGlow)"
+    });
+    effectsLayer.appendChild(ring);
+    animations.push(waitForAnimation(ring.animate([
+      { r: 10, opacity: 0, strokeWidth: 7 },
+      { r: vfx.radius ?? 48, opacity: 0.85, strokeWidth: 3, offset: 0.4 },
+      { r: (vfx.radius ?? 48) + 16, opacity: 0, strokeWidth: 1 }
+    ], { duration: vfx.durationMs ?? 680, easing: "ease-out" })).then(() => ring.remove()));
+
+    // Radial particle burst from caster
+    for (let i = 0; i < (vfx.particleCount ?? 20); i += 1) {
+      const angle = (Math.PI * 2 * i) / (vfx.particleCount ?? 20);
+      const dist = 28 + (i % 3) * 14;
+      const mote = svg("circle", {
+        class: "fx-mote",
+        cx: center.x,
+        cy: center.y,
+        r: 3 + (i % 2),
+        fill: i % 3 === 0 ? vfx.colors.impact : vfx.colors.core,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(mote);
+      animations.push(waitForAnimation(mote.animate([
+        { transform: "translate(0,0) scale(.3)", opacity: 0 },
+        { transform: `translate(${Math.cos(angle) * dist * 0.4}px ${Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
+        { transform: `translate(${Math.cos(angle) * dist}px ${Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
+      ], { duration: vfx.durationMs ?? 680, delay: i * 8, easing: "ease-out" })).then(() => mote.remove()));
+    }
+
+    // Impact flash on each struck target
+    for (const target of targets) {
+      const pt = effectPoint(target.position, 18);
+      const flash = svg("circle", {
+        class: "fx-ring",
+        cx: pt.x,
+        cy: pt.y,
+        r: 6,
+        stroke: vfx.colors.trail,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(flash);
+      animations.push(waitForAnimation(flash.animate([
+        { r: 6, opacity: 0, strokeWidth: 5 },
+        { r: 28, opacity: 0.7, strokeWidth: 2, offset: 0.5 },
+        { r: 36, opacity: 0, strokeWidth: 1 }
+      ], { duration: 340, delay: 80, easing: "ease-out" })).then(() => flash.remove()));
+    }
+
+    await Promise.all(animations);
+  }
+
+  async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect, coneCells } = {}) {
     const vfx = getAbilityVfx(artId);
     if (!vfx || !actor) return;
     if (vfx.type === "dashTrail") {
       await dashTrail(actor, path, targets, vfx);
+      return;
+    }
+    if (vfx.type === "volleyRain") {
+      await volleyRain(actor, coneCells ?? [], targets, targetPosition, vfx);
       return;
     }
     if (vfx.type === "projectileFan") {
@@ -406,6 +517,10 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
     if (vfx.type === "healPulse") {
       await healPulse(actor, targets, vfx);
+      return;
+    }
+    if (vfx.type === "magicBurst") {
+      await magicBurst(actor, targets, vfx);
       return;
     }
     if (vfx.type === "statusStrike" && target && effect?.applied) {

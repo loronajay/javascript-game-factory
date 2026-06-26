@@ -85,6 +85,12 @@
   transform-origin: center bottom;
 }
 
+.unit .tap-target {
+  fill: transparent;
+  pointer-events: all;
+  stroke: none;
+}
+
 .unit .shadow {
   fill: rgba(0, 0, 0, .4);
   filter: blur(2px);

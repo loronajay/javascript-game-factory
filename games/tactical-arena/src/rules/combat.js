@@ -60,6 +60,19 @@ export function getProximityBonus(attacker, target) {
   return 0;
 }
 
+// Resolves a strike with an explicit damage type override (used by magic-damage ARTS
+// like Spark and Banish). Falls back to a physical strike when no override is given.
+// Returns the same shape as resolvePhysicalStrike so callers and the forecast are interchangeable.
+export function resolveBaseStrike(attacker, target, { proximity = false, critical = false, state = null, damageType = null } = {}) {
+  if (!damageType || damageType === "physical") {
+    return resolvePhysicalStrike(attacker, target, { proximity, critical, state });
+  }
+  const actorStats = getEffectiveStats(attacker, state);
+  const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
+  return { ...result, critical, proximityBonus: 0, damage: result.damage };
+}
+
 // THE single source of truth for the damage a physical strike will deal *right now*.
 // The reducer's basic ATTACK and its targeted-ART attacks resolve through here, and
 // so does the on-board damage forecast — so a player can never be shown a number the
