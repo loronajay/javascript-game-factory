@@ -107,7 +107,7 @@ function startMatch(config) {
 }
 
 function resetBattle() {
-  startMatch(matchConfig ?? { size: 10, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
+  startMatch(matchConfig ?? { size: 13, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
 }
 
 function announceTurn(player, { hold = false } = {}) {

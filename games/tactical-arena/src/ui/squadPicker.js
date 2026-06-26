@@ -1,32 +1,19 @@
-// Squad builder: a small front/back unit picker shared by the setup screen. It
-// mirrors the real four-unit corner spawn block. Each cell click cycles the unit
-// type. Presentation only: it produces a normalized squad array the setup screen
-// threads into the match config; it never touches the engine.
+// Squad strip — the inline per-player summary shown on the setup screen. It shows
+// the four chosen pieces and an Edit button; the actual choosing happens in the
+// roster pop-up (rosterPicker.js), which carries the unit details that teach new
+// players the engine. Presentation only: it produces a normalized squad array the
+// setup screen threads into the match config; it never touches the engine.
+//
+// The squad model (keys, defaults, normalization, duplicate rules) lives in
+// squadModel.js and is re-exported here so existing import paths keep working.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { UNIT_TYPE_KEYS, DEFAULT_SQUAD, SLOT_LAYOUT, normalizeSquad, availableTypesForSlot } from "./squadModel.js";
+import { openRosterPicker } from "./rosterPicker.js";
 
-// Summons (Ghouls) are raised in-match, never drafted, so they are not pickable.
-export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES).filter((key) => !UNIT_TYPES[key].summon);
-export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
+export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, availableTypesForSlot };
 
-// Force any input into a valid 4-slot squad of known unit types.
-export function normalizeSquad(squad) {
-  const out = [];
-  for (let i = 0; i < DEFAULT_SQUAD.length; i += 1) {
-    const type = squad?.[i];
-    out.push(UNIT_TYPE_KEYS.includes(type) ? type : DEFAULT_SQUAD[i]);
-  }
-  return out;
-}
-
-const SLOT_LAYOUT = [
-  { index: 0, row: "front" },
-  { index: 1, row: "front" },
-  { index: 2, row: "back" },
-  { index: 3, row: "back" }
-];
-
-export function createSquadPicker({ title = "Squad", initial = null, accent = null } = {}) {
-  const squad = normalizeSquad(initial);
+export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true } = {}) {
+  let squad = normalizeSquad(initial);
 
   const el = document.createElement("div");
   el.className = "squad-picker";
@@ -37,35 +24,40 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
   heading.textContent = title;
   el.appendChild(heading);
 
-  const grid = document.createElement("div");
-  grid.className = "squad-picker-grid";
-  el.appendChild(grid);
+  const chips = document.createElement("div");
+  chips.className = "squad-chip-row";
+  el.appendChild(chips);
 
-  for (const slot of SLOT_LAYOUT) {
-    const cell = document.createElement("button");
-    cell.type = "button";
-    cell.className = `squad-cell row-${slot.row}`;
-    cell.addEventListener("click", () => {
-      squad[slot.index] = nextType(squad[slot.index]);
-      paintCell(cell, squad[slot.index]);
-    });
-    paintCell(cell, squad[slot.index]);
-    grid.appendChild(cell);
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "squad-edit-btn";
+  editBtn.textContent = "Edit Squad";
+  el.appendChild(editBtn);
+
+  // Open the roster pop-up on the slot the player tapped (or slot 0 from Edit).
+  async function edit(startSlot = 0) {
+    const result = await openRosterPicker({ title, accent, initial: squad, allowDuplicates, startSlot });
+    if (result) { squad = result; paintChips(); }
   }
+
+  function paintChips() {
+    chips.replaceChildren();
+    for (const slot of SLOT_LAYOUT) {
+      const def = UNIT_TYPES[squad[slot.index]];
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = `squad-chip row-${slot.row}`;
+      chip.innerHTML = `<span class="squad-chip-icon">${def.glyph}</span><span class="squad-chip-name">${def.name}</span>`;
+      chip.addEventListener("click", () => edit(slot.index));
+      chips.appendChild(chip);
+    }
+  }
+
+  editBtn.addEventListener("click", () => edit(0));
+  paintChips();
 
   return {
     el,
     getSquad: () => [...squad]
   };
-}
-
-function nextType(type) {
-  const at = UNIT_TYPE_KEYS.indexOf(type);
-  return UNIT_TYPE_KEYS[(at + 1) % UNIT_TYPE_KEYS.length];
-}
-
-function paintCell(cell, type) {
-  const def = UNIT_TYPES[type];
-  cell.dataset.type = type;
-  cell.innerHTML = `<span class="squad-cell-icon">${def.glyph}</span><span class="squad-cell-name">${def.name}</span>`;
 }

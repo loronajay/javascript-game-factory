@@ -75,6 +75,7 @@ export function readableError(errorCode) {
     INVALID_ART_PATH: "Footwork must use its full unique orthogonal path and finish on empty ground.",
     MOVE_OUT_OF_RANGE: "That tile is not reachable this activation.",
     TARGET_OUT_OF_RANGE: "That target is beyond attack range.",
+    TARGET_OBSTRUCTED: "Another unit is blocking the line of fire.",
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",
     FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation.",
     SUMMON_LIMIT: "This Necromancer already has a Ghoul on the field."

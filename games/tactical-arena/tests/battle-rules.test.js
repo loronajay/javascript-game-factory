@@ -234,7 +234,7 @@ test("defend is a primary action and clears when that unit begins its next activ
 test("a unit stays active after moving and can immediately defend", () => {
   const initial = createBattleState();
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
-  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 9));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 12));
 
   assert.equal(moved.nextState.activation.unitId, "p1-swordsman");
   assert.equal(moved.nextState.activation.moved, true);

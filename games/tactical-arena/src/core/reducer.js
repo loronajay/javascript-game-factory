@@ -2,7 +2,7 @@ import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
-import { getProximityBonus, getTeamDamageReduction, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { getProximityBonus, getTeamDamageReduction, isShotBlocked, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -24,6 +24,7 @@ const ERR = Object.freeze({
   INVALID_TARGET: "INVALID_TARGET",
   TARGET_OUT_OF_RANGE: "TARGET_OUT_OF_RANGE",
   ART_NOT_AVAILABLE: "ART_NOT_AVAILABLE",
+  TARGET_OBSTRUCTED: "TARGET_OBSTRUCTED",
   INVALID_ART_PATH: "INVALID_ART_PATH",
   FINISH_REQUIRES_ACTION: "FINISH_REQUIRES_ACTION",
   SUMMON_LIMIT: "SUMMON_LIMIT"
@@ -112,6 +113,9 @@ function attack(state, command) {
   if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
+  // Basic attacks are always physical, so a body between attacker and target blocks
+  // the shot (melee never has an intervening tile, so this is a no-op at range 1).
+  if (isShotBlocked(state, result.unit.position, target.position)) return reject(ERR.TARGET_OBSTRUCTED);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.actorId);
@@ -206,6 +210,11 @@ function resolveTargetedArt(state, command, art) {
   if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  // ARTS that resolve as a physical strike (Poison Arrow, Leg Shot) are body-blocked
+  // just like a basic attack; magic ARTS (Spark, Banish) reach their target directly.
+  if ((art.damageType ?? "physical") === "physical" && isShotBlocked(state, actorState.position, targetState.position)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
   }
 
   const next = cloneState(state);

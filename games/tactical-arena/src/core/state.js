@@ -63,7 +63,7 @@ function defaultRoster(size) {
   })));
 }
 
-export function createBattleState({ size = 10, units, seed, tiles = [] } = {}) {
+export function createBattleState({ size = 13, units, seed, tiles = [] } = {}) {
   const roster = units ?? defaultRoster(size);
 
   return {

@@ -45,14 +45,14 @@ test("the default battle state is a four-unit mirror match", () => {
   assert.deepEqual(
     state.units.map((unit) => [unit.id, unit.player, unit.type, unit.position]),
     [
-      ["p1-swordsman", 1, "swordsman", { x: 1, y: 9 }],
-      ["p1-archer", 1, "archer", { x: 0, y: 8 }],
-      ["p1-mystic", 1, "mystic", { x: 0, y: 9 }],
-      ["p1-magician", 1, "magician", { x: 1, y: 8 }],
-      ["p2-swordsman", 2, "swordsman", { x: 8, y: 0 }],
-      ["p2-archer", 2, "archer", { x: 9, y: 1 }],
-      ["p2-mystic", 2, "mystic", { x: 9, y: 0 }],
-      ["p2-magician", 2, "magician", { x: 8, y: 1 }]
+      ["p1-swordsman", 1, "swordsman", { x: 1, y: 12 }],
+      ["p1-archer", 1, "archer", { x: 0, y: 11 }],
+      ["p1-mystic", 1, "mystic", { x: 0, y: 12 }],
+      ["p1-magician", 1, "magician", { x: 1, y: 11 }],
+      ["p2-swordsman", 2, "swordsman", { x: 11, y: 0 }],
+      ["p2-archer", 2, "archer", { x: 12, y: 1 }],
+      ["p2-mystic", 2, "mystic", { x: 12, y: 0 }],
+      ["p2-magician", 2, "magician", { x: 11, y: 1 }]
     ]
   );
 });

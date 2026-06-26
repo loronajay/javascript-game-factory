@@ -3,7 +3,7 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
-import { getMissChance, resolveBaseStrike } from "../rules/combat.js";
+import { getMissChance, isShotBlocked, resolveBaseStrike } from "../rules/combat.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
@@ -31,10 +31,14 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   const metrics = createBoardMetrics(state.size);
   const reach = getEffectiveStats(actor, state).attackRange;
   const guaranteedMiss = (isAttack || isStrikeArt) && getMissChance(actor) >= 1;
+  // Physical strikes (basic attack + physical ARTS) can be body-blocked; magic ARTS
+  // ignore intervening units, so they keep forecasting through them.
+  const blockable = isAttack || (isStrikeArt && (art?.damageType ?? "physical") === "physical");
 
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;
     if (chebyshevDistance(actor.position, target.position) > reach) continue;
+    if (blockable && isShotBlocked(state, actor.position, target.position)) continue;
     if (guaranteedMiss) {
       drawForecastBadge(forecastLayer, metrics, target, "miss", "fc-miss");
       continue;

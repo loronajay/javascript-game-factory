@@ -4,7 +4,8 @@ import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, 
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { getFootworkStepOptions, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
+import { isShotBlocked } from "../rules/combat.js";
+import { artUsesPhysicalStrike, getFootworkStepOptions, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -119,16 +120,22 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
 
   if (actor && targeted) {
     const reach = getEffectiveStats(actor, state).attackRange;
+    // Body-blocking only applies to physical strikes (basic attack + physical ARTS);
+    // magic ARTS reach through bodies, so their range wash and targets stay unculled.
+    const art = mode?.startsWith("art:") ? getArt(actor.type, mode.slice("art:".length)) : null;
+    const blockable = mode === "attack" || artUsesPhysicalStrike(art);
     for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
       for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
         const cell = { x, y };
         if (!isOnBoard(state, cell)) continue;
         if (chebyshevDistance(actor.position, cell) === 0) continue;
+        if (blockable && isShotBlocked(state, actor.position, cell)) continue;
         range.add(positionKey(cell));
       }
     }
     for (const target of state.units) {
-      if (target.hp > 0 && target.player !== actor.player && chebyshevDistance(actor.position, target.position) <= reach) {
+      if (target.hp > 0 && target.player !== actor.player && chebyshevDistance(actor.position, target.position) <= reach &&
+          !(blockable && isShotBlocked(state, actor.position, target.position))) {
         legal.add(positionKey(target.position));
       }
     }

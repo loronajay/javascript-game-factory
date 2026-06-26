@@ -12,6 +12,31 @@
     <link rel="stylesheet" href="./menus.css">
   </head>
   <body>
+    <!-- Global SVG paint servers. These figurine materials + soft-glow filter are
+         referenced by standalone SVGs (roster/squad picker figurines, combat FX)
+         that live OUTSIDE #boardSvg. #boardSvg sits in the match <section>, which
+         is display:none while other screens are active — and gradients inside a
+         display:none subtree don't resolve as paint servers, so picker figurines
+         rendered with empty ivory/steel/gold fills. Keeping them here (always
+         rendered, 0×0) makes url(#…) resolve from any screen. -->
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute" focusable="false">
+      <defs>
+        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <!-- Carved-figurine materials: ivory/bone body, polished steel, brass/wood. -->
+        <linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f6f1e3"/><stop offset="46%" stop-color="#e3d9c2"/><stop offset="100%" stop-color="#b9ac8e"/>
+        </linearGradient>
+        <linearGradient id="figSteel" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stop-color="#eef4fb"/><stop offset="45%" stop-color="#aebfd0"/><stop offset="100%" stop-color="#5d6c7c"/>
+        </linearGradient>
+        <linearGradient id="figGold" x1="0" y1="0" x2="0.2" y2="1">
+          <stop offset="0%" stop-color="#f4dfa0"/><stop offset="48%" stop-color="#cb9f55"/><stop offset="100%" stop-color="#876026"/>
+        </linearGradient>
+      </defs>
+    </svg>
     <div id="app">
 
       <!-- ============================== TITLE ============================== -->
@@ -62,21 +87,17 @@
           <div class="setup-field">
             <span class="setup-label">Board size</span>
             <div class="segmented" data-field="boardSize">
-              <button type="button" class="seg is-selected" data-size="10">10 × 10</button>
-              <button type="button" class="seg" data-size="13">13 × 13</button>
+              <button type="button" class="seg is-selected" data-size="13">13 × 13</button>
+              <button type="button" class="seg" data-size="15">15 × 15</button>
             </div>
           </div>
 
           <div class="setup-field" data-group="squads">
             <span class="setup-label">Squads</span>
-            <div class="segmented" data-field="squadMode">
-              <button type="button" class="seg is-selected" data-squad="standard">Standard</button>
-              <button type="button" class="seg" data-squad="custom">Custom</button>
-            </div>
-            <p class="setup-hint" data-squad-hint hidden>
-              Tap a slot to change its unit. Each squad deploys four pieces.
+            <p class="setup-hint">
+              Each squad deploys four pieces. Tap Edit Squad to choose units and read their stats, passives and ARTS.
             </p>
-            <div class="squad-pickers" data-squad-pickers hidden></div>
+            <div class="squad-pickers" data-squad-pickers></div>
           </div>
 
           <div class="menu-buttons">
@@ -123,24 +144,13 @@
           <div id="sceneBackdrop" aria-hidden="true"></div>
           <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Tactical Arena board" role="grid">
             <defs>
-              <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
-                <feGaussianBlur stdDeviation="5" result="blur"/>
-                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-              </filter>
               <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stop-color="#70aed8" stop-opacity=".18"/>
                 <stop offset="100%" stop-color="#70aed8" stop-opacity="0"/>
               </radialGradient>
-              <!-- Carved-figurine materials: ivory/bone body, polished steel, brass/wood. -->
-              <linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#f6f1e3"/><stop offset="46%" stop-color="#e3d9c2"/><stop offset="100%" stop-color="#b9ac8e"/>
-              </linearGradient>
-              <linearGradient id="figSteel" x1="0" y1="0" x2="0.3" y2="1">
-                <stop offset="0%" stop-color="#eef4fb"/><stop offset="45%" stop-color="#aebfd0"/><stop offset="100%" stop-color="#5d6c7c"/>
-              </linearGradient>
-              <linearGradient id="figGold" x1="0" y1="0" x2="0.2" y2="1">
-                <stop offset="0%" stop-color="#f4dfa0"/><stop offset="48%" stop-color="#cb9f55"/><stop offset="100%" stop-color="#876026"/>
-              </linearGradient>
+              <!-- Figurine materials (#ivory/#figSteel/#figGold) and #softGlow now live
+                   in the global <defs> at the top of <body> so picker figurines on other
+                   screens can resolve them too. -->
               <!-- War-table dais materials: a moonlit stone top, darker side faces,
                    and a soft diamond aura halo that pools under the board. -->
               <linearGradient id="daisStone" x1="0" y1="0" x2="0" y2="1">

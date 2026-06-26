@@ -7,9 +7,11 @@ export const STAT_GLOSSARY = [
   ["Slow", "Reduces MOVE. Duration and amount set per ability."]
 ];
 
-// ── Private helpers ──────────────────────────────────────────────────────────
+// ── Shared detail markup ─────────────────────────────────────────────────────
 
-function unitDetailHtml(def) {
+// Stat pills + passives + ARTS for one unit. Exported so the squad roster picker
+// renders the exact same reference card players see in the in-match Codex.
+export function unitDetailHtml(def) {
   const s = def.stats;
   const statPills = [
     `${s.maxHp} HP`, `${s.maxMp} MP`, `Move ${s.moveRange}`,

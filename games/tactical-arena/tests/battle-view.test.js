@@ -7,20 +7,20 @@ import { isTargetedMode } from "../src/ui/boardRenderer.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes } from "../src/ui/codex.js";
 
-test("the default duel uses Mini Tactics' ten-tile map and four-unit corner staging", () => {
+test("the default duel uses the standard thirteen-tile map and four-unit corner staging", () => {
   const state = createBattleState();
-  assert.equal(state.size, 10);
+  assert.equal(state.size, 13);
   assert.deepEqual(
     state.units.map((unit) => [unit.id, unit.position]),
     [
-      ["p1-swordsman", { x: 1, y: 9 }],
-      ["p1-archer", { x: 0, y: 8 }],
-      ["p1-mystic", { x: 0, y: 9 }],
-      ["p1-magician", { x: 1, y: 8 }],
-      ["p2-swordsman", { x: 8, y: 0 }],
-      ["p2-archer", { x: 9, y: 1 }],
-      ["p2-mystic", { x: 9, y: 0 }],
-      ["p2-magician", { x: 8, y: 1 }]
+      ["p1-swordsman", { x: 1, y: 12 }],
+      ["p1-archer", { x: 0, y: 11 }],
+      ["p1-mystic", { x: 0, y: 12 }],
+      ["p1-magician", { x: 1, y: 11 }],
+      ["p2-swordsman", { x: 11, y: 0 }],
+      ["p2-archer", { x: 12, y: 1 }],
+      ["p2-mystic", { x: 12, y: 0 }],
+      ["p2-magician", { x: 11, y: 1 }]
     ]
   );
 });

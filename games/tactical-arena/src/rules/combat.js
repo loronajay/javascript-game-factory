@@ -1,7 +1,21 @@
 import { getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
-import { getTileAffinity } from "../core/state.js";
+import { traceGridLine } from "./movement.js";
+import { getTileAffinity, unitAt } from "../core/state.js";
+
+// Body-block line of sight: a physical ranged shot is stopped if ANY unit — friend
+// OR foe — stands on a tile strictly between the attacker and its target. Carried
+// over from Mini-Tactics (isRangerShotBlocked). Adjacent strikes have no tile in
+// between, so melee passes through untouched and needs no special-casing. Only the
+// physical-strike paths consult this; magic ARTS (Spark, Banish), pure casts
+// (Silence), the Volley Shot rain, and self-centred blasts (Nuke) ignore bodies.
+// `from`/`to` are {x,y} positions.
+export function isShotBlocked(state, from, to) {
+  return traceGridLine(from.x, from.y, to.x, to.y)
+    .slice(1, -1)
+    .some((cell) => Boolean(unitAt(state, cell)));
+}
 
 // Combat roll tuning — kept as named constants so balance stays in one place. The
 // engine rolls a probability in [0,1) (not literally a d6), so these compose with

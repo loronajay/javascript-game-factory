@@ -19,39 +19,26 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
     screens.register(name, { el: screenEl(name) });
   }
 
-  // ── Hot-seat setup: board size + Standard/Custom squads ──────────────────
+  // ── Hot-seat setup: board size + custom squads ───────────────────────────
+  // Squads are always custom now — both players build a four-piece squad from the
+  // roster pop-up (squadPicker → rosterPicker). Hot-seat is casual, so duplicate
+  // units are allowed; draft/ranked will pass allowDuplicates:false later.
   const setup = screenEl("hsSetup");
   const squadPickersHost = $("[data-squad-pickers]", setup);
-  const squadHint = $("[data-squad-hint]", setup);
   let p1Picker = null;
   let p2Picker = null;
 
   function rebuildSquadPickers() {
     squadPickersHost.replaceChildren();
-    p1Picker = createSquadPicker({ title: "Player 1", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1] });
-    p2Picker = createSquadPicker({ title: "Player 2", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[2] });
+    p1Picker = createSquadPicker({ title: "Player 1", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1], allowDuplicates: true });
+    p2Picker = createSquadPicker({ title: "Player 2", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[2], allowDuplicates: true });
     squadPickersHost.append(p1Picker.el, p2Picker.el);
   }
   rebuildSquadPickers();
 
-  function squadModeIsCustom() {
-    return selectedValue(setup, "squadMode", "squad") === "custom";
-  }
-
-  function syncSquadVisibility() {
-    const custom = squadModeIsCustom();
-    squadHint.hidden = !custom;
-    squadPickersHost.hidden = !custom;
-  }
-  syncSquadVisibility();
-
   function gatherConfig() {
-    const size = Number(selectedValue(setup, "boardSize", "size")) || 10;
-    const custom = squadModeIsCustom();
-    const squads = custom
-      ? { 1: p1Picker.getSquad(), 2: p2Picker.getSquad() }
-      : { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] };
-    return { size, squads };
+    const size = Number(selectedValue(setup, "boardSize", "size")) || 13;
+    return { size, squads: { 1: p1Picker.getSquad(), 2: p2Picker.getSquad() } };
   }
 
   // ── Results ──────────────────────────────────────────────────────────────
@@ -106,7 +93,6 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
     const seg = event.target.closest(".seg");
     if (seg && !seg.disabled) {
       for (const sibling of seg.parentElement.querySelectorAll(".seg")) sibling.classList.toggle("is-selected", sibling === seg);
-      if (seg.parentElement.dataset.field === "squadMode") syncSquadVisibility();
       return;
     }
 

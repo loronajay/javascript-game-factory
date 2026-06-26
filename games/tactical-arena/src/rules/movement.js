@@ -21,6 +21,29 @@ export function chebyshevDistance(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 }
 
+// Bresenham grid line between two cells, inclusive of both endpoints. The body-block
+// line-of-sight check walks this and looks for an occupant on any tile strictly
+// between the attacker and its target. Pure geometry — no board/unit state.
+export function traceGridLine(x0, y0, x1, y1) {
+  const cells = [];
+  let x = x0;
+  let y = y0;
+  const dx = Math.abs(x1 - x0);
+  const sx = x0 < x1 ? 1 : -1;
+  const dy = -Math.abs(y1 - y0);
+  const sy = y0 < y1 ? 1 : -1;
+  let error = dx + dy;
+
+  while (true) {
+    cells.push({ x, y });
+    if (x === x1 && y === y1) break;
+    const doubleError = 2 * error;
+    if (doubleError >= dy) { error += dy; x += sx; }
+    if (doubleError <= dx) { error += dx; y += sy; }
+  }
+  return cells;
+}
+
 export function getLegalMoves(state, unit) {
   const maxSteps = getEffectiveStats(unit, state).moveRange;
   const queue = [{ ...unit.position, distance: 0 }];

@@ -122,6 +122,20 @@ export function getTilePulseTargets(state, actor, art) {
   );
 }
 
+// True when a targeted ART lands a real physical attack (the same path the basic
+// ATTACK takes) and is therefore body-blockable. Magic ARTS (Spark, Banish — a
+// `damageType` of "magic") and pure casts (Silence — `resolution: "statusCast"`)
+// reach their target directly and are never blocked. Callers must already have
+// excluded heal/flee/summon/AoE modes (see isTargetedMode) before consulting this.
+export function artUsesPhysicalStrike(art) {
+  return Boolean(
+    art &&
+    art.kind === "active" &&
+    (art.damageType ?? "physical") === "physical" &&
+    art.resolution !== "statusCast"
+  );
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   const activation = state.activation;
