@@ -38,7 +38,6 @@ export function createSinglePlayerSetupScreen(ctx) {
   });
 
   el.querySelector('[data-action="startSingle"]').addEventListener("click", () => {
-    void ctx.enterMobileFullscreen?.();
     ctx.nav("match", {
       mode: "single",
       size: state.size,

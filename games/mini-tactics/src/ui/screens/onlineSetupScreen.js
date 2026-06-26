@@ -136,7 +136,6 @@ export function createOnlineSetupScreen(ctx) {
     client?.joinLobby(code);
   });
   el.querySelector('[data-action="startMatch"]').addEventListener("click", () => {
-    void ctx.enterMobileFullscreen?.();
     if (isOwner) client?.startLobby();
   });
   el.querySelector('[data-action="leaveLobby"]').addEventListener("click", () => {
@@ -394,7 +393,6 @@ export function createOnlineSetupScreen(ctx) {
     const compositions = {};
     for (let seat = 1; seat <= count; seat += 1) compositions[seat] = compositionsBySeat[seat];
 
-    void ctx.enterMobileFullscreen?.();
     ctx.nav("match", {
       mode: "online",
       net: session,

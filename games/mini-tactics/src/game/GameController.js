@@ -23,6 +23,7 @@ import {
 import {
   createBoardMetrics,
   createBoardViewBox,
+  screenToGrid,
   tileKey,
 } from "../geometry/isometric.js";
 import { getLegalMoves } from "../rules/movement.js";
@@ -107,7 +108,7 @@ export class GameController {
     this.unitRenderer = new UnitRenderer({
       unitsLayer: elements.unitsLayer,
       metrics: this.metrics,
-      onUnitClick: (id) => this.handleUnitClick(id),
+      onUnitClick: (id, event) => this.handleUnitClick(id, event),
     });
 
     this.overlayRenderer = new OverlayRenderer(elements.boardLayer);
@@ -445,8 +446,29 @@ export class GameController {
     this.ui.rangeTiles = new Set();
   }
 
-  handleUnitClick(id) {
+  handleUnitClick(id, event = null) {
+    if (this.ui.actionMode === ACTION_MODES.MOVE) {
+      const tile = this.tileFromPointerEvent(event);
+      if (tile && this.ui.legalTiles.has(tileKey(tile.x, tile.y))) {
+        this.handleTileClick(tile.x, tile.y);
+        return;
+      }
+    }
+
     this.selectUnit(id);
+  }
+
+  tileFromPointerEvent(event) {
+    if (!event || typeof event.clientX !== "number" || typeof event.clientY !== "number") {
+      return null;
+    }
+
+    const point = clientToSvgPoint(this.elements.svg, event.clientX, event.clientY);
+    if (!point) {
+      return null;
+    }
+
+    return screenToGrid(this.metrics, point.x, point.y, this.match.size);
   }
 
   selectUnit(id) {
@@ -1497,6 +1519,27 @@ function colorblindActive() {
     typeof document !== "undefined" &&
     document.documentElement?.getAttribute("data-colorblind") === "on"
   );
+}
+
+function clientToSvgPoint(svg, clientX, clientY) {
+  const ctm = svg.getScreenCTM?.();
+  if (ctm && svg.createSVGPoint) {
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    return point.matrixTransform(ctm.inverse());
+  }
+
+  const rect = svg.getBoundingClientRect?.();
+  const viewBox = svg.viewBox?.baseVal;
+  if (!rect || !viewBox || rect.width === 0 || rect.height === 0) {
+    return null;
+  }
+
+  return {
+    x: viewBox.x + ((clientX - rect.left) / rect.width) * viewBox.width,
+    y: viewBox.y + ((clientY - rect.top) / rect.height) * viewBox.height,
+  };
 }
 
 function createUiState() {

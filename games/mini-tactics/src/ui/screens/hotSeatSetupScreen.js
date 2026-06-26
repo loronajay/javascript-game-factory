@@ -84,7 +84,6 @@ export function createHotSeatSetupScreen(ctx) {
   });
 
   el.querySelector('[data-action="startHotSeat"]').addEventListener("click", () => {
-    void ctx.enterMobileFullscreen?.();
     ctx.nav("match", {
       mode: "hotseat",
       size: state.size,

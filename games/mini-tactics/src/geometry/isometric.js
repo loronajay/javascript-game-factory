@@ -52,6 +52,20 @@ export function gridToScreen(metrics, x, y) {
   };
 }
 
+export function screenToGrid(metrics, screenX, screenY, size) {
+  const { tileWidth, tileHeight, originX, originY } = metrics;
+  const diagonalX = (screenX - originX) / (tileWidth / 2);
+  const diagonalY = (screenY - originY - tileHeight / 2) / (tileHeight / 2);
+  const x = Math.round((diagonalX + diagonalY) / 2);
+  const y = Math.round((diagonalY - diagonalX) / 2);
+
+  if (x < 0 || y < 0 || x >= size || y >= size) {
+    return null;
+  }
+
+  return { x, y };
+}
+
 export function chebyshevDistance(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 }

@@ -57,8 +57,8 @@ export class UnitRenderer {
       class: "tap-target",
       cx: 0,
       cy: 0,
-      rx: 42,
-      ry: 54
+      rx: 30,
+      ry: 38
     });
 
     const body = createSvgElement("g", { class: "body-group" });
@@ -187,7 +187,7 @@ export class UnitRenderer {
 
     group.addEventListener("click", (event) => {
       event.stopPropagation();
-      this.onUnitClick(unit.id);
+      this.onUnitClick(unit.id, event);
     });
 
     return group;

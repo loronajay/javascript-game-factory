@@ -35,6 +35,17 @@ export function createApp(documentRef = document) {
   // all in effect from the title screen on (no flash of defaults).
   const settings = applySettings(loadSettings(), { audio, documentRef });
 
+  const requestAppFullscreen = () => {
+    void requestMobileFullscreen({
+      documentRef,
+      windowRef: documentRef.defaultView ?? globalThis.window,
+    });
+  };
+
+  // Capture every app tap before target handlers stop propagation (unit clicks do
+  // that), so fullscreen is an app-level affordance instead of a match-only one.
+  documentRef.addEventListener("click", requestAppFullscreen, { capture: true });
+
   // One delegated click hit for every button on every screen (menus, setup,
   // in-game HUD, modals). The first such click is also the user gesture that
   // unlocks audio playback, so combat/UI sounds work for the rest of the session.
@@ -69,11 +80,6 @@ export function createApp(documentRef = document) {
     nav: (name, params) => manager.show(name, params),
     openRules: () => rules.open(),
     openSettings: () => settingsModal.open(),
-    enterMobileFullscreen: () =>
-      requestMobileFullscreen({
-        documentRef,
-        windowRef: documentRef.defaultView ?? globalThis.window,
-      }),
   };
 
   const controller = new GameController({

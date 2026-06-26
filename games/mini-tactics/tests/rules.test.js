@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 
 import {
   chebyshevDistance,
+  createBoardMetrics,
+  gridToScreen,
+  screenToGrid,
   tileKey,
   traceGridLine
 } from "../src/geometry/isometric.js";
@@ -110,4 +113,16 @@ test("grid trace includes both endpoints", () => {
       { x: 2, y: 2 }
     ]
   );
+});
+
+test("screenToGrid maps isometric tile centers back to grid cells", () => {
+  const metrics = createBoardMetrics(10);
+
+  for (const cell of [{ x: 0, y: 0 }, { x: 4, y: 6 }, { x: 9, y: 9 }]) {
+    const point = gridToScreen(metrics, cell.x, cell.y);
+    assert.deepEqual(
+      screenToGrid(metrics, point.x, point.y + metrics.tileHeight / 2, 10),
+      cell
+    );
+  }
 });

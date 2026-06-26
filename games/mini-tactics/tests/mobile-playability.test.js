@@ -86,14 +86,25 @@ test("the document exposes the mobile playability shell", () => {
     "units need a larger invisible touch target than their painted figurine",
   );
   assert.match(
+    readFileSync(new URL("../src/render/unitRenderer.js", import.meta.url), "utf8"),
+    /rx:\s*30,[\s\S]*?ry:\s*38/,
+    "unit touch targets should not steal taps from nearby floor tiles",
+  );
+  assert.match(
     responsiveCss,
     /grid-template-areas:\s*"top top"\s*"stage hud"/,
     "landscape phones should move commands beside the battlefield instead of crushing it vertically",
   );
+  const appJs = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
   assert.match(
-    html,
-    /data-action="startHotSeat"/,
-    "match start buttons are the user gesture used for fullscreen requests",
+    appJs,
+    /const requestAppFullscreen = \(\) => \{[\s\S]*?requestMobileFullscreen/,
+    "the app-level fullscreen handler should call the Fullscreen API helper",
+  );
+  assert.match(
+    appJs,
+    /addEventListener\("click", requestAppFullscreen, \{ capture: true \}\)/,
+    "the app should request mobile fullscreen from taps anywhere in the app, not just match start",
   );
 });
 
