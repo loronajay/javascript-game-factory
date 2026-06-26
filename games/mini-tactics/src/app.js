@@ -13,7 +13,7 @@ import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { SettingsModal } from "./ui/settingsModal.js";
 import { loadSettings, applySettings } from "./ui/settings.js";
-import { applyMobileViewport } from "./ui/mobileViewport.js";
+import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { ConfirmDialog } from "./ui/confirmDialog.js";
 import { GameController } from "./game/GameController.js";
 import { ScreenManager } from "./ui/screens/screenManager.js";
@@ -69,6 +69,11 @@ export function createApp(documentRef = document) {
     nav: (name, params) => manager.show(name, params),
     openRules: () => rules.open(),
     openSettings: () => settingsModal.open(),
+    enterMobileFullscreen: () =>
+      requestMobileFullscreen({
+        documentRef,
+        windowRef: documentRef.defaultView ?? globalThis.window,
+      }),
   };
 
   const controller = new GameController({

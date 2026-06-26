@@ -20,6 +20,58 @@ export function getViewportPosture({ width, height, coarsePointer = false }) {
   };
 }
 
+export function shouldRequestFullscreen({
+  width,
+  height,
+  coarsePointer = false,
+  fullscreenElement = null,
+}) {
+  const posture = getViewportPosture({ width, height, coarsePointer });
+  return (
+    posture.isCompactTouch &&
+    posture.orientation === "landscape" &&
+    !fullscreenElement
+  );
+}
+
+export async function requestMobileFullscreen({
+  windowRef = globalThis.window,
+  documentRef = globalThis.document,
+} = {}) {
+  const root = documentRef?.documentElement;
+  if (!windowRef || !root?.requestFullscreen) {
+    return false;
+  }
+
+  const viewport = windowRef.visualViewport;
+  const width = Math.round(
+    viewport?.width ?? windowRef.innerWidth ?? root.clientWidth ?? 0,
+  );
+  const height = Math.round(
+    viewport?.height ?? windowRef.innerHeight ?? root.clientHeight ?? 0,
+  );
+
+  if (
+    !shouldRequestFullscreen({
+      width,
+      height,
+      coarsePointer: isCoarsePointer(windowRef),
+      fullscreenElement: documentRef.fullscreenElement,
+    })
+  ) {
+    return false;
+  }
+
+  try {
+    await root.requestFullscreen({ navigationUI: "hide" });
+    return true;
+  } catch {
+    // Browsers without a compatible Fullscreen API (notably some iOS builds)
+    // still benefit from the compact landscape layout.
+    return false;
+  }
+}
+
 export function applyMobileViewport({
   windowRef = globalThis.window,
   documentRef = globalThis.document,

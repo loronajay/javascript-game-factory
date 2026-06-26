@@ -101,10 +101,15 @@
 
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
   .match-screen.is-active {
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) clamp(164px, 26vw, 224px);
+    grid-template-areas:
+      "top top"
+      "stage hud";
   }
 
   .topbar {
+    grid-area: top;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: .45rem;
     padding:
@@ -148,21 +153,34 @@
     letter-spacing: .02em;
   }
 
+  #stageWrap {
+    grid-area: stage;
+  }
+
   .hud {
+    grid-area: hud;
     padding:
-      .28rem max(.45rem, env(safe-area-inset-right))
-      calc(.32rem + env(safe-area-inset-bottom))
-      max(.45rem, env(safe-area-inset-left));
+      .42rem max(.42rem, env(safe-area-inset-right))
+      calc(.42rem + env(safe-area-inset-bottom))
+      .42rem;
+    border-top: 0;
+    border-left: 2px solid var(--brass);
+    box-shadow:
+      inset 1px 0 0 rgba(0, 0, 0, .5),
+      -8px 0 24px rgba(0, 0, 0, .34);
   }
 
   .panel.command-console {
-    grid-template-columns: minmax(8.6rem, 11.6rem) minmax(0, 1fr);
-    gap: .48rem;
-    padding: .42rem .5rem;
+    height: 100%;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: .42rem;
+    align-content: start;
+    padding: .42rem;
   }
 
   .unit-card {
-    height: 44px;
+    height: 46px;
     gap: .48rem;
   }
 
@@ -188,12 +206,13 @@
   }
 
   .actions {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
     gap: .28rem;
   }
 
   .actions button {
-    min-height: 44px;
+    min-height: 46px;
     padding: .32rem .15rem .28rem;
     font-size: .48rem;
     letter-spacing: .01em;
@@ -214,13 +233,17 @@
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
+  .match-screen.is-active {
+    grid-template-columns: minmax(0, 1fr) clamp(148px, 24vw, 190px);
+  }
+
   .top-actions button {
     padding-inline: .35rem;
     font-size: .5rem;
   }
 
   .panel.command-console {
-    grid-template-columns: minmax(7.4rem, 9.6rem) minmax(0, 1fr);
+    padding: .34rem;
   }
 
   .unit-emblem {
@@ -229,6 +252,66 @@
 
   .unit-card {
     grid-template-columns: 1fr;
+    height: 40px;
+  }
+
+  .actions button {
+    min-height: 40px;
+  }
+}
+
+@media (pointer: coarse) and (max-height: 540px) {
+  .menu-screen.is-active {
+    padding:
+      max(.55rem, env(safe-area-inset-top))
+      max(.55rem, env(safe-area-inset-right))
+      max(.55rem, env(safe-area-inset-bottom))
+      max(.55rem, env(safe-area-inset-left));
+  }
+
+  .menu-card {
+    width: min(380px, 100%);
+    padding: 1.05rem 1rem 1rem;
+  }
+
+  .title-card {
+    padding-top: 1.15rem;
+  }
+
+  .title-mark {
+    width: 2.55rem;
+    height: 2.55rem;
+    margin-bottom: .62rem;
+  }
+
+  .title-mark::before {
+    font-size: 1.28rem;
+  }
+
+  .title-name {
+    font-size: 1.62rem;
+    letter-spacing: .04em;
+  }
+
+  .title-sub {
+    margin: .24rem 0 .82rem;
+    font-size: .62rem;
+    letter-spacing: .16em;
+  }
+
+  .title-sub::after {
+    margin-top: .52rem;
+  }
+
+  .menu-buttons {
+    gap: .42rem;
+    margin-top: .85rem;
+  }
+
+  .menu-btn {
+    min-height: 40px;
+    padding: .5rem .78rem;
+    font-size: .82rem;
   }
 }
 
@@ -286,6 +369,12 @@
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
   .turn-banner {
     padding: .3rem .62rem;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: .28rem;
   }
 
   .unit-card {
