@@ -75,6 +75,25 @@ function getTileStrikeBonus(attacker, target, state) {
   return 0;
 }
 
+// Flat damage reduction granted to a unit's team by a living host passive (the
+// Necromancer's Dead Zone: -1 magic damage). Additive across hosts, never below
+// zero. Applied wherever magic damage is finalized so the forecast and the reducer
+// agree. Returns 0 for any team without a matching host.
+export function getTeamDamageReduction(target, state, damageType) {
+  if (!state?.units) return 0;
+  let reduction = 0;
+  for (const source of state.units) {
+    if (source.hp <= 0 || source.player !== target.player) continue;
+    const definition = getUnitType(source.type);
+    for (const passive of [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt]) {
+      if (passive?.effect?.type === "teamDamageReduction" && (passive.effect.damageType ?? "magic") === damageType) {
+        reduction += Math.max(0, Number(passive.effect.amount) || 0);
+      }
+    }
+  }
+  return reduction;
+}
+
 // Resolves a strike with an explicit damage type override (used by magic-damage ARTS
 // like Spark and Banish). Falls back to a physical strike when no override is given.
 // Returns the same shape as resolvePhysicalStrike so callers and the forecast are interchangeable.
@@ -85,7 +104,8 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const actorStats = getEffectiveStats(attacker, state);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
-  return { ...result, critical, proximityBonus: 0, damage: result.damage };
+  const damage = Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
+  return { ...result, critical, proximityBonus: 0, damage };
 }
 
 // THE single source of truth for the damage a physical strike will deal *right now*.

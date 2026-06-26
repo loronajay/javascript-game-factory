@@ -108,9 +108,18 @@ threshold passives are added.
 
 Passives should be data-first. Existing effect types:
 
-- `statModifiers` - additive stat changes, currently used by RAGE passives.
+- `statModifiers` - additive stat changes, currently used by RAGE passives. May
+  carry a nested `enemyAura` block for a RAGE-only aura amplification (Necromancer).
 - `immunity` - status immunity, centrally read by `rules/statuses.js`.
 - `proximityDamage` - Archer Close Shot, read by `rules/combat.js`.
+- `teamAura` - additive stat buff to the host's living team (Mystic Guardian),
+  folded by `getEffectiveStats`.
+- `enemyAura` - additive stat DEBUFF to enemies within a Chebyshev `radius`
+  (Necromancer Deathly Aura, carried by the Ghoul), folded by `getEffectiveStats`.
+- `teamDamageReduction` - flat reduction (`amount`) to a `damageType` the host's
+  living team takes (Necromancer Dead Zone: -1 magic), applied wherever magic damage
+  is finalized via `getTeamDamageReduction` in `rules/combat.js`.
+- `physicalDamageHealAura` - Paladin Hand of Life, resolved in the reducer.
 
 Add a new passive effect type only when the behavior is reusable or cannot be
 described by existing data. When adding one, wire it into the shared rule layer
@@ -240,7 +249,15 @@ Current VFX recipe types:
 - `drain`
 - `statusStrike`
 
-Persistent status badges come from `STATUS_VFX` in `vfxCatalog.js`.
+Persistent status badges are two layers: the **color/glow** comes from
+`STATUS_VFX` in `vfxCatalog.js` (keyed by status type), and the **icon shape** is
+drawn by a matching entry in `STATUS_ICON_BUILDERS` in `unitRenderer.js`
+(`createStatusBadges`). Current icons: poison = bubble cluster, silence = "..."
+chat box, stun = lightning bolt, blind = sunglasses, slow = boot + down arrow.
+Adding a new status means a `STATUS_VFX` entry (for the disc color/glow) **and** a
+`STATUS_ICON_BUILDERS` entry (the ±8 box icon), plus per-icon CSS in `style.css`
+under the `.status-icon` block. `stun` is already wired in both even though no
+ability applies it yet.
 
 ## Board figurine (the carved-miniature model)
 
@@ -339,19 +356,23 @@ const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 Legacy units include abilities that the current engine does not fully support.
 Prefer small reusable seams over one-off hacks.
 
+Already landed (reuse these rather than reinventing them):
+
+- team aura modifiers while a host is alive (`teamAura` — Mystic Guardian)
+- always-defending or passive damage reduction (`isDefending`; `teamDamageReduction` — Dead Zone)
+- ally/self-targeted healing (`healAllies` — Pray/Wish)
+- magic attack ART resolution (`damageType: "magic"` — Spark/Banish/Wither)
+- empty-tile targeting (Flee `getLegalFleeTiles`; Summon placement `getSummonPlacementTiles`)
+- summons as real units with special turn rules (`summon: true` + `takesTurns`; Ghoul)
+- area targeting (self-centered AoE — Nuke/Dark Bomb `resolveNuke`; cone — Volley Shot)
+- aura-based enemy debuffs (`enemyAura` — Deathly Aura)
+
 Likely needed soon:
 
-- team aura modifiers while a host is alive
-- always-defending or passive damage reduction
-- ally/self-targeted healing
 - cleanse and status prevention
-- magic attack ART resolution
-- empty-tile targeting
-- terrain placement such as fire/walls/cover
-- summons as real units with special turn rules
-- line and area targeting
-- aura-based enemy debuffs
-- minimum damage and range-specific sniper rules
+- terrain placement such as fire/walls/cover (Sniper Build Cover / Smoke Bomb)
+- arbitrary line targeting
+- minimum damage and range-specific sniper rules (Sniper `Rifle Powered`)
 
 When adding one, document the new effect shape in this guide and add a test that
 uses a minimal fixture instead of relying on default spawns.
@@ -378,6 +399,45 @@ Mystic added these reusable engine seams:
 - `healAllies` instant ART resolution for self-aura and global team healing.
 - `statusCast` ART resolution for no-damage status spells.
 - `healPulse` VFX recipes for friendly healing ARTS.
+
+## Necromancer implementation notes
+
+The Necromancer is the worked example for **debuff auras and summons**. Implemented
+recovered data:
+
+- HP 23, Move 3, Range 5, STR 6, DEF 3, MP 36.
+- **Deathly Aura:** enemies within 2 tiles take -1 DEF (an `enemyAura` passive).
+- **Dead Zone:** the Necromancer's team takes 1 less magic damage while it lives
+  (a `teamDamageReduction` passive).
+- **Wither, 4 MP:** magic-damage attack plus a 70% Slow (-1 MOVE, 3 turns) check.
+  Routes through the default `resolveTargetedArt`; immunity is central, so Paladin
+  resists but Mystic no longer does.
+- **Dark Bomb, 10 MP:** self-centered 5-magic AoE within 2 tiles. Reuses the
+  Magician's `resolveNuke` resolver (registered by id) — both AoE-magic arts respect
+  Dead Zone.
+- **Summon Ghoul, 8 MP:** places a 10 HP Ghoul on an empty tile within 2, one per
+  Necromancer. The Ghoul (`src/core/units/ghoul.js`, `summon: true`) carries the
+  same `enemyAura`.
+- RAGE: +1 MOVE and an amplified aura (-2 DEF, -1 STR, -1 MOVE) via the nested
+  `effect.enemyAura` on the statModifiers `ragePassive`.
+
+Necromancer added these reusable engine seams:
+
+- `enemyAura` debuffs, folded by `enemyAuraStats` inside `getEffectiveStats`
+  (gated on Chebyshev range, amplified while the *source* rages).
+- `teamDamageReduction`, applied via `getTeamDamageReduction` in every magic path
+  (`resolveBaseStrike` magic branch + `resolveNuke`).
+- **Summons:** `takesTurns(unit)` (false for `summon: true` defs). Summons spawn
+  `spent`, are skipped by the turn loop (`spendAndAdvance`) and the squad picker /
+  match summary, and `resolveVictory` is decided by living *commanders* so a
+  turn-less summon can't keep a defeated player alive. New summon arts use the
+  `summon` resolution + a `targeting.shape: "placement"` empty-tile selection
+  (`getSummonPlacementTiles`), mirrored in `main.js` like Flee.
+
+When you add a unit whose RAGE both changes its own stats *and* projects an aura,
+keep the self-stat change as a `statModifiers` rage source — the rage self-stat
+loop in `getEffectiveStats` deliberately ignores non-`statModifiers` sources so a
+nested `enemyAura` never leaks onto the raging unit.
 
 ## Done checklist
 

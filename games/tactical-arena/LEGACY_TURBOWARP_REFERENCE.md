@@ -114,6 +114,36 @@ confirmed override.
   `Sniper Extra Damage Check`, and `Sniper Minimum Damage Check`, but their
   exact legacy behavior still needs a focused pass before implementation.
 
+## Necromancer — recovered + implemented (rebuild canon)
+
+Confirmed from the `.sb3`: stat block HP 23 / Move 3 / Range 5 / STR 6 / DEF 3 /
+MP 36; passive **Deathly Aura** (a Chebyshev radius-2 square around the
+Necromancer); **Dead Zone** reduces the host team's incoming magic damage by 1
+(the `Necro Anti-Magic Passive Check` adds 1 to the damage-reduction accumulator
+when the defending team holds a living Necromancer); the **Ghoul** is summoned
+with 10 HP, DEF 2, carries the aura, and takes no turns.
+
+The implemented rebuild fixes the values the `.sb3` scatters across animation
+scripts (combat rolls are themselves a rebuild override, so these are balance
+choices, not legacy violations):
+
+- **Deathly Aura:** enemies within 2 tiles suffer **-1 DEF**. While the
+  Necromancer rages, the aura also saps **-1 STR and -1 MOVE** and deepens DEF to
+  **-2** (matching the legacy RAGE tooltip's "extra -1 DEF plus -1 STR and -1
+  Move"); the Necromancer itself gains **+1 MOVE**.
+- **Dark Bomb:** 10 MP, self-centered, **5 magic damage** to every enemy within 2
+  tiles. Implemented as a non-rage-locked sibling of the Magician's Nuke; pairs
+  with the radius-2 aura wanting the Necromancer mid-board.
+- **Wither:** 4 MP, **magic** damage plus a 70% **Slow (-1 MOVE, 3 turns)** check.
+  Immunity is resolved centrally, so **Paladin is immune** (Chosen) but — unlike
+  the legacy per-ART list — **Mystic is no longer Wither-immune**.
+- **Summon Ghoul:** 8 MP, places a Ghoul on an empty tile within 2; **one Ghoul
+  per Necromancer** at a time (legacy `petPlaced`).
+- **Ghoul / victory:** summons take no turns and are excluded from the turn loop
+  and match-stat counts. Defeat is decided by living *commanders*, so a player left
+  with only a Ghoul has lost (avoids a turn-less stalemate the legacy project never
+  had to formalize).
+
 ## Not carried over
 
 No old SVG, PNG, font, or sound asset has been copied. The new cabinet will use

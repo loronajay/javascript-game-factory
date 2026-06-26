@@ -2,7 +2,8 @@ const STATUS_VFX = Object.freeze({
   poison: Object.freeze({ type: "poison", label: "POI", color: "#78d46b", glow: "#315f29", ring: "bubble" }),
   slow: Object.freeze({ type: "slow", label: "SLW", color: "#70b7ff", glow: "#244c80", ring: "drag" }),
   blind: Object.freeze({ type: "blind", label: "BLD", color: "#f0d77a", glow: "#705f1e", ring: "blink" }),
-  silence: Object.freeze({ type: "silence", label: "SIL", color: "#c89cff", glow: "#553276", ring: "mute" })
+  silence: Object.freeze({ type: "silence", label: "SIL", color: "#c89cff", glow: "#553276", ring: "mute" }),
+  stun: Object.freeze({ type: "stun", label: "STN", color: "#ffe45e", glow: "#7a6310", ring: "jolt" })
 });
 
 const ABILITY_VFX = Object.freeze({
@@ -100,10 +101,42 @@ const ABILITY_VFX = Object.freeze({
   nuke: Object.freeze({
     type: "magicBurst",
     soundKey: "nuke",
-    particleCount: 20,
+    blast: true,
+    blastTiles: 3,
+    shake: 12,
+    particleCount: 26,
     radius: 48,
-    durationMs: 680,
+    durationMs: 720,
     colors: Object.freeze({ core: "#9966ff", trail: "#4422aa", impact: "#ccaaff" })
+  }),
+  "dark-bomb": Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    // A self-centred detonation, not a single bolt: implosion → shockwave → debris,
+    // with the ground ring sweeping the whole 2-tile blast footprint (blastTiles).
+    blast: true,
+    blastTiles: 2,
+    shake: 10,
+    particleCount: 24,
+    radius: 46,
+    durationMs: 700,
+    colors: Object.freeze({ core: "#b48cff", trail: "#2a1746", impact: "#9be08a" })
+  }),
+  "summon-ghoul": Object.freeze({
+    type: "magicBurst",
+    soundKey: "darkseeker",
+    particleCount: 14,
+    radius: 34,
+    durationMs: 600,
+    colors: Object.freeze({ core: "#9be08a", trail: "#244d1f", impact: "#e8ffd6" })
+  }),
+  wither: Object.freeze({
+    type: "statusStrike",
+    soundKey: "slowApplied",
+    status: "slow",
+    motif: "snare",
+    ringCount: 3,
+    colors: Object.freeze({ core: "#9b8cff", trail: "#2a1746", impact: "#cdbcff" })
   }),
   lightseeker: Object.freeze({
     type: "magicBurst",

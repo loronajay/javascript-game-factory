@@ -1,8 +1,8 @@
 import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { createBattleState, findUnit, unitAt } from "./core/state.js";
-import { canUseArt, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getVolleyShotAimOptions, getVolleyShotCells } from "./rules/arts.js";
-import { positionKey } from "./rules/movement.js";
+import { canUseArt, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells } from "./rules/arts.js";
+import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { applyCommand } from "./core/reducer.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
@@ -288,6 +288,9 @@ async function resolveInstantArt(command) {
       targets: [],
       path: resolved.path ?? [actorBefore.position]
     });
+  } else if (resolved?.artId === "summon-ghoul" && actorBefore) {
+    const ghoul = findUnit(result.nextState, resolved.summonedUnitId);
+    if (ghoul) await effects.playAbilityVfx("summon-ghoul", { actor: actorBefore, targets: [ghoul] });
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -390,7 +393,8 @@ function playEventSounds(events) {
       // VFX-managed arts play their own sound through the animation path
       if (artId === "footwork" || artId === "flee" || artId === "nuke" ||
           artId === "spark" || artId === "pray" || artId === "wish" ||
-          artId === "lightseeker" || artId === "darkseeker") continue;
+          artId === "lightseeker" || artId === "darkseeker" ||
+          artId === "dark-bomb" || artId === "summon-ghoul") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
       else if (artId === "volley-shot") audio.play("arrowHit");
@@ -480,10 +484,27 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "volley-shot", { targetPosition: position }))) {
       setMessage("Volley Shot resolved. This unit's activation is complete.");
     }
+  } else if (mode === "art:summon-ghoul") {
+    const placement = getSummonPlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "summon-ghoul"));
+    if (!placement.has(positionKey(position))) {
+      setMessage("Summon Ghoul: choose a highlighted empty tile near the Necromancer.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "summon-ghoul", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Ghoul raised. This unit's activation is complete.");
+    }
   } else if (mode?.startsWith("art:")) {
     const artId = mode.slice("art:".length);
     const art = getAvailableArts(unit).find((a) => a.id === artId);
-    if (art?.effect?.type === "healAllies") {
+    if (art?.targeting?.shape === "nukeAura") {
+      // Self-centred blast: any click inside the previewed footprint detonates it.
+      const radius = art.targeting.radius ?? 2;
+      if (chebyshevDistance(unit.position, position) > radius) {
+        setMessage(`${art.name}: click inside the highlighted blast zone to detonate.`, true);
+      } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
+        mode = null;
+        setMessage(`${art.name} resolved. This unit's activation is complete.`);
+      }
+    } else if (art?.effect?.type === "healAllies") {
       const clickedAlly = unitAt(state, position);
       if (!clickedAlly || clickedAlly.player !== unit.player) {
         setMessage("Click a highlighted ally to confirm.", true);
@@ -541,6 +562,15 @@ async function handleActionClick(action, unit) {
       const artId = action.slice(4);
       const art = getAvailableArts(unit).find((a) => a.id === artId);
       if (art?.selfCast) {
+        // Self-centred AoE blasts (Dark Bomb, Nuke) preview their detonation
+        // footprint first — staying in art mode lets the board light the blast
+        // zone and its victims; a click inside the zone confirms (see handleTile).
+        // Every other selfCast resolves immediately.
+        if (art.targeting?.shape === "nukeAura") {
+          setMessage(`${art.name} (${art.mpCost} MP): ${art.description} Click inside the highlighted blast zone to detonate.`);
+          render();
+          return;
+        }
         if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
           setMessage(art.bonusActionGroup
             ? `${art.name} resolved. Take the rest of this unit's turn.`
@@ -553,11 +583,13 @@ async function handleActionClick(action, unit) {
         ? "Hover a direction to preview the cone, then click to fire."
         : action === "art:flee"
           ? "Choose a highlighted empty tile to teleport to."
-          : art?.effect?.type === "healAllies"
-            ? "Click any highlighted ally to confirm."
-            : art?.resolution === "statusCast"
-              ? "Choose a highlighted enemy target."
-              : "Choose a highlighted enemy target.";
+          : action === "art:summon-ghoul"
+            ? "Choose a highlighted empty tile to raise the Ghoul."
+            : art?.effect?.type === "healAllies"
+              ? "Click any highlighted ally to confirm."
+              : art?.resolution === "statusCast"
+                ? "Choose a highlighted enemy target."
+                : "Choose a highlighted enemy target.";
       setMessage(`${art.name} (${art.mpCost} MP): ${art.description} ${lead}`);
     } else {
       setMessage(`Choose a highlighted ${action} tile.`);

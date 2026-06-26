@@ -203,6 +203,69 @@ function buildPaladin(g) {
   );
 }
 
+function buildNecromancer(g) {
+  g.append(
+    // tattered hooded cloak with a jagged hem
+    E("path", { class: "fig-cloak", d: "M -7 -29 Q -18 -8 -16 11 L -11 8 L -7 11 L -2 8 L 2 11 L 7 8 L 11 11 L 16 8 Q 18 -8 7 -29 Q 0 -32 -7 -29 Z" }),
+    E("path", { class: "fig-cloak-dk", d: "M 0 -30 Q 18 -8 16 8 Q 8 10 0 10 Z" }),
+    // robe body, hunched forward
+    E("path", { class: "fig-body", d: "M -7 -27 Q -15 -8 -13 9 Q 0 12 13 9 Q 15 -8 7 -27 Q 0 -30 -7 -27 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -28 Q 15 -8 13 9 Q 7 10.5 0 10.8 Z" }),
+    E("path", { class: "fig-light", d: "M -7 -27 Q -15 -8 -13 9 Q -10 10 -7 10.5 Q -11 -7 -3 -26 Z" }),
+    // team stole down the front
+    E("path", { class: "fig-cloak", d: "M -6 -27 L -4 8 L -1 8 L -2 -27 Z" }),
+    E("path", { class: "fig-cloak", d: "M 6 -27 L 4 8 L 1 8 L 2 -27 Z" }),
+    // bone clasp + a small skull sigil on the chest
+    E("path", { class: "fig-body", d: "M -3 -20 Q -3 -25 0 -25 Q 3 -25 3 -20 Q 3 -17 0 -16 Q -3 -17 -3 -20 Z" }),
+    E("ellipse", { class: "fig-dark", cx: -1.3, cy: -20.5, rx: 0.8, ry: 1 }),
+    E("ellipse", { class: "fig-dark", cx: 1.3, cy: -20.5, rx: 0.8, ry: 1 }),
+    // deep cowl with a shadowed hollow and two cold glowing eyes
+    E("path", { class: "fig-body", d: "M -8 -29 Q -10 -45 0 -47 Q 10 -45 8 -29 Q 4 -33 0 -33 Q -4 -33 -8 -29 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -47 Q 10 -45 8 -29 Q 4 -32 0 -32 Z" }),
+    E("path", { class: "fig-dark", d: "M -6 -38 Q 0 -33 6 -38 Q 5 -29 0 -29 Q -5 -29 -6 -38 Z" }),
+    E("ellipse", { class: "fig-glow", cx: -2.4, cy: -36, rx: 1.4, ry: 1.6 }),
+    E("ellipse", { class: "fig-glow", cx: 2.4, cy: -36, rx: 1.4, ry: 1.6 }),
+    // gnarled necromancer staff: a brass rod, a glowing dark orb, and a forked bone crown
+    E("rect", { class: "fig-gold", x: 13, y: -36, width: 3.2, height: 48, rx: 1.5 }),
+    E("circle", { class: "fig-glow", cx: 14.6, cy: -40, r: 8 }),
+    E("circle", { class: "fig-dark", cx: 14.6, cy: -40, r: 4.3 }),
+    E("ellipse", { class: "fig-light", cx: 13.1, cy: -41.6, rx: 1.3, ry: 1.6 }),
+    E("path", { class: "fig-gold", d: "M 14.6 -44 L 10.4 -50.5 L 12 -50.9 L 14.6 -46.6 L 17.2 -50.9 L 18.8 -50.5 Z" }),
+    E("ellipse", { class: "fig-body", cx: 10, cy: -14, rx: 2.4, ry: 2.4 })
+  );
+}
+
+function buildGhoul(g) {
+  g.append(
+    // ragged team loincloth at the hips — the summon's team identity
+    E("path", { class: "fig-cloak", d: "M -8 -6 L 8 -6 L 9 0 L 6 8 L 4 3 L 1 9 L -2 3 L -4 8 L -9 0 Z" }),
+    E("path", { class: "fig-cloak-dk", d: "M 0 -6 L 8 -6 L 9 0 L 6 8 L 4 3 L 1 9 L 0 6 Z" }),
+    // hunched skeletal torso with a bare ribcage
+    E("path", { class: "fig-body", d: "M -8 -24 Q -11 -14 -8 -2 L -7 4 L 7 4 L 8 -2 Q 11 -14 8 -24 Q 0 -27 -8 -24 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -26 L 8 -24 Q 11 -14 8 -2 L 7 4 L 0 4 Z" }),
+    E("path", { class: "fig-light", d: "M -8 -24 Q -11 -14 -8 -2 L -7 4 L -5 4 L -5 -2 Q -8 -14 -6 -23 Z" }),
+    E("line", { class: "fig-line", x1: -6, y1: -18, x2: 6, y2: -18 }),
+    E("line", { class: "fig-line", x1: -6, y1: -14, x2: 6, y2: -14 }),
+    E("line", { class: "fig-line", x1: -5, y1: -10, x2: 5, y2: -10 }),
+    E("line", { class: "fig-line", x1: 0, y1: -22, x2: 0, y2: -7 }),
+    // long bony clawed arms reaching forward
+    E("path", { class: "fig-body", d: "M -8 -20 Q -16 -14 -15 -2 L -12 -3 Q -13 -12 -6 -17 Z" }),
+    E("path", { class: "fig-body", d: "M 8 -20 Q 16 -14 15 -2 L 12 -3 Q 13 -12 6 -17 Z" }),
+    E("path", { class: "fig-dark", d: "M -16 -3 L -13 -2 M -15 -1 L -12 -1 M -16 1 L -13 1" }),
+    E("path", { class: "fig-dark", d: "M 16 -3 L 13 -2 M 15 -1 L 12 -1 M 16 1 L 13 1" }),
+    // tilted skull with hollow sockets and a gaunt jaw
+    E("path", { class: "fig-body", d: "M -7 -28 Q -8 -38 0 -39 Q 8 -38 7 -28 Q 5 -24 0 -24 Q -5 -24 -7 -28 Z" }),
+    E("path", { class: "fig-light", d: "M -7 -28 Q -8 -38 0 -39 L -2 -38 Q -5 -33 -4.5 -27 Z" }),
+    E("ellipse", { class: "fig-dark", cx: -2.6, cy: -31, rx: 2, ry: 2.4 }),
+    E("ellipse", { class: "fig-dark", cx: 2.6, cy: -31, rx: 2, ry: 2.4 }),
+    E("path", { class: "fig-dark", d: "M -0.2 -28 L -1.4 -25 L 1 -25 Z" }),
+    E("line", { class: "fig-line", x1: -4, y1: -25.5, x2: 4, y2: -25.5 }),
+    E("line", { class: "fig-line", x1: -2.4, y1: -24, x2: -2.4, y2: -26 }),
+    E("line", { class: "fig-line", x1: 0, y1: -24, x2: 0, y2: -26 }),
+    E("line", { class: "fig-line", x1: 2.4, y1: -24, x2: 2.4, y2: -26 })
+  );
+}
+
 // Register one builder per unit type. The builder receives an empty
 // <g class="figure"> and appends layered figurine paths (back to front).
 const FIGURE_BUILDERS = new Map([
@@ -210,7 +273,9 @@ const FIGURE_BUILDERS = new Map([
   ["archer", buildArcher],
   ["mystic", buildMystic],
   ["magician", buildMagician],
-  ["paladin", buildPaladin]
+  ["paladin", buildPaladin],
+  ["necromancer", buildNecromancer],
+  ["ghoul", buildGhoul]
 ]);
 
 export function createUnitFigurine(type) {
@@ -219,6 +284,53 @@ export function createUnitFigurine(type) {
   return figure;
 }
 
+// Each status wears a literal little icon, not a 3-letter coin: poison = a
+// cluster of bubbles, silence = a "..." chat box, stun = a lightning bolt,
+// blind = sunglasses, slow = a boot with a down arrow. Shapes are drawn in a
+// ±8 box centred on (0,0) and sit on a dark themed disc for board contrast.
+// Keyed by status TYPE (not catalog data) so the catalog/test contract is
+// untouched — the icon comes from the renderer, the color/glow from STATUS_VFX.
+const STATUS_ICON_BUILDERS = {
+  poison(g) {
+    g.append(
+      svgElement("circle", { class: "ic-bubble", cx: -2.6, cy: 3, r: 4 }),
+      svgElement("circle", { class: "ic-bubble", cx: 3, cy: 0.4, r: 2.7 }),
+      svgElement("circle", { class: "ic-bubble", cx: -0.2, cy: -3.8, r: 1.8 }),
+      svgElement("circle", { class: "ic-shine", cx: -3.9, cy: 1.5, r: 1.1 })
+    );
+  },
+  silence(g) {
+    g.append(
+      svgElement("path", {
+        class: "ic-bubble-box",
+        d: "M -7 -6 Q -7 -7.4 -5.6 -7.4 H 5.6 Q 7 -7.4 7 -6 V 0 Q 7 1.4 5.6 1.4 H -1.6 L -4.4 5.4 L -4.4 1.4 H -5.6 Q -7 1.4 -7 0 Z"
+      }),
+      svgElement("circle", { class: "ic-dot", cx: -3, cy: -3, r: 1 }),
+      svgElement("circle", { class: "ic-dot", cx: 0, cy: -3, r: 1 }),
+      svgElement("circle", { class: "ic-dot", cx: 3, cy: -3, r: 1 })
+    );
+  },
+  stun(g) {
+    g.append(
+      svgElement("path", { class: "ic-bolt", d: "M 1.5 -8 L -4.5 1.6 L -0.6 1.6 L -2.6 8 L 6 -2.2 L 1.6 -2.2 L 4 -8 Z" })
+    );
+  },
+  blind(g) {
+    g.append(
+      svgElement("path", { class: "ic-temple", d: "M -7.6 -3.6 L -6 -1 M 7.6 -3.6 L 6 -1" }),
+      svgElement("path", { class: "ic-bridge", d: "M -1.4 -0.6 Q 0 -2.2 1.4 -0.6" }),
+      svgElement("rect", { class: "ic-lens", x: -7, y: -1.2, width: 5.6, height: 5, rx: 2.4 }),
+      svgElement("rect", { class: "ic-lens", x: 1.4, y: -1.2, width: 5.6, height: 5, rx: 2.4 })
+    );
+  },
+  slow(g) {
+    g.append(
+      svgElement("path", { class: "ic-boot", d: "M -5 -6 L -1.2 -6 L -1.2 1.4 L 4.8 1.4 Q 7 1.4 7 3.8 L 7 6 L -5 6 Z" }),
+      svgElement("path", { class: "ic-down", d: "M 2.6 -7 L 2.6 -1.4 M 0.4 -3.4 L 2.6 -1.4 L 4.8 -3.4" })
+    );
+  }
+};
+
 function createStatusBadges(unit) {
   const visuals = getUnitStatusVfx(unit.statuses);
   if (!visuals.length) return null;
@@ -226,16 +338,14 @@ function createStatusBadges(unit) {
   const group = svgElement("g", { class: "status-stack", transform: `translate(${-((visuals.length - 1) * (spacing / 2))} -58)` });
   visuals.forEach((visual, index) => {
     const badge = svgElement("g", {
-      class: `status-badge status-${visual.type} status-ring-${visual.ring}`,
+      class: `status-badge status-${visual.type}`,
       transform: `translate(${index * spacing} 0)`,
       style: `--status:${visual.color};--status-glow:${visual.glow};`
     });
-    badge.append(
-      svgElement("circle", { class: "status-halo", cx: 0, cy: 0, r: 10 }),
-      svgElement("circle", { class: "status-core", cx: 0, cy: 0, r: 7 }),
-      svgElement("text", { class: "status-label", x: 0, y: 3, "text-anchor": "middle" })
-    );
-    badge.querySelector(".status-label").textContent = visual.label;
+    badge.append(svgElement("circle", { class: "status-disc", cx: 0, cy: 0, r: 10 }));
+    const icon = svgElement("g", { class: "status-icon" });
+    (STATUS_ICON_BUILDERS[visual.type] ?? (() => {}))(icon);
+    badge.append(icon);
     group.append(badge);
   });
   return group;

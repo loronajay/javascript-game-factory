@@ -1,10 +1,14 @@
+import { takesTurns } from "../core/unitCatalog.js";
+
 export function teamColor(player) {
   return player === 1 ? "#5288c6" : "#c4463f";
 }
 
+// Summoned pieces (Ghouls) are excluded from all match stats — totals, HP, kills,
+// and damage are about the players' real squads, not transient summons.
 export function hpRemaining(state, player) {
   return state.units
-    .filter((u) => u.player === player)
+    .filter((u) => u.player === player && takesTurns(u))
     .reduce((sum, u) => sum + Math.max(0, u.hp), 0);
 }
 
@@ -36,11 +40,11 @@ export function buildRoster(squads, size) {
 
 export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
   const remaining = (player) => state.units
-    .filter((u) => u.player === player)
+    .filter((u) => u.player === player && takesTurns(u))
     .reduce((sum, u) => sum + Math.max(0, u.hp), 0);
 
   const teams = [1, 2].map((player) => {
-    const units = state.units.filter((u) => u.player === player);
+    const units = state.units.filter((u) => u.player === player && takesTurns(u));
     const opponent = player === 1 ? 2 : 1;
     return {
       player,
@@ -52,7 +56,7 @@ export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
       hpRemaining: remaining(player),
       hpTotal: initialHpByPlayer[player],
       damageDealt: Math.max(0, initialHpByPlayer[opponent] - remaining(opponent)),
-      kills: state.units.filter((u) => u.player === opponent && u.hp <= 0).length
+      kills: state.units.filter((u) => u.player === opponent && takesTurns(u) && u.hp <= 0).length
     };
   }).sort((a, b) => Number(b.isWinner) - Number(a.isWinner));
 
@@ -72,6 +76,7 @@ export function readableError(errorCode) {
     MOVE_OUT_OF_RANGE: "That tile is not reachable this activation.",
     TARGET_OUT_OF_RANGE: "That target is beyond attack range.",
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",
-    FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation."
+    FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation.",
+    SUMMON_LIMIT: "This Necromancer already has a Ghoul on the field."
   })[errorCode] ?? "That action is not legal right now.";
 }

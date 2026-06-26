@@ -1,12 +1,12 @@
 import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
-import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
+import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { getFootworkStepOptions, getLegalFleeTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
+import { getFootworkStepOptions, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
 
-function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range }) {
+function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
   const hw = metrics.tileWidth / 2;
   const hh = metrics.tileHeight / 2;
@@ -18,6 +18,9 @@ function createTile(metrics, position, { affinity, selected, legal, targetKind, 
   if (range) classes.push(`${range}-range`);
   if (legal) classes.push(`legal-${targetKind}`);
   if (path) classes.push("path");
+  // Always-on Deathly Aura tint — lowest priority, so it only paints when no
+  // brighter action highlight (legal / range / path / selection) claims the tile.
+  if (aura) classes.push("aura-zone", `aura-zone--p${aura}`);
   const tile = svgElement("g", { class: classes.join(" ") });
   tile.append(
     svgElement("polygon", { class: "tile-side-a", points: pointsToString(left) }),
@@ -73,7 +76,13 @@ export function isTargetedMode(mode, actor) {
   if (mode === "attack") return true;
   if (!actor || !mode?.startsWith("art:") || mode === "art:volley-shot") return false;
   const art = getArt(actor.type, mode.slice("art:".length));
-  return Boolean(art && art.effect?.type !== "healAllies" && art.resolution !== "flee");
+  return Boolean(
+    art &&
+    art.effect?.type !== "healAllies" &&
+    art.resolution !== "flee" &&
+    art.resolution !== "summon" &&
+    art.targeting?.shape !== "nukeAura"
+  );
 }
 
 // Hovering a Volley direction lights that cone's tiles so the player sees the
@@ -138,6 +147,30 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
 
   if (actor && mode === "footwork") legal = getFootworkStepOptions(state, actor, footworkPath);
   if (actor && mode === "art:flee") legal = getLegalFleeTiles(state, actor);
+  if (actor && mode === "art:summon-ghoul") legal = getSummonPlacementTiles(state, actor, getArt(actor.type, "summon-ghoul"));
+
+  // Self-centred AoE blasts (Dark Bomb, Nuke): preview the whole detonation
+  // footprint as a range wash and light every enemy caught inside as a legal
+  // target, so the player sees who dies before committing the MP.
+  let nukeArt = null;
+  if (actor && mode?.startsWith("art:")) {
+    const candidate = getArt(actor.type, mode.slice("art:".length));
+    if (candidate?.targeting?.shape === "nukeAura") {
+      nukeArt = candidate;
+      const radius = candidate.targeting.radius ?? 2;
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        for (let dy = -radius; dy <= radius; dy += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
+          const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+          if (isOnBoard(state, pos)) range.add(positionKey(pos));
+        }
+      }
+      for (const u of state.units) {
+        if (u.hp > 0 && u.player !== actor.player && chebyshevDistance(actor.position, u.position) <= radius)
+          legal.add(positionKey(u.position));
+      }
+    }
+  }
 
   let isHealArt = false;
   if (actor && mode?.startsWith("art:")) {
@@ -174,6 +207,20 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   board.classList.toggle("board-focused", Boolean(actor));
   boardLayer.append(createBoardDais(metrics, state.size));
 
+  // Deathly Aura zones (Necromancer + the Ghoul that carries it), tile → source
+  // player for faction tinting. Computed every render and independent of selection
+  // so the aura is always visible — the per-tile suppression below keeps it under
+  // any brighter action highlight.
+  const auraByKey = new Map();
+  for (const src of getAuraSources(state)) {
+    for (let dx = -src.radius; dx <= src.radius; dx += 1) {
+      for (let dy = -src.radius; dy <= src.radius; dy += 1) {
+        const pos = { x: src.position.x + dx, y: src.position.y + dy };
+        if (isOnBoard(state, pos)) auraByKey.set(positionKey(pos), src.player);
+      }
+    }
+  }
+
   const tileByKey = new Map();
   for (let sum = 0; sum <= (state.size - 1) * 2; sum += 1) {
     for (let x = 0; x < state.size; x += 1) {
@@ -182,13 +229,17 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       const position = { x, y };
       const key = positionKey(position);
       const isLegal = legal.has(key);
+      const isSelected = unitAt(state, position)?.id === selectedId;
+      const inRange = !isLegal && range.has(key);
+      const inPath = path.has(key);
       const tile = createTile(metrics, position, {
         affinity: getTileAffinity(state, position),
-        selected: unitAt(state, position)?.id === selectedId,
+        selected: isSelected,
         legal: isLegal,
         targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art",
-        path: path.has(key),
-        range: !isLegal && range.has(key) ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null
+        path: inPath,
+        range: inRange ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null,
+        aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null
       });
       tile.addEventListener("click", () => onTileClick(position));
       boardLayer.append(tile);
@@ -202,7 +253,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     .filter((u) => u.hp > 0)
     .sort((a, b) => (a.position.x + a.position.y) - (b.position.x + b.position.y))
     .forEach((u) => {
-      const isTarget = targeted && actor && u.player !== actor.player && legal.has(positionKey(u.position));
+      const isTarget = (targeted || Boolean(nukeArt)) && actor && u.player !== actor.player && legal.has(positionKey(u.position));
       unitsLayer.append(createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state }));
     });
 }

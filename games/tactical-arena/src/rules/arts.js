@@ -90,6 +90,24 @@ export function getLegalFleeTiles(state, actor) {
   return legal;
 }
 
+// Empty on-board tiles within an ART's placement radius (Summon Ghoul). The
+// Necromancer raises a Ghoul on one of these; occupied tiles and off-board cells
+// are excluded. Chebyshev radius, like the rest of the targeting geometry.
+export function getSummonPlacementTiles(state, actor, art) {
+  const radius = art?.targeting?.radius ?? 2;
+  const tiles = new Set();
+  for (let dx = -radius; dx <= radius; dx += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
+      if (dx === 0 && dy === 0) continue;
+      const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+      if (!isOnBoard(state, pos) || unitAt(state, pos)) continue;
+      tiles.add(positionKey(pos));
+    }
+  }
+  return tiles;
+}
+
 export function getTilePulseTargets(state, actor, art) {
   const effect = art.effect;
   if (effect?.type !== "tilePulse") return [];

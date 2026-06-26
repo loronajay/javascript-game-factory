@@ -1,8 +1,8 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getEffectiveStats, getUnitType, isDefending } from "./unitCatalog.js";
+import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getTilePulseTargets, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
-import { getProximityBonus, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
+import { getProximityBonus, getTeamDamageReduction, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -25,7 +25,8 @@ const ERR = Object.freeze({
   TARGET_OUT_OF_RANGE: "TARGET_OUT_OF_RANGE",
   ART_NOT_AVAILABLE: "ART_NOT_AVAILABLE",
   INVALID_ART_PATH: "INVALID_ART_PATH",
-  FINISH_REQUIRES_ACTION: "FINISH_REQUIRES_ACTION"
+  FINISH_REQUIRES_ACTION: "FINISH_REQUIRES_ACTION",
+  SUMMON_LIMIT: "SUMMON_LIMIT"
 });
 
 const reject = (errorCode) => ({ accepted: false, errorCode });
@@ -63,7 +64,9 @@ function beginActivation(state, command) {
   if (command.player !== state.currentPlayer) return reject(ERR.NOT_ACTIVE_PLAYER);
   const result = validateOwnedLivingUnit(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
-  if (result.unit.spent) return reject(ERR.UNIT_SPENT);
+  // Summons (Ghouls) never activate — they spawn spent, but guard explicitly so a
+  // summon can never open an activation even if some path clears its spent flag.
+  if (!takesTurns(result.unit) || result.unit.spent) return reject(ERR.UNIT_SPENT);
   if (state.activation && state.activation.unitId !== result.unit.id &&
       (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
 
@@ -154,6 +157,8 @@ const ART_RESOLVERS = new Map([
   ["silence", resolveStatusCast],
   ["flee", resolveFlee],
   ["nuke", resolveNuke],
+  ["dark-bomb", resolveNuke],
+  ["summon-ghoul", resolveSummonGhoul],
   ["lightseeker", resolveTilePulse],
   ["darkseeker", resolveTilePulse]
 ]);
@@ -292,9 +297,11 @@ function resolveNuke(state, command, art) {
     if (chebyshevDistance(actor.position, target.position) > radius) continue;
     const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
-    target.hp = Math.max(0, target.hp - result.damage);
+    // Dead Zone (and any future magic-reduction host) trims the final magic number.
+    const damage = Math.max(0, result.damage - getTeamDamageReduction(target, next, "magic"));
+    target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
-    damageByTarget[target.id] = result.damage;
+    damageByTarget[target.id] = damage;
   }
 
   actor.mp -= art.mpCost;
@@ -307,6 +314,59 @@ function resolveNuke(state, command, art) {
     actorId: actor.id,
     targetIds,
     damageByTarget,
+    mpCost: art.mpCost
+  }]);
+}
+
+// A summoned piece is a full unit object (same shape createUnit produces) plus a
+// `summonerId` so the one-Ghoul-per-Necromancer cap can find it. It spawns already
+// `spent` so the turn loop never offers it an activation.
+function createSummon(id, type, player, position, summonerId) {
+  const definition = getUnitType(type);
+  return {
+    id,
+    player,
+    type,
+    position: { ...position },
+    hp: definition.stats.maxHp,
+    mp: definition.stats.maxMp,
+    statModifiers: {},
+    statuses: [],
+    defending: false,
+    spent: true,
+    mageChargeCount: 0,
+    summonerId
+  };
+}
+
+function resolveSummonGhoul(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const placement = command.targetPosition;
+  if (!placement || !getSummonPlacementTiles(state, actorState, art).has(positionKey(placement))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  // One living Ghoul per Necromancer (legacy petPlaced). Re-summon is blocked
+  // until the current one dies.
+  if (state.units.some((unit) => unit.hp > 0 && unit.summonerId === actorState.id)) {
+    return reject(ERR.SUMMON_LIMIT);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  // Unique id across this Necromancer's whole summon history (dead Ghouls stay in
+  // the units array), so findUnit never collides with a previous corpse.
+  const seq = next.units.filter((unit) => unit.summonerId === actor.id).length;
+  const ghoulId = `${actor.id}-${art.summon.type}-${seq}`;
+  const ghoul = createSummon(ghoulId, art.summon.type, actor.player, placement, actor.id);
+  next.units.push(ghoul);
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    summonedUnitId: ghoulId,
+    position: { ...placement },
     mpCost: art.mpCost
   }]);
 }
@@ -491,14 +551,18 @@ function spendAndAdvance(state, unit) {
   }
 
   state.activation = null;
-  if (livingUnits(state, state.currentPlayer).some((member) => !member.spent)) return;
+  // Summons never take turns, so they neither keep the turn open nor get their
+  // spent flag reset at the rollover.
+  if (livingUnits(state, state.currentPlayer).some((member) => takesTurns(member) && !member.spent)) return;
   state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
   state.turnNumber += 1;
-  for (const member of livingUnits(state, state.currentPlayer)) member.spent = false;
+  for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
 }
 
 function resolveVictory(state) {
-  const livingPlayers = new Set(livingUnits(state).map((unit) => unit.player));
+  // Defeat is decided by living COMMANDERS, not raw bodies: a player whose only
+  // survivor is a turn-less summon (a lone Ghoul) has lost and cannot stall.
+  const livingPlayers = new Set(livingUnits(state).filter(takesTurns).map((unit) => unit.player));
   if (livingPlayers.size === 1) {
     state.winner = [...livingPlayers][0];
     state.phase = "complete";

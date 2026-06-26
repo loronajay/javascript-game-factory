@@ -438,7 +438,43 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     if (vfx.soundKey) sound.play(vfx.soundKey);
     if (reducedMotion()) return;
     const center = effectPoint(actor.position, 18);
+    const ground = unitBase(actor.position);
+    const blast = Boolean(vfx.blast);
+    const duration = vfx.durationMs ?? 680;
+    const particleCount = vfx.particleCount ?? 20;
     const animations = [];
+
+    // A blast detonates rather than just blooms: a flat shockwave sweeps the table
+    // out to the real footprint, the core implodes then erupts, and the board jolts.
+    if (blast) {
+      shake(vfx.shake ?? 10);
+
+      const reach = boardMetrics.tileWidth * 0.55 * (vfx.blastTiles ?? 2) + boardMetrics.tileWidth * 0.5;
+      const wave = svg("ellipse", {
+        class: "fx-ring",
+        cx: ground.x,
+        cy: ground.y + 6,
+        rx: 12,
+        ry: 6,
+        stroke: vfx.colors.impact,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(wave);
+      animations.push(waitForAnimation(wave.animate([
+        { rx: 12, ry: 6, opacity: 0, strokeWidth: 7 },
+        { rx: reach, ry: reach * 0.5, opacity: 0.9, strokeWidth: 3, offset: 0.5 },
+        { rx: reach + 18, ry: (reach + 18) * 0.5, opacity: 0, strokeWidth: 1 }
+      ], { duration, easing: "cubic-bezier(.15,.85,.3,1)" })).then(() => wave.remove()));
+
+      const core = svg("circle", { class: "fx-flash", cx: center.x, cy: center.y, r: 4, fill: vfx.colors.core, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(core);
+      animations.push(waitForAnimation(core.animate([
+        { r: 34, opacity: 0 },
+        { r: 7, opacity: 1, offset: 0.34 },
+        { r: 26, opacity: 1, offset: 0.52 },
+        { r: 4, opacity: 0 }
+      ], { duration: duration * 0.72, easing: "cubic-bezier(.4,0,.2,1)" })).then(() => core.remove()));
+    }
 
     // Expanding ring centred on the caster
     const ring = svg("circle", {
@@ -454,11 +490,12 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       { r: 10, opacity: 0, strokeWidth: 7 },
       { r: vfx.radius ?? 48, opacity: 0.85, strokeWidth: 3, offset: 0.4 },
       { r: (vfx.radius ?? 48) + 16, opacity: 0, strokeWidth: 1 }
-    ], { duration: vfx.durationMs ?? 680, easing: "ease-out" })).then(() => ring.remove()));
+    ], { duration, easing: "ease-out" })).then(() => ring.remove()));
 
-    // Radial particle burst from caster
-    for (let i = 0; i < (vfx.particleCount ?? 20); i += 1) {
-      const angle = (Math.PI * 2 * i) / (vfx.particleCount ?? 20);
+    // Radial particle burst from caster. Blast motes implode toward the centre on
+    // a short delay before erupting, so the detonation reads as a gathered collapse.
+    for (let i = 0; i < particleCount; i += 1) {
+      const angle = (Math.PI * 2 * i) / particleCount;
       const dist = 28 + (i % 3) * 14;
       const mote = svg("circle", {
         class: "fx-mote",
@@ -469,30 +506,38 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         filter: "url(#softGlow)"
       });
       effectsLayer.appendChild(mote);
-      animations.push(waitForAnimation(mote.animate([
-        { transform: "translate(0,0) scale(.3)", opacity: 0 },
-        { transform: `translate(${Math.cos(angle) * dist * 0.4}px ${Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
-        { transform: `translate(${Math.cos(angle) * dist}px ${Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
-      ], { duration: vfx.durationMs ?? 680, delay: i * 8, easing: "ease-out" })).then(() => mote.remove()));
+      const frames = blast
+        ? [
+            { transform: `translate(${Math.cos(angle) * dist}px ${Math.sin(angle) * dist * 0.6 - 18}px) scale(.5)`, opacity: 0 },
+            { transform: "translate(0,0) scale(.7)", opacity: 1, offset: 0.34 },
+            { transform: `translate(${Math.cos(angle) * dist * 1.15}px ${Math.sin(angle) * dist * 0.7 - 24}px) scale(.2)`, opacity: 0 }
+          ]
+        : [
+            { transform: "translate(0,0) scale(.3)", opacity: 0 },
+            { transform: `translate(${Math.cos(angle) * dist * 0.4}px ${Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
+            { transform: `translate(${Math.cos(angle) * dist}px ${Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
+          ];
+      animations.push(waitForAnimation(mote.animate(frames, { duration, delay: i * 8, easing: "ease-out" })).then(() => mote.remove()));
     }
 
-    // Impact flash on each struck target
+    // Impact on each struck target — a hard pop for blasts, a soft ring otherwise.
     for (const target of targets) {
       const pt = effectPoint(target.position, 18);
+      if (blast) impact(pt, true);
       const flash = svg("circle", {
         class: "fx-ring",
         cx: pt.x,
         cy: pt.y,
         r: 6,
-        stroke: vfx.colors.trail,
+        stroke: blast ? vfx.colors.core : vfx.colors.trail,
         filter: "url(#softGlow)"
       });
       effectsLayer.appendChild(flash);
       animations.push(waitForAnimation(flash.animate([
-        { r: 6, opacity: 0, strokeWidth: 5 },
-        { r: 28, opacity: 0.7, strokeWidth: 2, offset: 0.5 },
-        { r: 36, opacity: 0, strokeWidth: 1 }
-      ], { duration: 340, delay: 80, easing: "ease-out" })).then(() => flash.remove()));
+        { r: 6, opacity: 0, strokeWidth: blast ? 6 : 5 },
+        { r: blast ? 34 : 28, opacity: blast ? 0.9 : 0.7, strokeWidth: 2, offset: 0.5 },
+        { r: blast ? 44 : 36, opacity: 0, strokeWidth: 1 }
+      ], { duration: blast ? 420 : 340, delay: blast ? 140 : 80, easing: "ease-out" })).then(() => flash.remove()));
     }
 
     await Promise.all(animations);

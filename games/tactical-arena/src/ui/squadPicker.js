@@ -4,7 +4,8 @@
 // threads into the match config; it never touches the engine.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 
-export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES);
+// Summons (Ghouls) are raised in-match, never drafted, so they are not pickable.
+export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES).filter((key) => !UNIT_TYPES[key].summon);
 export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
 
 // Force any input into a valid 4-slot squad of known unit types.
