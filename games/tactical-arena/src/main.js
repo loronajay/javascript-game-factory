@@ -343,7 +343,9 @@ function finishNow() {
 function playAttackImpactSound(rolled, ranged) {
   if (rolled.missed) { audio.play("miss"); return; }
   if (rolled.defended) { audio.play("defendedHit"); return; }
-  if (rolled.effect?.applied && rolled.artId === "life-sap") audio.play("heal");
+  if (rolled.artId === "spark")  { audio.play("spark");  return; }
+  if (rolled.artId === "banish") { audio.play("banish"); return; }
+  if (rolled.effect?.applied && rolled.artId === "life-sap") audio.play("lifeSap");
   audio.play(ranged ? "arrowHit" : "attackHit");
 }
 
@@ -362,11 +364,15 @@ function playEventSounds(events) {
     if (event.type === "UNIT_MOVED") audio.play("unitMove");
     else if (event.type === "UNIT_DEFENDED") audio.play("defend");
     else if (event.type === "ART_RESOLVED") {
+      const artId = event.artId;
+      // VFX-managed arts play their own sound through the animation path
+      if (artId === "footwork" || artId === "flee" || artId === "nuke" ||
+          artId === "spark" || artId === "pray" || artId === "wish" ||
+          artId === "lightseeker" || artId === "darkseeker") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
-      if (event.artId === "footwork" || event.artId === "flee" || event.artId === "nuke") continue;
-      else if (event.healingByTarget) audio.play("heal");
-      else if (event.artId === "volley-shot") audio.play("arrowHit");
-      else if (event.effect?.status === "silence") audio.play("attackHit");
+      if (event.healingByTarget) audio.play("heal");
+      else if (artId === "volley-shot") audio.play("arrowHit");
+      else if (artId === "silence" || event.effect?.status === "silence") audio.play("silenceApplied");
       else if (ranged) { audio.play("arrowAirborne"); audio.play("arrowHit"); }
       else audio.play("attackHit");
     }
@@ -514,7 +520,9 @@ async function handleActionClick(action, unit) {
       const art = getAvailableArts(unit).find((a) => a.id === artId);
       if (art?.selfCast) {
         if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
-          setMessage(`${art.name} resolved. This unit's activation is complete.`);
+          setMessage(art.bonusActionGroup
+            ? `${art.name} resolved. Take the rest of this unit's turn.`
+            : `${art.name} resolved. This unit's activation is complete.`);
         }
         render();
         return;

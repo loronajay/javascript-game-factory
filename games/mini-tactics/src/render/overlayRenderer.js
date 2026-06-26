@@ -20,6 +20,7 @@ export class OverlayRenderer {
         "legal-move",
         "legal-attack",
         "legal-heal",
+        "legal-guard",
         "attack-range",
         "heal-range"
       );
@@ -58,6 +59,9 @@ export class OverlayRenderer {
         case ACTION_MODES.HEAL:
           tile.classList.add("legal-heal");
           break;
+        case ACTION_MODES.GUARD:
+          tile.classList.add("legal-guard");
+          break;
       }
     }
   }
@@ -75,7 +79,7 @@ export class OverlayRenderer {
     const origin = selected ?? { x: 0, y: 0 };
 
     for (const tile of this.boardLayer.querySelectorAll(
-      ".legal-move, .legal-attack, .legal-heal"
+      ".legal-move, .legal-attack, .legal-heal, .legal-guard"
     )) {
       const face = tile.querySelector(".tile-face");
       if (!face) {

@@ -1,7 +1,7 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType, isDefending } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
+import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getTilePulseTargets, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
 import { getProximityBonus, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
@@ -80,7 +80,8 @@ function beginActivation(state, command) {
     origin: { ...unit.position },
     moved: false,
     primaryUsed: false,
-    spellUsed: false
+    spellUsed: false,
+    bonusActionGroups: []
   };
   return accept(next, [...statusEvents, { type: "ACTIVATION_BEGAN", unitId: unit.id }]);
 }
@@ -122,13 +123,15 @@ function attack(state, command) {
     return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }]);
   }
   const damage = resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical, state: next });
+  const damageDealt = Math.min(nextTarget.hp, damage.damage);
   nextTarget.hp = Math.max(0, nextTarget.hp - damage.damage);
+  const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
     hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, ...damageFields
-  }]);
+  }, ...healingEvents]);
 }
 
 function defend(state, command) {
@@ -150,7 +153,9 @@ const ART_RESOLVERS = new Map([
   ["wish", resolveHealAllies],
   ["silence", resolveStatusCast],
   ["flee", resolveFlee],
-  ["nuke", resolveNuke]
+  ["nuke", resolveNuke],
+  ["lightseeker", resolveTilePulse],
+  ["darkseeker", resolveTilePulse]
 ]);
 
 function useArt(state, command) {
@@ -218,6 +223,7 @@ function resolveTargetedArt(state, command, art) {
   // Targeted attack ARTS resolve via the attacker's base strike type. `art.damageType`
   // overrides to magic for ARTS like Spark and Banish (magic ignores proximity bonuses).
   const damage = resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null });
+  const damageDealt = Math.min(target.hp, damage.damage);
   target.hp = Math.max(0, target.hp - damage.damage);
 
   let effect = null;
@@ -236,6 +242,7 @@ function resolveTargetedArt(state, command, art) {
     effect = { attempted: true, applied: successful, healing };
   }
 
+  const healingEvents = damage.type === "physical" ? resolvePhysicalDamageHealing(next, actor, damageDealt) : [];
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -249,7 +256,7 @@ function resolveTargetedArt(state, command, art) {
     roll: swing.hitRoll,
     damage,
     ...(effect ? { effect } : {})
-  }]);
+  }, ...healingEvents]);
 }
 
 function resolveFlee(state, command, art) {
@@ -301,6 +308,43 @@ function resolveNuke(state, command, art) {
     targetIds,
     damageByTarget,
     mpCost: art.mpCost
+  }]);
+}
+
+function resolveTilePulse(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const targets = getTilePulseTargets(next, actor, art);
+  const targetIds = [];
+  const damageByTarget = {};
+  const amount = Math.max(0, Number(art.effect.amount) || 0);
+
+  for (const target of targets) {
+    const damage = Math.min(target.hp, amount);
+    if (damage <= 0) continue;
+    target.hp = Math.max(0, target.hp - amount);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = damage;
+  }
+
+  actor.mp -= art.mpCost;
+  if (art.bonusActionGroup) {
+    next.activation.bonusActionGroups = [
+      ...(next.activation.bonusActionGroups ?? []),
+      art.bonusActionGroup
+    ];
+  } else {
+    spendAndAdvance(next, actor);
+  }
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetIds,
+    damageByTarget,
+    mpCost: art.mpCost,
+    bonusActionGroup: art.bonusActionGroup ?? null
   }]);
 }
 
@@ -402,6 +446,29 @@ function finishActivation(state, command) {
   const unit = findUnit(next, command.unitId);
   spendAndAdvance(next, unit);
   return accept(next, [{ type: "ACTIVATION_FINISHED", unitId: unit.id }]);
+}
+
+function resolvePhysicalDamageHealing(state, actor, damageDealt) {
+  const effect = getUnitType(actor.type).passive?.effect;
+  if (effect?.type !== "physicalDamageHealAura" || damageDealt <= 0) return [];
+  const amount = effect.rounding === "floor"
+    ? Math.floor(damageDealt * effect.fraction)
+    : Math.round(damageDealt * effect.fraction);
+  if (amount <= 0) return [];
+
+  const healingByTarget = {};
+  for (const target of livingUnits(state, actor.player)) {
+    if (target.id === actor.id) continue;
+    if (chebyshevDistance(actor.position, target.position) > effect.radius) continue;
+    const before = target.hp;
+    target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + amount);
+    const healed = target.hp - before;
+    if (healed > 0) healingByTarget[target.id] = healed;
+  }
+
+  return Object.keys(healingByTarget).length
+    ? [{ type: "HAND_OF_LIFE", actorId: actor.id, healingByTarget }]
+    : [];
 }
 
 function spendAndAdvance(state, unit) {

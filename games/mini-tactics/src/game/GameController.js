@@ -32,6 +32,7 @@ import {
   getLegalAttackTargets,
   getLegalHealTargets,
 } from "../rules/combat.js";
+import { getLegalGuardTargets } from "../rules/guard.js";
 import { colorOf, teamOf, unitAt } from "../state/gameState.js";
 import {
   createMatchState,
@@ -42,7 +43,7 @@ import { applyCommand } from "../core/reducer.js";
 import { EVENTS } from "../core/events.js";
 import * as cmd from "../core/commands.js";
 import { chooseActivation, cpuRng } from "../ai/cpuController.js";
-import { winnerLabel, teamColor, teamLabel } from "../render/labels.js";
+import { winnerLabel, teamColor, teamLabel, unitLabel } from "../render/labels.js";
 import { BoardRenderer } from "../render/boardRenderer.js";
 import { UnitRenderer } from "../render/unitRenderer.js";
 import { OverlayRenderer } from "../render/overlayRenderer.js";
@@ -315,7 +316,7 @@ export class GameController {
   }
 
   // Keyboard shortcuts mirror the action toolbar: 1 Move, 2 Attack, 3 Heal,
-  // 4 Defend, F/Enter Finish, C Cancel Move, Escape exit targeting. Each action
+  // 4 Defend/Guard, F/Enter Finish, C Cancel Move, Escape exit targeting. Each action
   // key gates on the *same* disabled state the HUD already computes for its
   // button, so the keyboard can never trigger something the button wouldn't.
   handleHotkey(event) {
@@ -372,8 +373,8 @@ export class GameController {
 
     if (handled) event.preventDefault();
     // Echo the toolbar's click sound, exactly as clicking the button would (the
-    // Defend key also fires its own brace sound via defendSelected — same as
-    // clicking the Defend button, which gets both the click and the brace).
+    // Defend/Guard key also fires its own brace sound via defendSelected — same
+    // as clicking the toolbar button.
     if (fired) this.audio.play("buttonClick");
   }
 
@@ -461,7 +462,8 @@ export class GameController {
     // While targeting, a unit click is a target choice, not a re-selection.
     if (
       this.ui.actionMode === ACTION_MODES.ATTACK ||
-      this.ui.actionMode === ACTION_MODES.HEAL
+      this.ui.actionMode === ACTION_MODES.HEAL ||
+      this.ui.actionMode === ACTION_MODES.GUARD
     ) {
       this.handleTargetUnit(unit);
       return;
@@ -500,7 +502,8 @@ export class GameController {
 
     if (
       this.ui.actionMode === ACTION_MODES.ATTACK ||
-      this.ui.actionMode === ACTION_MODES.HEAL
+      this.ui.actionMode === ACTION_MODES.HEAL ||
+      this.ui.actionMode === ACTION_MODES.GUARD
     ) {
       const target = unitAt(this.match, x, y);
 
@@ -545,6 +548,9 @@ export class GameController {
         // Show the whole heal radius behind the bright injured-ally tiles.
         this.ui.rangeTiles = getHealRangeTiles(this.match, unit);
         break;
+      case ACTION_MODES.GUARD:
+        this.ui.legalTiles = getLegalGuardTargets(this.match, unit);
+        break;
       default:
         this.ui.legalTiles = new Set();
     }
@@ -560,6 +566,7 @@ export class GameController {
         [ACTION_MODES.MOVE]: "legal movement tiles",
         [ACTION_MODES.ATTACK]: "valid targets",
         [ACTION_MODES.HEAL]: "injured allies in range",
+        [ACTION_MODES.GUARD]: "guard targets",
       }[mode];
 
       this.messages.show(`No ${emptyLabel}.`);
@@ -592,7 +599,7 @@ export class GameController {
     );
 
     this.ui.locked = false;
-    this.afterActionResolved("Movement committed. Attack, heal, or defend.");
+    this.afterActionResolved("Movement committed. Use a primary action.");
   }
 
   handleTargetUnit(target) {
@@ -611,6 +618,8 @@ export class GameController {
       void this.resolveAttack(actor.id, target.id);
     } else if (this.ui.actionMode === ACTION_MODES.HEAL) {
       void this.resolveHeal(actor.id, target.id);
+    } else if (this.ui.actionMode === ACTION_MODES.GUARD) {
+      this.resolveGuard(actor.id, target.id);
     }
   }
 
@@ -629,10 +638,11 @@ export class GameController {
     this.hudRenderer.render(this.view());
 
     const attacker = findUnit(this.match, actorId);
-    const target = findUnit(this.match, targetId);
     const resolved = result.events.find(
       (event) => event.type === EVENTS.ATTACK_RESOLVED,
     );
+    const declaredTarget = findUnit(this.match, resolved.declaredTargetId ?? targetId);
+    const target = findUnit(this.match, resolved.targetId);
 
     await this.effectsRenderer.animateAttack(attacker, target);
     await this.effectsRenderer.rollDie(resolved.roll);
@@ -640,7 +650,10 @@ export class GameController {
 
     if (!resolved.hit) {
       await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
-      this.messages.show(`${UNIT_TYPES[attacker.type].name} missed.`);
+      const interceptText = resolved.intercepted && declaredTarget
+        ? ` ${UNIT_TYPES[target.type].name} protected ${unitLabel(declaredTarget)}.`
+        : "";
+      this.messages.show(`${UNIT_TYPES[attacker.type].name} missed.${interceptText}`);
     } else {
       await this.effectsRenderer.animateHit(
         target,
@@ -655,12 +668,13 @@ export class GameController {
 
       this.messages.show(
         `${UNIT_TYPES[attacker.type].name} dealt ` +
-          `${resolved.damage} damage.${criticalText}${defenseText}`,
+          `${resolved.damage} damage.${criticalText}${defenseText}` +
+          `${resolved.intercepted && declaredTarget ? ` ${UNIT_TYPES[target.type].name} intercepted for ${unitLabel(declaredTarget)}.` : ""}`,
       );
 
       const eliminated = result.events.some(
         (event) =>
-          event.type === EVENTS.UNIT_ELIMINATED && event.unitId === targetId,
+          event.type === EVENTS.UNIT_ELIMINATED && event.unitId === target.id,
       );
 
       if (eliminated) {
@@ -734,6 +748,11 @@ export class GameController {
       return;
     }
 
+    if (unit.type === "tank") {
+      this.setMode(ACTION_MODES.GUARD);
+      return;
+    }
+
     const result = this.dispatch(cmd.defend(this.match.currentPlayer, unit.id));
     if (!result) {
       return;
@@ -744,6 +763,29 @@ export class GameController {
     this.audio.play("defend");
     this.messages.show(`${UNIT_TYPES[unit.type].name} is defending.`);
     // Defend always completes the activation immediately.
+    this.finishActivation();
+  }
+
+  resolveGuard(unitId, targetId) {
+    const result = this.dispatch(cmd.guard(this.match.currentPlayer, unitId, targetId));
+    if (!result) {
+      return;
+    }
+
+    const guarded = result.events.find((event) => event.type === EVENTS.UNIT_GUARDED);
+    const tank = findUnit(this.match, unitId);
+    const target = findUnit(this.match, targetId);
+
+    this.clearMode();
+    this.renderDynamic();
+    this.audio.play("defend");
+
+    if (guarded?.selfGuard) {
+      this.messages.show(`${UNIT_TYPES[tank.type].name} is guarding itself.`);
+    } else if (tank && target) {
+      this.messages.show(`${UNIT_TYPES[tank.type].name} is guarding ${unitLabel(target)}.`);
+    }
+
     this.finishActivation();
   }
 
@@ -1142,6 +1184,28 @@ export class GameController {
         case EVENTS.HEAL_RESOLVED:
           await this.animateHealEvent(event);
           break;
+        case EVENTS.UNIT_GUARDED: {
+          const unit = findUnit(this.match, event.unitId);
+          const target = findUnit(this.match, event.targetId);
+          this.renderDynamic();
+          this.audio.play("defend");
+          if (unit && target) {
+            const text = event.selfGuard
+              ? `${UNIT_TYPES[unit.type].name} guards itself.`
+              : `${UNIT_TYPES[unit.type].name} guards ${unitLabel(target)}.`;
+            this.messages.show(text);
+          }
+          await sleep(CPU_STEP_MS);
+          break;
+        }
+        case EVENTS.GUARD_INTERCEPTED: {
+          const tank = findUnit(this.match, event.tankId);
+          const protectedUnit = findUnit(this.match, event.protectedUnitId);
+          if (tank && protectedUnit) {
+            this.messages.show(`${UNIT_TYPES[tank.type].name} intercepted for ${unitLabel(protectedUnit)}.`);
+          }
+          break;
+        }
         case EVENTS.UNIT_DEFENDED: {
           const unit = findUnit(this.match, event.unitId);
           this.renderDynamic();
@@ -1183,14 +1247,22 @@ export class GameController {
 
     if (!event.hit) {
       await this.effectsRenderer.floatText(target, "MISS", "#ffffff");
-      this.messages.show(`${UNIT_TYPES[attacker.type].name} missed.`);
+      const declared = event.declaredTargetId ? findUnit(this.match, event.declaredTargetId) : target;
+      const interceptText = event.intercepted && declared
+        ? ` ${UNIT_TYPES[target.type].name} protected ${unitLabel(declared)}.`
+        : "";
+      this.messages.show(`${UNIT_TYPES[attacker.type].name} missed.${interceptText}`);
       return;
     }
 
     await this.effectsRenderer.animateHit(target, event.damage, event.critical);
     const criticalText = event.critical ? " Critical hit." : "";
+    const declared = event.declaredTargetId ? findUnit(this.match, event.declaredTargetId) : target;
+    const interceptText = event.intercepted && declared
+      ? ` ${UNIT_TYPES[target.type].name} intercepted for ${unitLabel(declared)}.`
+      : "";
     this.messages.show(
-      `${UNIT_TYPES[attacker.type].name} dealt ${event.damage} damage.${criticalText}`,
+      `${UNIT_TYPES[attacker.type].name} dealt ${event.damage} damage.${criticalText}${interceptText}`,
     );
   }
 
@@ -1464,6 +1536,12 @@ function messageForError(errorCode) {
       return "A piece is blocking the shot.";
     case "INVALID_TARGET":
       return "That is not a legal target.";
+    case "GUARD_TANK_ONLY":
+      return "Only Tanks can guard.";
+    case "TARGET_ALREADY_GUARDED":
+      return "That unit is already guarded.";
+    case "DEFEND_NOT_AVAILABLE":
+      return "Tanks use Guard instead of Defend.";
     case "CANCEL_NOT_AVAILABLE":
       return "There is no movement to cancel.";
     case "MATCH_COMPLETE":

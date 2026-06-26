@@ -425,7 +425,7 @@
           </div>
 
           <div id="actionHelp" class="action-help">
-            A piece cannot finish after moving alone; it must attack, heal, or defend.
+            A piece cannot finish after moving alone; it must use a primary action.
           </div>
         </section>
       </footer>
@@ -448,13 +448,14 @@
         <div class="ref-panel is-active" data-panel="basics">
           <ul>
             <li>Each player activates every living piece once, then the squad turn changes.</li>
-            <li>A piece may move then act, or act then move — but a move alone is illegal. Every activation must end in an attack, heal, or defend.</li>
+            <li>A piece may move then act, or act then move — but a move alone is illegal. Every activation must use a primary action.</li>
             <li>Movement is orthogonal: warrior &amp; tank 3 tiles, ranger/medic 2. Pieces block movement.</li>
             <li>Attack range includes diagonals with no penalty: warrior/tank 1, medic 3, ranger 4.</li>
             <li>Ranger shots are blocked by any piece between ranger and target — including your own.</li>
             <li>Attack/heal roll: 1 misses, 6 crits. Crit attacks add 1 damage; crit heals restore 4 instead of 3.</li>
-            <li>Defending reduces each incoming hit by 1 (down to zero) and expires when that piece is next selected to act.</li>
-            <li>Cancel Move undoes an uncommitted move before the piece attacks, heals, or defends.</li>
+            <li>Defending reduces each incoming hit by 1 (down to zero) and expires when that piece is next selected to act. Tanks use Guard instead.</li>
+            <li>A Tank can Guard itself like Defend, or Guard one adjacent ally; the first attack on that ally is redirected to the Tank and reduced by 1.</li>
+            <li>Cancel Move undoes an uncommitted move before the piece uses its primary action.</li>
             <li>Last squad standing wins.</li>
           </ul>
         </div>
@@ -495,7 +496,7 @@
                   <span class="ug-stat"><b>1</b><i>Range</i></span>
                   <span class="ug-stat"><b>2</b><i>Damage</i></span>
                 </div>
-                <p class="ug-role">Wall and blocker with a Warrior's stride. Bodies plug lanes and soak the Warrior, who only does 2 back to it.</p>
+                <p class="ug-role">Wall and blocker with a Warrior's stride. Guards itself or an adjacent ally, intercepting the first attack aimed at that ally.</p>
               </div>
             </article>
 
@@ -534,7 +535,7 @@
             </article>
           </div>
 
-          <p class="ref-note">Every unit has <strong>10 HP</strong>. On an attack roll, <strong>1 misses</strong> and <strong>6 crits</strong> (+1 damage; a Medic crit heals 4). <strong>Defend</strong> cuts each incoming hit by 1 (to zero) until that unit next acts.</p>
+          <p class="ref-note">Every unit has <strong>10 HP</strong>. On an attack roll, <strong>1 misses</strong> and <strong>6 crits</strong> (+1 damage; a Medic crit heals 4). <strong>Defend</strong> cuts each incoming hit by 1; Tanks use <strong>Guard</strong> to protect themselves or an adjacent ally.</p>
         </div>
 
         <!-- Advanced: strategy depth (condensed from STRATEGY.md). -->
@@ -545,7 +546,7 @@
             <li><strong>Know the matchups.</strong> Warriors hit Tanks for only 2 — send them at Rangers and Medics instead. Your Ranger does +1 to the enemy Ranger: use it as a counter-sniper.</li>
             <li><strong>Kill or pin the Medic.</strong> A medic only one attacker can reach is nearly unkillable (it out-heals a single attacker). Get two threats on it, or pressure two targets so its one heal can't cover both.</li>
             <li><strong>Mind line of sight.</strong> Ranger shots stop on any body, including your own. Keep your lanes clear, and park units in the enemy Ranger's lanes to block it.</li>
-            <li><strong>Defend the chip, not the crit.</strong> Defend only removes 1 — huge against Tank/Ranger/Medic pokes, minor against a Warrior. Time it to cover the enemy's whole turn.</li>
+            <li><strong>Guard the piece they want.</strong> Tank Guard can make a Medic or Ranger expensive to pick off. Keep the Tank adjacent, then punish attacks that get redirected into armor.</li>
             <li><strong>Threat = move + reach.</strong> A Warrior threatens 4 tiles away. Keep your Ranger and Medic outside every enemy's move-plus-reach box, not just their current tile.</li>
             <li><strong>Scout with Cancel Move.</strong> Move a piece to see its highlights and line of sight, then Cancel if the angle is wrong — free board reading before you commit.</li>
           </ul>

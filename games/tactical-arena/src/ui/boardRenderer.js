@@ -2,18 +2,18 @@ import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } from "./isometric.js";
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
-import { unitAt } from "../core/state.js";
+import { getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { getFootworkStepOptions, getLegalFleeTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
 
-function createTile(metrics, position, { selected, legal, targetKind, path, range }) {
+function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range }) {
   const point = gridToScreen(metrics, position.x, position.y);
   const hw = metrics.tileWidth / 2;
   const hh = metrics.tileHeight / 2;
   const top = [[point.x, point.y], [point.x + hw, point.y + hh], [point.x, point.y + metrics.tileHeight], [point.x - hw, point.y + hh]];
   const left = [[point.x - hw, point.y + hh], [point.x, point.y + metrics.tileHeight], [point.x, point.y + metrics.tileHeight + metrics.depth], [point.x - hw, point.y + hh + metrics.depth]];
   const right = [[point.x + hw, point.y + hh], [point.x, point.y + metrics.tileHeight], [point.x, point.y + metrics.tileHeight + metrics.depth], [point.x + hw, point.y + hh + metrics.depth]];
-  const classes = ["tile", (position.x + position.y) % 2 === 0 ? "tile-light" : "tile-dark"];
+  const classes = ["tile", affinity === "light" ? "tile-light" : "tile-dark"];
   if (selected) classes.push("selected");
   if (range) classes.push(`${range}-range`);
   if (legal) classes.push(`legal-${targetKind}`);
@@ -140,6 +140,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       const key = positionKey(position);
       const isLegal = legal.has(key);
       const tile = createTile(metrics, position, {
+        affinity: getTileAffinity(state, position),
         selected: unitAt(state, position)?.id === selectedId,
         legal: isLegal,
         targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art",

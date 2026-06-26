@@ -1,4 +1,5 @@
 import { gridToScreen } from "../geometry/isometric.js";
+import { getGuardingTank } from "../rules/guard.js";
 import { colorOf } from "../state/gameState.js";
 import { createSvgElement } from "./svg.js";
 import { hpClass } from "./hp.js";
@@ -33,6 +34,8 @@ export class UnitRenderer {
 
     if (unit.spent) classes.push("spent");
     if (unit.defending) classes.push("defending");
+    if (unit.guardTargetId && unit.guardTargetId !== unit.id) classes.push("guarding");
+    if (getGuardingTank(state, unit)) classes.push("guarded");
     if (unit.id === state.selectedId) classes.push("active");
 
     const group = createSvgElement("g", {

@@ -5,7 +5,7 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 
 export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES);
-export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "swordsman"];
+export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
 
 // Force any input into a valid 4-slot squad of known unit types.
 export function normalizeSquad(squad) {

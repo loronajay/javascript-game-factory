@@ -4,7 +4,8 @@
 //
 // The hash covers every field that affects future legal actions, including the
 // RNG state (so a divergent dice stream is caught immediately). It excludes
-// matchId/mode/schemaVersion because those never change mid-match.
+// matchId/mode/schemaVersion because those never change mid-match; ruleset
+// compatibility is checked during match setup.
 
 function canonicalUnits(units) {
   return [...units]
@@ -12,7 +13,8 @@ function canonicalUnits(units) {
     .map(
       (unit) =>
         `${unit.id}=${unit.x},${unit.y},${unit.hp},` +
-        `${unit.spent ? 1 : 0},${unit.defending ? 1 : 0}`,
+        `${unit.spent ? 1 : 0},${unit.defending ? 1 : 0},` +
+        `${unit.guardTargetId ?? "-"}`,
     )
     .join("|");
 }

@@ -8,6 +8,7 @@ const STATUS_VFX = Object.freeze({
 const ABILITY_VFX = Object.freeze({
   footwork: Object.freeze({
     type: "dashTrail",
+    soundKey: "footwork",
     durationMs: 760,
     afterimageCount: 4,
     sparkCount: 10,
@@ -22,6 +23,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   "life-sap": Object.freeze({
     type: "drain",
+    soundKey: "lifeSap",
     particleCount: 18,
     durationMs: 680,
     staggerMs: 18,
@@ -30,6 +32,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   "poison-arrow": Object.freeze({
     type: "statusStrike",
+    soundKey: "poisonArrow",
     status: "poison",
     motif: "venom",
     particleCount: 14,
@@ -37,6 +40,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   "leg-shot": Object.freeze({
     type: "statusStrike",
+    soundKey: "slowApplied",
     status: "slow",
     motif: "snare",
     ringCount: 3,
@@ -44,6 +48,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   moonstrike: Object.freeze({
     type: "statusStrike",
+    soundKey: "blindApplied",
     status: "blind",
     motif: "moon",
     particleCount: 9,
@@ -51,6 +56,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   "mage-killer": Object.freeze({
     type: "statusStrike",
+    soundKey: "silenceApplied",
     status: "silence",
     motif: "silenceRune",
     runeCount: 4,
@@ -58,6 +64,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   silence: Object.freeze({
     type: "statusStrike",
+    soundKey: "silenceApplied",
     status: "silence",
     motif: "silenceRune",
     runeCount: 5,
@@ -65,6 +72,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   spark: Object.freeze({
     type: "projectileFan",
+    soundKey: "spark",
     projectileCount: 1,
     spread: 0,
     arcHeight: 52,
@@ -75,6 +83,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   flee: Object.freeze({
     type: "dashTrail",
+    soundKey: "flee",
     durationMs: 380,
     afterimageCount: 2,
     sparkCount: 8,
@@ -82,6 +91,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   banish: Object.freeze({
     type: "statusStrike",
+    soundKey: "banish",
     status: "silence",
     motif: "banish",
     particleCount: 14,
@@ -89,13 +99,29 @@ const ABILITY_VFX = Object.freeze({
   }),
   nuke: Object.freeze({
     type: "magicBurst",
+    soundKey: "nuke",
     particleCount: 20,
     radius: 48,
     durationMs: 680,
     colors: Object.freeze({ core: "#9966ff", trail: "#4422aa", impact: "#ccaaff" })
   }),
+  lightseeker: Object.freeze({
+    type: "magicBurst",
+    particleCount: 14,
+    radius: 44,
+    durationMs: 560,
+    colors: Object.freeze({ core: "#f7e27d", trail: "#d8eeff", impact: "#fff7b8" })
+  }),
+  darkseeker: Object.freeze({
+    type: "magicBurst",
+    particleCount: 16,
+    radius: 50,
+    durationMs: 620,
+    colors: Object.freeze({ core: "#9b8cff", trail: "#38256f", impact: "#d6c8ff" })
+  }),
   pray: Object.freeze({
     type: "healPulse",
+    soundKey: "pray",
     particleCount: 10,
     radius: 34,
     durationMs: 620,
@@ -103,6 +129,7 @@ const ABILITY_VFX = Object.freeze({
   }),
   wish: Object.freeze({
     type: "healPulse",
+    soundKey: "wish",
     particleCount: 7,
     radius: 24,
     durationMs: 520,

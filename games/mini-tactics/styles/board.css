@@ -79,6 +79,13 @@
   animation: heal-tile-pulse .9s ease-in-out infinite alternate;
 }
 
+.tile.legal-guard .tile-face {
+  fill: #5a78a8;
+  stroke: #f1d27b;
+  stroke-width: 2;
+  animation: guard-tile-pulse .9s ease-in-out infinite alternate;
+}
+
 .unit {
   cursor: pointer;
   transform-box: fill-box;
@@ -224,6 +231,21 @@
   animation: shield-orbit 1.6s linear infinite;
 }
 
+.unit.guarding .shield-ring,
+.unit.guarded .shield-ring {
+  opacity: 1;
+}
+
+.unit.guarding .shield-ring {
+  stroke: #f1d27b;
+  animation: shield-orbit 1.8s linear infinite;
+}
+
+.unit.guarded .shield-ring {
+  stroke: #9fc8ff;
+  stroke-dasharray: 4 4;
+}
+
 /* Defend badge: hidden by default, shown as a steady shield emblem on braced
    units so "this piece is defending" reads at a glance, not just from the ring. */
 .unit .defend-mark {
@@ -234,16 +256,27 @@
   opacity: 1;
 }
 
+.unit.guarding .defend-mark,
+.unit.guarded .defend-mark {
+  opacity: 1;
+}
+
 .defend-mark .defend-shield {
   fill: var(--gold);
   stroke: rgba(20, 16, 8, .6);
   stroke-width: .8;
 }
 
+.unit.guarded .defend-mark .defend-shield {
+  fill: #9fc8ff;
+}
+
 /* A braced unit is usually also spent (defend ends the activation). The heavy
    spent dim would bury the shield right when it matters — on the opponent's
    turn — so defending takes visual precedence and stays legible. */
-.unit.spent.defending {
+.unit.spent.defending,
+.unit.spent.guarding,
+.unit.spent.guarded {
   opacity: .9;
   filter: none;
 }
@@ -257,7 +290,7 @@
 /* Selection spotlight: while a piece is active, dim the static, uninvolved board
    so the selected unit and its highlighted tiles carry the eye. Highlighted
    tiles are excluded so they stay at full strength. */
-.board-focused .tile:not(.selected):not(.legal-move):not(.legal-attack):not(.legal-heal):not(.attack-range):not(.heal-range) .tile-face {
+.board-focused .tile:not(.selected):not(.legal-move):not(.legal-attack):not(.legal-heal):not(.legal-guard):not(.attack-range):not(.heal-range) .tile-face {
   filter: brightness(.7) saturate(.85);
   transition: filter .2s ease;
 }
@@ -287,6 +320,10 @@
 
 @keyframes heal-tile-pulse {
   to { filter: brightness(1.25); }
+}
+
+@keyframes guard-tile-pulse {
+  to { filter: brightness(1.25) saturate(1.12); }
 }
 
 @keyframes shield-orbit {

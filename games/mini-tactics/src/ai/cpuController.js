@@ -31,15 +31,15 @@ import { generatePlans, projectPlan } from "./plans.js";
 const WEIGHTS = Object.freeze({
   easy: {
     kill: 8, killKey: 2, damage: 1.5, heal: 1.2, healThreatened: 1,
-    defendBase: -2, exposure: 0.05, keyExposure: 0.05, advance: 0.6,
+    defendBase: -2, guardAlly: 0.8, exposure: 0.05, keyExposure: 0.05, advance: 0.6,
   },
   normal: {
     kill: 14, killKey: 5, damage: 1.4, heal: 1.2, healThreatened: 1.5,
-    defendBase: -1, exposure: 0.3, keyExposure: 0.3, advance: 2.0,
+    defendBase: -1, guardAlly: 1.5, exposure: 0.3, keyExposure: 0.3, advance: 2.0,
   },
   hard: {
     kill: 18, killKey: 8, damage: 1.4, heal: 1.3, healThreatened: 2.2,
-    defendBase: -1.5, exposure: 0.5, keyExposure: 0.5, advance: 3.2,
+    defendBase: -1.5, guardAlly: 2.4, exposure: 0.5, keyExposure: 0.5, advance: 3.2,
   },
 });
 
@@ -71,7 +71,7 @@ export function chooseActivation(
     }
   }
 
-  // Defensive: generatePlans always yields at least a defend plan, so this is
+  // Defensive: generatePlans always yields at least a primary fallback, so this is
   // unreachable — but never leave a unit stuck.
   if (scored.length === 0) {
     return toCommands(cpuPlayer, {
@@ -118,6 +118,15 @@ function scorePlan(state, p, unit, cpuPlayer, weights) {
         score += weights.healThreatened * eh.expHeal;
       }
     }
+  } else if (p.primary.kind === "guard") {
+    score += weights.defendBase;
+    const target = state.units.find((t) => t.id === p.primary.targetId);
+    if (target && target.id !== unit.id) {
+      const threat = incomingThreat(state, state.units, target, target, target.defending);
+      const key = isKeyUnit(target.type) ? KEY_BONUS : 0;
+      const wounded = Math.max(0, target.maxHp - target.hp);
+      score += weights.guardAlly * (unitValue(target.type) + key + threat + wounded * 0.35);
+    }
   } else {
     score += weights.defendBase;
   }
@@ -126,7 +135,9 @@ function scorePlan(state, p, unit, cpuPlayer, weights) {
   //    and (when nothing better) drift toward the enemy. Defending lowers the
   //    projected incoming threat, which is exactly why bracing scores well under
   //    pressure.
-  const defending = p.primary.kind === "defend";
+  const defending =
+    p.primary.kind === "defend" ||
+    (p.primary.kind === "guard" && p.primary.targetId === unit.id);
   const threat = Math.min(
     THREAT_CAP,
     incomingThreat(state, state.units, unit, finalPos, defending),
@@ -190,6 +201,8 @@ function toCommands(player, p) {
     commands.push(cmd.attack(player, p.unitId, p.primary.targetId));
   } else if (p.primary.kind === "heal") {
     commands.push(cmd.heal(player, p.unitId, p.primary.targetId));
+  } else if (p.primary.kind === "guard") {
+    commands.push(cmd.guard(player, p.unitId, p.primary.targetId));
   } else {
     commands.push(cmd.defend(player, p.unitId));
   }

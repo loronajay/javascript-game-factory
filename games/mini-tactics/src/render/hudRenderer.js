@@ -1,4 +1,5 @@
 import { UNIT_TYPES } from "../config.js";
+import { getGuardingTank } from "../rules/guard.js";
 import {
   colorOf,
   getSelectedUnit,
@@ -69,6 +70,10 @@ export class HudRenderer {
     }
 
     const definition = UNIT_TYPES[selected.type];
+    const guardTarget = selected.guardTargetId && selected.guardTargetId !== selected.id
+      ? state.units.find((unit) => unit.id === selected.guardTargetId)
+      : null;
+    const guardingTank = getGuardingTank(state, selected);
 
     // Status reads as discrete pills so the dossier looks like a unit readout
     // rather than a run-on caption.
@@ -77,6 +82,8 @@ export class HudRenderer {
       { label: `Move ${definition.moveRange}`, cls: "" },
       { label: `Range ${definition.attackRange}`, cls: "" },
       selected.defending ? { label: "Defending", cls: "on" } : null,
+      guardTarget ? { label: `Guarding ${unitLabel(guardTarget)}`, cls: "on" } : null,
+      guardingTank ? { label: `Guarded by ${unitLabel(guardingTank)}`, cls: "on" } : null,
       selected.spent ? { label: "Spent", cls: "spent" } : null
     ]
       .filter(Boolean)
@@ -156,7 +163,7 @@ export class HudRenderer {
         unit.hp > 0 &&
         !unit.spent
       );
-      list.appendChild(buildSquadChip(unit, selectable, this.onUnitClick));
+      list.appendChild(buildSquadChip(state, unit, selectable, this.onUnitClick));
     }
     panel.appendChild(list);
 
@@ -176,6 +183,10 @@ export class HudRenderer {
 
     const moved = Boolean(activation?.moved);
     const primaryUsed = Boolean(activation?.primaryUsed);
+    const primaryLabel = selected?.type === "tank" ? "Guard" : "Defend";
+    if (this.elements.defendBtn.firstChild) {
+      this.elements.defendBtn.firstChild.nodeValue = primaryLabel;
+    }
 
     this.elements.moveBtn.disabled = !usable || moved;
     this.elements.attackBtn.disabled = !usable || primaryUsed;
@@ -190,7 +201,8 @@ export class HudRenderer {
     for (const button of [
       this.elements.moveBtn,
       this.elements.attackBtn,
-      this.elements.healBtn
+      this.elements.healBtn,
+      this.elements.defendBtn
     ]) {
       button.classList.remove("active");
     }
@@ -198,6 +210,7 @@ export class HudRenderer {
     if (state.mode === "move") this.elements.moveBtn.classList.add("active");
     if (state.mode === "attack") this.elements.attackBtn.classList.add("active");
     if (state.mode === "heal") this.elements.healBtn.classList.add("active");
+    if (state.mode === "guard") this.elements.defendBtn.classList.add("active");
 
     if (!usable) {
       this.elements.actionHelp.textContent = state.winner
@@ -205,7 +218,7 @@ export class HudRenderer {
         : "Select an unspent piece.";
     } else if (moved && !primaryUsed) {
       this.elements.actionHelp.textContent =
-        "Movement is committed. This piece must attack, heal, or defend.";
+        "Movement is committed. Use a primary action.";
     } else if (primaryUsed && !moved) {
       this.elements.actionHelp.textContent =
         "Primary action complete. Move now or finish the activation.";
@@ -218,7 +231,7 @@ export class HudRenderer {
   }
 }
 
-function buildSquadChip(unit, selectable = false, onSelect = null) {
+function buildSquadChip(state, unit, selectable = false, onSelect = null) {
   const definition = UNIT_TYPES[unit.type];
   const hp = Math.max(0, unit.hp);
   const chip = document.createElement("div");
@@ -227,6 +240,8 @@ function buildSquadChip(unit, selectable = false, onSelect = null) {
   if (unit.spent) chip.classList.add("spent");
   if (unit.hp <= 0) chip.classList.add("dead");
   if (unit.defending) chip.classList.add("defending");
+  if (unit.guardTargetId && unit.guardTargetId !== unit.id) chip.classList.add("guarding");
+  if (getGuardingTank(state, unit)) chip.classList.add("guarded");
 
   if (selectable && onSelect) {
     chip.classList.add("selectable");

@@ -15,7 +15,7 @@
 // state hash per revision so a divergence is caught.
 //
 // room (lobby) message contract (all `value`s are JSON strings):
-//   owner -> all : config   { size, format, teamColors, teamNames }  match framing
+//   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }  match framing
 //   each  -> all : setup     { seat, composition }                   blind squad pick
 //   active-> all : command   { command }                            an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                      desync check
@@ -83,6 +83,8 @@ function parseConfigMessage(value) {
   if (!p || typeof p !== "object") return null;
   const out = {};
   const size = Number(p.size);
+  const rulesetVersion = Number(p.rulesetVersion);
+  if (Number.isFinite(rulesetVersion)) out.rulesetVersion = Math.floor(rulesetVersion);
   if (Number.isFinite(size)) out.size = Math.floor(size);
   if (typeof p.format === "string") out.format = p.format;
   if (p.teamColors && typeof p.teamColors === "object") out.teamColors = p.teamColors;
@@ -165,7 +167,7 @@ export function createOnlineClient() {
     onLobbyUpdated: null, // (lobby)
     onLobbyStarted: null, // ({ seed, ownerId, members, myClientId })
     onPlayerLeft: null, // ({ clientId, ownerId, playerCount })
-    onRemoteConfig: null, // ({ size?, format?, teamColors?, teamNames? })
+    onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteSetup: null, // ({ seat, composition? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })

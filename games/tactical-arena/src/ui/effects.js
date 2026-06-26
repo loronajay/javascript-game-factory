@@ -127,7 +127,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function projectileFan(actor, targets, targetPosition, vfx) {
-    sound.play("arrowAirborne");
+    sound.play(vfx.soundKey ?? "arrowAirborne");
     if (reducedMotion()) return;
     const from = effectPoint(actor.position, 12);
     const fallback = targetPosition ? effectPoint(targetPosition, 12) : from;
@@ -167,7 +167,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function volleyRain(actor, coneCells, targets, targetPosition, vfx) {
-    sound.play("arrowAirborne");
+    sound.play(vfx.soundKey ?? "arrowAirborne");
     if (reducedMotion() || !coneCells?.length) return;
     const from = effectPoint(actor.position, 18);
     const hitSet = new Set(targets.map((t) => `${t.position.x},${t.position.y}`));
@@ -210,6 +210,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function drain(actor, target, vfx) {
+    if (vfx.soundKey) sound.play(vfx.soundKey);
     if (reducedMotion()) return;
     const from = effectPoint(target.position, 14);
     const to = effectPoint(actor.position, 20);
@@ -242,7 +243,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function healPulse(actor, targets, vfx) {
-    sound.play("heal");
+    sound.play(vfx.soundKey ?? "heal");
     if (reducedMotion()) return;
     const recipients = targets.length ? targets : [actor];
     const animations = [];
@@ -287,7 +288,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
   async function dashTrail(actor, path, targets, vfx) {
     if (!path?.length) return;
-    sound.play("unitMove");
+    sound.play(vfx.soundKey ?? "unitMove");
     if (reducedMotion()) return;
     const bases = [actor.position, ...path].map((position) => unitBase(position));
     const lifted = bases.map((point) => ({ x: point.x, y: point.y - 7 }));
@@ -364,6 +365,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
   async function statusStrike(actor, target, vfx) {
     if (!target) return;
+    if (vfx.soundKey) sound.play(vfx.soundKey);
     if (reducedMotion()) return;
     const point = effectPoint(target.position, 30);
     const base = effectPoint(target.position, 2);
@@ -433,7 +435,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function magicBurst(actor, targets, vfx) {
-    sound.play("attackHit");
+    if (vfx.soundKey) sound.play(vfx.soundKey);
     if (reducedMotion()) return;
     const center = effectPoint(actor.position, 18);
     const animations = [];

@@ -19,16 +19,18 @@ function unitDetailHtml(def) {
   const passiveEntries = [
     def.passive ? { tag: "Passive", ...def.passive } : null,
     ...def.arts.filter((a) => a.kind === "passive").map((a) => ({ tag: "Passive", ...a })),
-    def.rageArt ? { tag: "RAGE", ...def.rageArt } : null
+    def.ragePassive ? { tag: "RAGE Passive", ...def.ragePassive } : null
   ].filter(Boolean);
 
   const passives = passiveEntries
     .map((p) => `<div class="ref-line"><span class="ref-tag passive">${p.tag}</span><b>${p.name}</b> — ${p.description}</div>`)
     .join("");
 
-  const arts = def.arts
-    .filter((art) => art.kind === "active")
-    .map((art) => `<div class="ref-line"><span class="ref-tag art">ART · ${art.mpCost} MP</span><b>${art.name}</b> — ${art.description}</div>`)
+  const arts = [
+    ...def.arts.filter((art) => art.kind === "active").map((art) => ({ tag: `ART · ${art.mpCost} MP`, ...art })),
+    ...(def.rageArt?.kind === "active" ? [{ tag: `RAGE ART · ${def.rageArt.mpCost} MP`, ...def.rageArt }] : [])
+  ]
+    .map((art) => `<div class="ref-line"><span class="ref-tag art">${art.tag}</span><b>${art.name}</b> — ${art.description}</div>`)
     .join("");
 
   return `<div class="ref-pills">${statPills}</div>

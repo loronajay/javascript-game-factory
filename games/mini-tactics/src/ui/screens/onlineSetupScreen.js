@@ -6,7 +6,7 @@ import {
   screenRoot,
   selectSeg,
 } from "./common.js";
-import { BOARD_SIZES, PLAYER_COLORS } from "../../config.js";
+import { BOARD_SIZES, PLAYER_COLORS, RULESET_VERSION } from "../../config.js";
 import { createOnlineClient } from "../../online/onlineClient.js";
 import { createOnlineSession } from "../../online/onlineSession.js";
 import { createSquadPicker } from "./squadBuilder.js";
@@ -60,6 +60,7 @@ export function createOnlineSetupScreen(ctx) {
 
   // Owner-authored match framing (mirrored live to every client via `config`).
   const config = {
+    rulesetVersion: RULESET_VERSION,
     size: 10,
     format: "ffa",
     teamColors: { 1: PLAYER_COLORS[1], 2: PLAYER_COLORS[4] },
@@ -175,6 +176,7 @@ export function createOnlineSetupScreen(ctx) {
   // Broadcast the owner's framing so every client renders + builds it identically.
   function pushConfig() {
     client?.sendConfig({
+      rulesetVersion: RULESET_VERSION,
       size: config.size,
       format: config.format,
       teamColors: { ...config.teamColors },
@@ -321,6 +323,10 @@ export function createOnlineSetupScreen(ctx) {
 
     cb.onRemoteConfig = (cfg) => {
       if (isOwner) return;
+      if (cfg.rulesetVersion !== RULESET_VERSION) {
+        setStatus("Rules version mismatch. Refresh before starting this match.");
+        return;
+      }
       receivedConfig = { ...receivedConfig, ...cfg };
       syncConfigUI();
       tryStart();
@@ -365,6 +371,10 @@ export function createOnlineSetupScreen(ctx) {
     if (handedOff || seed == null || mySeat < 1 || !membersAtStart) return;
     const cfg = activeConfig();
     if (!cfg) return;
+    if (cfg.rulesetVersion !== RULESET_VERSION) {
+      setStatus("Rules version mismatch. Refresh before starting this match.");
+      return;
+    }
     const count = membersAtStart.length;
     for (let seat = 1; seat <= count; seat += 1) {
       if (!compositionsBySeat[seat]) return; // a squad is still missing

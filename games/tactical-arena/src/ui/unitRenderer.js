@@ -10,7 +10,8 @@ const ICON_BUILDERS = new Map([
   ["swordsman", buildSwordsmanIcon],
   ["archer", buildArcherIcon],
   ["mystic", buildMysticIcon],
-  ["magician", buildMagicianIcon]
+  ["magician", buildMagicianIcon],
+  ["paladin", buildPaladinIcon]
 ]);
 
 function buildSwordsmanIcon(icon) {
@@ -41,6 +42,13 @@ function buildMagicianIcon(icon) {
   icon.append(
     svgElement("path", { d: "M 0 -26 L 4 -16 L 14 -12 L 4 -8 L 0 2 L -4 -8 L -14 -12 L -4 -16 Z" }),
     svgElement("line", { class: "emblem-line", x1: 0, y1: -1, x2: 0, y2: 22, "stroke-width": 5, "stroke-linecap": "round" })
+  );
+}
+
+function buildPaladinIcon(icon) {
+  icon.append(
+    svgElement("path", { d: "M 0 -28 L 14 -20 L 11 -4 Q 9 12 0 21 Q -9 12 -11 -4 L -14 -20 Z" }),
+    svgElement("path", { d: "M -3 -20 L 3 -20 L 3 -8 L 10 -8 L 10 -2 L 3 -2 L 3 12 L -3 12 L -3 -2 L -10 -2 L -10 -8 L -3 -8 Z" })
   );
 }
 

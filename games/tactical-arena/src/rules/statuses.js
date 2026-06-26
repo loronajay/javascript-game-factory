@@ -2,7 +2,7 @@ import { getUnitType } from "../core/unitCatalog.js";
 
 export function statusImmunities(unit) {
   const definition = getUnitType(unit.type);
-  const sources = [definition.passive, ...definition.arts, definition.rageArt];
+  const sources = [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt];
   return new Set(sources.flatMap((source) =>
     source?.effect?.type === "immunity" ? source.effect.statuses : []
   ));

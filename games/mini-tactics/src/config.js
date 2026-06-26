@@ -1,6 +1,7 @@
 export const BOARD_SIZES = Object.freeze([10, 13]);
 export const DEFAULT_BOARD_SIZE = 10;
 export const MAX_HP = 10;
+export const RULESET_VERSION = 2;
 
 // Medic heal range is 3 (canonical). Kept explicit here so it never becomes
 // hidden engine behavior.
@@ -68,5 +69,6 @@ export const COLORBLIND_TEAM_COLORS = Object.freeze({
 export const ACTION_MODES = Object.freeze({
   MOVE: "move",
   ATTACK: "attack",
-  HEAL: "heal"
+  HEAL: "heal",
+  GUARD: "guard"
 });

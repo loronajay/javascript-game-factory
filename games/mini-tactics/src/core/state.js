@@ -12,7 +12,7 @@ import { createRoster } from "./roster.js";
 import { normalizeCompositions } from "./composition.js";
 import { createRngState } from "./rng.js";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function createMatchState({
   size = DEFAULT_BOARD_SIZE,

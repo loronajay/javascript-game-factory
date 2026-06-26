@@ -23,6 +23,7 @@ function unit(id, player, type, x, y, extra = {}) {
     maxHp: 10,
     spent: false,
     defending: false,
+    guardTargetId: null,
     ...extra,
   };
 }
@@ -87,6 +88,23 @@ test("serialize then deserialize preserves legal actions", () => {
   const after = getLegalMoves(restored, warrior);
   assert.deepEqual([...before].sort(), [...after].sort());
   assert.equal(hashState(state), hashState(restored));
+});
+
+test("guard state survives serialization and contributes to the state hash", () => {
+  let state = freshMatch(321);
+  state.units.push(unit("p1-tank", 1, "tank", 2, 2));
+  state.units.find((u) => u.id === "p1-medic").x = 3;
+  state.units.find((u) => u.id === "p1-medic").y = 2;
+  state = applyCommand(state, cmd.beginActivation(1, "p1-tank")).nextState;
+  state = applyCommand(state, cmd.guard(1, "p1-tank", "p1-medic")).nextState;
+
+  const restored = deserializeState(serializeState(state));
+  assert.equal(restored.units.find((u) => u.id === "p1-tank").guardTargetId, "p1-medic");
+  assert.equal(hashState(state), hashState(restored));
+
+  const changed = deserializeState(serializeState(state));
+  changed.units.find((u) => u.id === "p1-tank").guardTargetId = null;
+  assert.notEqual(hashState(state), hashState(changed));
 });
 
 test("replaying the command log from a serialized start reproduces the final hash", () => {

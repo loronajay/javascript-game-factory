@@ -11,6 +11,7 @@ export const COMMANDS = Object.freeze({
   CANCEL_MOVE: "CANCEL_MOVE",
   ATTACK: "ATTACK",
   HEAL: "HEAL",
+  GUARD: "GUARD",
   DEFEND: "DEFEND",
   FINISH_ACTIVATION: "FINISH_ACTIVATION",
   CONCEDE: "CONCEDE",
@@ -34,6 +35,10 @@ export function attack(player, actorId, targetId) {
 
 export function heal(player, actorId, targetId) {
   return { type: COMMANDS.HEAL, player, actorId, targetId };
+}
+
+export function guard(player, unitId, targetId) {
+  return { type: COMMANDS.GUARD, player, unitId, targetId };
 }
 
 export function defend(player, unitId) {

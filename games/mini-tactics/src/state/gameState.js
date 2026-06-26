@@ -94,7 +94,8 @@ function createUnit(id, player, type, x, y) {
     hp: MAX_HP,
     maxHp: MAX_HP,
     spent: false,
-    defending: false
+    defending: false,
+    guardTargetId: null
   };
 }
 

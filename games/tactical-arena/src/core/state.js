@@ -18,11 +18,24 @@ function createUnit(spec) {
   };
 }
 
+function tileKey(position) {
+  return `${position.x},${position.y}`;
+}
+
+function normalizeTileAffinities(tiles = []) {
+  const affinities = {};
+  for (const tile of tiles) {
+    if (tile?.affinity !== "light" && tile?.affinity !== "dark") continue;
+    affinities[tileKey(tile)] = tile.affinity;
+  }
+  return affinities;
+}
+
 const DEFAULT_ROSTER = [
   { id: "swordsman", type: "swordsman" },
   { id: "archer", type: "archer" },
   { id: "mystic", type: "mystic" },
-  { id: "swordsman-2", type: "swordsman" }
+  { id: "magician", type: "magician" }
 ];
 
 function defaultRoster(size) {
@@ -50,11 +63,12 @@ function defaultRoster(size) {
   })));
 }
 
-export function createBattleState({ size = 10, units, seed } = {}) {
+export function createBattleState({ size = 10, units, seed, tiles = [] } = {}) {
   const roster = units ?? defaultRoster(size);
 
   return {
     size,
+    tileAffinities: normalizeTileAffinities(tiles),
     units: roster.map(createUnit),
     currentPlayer: 1,
     turnNumber: 1,
@@ -71,6 +85,7 @@ export function createBattleState({ size = 10, units, seed } = {}) {
 export function cloneState(state) {
   return {
     ...state,
+    tileAffinities: { ...(state.tileAffinities ?? {}) },
     units: state.units.map((unit) => ({
       ...unit,
       position: { ...unit.position },
@@ -79,9 +94,14 @@ export function cloneState(state) {
     })),
     activation: state.activation ? {
       ...state.activation,
-      origin: { ...state.activation.origin }
+      origin: { ...state.activation.origin },
+      bonusActionGroups: [...(state.activation.bonusActionGroups ?? [])]
     } : null
   };
+}
+
+export function getTileAffinity(state, position) {
+  return state.tileAffinities?.[tileKey(position)] ?? ((position.x + position.y) % 2 === 0 ? "light" : "dark");
 }
 
 export function findUnit(state, id) {

@@ -1,5 +1,6 @@
 import { areEnemies, unitAt } from "../core/state.js";
 import { getArt, getEffectiveStats, isRaging } from "../core/unitCatalog.js";
+import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 
 export const FOOTWORK_DAMAGE = 2;
@@ -89,13 +90,36 @@ export function getLegalFleeTiles(state, actor) {
   return legal;
 }
 
+export function getTilePulseTargets(state, actor, art) {
+  const effect = art.effect;
+  if (effect?.type !== "tilePulse") return [];
+  return state.units.filter((target) =>
+    target.hp > 0 &&
+    areEnemies(actor, target) &&
+    getTileAffinity(state, target.position) === effect.affinity &&
+    (effect.global || Math.max(
+      Math.abs(actor.position.x - target.position.x),
+      Math.abs(actor.position.y - target.position.y)
+    ) <= effect.range)
+  );
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
+  const activation = state.activation;
+  const usedBonusGroups = activation?.bonusActionGroups ?? [];
+  const bonusActionAvailable = Boolean(
+    art?.bonusActionGroup &&
+    activation?.unitId === actor.id &&
+    !usedBonusGroups.includes(art.bonusActionGroup)
+  );
+  const actionAvailable = art?.bonusActionGroup
+    ? bonusActionAvailable
+    : (!activation?.moved && !activation?.primaryUsed);
   return Boolean(
     art?.implemented && art.kind === "active" &&
-    state.activation?.unitId === actor.id &&
-    !state.activation.moved &&
-    !state.activation.primaryUsed &&
+    activation?.unitId === actor.id &&
+    actionAvailable &&
     !actor.spent &&
     !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= art.mpCost &&

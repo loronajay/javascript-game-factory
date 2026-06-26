@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { createBattleState } from "../src/core/state.js";
 import { canMoveInActivation } from "../src/ui/hud.js";
 import { isTargetedMode } from "../src/ui/boardRenderer.js";
-import { buildCodex } from "../src/ui/codex.js";
+import { UNIT_TYPES } from "../src/core/unitCatalog.js";
+import { buildCodex, buildCodexForTypes } from "../src/ui/codex.js";
 
 test("the default duel uses Mini Tactics' ten-tile map and four-unit corner staging", () => {
   const state = createBattleState();
@@ -45,4 +46,13 @@ test("the codex describes either-order movement and primary actions", () => {
 
   assert.match(html, /Move and act in either order/);
   assert.doesNotMatch(html, /Move, then attack or defend/);
+});
+
+test("the Paladin codex entry lists Hand of Life and the full passive stack", () => {
+  const html = buildCodexForTypes([UNIT_TYPES.paladin]);
+
+  assert.match(html, /Hand of Life/);
+  assert.match(html, /Chosen/);
+  assert.match(html, /Heaven's Realm/);
+  assert.match(html, /Darkseeker/);
 });

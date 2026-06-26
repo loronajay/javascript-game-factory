@@ -567,6 +567,14 @@ select {
   fill: #b6f5d2;
 }
 
+.fc-guard .fc-bg {
+  stroke: color-mix(in srgb, #9fc8ff 65%, transparent);
+}
+
+.fc-guard .fc-text {
+  fill: #cfe2ff;
+}
+
 /* Can crit-kill: a gold rim hint, still showing the normal number. */
 .fc-critlethal .fc-bg {
   stroke: color-mix(in srgb, var(--gold) 70%, transparent);

@@ -16,6 +16,7 @@
 import { tileKey } from "../geometry/isometric.js";
 import { getLegalMoves } from "../rules/movement.js";
 import { getLegalAttackTargets, getLegalHealTargets } from "../rules/combat.js";
+import { getLegalGuardTargets } from "../rules/guard.js";
 import { livingUnits } from "../state/gameState.js";
 import { expectedAttack, expectedHeal, nearestEnemyDistance } from "./evaluate.js";
 
@@ -41,6 +42,12 @@ export function generatePlans(state, unit) {
         plans.push(plan(unit, moveTo, movePhase, { kind: "heal", targetId: ally.id }));
       }
     }
+
+    if (unit.type === "tank") {
+      for (const target of guardTargetsFrom(state, unit, dest)) {
+        plans.push(plan(unit, moveTo, movePhase, { kind: "guard", targetId: target.id }));
+      }
+    }
   }
 
   // Hit-and-run: take the strongest shot available from the origin, then retreat
@@ -54,13 +61,16 @@ export function generatePlans(state, unit) {
     }
   }
 
-  // Defend fallbacks: brace in place, and (if able to move) brace after advancing
-  // toward the nearest enemy. These guarantee every unit always has at least one
-  // legal plan even with nothing to attack or heal.
-  plans.push(plan(unit, null, null, { kind: "defend" }));
+  // Defend/Guard fallbacks: brace in place, and (if able to move) brace after
+  // advancing toward the nearest enemy. These guarantee every unit always has at
+  // least one legal plan even with nothing to attack or heal.
+  const fallback = unit.type === "tank"
+    ? { kind: "guard", targetId: unit.id }
+    : { kind: "defend" };
+  plans.push(plan(unit, null, null, fallback));
   const advance = advanceTile(state, unit, moveTiles);
   if (advance) {
-    plans.push(plan(unit, advance, "before", { kind: "defend" }));
+    plans.push(plan(unit, advance, "before", fallback));
   }
 
   return plans;
@@ -84,6 +94,9 @@ export function projectPlan(state, p) {
   } else if (p.primary.kind === "heal") {
     const target = byId.get(p.primary.targetId);
     if (target) target.hp = expectedHeal(target).expTargetHp;
+  } else if (p.primary.kind === "guard") {
+    actor.guardTargetId = p.primary.targetId;
+    actor.defending = p.primary.targetId === actor.id;
   } else if (p.primary.kind === "defend") {
     actor.defending = true;
   }
@@ -109,6 +122,13 @@ function healTargetsFrom(state, unit, pos) {
   const moved = withUnitAt(state, unit.id, pos);
   const actor = moved.units.find((u) => u.id === unit.id);
   const set = getLegalHealTargets(moved, actor);
+  return livingUnits(moved).filter((u) => set.has(tileKey(u.x, u.y)));
+}
+
+function guardTargetsFrom(state, unit, pos) {
+  const moved = withUnitAt(state, unit.id, pos);
+  const actor = moved.units.find((u) => u.id === unit.id);
+  const set = getLegalGuardTargets(moved, actor);
   return livingUnits(moved).filter((u) => set.has(tileKey(u.x, u.y)));
 }
 

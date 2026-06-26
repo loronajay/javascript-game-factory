@@ -21,6 +21,7 @@ function unit(id, player, type, x, y, extra = {}) {
     maxHp: 10,
     spent: false,
     defending: false,
+    guardTargetId: null,
     ...extra,
   };
 }
@@ -364,7 +365,7 @@ test("the squad turn changes only when every living unit is spent", () => {
   assert.equal(state.currentPlayer, 1); // p1-b still unspent
 
   state = must(state, cmd.beginActivation(1, "p1-b"));
-  state = must(state, cmd.defend(1, "p1-b"));
+  state = must(state, cmd.guard(1, "p1-b", "p1-b"));
   state = must(state, cmd.finishActivation(1, "p1-b"));
   assert.equal(state.currentPlayer, 2);
   assert.equal(state.turnNumber, 2);
@@ -406,13 +407,13 @@ test("defending reduces the next incoming hit", () => {
     unit("p1-warrior", 1, "warrior", 4, 1),
     unit("p2-tank", 2, "tank", 5, 1),
     unit("p1-extra", 1, "tank", 9, 9, { spent: true }),
-    unit("p2-extra", 2, "tank", 0, 9),
+    unit("p2-extra", 2, "warrior", 0, 9),
   ], { seed: NORMAL_HIT });
 
   // Hand the turn to p2 so the tank can defend, then back to p1.
   state.currentPlayer = 2;
   state = must(state, cmd.beginActivation(2, "p2-tank"));
-  state = must(state, cmd.defend(2, "p2-tank"));
+  state = must(state, cmd.guard(2, "p2-tank", "p2-tank"));
   state = must(state, cmd.finishActivation(2, "p2-tank"));
   state = must(state, cmd.beginActivation(2, "p2-extra"));
   state = must(state, cmd.defend(2, "p2-extra"));
@@ -428,4 +429,193 @@ test("defending reduces the next incoming hit", () => {
   // Warrior deals 2 to a tank; defense knocks it to 1 (assuming non-crit seed).
   assert.equal(event.defended, true);
   assert.equal(event.damage, 1);
+});
+
+// --- tank guard -------------------------------------------------------------
+
+test("tank can guard itself instead of using normal defend", () => {
+  let state = makeMatch([
+    unit("p1-tank", 1, "tank", 5, 5),
+  ]);
+  state = must(state, cmd.beginActivation(1, "p1-tank"));
+
+  const defend = applyCommand(state, cmd.defend(1, "p1-tank"));
+  assert.equal(defend.accepted, false);
+  assert.equal(defend.errorCode, ERR.DEFEND_NOT_AVAILABLE);
+
+  const result = applyCommand(state, cmd.guard(1, "p1-tank", "p1-tank"));
+  assert.equal(result.accepted, true);
+  const tank = result.nextState.units.find((u) => u.id === "p1-tank");
+  assert.equal(tank.guardTargetId, "p1-tank");
+  assert.equal(tank.defending, true);
+  assert.ok(result.events.some((e) => e.type === EVENTS.UNIT_GUARDED && e.selfGuard));
+});
+
+test("only tanks can guard adjacent living allies", () => {
+  let state = makeMatch([
+    unit("p1-tank", 1, "tank", 5, 5),
+    unit("p1-medic", 1, "medic", 6, 6),
+    unit("p1-ranger", 1, "ranger", 8, 8),
+    unit("p2-warrior", 2, "warrior", 5, 6),
+  ]);
+  state = must(state, cmd.beginActivation(1, "p1-tank"));
+
+  assert.equal(
+    applyCommand(state, cmd.guard(1, "p1-tank", "p1-ranger")).errorCode,
+    ERR.TARGET_OUT_OF_RANGE,
+  );
+  assert.equal(
+    applyCommand(state, cmd.guard(1, "p1-tank", "p2-warrior")).errorCode,
+    ERR.INVALID_TARGET,
+  );
+
+  const guarded = applyCommand(state, cmd.guard(1, "p1-tank", "p1-medic"));
+  assert.equal(guarded.accepted, true);
+  assert.equal(
+    guarded.nextState.units.find((u) => u.id === "p1-tank").guardTargetId,
+    "p1-medic",
+  );
+  assert.equal(
+    guarded.nextState.units.find((u) => u.id === "p1-tank").defending,
+    false,
+  );
+
+  let nonTank = makeMatch([
+    unit("p1-warrior", 1, "warrior", 5, 5),
+    unit("p1-medic", 1, "medic", 6, 5),
+  ]);
+  nonTank = must(nonTank, cmd.beginActivation(1, "p1-warrior"));
+  const rejected = applyCommand(nonTank, cmd.guard(1, "p1-warrior", "p1-medic"));
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.errorCode, ERR.GUARD_TANK_ONLY);
+});
+
+test("external guard redirects the declared attack to the tank and is consumed", () => {
+  let state = makeMatch([
+    unit("p1-warrior", 1, "warrior", 4, 5),
+    unit("p2-tank", 2, "tank", 6, 6),
+    unit("p2-medic", 2, "medic", 5, 5, { spent: true }),
+    unit("p1-extra", 1, "tank", 9, 9, { spent: true }),
+    unit("p2-extra", 2, "tank", 0, 9, { spent: true }),
+  ], { seed: NORMAL_HIT });
+
+  state.currentPlayer = 2;
+  state = must(state, cmd.beginActivation(2, "p2-tank"));
+  state = must(state, cmd.guard(2, "p2-tank", "p2-medic"));
+  state = must(state, cmd.finishActivation(2, "p2-tank"));
+  state = must(state, cmd.beginActivation(1, "p1-warrior"));
+  const result = applyCommand(state, cmd.attack(1, "p1-warrior", "p2-medic"));
+  assert.equal(result.accepted, true);
+
+  const event = result.events.find((e) => e.type === EVENTS.ATTACK_RESOLVED);
+  assert.equal(event.declaredTargetId, "p2-medic");
+  assert.equal(event.targetId, "p2-tank");
+  assert.equal(event.intercepted, true);
+  assert.equal(event.guardingTankId, "p2-tank");
+  assert.equal(event.defended, true);
+  assert.equal(event.damage, 1); // warrior vs tank is 2, intercepted guard reduces by 1
+  assert.ok(result.events.some((e) => e.type === EVENTS.GUARD_INTERCEPTED));
+
+  const nextTank = result.nextState.units.find((u) => u.id === "p2-tank");
+  const nextMedic = result.nextState.units.find((u) => u.id === "p2-medic");
+  assert.equal(nextTank.hp, 9);
+  assert.equal(nextMedic.hp, 10);
+  assert.equal(nextTank.guardTargetId, null);
+});
+
+test("external guard is consumed on a miss", () => {
+  let state = makeMatch([
+    unit("p1-warrior", 1, "warrior", 4, 5),
+    unit("p2-tank", 2, "tank", 6, 6),
+    unit("p2-medic", 2, "medic", 5, 5),
+  ], { seed: MISS });
+  state.currentPlayer = 2;
+  state = must(state, cmd.beginActivation(2, "p2-tank"));
+  state = must(state, cmd.guard(2, "p2-tank", "p2-medic"));
+  state = must(state, cmd.finishActivation(2, "p2-tank"));
+  state.currentPlayer = 1;
+  state = must(state, cmd.beginActivation(1, "p1-warrior"));
+
+  const result = applyCommand(state, cmd.attack(1, "p1-warrior", "p2-medic"));
+  assert.equal(result.accepted, true);
+  assert.equal(result.events.find((e) => e.type === EVENTS.ATTACK_RESOLVED).hit, false);
+  assert.equal(result.nextState.units.find((u) => u.id === "p2-tank").guardTargetId, null);
+});
+
+test("direct attacks against an externally guarding tank are not reduced", () => {
+  let state = makeMatch([
+    unit("p1-warrior", 1, "warrior", 5, 6),
+    unit("p2-tank", 2, "tank", 6, 6),
+    unit("p2-medic", 2, "medic", 5, 5),
+  ], { seed: NORMAL_HIT });
+  state.currentPlayer = 2;
+  state = must(state, cmd.beginActivation(2, "p2-tank"));
+  state = must(state, cmd.guard(2, "p2-tank", "p2-medic"));
+  state = must(state, cmd.finishActivation(2, "p2-tank"));
+  state.currentPlayer = 1;
+  state = must(state, cmd.beginActivation(1, "p1-warrior"));
+
+  const result = applyCommand(state, cmd.attack(1, "p1-warrior", "p2-tank"));
+  const event = result.events.find((e) => e.type === EVENTS.ATTACK_RESOLVED);
+  assert.equal(event.intercepted, false);
+  assert.equal(event.defended, false);
+  assert.equal(event.damage, 2);
+});
+
+test("guard clears when units separate, die, or the tank activates again", () => {
+  let state = makeMatch([
+    unit("p1-tank", 1, "tank", 5, 5),
+    unit("p1-medic", 1, "medic", 6, 5),
+    unit("p2-warrior", 2, "warrior", 9, 9),
+  ], { seed: NORMAL_HIT });
+  state = must(state, cmd.beginActivation(1, "p1-tank"));
+  state = must(state, cmd.guard(1, "p1-tank", "p1-medic"));
+  state = must(state, cmd.finishActivation(1, "p1-tank"));
+  state = must(state, cmd.beginActivation(1, "p1-medic"));
+  state = must(state, cmd.moveUnit(1, "p1-medic", 7, 5));
+  assert.equal(state.units.find((u) => u.id === "p1-tank").guardTargetId, null);
+
+  state = makeMatch([
+    unit("p1-tank", 1, "tank", 5, 5),
+    unit("p1-medic", 1, "medic", 6, 5),
+    unit("p2-warrior", 2, "warrior", 7, 4),
+  ], { seed: NORMAL_HIT });
+  state = must(state, cmd.beginActivation(1, "p1-tank"));
+  state = must(state, cmd.guard(1, "p1-tank", "p1-medic"));
+  state = must(state, cmd.finishActivation(1, "p1-tank"));
+  state = must(state, cmd.beginActivation(1, "p1-medic"));
+  state = must(state, cmd.moveUnit(1, "p1-medic", 6, 4));
+  assert.equal(state.units.find((u) => u.id === "p1-tank").guardTargetId, "p1-medic");
+
+  state.currentPlayer = 2;
+  state.activation = null;
+  state = must(state, cmd.beginActivation(2, "p2-warrior"));
+  state = must(state, cmd.attack(2, "p2-warrior", "p1-medic"));
+  assert.equal(state.units.find((u) => u.id === "p1-tank").guardTargetId, null);
+
+  state.currentPlayer = 1;
+  state.activation = null;
+  state.units.find((u) => u.id === "p1-tank").spent = false;
+  state.units.find((u) => u.id === "p1-tank").guardTargetId = "p1-tank";
+  state.units.find((u) => u.id === "p1-tank").defending = true;
+  state = must(state, cmd.beginActivation(1, "p1-tank"));
+  const tank = state.units.find((u) => u.id === "p1-tank");
+  assert.equal(tank.guardTargetId, null);
+  assert.equal(tank.defending, false);
+});
+
+test("one ally cannot be externally guarded by two tanks", () => {
+  let state = makeMatch([
+    unit("p1-tank-a", 1, "tank", 5, 5),
+    unit("p1-tank-b", 1, "tank", 5, 6),
+    unit("p1-medic", 1, "medic", 6, 5),
+  ]);
+  state = must(state, cmd.beginActivation(1, "p1-tank-a"));
+  state = must(state, cmd.guard(1, "p1-tank-a", "p1-medic"));
+  state.activation = null;
+  state = must(state, cmd.beginActivation(1, "p1-tank-b"));
+
+  const result = applyCommand(state, cmd.guard(1, "p1-tank-b", "p1-medic"));
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, ERR.TARGET_ALREADY_GUARDED);
 });

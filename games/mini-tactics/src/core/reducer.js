@@ -26,6 +26,12 @@ import {
   resolveHealRoll,
 } from "../rules/combat.js";
 import {
+  clearBrokenGuards,
+  clearGuardsForUnit,
+  getGuardingTank,
+  isValidExternalGuard,
+} from "../rules/guard.js";
+import {
   determineWinner,
   nextActivePlayer,
   playerHasUnspentUnits,
@@ -69,6 +75,8 @@ export function applyCommand(state, command) {
       return attack(state, command);
     case COMMANDS.HEAL:
       return heal(state, command);
+    case COMMANDS.GUARD:
+      return guard(state, command);
     case COMMANDS.DEFEND:
       return defend(state, command);
     case COMMANDS.FINISH_ACTIVATION:
@@ -110,6 +118,9 @@ function beginActivation(state, command) {
 
   // Defense expires when a unit is selected to begin its next activation.
   nextUnit.defending = false;
+  if (nextUnit.type === "tank") {
+    nextUnit.guardTargetId = null;
+  }
   next.activation = {
     unitId: nextUnit.id,
     origin: { x: nextUnit.x, y: nextUnit.y },
@@ -158,6 +169,7 @@ function moveUnit(state, command) {
   nextUnit.x = x;
   nextUnit.y = y;
   next.activation.moved = true;
+  clearBrokenGuards(next);
 
   return accept(next, [
     { type: EVENTS.UNIT_MOVED, unitId: nextUnit.id, from, to: { x, y } },
@@ -183,6 +195,7 @@ function cancelMove(state, command) {
   nextUnit.x = restoredTo.x;
   nextUnit.y = restoredTo.y;
   next.activation.moved = false;
+  clearBrokenGuards(next);
 
   return accept(next, [
     { type: EVENTS.MOVE_CANCELLED, unitId: nextUnit.id, restoredTo },
@@ -207,33 +220,62 @@ function attack(state, command) {
   const rejection = validateAttackTarget(state, actor, target);
   if (rejection) return reject(rejection);
 
+  const guardingTank = getGuardingTank(state, target);
+  const actualTarget = guardingTank ?? target;
+  const intercepted = Boolean(guardingTank);
+  const defended = Boolean(actualTarget.defending || intercepted);
+
   const { roll, rngState } = rollD6(state.rngState);
-  const result = resolveAttackRoll(actor, target, roll);
+  const result = resolveAttackRoll(
+    actor,
+    { ...actualTarget, defending: defended },
+    roll,
+  );
 
   const next = cloneState(state);
   next.rngState = rngState;
-  const nextTarget = findUnit(next, command.targetId);
+  const nextTarget = findUnit(next, actualTarget.id);
+  const nextGuardingTank = guardingTank ? findUnit(next, guardingTank.id) : null;
+
+  if (nextGuardingTank) {
+    nextGuardingTank.guardTargetId = null;
+  }
 
   if (result.hit) {
     nextTarget.hp = Math.max(0, nextTarget.hp - result.damage);
   }
   next.activation.primaryUsed = true;
 
-  const events = [
+  const events = [];
+
+  if (intercepted) {
+    events.push({
+      type: EVENTS.GUARD_INTERCEPTED,
+      tankId: guardingTank.id,
+      protectedUnitId: target.id,
+      actorId: actor.id,
+    });
+  }
+
+  events.push(
     {
       type: EVENTS.ATTACK_RESOLVED,
       actorId: actor.id,
-      targetId: target.id,
+      declaredTargetId: target.id,
+      targetId: actualTarget.id,
+      intercepted,
+      guardingTankId: guardingTank?.id ?? null,
       roll,
       hit: result.hit,
       critical: result.critical,
       damage: result.damage,
-      defended: target.defending,
+      defended,
       targetHpAfter: nextTarget.hp,
     },
-  ];
+  );
 
   if (nextTarget.hp <= 0) {
+    clearGuardsForUnit(next, nextTarget.id);
     events.push({ type: EVENTS.UNIT_ELIMINATED, unitId: nextTarget.id });
     applyMatchEndIfDecided(next, events);
   }
@@ -285,6 +327,49 @@ function heal(state, command) {
   ]);
 }
 
+function guard(state, command) {
+  if (command.player !== state.currentPlayer) {
+    return reject(ERR.NOT_ACTIVE_PLAYER);
+  }
+  if (!state.activation) return reject(ERR.NO_ACTIVATION);
+  if (state.activation.unitId !== command.unitId) {
+    return reject(ERR.WRONG_ACTIVE_UNIT);
+  }
+  if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
+
+  const tank = findUnit(state, command.unitId);
+  const target = findUnit(state, command.targetId);
+  if (!tank || tank.hp <= 0) return reject(ERR.UNIT_DEAD);
+  if (tank.type !== "tank") return reject(ERR.GUARD_TANK_ONLY);
+  if (!target || target.hp <= 0) return reject(ERR.INVALID_TARGET);
+
+  const selfGuard = target.id === tank.id;
+  if (!selfGuard) {
+    if (!sameTeam(state, tank, target)) return reject(ERR.INVALID_TARGET);
+    if (!isValidExternalGuard(state, tank, target)) {
+      return reject(ERR.TARGET_OUT_OF_RANGE);
+    }
+    const guardingTank = getGuardingTank(state, target, { ignoreTankId: tank.id });
+    if (guardingTank) return reject(ERR.TARGET_ALREADY_GUARDED);
+  }
+
+  const next = cloneState(state);
+  const nextTank = findUnit(next, tank.id);
+
+  nextTank.guardTargetId = target.id;
+  nextTank.defending = selfGuard;
+  next.activation.primaryUsed = true;
+
+  return accept(next, [
+    {
+      type: EVENTS.UNIT_GUARDED,
+      unitId: nextTank.id,
+      targetId: target.id,
+      selfGuard,
+    },
+  ]);
+}
+
 function defend(state, command) {
   if (command.player !== state.currentPlayer) {
     return reject(ERR.NOT_ACTIVE_PLAYER);
@@ -297,6 +382,8 @@ function defend(state, command) {
 
   const next = cloneState(state);
   const nextUnit = findUnit(next, command.unitId);
+  if (!nextUnit || nextUnit.hp <= 0) return reject(ERR.UNIT_DEAD);
+  if (nextUnit.type === "tank") return reject(ERR.DEFEND_NOT_AVAILABLE);
 
   nextUnit.defending = true;
   next.activation.primaryUsed = true;
@@ -354,9 +441,11 @@ function concede(state, command) {
   for (const unit of next.units) {
     if (unit.player === conceding && unit.hp > 0) {
       unit.hp = 0;
+      clearGuardsForUnit(next, unit.id);
       events.push({ type: EVENTS.UNIT_ELIMINATED, unitId: unit.id });
     }
   }
+  clearBrokenGuards(next);
   events.push({ type: EVENTS.PLAYER_CONCEDED, player: conceding });
 
   const winner = determineWinner(next);

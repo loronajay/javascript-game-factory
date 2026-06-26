@@ -4,12 +4,14 @@ import { SWORDSMAN } from "./units/swordsman.js";
 import { ARCHER } from "./units/archer.js";
 import { MYSTIC } from "./units/mystic.js";
 import { MAGICIAN } from "./units/magician.js";
+import { PALADIN } from "./units/paladin.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
   archer: ARCHER,
   mystic: MYSTIC,
-  magician: MAGICIAN
+  magician: MAGICIAN,
+  paladin: PALADIN
 });
 
 export function getUnitType(type) {
@@ -19,7 +21,9 @@ export function getUnitType(type) {
 }
 
 export function getArt(type, artId) {
-  return getUnitType(type).arts.find((art) => art.id === artId) ?? null;
+  const definition = getUnitType(type);
+  return definition.arts.find((art) => art.id === artId) ??
+    (definition.rageArt?.id === artId ? definition.rageArt : null);
 }
 
 export function isRaging(unit) {
@@ -27,7 +31,11 @@ export function isRaging(unit) {
 }
 
 function passiveSources(definition) {
-  return [definition.passive, ...definition.arts, definition.rageArt].filter(Boolean);
+  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt].filter(Boolean);
+}
+
+function rageStatSources(definition) {
+  return [definition.ragePassive, definition.rageArt].filter(Boolean);
 }
 
 function teamAuraStats(unit, state) {
@@ -65,8 +73,10 @@ export function getEffectiveStats(unit, state = null) {
     }
   }
   if (isRaging(unit)) {
-    for (const [name, value] of Object.entries(getUnitType(unit.type).rageArt.effect?.stats ?? {})) {
-      if (name in stats && Number.isFinite(value)) stats[name] += value;
+    for (const source of rageStatSources(getUnitType(unit.type))) {
+      for (const [name, value] of Object.entries(source.effect?.stats ?? {})) {
+        if (name in stats && Number.isFinite(value)) stats[name] += value;
+      }
     }
   }
   for (const status of unit.statuses ?? []) {
@@ -80,7 +90,9 @@ export function getEffectiveStats(unit, state = null) {
 
 export function isDefending(unit) {
   if (unit.defending) return true;
-  return Boolean(isRaging(unit) && getUnitType(unit.type).rageArt.effect?.defending);
+  if (!isRaging(unit)) return false;
+  const definition = getUnitType(unit.type);
+  return Boolean(definition.ragePassive?.effect?.defending || definition.rageArt?.effect?.defending);
 }
 
 // Presentation/query helper — not permission to activate an ART.

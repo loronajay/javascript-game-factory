@@ -105,13 +105,16 @@ tests/
 - Roll 1 misses. Roll 6 crits.
 - Critical attacks add 1 damage.
 - Normal heal restores 3; critical heal restores 4; healing may miss.
-- Defense reduces damage by 1, including to zero.
-- Defense expires when that unit begins its next activation.
+- Defense reduces damage by 1, including to zero, for warriors, rangers, and medics.
+- Tanks use Guard instead of Defend: self-Guard behaves like Defend; external
+  Guard protects one adjacent ally and redirects the first attack on that ally to
+  the Tank with a 1-point reduction.
+- Defense and Guard expire when that unit begins its next activation.
 - Each living unit activates once before the squad turn changes.
 - Move-only activation is prohibited.
 - Attack/heal may occur before or after movement.
 - An uncommitted move can be undone with `Cancel Move` before the piece
-  attacks, heals, or defends; it returns the piece to its activation origin and
+  uses its primary action; it returns the piece to its activation origin and
   leaves it selected and unspent. Cancellation is impossible once any primary
   action has resolved.
 - Medic may heal itself.

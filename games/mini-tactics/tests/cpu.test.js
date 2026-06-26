@@ -10,7 +10,7 @@ import { generatePlans } from "../src/ai/plans.js";
 // --- helpers -----------------------------------------------------------------
 
 function unit(id, player, type, x, y, extra = {}) {
-  return { id, player, type, x, y, hp: 10, maxHp: 10, spent: false, defending: false, ...extra };
+  return { id, player, type, x, y, hp: 10, maxHp: 10, spent: false, defending: false, guardTargetId: null, ...extra };
 }
 
 function makeMatch(opts, units) {
@@ -157,7 +157,7 @@ test("the CPU heals a wounded ally that is in range", () => {
 test("the CPU defends when no attack, heal, or reachable enemy is available", () => {
   // One lone CPU unit and an enemy parked far out of any move+attack reach.
   const state = makeMatch({ size: 13 }, [
-    unit("p2-tank", 2, "tank", 11, 11),
+    unit("p2-warrior", 2, "warrior", 11, 11),
     unit("p1-tank", 1, "tank", 0, 0), // unreachable this turn
   ]);
   state.currentPlayer = 2;
@@ -166,6 +166,36 @@ test("the CPU defends when no attack, heal, or reachable enemy is available", ()
   const kinds = commandKinds(commands);
   assert.ok(kinds.includes("DEFEND"), "fell back to defend");
   assert.ok(!kinds.includes("ATTACK"), "did not invent an attack");
+});
+
+test("the CPU emits guard, not defend, for a tank fallback", () => {
+  const state = makeMatch({ size: 13 }, [
+    unit("p2-tank", 2, "tank", 11, 11),
+    unit("p1-tank", 1, "tank", 0, 0),
+  ]);
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  const kinds = commandKinds(commands);
+  assert.ok(kinds.includes("GUARD"), "tank fell back to guard");
+  assert.ok(!kinds.includes("DEFEND"), "tank did not use old defend");
+  const guard = commands.find((c) => c.type === "GUARD");
+  assert.equal(guard.unitId, "p2-tank");
+  assert.equal(guard.targetId, "p2-tank");
+});
+
+test("the CPU can generate external guard plans for adjacent allies", () => {
+  const state = makeMatch({ size: 10 }, [
+    unit("p2-tank", 2, "tank", 5, 5),
+    unit("p2-medic", 2, "medic", 6, 5),
+    unit("p1-warrior", 1, "warrior", 9, 9),
+  ]);
+  state.currentPlayer = 2;
+
+  const tank = state.units.find((u) => u.id === "p2-tank");
+  const guards = generatePlans(state, tank).filter((p) => p.primary.kind === "guard");
+  assert.ok(guards.some((p) => p.primary.targetId === "p2-tank"));
+  assert.ok(guards.some((p) => p.primary.targetId === "p2-medic"));
 });
 
 // --- single surviving unit ---------------------------------------------------

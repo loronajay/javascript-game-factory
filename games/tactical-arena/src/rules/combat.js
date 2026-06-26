@@ -1,6 +1,7 @@
 import { getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
+import { getTileAffinity } from "../core/state.js";
 
 // Combat roll tuning — kept as named constants so balance stays in one place. The
 // engine rolls a probability in [0,1) (not literally a d6), so these compose with
@@ -60,6 +61,20 @@ export function getProximityBonus(attacker, target) {
   return 0;
 }
 
+function getTileStrikeBonus(attacker, target, state) {
+  if (!state || !isRaging(attacker)) return 0;
+  const definition = getUnitType(attacker.type);
+  for (const source of [definition.ragePassive, definition.rageArt]) {
+    const bonus = source?.effect?.tileStrikeBonus;
+    if (!bonus) continue;
+    if (getTileAffinity(state, attacker.position) === bonus.affinity &&
+        getTileAffinity(state, target.position) === bonus.affinity) {
+      return Math.max(0, Number(bonus.amount) || 0);
+    }
+  }
+  return 0;
+}
+
 // Resolves a strike with an explicit damage type override (used by magic-damage ARTS
 // like Spark and Banish). Falls back to a physical strike when no override is given.
 // Returns the same shape as resolvePhysicalStrike so callers and the forecast are interchangeable.
@@ -96,7 +111,8 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
     critical
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
-  return { ...result, critical, proximityBonus, damage: result.damage + proximityBonus };
+  const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
+  return { ...result, critical, proximityBonus, tileStrikeBonus, damage: result.damage + proximityBonus + tileStrikeBonus };
 }
 
 // A blinded unit's attack roll is a guaranteed miss unless a combat override (the
