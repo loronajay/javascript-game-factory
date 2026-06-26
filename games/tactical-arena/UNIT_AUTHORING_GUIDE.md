@@ -242,8 +242,52 @@ Current VFX recipe types:
 
 Persistent status badges come from `STATUS_VFX` in `vfxCatalog.js`.
 
-Unit figurine icons live in `src/ui/unitRenderer.js`. Add an `ICON_BUILDERS`
-entry for every new unit type so the board token is recognizable.
+## Board figurine (the carved-miniature model)
+
+Every unit on the board is a small standing **carved figurine**, not a flat coin
+emblem. Builders live in `src/ui/unitRenderer.js` — register one per unit type in
+`FIGURE_BUILDERS`. The builder receives an empty `<g class="figure">` and appends
+layered SVG paths in back-to-front order.
+
+**Figure space.** Draw in the figure's local coordinates: `(0,0)` is the standing
+spot on the plinth, the piece rises into **negative y** (head around `y = -45`,
+tall headgear to about `-60`), and everything stays within `x = ±22`. No transform
+is needed — `createUnitFigure` places the figure on the plinth for you.
+
+**Light is from the upper-left.** So highlights (`.fig-light`) go on the upper-left
+of each form and shadows (`.fig-shade`) go on the lower-right. Keeping this
+consistent is what makes the pieces read as sculpted instead of flat.
+
+**Use the shared material classes, never inline colors** (so each path recolors
+per team automatically — team color comes from `--team` on the unit group):
+
+| class           | material / use                                              |
+|-----------------|-------------------------------------------------------------|
+| `.fig-body`     | ivory/bone gradient + dark outline — the carved body        |
+| `.fig-shade`    | translucent dark overlay — the shadowed (lower-right) side  |
+| `.fig-light`    | translucent light overlay — the lit (upper-left) edge       |
+| `.fig-cloak`    | **team color** — cloak / tabard / sash / hat band / crest   |
+| `.fig-cloak-dk` | shaded fold of the team cloth                               |
+| `.fig-steel`    | polished steel gradient — blades, shields, mace heads       |
+| `.fig-gold`     | brass / wood gradient — hilts, staves, bow limbs, halos     |
+| `.fig-dark`     | deep recess — visor slits, hood hollows, grips, eyes        |
+| `.fig-line`     | thin engraved seam line (no fill)                           |
+| `.fig-glow`     | team-tinted magical glow (orbs / sparks) — uses `#softGlow` |
+| `.fig-halo`     | gold glowing ring (clerics / holy units)                    |
+
+**Recipe to follow** (back to front): team cloak/cape → ivory body silhouette →
+`.fig-shade` on the right + `.fig-light` on the left → team tabard/sash → shoulders
+→ head/helmet/hood/hat → weapon or implement (`.fig-steel`/`.fig-gold`, with a
+`.fig-glow` for casters). Give every class a **distinct silhouette and a
+class-defining prop** — the existing five are the worked examples: Swordsman
+(plumed helm + planted greatsword), Archer (hood + drawn recurve bow), Mystic
+(cowl + halo + glowing staff), Magician (pointed hat + wand spark), Paladin (tower
+shield + cross + mace + haloed winged helm). Avoid two units sharing a silhouette.
+
+The materials are defined as gradients in `index.html` (`#ivory`, `#figSteel`,
+`#figGold`) and as `.fig-*` rules in `style.css`. The HP bar, spent/defend marks,
+status badges, target reticle, plinth, and all combat FX are added by
+`createUnitFigure` around your figure — you only draw the miniature itself.
 
 ## Sounds
 
@@ -341,7 +385,8 @@ Before calling a unit complete:
 
 - Unit file added under `src/core/units/`.
 - Unit registered in `src/core/unitCatalog.js`.
-- Icon added in `src/ui/unitRenderer.js`.
+- Figurine builder added to `FIGURE_BUILDERS` in `src/ui/unitRenderer.js`
+  (distinct silhouette + class-defining prop, shared `.fig-*` materials).
 - Every implemented active ART has reducer behavior.
 - Every implemented active ART has targeting UI.
 - Every implemented active ART has VFX coverage.

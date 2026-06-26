@@ -11,6 +11,7 @@ import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
 import { AudioManager } from "./audio/sounds.js";
 import { renderBoard } from "./ui/boardRenderer.js";
+import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
 import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/hud.js";
 import { RulesModal } from "./ui/rulesModal.js";
@@ -57,6 +58,10 @@ const rulesModal = new RulesModal(refModal, document.querySelector("#refCloseBtn
 const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
 const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
 const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex });
+
+// Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
+// once — it's independent of board size and presentation only.
+mountSceneBackdrop(document.querySelector("#sceneBackdrop"));
 
 // --- Render ---
 

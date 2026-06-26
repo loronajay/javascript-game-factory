@@ -118,6 +118,9 @@
         </header>
 
         <main id="stageWrap">
+          <!-- Atmospheric world backdrop (populated by sceneBackdrop.js): parallax
+               sky, distant fortress, drifting clouds/fog, light shafts, embers. -->
+          <div id="sceneBackdrop" aria-hidden="true"></div>
           <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Tactical Arena board" role="grid">
             <defs>
               <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
@@ -128,9 +131,35 @@
                 <stop offset="0%" stop-color="#70aed8" stop-opacity=".18"/>
                 <stop offset="100%" stop-color="#70aed8" stop-opacity="0"/>
               </radialGradient>
-              <linearGradient id="pewter" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#e0eef8"/><stop offset="42%" stop-color="#a8c4dc"/><stop offset="100%" stop-color="#6888a0"/>
+              <!-- Carved-figurine materials: ivory/bone body, polished steel, brass/wood. -->
+              <linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f6f1e3"/><stop offset="46%" stop-color="#e3d9c2"/><stop offset="100%" stop-color="#b9ac8e"/>
               </linearGradient>
+              <linearGradient id="figSteel" x1="0" y1="0" x2="0.3" y2="1">
+                <stop offset="0%" stop-color="#eef4fb"/><stop offset="45%" stop-color="#aebfd0"/><stop offset="100%" stop-color="#5d6c7c"/>
+              </linearGradient>
+              <linearGradient id="figGold" x1="0" y1="0" x2="0.2" y2="1">
+                <stop offset="0%" stop-color="#f4dfa0"/><stop offset="48%" stop-color="#cb9f55"/><stop offset="100%" stop-color="#876026"/>
+              </linearGradient>
+              <!-- War-table dais materials: a moonlit stone top, darker side faces,
+                   and a soft diamond aura halo that pools under the board. -->
+              <linearGradient id="daisStone" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#46566a"/><stop offset="52%" stop-color="#2b3746"/><stop offset="100%" stop-color="#19222e"/>
+              </linearGradient>
+              <linearGradient id="daisSideL" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1c2734"/><stop offset="100%" stop-color="#0a121b"/>
+              </linearGradient>
+              <linearGradient id="daisSideR" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#121b26"/><stop offset="100%" stop-color="#060c14"/>
+              </linearGradient>
+              <radialGradient id="daisAura" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#86c4ee" stop-opacity=".5"/>
+                <stop offset="55%" stop-color="#5a93c8" stop-opacity=".18"/>
+                <stop offset="100%" stop-color="#5a93c8" stop-opacity="0"/>
+              </radialGradient>
+              <filter id="daisAuraBlur" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="26"/>
+              </filter>
             </defs>
             <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
             <g id="boardLayer"></g>

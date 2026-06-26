@@ -1,6 +1,6 @@
 import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
-import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } from "./isometric.js";
+import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
 import { getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
@@ -25,6 +25,48 @@ function createTile(metrics, position, { affinity, selected, legal, targetKind, 
     svgElement("polygon", { class: "tile-face", points: pointsToString(top) })
   );
   return tile;
+}
+
+// The stone war-table the diamond sits on: a blurred aura, a raised stone rim
+// around the tiles, and two side faces giving the platform real thickness so the
+// board reads as a physical table instead of tiles floating in a void. Drawn
+// behind the tiles (appended first) and rebuilt with the board so it tracks size.
+function createBoardDais(metrics, size) {
+  const d = getBoardDiamond(metrics, size);
+  const scale = (p, f) => ({ x: d.cx + (p.x - d.cx) * f, y: d.cy + (p.y - d.cy) * f });
+  const rim = 1.17;
+  const N = scale(d.n, rim);
+  const E = scale(d.e, rim);
+  const S = scale(d.s, rim);
+  const W = scale(d.w, rim);
+  const depth = Math.max(22, metrics.tileHeight * 1.05);
+
+  const aura = 1.62;
+  const aN = scale(d.n, aura);
+  const aE = scale(d.e, aura);
+  const aS = scale(d.s, aura);
+  const aW = scale(d.w, aura);
+
+  const g = svgElement("g", { class: "board-dais" });
+  g.append(
+    svgElement("polygon", {
+      class: "dais-aura",
+      points: pointsToString([[aN.x, aN.y], [aE.x, aE.y], [aS.x, aS.y], [aW.x, aW.y]])
+    }),
+    svgElement("polygon", {
+      class: "dais-side dais-side-l",
+      points: pointsToString([[W.x, W.y], [S.x, S.y], [S.x, S.y + depth], [W.x, W.y + depth]])
+    }),
+    svgElement("polygon", {
+      class: "dais-side dais-side-r",
+      points: pointsToString([[S.x, S.y], [E.x, E.y], [E.x, E.y + depth], [S.x, S.y + depth]])
+    }),
+    svgElement("polygon", {
+      class: "dais-top",
+      points: pointsToString([[N.x, N.y], [E.x, E.y], [S.x, S.y], [W.x, W.y]])
+    })
+  );
+  return g;
 }
 
 export function isTargetedMode(mode, actor) {
@@ -130,6 +172,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   boardLayer.replaceChildren();
   unitsLayer.replaceChildren();
   board.classList.toggle("board-focused", Boolean(actor));
+  boardLayer.append(createBoardDais(metrics, state.size));
 
   const tileByKey = new Map();
   for (let sum = 0; sum <= (state.size - 1) * 2; sum += 1) {

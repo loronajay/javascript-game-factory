@@ -22,7 +22,7 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .topbar { z-index: 10; display: grid; grid-template-columns: 1fr auto 1fr; gap: .75rem; align-items: center; padding: .65rem max(.9rem, env(safe-area-inset-right)) .65rem max(.9rem, env(safe-area-inset-left)); border-bottom: 2px solid var(--brass); background: linear-gradient(180deg, rgba(160,210,255,.05), transparent 30%), linear-gradient(180deg, #14202e, #0c1520); box-shadow: inset 0 -1px rgba(0,0,0,.6), 0 8px 24px rgba(0,0,0,.5); }
 .brand { display: flex; gap: .55rem; align-items: center; color: var(--brass-hi); font: 800 .82rem var(--font-display); letter-spacing: .16em; text-transform: uppercase; }.brand::before { content: ""; width: .9rem; height: .9rem; border: 1px solid var(--brass-lo); border-radius: 50%; background: radial-gradient(circle at 38% 30%, var(--brass-hi), var(--brass) 55%, var(--brass-lo)); box-shadow: inset 0 1px 1px rgba(180,220,255,.45), 0 0 10px rgba(100,170,220,.35); }
 .turn-banner { min-width: min(58vw, 360px); padding: .4rem 1.4rem; border: 1px solid var(--brass); border-radius: 999px; text-align: center; background: linear-gradient(180deg, rgba(160,210,255,.08), transparent 52%), linear-gradient(180deg, #142030, #0c1820); box-shadow: inset 0 1px rgba(160,210,255,.15), inset 0 0 0 1px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.5); }.turn-title { display: inline-flex; gap: .5rem; align-items: center; color: var(--text); font: 800 .98rem var(--font-display); letter-spacing: .05em; white-space: nowrap; }.turn-title::before { content: ""; width: .62rem; height: .62rem; border-radius: 50%; background: var(--team, var(--muted)); box-shadow: 0 0 12px var(--team, transparent); }.turn-sub { margin-top: .12rem; color: var(--muted); font-size: .72rem; letter-spacing: .02em; }.top-actions { display: flex; gap: .45rem; justify-content: flex-end; }.top-actions button { font-size: .68rem; }
-#stageWrap { position: relative; min-height: 0; overflow: hidden; touch-action: none; } #boardSvg { display: block; width: 100%; height: 100%; user-select: none; touch-action: none; }
+#stageWrap { position: relative; min-height: 0; overflow: hidden; touch-action: none; } #boardSvg { position: relative; z-index: 1; display: block; width: 100%; height: 100%; user-select: none; touch-action: none; }
 .hud { z-index: 10; padding: .55rem max(.8rem, env(safe-area-inset-right)) calc(.55rem + env(safe-area-inset-bottom)) max(.8rem, env(safe-area-inset-left)); border-top: 2px solid var(--brass); background: linear-gradient(0deg, rgba(160,210,255,.04), transparent 30%), linear-gradient(0deg, #14202e, #0c1520); box-shadow: inset 0 1px rgba(0,0,0,.6), 0 -8px 24px rgba(0,0,0,.5); }.panel { position: relative; min-width: 0; padding: .8rem; border: 1px solid var(--console-edge); border-radius: var(--radius-console); background: var(--console-fill); box-shadow: var(--console-shadow); }.panel::before,.panel::after { content:""; position:absolute; width:14px; height:14px; opacity:.55; pointer-events:none; }.panel::before { top:7px; left:7px; border-top:2px solid var(--console-edge); border-left:2px solid var(--console-edge); border-radius:6px 0 0; }.panel::after { right:7px; bottom:7px; border-right:2px solid var(--console-edge); border-bottom:2px solid var(--console-edge); border-radius:0 0 6px; }
 /* min-height reserves the worst-case (2-row ARTS menu) height so selecting a
    unit never grows the HUD and shrinks the battlefield. The board no longer
@@ -42,7 +42,38 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 /* Hovered Volley direction: its cone lights bright over the faint range wash. */
 .tile.cone-hot .tile-face { fill:#9a5bd0; stroke:#ecd8ff; stroke-width:2; animation:legal-pulse 1s ease-in-out infinite alternate; }.unit.volley-hit,.unit.spent.volley-hit { opacity:1; filter:drop-shadow(0 0 8px rgba(255,90,72,.95)) brightness(1.08); }
 .board-focused .tile:not(.selected):not(.legal-move):not(.legal-attack):not(.legal-art):not(.legal-heal):not(.attack-range):not(.art-range):not(.heal-range):not(.path) .tile-face { filter:brightness(.7) saturate(.85); }
-.unit { cursor:pointer; transform-box:fill-box; transform-origin:center bottom; }.unit .shadow { fill:rgba(0,0,0,.4); filter:blur(2px); }.unit .base-side { fill:#0e1a26; }.unit .base-top { fill:color-mix(in srgb,var(--team,var(--p1)) 40%,#060e18); stroke:rgba(160,210,255,.22); stroke-width:1.2; vector-effect:non-scaling-stroke; }.unit .rim { fill:none; stroke:var(--team,var(--p1)); stroke-width:3; vector-effect:non-scaling-stroke; }.unit.player-1 { --team:var(--p1); }.unit.player-2 { --team:var(--p2); }.unit .emblem .icon { fill:url(#pewter); stroke:#0a1620; stroke-width:1; stroke-linejoin:round; vector-effect:non-scaling-stroke; }.unit .icon-shadow,.unit .icon-shadow * { fill:rgba(4,12,24,.6); stroke:rgba(4,12,24,.6); }.unit .icon-highlight,.unit .icon-highlight * { fill:rgba(220,240,255,.9); stroke:rgba(220,240,255,.9); }.unit .emblem-line { stroke:#0a1620; vector-effect:non-scaling-stroke; }.unit .hp-back { fill:rgba(0,0,0,.65); stroke:rgba(0,0,0,.5); }.unit .hp-front { fill:var(--hp-high); }.unit .spent-mark,.unit .defend-mark { opacity:0; }.unit.spent { opacity:.46; filter:grayscale(.55) sepia(.1); }.unit.spent .spent-mark { opacity:1; }.unit.active { filter:drop-shadow(0 0 10px rgba(100,180,240,.85)); }.unit.active .rim { stroke:var(--gold); stroke-dasharray:9 5; animation:rim-spin 1.2s linear infinite; }.shield-ring { fill:none; stroke:var(--gold); stroke-width:2.2; stroke-dasharray:8 5; opacity:0; transform-box:fill-box; transform-origin:center; }.unit.defending .shield-ring,.unit.defending .defend-mark { opacity:1; }.unit.defending .shield-ring { animation:shield-orbit 1.6s linear infinite; }.defend-mark .defend-shield { fill:var(--gold); stroke:rgba(6,14,24,.7); stroke-width:.8; }.unit.spent.defending { opacity:.9; filter:none; }.unit.idle:not(.spent) .body-group { transform-box:fill-box; transform-origin:center bottom; animation:idle-bob 2.4s ease-in-out infinite; }
+.unit { cursor:pointer; transform-box:fill-box; transform-origin:center bottom; }.unit .shadow { fill:rgba(0,0,0,.4); filter:blur(2px); }.unit .base-side { fill:#0e1a26; }.unit .base-top { fill:color-mix(in srgb,var(--team,var(--p1)) 40%,#060e18); stroke:rgba(160,210,255,.22); stroke-width:1.2; vector-effect:non-scaling-stroke; }.unit .rim { fill:none; stroke:var(--team,var(--p1)); stroke-width:3; vector-effect:non-scaling-stroke; }.unit.player-1 { --team:var(--p1); }.unit.player-2 { --team:var(--p2); }.unit .hp-back { fill:rgba(0,0,0,.65); stroke:rgba(0,0,0,.5); }.unit .hp-front { fill:var(--hp-high); }.unit .spent-mark,.unit .defend-mark { opacity:0; }.unit.spent { opacity:.46; filter:grayscale(.55) sepia(.1); }.unit.spent .spent-mark { opacity:1; }.unit.active { filter:drop-shadow(0 0 10px rgba(100,180,240,.85)); }.unit.active .rim { stroke:var(--gold); stroke-dasharray:9 5; animation:rim-spin 1.2s linear infinite; }.shield-ring { fill:none; stroke:var(--gold); stroke-width:2.2; stroke-dasharray:8 5; opacity:0; transform-box:fill-box; transform-origin:center; }.unit.defending .shield-ring,.unit.defending .defend-mark { opacity:1; }.unit.defending .shield-ring { animation:shield-orbit 1.6s linear infinite; }.defend-mark .defend-shield { fill:var(--gold); stroke:rgba(6,14,24,.7); stroke-width:.8; }.unit.spent.defending { opacity:.9; filter:none; }.unit.idle:not(.spent) .body-group { transform-box:fill-box; transform-origin:center bottom; animation:idle-bob 2.4s ease-in-out infinite; }
+/* Plinth inlay — a faintly team-tinted inset on the base top so the figure reads
+   as standing on a pedestal rather than a flat coin. */
+.unit .base-inlay { fill:color-mix(in srgb,var(--team,var(--p1)) 20%,#0a141e); stroke:rgba(0,0,0,.4); stroke-width:.8; vector-effect:non-scaling-stroke; }
+/* Carved-figurine material classes. Geometry stays pure (see unitRenderer.js);
+   color/relief is entirely CSS so every path recolors per team. Light is from the
+   upper-left, hence .fig-shade (right/under) and .fig-light (upper-left). */
+/* Only the tile-shaped .unit-hit diamond is clickable; every painted part of the
+   figurine is click-through, so a tall piece never blocks the tiles behind it. */
+.unit * { pointer-events:none; }
+.unit .unit-hit { pointer-events:all; fill:transparent; cursor:pointer; }
+/* The figurine is scaled (FIGURE_SCALE) about its FEET — the local origin (0,0)
+   in figure space, which sits at the coin-base centre. Pin transform-origin to
+   0 0 so shrinking the piece keeps it planted on its base. (The default
+   transform-box:fill-box pivots about the bounding-box centre, which drifts
+   sideways per unit for asymmetric figures — staff/bow/wand — and lifts the feet
+   off the disc once scaled below 1.) */
+.unit .figure { transform-box:view-box; transform-origin:0 0; }
+.unit .figure path,.unit .figure rect,.unit .figure circle,.unit .figure ellipse,.unit .figure line { stroke-linejoin:round; }
+.unit .fig-body { fill:url(#ivory); stroke:#281e12; stroke-width:1.1; vector-effect:non-scaling-stroke; }
+.unit .fig-shade { fill:rgba(38,27,14,.30); stroke:none; }
+.unit .fig-light { fill:rgba(255,250,236,.55); stroke:none; }
+.unit .fig-cloak { fill:var(--team,var(--p1)); stroke:#15110c; stroke-width:1.1; vector-effect:non-scaling-stroke; }
+.unit .fig-cloak-dk { fill:color-mix(in srgb,var(--team,var(--p1)) 52%,#080810); stroke:none; }
+.unit .fig-steel { fill:url(#figSteel); stroke:#1b2531; stroke-width:1; vector-effect:non-scaling-stroke; }
+.unit .fig-gold { fill:url(#figGold); stroke:#3a2a10; stroke-width:1; vector-effect:non-scaling-stroke; }
+.unit .fig-dark { fill:#221a10; stroke:none; }
+.unit .fig-line { fill:none; stroke:#281e12; stroke-width:1; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+.unit .fig-glow { fill:var(--team,var(--p1)); filter:url(#softGlow); opacity:.85; }
+.unit .fig-halo { stroke:#f3dea0; stroke-width:2; opacity:.7; vector-effect:non-scaling-stroke; filter:url(#softGlow); }
+/* Selected/active piece: warm the bone so the highlight reads on the figure. */
+.unit.active .fig-body { filter:brightness(1.08); }
 #message { position:absolute; left:50%; bottom:14px; z-index:7; max-width:min(72vw,620px); padding:.45rem .85rem; transform:translateX(-50%); border:1px solid rgba(100,140,170,.42); border-radius:14px; background:rgba(4,12,26,.92); color:var(--text); box-shadow:0 4px 16px rgba(0,0,0,.45); font-size:.78rem; line-height:1.34; text-align:center; }#message.error { color:#ffaca0; }
 /* Sound toggle reads "Muted" and dims its frame when off. */
 #muteBtn::before { content:"\1F50A"; margin-right:.3rem; }#muteBtn.is-muted { color:var(--muted); border-color:var(--brass-lo); }#muteBtn.is-muted::before { content:"\1F507"; }
@@ -107,4 +138,67 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 @media (prefers-reduced-motion:reduce) { #turnFlash { transition:none; } .turn-flash-card { transition:none; transform:none; } }
 /* Stage vignette — seats the diamond in a pool of shadow instead of flat black. */
 #stageWrap::after { content:""; position:absolute; z-index:5; inset:0; pointer-events:none; background:radial-gradient(ellipse at 50% 45%, transparent 54%, rgba(4,10,20,.65) 100%); }
+
+/* ================= Atmospheric battle-view backdrop ================= */
+/* A layered, living world behind the war-table. All layers are absolutely
+   positioned and non-interactive; the board (#boardSvg) sits at z-index 1 above
+   them. Built by sceneBackdrop.js. */
+#sceneBackdrop { position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+#sceneBackdrop > * { position:absolute; inset:0; }
+
+/* Sky: deep night up top easing into a luminous horizon band, with a slow drift. */
+.bk-sky { background:radial-gradient(90% 46% at 50% 56%, rgba(86,150,210,.42) 0%, rgba(54,104,160,.18) 40%, transparent 72%), radial-gradient(130% 96% at 50% 4%, #1d3050 0%, #122139 40%, #0a1325 70%, #060b16 100%), linear-gradient(180deg, #0c1628 0%, #081120 58%, #05090f 100%); animation:bk-sky-drift 26s ease-in-out infinite alternate; }
+@keyframes bk-sky-drift { 0% { filter:brightness(.94) saturate(1); } 100% { filter:brightness(1.12) saturate(1.18); } }
+
+/* Stars: tiny dots from layered radial gradients, slow twinkle. Sit only in the upper band. */
+.bk-stars { background-image:radial-gradient(1.4px 1.4px at 12% 18%, rgba(220,236,255,.9), transparent 60%), radial-gradient(1.2px 1.2px at 28% 9%, rgba(200,224,255,.7), transparent 60%), radial-gradient(1.6px 1.6px at 44% 22%, rgba(255,255,255,.85), transparent 60%), radial-gradient(1.2px 1.2px at 62% 12%, rgba(190,214,255,.7), transparent 60%), radial-gradient(1.5px 1.5px at 74% 24%, rgba(235,245,255,.8), transparent 60%), radial-gradient(1.2px 1.2px at 88% 14%, rgba(200,224,255,.7), transparent 60%), radial-gradient(1.3px 1.3px at 8% 32%, rgba(210,230,255,.6), transparent 60%), radial-gradient(1.4px 1.4px at 54% 6%, rgba(255,255,255,.75), transparent 60%); background-repeat:no-repeat; mask-image:linear-gradient(180deg, #000 0%, #000 40%, transparent 62%); animation:bk-twinkle 5.5s ease-in-out infinite alternate; }
+@keyframes bk-twinkle { 0% { opacity:.45; } 100% { opacity:.95; } }
+
+/* Aurora: faint colored blurred bands that drift sideways behind the fortress. */
+.bk-aurora { background:radial-gradient(60% 40% at 30% 30%, rgba(86,196,176,.16), transparent 70%), radial-gradient(50% 38% at 72% 26%, rgba(120,150,235,.16), transparent 72%); filter:blur(18px); mix-blend-mode:screen; animation:bk-aurora-drift 32s ease-in-out infinite alternate; }
+@keyframes bk-aurora-drift { 0% { transform:translateX(-3%) scaleY(1); opacity:.7; } 100% { transform:translateX(3%) scaleY(1.12); opacity:1; } }
+
+/* Distant fortress silhouette, backlit by the horizon glow so it reads as a
+   far-off skyline rather than blending into the night. */
+.bk-fortress { display:grid; align-items:end; justify-items:center; inset:0 0 56% 0; }
+.bk-fortress::before { content:""; position:absolute; left:0; right:0; bottom:-3%; height:40%; background:radial-gradient(72% 100% at 50% 100%, rgba(120,176,224,.42), rgba(80,130,180,.15) 50%, transparent 78%); filter:blur(8px); }
+.bk-fortress-svg { position:relative; width:min(128%, 1700px); height:96%; opacity:.95; filter:drop-shadow(0 0 22px rgba(110,168,224,.3)); }
+.bk-wall, .bk-tower { fill:#14233a; stroke:rgba(150,196,240,.32); stroke-width:1.5; }
+.bk-tower { fill:#182a44; }
+.bk-window { fill:#f6c873; stroke:none; opacity:.7; filter:drop-shadow(0 0 5px rgba(246,200,115,.9)); animation:bk-window-flicker 4s ease-in-out infinite alternate; }
+@keyframes bk-window-flicker { 0%,70% { opacity:.4; } 85% { opacity:.7; } 100% { opacity:.5; } }
+
+/* Slow-drifting cloud bands across the mid sky. */
+.bk-clouds { background:radial-gradient(40% 18% at 20% 34%, rgba(40,56,80,.5), transparent 70%), radial-gradient(46% 16% at 64% 28%, rgba(34,48,70,.45), transparent 72%), radial-gradient(38% 14% at 88% 38%, rgba(44,60,84,.4), transparent 70%); filter:blur(6px); animation:bk-clouds-drift 60s linear infinite; }
+@keyframes bk-clouds-drift { 0% { transform:translateX(-6%); } 100% { transform:translateX(6%); } }
+
+/* God-ray light shafts angling down from above the table, shimmering slowly. */
+.bk-rays { background:repeating-linear-gradient(99deg, rgba(150,196,240,.06) 0 22px, transparent 22px 92px); mask-image:radial-gradient(70% 60% at 50% 0%, #000 0%, transparent 72%); mix-blend-mode:screen; animation:bk-rays-shimmer 14s ease-in-out infinite alternate; }
+@keyframes bk-rays-shimmer { 0% { opacity:.5; transform:translateX(-1.5%); } 100% { opacity:.95; transform:translateX(1.5%); } }
+
+/* Ground fog pooling at the base of the table, drifting laterally. */
+.bk-fog { top:auto; height:46%; bottom:0; background:radial-gradient(120% 80% at 50% 100%, rgba(120,150,180,.2), rgba(80,110,150,.08) 45%, transparent 72%); filter:blur(10px); animation:bk-fog-drift 40s ease-in-out infinite alternate; }
+@keyframes bk-fog-drift { 0% { transform:translateX(-4%) scaleY(1); opacity:.8; } 100% { transform:translateX(4%) scaleY(1.1); opacity:1; } }
+
+/* Floating embers/dust — each .bk-ember is randomized in sceneBackdrop.js. */
+.bk-ember { position:absolute; border-radius:50%; background:var(--ember, #f4c98a); box-shadow:0 0 8px 1px var(--ember, #f4c98a); opacity:0; animation:bk-ember-rise var(--rise, 12s) linear var(--delay, 0s) infinite; }
+@keyframes bk-ember-rise {
+  0% { transform:translate(0, 0) scale(.7); opacity:0; }
+  12% { opacity:var(--peak, .6); }
+  80% { opacity:var(--peak, .6); }
+  100% { transform:translate(var(--sway, 0), -120%) scale(1); opacity:0; }
+}
+
+/* ===================== War-table dais (in-SVG) ===================== */
+/* Drawn behind the tiles by boardRenderer.js so it tracks board size. */
+.dais-aura { fill:url(#daisAura); filter:url(#daisAuraBlur); }
+.dais-top { fill:url(#daisStone); stroke:var(--brass, #b9923f); stroke-width:2.4; vector-effect:non-scaling-stroke; filter:drop-shadow(0 6px 14px rgba(0,0,0,.55)); }
+.dais-side-l { fill:url(#daisSideL); }
+.dais-side-r { fill:url(#daisSideR); }
+.dais-side { stroke:rgba(0,0,0,.5); stroke-width:1; vector-effect:non-scaling-stroke; }
+
+@media (prefers-reduced-motion:reduce) {
+  .bk-sky, .bk-stars, .bk-aurora, .bk-clouds, .bk-rays, .bk-fog, .bk-ember, .bk-window { animation:none !important; }
+  .bk-ember { opacity:var(--peak, .5); }
+}
 @media (max-width:820px) { .topbar { grid-template-columns:1fr auto; }.brand { display:none; }.squad-overlay { display:none; }.panel.command-console { grid-template-columns:1fr; gap:.5rem; }.actions { grid-template-columns:repeat(6,minmax(0,1fr)); }.panel { padding:.55rem; }.unit-card { height:auto; min-height:52px; }.unit-stats { max-height:none; }.unit-emblem { width:44px; height:44px; font-size:1.25rem; }.turn-banner { min-width:0; padding:.35rem .9rem; text-align:left; } } @media (max-width:480px) { .actions { grid-template-columns:repeat(3,minmax(0,1fr)); }.top-actions button:first-child { display:none; } } @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }

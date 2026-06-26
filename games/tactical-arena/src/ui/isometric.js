@@ -41,3 +41,21 @@ export function gridToScreen(metrics, x, y) {
 export function pointsToString(points) {
   return points.map(([x, y]) => `${x},${y}`).join(" ");
 }
+
+// The four outer screen vertices (and center) of the whole board diamond, used
+// to draw the war-table dais beneath the tiles so it tracks board size exactly.
+export function getBoardDiamond(metrics, size) {
+  const hw = metrics.tileWidth / 2;
+  const hh = metrics.tileHeight / 2;
+  const cx = metrics.originX;
+  const top = metrics.originY;
+  const cy = top + size * hh;
+  return {
+    cx,
+    cy,
+    n: { x: cx, y: top },
+    e: { x: cx + size * hw, y: cy },
+    s: { x: cx, y: top + 2 * size * hh },
+    w: { x: cx - size * hw, y: cy }
+  };
+}

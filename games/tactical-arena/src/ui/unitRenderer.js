@@ -4,65 +4,226 @@ import { getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { positionKey } from "../rules/movement.js";
 import { getUnitStatusVfx } from "./vfxCatalog.js";
 
-// Add an entry here for each new unit type. The builder receives an empty <g
-// class="icon"> and appends the SVG paths that form the figurine emblem.
-const ICON_BUILDERS = new Map([
-  ["swordsman", buildSwordsmanIcon],
-  ["archer", buildArcherIcon],
-  ["mystic", buildMysticIcon],
-  ["magician", buildMagicianIcon],
-  ["paladin", buildPaladinIcon]
+// ---------------------------------------------------------------------------
+// Carved-figurine model (the template every unit follows)
+// ---------------------------------------------------------------------------
+// Each unit is a small standing miniature, not a flat coin emblem. It is built
+// in "figure space": (0,0) is the figure's standing spot on the plinth, the
+// piece rises into NEGATIVE y (head near y=-50), and stays within x = ±22.
+// Light comes from the upper-LEFT, so highlights sit on the upper-left of each
+// form and `.fig-shade` overlays go on the lower-right.
+//
+// The look is achieved with shared CSS material classes (see style.css), NOT
+// inline colors, so the same path geometry recolors per team:
+//   .fig-body     ivory/bone gradient + dark outline (the carved body)
+//   .fig-shade    translucent dark overlay (sculpts the shadowed right side)
+//   .fig-light    translucent light overlay (the lit upper-left edge)
+//   .fig-cloak    team color (cloak / tabard / sash / hat band — team identity)
+//   .fig-cloak-dk shaded fold of the team cloth
+//   .fig-steel    polished metal gradient (blades, shields, mace heads)
+//   .fig-gold     brass / wood gradient (hilts, staves, bow limbs, halos)
+//   .fig-dark     deep recess (visor slits, hood hollows, grips)
+//   .fig-line     thin engraved seam line (no fill)
+//   .fig-glow     team-tinted magical glow (orbs / sparks) — uses #softGlow
+//
+// To add a unit: register a builder in FIGURE_BUILDERS that appends layers in
+// back-to-front order. Reuse the helpers below and keep within the figure-space
+// bounds above. See UNIT_AUTHORING_GUIDE.md for the worked walkthrough.
+
+const E = svgElement;
+
+// Display scale for the figurine inside its token. Drawn at native figure-space
+// size, then shrunk so a tall piece stays comfortably within its tile.
+const FIGURE_SCALE = 0.82;
+
+// A team plume / crest helper (small fan above a helmet or hat tip).
+function plume(x, y, h = 11, w = 4) {
+  return E("path", {
+    class: "fig-cloak",
+    d: `M ${x - 1.5} ${y} Q ${x - w} ${y - h * 0.7} ${x - w * 0.5} ${y - h} Q ${x} ${y - h * 1.25} ${x + w * 0.5} ${y - h} Q ${x + w} ${y - h * 0.7} ${x + 1.5} ${y} Z`
+  });
+}
+
+function buildSwordsman(g) {
+  g.append(
+    // cape behind
+    E("path", { class: "fig-cloak", d: "M -8 -29 Q -21 -8 -15 10 L 15 10 Q 21 -8 8 -29 Q 0 -32 -8 -29 Z" }),
+    E("path", { class: "fig-cloak-dk", d: "M 0 -30 Q 18 -7 13 10 L 0 10 Z" }),
+    // armored body (breastplate + faulds)
+    E("path", { class: "fig-body", d: "M -13 -27 Q -15 -14 -11 -4 L -12 9 L 12 9 L 11 -4 Q 15 -14 13 -27 Q 0 -31 -13 -27 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -30 L 13 -27 Q 15 -14 11 -4 L 12 9 L 0 9 Z" }),
+    E("path", { class: "fig-light", d: "M -13 -27 Q -15 -14 -11 -4 L -12 9 L -9 9 L -8 -5 Q -11 -14 -9 -26 Z" }),
+    E("line", { class: "fig-line", x1: -12, y1: 1, x2: 12, y2: 1 }),
+    // team tabard down the chest
+    E("path", { class: "fig-cloak", d: "M -4 -22 L -5 9 L 5 9 L 4 -22 Q 0 -24 -4 -22 Z" }),
+    E("line", { class: "fig-line", x1: 0, y1: -20, x2: 0, y2: 9 }),
+    // pauldrons
+    E("ellipse", { class: "fig-body", cx: -13, cy: -26, rx: 5.5, ry: 4.2 }),
+    E("ellipse", { class: "fig-body", cx: 13, cy: -26, rx: 5.5, ry: 4.2 }),
+    E("ellipse", { class: "fig-shade", cx: 14, cy: -25, rx: 3, ry: 3 }),
+    // helmet
+    E("path", { class: "fig-body", d: "M -8 -33 Q -8 -46 0 -46 Q 8 -46 8 -33 L 6.5 -28 Q 0 -25 -6.5 -28 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -46 Q 8 -46 8 -33 L 6.5 -28 Q 3 -26 0 -27 Z" }),
+    E("rect", { class: "fig-dark", x: -7, y: -37, width: 14, height: 2.6, rx: 1.2 }),
+    E("line", { class: "fig-line", x1: 0, y1: -33, x2: 0, y2: -28 }),
+    plume(0, -46, 12, 4),
+    // greatsword planted point-down over the tabard
+    E("circle", { class: "fig-gold", cx: 0, cy: -30, r: 2.6 }),
+    E("rect", { class: "fig-dark", x: -1.6, y: -29, width: 3.2, height: 7 }),
+    E("path", { class: "fig-gold", d: "M -9 -23 L 9 -23 L 7 -20 L -7 -20 Z" }),
+    E("path", { class: "fig-steel", d: "M -2.6 -19 L 2.6 -19 L 1.5 6 L 0 10 L -1.5 6 Z" }),
+    E("line", { class: "fig-line", x1: 0, y1: -18, x2: 0, y2: 5 }),
+    E("ellipse", { class: "fig-body", cx: -3.4, cy: -25, rx: 2.4, ry: 2 }),
+    E("ellipse", { class: "fig-body", cx: 3.4, cy: -25, rx: 2.4, ry: 2 })
+  );
+}
+
+function buildArcher(g) {
+  g.append(
+    // short cloak off the left shoulder
+    E("path", { class: "fig-cloak", d: "M -1 -29 Q -16 -12 -12 10 L 5 10 Q 7 -10 5 -29 Z" }),
+    E("path", { class: "fig-cloak-dk", d: "M -1 -29 Q -7 -8 -5 10 L 5 10 Q 7 -10 5 -29 Z" }),
+    // slim tunic body + legs
+    E("path", { class: "fig-body", d: "M -9 -27 Q -11 -14 -9 -3 L -10 10 L -1 10 L -1 -2 L 1 -2 L 1 10 L 10 10 L 9 -3 Q 11 -14 9 -27 Q 0 -30 -9 -27 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -29 L 9 -27 Q 11 -14 9 -3 L 10 10 L 1 10 L 1 -2 L 0 -2 Z" }),
+    E("path", { class: "fig-light", d: "M -9 -27 Q -11 -14 -9 -3 L -10 10 L -7 10 L -6 -3 Q -8 -14 -6 -26 Z" }),
+    // team belt + sash
+    E("path", { class: "fig-cloak", d: "M -10 -7 L 10 -7 L 9 -3 L -9 -3 Z" }),
+    E("path", { class: "fig-cloak", d: "M 4 -7 L 8 -3 L 6 8 L 2 8 Z" }),
+    // quiver behind right shoulder with arrow nocks
+    E("rect", { class: "fig-gold", x: 8, y: -28, width: 5, height: 14, rx: 2, transform: "rotate(14 10 -21)" }),
+    E("line", { class: "fig-line", x1: 9, y1: -29, x2: 11, y2: -34 }),
+    E("line", { class: "fig-line", x1: 11, y1: -28, x2: 13, y2: -33 }),
+    // hood
+    E("path", { class: "fig-body", d: "M -9 -28 Q -10 -44 0 -46 Q 10 -44 9 -28 Q 4 -32 0 -32 Q -4 -32 -9 -28 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -46 Q 10 -44 9 -28 Q 5 -31 0 -31 Z" }),
+    E("path", { class: "fig-dark", d: "M -5 -36 Q 0 -31 5 -36 Q 4 -29 0 -29 Q -4 -29 -5 -36 Z" }),
+    E("ellipse", { class: "fig-light", cx: -2.2, cy: -34.5, rx: 0.9, ry: 1 }),
+    E("ellipse", { class: "fig-light", cx: 2.2, cy: -34.5, rx: 0.9, ry: 1 }),
+    // tall recurve bow drawn on the left + nocked arrow
+    E("path", { class: "fig-gold", d: "M -14 -36 Q -27 -14 -15 13 L -12 11 Q -22 -13 -11 -34 Z" }),
+    E("line", { class: "fig-line", x1: -13, y1: -35, x2: -13, y2: 12 }),
+    E("path", { class: "fig-steel", d: "M -13 -10 L 6 -10 L 6 -11.6 L -13 -11.6 Z" }),
+    E("path", { class: "fig-steel", d: "M 6 -10.8 L 1.5 -13.5 L 1.5 -8 Z" }),
+    E("ellipse", { class: "fig-body", cx: -3, cy: -10.5, rx: 2.4, ry: 2.2 })
+  );
+}
+
+function buildMystic(g) {
+  g.append(
+    // gold halo behind the head
+    E("circle", { class: "fig-halo", cx: 0, cy: -37, r: 10, fill: "none" }),
+    // long robe
+    E("path", { class: "fig-body", d: "M -7 -29 Q -17 -8 -16 10 Q 0 14 16 10 Q 17 -8 7 -29 Q 0 -32 -7 -29 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -30 Q 17 -8 16 10 Q 8 12.5 0 12.8 Z" }),
+    E("path", { class: "fig-light", d: "M -7 -29 Q -17 -8 -16 10 Q -12 11.5 -9 11.8 Q -12 -6 -3 -28 Z" }),
+    E("path", { class: "fig-line", d: "M -6 -18 Q -8 0 -7 11" }),
+    E("path", { class: "fig-line", d: "M 6 -18 Q 8 0 7 11" }),
+    // team stole down the front
+    E("path", { class: "fig-cloak", d: "M -6 -28 L -4 8 L -1 8 L -2 -28 Z" }),
+    E("path", { class: "fig-cloak", d: "M 6 -28 L 4 8 L 1 8 L 2 -28 Z" }),
+    E("path", { class: "fig-cloak", d: "M -6 -28 Q 0 -24 6 -28 L 5 -24 Q 0 -20 -5 -24 Z" }),
+    // cowled head
+    E("path", { class: "fig-body", d: "M -7 -30 Q -8 -44 0 -45 Q 8 -44 7 -30 Q 0 -33 -7 -30 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -45 Q 8 -44 7 -30 Q 4 -32 0 -32 Z" }),
+    E("path", { class: "fig-dark", d: "M -4.5 -37 Q 0 -32 4.5 -37 Q 3.5 -30 0 -30 Q -3.5 -30 -4.5 -37 Z" }),
+    // staff with a glowing star finial on the right
+    E("circle", { class: "fig-glow", cx: 13, cy: -36, r: 6 }),
+    E("rect", { class: "fig-gold", x: 11.4, y: -34, width: 3.2, height: 46, rx: 1.4 }),
+    E("path", { class: "fig-gold", d: "M 13 -44 L 15 -38 L 21 -37.5 L 16.5 -33.5 L 18 -27.5 L 13 -31 L 8 -27.5 L 9.5 -33.5 L 5 -37.5 L 11 -38 Z" }),
+    E("ellipse", { class: "fig-body", cx: 9.5, cy: -16, rx: 2.4, ry: 2.4 })
+  );
+}
+
+function buildMagician(g) {
+  g.append(
+    // robe
+    E("path", { class: "fig-body", d: "M -7 -28 Q -17 -8 -16 10 Q 0 14 16 10 Q 17 -8 7 -28 Q 0 -31 -7 -28 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -29 Q 17 -8 16 10 Q 8 12.5 0 12.8 Z" }),
+    E("path", { class: "fig-light", d: "M -7 -28 Q -17 -8 -16 10 Q -12 11.5 -9 11.8 Q -12 -6 -3 -27 Z" }),
+    // star-studded team hem trim
+    E("path", { class: "fig-cloak", d: "M -16 7 Q 0 12 16 7 L 16 11 Q 0 15 -16 11 Z" }),
+    E("circle", { class: "fig-gold", cx: -9, cy: 7.5, r: 1.4 }),
+    E("circle", { class: "fig-gold", cx: 0, cy: 9, r: 1.4 }),
+    E("circle", { class: "fig-gold", cx: 9, cy: 7.5, r: 1.4 }),
+    // team sash
+    E("path", { class: "fig-cloak", d: "M -8 -22 L 9 -10 L 7 -6 L -9 -18 Z" }),
+    // head + beard
+    E("path", { class: "fig-body", d: "M -6 -30 Q -6 -38 0 -38 Q 6 -38 6 -30 Q 3 -27 0 -27 Q -3 -27 -6 -30 Z" }),
+    E("path", { class: "fig-light", d: "M -6 -30 Q -6 -38 0 -38 L -2 -37 Q -4 -33 -3.5 -28 Z" }),
+    E("ellipse", { class: "fig-dark", cx: -2, cy: -32.5, rx: 0.8, ry: 0.9 }),
+    E("ellipse", { class: "fig-dark", cx: 2, cy: -32.5, rx: 0.8, ry: 0.9 }),
+    E("path", { class: "fig-body", d: "M -4 -28 Q 0 -18 4 -28 Q 2 -24 0 -24 Q -2 -24 -4 -28 Z" }),
+    // tall pointed wizard hat with team band + gold star
+    E("ellipse", { class: "fig-body", cx: 0, cy: -38, rx: 12, ry: 3.4 }),
+    E("path", { class: "fig-body", d: "M -10 -38 Q -6 -52 3 -60 Q 0 -50 2 -40 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -42 Q 1 -52 3 -60 Q 2 -49 2 -40 Z" }),
+    E("path", { class: "fig-cloak", d: "M -10 -38 Q 0 -35 10 -38 L 9 -42 Q 0 -39 -9 -42 Z" }),
+    E("path", { class: "fig-gold", d: "M -3 -46 L -1.6 -43.5 L 1 -43.5 L -1 -42 L -0.2 -39.5 L -2.4 -41 L -4.6 -39.5 L -3.8 -42 L -5.8 -43.5 L -3.2 -43.5 Z" }),
+    // raised wand with a spark
+    E("rect", { class: "fig-gold", x: 7, y: -36, width: 2.6, height: 20, rx: 1.2, transform: "rotate(28 8 -26)" }),
+    E("circle", { class: "fig-glow", cx: 15, cy: -39, r: 5.5 }),
+    E("path", { class: "fig-gold", d: "M 15 -44 L 16.4 -40.5 L 20 -39 L 16.4 -37.5 L 15 -34 L 13.6 -37.5 L 10 -39 L 13.6 -40.5 Z" }),
+    E("ellipse", { class: "fig-body", cx: 7, cy: -14, rx: 2.4, ry: 2.4 })
+  );
+}
+
+function buildPaladin(g) {
+  g.append(
+    // broad cape
+    E("path", { class: "fig-cloak", d: "M -9 -29 Q -23 -7 -17 11 L 17 11 Q 23 -7 9 -29 Q 0 -32 -9 -29 Z" }),
+    E("path", { class: "fig-cloak-dk", d: "M 0 -30 Q 20 -6 14 11 L 0 11 Z" }),
+    // heavy armored body
+    E("path", { class: "fig-body", d: "M -12 -27 Q -14 -13 -10 -3 L -11 10 L 11 10 L 10 -3 Q 14 -13 12 -27 Q 0 -31 -12 -27 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -30 L 12 -27 Q 14 -13 10 -3 L 11 10 L 0 10 Z" }),
+    E("path", { class: "fig-light", d: "M -12 -27 Q -14 -13 -10 -3 L -11 10 L -8 10 L -7 -3 Q -10 -13 -8 -26 Z" }),
+    // team tabard with a holy cross
+    E("path", { class: "fig-cloak", d: "M -4 -22 L -5 10 L 5 10 L 4 -22 Q 0 -24 -4 -22 Z" }),
+    E("path", { class: "fig-gold", d: "M -1.4 -19 L 1.4 -19 L 1.4 -12 L 5 -12 L 5 -9 L 1.4 -9 L 1.4 3 L -1.4 3 L -1.4 -9 L -5 -9 L -5 -12 L -1.4 -12 Z" }),
+    // pauldrons
+    E("ellipse", { class: "fig-body", cx: -12, cy: -25, rx: 6, ry: 4.6 }),
+    E("ellipse", { class: "fig-body", cx: 12, cy: -25, rx: 6, ry: 4.6 }),
+    E("ellipse", { class: "fig-shade", cx: 13, cy: -24, rx: 3.2, ry: 3 }),
+    // winged / haloed helm
+    E("circle", { class: "fig-halo", cx: 0, cy: -40, r: 8.5, fill: "none" }),
+    E("path", { class: "fig-body", d: "M -8 -33 Q -8 -47 0 -47 Q 8 -47 8 -33 L 6.5 -28 Q 0 -25 -6.5 -28 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -47 Q 8 -47 8 -33 L 6.5 -28 Q 3 -26 0 -27 Z" }),
+    E("rect", { class: "fig-dark", x: -6.5, y: -38, width: 13, height: 2.4, rx: 1.1 }),
+    E("path", { class: "fig-body", d: "M -8 -41 Q -18 -45 -20 -36 Q -13 -37 -8 -33 Z" }),
+    E("path", { class: "fig-light", d: "M -8 -41 Q -15 -43.5 -18 -38 Q -13 -38 -9 -35 Z" }),
+    E("path", { class: "fig-body", d: "M 8 -41 Q 18 -45 20 -36 Q 13 -37 8 -33 Z" }),
+    // mace raised on the right
+    E("rect", { class: "fig-gold", x: 14, y: -30, width: 2.8, height: 22, rx: 1.2 }),
+    E("circle", { class: "fig-steel", cx: 15.4, cy: -34, r: 5 }),
+    E("circle", { class: "fig-light", cx: 13.5, cy: -36, r: 1.6 }),
+    // big tower shield on the left arm
+    E("path", { class: "fig-steel", d: "M -22 -25 L -7 -29 L -7 8 Q -14.5 16 -22 8 Z" }),
+    E("path", { class: "fig-light", d: "M -22 -25 L -16 -26.5 L -16 8 Q -19 9 -22 7 Z" }),
+    E("path", { class: "fig-gold", d: "M -16 -22 L -13 -22 L -13 -10 L -8 -10 L -8 -7 L -13 -7 L -13 4 L -16 4 L -16 -7 L -21 -7 L -21 -10 L -16 -10 Z" })
+  );
+}
+
+// Register one builder per unit type. The builder receives an empty
+// <g class="figure"> and appends layered figurine paths (back to front).
+const FIGURE_BUILDERS = new Map([
+  ["swordsman", buildSwordsman],
+  ["archer", buildArcher],
+  ["mystic", buildMystic],
+  ["magician", buildMagician],
+  ["paladin", buildPaladin]
 ]);
 
-function buildSwordsmanIcon(icon) {
-  icon.append(
-    svgElement("path", { d: "M -4 -16 L 4 -16 L 4 7 L 12 7 L 12 12 L 4 12 L 4 20 L -4 20 L -4 12 L -12 12 L -12 7 L -4 7 Z" }),
-    svgElement("path", { d: "M -6 -17 L 0 -27 L 6 -17 Z" })
-  );
-}
-
-function buildArcherIcon(icon) {
-  icon.append(
-    svgElement("path", { d: "M -17 15 Q 1 -1 -17 -18 L -12 -21 Q 11 -1 -12 19 Z" }),
-    svgElement("line", { class: "emblem-line", x1: -15, y1: -19, x2: -15, y2: 17, "stroke-width": 2 }),
-    svgElement("line", { class: "emblem-line", x1: -13, y1: -2, x2: 18, y2: -2, "stroke-width": 3 }),
-    svgElement("path", { d: "M 18 -2 L 9 -7 L 9 3 Z" })
-  );
-}
-
-function buildMysticIcon(icon) {
-  icon.append(
-    svgElement("circle", { cx: 0, cy: -8, r: 11 }),
-    svgElement("path", { d: "M 0 -27 L 5 -13 L 20 -12 L 8 -3 L 12 12 L 0 4 L -12 12 L -8 -3 L -20 -12 L -5 -13 Z" }),
-    svgElement("line", { class: "emblem-line", x1: 0, y1: 4, x2: 0, y2: 22, "stroke-width": 4, "stroke-linecap": "round" })
-  );
-}
-
-function buildMagicianIcon(icon) {
-  icon.append(
-    svgElement("path", { d: "M 0 -26 L 4 -16 L 14 -12 L 4 -8 L 0 2 L -4 -8 L -14 -12 L -4 -16 Z" }),
-    svgElement("line", { class: "emblem-line", x1: 0, y1: -1, x2: 0, y2: 22, "stroke-width": 5, "stroke-linecap": "round" })
-  );
-}
-
-function buildPaladinIcon(icon) {
-  icon.append(
-    svgElement("path", { d: "M 0 -28 L 14 -20 L 11 -4 Q 9 12 0 21 Q -9 12 -11 -4 L -14 -20 Z" }),
-    svgElement("path", { d: "M -3 -20 L 3 -20 L 3 -8 L 10 -8 L 10 -2 L 3 -2 L 3 12 L -3 12 L -3 -2 L -10 -2 L -10 -8 L -3 -8 Z" })
-  );
-}
-
-export function createUnitIcon(type) {
-  const icon = svgElement("g", { class: "icon" });
-  ICON_BUILDERS.get(type)?.(icon);
-  return icon;
+export function createUnitFigurine(type) {
+  const figure = E("g", { class: "figure" });
+  FIGURE_BUILDERS.get(type)?.(figure);
+  return figure;
 }
 
 function createStatusBadges(unit) {
   const visuals = getUnitStatusVfx(unit.statuses);
   if (!visuals.length) return null;
   const spacing = 20;
-  const group = svgElement("g", { class: "status-stack", transform: `translate(${-((visuals.length - 1) * (spacing / 2))} -48)` });
+  const group = svgElement("g", { class: "status-stack", transform: `translate(${-((visuals.length - 1) * (spacing / 2))} -58)` });
   visuals.forEach((visual, index) => {
     const badge = svgElement("g", {
       class: `status-badge status-${visual.type} status-ring-${visual.ring}`,
@@ -98,47 +259,60 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
 
   const body = svgElement("g", { class: "body-group" });
   body.append(
-    svgElement("ellipse", { class: "base-side", cx: 0, cy: 9, rx: 25, ry: 12 }),
-    svgElement("ellipse", { class: "base-top", cx: 0, cy: 2, rx: 25, ry: 12 }),
-    svgElement("ellipse", { class: "rim", cx: 0, cy: 2, rx: 20, ry: 9 }),
-    svgElement("circle", { class: "shield-ring", cx: 0, cy: -2, r: 31 })
+    svgElement("ellipse", { class: "base-side", cx: 0, cy: 9, rx: 24, ry: 11 }),
+    svgElement("ellipse", { class: "base-top", cx: 0, cy: 4, rx: 24, ry: 11 }),
+    svgElement("ellipse", { class: "base-inlay", cx: 0, cy: 4, rx: 18, ry: 8 }),
+    svgElement("ellipse", { class: "rim", cx: 0, cy: 4, rx: 24, ry: 11 }),
+    svgElement("circle", { class: "shield-ring", cx: 0, cy: -10, r: 33 })
   );
 
-  const emblem = svgElement("g", { class: "emblem", transform: "translate(0 -10) scale(.72)" });
-  const face = createUnitIcon(unit.type);
-  const shadow = face.cloneNode(true); shadow.setAttribute("class", "icon-shadow"); shadow.setAttribute("transform", "translate(1.4 1.9)");
-  const highlight = face.cloneNode(true); highlight.setAttribute("class", "icon-highlight"); highlight.setAttribute("transform", "translate(-1.2 -1.5)");
-  emblem.append(shadow, highlight, face);
+  // The carved miniature stands on the plinth (figure space puts its feet at
+  // (0,0) and rises into -y). FIGURE_SCALE keeps the piece compact enough that a
+  // tall figurine doesn't visually swamp its tile.
+  const figure = createUnitFigurine(unit.type);
+  figure.setAttribute("transform", `scale(${FIGURE_SCALE})`);
+  body.append(figure);
 
-  const hpBack = svgElement("rect", { class: "hp-back", x: -25, y: 27, width: 50, height: 5, rx: 2.5 });
-  const hpFront = svgElement("rect", { class: "hp-front", x: -25, y: 27, width: 50 * unit.hp / stats.maxHp, height: 5, rx: 2.5 });
+  const hpBack = svgElement("rect", { class: "hp-back", x: -25, y: 28, width: 50, height: 5, rx: 2.5 });
+  const hpFront = svgElement("rect", { class: "hp-front", x: -25, y: 28, width: 50 * unit.hp / stats.maxHp, height: 5, rx: 2.5 });
 
-  const spentMark = svgElement("g", { class: "spent-mark", transform: "translate(18 -18)" });
+  const spentMark = svgElement("g", { class: "spent-mark", transform: "translate(19 -30)" });
   spentMark.append(
     svgElement("circle", { cx: 0, cy: 0, r: 8, fill: "rgba(0,0,0,.72)", stroke: "rgba(255,255,255,.5)" }),
     svgElement("path", { d: "M -4 0 L -1 3 L 5 -4", fill: "none", stroke: "#fff", "stroke-width": 2 })
   );
 
-  const defendMark = svgElement("g", { class: "defend-mark", transform: "translate(-18 -18)" });
+  const defendMark = svgElement("g", { class: "defend-mark", transform: "translate(-19 -30)" });
   defendMark.append(
     svgElement("circle", { cx: 0, cy: 0, r: 9, fill: "rgba(6,14,24,.88)", stroke: "var(--gold)", "stroke-width": 1.4 }),
     svgElement("path", { class: "defend-shield", d: "M 0 -6 L 5 -3.5 L 5 1 Q 5 5 0 7 Q -5 5 -5 1 L -5 -3.5 Z" })
   );
 
-  body.append(emblem, hpBack, hpFront, spentMark, defendMark);
+  body.append(hpBack, hpFront, spentMark, defendMark);
   const statusBadges = createStatusBadges(unit);
   if (statusBadges) body.append(statusBadges);
 
   if (isTarget) {
     const reticle = svgElement("g", { class: "target-mark" });
     reticle.append(
-      svgElement("circle", { class: "target-ring", cx: 0, cy: -2, r: 30, fill: "none" }),
-      svgElement("path", { class: "target-chevron", d: "M -7 -40 L 0 -32 L 7 -40" })
+      svgElement("circle", { class: "target-ring", cx: 0, cy: -10, r: 28, fill: "none" }),
+      svgElement("path", { class: "target-chevron", d: "M -7 -44 L 0 -36 L 7 -44" })
     );
     body.append(reticle);
   }
 
-  token.append(svgElement("ellipse", { class: "shadow", cx: 0, cy: 18, rx: 25, ry: 8 }), body);
+  // Hit area = the unit's own tile diamond (in token space). The tall figurine
+  // visuals are pointer-events:none (see style.css), so the body that overhangs
+  // the tiles BEHIND it lets those clicks pass through to the board — only this
+  // diamond, sitting over the unit's own square, selects the piece.
+  const hw = metrics.tileWidth / 2;
+  const th = metrics.tileHeight;
+  const hit = svgElement("polygon", {
+    class: "unit-hit",
+    points: `0,${-0.45 * th} ${hw},${0.05 * th} 0,${0.55 * th} ${-hw},${0.05 * th}`
+  });
+
+  token.append(svgElement("ellipse", { class: "shadow", cx: 0, cy: 18, rx: 24, ry: 8 }), body, hit);
   token.addEventListener("click", (event) => { event.stopPropagation(); onUnitClick(unit.position); });
   return token;
 }
