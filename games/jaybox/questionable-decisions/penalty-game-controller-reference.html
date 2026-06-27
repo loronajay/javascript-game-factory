@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Questionable Decisions Remote V5</title>
+<style>
+  :root {
+    --bg0:#05070d;
+    --bg1:#0b1324;
+    --panel0:#111827;
+    --panel1:#1b2538;
+    --panel2:#2a3650;
+    --stroke:rgba(255,255,255,.13);
+    --stroke2:rgba(255,255,255,.23);
+    --text:#f4f8ff;
+    --muted:#9da9bf;
+    --blue:#59adff;
+    --green:#56dc84;
+    --red:#ff626e;
+    --yellow:#ffd653;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-right:env(safe-area-inset-right,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+    --safe-left:env(safe-area-inset-left,0px);
+  }
+
+  * {
+    box-sizing:border-box;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+    touch-action:none;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+
+  html, body {
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    background:
+      radial-gradient(circle at 18% 18%, rgba(89,173,255,.14), transparent 30%),
+      radial-gradient(circle at 82% 82%, rgba(86,220,132,.10), transparent 30%),
+      linear-gradient(180deg,var(--bg1),var(--bg0));
+    color:var(--text);
+  }
+
+  body {
+    position:fixed;
+    inset:0;
+    padding:
+      calc(6px + var(--safe-top))
+      calc(6px + var(--safe-right))
+      calc(6px + var(--safe-bottom))
+      calc(6px + var(--safe-left));
+  }
+
+  button {
+    border:0;
+    color:inherit;
+    background:none;
+    outline:none;
+    cursor:pointer;
+    touch-action:none;
+  }
+
+  .remote {
+    width:100%;
+    height:100%;
+    display:grid;
+    grid-template-rows:38px minmax(0,1fr);
+    gap:7px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .topbar {
+    min-width:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:8px;
+    padding:0 7px 0 13px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.085);
+    background:rgba(8,13,23,.72);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 20px rgba(0,0,0,.14);
+  }
+
+  .brand {
+    min-width:0;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+
+  .brand strong {
+    font-size:12px;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+
+  .brand span {
+    min-width:0;
+    color:var(--muted);
+    font-size:12px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .fullscreen {
+    height:28px;
+    min-width:104px;
+    padding:0 12px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.16);
+    background:linear-gradient(180deg,#34455f,#1d293d);
+    box-shadow:0 7px 14px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.09);
+    color:var(--text);
+    font-size:10px;
+    font-weight:1000;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .body {
+    min-width:0;
+    min-height:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) clamp(92px, 13vw, 132px) minmax(0,1fr);
+    gap:7px;
+    overflow:hidden;
+  }
+
+  .grip {
+    position:relative;
+    min-width:0;
+    min-height:0;
+    overflow:hidden;
+    border:1px solid var(--stroke);
+    background:
+      radial-gradient(circle at 50% 48%, rgba(255,255,255,.045), transparent 43%),
+      linear-gradient(180deg,rgba(43,55,79,.98),rgba(13,20,33,.99));
+    box-shadow:
+      0 16px 34px rgba(0,0,0,.30),
+      inset 0 1px 0 rgba(255,255,255,.08),
+      inset 0 -16px 30px rgba(0,0,0,.24);
+  }
+
+  .leftGrip {
+    border-radius:42px 25px 25px 42px;
+  }
+
+  .rightGrip {
+    border-radius:25px 42px 42px 25px;
+  }
+
+  .grip::after {
+    content:"";
+    position:absolute;
+    inset:14px;
+    border-radius:28px;
+    border:1px solid rgba(255,255,255,.045);
+    pointer-events:none;
+  }
+
+  .shoulder {
+    position:absolute;
+    z-index:4;
+    top:11px;
+    height:clamp(42px, 12vh, 58px);
+    width:min(48%, 210px);
+    border-radius:22px;
+    border:1px solid var(--stroke2);
+    background:linear-gradient(180deg,#3a4964,#1f2a3e);
+    box-shadow:0 9px 18px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.11);
+    color:var(--text);
+    font-size:clamp(18px, 5vh, 25px);
+    font-weight:1000;
+    display:grid;
+    place-items:center;
+  }
+
+  .leftGrip .shoulder { left:18px; }
+  .rightGrip .shoulder { right:18px; }
+
+  .shoulderHit {
+    position:absolute;
+    z-index:8;
+    top:0;
+    width:58%;
+    height:32%;
+    border-radius:0 0 24px 24px;
+  }
+
+  .leftGrip .shoulderHit { left:0; }
+  .rightGrip .shoulderHit { right:0; }
+
+  .clusterWrap {
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding-top:clamp(30px, 8vh, 48px);
+    z-index:2;
+  }
+
+  .dpad,
+  .faces {
+    position:relative;
+    width:min(63vh, 330px, 86%);
+    aspect-ratio:1 / 1;
+    max-height:88%;
+  }
+
+  .visual {
+    position:absolute;
+    display:grid;
+    place-items:center;
+    will-change:transform,filter;
+    transition:transform 45ms linear, filter 45ms linear, box-shadow 45ms linear;
+    pointer-events:none;
+  }
+
+  .dVisual {
+    border:1px solid var(--stroke2);
+    background:linear-gradient(180deg,#384762,#202a3d);
+    color:var(--text);
+    font-size:clamp(26px, 7vh, 48px);
+    font-weight:1000;
+    box-shadow:0 10px 21px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.11);
+  }
+
+  .dVisual.up {
+    left:34%;
+    top:1%;
+    width:32%;
+    height:35%;
+    border-radius:24px 24px 14px 14px;
+  }
+
+  .dVisual.down {
+    left:34%;
+    bottom:1%;
+    width:32%;
+    height:35%;
+    border-radius:14px 14px 24px 24px;
+  }
+
+  .dVisual.left {
+    left:1%;
+    top:34%;
+    width:35%;
+    height:32%;
+    border-radius:24px 14px 14px 24px;
+  }
+
+  .dVisual.right {
+    right:1%;
+    top:34%;
+    width:35%;
+    height:32%;
+    border-radius:14px 24px 24px 14px;
+  }
+
+  .faceVisual {
+    width:31%;
+    height:31%;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,.21);
+    color:white;
+    font-size:clamp(29px, 7.2vh, 52px);
+    font-weight:1000;
+    box-shadow:0 11px 22px rgba(0,0,0,.34), inset 0 2px 0 rgba(255,255,255,.20), inset 0 -8px 18px rgba(0,0,0,.18);
+  }
+
+  .faceVisual.y {
+    top:1%;
+    left:34.5%;
+    color:#2d2509;
+    background:linear-gradient(180deg,#ffe578,var(--yellow));
+  }
+
+  .faceVisual.b {
+    bottom:1%;
+    left:34.5%;
+    background:linear-gradient(180deg,#ff858d,var(--red));
+  }
+
+  .faceVisual.x {
+    top:34.5%;
+    left:1%;
+    background:linear-gradient(180deg,#78c6ff,var(--blue));
+  }
+
+  .faceVisual.a {
+    top:34.5%;
+    right:1%;
+    background:linear-gradient(180deg,#71ed9b,var(--green));
+  }
+
+  .hit {
+    position:absolute;
+    z-index:10;
+    background:rgba(255,255,255,0);
+    border-radius:24px;
+  }
+
+  .hit.up {
+    left:25%;
+    top:0;
+    width:50%;
+    height:42%;
+  }
+
+  .hit.down {
+    left:25%;
+    bottom:0;
+    width:50%;
+    height:42%;
+  }
+
+  .hit.left {
+    left:0;
+    top:25%;
+    width:42%;
+    height:50%;
+  }
+
+  .hit.right {
+    right:0;
+    top:25%;
+    width:42%;
+    height:50%;
+  }
+
+  .hit.y {
+    top:0;
+    left:25%;
+    width:50%;
+    height:42%;
+    border-radius:50%;
+  }
+
+  .hit.b {
+    bottom:0;
+    left:25%;
+    width:50%;
+    height:42%;
+    border-radius:50%;
+  }
+
+  .hit.x {
+    top:25%;
+    left:0;
+    width:42%;
+    height:50%;
+    border-radius:50%;
+  }
+
+  .hit.a {
+    top:25%;
+    right:0;
+    width:42%;
+    height:50%;
+    border-radius:50%;
+  }
+
+  .middle {
+    min-width:0;
+    min-height:0;
+    display:grid;
+    grid-template-rows:1fr auto 1fr;
+    align-items:center;
+    justify-items:center;
+    overflow:visible;
+  }
+
+  .systemStack {
+    width:100%;
+    display:grid;
+    gap:11px;
+    justify-items:center;
+  }
+
+  .systemBtn {
+    width:100%;
+    height:34px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg,#2f3c55,#192337);
+    color:var(--text);
+    font-size:10px;
+    font-weight:1000;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    box-shadow:0 8px 15px rgba(0,0,0,.23), inset 0 1px 0 rgba(255,255,255,.08);
+    display:grid;
+    place-items:center;
+    transition:transform 45ms linear, filter 45ms linear, box-shadow 45ms linear;
+  }
+
+  .logo {
+    width:50px;
+    height:50px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    border:1px solid rgba(255,255,255,.10);
+    background:radial-gradient(circle at 36% 26%, rgba(255,255,255,.20), transparent 22%), linear-gradient(180deg,#28364f,#151e30);
+    box-shadow:inset 0 4px 13px rgba(0,0,0,.26);
+    color:rgba(255,255,255,.72);
+    font-size:14px;
+    font-weight:1000;
+    letter-spacing:.08em;
+  }
+
+  .pressed {
+    transform:translateY(3px) scale(.955);
+    filter:brightness(1.18) saturate(1.08);
+    box-shadow:0 2px 7px rgba(0,0,0,.38), 0 0 28px rgba(255,255,255,.12), inset 0 2px 9px rgba(255,255,255,.13), inset 0 -3px 9px rgba(0,0,0,.20) !important;
+  }
+
+  .faceVisual.y.pressed { box-shadow:0 0 34px rgba(255,214,83,.44), inset 0 2px 9px rgba(255,255,255,.16) !important; }
+  .faceVisual.b.pressed { box-shadow:0 0 34px rgba(255,98,110,.44), inset 0 2px 9px rgba(255,255,255,.16) !important; }
+  .faceVisual.x.pressed { box-shadow:0 0 34px rgba(89,173,255,.44), inset 0 2px 9px rgba(255,255,255,.16) !important; }
+  .faceVisual.a.pressed { box-shadow:0 0 34px rgba(86,220,132,.44), inset 0 2px 9px rgba(255,255,255,.16) !important; }
+
+  .bubble {
+    position:absolute;
+    left:50%;
+    bottom:9px;
+    z-index:30;
+    transform:translateX(-50%) translateY(14px);
+    opacity:0;
+    height:30px;
+    min-width:104px;
+    display:grid;
+    place-items:center;
+    padding:0 13px;
+    border-radius:999px;
+    background:rgba(8,12,20,.82);
+    border:1px solid rgba(255,255,255,.10);
+    color:rgba(255,255,255,.84);
+    font-size:11px;
+    font-weight:1000;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    pointer-events:none;
+    transition:opacity .10s ease, transform .10s ease;
+  }
+
+  .bubble.show {
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+
+  .portrait {
+    position:fixed;
+    inset:0;
+    z-index:100;
+    display:none;
+    place-items:center;
+    padding:24px;
+    text-align:center;
+    background:linear-gradient(180deg,#0b1020,#06080f);
+  }
+
+  .portraitCard {
+    max-width:360px;
+    padding:22px;
+    border-radius:24px;
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 18px 40px rgba(0,0,0,.36);
+  }
+
+  .portraitCard h1 {
+    margin:0 0 8px;
+    font-size:24px;
+  }
+
+  .portraitCard p {
+    margin:0;
+    color:var(--muted);
+    line-height:1.4;
+  }
+
+  @media (orientation:portrait) {
+    .portrait { display:grid; }
+  }
+
+  @media (max-height:390px) {
+    body {
+      padding:
+        calc(4px + var(--safe-top))
+        calc(4px + var(--safe-right))
+        calc(4px + var(--safe-bottom))
+        calc(4px + var(--safe-left));
+    }
+
+    .remote {
+      grid-template-rows:31px minmax(0,1fr);
+      gap:5px;
+    }
+
+    .topbar {
+      padding-left:10px;
+    }
+
+    .brand strong { font-size:10px; }
+    .brand span { font-size:10px; }
+
+    .fullscreen {
+      height:24px;
+      min-width:92px;
+      font-size:9px;
+      padding:0 9px;
+    }
+
+    .body {
+      grid-template-columns:minmax(0,1fr) 112px minmax(0,1fr);
+      gap:5px;
+    }
+
+    .leftGrip { border-radius:34px 22px 22px 34px; }
+    .rightGrip { border-radius:22px 34px 34px 22px; }
+
+    .shoulder {
+      top:8px;
+      height:37px;
+      border-radius:17px;
+    }
+
+    .leftGrip .shoulder { left:14px; }
+    .rightGrip .shoulder { right:14px; }
+
+    .clusterWrap {
+      padding-top:26px;
+    }
+
+    .systemStack {
+      gap:9px;
+    }
+
+    .systemBtn {
+      height:30px;
+      font-size:9px;
+    }
+
+    .logo {
+      width:42px;
+      height:42px;
+      font-size:12px;
+    }
+  }
+</style>
+</head>
+<body>
+  <main class="remote" id="remote">
+    <header class="topbar">
+      <div class="brand">
+        <strong>Questionable Decisions</strong>
+        <span>remote feel prototype v5</span>
+      </div>
+      <button class="fullscreen" id="fullscreenBtn" type="button">Fullscreen</button>
+    </header>
+
+    <section class="body">
+      <div class="grip leftGrip">
+        <div class="shoulder visual" data-visual="L">L</div>
+        <div class="shoulderHit" data-hit="L"></div>
+
+        <div class="clusterWrap">
+          <div class="dpad">
+            <div class="dVisual visual up" data-visual="Up">▲</div>
+            <div class="dVisual visual left" data-visual="Left">◀</div>
+            <div class="dVisual visual right" data-visual="Right">▶</div>
+            <div class="dVisual visual down" data-visual="Down">▼</div>
+            <div class="hit up" data-hit="Up"></div>
+            <div class="hit left" data-hit="Left"></div>
+            <div class="hit right" data-hit="Right"></div>
+            <div class="hit down" data-hit="Down"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="middle">
+        <div></div>
+        <div class="systemStack">
+          <button class="systemBtn" data-hit="Select" data-visual="Select" type="button">Select</button>
+          <div class="logo">QD</div>
+          <button class="systemBtn" data-hit="Start" data-visual="Start" type="button">Start</button>
+        </div>
+        <div></div>
+      </div>
+
+      <div class="grip rightGrip">
+        <div class="shoulder visual" data-visual="R">R</div>
+        <div class="shoulderHit" data-hit="R"></div>
+
+        <div class="clusterWrap">
+          <div class="faces">
+            <div class="faceVisual visual y" data-visual="Y">Y</div>
+            <div class="faceVisual visual x" data-visual="X">X</div>
+            <div class="faceVisual visual a" data-visual="A">A</div>
+            <div class="faceVisual visual b" data-visual="B">B</div>
+            <div class="hit y" data-hit="Y"></div>
+            <div class="hit x" data-hit="X"></div>
+            <div class="hit a" data-hit="A"></div>
+            <div class="hit b" data-hit="B"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="bubble" id="bubble">Button</div>
+  </main>
+
+  <div class="portrait">
+    <div class="portraitCard">
+      <h1>Rotate sideways</h1>
+      <p>This controller is built for landscape phone testing.</p>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const visualByName = new Map();
+  const activeByPointer = new Map();
+  const activeCounts = new Map();
+  const heldKeys = new Map();
+  const bubble = document.getElementById('bubble');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  let bubbleTimer = null;
+
+  document.querySelectorAll('[data-visual]').forEach(el => {
+    visualByName.set(el.dataset.visual, el);
+  });
+
+  function buzz(name) {
+    if (!navigator.vibrate) return;
+    const face = name === 'A' || name === 'B' || name === 'X' || name === 'Y';
+    navigator.vibrate(face ? 16 : 9);
+  }
+
+  function bubbleText(name) {
+    bubble.textContent = name;
+    bubble.classList.add('show');
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(() => bubble.classList.remove('show'), 210);
+  }
+
+  function activate(name) {
+    const current = activeCounts.get(name) || 0;
+    activeCounts.set(name, current + 1);
+    if (current === 0) {
+      const visual = visualByName.get(name);
+      if (visual) visual.classList.add('pressed');
+      buzz(name);
+      bubbleText(name);
+    }
+  }
+
+  function deactivate(name) {
+    const current = activeCounts.get(name) || 0;
+    if (current <= 1) {
+      activeCounts.delete(name);
+      const visual = visualByName.get(name);
+      if (visual) visual.classList.remove('pressed');
+    } else {
+      activeCounts.set(name, current - 1);
+    }
+  }
+
+  function zoneFromRect(el, x, y, type) {
+    const rect = el.getBoundingClientRect();
+    const nx = ((x - rect.left) / rect.width) * 2 - 1;
+    const ny = ((y - rect.top) / rect.height) * 2 - 1;
+
+    if (nx < -1 || nx > 1 || ny < -1 || ny > 1) return null;
+
+    // Do not create a dead center. Dragging across the middle should still
+    // resolve to the nearest useful control.
+    if (type === 'dpad') {
+      if (Math.abs(nx) > Math.abs(ny)) return nx < 0 ? 'Left' : 'Right';
+      return ny < 0 ? 'Up' : 'Down';
+    }
+
+    // Face cluster uses angle sectors. This lets players slide cleanly
+    // X <-> A and Y <-> B through the center without getting dropped.
+    const angle = Math.atan2(ny, nx);
+    const deg = angle * 180 / Math.PI;
+    if (deg >= -45 && deg < 45) return 'A';
+    if (deg >= 45 && deg < 135) return 'B';
+    if (deg >= -135 && deg < -45) return 'Y';
+    return 'X';
+  }
+
+  function hitNameAt(x, y) {
+    const stack = document.elementsFromPoint(x, y);
+
+    for (const el of stack) {
+      if (el === fullscreenBtn) return '__fullscreen__';
+      if (el.classList && el.classList.contains('dpad')) return zoneFromRect(el, x, y, 'dpad');
+      if (el.classList && el.classList.contains('faces')) return zoneFromRect(el, x, y, 'faces');
+      if (el.dataset && (el.dataset.hit === 'L' || el.dataset.hit === 'R' || el.dataset.hit === 'Start' || el.dataset.hit === 'Select')) {
+        return el.dataset.hit;
+      }
+    }
+
+    return null;
+  }
+
+  function movePointer(id, x, y) {
+    const next = hitNameAt(x, y);
+    if (next === '__fullscreen__') return;
+
+    const prev = activeByPointer.get(id);
+    if (prev === next) return;
+
+    if (prev) deactivate(prev);
+
+    if (next && visualByName.has(next)) {
+      activeByPointer.set(id, next);
+      activate(next);
+    } else {
+      activeByPointer.delete(id);
+    }
+  }
+
+  function releasePointer(id) {
+    const prev = activeByPointer.get(id);
+    if (prev) deactivate(prev);
+    activeByPointer.delete(id);
+  }
+
+  function clearAll() {
+    for (const name of activeByPointer.values()) deactivate(name);
+    activeByPointer.clear();
+    activeCounts.clear();
+    visualByName.forEach(el => el.classList.remove('pressed'));
+  }
+
+  window.addEventListener('pointerdown', e => {
+    if (e.target === fullscreenBtn) return;
+    e.preventDefault();
+    movePointer(e.pointerId, e.clientX, e.clientY);
+  }, { passive:false });
+
+  window.addEventListener('pointermove', e => {
+    if (!activeByPointer.has(e.pointerId)) return;
+    e.preventDefault();
+    movePointer(e.pointerId, e.clientX, e.clientY);
+  }, { passive:false });
+
+  window.addEventListener('pointerup', e => {
+    e.preventDefault();
+    releasePointer(e.pointerId);
+  }, { passive:false });
+
+  window.addEventListener('pointercancel', e => {
+    e.preventDefault();
+    releasePointer(e.pointerId);
+  }, { passive:false });
+
+  fullscreenBtn.addEventListener('click', async e => {
+    e.preventDefault();
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        if (screen.orientation && screen.orientation.lock) {
+          try { await screen.orientation.lock('landscape'); } catch {}
+        }
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      bubbleText('Fullscreen blocked');
+    }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    fullscreenBtn.textContent = document.fullscreenElement ? 'Exit' : 'Fullscreen';
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearAll();
+  });
+
+  window.addEventListener('blur', clearAll);
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  const keyMap = {
+    ArrowUp:'Up', ArrowDown:'Down', ArrowLeft:'Left', ArrowRight:'Right',
+    w:'Up', s:'Down', a:'Left', d:'Right',
+    j:'A', k:'B', u:'X', i:'Y',
+    q:'L', e:'R',
+    Enter:'Start', Shift:'Select'
+  };
+
+  window.addEventListener('keydown', e => {
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const name = keyMap[key];
+    if (!name || heldKeys.has(e.code)) return;
+    e.preventDefault();
+    heldKeys.set(e.code, name);
+    activate(name);
+  }, { passive:false });
+
+  window.addEventListener('keyup', e => {
+    const name = heldKeys.get(e.code);
+    if (!name) return;
+    e.preventDefault();
+    heldKeys.delete(e.code);
+    deactivate(name);
+  }, { passive:false });
+})();
+</script>
+</body>
+</html>

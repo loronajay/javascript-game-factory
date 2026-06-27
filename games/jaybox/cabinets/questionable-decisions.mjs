@@ -13,6 +13,8 @@
 //     qd_penalty_input  { input }
 //     qd_reaction       { reaction }
 import { decoratePlayer, escapeHtml, avatarToken } from "../jaybox-client-model.mjs";
+import { getPenaltyView } from "./qd-penalties/registry.mjs";
+import { renderGamepad, wireGamepad, unwireGamepad } from "./qd-penalties/gamepad.mjs";
 
 // Preset spectator reactions (subset of the GDD bank; punch at the play, not the
 // person). Kept here so the controller and any future display ticker share one list.
@@ -117,9 +119,10 @@ export const questionableDecisionsCabinet = {
     } else if (match.phase === "penalty_intro" || match.phase === "penalty_active" || match.phase === "penalty_results") {
       const penalty = match.penalty || {};
       const player = qdPlayers(state).find((candidate) => candidate.id === penalty.activePlayerId);
+      const view = getPenaltyView(penalty.penaltyId);
       body = `<section class="qd-penalty-stage"><div class="eyebrow">Penalty</div><h2>${escapeHtml(penalty.displayName || penalty.penaltyId || "")}</h2>
         <p class="hint">${player ? `${escapeHtml(player.name)} on the controller` : ""}</p>
-        ${penalty.statusText ? `<p class="status">${escapeHtml(penalty.statusText)}</p>` : ""}
+        <div class="qd-penalty-spectacle">${view.renderDisplay(penalty)}</div>
         ${Number.isFinite(penalty.pointsLost) ? `<div class="qd-loss danger">-${penalty.pointsLost}</div>` : ""}</section>` + renderScores(state);
     } else if (match.phase === "scoreboard" || match.phase === "match_end") {
       const winner = qdPlayers(state).find((player) => player.id === match.winnerPlayerId);
@@ -155,10 +158,12 @@ export const questionableDecisionsCabinet = {
     }
 
     if (screen === "penalty") {
-      const penalty = match.penalty || {};
-      const controls = me.penaltyControls || penalty.controls || [];
-      return wrap(`<div class="eyebrow">Penalty</div><h2>${escapeHtml(penalty.displayName || "Survive it")}</h2><p class="hint">${escapeHtml(penalty.promptText || "Hit the controls. Everyone is watching.")}</p>
-        <div class="qd-pad">${controls.map((control) => `<button class="qd-pad-btn" data-penalty-input="${escapeHtml(control.input)}">${escapeHtml(control.label)}</button>`).join("")}</div>`);
+      const pen = me.penalty || {};
+      const view = getPenaltyView(pen.penaltyId);
+      return `<main class="shell controller qd-penalty-controller">${top}
+        <div class="qd-pen-overlay">${view.renderControllerOverlay(pen)}</div>
+        ${renderGamepad(view.litButtons(pen))}
+      </main>`;
     }
 
     if (screen === "results") {
@@ -186,9 +191,12 @@ export const questionableDecisionsCabinet = {
       const answer = new FormData(event.currentTarget).get("answer");
       send("lobby_message", { messageType: "qd_answer", value: JSON.stringify({ answer }) });
     });
-    app.querySelectorAll("[data-penalty-input]").forEach((button) => button.addEventListener("click", () => {
-      send("lobby_message", { messageType: "qd_penalty_input", value: JSON.stringify({ input: button.dataset.penaltyInput }) });
-    }));
+    // Penalty controller: the shared gamepad emits standard input tokens.
+    if (app.querySelector(".qd-gamepad")) {
+      wireGamepad(app, (input) => send("lobby_message", { messageType: "qd_penalty_input", value: JSON.stringify({ input }) }));
+    } else {
+      unwireGamepad();
+    }
     app.querySelectorAll("[data-reaction]").forEach((button) => button.addEventListener("click", () => {
       send("lobby_message", { messageType: "qd_reaction", value: JSON.stringify({ reaction: button.dataset.reaction }) });
     }));

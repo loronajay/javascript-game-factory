@@ -1,6 +1,11 @@
 # Jaybox
 
-Jaybox is the shared-screen client for Pot of Greed. It does not own Pot of Greed rules, economy, phase progression, votes, hidden state, or reconnect authority. Those live in `loronajay/factory-network-server` under the registered lobby game `gameId: "pot-of-greed"`.
+Jaybox is the shared-screen host shell for a catalog of party games. It does not own any game's rules, economy, phases, scoring, or reconnect authority. Those live in `loronajay/factory-network-server` as registered lobby games. The shell stays game-agnostic and resolves the active game from the lobby's `gameId`; each game's display/controller views, message handling, and input wiring live in a cabinet module under `cabinets/` (see `cabinets/registry.mjs`). Pot of Greed is `gameId: "pot-of-greed"`; Questionable Decisions is `gameId: "questionable-decisions"`.
+
+## Cabinets
+
+- `cabinets/pot-of-greed.mjs` — secret-vault social deduction; controllers pick vault actions and cast votes.
+- `cabinets/questionable-decisions.mjs` — trivia on the shared display with phones as controllers. The active player picks a board tile and answers; a wrong answer drops them into a penalty mini-game played on their phone while everyone else watches and reacts. The cabinet is the single source of the wire message names: it receives `qd_public_state` / `qd_private_state` and sends `qd_theme_vote`, `qd_select_tile`, `qd_answer`, `qd_penalty_input`, and `qd_reaction` as `lobby_message` intents. Server-authoritative rules live in `factory-network-server/games/questionable-decisions/server/`.
 
 ## Server Contract
 
