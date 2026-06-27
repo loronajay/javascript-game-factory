@@ -1,8 +1,8 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
-import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getLegalFleeTiles, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, validateFootworkPath } from "../rules/arts.js";
-import { getProximityBonus, getTeamDamageReduction, isShotBlocked, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
+import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { getProximityBonus, getTeamDamageReduction, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -31,7 +31,13 @@ const ERR = Object.freeze({
 });
 
 const reject = (errorCode) => ({ accepted: false, errorCode });
-const accept = (nextState, events = []) => ({ accepted: true, nextState, events });
+// Surface any rollover side-effects (fire-tile burns) the turn flip queued onto the
+// state, then clear them so they never persist into the returned state or a clone.
+const accept = (nextState, events = []) => {
+  const rollover = nextState.pendingRolloverEvents;
+  if (rollover) delete nextState.pendingRolloverEvents;
+  return { accepted: true, nextState, events: rollover ? [...events, ...rollover] : events };
+};
 
 export function applyCommand(state, command) {
   if (!command?.type || state.phase !== "playing") return reject(ERR.INVALID_COMMAND);
@@ -108,6 +114,8 @@ function attack(state, command) {
   const result = validateOpenActivation(state, command.player, command.actorId);
   if (result.error) return reject(result.error);
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
+  // A wall is attacked by tile (no unit there); it resolves through its own path.
+  if (command.targetPosition) return attackWall(state, command, result.unit);
   const target = findUnit(state, command.targetId);
   if (!target || target.hp <= 0 || !areEnemies(result.unit, target)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
@@ -115,7 +123,9 @@ function attack(state, command) {
   }
   // Basic attacks are always physical, so a body between attacker and target blocks
   // the shot (melee never has an intervening tile, so this is a no-op at range 1).
-  if (isShotBlocked(state, result.unit.position, target.position)) return reject(ERR.TARGET_OBSTRUCTED);
+  // A wall between also blocks it (and walls stop everything — see isWallBetween).
+  if (isShotBlocked(state, result.unit.position, target.position, result.unit) ||
+      isWallBetween(state, result.unit.position, target.position, result.unit)) return reject(ERR.TARGET_OBSTRUCTED);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.actorId);
@@ -141,6 +151,30 @@ function attack(state, command) {
   }, ...healingEvents]);
 }
 
+// A Build Cover wall is a destructible obstacle, not a unit: an attack against it
+// never rolls to-hit (it can't dodge) and deals the attacker's STR, removing the
+// wall once its HP hits 0. Spends the unit's primary like any attack. Range and
+// line-of-sight are checked like a unit attack — a body blocks a physical shot, a
+// wall blocks the line, and only the Sniper's pierce reaches a covered wall.
+function attackWall(state, command, attacker) {
+  const pos = command.targetPosition;
+  if (!isWallAt(state, pos)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(attacker.position, pos) > getEffectiveStats(attacker, state).attackRange) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isShotBlocked(state, attacker.position, pos, attacker) ||
+      isWallBetween(state, attacker.position, pos, attacker)) return reject(ERR.TARGET_OBSTRUCTED);
+
+  const next = cloneState(state);
+  const key = positionKey(pos);
+  const wall = next.tileObjects[key];
+  wall.hp = Math.max(0, wall.hp - getEffectiveStats(findUnit(next, command.actorId), next).strength);
+  next.activation.primaryUsed = true;
+  const destroyed = wall.hp <= 0;
+  if (destroyed) delete next.tileObjects[key];
+  return accept(next, [{ type: "WALL_ATTACKED", actorId: command.actorId, position: { ...pos }, destroyed, hpAfter: destroyed ? 0 : wall.hp }]);
+}
+
 function defend(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
@@ -159,10 +193,13 @@ const ART_RESOLVERS = new Map([
   ["pray", resolveHealAllies],
   ["wish", resolveHealAllies],
   ["silence", resolveStatusCast],
+  ["smoke-bomb", resolveStatusCast],
   ["flee", resolveFlee],
   ["nuke", resolveNuke],
   ["dark-bomb", resolveNuke],
   ["summon-ghoul", resolveSummonGhoul],
+  ["build-cover", resolveBuildCover],
+  ["throw-cigar", resolveThrowCigar],
   ["lightseeker", resolveTilePulse],
   ["darkseeker", resolveTilePulse]
 ]);
@@ -213,7 +250,11 @@ function resolveTargetedArt(state, command, art) {
   }
   // ARTS that resolve as a physical strike (Poison Arrow, Leg Shot) are body-blocked
   // just like a basic attack; magic ARTS (Spark, Banish) reach their target directly.
-  if ((art.damageType ?? "physical") === "physical" && isShotBlocked(state, actorState.position, targetState.position)) {
+  // A wall, however, blocks BOTH physical and magic ARTS (only the Sniper pierces it).
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+  if ((art.damageType ?? "physical") === "physical" && isShotBlocked(state, actorState.position, targetState.position, actorState)) {
     return reject(ERR.TARGET_OBSTRUCTED);
   }
 
@@ -380,6 +421,42 @@ function resolveSummonGhoul(state, command, art) {
   }]);
 }
 
+// Build Cover: drop a destructible wall on a clear tile within range. Spends the
+// activation and MP like any active ART; the wall lives in state.tileObjects.
+function resolveBuildCover(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const placement = command.targetPosition;
+  if (!placement || !getWallPlacementTiles(state, actorState, art).has(positionKey(placement))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  next.tileObjects[positionKey(placement)] = { kind: "wall", hp: art.wall?.hp ?? 1 };
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, position: { ...placement }, mpCost: art.mpCost
+  }]);
+}
+
+// Throw Cigar: set a tile alight within range (an occupied tile is allowed — fire at
+// the target's feet). The fire burns at every rollover via applyFireTick.
+function resolveThrowCigar(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const placement = command.targetPosition;
+  if (!placement || !getFirePlacementTiles(state, actorState, art).has(positionKey(placement))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  next.tileObjects[positionKey(placement)] = { kind: "fire", turnsLeft: art.fire?.turns ?? 3 };
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, position: { ...placement }, mpCost: art.mpCost
+  }]);
+}
+
 function resolveTilePulse(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
@@ -452,6 +529,10 @@ function resolveStatusCast(state, command, art) {
   if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  // A wall blocks a pure cast (Silence) just like any other ranged ability.
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
   }
 
   const next = cloneState(state);
@@ -566,6 +647,35 @@ function spendAndAdvance(state, unit) {
   state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
   state.turnNumber += 1;
   for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
+  // Board hazards resolve at the rollover, after the turn flips: fire burns whoever
+  // stands on it and counts down. A burn can be lethal, so re-check victory. Burn
+  // events are stashed on the state for accept() to surface (presentation only).
+  const fireEvents = [];
+  applyFireTick(state, fireEvents);
+  resolveVictory(state);
+  if (fireEvents.length) state.pendingRolloverEvents = fireEvents;
+}
+
+const FIRE_DAMAGE = 1;
+
+// Throw Cigar fire: at every turn rollover, any unit (friend OR foe) standing on a
+// fire tile takes 1 TRUE damage — it ignores DEF and Defend, so this subtracts HP
+// directly. The fire then counts down and is removed once its turns run out. Board
+// level, so it lives beside the rollover rather than in the per-unit status tick.
+// Pushes a FIRE_DAMAGE event per burn so the view can voice + float it.
+function applyFireTick(state, events) {
+  for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
+    if (obj.kind !== "fire") continue;
+    const [x, y] = key.split(",").map(Number);
+    const occupant = unitAt(state, { x, y });
+    if (occupant) {
+      const dealt = Math.min(occupant.hp, FIRE_DAMAGE);
+      occupant.hp = Math.max(0, occupant.hp - FIRE_DAMAGE);
+      if (dealt > 0) events.push({ type: "FIRE_DAMAGE", unitId: occupant.id, position: { x, y }, damage: dealt });
+    }
+    obj.turnsLeft -= 1;
+    if (obj.turnsLeft <= 0) delete state.tileObjects[key];
+  }
 }
 
 function resolveVictory(state) {

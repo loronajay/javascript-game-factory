@@ -2,12 +2,12 @@ import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
-import { getTileAffinity, unitAt } from "../core/state.js";
+import { getTileAffinity, getTileObject, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { isShotBlocked } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getFootworkStepOptions, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells } from "../rules/arts.js";
+import { isShotBlocked, isWallBetween } from "../rules/combat.js";
+import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
-function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
+function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura, tileObject }) {
   const point = gridToScreen(metrics, position.x, position.y);
   const hw = metrics.tileWidth / 2;
   const hh = metrics.tileHeight / 2;
@@ -28,7 +28,59 @@ function createTile(metrics, position, { affinity, selected, legal, targetKind, 
     svgElement("polygon", { class: "tile-side-b", points: pointsToString(right) }),
     svgElement("polygon", { class: "tile-face", points: pointsToString(top) })
   );
+  if (tileObject?.kind === "wall") tile.append(createWallFigure(metrics, point));
+  if (tileObject?.kind === "fire") tile.append(createFireFigure(metrics, point));
   return tile;
+}
+
+// Throw Cigar fire: a cluster of flame tongues licking up off the tile face, with a
+// glowing ember base. Pure presentation; the hazard lives in state.tileObjects.
+function createFireFigure(metrics, point) {
+  const hh = metrics.tileHeight / 2;
+  const c = { x: point.x, y: point.y + hh };
+  const w = metrics.tileWidth * 0.30;
+  const h = Math.max(18, metrics.tileHeight * 1.15);
+  const flame = (dx, scale, cls) => {
+    const bx = c.x + dx;
+    const by = c.y + hh * 0.35;
+    return svgElement("path", {
+      class: cls,
+      d: `M ${bx} ${by} C ${bx - w * scale} ${by - h * scale * 0.55}, ${bx - w * scale * 0.3} ${by - h * scale}, ${bx} ${by - h * scale} C ${bx + w * scale * 0.3} ${by - h * scale}, ${bx + w * scale} ${by - h * scale * 0.55}, ${bx} ${by} Z`
+    });
+  };
+  const g = svgElement("g", { class: "tile-fire" });
+  g.append(
+    svgElement("ellipse", { class: "tile-fire-base", cx: c.x, cy: c.y + hh * 0.5, rx: w * 1.2, ry: hh * 0.4 }),
+    flame(-w * 0.7, 0.7, "tile-fire-flame tile-fire-flame--lo"),
+    flame(w * 0.7, 0.7, "tile-fire-flame tile-fire-flame--lo"),
+    flame(0, 1, "tile-fire-flame tile-fire-flame--hi")
+  );
+  return g;
+}
+
+// A short isometric stone block raised off the tile face — the Sniper's Build Cover
+// wall. Drawn inside the tile group (under the unit layer) so it tracks the tile and
+// sits behind figures. Pure presentation; gameplay reads state.tileObjects.
+function createWallFigure(metrics, point) {
+  const hw = metrics.tileWidth / 2;
+  const hh = metrics.tileHeight / 2;
+  const inset = 0.74;
+  const rise = Math.max(16, metrics.tileHeight * 0.95);
+  const c = { x: point.x, y: point.y + hh };           // tile-face centre
+  const base = {
+    n: { x: c.x, y: c.y - hh * inset }, e: { x: c.x + hw * inset, y: c.y },
+    s: { x: c.x, y: c.y + hh * inset }, w: { x: c.x - hw * inset, y: c.y }
+  };
+  const up = (p) => ({ x: p.x, y: p.y - rise });
+  const cap = { n: up(base.n), e: up(base.e), s: up(base.s), w: up(base.w) };
+
+  const g = svgElement("g", { class: "tile-wall" });
+  g.append(
+    svgElement("polygon", { class: "tile-wall-side tile-wall-side-l", points: pointsToString([[base.w.x, base.w.y], [base.s.x, base.s.y], [cap.s.x, cap.s.y], [cap.w.x, cap.w.y]]) }),
+    svgElement("polygon", { class: "tile-wall-side tile-wall-side-r", points: pointsToString([[base.s.x, base.s.y], [base.e.x, base.e.y], [cap.e.x, cap.e.y], [cap.s.x, cap.s.y]]) }),
+    svgElement("polygon", { class: "tile-wall-cap", points: pointsToString([[cap.n.x, cap.n.y], [cap.e.x, cap.e.y], [cap.s.x, cap.s.y], [cap.w.x, cap.w.y]]) })
+  );
+  return g;
 }
 
 // The stone war-table the diamond sits on: a blurred aura, a raised stone rim
@@ -82,7 +134,8 @@ export function isTargetedMode(mode, actor) {
     art.effect?.type !== "healAllies" &&
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
-    art.targeting?.shape !== "nukeAura"
+    art.targeting?.shape !== "nukeAura" &&
+    art.targeting?.shape !== "tilePlacement"
   );
 }
 
@@ -129,14 +182,33 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         const cell = { x, y };
         if (!isOnBoard(state, cell)) continue;
         if (chebyshevDistance(actor.position, cell) === 0) continue;
-        if (blockable && isShotBlocked(state, actor.position, cell)) continue;
+        if (blockable && isShotBlocked(state, actor.position, cell, actor)) continue;
+        // A wall blocks the line for EVERY ranged ability (physical or magic), so it
+        // culls the wash unconditionally — only the Sniper's pierce reaches through.
+        if (isWallBetween(state, actor.position, cell, actor)) continue;
         range.add(positionKey(cell));
       }
     }
     for (const target of state.units) {
       if (target.hp > 0 && target.player !== actor.player && chebyshevDistance(actor.position, target.position) <= reach &&
-          !(blockable && isShotBlocked(state, actor.position, target.position))) {
+          !(blockable && isShotBlocked(state, actor.position, target.position, actor)) &&
+          !isWallBetween(state, actor.position, target.position, actor)) {
         legal.add(positionKey(target.position));
+      }
+    }
+    // In attack mode, an in-range wall with a clear shot is itself a legal target
+    // (you can destroy cover). A body or another wall between still blocks it; the
+    // Sniper's pierce reaches a covered wall.
+    if (mode === "attack") {
+      for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
+        if (obj.kind !== "wall") continue;
+        const [wx, wy] = key.split(",").map(Number);
+        const pos = { x: wx, y: wy };
+        if (chebyshevDistance(actor.position, pos) <= reach &&
+            !isShotBlocked(state, actor.position, pos, actor) &&
+            !isWallBetween(state, actor.position, pos, actor)) {
+          legal.add(key);
+        }
       }
     }
   }
@@ -155,6 +227,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (actor && mode === "footwork") legal = getFootworkStepOptions(state, actor, footworkPath);
   if (actor && mode === "art:flee") legal = getLegalFleeTiles(state, actor);
   if (actor && mode === "art:summon-ghoul") legal = getSummonPlacementTiles(state, actor, getArt(actor.type, "summon-ghoul"));
+  if (actor && mode === "art:build-cover") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "build-cover"));
+  if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));
 
   // Self-centred AoE blasts (Dark Bomb, Nuke): preview the whole detonation
   // footprint as a range wash and light every enemy caught inside as a legal
@@ -246,7 +320,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art",
         path: inPath,
         range: inRange ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null,
-        aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null
+        aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null,
+        tileObject: getTileObject(state, position)
       });
       tile.addEventListener("click", () => onTileClick(position));
       boardLayer.append(tile);

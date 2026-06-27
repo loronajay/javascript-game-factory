@@ -7,6 +7,7 @@ import { MAGICIAN } from "./units/magician.js";
 import { PALADIN } from "./units/paladin.js";
 import { NECROMANCER } from "./units/necromancer.js";
 import { GHOUL } from "./units/ghoul.js";
+import { SNIPER } from "./units/sniper.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
@@ -15,7 +16,8 @@ export const UNIT_TYPES = Object.freeze({
   magician: MAGICIAN,
   paladin: PALADIN,
   necromancer: NECROMANCER,
-  ghoul: GHOUL
+  ghoul: GHOUL,
+  sniper: SNIPER
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -189,6 +191,6 @@ export function isDefending(unit) {
 export function getAvailableArts(unit) {
   const definition = getUnitType(unit.type);
   return isRaging(unit)
-    ? [...definition.arts, definition.rageArt]
+    ? [...definition.arts, definition.rageArt].filter(Boolean)
     : [...definition.arts];
 }

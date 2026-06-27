@@ -71,6 +71,14 @@ const ABILITY_VFX = Object.freeze({
     runeCount: 5,
     colors: Object.freeze({ core: "#c89cff", trail: "#553276", impact: "#ead6ff" })
   }),
+  "smoke-bomb": Object.freeze({
+    type: "statusStrike",
+    soundKey: "smokeBomb",
+    status: "blind",
+    motif: "smoke",
+    puffCount: 7,
+    colors: Object.freeze({ core: "#d8d3c8", trail: "#8a8478", impact: "#ece8de" })
+  }),
   spark: Object.freeze({
     type: "projectileFan",
     soundKey: "spark",

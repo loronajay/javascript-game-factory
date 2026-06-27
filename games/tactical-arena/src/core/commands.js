@@ -13,6 +13,9 @@ export const moveUnit = (player, unitId, x, y) => ({ type: COMMANDS.MOVE_UNIT, p
 // deterministic tests and recorded replay; live play omits it and the reducer
 // draws from the authoritative seed.
 export const attack = (player, actorId, targetId, rolls = {}) => ({ type: COMMANDS.ATTACK, player, actorId, targetId, ...rolls });
+// Attacking a Build Cover wall: same ATTACK command, but the target is a tile (the
+// wall) rather than a unit. Walls are inert, so this never rolls to-hit.
+export const attackTile = (player, actorId, x, y) => ({ type: COMMANDS.ATTACK, player, actorId, targetPosition: { x, y } });
 export const defend = (player, unitId) => ({ type: COMMANDS.DEFEND, player, unitId });
 export const useArt = (player, unitId, artId, options = []) => {
   const targeting = Array.isArray(options) ? { path: options } : options;

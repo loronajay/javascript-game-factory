@@ -1,7 +1,7 @@
-import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
+import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
-import { createBattleState, findUnit, unitAt } from "./core/state.js";
-import { canUseArt, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells } from "./rules/arts.js";
+import { createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
+import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { applyCommand } from "./core/reducer.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
@@ -140,6 +140,7 @@ function dispatch(command) {
   const prevPlayer = state.currentPlayer;
   state = result.nextState;
   playEventSounds(result.events ?? []);
+  playRolloverFx(result.events ?? []);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   announceTurnChange(prevPlayer);
   return true;
@@ -231,6 +232,7 @@ async function resolveCombat(command) {
 
   state = result.nextState;
   playEventSounds(events);
+  playRolloverFx(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   render();
   announceTurnChange(prevPlayer);
@@ -291,6 +293,15 @@ async function resolveInstantArt(command) {
   } else if (resolved?.artId === "summon-ghoul" && actorBefore) {
     const ghoul = findUnit(result.nextState, resolved.summonedUnitId);
     if (ghoul) await effects.playAbilityVfx("summon-ghoul", { actor: actorBefore, targets: [ghoul] });
+  } else if (resolved?.artId === "build-cover" && resolved.position) {
+    const point = unitCenter(createBoardMetrics(state.size), { position: resolved.position });
+    audio.play("buildCover");
+    effects.impact(point, false);
+    effects.shake(4);
+  } else if (resolved?.artId === "throw-cigar" && resolved.position) {
+    const point = unitCenter(createBoardMetrics(state.size), { position: resolved.position });
+    audio.play("throwCigar");
+    effects.impact(point, false);
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -340,6 +351,7 @@ async function resolveInstantArt(command) {
 
   state = result.nextState;
   playEventSounds(events);
+  playRolloverFx(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   render();
   announceTurnChange(prevPlayer);
@@ -394,7 +406,8 @@ function playEventSounds(events) {
       if (artId === "footwork" || artId === "flee" || artId === "nuke" ||
           artId === "spark" || artId === "pray" || artId === "wish" ||
           artId === "lightseeker" || artId === "darkseeker" ||
-          artId === "dark-bomb" || artId === "summon-ghoul") continue;
+          artId === "dark-bomb" || artId === "summon-ghoul" ||
+          artId === "smoke-bomb" || artId === "build-cover" || artId === "throw-cigar") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
       else if (artId === "volley-shot") audio.play("arrowHit");
@@ -403,6 +416,25 @@ function playEventSounds(events) {
       else audio.play("attackHit");
     }
   }
+}
+
+// Fire-tile burns happen at the rollover (inside the reducer), so they surface as
+// FIRE_DAMAGE events on whatever action ended the turn. Voice + float them here —
+// fire-and-forget, since a board hazard shouldn't block input. `state` is already
+// the committed post-rollover state when this runs.
+function playRolloverFx(events) {
+  const burns = events.filter((e) => e.type === "FIRE_DAMAGE");
+  if (!burns.length) return;
+  audio.play("fireTick");
+  const metrics = createBoardMetrics(state.size);
+  let killed = false;
+  for (const burn of burns) {
+    const center = unitCenter(metrics, { position: burn.position });
+    effects.floatText(center, `-${burn.damage}`, "#ff9a3c");
+    const after = findUnit(state, burn.unitId);
+    if (!after || after.hp <= 0) { effects.deathBurst(center, teamColor(after?.player ?? 1)); killed = true; }
+  }
+  if (killed) audio.play("unitDefeated");
 }
 
 // --- Input ---
@@ -416,6 +448,7 @@ function beginUnit(unit) {
     selectedId = unit.id;
     mode = null;
     volleyShotOrigin = null;
+    audio.play("unitSelect");
     setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
     return;
   }
@@ -423,6 +456,7 @@ function beginUnit(unit) {
     selectedId = unit.id;
     mode = null;
     volleyShotOrigin = null;
+    audio.play("unitSelect");
     setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
   }
 }
@@ -452,10 +486,23 @@ async function handleTile(position) {
     }
   } else if (mode === "attack") {
     const target = unitAt(state, position);
-    if (target && await resolveCombat(attack(state.currentPlayer, unit.id, target.id))) {
-      mode = null;
-      setMessage("Attack resolved.");
-      maybeAutoFinish();
+    if (target) {
+      if (await resolveCombat(attack(state.currentPlayer, unit.id, target.id))) {
+        mode = null;
+        setMessage("Attack resolved.");
+        maybeAutoFinish();
+      }
+    } else if (isWallAt(state, position)) {
+      // Walls are inert — no roll, so destroy them synchronously.
+      const point = unitCenter(createBoardMetrics(state.size), { position });
+      if (dispatch(attackTile(state.currentPlayer, unit.id, position.x, position.y))) {
+        audio.play("wallBreak");
+        effects.deathBurst(point, "#9a9384");
+        effects.shake(5);
+        mode = null;
+        setMessage("Wall destroyed.");
+        maybeAutoFinish();
+      }
     }
   } else if (mode === "footwork") {
     const options = getFootworkStepOptions(state, unit, footworkPath);
@@ -491,6 +538,22 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "summon-ghoul", { targetPosition: position }))) {
       mode = null;
       setMessage("Ghoul raised. This unit's activation is complete.");
+    }
+  } else if (mode === "art:build-cover") {
+    const placement = getWallPlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "build-cover"));
+    if (!placement.has(positionKey(position))) {
+      setMessage("Build Cover: choose a highlighted empty tile to raise the wall.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "build-cover", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Cover raised. This unit's activation is complete.");
+    }
+  } else if (mode === "art:throw-cigar") {
+    const placement = getFirePlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "throw-cigar"));
+    if (!placement.has(positionKey(position))) {
+      setMessage("Throw Cigar: choose a highlighted tile to set alight.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "throw-cigar", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Fire started. This unit's activation is complete.");
     }
   } else if (mode?.startsWith("art:")) {
     const artId = mode.slice("art:".length);
@@ -585,11 +648,15 @@ async function handleActionClick(action, unit) {
           ? "Choose a highlighted empty tile to teleport to."
           : action === "art:summon-ghoul"
             ? "Choose a highlighted empty tile to raise the Ghoul."
-            : art?.effect?.type === "healAllies"
-              ? "Click any highlighted ally to confirm."
-              : art?.resolution === "statusCast"
-                ? "Choose a highlighted enemy target."
-                : "Choose a highlighted enemy target.";
+            : action === "art:build-cover"
+              ? "Choose a highlighted empty tile to raise the wall."
+              : action === "art:throw-cigar"
+                ? "Choose a highlighted tile to set alight."
+                : art?.effect?.type === "healAllies"
+                  ? "Click any highlighted ally to confirm."
+                  : art?.resolution === "statusCast"
+                    ? "Choose a highlighted enemy target."
+                    : "Choose a highlighted enemy target.";
       setMessage(`${art.name} (${art.mpCost} MP): ${art.description} ${lead}`);
     } else {
       setMessage(`Choose a highlighted ${action} tile.`);

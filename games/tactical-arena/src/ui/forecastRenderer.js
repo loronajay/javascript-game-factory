@@ -3,7 +3,7 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
-import { getMissChance, isShotBlocked, resolveBaseStrike } from "../rules/combat.js";
+import { getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike } from "../rules/combat.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
@@ -38,7 +38,10 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;
     if (chebyshevDistance(actor.position, target.position) > reach) continue;
-    if (blockable && isShotBlocked(state, actor.position, target.position)) continue;
+    if (blockable && isShotBlocked(state, actor.position, target.position, actor)) continue;
+    // A wall hides the forecast for any ranged ability (physical or magic) — the
+    // Sniper's pierce is the only shot that still reaches and shows a number.
+    if (isWallBetween(state, actor.position, target.position, actor)) continue;
     if (guaranteedMiss) {
       drawForecastBadge(forecastLayer, metrics, target, "miss", "fc-miss");
       continue;

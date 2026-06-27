@@ -266,6 +266,39 @@ function buildGhoul(g) {
   );
 }
 
+function buildSniper(g) {
+  g.append(
+    // long duster coat behind
+    E("path", { class: "fig-cloak", d: "M -2 -29 Q -18 -10 -14 11 L 6 11 Q 8 -10 6 -29 Z" }),
+    E("path", { class: "fig-cloak-dk", d: "M -2 -29 Q -8 -8 -6 11 L 6 11 Q 8 -10 6 -29 Z" }),
+    // slim coated body + legs
+    E("path", { class: "fig-body", d: "M -9 -27 Q -11 -14 -9 -3 L -10 11 L -1 11 L -1 -2 L 1 -2 L 1 11 L 10 11 L 9 -3 Q 11 -14 9 -27 Q 0 -30 -9 -27 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -29 L 9 -27 Q 11 -14 9 -3 L 10 11 L 1 11 L 1 -2 L 0 -2 Z" }),
+    E("path", { class: "fig-light", d: "M -9 -27 Q -11 -14 -9 -3 L -10 11 L -7 11 L -6 -3 Q -8 -14 -6 -26 Z" }),
+    // team bandolier across the chest with brass cartridges
+    E("path", { class: "fig-cloak", d: "M -9 -25 L 9 -8 L 7 -4 L -11 -21 Z" }),
+    E("circle", { class: "fig-gold", cx: -3, cy: -15, r: 1.3 }),
+    E("circle", { class: "fig-gold", cx: 1, cy: -11.5, r: 1.3 }),
+    // collar
+    E("path", { class: "fig-cloak", d: "M -8 -28 Q 0 -24 8 -28 L 6 -23 Q 0 -20 -6 -23 Z" }),
+    // head
+    E("path", { class: "fig-body", d: "M -6 -30 Q -7 -40 0 -41 Q 7 -40 6 -30 Q 3 -27 0 -27 Q -3 -27 -6 -30 Z" }),
+    E("path", { class: "fig-shade", d: "M 0 -41 Q 7 -40 6 -30 Q 3 -28 0 -28 Z" }),
+    E("ellipse", { class: "fig-light", cx: -2, cy: -33, rx: 0.9, ry: 1 }),
+    // wide-brim hat
+    E("path", { class: "fig-dark", d: "M -12 -39 Q 0 -43 12 -39 Q 6 -36 0 -36 Q -6 -36 -12 -39 Z" }),
+    E("path", { class: "fig-body", d: "M -6 -40 Q -6 -47 0 -47 Q 6 -47 6 -40 Z" }),
+    E("path", { class: "fig-cloak", d: "M -6 -40.5 L 6 -40.5 L 6 -38.5 L -6 -38.5 Z" }),
+    // long rifle slung diagonally across the body (barrel up to the right)
+    E("rect", { class: "fig-steel", x: -14, y: -8.1, width: 30, height: 2.2, rx: 1, transform: "rotate(-32 0 -7)" }),
+    E("rect", { class: "fig-dark", x: -15, y: -9, width: 11, height: 4.6, rx: 1.4, transform: "rotate(-32 0 -7)" }),
+    E("circle", { class: "fig-gold", cx: 9.5, cy: -16.5, r: 1.7 }),
+    // hands on the stock and grip
+    E("ellipse", { class: "fig-body", cx: -3, cy: -10.5, rx: 2.3, ry: 2.1 }),
+    E("ellipse", { class: "fig-body", cx: 4.5, cy: -13.5, rx: 2.2, ry: 2 })
+  );
+}
+
 // Register one builder per unit type. The builder receives an empty
 // <g class="figure"> and appends layered figurine paths (back to front).
 const FIGURE_BUILDERS = new Map([
@@ -275,7 +308,8 @@ const FIGURE_BUILDERS = new Map([
   ["magician", buildMagician],
   ["paladin", buildPaladin],
   ["necromancer", buildNecromancer],
-  ["ghoul", buildGhoul]
+  ["ghoul", buildGhoul],
+  ["sniper", buildSniper]
 ]);
 
 export function createUnitFigurine(type) {

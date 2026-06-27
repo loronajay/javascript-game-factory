@@ -2,9 +2,11 @@
 // Each entry maps a logical key to a HybridAudioEngine patch.
 // Sample assets reference the 5 reference WAVs in sounds/references/.
 
-const REF_BASE = new URL("../../../sounds/references/", import.meta.url);
+const SOUND_BASE = new URL("../../sounds/", import.meta.url);
+const REF_BASE = new URL("references/", SOUND_BASE);
 
 export const SAMPLE_SOURCES = Object.freeze({
+  buttonClick:         new URL("button-click.wav",         SOUND_BASE).href,
   arrowHit:            new URL("arrow-hit.wav",            REF_BASE).href,
   projectileAirborne:  new URL("projectile-airborne.wav",  REF_BASE).href,
   miss:                new URL("miss.wav",                  REF_BASE).href,
@@ -19,13 +21,29 @@ export const SAMPLE_SOURCES = Object.freeze({
 const P_BUTTON_CLICK = {
   id: "ta_button_click", duration: 0.1, gain: 0.72,
   layers: [
-    { type: "sample", asset: "arrowHit", role: "contact", gain: 0.22,
-      playbackRate: 1.75, trimEnd: 0.018,
+    { type: "sample", asset: "buttonClick", role: "contact", gain: 0.48,
+      playbackRate: 1.08, trimEnd: 0.012,
       filter: [{ type: "highpass", frequency: 650, q: 0.7 }, { type: "lowpass", frequency: 6200, q: 0.7 }] },
     { type: "resonatorBank", role: "resonance", material: "wood", gain: 0.045, offset: 0.002,
       pitchScale: 1.45, excitationDuration: 0.008 }
   ],
   effects: { highpass: 220, lowpass: 9000, compressor: { threshold: -18, ratio: 2.5, attack: 0.001, release: 0.06 } }
+};
+
+const P_UNIT_SELECT = {
+  id: "ta_unit_select", duration: 0.18, gain: 0.76,
+  layers: [
+    { type: "sample", asset: "buttonClick", role: "contact", gain: 0.28,
+      playbackRate: 0.78, trimEnd: 0.01,
+      filter: [{ type: "highpass", frequency: 180, q: 0.7 }, { type: "lowpass", frequency: 5200, q: 0.7 }] },
+    { type: "oscillator", role: "tone", waveform: "triangle", gain: 0.16, duration: 0.16, offset: 0.012,
+      frequencyCurve: [[0, 260], [0.26, 390], [1, 330]],
+      envelope: [[0, 0.0001], [0.08, 0.9], [0.52, 0.55], [1, 0.0001]],
+      filter: { type: "lowpass", frequency: 1800, q: 0.8 } },
+    { type: "resonatorBank", role: "resonance", material: "wood", gain: 0.055, offset: 0.018,
+      pitchScale: 0.92, excitationDuration: 0.012 }
+  ],
+  effects: { highpass: 80, lowpass: 7200, compressor: { threshold: -19, ratio: 2.8, attack: 0.001, release: 0.08 } }
 };
 
 const P_DICE_ROLL = {
@@ -520,6 +538,83 @@ const P_HAND_OF_LIFE = {
   effects: { highpass: 160, lowpass: 11500, saturation: 0.005, delay: { time: 0.092, feedback: 0.11, mix: 0.09 }, compressor: { threshold: -23, ratio: 2.5, attack: 0.005, release: 0.2 } }
 };
 
+// Sniper: Build Cover — a heavy stone block dropped into place (wood/stone thunk)
+const P_BUILD_COVER = {
+  id: "ta_build_cover", duration: 0.42, gain: 0.84,
+  layers: [
+    { type: "impactBody", gain: 0.5, frequency: 96, endFrequency: 52, duration: 0.26,
+      effects: { filter: { type: "lowpass", frequency: 500, q: 0.8 }, saturation: 0.05 } },
+    { type: "noise", color: "brown", gain: 0.14, duration: 0.22,
+      envelope: [[0, 0.0001], [0.03, 1], [0.3, 0.4], [1, 0.0001]],
+      filter: { type: "lowpass", frequencyCurve: [[0, 1400], [1, 300]], q: 0.8 } },
+    { type: "resonatorBank", material: "stone", gain: 0.12, offset: 0.02, pitchScale: 0.7, excitationDuration: 0.018 }
+  ],
+  effects: { highpass: 30, lowpass: 6000, saturation: 0.05, compressor: { threshold: -20, ratio: 4, attack: 0.001, release: 0.16 } }
+};
+
+// Sniper: Throw Cigar — the ground catches alight (ignite whoosh + low roar)
+const P_THROW_CIGAR = {
+  id: "ta_throw_cigar", duration: 0.5, gain: 0.8,
+  layers: [
+    { type: "noise", color: "white", gain: 0.2, duration: 0.42,
+      envelope: [[0, 0.0001], [0.06, 0.5], [0.3, 1], [0.7, 0.5], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 500], [0.3, 2600], [1, 1400]], q: 0.7 } },
+    { type: "oscillator", waveform: "sawtooth", gain: 0.1, duration: 0.32, offset: 0.02,
+      frequencyCurve: [[0, 120], [0.4, 200], [1, 150]],
+      envelope: [[0, 0.0001], [0.05, 0.7], [0.5, 0.5], [1, 0.0001]],
+      filter: { type: "lowpass", frequencyCurve: [[0, 1800], [1, 600]], q: 0.9 } },
+    { type: "noise", color: "brown", gain: 0.1, duration: 0.3, offset: 0.05,
+      envelope: [[0, 0.0001], [0.08, 0.8], [0.5, 0.4], [1, 0.0001]],
+      filter: { type: "lowpass", frequency: 900, q: 0.8 } }
+  ],
+  effects: { highpass: 120, lowpass: 9000, saturation: 0.04, compressor: { threshold: -19, ratio: 3.5, attack: 0.002, release: 0.14 } }
+};
+
+// Sniper: a Build Cover wall shattering under fire (crunchy stone debris)
+const P_WALL_BREAK = {
+  id: "ta_wall_break", duration: 0.58, gain: 0.9,
+  layers: [
+    { type: "impactBody", gain: 0.4, frequency: 84, endFrequency: 40, duration: 0.3,
+      effects: { filter: { type: "lowpass", frequency: 520, q: 0.8 }, saturation: 0.08 } },
+    { type: "noise", color: "brown", gain: 0.26, duration: 0.5,
+      envelope: [[0, 0.0001], [0.02, 1], [0.22, 0.5], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 1800], [0.4, 700], [1, 220]], q: 0.8 } },
+    { type: "noise", color: "white", gain: 0.1, duration: 0.16,
+      envelope: [[0, 0.0001], [0.02, 1], [0.4, 0.2], [1, 0.0001]],
+      filter: { type: "highpass", frequency: 2600, q: 0.7 } },
+    { type: "resonatorBank", material: "stone", gain: 0.14, pitchScale: 0.6, excitationDuration: 0.02 }
+  ],
+  effects: { highpass: 40, lowpass: 9000, saturation: 0.07, compressor: { threshold: -21, ratio: 5, attack: 0.001, release: 0.2 } }
+};
+
+// Fire tile burning a unit at the rollover — a short quiet crackle
+const P_FIRE_TICK = {
+  id: "ta_fire_tick", duration: 0.3, gain: 0.66,
+  layers: [
+    { type: "noise", color: "pink", gain: 0.14, duration: 0.26,
+      envelope: [[0, 0.0001], [0.04, 1], [0.4, 0.4], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 1200], [0.4, 2400], [1, 900]], q: 0.8 } },
+    { type: "noise", color: "white", gain: 0.06, duration: 0.12,
+      envelope: [[0, 0.0001], [0.02, 1], [0.5, 0.2], [1, 0.0001]],
+      filter: { type: "highpass", frequency: 3000, q: 0.7 } }
+  ],
+  effects: { highpass: 200, lowpass: 8000, saturation: 0.03, compressor: { threshold: -20, ratio: 3, attack: 0.001, release: 0.1 } }
+};
+
+// Sniper: Smoke Bomb — a soft pressurized puff/hiss
+const P_SMOKE_BOMB = {
+  id: "ta_smoke_bomb", duration: 0.42, gain: 0.74,
+  layers: [
+    { type: "noise", color: "pink", gain: 0.2, duration: 0.38,
+      envelope: [[0, 0.0001], [0.04, 1], [0.35, 0.5], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 400], [0.3, 1400], [1, 600]], q: 0.7 } },
+    { type: "noise", color: "white", gain: 0.08, duration: 0.1,
+      envelope: [[0, 0.0001], [0.02, 1], [0.4, 0.2], [1, 0.0001]],
+      filter: { type: "highpass", frequency: 2200, q: 0.7 } }
+  ],
+  effects: { highpass: 150, lowpass: 6000, saturation: 0.02, compressor: { threshold: -20, ratio: 3, attack: 0.002, release: 0.14 } }
+};
+
 // Victory chord
 const P_VICTORY = {
   id: "ta_victory", duration: 1.2, gain: 0.88,
@@ -546,6 +641,7 @@ const P_VICTORY = {
 
 export const SOUND_CATALOG = Object.freeze([
   { key: "buttonClick",     patch: P_BUTTON_CLICK },
+  { key: "unitSelect",      patch: P_UNIT_SELECT },
   { key: "diceRoll",        patch: P_DICE_ROLL },
   { key: "unitMove",        patch: P_UNIT_MOVE },
   { key: "attackHit",       patch: P_ATTACK_HIT },
@@ -579,4 +675,10 @@ export const SOUND_CATALOG = Object.freeze([
   { key: "lightseeker",    patch: P_LIGHTSEEKER },
   { key: "darkseeker",     patch: P_DARKSEEKER },
   { key: "handOfLife",     patch: P_HAND_OF_LIFE },
+  // Sniper + tile hazards
+  { key: "buildCover",     patch: P_BUILD_COVER },
+  { key: "throwCigar",     patch: P_THROW_CIGAR },
+  { key: "wallBreak",      patch: P_WALL_BREAK },
+  { key: "fireTick",       patch: P_FIRE_TICK },
+  { key: "smokeBomb",      patch: P_SMOKE_BOMB },
 ]);

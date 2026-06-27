@@ -218,6 +218,25 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .dais-side-r { fill:url(#daisSideR); }
 .dais-side { stroke:rgba(0,0,0,.5); stroke-width:1; vector-effect:non-scaling-stroke; }
 
+/* ===================== Build Cover wall (in-SVG, per tile) ===================== */
+/* A short stone block raised off the tile face by boardRenderer.js. Lit cap on top,
+   darker side faces, so it reads as a solid isometric obstacle behind unit figures. */
+.tile-wall { filter:drop-shadow(0 4px 6px rgba(0,0,0,.55)); }
+.tile-wall-cap { fill:#9a9384; stroke:#cdb27a; stroke-width:1.4; vector-effect:non-scaling-stroke; }
+.tile-wall-side { stroke:#0e0c08; stroke-width:1; vector-effect:non-scaling-stroke; }
+.tile-wall-side-l { fill:#5d574b; }
+.tile-wall-side-r { fill:#474236; }
+
+/* ===================== Throw Cigar fire (in-SVG, per tile) ===================== */
+/* Flame tongues + ember base drawn on a fire tile by boardRenderer.js. */
+.tile-fire { filter:drop-shadow(0 0 7px rgba(255,140,40,.8)); }
+.tile-fire-base { fill:rgba(255,150,50,.32); }
+.tile-fire-flame { stroke:none; transform-box:fill-box; transform-origin:center bottom; animation:fire-flicker .5s ease-in-out infinite alternate; }
+.tile-fire-flame--hi { fill:#ffcf4d; }
+.tile-fire-flame--lo { fill:#ff7a26; animation-duration:.62s; }
+@keyframes fire-flicker { from { transform:scaleY(.86) scaleX(1.04); } to { transform:scaleY(1.08) scaleX(.94); } }
+@media (prefers-reduced-motion:reduce) { .tile-fire-flame { animation:none; } }
+
 @media (prefers-reduced-motion:reduce) {
   .bk-sky, .bk-stars, .bk-aurora, .bk-clouds, .bk-rays, .bk-fog, .bk-ember, .bk-window { animation:none !important; }
   .bk-ember { opacity:var(--peak, .5); }

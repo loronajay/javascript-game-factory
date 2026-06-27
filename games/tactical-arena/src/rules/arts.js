@@ -1,4 +1,4 @@
-import { areEnemies, unitAt } from "../core/state.js";
+import { areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
 import { getArt, getEffectiveStats, isRaging } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
@@ -20,6 +20,7 @@ export function validateFootworkPath(state, actor, path) {
     const step = path[index];
     const key = positionKey(step);
     if (!isOnBoard(state, step) || visited.has(key) || !isOrthogonallyAdjacent(previous, step)) return false;
+    if (isWallAt(state, step)) return false; // a wall blocks a Footwork step like a body
 
     const occupant = unitAt(state, step);
     const isFinalStep = index === path.length - 1;
@@ -41,7 +42,7 @@ export function getFootworkStepOptions(state, actor, path) {
     { x: prior.x + 1, y: prior.y }, { x: prior.x - 1, y: prior.y },
     { x: prior.x, y: prior.y + 1 }, { x: prior.x, y: prior.y - 1 }
   ]) {
-    if (!isOnBoard(state, candidate) || visited.has(positionKey(candidate))) continue;
+    if (!isOnBoard(state, candidate) || visited.has(positionKey(candidate)) || isWallAt(state, candidate)) continue;
     const occupant = unitAt(state, candidate);
     if (occupant && (!areEnemies(actor, occupant) || lastStep)) continue;
     options.add(positionKey(candidate));
@@ -83,7 +84,7 @@ export function getLegalFleeTiles(state, actor) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) > range) continue;
       if (dx === 0 && dy === 0) continue;
       const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
-      if (!isOnBoard(state, pos) || unitAt(state, pos)) continue;
+      if (!isOnBoard(state, pos) || unitAt(state, pos) || isWallAt(state, pos)) continue;
       legal.add(positionKey(pos));
     }
   }
@@ -101,11 +102,41 @@ export function getSummonPlacementTiles(state, actor, art) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
       if (dx === 0 && dy === 0) continue;
       const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
-      if (!isOnBoard(state, pos) || unitAt(state, pos)) continue;
+      if (!isOnBoard(state, pos) || unitAt(state, pos) || isWallAt(state, pos)) continue;
       tiles.add(positionKey(pos));
     }
   }
   return tiles;
+}
+
+// Shared Chebyshev-radius tile sweep around an actor, keeping only on-board tiles
+// (never the actor's own tile) that pass `predicate`. Backs the Sniper's placement
+// ARTS so wall vs fire only differ by their rule.
+function tilesInRadius(state, actor, radius, predicate) {
+  const tiles = new Set();
+  for (let dx = -radius; dx <= radius; dx += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
+      if (dx === 0 && dy === 0) continue;
+      const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+      if (!isOnBoard(state, pos)) continue;
+      if (predicate(pos)) tiles.add(positionKey(pos));
+    }
+  }
+  return tiles;
+}
+
+// Build Cover places a solid wall, so it needs a clear floor tile: no unit and no
+// existing tile object. Chebyshev radius from the art (default 3).
+export function getWallPlacementTiles(state, actor, art) {
+  return tilesInRadius(state, actor, art?.targeting?.radius ?? 3, (pos) =>
+    !unitAt(state, pos) && !getTileObject(state, pos));
+}
+
+// Throw Cigar drops a hazard, so it may land on an OCCUPIED tile (fire at an enemy's
+// feet) — it only avoids a wall or an existing fire. Chebyshev radius (default 4).
+export function getFirePlacementTiles(state, actor, art) {
+  return tilesInRadius(state, actor, art?.targeting?.radius ?? 4, (pos) => !getTileObject(state, pos));
 }
 
 export function getTilePulseTargets(state, actor, art) {

@@ -31,6 +31,24 @@ function normalizeTileAffinities(tiles = []) {
   return affinities;
 }
 
+// Board-level placeable objects (the Sniper's Build Cover walls and Throw Cigar
+// fire) live in their own keyed map alongside tile affinities — one object per
+// tile. A wall blocks movement and line of sight and carries HP; fire is a hazard
+// zone that burns occupants and counts down. Input is a list of
+// `{ x, y, kind, hp?/turnsLeft? }`; output is keyed by tile.
+function normalizeTileObjects(objects = []) {
+  const map = {};
+  for (const obj of objects) {
+    if (!obj || !Number.isInteger(obj.x) || !Number.isInteger(obj.y)) continue;
+    if (obj.kind === "wall") {
+      map[tileKey(obj)] = { kind: "wall", hp: Number.isFinite(obj.hp) ? obj.hp : 1 };
+    } else if (obj.kind === "fire") {
+      map[tileKey(obj)] = { kind: "fire", turnsLeft: Number.isFinite(obj.turnsLeft) ? obj.turnsLeft : 3 };
+    }
+  }
+  return map;
+}
+
 const DEFAULT_ROSTER = [
   { id: "swordsman", type: "swordsman" },
   { id: "archer", type: "archer" },
@@ -63,12 +81,13 @@ function defaultRoster(size) {
   })));
 }
 
-export function createBattleState({ size = 13, units, seed, tiles = [] } = {}) {
+export function createBattleState({ size = 13, units, seed, tiles = [], tileObjects = [] } = {}) {
   const roster = units ?? defaultRoster(size);
 
   return {
     size,
     tileAffinities: normalizeTileAffinities(tiles),
+    tileObjects: normalizeTileObjects(tileObjects),
     units: roster.map(createUnit),
     currentPlayer: 1,
     turnNumber: 1,
@@ -86,6 +105,9 @@ export function cloneState(state) {
   return {
     ...state,
     tileAffinities: { ...(state.tileAffinities ?? {}) },
+    tileObjects: Object.fromEntries(
+      Object.entries(state.tileObjects ?? {}).map(([key, obj]) => [key, { ...obj }])
+    ),
     units: state.units.map((unit) => ({
       ...unit,
       position: { ...unit.position },
@@ -113,6 +135,18 @@ export function unitAt(state, position, { includeDefeated = false } = {}) {
     (includeDefeated || unit.hp > 0) &&
     unit.position.x === position.x && unit.position.y === position.y
   ) ?? null;
+}
+
+export function getTileObject(state, position) {
+  return state.tileObjects?.[tileKey(position)] ?? null;
+}
+
+export function isWallAt(state, position) {
+  return getTileObject(state, position)?.kind === "wall";
+}
+
+export function isFireAt(state, position) {
+  return getTileObject(state, position)?.kind === "fire";
 }
 
 export function areEnemies(a, b) {

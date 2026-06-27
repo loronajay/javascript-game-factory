@@ -2,7 +2,14 @@ import { getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/u
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
-import { getTileAffinity, unitAt } from "../core/state.js";
+import { getTileAffinity, isWallAt, unitAt } from "../core/state.js";
+
+// True when an attacker's shot ignores intervening obstacles entirely — the
+// Sniper's Rifle Powered passive (pierces both bodies AND Build Cover walls). Read
+// centrally off unit passive data so any future piercing unit works the same way.
+export function attackerPierces(attacker) {
+  return Boolean(attacker && getUnitType(attacker.type).passive?.effect?.pierce);
+}
 
 // Body-block line of sight: a physical ranged shot is stopped if ANY unit — friend
 // OR foe — stands on a tile strictly between the attacker and its target. Carried
@@ -10,11 +17,25 @@ import { getTileAffinity, unitAt } from "../core/state.js";
 // between, so melee passes through untouched and needs no special-casing. Only the
 // physical-strike paths consult this; magic ARTS (Spark, Banish), pure casts
 // (Silence), the Volley Shot rain, and self-centred blasts (Nuke) ignore bodies.
-// `from`/`to` are {x,y} positions.
-export function isShotBlocked(state, from, to) {
+// `from`/`to` are {x,y} positions. Pass `attacker` so a piercing shot reaches
+// through bodies; omit it for a pure-geometry query.
+export function isShotBlocked(state, from, to, attacker = null) {
+  if (attackerPierces(attacker)) return false;
   return traceGridLine(from.x, from.y, to.x, to.y)
     .slice(1, -1)
     .some((cell) => Boolean(unitAt(state, cell)));
+}
+
+// Wall line of sight: a Build Cover wall on any tile strictly between `from` and
+// `to` blocks the shot. UNLIKE unit body-block, a wall stops EVERY ranged ability —
+// physical and magic alike — so this is a separate, broader predicate. The sole
+// exception is a piercing attacker (the Sniper's Rifle Powered shoots through
+// cover). `from`/`to` are {x,y}; pass `attacker` to honour pierce.
+export function isWallBetween(state, from, to, attacker = null) {
+  if (attackerPierces(attacker)) return false;
+  return traceGridLine(from.x, from.y, to.x, to.y)
+    .slice(1, -1)
+    .some((cell) => isWallAt(state, cell));
 }
 
 // Combat roll tuning — kept as named constants so balance stays in one place. The
@@ -73,6 +94,22 @@ export function getProximityBonus(attacker, target) {
   // Bands are ordered closest-first; the first one the attacker is inside wins.
   for (const band of effect.bands) if (distance <= band.maxDistance) return band.bonusDamage;
   return 0;
+}
+
+// Flat physical-damage bonus an attacker's passive grants on every hit (the Sniper's
+// Rifle Powered: +1). Added after Defend halving, like the proximity bonus, so it is
+// never halved. Returns 0 for any unit without one.
+function getFlatDamageBonus(attacker) {
+  const bonus = getUnitType(attacker.type).passive?.effect?.flatDamage;
+  return Number.isFinite(bonus) ? bonus : 0;
+}
+
+// A hard floor a passive places under a landed physical hit (the Sniper's Rifle
+// Powered: never below 2), so heavy DEF can't chip the attacker to the physical
+// minimum. Returns 0 (no floor) for any unit without one.
+function getMinimumDamage(attacker) {
+  const minimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
+  return Number.isFinite(minimum) ? minimum : 0;
 }
 
 function getTileStrikeBonus(attacker, target, state) {
@@ -146,7 +183,13 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
-  return { ...result, critical, proximityBonus, tileStrikeBonus, damage: result.damage + proximityBonus + tileStrikeBonus };
+  const flatBonus = getFlatDamageBonus(attacker);
+  let damage = result.damage + proximityBonus + tileStrikeBonus + flatBonus;
+  // A landed hit (we only reach here past the to-hit roll) is floored by any minimum
+  // the attacker's passive sets — last, after every bonus.
+  const minimum = getMinimumDamage(attacker);
+  if (minimum > 0 && damage >= 1) damage = Math.max(minimum, damage);
+  return { ...result, critical, proximityBonus, tileStrikeBonus, flatBonus, damage };
 }
 
 // A blinded unit's attack roll is a guaranteed miss unless a combat override (the

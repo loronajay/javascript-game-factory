@@ -1,5 +1,5 @@
 import { getEffectiveStats } from "../core/unitCatalog.js";
-import { unitAt } from "../core/state.js";
+import { isWallAt, unitAt } from "../core/state.js";
 
 export const ORTHOGONAL_DIRECTIONS = Object.freeze([
   { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
@@ -57,7 +57,8 @@ export function getLegalMoves(state, unit) {
     for (const direction of ORTHOGONAL_DIRECTIONS) {
       const next = { x: current.x + direction.x, y: current.y + direction.y };
       const key = positionKey(next);
-      if (!isOnBoard(state, next) || visited.has(key) || unitAt(state, next)) continue;
+      // A wall occupies its tile like a body: you can't step onto it or path through it.
+      if (!isOnBoard(state, next) || visited.has(key) || unitAt(state, next) || isWallAt(state, next)) continue;
       visited.add(key);
       legal.add(key);
       queue.push({ ...next, distance: current.distance + 1 });

@@ -412,6 +412,21 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         ], { duration: 560, delay: i * 22, easing: "ease-out" });
         animations.push(waitForAnimation(animation).then(() => shard.remove()));
       }
+    } else if (vfx.motif === "smoke") {
+      // A cloud of grey puffs billowing up and outward from the target.
+      for (let i = 0; i < (vfx.puffCount ?? 7); i += 1) {
+        const angle = (Math.PI * 2 * i) / (vfx.puffCount ?? 7) + Math.random() * 0.4;
+        const spread = 14 + (i % 3) * 7;
+        const puff = svg("circle", { class: "fx-mote", cx: point.x, cy: point.y, r: 5 + (i % 3) * 2, fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
+        puff.style.opacity = "0.62";
+        effectsLayer.appendChild(puff);
+        const animation = puff.animate([
+          { transform: "translate(0,0) scale(.4)", opacity: 0 },
+          { transform: `translate(${Math.cos(angle) * spread * 0.5}px ${Math.sin(angle) * spread * 0.4 - 10}px) scale(1.1)`, opacity: 0.6, offset: 0.3 },
+          { transform: `translate(${Math.cos(angle) * spread}px ${Math.sin(angle) * spread * 0.6 - 22}px) scale(1.7)`, opacity: 0 }
+        ], { duration: 620, delay: i * 16, easing: "ease-out" });
+        animations.push(waitForAnimation(animation).then(() => puff.remove()));
+      }
     } else if (vfx.motif === "silenceRune") {
       const ring = svg("circle", { class: "fx-rune", cx: point.x, cy: point.y, r: 11, fill: "none", stroke: vfx.colors.core, "stroke-width": 3, filter: "url(#softGlow)" });
       effectsLayer.appendChild(ring);
