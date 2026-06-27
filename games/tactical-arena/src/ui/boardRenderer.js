@@ -2,12 +2,12 @@ import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
-import { getTileAffinity, getTileObject, unitAt } from "../core/state.js";
+import { getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
-function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura, tileObject }) {
+function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
   const hw = metrics.tileWidth / 2;
   const hh = metrics.tileHeight / 2;
@@ -28,8 +28,6 @@ function createTile(metrics, position, { affinity, selected, legal, targetKind, 
     svgElement("polygon", { class: "tile-side-b", points: pointsToString(right) }),
     svgElement("polygon", { class: "tile-face", points: pointsToString(top) })
   );
-  if (tileObject?.kind === "wall") tile.append(createWallFigure(metrics, point));
-  if (tileObject?.kind === "fire") tile.append(createFireFigure(metrics, point));
   return tile;
 }
 
@@ -59,8 +57,9 @@ function createFireFigure(metrics, point) {
 }
 
 // A short isometric stone block raised off the tile face — the Sniper's Build Cover
-// wall. Drawn inside the tile group (under the unit layer) so it tracks the tile and
-// sits behind figures. Pure presentation; gameplay reads state.tileObjects.
+// wall. Drawn in the units layer and depth-sorted alongside figures (see renderBoard)
+// so a wall correctly occludes units behind it and is occluded by units in front.
+// Pure presentation; gameplay reads state.tileObjects.
 function createWallFigure(metrics, point) {
   const hw = metrics.tileWidth / 2;
   const hh = metrics.tileHeight / 2;
@@ -320,8 +319,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art",
         path: inPath,
         range: inRange ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null,
-        aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null,
-        tileObject: getTileObject(state, position)
+        aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null
       });
       tile.addEventListener("click", () => onTileClick(position));
       boardLayer.append(tile);
@@ -331,11 +329,40 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
 
   if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state);
 
-  [...state.units]
-    .filter((u) => u.hp > 0)
-    .sort((a, b) => (a.position.x + a.position.y) - (b.position.x + b.position.y))
-    .forEach((u) => {
-      const isTarget = (targeted || Boolean(nukeArt)) && actor && u.player !== actor.player && legal.has(positionKey(u.position));
-      unitsLayer.append(createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state }));
+  // Units and tile props (Build Cover walls, Throw Cigar fire) share ONE depth-
+  // sorted layer so isometric occlusion is correct: a prop closer to the viewer
+  // (larger x+y) paints over a unit behind it, and a unit in front paints over a
+  // prop behind it. Painting walls/fire inside the board layer (as before) put
+  // every unit on top of every wall regardless of depth — the layering bug. Ties
+  // on the same anti-diagonal can't visually overlap; only a unit standing in
+  // fire shares a tile, and `z` keeps that unit above its own fire.
+  const renderables = [];
+  for (const u of state.units) {
+    if (u.hp <= 0) continue;
+    renderables.push({
+      depth: u.position.x + u.position.y,
+      z: 1,
+      make: () => {
+        const isTarget = (targeted || Boolean(nukeArt)) && actor && u.player !== actor.player && legal.has(positionKey(u.position));
+        return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state });
+      }
     });
+  }
+  for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
+    if (obj.kind !== "wall" && obj.kind !== "fire") continue;
+    const [x, y] = key.split(",").map(Number);
+    const position = { x, y };
+    const point = gridToScreen(metrics, x, y);
+    renderables.push({
+      depth: x + y,
+      z: 0,
+      make: () => {
+        const fig = obj.kind === "wall" ? createWallFigure(metrics, point) : createFireFigure(metrics, point);
+        fig.addEventListener("click", () => onTileClick(position));
+        return fig;
+      }
+    });
+  }
+  renderables.sort((a, b) => a.depth - b.depth || a.z - b.z);
+  for (const r of renderables) unitsLayer.append(r.make());
 }

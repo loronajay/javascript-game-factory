@@ -2,28 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { ARCADE_GRID_URL, goBackToArcade } from "../src/ui/screens/mainMenuScreen.js";
-
-test("main menu exposes a Back to Arcade button", () => {
+test("page shell exposes the arcade back link in the standard top-left chrome", () => {
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const layoutCss = readFileSync(new URL("../styles/layout.css", import.meta.url), "utf8");
 
   assert.match(
     html,
-    /<button\s+[^>]*data-action="backArcade"[^>]*class="menu-btn ghost"[^>]*>\s*Back to Arcade\s*<\/button>/,
+    /<a\s+[^>]*href="\.\.\/\.\.\/grid\.html"[^>]*class="back-link"[^>]*>\s*&larr;\s*Arcade\s*<\/a>/,
   );
-});
-
-test("Back to Arcade routes to the arcade grid", () => {
-  assert.equal(ARCADE_GRID_URL, "../../grid.html");
-
-  let assigned = null;
-  goBackToArcade({
-    location: {
-      assign(url) {
-        assigned = url;
-      },
-    },
-  });
-
-  assert.equal(assigned, "../../grid.html");
+  assert.match(layoutCss, /\.back-link\s*\{[\s\S]*?position:\s*fixed;/);
+  assert.match(layoutCss, /\.back-link\s*\{[\s\S]*?top:\s*max\(14px, env\(safe-area-inset-top\)\);/);
+  assert.match(layoutCss, /\.back-link\s*\{[\s\S]*?left:\s*max\(16px, env\(safe-area-inset-left\)\);/);
 });

@@ -1,0 +1,126 @@
+/* Dev-tool chrome for sandbox.html + vfx-gallery.html. Deliberately plain and
+   utilitarian — these are internal QA surfaces, not the game shell. The board SVG
+   itself is styled by the game's style.css (shared), so only the panel/controls live
+   here. */
+
+.dev-body {
+  margin: 0;
+  font-family: "Spectral", Georgia, serif;
+  color: #e9e0cc;
+  background: radial-gradient(120% 90% at 50% 0%, #1b2330 0%, #0c1016 70%, #070a0e 100%);
+}
+
+.dev-shell {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: 100vh;
+}
+
+/* ---- side panel ---- */
+.dev-panel {
+  background: linear-gradient(180deg, #16202c, #0e151d);
+  border-right: 1px solid #2a3947;
+  padding: 16px 16px 48px;
+  overflow-y: auto;
+  max-height: 100vh;
+}
+.dev-panel-head h1 {
+  font-family: "Cinzel", serif;
+  font-size: 22px;
+  margin: 0 0 4px;
+  color: #f1d79a;
+  letter-spacing: .5px;
+}
+.dev-sub { font-size: 12.5px; color: #9fb0c0; margin: 0 0 10px; line-height: 1.4; }
+.dev-links { display: flex; gap: 12px; margin-bottom: 12px; }
+.dev-links a { color: #7fc8ff; text-decoration: none; font-size: 13px; }
+.dev-links a:hover { text-decoration: underline; }
+
+.dev-warn {
+  background: #3a2417; border: 1px solid #7a4a23; color: #ffcf9c;
+  padding: 8px 10px; border-radius: 6px; font-size: 12.5px; margin: 0 0 12px;
+}
+
+.dev-group {
+  border-top: 1px solid #243140;
+  padding: 12px 0;
+}
+.dev-group h2 {
+  font-family: "Cinzel", serif;
+  font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+  color: #c9b487; margin: 0 0 8px;
+}
+.dev-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+.dev-row.dev-wrap { gap: 10px; }
+.dev-row > label { font-size: 12.5px; color: #a9bccd; min-width: 56px; }
+.dev-hint { font-size: 11.5px; color: #7f93a4; margin: 6px 0 0; line-height: 1.35; }
+.dev-tag { font-size: 11px; color: #f1d79a; font-family: monospace; }
+
+select, input[type="number"], textarea {
+  background: #0c1218; color: #e9e0cc; border: 1px solid #34465a;
+  border-radius: 5px; padding: 5px 7px; font-family: inherit; font-size: 13px;
+}
+input[type="number"] { width: 90px; }
+textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 11.5px; resize: vertical; margin-top: 8px; }
+input[type="range"] { flex: 1; min-width: 120px; accent-color: #d9b25a; }
+
+/* ---- segmented toggles ---- */
+.dev-seg { display: inline-flex; border: 1px solid #34465a; border-radius: 6px; overflow: hidden; }
+.dev-seg button {
+  background: #111a23; color: #b7c6d4; border: none; padding: 5px 12px;
+  font-family: inherit; font-size: 13px; cursor: pointer;
+}
+.dev-seg button + button { border-left: 1px solid #34465a; }
+.dev-seg button.is-on { background: #d9b25a; color: #1a1206; font-weight: 600; }
+.dev-mode { width: 100%; margin: 10px 0 4px; }
+.dev-mode button { flex: 1; padding: 8px 0; font-family: "Cinzel", serif; }
+
+/* ---- buttons ---- */
+.dev-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.dev-fx-btn, button#addTarget, button#removeTarget {
+  background: #1b2735; color: #dfe7ef; border: 1px solid #35506a;
+  border-radius: 6px; padding: 6px 10px; font-family: inherit; font-size: 12.5px;
+  cursor: pointer; transition: background .12s, border-color .12s;
+}
+.dev-fx-btn:hover, button#addTarget:hover, button#removeTarget:hover { background: #25394d; border-color: #5a86ad; }
+.dev-fx-btn:active { transform: translateY(1px); }
+.dev-fx-btn.is-on { background: #d9b25a; color: #1a1206; border-color: #f1d79a; font-weight: 600; }
+.dev-danger { border-color: #7a3b3b !important; color: #ffb4b4 !important; }
+.dev-danger:hover { background: #3a2020 !important; }
+
+.dev-check { font-size: 12.5px; color: #cdd9e4; display: inline-flex; align-items: center; gap: 3px; }
+
+/* ---- stage ---- */
+.dev-stage {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.dev-stage #boardSvg { width: 100%; max-width: 1100px; height: auto; }
+
+.dev-message {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  background: rgba(8, 12, 18, .82); border: 1px solid #2a3947;
+  padding: 7px 16px; border-radius: 20px; font-size: 13px; color: #d6e2ee;
+  pointer-events: none; max-width: 80%; text-align: center;
+}
+.dev-message.error { color: #ffb4b4; border-color: #7a3b3b; }
+
+.dev-toast {
+  position: absolute; left: 50%; top: 18px; transform: translateX(-50%) translateY(-8px);
+  background: #d9b25a; color: #1a1206; font-weight: 600; font-size: 13px;
+  padding: 7px 16px; border-radius: 20px; opacity: 0; transition: opacity .2s, transform .2s;
+  pointer-events: none;
+}
+.dev-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Reuse of game HUD bits inside the play pane keeps their own look from style.css;
+   just give them breathing room here. */
+#playPane .unit-card { margin-top: 10px; }
+#playPane .actions { margin-top: 8px; }
+#playPane .turn-banner { text-align: center; }
+
+@media (max-width: 820px) {
+  .dev-shell { grid-template-columns: 1fr; }
+  .dev-panel { max-height: none; }
+}

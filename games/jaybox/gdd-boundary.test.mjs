@@ -7,6 +7,7 @@ const workspace = import.meta.dirname;
 const jayboxGddPath = join(workspace, 'jaybox-gdd.md');
 const potOfGreedGddPath = join(workspace, 'pot-of-greed', 'pot-of-greed-gdd.md');
 const legacyCombinedGddPath = join(workspace, 'pot-of-greed', 'jaybox-pot-of-greed-gdd.md');
+const readmePath = join(workspace, 'README.md');
 
 test('Jaybox and Pot of Greed keep separate implementation GDDs', () => {
   assert.equal(existsSync(jayboxGddPath), true);
@@ -21,4 +22,14 @@ test('Jaybox and Pot of Greed keep separate implementation GDDs', () => {
   assert.match(potOfGreedGdd, /^# POT OF GREED$/m);
   assert.match(potOfGreedGdd, /^## Jaybox Integration Boundary$/m);
   assert.doesNotMatch(potOfGreedGdd, /^## 23\. Jaybox Platform Flow$/m);
+});
+
+test('Jaybox documents its factory-network-server integration contract', () => {
+  assert.equal(existsSync(readmePath), true);
+
+  const readme = readFileSync(readmePath, 'utf8');
+  assert.match(readme, /factory-network-server/);
+  assert.match(readme, /gameId: "pot-of-greed"/);
+  assert.match(readme, /wss:\/\/factory-network-server-production\.up\.railway\.app/);
+  assert.match(readme, /\?server=ws:\/\/localhost:3000/);
 });

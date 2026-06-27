@@ -84,7 +84,7 @@ Completed:
 - `illuminauts` is a 2-player online maze race; Phase 4 online code complete, ready for first playtest
 - `echo-duel` is an active 2-6 player online prototype with a host-authoritative lobby model; if resuming cabinet work there, start with `games/echo-duel/README.md` and `games/echo-duel/ECHO_DUEL_NEXT_AGENT_HANDOFF.md`
 - `build-buddy` is currently GDD-only in `games/build-buddy/BUILD_BUDDY_GDD.md`
-- `questionable-decisions` is currently a scoped docs-first workstream under `games/questionable-decisions/`, including a base GDD plus multiple penalty mini-game GDDs
+- `questionable-decisions` is now a Jaybox cabinet under `games/jaybox/questionable-decisions/` (trivia board on the shared display, phones as controllers for the penalty mini-games), including a base GDD, a browser prototype, and multiple penalty mini-game GDDs
 - `creature-battle` is currently docs/simulator-heavy under `games/creature-battle/` with combat-system docs, progression docs, creature scope docs, battle-scene canon docs, and tuning simulators; it is not a grid-listed cabinet yet
 
 ## Pre-TypeScript Gate
@@ -274,4 +274,4 @@ node .\js\tests\platform-plan.test.mjs
 - Keep the signed-in shell centralized in `js/arcade-session-nav.mjs`; do not go back to hand-editing bespoke nav link clusters per page unless a page truly needs a contextual exception.
 - Treat `BUGS.md` as split between manual-QA-ready platform bug fixes and longer-term architecture backlog.
 - If a module is large but cohesive, move it later; prioritize mixed-responsibility files first.
-- If the task is game-specific rather than platform-specific, prefer the cabinet-local docs first (`games/echo-duel/ECHO_DUEL_NEXT_AGENT_HANDOFF.md`, `games/build-buddy/BUILD_BUDDY_GDD.md`, `games/questionable-decisions/`, `games/creature-battle/`) before expanding platform cleanup scope.
+- If the task is game-specific rather than platform-specific, prefer the cabinet-local docs first (`games/echo-duel/ECHO_DUEL_NEXT_AGENT_HANDOFF.md`, `games/build-buddy/BUILD_BUDDY_GDD.md`, `games/jaybox/questionable-decisions/`, `games/creature-battle/`) before expanding platform cleanup scope.

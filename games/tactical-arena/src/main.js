@@ -240,6 +240,47 @@ async function resolveCombat(command) {
   return true;
 }
 
+// A wall is attacked like a unit (it can't dodge, so there's no roll), but it gets
+// the SAME attacker lunge/projectile animation as a normal strike instead of just
+// popping. Impact lands on the wall; a destroyed wall bursts into stone shards.
+async function resolveWallAttack(command) {
+  const result = applyCommand(state, command);
+  if (!result.accepted) { setMessage(readableError(result.errorCode), true); return false; }
+  const event = (result.events ?? []).find((e) => e.type === "WALL_ATTACKED");
+
+  const prevPlayer = state.currentPlayer;
+  resolving = true;
+  mode = null; footworkPath = []; volleyShotOrigin = null;
+  render();
+
+  const metrics = createBoardMetrics(state.size);
+  const attackerBefore = findUnit(state, command.actorId);
+  if (event && attackerBefore) {
+    const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
+    const center = unitCenter(metrics, { position: event.position });
+    await effects.animateAttack(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position }, ranged);
+    audio.play(ranged ? "arrowHit" : "attackHit");
+    effects.impact(center, false);
+    effects.shake(5);
+    if (event.destroyed) {
+      audio.play("wallBreak");
+      effects.deathBurst(center, "#9a9384");
+      setMessage("Wall destroyed.");
+    } else {
+      setMessage(`Wall struck — ${event.hpAfter} HP left.`);
+    }
+  }
+
+  state = result.nextState;
+  playEventSounds(result.events ?? []);
+  playRolloverFx(result.events ?? []);
+  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+  render();
+  announceTurnChange(prevPlayer);
+  resolving = false;
+  return true;
+}
+
 async function resolveInstantArt(command) {
   const result = applyCommand(state, command);
   if (!result.accepted) { setMessage(readableError(result.errorCode), true); return false; }
@@ -493,14 +534,8 @@ async function handleTile(position) {
         maybeAutoFinish();
       }
     } else if (isWallAt(state, position)) {
-      // Walls are inert — no roll, so destroy them synchronously.
-      const point = unitCenter(createBoardMetrics(state.size), { position });
-      if (dispatch(attackTile(state.currentPlayer, unit.id, position.x, position.y))) {
-        audio.play("wallBreak");
-        effects.deathBurst(point, "#9a9384");
-        effects.shake(5);
+      if (await resolveWallAttack(attackTile(state.currentPlayer, unit.id, position.x, position.y))) {
         mode = null;
-        setMessage("Wall destroyed.");
         maybeAutoFinish();
       }
     }

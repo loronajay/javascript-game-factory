@@ -21,14 +21,13 @@ assets, and tests.
 | `echo-duel/` | Playable online cabinet | 2-6 player online memory duel with solo survival, personal bests, server-authoritative match support, and compatibility fallback paths. |
 | `game-sound-factory-v3/` | Tool | Hybrid game sound editor with organized pseudo-filesystem, persistent patch controls, WAV rendering, and standalone/integration entry points. |
 | `illuminauts/` | Playable online cabinet | 2-player maze race with fog/light systems, chips, doors, hazards, audio, map tools, online identity handling, and tests. |
-| `jaybox/` | Platform prototype | Shared-screen party-game host shell with room/session identity boundaries, phone-controller model, and Pot of Greed as the first catalog target. |
+| `jaybox/` | Platform prototype | Shared-screen party-game host shell with room/session identity boundaries and the phone-controller model. Hosts its cabinets as nested folders: `jaybox/pot-of-greed/` (first catalog target) and `jaybox/questionable-decisions/` (trivia + phone-controlled penalty mini-games). |
 | `juggle-fighter/` | Engine prototype | Deterministic platform-fighter foundation with fixed-step simulation, input buffering, fighter archetypes, local training scene, and tests. |
 | `last-bastion/` | Playable prototype | Tactical defense game with campaign menu flow, authored missions/maps, deployable unit roles, wave pressure, gold rewards, and smoke/campaign tests. |
 | `lovers-lost/` | Playable cabinet | Split-screen reunion runner with mobile/name input support, scoring, obstacle, player, input, and project-structure tests. |
 | `meat-cards/` | Rules + engine workbench | Digital rules capture and implementation workspace for a paper card game, including card digitization, engine tests, and scene/layout work. |
 | `mini-tactics/` | Playable prototype | Modular isometric squad tactics extraction with deterministic headless engine, reducer, seeded RNG, settings, CPU/multiplayer seams, and Node tests. |
 | `project-draw/` | Tool prototype | Mobile drawing-engine fill prototype with canvas setup, camera, joystick movement, drawing tools, shape/fill tools, undo, and raw/smooth strokes. |
-| `questionable-decisions/` | Design workspace | Docs-first multiplayer trivia and penalty mini-game cabinet. GDD and mini-game specs exist; playable implementation has not started. |
 | `rts-exploration-demo/` | Playable prototype | Browser RTS slice with selection, movement, attack-move, fog of war, harvesters, neutral patrols, breakable walls, and scenario tests. |
 | `sumorai/` | Playable cabinet | Samurai-sumo fighter port with local 2P, CPU difficulty modes, online casual/ranked play, rollback netcode, grid registration, and tests. |
 | `tactical-arena/` | WIP playable prototype | Successor to Mini-Tactics: local hot-seat 1v1, menu flow, deterministic reducer, data-driven units/ARTS/statuses, seeded combat rolls, and Node tests. |

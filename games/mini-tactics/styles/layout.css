@@ -4,6 +4,29 @@
   overflow: hidden;
 }
 
+.back-link {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 30;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .75);
+  transition: color .15s ease, filter .15s ease;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: var(--brass-hi);
+  filter: brightness(1.1);
+}
+
 /* The match screen owns the original three-row board layout. Menu screens use
    their own centered layout (styles/menus.css). */
 .match-screen.is-active {
