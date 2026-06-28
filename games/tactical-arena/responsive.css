@@ -32,6 +32,15 @@
   filter: brightness(1.1);
 }
 
+/* The fixed corner link collides with the in-match turn banner and sits on top
+   of any open pop-up (roster picker / Field Manual / Settings). Hide it in both
+   cases — the match topbar has its own Menu button, and a modal owns the screen.
+   On menu screens (title / main / setup) it stays put in the free corner. */
+body:has(.match-screen.is-active) .back-link,
+body:has(.ref-modal:not([hidden])) .back-link {
+  display: none;
+}
+
 /* -----------------------------------------------------------------------
    Portrait rotate-gate
    ----------------------------------------------------------------------- */
@@ -357,5 +366,107 @@
     min-height: 40px;
     padding: .5rem .78rem;
     font-size: .82rem;
+  }
+}
+
+/* -----------------------------------------------------------------------
+   Roster pop-up on landscape phones (the squad picker)
+
+   The picker's fixed chrome — header, the 4-slot tray, and the footer — ate the
+   whole short landscape height, crushing the unit grid + detail pane into an
+   unusable ~90px sliver (you saw one row of units and a clipped stat card). This
+   compresses the chrome so the body gets the room, keeps the grid|detail split
+   side-by-side (wide enough), and scrolls the grid + detail internally.
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+  .roster-card {
+    width: min(980px, 98vw);
+    height: 94vh;
+    max-height: 94vh;
+  }
+
+  /* Header: drop the long instruction line, shrink the title + padding. */
+  .roster-head {
+    padding: .45rem .8rem;
+  }
+
+  .roster-head h2 {
+    font-size: .82rem;
+  }
+
+  .roster-sub {
+    display: none;
+  }
+
+  /* Tray: the four chosen slots collapse to compact glyph + name chips. */
+  .roster-tray {
+    gap: .3rem;
+    padding: .4rem .6rem;
+  }
+
+  .roster-slot {
+    padding: .26rem .2rem;
+  }
+
+  .roster-slot-tag {
+    display: none;
+  }
+
+  .roster-slot-glyph {
+    font-size: 1rem;
+  }
+
+  .roster-slot-name {
+    font-size: .54rem;
+  }
+
+  /* Body now owns the height. Grid scrolls on the left, detail on the right. */
+  .roster-grid {
+    width: 42%;
+    max-width: 300px;
+    gap: .35rem;
+    padding: .5rem;
+    grid-template-columns: repeat(auto-fill, minmax(4.4rem, 1fr));
+  }
+
+  .roster-unit {
+    padding: .42rem .25rem;
+  }
+
+  .roster-unit-glyph {
+    font-size: 1.2rem;
+  }
+
+  .roster-unit-name {
+    font-size: .58rem;
+  }
+
+  .roster-detail {
+    padding: .6rem .85rem;
+  }
+
+  .roster-detail-hero {
+    gap: .6rem;
+    margin-bottom: .45rem;
+  }
+
+  .roster-figure-svg {
+    width: 72px;
+    height: 96px;
+  }
+
+  /* Footer: tighter so Place / Done never get pushed off a short screen. */
+  .roster-foot {
+    gap: .45rem;
+    padding: .45rem .7rem;
+  }
+
+  .roster-foot .menu-btn {
+    min-width: 5.5rem;
+    padding: .5rem .7rem;
+  }
+
+  .roster-assign {
+    min-width: 9.5rem !important;
   }
 }
