@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#140d06">
     <title>Tactical Arena</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500,600&display=swap">
     <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="./menus.css">
+    <link rel="stylesheet" href="./responsive.css">
   </head>
   <body>
     <!-- Global SVG paint servers. These figurine materials + soft-glow filter are
@@ -37,7 +38,19 @@
         </linearGradient>
       </defs>
     </svg>
+    <a href="../../grid.html" class="back-link">&larr; Arcade</a>
     <div id="app">
+
+      <!-- Portrait phones get a rotate prompt — the war-table board needs the
+           width. Shown via the data-landscape-gate attribute (mobileViewport.js)
+           with a pointer:coarse + portrait media-query fallback. -->
+      <div id="landscapeGate" class="landscape-gate" role="dialog" aria-live="polite" aria-label="Rotate device">
+        <div class="landscape-gate-card">
+          <div class="landscape-gate-phone" aria-hidden="true"></div>
+          <h2>Rotate to Play</h2>
+          <p>Tactical Arena needs landscape on phones.</p>
+        </div>
+      </div>
 
       <!-- ============================== TITLE ============================== -->
       <section class="screen menu-screen is-active" data-screen="title">

@@ -16,6 +16,7 @@ import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
 import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/hud.js";
 import { RulesModal } from "./ui/rulesModal.js";
+import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { buildRoster, buildSummary, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 
 // --- DOM refs ---
@@ -856,6 +857,17 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button && !button.disabled) audio.play("buttonClick");
 });
+
+// --- Mobile playability ---
+// Track viewport posture (portrait rotate-gate vs. playable landscape) and feed
+// it to the stylesheet via root data-attributes + --app-height.
+applyMobileViewport();
+
+// Capture every app tap before target handlers stop propagation (unit clicks
+// call stopPropagation), so going fullscreen on phone landscape is an app-level
+// affordance rather than a match-only one. No-op on desktop / non-landscape.
+const requestAppFullscreen = () => { void requestMobileFullscreen(); };
+document.addEventListener("click", requestAppFullscreen, { capture: true });
 
 // --- Field Manual ---
 
