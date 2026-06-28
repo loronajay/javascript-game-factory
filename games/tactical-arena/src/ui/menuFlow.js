@@ -15,30 +15,36 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
-  for (const name of ["title", "mainMenu", "hsSetup", "results", "match"]) {
+  for (const name of ["title", "mainMenu", "hsSetup", "spSetup", "results", "match"]) {
     screens.register(name, { el: screenEl(name) });
   }
 
-  // ── Hot-seat setup: board size + custom squads ───────────────────────────
-  // Squads are always custom now — both players build a four-piece squad from the
-  // roster pop-up (squadPicker → rosterPicker). Hot-seat is casual, so duplicate
-  // units are allowed; draft/ranked will pass allowDuplicates:false later.
-  const setup = screenEl("hsSetup");
-  const squadPickersHost = $("[data-squad-pickers]", setup);
-  let p1Picker = null;
-  let p2Picker = null;
-
-  function rebuildSquadPickers() {
-    squadPickersHost.replaceChildren();
-    p1Picker = createSquadPicker({ title: "Player 1", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1], allowDuplicates: true });
-    p2Picker = createSquadPicker({ title: "Player 2", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[2], allowDuplicates: true });
-    squadPickersHost.append(p1Picker.el, p2Picker.el);
+  // ── Setup screens: board size + custom squads (and difficulty for solo) ───
+  // Squads are always custom — both sides build a four-piece squad from the roster
+  // pop-up (squadPicker → rosterPicker). These modes are casual, so duplicate units
+  // are allowed; draft/ranked will pass allowDuplicates:false later.
+  function buildSquadPickers(host, p2Title) {
+    host.replaceChildren();
+    const p1 = createSquadPicker({ title: "Player 1", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1], allowDuplicates: true });
+    const p2 = createSquadPicker({ title: p2Title, initial: DEFAULT_SQUAD, accent: TEAM_COLOR[2], allowDuplicates: true });
+    host.append(p1.el, p2.el);
+    return { p1, p2 };
   }
-  rebuildSquadPickers();
 
-  function gatherConfig() {
-    const size = Number(selectedValue(setup, "boardSize", "size")) || 13;
-    return { size, squads: { 1: p1Picker.getSquad(), 2: p2Picker.getSquad() } };
+  const hsSetup = screenEl("hsSetup");
+  const spSetup = screenEl("spSetup");
+  const hsPickers = buildSquadPickers($("[data-squad-pickers]", hsSetup), "Player 2");
+  const spPickers = buildSquadPickers($("[data-sp-squad-pickers]", spSetup), "Computer");
+
+  function gatherHotSeatConfig() {
+    const size = Number(selectedValue(hsSetup, "boardSize", "size")) || 13;
+    return { mode: "hotseat", size, squads: { 1: hsPickers.p1.getSquad(), 2: hsPickers.p2.getSquad() } };
+  }
+
+  function gatherSingleConfig() {
+    const size = Number(selectedValue(spSetup, "boardSize", "size")) || 13;
+    const difficulty = selectedValue(spSetup, "difficulty", "difficulty") || "normal";
+    return { mode: "single", difficulty, size, squads: { 1: spPickers.p1.getSquad(), 2: spPickers.p2.getSquad() } };
   }
 
   // ── Results ──────────────────────────────────────────────────────────────
@@ -52,7 +58,9 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
     renderReport($("[data-results='report']", results), summary.teams);
     const stats = $("[data-results='stats']", results);
     stats.innerHTML = "";
-    addStat(stats, "Mode", "Hot Seat");
+    addStat(stats, "Mode", lastConfig?.mode === "single"
+      ? `Single Player · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
+      : "Hot Seat");
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));
     addStat(stats, "Duration", formatDuration(summary.durationMs));
@@ -101,7 +109,8 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
       case "settings": openSettings(); break;
-      case "startHotSeat": { lastConfig = gatherConfig(); onStartMatch(lastConfig); break; }
+      case "startHotSeat": { lastConfig = gatherHotSeatConfig(); onStartMatch(lastConfig); break; }
+      case "startSingle": { lastConfig = gatherSingleConfig(); onStartMatch(lastConfig); break; }
       case "rematch": if (lastConfig) onStartMatch(lastConfig); break;
       default: break;
     }

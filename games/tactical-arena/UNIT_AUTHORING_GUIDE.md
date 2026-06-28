@@ -26,6 +26,8 @@ export const MYSTIC = Object.freeze({
   id: "mystic",
   name: "Mystic",
   glyph: "?",
+  // CPU metadata — REQUIRED on every unit (see "CPU AI metadata" below).
+  ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 5,
@@ -47,7 +49,9 @@ export const MYSTIC = Object.freeze({
       kind: "active",
       mpCost: 0,
       description: "...",
-      implemented: false
+      implemented: false,
+      // CPU metadata — REQUIRED on every ACTIVE art (see "CPU AI metadata" below).
+      ai: Object.freeze({ intent: "healAllies" })
     })
   ]),
   rageArt: Object.freeze({
@@ -171,6 +175,43 @@ Current special resolvers:
 
 - `footwork` - path validation, pass-through true damage, movement.
 - `volley-shot` - cone targeting, true damage to every enemy in cone.
+
+## CPU AI metadata (REQUIRED — do not skip)
+
+Single-player has a CPU brain in `src/ai/` that plans against expected values. It is
+**data-driven off the unit/art `ai` blocks**, so a unit that omits them ships unplayable
+to the CPU. `tests/ai-metadata.test.js` fails the build if you forget. Full schema +
+the worked-out per-art examples: `CPU_AI_METADATA_SCHEMA.md`.
+
+**Every unit** declares:
+
+```js
+ai: Object.freeze({ threatValue: 12, role: "ranged", protect: true })
+```
+
+- `threatValue` — tactical worth alive, before HP (casters/healers/snipers higher).
+- `role` — `bruiser | skirmisher | ranged | caster | support | controller | summon`
+  (biases advance vs. crossfire-avoidance, and silence value).
+- `protect` — key unit the CPU guards/hunts (defaults true for support/caster).
+
+**Every ACTIVE art** declares `ai.intent` (the one categorical field the CPU can't
+infer), plus `evHints` only where a default is wrong:
+
+```js
+ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
+```
+
+Intent taxonomy (covers the whole current roster): `strike` (single-enemy damage ±
+status/heal rider — the rider is read from `effect`, so a new "attack + apply X" art
+needs only `{ intent: "strike" }`), `statusCast`, `coneAoe`, `selfBlast`, `healAllies`,
+`tilePulse` (bonus action), `reposition`, `rush`, `summon`, `placeObject` (the only
+intent that REQUIRES `evHints.zoneValue` + `evHints.placeNear`). Passives carry no `ai`.
+
+**If your art's shape is NOT in the taxonomy, you are adding a new plan family** —
+extend `generateArtPlans`/`applyPrimaryProjection` in `src/ai/plans.js` and the scoring
+in `src/ai/cpuController.js`, add the new intent to `AI_INTENTS` in `unitCatalog.js`,
+and document it in `CPU_AI_METADATA_SCHEMA.md` first. Then add an `ai-plans` test case
+proving the new plan replays cleanly through the reducer.
 
 ## Targeting and board modes
 
@@ -445,6 +486,8 @@ Before calling a unit complete:
 
 - Unit file added under `src/core/units/`.
 - Unit registered in `src/core/unitCatalog.js`.
+- Unit `ai` block (`threatValue`/`role`/`protect`) and an `ai.intent` on every active
+  ART (see "CPU AI metadata"); `npm test` enforces this via `ai-metadata`.
 - Figurine builder added to `FIGURE_BUILDERS` in `src/ui/unitRenderer.js`
   (distinct silhouette + class-defining prop, shared `.fig-*` materials).
 - Every implemented active ART has reducer behavior.

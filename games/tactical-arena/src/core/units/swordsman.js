@@ -2,6 +2,7 @@ export const SWORDSMAN = Object.freeze({
   id: "swordsman",
   name: "Swordsman",
   glyph: "⚔",
+  ai: Object.freeze({ threatValue: 10, role: "bruiser", protect: false }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 1,
@@ -25,7 +26,8 @@ export const SWORDSMAN = Object.freeze({
       mpCost: 4,
       extraMove: 3,
       description: "Walk your current MOVE + 3 as unique tiles, passing through enemies for 2 true damage. End on empty ground.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "rush", tags: Object.freeze(["setup"]) })
     }),
     Object.freeze({
       id: "moonstrike",
@@ -34,7 +36,8 @@ export const SWORDSMAN = Object.freeze({
       mpCost: 5,
       effect: Object.freeze({ type: "status", status: "blind", chance: 0.7, durationTurns: 1 }),
       description: "Attack with a 70% chance to blind the target.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "mage-killer",
@@ -43,7 +46,8 @@ export const SWORDSMAN = Object.freeze({
       mpCost: 5,
       effect: Object.freeze({ type: "status", status: "silence", chance: 0.7, durationTurns: 1 }),
       description: "Attack with a 70% chance to silence the target.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "life-sap",
@@ -52,7 +56,8 @@ export const SWORDSMAN = Object.freeze({
       mpCost: 5,
       effect: Object.freeze({ type: "heal", chance: 0.7, amount: "halfDamageDealtRounded" }),
       description: "Attack with a 70% chance to restore half the damage dealt, rounded.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["sustain"]) })
     })
   ]),
   rageArt: Object.freeze({

@@ -1,6 +1,7 @@
 export const PALADIN = Object.freeze({
   id: "paladin",
   name: "Paladin",
+  ai: Object.freeze({ threatValue: 12, role: "bruiser", protect: false }),
   glyph: "🛡️",
   stats: Object.freeze({
     moveRange: 3,
@@ -32,7 +33,8 @@ export const PALADIN = Object.freeze({
       bonusActionGroup: "seeker",
       effect: Object.freeze({ type: "tilePulse", affinity: "light", amount: 1, range: 5 }),
       description: "Deal 1 true damage to every enemy within 5 tiles standing on a light tile. Does not spend the Paladin's action.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "tilePulse", tags: Object.freeze(["bonus"]) })
     }),
     Object.freeze({
       id: "chosen",
@@ -70,6 +72,7 @@ export const PALADIN = Object.freeze({
     bonusActionGroup: "seeker",
     effect: Object.freeze({ type: "tilePulse", affinity: "dark", amount: 2, global: true }),
     description: "While raging, deal 2 true damage to every enemy on a dark tile anywhere on the board. Does not spend the Paladin's action.",
-    implemented: true
+    implemented: true,
+    ai: Object.freeze({ intent: "tilePulse", tags: Object.freeze(["bonus", "rageOnly"]) })
   })
 });

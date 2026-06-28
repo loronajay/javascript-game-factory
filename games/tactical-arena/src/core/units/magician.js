@@ -1,6 +1,7 @@
 export const MAGICIAN = Object.freeze({
   id: "magician",
   name: "Magician",
+  ai: Object.freeze({ threatValue: 13, role: "caster", protect: true }),
   glyph: "✦",
   stats: Object.freeze({
     moveRange: 2,
@@ -27,7 +28,8 @@ export const MAGICIAN = Object.freeze({
       mpCost: 4,
       damageType: "magic",
       description: "Hurl a bolt of magic at a target in range. Deals magic damage, ignoring DEF.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike" })
     }),
     Object.freeze({
       id: "flee",
@@ -37,7 +39,8 @@ export const MAGICIAN = Object.freeze({
       resolution: "flee",
       targeting: Object.freeze({ shape: "flee" }),
       description: "Teleport to any empty tile within Move+2 tiles. Spends this unit's activation.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "reposition", evHints: Object.freeze({ purpose: "escape" }), tags: Object.freeze(["escape"]) })
     }),
     Object.freeze({
       id: "banish",
@@ -47,7 +50,8 @@ export const MAGICIAN = Object.freeze({
       damageType: "magic",
       effect: Object.freeze({ type: "status", status: "silence", chance: 0.75, durationTurns: 1 }),
       description: "Strike a target with arcane force for magic damage, then silence them for 1 turn on a 75% check.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),
     // Nuke is only available while raging (rageLocked). Deals heavy magic damage
     // to all enemies within 3 tiles centered on the Magician.
@@ -61,7 +65,8 @@ export const MAGICIAN = Object.freeze({
       targeting: Object.freeze({ shape: "nukeAura", radius: 3 }),
       damage: Object.freeze({ type: "magic", amount: 12 }),
       description: "RAGE: Detonate a burst of arcane energy, dealing 12 magic damage to all enemies within 3 tiles.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "selfBlast", evHints: Object.freeze({ minTargets: 2 }), tags: Object.freeze(["finisher", "rageOnly"]) })
     })
   ]),
   rageArt: Object.freeze({

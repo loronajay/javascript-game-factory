@@ -8,6 +8,7 @@
 export const SNIPER = Object.freeze({
   id: "sniper",
   name: "Sniper",
+  ai: Object.freeze({ threatValue: 13, role: "ranged", protect: true }),
   glyph: "🎯",
   stats: Object.freeze({
     moveRange: 2,
@@ -42,7 +43,8 @@ export const SNIPER = Object.freeze({
       resolution: "statusCast",
       effect: Object.freeze({ type: "status", status: "blind", chance: 0.7, durationTurns: 1 }),
       description: "Throw a smoke bomb at one enemy in range: 70% to blind it for 1 turn. No damage. Blocked by walls, not bodies.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "statusCast", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "build-cover",
@@ -52,7 +54,8 @@ export const SNIPER = Object.freeze({
       targeting: Object.freeze({ shape: "tilePlacement", radius: 3 }),
       wall: Object.freeze({ hp: 1 }),
       description: "Raise a 1-HP wall on an empty tile within 3. It blocks movement and line of sight for everyone — except the Sniper's own shots.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "placeObject", evHints: Object.freeze({ zoneValue: 5, placeNear: "threatenedAlly" }), tags: Object.freeze(["zone", "setup"]) })
     }),
     Object.freeze({
       id: "throw-cigar",
@@ -62,7 +65,8 @@ export const SNIPER = Object.freeze({
       targeting: Object.freeze({ shape: "tilePlacement", radius: 4, allowOccupied: true }),
       fire: Object.freeze({ turns: 3 }),
       description: "Set a tile within 4 alight. Anyone standing on it takes 1 true damage at each turn rollover for 3 turns.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "placeObject", evHints: Object.freeze({ zoneValue: 6, placeNear: "enemy" }), tags: Object.freeze(["zone"]) })
     })
   ]),
   ragePassive: Object.freeze({

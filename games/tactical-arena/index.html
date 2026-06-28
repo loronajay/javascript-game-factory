@@ -58,8 +58,8 @@
         <div class="menu-card">
           <h2 class="menu-heading">Main Menu</h2>
           <div class="menu-buttons">
-            <button class="menu-btn" disabled>Single Player<span class="soon">Soon</span></button>
-            <button data-nav="hsSetup" class="primary menu-btn">Hot Seat</button>
+            <button data-nav="spSetup" class="primary menu-btn">Single Player</button>
+            <button data-nav="hsSetup" class="menu-btn">Hot Seat</button>
             <button class="menu-btn" disabled>Online Versus<span class="soon">Soon</span></button>
             <button data-action="rules" class="menu-btn">How to Play</button>
             <button data-action="settings" class="menu-btn">Settings</button>
@@ -102,6 +102,44 @@
 
           <div class="menu-buttons">
             <button data-action="startHotSeat" class="primary menu-btn">Start Match</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= SINGLE PLAYER ========================= -->
+      <section class="screen menu-screen" data-screen="spSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Single Player</h2>
+          <p class="menu-note">Command Player 1 against the computer.</p>
+
+          <div class="setup-field">
+            <span class="setup-label">Difficulty</span>
+            <div class="segmented" data-field="difficulty">
+              <button type="button" class="seg" data-difficulty="easy">Easy</button>
+              <button type="button" class="seg is-selected" data-difficulty="normal">Normal</button>
+              <button type="button" class="seg" data-difficulty="hard">Hard</button>
+            </div>
+          </div>
+
+          <div class="setup-field">
+            <span class="setup-label">Board size</span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="13">13 × 13</button>
+              <button type="button" class="seg" data-size="15">15 × 15</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Squads</span>
+            <p class="setup-hint">
+              Build your squad and the computer's. Each deploys four pieces. Tap Edit Squad to choose units and read their stats, passives and ARTS.
+            </p>
+            <div class="squad-pickers" data-sp-squad-pickers></div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-action="startSingle" class="primary menu-btn">Start Match</button>
             <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
           </div>
         </div>

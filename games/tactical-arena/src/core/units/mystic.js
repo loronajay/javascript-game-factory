@@ -2,6 +2,7 @@ export const MYSTIC = Object.freeze({
   id: "mystic",
   name: "Mystic",
   glyph: "✨",
+  ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 5,
@@ -26,7 +27,8 @@ export const MYSTIC = Object.freeze({
       targeting: Object.freeze({ shape: "selfAura", radius: 3 }),
       effect: Object.freeze({ type: "healAllies", amount: 3, radius: 3 }),
       description: "Heal the Mystic and nearby allies within 3 tiles for 3 HP.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "healAllies" })
     }),
     Object.freeze({
       id: "wish",
@@ -36,7 +38,8 @@ export const MYSTIC = Object.freeze({
       targeting: Object.freeze({ shape: "globalAllies" }),
       effect: Object.freeze({ type: "healAllies", amount: 1, global: true }),
       description: "Heal every living ally for 1 HP, regardless of distance.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "healAllies" })
     }),
     Object.freeze({
       id: "silence",
@@ -46,7 +49,8 @@ export const MYSTIC = Object.freeze({
       resolution: "statusCast",
       effect: Object.freeze({ type: "status", status: "silence", chance: 0.7, durationTurns: 1 }),
       description: "Cast silence at attack range with a 70% effect check. Mystics are immune.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "statusCast", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "guardian",

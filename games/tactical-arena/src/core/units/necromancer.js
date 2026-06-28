@@ -16,6 +16,7 @@
 export const NECROMANCER = Object.freeze({
   id: "necromancer",
   name: "Necromancer",
+  ai: Object.freeze({ threatValue: 13, role: "controller", protect: true }),
   glyph: "☠",
   stats: Object.freeze({
     moveRange: 3,
@@ -47,7 +48,8 @@ export const NECROMANCER = Object.freeze({
         statModifiers: Object.freeze({ moveRange: -1 })
       }),
       description: "Curse a target for magic damage, then apply -1 MOVE Slow for 3 turns on a 70% check. Paladins are immune.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "dark-bomb",
@@ -58,7 +60,8 @@ export const NECROMANCER = Object.freeze({
       targeting: Object.freeze({ shape: "nukeAura", radius: 2 }),
       damage: Object.freeze({ type: "magic", amount: 5 }),
       description: "Detonate dark energy, dealing 5 magic damage to every enemy within 2 tiles of the Necromancer.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "selfBlast", evHints: Object.freeze({ minTargets: 2 }) })
     }),
     Object.freeze({
       id: "summon-ghoul",
@@ -69,7 +72,8 @@ export const NECROMANCER = Object.freeze({
       targeting: Object.freeze({ shape: "placement", radius: 2 }),
       summon: Object.freeze({ type: "ghoul" }),
       description: "Raise a Ghoul on an empty tile within 2 tiles. It has 10 HP, takes no turns, and carries the Deathly Aura. Only one Ghoul at a time.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "summon", evHints: Object.freeze({ placeNear: "enemy" }), tags: Object.freeze(["zone"]) })
     }),
     Object.freeze({
       id: "dead-zone",

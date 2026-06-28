@@ -194,3 +194,44 @@ export function getAvailableArts(unit) {
     ? [...definition.arts, definition.rageArt].filter(Boolean)
     : [...definition.arts];
 }
+
+// --- CPU AI metadata --------------------------------------------------------
+// Every active art declares `ai.intent`; every unit declares an `ai` block
+// (threatValue / role / protect). The planner + evaluator in src/ai/ read these
+// through the normalizers below so they never see a missing block — decision 4,
+// option C: normalize for runtime safety AND tests/ai-metadata.test.js enforces
+// that the data is authored explicitly. Full schema: CPU_AI_METADATA_SCHEMA.md.
+export const AI_INTENTS = Object.freeze([
+  "strike", "statusCast", "coneAoe", "selfBlast", "healAllies",
+  "tilePulse", "reposition", "rush", "summon", "placeObject", "defend"
+]);
+export const AI_ROLES = Object.freeze([
+  "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"
+]);
+
+const DEFAULT_UNIT_AI = Object.freeze({ threatValue: 10, role: "skirmisher", protect: false });
+
+// Normalized unit-level AI metadata, with safe fallbacks for any unannotated unit.
+// `protect` defaults true for support/caster roles when omitted.
+export function normalizeUnitAi(definitionOrType) {
+  const definition = typeof definitionOrType === "string" ? getUnitType(definitionOrType) : definitionOrType;
+  const ai = definition?.ai ?? {};
+  return {
+    threatValue: Number.isFinite(ai.threatValue) ? ai.threatValue : DEFAULT_UNIT_AI.threatValue,
+    role: AI_ROLES.includes(ai.role) ? ai.role : DEFAULT_UNIT_AI.role,
+    protect: typeof ai.protect === "boolean" ? ai.protect : (ai.role === "support" || ai.role === "caster")
+  };
+}
+
+// Normalized art-level AI metadata. An active art missing `ai` degrades to a plain
+// `strike` so the planner can still offer it; tags/evHints/priority get empty/neutral
+// defaults.
+export function normalizeArtAi(art) {
+  const ai = art?.ai ?? {};
+  return {
+    intent: AI_INTENTS.includes(ai.intent) ? ai.intent : "strike",
+    tags: Array.isArray(ai.tags) ? ai.tags : [],
+    evHints: ai.evHints ?? {},
+    priority: Number.isFinite(ai.priority) ? ai.priority : 1
+  };
+}

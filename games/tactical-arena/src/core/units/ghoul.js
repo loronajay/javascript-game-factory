@@ -14,6 +14,7 @@ export const GHOUL = Object.freeze({
   name: "Ghoul",
   glyph: "🦴",
   summon: true,
+  ai: Object.freeze({ threatValue: 5, role: "summon", protect: false }),
   stats: Object.freeze({
     moveRange: 1,
     attackRange: 0,

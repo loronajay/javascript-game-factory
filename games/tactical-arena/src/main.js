@@ -4,6 +4,7 @@ import { createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { applyCommand } from "./core/reducer.js";
+import { chooseActivation, cpuRng } from "./ai/cpuController.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
@@ -42,6 +43,23 @@ let mode = null;
 let footworkPath = [];
 let volleyShotOrigin = null;
 let resolving = false;
+
+// --- CPU (single-player) ---
+// `cpu` is null in hot-seat; in single-player it names the difficulty and which seats
+// the computer drives (Player 2 in v1). `cpuThinking` guards against re-entering the
+// CPU loop, and `matchEpoch` lets a running CPU loop bail the moment a new match starts.
+let cpu = null;
+let cpuThinking = false;
+let matchEpoch = 0;
+const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const CPU_TURN_LEAD_MS = 480;        // pause before the CPU's first move
+const CPU_ACTIVATION_GAP_MS = 320;   // between one unit finishing and the next
+const CPU_STEP_MS = 260;             // beat when a CPU unit takes the field
+const CPU_MAX_ACTIVATIONS = 64;      // guard against a runaway planning loop
+
+function isCpu(player) {
+  return Boolean(cpu && cpu.players.has(player));
+}
 
 // --- Match metadata ---
 let matchConfig = null;
@@ -88,11 +106,15 @@ function setMessage(text, isError = false) {
 
 function startMatch(config) {
   window.clearTimeout(resultsTimer);
+  matchEpoch += 1;
   state = createBattleState({ size: config.size, units: buildRoster(config.squads, config.size) });
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
   initialHpByPlayer = { 1: hpRemaining(state, 1), 2: hpRemaining(state, 2) };
+  // Single-player drives Player 2 with the CPU; hot-seat leaves cpu null.
+  cpu = config.mode === "single" ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) } : null;
+  cpuThinking = false;
   selectedId = null;
   mode = null;
   footworkPath = [];
@@ -143,6 +165,7 @@ function dispatch(command) {
   playRolloverFx(result.events ?? []);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   announceTurnChange(prevPlayer);
+  maybeStartCpuTurn();
   return true;
 }
 
@@ -237,6 +260,7 @@ async function resolveCombat(command) {
   render();
   announceTurnChange(prevPlayer);
   resolving = false;
+  maybeStartCpuTurn();
   return true;
 }
 
@@ -278,6 +302,7 @@ async function resolveWallAttack(command) {
   render();
   announceTurnChange(prevPlayer);
   resolving = false;
+  maybeStartCpuTurn();
   return true;
 }
 
@@ -397,6 +422,115 @@ async function resolveInstantArt(command) {
   render();
   announceTurnChange(prevPlayer);
   resolving = false;
+  maybeStartCpuTurn();
+  return true;
+}
+
+// --- CPU driver ---
+//
+// The CPU drives its whole squad turn here. It asks the AI for one activation at a
+// time and replays each command through the SAME reducer + resolvers a human's clicks
+// use — so what the CPU does is animated and validated identically. Input stays locked
+// (`resolving`) for the duration; control returns to the human when the turn passes
+// back or the match ends. A change in `matchEpoch` (a new match started) abandons the
+// loop immediately.
+
+// Fired at the tail of every human commit path. Kicks the CPU turn the moment the turn
+// passes to a computer-controlled seat; guarded so it never re-enters or stacks.
+function maybeStartCpuTurn() {
+  if (cpuThinking || state.phase !== "playing" || !isCpu(state.currentPlayer)) return;
+  cpuThinking = true;
+  void runCpuTurn().finally(() => { cpuThinking = false; });
+}
+
+async function runCpuTurn() {
+  const epoch = matchEpoch;
+  resolving = true;
+  selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
+  render();
+  setMessage(`Player ${state.currentPlayer} (CPU) is planning…`);
+  await sleep(CPU_TURN_LEAD_MS);
+
+  // The guard is belt-and-braces against a planning bug; chooseActivation always
+  // returns at least a defend, so a living squad cannot truly stall.
+  let guard = 0;
+  while (epoch === matchEpoch && state.phase === "playing" && isCpu(state.currentPlayer) && guard < CPU_MAX_ACTIVATIONS) {
+    guard += 1;
+    const commands = chooseActivation(state, {
+      difficulty: cpu.difficulty,
+      cpuPlayer: state.currentPlayer,
+      rng: cpuRng(state)
+    });
+    if (!commands.length) break;
+
+    for (const command of commands) {
+      if (epoch !== matchEpoch) return;
+      const applied = await applyCpuCommand(command);
+      resolving = true; // the per-command resolvers clear it; keep input locked through the turn
+      if (!applied || state.phase !== "playing") break;
+    }
+
+    if (epoch !== matchEpoch) return;
+    if (state.phase !== "playing") break;
+    await sleep(CPU_ACTIVATION_GAP_MS);
+  }
+
+  if (epoch !== matchEpoch) return;
+  resolving = false;
+  if (state.phase === "complete") { render(); return; }
+  selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
+  render();
+  setMessage("Your squad turn. Select a ready commander.");
+}
+
+// Route one CPU command to the resolver that animates its events — the same resolvers
+// the human path uses. BEGIN/DEFEND/FINISH are instant (sync dispatch); a move slides;
+// an attack and a strike ART roll (resolveCombat); every other ART is instant.
+async function applyCpuCommand(command) {
+  switch (command.type) {
+    case "BEGIN_ACTIVATION": {
+      if (!dispatch(command)) return false;
+      selectedId = command.unitId;
+      const unit = findUnit(state, command.unitId);
+      if (unit) setMessage(`Player ${unit.player} (CPU) activates its ${getUnitType(unit.type).name}.`);
+      render();
+      await sleep(CPU_STEP_MS);
+      return true;
+    }
+    case "MOVE_UNIT":
+      return resolveCpuMove(command);
+    case "ATTACK":
+      return command.targetPosition ? resolveWallAttack(command) : resolveCombat(command);
+    case "DEFEND": {
+      const ok = dispatch(command);
+      render();
+      return ok;
+    }
+    case "USE_ART": {
+      // A strike ART rolls to-hit (resolveCombat handles ART_RESOLVED-with-hit); every
+      // other ART is instant. Peek the events to route — applyCommand is pure.
+      const peek = applyCommand(state, command);
+      const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e);
+      return rolled ? resolveCombat(command) : resolveInstantArt(command);
+    }
+    case "FINISH_ACTIVATION": {
+      const ok = dispatch(command);
+      render();
+      return ok;
+    }
+    default:
+      return false;
+  }
+}
+
+async function resolveCpuMove(command) {
+  const unit = findUnit(state, command.unitId);
+  const from = unit ? { ...unit.position } : null;
+  resolving = true;
+  if (!dispatch(command)) return false;
+  render();
+  if (from) await effects.animateMovement(command.unitId, from, command.position);
+  render();
   return true;
 }
 

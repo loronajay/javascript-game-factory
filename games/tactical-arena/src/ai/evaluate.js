@@ -1,0 +1,183 @@
+// Expected-value combat math for the CPU.
+//
+// The AI plans against averages and NEVER rolls a die: it must not peek at — or
+// consume — the authoritative `rngState` carried in match state, and its scoring
+// has to be deterministic so a replay reproduces the same choices. Every helper
+// here is pure and headless (no DOM, no RNG, no state mutation).
+//
+// Crucially, the damage numbers come from the SAME resolvers the reducer + the
+// on-board forecast use (`resolveBaseStrike`, `resolveDamage`, `getMissChance`,
+// `getCritChance`, `getTeamDamageReduction`). A roll lands as miss / normal / crit
+// with fixed probabilities, so each strike turns into an exact expected value that
+// can never disagree with what the reducer will actually deliver.
+//
+// Status/role/MP *values* are tactical priors that live here (not on the art data)
+// — see CPU_AI_METADATA_SCHEMA.md §4. Per-art/per-unit `ai` metadata is read
+// through `normalizeUnitAi` so a new unit needs no edit to this file.
+
+import { areEnemies, livingUnits } from "../core/state.js";
+import { getEffectiveStats, isDefending, normalizeUnitAi } from "../core/unitCatalog.js";
+import { getCritChance, getMissChance, getTeamDamageReduction, resolveBaseStrike } from "../rules/combat.js";
+import { chebyshevDistance } from "../rules/movement.js";
+import { statusImmunities } from "../rules/statuses.js";
+
+// Tuning priors. All values are in the same currency as HP / expected damage, so
+// the difficulty weights in cpuController compose cleanly (decision 3: one currency).
+const DEF_BASELINE = 4;      // notional enemy DEF, for estimating a unit's offense
+const HIT_BASELINE = 0.9;    // 1 − base miss; a unit's swing usually lands
+const POISON_HORIZON = 3;    // turns of DoT the CPU plans for (decision 1)
+const SLOW_FACTOR = 0.25;    // a slowed turn denies only a slice of value
+
+// How much silencing a target is worth, by role. A caster/controller's whole kit
+// is its ARTS, so denying them hurts; a bruiser barely cares.
+const SILENCE_ROLE_MULT = Object.freeze({
+  caster: 1.5, controller: 1.5, support: 1.4, ranged: 1.0,
+  bruiser: 0.5, skirmisher: 0.6, summon: 0
+});
+
+// Tactical worth of keeping a unit alive, before HP — self-declared on the unit's
+// `ai` block, so a new unit sets its own value (replaces Mini-Tactics' hardcoded
+// UNIT_VALUE table).
+export function unitThreatValue(unit) {
+  return normalizeUnitAi(unit.type).threatValue;
+}
+
+// A "key" unit is one the schema marks `protect` (healers/casters/snipers): the CPU
+// guards its own and prioritizes hunting the enemy's.
+export function isKeyUnit(unit) {
+  return normalizeUnitAi(unit.type).protect;
+}
+
+// Rough expected damage this unit deals on a typical attack — used to value
+// denying it a turn (blind/silence/slow). Casters/controllers deal magic, which
+// ignores DEF, so they estimate off raw strength; everyone else off STR − DEF.
+export function offenseEstimate(unit, state = null) {
+  const str = getEffectiveStats(unit, state).strength;
+  const role = normalizeUnitAi(unit.type).role;
+  const physical = Math.max(1, str - DEF_BASELINE);
+  const magicish = role === "caster" || role === "controller" ? str : physical;
+  return Math.max(physical, magicish) * HIT_BASELINE;
+}
+
+// Tactical value of landing one status on `target`, in damage-equivalent units.
+// Immunity (read from the SAME `statusImmunities` the reducer uses) zeroes it, so
+// the CPU never wastes Silence on a Mystic or any status on a Paladin. Capped at
+// the target's threat value — disabling can never beat killing (decision 1).
+export function statusValue(target, effect, state = null, { survivingHp } = {}) {
+  if (!effect?.status || statusImmunities(target).has(effect.status)) return 0;
+
+  const duration = effect.duration === "permanent"
+    ? POISON_HORIZON
+    : (effect.durationTurns ?? (Number.isFinite(effect.duration) ? effect.duration : 1));
+  const offense = offenseEstimate(target, state);
+  const role = normalizeUnitAi(target.type).role;
+
+  let value;
+  switch (effect.status) {
+    case "blind":
+      value = offense * duration;
+      break;
+    case "silence":
+      value = offense * duration * (SILENCE_ROLE_MULT[role] ?? 1);
+      break;
+    case "slow":
+      value = offense * duration * SLOW_FACTOR;
+      break;
+    case "poison": {
+      const hp = Number.isFinite(survivingHp) ? survivingHp : target.hp;
+      value = (effect.turnStartDamage ?? 1) * Math.min(POISON_HORIZON, hp);
+      break;
+    }
+    default:
+      value = offense * duration;
+  }
+  return Math.min(value, unitThreatValue(target));
+}
+
+// Effective healing applied to `unit` for `amount`, capped by its missing HP (no
+// overheal). The currency is HP, same as damage.
+export function expectedHeal(unit, amount, state = null) {
+  const maxHp = getEffectiveStats(unit, state).maxHp;
+  return Math.max(0, Math.min(amount, maxHp - unit.hp));
+}
+
+// Expected outcome of a rolled strike — the basic ATTACK and every `strike` ART.
+// `art` (optional) supplies `damageType` (magic reaches through / ignores DEF) and
+// the status/heal rider; pass null for a basic attack. Mirrors resolveTargetedArt:
+// a missed swing deals nothing and lands no rider, and the status rider only fires
+// if the target survives the hit.
+export function expectedStrike(state, attacker, target, art = null) {
+  const damageType = art?.damageType ?? "physical";
+  const normal = resolveBaseStrike(attacker, target, { proximity: true, critical: false, state, damageType }).damage;
+  const crit = resolveBaseStrike(attacker, target, { proximity: true, critical: true, state, damageType }).damage;
+
+  const pMiss = getMissChance(attacker);
+  const pHit = 1 - pMiss;
+  const pCrit = getCritChance(attacker);
+
+  const expDamage = pHit * ((1 - pCrit) * normal + pCrit * crit);
+  const normalKills = normal >= target.hp;
+  const critKills = crit >= target.hp;
+  const pKill = pHit * ((1 - pCrit) * (normalKills ? 1 : 0) + pCrit * (critKills ? 1 : 0));
+  const expTargetHp = Math.max(0, target.hp - expDamage);
+
+  let riderValue = 0;
+  if (art?.effect?.type === "status") {
+    // Rider only rolls on a landing swing that the target survives.
+    const pSurvive = pHit * ((1 - pCrit) * (normalKills ? 0 : 1) + pCrit * (critKills ? 0 : 1));
+    riderValue = pSurvive * (art.effect.chance ?? 1) *
+      statusValue(target, art.effect, state, { survivingHp: Math.max(1, Math.ceil(expTargetHp)) });
+  } else if (art?.effect?.type === "heal") {
+    // Self-heal (Life Sap): half the damage dealt, on a successful effect roll.
+    const healAmount = Math.round(normal / 2);
+    riderValue = pHit * (art.effect.chance ?? 1) * expectedHeal(attacker, healAmount, state);
+  }
+
+  return { expDamage, pKill, expTargetHp, normalDamage: normal, critDamage: crit, riderValue };
+}
+
+// A fixed-amount, no-roll hit against one target — the per-target math for AoE and
+// pulse ARTS (the planner sums this over the ability's target set). `true` damage
+// ignores DEF, Defend, and team reduction (Volley Shot, tile pulses); `magic`
+// honors Defend halving and Dead Zone, matching resolveNuke / resolveDamage.
+export function expectedFixedHit(state, target, { amount, type }) {
+  let damage;
+  if (type === "true") {
+    damage = Math.max(0, amount);
+  } else if (type === "magic") {
+    const defender = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+    const base = defender.defending ? Math.ceil(Math.max(0, amount) / 2) : Math.max(0, amount);
+    damage = Math.max(0, base - getTeamDamageReduction(target, state, "magic"));
+  } else {
+    throw new Error(`expectedFixedHit: unsupported type "${type}"`);
+  }
+  const dealt = Math.min(damage, target.hp);
+  return { raw: damage, damage: dealt, kills: damage >= target.hp };
+}
+
+// Expected damage the enemy squad could land on `victim` next turn if it stood at
+// `pos`, approximated by reach = effective move + attack range. Deliberately ignores
+// blockers and turn order (an over-estimate) so the CPU keeps its key units wary of
+// crossfire. `defending` lowers it, which is why bracing scores well under pressure.
+export function incomingThreat(state, victim, pos, defending = false) {
+  const proxy = { ...victim, position: { x: pos.x, y: pos.y }, defending };
+  let threat = 0;
+  for (const enemy of livingUnits(state)) {
+    if (!areEnemies(enemy, victim)) continue;
+    const stats = getEffectiveStats(enemy, state);
+    if (chebyshevDistance(enemy.position, pos) > stats.moveRange + stats.attackRange) continue;
+    threat += expectedStrike(state, enemy, proxy).expDamage;
+  }
+  return threat;
+}
+
+// Chebyshev distance from `pos` to the nearest living enemy of `forPlayer`. Used to
+// reward closing the gap when no attack is available yet; 0 when no enemy remains.
+export function nearestEnemyDistance(state, forPlayer, pos) {
+  let best = Infinity;
+  for (const enemy of livingUnits(state)) {
+    if (enemy.player === forPlayer) continue;
+    best = Math.min(best, chebyshevDistance(enemy.position, pos));
+  }
+  return best === Infinity ? 0 : best;
+}

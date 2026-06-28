@@ -2,6 +2,7 @@ export const ARCHER = Object.freeze({
   id: "archer",
   name: "Archer",
   glyph: "🏹",
+  ai: Object.freeze({ threatValue: 12, role: "ranged", protect: true }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 5,
@@ -33,7 +34,8 @@ export const ARCHER = Object.freeze({
       targeting: Object.freeze({ shape: "cone", range: 5 }),
       damage: Object.freeze({ type: "true", amount: 2 }),
       description: "Select a range-5 cone and deal 2 true damage to every enemy in it. Close Shot bonuses apply by target.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "coneAoe", evHints: Object.freeze({ minTargets: 2 }) })
     }),
     Object.freeze({
       id: "poison-arrow",
@@ -42,7 +44,8 @@ export const ARCHER = Object.freeze({
       mpCost: 4,
       effect: Object.freeze({ type: "status", status: "poison", chance: 0.6, duration: "permanent", turnStartDamage: 1 }),
       description: "Attack, then apply permanent poison on a 60% effect check.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "leg-shot",
@@ -57,7 +60,8 @@ export const ARCHER = Object.freeze({
         statModifiers: Object.freeze({ moveRange: -1 })
       }),
       description: "Attack, then apply -1 MOVE Slow for 3 turns on a 60% effect check.",
-      implemented: true
+      implemented: true,
+      ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "emblem",
