@@ -1,0 +1,11 @@
+{
+  "title": "Tactical Arena",
+  "tagline": "Seven warriors, real stat blocks, every tile a gamble.",
+  "description": "A turn-based isometric tactics duel on a fantasy war-table — the successor to Mini-Tactics. Draft a custom squad from a roster of swordsmen, archers, mystics, magicians, paladins, necromancers, and snipers, each with their own stat block, ARTS abilities, passives, and status effects (blind, silence, poison, slow). Line up to-hit and crit rolls, block line-of-sight with bodies, raise cover walls, and burn the board. Play local hot-seat 1v1 or single-player vs CPU on three difficulties.",
+  "players": "1-2",
+  "status": "Playable — local hot-seat 1v1 and single-player vs CPU (3 difficulties)",
+  "order": 12,
+  "featured": false,
+  "theme": "ember",
+  "accentColor": "#c8943a"
+}
