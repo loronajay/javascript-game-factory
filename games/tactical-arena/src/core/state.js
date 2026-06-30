@@ -94,6 +94,11 @@ export function createBattleState({ size = 13, units, seed, tiles = [], tileObje
     activation: null,
     winner: null,
     phase: "playing",
+    // Monotonic command counter (incremented by the reducer on every accepted
+    // command). It is the transport sequence key for online lockstep — the lobby
+    // owner broadcasts its state hash keyed by this revision — and is deliberately
+    // EXCLUDED from the state hash itself (see core/state-hash.js).
+    revision: 0,
     // Authoritative roll seed lives in match state so every actor draws identical
     // rolls from the same seed + command stream. A fresh match varies; an online
     // or replay match is handed a fixed seed.

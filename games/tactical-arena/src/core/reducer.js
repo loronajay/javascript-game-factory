@@ -34,6 +34,10 @@ const reject = (errorCode) => ({ accepted: false, errorCode });
 // Surface any rollover side-effects (fire-tile burns) the turn flip queued onto the
 // state, then clear them so they never persist into the returned state or a clone.
 const accept = (nextState, events = []) => {
+  // Every accepted command bumps the monotonic revision (the online lockstep
+  // sequence key). This is the single increment point — all accepted paths return
+  // through here — and it is excluded from the state hash (see core/state-hash.js).
+  nextState.revision = (nextState.revision ?? 0) + 1;
   const rollover = nextState.pendingRolloverEvents;
   if (rollover) delete nextState.pendingRolloverEvents;
   return { accepted: true, nextState, events: rollover ? [...events, ...rollover] : events };
@@ -48,6 +52,7 @@ export function applyCommand(state, command) {
     case COMMANDS.DEFEND: return defend(state, command);
     case COMMANDS.USE_ART: return useArt(state, command);
     case COMMANDS.FINISH_ACTIVATION: return finishActivation(state, command);
+    case COMMANDS.CONCEDE: return concede(state, command);
     default: return reject(ERR.INVALID_COMMAND);
   }
 }
@@ -81,7 +86,13 @@ function beginActivation(state, command) {
   const unit = findUnit(next, command.unitId);
   const statusEvents = resolveTurnStartStatuses(unit);
   if (unit.hp <= 0) {
+    // The activating unit died to its own turn-start poison before opening an
+    // activation. Resolve victory, then hand off the turn if this was the player's
+    // last unspent commander (otherwise the match would soft-lock — see
+    // advanceTurnIfExhausted).
+    next.activation = null;
     resolveVictory(next);
+    advanceTurnIfExhausted(next);
     return accept(next, statusEvents);
   }
   unit.defending = false;
@@ -641,8 +652,17 @@ function spendAndAdvance(state, unit) {
   }
 
   state.activation = null;
-  // Summons never take turns, so they neither keep the turn open nor get their
-  // spent flag reset at the rollover.
+  advanceTurnIfExhausted(state);
+}
+
+// Pass the turn to the other player once the current one has no unspent living
+// commander left. Shared by the normal end-of-activation path AND the rare
+// turn-start death: a unit that dies to poison on BEGIN never opens an activation,
+// so if it was the player's last unspent commander the turn must still hand off here
+// — otherwise that player soft-locks the match with no legal move. Summons never
+// take turns, so they neither keep the turn open nor get their spent flag reset.
+function advanceTurnIfExhausted(state) {
+  if (state.phase !== "playing") return;
   if (livingUnits(state, state.currentPlayer).some((member) => takesTurns(member) && !member.spent)) return;
   state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
   state.turnNumber += 1;
@@ -676,6 +696,32 @@ function applyFireTick(state, events) {
     obj.turnsLeft -= 1;
     if (obj.turnsLeft <= 0) delete state.tileObjects[key];
   }
+}
+
+// A player resigns. Their living units all drop out, then victory is re-resolved
+// (in a 1v1 this always completes the match for the opponent). Written
+// player-generically so it carries forward to FFA/teams: if the match continues and
+// the conceding player was on the clock, the turn passes on. Summons follow their
+// commander out, so a forfeit can't leave a lone Ghoul stalling the board.
+function concede(state, command) {
+  if (!Number.isInteger(command.player) || command.player < 1) return reject(ERR.INVALID_COMMAND);
+  const next = cloneState(state);
+  const events = [];
+  for (const unit of next.units) {
+    if (unit.player === command.player && unit.hp > 0) {
+      unit.hp = 0;
+      events.push({ type: "UNIT_DEFEATED", unitId: unit.id });
+    }
+  }
+  events.push({ type: "PLAYER_CONCEDED", player: command.player });
+  next.activation = null;
+  resolveVictory(next);
+  if (next.phase === "playing" && next.currentPlayer === command.player) {
+    next.currentPlayer = next.currentPlayer === 1 ? 2 : 1;
+    next.turnNumber += 1;
+    for (const member of livingUnits(next, next.currentPlayer)) if (takesTurns(member)) member.spent = false;
+  }
+  return accept(next, events);
 }
 
 function resolveVictory(state) {

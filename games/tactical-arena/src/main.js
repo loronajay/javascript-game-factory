@@ -1,4 +1,4 @@
-import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
+import { attack, attackTile, beginActivation, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
@@ -62,6 +62,33 @@ function isCpu(player) {
   return Boolean(cpu && cpu.players.has(player));
 }
 
+// --- Online (multiplayer) ---
+// `net` is null in local play; in online it is the deterministic-lockstep session
+// bridge (src/online/onlineSession.js). `mySeat` is the local player's seat number;
+// only my own seat's input is accepted — the opponent's moves arrive as remote
+// commands. `applyingRemote` suppresses the broadcast hook while we replay an
+// opponent's command, so a replayed command is never echoed back. Online and `cpu`
+// are mutually exclusive (no CPU in an online match).
+let net = null;
+let mySeat = null;
+let applyingRemote = false;
+
+// Input is locked during an animation (`resolving`) AND, online, whenever it is not
+// the local seat's turn. This is the single gate every input entry point checks —
+// without the seat check a player could open the OPPONENT's activation on their turn
+// (both beginUnit and the reducer only check currentPlayer), breaking lockstep.
+function inputLocked() {
+  return resolving || (net != null && state.currentPlayer !== mySeat);
+}
+
+// Broadcast a locally-originated accepted command to the opponent. Skipped while
+// replaying a remote command (applyingRemote) and a no-op in local play (net null).
+// The command carries NO rolls — both clients draw identical dice from the shared
+// seeded rngState — so the raw command is all the peer needs to stay in lockstep.
+function broadcastIfLocal(command) {
+  if (net && !applyingRemote) net.onLocalCommandApplied(command);
+}
+
 // --- Match metadata ---
 let matchConfig = null;
 let matchStartedAt = 0;
@@ -76,7 +103,7 @@ let audioUnlocked = false;
 const rulesModal = new RulesModal(refModal, document.querySelector("#refCloseBtn"));
 const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
 const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
-const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex });
+const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex, onLeaveMatch });
 
 // Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
 // once — it's independent of board size and presentation only.
@@ -108,29 +135,53 @@ function setMessage(text, isError = false) {
 function startMatch(config) {
   window.clearTimeout(resultsTimer);
   matchEpoch += 1;
-  state = createBattleState({ size: config.size, units: buildRoster(config.squads, config.size) });
+  const online = config.mode === "online";
+  // Online builds from the relay's shared seed so every client draws identical dice;
+  // local play omits it for a fresh random seed each match.
+  state = createBattleState({ size: config.size, units: buildRoster(config.squads, config.size), seed: online ? config.seed : undefined });
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
   initialHpByPlayer = { 1: hpRemaining(state, 1), 2: hpRemaining(state, 2) };
-  // Single-player drives Player 2 with the CPU; hot-seat leaves cpu null.
+  // Single-player drives Player 2 with the CPU; hot-seat and online leave cpu null.
   cpu = config.mode === "single" ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) } : null;
   cpuThinking = false;
+  // Online wiring: bind the lockstep session, remember our seat. Mutually exclusive
+  // with cpu. A networked match can't be unilaterally restarted, so hide Restart.
+  net = online ? config.net : null;
+  mySeat = online ? config.mySeat : null;
+  applyingRemote = false;
+  document.querySelector("#restartBtn").hidden = online;
   selectedId = null;
   mode = null;
   footworkPath = [];
   volleyShotOrigin = null;
   resolving = false;
   turnFlash.clear();
-  setMessage("Player 1 opens the battle.");
+  setMessage(online
+    ? (state.currentPlayer === mySeat ? "You open the battle." : "Opponent's turn — please wait.")
+    : "Player 1 opens the battle.");
   menu.show("match");
   if (audioUnlocked && !muted) audio.startMusic("battle");
+  // Bind AFTER the match screen + state exist so any remote commands buffered during
+  // the lobby→match handoff flush onto a live board.
+  if (online) net.bind(onlineController);
   render();
   announceTurn(state.currentPlayer);
 }
 
 function resetBattle() {
+  if (net) return; // a networked match can't be unilaterally restarted
   startMatch(matchConfig ?? { size: 13, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
+}
+
+// Called by the menu when the match screen is left. Abandon a still-live online
+// match (the remaining peer wins by walkover); a cleanly finished one already ran
+// net.endMatch(), so we only null our handles here.
+function onLeaveMatch() {
+  if (net && state.phase === "playing") net.dispose();
+  net = null;
+  mySeat = null;
 }
 
 function announceTurn(player, { hold = false } = {}) {
@@ -143,12 +194,14 @@ function announceTurn(player, { hold = false } = {}) {
 
 function announceTurnChange(prevPlayer) {
   if (state.phase === "complete") {
+    net?.endMatch(); // clean finish: let the session keep the socket alive briefly for the peer
     announceTurn(state.winner);
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
     window.clearTimeout(resultsTimer);
     resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
   } else if (state.currentPlayer !== prevPlayer) {
     announceTurn(state.currentPlayer);
+    if (net && state.currentPlayer !== mySeat) setMessage("Opponent's turn — please wait.");
   }
 }
 
@@ -162,6 +215,7 @@ function dispatch(command) {
   }
   const prevPlayer = state.currentPlayer;
   state = result.nextState;
+  broadcastIfLocal(command);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -255,6 +309,7 @@ async function resolveCombat(command) {
   }
 
   state = result.nextState;
+  broadcastIfLocal(command);
   playEventSounds(events);
   playRolloverFx(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -297,6 +352,7 @@ async function resolveWallAttack(command) {
   }
 
   state = result.nextState;
+  broadcastIfLocal(command);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -420,6 +476,7 @@ async function resolveInstantArt(command) {
   }
 
   state = result.nextState;
+  broadcastIfLocal(command);
   playEventSounds(events);
   playRolloverFx(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -538,6 +595,86 @@ async function resolveCpuMove(command) {
   return true;
 }
 
+// --- Online driver ---
+//
+// The lockstep session (src/online/onlineSession.js) calls into `onlineController`:
+// it replays the opponent's accepted commands through applyRemoteCommand (the SAME
+// reducer + resolvers a human's clicks use, so a remote move animates and validates
+// identically), reads getMatchState for the per-revision hash, and routes
+// disconnect/desync endings here. We push our own accepted commands the other way
+// via net.onLocalCommandApplied (the broadcastIfLocal hook on every commit path).
+
+// Replay one command the opponent broadcast. `applyingRemote` suppresses the
+// broadcast hook so we don't echo it back; the session serializes these so they
+// never overlap an in-flight animation. Routing mirrors applyCpuCommand — the same
+// animated resolvers — plus a CONCEDE case for a forfeit/disconnect.
+async function applyRemoteCommand(command) {
+  applyingRemote = true;
+  try {
+    switch (command.type) {
+      case "BEGIN_ACTIVATION": {
+        if (!dispatch(command)) return;
+        selectedId = command.unitId;
+        const unit = findUnit(state, command.unitId);
+        if (unit) setMessage(`Opponent activates its ${getUnitType(unit.type).name}.`);
+        render();
+        await sleep(CPU_STEP_MS);
+        return;
+      }
+      case "MOVE_UNIT": await resolveCpuMove(command); return;
+      case "ATTACK":
+        if (command.targetPosition) await resolveWallAttack(command);
+        else await resolveCombat(command);
+        return;
+      case "DEFEND": dispatch(command); render(); return;
+      case "USE_ART": {
+        // A strike ART rolls to-hit (resolveCombat handles the hit path); every other
+        // ART is instant. Peek the events to route — applyCommand is pure.
+        const peek = applyCommand(state, command);
+        const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e);
+        if (rolled) await resolveCombat(command); else await resolveInstantArt(command);
+        return;
+      }
+      case "FINISH_ACTIVATION": dispatch(command); render(); return;
+      case "CONCEDE": dispatch(command); render(); return;
+      default: return;
+    }
+  } finally {
+    applyingRemote = false;
+  }
+}
+
+// The session bridge's view of us — method names match onlineSession's expectations.
+const onlineController = {
+  getMatchState: () => state,
+  applyRemoteCommand,
+  // A peer dropped and we're the owner: inject a concede for its seat into the
+  // ordered command stream. Goes through the LOCAL path (dispatch), so it broadcasts
+  // and advances exactly like any other command.
+  applyOwnerConcede(seat) {
+    if (!net) return;
+    dispatch(concede(seat));
+    render();
+  },
+  endOnDesync() { endOnlineMatch("Match desynced", "The game states diverged. Match ended."); },
+  endOnDisconnect(reason) { endOnlineMatch("Disconnected", reason || "Lost connection to the match."); },
+};
+
+// Tear down an online match that ended abnormally (desync / lost connection) and
+// drop back to the menu. The clean-win path uses net.endMatch() instead (it keeps
+// the socket alive briefly so the peer can finish animating).
+function endOnlineMatch(title, sub) {
+  if (!net) return;
+  net.dispose();
+  net = null;
+  mySeat = null;
+  resolving = true;
+  turnFlash.announce({ title, sub, color: "#c4463f", hold: true });
+  setMessage(sub, true);
+  window.clearTimeout(resultsTimer);
+  resultsTimer = window.setTimeout(() => { resolving = false; menu.show("mainMenu"); }, 2200);
+}
+
 function maybeAutoFinish() {
   const activation = state.activation;
   if (activation && activation.moved && activation.primaryUsed) {
@@ -619,7 +756,7 @@ function playRolloverFx(events) {
 // --- Input ---
 
 function beginUnit(unit) {
-  if (resolving) return;
+  if (inputLocked()) return;
   if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0) return;
   // Re-selecting the already-active unit (e.g. after deselecting mid-activation)
   // should not re-dispatch beginActivation — that would reset moved/primaryUsed.
@@ -641,7 +778,7 @@ function beginUnit(unit) {
 }
 
 async function handleTile(position) {
-  if (resolving) return;
+  if (inputLocked()) return;
   const unit = selectedUnit();
   if (!unit) {
     const clicked = unitAt(state, position);
@@ -775,6 +912,7 @@ async function handleTile(position) {
 
 // Action button handler — called by renderActions with the action string.
 async function handleActionClick(action, unit) {
+  if (inputLocked()) return;
   if (action === "defend") {
     if (dispatch(defend(state.currentPlayer, unit.id))) {
       setMessage("Defending: incoming physical and magic damage is halved.");

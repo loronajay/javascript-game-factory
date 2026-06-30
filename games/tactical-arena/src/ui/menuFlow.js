@@ -6,17 +6,33 @@
 // flagged "Soon" until their units/CPU/online land.
 import { ScreenManager } from "./screenManager.js";
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
+import { createOnlineFlow } from "./onlineFlow.js";
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };
 const CONFETTI_COUNT = 44;
 
-export function createMenuFlow({ audio, onStartMatch, openCodex }) {
+export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
-  for (const name of ["title", "mainMenu", "hsSetup", "spSetup", "results", "match"]) {
+  for (const name of ["title", "mainMenu", "hsSetup", "spSetup", "results"]) {
     screens.register(name, { el: screenEl(name) });
+  }
+  // The match screen disposes a live online session when left mid-game.
+  screens.register("match", { el: screenEl("match"), onExit: () => onLeaveMatch?.() });
+
+  // Online Versus owns its own relay client; it calls startMatchTracked once the
+  // lobby starts and both squads are exchanged. Registered with ScreenManager's
+  // onEnter/onExit so connecting/disconnecting is tied to the screen lifecycle.
+  const onlineFlow = createOnlineFlow({ onStartMatch: startMatchTracked });
+  screens.register("onlineSetup", { el: onlineFlow.el, onEnter: onlineFlow.onEnter, onExit: onlineFlow.onExit });
+
+  // Every match start routes through here so `lastConfig` (used by the results
+  // screen + Rematch) tracks hot-seat, single-player, AND online identically.
+  function startMatchTracked(config) {
+    lastConfig = config;
+    onStartMatch(config);
   }
 
   // ── Setup screens: board size + custom squads (and difficulty for solo) ───
@@ -52,19 +68,26 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
   const burstEl = $("[data-results='burst']", results);
   let lastConfig = null;
 
+  const rematchBtn = $("[data-action='rematch']", results);
+
   function showResults(summary) {
+    const online = lastConfig?.mode === "online";
     $("[data-results='winner']", results).textContent = `Player ${summary.winner} wins.`;
     $("[data-results='winner']", results).style.setProperty("--team", TEAM_COLOR[summary.winner]);
     renderReport($("[data-results='report']", results), summary.teams);
     const stats = $("[data-results='stats']", results);
     stats.innerHTML = "";
-    addStat(stats, "Mode", lastConfig?.mode === "single"
-      ? `Single Player · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
-      : "Hot Seat");
+    addStat(stats, "Mode", online
+      ? "Online Versus"
+      : lastConfig?.mode === "single"
+        ? `Single Player · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
+        : "Hot Seat");
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));
     addStat(stats, "Duration", formatDuration(summary.durationMs));
     addStat(stats, "Ended by", "Squad eliminated");
+    // A finished online session can't be locally replayed — Main Menu only.
+    if (rematchBtn) rematchBtn.hidden = online;
     screens.show("results");
     spawnConfetti(burstEl, TEAM_COLOR[summary.winner]);
   }
@@ -109,9 +132,9 @@ export function createMenuFlow({ audio, onStartMatch, openCodex }) {
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
       case "settings": openSettings(); break;
-      case "startHotSeat": { lastConfig = gatherHotSeatConfig(); onStartMatch(lastConfig); break; }
-      case "startSingle": { lastConfig = gatherSingleConfig(); onStartMatch(lastConfig); break; }
-      case "rematch": if (lastConfig) onStartMatch(lastConfig); break;
+      case "startHotSeat": { startMatchTracked(gatherHotSeatConfig()); break; }
+      case "startSingle": { startMatchTracked(gatherSingleConfig()); break; }
+      case "rematch": if (lastConfig && lastConfig.mode !== "online") startMatchTracked(lastConfig); break;
       default: break;
     }
   });

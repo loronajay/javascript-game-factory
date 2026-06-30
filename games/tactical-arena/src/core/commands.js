@@ -4,7 +4,8 @@ export const COMMANDS = Object.freeze({
   ATTACK: "ATTACK",
   DEFEND: "DEFEND",
   USE_ART: "USE_ART",
-  FINISH_ACTIVATION: "FINISH_ACTIVATION"
+  FINISH_ACTIVATION: "FINISH_ACTIVATION",
+  CONCEDE: "CONCEDE"
 });
 
 export const beginActivation = (player, unitId) => ({ type: COMMANDS.BEGIN_ACTIVATION, player, unitId });
@@ -22,3 +23,8 @@ export const useArt = (player, unitId, artId, options = []) => {
   return { type: COMMANDS.USE_ART, player, unitId, artId, ...targeting };
 };
 export const finishActivation = (player, unitId) => ({ type: COMMANDS.FINISH_ACTIVATION, player, unitId });
+// A player resigns: every one of their living units drops out. In a duel this hands
+// victory to the opponent immediately. Online, a mid-match disconnect is modelled by
+// the surviving lobby owner injecting this command for the departed seat into the
+// same ordered command stream, so every client resolves it deterministically.
+export const concede = (player) => ({ type: COMMANDS.CONCEDE, player });
