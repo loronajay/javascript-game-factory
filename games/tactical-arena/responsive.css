@@ -445,14 +445,19 @@ body:has(.ref-modal:not([hidden])) .back-link {
     padding: .6rem .85rem;
   }
 
-  .roster-detail-hero {
-    gap: .6rem;
-    margin-bottom: .45rem;
+  /* Short landscape phone: shrink the portrait + tighten the split so the stat
+     card still fits beside it without crushing the unit grid above. */
+  .roster-detail-split {
+    gap: .7rem;
   }
 
-  .roster-figure-svg {
-    width: 72px;
-    height: 96px;
+  .roster-detail-info h3 {
+    margin-bottom: .35rem;
+  }
+
+  .roster-detail-split .unit-portrait.is-hero {
+    width: 96px;
+    height: 132px;
   }
 
   /* Footer: tighter so Place / Done never get pushed off a short screen. */
@@ -468,5 +473,66 @@ body:has(.ref-modal:not([hidden])) .back-link {
 
   .roster-assign {
     min-width: 9.5rem !important;
+  }
+}
+
+/* -----------------------------------------------------------------------
+   Mobile performance mode (coarse pointer)
+
+   A turn-based game has no render loop, so every continuous GPU cost is a CSS
+   animation or filter. On phones the worst offenders are the full-screen
+   animated backdrop layers that combine filter:blur() with mix-blend-mode
+   (aurora, rays, fog, clouds) and the glowing ember field — animated blur+blend
+   is the textbook cause of mobile jank. style.css only sheds these under OS-level
+   prefers-reduced-motion, which almost no phone user enables, so do it for every
+   touch device here. We keep a static sky + stars + fortress silhouette so the
+   scene still reads; desktop keeps the full ambiance.
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  /* Drop the blur/blend/glow backdrop layers entirely (embers are also skipped
+     at the source in sceneBackdrop.js so they never get built). */
+  .bk-aurora,
+  .bk-rays,
+  .bk-fog,
+  .bk-clouds,
+  .bk-ember {
+    display: none;
+  }
+
+  /* Keep the cheap static layers but stop their perpetual repaint. .bk-sky
+     animates filter:brightness on a full-viewport gradient — a full-screen
+     repaint every frame. */
+  .bk-sky,
+  .bk-stars,
+  .bk-window {
+    animation: none !important;
+  }
+
+  /* The fortress silhouette stays, but lose its blurred backlight glow. */
+  .bk-fortress::before {
+    display: none;
+  }
+
+  .bk-fortress-svg {
+    filter: none;
+  }
+
+  /* Hold the resting frame on the always-on board/unit/status animations. */
+  .unit.idle:not(.spent) .body-group,
+  .status-badge,
+  .tile.aura-zone .tile-face,
+  .tile.legal-move .tile-face,
+  .tile.legal-attack .tile-face,
+  .tile.legal-art .tile-face,
+  .tile.legal-heal .tile-face,
+  .tile.path .tile-face,
+  .tile.cone-hot .tile-face {
+    animation: none;
+  }
+
+  /* Per-unit blurred drop-shadow: an SVG blur filter re-rasterized on every
+     board rebuild. A flat shadow composites for free. */
+  .unit .shadow {
+    filter: none;
   }
 }

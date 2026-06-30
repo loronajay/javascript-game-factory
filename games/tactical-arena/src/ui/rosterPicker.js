@@ -11,11 +11,8 @@
 // carries the draft/ranked uniqueness rule (false greys out used units).
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
-import { createUnitFigurine } from "./unitRenderer.js";
-import { svgElement } from "./svgHelpers.js";
+import { createPortrait } from "./portraits.js";
 import { UNIT_TYPE_KEYS, SLOT_LAYOUT, normalizeSquad, availableTypesForSlot } from "./squadModel.js";
-
-const SVG_NS = "http://www.w3.org/2000/svg";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 
@@ -129,17 +126,22 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     function paintDetail() {
       const def = UNIT_TYPES[focusedType];
       const section = el("section", "ref-unit codex-unit-detail");
-      // Hero band: the actual carved figurine (team-tinted) beside the name, so
-      // players see the piece they're drafting — not just a text block.
-      const hero = el("div", "roster-detail-hero");
-      hero.append(figureStage(focusedType, accent));
+      // Two-column card: a large painted portrait on the LEFT, the unit's name +
+      // stats/passives/ARTS to its RIGHT — so players read the figure they're
+      // drafting alongside its data. The portrait self-frames to a consistent
+      // scale (see portraits.js); the team accent rings the frame.
+      const split = el("div", "roster-detail-split");
+      const portrait = createPortrait(focusedType, { variant: "is-hero" });
+      portrait.style.setProperty("--team", accent || "var(--p1)");
+      split.append(portrait);
+      const info = el("div", "roster-detail-info");
       const name = document.createElement("h3");
       name.innerHTML = `<span class="ref-glyph">${def.glyph}</span>${escapeHtml(def.name)}`;
-      hero.append(name);
-      section.append(hero);
       const bodyHtml = document.createElement("div");
       bodyHtml.innerHTML = unitDetailHtml(def);
-      section.append(bodyHtml);
+      info.append(name, bodyHtml);
+      split.append(info);
+      section.append(split);
       detail.replaceChildren(section);
     }
 
@@ -194,25 +196,6 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
     overlay.hidden = false;
   });
-}
-
-// A standing-figurine portrait. Reuses the board's carved-miniature builder; the
-// `.unit` wrapper scopes the shared `.fig-*` material CSS and `--team` tints the
-// cloak/glow to the picking player's colour. Figure space puts the feet at (0,0)
-// and the piece rises into -y, so the viewBox frames the body with a small plinth.
-function figureStage(type, accent) {
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("class", "roster-figure-svg");
-  svg.setAttribute("viewBox", "-30 -64 60 80");
-  svg.setAttribute("aria-hidden", "true");
-  const stage = svgElement("g", { class: "unit", style: `--team:${accent || "var(--p1)"}` });
-  stage.append(
-    svgElement("ellipse", { class: "roster-plinth-side", cx: 0, cy: 11, rx: 19, ry: 6 }),
-    svgElement("ellipse", { class: "roster-plinth-top", cx: 0, cy: 8, rx: 19, ry: 6 }),
-    createUnitFigurine(type)
-  );
-  svg.append(stage);
-  return svg;
 }
 
 function clampSlot(index) {

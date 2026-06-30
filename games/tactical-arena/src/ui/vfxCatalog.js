@@ -11,6 +11,7 @@ const ABILITY_VFX = Object.freeze({
     type: "dashTrail",
     soundKey: "footwork",
     durationMs: 760,
+    stepMs: 190,
     afterimageCount: 4,
     sparkCount: 10,
     colors: Object.freeze({ core: "#f8f2c0", trail: "#7fd7ff", impact: "#fff1a6" })

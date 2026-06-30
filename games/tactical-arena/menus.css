@@ -72,12 +72,14 @@
 .roster-unit-flag { font:700 .5rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 .roster-detail { flex:1; overflow-y:auto; padding:1rem 1.1rem; }
 .roster-detail .ref-unit { padding-top:0; border-bottom:0; }
-/* Figurine portrait beside the unit name */
-.roster-detail-hero { display:flex; align-items:center; gap:1rem; margin-bottom:.7rem; }
-.roster-detail-hero h3 { margin:0; }
-.roster-figure-svg { width:108px; height:144px; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); box-shadow:inset 0 1px 0 rgba(160,210,255,.12), inset 0 0 24px rgba(0,10,20,.5); }
-.roster-plinth-top { fill:color-mix(in srgb,var(--team,var(--p1)) 32%,#0b1622); stroke:rgba(160,210,255,.25); stroke-width:1; }
-.roster-plinth-side { fill:#0a141e; }
+/* Drafting detail card: large painted portrait on the LEFT, unit data on the RIGHT.
+   The portrait (ui/portraits.js) self-frames to a consistent scale; the team accent
+   rings the frame so the player still reads which side they're drafting for. */
+.roster-detail-split { display:flex; align-items:flex-start; gap:1.2rem; }
+.roster-detail-info { flex:1; min-width:0; }
+.roster-detail-info h3 { margin:0 0 .6rem; }
+.roster-detail-split .unit-portrait.is-hero { width:172px; height:240px; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(160,210,255,.12), inset 0 0 24px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--p1)) 45%,transparent); }
+.roster-detail-split .is-glyph-fallback { font-size:3rem; }
 .roster-foot { display:flex; align-items:center; gap:.6rem; padding:.8rem 1.1rem; border-top:1px solid var(--parchment-edge); background:linear-gradient(0deg,#162230,#0c1820); flex-shrink:0; }
 .roster-foot .menu-btn { width:auto; min-width:7rem; }
 /* Contextual Place button — the primary build action; strong brass call-to-action. */

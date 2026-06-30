@@ -89,14 +89,22 @@ function buildEmbers(count) {
 
 export function mountSceneBackdrop(container) {
   if (!container) return;
-  container.replaceChildren(
+  // This is a turn-based game with no render loop, so the only continuous GPU
+  // cost is CSS animation. On phones the animated blur/blend backdrop layers and
+  // the ember field are the dominant cause of jank — responsive.css strips the
+  // heavy layers on a coarse pointer, and we skip the ember field at the source
+  // so we never even create 28 perpetually-animating nodes there.
+  const coarse =
+    typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const layers = [
     layer("bk-sky"),
     layer("bk-stars"),
     layer("bk-aurora"),
     buildSkyline(),
     layer("bk-clouds"),
     layer("bk-rays"),
-    layer("bk-fog"),
-    buildEmbers(28)
-  );
+    layer("bk-fog")
+  ];
+  if (!coarse) layers.push(buildEmbers(28));
+  container.replaceChildren(...layers);
 }

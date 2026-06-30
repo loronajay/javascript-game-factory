@@ -229,8 +229,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       effectsLayer.appendChild(particle);
       const animation = particle.animate([
         { transform: "translate(0,0) scale(.5)", opacity: 0 },
-        { transform: `translate(${drift * 4}px ${-12 - Math.abs(drift)}px) scale(1)`, opacity: 0.95, offset: 0.22 },
-        { transform: `translate(${to.x - from.x + drift}px ${to.y - from.y}px) scale(.45)`, opacity: 0 }
+        { transform: `translate(${drift * 4}px, ${-12 - Math.abs(drift)}px) scale(1)`, opacity: 0.95, offset: 0.22 },
+        { transform: `translate(${to.x - from.x + drift}px, ${to.y - from.y}px) scale(.45)`, opacity: 0 }
       ], {
         duration: vfx.durationMs ?? 680,
         delay: i * (vfx.staggerMs ?? 18),
@@ -277,8 +277,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         effectsLayer.appendChild(mote);
         const animation = mote.animate([
           { transform: "translate(0,0) scale(.45)", opacity: 0 },
-          { transform: `translate(${Math.cos(angle) * 12}px ${Math.sin(angle) * 8 - 8}px) scale(1)`, opacity: 0.9, offset: 0.28 },
-          { transform: `translate(${Math.cos(angle) * 22}px ${Math.sin(angle) * 16 - 26}px) scale(.3)`, opacity: 0 }
+          { transform: `translate(${Math.cos(angle) * 12}px, ${Math.sin(angle) * 8 - 8}px) scale(1)`, opacity: 0.9, offset: 0.28 },
+          { transform: `translate(${Math.cos(angle) * 22}px, ${Math.sin(angle) * 16 - 26}px) scale(.3)`, opacity: 0 }
         ], { duration: vfx.durationMs ?? 560, delay: i * 12, easing: "ease-out" });
         animations.push(waitForAnimation(animation).then(() => mote.remove()));
       }
@@ -310,11 +310,10 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     ], { duration: vfx.durationMs ?? 760, easing: "cubic-bezier(.2,.8,.2,1)" });
 
     const token = unitElement(actor.id);
-    // Relative offsets from bases[0] (the actor's SVG attribute position).
-    const originX = bases[0].x;
-    const originY = bases[0].y;
+    // ABSOLUTE board coords (a CSS transform replaces the SVG attribute, so each keyframe
+    // must carry the full position, not a delta). The token glides through every base.
     const tokenAnimation = token?.animate(bases.map((point, index) => ({
-      transform: `translate(${point.x - originX}px ${point.y - originY - (index % 2 ? 12 : 0)}px) scale(${index === bases.length - 1 ? 1.08 : 1})`,
+      transform: `translate(${point.x}px, ${point.y - (index % 2 ? 12 : 0)}px) scale(${index === bases.length - 1 ? 1.08 : 1})`,
       offset: bases.length === 1 ? 1 : index / (bases.length - 1)
     })), { duration: vfx.durationMs ?? 760, easing: "cubic-bezier(.17,.84,.28,1)", fill: "forwards" });
 
@@ -352,7 +351,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         effectsLayer.appendChild(spark);
         spark.animate([
           { transform: "translate(0,0) rotate(0deg)", opacity: 0.95 },
-          { transform: `translate(${Math.cos(angle) * 24}px ${Math.sin(angle) * 18}px) rotate(160deg)`, opacity: 0 }
+          { transform: `translate(${Math.cos(angle) * 24}px, ${Math.sin(angle) * 18}px) rotate(160deg)`, opacity: 0 }
         ], { duration: 430, delay: 220 + i * 10, easing: "ease-out" }).finished.catch(() => {}).then(() => spark.remove());
       }
     }
@@ -361,6 +360,79 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       waitForAnimation(trailAnimation).then(() => trail.remove()),
       tokenAnimation ? waitForAnimation(tokenAnimation) : Promise.resolve()
     ]);
+  }
+
+  // Footwork's signature dash: unlike the all-at-once dashTrail (still used by Flee),
+  // the actor slides tile-by-tile ALONG the chosen route, pausing a beat to strike each
+  // enemy it passes through at the exact moment of contact. `onContact(tile)` is awaited
+  // when the dasher arrives on each step, so the caller lands damage in cadence with the
+  // slide instead of dumping every hit after a teleport. Resolves under reduced-motion
+  // after firing each contact (so damage numbers still show) without moving the token.
+  async function footworkCharge(actor, path, onContact) {
+    if (!path?.length) return;
+    const vfx = getAbilityVfx("footwork");
+    if (!vfx) return;
+    sound.play(vfx.soundKey ?? "footwork");
+    if (reducedMotion()) {
+      for (const tile of path) await onContact?.(tile);
+      return;
+    }
+    const bases = [actor.position, ...path].map((position) => unitBase(position));
+    const lifted = bases.map((point) => ({ x: point.x, y: point.y - 7 }));
+    const stepMs = vfx.stepMs ?? 190;
+
+    // Ambient guide line drawn beneath the whole route for the duration of the charge.
+    const trailPath = lifted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+    const trail = svg("path", {
+      d: trailPath,
+      class: "fx-line fx-dash-trail",
+      stroke: vfx.colors.trail,
+      "stroke-width": 7,
+      filter: "url(#softGlow)"
+    });
+    trail.style.strokeDasharray = "18 12";
+    effectsLayer.appendChild(trail);
+    const trailAnimation = trail.animate([
+      { strokeDashoffset: "80", opacity: 0 },
+      { strokeDashoffset: "0", opacity: 0.9, offset: 0.2 },
+      { strokeDashoffset: "-80", opacity: 0 }
+    ], { duration: stepMs * path.length + 220, easing: "linear" });
+
+    const token = unitElement(actor.id);
+    for (let i = 1; i < bases.length; i += 1) {
+      // ABSOLUTE board coords (a CSS transform replaces the SVG attribute). Each segment
+      // holds with fill:forwards so the token waits in place during a contact strike.
+      const fromX = bases[i - 1].x;
+      const fromY = bases[i - 1].y;
+      const toX = bases[i].x;
+      const toY = bases[i].y;
+      if (token) {
+        await waitForAnimation(token.animate([
+          { transform: `translate(${fromX}px, ${fromY}px) scale(1.05)` },
+          { transform: `translate(${(fromX + toX) / 2}px, ${(fromY + toY) / 2 - 12}px) scale(1.12)`, offset: 0.5 },
+          { transform: `translate(${toX}px, ${toY}px) scale(1.05)` }
+        ], { duration: stepMs, easing: "cubic-bezier(.3,.7,.3,1)", fill: "forwards" }));
+      }
+      // Afterimage ghost left on the tile just vacated.
+      const ghostPoint = lifted[i];
+      const afterimage = svg("circle", {
+        class: "fx-afterimage",
+        cx: ghostPoint.x,
+        cy: ghostPoint.y + 8,
+        r: 6,
+        fill: vfx.colors.core,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(afterimage);
+      afterimage.animate([
+        { transform: "scale(.7)", opacity: 0.7 },
+        { transform: "scale(2.3)", opacity: 0 }
+      ], { duration: 380, easing: "ease-out" }).finished.catch(() => {}).then(() => afterimage.remove());
+
+      // Strike whoever stands on the tile we just reached, in the moment of contact.
+      await onContact?.(path[i - 1]);
+    }
+    await waitForAnimation(trailAnimation).then(() => trail.remove());
   }
 
   async function statusStrike(actor, target, vfx) {
@@ -378,8 +450,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         effectsLayer.appendChild(mote);
         const animation = mote.animate([
           { transform: "translate(0,0) scale(.5)", opacity: 0 },
-          { transform: `translate(${Math.cos(angle) * 14}px ${Math.sin(angle) * 8}px) scale(1)`, opacity: 0.9, offset: 0.25 },
-          { transform: `translate(${Math.cos(angle) * 30}px ${Math.sin(angle) * 22 - 18}px) scale(.35)`, opacity: 0 }
+          { transform: `translate(${Math.cos(angle) * 14}px, ${Math.sin(angle) * 8}px) scale(1)`, opacity: 0.9, offset: 0.25 },
+          { transform: `translate(${Math.cos(angle) * 30}px, ${Math.sin(angle) * 22 - 18}px) scale(.35)`, opacity: 0 }
         ], { duration: 520, delay: i * 14, easing: "ease-out" });
         animations.push(waitForAnimation(animation).then(() => mote.remove()));
       }
@@ -422,8 +494,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         effectsLayer.appendChild(puff);
         const animation = puff.animate([
           { transform: "translate(0,0) scale(.4)", opacity: 0 },
-          { transform: `translate(${Math.cos(angle) * spread * 0.5}px ${Math.sin(angle) * spread * 0.4 - 10}px) scale(1.1)`, opacity: 0.6, offset: 0.3 },
-          { transform: `translate(${Math.cos(angle) * spread}px ${Math.sin(angle) * spread * 0.6 - 22}px) scale(1.7)`, opacity: 0 }
+          { transform: `translate(${Math.cos(angle) * spread * 0.5}px, ${Math.sin(angle) * spread * 0.4 - 10}px) scale(1.1)`, opacity: 0.6, offset: 0.3 },
+          { transform: `translate(${Math.cos(angle) * spread}px, ${Math.sin(angle) * spread * 0.6 - 22}px) scale(1.7)`, opacity: 0 }
         ], { duration: 620, delay: i * 16, easing: "ease-out" });
         animations.push(waitForAnimation(animation).then(() => puff.remove()));
       }
@@ -523,14 +595,14 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       effectsLayer.appendChild(mote);
       const frames = blast
         ? [
-            { transform: `translate(${Math.cos(angle) * dist}px ${Math.sin(angle) * dist * 0.6 - 18}px) scale(.5)`, opacity: 0 },
+            { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist * 0.6 - 18}px) scale(.5)`, opacity: 0 },
             { transform: "translate(0,0) scale(.7)", opacity: 1, offset: 0.34 },
-            { transform: `translate(${Math.cos(angle) * dist * 1.15}px ${Math.sin(angle) * dist * 0.7 - 24}px) scale(.2)`, opacity: 0 }
+            { transform: `translate(${Math.cos(angle) * dist * 1.15}px, ${Math.sin(angle) * dist * 0.7 - 24}px) scale(.2)`, opacity: 0 }
           ]
         : [
             { transform: "translate(0,0) scale(.3)", opacity: 0 },
-            { transform: `translate(${Math.cos(angle) * dist * 0.4}px ${Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
-            { transform: `translate(${Math.cos(angle) * dist}px ${Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
+            { transform: `translate(${Math.cos(angle) * dist * 0.4}px, ${Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
+            { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
           ];
       animations.push(waitForAnimation(mote.animate(frames, { duration, delay: i * 8, easing: "ease-out" })).then(() => mote.remove()));
     }
@@ -620,21 +692,23 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
   // Slide a unit from its old tile to its new tile. Called after the board has
   // re-rendered the token at its DESTINATION, so we animate from the old point in.
-  // Keyframes use relative offsets (delta from the SVG attribute position) because
-  // WAAPI CSS transforms stack on top of the SVG `transform` attribute rather than
-  // replacing it — using absolute SVG coordinates here would double the offset.
+  // Keyframes use ABSOLUTE board coordinates that match the token's `transform`
+  // attribute. A CSS/WAAPI `transform` REPLACES the SVG `transform` attribute (it does
+  // not stack on top of it), so a relative `translate(0,0)` resting keyframe would fling
+  // the token to the SVG origin (0,0) and snap back — the old "teleport" bug. The final
+  // keyframe equals the element's resting `translate(base.x base.y)`, so the token lands
+  // exactly where the next render() will place it, with no jump.
   async function animateMovement(unitId, from, to) {
     const element = unitElement(unitId);
     if (!element || reducedMotion()) return;
     const fromBase = unitBase(from);
     const toBase = unitBase(to);
-    // SVG attr is already at toBase; dx/dy is the vector back to the old position.
-    const dx = fromBase.x - toBase.x;
-    const dy = fromBase.y - toBase.y;
+    const midX = (fromBase.x + toBase.x) / 2;
+    const midY = (fromBase.y + toBase.y) / 2;
     await element.animate([
-      { transform: `translate(${dx}px ${dy}px) scale(1)` },
-      { transform: `translate(0px -12px) scale(1.08)`, offset: 0.55 },
-      { transform: `translate(0px 0px) scale(1)` }
+      { transform: `translate(${fromBase.x}px, ${fromBase.y}px) scale(1)` },
+      { transform: `translate(${midX}px, ${midY - 12}px) scale(1.08)`, offset: 0.55 },
+      { transform: `translate(${toBase.x}px, ${toBase.y}px) scale(1)` }
     ], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" }).finished.catch(() => {});
   }
 
@@ -647,14 +721,15 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     if (!ranged) {
       const element = unitElement(attacker.id);
       if (!element || reducedMotion()) return;
-      // Relative offsets: SVG attr is already at fromBase; delta is a fraction toward target.
+      // Absolute coords around the attacker's base; delta is a fraction toward the target
+      // (a small wind-up away, then a lunge in, then settle back exactly onto the base).
       const deltaX = (toBase.x - fromBase.x) * 0.18;
       const deltaY = (toBase.y - fromBase.y) * 0.18;
       await element.animate([
-        { transform: `translate(0px 0px)` },
-        { transform: `translate(${-deltaX * 0.3}px ${-deltaY * 0.3}px)` },
-        { transform: `translate(${deltaX}px ${deltaY}px) scale(1.12)` },
-        { transform: `translate(0px 0px)` }
+        { transform: `translate(${fromBase.x}px, ${fromBase.y}px)` },
+        { transform: `translate(${fromBase.x - deltaX * 0.3}px, ${fromBase.y - deltaY * 0.3}px)` },
+        { transform: `translate(${fromBase.x + deltaX}px, ${fromBase.y + deltaY}px) scale(1.12)` },
+        { transform: `translate(${fromBase.x}px, ${fromBase.y}px)` }
       ], { duration: 360, easing: "cubic-bezier(.2,.75,.2,1)" }).finished.catch(() => {});
       return;
     }
@@ -681,12 +756,13 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   async function hitRecoil(unitId, position, critical) {
     const element = unitElement(unitId);
     if (element && !reducedMotion()) {
-      // Relative offsets: SVG attr already positions the token; we just wobble it.
+      // Absolute coords around the token's base; a wobble that settles back onto it.
+      const base = unitBase(position);
       await element.animate([
-        { transform: `translate(0px 0px)` },
-        { transform: `translate(-8px 0px) rotate(-5deg)` },
-        { transform: `translate(7px 0px) rotate(4deg)` },
-        { transform: `translate(0px 0px)` }
+        { transform: `translate(${base.x}px, ${base.y}px)` },
+        { transform: `translate(${base.x - 8}px, ${base.y}px) rotate(-5deg)` },
+        { transform: `translate(${base.x + 7}px, ${base.y}px) rotate(4deg)` },
+        { transform: `translate(${base.x}px, ${base.y}px)` }
       ], { duration: 330, easing: "ease-out" }).finished.catch(() => {});
     }
     if (!reducedMotion()) await sleep(critical ? 110 : 70);
@@ -700,11 +776,11 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     shake(6);
     const element = unitElement(unitId);
     if (!element || reducedMotion()) return;
-    // Relative offsets: SVG attr already positions the token at `base`.
+    // Absolute coords around the token's base; it sinks and shrinks in place.
     await element.animate([
-      { transform: `translate(0px 0px) scale(1)`, opacity: 1 },
-      { transform: `translate(0px 8px) scale(1.12,.7) rotate(8deg)`, opacity: 0.75 },
-      { transform: `translate(0px 24px) scale(.2) rotate(30deg)`, opacity: 0 }
+      { transform: `translate(${base.x}px, ${base.y}px) scale(1)`, opacity: 1 },
+      { transform: `translate(${base.x}px, ${base.y + 8}px) scale(1.12,.7) rotate(8deg)`, opacity: 0.75 },
+      { transform: `translate(${base.x}px, ${base.y + 24}px) scale(.2) rotate(30deg)`, opacity: 0 }
     ], { duration: 620, easing: "cubic-bezier(.3,.7,.3,1)" }).finished.catch(() => {});
   }
 
@@ -732,5 +808,5 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     await sleep(120);
   }
 
-  return { setMetrics, shake, critFlash, impact, statusBurst, floatText, deathBurst, animateMovement, animateAttack, hitRecoil, deathDissolve, rollReveal, playAbilityVfx };
+  return { setMetrics, shake, critFlash, impact, statusBurst, floatText, deathBurst, animateMovement, animateAttack, hitRecoil, deathDissolve, rollReveal, playAbilityVfx, footworkCharge };
 }

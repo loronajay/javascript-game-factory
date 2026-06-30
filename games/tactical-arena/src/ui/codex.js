@@ -1,4 +1,5 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { createPortrait } from "./portraits.js";
 
 export const STAT_GLOSSARY = [
   ["Blind", "Afflicted unit's next attack automatically misses. Duration set per ability."],
@@ -91,11 +92,21 @@ export function mountCodex(containerEl, unitTypeDefs) {
 
   function showUnit(def) {
     activate(def.id);
-    detail.innerHTML =
-      `<section class="ref-unit codex-unit-detail">` +
-      `<h3><span class="ref-glyph">${def.glyph}</span>${def.name}</h3>` +
-      unitDetailHtml(def) +
-      `</section>`;
+    const section = document.createElement("section");
+    section.className = "ref-unit codex-unit-detail";
+    // Hero band: the painted portrait beside the name, so the Codex reads as a
+    // character card, not just a stat block. The portrait frames itself (see
+    // portraits.js) so every unit lands at a consistent scale with no clipping.
+    const hero = document.createElement("div");
+    hero.className = "codex-detail-hero";
+    hero.appendChild(createPortrait(def, { variant: "is-hero" }));
+    const name = document.createElement("h3");
+    name.innerHTML = `<span class="ref-glyph">${def.glyph}</span>${def.name}`;
+    hero.appendChild(name);
+    const body = document.createElement("div");
+    body.innerHTML = unitDetailHtml(def);
+    section.append(hero, body);
+    detail.replaceChildren(section);
   }
 
   function showStatus() {
@@ -109,9 +120,11 @@ export function mountCodex(containerEl, unitTypeDefs) {
     btn.className = "codex-nav-item";
     btn.dataset.unitId = def.id;
     btn.type = "button";
-    btn.innerHTML =
-      `<span class="codex-nav-glyph">${def.glyph}</span>` +
-      `<span class="codex-nav-name">${def.name}</span>`;
+    btn.appendChild(createPortrait(def, { variant: "is-thumb" }));
+    const navName = document.createElement("span");
+    navName.className = "codex-nav-name";
+    navName.textContent = def.name;
+    btn.appendChild(navName);
     btn.addEventListener("click", () => showUnit(def));
     nav.appendChild(btn);
   }

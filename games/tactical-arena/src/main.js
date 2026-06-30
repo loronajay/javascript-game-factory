@@ -323,18 +323,21 @@ async function resolveInstantArt(command) {
 
   if (resolved?.artId === "footwork" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
-    await effects.playAbilityVfx("footwork", {
-      actor: actorBefore,
-      targets: targetsBefore,
-      path: resolved.path
-    });
-    await Promise.all(targetsBefore.map(async (target) => {
+    // Map each harmed enemy to its tile so we can strike it as the dasher arrives there,
+    // instead of dumping every hit after the slide. The dasher glides tile-by-tile and
+    // the contact fires the recoil/damage/death the moment it reaches the occupied tile.
+    const harmedByTile = new Map(targetsBefore.map((target) => [positionKey(target.position), target]));
+    await effects.footworkCharge(actorBefore, resolved.path, async (tile) => {
+      const target = harmedByTile.get(positionKey(tile));
+      if (!target) return;
       const center = unitCenter(metrics, target);
+      audio.play("attackHit");
+      effects.impact(center, false);
       await effects.hitRecoil(target.id, target.position, false);
       await effects.floatText(center, "-2", "#ff7684");
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
-    }));
+    });
   } else if (resolved?.artId === "volley-shot" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     const coneCells = getVolleyShotCells(state, actorBefore, resolved.targetPosition) ?? [];

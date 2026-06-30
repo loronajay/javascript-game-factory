@@ -102,6 +102,20 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .codex-nav-glyph { font-size:.95rem; flex-shrink:0; }
 .codex-nav-name { overflow:hidden; text-overflow:ellipsis; }
 .codex-nav-status { margin-top:.45rem; padding-top:.52rem; border-top:1px solid rgba(70,100,130,.3); }
+/* Painted unit portraits (assets/units/*.png) — see ui/portraits.js. The <img> is
+   self-framed by inline height + transform (consistent scale, baseline-aligned, no
+   clipping); the frame just crops the dead canvas space and decorates. */
+.unit-portrait { position:relative; overflow:hidden; flex-shrink:0; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); }
+.unit-portrait-img { position:absolute; top:0; left:50%; width:auto; pointer-events:none; }
+.unit-portrait.is-glyph-fallback { display:flex; align-items:center; justify-content:center; color:var(--brass-hi); }
+/* Codex detail hero: portrait beside the unit name. */
+.codex-detail-hero { display:flex; align-items:flex-end; gap:1rem; margin-bottom:.7rem; }
+.codex-detail-hero h3 { margin:0 0 .45rem; }
+.codex-detail-hero .unit-portrait.is-hero { width:132px; height:176px; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(160,210,255,.12), inset 0 0 24px rgba(0,10,20,.5); }
+.codex-detail-hero .is-glyph-fallback { font-size:3rem; }
+/* Codex nav thumbnail (replaces the per-unit glyph in the unit list). */
+.codex-nav-item .unit-portrait.is-thumb { width:30px; height:34px; border-radius:6px; }
+.codex-nav-item .is-glyph-fallback { font-size:1rem; }
 /* Targetable-enemy reticle: a red ring + chevron drawn on the figurine so valid
    targets read clearly even though the bright tile sits beneath them. */
 .unit.targetable,.unit.spent.targetable { opacity:1; filter:none; }.unit .target-mark { pointer-events:none; }.unit .target-ring { stroke:#ff8a7e; stroke-width:2.4; stroke-dasharray:7 6; opacity:.95; transform-box:fill-box; transform-origin:center; animation:target-spin 2.4s linear infinite, target-pulse 1s ease-in-out infinite alternate; filter:drop-shadow(0 0 5px rgba(255,90,72,.7)); }.unit .target-chevron { fill:none; stroke:#ff8a7e; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; animation:target-pulse 1s ease-in-out infinite alternate; }
