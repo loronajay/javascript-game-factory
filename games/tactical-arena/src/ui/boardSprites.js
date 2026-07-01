@@ -21,21 +21,49 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 // feet at (0,0) and rises into -y (see unitRenderer.js), matching the old figurine.
 export const STAND_HEIGHT = 52;
 
+// The carved-figurine fallback (unitRenderer.js FIGURE_BUILDERS) does NOT actually
+// plant its feet at figure-space y=0 — every builder's leg/robe path bottoms out
+// around raw y≈10, and the whole figurine is then drawn at `scale(0.82)` (see
+// FIGURE_SCALE in unitRenderer.js), so its real on-screen foot position is
+// 10 * 0.82 ≈ 8. Board sprites used footY=0 (the plinth origin) directly, which
+// planted them ~8 figure-space units too high — visually perched on the back/top
+// rim of the coin ellipse instead of centered on it. This is the figurine's
+// calibrated foot offset, reused so both fallbacks land in the same spot.
+export const FIGURINE_FOOT_Y = 8;
+
 // w/h are the sprite's native pixel size (drives aspect ratio only — absolute px are
 // irrelevant once normalized). scale: per-unit visual-size fudge (1 = normalize to the
 // shared standing height). Lower it for a hunched figure whose full-canvas height
 // over-reads its "creature size" so it doesn't tower (the ghoul, same as its portrait).
+// 2026-07-01: re-cropped from the 600×600 portrait source (tight alpha bbox + 3px
+// pad) instead of the old ~100-150px exports — those were being upscaled by the
+// browser to fill their on-screen space, which was the source of the blur. Native
+// sizes below are now several times the old pixel count, so the same normalize-to-
+// STAND_HEIGHT framing reads sharp instead of smoothed.
+//
+// Two follow-up misses before this landed: (1) centering the crop on the alpha
+// bbox drifts toward whichever hand holds a sword/bow/staff/rifle/flame-effect
+// reaching far to one side, so the painted body sat off the coin; (2) centering on
+// an automatically-detected "feet band" is just as fragile — robe hems flare
+// asymmetrically and weapon tips/shields touch the ground well away from the
+// actual feet, so the auto-centroid grabbed the wrong point entirely for the
+// robed casters. What's here now is centered on a MEASURED stance x per unit
+// (read off a gridded view of each portrait, feet/torso midpoint, weapon overhang
+// ignored) — see the `FEET_X` map in the scratchpad recrop script if these ever
+// need re-deriving after an art swap. Padded with transparent canvas on the tight
+// side rather than clamped, so the stance stays dead-center regardless of how far
+// a held weapon reaches past the source canvas edge.
 export const BOARD_SPRITES = Object.freeze({
-  swordsman:   sprite("swordsman",   112, 131),
-  archer:      sprite("archer",       77, 116),
-  mystic:      sprite("mystic",      102, 142),
-  magician:    sprite("magician",    102, 136),
-  paladin:     sprite("paladin",     128, 144),
-  necromancer: sprite("necromancer", 120, 150),
-  sniper:      sprite("sniper",      113, 124),
+  swordsman:   sprite("swordsman",   584, 574),
+  archer:      sprite("archer",      462, 595),
+  mystic:      sprite("mystic",      396, 581),
+  magician:    sprite("magician",    458, 572),
+  paladin:     sprite("paladin",     572, 566),
+  necromancer: sprite("necromancer", 510, 558),
+  sniper:      sprite("sniper",      602, 581),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
-  ghoul:       sprite("ghoul",        88,  93, { scale: 0.82 })
+  ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })
 });
 
 function sprite(type, w, h, { scale = 1, src = `assets/units/board-units/game-ready/${type}.png` } = {}) {
@@ -57,7 +85,7 @@ export function hasBoardSprite(typeOrDef) {
 // Pure framing math (tested headlessly). Turns a sprite's native size + scale into the
 // SVG <image> rect in figure space: every figure ends up the same standing height
 // (× its own scale), horizontally centred, with its feet seated on the coin at footY.
-export function boardSpriteFrameStyle(meta, { standHeight = STAND_HEIGHT, footY = 0 } = {}) {
+export function boardSpriteFrameStyle(meta, { standHeight = STAND_HEIGHT, footY = FIGURINE_FOOT_Y } = {}) {
   const { w, h, scale = 1 } = meta;
   const height = standHeight * scale;
   const width = height * (w / h);

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
-import { BOARD_SPRITES, getBoardSprite, hasBoardSprite, boardSpriteFrameStyle, STAND_HEIGHT } from "../src/ui/boardSprites.js";
+import { BOARD_SPRITES, getBoardSprite, hasBoardSprite, boardSpriteFrameStyle, STAND_HEIGHT, FIGURINE_FOOT_Y } from "../src/ui/boardSprites.js";
 
 // Teeth (mirrors portraits.test.js / ai-metadata.test.js): a new unit that forgets its
 // board sprite fails the suite instead of silently falling back to the carved figurine.
@@ -47,9 +47,10 @@ test("framing math yields a centred, foot-seated <image> rect", () => {
     const f = boardSpriteFrameStyle(meta);
     assert.ok(Number.isFinite(f.width) && f.width > 0, `${type} width must be positive`);
     assert.ok(Number.isFinite(f.height) && f.height > 0, `${type} height must be positive`);
-    // Centred horizontally, feet on the coin at y=0 (the rect rises into -y).
+    // Centred horizontally, feet on the coin at FIGURINE_FOOT_Y (the carved
+    // figurine's calibrated foot offset, not the plinth origin — see boardSprites.js).
     assert.ok(Math.abs(f.x + f.width / 2) < 0.02, `${type} should be horizontally centred`);
-    assert.ok(Math.abs(f.y + f.height) < 0.02, `${type} feet should sit at y=0`);
+    assert.ok(Math.abs(f.y + f.height - FIGURINE_FOOT_Y) < 0.02, `${type} feet should sit at FIGURINE_FOOT_Y`);
     // Aspect ratio is preserved from the native size.
     assert.ok(Math.abs(f.width / f.height - meta.w / meta.h) < 1e-3, `${type} should keep native aspect ratio`);
   }
