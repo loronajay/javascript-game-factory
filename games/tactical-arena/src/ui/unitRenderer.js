@@ -3,6 +3,7 @@ import { gridToScreen } from "./isometric.js";
 import { getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { positionKey } from "../rules/movement.js";
 import { getUnitStatusVfx } from "./vfxCatalog.js";
+import { createBoardSpriteFigure } from "./boardSprites.js";
 
 // ---------------------------------------------------------------------------
 // Carved-figurine model (the template every unit follows)
@@ -410,12 +411,22 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
     svgElement("circle", { class: "shield-ring", cx: 0, cy: -10, r: 33 })
   );
 
-  // The carved miniature stands on the plinth (figure space puts its feet at
-  // (0,0) and rises into -y). FIGURE_SCALE keeps the piece compact enough that a
-  // tall figurine doesn't visually swamp its tile.
-  const figure = createUnitFigurine(unit.type);
-  figure.setAttribute("transform", `scale(${FIGURE_SCALE})`);
-  body.append(figure);
+  // The piece stands on the plinth — figure space puts its feet at (0,0) and rises
+  // into -y. Prefer the painted board sprite (normalized to a shared standing height
+  // by boardSprites.js); a type with no registered sprite falls back to the carved
+  // SVG figurine, scaled by FIGURE_SCALE so a tall figurine doesn't swamp its tile.
+  const figure = createBoardSpriteFigure(unit.type, svgElement);
+  if (figure) {
+    // Red team (player 2) faces the enemy: mirror the painted sprite horizontally.
+    // The <image> is centred on x=0 in the sprite-figure group, so scale(-1 1)
+    // flips it about the coin centre without shifting its footing.
+    if (unit.player === 2) figure.setAttribute("transform", "scale(-1 1)");
+    body.append(figure);
+  } else {
+    const figurine = createUnitFigurine(unit.type);
+    figurine.setAttribute("transform", `scale(${FIGURE_SCALE})`);
+    body.append(figurine);
+  }
 
   const hpBack = svgElement("rect", { class: "hp-back", x: -25, y: 28, width: 50, height: 5, rx: 2.5 });
   const hpFront = svgElement("rect", { class: "hp-front", x: -25, y: 28, width: 50 * unit.hp / stats.maxHp, height: 5, rx: 2.5 });

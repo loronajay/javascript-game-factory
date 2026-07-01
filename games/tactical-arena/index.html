@@ -26,6 +26,20 @@
           <feGaussianBlur stdDeviation="5" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
+        <!-- Team-color tint wash for the painted board sprites (boardSprites.js):
+             flood the team color, mask it to the sprite alpha, lay it over the art
+             at low opacity so the piece reads as its faction without recoloring the
+             art. Colors mirror the --p1/--p2 tokens in style.css. -->
+        <filter id="teamTintP1">
+          <feFlood flood-color="#4a90d8" flood-opacity="0.30" result="flood"/>
+          <feComposite in="flood" in2="SourceGraphic" operator="in" result="tint"/>
+          <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="tint"/></feMerge>
+        </filter>
+        <filter id="teamTintP2">
+          <feFlood flood-color="#cc4444" flood-opacity="0.34" result="flood"/>
+          <feComposite in="flood" in2="SourceGraphic" operator="in" result="tint"/>
+          <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="tint"/></feMerge>
+        </filter>
         <!-- Carved-figurine materials: ivory/bone body, polished steel, brass/wood. -->
         <linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#f6f1e3"/><stop offset="46%" stop-color="#e3d9c2"/><stop offset="100%" stop-color="#b9ac8e"/>

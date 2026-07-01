@@ -71,6 +71,12 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
    off the disc once scaled below 1.) */
 .unit .figure { transform-box:view-box; transform-origin:0 0; }
 .unit .figure path,.unit .figure rect,.unit .figure circle,.unit .figure ellipse,.unit .figure line { stroke-linejoin:round; }
+/* Painted board sprite (boardSprites.js) — the on-board token for units that have a
+   sprite. Team identity is the recolored coin + a team-color tint wash (the
+   #teamTintP* filters); a soft drop-shadow grounds the piece on the disc. */
+.unit .sprite-img { filter:drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
+.unit.player-1 .sprite-img { filter:url(#teamTintP1) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
+.unit.player-2 .sprite-img { filter:url(#teamTintP2) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
 .unit .fig-body { fill:url(#ivory); stroke:#281e12; stroke-width:1.1; vector-effect:non-scaling-stroke; }
 .unit .fig-shade { fill:rgba(38,27,14,.30); stroke:none; }
 .unit .fig-light { fill:rgba(255,250,236,.55); stroke:none; }
