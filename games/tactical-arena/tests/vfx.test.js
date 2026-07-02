@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getAbilityVfx, getStatusVfx, getUnitStatusVfx, retuneVfx } from "../src/ui/vfxCatalog.js";
+import { getAbilityVfx, getAttackProjectile, getImpactVfx, getStatusVfx, getUnitStatusVfx, retuneVfx } from "../src/ui/vfxCatalog.js";
 
 test("ability VFX are reusable templates that can be retuned per ability", () => {
   const lifeSap = getAbilityVfx("life-sap");
@@ -55,6 +55,74 @@ test("every implemented active ART declares a distinct VFX recipe", () => {
   assert.equal(getAbilityVfx("leg-shot").motif, "snare");
   assert.equal(getAbilityVfx("silence").motif, "silenceRune");
   assert.ok(getAbilityVfx("pray").radius > getAbilityVfx("wish").radius);
+});
+
+test("ranged basic attacks fire a per-unit-type projectile with a safe fallback", () => {
+  assert.equal(getAttackProjectile("archer").shape, "arrow");
+  assert.equal(getAttackProjectile("sniper").shape, "tracer");
+  assert.equal(getAttackProjectile("magician").shape, "orb");
+  assert.equal(getAttackProjectile("mystic").shape, "orb");
+  assert.equal(getAttackProjectile("necromancer").shape, "orb");
+  // Unknown/new ranged types never fire nothing.
+  const fallback = getAttackProjectile("some-future-unit");
+  assert.equal(fallback.shape, "orb");
+  assert.ok(fallback.colors.core);
+});
+
+test("rolled attack ARTS carry their own attack projectile; pure casts carry a cast projectile", () => {
+  // `projectile` replaces the unit's basic-attack shot inside animateAttack.
+  assert.equal(getAbilityVfx("poison-arrow").projectile.shape, "arrow");
+  assert.equal(getAbilityVfx("leg-shot").projectile.shape, "arrow");
+  assert.equal(getAbilityVfx("spark").projectile.shape, "orb");
+  assert.equal(getAbilityVfx("banish").projectile.shape, "orb");
+  assert.equal(getAbilityVfx("wither").projectile.shape, "orb");
+  // `castProjectile` is flown by statusStrike itself (no attack phase to ride on).
+  assert.equal(getAbilityVfx("silence").castProjectile.shape, "orb");
+  assert.equal(getAbilityVfx("smoke-bomb").castProjectile.shape, "lob");
+  // Melee arts fly nothing.
+  assert.equal(getAbilityVfx("moonstrike").projectile, undefined);
+  assert.equal(getAbilityVfx("mage-killer").projectile, undefined);
+});
+
+test("magic and casts declare a gather windup; thrown objects declare a toss windup", () => {
+  // Gathers: motes converge on the caster + castCharge riser before the release.
+  for (const id of ["nuke", "dark-bomb", "summon-ghoul", "lightseeker", "darkseeker", "pray", "wish", "hand-of-life", "silence", "spark", "banish", "wither"]) {
+    assert.equal(getAbilityVfx(id)?.windup?.style, "gather", `${id} should gather`);
+  }
+  // The rage ultimate earns the heaviest gather.
+  assert.ok(getAbilityVfx("nuke").windup.durationMs >= getAbilityVfx("spark").windup.durationMs);
+  // Tosses: the token leans back and snaps forward before the lob.
+  assert.equal(getAbilityVfx("smoke-bomb").windup.style, "toss");
+  assert.equal(getAbilityVfx("throw-cigar").windup.style, "toss");
+  // Physical draws and motion arts stay windup-free (pace + no gather fantasy).
+  for (const id of ["poison-arrow", "leg-shot", "volley-shot", "footwork", "flee", "life-sap", "moonstrike", "mage-killer"]) {
+    assert.equal(getAbilityVfx(id)?.windup, undefined, `${id} should not wind up`);
+  }
+});
+
+test("Volley Shot rains real arrows and Throw Cigar is a tumbling lob", () => {
+  assert.equal(getAbilityVfx("volley-shot").projectile.shape, "arrow");
+  const cigar = getAbilityVfx("throw-cigar");
+  assert.equal(cigar.type, "lob");
+  assert.equal(cigar.projectile.shape, "lob");
+  assert.equal(cigar.soundKey, "throwCigar");
+});
+
+test("impacts are styled per damage type with a physical fallback", () => {
+  const kinds = ["physical", "magic", "fire", "true"].map((kind) => getImpactVfx(kind));
+  for (const style of kinds) {
+    assert.ok(style.flash && style.ring && style.spark, `${style.kind} has full colors`);
+    assert.ok(style.sparkCount > 0);
+    assert.ok(["chips", "motes", "embers"].includes(style.motion));
+  }
+  // Ring colors are the read-at-a-glance signal — they must differ per type.
+  assert.equal(new Set(kinds.map((style) => style.ring)).size, kinds.length);
+  assert.equal(getImpactVfx("fire").motion, "embers");
+  assert.equal(getImpactVfx("magic").motion, "motes");
+  // Unknown kinds fall back to physical rather than throwing.
+  assert.equal(getImpactVfx("shadow-flame").kind, "physical");
+  // Throw Cigar lands as fire.
+  assert.equal(getAbilityVfx("throw-cigar").impactKind, "fire");
 });
 
 test("status VFX resolve to compact persistent badges above units", () => {

@@ -10,6 +10,17 @@ function artTip(art) {
   return `${art.name} · ${art.mpCost} MP — ${art.description}`;
 }
 
+function toggleClass(element, className, enabled) {
+  if (element.classList?.toggle) {
+    element.classList.toggle(className, enabled);
+    return;
+  }
+  const classes = new Set(String(element.className ?? "").split(/\s+/).filter(Boolean));
+  if (enabled) classes.add(className);
+  else classes.delete(className);
+  element.className = [...classes].join(" ");
+}
+
 export function canMoveInActivation(activation) {
   return Boolean(activation && !activation.moved);
 }
@@ -80,6 +91,7 @@ function statLineHtml(definition, stats) {
 
 export function renderUnitCard(unit, state, unitCard) {
   if (!unit) {
+    toggleClass(unitCard, "is-raging", false);
     unitCard.style.removeProperty("--team");
     unitCard.innerHTML = `<figure class="unit-portrait is-hud is-glyph-fallback is-empty">?</figure>
       <div class="unit-info">
@@ -91,7 +103,9 @@ export function renderUnitCard(unit, state, unitCard) {
   }
   const definition = getUnitType(unit.type);
   const stats = getEffectiveStats(unit, state);
+  const raging = isRaging(unit);
   unitCard.style.setProperty("--team", unit.player === 1 ? "#5288c6" : "#c4463f");
+  toggleClass(unitCard, "is-raging", raging);
 
   const tags = unitTagsHtml(unit, definition);
 
@@ -186,7 +200,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       const dead = unit.hp <= 0;
       const active = state.activation?.unitId === unit.id;
       const selectable = controlsEnabled && unit.player === state.currentPlayer && !unit.spent && !dead;
-      row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
+      row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
       const tags = dead
         ? `<span class="unit-tag spent">Fallen</span>`
         : unitTagsHtml(unit, definition, { includePassive: false, includeSpent: true, spentLabel: "Done" });

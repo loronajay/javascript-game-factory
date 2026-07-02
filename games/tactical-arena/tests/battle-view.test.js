@@ -5,8 +5,9 @@ import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation } from "../src/core/commands.js";
 import { canMoveInActivation } from "../src/ui/hud.js";
-import { renderActions, renderSquads } from "../src/ui/hud.js";
+import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode } from "../src/ui/boardRenderer.js";
+import { createUnitFigure } from "../src/ui/unitRenderer.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes } from "../src/ui/codex.js";
 
@@ -17,6 +18,10 @@ class TestStyle {
 
   setProperty(name, value) {
     this.props.set(name, value);
+  }
+
+  removeProperty(name) {
+    this.props.delete(name);
   }
 }
 
@@ -66,6 +71,42 @@ class TestElement {
     if (this.className.split(/\s+/).includes(className)) return this;
     for (const child of this.children) {
       const match = child.findByClass(className);
+      if (match) return match;
+    }
+    return null;
+  }
+}
+
+class TestSvgElement {
+  constructor(tagName) {
+    this.tagName = tagName;
+    this.children = [];
+    this.attributes = new Map();
+    this.listeners = new Map();
+    this.className = "";
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+    if (name === "class") this.className = String(value);
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
+  append(...children) {
+    this.children.push(...children);
+  }
+
+  addEventListener(type, handler) {
+    this.listeners.set(type, handler);
+  }
+
+  findByClass(className) {
+    if (this.className.split(/\s+/).includes(className)) return this;
+    for (const child of this.children) {
+      const match = child.findByClass?.(className);
       if (match) return match;
     }
     return null;
@@ -154,6 +195,67 @@ test("spent defending squad rows keep Done in the status tag strip", () => {
     assert.ok(spentRow, "spent unit should render as a spent squad row");
     assert.match(spentRow.innerHTML, /<span class="unit-tag on">Defending<\/span>/);
     assert.match(spentRow.innerHTML, /<span class="unit-tag spent">Done<\/span>/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("raging board units carry a rage state class and aura element", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const unit = {
+      id: "p1-rage",
+      player: 1,
+      type: "swordsman",
+      hp: 5,
+      mp: 12,
+      position: { x: 0, y: 0 },
+      statuses: [],
+      statModifiers: {}
+    };
+
+    const token = createUnitFigure(metrics, unit, { onUnitClick: () => {} });
+
+    assert.match(token.getAttribute("class"), /\bis-raging\b/);
+    assert.ok(token.findByClass("rage-aura"), "raging units should draw a persistent rage aura");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("the selected-unit HUD gains a rage glow state", () => {
+  const state = createBattleState();
+  const unit = state.units.find((candidate) => candidate.id === "p1-swordsman");
+  unit.hp = 5;
+  const unitCard = new TestElement("div");
+  unitCard.className = "unit-card";
+
+  renderUnitCard(unit, state, unitCard);
+
+  assert.match(unitCard.className, /\bis-raging\b/);
+  assert.match(unitCard.innerHTML, /<span class="unit-tag rage"/);
+
+  renderUnitCard(null, state, unitCard);
+  assert.doesNotMatch(unitCard.className, /\bis-raging\b/);
+});
+
+test("raging squad rows get an obvious HUD state", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const state = createBattleState();
+    state.units.find((candidate) => candidate.id === "p1-swordsman").hp = 5;
+
+    const overlay = new TestElement("div");
+    renderSquads(state, overlay, () => {});
+
+    const ragingRow = overlay.children[0].querySelector(".squad-list").children[0];
+    assert.match(ragingRow.className, /\bis-raging\b/);
+    assert.match(ragingRow.innerHTML, /<span class="unit-tag rage"/);
   } finally {
     globalThis.document = previousDocument;
   }

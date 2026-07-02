@@ -6,7 +6,7 @@
 // goes silent (no transform left behind) under prefers-reduced-motion.
 
 import { gridToScreen } from "./isometric.js";
-import { getAbilityVfx, getStatusVfx } from "./vfxCatalog.js";
+import { getAbilityVfx, getAttackProjectile, getImpactVfx, getStatusVfx } from "./vfxCatalog.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -79,17 +79,277 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       .finished.catch(() => {}).then(() => flash.remove());
   }
 
-  // Brief impact pop + expanding ring at the point of contact.
-  function impact(point, critical) {
+  // Impact pop + expanding ring + debris at the point of contact, styled by damage
+  // type ("physical" | "magic" | "fire" | "true" — see IMPACT_VFX in vfxCatalog).
+  function impact(point, critical, kind = "physical") {
     if (reducedMotion()) return;
-    const flash = svg("circle", { class: "fx-flash", cx: point.x, cy: point.y + 8, r: 6, fill: critical ? "#c8e8ff" : "#c0d8f0", filter: "url(#softGlow)" });
+    const style = getImpactVfx(kind);
+    const center = { x: point.x, y: point.y + 8 };
+    const flash = svg("circle", { class: "fx-flash", cx: center.x, cy: center.y, r: 6, fill: critical ? style.critFlash : style.flash, filter: "url(#softGlow)" });
     effectsLayer.appendChild(flash);
     flash.animate([{ r: 6, opacity: 0.95 }, { r: critical ? 30 : 24, opacity: 0 }], { duration: 200, easing: "ease-out" })
       .finished.catch(() => {}).then(() => flash.remove());
-    const ring = svg("circle", { class: "fx-ring", cx: point.x, cy: point.y + 8, r: 8, stroke: critical ? "#80c8f0" : "#ff7684", filter: "url(#softGlow)" });
+    const ring = svg("circle", { class: "fx-ring", cx: center.x, cy: center.y, r: 8, stroke: critical ? style.critRing : style.ring, filter: "url(#softGlow)" });
     effectsLayer.appendChild(ring);
     ring.animate([{ r: 8, opacity: 1, strokeWidth: 5 }, { r: 44, opacity: 0, strokeWidth: 1 }], { duration: 420, easing: "ease-out" })
       .finished.catch(() => {}).then(() => ring.remove());
+
+    // Debris sells the material: chips tumble outward, motes drift out and up,
+    // embers climb with a flicker. Origin-centered geometry + absolute translate
+    // (scale/rotate on SVG are user-space-origin-relative — see castWindup).
+    const count = style.sparkCount + (critical ? 3 : 0);
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.6;
+      const reach = 16 + Math.random() * 14 + (critical ? 6 : 0);
+      const isChip = style.motion === "chips";
+      const debris = isChip
+        ? svg("rect", { class: "fx-spark", x: -2, y: -2, width: 4, height: 4, rx: 1, fill: style.spark, filter: "url(#softGlow)" })
+        : svg("circle", { class: "fx-spark", cx: 0, cy: 0, r: style.motion === "embers" ? 1.8 + (i % 2) : 2.2 + (i % 2) * 0.8, fill: style.spark, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(debris);
+      let frames;
+      if (style.motion === "embers") {
+        // Rising sparks with a sideways wander and a mid-flight flicker.
+        const driftX = Math.cos(angle) * reach * 0.5;
+        frames = [
+          { transform: `translate(${center.x}px, ${center.y}px) scale(1)`, opacity: 1 },
+          { transform: `translate(${center.x + driftX}px, ${center.y - reach * 0.7}px) scale(.9)`, opacity: 0.5, offset: 0.45 },
+          { transform: `translate(${center.x + driftX * 0.6}px, ${center.y - reach * 1.1}px) scale(1)`, opacity: 0.85, offset: 0.65 },
+          { transform: `translate(${center.x + driftX * 1.3}px, ${center.y - reach * 1.7}px) scale(.4)`, opacity: 0 }
+        ];
+      } else if (style.motion === "motes") {
+        // Arcane points floating outward then lifting away.
+        frames = [
+          { transform: `translate(${center.x}px, ${center.y}px) scale(.5)`, opacity: 0.95 },
+          { transform: `translate(${center.x + Math.cos(angle) * reach}px, ${center.y + Math.sin(angle) * reach * 0.5 - 4}px) scale(1)`, opacity: 0.8, offset: 0.5 },
+          { transform: `translate(${center.x + Math.cos(angle) * reach * 1.2}px, ${center.y + Math.sin(angle) * reach * 0.5 - 16}px) scale(.35)`, opacity: 0 }
+        ];
+      } else {
+        // Kinetic chips tumbling out on a shallow ballistic hop.
+        frames = [
+          { transform: `translate(${center.x}px, ${center.y}px) rotate(0deg) scale(1)`, opacity: 1 },
+          { transform: `translate(${center.x + Math.cos(angle) * reach}px, ${center.y + Math.sin(angle) * reach * 0.55 - 8}px) rotate(${140 + i * 40}deg) scale(.8)`, opacity: 0.9, offset: 0.55 },
+          { transform: `translate(${center.x + Math.cos(angle) * reach * 1.25}px, ${center.y + Math.sin(angle) * reach * 0.6 + 6}px) rotate(${220 + i * 40}deg) scale(.5)`, opacity: 0 }
+        ];
+      }
+      debris.animate(frames, { duration: 340 + Math.random() * 140 + (style.motion === "embers" ? 160 : 0), delay: i * 6, easing: "ease-out", fill: "backwards" })
+        .finished.catch(() => {}).then(() => debris.remove());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Projectile flight primitive. A REAL object (arrow, orb, tracer, lobbed toss)
+  // flies a quadratic arc from `from` to `to`, rotating to its heading, with a
+  // faint trail behind it. The promise resolves at arrival so the caller can land
+  // the impact in sync. Shape builders draw pointing +x; the flight rotates them.
+  // ---------------------------------------------------------------------------
+
+  const PROJECTILE_BUILDERS = {
+    arrow(colors, size) {
+      const group = svg("g", { class: "fx-projectile" });
+      group.appendChild(svg("line", { x1: -9 * size, y1: 0, x2: 7 * size, y2: 0, stroke: colors.trail, "stroke-width": 2.2 * size, "stroke-linecap": "round" }));
+      group.appendChild(svg("polygon", { points: `${7 * size},${-3.2 * size} ${12.5 * size},0 ${7 * size},${3.2 * size}`, fill: colors.core }));
+      group.appendChild(svg("line", { x1: -9 * size, y1: 0, x2: -5.5 * size, y2: -2.6 * size, stroke: colors.core, "stroke-width": 1.6 * size, "stroke-linecap": "round" }));
+      group.appendChild(svg("line", { x1: -9 * size, y1: 0, x2: -5.5 * size, y2: 2.6 * size, stroke: colors.core, "stroke-width": 1.6 * size, "stroke-linecap": "round" }));
+      return group;
+    },
+    orb(colors, size) {
+      const group = svg("g", { class: "fx-projectile", filter: "url(#softGlow)" });
+      const halo = svg("circle", { cx: 0, cy: 0, r: 7 * size, fill: colors.trail });
+      halo.style.opacity = "0.4";
+      group.appendChild(halo);
+      const tail = svg("ellipse", { cx: -7 * size, cy: 0, rx: 7 * size, ry: 2.6 * size, fill: colors.trail });
+      tail.style.opacity = "0.55";
+      group.appendChild(tail);
+      group.appendChild(svg("circle", { cx: 0, cy: 0, r: 4 * size, fill: colors.core }));
+      const spark = svg("circle", { cx: 0, cy: 0, r: 1.8 * size, fill: "#ffffff" });
+      spark.style.opacity = "0.9";
+      group.appendChild(spark);
+      return group;
+    },
+    tracer(colors, size) {
+      const group = svg("g", { class: "fx-projectile", filter: "url(#softGlow)" });
+      const wake = svg("line", { x1: -22 * size, y1: 0, x2: -6 * size, y2: 0, stroke: colors.trail, "stroke-width": 1.6 * size, "stroke-linecap": "round" });
+      wake.style.opacity = "0.5";
+      group.appendChild(wake);
+      group.appendChild(svg("line", { x1: -8 * size, y1: 0, x2: 9 * size, y2: 0, stroke: colors.core, "stroke-width": 2.6 * size, "stroke-linecap": "round" }));
+      group.appendChild(svg("circle", { cx: 9 * size, cy: 0, r: 2.1 * size, fill: "#ffffff" }));
+      return group;
+    },
+    lob(colors, size) {
+      const group = svg("g", { class: "fx-projectile" });
+      group.appendChild(svg("rect", { x: -5 * size, y: -1.9 * size, width: 10 * size, height: 3.8 * size, rx: 1.8 * size, fill: colors.core, stroke: colors.trail, "stroke-width": 1 }));
+      const ember = svg("circle", { cx: 5.5 * size, cy: 0, r: 2 * size, fill: "#ff8a4c", filter: "url(#softGlow)" });
+      group.appendChild(ember);
+      return group;
+    }
+  };
+
+  // Flies one projectile and resolves when it lands. `opacity`/`trail` let a rain
+  // of many (volley) keep its faint non-hit shots without a wall of glow streaks.
+  async function flyProjectile(from, to, spec = {}, { delay = 0, opacity = 1, trail = true } = {}) {
+    if (reducedMotion()) return;
+    const colors = spec.colors ?? { core: "#f7e27d", trail: "#8a6d3a" };
+    const size = spec.size ?? 1;
+    const control = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - (spec.arcHeight ?? 50) };
+    const duration = spec.durationMs ?? 430;
+
+    if (trail) {
+      const wake = svg("path", {
+        d: `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`,
+        class: "fx-line fx-projectile-trail",
+        stroke: colors.trail,
+        "stroke-width": 2,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(wake);
+      wake.animate([
+        { opacity: 0 },
+        { opacity: 0.3 * opacity, offset: 0.4 },
+        { opacity: 0 }
+      ], { duration: duration + 220, delay, easing: "ease-out", fill: "backwards" })
+        .finished.catch(() => {}).then(() => wake.remove());
+    }
+
+    const builder = PROJECTILE_BUILDERS[spec.shape] ?? PROJECTILE_BUILDERS.orb;
+    const projectile = builder(colors, size);
+    projectile.style.opacity = String(opacity);
+    effectsLayer.appendChild(projectile);
+
+    // Sampled quadratic-bezier keyframes: position from the curve, rotation from its
+    // tangent (a lob also tumbles end-over-end on top of its heading).
+    const steps = 22;
+    const tumble = spec.shape === "lob" ? 540 : 0;
+    const frames = [];
+    for (let i = 0; i <= steps; i += 1) {
+      const t = i / steps;
+      const inv = 1 - t;
+      const x = inv * inv * from.x + 2 * inv * t * control.x + t * t * to.x;
+      const y = inv * inv * from.y + 2 * inv * t * control.y + t * t * to.y;
+      const dx = 2 * inv * (control.x - from.x) + 2 * t * (to.x - control.x);
+      const dy = 2 * inv * (control.y - from.y) + 2 * t * (to.y - control.y);
+      const deg = (Math.atan2(dy, dx) * 180) / Math.PI + tumble * t;
+      frames.push({ transform: `translate(${x}px, ${y}px) rotate(${deg}deg)`, offset: t });
+    }
+    frames[0].opacity = 0;
+    if (frames[1]) frames[1].opacity = opacity;
+    await waitForAnimation(projectile.animate(frames, { duration, delay, easing: "linear", fill: "backwards" }));
+    projectile.remove();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Caster anticipation. Two styles, both awaited so cause precedes effect:
+  //  - castWindup ("gather"): ability-colored motes converge into a swelling core
+  //    over the caster while a ground ring draws in and the token rises — plus the
+  //    shared castCharge audio riser. The ability's own sound then fires at release.
+  //  - tossWindup ("toss"): the token leans back away from the throw line, holds a
+  //    beat, and snaps forward — the anticipation for lobbed objects.
+  // ---------------------------------------------------------------------------
+
+  async function castWindup(actor, vfx) {
+    if (reducedMotion() || !actor) return;
+    const windup = vfx.windup ?? {};
+    const colors = vfx.colors ?? { core: "#f7e27d", trail: "#8a6d3a" };
+    const duration = windup.durationMs ?? 420;
+    const count = windup.particleCount ?? 9;
+    const focus = effectPoint(actor.position, windup.lift ?? 26);
+    const ground = unitBase(actor.position);
+    sound.play("castCharge");
+    const animations = [];
+
+    // Motes drawn in from a loose halo, vanishing into the core as they arrive.
+    // Geometry is origin-centered with the position carried in translate() —
+    // scale() on SVG is user-space-origin-relative, so a cx/cy-placed mote with a
+    // scale keyframe renders displaced toward the SVG origin (caught on-screen).
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const dist = 30 + (i % 3) * 12;
+      const startX = focus.x + Math.cos(angle) * dist;
+      const startY = focus.y + Math.sin(angle) * dist * 0.6;
+      const midX = startX + (focus.x - startX) * 0.55;
+      const midY = startY + (focus.y - startY) * 0.55;
+      const mote = svg("circle", {
+        class: "fx-mote",
+        cx: 0,
+        cy: 0,
+        r: 1.8 + (i % 2),
+        fill: i % 2 ? colors.trail : colors.core,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(mote);
+      const animation = mote.animate([
+        { transform: `translate(${startX}px, ${startY}px) scale(.6)`, opacity: 0 },
+        { transform: `translate(${midX}px, ${midY}px) scale(1)`, opacity: 0.95, offset: 0.55 },
+        { transform: `translate(${focus.x}px, ${focus.y}px) scale(.35)`, opacity: 0 }
+      ], { duration: duration - 40, delay: i * 16, easing: "cubic-bezier(.4,0,.6,1)", fill: "backwards" });
+      animations.push(waitForAnimation(animation).then(() => mote.remove()));
+    }
+
+    // Swelling core that pops on release.
+    const core = svg("circle", { class: "fx-flash", cx: focus.x, cy: focus.y, r: 2, fill: colors.core, filter: "url(#softGlow)" });
+    effectsLayer.appendChild(core);
+    animations.push(waitForAnimation(core.animate([
+      { r: 2, opacity: 0 },
+      { r: 6.5, opacity: 0.95, offset: 0.82 },
+      { r: 13, opacity: 0 }
+    ], { duration, easing: "ease-in" })).then(() => core.remove()));
+
+    // Ground ring contracting inward — the visual opposite of an impact ring.
+    const ring = svg("ellipse", {
+      class: "fx-ring",
+      cx: ground.x,
+      cy: ground.y + 6,
+      rx: 26,
+      ry: 12,
+      stroke: colors.trail,
+      filter: "url(#softGlow)"
+    });
+    effectsLayer.appendChild(ring);
+    animations.push(waitForAnimation(ring.animate([
+      { rx: 26, ry: 12, opacity: 0, strokeWidth: 1 },
+      { rx: 16, ry: 7.5, opacity: 0.7, strokeWidth: 2.5, offset: 0.55 },
+      { rx: 7, ry: 3.2, opacity: 0, strokeWidth: 4 }
+    ], { duration, easing: "ease-in" })).then(() => ring.remove()));
+
+    // The caster rises slightly with the gather and settles on release.
+    const token = unitElement(actor.id);
+    if (token) {
+      animations.push(waitForAnimation(token.animate([
+        { transform: `translate(${ground.x}px, ${ground.y}px) scale(1)` },
+        { transform: `translate(${ground.x}px, ${ground.y - 5}px) scale(1.05)`, offset: 0.75 },
+        { transform: `translate(${ground.x}px, ${ground.y}px) scale(1)` }
+      ], { duration: duration + 60, easing: "ease-in-out" })));
+    }
+
+    await Promise.all(animations);
+  }
+
+  async function tossWindup(actor, targetPosition) {
+    if (reducedMotion() || !actor) return;
+    const element = unitElement(actor.id);
+    if (!element) return;
+    const base = unitBase(actor.position);
+    const toward = targetPosition ? unitBase(targetPosition) : { x: base.x + 1, y: base.y };
+    const dx = toward.x - base.x;
+    const dy = toward.y - base.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const backX = (-dx / length) * 7;
+    const backY = (-dy / length) * 4;
+    // Absolute board coords (a WAAPI transform replaces the SVG attribute): lean back
+    // off the throw line, hold the beat, snap through, settle exactly onto the base.
+    await element.animate([
+      { transform: `translate(${base.x}px, ${base.y}px)` },
+      { transform: `translate(${base.x + backX}px, ${base.y + backY - 3}px) rotate(-4deg)`, offset: 0.4 },
+      { transform: `translate(${base.x + backX}px, ${base.y + backY - 3}px) rotate(-4deg)`, offset: 0.62 },
+      { transform: `translate(${base.x - backX * 0.6}px, ${base.y - backY * 0.4}px) scale(1.06)`, offset: 0.85 },
+      { transform: `translate(${base.x}px, ${base.y}px) scale(1)` }
+    ], { duration: 320, easing: "cubic-bezier(.3,.7,.3,1)" }).finished.catch(() => {});
+  }
+
+  // Dispatch a recipe's windup block to its style.
+  async function playWindup(actor, vfx, targetPosition = null) {
+    if (!vfx?.windup) return;
+    if (vfx.windup.style === "toss") await tossWindup(actor, targetPosition);
+    else await castWindup(actor, vfx);
   }
 
   function statusBurst(unit, status) {
@@ -127,84 +387,61 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function projectileFan(actor, targets, targetPosition, vfx) {
+    if (reducedMotion()) {
+      sound.play(vfx.soundKey ?? "arrowAirborne");
+      return;
+    }
+    await playWindup(actor, vfx, targets[0]?.position ?? targetPosition);
     sound.play(vfx.soundKey ?? "arrowAirborne");
-    if (reducedMotion()) return;
-    const from = effectPoint(actor.position, 12);
-    const fallback = targetPosition ? effectPoint(targetPosition, 12) : from;
-    const endpoints = targets.length ? targets.map((target) => effectPoint(target.position, 12)) : [fallback];
+    const from = effectPoint(actor.position, 22);
+    const fallback = targetPosition ? effectPoint(targetPosition, 16) : from;
+    const endpoints = targets.length ? targets.map((target) => effectPoint(target.position, 16)) : [fallback];
     const count = vfx.projectileCount ?? endpoints.length;
+    const spec = vfx.projectile ?? { shape: "orb", arcHeight: vfx.arcHeight, durationMs: vfx.durationMs, colors: vfx.colors };
     const animations = [];
     for (let i = 0; i < count; i += 1) {
       const target = endpoints[i % endpoints.length];
       const lane = i - (count - 1) / 2;
       const end = { x: target.x + lane * 3.5, y: target.y - Math.abs(lane) * 1.5 };
-      const control = {
-        x: (from.x + end.x) / 2 + lane * (vfx.spread ?? 24) * 0.35,
-        y: Math.min(from.y, end.y) - (vfx.arcHeight ?? 58) - Math.abs(lane) * 3
+      const laneSpec = {
+        ...spec,
+        arcHeight: (spec.arcHeight ?? vfx.arcHeight ?? 58) + Math.abs(lane) * 4
       };
-      const path = svg("path", {
-        d: `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
-        class: "fx-line fx-projectile-fan",
-        stroke: i % 2 ? vfx.colors.trail : vfx.colors.core,
-        "stroke-width": i % 3 === 0 ? 4 : 3,
-        filter: "url(#softGlow)"
-      });
-      path.style.strokeDasharray = "11 12";
-      effectsLayer.appendChild(path);
-      const animation = path.animate([
-        { strokeDashoffset: "80", opacity: 0 },
-        { strokeDashoffset: "20", opacity: 1, offset: 0.24 },
-        { strokeDashoffset: "-55", opacity: 0 }
-      ], {
-        duration: vfx.durationMs ?? 520,
-        delay: i * (vfx.staggerMs ?? 36),
-        easing: "ease-out"
-      });
-      animations.push(waitForAnimation(animation).then(() => path.remove()));
+      animations.push(
+        flyProjectile(from, end, laneSpec, { delay: i * (vfx.staggerMs ?? 36) })
+          .then(() => impact({ x: end.x, y: end.y }, false, vfx.impactKind ?? "magic"))
+      );
     }
     await Promise.all(animations);
-    for (const target of endpoints) impact({ x: target.x, y: target.y }, false);
   }
 
   async function volleyRain(actor, coneCells, targets, targetPosition, vfx) {
     sound.play(vfx.soundKey ?? "arrowAirborne");
     if (reducedMotion() || !coneCells?.length) return;
-    const from = effectPoint(actor.position, 18);
+    const from = effectPoint(actor.position, 22);
     const hitSet = new Set(targets.map((t) => `${t.position.x},${t.position.y}`));
     const dir = targetPosition
       ? { x: targetPosition.x - actor.position.x, y: targetPosition.y - actor.position.y }
       : { x: 0, y: 1 };
+    const spec = vfx.projectile ?? { shape: "arrow", size: 0.8, colors: vfx.colors };
     const animations = [];
     for (const cell of coneCells) {
       const key = `${cell.x},${cell.y}`;
       const isHit = hitSet.has(key);
-      const to = effectPoint(cell, isHit ? 12 : 4);
+      const to = effectPoint(cell, isHit ? 14 : 4);
       const depth = Math.round((cell.x - actor.position.x) * dir.x + (cell.y - actor.position.y) * dir.y);
-      const ctrl = {
-        x: (from.x + to.x) / 2 + (Math.random() - 0.5) * 10,
-        y: Math.min(from.y, to.y) - (vfx.arcHeight ?? 60) - depth * 7
+      const cellSpec = {
+        ...spec,
+        arcHeight: (vfx.arcHeight ?? 60) + depth * 7 + (Math.random() - 0.5) * 8,
+        durationMs: (vfx.durationMs ?? 380) + depth * 18
       };
-      const path = svg("path", {
-        d: `M ${from.x} ${from.y} Q ${ctrl.x} ${ctrl.y} ${to.x} ${to.y}`,
-        class: "fx-line",
-        stroke: isHit ? vfx.colors.core : vfx.colors.trail,
-        "stroke-width": isHit ? 3 : 2,
-        filter: "url(#softGlow)"
-      });
-      path.style.strokeDasharray = "8 12";
-      path.style.opacity = isHit ? "1" : "0.45";
-      effectsLayer.appendChild(path);
       const delay = Math.max(0, depth - 1) * (vfx.staggerMs ?? 65);
-      const duration = (vfx.durationMs ?? 380) + depth * 18;
-      const anim = path.animate([
-        { strokeDashoffset: "60", opacity: 0 },
-        { strokeDashoffset: "16", opacity: isHit ? 1 : 0.45, offset: 0.28 },
-        { strokeDashoffset: "-40", opacity: 0 }
-      ], { duration, delay, easing: "ease-in" });
-      animations.push(waitForAnimation(anim).then(() => {
-        path.remove();
-        if (isHit) impact({ x: to.x, y: to.y }, false);
-      }));
+      // Real arrows now rain onto every cone tile — bright ones stick their targets,
+      // faint trailless ones pepper the empty ground so the cone still reads.
+      animations.push(
+        flyProjectile(from, to, cellSpec, { delay, opacity: isHit ? 1 : 0.45, trail: false })
+          .then(() => { if (isHit) impact({ x: to.x, y: to.y }, false); })
+      );
     }
     await Promise.all(animations);
   }
@@ -218,33 +455,39 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     const animations = [];
     for (let i = 0; i < count; i += 1) {
       const drift = (i - (count - 1) / 2) * 1.9;
+      // Origin-centered + absolute translate (SVG scale is origin-relative).
       const particle = svg("circle", {
         class: "fx-drain-particle",
-        cx: from.x,
-        cy: from.y,
+        cx: 0,
+        cy: 0,
         r: i % 3 === 0 ? 3.2 : 2.2,
         fill: i % 2 ? vfx.colors.trail : vfx.colors.core,
         filter: "url(#softGlow)"
       });
       effectsLayer.appendChild(particle);
       const animation = particle.animate([
-        { transform: "translate(0,0) scale(.5)", opacity: 0 },
-        { transform: `translate(${drift * 4}px, ${-12 - Math.abs(drift)}px) scale(1)`, opacity: 0.95, offset: 0.22 },
-        { transform: `translate(${to.x - from.x + drift}px, ${to.y - from.y}px) scale(.45)`, opacity: 0 }
+        { transform: `translate(${from.x}px, ${from.y}px) scale(.5)`, opacity: 0 },
+        { transform: `translate(${from.x + drift * 4}px, ${from.y - 12 - Math.abs(drift)}px) scale(1)`, opacity: 0.95, offset: 0.22 },
+        { transform: `translate(${to.x + drift}px, ${to.y}px) scale(.45)`, opacity: 0 }
       ], {
         duration: vfx.durationMs ?? 680,
         delay: i * (vfx.staggerMs ?? 18),
-        easing: "cubic-bezier(.25,.8,.25,1)"
+        easing: "cubic-bezier(.25,.8,.25,1)",
+        fill: "backwards"
       });
       animations.push(waitForAnimation(animation).then(() => particle.remove()));
     }
     await Promise.all(animations);
-    impact({ x: to.x, y: to.y }, false);
+    impact({ x: to.x, y: to.y }, false, "magic");
   }
 
   async function healPulse(actor, targets, vfx) {
+    if (reducedMotion()) {
+      sound.play(vfx.soundKey ?? "heal");
+      return;
+    }
+    await playWindup(actor, vfx);
     sound.play(vfx.soundKey ?? "heal");
-    if (reducedMotion()) return;
     const recipients = targets.length ? targets : [actor];
     const animations = [];
     for (const target of recipients) {
@@ -266,20 +509,21 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
       for (let i = 0; i < (vfx.particleCount ?? 8); i += 1) {
         const angle = (Math.PI * 2 * i) / (vfx.particleCount ?? 8);
+        // Origin-centered + absolute translate (SVG scale is origin-relative).
         const mote = svg("circle", {
           class: "fx-mote",
-          cx: point.x,
-          cy: point.y,
+          cx: 0,
+          cy: 0,
           r: 2.4 + (i % 2),
           fill: i % 2 ? vfx.colors.impact : vfx.colors.core,
           filter: "url(#softGlow)"
         });
         effectsLayer.appendChild(mote);
         const animation = mote.animate([
-          { transform: "translate(0,0) scale(.45)", opacity: 0 },
-          { transform: `translate(${Math.cos(angle) * 12}px, ${Math.sin(angle) * 8 - 8}px) scale(1)`, opacity: 0.9, offset: 0.28 },
-          { transform: `translate(${Math.cos(angle) * 22}px, ${Math.sin(angle) * 16 - 26}px) scale(.3)`, opacity: 0 }
-        ], { duration: vfx.durationMs ?? 560, delay: i * 12, easing: "ease-out" });
+          { transform: `translate(${point.x}px, ${point.y}px) scale(.45)`, opacity: 0 },
+          { transform: `translate(${point.x + Math.cos(angle) * 12}px, ${point.y + Math.sin(angle) * 8 - 8}px) scale(1)`, opacity: 0.9, offset: 0.28 },
+          { transform: `translate(${point.x + Math.cos(angle) * 22}px, ${point.y + Math.sin(angle) * 16 - 26}px) scale(.3)`, opacity: 0 }
+        ], { duration: vfx.durationMs ?? 560, delay: i * 12, easing: "ease-out", fill: "backwards" });
         animations.push(waitForAnimation(animation).then(() => mote.remove()));
       }
     }
@@ -319,19 +563,20 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
     for (let i = 1; i < lifted.length; i += 1) {
       const point = lifted[i];
+      // Origin-centered + absolute translate (SVG scale is origin-relative).
       const afterimage = svg("circle", {
         class: "fx-afterimage",
-        cx: point.x,
-        cy: point.y + 8,
+        cx: 0,
+        cy: 0,
         r: 5 + (i % 2) * 2,
         fill: vfx.colors.core,
         filter: "url(#softGlow)"
       });
       effectsLayer.appendChild(afterimage);
       afterimage.animate([
-        { transform: "scale(.7)", opacity: 0.7 },
-        { transform: "scale(2.3)", opacity: 0 }
-      ], { duration: 420, delay: i * 48, easing: "ease-out" }).finished.catch(() => {}).then(() => afterimage.remove());
+        { transform: `translate(${point.x}px, ${point.y + 8}px) scale(.7)`, opacity: 0.7 },
+        { transform: `translate(${point.x}px, ${point.y + 8}px) scale(2.3)`, opacity: 0 }
+      ], { duration: 420, delay: i * 48, easing: "ease-out", fill: "backwards" }).finished.catch(() => {}).then(() => afterimage.remove());
     }
 
     for (const target of targets) {
@@ -340,8 +585,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         const angle = (Math.PI * 2 * i) / (vfx.sparkCount ?? 8);
         const spark = svg("rect", {
           class: "fx-spark",
-          x: point.x - 2,
-          y: point.y - 2,
+          x: -2,
+          y: -2,
           width: 4,
           height: 4,
           rx: 1,
@@ -350,9 +595,9 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         });
         effectsLayer.appendChild(spark);
         spark.animate([
-          { transform: "translate(0,0) rotate(0deg)", opacity: 0.95 },
-          { transform: `translate(${Math.cos(angle) * 24}px, ${Math.sin(angle) * 18}px) rotate(160deg)`, opacity: 0 }
-        ], { duration: 430, delay: 220 + i * 10, easing: "ease-out" }).finished.catch(() => {}).then(() => spark.remove());
+          { transform: `translate(${point.x}px, ${point.y}px) rotate(0deg)`, opacity: 0.95 },
+          { transform: `translate(${point.x + Math.cos(angle) * 24}px, ${point.y + Math.sin(angle) * 18}px) rotate(160deg)`, opacity: 0 }
+        ], { duration: 430, delay: 220 + i * 10, easing: "ease-out", fill: "backwards" }).finished.catch(() => {}).then(() => spark.remove());
       }
     }
 
@@ -414,19 +659,20 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         ], { duration: stepMs, easing: "cubic-bezier(.3,.7,.3,1)", fill: "forwards" }));
       }
       // Afterimage ghost left on the tile just vacated.
+      // Origin-centered + absolute translate (SVG scale is origin-relative).
       const ghostPoint = lifted[i];
       const afterimage = svg("circle", {
         class: "fx-afterimage",
-        cx: ghostPoint.x,
-        cy: ghostPoint.y + 8,
+        cx: 0,
+        cy: 0,
         r: 6,
         fill: vfx.colors.core,
         filter: "url(#softGlow)"
       });
       effectsLayer.appendChild(afterimage);
       afterimage.animate([
-        { transform: "scale(.7)", opacity: 0.7 },
-        { transform: "scale(2.3)", opacity: 0 }
+        { transform: `translate(${ghostPoint.x}px, ${ghostPoint.y + 8}px) scale(.7)`, opacity: 0.7 },
+        { transform: `translate(${ghostPoint.x}px, ${ghostPoint.y + 8}px) scale(2.3)`, opacity: 0 }
       ], { duration: 380, easing: "ease-out" }).finished.catch(() => {}).then(() => afterimage.remove());
 
       // Strike whoever stands on the tile we just reached, in the moment of contact.
@@ -437,8 +683,21 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
   async function statusStrike(actor, target, vfx) {
     if (!target) return;
-    if (vfx.soundKey) sound.play(vfx.soundKey);
-    if (reducedMotion()) return;
+    if (reducedMotion()) {
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      return;
+    }
+    // Pure casts carry a `castProjectile`: the caster winds up, then the payload
+    // visibly travels before the motif blooms, so the effect never appears from
+    // nowhere. Rolled attack ARTS omit both here — their windup + arrow already
+    // played in animateAttack; only their post-roll motif belongs to this call.
+    if (vfx.castProjectile && actor) {
+      await playWindup(actor, vfx, target.position);
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      await flyProjectile(effectPoint(actor.position, 24), effectPoint(target.position, 20), vfx.castProjectile);
+    } else if (vfx.soundKey) {
+      sound.play(vfx.soundKey);
+    }
     const point = effectPoint(target.position, 30);
     const base = effectPoint(target.position, 2);
     const animations = [];
@@ -446,13 +705,14 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     if (vfx.motif === "venom") {
       for (let i = 0; i < (vfx.particleCount ?? 12); i += 1) {
         const angle = (Math.PI * 2 * i) / (vfx.particleCount ?? 12);
-        const mote = svg("circle", { class: "fx-mote", cx: point.x, cy: point.y, r: 2.2 + (i % 3), fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
+        // Origin-centered + absolute translate (SVG scale is origin-relative).
+        const mote = svg("circle", { class: "fx-mote", cx: 0, cy: 0, r: 2.2 + (i % 3), fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
         effectsLayer.appendChild(mote);
         const animation = mote.animate([
-          { transform: "translate(0,0) scale(.5)", opacity: 0 },
-          { transform: `translate(${Math.cos(angle) * 14}px, ${Math.sin(angle) * 8}px) scale(1)`, opacity: 0.9, offset: 0.25 },
-          { transform: `translate(${Math.cos(angle) * 30}px, ${Math.sin(angle) * 22 - 18}px) scale(.35)`, opacity: 0 }
-        ], { duration: 520, delay: i * 14, easing: "ease-out" });
+          { transform: `translate(${point.x}px, ${point.y}px) scale(.5)`, opacity: 0 },
+          { transform: `translate(${point.x + Math.cos(angle) * 14}px, ${point.y + Math.sin(angle) * 8}px) scale(1)`, opacity: 0.9, offset: 0.25 },
+          { transform: `translate(${point.x + Math.cos(angle) * 30}px, ${point.y + Math.sin(angle) * 22 - 18}px) scale(.35)`, opacity: 0 }
+        ], { duration: 520, delay: i * 14, easing: "ease-out", fill: "backwards" });
         animations.push(waitForAnimation(animation).then(() => mote.remove()));
       }
     } else if (vfx.motif === "snare") {
@@ -469,19 +729,21 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     } else if (vfx.motif === "moon") {
       for (let i = 0; i < (vfx.particleCount ?? 8); i += 1) {
         const offset = i - ((vfx.particleCount ?? 8) - 1) / 2;
+        // Path drawn around the origin; position carried in translate (SVG
+        // scale is origin-relative, so absolute path coords + scale drift).
         const shard = svg("path", {
           class: "fx-rune",
-          d: `M ${point.x - 8 + offset * 4} ${point.y - 28} Q ${point.x + offset * 2} ${point.y - 10} ${point.x + 8 + offset * 4} ${point.y - 28}`,
+          d: `M ${-8 + offset * 4} -28 Q ${offset * 2} -10 ${8 + offset * 4} -28`,
           stroke: vfx.colors.core,
           "stroke-width": 2.4,
           filter: "url(#softGlow)"
         });
         effectsLayer.appendChild(shard);
         const animation = shard.animate([
-          { transform: "translateY(-12px) scale(.7)", opacity: 0 },
-          { transform: "translateY(0) scale(1)", opacity: 0.95, offset: 0.35 },
-          { transform: "translateY(24px) scale(.85)", opacity: 0 }
-        ], { duration: 560, delay: i * 22, easing: "ease-out" });
+          { transform: `translate(${point.x}px, ${point.y - 12}px) scale(.7)`, opacity: 0 },
+          { transform: `translate(${point.x}px, ${point.y}px) scale(1)`, opacity: 0.95, offset: 0.35 },
+          { transform: `translate(${point.x}px, ${point.y + 24}px) scale(.85)`, opacity: 0 }
+        ], { duration: 560, delay: i * 22, easing: "ease-out", fill: "backwards" });
         animations.push(waitForAnimation(animation).then(() => shard.remove()));
       }
     } else if (vfx.motif === "smoke") {
@@ -489,14 +751,14 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       for (let i = 0; i < (vfx.puffCount ?? 7); i += 1) {
         const angle = (Math.PI * 2 * i) / (vfx.puffCount ?? 7) + Math.random() * 0.4;
         const spread = 14 + (i % 3) * 7;
-        const puff = svg("circle", { class: "fx-mote", cx: point.x, cy: point.y, r: 5 + (i % 3) * 2, fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
+        const puff = svg("circle", { class: "fx-mote", cx: 0, cy: 0, r: 5 + (i % 3) * 2, fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
         puff.style.opacity = "0.62";
         effectsLayer.appendChild(puff);
         const animation = puff.animate([
-          { transform: "translate(0,0) scale(.4)", opacity: 0 },
-          { transform: `translate(${Math.cos(angle) * spread * 0.5}px, ${Math.sin(angle) * spread * 0.4 - 10}px) scale(1.1)`, opacity: 0.6, offset: 0.3 },
-          { transform: `translate(${Math.cos(angle) * spread}px, ${Math.sin(angle) * spread * 0.6 - 22}px) scale(1.7)`, opacity: 0 }
-        ], { duration: 620, delay: i * 16, easing: "ease-out" });
+          { transform: `translate(${point.x}px, ${point.y}px) scale(.4)`, opacity: 0 },
+          { transform: `translate(${point.x + Math.cos(angle) * spread * 0.5}px, ${point.y + Math.sin(angle) * spread * 0.4 - 10}px) scale(1.1)`, opacity: 0.6, offset: 0.3 },
+          { transform: `translate(${point.x + Math.cos(angle) * spread}px, ${point.y + Math.sin(angle) * spread * 0.6 - 22}px) scale(1.7)`, opacity: 0 }
+        ], { duration: 620, delay: i * 16, easing: "ease-out", fill: "backwards" });
         animations.push(waitForAnimation(animation).then(() => puff.remove()));
       }
     } else if (vfx.motif === "silenceRune") {
@@ -504,15 +766,17 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       effectsLayer.appendChild(ring);
       animations.push(waitForAnimation(ring.animate([{ r: 11, opacity: 0 }, { r: 30, opacity: 0.95, offset: 0.38 }, { r: 18, opacity: 0 }], { duration: 560, easing: "ease-out" })).then(() => ring.remove()));
       for (let i = 0; i < (vfx.runeCount ?? 4); i += 1) {
-        const angle = (Math.PI * 2 * i) / (vfx.runeCount ?? 4);
-        const mark = svg("line", { class: "fx-rune", x1: point.x - 18, y1: point.y, x2: point.x + 18, y2: point.y, stroke: vfx.colors.core, "stroke-width": 3, filter: "url(#softGlow)" });
-        mark.setAttribute("transform", `rotate(${angle * 180 / Math.PI} ${point.x} ${point.y})`);
+        const degrees = (180 * i) / (vfx.runeCount ?? 4);
+        // Line drawn through the origin; the keyframes carry BOTH the position and
+        // the spoke rotation (a WAAPI transform replaces the SVG attribute, so the
+        // old attribute-rotate + origin-relative keyframe rotate drew stray marks).
+        const mark = svg("line", { class: "fx-rune", x1: -18, y1: 0, x2: 18, y2: 0, stroke: vfx.colors.core, "stroke-width": 3, filter: "url(#softGlow)" });
         effectsLayer.appendChild(mark);
         const animation = mark.animate([
-          { opacity: 0, transform: `rotate(${angle}rad) scale(.4)` },
-          { opacity: 0.9, transform: `rotate(${angle}rad) scale(1)`, offset: 0.35 },
-          { opacity: 0, transform: `rotate(${angle}rad) scale(1.25)` }
-        ], { duration: 520, delay: i * 45, easing: "ease-out" });
+          { opacity: 0, transform: `translate(${point.x}px, ${point.y}px) rotate(${degrees}deg) scale(.4)` },
+          { opacity: 0.9, transform: `translate(${point.x}px, ${point.y}px) rotate(${degrees}deg) scale(1)`, offset: 0.35 },
+          { opacity: 0, transform: `translate(${point.x}px, ${point.y}px) rotate(${degrees}deg) scale(1.25)` }
+        ], { duration: 520, delay: i * 45, easing: "ease-out", fill: "backwards" });
         animations.push(waitForAnimation(animation).then(() => mark.remove()));
       }
     }
@@ -522,8 +786,12 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   async function magicBurst(actor, targets, vfx) {
+    if (reducedMotion()) {
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      return;
+    }
+    await playWindup(actor, vfx);
     if (vfx.soundKey) sound.play(vfx.soundKey);
-    if (reducedMotion()) return;
     const center = effectPoint(actor.position, 18);
     const ground = unitBase(actor.position);
     const blast = Boolean(vfx.blast);
@@ -581,13 +849,16 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
 
     // Radial particle burst from caster. Blast motes implode toward the centre on
     // a short delay before erupting, so the detonation reads as a gathered collapse.
+    // Origin-centered geometry + absolute translate (scale() on SVG is user-space-
+    // origin-relative; cx/cy-placed motes with scale keyframes drift toward origin).
     for (let i = 0; i < particleCount; i += 1) {
       const angle = (Math.PI * 2 * i) / particleCount;
       const dist = 28 + (i % 3) * 14;
+      const outX = center.x + Math.cos(angle) * dist;
       const mote = svg("circle", {
         class: "fx-mote",
-        cx: center.x,
-        cy: center.y,
+        cx: 0,
+        cy: 0,
         r: 3 + (i % 2),
         fill: i % 3 === 0 ? vfx.colors.impact : vfx.colors.core,
         filter: "url(#softGlow)"
@@ -595,14 +866,14 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       effectsLayer.appendChild(mote);
       const frames = blast
         ? [
-            { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist * 0.6 - 18}px) scale(.5)`, opacity: 0 },
-            { transform: "translate(0,0) scale(.7)", opacity: 1, offset: 0.34 },
-            { transform: `translate(${Math.cos(angle) * dist * 1.15}px, ${Math.sin(angle) * dist * 0.7 - 24}px) scale(.2)`, opacity: 0 }
+            { transform: `translate(${outX}px, ${center.y + Math.sin(angle) * dist * 0.6 - 18}px) scale(.5)`, opacity: 0 },
+            { transform: `translate(${center.x}px, ${center.y}px) scale(.7)`, opacity: 1, offset: 0.34 },
+            { transform: `translate(${center.x + Math.cos(angle) * dist * 1.15}px, ${center.y + Math.sin(angle) * dist * 0.7 - 24}px) scale(.2)`, opacity: 0 }
           ]
         : [
-            { transform: "translate(0,0) scale(.3)", opacity: 0 },
-            { transform: `translate(${Math.cos(angle) * dist * 0.4}px, ${Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
-            { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
+            { transform: `translate(${center.x}px, ${center.y}px) scale(.3)`, opacity: 0 },
+            { transform: `translate(${center.x + Math.cos(angle) * dist * 0.4}px, ${center.y + Math.sin(angle) * dist * 0.3 - 8}px) scale(1)`, opacity: 1, offset: 0.25 },
+            { transform: `translate(${outX}px, ${center.y + Math.sin(angle) * dist * 0.65 - 22}px) scale(.2)`, opacity: 0 }
           ];
       animations.push(waitForAnimation(mote.animate(frames, { duration, delay: i * 8, easing: "ease-out" })).then(() => mote.remove()));
     }
@@ -610,7 +881,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     // Impact on each struck target — a hard pop for blasts, a soft ring otherwise.
     for (const target of targets) {
       const pt = effectPoint(target.position, 18);
-      if (blast) impact(pt, true);
+      if (blast) impact(pt, true, "magic");
       const flash = svg("circle", {
         class: "fx-ring",
         cx: pt.x,
@@ -659,6 +930,16 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
     if (vfx.type === "statusStrike" && target && effect?.applied) {
       await statusStrike(actor, target, { ...vfx, status: effect.status ?? vfx.status });
+      return;
+    }
+    if (vfx.type === "lob") {
+      const destination = targetPosition ?? target?.position;
+      if (!destination) return;
+      await playWindup(actor, vfx, destination);
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      const landing = effectPoint(destination, 4);
+      await flyProjectile(effectPoint(actor.position, 24), landing, vfx.projectile ?? {});
+      impact(landing, false, vfx.impactKind ?? "physical");
     }
   }
 
@@ -670,13 +951,14 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       const angle = (Math.PI * 2 * i) / 11 + Math.random() * 0.5;
       const distance = 26 + Math.random() * 30;
       const size = 2.5 + Math.random() * 3.5;
-      const shard = svg("rect", { class: "fx-shard", x: point.x - size / 2, y: point.y - size / 2, width: size, height: size, rx: 1, fill: hue, filter: "url(#softGlow)" });
+      // Origin-centered + absolute translate (SVG rotate/scale are origin-relative).
+      const shard = svg("rect", { class: "fx-shard", x: -size / 2, y: -size / 2, width: size, height: size, rx: 1, fill: hue, filter: "url(#softGlow)" });
       effectsLayer.appendChild(shard);
       const driftX = Math.cos(angle) * distance;
       const driftY = Math.sin(angle) * distance - 10;
       shard.animate([
-        { transform: "translate(0,0) scale(1)", opacity: 1 },
-        { transform: `translate(${driftX}px, ${driftY + 18}px) rotate(${(Math.random() - 0.5) * 220}deg) scale(.4)`, opacity: 0 }
+        { transform: `translate(${point.x}px, ${point.y}px) scale(1)`, opacity: 1 },
+        { transform: `translate(${point.x + driftX}px, ${point.y + driftY + 18}px) rotate(${(Math.random() - 0.5) * 220}deg) scale(.4)`, opacity: 0 }
       ], { duration: 480 + Math.random() * 220, easing: "cubic-bezier(.2,.7,.3,1)" })
         .finished.catch(() => {}).then(() => shard.remove());
     }
@@ -713,9 +995,12 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   // The attacker commits: a melee fighter lunges a fraction toward the target; a
-  // ranged unit fires a glowing projectile arc that flies across to land just as
-  // the dice resolve. Awaited so the strike reads as cause → effect.
-  async function animateAttack(attacker, target, ranged) {
+  // ranged unit fires a REAL projectile (per-unit-type: the Archer's arrow, the
+  // Sniper's tracer, a class-colored magic bolt) that flies across to land just as
+  // the dice resolve. A rolled attack ART passes its `artId` so its recipe's own
+  // `projectile` (Poison Arrow's venom arrow, Spark's blue orb…) replaces the
+  // unit's basic shot. Awaited so the strike reads as cause → effect.
+  async function animateAttack(attacker, target, ranged, artId = null) {
     const fromBase = unitBase(attacker.position);
     const toBase = unitBase(target.position);
     if (!ranged) {
@@ -733,39 +1018,42 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       ], { duration: 360, easing: "cubic-bezier(.2,.75,.2,1)" }).finished.catch(() => {});
       return;
     }
-    // Ranged: launch whoosh + projectile arc. The hit sound is played by the
-    // controller once the roll resolves, so the launch and the land stay distinct.
+    // Ranged: launch whoosh + a real projectile in flight. The hit sound is played
+    // by the controller once the roll resolves, so the launch and the land stay
+    // distinct. (The projectile flies even on a MISS — the roll reveal after it
+    // lands is what tells the player whether it found its mark.) A magic art's
+    // recipe windup gathers on the caster before its bolt releases.
+    const artVfx = artId ? getAbilityVfx(artId) : null;
+    if (!reducedMotion() && artVfx?.windup) await playWindup(attacker, artVfx, target.position);
     sound.play("arrowAirborne");
     if (reducedMotion()) return;
-    const path = svg("path", {
-      d: `M ${fromBase.x} ${fromBase.y - 8} Q ${(fromBase.x + toBase.x) / 2} ${Math.min(fromBase.y, toBase.y) - 60} ${toBase.x} ${toBase.y - 8}`,
-      class: "fx-line", stroke: "#f7e27d", "stroke-width": 5, filter: "url(#softGlow)"
-    });
-    path.style.strokeDasharray = "14 10";
-    effectsLayer.appendChild(path);
-    await path.animate([
-      { strokeDashoffset: "70", opacity: 0 },
-      { strokeDashoffset: "0", opacity: 1, offset: 0.25 },
-      { strokeDashoffset: "-50", opacity: 0 }
-    ], { duration: 420, easing: "ease-out" }).finished.catch(() => {});
-    path.remove();
+    const spec = artVfx?.projectile ?? getAttackProjectile(attacker.type);
+    await flyProjectile(
+      { x: fromBase.x, y: fromBase.y - 24 },
+      { x: toBase.x, y: toBase.y - 18 },
+      spec
+    );
   }
 
-  // The target reels from the blow: a short side-to-side wobble, then a held beat
-  // (hit-stop) so the hit lands with weight. Awaited.
+  // The target reels from the blow with real hit-stop: it snaps to max displacement
+  // fast, FREEZES there for a beat (the frozen frame is what sells the weight), then
+  // wobbles back to rest. A crit kicks harder, squashes the token, and holds longer.
   async function hitRecoil(unitId, position, critical) {
     const element = unitElement(unitId);
     if (element && !reducedMotion()) {
       // Absolute coords around the token's base; a wobble that settles back onto it.
       const base = unitBase(position);
+      const kick = critical ? 12 : 8;
+      const squash = critical ? " scale(1.08, .94)" : "";
       await element.animate([
         { transform: `translate(${base.x}px, ${base.y}px)` },
-        { transform: `translate(${base.x - 8}px, ${base.y}px) rotate(-5deg)` },
-        { transform: `translate(${base.x + 7}px, ${base.y}px) rotate(4deg)` },
+        { transform: `translate(${base.x - kick}px, ${base.y}px) rotate(-5deg)${squash}`, offset: critical ? 0.16 : 0.2 },
+        { transform: `translate(${base.x - kick}px, ${base.y}px) rotate(-5deg)${squash}`, offset: critical ? 0.46 : 0.38 },
+        { transform: `translate(${base.x + kick * 0.8}px, ${base.y}px) rotate(4deg)`, offset: 0.72 },
         { transform: `translate(${base.x}px, ${base.y}px)` }
-      ], { duration: 330, easing: "ease-out" }).finished.catch(() => {});
+      ], { duration: critical ? 430 : 340, easing: "ease-out" }).finished.catch(() => {});
     }
-    if (!reducedMotion()) await sleep(critical ? 110 : 70);
+    if (!reducedMotion()) await sleep(critical ? 120 : 60);
   }
 
   // A defeated figurine dissolves: it squashes, sinks, and fades while its shards

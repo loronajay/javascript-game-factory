@@ -417,6 +417,8 @@ test("Spark, Flee, Banish, and Nuke have VFX catalog entries", () => {
   assert.equal(getAbilityVfx("spark")?.type, "projectileFan");
   assert.equal(getAbilityVfx("flee")?.type, "dashTrail");
   assert.equal(getAbilityVfx("banish")?.type, "statusStrike");
-  assert.equal(getAbilityVfx("banish")?.motif, "banish");
+  // Banish silences, so it draws the real silenceRune motif (the old "banish"
+  // motif string had no statusStrike branch and rendered nothing).
+  assert.equal(getAbilityVfx("banish")?.motif, "silenceRune");
   assert.equal(getAbilityVfx("nuke")?.type, "magicBurst");
 });

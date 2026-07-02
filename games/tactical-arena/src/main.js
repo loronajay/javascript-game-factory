@@ -273,7 +273,7 @@ async function resolveCombat(command) {
     const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
     const center = unitCenter(metrics, targetBefore);
 
-    await effects.animateAttack(attackerBefore, targetBefore, ranged);
+    await effects.animateAttack(attackerBefore, targetBefore, ranged, rolled.artId ?? null);
     await effects.rollReveal({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) });
     playAttackImpactSound(rolled, ranged);
 
@@ -281,16 +281,17 @@ async function resolveCombat(command) {
       await effects.floatText(center, "MISS", "#cbb78b");
     } else {
       const dmg = typeof rolled.damage === "number" ? rolled.damage : (rolled.damage?.damage ?? 0);
+      const impactKind = rolled.artId && artDefinition(attackerBefore, rolled.artId)?.damageType === "magic" ? "magic" : "physical";
       if (rolled.critical) { effects.critFlash(); effects.shake(11); }
       else effects.shake(Math.min(8, 2.5 + dmg * 1.4));
-      effects.impact(center, Boolean(rolled.critical));
+      effects.impact(center, Boolean(rolled.critical), impactKind);
       await effects.hitRecoil(targetBefore.id, targetBefore.position, Boolean(rolled.critical));
       await effects.floatText(center, rolled.critical ? `✦ ${dmg}` : `-${dmg}`, rolled.critical ? "#ffd26a" : "#ff7684");
       for (const hitTarget of rolledTargetsBefore) {
         if (hitTarget.id === targetBefore.id) continue;
         const hitCenter = unitCenter(metrics, hitTarget);
         const hitDamage = rolled.damageByTarget?.[hitTarget.id] ?? dmg;
-        effects.impact(hitCenter, Boolean(rolled.critical));
+        effects.impact(hitCenter, Boolean(rolled.critical), impactKind);
         await effects.hitRecoil(hitTarget.id, hitTarget.position, Boolean(rolled.critical));
         await effects.floatText(hitCenter, rolled.critical ? `âœ¦ ${hitDamage}` : `-${hitDamage}`, rolled.critical ? "#ffd26a" : "#ff7684");
       }
@@ -428,7 +429,7 @@ async function resolveInstantArt(command) {
       if (!target) return;
       const center = unitCenter(metrics, target);
       audio.play("attackHit");
-      effects.impact(center, false);
+      effects.impact(center, false, "true");
       await effects.hitRecoil(target.id, target.position, false);
       await effects.floatText(center, "-2", "#ff7684");
       const after = findUnit(result.nextState, target.id);
@@ -464,10 +465,10 @@ async function resolveInstantArt(command) {
     audio.play("buildCover");
     effects.impact(point, false);
     effects.shake(4);
-  } else if (resolved?.artId === "throw-cigar" && resolved.position) {
-    const point = unitCenter(createBoardMetrics(state.size), { position: resolved.position });
-    audio.play("throwCigar");
-    effects.impact(point, false);
+  } else if (resolved?.artId === "throw-cigar" && resolved.position && actorBefore) {
+    // The cigar visibly tumbles from the Sniper to the tile before the fire takes
+    // (the lob recipe plays the throwCigar sound and lands its own impact).
+    await effects.playAbilityVfx("throw-cigar", { actor: actorBefore, targetPosition: resolved.position });
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -786,6 +787,7 @@ function playRolloverFx(events) {
   let killed = false;
   for (const burn of burns) {
     const center = unitCenter(metrics, { position: burn.position });
+    effects.impact(center, false, "fire");
     effects.floatText(center, `-${burn.damage}`, "#ff9a3c");
     const after = findUnit(state, burn.unitId);
     if (!after || after.hp <= 0) { effects.deathBurst(center, teamColor(after?.player ?? 1)); killed = true; }

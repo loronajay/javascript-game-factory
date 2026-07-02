@@ -229,6 +229,26 @@ const P_TURN_SWITCH = {
 // Patches: Tactical Arena — new synthesized sounds (no sample files needed)
 // ---------------------------------------------------------------------------
 
+// Shared cast wind-up — a soft arcane riser that swells under any gather; the
+// ability's own sound then fires at the release, so charge → release reads in audio
+// the same way the gather → burst reads on screen.
+const P_CAST_CHARGE = {
+  id: "ta_cast_charge", duration: 0.5, gain: 0.58,
+  layers: [
+    { type: "noise", color: "pink", gain: 0.08, duration: 0.46,
+      envelope: [[0, 0.0001], [0.55, 0.45], [0.9, 1], [1, 0.0001]],
+      filter: { type: "bandpass", frequency: 2100, q: 1.2 } },
+    { type: "oscillator", waveform: "sine", gain: 0.15, duration: 0.48,
+      frequencyCurve: [[0, 300], [0.7, 500], [1, 660]],
+      envelope: [[0, 0.0001], [0.25, 0.5], [0.85, 0.9], [1, 0.0001]] },
+    { type: "oscillator", waveform: "triangle", gain: 0.07, duration: 0.44, offset: 0.04,
+      frequencyCurve: [[0, 620], [1, 1160]],
+      envelope: [[0, 0.0001], [0.4, 0.5], [0.9, 0.75], [1, 0.0001]],
+      filter: { type: "lowpass", frequency: 4200, q: 0.8 } }
+  ],
+  effects: { highpass: 160, lowpass: 7600, compressor: { threshold: -20, ratio: 3, attack: 0.003, release: 0.12 } }
+};
+
 // Magician: Spark — electric bolt
 const P_SPARK = {
   id: "ta_spark", duration: 0.28, gain: 0.82,
@@ -655,6 +675,7 @@ export const SOUND_CATALOG = Object.freeze([
   { key: "unitDefeated",    patch: P_UNIT_DEFEATED },
   { key: "turnSwitch",      patch: P_TURN_SWITCH },
   // Tactical Arena arts
+  { key: "castCharge",      patch: P_CAST_CHARGE },
   { key: "spark",           patch: P_SPARK },
   { key: "banish",          patch: P_BANISH },
   { key: "nuke",            patch: P_NUKE },

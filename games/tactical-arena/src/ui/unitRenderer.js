@@ -1,6 +1,6 @@
 import { svgElement } from "./svgHelpers.js";
 import { gridToScreen } from "./isometric.js";
-import { getEffectiveStats, isDefending } from "../core/unitCatalog.js";
+import { getEffectiveStats, isDefending, isRaging } from "../core/unitCatalog.js";
 import { positionKey } from "../rules/movement.js";
 import { getUnitStatusVfx } from "./vfxCatalog.js";
 import { createBoardSpriteFigure } from "./boardSprites.js";
@@ -392,6 +392,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   const classes = ["unit", `player-${unit.player}`, "idle"];
   if (unit.spent) classes.push("spent");
   if (isDefending(unit)) classes.push("defending");
+  if (isRaging(unit)) classes.push("is-raging");
   if (unit.id === selectedId) classes.push("active");
   if (isTarget) classes.push("targetable");
 
@@ -404,6 +405,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
 
   const body = svgElement("g", { class: "body-group" });
   body.append(
+    svgElement("circle", { class: "rage-aura", cx: 0, cy: -9, r: 37 }),
     svgElement("ellipse", { class: "base-side", cx: 0, cy: 9, rx: 24, ry: 11 }),
     svgElement("ellipse", { class: "base-top", cx: 0, cy: 4, rx: 24, ry: 11 }),
     svgElement("ellipse", { class: "base-inlay", cx: 0, cy: 4, rx: 18, ry: 8 }),
