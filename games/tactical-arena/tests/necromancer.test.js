@@ -426,5 +426,6 @@ test("A healthy Necromancer projects only the base aura (no STR/MOVE sap)", () =
 test("Wither, Dark Bomb, and Summon Ghoul all declare VFX recipes", () => {
   assert.equal(getAbilityVfx("wither")?.type, "statusStrike");
   assert.equal(getAbilityVfx("dark-bomb")?.type, "magicBurst");
-  assert.equal(getAbilityVfx("summon-ghoul")?.type, "magicBurst");
+  // Summon Ghoul owns the grave-rising signature (animation batch 4).
+  assert.equal(getAbilityVfx("summon-ghoul")?.type, "summonRise");
 });

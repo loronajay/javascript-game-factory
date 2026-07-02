@@ -108,6 +108,26 @@ test("Volley Shot rains real arrows and Throw Cigar is a tumbling lob", () => {
   assert.equal(cigar.soundKey, "throwCigar");
 });
 
+test("signature abilities carry their bespoke recipe flags", () => {
+  // Nuke owns the full detonation signature; Dark Bomb keeps only the scorch.
+  const nuke = getAbilityVfx("nuke");
+  assert.equal(nuke.boardFlash, true);
+  assert.equal(nuke.pillar, true);
+  assert.equal(nuke.afterglow, true);
+  const darkBomb = getAbilityVfx("dark-bomb");
+  assert.equal(darkBomb.afterglow, true);
+  assert.equal(darkBomb.pillar, undefined);
+  assert.equal(darkBomb.boardFlash, undefined);
+  // Summon Ghoul is the grave-rising, with a stream into the summon tile.
+  const summon = getAbilityVfx("summon-ghoul");
+  assert.equal(summon.type, "summonRise");
+  assert.equal(summon.stream.shape, "orb");
+  assert.ok(summon.soilCount > 0);
+  assert.ok(summon.miasmaCount > 0);
+  // Life Sap channels through a visible tether.
+  assert.equal(getAbilityVfx("life-sap").tether, true);
+});
+
 test("impacts are styled per damage type with a physical fallback", () => {
   const kinds = ["physical", "magic", "fire", "true"].map((kind) => getImpactVfx(kind));
   for (const style of kinds) {

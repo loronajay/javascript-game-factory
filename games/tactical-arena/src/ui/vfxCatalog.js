@@ -52,6 +52,9 @@ const ABILITY_VFX = Object.freeze({
     durationMs: 680,
     staggerMs: 18,
     curveHeight: 54,
+    // Signature: a pulsing life-tether arcs between victim and drinker while the
+    // motes travel it, and the drinker pulses as the stolen life lands.
+    tether: true,
     colors: Object.freeze({ core: "#8cf0a4", trail: "#3fbf86", impact: "#d8ffd6" })
   }),
   "poison-arrow": Object.freeze({
@@ -156,8 +159,13 @@ const ABILITY_VFX = Object.freeze({
     particleCount: 26,
     radius: 48,
     durationMs: 720,
-    // The rage ultimate earns the longest, heaviest gather in the game.
+    // The rage ultimate earns the longest, heaviest gather in the game — and the
+    // full signature detonation: whole-board bloom at release, a light pillar at
+    // the epicenter, and a scorch afterglow that lingers on the ground.
     windup: Object.freeze({ style: "gather", durationMs: 560, particleCount: 14 }),
+    boardFlash: true,
+    pillar: true,
+    afterglow: true,
     colors: Object.freeze({ core: "#9966ff", trail: "#4422aa", impact: "#ccaaff" })
   }),
   "dark-bomb": Object.freeze({
@@ -172,6 +180,8 @@ const ABILITY_VFX = Object.freeze({
     radius: 46,
     durationMs: 700,
     windup: Object.freeze({ style: "gather", durationMs: 500, particleCount: 12 }),
+    // Scorch lingers, but no pillar/board bloom — those stay Nuke's signature.
+    afterglow: true,
     colors: Object.freeze({ core: "#b48cff", trail: "#2a1746", impact: "#9be08a" })
   }),
   "throw-cigar": Object.freeze({
@@ -184,12 +194,16 @@ const ABILITY_VFX = Object.freeze({
     colors: Object.freeze({ core: "#ffb45e", trail: "#8a5a30", impact: "#ffd9a0" })
   }),
   "summon-ghoul": Object.freeze({
-    type: "magicBurst",
+    // Signature: the grave-rising. The necromancer gathers, a dark stream pours
+    // into the chosen tile, a summoning circle contracts, soil bursts upward, a
+    // wraith silhouette climbs out, and lingering miasma masks the ghoul's arrival.
+    type: "summonRise",
     soundKey: "darkseeker",
-    particleCount: 14,
-    radius: 34,
-    durationMs: 600,
+    soilCount: 8,
+    miasmaCount: 6,
+    riseDurationMs: 520,
     windup: Object.freeze({ style: "gather", durationMs: 460, particleCount: 10 }),
+    stream: Object.freeze({ shape: "orb", arcHeight: 32, durationMs: 400, size: 1.1, colors: Object.freeze({ core: "#9be08a", trail: "#244d1f" }) }),
     colors: Object.freeze({ core: "#9be08a", trail: "#244d1f", impact: "#e8ffd6" })
   }),
   wither: Object.freeze({

@@ -453,6 +453,27 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     const to = effectPoint(actor.position, 20);
     const count = vfx.particleCount ?? 14;
     const animations = [];
+
+    // Signature tether: a pulsing life-cord arcs victim → drinker for the duration
+    // of the drain, so the motes read as riding a channel rather than floating free.
+    if (vfx.tether) {
+      const controlY = Math.min(from.y, to.y) - (vfx.curveHeight ?? 54) * 0.6;
+      const tether = svg("path", {
+        d: `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${controlY} ${to.x} ${to.y}`,
+        class: "fx-line fx-tether",
+        stroke: vfx.colors.core,
+        "stroke-width": 2.5,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(tether);
+      animations.push(waitForAnimation(tether.animate([
+        { opacity: 0, strokeWidth: 1 },
+        { opacity: 0.75, strokeWidth: 3.5, offset: 0.25 },
+        { opacity: 0.45, strokeWidth: 2, offset: 0.6 },
+        { opacity: 0.7, strokeWidth: 3, offset: 0.8 },
+        { opacity: 0 }
+      ], { duration: (vfx.durationMs ?? 680) + 160, easing: "ease-out" })).then(() => tether.remove()));
+    }
     for (let i = 0; i < count; i += 1) {
       const drift = (i - (count - 1) / 2) * 1.9;
       // Origin-centered + absolute translate (SVG scale is origin-relative).
@@ -478,6 +499,18 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       animations.push(waitForAnimation(animation).then(() => particle.remove()));
     }
     await Promise.all(animations);
+    // Absorb pulse: the drinker swells for a beat as the stolen life lands.
+    if (vfx.tether) {
+      const token = unitElement(actor.id);
+      if (token) {
+        const base = unitBase(actor.position);
+        token.animate([
+          { transform: `translate(${base.x}px, ${base.y}px) scale(1)` },
+          { transform: `translate(${base.x}px, ${base.y - 3}px) scale(1.07)`, offset: 0.4 },
+          { transform: `translate(${base.x}px, ${base.y}px) scale(1)` }
+        ], { duration: 360, easing: "ease-out" });
+      }
+    }
     impact({ x: to.x, y: to.y }, false, "magic");
   }
 
@@ -799,6 +832,16 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     const particleCount = vfx.particleCount ?? 20;
     const animations = [];
 
+    // Signature extras (recipe-flagged, Nuke carries all three): a whole-board
+    // bloom in the ability's color at the release instant…
+    if (vfx.boardFlash && board) {
+      const box = board.viewBox.baseVal;
+      const bloom = svg("rect", { class: "fx-critflash", x: box.x, y: box.y, width: box.width, height: box.height, fill: vfx.colors.core });
+      effectsLayer.appendChild(bloom);
+      bloom.animate([{ opacity: 0.38 }, { opacity: 0 }], { duration: 340, easing: "ease-out" })
+        .finished.catch(() => {}).then(() => bloom.remove());
+    }
+
     // A blast detonates rather than just blooms: a flat shockwave sweeps the table
     // out to the real footprint, the core implodes then erupts, and the board jolts.
     if (blast) {
@@ -829,6 +872,33 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         { r: 26, opacity: 1, offset: 0.52 },
         { r: 4, opacity: 0 }
       ], { duration: duration * 0.72, easing: "cubic-bezier(.4,0,.2,1)" })).then(() => core.remove()));
+
+      // …a pillar of light climbing out of the epicenter as the core erupts…
+      if (vfx.pillar) {
+        const pillar = svg("ellipse", { class: "fx-flash", cx: ground.x, cy: ground.y - 72, rx: 24, ry: 92, fill: vfx.colors.core, filter: "url(#softGlow)" });
+        effectsLayer.appendChild(pillar);
+        animations.push(waitForAnimation(pillar.animate([
+          { rx: 26, opacity: 0 },
+          { rx: 15, opacity: 0.8, offset: 0.35 },
+          { rx: 5, opacity: 0.9, offset: 0.7 },
+          { rx: 2, opacity: 0 }
+        ], { duration: duration * 0.8, delay: duration * 0.24, easing: "ease-out", fill: "backwards" })).then(() => pillar.remove()));
+      }
+    }
+
+    // …and a scorch afterglow that outlives the burst on the ground. Fire-and-forget
+    // so the lingering fade never slows the resolver's pacing.
+    if (vfx.afterglow) {
+      const reach = boardMetrics.tileWidth * 0.5 * (vfx.blastTiles ?? 1.5);
+      const scorch = svg("ellipse", { class: "fx-flash", cx: ground.x, cy: ground.y + 6, rx: reach, ry: reach * 0.5, fill: vfx.colors.trail, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(scorch);
+      scorch.animate([
+        { opacity: 0 },
+        { opacity: 0.4, offset: 0.18 },
+        { opacity: 0.28, offset: 0.55 },
+        { opacity: 0 }
+      ], { duration: 1300, delay: duration * 0.35, easing: "ease-out", fill: "backwards" })
+        .finished.catch(() => {}).then(() => scorch.remove());
     }
 
     // Expanding ring centred on the caster
@@ -901,6 +971,75 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     await Promise.all(animations);
   }
 
+  // The grave-rising (Summon Ghoul's signature). Gather on the necromancer, a dark
+  // stream pours into the summon tile, a summoning circle contracts, soil bursts
+  // upward and falls back, a wraith silhouette climbs out — then lingering miasma
+  // puffs stay behind (not awaited) to mask the ghoul token's pop-in on the next
+  // render, which happens right after this resolves.
+  async function summonRise(actor, targets, vfx) {
+    if (reducedMotion()) {
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      return;
+    }
+    await playWindup(actor, vfx);
+    if (vfx.soundKey) sound.play(vfx.soundKey);
+    const spot = targets[0]?.position ?? actor.position;
+    const ground = unitBase(spot);
+    await flyProjectile(effectPoint(actor.position, 24), { x: ground.x, y: ground.y - 4 }, vfx.stream ?? { shape: "orb", arcHeight: 32, colors: vfx.colors });
+
+    const animations = [];
+
+    // Summoning circle contracting into the grave point.
+    const circle = svg("ellipse", { class: "fx-ring", cx: ground.x, cy: ground.y + 5, rx: 30, ry: 14, stroke: vfx.colors.core, filter: "url(#softGlow)" });
+    effectsLayer.appendChild(circle);
+    animations.push(waitForAnimation(circle.animate([
+      { rx: 30, ry: 14, opacity: 0, strokeWidth: 1.5 },
+      { rx: 18, ry: 8.5, opacity: 0.85, strokeWidth: 3, offset: 0.5 },
+      { rx: 8, ry: 3.6, opacity: 0, strokeWidth: 4.5 }
+    ], { duration: 520, easing: "ease-in" })).then(() => circle.remove()));
+
+    // Soil shards thrown up on a ballistic hop, falling back past the surface.
+    for (let i = 0; i < (vfx.soilCount ?? 8); i += 1) {
+      const angle = Math.PI * (0.15 + 0.7 * (i / Math.max(1, (vfx.soilCount ?? 8) - 1)));
+      const throwX = Math.cos(angle) * (10 + (i % 3) * 8) * (i % 2 ? 1 : -1);
+      const rise = 24 + (i % 4) * 9;
+      const shard = svg("rect", { class: "fx-shard", x: -2, y: -2, width: 4, height: 4, rx: 1, fill: i % 2 ? "#5a4a38" : vfx.colors.trail, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(shard);
+      animations.push(waitForAnimation(shard.animate([
+        { transform: `translate(${ground.x}px, ${ground.y + 4}px) rotate(0deg) scale(1)`, opacity: 1 },
+        { transform: `translate(${ground.x + throwX}px, ${ground.y - rise}px) rotate(${120 + i * 30}deg) scale(.9)`, opacity: 0.95, offset: 0.45 },
+        { transform: `translate(${ground.x + throwX * 1.4}px, ${ground.y + 8}px) rotate(${240 + i * 30}deg) scale(.5)`, opacity: 0 }
+      ], { duration: 560, delay: 60 + i * 22, easing: "cubic-bezier(.3,.6,.6,1)", fill: "backwards" })).then(() => shard.remove()));
+    }
+
+    // The wraith silhouette climbing out of the tile (origin-centered ellipse, so
+    // the vertical stretch scales around its own body, not the SVG origin).
+    const wraith = svg("ellipse", { class: "fx-mote", cx: 0, cy: 0, rx: 8, ry: 11, fill: vfx.colors.trail, filter: "url(#softGlow)" });
+    effectsLayer.appendChild(wraith);
+    animations.push(waitForAnimation(wraith.animate([
+      { transform: `translate(${ground.x}px, ${ground.y}px) scale(1, .18)`, opacity: 0 },
+      { transform: `translate(${ground.x}px, ${ground.y - 15}px) scale(1.05, 1.5)`, opacity: 0.8, offset: 0.55 },
+      { transform: `translate(${ground.x}px, ${ground.y - 24}px) scale(.85, 1.9)`, opacity: 0 }
+    ], { duration: vfx.riseDurationMs ?? 520, delay: 140, easing: "ease-out", fill: "backwards" })).then(() => wraith.remove()));
+
+    await Promise.all(animations);
+
+    // Lingering miasma — deliberately NOT awaited: the committing render pops the
+    // ghoul in while these still drift, so it reads as emerging from the fog.
+    for (let i = 0; i < (vfx.miasmaCount ?? 6); i += 1) {
+      const angle = (Math.PI * 2 * i) / (vfx.miasmaCount ?? 6) + Math.random() * 0.5;
+      const spread = 12 + (i % 3) * 6;
+      const puff = svg("circle", { class: "fx-mote", cx: 0, cy: 0, r: 5 + (i % 3) * 2, fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(puff);
+      puff.animate([
+        { transform: `translate(${ground.x}px, ${ground.y - 4}px) scale(.4)`, opacity: 0 },
+        { transform: `translate(${ground.x + Math.cos(angle) * spread}px, ${ground.y - 10 - (i % 2) * 8}px) scale(1.15)`, opacity: 0.5, offset: 0.3 },
+        { transform: `translate(${ground.x + Math.cos(angle) * spread * 1.6}px, ${ground.y - 26 - (i % 2) * 8}px) scale(1.8)`, opacity: 0 }
+      ], { duration: 780, delay: i * 24, easing: "ease-out", fill: "backwards" })
+        .finished.catch(() => {}).then(() => puff.remove());
+    }
+  }
+
   async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect, coneCells } = {}) {
     const vfx = getAbilityVfx(artId);
     if (!vfx || !actor) return;
@@ -926,6 +1065,10 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
     if (vfx.type === "magicBurst") {
       await magicBurst(actor, targets, vfx);
+      return;
+    }
+    if (vfx.type === "summonRise") {
+      await summonRise(actor, targets, vfx);
       return;
     }
     if (vfx.type === "statusStrike" && target && effect?.applied) {
