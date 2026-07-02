@@ -14,6 +14,7 @@ import { AudioManager } from "./audio/sounds.js";
 import { renderBoard } from "./ui/boardRenderer.js";
 import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
+import { resolveAnimatedMove } from "./ui/animatedCommands.js";
 import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/hud.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
@@ -598,7 +599,7 @@ async function applyCpuCommand(command) {
       return true;
     }
     case "MOVE_UNIT":
-      return resolveCpuMove(command);
+      return resolveCpuMove(command, { keepResolving: true });
     case "ATTACK":
       return command.targetPosition ? resolveWallAttack(command) : resolveCombat(command);
     case "DEFEND": {
@@ -623,15 +624,15 @@ async function applyCpuCommand(command) {
   }
 }
 
-async function resolveCpuMove(command) {
-  const unit = findUnit(state, command.unitId);
-  const from = unit ? { ...unit.position } : null;
-  resolving = true;
-  if (!dispatch(command)) return false;
-  render();
-  if (from) await effects.animateMovement(command.unitId, from, command.position);
-  render();
-  return true;
+async function resolveCpuMove(command, options) {
+  return resolveAnimatedMove(command, {
+    getState: () => state,
+    setResolving: (value) => { resolving = value; },
+    findUnit,
+    dispatch,
+    render,
+    effects,
+  }, options);
 }
 
 // --- Online driver ---

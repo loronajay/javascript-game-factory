@@ -44,6 +44,9 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
 
   // Remote commands that arrive before the controller binds, kept in order.
   const _pending = [];
+  // Owner-authored disconnect concedes can also arrive during the lobby -> match
+  // handoff. Keep them until a live controller can inject the command.
+  const _pendingOwnerConcedes = [];
   // Serialize remote applies (and owner-authored concedes) so their async
   // animations never overlap.
   let _applyChain = Promise.resolve();
@@ -91,6 +94,18 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     return _applyChain;
   }
 
+  function _enqueueOwnerConcede(seat) {
+    if (!_controller) {
+      _pendingOwnerConcedes.push(seat);
+      return Promise.resolve();
+    }
+    _applyChain = _applyChain.then(async () => {
+      if (_ended || !_controller) return;
+      await _controller.applyOwnerConcede(seat);
+    });
+    return _applyChain;
+  }
+
   // ── client gameplay callbacks (own them from session creation) ──
   client.cb.onRemoteCommand = ({ command }) => {
     if (_controller) _enqueueRemote(command);
@@ -123,10 +138,7 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     if (seat == null || handledDrops.has(seat)) return;
     handledDrops.add(seat);
     if (!_owner) return; // non-owners simply replay the owner's concede command
-    _applyChain = _applyChain.then(async () => {
-      if (_ended || !_controller) return;
-      await _controller.applyOwnerConcede(seat);
-    });
+    _enqueueOwnerConcede(seat);
   };
 
   client.cb.onClosed = () => {
@@ -156,6 +168,7 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     // Seed our revision-0 hash so an immediate desync (bad seed/size) is caught.
     _recordLocalHash(controller.getMatchState?.());
     while (_pending.length) _enqueueRemote(_pending.shift());
+    while (_pendingOwnerConcedes.length) _enqueueOwnerConcede(_pendingOwnerConcedes.shift());
     client.startPinging();
   }
 
