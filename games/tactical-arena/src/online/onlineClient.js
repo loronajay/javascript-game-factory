@@ -31,21 +31,55 @@ const LOCAL_WS_PORT = "3000";
 const GAME_ID = "tactical-arena";
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 2;
+const RELAY_STORAGE_KEY = "tacticalArenaRelay";
 
 function isLocalHostname(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
-// Use the local relay during local dev so a multi-tab playtest does not depend on
-// the production server.
-export function resolveWebSocketUrl(locationLike = globalThis.location) {
+function readRelayOverride(locationLike, storageLike) {
+  const candidates = [];
+  const search = typeof locationLike?.search === "string" ? locationLike.search : "";
+  try {
+    const params = new URLSearchParams(search);
+    candidates.push(params.get("relay"), params.get("ws"));
+  } catch {
+    // Ignore malformed query strings and fall back below.
+  }
+  try {
+    candidates.push(storageLike?.getItem?.(RELAY_STORAGE_KEY));
+  } catch {
+    // Storage can throw in private/cross-origin contexts.
+  }
+  return candidates.find((value) => typeof value === "string" && value.trim())?.trim() ?? "";
+}
+
+function localWebSocketUrl(locationLike) {
   const protocol = typeof locationLike?.protocol === "string" ? locationLike.protocol : "";
   const hostname = typeof locationLike?.hostname === "string" ? locationLike.hostname : "";
-  if (isLocalHostname(hostname)) {
-    const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
-    return `${wsProtocol}//${hostname}:${LOCAL_WS_PORT}`;
+  const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
+  const host = hostname === "::1" ? "[::1]" : (hostname || "localhost");
+  return `${wsProtocol}//${host}:${LOCAL_WS_PORT}`;
+}
+
+// Default to the production relay even when the game is served from localhost:
+// cross-device online tests need both players on the same relay. Developers can
+// still force a local relay with ?relay=local or localStorage.tacticalArenaRelay.
+export function resolveWebSocketUrl(locationLike = globalThis.location, storageLike = globalThis.localStorage) {
+  const override = readRelayOverride(locationLike, storageLike);
+  if (/^wss?:\/\//i.test(override)) return override;
+  if (/^(local|localhost)$/i.test(override)) return localWebSocketUrl(locationLike);
+  if (/^(prod|production)$/i.test(override)) return PROD_WS_URL;
+
+  const hostname = typeof locationLike?.hostname === "string" ? locationLike.hostname : "";
+  if (isLocalHostname(hostname) && /^(1|true|yes)$/i.test(override)) {
+    return localWebSocketUrl(locationLike);
   }
   return PROD_WS_URL;
+}
+
+export function normalizeRoomCode(code) {
+  return String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
 }
 
 // ─── Message parsers (validation seam — never trust the wire) ─────────────────
@@ -334,7 +368,7 @@ export function createOnlineClient() {
     _send({
       type: "join_lobby",
       gameId: GAME_ID,
-      roomCode: String(code || "").trim().toUpperCase(),
+      roomCode: normalizeRoomCode(code),
       identity: _identity,
     });
   }
@@ -426,6 +460,7 @@ export function createOnlineClient() {
     getLatencyMs,
     getClientId,
     getRoomCode,
+    getWebSocketUrl: () => wsUrl,
     disconnect,
     reset,
     cb,

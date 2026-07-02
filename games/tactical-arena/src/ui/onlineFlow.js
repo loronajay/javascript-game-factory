@@ -13,7 +13,7 @@
 // start; the match builds only once every seat's squad is in. A future draft-pick
 // mode (back-and-forth with bans) will replace the blind exchange, not this transport.
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
-import { createOnlineClient } from "../online/onlineClient.js";
+import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js";
 import { createOnlineSession } from "../online/onlineSession.js";
 
 const RULESET_VERSION = 1; // bump when a wire/rules change makes mixed clients unsafe
@@ -130,12 +130,18 @@ export function createOnlineFlow({ onStartMatch }) {
     }
   }
 
+  function describeRelay(url) {
+    return String(url || "").includes("localhost") || String(url || "").includes("127.0.0.1")
+      ? "local relay"
+      : "online relay";
+  }
+
   // ── client wiring ────────────────────────────────────────────────────────
   function wireLobby() {
     const cb = client.cb;
 
     cb.onConnected = () => {
-      setStatus("Connected. Choose how to play.");
+      setStatus(`Connected to ${describeRelay(client.getWebSocketUrl())}. Choose how to play.`);
       setPanel("idle");
     };
 
@@ -250,16 +256,21 @@ export function createOnlineFlow({ onStartMatch }) {
   $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby());
   $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby());
   $('[data-action="joinRoom"]').addEventListener("click", () => {
-    const code = codeInput.value.trim().toUpperCase();
-    if (code.length < 4) { setStatus("Enter the room code to join."); return; }
+    const code = normalizeRoomCode(codeInput.value);
+    codeInput.value = code;
+    if (code.length !== 5) { setStatus("Enter the 5-character room code to join."); return; }
     client?.joinLobby(code);
+  });
+  codeInput.addEventListener("input", () => {
+    const normalized = normalizeRoomCode(codeInput.value);
+    if (codeInput.value !== normalized) codeInput.value = normalized;
   });
   startBtn.addEventListener("click", () => { if (isOwner) client?.startLobby(); });
   $('[data-action="leaveLobby"]').addEventListener("click", () => {
     client?.leaveLobby();
     resetLobbyState();
     setPanel("idle");
-    setStatus("Connected. Choose how to play.");
+    setStatus(`Connected to ${describeRelay(client?.getWebSocketUrl())}. Choose how to play.`);
   });
   for (const seg of sizeSegs) {
     seg.addEventListener("click", () => {
