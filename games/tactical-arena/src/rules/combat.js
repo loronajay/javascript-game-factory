@@ -1,14 +1,52 @@
-import { getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getEffectiveStats, getUnitType, isDefending, isRaging, passiveStackKey } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
-import { getTileAffinity, isWallAt, unitAt } from "../core/state.js";
+import { areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
 
 // True when an attacker's shot ignores intervening obstacles entirely — the
 // Sniper's Rifle Powered passive (pierces both bodies AND Build Cover walls). Read
 // centrally off unit passive data so any future piercing unit works the same way.
 export function attackerPierces(attacker) {
   return Boolean(attacker && getUnitType(attacker.type).passive?.effect?.pierce);
+}
+
+export function attackerHasLineAttack(attacker) {
+  if (!attacker || !isRaging(attacker)) return false;
+  const definition = getUnitType(attacker.type);
+  return Boolean(definition.ragePassive?.effect?.lineAttack || definition.rageArt?.effect?.lineAttack);
+}
+
+function straightLineStep(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (dx === 0 && dy === 0) return null;
+  if (dx === 0) return { x: 0, y: Math.sign(dy) };
+  if (dy === 0) return { x: Math.sign(dx), y: 0 };
+  if (Math.abs(dx) === Math.abs(dy)) return { x: Math.sign(dx), y: Math.sign(dy) };
+  return null;
+}
+
+// RAGE line attacks fire along the chosen row/column/diagonal ray. The selected
+// target still defines the shot direction; every enemy on that ray within attack
+// range is damaged by the same landed attack roll.
+export function getLineAttackTargets(state, attacker, target) {
+  if (!attackerHasLineAttack(attacker)) return [target];
+  const step = straightLineStep(attacker.position, target.position);
+  if (!step) return [target];
+
+  const targets = [];
+  const reach = getEffectiveStats(attacker, state).attackRange;
+  for (let distance = 1; distance <= reach; distance += 1) {
+    const position = {
+      x: attacker.position.x + step.x * distance,
+      y: attacker.position.y + step.y * distance
+    };
+    if (position.x < 0 || position.y < 0 || position.x >= state.size || position.y >= state.size) break;
+    const occupant = unitAt(state, position);
+    if (occupant && areEnemies(attacker, occupant)) targets.push(occupant);
+  }
+  return targets.length ? targets : [target];
 }
 
 // Body-block line of sight: a physical ranged shot is stopped if ANY unit — friend
@@ -96,14 +134,6 @@ export function getProximityBonus(attacker, target) {
   return 0;
 }
 
-// Flat physical-damage bonus an attacker's passive grants on every hit (the Sniper's
-// Rifle Powered: +1). Added after Defend halving, like the proximity bonus, so it is
-// never halved. Returns 0 for any unit without one.
-function getFlatDamageBonus(attacker) {
-  const bonus = getUnitType(attacker.type).passive?.effect?.flatDamage;
-  return Number.isFinite(bonus) ? bonus : 0;
-}
-
 // A hard floor a passive places under a landed physical hit (the Sniper's Rifle
 // Powered: never below 2), so heavy DEF can't chip the attacker to the physical
 // minimum. Returns 0 (no floor) for any unit without one.
@@ -127,17 +157,22 @@ function getTileStrikeBonus(attacker, target, state) {
 }
 
 // Flat damage reduction granted to a unit's team by a living host passive (the
-// Necromancer's Dead Zone: -1 magic damage). Additive across hosts, never below
-// zero. Applied wherever magic damage is finalized so the forecast and the reducer
-// agree. Returns 0 for any team without a matching host.
+// Necromancer's Dead Zone: -1 magic damage). Duplicate passive effects apply once
+// so blind-pick duplicate units do not multiply global defenses. Applied wherever
+// magic damage is finalized so the forecast and the reducer agree. Returns 0 for
+// any team without a matching host.
 export function getTeamDamageReduction(target, state, damageType) {
   if (!state?.units) return 0;
   let reduction = 0;
+  const applied = new Set();
   for (const source of state.units) {
     if (source.hp <= 0 || source.player !== target.player) continue;
     const definition = getUnitType(source.type);
     for (const passive of [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt]) {
       if (passive?.effect?.type === "teamDamageReduction" && (passive.effect.damageType ?? "magic") === damageType) {
+        const key = passiveStackKey(passive);
+        if (applied.has(key)) continue;
+        applied.add(key);
         reduction += Math.max(0, Number(passive.effect.amount) || 0);
       }
     }
@@ -183,13 +218,12 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
-  const flatBonus = getFlatDamageBonus(attacker);
-  let damage = result.damage + proximityBonus + tileStrikeBonus + flatBonus;
+  let damage = result.damage + proximityBonus + tileStrikeBonus;
   // A landed hit (we only reach here past the to-hit roll) is floored by any minimum
   // the attacker's passive sets — last, after every bonus.
   const minimum = getMinimumDamage(attacker);
   if (minimum > 0 && damage >= 1) damage = Math.max(minimum, damage);
-  return { ...result, critical, proximityBonus, tileStrikeBonus, flatBonus, damage };
+  return { ...result, critical, proximityBonus, tileStrikeBonus, damage };
 }
 
 // A blinded unit's attack roll is a guaranteed miss unless a combat override (the

@@ -55,7 +55,7 @@ export const NECROMANCER = Object.freeze({
       id: "dark-bomb",
       name: "Dark Bomb",
       kind: "active",
-      mpCost: 10,
+      mpCost: 6,
       selfCast: true,
       targeting: Object.freeze({ shape: "nukeAura", radius: 2 }),
       damage: Object.freeze({ type: "magic", amount: 5 }),

@@ -57,14 +57,28 @@ function rageStatSources(definition) {
   return [definition.ragePassive, definition.rageArt].filter(Boolean);
 }
 
+function stableValueKey(value) {
+  if (!value || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableValueKey).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableValueKey(value[key])}`).join(",")}}`;
+}
+
+export function passiveStackKey(passive, effect = passive?.effect) {
+  return passive?.stackKey ?? effect?.stackKey ?? `${effect?.type ?? "passive"}:${stableValueKey(effect)}`;
+}
+
 function teamAuraStats(unit, state) {
   const totals = {};
   if (!state?.units) return totals;
+  const applied = new Set();
   for (const source of state.units) {
     if (source.hp <= 0 || source.player !== unit.player) continue;
     const definition = getUnitType(source.type);
     for (const passive of passiveSources(definition)) {
       if (passive.kind !== "passive" || passive.effect?.type !== "teamAura") continue;
+      const key = passiveStackKey(passive);
+      if (applied.has(key)) continue;
+      applied.add(key);
       for (const [name, value] of Object.entries(passive.effect.stats ?? {})) {
         if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
       }
@@ -98,7 +112,13 @@ function auraEntries(source, state) {
     const auras = [];
     if (passive?.effect?.type === "enemyAura") auras.push(passive.effect);
     if (passive?.effect?.enemyAura) auras.push(passive.effect.enemyAura);
-    for (const aura of auras) entries.push({ aura, radius: auraRadius(source, aura.radius ?? 2, state) });
+    for (const aura of auras) {
+      entries.push({
+        aura,
+        radius: auraRadius(source, aura.radius ?? 2, state),
+        stackKey: passiveStackKey(passive, aura)
+      });
+    }
   }
   return entries;
 }
@@ -111,10 +131,13 @@ function auraEntries(source, state) {
 function enemyAuraStats(unit, state) {
   const totals = {};
   if (!state?.units) return totals;
+  const applied = new Set();
   for (const source of state.units) {
     if (source.hp <= 0 || source.player === unit.player) continue;
-    for (const { aura, radius } of auraEntries(source, state)) {
+    for (const { aura, radius, stackKey } of auraEntries(source, state)) {
       if (chebyshev(source.position, unit.position) > radius) continue;
+      if (applied.has(stackKey)) continue;
+      applied.add(stackKey);
       for (const [name, value] of Object.entries(aura.stats ?? {})) {
         if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
       }

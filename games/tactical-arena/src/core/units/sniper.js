@@ -26,12 +26,11 @@ export const SNIPER = Object.freeze({
       // The shot passes through intervening units AND Build Cover walls — the one
       // thing that ignores cover. Read centrally by attackerPierces in rules/combat.js.
       pierce: true,
-      // +1 damage on every physical hit, and a hard floor so high DEF can never chip
-      // the Sniper below 2 (the legacy Sniper Extra/Minimum Damage Check procedures).
-      flatDamage: 1,
+      // A hard floor so high DEF can never chip the Sniper below 2 (the legacy
+      // Minimum Damage Check procedure).
       minimumDamage: 2
     }),
-    description: "Shots pierce units and walls, deal +1 damage, and never do less than 2.",
+    description: "Shots pierce units and walls, and never do less than 2.",
     implemented: true
   }),
   arts: Object.freeze([
@@ -76,9 +75,10 @@ export const SNIPER = Object.freeze({
     mpCost: 0,
     effect: Object.freeze({
       type: "statModifiers",
-      stats: Object.freeze({ strength: 1, attackRange: 1, moveRange: 2 })
+      stats: Object.freeze({ strength: 1, attackRange: 1, moveRange: 2 }),
+      lineAttack: Object.freeze({ damageType: "physical" })
     }),
-    description: "At 5 HP or lower, gain +1 STR, +1 range, and +2 MOVE.",
+    description: "At 5 HP or lower, gain +1 STR, +1 range, +2 MOVE, and basic attacks damage every enemy in the chosen straight ray.",
     implemented: true
   })
 });

@@ -10,6 +10,7 @@ export const PLATFORM_STORAGE_KEYS = Object.freeze({
     loversLostPbBoy: "lovers-lost.pb.boy",
     loversLostPbGirl: "lovers-lost.pb.girl",
     echoDuelPbSolo: "echo-duel.pb.solo",
+    tacticalArenaTheme: "tactical-arena.theme",
 });
 function isNonEmptyString(value) {
     return typeof value === "string" && value.trim().length > 0;

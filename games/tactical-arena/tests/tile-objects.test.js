@@ -87,7 +87,7 @@ test("a Sniper shoots through a wall (Rifle Powered pierces cover)", () => {
   const begun = applyCommand(state, beginActivation(1, "sniper"));
   const result = applyCommand(begun.nextState, attack(1, "sniper", "mark", NORMAL_HIT));
   assert.equal(result.accepted, true);
-  assert.equal(result.nextState.units.find((u) => u.id === "mark").hp, 21); // 25 - (3+1)
+  assert.equal(result.nextState.units.find((u) => u.id === "mark").hp, 22); // 25 - 3
 });
 
 test("a wall blocks a MAGIC ART too (unlike a unit body)", () => {

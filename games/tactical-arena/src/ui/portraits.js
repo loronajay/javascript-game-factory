@@ -83,7 +83,7 @@ function round(n) {
 // Build a framed portrait node: <figure class="unit-portrait"><img …></figure>.
 // `variant` adds a modifier class (e.g. "is-hero", "is-thumb") for CSS sizing; the
 // framing math is variant-independent. Browser-only (touches document).
-export function createPortrait(typeOrDef, { variant = "", alt = "", frame } = {}) {
+export function createPortrait(typeOrDef, { variant = "", alt = "", frame, eager = false } = {}) {
   const meta = getPortrait(typeOrDef);
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id;
   const wrap = document.createElement("figure");
@@ -101,7 +101,7 @@ export function createPortrait(typeOrDef, { variant = "", alt = "", frame } = {}
   img.className = "unit-portrait-img";
   img.src = meta.src;
   img.alt = alt || `${UNIT_TYPES[type]?.name ?? type} portrait`;
-  img.loading = "lazy";
+  img.loading = eager ? "eager" : "lazy";
   img.decoding = "async";
   img.style.height = style.cssHeight;
   img.style.transform = style.cssTransform;

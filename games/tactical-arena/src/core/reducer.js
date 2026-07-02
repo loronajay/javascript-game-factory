@@ -2,7 +2,7 @@ import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { getProximityBonus, getTeamDamageReduction, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { getLineAttackTargets, getProximityBonus, getTeamDamageReduction, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -150,15 +150,27 @@ function attack(state, command) {
   if (swing.missed) {
     return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }]);
   }
-  const damage = resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical, state: next });
-  const damageDealt = Math.min(nextTarget.hp, damage.damage);
-  nextTarget.hp = Math.max(0, nextTarget.hp - damage.damage);
-  const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
+  const targets = getLineAttackTargets(next, actor, nextTarget);
+  const targetIds = [];
+  const damageByTarget = {};
+  let totalDamageDealt = 0;
+  let primaryDamage = null;
+  for (const targetUnit of targets) {
+    const damage = resolvePhysicalStrike(actor, targetUnit, { proximity: true, critical: swing.critical, state: next });
+    const damageDealt = Math.min(targetUnit.hp, damage.damage);
+    targetUnit.hp = Math.max(0, targetUnit.hp - damage.damage);
+    targetIds.push(targetUnit.id);
+    damageByTarget[targetUnit.id] = damage.damage;
+    totalDamageDealt += damageDealt;
+    if (targetUnit.id === nextTarget.id) primaryDamage = damage;
+  }
+  const damage = primaryDamage ?? resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical, state: next });
+  const healingEvents = resolvePhysicalDamageHealing(next, actor, totalDamageDealt);
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
-    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, ...damageFields
+    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget, ...damageFields
   }, ...healingEvents]);
 }
 

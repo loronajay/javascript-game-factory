@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { UNIT_TYPES, getAuraSources, getEffectiveStats, isRaging, takesTurns } from "../src/core/unitCatalog.js";
+import { UNIT_TYPES, getArt, getAuraSources, getEffectiveStats, isRaging, takesTurns } from "../src/core/unitCatalog.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
@@ -83,6 +83,18 @@ test("Deathly Aura lowers an enemy's DEF by 1 within 2 tiles, not beyond", () =>
   assert.equal(getEffectiveStats(findId(state, "p2-far"), state).defense, 5);
 });
 
+test("duplicate Deathly Aura passives do not stack on the same enemy", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-necro-a", player: 1, type: "necromancer", x: 0, y: 0 },
+      { id: "p1-necro-b", player: 1, type: "necromancer", x: 1, y: 0 },
+      { id: "p2-sword", player: 2, type: "swordsman", x: 2, y: 0 }
+    ]
+  });
+
+  assert.equal(getEffectiveStats(findId(state, "p2-sword"), state).defense, 5 - 1);
+});
+
 test("Deathly Aura never debuffs the Necromancer's own allies", () => {
   const state = createBattleState({
     units: [
@@ -133,6 +145,20 @@ test("Dead Zone stops protecting once the host Necromancer dies", () => {
   const s1 = activate(state, "p1-mag");
   const r = applyCommand(s1, useArt(1, "p1-mag", "spark", { targetId: "p2-sword", ...NORMAL_HIT }));
   assert.equal(r.events.find((e) => e.type === "ART_RESOLVED").damage.damage, 6);
+});
+
+test("duplicate Dead Zone passives do not stack", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-mag", player: 1, type: "magician", x: 0, y: 0 },
+      { id: "p2-sword", player: 2, type: "swordsman", x: 2, y: 0 },
+      { id: "p2-necro-a", player: 2, type: "necromancer", x: 9, y: 9 },
+      { id: "p2-necro-b", player: 2, type: "necromancer", x: 8, y: 8 }
+    ]
+  });
+  const s1 = activate(state, "p1-mag");
+  const r = applyCommand(s1, useArt(1, "p1-mag", "spark", { targetId: "p2-sword", ...NORMAL_HIT }));
+  assert.equal(r.events.find((e) => e.type === "ART_RESOLVED").damage.damage, 5);
 });
 
 // --- Wither ---
@@ -201,7 +227,7 @@ test("Dark Bomb deals 5 magic damage to every enemy within 2 tiles", () => {
   assert.ok(event.targetIds.includes("p2-in"));
   assert.ok(!event.targetIds.includes("p2-out"));
   assert.equal(findId(r.nextState, "p2-in").hp, swordHp - 5);
-  assert.equal(findId(r.nextState, "p1-necro").mp, 36 - 10);
+  assert.equal(findId(r.nextState, "p1-necro").mp, 36 - getArt("necromancer", "dark-bomb").mpCost);
 });
 
 // --- Summon Ghoul ---

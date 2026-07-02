@@ -9,6 +9,7 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { UNIT_TYPE_KEYS, DEFAULT_SQUAD, SLOT_LAYOUT, normalizeSquad, availableTypesForSlot } from "./squadModel.js";
 import { openRosterPicker } from "./rosterPicker.js";
+import { createPortrait } from "./portraits.js";
 
 export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, availableTypesForSlot };
 
@@ -47,7 +48,11 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `squad-chip row-${slot.row}`;
-      chip.innerHTML = `<span class="squad-chip-icon">${def.glyph}</span><span class="squad-chip-name">${def.name}</span>`;
+      chip.append(createPortrait(squad[slot.index], { variant: "is-chip", eager: true }));
+      const name = document.createElement("span");
+      name.className = "squad-chip-name";
+      name.textContent = def.name;
+      chip.append(name);
       chip.addEventListener("click", () => edit(slot.index));
       chips.appendChild(chip);
     }

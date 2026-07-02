@@ -10,14 +10,14 @@ import { attack, beginActivation, useArt } from "../src/core/commands.js";
 // Pin a clean normal hit so reducer damage is deterministic.
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 
-test("Rifle Powered adds +1 to the Sniper's physical strike", () => {
+test("Rifle Powered pierces and guarantees minimum damage without adding flat damage", () => {
   const sniper = { type: "sniper", hp: 23, position: { x: 0, y: 0 } };
   const archer = { type: "archer", hp: 24, position: { x: 0, y: 0 } };
   const target = { type: "swordsman", hp: 25, defending: false, position: { x: 3, y: 0 } };
 
-  // Both have STR 8; the Sniper's hit is one higher thanks to Rifle Powered.
+  // Both have STR 8; Rifle Powered no longer adds flat damage.
   assert.equal(resolvePhysicalStrike(archer, target).damage, 3); // 8 STR - 5 DEF
-  assert.equal(resolvePhysicalStrike(sniper, target).damage, 4); // +1 Rifle Powered
+  assert.equal(resolvePhysicalStrike(sniper, target).damage, 3);
 });
 
 test("Rifle Powered guarantees at least 2 damage against heavy defense", () => {
@@ -110,7 +110,7 @@ test("Throw Cigar sets a tile alight — even one an enemy stands on", () => {
   assert.equal(result.nextState.units.find((u) => u.id === "sniper").mp, 15);
 });
 
-test("a Sniper shot pierces an intervening body and the reducer applies the +1", () => {
+test("a Sniper shot pierces an intervening body without adding flat damage", () => {
   const state = createBattleState({
     units: [
       { id: "sniper", player: 1, type: "sniper", x: 0, y: 0 },
@@ -123,9 +123,54 @@ test("a Sniper shot pierces an intervening body and the reducer applies the +1",
   assert.equal(isShotBlocked(state, { x: 0, y: 0 }, { x: 2, y: 0 }), true); // no attacker → blocked
   assert.equal(isShotBlocked(state, { x: 0, y: 0 }, { x: 2, y: 0 }, sniper), false); // pierces
 
-  // End to end: the shot lands through the blocker for 4 (3 base + 1 Rifle Powered).
+  // End to end: the shot lands through the blocker for 3 base damage.
   const begun = applyCommand(state, beginActivation(1, "sniper"));
   const result = applyCommand(begun.nextState, attack(1, "sniper", "mark", NORMAL_HIT));
   assert.equal(result.accepted, true);
-  assert.equal(result.nextState.units.find((u) => u.id === "mark").hp, 21); // 25 - 4
+  assert.equal(result.nextState.units.find((u) => u.id === "mark").hp, 22); // 25 - 3
+});
+
+test("a raging Sniper basic attack damages every enemy in the selected straight ray", () => {
+  const state = createBattleState({
+    units: [
+      { id: "sniper", player: 1, type: "sniper", hp: 5, x: 0, y: 0 },
+      { id: "near", player: 2, type: "swordsman", x: 1, y: 0 },
+      { id: "mark", player: 2, type: "swordsman", x: 2, y: 0 },
+      { id: "far", player: 2, type: "swordsman", x: 4, y: 0 },
+      { id: "offray", player: 2, type: "swordsman", x: 2, y: 1 },
+      { id: "ally", player: 1, type: "swordsman", x: 3, y: 0 }
+    ]
+  });
+
+  const begun = applyCommand(state, beginActivation(1, "sniper"));
+  const result = applyCommand(begun.nextState, attack(1, "sniper", "mark", NORMAL_HIT));
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(result.events[0].targetIds, ["near", "mark", "far"]);
+  assert.deepEqual(result.events[0].damageByTarget, { near: 4, mark: 4, far: 4 });
+  assert.equal(result.nextState.units.find((u) => u.id === "near").hp, 21);
+  assert.equal(result.nextState.units.find((u) => u.id === "mark").hp, 21);
+  assert.equal(result.nextState.units.find((u) => u.id === "far").hp, 21);
+  assert.equal(result.nextState.units.find((u) => u.id === "offray").hp, 25);
+  assert.equal(result.nextState.units.find((u) => u.id === "ally").hp, 25);
+});
+
+test("a raging Sniper line attack also works diagonally", () => {
+  const state = createBattleState({
+    units: [
+      { id: "sniper", player: 1, type: "sniper", hp: 5, x: 1, y: 1 },
+      { id: "mark", player: 2, type: "swordsman", x: 3, y: 3 },
+      { id: "far", player: 2, type: "swordsman", x: 5, y: 5 },
+      { id: "offray", player: 2, type: "swordsman", x: 5, y: 4 }
+    ]
+  });
+
+  const begun = applyCommand(state, beginActivation(1, "sniper"));
+  const result = applyCommand(begun.nextState, attack(1, "sniper", "mark", NORMAL_HIT));
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(result.events[0].targetIds, ["mark", "far"]);
+  assert.equal(result.nextState.units.find((u) => u.id === "mark").hp, 21);
+  assert.equal(result.nextState.units.find((u) => u.id === "far").hp, 21);
+  assert.equal(result.nextState.units.find((u) => u.id === "offray").hp, 25);
 });

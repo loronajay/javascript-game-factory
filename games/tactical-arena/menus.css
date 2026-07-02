@@ -7,15 +7,15 @@
 .title-card { padding-top:2.3rem; }
 .title-mark { position:relative; width:3.6rem; height:3.6rem; margin:0 auto 1.1rem; border-radius:50%; border:2px solid var(--brass-lo); background:radial-gradient(circle at 38% 30%,var(--brass-hi),var(--brass) 45%,var(--brass-lo) 90%); box-shadow:inset 0 2px 3px rgba(180,220,255,.5), inset 0 -4px 8px rgba(10,20,40,.6), 0 4px 14px rgba(0,0,0,.55); }
 .title-mark::before { content:"\2694"; position:absolute; inset:0; display:grid; place-items:center; color:#040e1a; font-size:1.7rem; text-shadow:0 1px 0 rgba(180,220,255,.3); }
-.title-name { margin:0; color:var(--text); font:900 2.2rem var(--font-display); letter-spacing:.06em; text-shadow:0 1px 0 rgba(160,210,255,.2); }
+.title-name { margin:0; color:var(--text); font:900 2.2rem var(--font-display); letter-spacing:.06em; text-shadow:0 1px 0 rgba(var(--sheen),.2); }
 .title-sub { margin:.4rem 0 1.6rem; color:var(--muted); font:700 .76rem var(--font-display); letter-spacing:.26em; text-transform:uppercase; }
 .title-sub::after { content:""; display:block; width:62%; height:1px; margin:.9rem auto 0; background:linear-gradient(90deg,transparent,var(--brass) 20%,var(--brass) 80%,transparent); }
 .menu-heading { margin:0 0 .4rem; color:var(--text); font:800 1.55rem var(--font-display); letter-spacing:.05em; }
 .menu-note { margin:0 0 1.3rem; color:var(--muted); font-size:.92rem; font-style:italic; line-height:1.5; }
 .menu-buttons { display:grid; gap:.6rem; margin-top:1.5rem; }
 .menu-btn { width:100%; padding:.82rem 1rem; font-size:.98rem; font-weight:700; letter-spacing:.06em; }
-.menu-btn.ghost { border-color:rgba(80,120,150,.55); background:linear-gradient(180deg,rgba(160,210,255,.06),rgba(160,210,255,0) 46%),linear-gradient(180deg,#14202e,#0c1520); color:var(--muted); }
-.soon { margin-left:.5rem; padding:.12rem .44rem; border:1px solid rgba(160,210,255,.28); border-radius:4px; background:rgba(0,0,0,.3); color:var(--brass-hi); font:700 .58rem var(--font-body); letter-spacing:.14em; text-transform:uppercase; vertical-align:middle; }
+.menu-btn.ghost { border-color:rgba(80,120,150,.55); background:linear-gradient(180deg,rgba(var(--sheen),.06),rgba(var(--sheen),0) 46%),linear-gradient(180deg,var(--surface-hi),var(--surface-lo)); color:var(--muted); }
+.soon { margin-left:.5rem; padding:.12rem .44rem; border:1px solid rgba(var(--sheen),.28); border-radius:4px; background:rgba(0,0,0,.3); color:var(--brass-hi); font:700 .58rem var(--font-body); letter-spacing:.14em; text-transform:uppercase; vertical-align:middle; }
 
 /* Setup fields + segmented controls */
 .setup-field { display:grid; gap:.55rem; margin:1.25rem 0 .4rem; text-align:left; }
@@ -23,7 +23,7 @@
 .setup-label { color:var(--muted); font:700 .7rem var(--font-display); letter-spacing:.18em; text-transform:uppercase; }
 .segmented { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:.4rem; padding:.35rem; border:1px solid var(--parchment-edge); border-radius:var(--radius-tile); background:rgba(8,18,32,.4); box-shadow:inset 0 2px 5px rgba(0,10,20,.4); }
 .segmented .seg { padding:.6rem .5rem; border:1px solid transparent; border-radius:7px; background:transparent; box-shadow:none; color:var(--muted); font:700 .9rem var(--font-display); letter-spacing:.04em; text-shadow:none; }
-.segmented .seg:hover:not(:disabled):not(.is-selected) { filter:none; background:rgba(160,210,255,.1); border-color:rgba(80,120,150,.3); transform:none; }
+.segmented .seg:hover:not(:disabled):not(.is-selected) { filter:none; background:rgba(var(--sheen),.1); border-color:rgba(80,120,150,.3); transform:none; }
 .segmented .seg.is-selected { border-color:var(--brass); color:#040e1a; background:linear-gradient(180deg,var(--brass-hi),var(--brass) 60%,var(--brass-lo)); text-shadow:0 1px 0 rgba(200,235,255,.35); box-shadow:inset 0 1px 0 rgba(200,235,255,.4), 0 2px 6px rgba(0,0,0,.4); }
 .segmented .seg:disabled { cursor:not-allowed; opacity:.35; }
 .setup-hint { margin:0; color:var(--muted); opacity:.7; font:400 .72rem var(--font-body); line-height:1.35; }
@@ -39,9 +39,10 @@
 .squad-chip { display:grid; gap:.12rem; justify-items:center; padding:.42rem .25rem; border:1px solid var(--parchment-edge); border-radius:7px; background:linear-gradient(180deg,rgba(30,50,70,.55),rgba(14,24,40,.45)); color:var(--text); cursor:pointer; }
 .squad-chip.row-back { background:linear-gradient(180deg,rgba(8,20,36,.5),rgba(6,16,28,.35)); }
 .squad-chip:hover { border-color:var(--brass); filter:brightness(1.1); transform:none; }
-.squad-chip-icon { font-size:1.25rem; line-height:1; }
-.squad-chip-name { font:700 .6rem var(--font-display); letter-spacing:.04em; }
-.squad-edit-btn { width:100%; padding:.45rem .5rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 45%,var(--parchment-edge)); border-radius:7px; background:linear-gradient(180deg,rgba(160,210,255,.08),rgba(160,210,255,0) 50%),rgba(12,22,36,.6); color:var(--text); font:700 .68rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
+.squad-chip .unit-portrait.is-chip { width:34px; height:40px; border-radius:5px; }
+.squad-chip .is-glyph-fallback { font-size:1.1rem; }
+.squad-chip-name { max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:700 .6rem var(--font-display); letter-spacing:.04em; }
+.squad-edit-btn { width:100%; padding:.45rem .5rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 45%,var(--parchment-edge)); border-radius:7px; background:linear-gradient(180deg,rgba(var(--sheen),.08),rgba(var(--sheen),0) 50%),rgba(12,22,36,.6); color:var(--text); font:700 .68rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
 .squad-edit-btn:hover { border-color:var(--team,var(--brass)); filter:brightness(1.12); transform:none; }
 
 /* Roster pop-up — full-roster squad builder with a unit detail pane (reuses the
@@ -52,39 +53,47 @@
 .roster-head { padding-bottom:.7rem; }
 .roster-sub { margin:.2rem 0 0; color:var(--muted); font-size:.78rem; font-style:italic; line-height:1.4; }
 .roster-tray { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.4rem; padding:.7rem 1.1rem; border-bottom:1px solid var(--parchment-edge); background:rgba(8,18,30,.4); flex-shrink:0; }
-.roster-slot { display:grid; gap:.1rem; justify-items:center; padding:.45rem .3rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
+.roster-slot { display:grid; gap:.18rem; justify-items:center; padding:.4rem .3rem .35rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
 .roster-slot.row-back { background:linear-gradient(180deg,rgba(8,20,36,.5),rgba(6,16,28,.35)); }
 .roster-slot:hover { border-color:var(--brass); filter:brightness(1.1); }
-.roster-slot.is-active { border-color:var(--team,var(--brass)); box-shadow:0 0 0 1px var(--team,var(--brass)), inset 0 1px 0 rgba(200,235,255,.25); }
+.roster-slot.is-active { border-color:var(--team,var(--brass)); box-shadow:0 0 0 1px var(--team,var(--brass)), inset 0 1px 0 rgba(200,235,255,.25); background:linear-gradient(180deg,color-mix(in srgb,var(--team,var(--brass)) 18%,transparent),transparent 60%),linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); }
+.roster-slot.is-active .roster-slot-tag { color:var(--brass-hi); }
 .roster-slot-tag { color:var(--muted); font:700 .52rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
-.roster-slot-glyph { font-size:1.35rem; line-height:1; }
+.roster-slot .unit-portrait.is-slot { width:40px; height:46px; border-radius:6px; }
+.roster-slot .is-glyph-fallback { font-size:1.2rem; }
 .roster-slot-name { font:700 .62rem var(--font-display); letter-spacing:.03em; }
 .roster-body { display:flex; flex:1; min-height:0; }
-.roster-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(5.2rem,1fr)); align-content:start; gap:.45rem; width:46%; max-width:340px; flex-shrink:0; overflow-y:auto; padding:.8rem; border-right:1px solid rgba(70,100,130,.35); }
-.roster-unit { position:relative; display:grid; gap:.18rem; justify-items:center; padding:.6rem .3rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
+.roster-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(5.6rem,1fr)); align-content:start; gap:.45rem; width:46%; max-width:340px; flex-shrink:0; overflow-y:auto; padding:.8rem; border-right:1px solid rgba(70,100,130,.35); }
+.roster-unit { position:relative; display:grid; gap:.3rem; justify-items:center; padding:.45rem .3rem .5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
 .roster-unit:hover:not(.is-disabled) { border-color:var(--brass); filter:brightness(1.1); }
 .roster-unit.is-focused { border-color:var(--brass); box-shadow:inset 0 0 0 1px var(--brass), 0 0 10px rgba(203,159,85,.3); }
 /* Already-in-squad units stay greyed but remain clickable for inspection. */
 .roster-unit.is-disabled { opacity:.5; filter:grayscale(.5); }
 .roster-unit.is-disabled.is-focused { opacity:.85; }
-.roster-unit-glyph { font-size:1.5rem; line-height:1; }
+.roster-unit .unit-portrait.is-card { width:100%; height:76px; border-radius:6px; }
+.roster-unit .is-glyph-fallback { font-size:1.6rem; }
 .roster-unit-name { font:700 .64rem var(--font-display); letter-spacing:.03em; }
 .roster-unit-flag { font:700 .5rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-.roster-detail { flex:1; overflow-y:auto; padding:1rem 1.1rem; }
+/* Detail pane: a pinned action bar (unit name + the Place button) above an
+   internally-scrolling card, so Place is always visible where the player reads. */
+.roster-detail { flex:1; display:flex; flex-direction:column; overflow:hidden; padding:0; }
 .roster-detail .ref-unit { padding-top:0; border-bottom:0; }
+.roster-detail-bar { display:flex; flex-shrink:0; align-items:center; gap:.8rem; padding:.55rem .9rem; border-bottom:1px solid var(--parchment-edge); background:rgba(8,18,30,.4); }
+.roster-detail-name { flex:1; display:flex; gap:.5rem; align-items:center; min-width:0; margin:0; color:var(--text); font:800 1rem var(--font-display); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.roster-detail-bar .roster-assign { width:auto; flex-shrink:0; }
+.roster-detail-scroll { flex:1; min-height:0; overflow-y:auto; padding:.9rem 1rem; }
 /* Drafting detail card: large painted portrait on the LEFT, unit data on the RIGHT.
    The portrait (ui/portraits.js) self-frames to a consistent scale; the team accent
    rings the frame so the player still reads which side they're drafting for. */
 .roster-detail-split { display:flex; align-items:flex-start; gap:1.2rem; }
 .roster-detail-info { flex:1; min-width:0; }
-.roster-detail-info h3 { margin:0 0 .6rem; }
-.roster-detail-split .unit-portrait.is-hero { width:172px; height:240px; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(160,210,255,.12), inset 0 0 24px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--p1)) 45%,transparent); }
+.roster-detail-split .unit-portrait.is-hero { width:172px; height:240px; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 24px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--p1)) 45%,transparent); }
 .roster-detail-split .is-glyph-fallback { font-size:3rem; }
-.roster-foot { display:flex; align-items:center; gap:.6rem; padding:.8rem 1.1rem; border-top:1px solid var(--parchment-edge); background:linear-gradient(0deg,#162230,#0c1820); flex-shrink:0; }
+.roster-foot { display:flex; align-items:center; gap:.6rem; padding:.8rem 1.1rem; border-top:1px solid var(--parchment-edge); background:linear-gradient(0deg,var(--console-hi),var(--console-lo)); flex-shrink:0; }
 .roster-foot .menu-btn { width:auto; min-width:7rem; }
 /* Contextual Place button — the primary build action; strong brass call-to-action. */
-.roster-assign { min-width:13rem !important; border-color:var(--brass); color:var(--text); background:linear-gradient(180deg,rgba(203,159,85,.32),rgba(150,108,46,.22)); box-shadow:inset 0 1px 0 rgba(255,235,190,.25); }
-.roster-assign:hover:not(:disabled) { filter:brightness(1.12); border-color:var(--brass-bright,var(--brass)); }
+.roster-assign { min-width:11rem; padding:.5rem .8rem; border-color:var(--brass); color:var(--text); font:700 .78rem var(--font-display); letter-spacing:.05em; background:linear-gradient(180deg,rgba(203,159,85,.32),rgba(150,108,46,.22)); box-shadow:inset 0 1px 0 rgba(255,235,190,.25); }
+.roster-assign:hover:not(:disabled) { filter:brightness(1.12); border-color:var(--brass-hi); }
 .roster-assign:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
 @media (max-width:560px) {
   .roster-body { flex-direction:column; }
@@ -127,6 +136,8 @@
 .set-label { font:700 .85rem var(--font-display); letter-spacing:.04em; color:var(--text); }
 .settings-body input[type="range"] { flex:1; max-width:220px; accent-color:var(--brass); }
 .settings-body input[type="checkbox"] { width:1.25rem; height:1.25rem; accent-color:var(--brass); }
+.set-select { flex:1; max-width:220px; padding:.5rem .6rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.55); color:var(--text); font:700 .82rem var(--font-display); letter-spacing:.04em; cursor:pointer; }
+.set-select:hover { border-color:var(--brass); }
 
 @media (prefers-reduced-motion:reduce) { .confetti { display:none; } }
 @media (max-width:480px) { .menu-card { padding:1.5rem 1.2rem; } .title-name { font-size:1.9rem; } }
@@ -142,7 +153,7 @@
 .online-join .menu-btn { width:auto; min-width:5.5rem; }
 .online-roomcode {
   margin:.2rem 0 .9rem; padding:.5rem .8rem; border:1px dashed var(--brass); border-radius:var(--radius-tile);
-  background:rgba(160,210,255,.05); color:var(--brass-hi); font:700 .9rem var(--font-display); letter-spacing:.12em; text-align:center;
+  background:rgba(var(--sheen),.05); color:var(--brass-hi); font:700 .9rem var(--font-display); letter-spacing:.12em; text-align:center;
 }
 .online-roomcode[hidden] { display:none; }
 

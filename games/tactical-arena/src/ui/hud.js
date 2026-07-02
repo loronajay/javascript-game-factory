@@ -1,5 +1,6 @@
 import { getAvailableArts, getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt, getFootworkSteps } from "../rules/arts.js";
+import { getPortrait, portraitFrameStyle } from "./portraits.js";
 
 function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -22,39 +23,115 @@ export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
   turnSub.textContent = state.phase === "complete" ? "Restart to play again" : `${available} piece${available === 1 ? "" : "s"} still available`;
 }
 
+// HUD portrait as an HTML string (renderUnitCard builds the card via innerHTML).
+// Mirrors createPortrait (portraits.js) but eager-loads — the HUD card swaps on
+// every selection and a lazy image pops in late.
+function portraitHtml(type, variant = "is-hud") {
+  const meta = getPortrait(type);
+  const definition = getUnitType(type);
+  if (!meta) return `<figure class="unit-portrait ${variant} is-glyph-fallback">${definition.glyph}</figure>`;
+  const style = portraitFrameStyle(meta);
+  return `<figure class="unit-portrait ${variant}" data-type="${escapeAttr(type)}">
+    <img class="unit-portrait-img" src="${meta.src}" alt="" style="height:${style.cssHeight};transform:${style.cssTransform}">
+  </figure>`;
+}
+
+// State tags — RAGE / Defending / Spent / passive / statuses — shared by the
+// active-unit card and the squad HUD rows. The squad rows drop the passive and
+// spent tags (row styling already carries spent) to stay compact.
+function unitTagsHtml(unit, definition, { includePassive = true, includeSpent = true, spentLabel = "Spent" } = {}) {
+  return [
+    includePassive && definition.passive ? { label: definition.passive.name, cls: "passive", title: definition.passive.description } : null,
+    isRaging(unit) ? { label: "RAGE", cls: "rage", title: definition.rageArt?.description } : null,
+    isDefending(unit) ? { label: "Defending", cls: "on" } : null,
+    includeSpent && unit.spent ? { label: spentLabel, cls: "spent" } : null,
+    ...(unit.statuses ?? []).map((s) => ({ label: s.type, cls: `status status-${s.type}` }))
+  ].filter(Boolean)
+    .map(({ label, cls, title }) => `<span class="unit-tag ${cls}"${title ? ` title="${escapeAttr(title)}"` : ""}>${label}</span>`).join("");
+}
+
+// One labeled vital bar (HP green / MP blue) with the numbers ON the bar, so
+// current totals track without reading pills.
+function vitalHtml(kind, label, current, max, { low = false } = {}) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, current / max * 100)) : 0;
+  return `<div class="vital vital-${kind}${low ? " is-low" : ""}">
+    <span class="vital-label">${label}</span>
+    <span class="vital-track"><span class="vital-fill" style="width:${pct}%"></span></span>
+    <span class="vital-num">${current}<i>/${max}</i></span>
+  </div>`;
+}
+
+// The four combat stats as labeled cells. Effective values that differ from the
+// unit's base (auras, statuses, RAGE, statModifiers) tint up/down so a buffed or
+// slowed stat is visible at the moment it matters.
+function statLineHtml(definition, stats) {
+  const cells = [
+    ["STR", stats.strength, definition.stats.strength],
+    ["DEF", stats.defense, definition.stats.defense],
+    ["MOV", stats.moveRange, definition.stats.moveRange],
+    ["RNG", stats.attackRange, definition.stats.attackRange]
+  ].map(([label, value, base]) => {
+    const cls = value > base ? " buffed" : value < base ? " debuffed" : "";
+    const title = cls ? ` title="Base ${label} ${base}"` : "";
+    return `<span class="stat-cell"${title}><i>${label}</i><b class="stat-cell-value${cls}">${value}</b></span>`;
+  }).join("");
+  return `<div class="unit-statline">${cells}</div>`;
+}
+
 export function renderUnitCard(unit, state, unitCard) {
   if (!unit) {
     unitCard.style.removeProperty("--team");
-    unitCard.innerHTML = `<div class="unit-emblem">?</div><div><div class="unit-name">No piece selected</div><div class="unit-meta">Choose an unspent Player ${state.currentPlayer} unit.</div><div class="hpbar"><div class="hpfill" style="width:0%"></div></div></div>`;
+    unitCard.innerHTML = `<figure class="unit-portrait is-hud is-glyph-fallback is-empty">?</figure>
+      <div class="unit-info">
+        <div class="unit-title-row"><span class="unit-name is-muted">No piece selected</span></div>
+        <div class="unit-meta">Choose an unspent Player ${state.currentPlayer} unit.</div>
+        <div class="vitals">${vitalHtml("hp", "HP", 0, 0)}${vitalHtml("mp", "MP", 0, 0)}</div>
+      </div>`;
     return;
   }
   const definition = getUnitType(unit.type);
   const stats = getEffectiveStats(unit, state);
   unitCard.style.setProperty("--team", unit.player === 1 ? "#5288c6" : "#c4463f");
 
-  const pills = [
-    { label: `${unit.hp}/${stats.maxHp} HP`, cls: "" },
-    { label: `${unit.mp}/${stats.maxMp} MP`, cls: "mp" },
-    { label: `Move ${stats.moveRange}`, cls: "" },
-    { label: `Range ${stats.attackRange}`, cls: "" },
-    definition.passive ? { label: definition.passive.name, cls: "passive", title: definition.passive.description } : null,
-    isRaging(unit) ? { label: "RAGE", cls: "rage", title: definition.rageArt?.description } : null,
-    isDefending(unit) ? { label: "Defending", cls: "on" } : null,
-    unit.spent ? { label: "Spent", cls: "spent" } : null
-  ].filter(Boolean)
-    .map(({ label, cls, title }) => `<span class="stat-pill ${cls}"${title ? ` title="${escapeAttr(title)}"` : ""}>${label}</span>`).join("");
+  const tags = unitTagsHtml(unit, definition);
 
-  const statusLine = (unit.statuses ?? []).length ? ` · ${unit.statuses.map((s) => s.type).join(", ")}` : "";
-  const hpPct = unit.hp / stats.maxHp * 100;
-  unitCard.innerHTML = `<div class="unit-emblem" title="${escapeAttr(definition.name)}">${definition.glyph}</div><div><div class="unit-name">Player ${unit.player} ${definition.name}${statusLine}</div><div class="unit-stats">${pills}</div><div class="hpbar"><div class="hpfill ${unit.hp <= stats.maxHp * 0.3 ? "low" : ""}" style="width:${hpPct}%"></div></div></div>`;
+  unitCard.innerHTML = `${portraitHtml(unit.type)}
+    <div class="unit-info">
+      <div class="unit-title-row">
+        <span class="unit-name">${definition.name}</span>
+        <span class="unit-owner">P${unit.player}</span>
+        <span class="unit-tags">${tags}</span>
+      </div>
+      <div class="vitals">
+        ${vitalHtml("hp", "HP", unit.hp, stats.maxHp, { low: unit.hp <= stats.maxHp * 0.3 })}
+        ${vitalHtml("mp", "MP", unit.mp, stats.maxMp)}
+      </div>
+      ${statLineHtml(definition, stats)}
+    </div>`;
 }
 
 // Renders the action bar for the active unit. onActionClick(action) is called
 // when a button is pressed; main.js provides this closure with dispatch/render.
-export function renderActions(unit, state, mode, { actions, actionHelp }, { resolving, onActionClick }) {
-  if (!unit || !state.activation || state.phase !== "playing") {
+export function renderActions(
+  unit,
+  state,
+  mode,
+  { actions, actionHelp },
+  { resolving, controlsEnabled = true, lockedMessage = "Wait for your turn.", onActionClick }
+) {
+  if (state.phase !== "playing") {
     actions.innerHTML = "";
     actionHelp.textContent = state.phase === "complete" ? "The duel is complete." : "Select an unspent piece.";
+    return;
+  }
+  if (!controlsEnabled) {
+    actions.innerHTML = "";
+    actionHelp.textContent = lockedMessage;
+    return;
+  }
+  if (!unit || !state.activation) {
+    actions.innerHTML = "";
+    actionHelp.textContent = "Select an unspent piece.";
     return;
   }
   const activation = state.activation;
@@ -93,7 +170,7 @@ export function renderActions(unit, state, mode, { actions, actionHelp }, { reso
   });
 }
 
-export function renderSquads(state, squadOverlays, onBeginUnit) {
+export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnabled = true } = {}) {
   squadOverlays.replaceChildren();
   for (const player of [1, 2]) {
     const panel = document.createElement("section");
@@ -105,12 +182,28 @@ export function renderSquads(state, squadOverlays, onBeginUnit) {
     for (const unit of state.units.filter((u) => u.player === player)) {
       const definition = getUnitType(unit.type);
       const stats = getEffectiveStats(unit, state);
-      const chip = document.createElement("div");
-      const selectable = unit.player === state.currentPlayer && !unit.spent && unit.hp > 0;
-      chip.className = `squad-chip${unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${selectable ? " selectable" : ""}`;
-      chip.innerHTML = `<span class="chip-icon">${definition.glyph}</span>${definition.name}<div class="chip-bar"><div class="chip-bar-fill" style="width:${unit.hp / stats.maxHp * 100}%"></div></div><div class="chip-hp">${unit.hp}/${stats.maxHp} HP</div>`;
-      if (selectable) chip.addEventListener("click", () => onBeginUnit(unit));
-      list.append(chip);
+      const row = document.createElement("div");
+      const dead = unit.hp <= 0;
+      const active = state.activation?.unitId === unit.id;
+      const selectable = controlsEnabled && unit.player === state.currentPlayer && !unit.spent && !dead;
+      row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
+      const tags = dead
+        ? `<span class="unit-tag spent">Fallen</span>`
+        : unitTagsHtml(unit, definition, { includePassive: false, includeSpent: true, spentLabel: "Done" });
+      row.innerHTML = `${portraitHtml(unit.type, "is-squad")}
+        <div class="squad-unit-body">
+          <div class="squad-unit-head">
+            <span class="squad-unit-name">${definition.name}</span>
+            <span class="unit-tags">${tags}</span>
+          </div>
+          <div class="vitals">
+            ${vitalHtml("hp", "HP", Math.max(0, unit.hp), stats.maxHp, { low: !dead && unit.hp <= stats.maxHp * 0.3 })}
+            ${vitalHtml("mp", "MP", unit.mp, stats.maxMp)}
+          </div>
+          ${statLineHtml(definition, stats)}
+        </div>`;
+      if (selectable) row.addEventListener("click", () => onBeginUnit(unit));
+      list.append(row);
     }
     squadOverlays.append(panel);
   }

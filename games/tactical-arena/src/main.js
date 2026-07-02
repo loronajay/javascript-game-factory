@@ -17,6 +17,7 @@ import { renderForecast } from "./ui/forecastRenderer.js";
 import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/hud.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
+import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { buildRoster, buildSummary, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 
 // --- DOM refs ---
@@ -62,6 +63,19 @@ function isCpu(player) {
   return Boolean(cpu && cpu.players.has(player));
 }
 
+function currentPlayerIsLocal() {
+  if (isCpu(state.currentPlayer)) return false;
+  if (net != null && state.currentPlayer !== mySeat) return false;
+  return true;
+}
+
+function lockedActionMessage() {
+  if (state.phase === "complete") return "The duel is complete.";
+  if (isCpu(state.currentPlayer)) return `Player ${state.currentPlayer} (CPU) is taking its turn.`;
+  if (net != null && state.currentPlayer !== mySeat) return "Opponent's turn - please wait.";
+  return "Wait for your turn.";
+}
+
 // --- Online (multiplayer) ---
 // `net` is null in local play; in online it is the deterministic-lockstep session
 // bridge (src/online/onlineSession.js). `mySeat` is the local player's seat number;
@@ -78,7 +92,7 @@ let applyingRemote = false;
 // without the seat check a player could open the OPPONENT's activation on their turn
 // (both beginUnit and the reducer only check currentPlayer), breaking lockstep.
 function inputLocked() {
-  return resolving || (net != null && state.currentPlayer !== mySeat);
+  return resolving || !currentPlayerIsLocal();
 }
 
 // Broadcast a locally-originated accepted command to the opponent. Skipped while
@@ -109,6 +123,10 @@ const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex, onLeav
 // once — it's independent of board size and presentation only.
 mountSceneBackdrop(document.querySelector("#sceneBackdrop"));
 
+// Saved palette (Settings → Theme) — presentation only, applied before first paint
+// settles so the board never flashes the default colors.
+applyTheme(loadSavedThemeId());
+
 // --- Render ---
 
 function selectedUnit() {
@@ -117,10 +135,16 @@ function selectedUnit() {
 
 function render() {
   const unit = selectedUnit();
+  const controlsEnabled = currentPlayerIsLocal();
   renderHeader(state, { turnTitle, turnSub, turnBanner });
   renderUnitCard(unit, state, unitCard);
-  renderActions(unit, state, mode, { actions, actionHelp }, { resolving, onActionClick: (action) => handleActionClick(action, unit) });
-  renderSquads(state, squadOverlays, (u) => { beginUnit(u); render(); });
+  renderActions(unit, state, mode, { actions, actionHelp }, {
+    resolving,
+    controlsEnabled,
+    lockedMessage: lockedActionMessage(),
+    onActionClick: (action) => handleActionClick(action, unit)
+  });
+  renderSquads(state, squadOverlays, (u) => { beginUnit(u); render(); }, { controlsEnabled });
   renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick: handleTile });
   renderForecast({ forecastLayer, state, mode, actor: unit, resolving });
 }
@@ -241,6 +265,8 @@ async function resolveCombat(command) {
   const metrics = createBoardMetrics(state.size);
   const attackerBefore = rolled ? findUnit(state, rolled.actorId) : null;
   const targetBefore = rolled ? findUnit(state, rolled.targetId) : null;
+  const rolledTargetIds = rolled?.targetIds ?? (rolled?.targetId ? [rolled.targetId] : []);
+  const rolledTargetsBefore = rolledTargetIds.map((id) => findUnit(state, id)).filter(Boolean);
 
   if (rolled && attackerBefore && targetBefore) {
     const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
@@ -259,6 +285,14 @@ async function resolveCombat(command) {
       effects.impact(center, Boolean(rolled.critical));
       await effects.hitRecoil(targetBefore.id, targetBefore.position, Boolean(rolled.critical));
       await effects.floatText(center, rolled.critical ? `✦ ${dmg}` : `-${dmg}`, rolled.critical ? "#ffd26a" : "#ff7684");
+      for (const hitTarget of rolledTargetsBefore) {
+        if (hitTarget.id === targetBefore.id) continue;
+        const hitCenter = unitCenter(metrics, hitTarget);
+        const hitDamage = rolled.damageByTarget?.[hitTarget.id] ?? dmg;
+        effects.impact(hitCenter, Boolean(rolled.critical));
+        await effects.hitRecoil(hitTarget.id, hitTarget.position, Boolean(rolled.critical));
+        await effects.floatText(hitCenter, rolled.critical ? `âœ¦ ${hitDamage}` : `-${hitDamage}`, rolled.critical ? "#ffd26a" : "#ff7684");
+      }
       if (rolled.artId) {
         const art = artDefinition(attackerBefore, rolled.artId);
         if (art?.effect?.type === "status" && rolled.effect?.attempted) {
@@ -288,6 +322,11 @@ async function resolveCombat(command) {
       }
       const slain = findUnit(result.nextState, rolled.targetId);
       if (!slain || slain.hp <= 0) await effects.deathDissolve(targetBefore.id, targetBefore.position, teamColor(targetBefore.player));
+      for (const hitTarget of rolledTargetsBefore) {
+        if (hitTarget.id === targetBefore.id) continue;
+        const slainExtra = findUnit(result.nextState, hitTarget.id);
+        if (!slainExtra || slainExtra.hp <= 0) await effects.deathDissolve(hitTarget.id, hitTarget.position, teamColor(hitTarget.player));
+      }
     }
   }
 

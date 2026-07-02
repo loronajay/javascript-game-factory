@@ -233,14 +233,13 @@ body:has(.ref-modal:not([hidden])) .back-link {
   }
 
   .unit-card {
-    height: 46px;
+    height: 54px;
     gap: .48rem;
   }
 
-  .unit-emblem {
-    width: 38px;
-    height: 38px;
-    font-size: 1.08rem;
+  .unit-portrait.is-hud {
+    width: 40px;
+    height: 54px;
   }
 
   .unit-name {
@@ -249,13 +248,30 @@ body:has(.ref-modal:not([hidden])) .back-link {
   }
 
   .unit-meta,
-  .unit-stats {
+  .unit-statline,
+  .unit-tags {
     display: none;
   }
 
-  .hpbar {
+  .unit-info {
+    gap: .18rem;
+  }
+
+  .vitals {
+    gap: .16rem;
+  }
+
+  .vital-track {
     height: 6px;
-    margin-top: .34rem;
+  }
+
+  .vital-label {
+    font-size: .48rem;
+  }
+
+  .vital-num {
+    min-width: 2.2rem;
+    font-size: .56rem;
   }
 
   .actions {
@@ -301,13 +317,13 @@ body:has(.ref-modal:not([hidden])) .back-link {
     padding: .34rem;
   }
 
-  .unit-emblem {
+  .unit-card .unit-portrait.is-hud {
     display: none;
   }
 
   .unit-card {
     grid-template-columns: 1fr;
-    height: 40px;
+    height: 44px;
   }
 
   .actions button {
@@ -412,8 +428,9 @@ body:has(.ref-modal:not([hidden])) .back-link {
     display: none;
   }
 
-  .roster-slot-glyph {
-    font-size: 1rem;
+  .roster-slot .unit-portrait.is-slot {
+    width: 28px;
+    height: 30px;
   }
 
   .roster-slot-name {
@@ -430,29 +447,39 @@ body:has(.ref-modal:not([hidden])) .back-link {
   }
 
   .roster-unit {
-    padding: .42rem .25rem;
+    padding: .3rem .2rem .34rem;
   }
 
-  .roster-unit-glyph {
-    font-size: 1.2rem;
+  .roster-unit .unit-portrait.is-card {
+    height: 52px;
   }
 
   .roster-unit-name {
     font-size: .58rem;
   }
 
-  .roster-detail {
-    padding: .6rem .85rem;
+  .roster-detail-bar {
+    padding: .4rem .7rem;
+  }
+
+  .roster-detail-name {
+    font-size: .82rem;
+  }
+
+  .roster-assign {
+    min-width: 8.5rem;
+    padding: .4rem .6rem;
+    font-size: .66rem;
+  }
+
+  .roster-detail-scroll {
+    padding: .55rem .8rem;
   }
 
   /* Short landscape phone: shrink the portrait + tighten the split so the stat
      card still fits beside it without crushing the unit grid above. */
   .roster-detail-split {
     gap: .7rem;
-  }
-
-  .roster-detail-info h3 {
-    margin-bottom: .35rem;
   }
 
   .roster-detail-split .unit-portrait.is-hero {
@@ -469,10 +496,6 @@ body:has(.ref-modal:not([hidden])) .back-link {
   .roster-foot .menu-btn {
     min-width: 5.5rem;
     padding: .5rem .7rem;
-  }
-
-  .roster-assign {
-    min-width: 9.5rem !important;
   }
 }
 
@@ -533,6 +556,12 @@ body:has(.ref-modal:not([hidden])) .back-link {
   /* Per-unit blurred drop-shadow: an SVG blur filter re-rasterized on every
      board rebuild. A flat shadow composites for free. */
   .unit .shadow {
+    filter: none;
+  }
+
+  /* Stone-grain feTurbulence over the tile layer re-rasterizes on every board
+     rebuild — same class of cost as the blur layers above. Flat fills on touch. */
+  #boardLayer {
     filter: none;
   }
 }

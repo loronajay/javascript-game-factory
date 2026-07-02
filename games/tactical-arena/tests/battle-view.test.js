@@ -2,10 +2,75 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createBattleState } from "../src/core/state.js";
+import { applyCommand } from "../src/core/reducer.js";
+import { beginActivation } from "../src/core/commands.js";
 import { canMoveInActivation } from "../src/ui/hud.js";
+import { renderActions, renderSquads } from "../src/ui/hud.js";
 import { isTargetedMode } from "../src/ui/boardRenderer.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes } from "../src/ui/codex.js";
+
+class TestStyle {
+  constructor() {
+    this.props = new Map();
+  }
+
+  setProperty(name, value) {
+    this.props.set(name, value);
+  }
+}
+
+class TestElement {
+  constructor(tagName) {
+    this.tagName = tagName;
+    this.children = [];
+    this.className = "";
+    this.style = new TestStyle();
+    this.listeners = new Map();
+    this._innerHTML = "";
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = value;
+    this.children = [];
+    if (value.includes('class="squad-list"')) {
+      const list = new TestElement("div");
+      list.className = "squad-list";
+      this.children.push(list);
+    }
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  append(child) {
+    this.children.push(child);
+  }
+
+  replaceChildren(...children) {
+    this.children = children;
+  }
+
+  addEventListener(type, handler) {
+    this.listeners.set(type, handler);
+  }
+
+  querySelector(selector) {
+    if (!selector.startsWith(".")) return null;
+    const className = selector.slice(1);
+    return this.findByClass(className);
+  }
+
+  findByClass(className) {
+    if (this.className.split(/\s+/).includes(className)) return this;
+    for (const child of this.children) {
+      const match = child.findByClass(className);
+      if (match) return match;
+    }
+    return null;
+  }
+}
 
 test("the default duel uses the standard thirteen-tile map and four-unit corner staging", () => {
   const state = createBattleState();
@@ -29,6 +94,69 @@ test("the action bar keeps Move available after attacking if movement is unused"
   assert.equal(canMoveInActivation({ moved: false, primaryUsed: true }), true);
   assert.equal(canMoveInActivation({ moved: true, primaryUsed: false }), false);
   assert.equal(canMoveInActivation({ moved: true, primaryUsed: true }), false);
+});
+
+test("the action bar hides commands when the active turn is not locally controllable", () => {
+  const started = applyCommand(createBattleState(), beginActivation(1, "p1-swordsman"));
+  assert.equal(started.accepted, true);
+  const state = started.nextState;
+  const unit = state.units.find((candidate) => candidate.id === "p1-swordsman");
+  const actions = { innerHTML: "", querySelectorAll: () => [] };
+  const actionHelp = { textContent: "" };
+
+  renderActions(unit, state, null, { actions, actionHelp }, {
+    resolving: false,
+    controlsEnabled: false,
+    lockedMessage: "Enemy turn - commands hidden.",
+    onActionClick: () => assert.fail("hidden commands should not be clickable")
+  });
+
+  assert.equal(actions.innerHTML, "");
+  assert.equal(actionHelp.textContent, "Enemy turn - commands hidden.");
+});
+
+test("the squad HUD renders each player as four stacked unit rows", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const overlay = new TestElement("div");
+    renderSquads(createBattleState(), overlay, () => {});
+
+    assert.equal(overlay.children.length, 2);
+    for (const panel of overlay.children) {
+      const list = panel.querySelector(".squad-list");
+      assert.ok(list, "panel should include a squad list");
+      assert.equal(list.children.length, 4);
+      assert.ok(list.children.every((row) => row.className.includes("squad-unit")));
+      assert.ok(list.children.every((row) => !row.className.includes("squad-chip")));
+    }
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("spent defending squad rows keep Done in the status tag strip", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const state = createBattleState();
+    const unit = state.units.find((candidate) => candidate.id === "p1-swordsman");
+    unit.spent = true;
+    unit.defending = true;
+
+    const overlay = new TestElement("div");
+    renderSquads(state, overlay, () => {});
+
+    const firstPlayerRows = overlay.children[0].querySelector(".squad-list").children;
+    const spentRow = firstPlayerRows.find((row) => row.className.includes("spent"));
+    assert.ok(spentRow, "spent unit should render as a spent squad row");
+    assert.match(spentRow.innerHTML, /<span class="unit-tag on">Defending<\/span>/);
+    assert.match(spentRow.innerHTML, /<span class="unit-tag spent">Done<\/span>/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
 });
 
 test("the board only treats attack and enemy-target ARTS as targeted modes", () => {

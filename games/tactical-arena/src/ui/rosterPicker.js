@@ -46,7 +46,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     head.innerHTML =
       `<div class="ref-head-title"><h2>${escapeHtml(title)}</h2>` +
       `<button class="ref-close" type="button" data-roster="close" aria-label="Close">✕</button></div>` +
-      `<p class="roster-sub">Click a unit to inspect it — its card stays put while you read. Then press Place (or double-click) to slot it.</p>`;
+      `<p class="roster-sub">Pick a slot, click a unit to read its card, then press <b>Place</b> beside its name. Double-click a unit to place it instantly.</p>`;
     card.appendChild(head);
 
     // Squad tray (the four slots being filled)
@@ -60,8 +60,8 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     body.append(grid, detail);
     card.appendChild(body);
 
-    // Footer — Cancel · contextual Place button (always visible, never needs a
-    // scroll to reach) · Done.
+    // Footer — Cancel · Done. The contextual Place button now lives in the
+    // detail pane, right beside the unit the player is reading.
     const footer = el("div", "roster-foot");
     const cancelBtn = el("button", "menu-btn ghost");
     cancelBtn.type = "button";
@@ -74,7 +74,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     doneBtn.type = "button";
     doneBtn.dataset.roster = "done";
     doneBtn.textContent = "Done";
-    footer.append(cancelBtn, assignBtn, doneBtn);
+    footer.append(cancelBtn, doneBtn);
     card.appendChild(footer);
     assignBtn.addEventListener("click", () => { if (!assignBtn.disabled) assign(focusedType); });
 
@@ -85,10 +85,11 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         const def = UNIT_TYPES[squad[slot.index]];
         const btn = el("button", `roster-slot row-${slot.row}${slot.index === activeSlot ? " is-active" : ""}`);
         btn.type = "button";
-        btn.innerHTML =
-          `<span class="roster-slot-tag">${slot.row === "front" ? "Front" : "Back"}</span>` +
-          `<span class="roster-slot-glyph">${def.glyph}</span>` +
-          `<span class="roster-slot-name">${escapeHtml(def.name)}</span>`;
+        const tag = el("span", "roster-slot-tag");
+        tag.textContent = `${slot.index + 1} · ${slot.row === "front" ? "Front" : "Back"}`;
+        const name = el("span", "roster-slot-name");
+        name.textContent = def.name;
+        btn.append(tag, createPortrait(squad[slot.index], { variant: "is-slot", eager: true }), name);
         btn.addEventListener("click", () => { activeSlot = slot.index; focusedType = squad[slot.index]; paintAll(); });
         tray.appendChild(btn);
       }
@@ -103,14 +104,19 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         const unitBtn = el("button", `roster-unit${type === focusedType ? " is-focused" : ""}${disabled ? " is-disabled" : ""}`);
         unitBtn.type = "button";
         unitBtn.dataset.type = type;
-        unitBtn.innerHTML =
-          `<span class="roster-unit-glyph">${def.glyph}</span>` +
-          `<span class="roster-unit-name">${escapeHtml(def.name)}</span>` +
-          (disabled ? `<span class="roster-unit-flag">In squad</span>` : "");
+        unitBtn.append(createPortrait(type, { variant: "is-card", eager: true }));
+        const name = el("span", "roster-unit-name");
+        name.textContent = def.name;
+        unitBtn.append(name);
+        if (disabled) {
+          const flag = el("span", "roster-unit-flag");
+          flag.textContent = "In squad";
+          unitBtn.append(flag);
+        }
         // Click inspects — the detail card stays locked to this unit (no hover
         // fragility, scroll it freely). Double-click is the power-user fast-slot.
         // Disabled (already-in-squad) units stay inspectable; only assign is blocked.
-        unitBtn.addEventListener("click", () => { focusedType = type; paintDetail(); flagFocus(); paintFooter(); });
+        unitBtn.addEventListener("click", () => { focusedType = type; paintDetail(); flagFocus(); });
         unitBtn.addEventListener("dblclick", () => { if (!disabled) assign(type); });
         grid.appendChild(unitBtn);
       }
@@ -125,39 +131,42 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
     function paintDetail() {
       const def = UNIT_TYPES[focusedType];
-      const section = el("section", "ref-unit codex-unit-detail");
-      // Two-column card: a large painted portrait on the LEFT, the unit's name +
-      // stats/passives/ARTS to its RIGHT — so players read the figure they're
-      // drafting alongside its data. The portrait self-frames to a consistent
-      // scale (see portraits.js); the team accent rings the frame.
-      const split = el("div", "roster-detail-split");
-      const portrait = createPortrait(focusedType, { variant: "is-hero" });
-      portrait.style.setProperty("--team", accent || "var(--p1)");
-      split.append(portrait);
-      const info = el("div", "roster-detail-info");
+      // Action bar — the unit's name + the contextual Place button, pinned above
+      // the scrolling card. Read the unit, press Place right where you read it;
+      // no trip down to the footer.
+      const bar = el("div", "roster-detail-bar");
       const name = document.createElement("h3");
+      name.className = "roster-detail-name";
       name.innerHTML = `<span class="ref-glyph">${def.glyph}</span>${escapeHtml(def.name)}`;
-      const bodyHtml = document.createElement("div");
-      bodyHtml.innerHTML = unitDetailHtml(def);
-      info.append(name, bodyHtml);
-      split.append(info);
-      section.append(split);
-      detail.replaceChildren(section);
+      bar.append(name, assignBtn);
+
+      // Scrolling card: large painted portrait LEFT, stat grid + passives + ARTS
+      // RIGHT — players read the figure they're drafting alongside its data. The
+      // portrait self-frames to a consistent scale (see portraits.js).
+      const scroll = el("div", "roster-detail-scroll");
+      const split = el("div", "roster-detail-split");
+      const portrait = createPortrait(focusedType, { variant: "is-hero", eager: true });
+      portrait.style.setProperty("--team", accent || "var(--p1)");
+      const info = el("div", "roster-detail-info");
+      info.innerHTML = unitDetailHtml(def);
+      split.append(portrait, info);
+      scroll.append(split);
+      detail.replaceChildren(bar, scroll);
+      paintAssign();
     }
 
     // The contextual Place button reflects the focused unit + the active slot, and
     // disables itself when that unit can't go there (already in squad, draft rule).
-    function paintFooter() {
-      const def = UNIT_TYPES[focusedType];
+    function paintAssign() {
       const available = new Set(availableTypesForSlot(squad, activeSlot, allowDuplicates));
       const activeSlotDef = SLOT_LAYOUT.find((s) => s.index === activeSlot) ?? SLOT_LAYOUT[0];
       const rowLabel = activeSlotDef.row === "front" ? "Front" : "Back";
       const canAssign = available.has(focusedType);
       assignBtn.disabled = !canAssign;
-      assignBtn.textContent = canAssign ? `▸ Place ${def.name} · ${rowLabel}` : `${def.name} already in squad`;
+      assignBtn.textContent = canAssign ? `▸ Place in Slot ${activeSlot + 1} · ${rowLabel}` : "Already in squad";
     }
 
-    function paintAll() { paintTray(); paintGrid(); paintDetail(); paintFooter(); }
+    function paintAll() { paintTray(); paintGrid(); paintDetail(); }
 
     // Place `type` in the active slot, then advance to the next slot so a player
     // can tap straight down the roster.

@@ -99,6 +99,9 @@ export function mountSceneBackdrop(container) {
   const layers = [
     layer("bk-sky"),
     layer("bk-stars"),
+    // The moon rides its own layer (not a .bk-stars pseudo-element) so the star
+    // twinkle never pulses it; color comes from the --moon theme tokens.
+    layer("bk-moon"),
     layer("bk-aurora"),
     buildSkyline(),
     layer("bk-clouds"),

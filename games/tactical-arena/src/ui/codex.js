@@ -10,14 +10,43 @@ export const STAT_GLOSSARY = [
 
 // ── Shared detail markup ─────────────────────────────────────────────────────
 
-// Stat pills + passives + ARTS for one unit. Exported so the squad roster picker
+// Stat display model: each stat renders as a labeled cell (small-caps label, big
+// numeral) with a meter underneath showing where the value sits relative to the
+// strongest unit in the roster — so a new player reads "high HP, low DEF" at a
+// glance instead of parsing six identical pills.
+const STAT_CELLS = [
+  { label: "HP", key: "maxHp", cls: "stat-hp" },
+  { label: "MP", key: "maxMp", cls: "stat-mp" },
+  { label: "STR", key: "strength", cls: "" },
+  { label: "DEF", key: "defense", cls: "" },
+  { label: "MOVE", key: "moveRange", cls: "" },
+  { label: "RANGE", key: "attackRange", cls: "" }
+];
+
+// Roster-wide maxima per stat, so every meter shares one scale. Computed once —
+// the catalog is frozen at module load.
+const STAT_MAX = Object.fromEntries(STAT_CELLS.map(({ key }) => [
+  key,
+  Math.max(...Object.values(UNIT_TYPES).map((def) => def.stats[key] ?? 0), 1)
+]));
+
+export function statGridHtml(stats) {
+  const cells = STAT_CELLS.map(({ label, key, cls }) => {
+    const value = stats[key] ?? 0;
+    const pct = Math.max(6, Math.round(value / STAT_MAX[key] * 100));
+    return `<div class="stat-box ${cls}">
+      <span class="stat-box-label">${label}</span>
+      <b class="stat-box-value">${value}</b>
+      <span class="stat-meter"><i style="width:${pct}%"></i></span>
+    </div>`;
+  }).join("");
+  return `<div class="stat-grid">${cells}</div>`;
+}
+
+// Stat grid + passives + ARTS for one unit. Exported so the squad roster picker
 // renders the exact same reference card players see in the in-match Codex.
 export function unitDetailHtml(def) {
-  const s = def.stats;
-  const statPills = [
-    `${s.maxHp} HP`, `${s.maxMp} MP`, `Move ${s.moveRange}`,
-    `Range ${s.attackRange}`, `STR ${s.strength}`, `DEF ${s.defense}`
-  ].map((label) => `<span class="ref-pill">${label}</span>`).join("");
+  const statGrid = statGridHtml(def.stats);
 
   const passiveEntries = [
     def.passive ? { tag: "Passive", ...def.passive } : null,
@@ -36,7 +65,7 @@ export function unitDetailHtml(def) {
     .map((art) => `<div class="ref-line"><span class="ref-tag art">${art.tag}</span><b>${art.name}</b> — ${art.description}</div>`)
     .join("");
 
-  return `<div class="ref-pills">${statPills}</div>
+  return `${statGrid}
     ${passives ? `<div class="ref-group"><div class="ref-group-title">Passives</div>${passives}</div>` : ""}
     ${arts ? `<div class="ref-group"><div class="ref-group-title">ARTS</div>${arts}</div>` : ""}`;
 }

@@ -262,41 +262,28 @@
           <div id="sceneBackdrop" aria-hidden="true"></div>
           <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Tactical Arena board" role="grid">
             <defs>
-              <!-- Colors come from the theme tokens (style.css :root, overridden by
-                   src/ui/themes.js): presentation attributes can't hold var(), so the
-                   stops carry inline style. -->
               <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" style="stop-color:var(--board-aura, #70aed8); stop-opacity:var(--board-aura-op, .24)"/>
-                <stop offset="100%" style="stop-color:var(--board-aura, #70aed8); stop-opacity:0"/>
+                <stop offset="0%" stop-color="#70aed8" stop-opacity=".18"/>
+                <stop offset="100%" stop-color="#70aed8" stop-opacity="0"/>
               </radialGradient>
-              <!-- Stone grain — multiplies fractal noise over the tile faces so the
-                   board reads as cut stone instead of flat vector fills. Disabled on
-                   coarse pointers (responsive.css): feTurbulence re-rasterizes on
-                   every board rebuild. -->
-              <filter id="boardStone" x="-2%" y="-2%" width="104%" height="104%">
-                <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="7" result="n"/>
-                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.45 0.45 0.45 0 0" result="na"/>
-                <feComposite in="na" in2="SourceAlpha" operator="in" result="grain"/>
-                <feBlend in="SourceGraphic" in2="grain" mode="multiply"/>
-              </filter>
               <!-- Figurine materials (#ivory/#figSteel/#figGold) and #softGlow now live
                    in the global <defs> at the top of <body> so picker figurines on other
                    screens can resolve them too. -->
               <!-- War-table dais materials: a moonlit stone top, darker side faces,
                    and a soft diamond aura halo that pools under the board. -->
               <linearGradient id="daisStone" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" style="stop-color:var(--dais-stone-1, #46566a)"/><stop offset="52%" style="stop-color:var(--dais-stone-2, #2b3746)"/><stop offset="100%" style="stop-color:var(--dais-stone-3, #19222e)"/>
+                <stop offset="0%" stop-color="#46566a"/><stop offset="52%" stop-color="#2b3746"/><stop offset="100%" stop-color="#19222e"/>
               </linearGradient>
               <linearGradient id="daisSideL" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" style="stop-color:var(--dais-side-l-1, #1c2734)"/><stop offset="100%" style="stop-color:var(--dais-side-l-2, #0a121b)"/>
+                <stop offset="0%" stop-color="#1c2734"/><stop offset="100%" stop-color="#0a121b"/>
               </linearGradient>
               <linearGradient id="daisSideR" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" style="stop-color:var(--dais-side-r-1, #121b26)"/><stop offset="100%" style="stop-color:var(--dais-side-r-2, #060c14)"/>
+                <stop offset="0%" stop-color="#121b26"/><stop offset="100%" stop-color="#060c14"/>
               </linearGradient>
               <radialGradient id="daisAura" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" style="stop-color:var(--dais-aura-1, #86c4ee)" stop-opacity=".5"/>
-                <stop offset="55%" style="stop-color:var(--dais-aura-2, #5a93c8)" stop-opacity=".18"/>
-                <stop offset="100%" style="stop-color:var(--dais-aura-2, #5a93c8)" stop-opacity="0"/>
+                <stop offset="0%" stop-color="#86c4ee" stop-opacity=".5"/>
+                <stop offset="55%" stop-color="#5a93c8" stop-opacity=".18"/>
+                <stop offset="100%" stop-color="#5a93c8" stop-opacity="0"/>
               </radialGradient>
               <filter id="daisAuraBlur" x="-60%" y="-60%" width="220%" height="220%">
                 <feGaussianBlur stdDeviation="26"/>
@@ -324,11 +311,8 @@
         <footer class="hud">
           <section class="panel command-console">
             <div id="unitCard" class="unit-card">
-              <figure class="unit-portrait is-hud is-glyph-fallback is-empty">?</figure>
-              <div class="unit-info">
-                <div class="unit-title-row"><span class="unit-name is-muted">No piece selected</span></div>
-                <div class="unit-meta">Choose an unspent unit on the board.</div>
-              </div>
+              <div class="unit-emblem">?</div>
+              <div><div class="unit-name">No piece selected</div><div class="unit-meta">Choose an unspent unit on the board.</div><div class="hpbar"><div class="hpfill" style="width:0%"></div></div></div>
             </div>
             <div id="actions" class="actions"></div>
             <div id="actionHelp" class="action-help">Select an unspent piece.</div>
@@ -401,10 +385,6 @@
         </header>
         <div class="ref-body settings-body">
           <label class="set-row">
-            <span class="set-label">Theme</span>
-            <select id="setTheme" class="set-select"></select>
-          </label>
-          <label class="set-row">
             <span class="set-label">Sound</span>
             <input id="setSoundToggle" type="checkbox" checked>
           </label>
@@ -421,5 +401,67 @@
     </div>
 
     <script type="module" src="./src/main.js"></script>
-  </body>
+  
+<style>
+:root {
+  --mock-vignette: rgba(12,6,2,.5);
+  --mock-moon: radial-gradient(circle at 40% 36%, #fff7e6, #f2ddae 58%, #d8b673 100%);
+  --mock-moon-glow: 0 0 55px 16px rgba(244,212,148,.32), 0 0 130px 55px rgba(244,212,148,.14);
+  --brass:#b9923f; --brass-hi:#e9c97c; --brass-lo:#5e4a20; --gold:#d9b25e;
+  --text:#f2e8d4; --muted:#9c8c70; --ink:#141008; --ink-soft:#3a3020; --ink-faint:#5c4e34;
+  --parchment:#d8c8a8; --parchment-edge:#806840;
+  --console-fill: linear-gradient(180deg, rgba(255,226,160,.07), transparent 16%), repeating-linear-gradient(91deg, rgba(0,0,0,.08) 0 3px, transparent 3px 7px), linear-gradient(180deg, #231b10, #120d07);
+  --console-edge-soft: rgba(192,152,82,.32);
+  --parchment-fill: linear-gradient(135deg, rgba(255,226,160,.08), transparent 50%), linear-gradient(180deg, #2a2012, #16100a);
+}
+body { background: radial-gradient(circle at 50% 22%, rgba(96,62,22,.25), transparent 46%), repeating-linear-gradient(92deg, rgba(0,0,0,.06) 0 4px, transparent 4px 9px), linear-gradient(180deg, #1a1309, #0d0805); }
+button { color: var(--gold); background: linear-gradient(180deg, rgba(255,222,150,.12), transparent 46%), linear-gradient(180deg, #2c2211, #150f08); box-shadow: inset 0 1px rgba(255,222,150,.16), inset 0 0 0 1px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.45); }
+.topbar { background: linear-gradient(180deg, rgba(255,222,150,.05), transparent 30%), linear-gradient(180deg, #231b10, #130d07); }
+.hud { background: linear-gradient(0deg, rgba(255,222,150,.04), transparent 30%), linear-gradient(0deg, #231b10, #130d07); }
+.turn-banner { background: linear-gradient(180deg, rgba(255,222,150,.08), transparent 52%), linear-gradient(180deg, #241b10, #140e08); }
+.unit-emblem { background: radial-gradient(circle at 35% 25%, rgba(255,226,160,.22), rgba(255,226,160,.04) 58%, rgba(0,0,0,.5)); }
+.stat-pill { color:#ded2b6; }
+.squad-chip { background: linear-gradient(180deg, rgba(255,226,160,.06), transparent 60%), rgba(28,21,12,.65); }
+.tile-light .tile-face { fill:#8b7b60; }
+.tile-dark .tile-face { fill:#5d4f3a; }
+.tile.tile-light:nth-of-type(3n) .tile-face { fill:#85765c; }
+.tile.tile-light:nth-of-type(7n) .tile-face { fill:#917f64; }
+.tile.tile-light:nth-of-type(11n) .tile-face { fill:#8e7d62; }
+.tile.tile-dark:nth-of-type(3n) .tile-face { fill:#584a37; }
+.tile.tile-dark:nth-of-type(7n) .tile-face { fill:#63543e; }
+.tile.tile-dark:nth-of-type(11n) .tile-face { fill:#5b4d3a; }
+.tile-face { stroke: rgba(26,17,8,.6); }
+.tile:hover .tile-face { fill:#a29070; }
+.tile-side-a { fill:#3a2f20; } .tile-side-b { fill:#261e12; }
+#daisStone stop:nth-child(1){stop-color:#7c5f38;} #daisStone stop:nth-child(2){stop-color:#4c3a22;} #daisStone stop:nth-child(3){stop-color:#2a2012;}
+#daisSideL stop:nth-child(1){stop-color:#33261a;} #daisSideL stop:nth-child(2){stop-color:#150e08;}
+#daisSideR stop:nth-child(1){stop-color:#241a10;} #daisSideR stop:nth-child(2){stop-color:#0c0806;}
+#boardAura stop:first-child{stop-color:#f0b060; stop-opacity:.26;} #boardAura stop:last-child{stop-color:#f0b060;}
+#daisAura stop:nth-child(1){stop-color:#f4b56a;} #daisAura stop:nth-child(2){stop-color:#c8863c;} #daisAura stop:nth-child(3){stop-color:#c8863c;}
+.bk-sky { background: radial-gradient(90% 46% at 50% 60%, rgba(240,160,70,.20) 0%, rgba(180,100,40,.08) 40%, transparent 72%), radial-gradient(130% 96% at 50% 4%, #241f38 0%, #171226 40%, #0d0a18 70%, #070510 100%), linear-gradient(180deg, #120e20 0%, #0c0916 58%, #070408 100%); }
+.bk-aurora { background: radial-gradient(60% 40% at 28% 32%, rgba(230,140,60,.12), transparent 70%), radial-gradient(50% 38% at 72% 28%, rgba(150,90,200,.10), transparent 72%); }
+.bk-wall { fill:#150f1e; } .bk-tower { fill:#191223; }
+.bk-fortress::before { background: radial-gradient(72% 100% at 50% 100%, rgba(240,170,90,.30), rgba(180,110,50,.12) 50%, transparent 78%); }
+.bk-fortress-svg { opacity:.92; filter: drop-shadow(0 0 22px rgba(240,170,90,.18)); }
+.bk-window { fill:#ffcf7a; }
+.bk-rays { background: repeating-linear-gradient(99deg, rgba(255,200,120,.05) 0 22px, transparent 22px 92px); }
+.bk-fog { background: radial-gradient(120% 80% at 50% 100%, rgba(200,150,90,.14), rgba(140,100,60,.06) 45%, transparent 72%); }
+
+#boardLayer { filter:url(#mockStone); }
+#stageWrap::after { content:""; position:absolute; inset:0; z-index:4; pointer-events:none; background:radial-gradient(120% 92% at 50% 42%, transparent 52%, var(--mock-vignette) 100%); }
+.bk-wall, .bk-tower { stroke:none; }
+.bk-stars::after { content:""; position:absolute; top:8%; left:72%; width:78px; height:78px; border-radius:50%; background:var(--mock-moon); box-shadow:var(--mock-moon-glow); }
+
+</style>
+
+<script>
+setTimeout(()=>{document.querySelector("[data-nav=mainMenu]").click();},400);
+setTimeout(()=>{document.querySelector("[data-nav=hsSetup]").click();},800);
+setTimeout(()=>{document.querySelector("[data-action=startHotSeat]").click();},1200);
+setTimeout(()=>{
+  const defs=document.querySelector("#boardSvg defs");
+  defs.insertAdjacentHTML("beforeend",'<filter id="mockStone" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="7" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.45 0.45 0.45 0 0" result="na"/><feComposite in="na" in2="SourceAlpha" operator="in" result="grain"/><feBlend in="SourceGraphic" in2="grain" mode="multiply"/></filter>');
+},1700);
+</script>
+</body>
 </html>

@@ -121,14 +121,10 @@ confirmed override.
 - **Summon Ghoul interaction:** legacy tooltip says summoned ghouls carry
   Necromancer's aura and take no turns. Rebuild intent is 10 HP for ghouls; the
   legacy tooltip's 1 HP note is not intended canon.
-- **Sniper passives (recovered):** `Rifle Powered` is the named passive; its
-  damage component is split across two warped procedures. Using the project's
-  `totalDamage`-is-HP-delta convention (negative = damage dealt): `Sniper Extra
-  Damage Check` does `totalDamage -= 1` for a sniper attacker (**+1 damage**), and
-  `Sniper Minimum Damage Check` bumps a 1-damage hit (`totalDamage == -1`) by one
-  more (**a minimum-2-damage floor**). The body-block bypass (shots ignore
-  intervening units) is the third Rifle Powered effect. See the dedicated Sniper
-  section below for the full rebuild canon.
+- **Sniper passives (recovered):** `Rifle Powered` is the named passive. Current
+  rebuild canon keeps the minimum-damage check and the body/wall pierce, but rejects
+  the earlier +1 flat-damage reading as likely legacy-procedure drift. See the
+  dedicated Sniper section below for the full rebuild canon.
 
 ## Necromancer — recovered + implemented (rebuild canon)
 
@@ -168,13 +164,12 @@ placement scaffolding for walls and fire exists, but the destructible-wall and
 fire-damage/duration mechanics, and the Sniper's RAGE, were never finished. The
 rebuild recovers what was there and finishes the rest:
 
-- **Rifle Powered (passive)** — three effects, all folded through the shared strike
+- **Rifle Powered (passive)** — two effects, folded through the shared strike
   resolver so they stay honest in the damage forecast:
   - **Pierce:** the Sniper's physical ranged shot ignores intervening bodies
     **and walls** (it is the *only* thing that shoots through a Build Cover wall).
     Implemented as an `ignoresBodyBlock` flag that short-circuits both the
     unit body-block (`isShotBlocked`) and the wall LOS check (`isWallBetween`).
-  - **+1 damage** on the Sniper's hits (`Sniper Extra Damage Check`).
   - **Minimum 2 damage:** a hit that would chip for 1 is bumped to 2 (`Sniper
     Minimum Damage Check`), so high DEF never reduces a Sniper to chip damage.
 - **Smoke Bomb (ART)** — 3 MP, ranged single-target, **70% → blind for 1 turn, no
@@ -191,8 +186,9 @@ rebuild recovers what was there and finishes the rest:
   (true = ignores DEF and Defend). Fire **lasts 3 turns** then expires. Fire does
   not block movement or LOS — it is a pure hazard zone.
 - **Sniper RAGE** — passive (no rage art), triggers at ≤5 HP like every unit:
-  **+1 STR, +1 Range, +2 MOVE**. A deliberate rebuild design (legacy had none),
-  tuned to be a meaningful-but-balanced swing on an already-strong kit.
+  **+1 STR, +1 Range, +2 MOVE**, and basic attacks damage every enemy on the chosen
+  horizontal, vertical, or diagonal ray. A deliberate rebuild design (legacy had
+  none), tuned to be a meaningful-but-balanced swing on an already-strong kit.
 
 Engine seams this introduces (none existed before): a board-level **tile-object
 layer** (`tileObjects` map beside `tileAffinities`, carrying `{kind:"wall", hp}` and

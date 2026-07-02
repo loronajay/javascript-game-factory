@@ -10,6 +10,7 @@ export const PLATFORM_STORAGE_KEYS = Object.freeze({
   loversLostPbBoy:  "lovers-lost.pb.boy",
   loversLostPbGirl: "lovers-lost.pb.girl",
   echoDuelPbSolo:   "echo-duel.pb.solo",
+  tacticalArenaTheme: "tactical-arena.theme",
 } as const);
 
 export type PlatformStorageKeyName = keyof typeof PLATFORM_STORAGE_KEYS;

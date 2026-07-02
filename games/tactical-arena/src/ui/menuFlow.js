@@ -7,6 +7,7 @@
 import { ScreenManager } from "./screenManager.js";
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
+import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };
 const CONFETTI_COUNT = 44;
@@ -97,11 +98,26 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const soundToggle = $("#setSoundToggle", settingsModal);
   const sfxRange = $("#setSfxVolume", settingsModal);
   const musicRange = $("#setMusicVolume", settingsModal);
+  const themeSelect = $("#setTheme", settingsModal);
+
+  // Palette list comes straight from the registry so a new theme in themes.js
+  // shows up here with no markup change. Applied live + persisted on change.
+  for (const theme of THEMES) {
+    const option = document.createElement("option");
+    option.value = theme.id;
+    option.textContent = theme.label;
+    themeSelect.append(option);
+  }
+  themeSelect.addEventListener("change", () => {
+    applyTheme(themeSelect.value);
+    saveThemeId(themeSelect.value);
+  });
 
   function openSettings() {
     soundToggle.checked = audio.enabled !== false;
     sfxRange.value = String(Math.round((audio.volume ?? 0.85) * 100));
     musicRange.value = String(Math.round((audio.musicVolume ?? 0.32) * 100));
+    themeSelect.value = loadSavedThemeId();
     settingsModal.hidden = false;
   }
   function closeSettings() { settingsModal.hidden = true; }

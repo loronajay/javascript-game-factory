@@ -160,6 +160,19 @@ test("Mystic Guardian adds team defense while the Mystic is alive", () => {
   assert.equal(getEffectiveStats(defeated.units.find((unit) => unit.id === "p1-archer"), defeated).defense, 4);
 });
 
+test("duplicate Mystic Guardian passives do not stack", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-mystic-a", player: 1, type: "mystic", x: 0, y: 0 },
+      { id: "p1-mystic-b", player: 1, type: "mystic", x: 1, y: 0 },
+      { id: "p1-archer", player: 1, type: "archer", x: 2, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 7, y: 7 }
+    ]
+  });
+
+  assert.equal(getEffectiveStats(state.units.find((unit) => unit.id === "p1-archer"), state).defense, 5);
+});
+
 test("Mystic RAGE adds movement and passively defends incoming physical damage", () => {
   const state = createBattleState({
     units: [
