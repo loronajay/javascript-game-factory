@@ -151,6 +151,7 @@ export function renderActions(
   const activation = state.activation;
   const hasPrimary = activation.primaryUsed;
   const canMove = canMoveInActivation(activation);
+  const canCancelMove = Boolean(activation.moved && !hasPrimary);
   const stats = getEffectiveStats(unit, state);
   const footwork = getUnitType(unit.type).arts.find((art) => art.id === "footwork");
   const footworkBtn = footwork
@@ -163,6 +164,7 @@ export function renderActions(
 
   actions.innerHTML = [
     `<button class="${mode === "move" ? "is-active" : ""}" data-action="move" title="Move up to ${stats.moveRange} tiles before or after your primary action." ${canMove ? "" : "disabled"}>Move<kbd class="key">1</kbd></button>`,
+    `<button data-action="cancel-move" title="Return this unit to its activation origin before taking a primary action." ${canCancelMove ? "" : "disabled"}>Cancel Move<kbd class="key">C</kbd></button>`,
     `<button class="${mode === "attack" ? "is-active" : ""}" data-action="attack" title="Strike an enemy within range ${stats.attackRange}." ${hasPrimary ? "disabled" : ""}>Attack<kbd class="key">2</kbd></button>`,
     `<button data-action="defend" title="Brace: halve incoming physical and magic damage until your next turn." ${hasPrimary ? "disabled" : ""}>Defend<kbd class="key">3</kbd></button>`,
     footworkBtn,
@@ -171,7 +173,7 @@ export function renderActions(
   ].join("");
 
   actionHelp.textContent = activation.moved && !hasPrimary
-    ? "Now attack or defend to end this unit's turn."
+    ? "Now attack, defend, or cancel the move."
     : hasPrimary && !activation.moved
       ? "Now move or finish this unit's turn."
       : `Move up to ${stats.moveRange} tiles before or after your primary action.`;

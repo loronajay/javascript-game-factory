@@ -9,6 +9,7 @@ import { applyCommand } from "../src/core/reducer.js";
 import {
   attack,
   beginActivation,
+  cancelMove,
   defend,
   finishActivation,
   moveUnit,
@@ -258,6 +259,104 @@ test("a unit stays active after moving and can immediately defend", () => {
   assert.equal(defended.nextState.activation.unitId, "p1-swordsman");
   assert.equal(defended.nextState.activation.primaryUsed, true);
   assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-swordsman").defending, true);
+});
+
+test("cancel move restores the activation origin and allows a different move", () => {
+  const initial = createBattleState();
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 12));
+  const cancelled = applyCommand(moved.nextState, cancelMove(1, "p1-swordsman"));
+
+  assert.equal(cancelled.accepted, true);
+  assert.deepEqual(cancelled.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 1, y: 12 });
+  assert.equal(cancelled.nextState.activation.unitId, "p1-swordsman");
+  assert.equal(cancelled.nextState.activation.moved, false);
+  assert.equal(cancelled.nextState.activation.primaryUsed, false);
+
+  const removed = applyCommand(cancelled.nextState, moveUnit(1, "p1-swordsman", 4, 12));
+  assert.equal(removed.accepted, true);
+  assert.deepEqual(removed.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 4, y: 12 });
+});
+
+test("cancel move allows attacking from the original tile", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 4, y: 1 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 5, y: 1 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 1));
+  const cancelled = applyCommand(moved.nextState, cancelMove(1, "p1-swordsman"));
+  const attacked = applyCommand(cancelled.nextState, attack(1, "p1-swordsman", "p2-swordsman", NORMAL_HIT));
+
+  assert.equal(attacked.accepted, true);
+  assert.equal(attacked.nextState.activation.primaryUsed, true);
+  assert.deepEqual(attacked.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 4, y: 1 });
+});
+
+test("cancel move allows defending from the original tile", () => {
+  const initial = createBattleState();
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 12));
+  const cancelled = applyCommand(moved.nextState, cancelMove(1, "p1-swordsman"));
+  const defended = applyCommand(cancelled.nextState, defend(1, "p1-swordsman"));
+
+  assert.equal(defended.accepted, true);
+  assert.deepEqual(defended.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 1, y: 12 });
+  assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-swordsman").defending, true);
+});
+
+test("cancel move is rejected after a primary action", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 4, y: 1 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 5, y: 1 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 4, 2));
+  const attacked = applyCommand(moved.nextState, attack(1, "p1-swordsman", "p2-swordsman", NORMAL_HIT));
+  const cancelled = applyCommand(attacked.nextState, cancelMove(1, "p1-swordsman"));
+
+  assert.equal(cancelled.accepted, false);
+  assert.equal(cancelled.errorCode, "PRIMARY_ALREADY_USED");
+});
+
+test("cancel move is rejected after attack then move", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 4, y: 1 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 5, y: 1 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const attacked = applyCommand(selected.nextState, attack(1, "p1-swordsman", "p2-swordsman", NORMAL_HIT));
+  const moved = applyCommand(attacked.nextState, moveUnit(1, "p1-swordsman", 4, 4));
+  const cancelled = applyCommand(moved.nextState, cancelMove(1, "p1-swordsman"));
+
+  assert.equal(cancelled.accepted, false);
+  assert.equal(cancelled.errorCode, "PRIMARY_ALREADY_USED");
+});
+
+test("cancel move is rejected when there is no move to cancel", () => {
+  const initial = createBattleState();
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const cancelled = applyCommand(selected.nextState, cancelMove(1, "p1-swordsman"));
+
+  assert.equal(cancelled.accepted, false);
+  assert.equal(cancelled.errorCode, "CANCEL_NOT_AVAILABLE");
+});
+
+test("cancel move cannot restore a spent unit", () => {
+  const initial = createBattleState();
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
+  const finished = applyCommand(defended.nextState, finishActivation(1, "p1-swordsman"));
+  const cancelled = applyCommand(finished.nextState, cancelMove(1, "p1-swordsman"));
+
+  assert.equal(cancelled.accepted, false);
+  assert.equal(cancelled.errorCode, "NO_ACTIVATION");
 });
 
 test("a unit can attack first and still use its movement", () => {

@@ -1,4 +1,4 @@
-import { attack, attackTile, beginActivation, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
+import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
@@ -601,6 +601,11 @@ async function applyCpuCommand(command) {
     }
     case "MOVE_UNIT":
       return resolveCpuMove(command, { keepResolving: true });
+    case "CANCEL_MOVE": {
+      const ok = dispatch(command);
+      render();
+      return ok;
+    }
     case "ATTACK":
       return command.targetPosition ? resolveWallAttack(command) : resolveCombat(command);
     case "DEFEND": {
@@ -663,6 +668,7 @@ async function applyRemoteCommand(command) {
         return;
       }
       case "MOVE_UNIT": await resolveCpuMove(command); return;
+      case "CANCEL_MOVE": dispatch(command); render(); return;
       case "ATTACK":
         if (command.targetPosition) await resolveWallAttack(command);
         else await resolveCombat(command);
@@ -961,6 +967,14 @@ async function handleActionClick(action, unit) {
       finishNow();
     }
     mode = null;
+  } else if (action === "cancel-move") {
+    if (dispatch(cancelMove(state.currentPlayer, unit.id))) {
+      selectedId = unit.id;
+      mode = null;
+      footworkPath = [];
+      volleyShotOrigin = null;
+      setMessage("Movement cancelled. Choose an action.");
+    }
   } else if (action === "finish") {
     if (dispatch(finishActivation(state.currentPlayer, unit.id)))
       setMessage("Activation complete. The next commander takes the field.");
@@ -1069,7 +1083,7 @@ function openCodex() {
 
 // --- Keyboard ---
 
-const HOTKEY_ACTIONS = { "1": "move", "2": "attack", "3": "defend", a: "footwork", A: "footwork", f: "finish", F: "finish", Enter: "finish" };
+const HOTKEY_ACTIONS = { "1": "move", "2": "attack", "3": "defend", a: "footwork", A: "footwork", c: "cancel-move", C: "cancel-move", f: "finish", F: "finish", Enter: "finish" };
 document.addEventListener("keydown", (event) => {
   if (rulesModal.isOpen || resolving) return;
   if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;

@@ -74,6 +74,7 @@ export function readableError(errorCode) {
     ART_NOT_AVAILABLE: "ARTS must be chosen before moving or attacking, with enough MP.",
     INVALID_ART_PATH: "Footwork must use its full unique orthogonal path and finish on empty ground.",
     MOVE_OUT_OF_RANGE: "That tile is not reachable this activation.",
+    CANCEL_NOT_AVAILABLE: "There is no movement to cancel.",
     TARGET_OUT_OF_RANGE: "That target is beyond attack range.",
     TARGET_OBSTRUCTED: "Another unit is blocking the line of fire.",
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",

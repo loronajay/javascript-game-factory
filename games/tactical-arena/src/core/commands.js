@@ -1,6 +1,7 @@
 export const COMMANDS = Object.freeze({
   BEGIN_ACTIVATION: "BEGIN_ACTIVATION",
   MOVE_UNIT: "MOVE_UNIT",
+  CANCEL_MOVE: "CANCEL_MOVE",
   ATTACK: "ATTACK",
   DEFEND: "DEFEND",
   USE_ART: "USE_ART",
@@ -10,6 +11,7 @@ export const COMMANDS = Object.freeze({
 
 export const beginActivation = (player, unitId) => ({ type: COMMANDS.BEGIN_ACTIVATION, player, unitId });
 export const moveUnit = (player, unitId, x, y) => ({ type: COMMANDS.MOVE_UNIT, player, unitId, position: { x, y } });
+export const cancelMove = (player, unitId) => ({ type: COMMANDS.CANCEL_MOVE, player, unitId });
 // `rolls` optionally pins the to-hit/crit draws ({ attackRoll, critRoll }) for
 // deterministic tests and recorded replay; live play omits it and the reducer
 // draws from the authoritative seed.

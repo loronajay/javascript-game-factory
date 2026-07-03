@@ -67,6 +67,7 @@ test("the document exposes the mobile playability shell", () => {
     new URL("../responsive.css", import.meta.url),
     "utf8",
   );
+  const menusCss = readFileSync(new URL("../menus.css", import.meta.url), "utf8");
 
   assert.match(
     html,
@@ -88,6 +89,26 @@ test("the document exposes the mobile playability shell", () => {
     responsiveCss,
     /grid-template-areas:\s*"top top"\s*"stage hud"/,
     "landscape phones should move commands beside the battlefield instead of crushing it vertically",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(max-width: 740px\),\s*\(pointer: coarse\) and \(max-height: 540px\)[\s\S]*?\.squad-pickers\s*\{[\s\S]*?grid-template-columns:\s*1fr/,
+    "mobile setup should stack squad pickers instead of squeezing two squads into cramped columns",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(max-width: 560px\)[\s\S]*?\.roster-grid\s*\{[\s\S]*?grid-auto-flow:\s*column/,
+    "narrow roster pickers should use a horizontal unit rail above the detail pane",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\)[\s\S]*?\.roster-card\s*\{[\s\S]*?var\(--app-height,\s*100vh\)/,
+    "touch roster modals should size to the live viewport height instead of overflowing mobile browser chrome",
+  );
+  assert.match(
+    menusCss,
+    /\.roster-body\s*\{[^}]*min-height:\s*0/,
+    "the roster modal body must be allowed to shrink so its internal panes can scroll",
   );
   assert.match(
     responsiveCss,

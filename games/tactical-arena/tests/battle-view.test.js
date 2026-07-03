@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation } from "../src/core/commands.js";
+import { beginActivation, moveUnit } from "../src/core/commands.js";
 import { canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode } from "../src/ui/boardRenderer.js";
@@ -154,6 +154,31 @@ test("the action bar hides commands when the active turn is not locally controll
 
   assert.equal(actions.innerHTML, "");
   assert.equal(actionHelp.textContent, "Enemy turn - commands hidden.");
+});
+
+test("the action bar enables Cancel Move only after an uncommitted move", () => {
+  const started = applyCommand(createBattleState(), beginActivation(1, "p1-swordsman"));
+  assert.equal(started.accepted, true);
+  const unit = started.nextState.units.find((candidate) => candidate.id === "p1-swordsman");
+  const actions = { innerHTML: "", querySelectorAll: () => [] };
+  const actionHelp = { textContent: "" };
+
+  renderActions(unit, started.nextState, null, { actions, actionHelp }, {
+    resolving: false,
+    controlsEnabled: true,
+    onActionClick: () => {}
+  });
+  assert.match(actions.innerHTML, /data-action="cancel-move"[^>]*disabled/);
+
+  const moved = applyCommand(started.nextState, moveUnit(1, "p1-swordsman", 2, 12));
+  assert.equal(moved.accepted, true);
+  renderActions(unit, moved.nextState, null, { actions, actionHelp }, {
+    resolving: false,
+    controlsEnabled: true,
+    onActionClick: () => {}
+  });
+  assert.match(actions.innerHTML, /data-action="cancel-move"/);
+  assert.doesNotMatch(actions.innerHTML, /data-action="cancel-move"[^>]*disabled/);
 });
 
 test("the squad HUD renders each player as four stacked unit rows", () => {

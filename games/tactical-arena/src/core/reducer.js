@@ -20,6 +20,7 @@ const ERR = Object.freeze({
   WRONG_ACTIVE_UNIT: "WRONG_ACTIVE_UNIT",
   MOVE_ALREADY_USED: "MOVE_ALREADY_USED",
   MOVE_OUT_OF_RANGE: "MOVE_OUT_OF_RANGE",
+  CANCEL_NOT_AVAILABLE: "CANCEL_NOT_AVAILABLE",
   PRIMARY_ALREADY_USED: "PRIMARY_ALREADY_USED",
   INVALID_TARGET: "INVALID_TARGET",
   TARGET_OUT_OF_RANGE: "TARGET_OUT_OF_RANGE",
@@ -48,6 +49,7 @@ export function applyCommand(state, command) {
   switch (command.type) {
     case COMMANDS.BEGIN_ACTIVATION: return beginActivation(state, command);
     case COMMANDS.MOVE_UNIT: return moveUnit(state, command);
+    case COMMANDS.CANCEL_MOVE: return cancelMove(state, command);
     case COMMANDS.ATTACK: return attack(state, command);
     case COMMANDS.DEFEND: return defend(state, command);
     case COMMANDS.USE_ART: return useArt(state, command);
@@ -119,6 +121,21 @@ function moveUnit(state, command) {
   unit.position = { ...command.position };
   next.activation.moved = true;
   return accept(next, [{ type: "UNIT_MOVED", unitId: unit.id, from, to: { ...unit.position } }]);
+}
+
+function cancelMove(state, command) {
+  const result = validateOpenActivation(state, command.player, command.unitId);
+  if (result.error) return reject(result.error);
+  if (!state.activation.moved) return reject(ERR.CANCEL_NOT_AVAILABLE);
+  if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
+
+  const next = cloneState(state);
+  const unit = findUnit(next, command.unitId);
+  const restoredTo = { ...next.activation.origin };
+  unit.position = restoredTo;
+  next.activation.moved = false;
+
+  return accept(next, [{ type: "MOVE_CANCELLED", unitId: unit.id, restoredTo: { ...restoredTo } }]);
 }
 
 function attack(state, command) {
