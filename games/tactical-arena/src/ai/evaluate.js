@@ -150,6 +150,26 @@ export function hastenValue(state, caster, target, isAlly) {
   return helps ? 1.5 : 0.4;
 }
 
+// Value of one Tether Grab pull (the 3 magic itself is scored by the HP diff). Dragging
+// an enemy that wants distance — a ranged unit or caster/support — into the bruiser's
+// face is the real payoff; hauling another melee body around is minor tempo.
+export function grabValue(state, caster, target) {
+  const role = normalizeUnitAi(target.type).role;
+  const kites = role === "ranged" || role === "caster" || role === "controller" || role === "support";
+  return kites ? 2.5 : 1;
+}
+
+// Value of a Recharge. At full MP the mend is 1 HP (scored by the projection, so 0 extra
+// here). Empty, refueling is only worth something if the Juggernaut could actually spend
+// the MP on a real play soon (an enemy within move + Rocket Punch reach). Small currency
+// so it always loses to an available attack.
+export function rechargeValue(state, caster) {
+  if (caster.mp > 0) return 0;
+  const reach = getEffectiveStats(caster, state).moveRange + 5;
+  const canSetUp = livingUnits(state).some((u) => areEnemies(caster, u) && chebyshevDistance(caster.position, u.position) <= reach);
+  return canSetUp ? 2.5 : 0.5;
+}
+
 // True when a unit is short of MP for at least one of its costed active arts, so a
 // small MP top-up (Spirit Dance) could matter to it.
 function isMpStarved(unit) {
@@ -268,6 +288,12 @@ export function expectedFixedHit(state, target, { amount, type }) {
     const defender = { ...getEffectiveStats(target, state), defending: isDefending(target) };
     const base = defender.defending ? Math.ceil(Math.max(0, amount) / 2) : Math.max(0, amount);
     damage = Math.max(0, base - getTeamDamageReduction(target, state, "magic"));
+  } else if (type === "physical") {
+    // Fixed-power physical (Rocket Punch): Defense reduces it, Defend halves it, like
+    // resolveDamage's physical branch with a fixed `strength`.
+    const defender = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+    const base = Math.max(1, Math.max(0, amount) - defender.defense);
+    damage = defender.defending ? Math.ceil(base / 2) : base;
   } else {
     throw new Error(`expectedFixedHit: unsupported type "${type}"`);
   }

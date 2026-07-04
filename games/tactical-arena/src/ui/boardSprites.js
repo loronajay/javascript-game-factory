@@ -64,6 +64,8 @@ export const BOARD_SPRITES = Object.freeze({
   // Re-cropped from the 600×600 portrait, centered on the measured stance x=300 (the
   // staff overhang to the right is ignored, per the centering trap in the header notes).
   "father-time": sprite("father-time", 488, 552),
+  // Cropped from the 600×600 portrait, centered on the measured feet x=304.
+  juggernaut:  sprite("juggernaut",  448, 576),
   sniper:      sprite("sniper",      602, 581),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.

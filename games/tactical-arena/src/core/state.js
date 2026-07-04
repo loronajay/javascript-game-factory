@@ -1,11 +1,13 @@
 import { getUnitType } from "./unitCatalog.js";
 import { createRngState } from "./rng.js";
+import { createRoster, FORMATS, playerColor } from "./roster.js";
 
 function createUnit(spec) {
   const definition = getUnitType(spec.type);
   return {
     id: spec.id,
     player: spec.player,
+    team: spec.team ?? spec.player,
     type: spec.type,
     position: { x: spec.x, y: spec.y },
     hp: spec.hp ?? definition.stats.maxHp,
@@ -64,36 +66,63 @@ const DEFAULT_ROSTER = [
   { id: "magician", type: "magician" }
 ];
 
-function defaultRoster(size) {
-  const slots = {
-    1: [
-      { x: 1, y: size - 1 },
-      { x: 0, y: size - 2 },
-      { x: 0, y: size - 1 },
-      { x: 1, y: size - 2 }
-    ],
-    2: [
-      { x: size - 2, y: 0 },
-      { x: size - 1, y: 1 },
-      { x: size - 1, y: 0 },
-      { x: size - 2, y: 1 }
-    ]
-  };
+const CORNERS = Object.freeze([
+  Object.freeze({ cx: 0, cy: 1 }),
+  Object.freeze({ cx: 1, cy: 0 }),
+  Object.freeze({ cx: 0, cy: 0 }),
+  Object.freeze({ cx: 1, cy: 1 }),
+]);
 
-  return [1, 2].flatMap((player) => DEFAULT_ROSTER.map(({ id, type }, i) => ({
-    id: `p${player}-${id}`,
-    player,
-    type,
-    x: slots[player][i].x,
-    y: slots[player][i].y
-  })));
+function spawnSlots(size, cornerIndex) {
+  const max = size - 1;
+  const corner = CORNERS[cornerIndex] ?? CORNERS[0];
+  const cx = corner.cx === 0 ? 0 : max;
+  const cy = corner.cy === 0 ? 0 : max;
+  const inwardX = cx === 0 ? 1 : -1;
+  const inwardY = cy === 0 ? 1 : -1;
+  return [
+    { x: cx + inwardX, y: cy },
+    { x: cx, y: cy + inwardY },
+    { x: cx, y: cy },
+    { x: cx + inwardX, y: cy + inwardY }
+  ];
 }
 
-export function createBattleState({ size = 13, units, seed, tiles = [], tileObjects = [] } = {}) {
-  const roster = units ?? defaultRoster(size);
+function defaultRoster(size, players = createRoster()) {
+  return players.flatMap((slot) => {
+    const slots = spawnSlots(size, slot.corner);
+    return DEFAULT_ROSTER.map(({ id, type }, i) => ({
+      id: `p${slot.id}-${id}`,
+      player: slot.id,
+      team: slot.team,
+      type,
+      x: slots[i].x,
+      y: slots[i].y
+    }));
+  });
+}
+
+export function createBattleState({
+  size = 13,
+  units,
+  seed,
+  tiles = [],
+  tileObjects = [],
+  players = null,
+  playerCount = 2,
+  format = FORMATS.FFA,
+  teamColors = null,
+  teamNames = null
+} = {}) {
+  const playerRoster = players ?? createRoster({ playerCount, format, teamColors });
+  const roster = units ?? defaultRoster(size, playerRoster);
 
   return {
     size,
+    format,
+    teamNames: normalizeTeamNames(teamNames),
+    players: playerRoster,
+    turnOrder: playerRoster.map((slot) => slot.id),
     tileAffinities: normalizeTileAffinities(tiles),
     tileObjects: normalizeTileObjects(tileObjects),
     units: roster.map(createUnit),
@@ -112,6 +141,17 @@ export function createBattleState({ size = 13, units, seed, tiles = [], tileObje
     // or replay match is handed a fixed seed.
     rngState: createRngState(seed ?? (Date.now() & 0xffffffff))
   };
+}
+
+const MAX_TEAM_NAME_LENGTH = 20;
+function normalizeTeamNames(names) {
+  if (!names || typeof names !== "object") return null;
+  const cleaned = {};
+  for (const [key, value] of Object.entries(names)) {
+    const trimmed = String(value ?? "").trim().slice(0, MAX_TEAM_NAME_LENGTH);
+    if (trimmed) cleaned[key] = trimmed;
+  }
+  return Object.keys(cleaned).length ? cleaned : null;
 }
 
 export function cloneState(state) {
@@ -165,10 +205,29 @@ export function isFireAt(state, position) {
   return getTileObject(state, position)?.kind === "fire";
 }
 
+export function teamOfUnit(unit) {
+  return unit?.team ?? unit?.player;
+}
+
 export function areEnemies(a, b) {
-  return a.player !== b.player;
+  return teamOfUnit(a) !== teamOfUnit(b);
+}
+
+export function areAllies(a, b) {
+  return teamOfUnit(a) === teamOfUnit(b);
 }
 
 export function livingUnits(state, player) {
   return state.units.filter((unit) => unit.hp > 0 && (player === undefined || unit.player === player));
+}
+
+export function livingTeamUnits(state, unitOrPlayer) {
+  const team = typeof unitOrPlayer === "object"
+    ? teamOfUnit(unitOrPlayer)
+    : state.players?.find((slot) => slot.id === unitOrPlayer)?.team ?? unitOrPlayer;
+  return state.units.filter((unit) => unit.hp > 0 && teamOfUnit(unit) === team);
+}
+
+export function colorOf(state, player) {
+  return state?.players?.find((slot) => slot.id === player)?.color ?? playerColor(player);
 }

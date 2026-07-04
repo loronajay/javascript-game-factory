@@ -25,7 +25,7 @@
 
 import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, getEffectiveStats, getUnitType, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -34,6 +34,7 @@ import {
   getFootworkStepOptions,
   getFootworkSteps,
   getLegalFleeTiles,
+  getLineTargets,
   getRevivePlacementTiles,
   getReviveTargets,
   getSelfBlastRadius,
@@ -222,6 +223,33 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "grab": {
+      // Tether Grab: pull the first ENEMY on a straight ray (grabbing an ally is a no-op
+      // for the CPU). Mirrors getLineTargets(includeAllies:true) then keeps only foes, so
+      // every plan replays cleanly through resolveTetherGrab.
+      for (const { unit: enemy } of getLineTargets(state, unit, art.targeting.range, { includeAllies: true })) {
+        if (!areEnemies(unit, enemy)) continue;
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: enemy.id } }));
+      }
+      break;
+    }
+    case "lineStrike": {
+      // Rocket Punch: strike the first enemy on a straight ray (allies block, so the ray
+      // stops at a friendly body and never yields an illegal target).
+      for (const { unit: enemy } of getLineTargets(state, unit, art.targeting.range, { includeAllies: false })) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: enemy.id } }));
+      }
+      break;
+    }
+    case "recharge": {
+      // Recharge: only worth offering when it does something (refuel MP, or mend 1 HP at
+      // full MP). It is always legal (0 MP, self-target), so no line-of-sight to check.
+      const stats = getEffectiveStats(unit, state);
+      if (unit.mp < stats.maxMp || unit.hp < stats.maxHp) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -286,10 +314,14 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     }
     case "selfBlast": {
       const radius = getSelfBlastRadius(state, actor, art);
+      const dtype = art.damage.type ?? "magic";
       for (const target of board) {
         if (!areEnemies(actor, target) || chebyshevDistance(actor.position, target.position) > radius) continue;
-        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: "magic" }).damage);
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: dtype }).damage);
       }
+      // A self-sacrifice blast (Juggernaut's Self Destruct) consumes the caster — model the
+      // loss so the CPU only detonates when the enemies wiped are worth its own life.
+      if (art.selfKill) actor.hp = 0;
       break;
     }
     case "healAllies": {
@@ -328,6 +360,28 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "statBuff":
     case "hasten":
       break; // Age/Time Stretch change stats, not HP now; value is a controller term
+    case "grab": {
+      // Tether Grab: the 3 magic (foe only) + the pull to the tile one step from the actor
+      // along the ray. The planner only ever grabs enemies.
+      const target = byId.get(primary.targetId);
+      if (target) {
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: "magic" }).damage);
+        const dir = { x: Math.sign(target.position.x - actor.position.x), y: Math.sign(target.position.y - actor.position.y) };
+        target.position = { x: actor.position.x + dir.x, y: actor.position.y + dir.y };
+      }
+      break;
+    }
+    case "lineStrike": {
+      const target = byId.get(primary.targetId);
+      if (target) target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: "physical" }).damage);
+      break; // the stun rider is a controller score term
+    }
+    case "recharge": {
+      // Refuel changes MP (not modeled as material); at full MP it mends 1 HP.
+      const stats = getEffectiveStats(actor, state);
+      if (actor.mp >= stats.maxMp) actor.hp = Math.min(stats.maxHp, actor.hp + (art.restore?.hpIfFull ?? 0));
+      break;
+    }
     case "revive": {
       // Rewind returns the fallen ally to the board at full HP — the material term
       // (unitThreatValue + hp) is exactly the value of the revival.
@@ -369,10 +423,12 @@ export function toCommands(player, plan) {
 // Total MP an entire plan spends (bonus prefix + ART primary). Basic attack / defend
 // cost nothing. The controller nets this against the plan's value.
 export function planMpCost(state, plan) {
-  const type = findUnit(state, plan.unitId).type;
+  const unit = findUnit(state, plan.unitId);
   let cost = 0;
-  if (plan.bonus) cost += getArt(type, plan.bonus.artId).mpCost ?? 0;
-  if (plan.primary.kind === "art") cost += getArt(type, plan.primary.artId).mpCost ?? 0;
+  // getArtMpCost honors a raging Juggernaut's freeArts (0-cost ARTS), so the CPU doesn't
+  // over-count MP it won't actually spend.
+  if (plan.bonus) cost += getArtMpCost(unit, getArt(unit.type, plan.bonus.artId));
+  if (plan.primary.kind === "art") cost += getArtMpCost(unit, getArt(unit.type, plan.primary.artId));
   return cost;
 }
 
@@ -536,7 +592,7 @@ function artUsableForPlanning(state, unit, art) {
     unit.hp > 0 && !unit.spent &&
     !isStunned(unit) &&
     !unit.statuses?.some((status) => status.type === "silence") &&
-    unit.mp >= art.mpCost &&
+    unit.mp >= getArtMpCost(unit, art) &&
     (!art.rageLocked || isRaging(unit))
   );
 }

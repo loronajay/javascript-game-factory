@@ -1,9 +1,24 @@
 import { createBattleState } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { takesTurns } from "../core/unitCatalog.js";
+import { createRoster, FORMATS, playerColor } from "../core/roster.js";
 
-export function teamColor(player) {
-  return player === 1 ? "#5288c6" : "#c4463f";
+export function teamColor(playerOrTeam, state = null) {
+  if (state?.players) {
+    const lead = state.players.find((slot) => slot.team === playerOrTeam || slot.id === playerOrTeam);
+    if (lead?.color) return lead.color;
+  }
+  return playerColor(playerOrTeam);
+}
+
+export function teamOf(state, player) {
+  return state.players?.find((slot) => slot.id === player)?.team ?? player;
+}
+
+export function teamLabel(state, team) {
+  const custom = state.teamNames?.[team];
+  if (custom) return custom;
+  return state.format === FORMATS.TEAMS ? `Team ${team}` : `Player ${team}`;
 }
 
 // Summoned pieces (Ghouls) are excluded from all match stats — totals, HP, kills,
@@ -16,40 +31,66 @@ export function hpRemaining(state, player) {
 
 // Map squad compositions onto the four-cell corner spawn blocks. The first two
 // slots preserve the original 2v2 staging, and the extra pair fills the block.
-export function buildRoster(squads, size) {
-  const slots = {
-    1: [
-      { x: 1, y: size - 1 },
-      { x: 0, y: size - 2 },
-      { x: 0, y: size - 1 },
-      { x: 1, y: size - 2 }
-    ],
-    2: [
-      { x: size - 2, y: 0 },
-      { x: size - 1, y: 1 },
-      { x: size - 1, y: 0 },
-      { x: size - 2, y: 1 }
-    ]
+export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 })) {
+  const slotsForCorner = (corner) => {
+    const max = size - 1;
+    const coords = [
+      { cx: 0, cy: max },
+      { cx: max, cy: 0 },
+      { cx: 0, cy: 0 },
+      { cx: max, cy: max },
+    ][corner] ?? { cx: 0, cy: max };
+    const inwardX = coords.cx === 0 ? 1 : -1;
+    const inwardY = coords.cy === 0 ? 1 : -1;
+    return [
+      { x: coords.cx + inwardX, y: coords.cy },
+      { x: coords.cx, y: coords.cy + inwardY },
+      { x: coords.cx, y: coords.cy },
+      { x: coords.cx + inwardX, y: coords.cy + inwardY }
+    ];
   };
   const units = [];
-  for (const player of [1, 2]) {
-    squads[player].slice(0, slots[player].length).forEach((type, i) => {
-      units.push({ id: `p${player}-${i}-${type}`, player, type, x: slots[player][i].x, y: slots[player][i].y });
+  for (const slot of players) {
+    const positions = slotsForCorner(slot.corner);
+    (squads[slot.id] ?? []).slice(0, positions.length).forEach((type, i) => {
+      units.push({
+        id: `p${slot.id}-${i}-${type}`,
+        player: slot.id,
+        team: slot.team,
+        type,
+        x: positions[i].x,
+        y: positions[i].y
+      });
     });
   }
   return units;
 }
 
-export function createMatchState({ size = 13, squads, seed } = {}) {
+export function createMatchState({
+  size = 13,
+  squads,
+  seed,
+  playerCount = squads ? Object.keys(squads).length : 2,
+  format = FORMATS.FFA,
+  teamColors = null,
+  teamNames = null
+} = {}) {
+  const players = createRoster({ playerCount, format, teamColors });
   const state = createBattleState({
     size,
     seed,
-    units: squads ? buildRoster(squads, size) : undefined,
+    players,
+    playerCount,
+    format,
+    teamColors,
+    teamNames,
+    units: squads ? buildRoster(squads, size, players) : undefined,
   });
   const flip = nextRandom(state.rngState);
+  const turnOrder = state.turnOrder ?? players.map((slot) => slot.id);
   return {
     ...state,
-    currentPlayer: flip.value < 0.5 ? 1 : 2,
+    currentPlayer: turnOrder[Math.floor(flip.value * turnOrder.length)] ?? 1,
     rngState: flip.state,
   };
 }
@@ -59,25 +100,38 @@ export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
     .filter((u) => u.player === player && takesTurns(u))
     .reduce((sum, u) => sum + Math.max(0, u.hp), 0);
 
-  const teams = [1, 2].map((player) => {
-    const units = state.units.filter((u) => u.player === player && takesTurns(u));
-    const opponent = player === 1 ? 2 : 1;
+  const teamIds = [];
+  for (const slot of state.players ?? [{ id: 1, team: 1 }, { id: 2, team: 2 }]) {
+    if (!teamIds.includes(slot.team)) teamIds.push(slot.team);
+  }
+  const teams = teamIds.map((team) => {
+    const memberIds = (state.players ?? []).filter((slot) => slot.team === team).map((slot) => slot.id);
+    if (!memberIds.length) memberIds.push(team);
+    const units = state.units.filter((u) => memberIds.includes(u.player) && takesTurns(u));
+    const opponents = (state.players ?? [])
+      .filter((slot) => slot.team !== team)
+      .map((slot) => slot.id);
+    const hpTotal = memberIds.reduce((sum, player) => sum + (initialHpByPlayer[player] ?? 0), 0);
+    const hpLeft = memberIds.reduce((sum, player) => sum + remaining(player), 0);
     return {
-      player,
-      label: `Player ${player}`,
-      color: teamColor(player),
-      isWinner: player === state.winner,
+      player: team,
+      label: teamLabel(state, team),
+      color: teamColor(team, state),
+      isWinner: team === state.winner,
       unitsAlive: units.filter((u) => u.hp > 0).length,
       unitsTotal: units.length,
-      hpRemaining: remaining(player),
-      hpTotal: initialHpByPlayer[player],
-      damageDealt: Math.max(0, initialHpByPlayer[opponent] - remaining(opponent)),
-      kills: state.units.filter((u) => u.player === opponent && takesTurns(u) && u.hp <= 0).length
+      hpRemaining: hpLeft,
+      hpTotal,
+      damageDealt: opponents.reduce((sum, player) => sum + Math.max(0, (initialHpByPlayer[player] ?? 0) - remaining(player)), 0),
+      kills: state.units.filter((u) => opponents.includes(u.player) && takesTurns(u) && u.hp <= 0).length
     };
   }).sort((a, b) => Number(b.isWinner) - Number(a.isWinner));
 
   return {
     winner: state.winner,
+    winnerLabel: state.winner ? teamLabel(state, state.winner) : null,
+    winnerColor: state.winner ? teamColor(state.winner, state) : null,
+    format: state.format,
     size: state.size,
     turns: state.turnNumber,
     durationMs: Date.now() - matchStartedAt,

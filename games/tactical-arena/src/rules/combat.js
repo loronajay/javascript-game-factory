@@ -1,8 +1,8 @@
-import { getEffectiveStats, getUnitType, isDefending, isRaging, passiveStackKey } from "../core/unitCatalog.js";
+import { getEffectiveStats, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
-import { areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
+import { areAllies, areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
 import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
 
 // True when an attacker's shot ignores intervening obstacles entirely — the
@@ -167,7 +167,7 @@ export function getTeamDamageReduction(target, state, damageType) {
   let reduction = 0;
   const applied = new Set();
   for (const source of state.units) {
-    if (source.hp <= 0 || source.player !== target.player) continue;
+    if (source.hp <= 0 || !areAllies(source, target)) continue;
     const definition = getUnitType(source.type);
     for (const passive of [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt]) {
       if (passive?.effect?.type === "teamDamageReduction" && (passive.effect.damageType ?? "magic") === damageType) {
@@ -181,6 +181,23 @@ export function getTeamDamageReduction(target, state, damageType) {
   return reduction;
 }
 
+// Extra magic damage a target takes RIGHT NOW from its own passive (Juggernaut's Bruiser
+// Mode: +1 magic damage while at 0 MP). Read off the target's passive data so no rule
+// hard-codes the unit; the paired stat swap lives in getEffectiveStats. Returns 0 for
+// any unit without the passive or with MP to spare. Applied only to landed magic damage.
+export function getSelfMagicVulnerability(target) {
+  const effect = getUnitType(target.type).passive?.effect;
+  if (effect?.type !== "emptyMpBoost" || (target?.mp ?? 0) > 0) return 0;
+  return Math.max(0, Number(effect.magicVulnerability) || 0);
+}
+
+// True when any living unit is projecting a board-wide healing lockout (a raging
+// Juggernaut's Null Zone). Read at every heal site so a healer can't top anyone up while
+// it holds. Presentation-free — a pure query over match state.
+export function isHealingDisabled(state) {
+  return Boolean(state?.units?.some((unit) => projectsHealingLockout(unit)));
+}
+
 // Resolves a strike with an explicit damage type override (used by magic-damage ARTS
 // like Spark and Banish). Falls back to a physical strike when no override is given.
 // Returns the same shape as resolvePhysicalStrike so callers and the forecast are interchangeable.
@@ -192,10 +209,11 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
   // Black Death Stance nulls magic damage entirely; otherwise Dead Zone-style team
-  // reduction trims the final number.
-  const damage = isDamageTypeImmuneByStance(target, "magic")
+  // reduction trims the final number, and Bruiser Mode adds +1 to a landed magic hit.
+  const reduced = isDamageTypeImmuneByStance(target, "magic")
     ? 0
     : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
+  const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
   return { ...result, critical, proximityBonus: 0, damage };
 }
 

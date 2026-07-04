@@ -19,10 +19,12 @@ import {
   ageValue,
   buffAlliesValue,
   expectedStrike,
+  grabValue,
   hastenValue,
   incomingThreat,
   isKeyUnit,
   nearestEnemyDistance,
+  rechargeValue,
   statusValue,
   unitThreatValue
 } from "./evaluate.js";
@@ -182,6 +184,22 @@ function planEffectValue(state, unit, plan) {
     const target = findUnit(state, plan.primary.targetId);
     if (!target) return { control: 0, heal: 0 };
     return { control: hastenValue(state, unit, target, target.player === unit.player), heal: 0 };
+  }
+  // Juggernaut. Rocket Punch's 10 damage rides the HP diff; only its stun is uncounted.
+  if (ai.intent === "lineStrike") {
+    const target = findUnit(state, plan.primary.targetId);
+    if (!target || !art.effect) return { control: 0, heal: 0 };
+    return { control: (art.effect.chance ?? 0) * statusValue(target, art.effect, state, { survivingHp: target.hp }), heal: 0 };
+  }
+  // Tether Grab's 3 magic rides the HP diff; the pull is the extra value here.
+  if (ai.intent === "grab") {
+    const target = findUnit(state, plan.primary.targetId);
+    if (!target) return { control: 0, heal: 0 };
+    return { control: grabValue(state, unit, target), heal: 0 };
+  }
+  // Recharge: refuel MP / mend 1 HP at full MP — a small tempo term (the mend is material).
+  if (ai.intent === "recharge") {
+    return { control: rechargeValue(state, unit), heal: 0 };
   }
   return { control: 0, heal: 0 };
 }

@@ -41,7 +41,7 @@ function canonicalUnits(units) {
     .map(
       (unit) =>
         `${unit.id}=${unit.player},${unit.type},` +
-        `${unit.position.x},${unit.position.y},${unit.hp},${unit.mp},` +
+        `${unit.team ?? unit.player},${unit.position.x},${unit.position.y},${unit.hp},${unit.mp},` +
         `${unit.defending ? 1 : 0},${unit.spent ? 1 : 0},${unit.mageChargeCount ?? 0},` +
         // Witch Doctor stance + pending Rain haste both change future legal actions and
         // damage, so they are part of the authoritative hash.
@@ -78,6 +78,7 @@ export function canonicalString(state) {
   return [
     state.size,
     state.phase,
+    state.format ?? "ffa",
     state.turnNumber,
     state.currentPlayer,
     state.winner ?? "-",

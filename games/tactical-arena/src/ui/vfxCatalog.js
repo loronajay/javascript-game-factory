@@ -351,6 +351,57 @@ const ABILITY_VFX = Object.freeze({
     projectile: Object.freeze({ shape: "orb", arcHeight: 48, durationMs: 420, size: 1, colors: Object.freeze({ core: "#7fe0d0", trail: "#2a6a66" }) }),
     colors: Object.freeze({ core: "#7fe0d0", trail: "#2a6a66", impact: "#d8fff8" })
   }),
+  // Juggernaut — Tether Grab: a metallic grapple-line snaps out to the caught unit (the
+  // haul-in itself is the target's slide, animated in main.js), then a soft magic tick.
+  "tether-grab": Object.freeze({
+    type: "projectileFan",
+    soundKey: "tetherGrab",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 18,
+    staggerMs: 0,
+    durationMs: 300,
+    impactRadius: 16,
+    projectile: Object.freeze({ shape: "tracer", arcHeight: 12, durationMs: 300, size: 1.1, colors: Object.freeze({ core: "#d0d4dc", trail: "#6a6f78" }) }),
+    colors: Object.freeze({ core: "#d0d4dc", trail: "#6a6f78", impact: "#e8ecf2" })
+  }),
+  // Rocket Punch: a heavy piston-fist rockets down the line and slams the first enemy.
+  "rocket-punch": Object.freeze({
+    type: "projectileFan",
+    soundKey: "rocketPunch",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 10,
+    staggerMs: 0,
+    durationMs: 260,
+    impactRadius: 26,
+    projectile: Object.freeze({ shape: "tracer", arcHeight: 6, durationMs: 260, size: 1.6, colors: Object.freeze({ core: "#ffca8a", trail: "#8a5230" }) }),
+    colors: Object.freeze({ core: "#ffca8a", trail: "#c0653a", impact: "#ffe0b0" })
+  }),
+  // Recharge: the reactor vents — a blue power-pulse over the Juggernaut itself.
+  recharge: Object.freeze({
+    type: "healPulse",
+    soundKey: "recharge",
+    particleCount: 10,
+    radius: 30,
+    durationMs: 520,
+    colors: Object.freeze({ core: "#8cc8ff", trail: "#3f7fd0", impact: "#e0f0ff" })
+  }),
+  // Self Destruct (RAGE): a full core overload — board bloom, screen shake, a 4-tile
+  // shockwave, and a lingering scorch where the Juggernaut stood.
+  "self-destruct": Object.freeze({
+    type: "magicBurst",
+    soundKey: "selfDestruct",
+    blast: true,
+    blastTiles: 4,
+    shake: 14,
+    particleCount: 28,
+    radius: 54,
+    durationMs: 760,
+    boardFlash: true,
+    afterglow: true,
+    colors: Object.freeze({ core: "#ffe6a0", trail: "#c0451f", impact: "#ffffff" })
+  }),
   // Rewind (RAGE): a golden life-stream pours into the placement tile and the fallen
   // ally rises from it — reuses the summon-rise signature with a warm, hopeful palette.
   rewind: Object.freeze({

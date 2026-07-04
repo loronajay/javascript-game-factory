@@ -10,6 +10,8 @@ import { GHOUL } from "./units/ghoul.js";
 import { SNIPER } from "./units/sniper.js";
 import { WITCH_DOCTOR } from "./units/witch-doctor.js";
 import { FATHER_TIME } from "./units/father-time.js";
+import { JUGGERNAUT } from "./units/juggernaut.js";
+import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
@@ -21,7 +23,8 @@ export const UNIT_TYPES = Object.freeze({
   ghoul: GHOUL,
   sniper: SNIPER,
   "witch-doctor": WITCH_DOCTOR,
-  "father-time": FATHER_TIME
+  "father-time": FATHER_TIME,
+  juggernaut: JUGGERNAUT
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -76,7 +79,7 @@ function teamAuraStats(unit, state) {
   if (!state?.units) return totals;
   const applied = new Set();
   for (const source of state.units) {
-    if (source.hp <= 0 || source.player !== unit.player) continue;
+    if (source.hp <= 0 || !areAllies(source, unit)) continue;
     const definition = getUnitType(source.type);
     for (const passive of passiveSources(definition)) {
       if (passive.kind !== "passive" || passive.effect?.type !== "teamAura") continue;
@@ -147,7 +150,7 @@ function enemyAuraStats(unit, state) {
   if (!state?.units) return totals;
   const applied = new Set();
   for (const source of state.units) {
-    if (source.hp <= 0 || source.player === unit.player) continue;
+    if (source.hp <= 0 || !areEnemies(source, unit)) continue;
     for (const { aura, radius, stackKey } of auraEntries(source, state)) {
       if (chebyshev(source.position, unit.position) > radius) continue;
       if (applied.has(stackKey)) continue;
@@ -226,6 +229,14 @@ export function getEffectiveStats(unit, state = null) {
       if (name in stats && Number.isFinite(value)) stats[name] += value;
     }
   }
+  // Bruiser Mode (Juggernaut): a stronger stat block while the unit sits at 0 MP. Folded
+  // generically off the passive data so no rule hard-codes the unit. The paired magic
+  // vulnerability lives in getSelfMagicVulnerability (rules/combat.js), not here.
+  if (passiveEffect?.type === "emptyMpBoost" && (unit.mp ?? 0) <= 0) {
+    for (const [name, value] of Object.entries(passiveEffect.stats ?? {})) {
+      if (name in stats && Number.isFinite(value)) stats[name] += value;
+    }
+  }
   if (isRaging(unit)) {
     for (const source of rageStatSources(getUnitType(unit.type))) {
       // Only statModifiers rage sources feed the unit's OWN stats. A rage source
@@ -253,6 +264,32 @@ export function isDefending(unit) {
   return Boolean(definition.ragePassive?.effect?.defending || definition.rageArt?.effect?.defending);
 }
 
+// True when a raging unit's rage passive/art zeroes its ART costs (Juggernaut's Null
+// Zone freeArts flag). Read centrally so the MP gate, the planner, and the resolvers
+// all agree on the effective cost.
+function hasFreeArts(unit) {
+  if (!isRaging(unit)) return false;
+  const definition = getUnitType(unit.type);
+  return Boolean(definition.ragePassive?.effect?.freeArts || definition.rageArt?.effect?.freeArts);
+}
+
+// The MP an ART actually costs this unit right now: 0 for a raging Juggernaut (freeArts),
+// the catalog cost for everyone else. The single seam every MP check reads.
+export function getArtMpCost(unit, art) {
+  if (!art) return 0;
+  if (hasFreeArts(unit)) return 0;
+  return art.mpCost ?? 0;
+}
+
+// True when a raging unit projects a board-wide healing lockout (Juggernaut's Null Zone
+// disableHealing). Any living source suffices; read by isHealingDisabled (rules/combat.js).
+export function projectsHealingLockout(unit) {
+  if (unit.hp <= 0 || !isRaging(unit)) return false;
+  const definition = getUnitType(unit.type);
+  return (definition.ragePassive?.effect?.disableHealing === "global") ||
+    (definition.rageArt?.effect?.disableHealing === "global");
+}
+
 // Presentation/query helper — not permission to activate an ART.
 export function getAvailableArts(unit) {
   const definition = getUnitType(unit.type);
@@ -277,7 +314,12 @@ export const AI_INTENTS = Object.freeze([
   //   statBuff — Age: persistent +stat on an ally / -stat on an enemy.
   //   hasten   — Time Stretch: +MOVE on an ally / Slow on an enemy.
   //   revive   — Rewind: return a fallen ally to the board.
-  "statBuff", "hasten", "revive"
+  "statBuff", "hasten", "revive",
+  // Juggernaut's line abilities + self MP vent:
+  //   grab       — Tether Grab: pull the first ally/enemy on a straight ray.
+  //   lineStrike — Rocket Punch: strike the first enemy on a straight ray (+ stun).
+  //   recharge   — Recharge: restore this unit's own MP (or 1 HP at full MP).
+  "grab", "lineStrike", "recharge"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

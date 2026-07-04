@@ -1,5 +1,5 @@
-import { areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getEffectiveStats, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
+import { getArt, getArtMpCost, getEffectiveStats, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -133,7 +133,7 @@ function tilesInRadius(state, actor, radius, predicate) {
 export function getReviveTargets(state, actor) {
   return state.units.filter((unit) =>
     unit.hp <= 0 &&
-    unit.player === actor.player &&
+    areAllies(unit, actor) &&
     unit.id !== actor.id &&
     takesTurns(unit));
 }
@@ -155,6 +155,34 @@ export function getWallPlacementTiles(state, actor, art) {
 // feet) — it only avoids a wall or an existing fire. Chebyshev radius (default 4).
 export function getFirePlacementTiles(state, actor, art) {
   return tilesInRadius(state, actor, art?.targeting?.radius ?? 4, (pos) => !getTileObject(state, pos));
+}
+
+// The 8 straight rays (orthogonal + diagonal) a line ability fires along.
+const LINE_DIRECTIONS = Object.freeze([
+  { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+  { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 }
+]);
+
+// The FIRST unit contacted along each of the 8 straight rays from `actor`, within
+// `range` tiles. A wall or the board edge stops a ray. `includeAllies` decides whether a
+// friendly first-contact counts as a target: Tether Grab grabs anyone (true), Rocket
+// Punch's shot is blocked by an ally (false). Returns [{ unit, dir, distance }]; the pull
+// destination for a grab is `actor.position + dir` (the tile one step along the ray).
+export function getLineTargets(state, actor, range, { includeAllies = false } = {}) {
+  const targets = [];
+  for (const dir of LINE_DIRECTIONS) {
+    for (let d = 1; d <= range; d += 1) {
+      const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
+      if (!isOnBoard(state, pos)) break;
+      if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
+      const occupant = unitAt(state, pos);
+      if (occupant) {
+        if (includeAllies || areEnemies(actor, occupant)) targets.push({ unit: occupant, dir, distance: d });
+        break; // first contact ends the ray regardless of team
+      }
+    }
+  }
+  return targets;
 }
 
 export function getTilePulseTargets(state, actor, art) {
@@ -211,7 +239,7 @@ export function canUseArt(state, actor, artId) {
     !actor.spent &&
     !isStunned(actor) &&
     !actor.statuses?.some((status) => status.type === "silence") &&
-    actor.mp >= art.mpCost &&
+    actor.mp >= getArtMpCost(actor, art) &&
     (!art.rageLocked || isRaging(actor))
   );
 }

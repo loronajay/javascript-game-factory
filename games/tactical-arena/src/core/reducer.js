@@ -1,8 +1,8 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
-import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { getLineAttackTargets, getProximityBonus, getTeamDamageReduction, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
+import { areEnemies, areAllies, cloneState, findUnit, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
+import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { getLineAttackTargets, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -258,7 +258,12 @@ const ART_RESOLVERS = new Map([
   // Father Time: ally-OR-enemy utility casts + a revive.
   ["age", resolveAge],
   ["time-stretch", resolveTimeStretch],
-  ["rewind", resolveRewind]
+  ["rewind", resolveRewind],
+  // Juggernaut: line grab/strike, a self MP vent, and a self-sacrifice blast.
+  ["tether-grab", resolveTetherGrab],
+  ["rocket-punch", resolveRocketPunch],
+  ["recharge", resolveRecharge],
+  ["self-destruct", resolveSelfDestruct]
 ]);
 
 function useArt(state, command) {
@@ -350,8 +355,9 @@ function resolveTargetedArt(state, command, art) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     const successful = roll.value >= 0 && roll.value < art.effect.chance;
-    // Rain Stance's global heal bonus rides on a successful heal.
-    const healing = successful ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) : 0;
+    // Rain Stance's global heal bonus rides on a successful heal; a raging Juggernaut's
+    // Null Zone shuts all healing off (isHealingDisabled) regardless of the roll.
+    const healing = (successful && !isHealingDisabled(next)) ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) : 0;
     actor.hp = Math.min(getEffectiveStats(actor, next).maxHp, actor.hp + healing);
     effect = { attempted: true, applied: successful, healing };
   }
@@ -407,10 +413,11 @@ function resolveNuke(state, command, art) {
     const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
     // Black Death Stance nulls magic damage; otherwise Dead Zone-style team reduction
-    // trims the final magic number.
-    const damage = isDamageTypeImmuneByStance(target, "magic")
+    // trims the final magic number, and Bruiser Mode adds +1 to a landed hit.
+    const reduced = isDamageTypeImmuneByStance(target, "magic")
       ? 0
       : Math.max(0, result.damage - getTeamDamageReduction(target, next, "magic"));
+    const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
     target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
@@ -433,11 +440,12 @@ function resolveNuke(state, command, art) {
 // A summoned piece is a full unit object (same shape createUnit produces) plus a
 // `summonerId` so the per-Necromancer summon cap can find it. It spawns already
 // `spent` so the turn loop never offers it an activation.
-function createSummon(id, type, player, position, summonerId) {
+function createSummon(id, type, player, team, position, summonerId) {
   const definition = getUnitType(type);
   return {
     id,
     player,
+    team,
     type,
     position: { ...position },
     hp: definition.stats.maxHp,
@@ -472,7 +480,7 @@ function resolveSummonGhoul(state, command, art) {
   // the units array), so findUnit never collides with a previous corpse.
   const seq = next.units.filter((unit) => unit.summonerId === actor.id).length;
   const ghoulId = `${actor.id}-${art.summon.type}-${seq}`;
-  const ghoul = createSummon(ghoulId, art.summon.type, actor.player, placement, actor.id);
+  const ghoul = createSummon(ghoulId, art.summon.type, actor.player, teamOfUnit(actor), placement, actor.id);
   next.units.push(ghoul);
   actor.mp -= art.mpCost;
   spendAndAdvance(next, actor);
@@ -565,10 +573,11 @@ function resolveHealAllies(state, command, art) {
   actor.mp -= art.mpCost;
   const healingByTarget = {};
   const targetIds = [];
-  // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too).
-  const amount = Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
+  // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too); a
+  // raging Juggernaut's Null Zone zeroes all healing.
+  const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
 
-  for (const target of livingUnits(next, actor.player)) {
+  for (const target of livingTeamUnits(next, actor)) {
     if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
     const before = target.hp;
     target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + amount);
@@ -613,10 +622,10 @@ function resolveWitchDance(state, command, art) {
   };
 
   if (art.effect?.type === "healAllies") {
-    const amount = Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
+    const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
     const healingByTarget = {};
     const targetIds = [];
-    for (const target of livingUnits(next, actor.player)) {
+    for (const target of livingTeamUnits(next, actor)) {
       if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
       const before = target.hp;
       target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + amount);
@@ -631,7 +640,7 @@ function resolveWitchDance(state, command, art) {
 
   if (art.teamBuff) {
     const buffed = [];
-    for (const target of livingUnits(next, actor.player)) {
+    for (const target of livingTeamUnits(next, actor)) {
       const result = applyStatus(target, {
         type: "empowered",
         duration: art.teamBuff.durationTurns,
@@ -647,7 +656,7 @@ function resolveWitchDance(state, command, art) {
 
   if (art.teamMp) {
     const restoredByTarget = {};
-    for (const target of livingUnits(next, actor.player)) {
+    for (const target of livingTeamUnits(next, actor)) {
       const before = target.mp;
       target.mp = Math.min(getEffectiveStats(target, next).maxMp, target.mp + art.teamMp.amount);
       const restored = target.mp - before;
@@ -705,7 +714,7 @@ function resolveWitchDance(state, command, art) {
   // the animation's reach can never drift from what the effect actually touched.
   event.beaconTargetIds = (art.cleanse?.scope === "all" || art.globalStatus
     ? livingUnits(next)
-    : livingUnits(next, actor.player)
+    : livingTeamUnits(next, actor)
   ).map((unit) => unit.id);
 
   actor.stance = art.stance ?? null;
@@ -877,6 +886,142 @@ function resolveRewind(state, command, art) {
   }]);
 }
 
+// Tether Grab: grab the first ally OR enemy on a straight ray within range and haul them
+// to the tile one step from the Juggernaut along that ray. An enemy also takes 3 magic
+// damage; an ally is only repositioned. The tiles between are empty (it was the first
+// contact), so the pull destination is always clear.
+function resolveTetherGrab(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const line = getLineTargets(state, actorState, art.targeting.range, { includeAllies: true });
+  const hit = line.find((entry) => entry.unit.id === command.targetId);
+  if (!hit) return reject(ERR.INVALID_TARGET);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art);
+  actor.mp -= cost;
+
+  const destination = { x: actor.position.x + hit.dir.x, y: actor.position.y + hit.dir.y };
+  const from = { ...target.position };
+  target.position = { ...destination };
+
+  const damageByTarget = {};
+  const targetIds = [];
+  let damage = 0;
+  if (areEnemies(actor, target)) {
+    const reduced = isDamageTypeImmuneByStance(target, "magic")
+      ? 0
+      : Math.max(0, art.damage.amount - getTeamDamageReduction(target, next, "magic"));
+    damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+    if (damage > 0) {
+      target.hp = Math.max(0, target.hp - damage);
+      damageByTarget[target.id] = damage;
+      targetIds.push(target.id);
+    }
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    from, to: { ...destination }, damage, targetIds, damageByTarget, mpCost: cost
+  }]);
+}
+
+// Rocket Punch: a fixed-power physical strike on the first ENEMY on a straight ray within
+// range (an ally on the ray blocks the shot, so the plan is never legal). Defense reduces
+// it and Defend halves it like any physical hit, but it never rolls to-hit — the piston
+// always connects. A separate 30% roll stuns the target for 1 turn if it survives.
+function resolveRocketPunch(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const line = getLineTargets(state, actorState, art.targeting.range, { includeAllies: false });
+  const hit = line.find((entry) => entry.unit.id === command.targetId);
+  if (!hit) return reject(ERR.INVALID_TARGET);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art);
+  actor.mp -= cost;
+
+  const result = resolveDamage({
+    attacker: { strength: art.damage.amount },
+    defender: { ...getEffectiveStats(target, next), defending: isDefending(target) },
+    type: "physical"
+  });
+  const damage = result.damage;
+  target.hp = Math.max(0, target.hp - damage);
+
+  let effect = null;
+  if (target.hp > 0) {
+    const roll = drawValue(next.rngState, command.effectRoll);
+    next.rngState = roll.rngState;
+    effect = resolveStatusEffect(target, art.effect, roll.value, getGlobalStatusChanceMultiplier(next));
+    if (effect.statuses) target.statuses = effect.statuses;
+    delete effect.statuses;
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    targetIds: [target.id], damageByTarget: { [target.id]: damage },
+    stunned: Boolean(effect?.applied), mpCost: cost
+  }]);
+}
+
+// Recharge: vent the reactor. Restore MP up to full; if already at full MP, mend 1 HP
+// instead — the mend is a heal, so a board-wide healing lockout (a raging Juggernaut's
+// own Null Zone) shuts it off. Spends the activation like any ART.
+function resolveRecharge(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const stats = getEffectiveStats(actor, next);
+  let mpRestored = 0;
+  let hpHealed = 0;
+  if (actor.mp < stats.maxMp) {
+    const before = actor.mp;
+    actor.mp = Math.min(stats.maxMp, actor.mp + (art.restore?.mp ?? 0));
+    mpRestored = actor.mp - before;
+  } else if (!isHealingDisabled(next)) {
+    const before = actor.hp;
+    actor.hp = Math.min(stats.maxHp, actor.hp + (art.restore?.hpIfFull ?? 0));
+    hpHealed = actor.hp - before;
+  }
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpRestored, hpHealed, mpCost: getArtMpCost(actor, art)
+  }]);
+}
+
+// Self Destruct (RAGE): overload the core for 10 TRUE damage to every enemy within the
+// blast radius — ignoring DEF, Defend, and team reduction — at the cost of the
+// Juggernaut's own life. Reuses the nukeAura targeting/preview; the caster is set to 0 HP.
+function resolveSelfDestruct(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const radius = getSelfBlastRadius(next, actor, art);
+  const damageByTarget = {};
+  const targetIds = [];
+  for (const target of livingUnits(next)) {
+    if (!areEnemies(actor, target)) continue;
+    if (chebyshevDistance(actor.position, target.position) > radius) continue;
+    const dealt = Math.min(target.hp, art.damage.amount);
+    target.hp = Math.max(0, target.hp - art.damage.amount);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = dealt;
+  }
+  actor.mp -= getArtMpCost(actor, art);
+  actor.hp = 0; // the core is spent — the Juggernaut is consumed
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
+    selfDestruct: true, mpCost: getArtMpCost(actor, art)
+  }]);
+}
+
 function finishActivation(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
@@ -890,6 +1035,7 @@ function finishActivation(state, command) {
 function resolvePhysicalDamageHealing(state, actor, damageDealt) {
   const effect = getUnitType(actor.type).passive?.effect;
   if (effect?.type !== "physicalDamageHealAura" || damageDealt <= 0) return [];
+  if (isHealingDisabled(state)) return []; // a raging Juggernaut's Null Zone shuts it off
   const base = effect.rounding === "floor"
     ? Math.floor(damageDealt * effect.fraction)
     : Math.round(damageDealt * effect.fraction);
@@ -898,7 +1044,7 @@ function resolvePhysicalDamageHealing(state, actor, damageDealt) {
   const amount = base + getGlobalHealBonus(state);
 
   const healingByTarget = {};
-  for (const target of livingUnits(state, actor.player)) {
+  for (const target of livingTeamUnits(state, actor)) {
     if (target.id === actor.id) continue;
     if (chebyshevDistance(actor.position, target.position) > effect.radius) continue;
     const before = target.hp;
@@ -1006,6 +1152,24 @@ function releaseStunLoopGuard(state) {
   }
 }
 
+function playerHasUnspentUnits(state, player) {
+  return livingUnits(state, player).some((member) => takesTurns(member) && !member.spent);
+}
+
+function playerHasLivingTurnUnits(state, player) {
+  return livingUnits(state, player).some(takesTurns);
+}
+
+function nextActivePlayer(state, fromPlayer) {
+  const order = state.turnOrder?.length ? state.turnOrder : [1, 2];
+  const start = Math.max(0, order.indexOf(fromPlayer));
+  for (let step = 1; step <= order.length; step += 1) {
+    const player = order[(start + step) % order.length];
+    if (playerHasLivingTurnUnits(state, player)) return player;
+  }
+  return fromPlayer;
+}
+
 // Pass the turn to the other player once the current one has no unspent living
 // commander left. Summons never take turns, so they neither keep the turn open nor
 // get their spent flag reset.
@@ -1020,7 +1184,7 @@ function advanceTurnIfExhausted(state) {
       releaseStunLoopGuard(state);
       break;
     }
-    state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
+    state.currentPlayer = nextActivePlayer(state, state.currentPlayer);
     state.turnNumber += 1;
     rollovers += 1;
     for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
@@ -1126,7 +1290,7 @@ function concede(state, command) {
   next.activation = null;
   resolveVictory(next);
   if (next.phase === "playing" && next.currentPlayer === command.player) {
-    next.currentPlayer = next.currentPlayer === 1 ? 2 : 1;
+    next.currentPlayer = nextActivePlayer(next, command.player);
     next.turnNumber += 1;
     for (const member of livingUnits(next, next.currentPlayer)) if (takesTurns(member)) member.spent = false;
   }
@@ -1136,9 +1300,9 @@ function concede(state, command) {
 function resolveVictory(state) {
   // Defeat is decided by living COMMANDERS, not raw bodies: a player whose only
   // survivor is a turn-less summon (a lone Ghoul) has lost and cannot stall.
-  const livingPlayers = new Set(livingUnits(state).filter(takesTurns).map((unit) => unit.player));
-  if (livingPlayers.size === 1) {
-    state.winner = [...livingPlayers][0];
+  const livingTeams = new Set(livingUnits(state).filter(takesTurns).map(teamOfUnit));
+  if (livingTeams.size === 1) {
+    state.winner = [...livingTeams][0];
     state.phase = "complete";
     state.activation = null;
   }

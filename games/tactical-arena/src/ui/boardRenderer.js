@@ -2,10 +2,10 @@ import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
-import { getTileAffinity, unitAt } from "../core/state.js";
+import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -138,7 +138,11 @@ export function isTargetedMode(mode, actor) {
     // Father Time's ally-or-enemy casts (Age, Time Stretch) and Rewind's revive
     // placement do their own highlighting below, not the enemy-only targeted wash.
     art.targeting?.shape !== "allyOrEnemy" &&
-    art.targeting?.shape !== "revive"
+    art.targeting?.shape !== "revive" &&
+    // Juggernaut's line abilities (Tether Grab / Rocket Punch) highlight their own
+    // first-contact ray targets below, not the Chebyshev box.
+    art.targeting?.shape !== "lineAny" &&
+    art.targeting?.shape !== "lineEnemy"
   );
 }
 
@@ -193,7 +197,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       }
     }
     for (const target of state.units) {
-      if (target.hp > 0 && target.player !== actor.player && chebyshevDistance(actor.position, target.position) <= reach &&
+      if (target.hp > 0 && areEnemies(actor, target) && chebyshevDistance(actor.position, target.position) <= reach &&
           !(blockable && isShotBlocked(state, actor.position, target.position, actor)) &&
           !isWallBetween(state, actor.position, target.position, actor)) {
         legal.add(positionKey(target.position));
@@ -312,6 +316,24 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
+  // Juggernaut's line abilities (Tether Grab / Rocket Punch): wash each of the 8 straight
+  // rays up to its first-contact target, and light that unit as a legal target. lineAny
+  // grabs an ally or enemy; lineEnemy only an enemy (an ally on the ray blocks it).
+  let isLineArt = false;
+  if (actor && mode?.startsWith("art:")) {
+    const lineArt = getArt(actor.type, mode.slice("art:".length));
+    const shape = lineArt?.targeting?.shape;
+    if (shape === "lineAny" || shape === "lineEnemy") {
+      isLineArt = true;
+      for (const { unit: target, dir, distance } of getLineTargets(state, actor, lineArt.targeting.range, { includeAllies: shape === "lineAny" })) {
+        for (let d = 1; d <= distance; d += 1) {
+          range.add(positionKey({ x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d }));
+        }
+        legal.add(positionKey(target.position));
+      }
+    }
+  }
+
   const path = new Set(footworkPath.map(positionKey));
   const metrics = createBoardMetrics(state.size);
   const view = createBoardViewBox(metrics, state.size);
@@ -380,7 +402,9 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         const isTarget = actor && legal.has(positionKey(u.position)) && (
           ((targeted || Boolean(nukeArt)) && u.player !== actor.player) ||
           // Age / Time Stretch reticle every in-range unit they can target (ally or enemy).
-          (isAllyOrEnemyArt && u.id !== actor.id)
+          (isAllyOrEnemyArt && u.id !== actor.id) ||
+          // Line abilities reticle their first-contact target (ally or enemy).
+          (isLineArt && u.id !== actor.id)
         );
         return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state });
       }

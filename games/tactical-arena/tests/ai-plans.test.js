@@ -162,6 +162,40 @@ test("a healthy (non-raging) Father Time offers no Rewind plans", () => {
   for (const plan of plans) assertPlanReplays(state, 1, plan);
 });
 
+test("Juggernaut line/self plans (grab, lineStrike, recharge) replay cleanly", () => {
+  const state = createBattleState({
+    size: 13, seed: 4,
+    units: [
+      { id: "p1-jug", type: "juggernaut", player: 1, x: 5, y: 5, mp: 5 },
+      { id: "p1-ally", type: "swordsman", player: 1, x: 4, y: 4 },
+      { id: "p2-a", type: "archer", player: 2, x: 5, y: 8 },  // on the +y ray (grab + rocket)
+      { id: "p2-b", type: "swordsman", player: 2, x: 8, y: 8 } // on the +x+y diagonal
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-jug"));
+  assert.ok(plans.some((p) => p.primary.artId === "tether-grab" && p.primary.targetId === "p2-a"), "expected a Tether Grab plan");
+  assert.ok(plans.some((p) => p.primary.artId === "rocket-punch" && p.primary.targetId === "p2-a"), "expected a Rocket Punch plan");
+  for (const plan of plans) assertPlanReplays(state, 1, plan);
+});
+
+test("a raging Juggernaut offers Self Destruct (free) and its plans replay", () => {
+  const state = createBattleState({
+    size: 13, seed: 6,
+    units: [
+      { id: "p1-jug", type: "juggernaut", player: 1, x: 5, y: 5, hp: 4, mp: 0 }, // raging
+      { id: "p1-ally", type: "swordsman", player: 1, x: 0, y: 0 },
+      { id: "p2-a", type: "archer", player: 2, x: 6, y: 5 },
+      { id: "p2-b", type: "swordsman", player: 2, x: 5, y: 7 }
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-jug"));
+  assert.ok(plans.some((p) => p.primary.artId === "self-destruct"), "expected a Self Destruct plan while raging");
+  // Free ARTS while raging: a Rocket Punch plan costs 0 MP even though the catalog says 5.
+  const rocket = plans.find((p) => p.primary.artId === "rocket-punch");
+  if (rocket) assert.equal(planMpCost(state, rocket), 0);
+  for (const plan of plans) assertPlanReplays(state, 1, plan);
+});
+
 test("projectPlan reduces an attacked enemy's expected HP, and planMpCost sums ART cost", () => {
   const state = skirmish();
   const attackPlan = { unitId: "p1-sword", bonus: null, moveTo: null, movePhase: null,

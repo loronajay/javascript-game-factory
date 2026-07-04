@@ -1,7 +1,7 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
-import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
-import { areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { UNIT_TYPES, getArt, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
+import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
+import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { isWallBetween } from "./rules/combat.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
@@ -80,7 +80,7 @@ function currentPlayerIsLocal() {
 function lockedActionMessage() {
   if (state.phase === "complete") return "The duel is complete.";
   if (isCpu(state.currentPlayer)) return `Player ${state.currentPlayer} (CPU) is taking its turn.`;
-  if (net != null && state.currentPlayer !== mySeat) return "Opponent's turn - please wait.";
+  if (net != null && state.currentPlayer !== mySeat) return `Player ${state.currentPlayer}'s turn - please wait.`;
   return "Wait for your turn.";
 }
 
@@ -170,11 +170,20 @@ function startMatch(config) {
   const online = config.mode === "online";
   // Online builds from the relay's shared seed so every client draws identical dice;
   // local play omits it for a fresh random seed each match.
-  state = createMatchState({ size: config.size, squads: config.squads, seed: online ? config.seed : undefined });
+  state = createMatchState({
+    size: config.size,
+    squads: config.squads,
+    seed: online ? config.seed : undefined,
+    playerCount: config.playerCount,
+    format: config.format,
+    teamColors: config.teamColors,
+    teamNames: config.teamNames,
+  });
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
-  initialHpByPlayer = { 1: hpRemaining(state, 1), 2: hpRemaining(state, 2) };
+  initialHpByPlayer = {};
+  for (const player of state.turnOrder ?? [1, 2]) initialHpByPlayer[player] = hpRemaining(state, player);
   // Single-player drives Player 2 with the CPU; hot-seat and online leave cpu null.
   cpu = config.mode === "single" ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) } : null;
   cpuThinking = false;
@@ -192,7 +201,7 @@ function startMatch(config) {
   resolving = false;
   turnFlash.clear();
   setMessage(online
-    ? (state.currentPlayer === mySeat ? "You open the battle." : "Opponent's turn — please wait.")
+    ? (state.currentPlayer === mySeat ? "You open the battle." : `Player ${state.currentPlayer}'s turn — please wait.`)
     : `${isCpu(state.currentPlayer) ? `Player ${state.currentPlayer} (CPU)` : `Player ${state.currentPlayer}`} opens the battle.`);
   menu.show("match");
   if (audioUnlocked && !muted) audio.startMusic("battle");
@@ -220,13 +229,14 @@ function onLeaveMatch() {
 
 function announceTurn(player, { hold = false } = {}) {
   if (state.phase === "complete") {
-    turnFlash.announce({ title: `Player ${state.winner} wins`, sub: "Victory", color: teamColor(state.winner), hold: true });
+    const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
+    turnFlash.announce({ title: `${summary.winnerLabel ?? `Player ${state.winner}`} wins`, sub: "Victory", color: summary.winnerColor ?? teamColor(state.winner, state), hold: true });
     return;
   }
   turnFlash.announce({
     title: `Player ${player} squad turn`,
     sub: turnAnnouncementSub({ matchMode: matchConfig?.mode, player, mySeat, isCpu: isCpu(player) }),
-    color: teamColor(player),
+    color: teamColor(player, state),
     hold
   });
 }
@@ -240,7 +250,7 @@ function announceTurnChange(prevPlayer) {
     resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
   } else if (state.currentPlayer !== prevPlayer) {
     announceTurn(state.currentPlayer);
-    if (net && state.currentPlayer !== mySeat) setMessage("Opponent's turn — please wait.");
+    if (net && state.currentPlayer !== mySeat) setMessage(`Player ${state.currentPlayer}'s turn — please wait.`);
   }
 }
 
@@ -544,6 +554,59 @@ async function resolveInstantArt(command) {
       if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), "BLIND", "#f0d77a"));
     }
     await Promise.all(floats);
+  } else if (resolved?.artId === "tether-grab" && actorBefore) {
+    // Fire the tether, haul the grabbed unit to the Juggernaut's side, then land the
+    // magic hit if it was an enemy. `state` is still pre-commit, so the target reads at
+    // its old tile — animateMovement slides it from `from` to `to`.
+    const metrics = createBoardMetrics(state.size);
+    const target = findUnit(state, resolved.targetId);
+    await effects.playAbilityVfx("tether-grab", { actor: actorBefore, targets: target ? [target] : [] });
+    if (target && resolved.from && resolved.to) await effects.animateMovement(target.id, resolved.from, resolved.to);
+    if (target && resolved.damage > 0) {
+      const center = unitCenter(metrics, { position: resolved.to });
+      effects.impact(center, false, "magic");
+      await effects.floatText(center, `-${resolved.damage}`, "#c89cff");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, resolved.to, teamColor(target.player));
+    }
+  } else if (resolved?.artId === "rocket-punch" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    const target = targetsBefore[0];
+    await effects.playAbilityVfx("rocket-punch", { actor: actorBefore, targets: targetsBefore });
+    if (target) {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "physical");
+        effects.shake(7);
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#ff7684");
+      }
+      if (resolved.stunned) await effects.floatText(center, "STUN", "#ffe45e");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }
+  } else if (resolved?.artId === "recharge" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("recharge", { actor: actorBefore, targets: [actorBefore] });
+    if (resolved.mpRestored > 0) await effects.floatText(unitCenter(metrics, actorBefore), `+${resolved.mpRestored} MP`, "#7fd0ff");
+    else if (resolved.hpHealed > 0) await effects.floatText(unitCenter(metrics, actorBefore), `+${resolved.hpHealed}`, "#8cf0a4");
+  } else if (resolved?.artId === "self-destruct" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("self-destruct", { actor: actorBefore, targets: targetsBefore });
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "true");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#ffffff");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+    // The core overloads — the Juggernaut is consumed.
+    await effects.deathDissolve(actorBefore.id, actorBefore.position, teamColor(actorBefore.player));
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -846,7 +909,9 @@ function playEventSounds(events) {
           artId === "lightseeker" || artId === "darkseeker" ||
           artId === "dark-bomb" || artId === "summon-ghoul" ||
           artId === "smoke-bomb" || artId === "build-cover" || artId === "throw-cigar" ||
-          artId === "age" || artId === "time-stretch" || artId === "rewind") continue;
+          artId === "age" || artId === "time-stretch" || artId === "rewind" ||
+          artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
+          artId === "self-destruct") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
       else if (artId === "volley-shot") audio.play("arrowHit");
@@ -1017,7 +1082,7 @@ async function handleTile(position) {
     if (!inReach) {
       setMessage("Age: click a highlighted ally or enemy in range.", true);
     } else {
-      const ally = target.player === unit.player;
+      const ally = areAllies(target, unit);
       const stat = await openChoiceModal({
         title: `Age — ${ally ? "empower" : "weaken"} ${getUnitType(target.type).name}`,
         subtitle: ally ? "Grant +1 to a stat until Father Time falls." : "Drain 1 from a stat until Father Time falls.",
@@ -1043,6 +1108,26 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "time-stretch", { targetId: target.id }))) {
       mode = null;
       setMessage("Time Stretch resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:tether-grab") {
+    // Grab the first ally OR enemy on a straight ray within range.
+    const target = unitAt(state, position);
+    const targets = getLineTargets(state, unit, getArt(unit.type, "tether-grab").targeting.range, { includeAllies: true });
+    if (!target || !targets.some((entry) => entry.unit.id === target.id)) {
+      setMessage("Tether Grab: click a highlighted ally or enemy on a straight line.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "tether-grab", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Tether Grab resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:rocket-punch") {
+    // Punch the first ENEMY on a straight ray (an ally on the ray blocks the shot).
+    const target = unitAt(state, position);
+    const targets = getLineTargets(state, unit, getArt(unit.type, "rocket-punch").targeting.range, { includeAllies: false });
+    if (!target || !targets.some((entry) => entry.unit.id === target.id)) {
+      setMessage("Rocket Punch: click a highlighted enemy on a straight line.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "rocket-punch", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Rocket Punch resolved. This unit's activation is complete.");
     }
   } else if (mode === "art:rewind") {
     const placement = getRevivePlacementTiles(state, unit, getAvailableArts(unit).find((a) => a.id === "rewind"));
@@ -1197,9 +1282,13 @@ async function handleActionClick(action, unit) {
                   ? "Click any highlighted ally to confirm."
                   : art?.targeting?.shape === "allyOrEnemy"
                     ? "Click a highlighted ally or enemy in range."
-                    : art?.resolution === "statusCast"
-                      ? "Choose a highlighted enemy target."
-                      : "Choose a highlighted enemy target.";
+                    : art?.targeting?.shape === "lineAny"
+                      ? "Click a highlighted ally or enemy on a straight line to grab it."
+                      : art?.targeting?.shape === "lineEnemy"
+                        ? "Click a highlighted enemy on a straight line to punch it."
+                        : art?.resolution === "statusCast"
+                          ? "Choose a highlighted enemy target."
+                          : "Choose a highlighted enemy target.";
       setMessage(`${art.name} (${art.mpCost} MP): ${art.description} ${lead}`);
     } else {
       setMessage(`Choose a highlighted ${action} tile.`);

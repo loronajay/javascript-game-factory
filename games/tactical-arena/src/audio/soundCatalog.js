@@ -697,6 +697,78 @@ const P_TIME_STEAL = {
   effects: { highpass: 120, lowpass: 7000, saturation: 0.02, compressor: { threshold: -20, ratio: 3, attack: 0.002, release: 0.12 } }
 };
 
+// Juggernaut: Tether Grab — a pneumatic grapple launches and clanks taut
+const P_TETHER_GRAB = {
+  id: "ta_tether_grab", duration: 0.4, gain: 0.8,
+  layers: [
+    { type: "noise", color: "white", gain: 0.14, duration: 0.12,
+      envelope: [[0, 0.0001], [0.02, 1], [0.4, 0.3], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 2600], [1, 1200]], q: 0.9 } },
+    { type: "oscillator", waveform: "sawtooth", gain: 0.12, duration: 0.2, offset: 0.02,
+      frequencyCurve: [[0, 520], [0.5, 300], [1, 200]],
+      envelope: [[0, 0.0001], [0.03, 0.9], [0.5, 0.4], [1, 0.0001]],
+      filter: { type: "lowpass", frequencyCurve: [[0, 3200], [1, 900]], q: 1.1 } },
+    { type: "resonatorBank", material: "metal", gain: 0.16, offset: 0.16, pitchScale: 0.9, excitationDuration: 0.012 }
+  ],
+  effects: { highpass: 120, lowpass: 8500, saturation: 0.03, compressor: { threshold: -19, ratio: 3.5, attack: 0.001, release: 0.12 } }
+};
+
+// Juggernaut: Rocket Punch — a heavy piston-fist slam (metal clang + body thump)
+const P_ROCKET_PUNCH = {
+  id: "ta_rocket_punch", duration: 0.6, gain: 0.96,
+  layers: [
+    { type: "noise", color: "white", gain: 0.1, duration: 0.09,
+      envelope: [[0, 0.0001], [0.02, 1], [0.4, 0.2], [1, 0.0001]],
+      filter: { type: "highpass", frequency: 1800, q: 0.7 } },
+    { type: "impactBody", gain: 0.5, offset: 0.12, frequency: 88, endFrequency: 42, duration: 0.34,
+      effects: { filter: { type: "lowpass", frequency: 560, q: 0.8 }, saturation: 0.1 } },
+    { type: "oscillator", waveform: "sawtooth", gain: 0.14, duration: 0.16, offset: 0.02,
+      frequencyCurve: [[0, 300], [0.3, 460], [1, 180]],
+      envelope: [[0, 0.0001], [0.03, 1], [0.4, 0.4], [1, 0.0001]],
+      filter: { type: "lowpass", frequencyCurve: [[0, 3400], [1, 1200]], q: 1.0 } },
+    { type: "resonatorBank", material: "armor", gain: 0.18, offset: 0.12, pitchScale: 0.7, excitationDuration: 0.02 }
+  ],
+  effects: { highpass: 30, lowpass: 11000, saturation: 0.07, compressor: { threshold: -21, ratio: 5, attack: 0.001, release: 0.2 } }
+};
+
+// Juggernaut: Recharge — the reactor vents, a bright electric hum swelling
+const P_RECHARGE = {
+  id: "ta_recharge", duration: 0.56, gain: 0.72,
+  layers: [
+    { type: "oscillator", waveform: "triangle", gain: 0.16, duration: 0.5,
+      frequencyCurve: [[0, 220], [0.5, 340], [1, 460]],
+      envelope: [[0, 0.0001], [0.1, 0.6], [0.7, 1], [1, 0.0001]] },
+    { type: "oscillator", waveform: "sine", gain: 0.09, duration: 0.42, offset: 0.06,
+      frequencyCurve: [[0, 440], [1, 700]],
+      envelope: [[0, 0.0001], [0.2, 0.5], [0.7, 0.8], [1, 0.0001]] },
+    { type: "noise", color: "white", gain: 0.05, duration: 0.2, offset: 0.02,
+      envelope: [[0, 0.0001], [0.1, 0.6], [0.5, 0.3], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 2000], [1, 4200]], q: 0.8 } }
+  ],
+  effects: { highpass: 140, lowpass: 8500, saturation: 0.02, compressor: { threshold: -21, ratio: 3, attack: 0.003, release: 0.14 } }
+};
+
+// Juggernaut: Self Destruct — a full core overload (bigger than Nuke)
+const P_SELF_DESTRUCT = {
+  id: "ta_self_destruct", duration: 1.0, gain: 1.0,
+  layers: [
+    { type: "impactBody", gain: 0.8, frequency: 46, endFrequency: 20, duration: 0.74,
+      effects: { filter: { type: "lowpass", frequency: 520, q: 0.8 }, saturation: 0.16 } },
+    { type: "oscillator", waveform: "sawtooth", gain: 0.3, duration: 0.56,
+      frequencyCurve: [[0, 380], [0.08, 620], [0.35, 150], [1, 56]],
+      envelope: [[0, 0.0001], [0.03, 1], [0.2, 0.7], [1, 0.0001]],
+      filter: { type: "lowpass", frequencyCurve: [[0, 6500], [0.3, 2000], [1, 340]], q: 1.0 } },
+    { type: "noise", color: "brown", gain: 0.28, duration: 0.8, offset: 0.03,
+      envelope: [[0, 0.0001], [0.03, 1], [0.24, 0.6], [1, 0.0001]],
+      filter: { type: "lowpass", frequencyCurve: [[0, 2000], [0.4, 500], [1, 110]], q: 0.8 } },
+    { type: "noise", color: "white", gain: 0.1, duration: 0.14,
+      envelope: [[0, 0.0001], [0.02, 1], [0.4, 0.2], [1, 0.0001]],
+      filter: { type: "highpass", frequency: 2600, q: 0.7 } },
+    { type: "resonatorBank", material: "armor", gain: 0.16, offset: 0.05, pitchScale: 0.58, excitationDuration: 0.026 }
+  ],
+  effects: { highpass: 16, lowpass: 10500, saturation: 0.14, compressor: { threshold: -24, ratio: 8, attack: 0.001, release: 0.3 } }
+};
+
 // Victory chord
 const P_VICTORY = {
   id: "ta_victory", duration: 1.2, gain: 0.88,
@@ -769,4 +841,9 @@ export const SOUND_CATALOG = Object.freeze([
   { key: "timeStretch",    patch: P_TIME_STRETCH },
   { key: "rewind",         patch: P_REWIND },
   { key: "timeSteal",      patch: P_TIME_STEAL },
+  // Juggernaut
+  { key: "tetherGrab",     patch: P_TETHER_GRAB },
+  { key: "rocketPunch",    patch: P_ROCKET_PUNCH },
+  { key: "recharge",       patch: P_RECHARGE },
+  { key: "selfDestruct",   patch: P_SELF_DESTRUCT },
 ]);

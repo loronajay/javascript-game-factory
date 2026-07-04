@@ -9,6 +9,7 @@
 // Kept free of a rules/movement.js import (movement imports unitCatalog, which the
 // stance data hangs off of) — the one geometry need, Chebyshev, is inlined.
 import { getUnitType } from "../core/unitCatalog.js";
+import { areAllies } from "../core/state.js";
 
 function chebyshev(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -81,6 +82,6 @@ export function alliesInRadius(state, actor, radius) {
   return (state?.units ?? []).filter((unit) =>
     unit.hp > 0 &&
     unit.id !== actor.id &&
-    unit.player === actor.player &&
+    areAllies(unit, actor) &&
     (radius == null || chebyshev(actor.position, unit.position) <= radius));
 }

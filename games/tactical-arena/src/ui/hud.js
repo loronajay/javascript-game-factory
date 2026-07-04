@@ -2,6 +2,8 @@ import { getAvailableArts, getEffectiveStats, getUnitType, isDefending, isRaging
 import { canUseArt, getFootworkSteps } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
+import { colorOf } from "../core/state.js";
+import { teamLabel, teamOf } from "../match/matchBuilder.js";
 
 function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -27,11 +29,13 @@ export function canMoveInActivation(activation) {
 }
 
 export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
-  const color = state.currentPlayer === 1 ? "#5288c6" : "#c4463f";
+  const color = colorOf(state, state.currentPlayer);
   const available = state.units.filter((u) => u.player === state.currentPlayer && u.hp > 0 && !u.spent && !isStunned(u)).length;
   turnBanner.style.setProperty("--team", color);
   turnTitle.style.setProperty("--team", color);
-  turnTitle.textContent = state.phase === "complete" ? `Player ${state.winner} wins` : `Player ${state.currentPlayer} squad turn`;
+  turnTitle.textContent = state.phase === "complete"
+    ? `${teamLabel(state, state.winner)} wins`
+    : `Player ${state.currentPlayer} squad turn`;
   turnSub.textContent = state.phase === "complete" ? "Restart to play again" : `${available} piece${available === 1 ? "" : "s"} still available`;
 }
 
@@ -107,7 +111,7 @@ export function renderUnitCard(unit, state, unitCard) {
   const definition = getUnitType(unit.type);
   const stats = getEffectiveStats(unit, state);
   const raging = isRaging(unit);
-  unitCard.style.setProperty("--team", unit.player === 1 ? "#5288c6" : "#c4463f");
+  unitCard.style.setProperty("--team", colorOf(state, unit.player));
   toggleClass(unitCard, "is-raging", raging);
 
   const tags = unitTagsHtml(unit, definition);
@@ -191,11 +195,12 @@ export function renderActions(
 
 export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnabled = true } = {}) {
   squadOverlays.replaceChildren();
-  for (const player of [1, 2]) {
+  for (const player of state.turnOrder ?? [1, 2]) {
     const panel = document.createElement("section");
     panel.className = `panel squad-panel squad-overlay slot-${player}${player === state.currentPlayer && state.phase === "playing" ? " is-active" : ""}`;
-    panel.style.setProperty("--team", player === 1 ? "#5288c6" : "#c4463f");
-    panel.innerHTML = `<div class="panel-title">Player ${player}</div><div class="squad-list"></div>`;
+    panel.style.setProperty("--team", colorOf(state, player));
+    const teamTag = state.format === "teams" ? ` · ${teamLabel(state, teamOf(state, player))}` : "";
+    panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list"></div>`;
     const list = panel.querySelector(".squad-list");
 
     for (const unit of state.units.filter((u) => u.player === player)) {
