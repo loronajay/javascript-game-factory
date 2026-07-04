@@ -63,8 +63,8 @@ function createFireFigure(metrics, point) {
 function createWallFigure(metrics, point) {
   const hw = metrics.tileWidth / 2;
   const hh = metrics.tileHeight / 2;
-  const inset = 0.74;
-  const rise = Math.max(16, metrics.tileHeight * 0.95);
+  const inset = 0.58;
+  const rise = Math.max(10, metrics.tileHeight * 0.52);
   const c = { x: point.x, y: point.y + hh };           // tile-face centre
   const base = {
     n: { x: c.x, y: c.y - hh * inset }, e: { x: c.x + hw * inset, y: c.y },
@@ -73,7 +73,7 @@ function createWallFigure(metrics, point) {
   const up = (p) => ({ x: p.x, y: p.y - rise });
   const cap = { n: up(base.n), e: up(base.e), s: up(base.s), w: up(base.w) };
 
-  const g = svgElement("g", { class: "tile-wall" });
+  const g = svgElement("g", { class: "tile-wall tile-wall--low-cover" });
   g.append(
     svgElement("polygon", { class: "tile-wall-side tile-wall-side-l", points: pointsToString([[base.w.x, base.w.y], [base.s.x, base.s.y], [cap.s.x, cap.s.y], [cap.w.x, cap.w.y]]) }),
     svgElement("polygon", { class: "tile-wall-side tile-wall-side-r", points: pointsToString([[base.s.x, base.s.y], [base.e.x, base.e.y], [cap.e.x, cap.e.y], [cap.s.x, cap.s.y]]) }),
@@ -358,7 +358,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       z: 0,
       make: () => {
         const fig = obj.kind === "wall" ? createWallFigure(metrics, point) : createFireFigure(metrics, point);
-        fig.addEventListener("click", () => onTileClick(position));
+        if (obj.kind !== "wall") fig.addEventListener("click", () => onTileClick(position));
         return fig;
       }
     });
