@@ -32,7 +32,7 @@ function scenario(overrides = {}) {
 test("Father Time is registered with its recovered stat block", () => {
   const def = getUnitType("father-time");
   assert.equal(def.name, "Father Time");
-  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 5, strength: 7, defense: 3, maxHp: 25, maxMp: 40 });
+  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 5, strength: 7, defense: 3, maxHp: 25, maxMp: 30 });
 });
 
 test("Father of Time makes Father Time immune to Stun and Slow", () => {
@@ -47,7 +47,7 @@ test("Time Steal drains enemies within 2 tiles at the rollover and refunds MP", 
   const state = createBattleState({
     size: 13, seed: 1,
     units: [
-      { id: "p1-ft", type: "father-time", player: 1, x: 5, y: 5, mp: 30 },
+      { id: "p1-ft", type: "father-time", player: 1, x: 5, y: 5, mp: 20 }, // below max so the refund shows
       { id: "p2-near", type: "swordsman", player: 2, x: 6, y: 5 },   // distance 1 — burned
       { id: "p2-edge", type: "swordsman", player: 2, x: 7, y: 7 },   // distance 2 — burned
       { id: "p2-out", type: "archer", player: 2, x: 9, y: 9 }        // distance 4 — safe
@@ -61,7 +61,7 @@ test("Time Steal drains enemies within 2 tiles at the rollover and refunds MP", 
   assert.equal(findUnit(next, "p2-near").hp, 24); // 25 - 1 true
   assert.equal(findUnit(next, "p2-edge").hp, 24);
   assert.equal(findUnit(next, "p2-out").hp, getUnitType("archer").stats.maxHp); // out of radius — untouched
-  assert.equal(findUnit(next, "p1-ft").mp, 32);   // +1 MP per point dealt (2 dealt)
+  assert.equal(findUnit(next, "p1-ft").mp, 22);   // 20 + 1 MP per point dealt (2 dealt)
 
   const steals = r.events.filter((e) => e.type === "TIME_STEAL");
   assert.equal(steals.length, 2);
@@ -76,7 +76,7 @@ test("Age grants an ally +1 STR until Father Time is defeated", () => {
   let s = r.nextState;
 
   assert.equal(getEffectiveStats(findUnit(s, "p1-ally"), s).strength, baseStr + 1);
-  assert.equal(findUnit(s, "p1-ft").mp, 40 - 5); // MP spent
+  assert.equal(findUnit(s, "p1-ft").mp, getUnitType("father-time").stats.maxMp - 5); // MP spent
 
   // Persists — a fresh clone still carries it.
   const r2 = run(s, beginActivation(1, "p1-ally"));

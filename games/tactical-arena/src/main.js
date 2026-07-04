@@ -9,6 +9,7 @@ import { applyCommand } from "./core/reducer.js";
 import { chooseActivation, cpuRng } from "./ai/cpuController.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
+import { orderedHitTargets } from "./ui/combatPresentation.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
@@ -23,7 +24,7 @@ import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewpor
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
-import { buildRoster, buildSummary, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
+import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -169,7 +170,7 @@ function startMatch(config) {
   const online = config.mode === "online";
   // Online builds from the relay's shared seed so every client draws identical dice;
   // local play omits it for a fresh random seed each match.
-  state = createBattleState({ size: config.size, units: buildRoster(config.squads, config.size), seed: online ? config.seed : undefined });
+  state = createMatchState({ size: config.size, squads: config.squads, seed: online ? config.seed : undefined });
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
@@ -192,7 +193,7 @@ function startMatch(config) {
   turnFlash.clear();
   setMessage(online
     ? (state.currentPlayer === mySeat ? "You open the battle." : "Opponent's turn — please wait.")
-    : "Player 1 opens the battle.");
+    : `${isCpu(state.currentPlayer) ? `Player ${state.currentPlayer} (CPU)` : `Player ${state.currentPlayer}`} opens the battle.`);
   menu.show("match");
   if (audioUnlocked && !muted) audio.startMusic("battle");
   // Bind AFTER the match screen + state exist so any remote commands buffered during
@@ -200,6 +201,7 @@ function startMatch(config) {
   if (online) net.bind(onlineController);
   render();
   announceTurn(state.currentPlayer);
+  maybeStartCpuTurn();
 }
 
 function resetBattle() {
@@ -277,9 +279,8 @@ async function resolveCombat(command) {
 
   const metrics = createBoardMetrics(state.size);
   const attackerBefore = rolled ? findUnit(state, rolled.actorId) : null;
-  const targetBefore = rolled ? findUnit(state, rolled.targetId) : null;
-  const rolledTargetIds = rolled?.targetIds ?? (rolled?.targetId ? [rolled.targetId] : []);
-  const rolledTargetsBefore = rolledTargetIds.map((id) => findUnit(state, id)).filter(Boolean);
+  const rolledTargetsBefore = rolled ? orderedHitTargets(rolled, (id) => findUnit(state, id)) : [];
+  const targetBefore = rolledTargetsBefore[0] ?? (rolled ? findUnit(state, rolled.targetId) : null);
 
   if (rolled && attackerBefore && targetBefore) {
     const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;

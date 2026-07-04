@@ -1,3 +1,5 @@
+import { createBattleState } from "../core/state.js";
+import { nextRandom } from "../core/rng.js";
 import { takesTurns } from "../core/unitCatalog.js";
 
 export function teamColor(player) {
@@ -36,6 +38,20 @@ export function buildRoster(squads, size) {
     });
   }
   return units;
+}
+
+export function createMatchState({ size = 13, squads, seed } = {}) {
+  const state = createBattleState({
+    size,
+    seed,
+    units: squads ? buildRoster(squads, size) : undefined,
+  });
+  const flip = nextRandom(state.rngState);
+  return {
+    ...state,
+    currentPlayer: flip.value < 0.5 ? 1 : 2,
+    rngState: flip.state,
+  };
 }
 
 export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {

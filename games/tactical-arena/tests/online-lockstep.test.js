@@ -1,12 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { concede } from "../src/core/commands.js";
 import { hashState } from "../src/core/state-hash.js";
 import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
-import { buildRoster } from "../src/match/matchBuilder.js";
+import { createMatchState } from "../src/match/matchBuilder.js";
 
 // Headless validation of the ONLINE deterministic-lockstep contract (see
 // src/online/onlineSession.js). The real game never sends rendered state — each
@@ -41,10 +40,9 @@ function jitter() {
 }
 
 function buildClients({ seed, size, squads }) {
-  const units = buildRoster(squads, size);
   const clients = [];
   for (let seat = 1; seat <= 2; seat += 1) {
-    clients.push({ seat, match: createBattleState({ size, seed, units }) });
+    clients.push({ seat, match: createMatchState({ size, seed, squads }) });
   }
   return clients;
 }
@@ -208,7 +206,7 @@ test("a replayed command stream reproduces an identical final hash", () => {
   const seed = 24680;
   const size = 13;
   const squads = { 1: DEFAULT_SQUAD, 2: DEFAULT_SQUAD };
-  const cfg = () => createBattleState({ size, seed, units: buildRoster(squads, size) });
+  const cfg = () => createMatchState({ size, seed, squads });
 
   const log = [];
   let match = cfg();
