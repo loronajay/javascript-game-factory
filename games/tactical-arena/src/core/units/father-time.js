@@ -20,6 +20,7 @@ export const FATHER_TIME = Object.freeze({
   id: "father-time",
   name: "Father Time",
   glyph: "⏳",
+  classType: "support",
   ai: Object.freeze({ threatValue: 16, role: "support", protect: true }),
   stats: Object.freeze({
     moveRange: 2,

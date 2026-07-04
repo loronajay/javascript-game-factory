@@ -3,6 +3,7 @@ export const PALADIN = Object.freeze({
   name: "Paladin",
   ai: Object.freeze({ threatValue: 12, role: "bruiser", protect: false }),
   glyph: "🛡️",
+  classType: "melee",
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 1,

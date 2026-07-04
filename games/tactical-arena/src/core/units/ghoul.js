@@ -13,6 +13,7 @@ export const GHOUL = Object.freeze({
   id: "ghoul",
   name: "Ghoul",
   glyph: "🦴",
+  classType: "summon",
   summon: true,
   ai: Object.freeze({ threatValue: 5, role: "summon", protect: false }),
   stats: Object.freeze({

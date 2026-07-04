@@ -12,7 +12,7 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
 import { createPortrait } from "./portraits.js";
-import { UNIT_TYPE_KEYS, SLOT_LAYOUT, normalizeSquad, availableTypesForSlot } from "./squadModel.js";
+import { SLOT_LAYOUT, normalizeSquad, availableTypesForSlot, groupedUnitTypes } from "./squadModel.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 
@@ -98,27 +98,36 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     function paintGrid() {
       const available = new Set(availableTypesForSlot(squad, activeSlot, allowDuplicates));
       grid.replaceChildren();
-      for (const type of UNIT_TYPE_KEYS) {
-        const def = UNIT_TYPES[type];
-        const disabled = !available.has(type);
-        const unitBtn = el("button", `roster-unit${type === focusedType ? " is-focused" : ""}${disabled ? " is-disabled" : ""}`);
-        unitBtn.type = "button";
-        unitBtn.dataset.type = type;
-        unitBtn.append(createPortrait(type, { variant: "is-card", eager: true }));
-        const name = el("span", "roster-unit-name");
-        name.textContent = def.name;
-        unitBtn.append(name);
-        if (disabled) {
-          const flag = el("span", "roster-unit-flag");
-          flag.textContent = "In squad";
-          unitBtn.append(flag);
+      for (const group of groupedUnitTypes()) {
+        const section = el("section", "roster-class");
+        section.dataset.classType = group.id;
+        const heading = el("h3", "roster-class-title");
+        heading.textContent = group.label;
+        const units = el("div", "roster-class-units");
+        for (const type of group.types) {
+          const def = UNIT_TYPES[type];
+          const disabled = !available.has(type);
+          const unitBtn = el("button", `roster-unit${type === focusedType ? " is-focused" : ""}${disabled ? " is-disabled" : ""}`);
+          unitBtn.type = "button";
+          unitBtn.dataset.type = type;
+          unitBtn.append(createPortrait(type, { variant: "is-card", eager: true }));
+          const name = el("span", "roster-unit-name");
+          name.textContent = def.name;
+          unitBtn.append(name);
+          if (disabled) {
+            const flag = el("span", "roster-unit-flag");
+            flag.textContent = "In squad";
+            unitBtn.append(flag);
+          }
+          // Click inspects — the detail card stays locked to this unit (no hover
+          // fragility, scroll it freely). Double-click is the power-user fast-slot.
+          // Disabled (already-in-squad) units stay inspectable; only assign is blocked.
+          unitBtn.addEventListener("click", () => { focusedType = type; paintDetail(); flagFocus(); });
+          unitBtn.addEventListener("dblclick", () => { if (!disabled) assign(type); });
+          units.appendChild(unitBtn);
         }
-        // Click inspects — the detail card stays locked to this unit (no hover
-        // fragility, scroll it freely). Double-click is the power-user fast-slot.
-        // Disabled (already-in-squad) units stay inspectable; only assign is blocked.
-        unitBtn.addEventListener("click", () => { focusedType = type; paintDetail(); flagFocus(); });
-        unitBtn.addEventListener("dblclick", () => { if (!disabled) assign(type); });
-        grid.appendChild(unitBtn);
+        section.append(heading, units);
+        grid.appendChild(section);
       }
     }
 

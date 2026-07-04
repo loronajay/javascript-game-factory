@@ -5,6 +5,7 @@ import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, useArt, finishActivation, defend } from "../src/core/commands.js";
 import { getArtMpCost, getEffectiveStats, getUnitType, isRaging } from "../src/core/unitCatalog.js";
+import { getLineReachTiles } from "../src/rules/arts.js";
 import { resolveBaseStrike } from "../src/rules/combat.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 
@@ -13,6 +14,12 @@ function run(state, command) {
   assert.ok(result.accepted, `command ${command.type} rejected (${result.errorCode})`);
   return result;
 }
+
+// Tether Grab (on an enemy) and Rocket Punch now roll to-hit like every attacking ART, so
+// any test asserting a damage outcome pins the swing. NORMAL_HIT lands a non-crit hit;
+// MISS forces a whiff (attackRoll below the 10% miss chance).
+const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
+const MISS = { attackRoll: 0.02 };
 
 // A custom board: Juggernaut (p1) plus chosen allies/enemies at set tiles. Everything
 // off the default corner spawns so stat/spawn tweaks never break these.
@@ -66,13 +73,26 @@ test("Tether Grab hauls an enemy adjacent and deals 3 magic; MP is spent", () =>
   const state = scenario();
   const foeHp = findUnit(state, "p2-foe").hp;
   let r = run(state, beginActivation(1, "p1-jug"));
-  r = run(r.nextState, useArt(1, "p1-jug", "tether-grab", { targetId: "p2-foe" }));
+  r = run(r.nextState, useArt(1, "p1-jug", "tether-grab", { targetId: "p2-foe", ...NORMAL_HIT }));
   const s = r.nextState;
   const foe = findUnit(s, "p2-foe");
   // Foe was at (5,8) on the +y ray; pulled to the tile one step from the Juggernaut.
   assert.deepEqual(foe.position, { x: 5, y: 6 });
   assert.equal(foe.hp, foeHp - 3);
   assert.equal(findUnit(s, "p1-jug").mp, 0); // 5 - 5
+});
+
+test("Tether Grab that misses its to-hit roll hauls no one and deals no damage (ART still spent)", () => {
+  const state = scenario();
+  const foeHp = findUnit(state, "p2-foe").hp;
+  const foePos = { ...findUnit(state, "p2-foe").position };
+  let r = run(state, beginActivation(1, "p1-jug"));
+  r = run(r.nextState, useArt(1, "p1-jug", "tether-grab", { targetId: "p2-foe", ...MISS }));
+  const s = r.nextState;
+  const foe = findUnit(s, "p2-foe");
+  assert.deepEqual(foe.position, foePos); // not pulled
+  assert.equal(foe.hp, foeHp);            // no damage
+  assert.equal(findUnit(s, "p1-jug").mp, 0); // ART still spent
 });
 
 test("Tether Grab repositions an ally with no damage", () => {
@@ -107,21 +127,44 @@ test("Rocket Punch deals fixed 10 physical (Defense reduces it) to the first ene
   const expected = Math.max(1, 10 - getEffectiveStats(foe, state).defense);
   const foeHp = foe.hp;
   let r = run(state, beginActivation(1, "p1-jug"));
-  r = run(r.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", effectRoll: 0.99 }));
+  r = run(r.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", ...NORMAL_HIT, effectRoll: 0.99 }));
   const s = r.nextState;
   assert.equal(findUnit(s, "p2-foe").hp, foeHp - expected);
   assert.equal(findUnit(s, "p1-jug").mp, 0);
 });
 
+test("Rocket Punch crits for ×1.5 on a critical to-hit roll", () => {
+  const state = scenario();
+  const foe = findUnit(state, "p2-foe");
+  const def = getEffectiveStats(foe, state).defense;
+  const critExpected = Math.ceil(Math.max(1, 10 - def) * 1.5);
+  const foeHp = foe.hp;
+  let r = run(state, beginActivation(1, "p1-jug"));
+  r = run(r.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", attackRoll: 0.5, critRoll: 0.01, effectRoll: 0.99 }));
+  assert.equal(findUnit(r.nextState, "p2-foe").hp, foeHp - critExpected);
+});
+
+test("Rocket Punch that misses its to-hit roll deals no damage and rolls no stun", () => {
+  const state = scenario();
+  const foeHp = findUnit(state, "p2-foe").hp;
+  let r = run(state, beginActivation(1, "p1-jug"));
+  // A failing stun roll is pinned too — but it must never even be consulted on a miss.
+  r = run(r.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", ...MISS, effectRoll: 0.01 }));
+  const foe = findUnit(r.nextState, "p2-foe");
+  assert.equal(foe.hp, foeHp);                                       // no damage
+  assert.ok(!foe.statuses.some((st) => st.type === "stun"));         // no stun despite a passing effectRoll
+  assert.equal(findUnit(r.nextState, "p1-jug").mp, 0);               // ART still spent
+});
+
 test("Rocket Punch stuns on a passing roll and does not on a failing one", () => {
   const hit = scenario();
   let r = run(hit, beginActivation(1, "p1-jug"));
-  r = run(r.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", effectRoll: 0.1 })); // < 0.30
+  r = run(r.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", ...NORMAL_HIT, effectRoll: 0.1 })); // < 0.30
   assert.ok(findUnit(r.nextState, "p2-foe").statuses.some((st) => st.type === "stun"));
 
   const miss = scenario();
   let r2 = run(miss, beginActivation(1, "p1-jug"));
-  r2 = run(r2.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", effectRoll: 0.9 })); // >= 0.30
+  r2 = run(r2.nextState, useArt(1, "p1-jug", "rocket-punch", { targetId: "p2-foe", ...NORMAL_HIT, effectRoll: 0.9 })); // >= 0.30
   assert.ok(!findUnit(r2.nextState, "p2-foe").statuses.some((st) => st.type === "stun"));
 });
 
@@ -159,7 +202,7 @@ test("Null Zone RAGE grants +2 STR / +2 MOVE and makes ARTS free", () => {
   // ARTS cost no MP while raging.
   assert.equal(getArtMpCost(jug, getUnitType("juggernaut").arts.find((a) => a.id === "tether-grab")), 0);
   let r = run(state, beginActivation(1, "p1-jug"));
-  r = run(r.nextState, useArt(1, "p1-jug", "tether-grab", { targetId: "p2-foe" }));
+  r = run(r.nextState, useArt(1, "p1-jug", "tether-grab", { targetId: "p2-foe", ...NORMAL_HIT }));
   assert.equal(findUnit(r.nextState, "p1-jug").mp, 5); // unspent — free ART
 });
 
@@ -248,6 +291,21 @@ test("Self Destruct bypasses Defend (true damage)", () => {
   let r = run(raging, beginActivation(1, "p1-jug"));
   r = run(r.nextState, useArt(1, "p1-jug", "self-destruct"));
   assert.equal(findUnit(r.nextState, "p2-foe").hp, getUnitType("swordsman").stats.maxHp - 10); // full 10, Defend ignored
+});
+
+test("getLineReachTiles washes the full reach of every ray, stopping AT the first unit", () => {
+  // Foe 3 tiles down the +y ray; a far ally further along the same ray is behind it.
+  const state = scenario({ foe: { x: 5, y: 8 }, ally: { x: 4, y: 4 }, far: { id: "p2-far", type: "swordsman", player: 2, x: 5, y: 11 } });
+  const jug = findUnit(state, "p1-jug"); // at (5,5)
+  const keys = new Set(getLineReachTiles(state, jug, 4).map((t) => `${t.x},${t.y}`));
+  // The +y ray reaches (5,6),(5,7),(5,8=foe) then STOPS — (5,9) is unreachable (behind the foe).
+  assert.ok(keys.has("5,6") && keys.has("5,7") && keys.has("5,8"));
+  assert.ok(!keys.has("5,9"));
+  // A clear ray (no unit in line, e.g. +x) washes out to the full range of 4.
+  assert.ok(keys.has("6,5") && keys.has("7,5") && keys.has("8,5") && keys.has("9,5"));
+  assert.ok(!keys.has("10,5")); // beyond range 4
+  // The actor's own tile is never in the reach.
+  assert.ok(!keys.has("5,5"));
 });
 
 test("every implemented Juggernaut ART declares a VFX recipe and an ai.intent", () => {

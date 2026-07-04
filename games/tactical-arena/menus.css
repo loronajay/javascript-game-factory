@@ -63,7 +63,10 @@
 .roster-slot .is-glyph-fallback { font-size:1.2rem; }
 .roster-slot-name { font:700 .62rem var(--font-display); letter-spacing:.03em; }
 .roster-body { display:flex; flex:1; min-height:0; }
-.roster-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(5.6rem,1fr)); align-content:start; gap:.45rem; width:46%; max-width:340px; flex-shrink:0; overflow-y:auto; padding:.8rem; border-right:1px solid rgba(70,100,130,.35); }
+.roster-grid { display:grid; grid-template-columns:1fr; align-content:start; gap:.7rem; width:46%; max-width:340px; flex-shrink:0; overflow-y:auto; padding:.8rem; border-right:1px solid rgba(70,100,130,.35); }
+.roster-class { display:grid; gap:.32rem; min-width:0; }
+.roster-class-title { margin:0; color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.roster-class-units { display:grid; grid-template-columns:repeat(auto-fill,minmax(5.6rem,1fr)); gap:.45rem; }
 .roster-unit { position:relative; display:grid; gap:.3rem; justify-items:center; padding:.45rem .3rem .5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
 .roster-unit:hover:not(.is-disabled) { border-color:var(--brass); filter:brightness(1.1); }
 .roster-unit.is-focused { border-color:var(--brass); box-shadow:inset 0 0 0 1px var(--brass), 0 0 10px rgba(203,159,85,.3); }

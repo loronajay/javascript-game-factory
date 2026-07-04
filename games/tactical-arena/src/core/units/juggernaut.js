@@ -21,6 +21,7 @@ export const JUGGERNAUT = Object.freeze({
   id: "juggernaut",
   name: "Juggernaut",
   glyph: "\u{1F916}",
+  classType: "tank",
   ai: Object.freeze({ threatValue: 15, role: "bruiser", protect: false }),
   stats: Object.freeze({
     moveRange: 2,
@@ -54,7 +55,8 @@ export const JUGGERNAUT = Object.freeze({
       resolution: "tetherGrab",
       targeting: Object.freeze({ shape: "lineAny", range: 4 }),
       damageType: "magic",
-      // Magic damage dealt only when the grabbed unit is an enemy.
+      // Magic damage dealt only when the grabbed unit is an enemy, and only on a landed
+      // to-hit roll (an enemy grab rolls like any strike; an ally grab always lands).
       damage: Object.freeze({ type: "magic", amount: 3 }),
       description: "Grab the first ally or enemy in a straight line within 4 and haul them to your side. An enemy also takes 3 magic damage.",
       implemented: true,
@@ -67,8 +69,8 @@ export const JUGGERNAUT = Object.freeze({
       mpCost: 5,
       resolution: "rocketPunch",
       targeting: Object.freeze({ shape: "lineEnemy", range: 5 }),
-      // A fixed-power physical strike (Defense + Defend still reduce it), then a stun roll.
-      // Never rolls to-hit — the cannon-fist always connects with the first enemy in line.
+      // A fixed-power physical strike (Defense + Defend still reduce it): rolls to-hit
+      // like any attacking ART (a miss lands nothing), then a separate stun roll on a hit.
       damage: Object.freeze({ type: "physical", amount: 10 }),
       effect: Object.freeze({ type: "status", status: "stun", chance: 0.30, durationTurns: 1 }),
       description: "Fire a piston-fist down a straight line within 5 at the first enemy (allies block the shot): 10 physical damage and a 30% chance to stun for 1 turn.",

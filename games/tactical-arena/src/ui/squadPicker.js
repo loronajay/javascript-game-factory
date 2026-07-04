@@ -7,11 +7,19 @@
 // The squad model (keys, defaults, normalization, duplicate rules) lives in
 // squadModel.js and is re-exported here so existing import paths keep working.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { UNIT_TYPE_KEYS, DEFAULT_SQUAD, SLOT_LAYOUT, normalizeSquad, availableTypesForSlot } from "./squadModel.js";
+import {
+  UNIT_TYPE_KEYS,
+  DEFAULT_SQUAD,
+  SLOT_LAYOUT,
+  normalizeSquad,
+  availableTypesForSlot,
+  UNIT_CLASS_GROUPS,
+  groupedUnitTypes
+} from "./squadModel.js";
 import { openRosterPicker } from "./rosterPicker.js";
 import { createPortrait } from "./portraits.js";
 
-export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, availableTypesForSlot };
+export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
 
 export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true } = {}) {
   let squad = normalizeSquad(initial);

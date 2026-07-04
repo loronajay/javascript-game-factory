@@ -555,36 +555,44 @@ async function resolveInstantArt(command) {
     }
     await Promise.all(floats);
   } else if (resolved?.artId === "tether-grab" && actorBefore) {
-    // Fire the tether, haul the grabbed unit to the Juggernaut's side, then land the
-    // magic hit if it was an enemy. `state` is still pre-commit, so the target reads at
-    // its old tile — animateMovement slides it from `from` to `to`.
+    // Fire the tether, then — on a landed grab — haul the unit to the Juggernaut's side and
+    // land the magic hit if it was an enemy. `state` is still pre-commit, so the target
+    // reads at its old tile; a missed enemy grab hauls no one, so float MISS in place.
     const metrics = createBoardMetrics(state.size);
     const target = findUnit(state, resolved.targetId);
     await effects.playAbilityVfx("tether-grab", { actor: actorBefore, targets: target ? [target] : [] });
-    if (target && resolved.from && resolved.to) await effects.animateMovement(target.id, resolved.from, resolved.to);
-    if (target && resolved.damage > 0) {
-      const center = unitCenter(metrics, { position: resolved.to });
-      effects.impact(center, false, "magic");
-      await effects.floatText(center, `-${resolved.damage}`, "#c89cff");
-      const after = findUnit(result.nextState, target.id);
-      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, resolved.to, teamColor(target.player));
+    if (resolved.missed) {
+      if (target) await effects.floatText(unitCenter(metrics, target), "MISS", "#c9d4e8");
+    } else {
+      if (target && resolved.from && resolved.to) await effects.animateMovement(target.id, resolved.from, resolved.to);
+      if (target && resolved.damage > 0) {
+        const center = unitCenter(metrics, { position: resolved.to });
+        effects.impact(center, resolved.critical, "magic");
+        await effects.floatText(center, `-${resolved.damage}`, "#c89cff");
+        const after = findUnit(result.nextState, target.id);
+        if (!after || after.hp <= 0) await effects.deathDissolve(target.id, resolved.to, teamColor(target.player));
+      }
     }
   } else if (resolved?.artId === "rocket-punch" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
-    const target = targetsBefore[0];
-    await effects.playAbilityVfx("rocket-punch", { actor: actorBefore, targets: targetsBefore });
+    const target = findUnit(state, resolved.targetId);
+    await effects.playAbilityVfx("rocket-punch", { actor: actorBefore, targets: target ? [target] : [] });
     if (target) {
-      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
-      const center = unitCenter(metrics, target);
-      if (dmg > 0) {
-        effects.impact(center, false, "physical");
-        effects.shake(7);
-        await effects.hitRecoil(target.id, target.position, false);
-        await effects.floatText(center, `-${dmg}`, "#ff7684");
+      if (resolved.missed) {
+        await effects.floatText(unitCenter(metrics, target), "MISS", "#c9d4e8");
+      } else {
+        const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+        const center = unitCenter(metrics, target);
+        if (dmg > 0) {
+          effects.impact(center, resolved.critical, "physical");
+          effects.shake(resolved.critical ? 10 : 7);
+          await effects.hitRecoil(target.id, target.position, resolved.critical);
+          await effects.floatText(center, `-${dmg}`, "#ff7684");
+        }
+        if (resolved.stunned) await effects.floatText(center, "STUN", "#ffe45e");
+        const after = findUnit(result.nextState, target.id);
+        if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
       }
-      if (resolved.stunned) await effects.floatText(center, "STUN", "#ffe45e");
-      const after = findUnit(result.nextState, target.id);
-      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }
   } else if (resolved?.artId === "recharge" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
@@ -1289,6 +1297,17 @@ async function handleActionClick(action, unit) {
                         : art?.resolution === "statusCast"
                           ? "Choose a highlighted enemy target."
                           : "Choose a highlighted enemy target.";
+      // Line abilities: the purple wash shows the ability's reach on every ray; if nothing
+      // is actually in line there is no legal target, so say so rather than leaving the
+      // player clicking an empty ray and wondering why nothing resolves.
+      const lineShape = art?.targeting?.shape === "lineAny" || art?.targeting?.shape === "lineEnemy";
+      const noLineTarget = lineShape &&
+        getLineTargets(state, unit, art.targeting.range, { includeAllies: art.targeting.shape === "lineAny" }).length === 0;
+      if (noLineTarget) {
+        setMessage(`${art.name} (${art.mpCost} MP): the purple tiles show its reach, but nothing is in a straight line right now. Reposition, or Escape to choose another action.`, true);
+        render();
+        return;
+      }
       setMessage(`${art.name} (${art.mpCost} MP): ${art.description} ${lead}`);
     } else {
       setMessage(`Choose a highlighted ${action} tile.`);

@@ -185,6 +185,26 @@ export function getLineTargets(state, actor, range, { includeAllies = false } = 
   return targets;
 }
 
+// Every tile a line ability can REACH along its 8 straight rays, for the range wash the
+// player sees when aiming Tether Grab / Rocket Punch. Each ray stops at the board edge or
+// a wall (exclusive) and ends AT the first unit it contacts (inclusive — that unit's tile
+// is a valid endpoint). Team-agnostic on purpose: the reach reads the same for both line
+// arts even with nothing in line, so the ability never looks inert; getLineTargets decides
+// which of these tiles is an actual legal target (bright), this just paints the reach.
+export function getLineReachTiles(state, actor, range) {
+  const tiles = [];
+  for (const dir of LINE_DIRECTIONS) {
+    for (let d = 1; d <= range; d += 1) {
+      const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
+      if (!isOnBoard(state, pos)) break;
+      if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
+      tiles.push(pos);
+      if (unitAt(state, pos)) break; // first contact ends the ray (its tile is included)
+    }
+  }
+  return tiles;
+}
+
 export function getTilePulseTargets(state, actor, art) {
   const effect = art.effect;
   if (effect?.type !== "tilePulse") return [];

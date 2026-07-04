@@ -17,7 +17,8 @@
 
 import { areEnemies, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getUnitType, isDefending, normalizeUnitAi } from "../core/unitCatalog.js";
-import { getCritChance, getMissChance, getTeamDamageReduction, resolveBaseStrike } from "../rules/combat.js";
+import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, resolveBaseStrike } from "../rules/combat.js";
+import { CRIT_MULTIPLIER } from "../rules/damage.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { statusImmunities } from "../rules/statuses.js";
 
@@ -299,6 +300,28 @@ export function expectedFixedHit(state, target, { amount, type }) {
   }
   const dealt = Math.min(damage, target.hp);
   return { raw: damage, damage: dealt, kills: damage >= target.hp };
+}
+
+// Expected damage of a Juggernaut LINE strike (Tether Grab magic / Rocket Punch physical),
+// modelled to match the reducer's resolvers so the CPU's EV can't drift: a to-hit roll
+// (miss = 0), then miss/normal/crit weighting with crit folded ×1.5 exactly where the
+// reducer folds it. Tether Grab's magic ignores DEF and does NOT halve under Defend (the
+// reducer skips resolveDamage there); Rocket Punch's physical takes DEF then Defend.
+export function expectedLineStrikeDamage(state, attacker, target, { amount, type }) {
+  const pHit = 1 - getMissChance(attacker);
+  const pCrit = getCritChance(attacker);
+  const fold = (critical) => {
+    if (type === "magic") {
+      const base = critical ? Math.ceil(amount * CRIT_MULTIPLIER) : amount;
+      const reduced = Math.max(0, base - getTeamDamageReduction(target, state, "magic"));
+      return reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+    }
+    const defender = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+    let base = Math.max(1, amount - defender.defense);
+    if (critical) base = Math.ceil(base * CRIT_MULTIPLIER);
+    return defender.defending ? Math.ceil(base / 2) : base;
+  };
+  return pHit * ((1 - pCrit) * fold(false) + pCrit * fold(true));
 }
 
 // Expected damage the enemy squad could land on `victim` next turn if it stood at

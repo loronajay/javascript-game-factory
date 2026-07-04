@@ -97,8 +97,8 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(max-width: 560px\)[\s\S]*?\.roster-grid\s*\{[\s\S]*?grid-auto-flow:\s*column/,
-    "narrow roster pickers should use a horizontal unit rail above the detail pane",
+    /@media \(pointer: coarse\) and \(max-width: 560px\)[\s\S]*?\.roster-grid\s*\{[\s\S]*?display:\s*flex[\s\S]*?\.roster-class-units\s*\{[\s\S]*?display:\s*flex/,
+    "narrow roster pickers should use horizontal class rails above the detail pane",
   );
   assert.match(
     responsiveCss,

@@ -2,6 +2,7 @@ export const MYSTIC = Object.freeze({
   id: "mystic",
   name: "Mystic",
   glyph: "✨",
+  classType: "support",
   ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
   stats: Object.freeze({
     moveRange: 2,

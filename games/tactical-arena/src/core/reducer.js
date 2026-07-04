@@ -3,7 +3,7 @@ import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isDefending, take
 import { areEnemies, areAllies, cloneState, findUnit, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
 import { getLineAttackTargets, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
-import { resolveDamage } from "../rules/damage.js";
+import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import { applyStatus, isStunned, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
@@ -902,6 +902,25 @@ function resolveTetherGrab(state, command, art) {
   const cost = getArtMpCost(actor, art);
   actor.mp -= cost;
 
+  const grabsEnemy = areEnemies(actor, target);
+
+  // Grabbing an ENEMY rolls to-hit like any attacking ART: a whiff hauls no one and
+  // deals no damage (the tether misses), though the ART is still spent. An ally grab is
+  // pure repositioning — allies are never rolled against, so it always lands.
+  let swing = null;
+  if (grabsEnemy) {
+    swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+    next.rngState = swing.rngState;
+    if (swing.missed) {
+      spendAndAdvance(next, actor);
+      resolveVictory(next);
+      return accept(next, [{
+        type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+        hit: false, missed: true, roll: swing.hitRoll, damage: 0, targetIds: [], damageByTarget: {}, mpCost: cost
+      }]);
+    }
+  }
+
   const destination = { x: actor.position.x + hit.dir.x, y: actor.position.y + hit.dir.y };
   const from = { ...target.position };
   target.position = { ...destination };
@@ -909,10 +928,13 @@ function resolveTetherGrab(state, command, art) {
   const damageByTarget = {};
   const targetIds = [];
   let damage = 0;
-  if (areEnemies(actor, target)) {
+  if (grabsEnemy) {
+    // A landed grab crits like any strike — the fixed 3 scales ×1.5 before the reduction
+    // fold (magic ignores DEF; Tether Grab does not halve under Defend).
+    const baseAmount = swing.critical ? Math.ceil(art.damage.amount * CRIT_MULTIPLIER) : art.damage.amount;
     const reduced = isDamageTypeImmuneByStance(target, "magic")
       ? 0
-      : Math.max(0, art.damage.amount - getTeamDamageReduction(target, next, "magic"));
+      : Math.max(0, baseAmount - getTeamDamageReduction(target, next, "magic"));
     damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
     if (damage > 0) {
       target.hp = Math.max(0, target.hp - damage);
@@ -925,14 +947,16 @@ function resolveTetherGrab(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
-    from, to: { ...destination }, damage, targetIds, damageByTarget, mpCost: cost
+    from, to: { ...destination }, damage, hit: true, critical: Boolean(swing?.critical),
+    targetIds, damageByTarget, mpCost: cost
   }]);
 }
 
 // Rocket Punch: a fixed-power physical strike on the first ENEMY on a straight ray within
-// range (an ally on the ray blocks the shot, so the plan is never legal). Defense reduces
-// it and Defend halves it like any physical hit, but it never rolls to-hit — the piston
-// always connects. A separate 30% roll stuns the target for 1 turn if it survives.
+// range (an ally on the ray blocks the shot, so the plan is never legal). It rolls to-hit
+// like any attacking ART — a miss deals no damage AND rolls no stun (the whole punch
+// whiffs), though the ART is still spent. On a landing hit Defense reduces it and Defend
+// halves it (a crit scales ×1.5 first), then a SEPARATE 30% roll stuns a survivor 1 turn.
 function resolveRocketPunch(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const line = getLineTargets(state, actorState, art.targeting.range, { includeAllies: false });
@@ -945,10 +969,22 @@ function resolveRocketPunch(state, command, art) {
   const cost = getArtMpCost(actor, art);
   actor.mp -= cost;
 
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    resolveVictory(next);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, targetIds: [], damageByTarget: {}, stunned: false, mpCost: cost
+    }]);
+  }
+
   const result = resolveDamage({
     attacker: { strength: art.damage.amount },
     defender: { ...getEffectiveStats(target, next), defending: isDefending(target) },
-    type: "physical"
+    type: "physical",
+    critical: swing.critical
   });
   const damage = result.damage;
   target.hp = Math.max(0, target.hp - damage);
@@ -967,7 +1003,7 @@ function resolveRocketPunch(state, command, art) {
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     targetIds: [target.id], damageByTarget: { [target.id]: damage },
-    stunned: Boolean(effect?.applied), mpCost: cost
+    hit: true, critical: swing.critical, stunned: Boolean(effect?.applied), mpCost: cost
   }]);
 }
 

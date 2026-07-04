@@ -26,6 +26,7 @@ export const MYSTIC = Object.freeze({
   id: "mystic",
   name: "Mystic",
   glyph: "?",
+  classType: "support",
   // CPU metadata — REQUIRED on every unit (see "CPU AI metadata" below).
   ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
   stats: Object.freeze({
@@ -81,6 +82,10 @@ export const UNIT_TYPES = Object.freeze({
 Use lowercase kebab-case ids for ARTS and passives. Runtime unit instances store
 `type`, `hp`, `mp`, `statuses`, `statModifiers`, `defending`, and `spent`; do
 not put per-match mutable state on the catalog object.
+
+Draftable units must set `classType` to one of `melee`, `ranger`, `support`,
+`mage`, or `tank`. `src/ui/squadModel.js` reads this field to group the squad
+picker roster.
 
 ## Stats and effective stats
 

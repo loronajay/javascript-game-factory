@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -316,19 +316,21 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
-  // Juggernaut's line abilities (Tether Grab / Rocket Punch): wash each of the 8 straight
-  // rays up to its first-contact target, and light that unit as a legal target. lineAny
-  // grabs an ally or enemy; lineEnemy only an enemy (an ally on the ray blocks it).
+  // Juggernaut's line abilities (Tether Grab / Rocket Punch): always wash the FULL reach
+  // of all 8 straight rays so the ability's range reads even when nothing is in line (no
+  // more "clicked it and nothing happened"), then light the actual first-contact target as
+  // a legal (bright) target. lineAny grabs an ally or enemy; lineEnemy only an enemy (an
+  // ally on the ray blocks it, so it is never a legal target).
   let isLineArt = false;
   if (actor && mode?.startsWith("art:")) {
     const lineArt = getArt(actor.type, mode.slice("art:".length));
     const shape = lineArt?.targeting?.shape;
     if (shape === "lineAny" || shape === "lineEnemy") {
       isLineArt = true;
-      for (const { unit: target, dir, distance } of getLineTargets(state, actor, lineArt.targeting.range, { includeAllies: shape === "lineAny" })) {
-        for (let d = 1; d <= distance; d += 1) {
-          range.add(positionKey({ x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d }));
-        }
+      for (const tile of getLineReachTiles(state, actor, lineArt.targeting.range)) {
+        range.add(positionKey(tile));
+      }
+      for (const { unit: target } of getLineTargets(state, actor, lineArt.targeting.range, { includeAllies: shape === "lineAny" })) {
         legal.add(positionKey(target.position));
       }
     }

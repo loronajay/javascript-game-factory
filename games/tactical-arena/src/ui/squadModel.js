@@ -4,6 +4,14 @@
 // controller can both drive the same rules without importing each other's UI.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 
+export const UNIT_CLASS_GROUPS = Object.freeze([
+  Object.freeze({ id: "melee", label: "Melees" }),
+  Object.freeze({ id: "ranger", label: "Rangers" }),
+  Object.freeze({ id: "support", label: "Supports" }),
+  Object.freeze({ id: "mage", label: "Mages" }),
+  Object.freeze({ id: "tank", label: "Tanks" })
+]);
+
 // Summons (Ghouls) are raised in-match, never drafted, so they are not pickable.
 export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES).filter((key) => !UNIT_TYPES[key].summon);
 export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
@@ -34,4 +42,11 @@ export function availableTypesForSlot(squad, slotIndex, allowDuplicates = true) 
   if (allowDuplicates) return [...UNIT_TYPE_KEYS];
   const usedElsewhere = new Set(squad.filter((_, i) => i !== slotIndex));
   return UNIT_TYPE_KEYS.filter((type) => !usedElsewhere.has(type));
+}
+
+export function groupedUnitTypes(types = UNIT_TYPE_KEYS) {
+  return UNIT_CLASS_GROUPS.map((group) => ({
+    ...group,
+    types: types.filter((type) => UNIT_TYPES[type]?.classType === group.id)
+  })).filter((group) => group.types.length > 0);
 }

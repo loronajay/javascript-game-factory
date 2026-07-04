@@ -28,6 +28,7 @@ export const WITCH_DOCTOR = Object.freeze({
   id: "witch-doctor",
   name: "Witch Doctor",
   glyph: "🪘",
+  classType: "support",
   ai: Object.freeze({ threatValue: 15, role: "support", protect: true }),
   stats: Object.freeze({
     moveRange: 2,

@@ -46,7 +46,7 @@ import {
   validateFootworkPath
 } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
-import { buffAlliesValue, expectedFixedHit, expectedStrike, nearestEnemyDistance } from "./evaluate.js";
+import { buffAlliesValue, expectedFixedHit, expectedLineStrikeDamage, expectedStrike, nearestEnemyDistance } from "./evaluate.js";
 
 const FOOTWORK_PATH_BUDGET = 3000; // DFS node cap so footwork search stays bounded
 const FOOTWORK_KEEP = 8;           // best N footwork paths kept (decision 2)
@@ -361,11 +361,12 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "hasten":
       break; // Age/Time Stretch change stats, not HP now; value is a controller term
     case "grab": {
-      // Tether Grab: the 3 magic (foe only) + the pull to the tile one step from the actor
-      // along the ray. The planner only ever grabs enemies.
+      // Tether Grab: an EV-weighted 3 magic (foe only, rolls to-hit) + the pull to the
+      // tile one step from the actor along the ray. The planner only ever grabs enemies;
+      // the pull is applied as the modal (landed) outcome.
       const target = byId.get(primary.targetId);
       if (target) {
-        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: "magic" }).damage);
+        target.hp = Math.max(0, target.hp - expectedLineStrikeDamage(state, actor, target, { amount: art.damage.amount, type: "magic" }));
         const dir = { x: Math.sign(target.position.x - actor.position.x), y: Math.sign(target.position.y - actor.position.y) };
         target.position = { x: actor.position.x + dir.x, y: actor.position.y + dir.y };
       }
@@ -373,7 +374,7 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     }
     case "lineStrike": {
       const target = byId.get(primary.targetId);
-      if (target) target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: "physical" }).damage);
+      if (target) target.hp = Math.max(0, target.hp - expectedLineStrikeDamage(state, actor, target, { amount: art.damage.amount, type: "physical" }));
       break; // the stun rider is a controller score term
     }
     case "recharge": {

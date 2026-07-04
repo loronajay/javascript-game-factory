@@ -429,13 +429,11 @@ body:has(.ref-modal:not([hidden])) .back-link {
   }
 
   .roster-grid {
+    display: flex;
     width: auto;
     max-width: none;
-    height: 118px;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(4.8rem, 5.3rem);
-    grid-template-columns: none;
-    gap: .32rem;
+    height: 132px;
+    gap: .45rem;
     overflow-x: auto;
     overflow-y: hidden;
     padding: .45rem;
@@ -444,7 +442,23 @@ body:has(.ref-modal:not([hidden])) .back-link {
     scroll-snap-type: x proximity;
   }
 
+  .roster-class {
+    flex: 0 0 auto;
+    gap: .24rem;
+  }
+
+  .roster-class-title {
+    font-size: .47rem;
+    letter-spacing: .08em;
+  }
+
+  .roster-class-units {
+    display: flex;
+    gap: .32rem;
+  }
+
   .roster-unit {
+    width: 5rem;
     min-height: 94px;
     padding: .28rem .18rem .3rem;
     scroll-snap-align: start;
@@ -649,7 +663,20 @@ body:has(.ref-modal:not([hidden])) .back-link {
     max-width: 300px;
     gap: .35rem;
     padding: .5rem;
+  }
+
+  .roster-class {
+    gap: .24rem;
+  }
+
+  .roster-class-title {
+    font-size: .5rem;
+    letter-spacing: .08em;
+  }
+
+  .roster-class-units {
     grid-template-columns: repeat(auto-fill, minmax(4.4rem, 1fr));
+    gap: .35rem;
   }
 
   .roster-unit {

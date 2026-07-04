@@ -2,6 +2,7 @@ export const SWORDSMAN = Object.freeze({
   id: "swordsman",
   name: "Swordsman",
   glyph: "⚔",
+  classType: "melee",
   ai: Object.freeze({ threatValue: 10, role: "bruiser", protect: false }),
   stats: Object.freeze({
     moveRange: 3,
