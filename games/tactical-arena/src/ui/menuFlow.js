@@ -2,14 +2,14 @@
 // results loop and the Settings overlay. Kept out of main.js (which owns the
 // match itself) so neither file becomes a mixed-purpose controller. Ported in
 // spirit from Mini-Tactics' screen system, trimmed to the modes Tactical Arena
-// currently supports (hot-seat 1v1); the other menu options are present but
+// currently supports (hot-seat 1v1/4-player); the other menu options are present but
 // flagged "Soon" until their units/CPU/online land.
 import { ScreenManager } from "./screenManager.js";
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 
-const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };
+const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
 
 export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch }) {
@@ -50,12 +50,49 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   const hsSetup = screenEl("hsSetup");
   const spSetup = screenEl("spSetup");
-  const hsPickers = buildSquadPickers($("[data-squad-pickers]", hsSetup), "Player 2");
+  const hsSquadHost = $("[data-squad-pickers]", hsSetup);
+  const hsPickers = new Map();
   const spPickers = buildSquadPickers($("[data-sp-squad-pickers]", spSetup), "Computer");
+
+  function ensureHotSeatPicker(player) {
+    if (!hsPickers.has(player)) {
+      hsPickers.set(player, createSquadPicker({
+        title: `Player ${player}`,
+        initial: DEFAULT_SQUAD,
+        accent: TEAM_COLOR[player],
+        allowDuplicates: true,
+      }));
+    }
+    return hsPickers.get(player);
+  }
+
+  function syncHotSeatSetup() {
+    const count = Number(selectedValue(hsSetup, "playerCount", "count")) || 2;
+    const formatGroup = $("[data-group='format']", hsSetup);
+    if (formatGroup) formatGroup.hidden = count !== 4;
+    hsSquadHost.replaceChildren();
+    for (let player = 1; player <= count; player += 1) {
+      hsSquadHost.append(ensureHotSeatPicker(player).el);
+    }
+  }
+  syncHotSeatSetup();
 
   function gatherHotSeatConfig() {
     const size = Number(selectedValue(hsSetup, "boardSize", "size")) || 13;
-    return { mode: "hotseat", size, squads: { 1: hsPickers.p1.getSquad(), 2: hsPickers.p2.getSquad() } };
+    const playerCount = Number(selectedValue(hsSetup, "playerCount", "count")) || 2;
+    const format = playerCount === 4 ? (selectedValue(hsSetup, "format", "format") || "ffa") : "ffa";
+    const squads = {};
+    for (let player = 1; player <= playerCount; player += 1) {
+      squads[player] = ensureHotSeatPicker(player).getSquad();
+    }
+    return {
+      mode: "hotseat",
+      size,
+      playerCount,
+      format,
+      teamColors: format === "teams" ? { 1: TEAM_COLOR[1], 2: TEAM_COLOR[2] } : null,
+      squads,
+    };
   }
 
   function gatherSingleConfig() {
@@ -140,6 +177,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     const seg = event.target.closest(".seg");
     if (seg && !seg.disabled) {
       for (const sibling of seg.parentElement.querySelectorAll(".seg")) sibling.classList.toggle("is-selected", sibling === seg);
+      if (seg.closest('[data-screen="hsSetup"]') && seg.closest('[data-field="playerCount"]')) syncHotSeatSetup();
       return;
     }
 

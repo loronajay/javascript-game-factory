@@ -177,6 +177,7 @@ function normalizeLobby(data) {
     status: data.status || "open",
     minPlayers: Number(data.minPlayers) || MIN_PLAYERS,
     maxPlayers: Number(data.maxPlayers) || MAX_PLAYERS,
+    settings: data.settings && typeof data.settings === "object" ? { ...data.settings } : {},
     members,
     players: members.map((id, index) => ({
       id,
@@ -345,24 +346,38 @@ export function createOnlineClient() {
   }
 
   // Quick Match: join an open public lobby for this game or create one.
-  function findLobby() {
+  function lobbyOptions(options = {}) {
+    const minPlayers = Number.isFinite(Number(options.minPlayers)) ? Math.floor(Number(options.minPlayers)) : MIN_PLAYERS;
+    const maxPlayers = Number.isFinite(Number(options.maxPlayers)) ? Math.floor(Number(options.maxPlayers)) : MAX_PLAYERS;
+    return {
+      minPlayers,
+      maxPlayers,
+      settings: options.settings && typeof options.settings === "object" ? { ...options.settings } : {},
+    };
+  }
+
+  function findLobby(options = {}) {
+    const opts = lobbyOptions(options);
     _send({
       type: "find_lobby",
       gameId: GAME_ID,
-      minPlayers: MIN_PLAYERS,
-      maxPlayers: MAX_PLAYERS,
+      minPlayers: opts.minPlayers,
+      maxPlayers: opts.maxPlayers,
+      settings: opts.settings,
       identity: _identity,
     });
   }
 
   // Create a private (code-only) lobby; the creator becomes the owner.
-  function createLobby() {
+  function createLobby(options = {}) {
+    const opts = lobbyOptions(options);
     _send({
       type: "create_lobby",
       gameId: GAME_ID,
       private: true,
-      minPlayers: MIN_PLAYERS,
-      maxPlayers: MAX_PLAYERS,
+      minPlayers: opts.minPlayers,
+      maxPlayers: opts.maxPlayers,
+      settings: opts.settings,
       identity: _identity,
     });
   }

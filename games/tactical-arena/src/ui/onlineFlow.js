@@ -20,6 +20,11 @@ const RULESET_VERSION = 1; // bump when a wire/rules change makes mixed clients 
 const BOARD_SIZES = [13, 15];
 const PLAYER_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };
+const MATCH_TYPES = Object.freeze({
+  duel: Object.freeze({ minPlayers: 2, maxPlayers: 2, format: "ffa", label: "Classic 1v1" }),
+  ffa4: Object.freeze({ minPlayers: 4, maxPlayers: 4, format: "ffa", label: "4 Player FFA" }),
+  teams4: Object.freeze({ minPlayers: 4, maxPlayers: 4, format: "teams", label: "2v2 Teams" }),
+});
 
 export function createOnlineFlow({ onStartMatch }) {
   const el = document.querySelector('[data-screen="onlineSetup"]');
@@ -36,6 +41,7 @@ export function createOnlineFlow({ onStartMatch }) {
   const startBtn = $('[data-online="startBtn"]');
   const squadHost = $('[data-online="squadHost"]');
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
+  const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
 
   let client = null;
   let handedOff = false;
@@ -43,6 +49,7 @@ export function createOnlineFlow({ onStartMatch }) {
   let lobby = null; // latest normalized lobby snapshot
   let myClientId = null;
   let isOwner = false;
+  let selectedMatchType = "duel";
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -79,8 +86,33 @@ export function createOnlineFlow({ onStartMatch }) {
     return lobby?.players?.length ?? 0;
   }
 
-  function formatForCount(count = playerCount()) {
-    return count === 4 ? "teams" : "ffa";
+  function normalizeMatchType(matchType) {
+    return MATCH_TYPES[matchType] ? matchType : "duel";
+  }
+
+  function activeMatchType() {
+    return normalizeMatchType(lobby?.settings?.matchType ?? selectedMatchType);
+  }
+
+  function matchTypeConfig(matchType = activeMatchType()) {
+    return MATCH_TYPES[normalizeMatchType(matchType)];
+  }
+
+  function selectMatchType(type) {
+    selectedMatchType = normalizeMatchType(type);
+    for (const seg of matchTypeSegs) {
+      seg.classList.toggle("is-selected", normalizeMatchType(seg.dataset.matchType) === selectedMatchType);
+    }
+  }
+
+  function lobbyOptions() {
+    const type = normalizeMatchType(selectedMatchType);
+    const cfg = matchTypeConfig(type);
+    return {
+      minPlayers: cfg.minPlayers,
+      maxPlayers: cfg.maxPlayers,
+      settings: { matchType: type },
+    };
   }
 
   function identity() {
@@ -95,7 +127,7 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function pushConfig() {
-    config.format = formatForCount();
+    config.format = matchTypeConfig().format;
     client?.sendConfig({
       rulesetVersion: RULESET_VERSION,
       size: config.size,
@@ -107,8 +139,7 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function renderRoster() {
     rosterEl.replaceChildren();
-    const count = playerCount();
-    const teams = formatForCount(count) === "teams";
+    const teams = activeMatchType() === "teams4";
     for (const p of lobby?.players ?? []) {
       const li = document.createElement("li");
       li.className = "lobby-roster-item";
@@ -132,7 +163,7 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function syncUI() {
     const cfg = activeConfig() ?? config;
-    cfg.format = formatForCount();
+    cfg.format = matchTypeConfig().format;
     selectSeg(cfg.size);
     for (const seg of sizeSegs) seg.disabled = !isOwner;
     hostHintEl.textContent = isOwner ? "(you set it)" : "(set by host)";
@@ -146,14 +177,13 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function syncStart() {
     const count = playerCount();
-    const ready = count === 2 || count === 4;
+    const type = matchTypeConfig();
+    const ready = count === type.maxPlayers;
     startBtn.hidden = !isOwner;
     startBtn.disabled = !(isOwner && ready);
     if (isOwner) {
       lobbyHintEl.hidden = ready;
-      lobbyHintEl.textContent = count < 2
-        ? "Waiting for an opponent to join..."
-        : "Need either 2 players for a duel or 4 players for 2v2.";
+      lobbyHintEl.textContent = `Waiting for ${type.maxPlayers - count} more player${type.maxPlayers - count === 1 ? "" : "s"} for ${type.label}.`;
     } else {
       lobbyHintEl.hidden = false;
       lobbyHintEl.textContent = "Waiting for the host to start…";
@@ -177,6 +207,7 @@ export function createOnlineFlow({ onStartMatch }) {
 
     cb.onLobbyJoined = (snapshot) => {
       lobby = snapshot;
+      selectedMatchType = normalizeMatchType(lobby.settings?.matchType ?? selectedMatchType);
       myClientId = client.getClientId();
       isOwner = lobby.ownerId === myClientId;
       setPanel("lobby");
@@ -202,7 +233,7 @@ export function createOnlineFlow({ onStartMatch }) {
         setStatus("Rules version mismatch. Refresh before starting this match.");
         return;
       }
-      receivedConfig = { ...receivedConfig, ...cfg, format: formatForCount() };
+      receivedConfig = { ...receivedConfig, ...cfg, format: matchTypeConfig().format };
       syncUI();
       tryStart();
     };
@@ -268,7 +299,7 @@ export function createOnlineFlow({ onStartMatch }) {
     const squads = {};
     for (let seat = 1; seat <= count; seat += 1) squads[seat] = compositionsBySeat[seat];
 
-    const format = formatForCount(count);
+    const format = matchTypeConfig().format;
     onStartMatch({
       mode: "online",
       net: session,
@@ -295,8 +326,14 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   // ── one-time control wiring (the section persists across enter/exit) ─────────
-  $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby());
-  $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby());
+  for (const seg of matchTypeSegs) {
+    seg.addEventListener("click", () => {
+      if (lobby) return;
+      selectMatchType(seg.dataset.matchType);
+    });
+  }
+  $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby(lobbyOptions()));
+  $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby(lobbyOptions()));
   $('[data-action="joinRoom"]').addEventListener("click", () => {
     const code = normalizeRoomCode(codeInput.value);
     codeInput.value = code;
@@ -329,6 +366,7 @@ export function createOnlineFlow({ onStartMatch }) {
   function onEnter() {
     handedOff = false;
     myClientId = null;
+    selectMatchType("duel");
     resetLobbyState();
     setPanel("none");
     setStatus("Connecting to the network…");

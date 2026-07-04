@@ -106,9 +106,17 @@
             <div class="segmented" data-field="playerCount">
               <button type="button" class="seg is-selected" data-count="2">2</button>
               <button type="button" class="seg" data-count="3" disabled>3</button>
-              <button type="button" class="seg" data-count="4" disabled>4</button>
+              <button type="button" class="seg" data-count="4">4</button>
             </div>
-            <p class="setup-hint">More commanders arrive as new units are forged.</p>
+            <p class="setup-hint">Three-player matches are deferred; four players can play FFA or 2v2.</p>
+          </div>
+
+          <div class="setup-field" data-group="format" hidden>
+            <span class="setup-label">Format</span>
+            <div class="segmented" data-field="format">
+              <button type="button" class="seg is-selected" data-format="ffa">Free-for-all</button>
+              <button type="button" class="seg" data-format="teams">Teams 2v2</button>
+            </div>
           </div>
 
           <div class="setup-field">
@@ -180,6 +188,14 @@
 
           <!-- Pairing: quick match or a private room code. -->
           <div data-online-panel="idle" hidden>
+            <div class="setup-field">
+              <span class="setup-label">Match type</span>
+              <div class="segmented" data-field="onlineMatchType">
+                <button type="button" class="seg is-selected" data-match-type="duel">Classic 1v1</button>
+                <button type="button" class="seg" data-match-type="ffa4">4 Player FFA</button>
+                <button type="button" class="seg" data-match-type="teams4">2v2 Teams</button>
+              </div>
+            </div>
             <div class="menu-buttons">
               <button type="button" class="primary menu-btn" data-action="quickMatch">Quick Match</button>
               <button type="button" class="menu-btn" data-action="createRoom">Create Private Room</button>
