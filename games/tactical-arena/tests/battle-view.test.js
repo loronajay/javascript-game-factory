@@ -276,6 +276,34 @@ test("raging board units carry a rage state class and aura element", () => {
   }
 });
 
+test("board sprite facing follows player ownership instead of board position", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const state = createBattleState();
+    const makeUnit = (id, player, position) => ({
+      id,
+      player,
+      type: "swordsman",
+      hp: 25,
+      mp: 20,
+      position,
+      statuses: [],
+      statModifiers: {}
+    });
+
+    const p1Token = createUnitFigure(metrics, makeUnit("p1-crossed", 1, { x: 9, y: 9 }), { state, onUnitClick: () => {} });
+    const p2Token = createUnitFigure(metrics, makeUnit("p2-left", 2, { x: 1, y: 1 }), { state, onUnitClick: () => {} });
+
+    assert.equal(p1Token.findByClass("sprite-figure").getAttribute("transform"), null);
+    assert.equal(p2Token.findByClass("sprite-figure").getAttribute("transform"), "scale(-1 1)");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("the selected-unit HUD gains a rage glow state", () => {
   const state = createBattleState();
   const unit = state.units.find((candidate) => candidate.id === "p1-swordsman");
