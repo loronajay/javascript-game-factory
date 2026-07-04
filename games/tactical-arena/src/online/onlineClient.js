@@ -16,7 +16,7 @@
 // revision so a divergence is caught.
 //
 // room (lobby) message contract (all `value`s are JSON strings):
-//   owner -> all : config   { rulesetVersion, size }            match framing
+//   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
 //   each  -> all : setup     { seat, composition }              blind squad pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
@@ -30,7 +30,7 @@ const PROD_WS_URL = "wss://factory-network-server-production.up.railway.app";
 const LOCAL_WS_PORT = "3000";
 const GAME_ID = "tactical-arena";
 const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 2;
+const MAX_PLAYERS = 4;
 const RELAY_STORAGE_KEY = "tacticalArenaRelay";
 
 function isLocalHostname(hostname) {
@@ -123,6 +123,9 @@ function parseConfigMessage(value) {
   const rulesetVersion = Number(p.rulesetVersion);
   if (Number.isFinite(rulesetVersion)) out.rulesetVersion = Math.floor(rulesetVersion);
   if (Number.isFinite(size)) out.size = Math.floor(size);
+  if (p.format === "ffa" || p.format === "teams") out.format = p.format;
+  if (p.teamColors && typeof p.teamColors === "object") out.teamColors = { ...p.teamColors };
+  if (p.teamNames && typeof p.teamNames === "object") out.teamNames = { ...p.teamNames };
   return out;
 }
 
@@ -201,7 +204,7 @@ export function createOnlineClient() {
     onLobbyUpdated: null, // (lobby)
     onLobbyStarted: null, // ({ seed, ownerId, members, myClientId })
     onPlayerLeft: null, // ({ clientId, ownerId, playerCount })
-    onRemoteConfig: null, // ({ rulesetVersion?, size? })
+    onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteSetup: null, // ({ seat, composition? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })

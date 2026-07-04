@@ -18,6 +18,7 @@ import { createOnlineSession } from "../online/onlineSession.js";
 
 const RULESET_VERSION = 1; // bump when a wire/rules change makes mixed clients unsafe
 const BOARD_SIZES = [13, 15];
+const PLAYER_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };
 
 export function createOnlineFlow({ onStartMatch }) {
@@ -44,11 +45,17 @@ export function createOnlineFlow({ onStartMatch }) {
   let isOwner = false;
 
   // Owner-authored framing, mirrored to every client via `config`.
-  const config = { rulesetVersion: RULESET_VERSION, size: 13 };
+  const config = {
+    rulesetVersion: RULESET_VERSION,
+    size: 13,
+    format: "ffa",
+    teamColors: { ...TEAM_COLOR },
+    teamNames: { 1: "", 2: "" },
+  };
   let receivedConfig = null; // what a non-owner adopts from the owner
 
   // Local blind squad pick — same roster pop-up as hot-seat.
-  const squadPicker = createSquadPicker({ title: "Your squad", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1], allowDuplicates: true });
+  const squadPicker = createSquadPicker({ title: "Your squad", initial: DEFAULT_SQUAD, accent: PLAYER_COLOR[1], allowDuplicates: true });
   squadHost.replaceChildren(squadPicker.el);
 
   // Match-start staging — filled from lobby_started (+ setup messages), consumed once.
@@ -72,6 +79,10 @@ export function createOnlineFlow({ onStartMatch }) {
     return lobby?.players?.length ?? 0;
   }
 
+  function formatForCount(count = playerCount()) {
+    return count === 4 ? "teams" : "ffa";
+  }
+
   function identity() {
     try {
       return {
@@ -84,18 +95,33 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function pushConfig() {
-    client?.sendConfig({ rulesetVersion: RULESET_VERSION, size: config.size });
+    config.format = formatForCount();
+    client?.sendConfig({
+      rulesetVersion: RULESET_VERSION,
+      size: config.size,
+      format: config.format,
+      teamColors: { ...config.teamColors },
+      teamNames: { ...config.teamNames },
+    });
   }
 
   function renderRoster() {
     rosterEl.replaceChildren();
+    const count = playerCount();
+    const teams = formatForCount(count) === "teams";
     for (const p of lobby?.players ?? []) {
       const li = document.createElement("li");
       li.className = "lobby-roster-item";
-      li.style.setProperty("--team", TEAM_COLOR[p.seat] ?? TEAM_COLOR[1]);
       const tags = [];
       if (p.id === lobby?.ownerId) tags.push('<span class="lobby-tag host">Host</span>');
       if (p.id === myClientId) tags.push('<span class="lobby-tag you">You</span>');
+      if (teams) {
+        const team = p.seat % 2 === 1 ? 1 : 2;
+        li.style.setProperty("--team", TEAM_COLOR[team] ?? PLAYER_COLOR[1]);
+        tags.push(`<span class="lobby-tag team">Team ${team}</span>`);
+      } else {
+        li.style.setProperty("--team", PLAYER_COLOR[p.seat] ?? PLAYER_COLOR[1]);
+      }
       li.innerHTML =
         `<span class="lobby-seat">${p.seat}</span>` +
         `<span class="lobby-name">${escapeHtml(p.name)}</span>` +
@@ -106,6 +132,7 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function syncUI() {
     const cfg = activeConfig() ?? config;
+    cfg.format = formatForCount();
     selectSeg(cfg.size);
     for (const seg of sizeSegs) seg.disabled = !isOwner;
     hostHintEl.textContent = isOwner ? "(you set it)" : "(set by host)";
@@ -119,11 +146,14 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function syncStart() {
     const count = playerCount();
+    const ready = count === 2 || count === 4;
     startBtn.hidden = !isOwner;
-    startBtn.disabled = !(isOwner && count >= 2);
+    startBtn.disabled = !(isOwner && ready);
     if (isOwner) {
-      lobbyHintEl.hidden = count >= 2;
-      lobbyHintEl.textContent = "Waiting for an opponent to join…";
+      lobbyHintEl.hidden = ready;
+      lobbyHintEl.textContent = count < 2
+        ? "Waiting for an opponent to join..."
+        : "Need either 2 players for a duel or 4 players for 2v2.";
     } else {
       lobbyHintEl.hidden = false;
       lobbyHintEl.textContent = "Waiting for the host to start…";
@@ -172,7 +202,7 @@ export function createOnlineFlow({ onStartMatch }) {
         setStatus("Rules version mismatch. Refresh before starting this match.");
         return;
       }
-      receivedConfig = { ...receivedConfig, ...cfg };
+      receivedConfig = { ...receivedConfig, ...cfg, format: formatForCount() };
       syncUI();
       tryStart();
     };
@@ -238,7 +268,19 @@ export function createOnlineFlow({ onStartMatch }) {
     const squads = {};
     for (let seat = 1; seat <= count; seat += 1) squads[seat] = compositionsBySeat[seat];
 
-    onStartMatch({ mode: "online", net: session, seed, size: cfg.size, mySeat, squads });
+    const format = formatForCount(count);
+    onStartMatch({
+      mode: "online",
+      net: session,
+      seed,
+      size: cfg.size,
+      mySeat,
+      squads,
+      playerCount: count,
+      format,
+      teamColors: format === "teams" ? { ...cfg.teamColors } : null,
+      teamNames: format === "teams" ? { ...cfg.teamNames } : null,
+    });
   }
 
   function resetLobbyState() {

@@ -73,8 +73,8 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   function showResults(summary) {
     const online = lastConfig?.mode === "online";
-    $("[data-results='winner']", results).textContent = `Player ${summary.winner} wins.`;
-    $("[data-results='winner']", results).style.setProperty("--team", TEAM_COLOR[summary.winner]);
+    $("[data-results='winner']", results).textContent = `${summary.winnerLabel ?? `Player ${summary.winner}`} wins.`;
+    $("[data-results='winner']", results).style.setProperty("--team", summary.winnerColor ?? TEAM_COLOR[summary.winner]);
     renderReport($("[data-results='report']", results), summary.teams);
     const stats = $("[data-results='stats']", results);
     stats.innerHTML = "";
