@@ -916,7 +916,7 @@ function resolveTetherGrab(state, command, art) {
       resolveVictory(next);
       return accept(next, [{
         type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
-        hit: false, missed: true, roll: swing.hitRoll, damage: 0, targetIds: [], damageByTarget: {}, mpCost: cost
+        hit: false, missed: true, rolled: true, roll: swing.hitRoll, damage: 0, targetIds: [], damageByTarget: {}, mpCost: cost
       }]);
     }
   }
@@ -947,7 +947,7 @@ function resolveTetherGrab(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
-    from, to: { ...destination }, damage, hit: true, critical: Boolean(swing?.critical),
+    from, to: { ...destination }, damage, hit: true, rolled: grabsEnemy, critical: Boolean(swing?.critical),
     targetIds, damageByTarget, mpCost: cost
   }]);
 }

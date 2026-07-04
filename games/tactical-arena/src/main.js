@@ -561,6 +561,9 @@ async function resolveInstantArt(command) {
     const metrics = createBoardMetrics(state.size);
     const target = findUnit(state, resolved.targetId);
     await effects.playAbilityVfx("tether-grab", { actor: actorBefore, targets: target ? [target] : [] });
+    // An enemy grab rolls to-hit like any strike — reveal the die before hauling/damaging.
+    // An ally grab (rolled === false) is pure repositioning and always lands, so no reveal.
+    if (resolved.rolled) await effects.rollReveal({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) });
     if (resolved.missed) {
       if (target) await effects.floatText(unitCenter(metrics, target), "MISS", "#c9d4e8");
     } else {
@@ -577,6 +580,8 @@ async function resolveInstantArt(command) {
     const metrics = createBoardMetrics(state.size);
     const target = findUnit(state, resolved.targetId);
     await effects.playAbilityVfx("rocket-punch", { actor: actorBefore, targets: target ? [target] : [] });
+    // Rocket Punch always rolls to-hit — reveal the die before the impact resolves.
+    await effects.rollReveal({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) });
     if (target) {
       if (resolved.missed) {
         await effects.floatText(unitCenter(metrics, target), "MISS", "#c9d4e8");
