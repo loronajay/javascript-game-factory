@@ -9,6 +9,7 @@ import { NECROMANCER } from "./units/necromancer.js";
 import { GHOUL } from "./units/ghoul.js";
 import { SNIPER } from "./units/sniper.js";
 import { WITCH_DOCTOR } from "./units/witch-doctor.js";
+import { FATHER_TIME } from "./units/father-time.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
@@ -19,7 +20,8 @@ export const UNIT_TYPES = Object.freeze({
   necromancer: NECROMANCER,
   ghoul: GHOUL,
   sniper: SNIPER,
-  "witch-doctor": WITCH_DOCTOR
+  "witch-doctor": WITCH_DOCTOR,
+  "father-time": FATHER_TIME
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -128,6 +130,10 @@ function auraEntries(source, state) {
 export function getUnitAuraRadius(source, state) {
   let radius = 0;
   for (const { radius: r } of auraEntries(source, state)) radius = Math.max(radius, r);
+  // A damage aura (Father Time's Time Steal) also projects a visible zone. It uses a
+  // FLAT radius (no RAGE extension) so the drawn overlay matches applyTimeStealTick.
+  const passiveEffect = getUnitType(source.type).passive?.effect;
+  if (passiveEffect?.type === "damageAura") radius = Math.max(radius, passiveEffect.radius ?? 2);
   return radius;
 }
 
@@ -169,6 +175,24 @@ export function getAuraSources(state) {
   return sources;
 }
 
+// Source-linked persistent stat modifiers placed on a unit (Father Time's Age). Each
+// entry is { sourceId, stats }; it applies only while its source is still alive, so a
+// modifier "lasts until the source is defeated" needs no cleanup path — the fold just
+// stops. Needs state to resolve the source, mirroring the aura folds (skipped when
+// state is null, exactly like team/enemy auras).
+function linkedStatModTotals(unit, state) {
+  const totals = {};
+  if (!state?.units || !unit.linkedStatMods?.length) return totals;
+  for (const mod of unit.linkedStatMods) {
+    const source = state.units.find((u) => u.id === mod.sourceId);
+    if (!source || source.hp <= 0) continue;
+    for (const [name, value] of Object.entries(mod.stats ?? {})) {
+      if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
+    }
+  }
+  return totals;
+}
+
 // Runtime modifiers are deliberately numeric and additive. Status effects,
 // map auras, and future ARTS can feed this same seam without teaching every
 // ability about one another. Per-unit passives apply after external modifiers.
@@ -181,6 +205,9 @@ export function getEffectiveStats(unit, state = null) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(enemyAuraStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  for (const [name, value] of Object.entries(linkedStatModTotals(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
 
@@ -245,7 +272,12 @@ export const AI_INTENTS = Object.freeze([
   "tilePulse", "reposition", "rush", "summon", "placeObject", "defend",
   // Self/team support casts with no enemy target (Witch Doctor's Fire/Spirit/
   // Misfortune/Black Death dances): buff allies, cleanse, or shift stance.
-  "buffAllies"
+  "buffAllies",
+  // Father Time's ally-OR-enemy single-target utility + revive:
+  //   statBuff — Age: persistent +stat on an ally / -stat on an enemy.
+  //   hasten   — Time Stretch: +MOVE on an ally / Slow on an enemy.
+  //   revive   — Rewind: return a fallen ally to the board.
+  "statBuff", "hasten", "revive"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

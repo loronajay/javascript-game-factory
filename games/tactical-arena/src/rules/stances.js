@@ -41,15 +41,16 @@ export function getGlobalHealBonus(state) {
   return bonus;
 }
 
-// The multiplier on a status effect's success chance for a roll made by `caster`.
-// Misfortune Stance doubles the caster's TEAM's status rolls (a living ally in that
-// stance). 1 when nothing applies. Chance is later clamped to [0,1] by the caller.
-export function getTeamStatusChanceMultiplier(state, caster) {
+// The multiplier on a status effect's success chance for ANY roll on the board right
+// now. Misfortune Stance doubles status rolls GLOBALLY (allies and foes alike) while
+// a living Witch Doctor holds it — it's a battlefield-wide curse, not a team buff. 1
+// when nothing applies. Chance is later clamped to [0,1] by the caller.
+export function getGlobalStatusChanceMultiplier(state) {
   let mult = 1;
   for (const unit of state?.units ?? []) {
-    if (unit.hp <= 0 || unit.player !== caster.player) continue;
+    if (unit.hp <= 0) continue;
     const stance = getStanceEffect(unit);
-    if (Number.isFinite(stance?.teamStatusChanceMultiplier)) mult = Math.max(mult, stance.teamStatusChanceMultiplier);
+    if (Number.isFinite(stance?.globalStatusChanceMultiplier)) mult = Math.max(mult, stance.globalStatusChanceMultiplier);
   }
   return mult;
 }

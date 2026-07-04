@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -134,7 +134,11 @@ export function isTargetedMode(mode, actor) {
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
     art.targeting?.shape !== "nukeAura" &&
-    art.targeting?.shape !== "tilePlacement"
+    art.targeting?.shape !== "tilePlacement" &&
+    // Father Time's ally-or-enemy casts (Age, Time Stretch) and Rewind's revive
+    // placement do their own highlighting below, not the enemy-only targeted wash.
+    art.targeting?.shape !== "allyOrEnemy" &&
+    art.targeting?.shape !== "revive"
   );
 }
 
@@ -228,6 +232,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (actor && mode === "art:summon-ghoul") legal = getSummonPlacementTiles(state, actor, getArt(actor.type, "summon-ghoul"));
   if (actor && mode === "art:build-cover") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "build-cover"));
   if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));
+  // Rewind places a revived ally on an empty tile within range (same rule as a summon).
+  if (actor && mode === "art:rewind") legal = getRevivePlacementTiles(state, actor, getArt(actor.type, "rewind"));
 
   // Self-centred AoE blasts (Dark Bomb, Nuke): preview the whole detonation
   // footprint as a range wash and light every enemy caught inside as a legal
@@ -274,6 +280,34 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         for (const u of state.units) {
           if (u.hp > 0 && u.player === actor.player) legal.add(positionKey(u.position));
         }
+      }
+    }
+  }
+
+  // Father Time's ally-OR-enemy casts (Age, Time Stretch): a Chebyshev range wash
+  // (walls block, bodies don't — these aren't physical strikes) plus every unit in
+  // range (ally AND enemy) as a legal target. Marked so the target reticle lights on
+  // in-range units below, since the bright tile hides under the figure.
+  let isAllyOrEnemyArt = false;
+  if (actor && mode?.startsWith("art:")) {
+    const utilArt = getArt(actor.type, mode.slice("art:".length));
+    if (utilArt?.targeting?.shape === "allyOrEnemy") {
+      isAllyOrEnemyArt = true;
+      const reach = getEffectiveStats(actor, state).attackRange;
+      for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
+        for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
+          const cell = { x, y };
+          if (!isOnBoard(state, cell)) continue;
+          if (chebyshevDistance(actor.position, cell) === 0) continue;
+          if (isWallBetween(state, actor.position, cell, actor)) continue;
+          range.add(positionKey(cell));
+        }
+      }
+      for (const u of state.units) {
+        if (u.hp <= 0 || u.id === actor.id) continue;
+        if (chebyshevDistance(actor.position, u.position) > reach) continue;
+        if (isWallBetween(state, actor.position, u.position, actor)) continue;
+        legal.add(positionKey(u.position));
       }
     }
   }
@@ -343,7 +377,11 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       depth: u.position.x + u.position.y,
       z: 1,
       make: () => {
-        const isTarget = (targeted || Boolean(nukeArt)) && actor && u.player !== actor.player && legal.has(positionKey(u.position));
+        const isTarget = actor && legal.has(positionKey(u.position)) && (
+          ((targeted || Boolean(nukeArt)) && u.player !== actor.player) ||
+          // Age / Time Stretch reticle every in-range unit they can target (ally or enemy).
+          (isAllyOrEnemyArt && u.id !== actor.id)
+        );
         return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state });
       }
     });

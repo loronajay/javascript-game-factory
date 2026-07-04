@@ -1040,6 +1040,81 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
   }
 
+  // The Witch Doctor's dances (and any future stance-caster). Every dance is a
+  // GLOBAL effect — a team-wide or board-wide ritual — so it deliberately reads
+  // differently from a single-target cast: a long gather on the dancer, a
+  // whole-board color wash at release, a ring that ripples out past the edges of
+  // any board size, an ambient aura orbiting the dancer, and a beacon pulse that
+  // lands on every affected tile staggered by its distance from the dancer, so
+  // the wave visibly propagates outward instead of just appearing everywhere.
+  async function ritual(actor, targets, vfx) {
+    if (reducedMotion()) {
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      return;
+    }
+    await playWindup(actor, vfx);
+    if (vfx.soundKey) sound.play(vfx.soundKey);
+    if (vfx.shake) shake(vfx.shake);
+    const center = effectPoint(actor.position, 18);
+    const ground = unitBase(actor.position);
+    const duration = vfx.durationMs ?? 900;
+    const animations = [];
+
+    if (board) {
+      const box = board.viewBox.baseVal;
+      const wash = svg("rect", { class: "fx-critflash", x: box.x, y: box.y, width: box.width, height: box.height, fill: vfx.colors.core });
+      effectsLayer.appendChild(wash);
+      animations.push(waitForAnimation(wash.animate([
+        { opacity: 0 },
+        { opacity: 0.34, offset: 0.22 },
+        { opacity: 0.16, offset: 0.6 },
+        { opacity: 0 }
+      ], { duration, easing: "ease-out" })).then(() => wash.remove()));
+    }
+
+    // A ring rippling outward from the dancer far enough to cross any board size.
+    const reach = boardMetrics.tileWidth * 9;
+    const ring = svg("ellipse", { class: "fx-ring", cx: ground.x, cy: ground.y + 6, rx: 10, ry: 5, stroke: vfx.colors.core, filter: "url(#softGlow)" });
+    effectsLayer.appendChild(ring);
+    animations.push(waitForAnimation(ring.animate([
+      { rx: 10, ry: 5, opacity: 0.9, strokeWidth: 6 },
+      { rx: reach * 0.5, ry: reach * 0.25, opacity: 0.3, strokeWidth: 2, offset: 0.62 },
+      { rx: reach, ry: reach * 0.5, opacity: 0, strokeWidth: 1 }
+    ], { duration, easing: "cubic-bezier(.15,.75,.3,1)" })).then(() => ring.remove()));
+
+    // Rising aura motes orbiting the dancer — the ritual's own signature glow.
+    const count = vfx.particleCount ?? 16;
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count;
+      const dist = 20 + (i % 3) * 10;
+      const mote = svg("circle", { class: "fx-mote", cx: 0, cy: 0, r: 2.6 + (i % 2), fill: i % 2 ? vfx.colors.trail : vfx.colors.core, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(mote);
+      animations.push(waitForAnimation(mote.animate([
+        { transform: `translate(${center.x}px, ${center.y}px) scale(.4)`, opacity: 0 },
+        { transform: `translate(${center.x + Math.cos(angle) * dist}px, ${center.y + Math.sin(angle) * dist * 0.6 - 14}px) scale(1)`, opacity: 0.9, offset: 0.4 },
+        { transform: `translate(${center.x + Math.cos(angle) * dist * 1.5}px, ${center.y - 46 - (i % 3) * 6}px) scale(.3)`, opacity: 0 }
+      ], { duration: duration * 0.85, delay: i * 18, easing: "ease-out", fill: "backwards" })).then(() => mote.remove()));
+    }
+
+    // A beacon pulse arrives at every affected tile, staggered by distance from the
+    // dancer so the ritual reads as a wave washing over the whole team/board.
+    for (const target of targets) {
+      if (target.id === actor.id) continue;
+      const point = unitBase(target.position);
+      const distance = Math.hypot(target.position.x - actor.position.x, target.position.y - actor.position.y);
+      const delay = Math.min(460, distance * 55);
+      const beacon = svg("circle", { class: "fx-ring", cx: point.x, cy: point.y - 4, r: 4, stroke: vfx.colors.impact, filter: "url(#softGlow)" });
+      effectsLayer.appendChild(beacon);
+      animations.push(waitForAnimation(beacon.animate([
+        { r: 4, opacity: 0, strokeWidth: 4 },
+        { r: 22, opacity: 0.92, strokeWidth: 2.5, offset: 0.5 },
+        { r: 30, opacity: 0, strokeWidth: 1 }
+      ], { duration: 420, delay, easing: "ease-out" })).then(() => beacon.remove()));
+    }
+
+    await Promise.all(animations);
+  }
+
   async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect, coneCells } = {}) {
     const vfx = getAbilityVfx(artId);
     if (!vfx || !actor) return;
@@ -1069,6 +1144,10 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
     if (vfx.type === "summonRise") {
       await summonRise(actor, targets, vfx);
+      return;
+    }
+    if (vfx.type === "ritual") {
+      await ritual(actor, targets, vfx);
       return;
     }
     if (vfx.type === "statusStrike" && target && effect?.applied) {

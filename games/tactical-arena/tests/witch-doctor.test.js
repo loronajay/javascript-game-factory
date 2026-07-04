@@ -8,6 +8,7 @@ import { attack, beginActivation, defend, finishActivation, useArt } from "../sr
 import { resolvePhysicalStrike } from "../src/rules/combat.js";
 import { buffAlliesValue } from "../src/ai/evaluate.js";
 import { chooseActivation } from "../src/ai/cpuController.js";
+import { getAbilityVfx, getStanceVfx } from "../src/ui/vfxCatalog.js";
 
 // The Witch Doctor is a dance-caster whose "Dancing Man" passive is a persistent
 // STANCE set by the dance it used last. These tests build their own fixtures (never
@@ -237,7 +238,7 @@ test("Misfortune Dance clears every status from all units, allies and foes", () 
   assert.equal(findId(r.nextState, "wd").stance, "misfortune");
 });
 
-test("Misfortune Stance doubles the caster team's status chance (a high roll now lands)", () => {
+test("Misfortune Stance doubles an ally's status chance (a high roll now lands)", () => {
   // Mystic Silence is 70%. A 0.9 roll fails normally, but an allied Witch Doctor in
   // Misfortune Stance doubles the chance to a capped 100%, so it lands.
   const withWd = (stance) => createBattleState({
@@ -256,6 +257,23 @@ test("Misfortune Stance doubles the caster team's status chance (a high roll now
   const on = cast(withWd("misfortune"));
   assert.ok(on.accepted);
   assert.equal(findId(on.nextState, "foe").statuses.some((s) => s.type === "silence"), true, "Misfortune ×2 lands the silence");
+});
+
+test("Misfortune Stance also doubles an ENEMY caster's status chance (it's global, not a team buff)", () => {
+  // A Witch Doctor's Misfortune Stance curses the whole battlefield, so even an
+  // opposing caster's status roll benefits from the ×2 multiplier.
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0, stance: "misfortune" },
+      { id: "mystic", player: 2, type: "mystic", x: 5, y: 5 },
+      { id: "target", player: 1, type: "swordsman", x: 6, y: 5 }
+    ]
+  });
+  state.currentPlayer = 2;
+  const s = activate(state, "mystic");
+  const r = applyCommand(s, useArt(2, "mystic", "silence", { targetId: "target", effectRoll: 0.9 }));
+  assert.ok(r.accepted);
+  assert.equal(findId(r.nextState, "target").statuses.some((st) => st.type === "silence"), true, "enemy caster still benefits from the global Misfortune multiplier");
 });
 
 // --- Black Death Stance (RAGE) ---
@@ -395,4 +413,89 @@ test("CPU: the Witch Doctor cleanses the team with Misfortune Dance when it's th
   const cmds = chooseActivation(state, { cpuPlayer: 2, difficulty: "hard" });
   assert.ok(cmds.some((c) => c.artId === "misfortune-dance"),
     "cleansing three poisoned allies outscores idle advancing");
+});
+
+// --- Dance feedback plumbing (every dance is a GLOBAL effect, not a single-target
+// cast) ---. main.js reads these ART_RESOLVED fields to drive the shared "ritual"
+// VFX + per-unit float text (see ui/effects.js's `ritual` + ui/vfxCatalog.js's
+// "*-dance" entries); pin them here so a future dance can't silently ship mute.
+
+test("team-scoped dances (heal/buff/MP) beacon every living ally, not the whole board", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0 },
+      { id: "ally", player: 1, type: "swordsman", x: 1, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+  for (const artId of ["rain-dance", "fire-dance", "spirit-dance"]) {
+    const s = activate(state, "wd");
+    const r = applyCommand(s, useArt(1, "wd", artId));
+    assert.ok(r.accepted, `${artId} rejected: ${r.errorCode}`);
+    const event = r.events.find((e) => e.type === "ART_RESOLVED");
+    assert.deepEqual(new Set(event.beaconTargetIds), new Set(["wd", "ally"]), `${artId} beacons allies only`);
+  }
+});
+
+function freshWdState(hp = 24) {
+  return createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0, hp },
+      { id: "ally", player: 1, type: "swordsman", x: 1, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 2, y: 0 }
+    ]
+  });
+}
+
+test("globally-scoped dances (cleanse/blind) beacon every living unit, allies and foes", () => {
+  let s = activate(freshWdState(), "wd");
+  let r = applyCommand(s, useArt(1, "wd", "misfortune-dance"));
+  assert.ok(r.accepted);
+  let event = r.events.find((e) => e.type === "ART_RESOLVED");
+  assert.deepEqual(new Set(event.beaconTargetIds), new Set(["wd", "ally", "foe"]), "Misfortune Dance beacons the whole board");
+
+  s = activate(freshWdState(5), "wd");
+  r = applyCommand(s, useArt(1, "wd", "black-death-dance"));
+  assert.ok(r.accepted, `black-death-dance rejected: ${r.errorCode}`);
+  event = r.events.find((e) => e.type === "ART_RESOLVED");
+  assert.deepEqual(new Set(event.beaconTargetIds), new Set(["wd", "ally", "foe"]), "Black Death Dance beacons the whole board");
+});
+
+test("Fire Dance's team buff and Black Death Dance's self buff both carry a readable stat label", () => {
+  let s = activate(freshWdState(), "wd");
+  let r = applyCommand(s, useArt(1, "wd", "fire-dance"));
+  assert.ok(r.accepted);
+  let event = r.events.find((e) => e.type === "ART_RESOLVED");
+  assert.equal(event.buffLabel, "+1 STR");
+  assert.deepEqual(event.buffed, ["wd", "ally"]);
+
+  s = activate(freshWdState(5), "wd");
+  r = applyCommand(s, useArt(1, "wd", "black-death-dance"));
+  assert.ok(r.accepted, `black-death-dance rejected: ${r.errorCode}`);
+  event = r.events.find((e) => e.type === "ART_RESOLVED");
+  assert.equal(event.selfBuffed, true);
+  assert.equal(event.selfBuffLabel, "+2 STR / +1 DEF / +1 MOVE");
+});
+
+test("every dance registers a global 'ritual' VFX recipe keyed by its own gather duration", () => {
+  const dances = ["rain-dance", "fire-dance", "spirit-dance", "misfortune-dance", "black-death-dance"];
+  const distinctColors = new Set();
+  for (const artId of dances) {
+    const vfx = getAbilityVfx(artId);
+    assert.equal(vfx?.type, "ritual", `${artId} should use the shared global-ritual VFX`);
+    assert.equal(vfx.windup?.style, "gather", `${artId} should gather before releasing`);
+    assert.ok(vfx.soundKey, `${artId} needs a sound`);
+    distinctColors.add(vfx.colors.core);
+  }
+  assert.equal(distinctColors.size, dances.length, "each dance should read as a visually distinct ritual");
+});
+
+test("every stance has a registered badge/tag visual", () => {
+  for (const stanceId of ["rain", "fire", "spirit", "misfortune", "blackDeath"]) {
+    const visual = getStanceVfx(stanceId);
+    assert.ok(visual, `${stanceId} missing from STANCE_VFX`);
+    assert.ok(visual.glyph, `${stanceId} needs a board-badge glyph`);
+    assert.ok(visual.color, `${stanceId} needs a color`);
+    assert.ok(visual.label, `${stanceId} needs a label`);
+  }
 });

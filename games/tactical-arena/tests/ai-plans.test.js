@@ -128,6 +128,40 @@ test("the Sniper offers legal tile-placement plans (Build Cover / Throw Cigar)",
   for (const plan of placements) assertPlanReplays(state, 1, plan);
 });
 
+test("Father Time offers statBuff / hasten / revive plans that all replay cleanly", () => {
+  // A raging Father Time (Rewind unlocked) with a fallen ally and enemies in range.
+  const state = createBattleState({
+    size: 13, seed: 5,
+    units: [
+      { id: "p1-ft", type: "father-time", player: 1, x: 5, y: 5, hp: 4, mp: 40 },
+      { id: "p1-ally", type: "swordsman", player: 1, x: 5, y: 6 },
+      { id: "p1-dead", type: "archer", player: 1, x: 4, y: 6, hp: 0 }, // revivable
+      { id: "p2-a", type: "swordsman", player: 2, x: 6, y: 5 },
+      { id: "p2-b", type: "mystic", player: 2, x: 7, y: 6 }
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-ft"));
+  assert.ok(plans.some((p) => p.primary.artId === "age" && p.primary.stat), "expected an Age plan carrying a stat");
+  assert.ok(plans.some((p) => p.primary.artId === "time-stretch"), "expected a Time Stretch plan");
+  assert.ok(plans.some((p) => p.primary.artId === "rewind" && p.primary.targetId === "p1-dead" && p.primary.targetPosition),
+    "expected a Rewind plan targeting the fallen ally + a tile");
+  for (const plan of plans) assertPlanReplays(state, 1, plan);
+});
+
+test("a healthy (non-raging) Father Time offers no Rewind plans", () => {
+  const state = createBattleState({
+    size: 13, seed: 5,
+    units: [
+      { id: "p1-ft", type: "father-time", player: 1, x: 5, y: 5 },
+      { id: "p1-dead", type: "archer", player: 1, x: 4, y: 6, hp: 0 },
+      { id: "p2-a", type: "swordsman", player: 2, x: 6, y: 5 }
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-ft"));
+  assert.ok(!plans.some((p) => p.primary.artId === "rewind"));
+  for (const plan of plans) assertPlanReplays(state, 1, plan);
+});
+
 test("projectPlan reduces an attacked enemy's expected HP, and planMpCost sums ART cost", () => {
   const state = skirmish();
   const attackPlan = { unitId: "p1-sword", bonus: null, moveTo: null, movePhase: null,

@@ -635,6 +635,68 @@ const P_SMOKE_BOMB = {
   effects: { highpass: 150, lowpass: 6000, saturation: 0.02, compressor: { threshold: -20, ratio: 3, attack: 0.002, release: 0.14 } }
 };
 
+// Father Time: Age — a slow clock chime settling onto the target
+const P_AGE = {
+  id: "ta_age", duration: 0.5, gain: 0.7,
+  layers: [
+    { type: "oscillator", waveform: "sine", gain: 0.16, duration: 0.42,
+      frequencyCurve: [[0, 660], [0.5, 523], [1, 440]],
+      envelope: [[0, 0.0001], [0.05, 1], [0.5, 0.5], [1, 0.0001]] },
+    { type: "oscillator", waveform: "triangle", gain: 0.1, duration: 0.3, offset: 0.06,
+      frequencyCurve: [[0, 880], [1, 587]],
+      envelope: [[0, 0.0001], [0.04, 0.7], [0.6, 0.3], [1, 0.0001]] },
+    { type: "noise", color: "white", gain: 0.04, duration: 0.08,
+      envelope: [[0, 0.0001], [0.02, 1], [0.4, 0.2], [1, 0.0001]],
+      filter: { type: "highpass", frequency: 3000, q: 0.7 } }
+  ],
+  effects: { highpass: 120, lowpass: 8000, delay: { time: 0.14, feedback: 0.2, mix: 0.12 }, compressor: { threshold: -20, ratio: 3, attack: 0.002, release: 0.16 } }
+};
+
+// Father Time: Time Stretch — a quick upward tempo shimmer
+const P_TIME_STRETCH = {
+  id: "ta_time_stretch", duration: 0.4, gain: 0.68,
+  layers: [
+    { type: "oscillator", waveform: "sine", gain: 0.14, duration: 0.32,
+      frequencyCurve: [[0, 494], [1, 784]],
+      envelope: [[0, 0.0001], [0.05, 1], [0.6, 0.5], [1, 0.0001]] },
+    { type: "oscillator", waveform: "triangle", gain: 0.08, duration: 0.26, offset: 0.05,
+      frequencyCurve: [[0, 659], [1, 988]],
+      envelope: [[0, 0.0001], [0.05, 0.7], [0.6, 0.3], [1, 0.0001]] }
+  ],
+  effects: { highpass: 150, lowpass: 9000, delay: { time: 0.1, feedback: 0.16, mix: 0.14 }, compressor: { threshold: -20, ratio: 3, attack: 0.002, release: 0.12 } }
+};
+
+// Father Time: Rewind — a warm reversal swell, life returning
+const P_REWIND = {
+  id: "ta_rewind", duration: 0.9, gain: 0.82,
+  layers: [
+    { type: "oscillator", waveform: "sine", gain: 0.2, duration: 0.78,
+      frequencyCurve: [[0, 294], [0.6, 392], [1, 523]],
+      envelope: [[0, 0.0001], [0.1, 0.8], [0.7, 1], [1, 0.0001]] },
+    { type: "oscillator", waveform: "sine", gain: 0.14, duration: 0.7, offset: 0.1,
+      frequencyCurve: [[0, 392], [1, 659]],
+      envelope: [[0, 0.0001], [0.12, 0.6], [0.7, 0.8], [1, 0.0001]] },
+    { type: "noise", color: "pink", gain: 0.05, duration: 0.5,
+      envelope: [[0, 0.0001], [0.1, 0.6], [0.6, 0.3], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 600], [1, 2000]], q: 0.8 } }
+  ],
+  effects: { highpass: 90, lowpass: 8500, delay: { time: 0.18, feedback: 0.24, mix: 0.18 }, compressor: { threshold: -20, ratio: 3, attack: 0.004, release: 0.2 } }
+};
+
+// Father Time: Time Steal — a soft draining tick at the rollover
+const P_TIME_STEAL = {
+  id: "ta_time_steal", duration: 0.34, gain: 0.6,
+  layers: [
+    { type: "oscillator", waveform: "sine", gain: 0.12, duration: 0.28,
+      frequencyCurve: [[0, 523], [1, 349]],
+      envelope: [[0, 0.0001], [0.04, 1], [0.5, 0.4], [1, 0.0001]] },
+    { type: "noise", color: "pink", gain: 0.06, duration: 0.2,
+      envelope: [[0, 0.0001], [0.03, 0.8], [0.5, 0.3], [1, 0.0001]],
+      filter: { type: "bandpass", frequencyCurve: [[0, 1200], [1, 500]], q: 0.9 } }
+  ],
+  effects: { highpass: 120, lowpass: 7000, saturation: 0.02, compressor: { threshold: -20, ratio: 3, attack: 0.002, release: 0.12 } }
+};
+
 // Victory chord
 const P_VICTORY = {
   id: "ta_victory", duration: 1.2, gain: 0.88,
@@ -702,4 +764,9 @@ export const SOUND_CATALOG = Object.freeze([
   { key: "wallBreak",      patch: P_WALL_BREAK },
   { key: "fireTick",       patch: P_FIRE_TICK },
   { key: "smokeBomb",      patch: P_SMOKE_BOMB },
+  // Father Time
+  { key: "age",            patch: P_AGE },
+  { key: "timeStretch",    patch: P_TIME_STRETCH },
+  { key: "rewind",         patch: P_REWIND },
+  { key: "timeSteal",      patch: P_TIME_STEAL },
 ]);

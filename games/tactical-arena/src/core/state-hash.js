@@ -47,6 +47,9 @@ function canonicalUnits(units) {
         // damage, so they are part of the authoritative hash.
         `${unit.stance ?? "-"},${unit.rainCharged ? 1 : 0},` +
         `${stableStringify(unit.statModifiers ?? {})},` +
+        // Source-linked modifiers (Father Time's Age) change future effective stats, so
+        // they are part of the authoritative hash.
+        `${stableStringify(unit.linkedStatMods ?? [])},` +
         `[${canonicalStatuses(unit.statuses)}]`
     )
     .join("|");

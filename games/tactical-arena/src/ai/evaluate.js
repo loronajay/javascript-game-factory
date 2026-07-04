@@ -111,10 +111,43 @@ export function expectedHeal(unit, amount, state = null) {
 // Can `unit` bring a strike to bear on any of `enemies` next turn (move + reach)?
 // The same reach heuristic incomingThreat uses, so the CPU's read of "an ally will
 // fight next turn" matches its read of who threatens it.
-function canReachAnEnemy(state, unit, enemies) {
+export function canReachAnEnemy(state, unit, enemies) {
   const stats = getEffectiveStats(unit, state);
   const reach = stats.moveRange + stats.attackRange;
   return enemies.some((enemy) => chebyshevDistance(unit.position, enemy.position) <= reach);
+}
+
+// Turns of value the CPU counts from a PERMANENT stat change (Father Time's Age). It
+// lasts all game, but the tactical horizon is short — capped like the other priors.
+const PERSIST_HORIZON = 3;
+
+// Value (damage currency) of one Age cast: a persistent ±1 STR/DEF. On an ally it's a
+// buff worth more if that ally will actually fight; on an enemy it either denies offense
+// (-STR) or softens it for our attacks (-DEF). Capped by the target's threat so it never
+// beats a kill. Reuses the same reach/offense priors as the rest of the evaluator.
+export function ageValue(state, caster, target, stat, isAlly) {
+  const enemies = livingUnits(state).filter((unit) => areEnemies(caster, unit));
+  if (isAlly) {
+    const reach = canReachAnEnemy(state, target, enemies) ? 1 : 0.35;
+    const per = stat === "strength" ? HIT_BASELINE : 0.8; // STR ≈ a hit's worth; DEF ≈ mitigation
+    return Math.min(per * PERSIST_HORIZON * reach, unitThreatValue(target));
+  }
+  return Math.min(HIT_BASELINE * PERSIST_HORIZON, unitThreatValue(target));
+}
+
+// Value of one Time Stretch cast. On an enemy it's exactly a 1-turn Slow (reuse the
+// shared status prior). On an ally, +1 MOVE mostly matters when it lets that ally reach
+// the fight it otherwise couldn't — the concrete payoff — otherwise it's minor utility.
+export function hastenValue(state, caster, target, isAlly) {
+  if (!isAlly) return statusValue(target, { status: "slow", durationTurns: 1 }, state);
+  const enemies = livingUnits(state).filter((unit) => areEnemies(caster, unit));
+  const stats = getEffectiveStats(target, state);
+  const reachNow = stats.moveRange + stats.attackRange;
+  const helps = enemies.some((enemy) => {
+    const distance = chebyshevDistance(target.position, enemy.position);
+    return distance > reachNow && distance <= reachNow + 1;
+  });
+  return helps ? 1.5 : 0.4;
 }
 
 // True when a unit is short of MP for at least one of its costed active arts, so a

@@ -45,6 +45,10 @@ rules helper enumerates candidates + how the plan projects onto the board) and t
 | `rush`        | `getFootworkSteps`/`validateFootworkPath` (bounded path search) | Σ true-damage to enemies passed through + reposition value of the end tile | footwork |
 | `summon`      | `getSummonPlacementTiles`                       | summoned piece's own `ai.threatValue` + aura/zone value at the chosen tile | summon-ghoul |
 | `placeObject` | `getWallPlacementTiles` / `getFirePlacementTiles` | `evHints.zoneValue` shaped by `evHints.placeNear` (LOS block for wall, DoT for fire) | build-cover, throw-cigar |
+| `buffAllies`  | none — self/team/global support cast (`selfCast`) | `buffAlliesValue` (team buff / cleanse / global disrupt; 0 when it would no-op) | rain/fire/spirit/misfortune/black-death dances |
+| `statBuff`    | allies AND enemies in `attackRange` (LOS-culled, both stat choices offered) | `ageValue` — persistent ±1 STR/DEF: ally buff vs. enemy offense-deny / softening (control weight) | age |
+| `hasten`      | allies (no LOS) + enemies in `attackRange` (LOS-culled) | `hastenValue` — ally +MOVE reach payoff / enemy 1-turn Slow (control weight) | time-stretch |
+| `revive`      | `getReviveTargets` (fallen allies) × `getRevivePlacementTiles` | revived ally's material (`threatValue`+HP) on the projected board; net vs. MP cost | rewind |
 | `defend`      | none — implicit brace                           | threat-reduction at current tile (defend halves incoming) | *implicit, every unit* |
 
 Notes:

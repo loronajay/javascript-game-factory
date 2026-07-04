@@ -52,8 +52,10 @@ function portraitHtml(type, variant = "is-hud") {
 // active-unit card and the squad HUD rows. The squad rows drop the passive and
 // spent tags (row styling already carries spent) to stay compact.
 function unitTagsHtml(unit, definition, { includePassive = true, includeSpent = true, spentLabel = "Spent" } = {}) {
+  const stance = unit.stance ? definition.stances?.[unit.stance] : null;
   return [
     includePassive && definition.passive ? { label: definition.passive.name, cls: "passive", title: definition.passive.description } : null,
+    stance ? { label: stance.name, cls: `stance stance-${unit.stance}`, title: definition.passive?.description } : null,
     isRaging(unit) ? { label: "RAGE", cls: "rage", title: definition.rageArt?.description } : null,
     isDefending(unit) ? { label: "Defending", cls: "on" } : null,
     includeSpent && unit.spent ? { label: spentLabel, cls: "spent" } : null,

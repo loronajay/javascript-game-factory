@@ -9,9 +9,9 @@
 // shared rule seams — NOT hard-coded per unit (see UNIT_AUTHORING_GUIDE.md):
 //   • getEffectiveStats folds `stances[stance].stats` (Fire Stance's +1 STR).
 //   • rules/stances.js reads the rest: the Rain global heal bonus, the Misfortune
-//     team status-chance ×2, the Black Death magic immunity + global true-damage
-//     rollover tick, and the on-attack triggers (Rain's next-turn haste, Spirit's
-//     ally MP restore).
+//     global status-chance ×2 (everyone, not just his team), the Black Death magic
+//     immunity + global true-damage rollover tick, and the on-attack triggers (Rain's
+//     next-turn haste, Spirit's ally MP restore).
 //   • the reducer's dance resolvers run each dance's one-shot effect then set stance.
 //
 // New engine seams this unit introduced:
@@ -71,9 +71,9 @@ export const WITCH_DOCTOR = Object.freeze({
     }),
     misfortune: Object.freeze({
       name: "Misfortune Stance",
-      // The Witch Doctor's TEAM lands status effects at ×2 chance while he is in
-      // Misfortune Stance (read by rules/statuses via rules/stances.js).
-      teamStatusChanceMultiplier: 2
+      // Status effects land at ×2 chance GLOBALLY (allies and foes alike) while he is
+      // in Misfortune Stance (read by rules/statuses via rules/stances.js).
+      globalStatusChanceMultiplier: 2
     }),
     blackDeath: Object.freeze({
       name: "Black Death Stance",
@@ -137,7 +137,7 @@ export const WITCH_DOCTOR = Object.freeze({
       selfCast: true,
       stance: "misfortune",
       cleanse: Object.freeze({ scope: "all" }),
-      description: "Remove every status effect from all units (allies and foes), then enter Misfortune Stance: your team's status effects are twice as likely to land.",
+      description: "Remove every status effect from all units (allies and foes), then enter Misfortune Stance: status effects are twice as likely to land for everyone.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["stance", "cleanse"]) })
     }),

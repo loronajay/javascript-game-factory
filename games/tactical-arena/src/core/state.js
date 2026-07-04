@@ -12,6 +12,9 @@ function createUnit(spec) {
     mp: spec.mp ?? definition.stats.maxMp,
     statModifiers: { ...(spec.statModifiers ?? {}) },
     statuses: (spec.statuses ?? []).map((status) => ({ ...status })),
+    // Source-linked persistent stat modifiers (Father Time's Age). Each entry is
+    // { sourceId, stats }; folded by getEffectiveStats only while the source lives.
+    linkedStatMods: (spec.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
     defending: false,
     spent: false,
     mageChargeCount: 0,
@@ -122,7 +125,10 @@ export function cloneState(state) {
       ...unit,
       position: { ...unit.position },
       statModifiers: { ...unit.statModifiers },
-      statuses: unit.statuses.map((status) => ({ ...status }))
+      statuses: unit.statuses.map((status) => ({ ...status })),
+      // Deep-copy the source-linked modifier list (Age) — a shallow `...unit` spread
+      // would share the array across clones and leak mutations between states.
+      linkedStatMods: (unit.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } }))
     })),
     activation: state.activation ? {
       ...state.activation,

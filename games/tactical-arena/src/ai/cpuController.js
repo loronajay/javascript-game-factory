@@ -16,8 +16,10 @@ import { getArt, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { isStunned } from "../rules/statuses.js";
 import {
+  ageValue,
   buffAlliesValue,
   expectedStrike,
+  hastenValue,
   incomingThreat,
   isKeyUnit,
   nearestEnemyDistance,
@@ -167,6 +169,19 @@ function planEffectValue(state, unit, plan) {
   // their worth rides the same `control` weight as a status cast.
   if (ai.intent === "buffAllies") {
     return { control: buffAlliesValue(state, unit, art), heal: 0 };
+  }
+  // Father Time's Age (persistent ±stat) and Time Stretch (haste/slow) change no HP now,
+  // so their value rides the `control` weight like a status cast. (Rewind's value is the
+  // revived ally's material on the projected board, so it needs no term here.)
+  if (ai.intent === "statBuff") {
+    const target = findUnit(state, plan.primary.targetId);
+    if (!target) return { control: 0, heal: 0 };
+    return { control: ageValue(state, unit, target, plan.primary.stat ?? "strength", target.player === unit.player), heal: 0 };
+  }
+  if (ai.intent === "hasten") {
+    const target = findUnit(state, plan.primary.targetId);
+    if (!target) return { control: 0, heal: 0 };
+    return { control: hastenValue(state, unit, target, target.player === unit.player), heal: 0 };
   }
   return { control: 0, heal: 0 };
 }

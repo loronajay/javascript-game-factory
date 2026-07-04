@@ -1,7 +1,8 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
-import { createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
+import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { isWallBetween } from "./rules/combat.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
 import { applyCommand } from "./core/reducer.js";
@@ -21,6 +22,7 @@ import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { turnAnnouncementSub } from "./ui/turnAnnouncement.js";
+import { openChoiceModal } from "./ui/choiceModal.js";
 import { buildRoster, buildSummary, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 
 // --- DOM refs ---
@@ -47,6 +49,8 @@ let selectedId = null;
 let mode = null;
 let footworkPath = [];
 let volleyShotOrigin = null;
+// The fallen ally chosen for Father Time's Rewind, awaiting a placement-tile click.
+let rewindTargetId = null;
 let resolving = false;
 
 // --- CPU (single-player) ---
@@ -183,6 +187,7 @@ function startMatch(config) {
   mode = null;
   footworkPath = [];
   volleyShotOrigin = null;
+  rewindTargetId = null;
   resolving = false;
   turnFlash.clear();
   setMessage(online
@@ -476,6 +481,68 @@ async function resolveInstantArt(command) {
     // The cigar visibly tumbles from the Sniper to the tile before the fire takes
     // (the lob recipe plays the throwCigar sound and lands its own impact).
     await effects.playAbilityVfx("throw-cigar", { actor: actorBefore, targetPosition: resolved.position });
+  } else if (resolved?.artId === "age" && actorBefore) {
+    // A time-mote glides to the target; the ±stat change floats where it lands.
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("age", { actor: actorBefore, targets: targetsBefore });
+    if (targetBefore) {
+      const stat = resolved.stat === "defense" ? "DEF" : "STR";
+      const label = `${resolved.delta >= 0 ? "+" : "−"}${Math.abs(resolved.delta)} ${stat}`;
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), label, resolved.delta >= 0 ? "#8cf0a4" : "#ff9d6b");
+    }
+  } else if (resolved?.artId === "time-stretch" && actorBefore) {
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("time-stretch", { actor: actorBefore, targets: targetsBefore });
+    if (targetBefore && resolved.effect?.applied) {
+      const enemy = targetBefore.player !== actorBefore.player;
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), enemy ? "SLOW" : "HASTE", enemy ? "#70b7ff" : "#8cf0a4");
+    }
+  } else if (resolved?.artId === "rewind") {
+    // The revived ally rises from the placement tile (summon-rise motif, warm palette).
+    const revived = findUnit(result.nextState, resolved.revivedUnitId);
+    if (revived) {
+      await effects.playAbilityVfx("rewind", { actor: actorBefore ?? revived, targets: [revived] });
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), revived), "REWIND", "#f7e9c0");
+    }
+  } else if (resolved?.stance !== undefined && actorBefore) {
+    // Witch Doctor dances: a global team/board ritual, never a single-target cast.
+    // One VFX (`ritual`) plays against every unit the reducer says the ritual
+    // actually reached (`beaconTargetIds`), then every numeric/status outcome the
+    // reducer recorded gets its own floating text — heals, MP, buffs, cleanses,
+    // and the global blind all read exactly like every other ability's feedback.
+    const metrics = createBoardMetrics(state.size);
+    const beaconTargets = (resolved.beaconTargetIds ?? []).map((id) => findUnit(state, id)).filter(Boolean);
+    await effects.playAbilityVfx(resolved.artId, { actor: actorBefore, targets: beaconTargets });
+
+    const floats = [];
+    for (const [id, amount] of Object.entries(resolved.healingByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), `+${amount}`, "#8cf0a4"));
+    }
+    for (const [id, amount] of Object.entries(resolved.restoredByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), `+${amount} MP`, "#8cc8ff"));
+    }
+    if (resolved.buffed?.length && resolved.buffLabel) {
+      for (const id of resolved.buffed) {
+        const unit = findUnit(state, id);
+        if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), resolved.buffLabel, "#ffb45e"));
+      }
+    }
+    for (const id of resolved.cleansed ?? []) {
+      const unit = findUnit(state, id);
+      if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), "CLEANSED", "#c89cff"));
+    }
+    if (resolved.selfBuffed && resolved.selfBuffLabel) {
+      floats.push(effects.floatText(unitCenter(metrics, actorBefore), resolved.selfBuffLabel, "#ff9a4c"));
+    }
+    for (const id of resolved.statusTargets ?? []) {
+      const unit = findUnit(state, id);
+      if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), "BLIND", "#f0d77a"));
+    }
+    await Promise.all(floats);
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -777,7 +844,8 @@ function playEventSounds(events) {
           artId === "spark" || artId === "pray" || artId === "wish" ||
           artId === "lightseeker" || artId === "darkseeker" ||
           artId === "dark-bomb" || artId === "summon-ghoul" ||
-          artId === "smoke-bomb" || artId === "build-cover" || artId === "throw-cigar") continue;
+          artId === "smoke-bomb" || artId === "build-cover" || artId === "throw-cigar" ||
+          artId === "age" || artId === "time-stretch" || artId === "rewind") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
       else if (artId === "volley-shot") audio.play("arrowHit");
@@ -794,10 +862,12 @@ function playEventSounds(events) {
 // the committed post-rollover state when this runs.
 function playRolloverFx(events) {
   const burns = events.filter((e) => e.type === "FIRE_DAMAGE");
-  if (!burns.length) return;
-  audio.play("fireTick");
+  const steals = events.filter((e) => e.type === "TIME_STEAL");
+  if (!burns.length && !steals.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
+
+  if (burns.length) audio.play("fireTick");
   for (const burn of burns) {
     const center = unitCenter(metrics, { position: burn.position });
     effects.impact(center, false, "fire");
@@ -805,6 +875,24 @@ function playRolloverFx(events) {
     const after = findUnit(state, burn.unitId);
     if (!after || after.hp <= 0) { effects.deathBurst(center, teamColor(after?.player ?? 1)); killed = true; }
   }
+
+  // Father Time's Time Steal drains nearby enemies at the rollover (true damage) and
+  // refunds him MP — voice + float both, fire-and-forget like the fire burns above.
+  if (steals.length) {
+    audio.play("timeSteal");
+    for (const steal of steals) {
+      const center = unitCenter(metrics, { position: steal.position });
+      effects.impact(center, false, "true");
+      effects.floatText(center, `-${steal.damage}`, "#c9b3ff");
+      const after = findUnit(state, steal.unitId);
+      if (!after || after.hp <= 0) { effects.deathBurst(center, teamColor(after?.player ?? 1)); killed = true; }
+    }
+    for (const mp of events.filter((e) => e.type === "TIME_STEAL_MP")) {
+      const src = findUnit(state, mp.sourceId);
+      if (src) effects.floatText(unitCenter(metrics, src), `+${mp.mpGained} MP`, "#7fd0ff");
+    }
+  }
+
   if (killed) audio.play("unitDefeated");
 }
 
@@ -920,6 +1008,52 @@ async function handleTile(position) {
       mode = null;
       setMessage("Fire started. This unit's activation is complete.");
     }
+  } else if (mode === "art:age") {
+    // Ally-or-enemy targeting, then a STR/DEF stat pick. A wall blocks the cast.
+    const target = unitAt(state, position);
+    const inReach = target && chebyshevDistance(unit.position, target.position) <= getEffectiveStats(unit, state).attackRange &&
+      !isWallBetween(state, unit.position, target.position, unit);
+    if (!inReach) {
+      setMessage("Age: click a highlighted ally or enemy in range.", true);
+    } else {
+      const ally = target.player === unit.player;
+      const stat = await openChoiceModal({
+        title: `Age — ${ally ? "empower" : "weaken"} ${getUnitType(target.type).name}`,
+        subtitle: ally ? "Grant +1 to a stat until Father Time falls." : "Drain 1 from a stat until Father Time falls.",
+        accent: teamColor(unit.player),
+        choices: [
+          { value: "strength", label: "Strength", sub: ally ? "+1 STR" : "−1 STR" },
+          { value: "defense", label: "Defense", sub: ally ? "+1 DEF" : "−1 DEF" }
+        ]
+      });
+      if (stat && mode === "art:age" && await resolveInstantArt(useArt(state.currentPlayer, unit.id, "age", { targetId: target.id, stat }))) {
+        mode = null;
+        setMessage("Age resolved. This unit's activation is complete.");
+      }
+    }
+  } else if (mode === "art:time-stretch") {
+    // Ally → +1 MOVE; enemy → Slow. A wall blocks the enemy path (not a friendly haste).
+    const target = unitAt(state, position);
+    const enemy = target && areEnemies(unit, target);
+    const inReach = target && chebyshevDistance(unit.position, target.position) <= getEffectiveStats(unit, state).attackRange &&
+      !(enemy && isWallBetween(state, unit.position, target.position, unit));
+    if (!inReach) {
+      setMessage("Time Stretch: click a highlighted ally or enemy in range.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "time-stretch", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Time Stretch resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:rewind") {
+    const placement = getRevivePlacementTiles(state, unit, getAvailableArts(unit).find((a) => a.id === "rewind"));
+    if (!rewindTargetId) {
+      setMessage("Rewind: choose a fallen ally first.", true);
+    } else if (!placement.has(positionKey(position))) {
+      setMessage("Rewind: click a highlighted empty tile within 3.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "rewind", { targetId: rewindTargetId, targetPosition: position }))) {
+      mode = null;
+      rewindTargetId = null;
+      setMessage("An ally returns to the field. This unit's activation is complete.");
+    }
   } else if (mode?.startsWith("art:")) {
     const artId = mode.slice("art:".length);
     const art = getAvailableArts(unit).find((a) => a.id === artId);
@@ -990,6 +1124,7 @@ async function handleActionClick(action, unit) {
     mode = deselect ? null : action;
     footworkPath = [];
     volleyShotOrigin = null;
+    rewindTargetId = null;
     if (deselect) {
       setMessage("Choose an action below.");
     } else if (action === "footwork") {
@@ -998,6 +1133,37 @@ async function handleActionClick(action, unit) {
     } else if (action.startsWith("art:")) {
       const artId = action.slice(4);
       const art = getAvailableArts(unit).find((a) => a.id === artId);
+      if (art?.targeting?.shape === "revive") {
+        // Rewind: pick which fallen ally to bring back FIRST (a pop-up), then place them
+        // on a highlighted tile. `mode` stays "art:rewind" so the board lights placement
+        // tiles behind the pop-up and after it closes.
+        const fallen = getReviveTargets(state, unit);
+        if (!fallen.length) {
+          mode = null;
+          setMessage("Rewind: no fallen allies to bring back.", true);
+          render();
+          return;
+        }
+        setMessage(`${art.name} (${art.mpCost} MP): choose a fallen ally to bring back.`);
+        render();
+        const chosen = await openChoiceModal({
+          title: "Rewind — bring back",
+          subtitle: "Return a fallen ally to the field, fully healed.",
+          accent: teamColor(unit.player),
+          choices: fallen.map((ally) => ({ value: ally.id, label: getUnitType(ally.type).name, sub: "Fallen · returns at full HP", type: ally.type }))
+        });
+        if (!chosen || mode !== "art:rewind") {
+          mode = null;
+          rewindTargetId = null;
+          setMessage("Rewind cancelled. Choose an action below.");
+          render();
+          return;
+        }
+        rewindTargetId = chosen;
+        setMessage(`${art.name}: click a highlighted tile within 3 to place ${getUnitType(findUnit(state, chosen).type).name}.`);
+        render();
+        return;
+      }
       if (art?.selfCast) {
         // Self-centred AoE blasts (Dark Bomb, Nuke) preview their detonation
         // footprint first — staying in art mode lets the board light the blast
@@ -1028,9 +1194,11 @@ async function handleActionClick(action, unit) {
                 ? "Choose a highlighted tile to set alight."
                 : art?.effect?.type === "healAllies"
                   ? "Click any highlighted ally to confirm."
-                  : art?.resolution === "statusCast"
-                    ? "Choose a highlighted enemy target."
-                    : "Choose a highlighted enemy target.";
+                  : art?.targeting?.shape === "allyOrEnemy"
+                    ? "Click a highlighted ally or enemy in range."
+                    : art?.resolution === "statusCast"
+                      ? "Choose a highlighted enemy target."
+                      : "Choose a highlighted enemy target.";
       setMessage(`${art.name} (${art.mpCost} MP): ${art.description} ${lead}`);
     } else {
       setMessage(`Choose a highlighted ${action} tile.`);

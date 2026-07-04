@@ -61,6 +61,9 @@ export const BOARD_SPRITES = Object.freeze({
   paladin:     sprite("paladin",     572, 566),
   necromancer: sprite("necromancer", 510, 558),
   "witch-doctor": sprite("witch-doctor", 600, 600),
+  // Re-cropped from the 600×600 portrait, centered on the measured stance x=300 (the
+  // staff overhang to the right is ignored, per the centering trap in the header notes).
+  "father-time": sprite("father-time", 488, 552),
   sniper:      sprite("sniper",      602, 581),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.

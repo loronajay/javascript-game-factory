@@ -128,6 +128,20 @@ test("signature abilities carry their bespoke recipe flags", () => {
   assert.equal(getAbilityVfx("life-sap").tether, true);
 });
 
+test("Father Time's arts declare their recipes (Age/Time Stretch motes, Rewind rise)", () => {
+  const age = getAbilityVfx("age");
+  assert.equal(age.type, "projectileFan");
+  assert.equal(age.soundKey, "age");
+  const stretch = getAbilityVfx("time-stretch");
+  assert.equal(stretch.type, "projectileFan");
+  assert.equal(stretch.soundKey, "timeStretch");
+  // Rewind reuses the summon-rise signature with its own sound.
+  const rewind = getAbilityVfx("rewind");
+  assert.equal(rewind.type, "summonRise");
+  assert.equal(rewind.soundKey, "rewind");
+  assert.ok(rewind.stream.shape);
+});
+
 test("impacts are styled per damage type with a physical fallback", () => {
   const kinds = ["physical", "magic", "fire", "true"].map((kind) => getImpactVfx(kind));
   for (const style of kinds) {

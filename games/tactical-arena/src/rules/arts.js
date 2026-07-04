@@ -1,5 +1,5 @@
 import { areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getEffectiveStats, getUnitAuraRadius, isRaging } from "../core/unitCatalog.js";
+import { getArt, getEffectiveStats, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -125,6 +125,23 @@ function tilesInRadius(state, actor, radius, predicate) {
     }
   }
   return tiles;
+}
+
+// Father Time's Rewind revives a FALLEN ally: the pickable targets are this player's
+// dead commanders (a turn-less summon like a Ghoul can't be revived). Corpses persist
+// in state.units, so they are found here by scanning for hp <= 0 allies.
+export function getReviveTargets(state, actor) {
+  return state.units.filter((unit) =>
+    unit.hp <= 0 &&
+    unit.player === actor.player &&
+    unit.id !== actor.id &&
+    takesTurns(unit));
+}
+
+// Legal tiles a revived ally can be placed on: empty on-board tiles within the art's
+// Chebyshev radius. Identical rule to a Ghoul summon, so it reuses that sweep.
+export function getRevivePlacementTiles(state, actor, art) {
+  return getSummonPlacementTiles(state, actor, art);
 }
 
 // Build Cover places a solid wall, so it needs a clear floor tile: no unit and no

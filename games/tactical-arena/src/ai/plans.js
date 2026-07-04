@@ -34,6 +34,8 @@ import {
   getFootworkStepOptions,
   getFootworkSteps,
   getLegalFleeTiles,
+  getRevivePlacementTiles,
+  getReviveTargets,
   getSelfBlastRadius,
   getSummonPlacementTiles,
   getTilePulseTargets,
@@ -178,6 +180,48 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "statBuff": {
+      // Age: an ally-OR-enemy persistent ±1 STR/DEF. Offer both stat choices per legal
+      // target (both replay legally: ally→buff, enemy→drain) and let the scorer pick.
+      // A wall blocks the cast for either team, matching resolveAge.
+      const range = getEffectiveStats(unit, state).attackRange;
+      for (const target of livingUnits(state)) {
+        if (target.id === unit.id) continue;
+        if (chebyshevDistance(unit.position, target.position) > range) continue;
+        if (isWallBetween(state, unit.position, target.position, unit)) continue;
+        for (const stat of ["strength", "defense"]) {
+          plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id, stat } }));
+        }
+      }
+      break;
+    }
+    case "hasten": {
+      // Time Stretch: haste an ally (+MOVE) or slow an enemy. Slowing an enemy is a
+      // ranged ability (wall-blocked); a friendly haste is not, matching resolveTimeStretch.
+      const range = getEffectiveStats(unit, state).attackRange;
+      for (const target of livingUnits(state)) {
+        if (target.id === unit.id) continue;
+        if (chebyshevDistance(unit.position, target.position) > range) continue;
+        if (areEnemies(unit, target) && isWallBetween(state, unit.position, target.position, unit)) continue;
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
+      }
+      break;
+    }
+    case "revive": {
+      // Rewind (rage-gated by artUsableForPlanning): each fallen ally × a few safe
+      // placement tiles (preferring tiles far from the enemy).
+      const deadAllies = getReviveTargets(state, unit);
+      if (deadAllies.length === 0) break;
+      const tiles = tilesFromKeys(getRevivePlacementTiles(state, unit, art))
+        .sort((a, b) => nearestEnemyDistance(state, unit.player, b) - nearestEnemyDistance(state, unit.player, a))
+        .slice(0, PLACEMENT_KEEP);
+      for (const dead of deadAllies) {
+        for (const tile of tiles) {
+          plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: dead.id, targetPosition: tile } }));
+        }
+      }
+      break;
+    }
     default:
       break;
   }
@@ -281,6 +325,23 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break; // zone value is a controller score term, not an HP change
     case "buffAllies":
       break; // buffs/cleanse/blind change no HP now; value is a controller score term
+    case "statBuff":
+    case "hasten":
+      break; // Age/Time Stretch change stats, not HP now; value is a controller term
+    case "revive": {
+      // Rewind returns the fallen ally to the board at full HP — the material term
+      // (unitThreatValue + hp) is exactly the value of the revival.
+      const dead = state.units.find((u) => u.id === primary.targetId);
+      if (dead) {
+        board.push({
+          ...dead,
+          hp: getUnitType(dead.type).stats.maxHp,
+          position: { ...primary.targetPosition },
+          statuses: [], statModifiers: {}, linkedStatMods: []
+        });
+      }
+      break;
+    }
     default:
       break;
   }
@@ -482,9 +543,15 @@ function artUsableForPlanning(state, unit, art) {
 
 function artCommand(player, unitId, primary) {
   if (primary.path) return useArt(player, unitId, primary.artId, primary.path);
-  if (primary.targetId != null) return useArt(player, unitId, primary.artId, { targetId: primary.targetId });
-  if (primary.targetPosition) return useArt(player, unitId, primary.artId, { targetPosition: primary.targetPosition });
-  return useArt(player, unitId, primary.artId);
+  // Collect whichever targeting fields the plan carries — Age adds `stat`, Rewind needs
+  // BOTH a targetId (the fallen ally) and a targetPosition (the tile).
+  const targeting = {};
+  if (primary.targetId != null) targeting.targetId = primary.targetId;
+  if (primary.targetPosition) targeting.targetPosition = primary.targetPosition;
+  if (primary.stat) targeting.stat = primary.stat;
+  return Object.keys(targeting).length
+    ? useArt(player, unitId, primary.artId, targeting)
+    : useArt(player, unitId, primary.artId);
 }
 
 function withUnitAt(state, unitId, pos) {

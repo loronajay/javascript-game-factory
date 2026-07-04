@@ -2,7 +2,7 @@ import { svgElement } from "./svgHelpers.js";
 import { gridToScreen } from "./isometric.js";
 import { getEffectiveStats, isDefending, isRaging } from "../core/unitCatalog.js";
 import { positionKey } from "../rules/movement.js";
-import { getUnitStatusVfx } from "./vfxCatalog.js";
+import { getStanceVfx, getUnitStatusVfx } from "./vfxCatalog.js";
 import { createBoardSpriteFigure } from "./boardSprites.js";
 
 // ---------------------------------------------------------------------------
@@ -386,6 +386,26 @@ function createStatusBadges(unit) {
   return group;
 }
 
+// A persistent stance badge (e.g. the Witch Doctor's "Dancing Man" passive) — unlike
+// the transient status-stack above the head, this never expires on its own, so it
+// sits lower and reads as a fixed emblem rather than a floating buff icon. Keyed off
+// `unit.stance` + STANCE_VFX (vfxCatalog.js), so a future stance-bearing unit needs
+// no renderer change.
+function createStanceBadge(unit) {
+  const visual = getStanceVfx(unit.stance);
+  if (!visual) return null;
+  const badge = svgElement("g", {
+    class: "stance-badge",
+    transform: "translate(18 -46)",
+    style: `--stance:${visual.color};--stance-glow:${visual.glow};`
+  });
+  badge.append(svgElement("circle", { class: "stance-disc", cx: 0, cy: 0, r: 10 }));
+  const glyph = svgElement("text", { class: "stance-glyph", x: 0, y: 4, "text-anchor": "middle" });
+  glyph.textContent = visual.glyph;
+  badge.append(glyph);
+  return badge;
+}
+
 export function createUnitFigure(metrics, unit, { isTarget = false, selectedId = null, onUnitClick, state = null }) {
   const point = gridToScreen(metrics, unit.position.x, unit.position.y);
   const stats = getEffectiveStats(unit, state);
@@ -448,6 +468,8 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   body.append(hpBack, hpFront, spentMark, defendMark);
   const statusBadges = createStatusBadges(unit);
   if (statusBadges) body.append(statusBadges);
+  const stanceBadge = createStanceBadge(unit);
+  if (stanceBadge) body.append(stanceBadge);
 
   if (isTarget) {
     const reticle = svgElement("g", { class: "target-mark" });

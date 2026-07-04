@@ -6,6 +6,18 @@ const STATUS_VFX = Object.freeze({
   stun: Object.freeze({ type: "stun", label: "STN", color: "#ffe45e", glow: "#7a6310", ring: "jolt" })
 });
 
+// Witch Doctor stances — the "Dancing Man" passive. Each stance gets a persistent
+// on-board badge (unitRenderer.js) + a HUD tag color, keyed by the SAME `stance` id
+// the catalog data (witch-doctor.js) and rules/stances.js already use. Adding a future
+// stance-bearing unit just needs an entry here — nothing else hard-codes these ids.
+const STANCE_VFX = Object.freeze({
+  rain: Object.freeze({ label: "Rain Stance", glyph: "\u{1F327}", color: "#6fb7f2", glow: "#1f4a72" }),
+  fire: Object.freeze({ label: "Fire Stance", glyph: "\u{1F525}", color: "#ff8a4c", glow: "#7a2c10" }),
+  spirit: Object.freeze({ label: "Spirit Stance", glyph: "\u{1F47B}", color: "#bff4d2", glow: "#2e6b4a" }),
+  misfortune: Object.freeze({ label: "Misfortune Stance", glyph: "\u{1F408}‍⬛", color: "#c89cff", glow: "#3a1d5c" }),
+  blackDeath: Object.freeze({ label: "Black Death Stance", glyph: "☠", color: "#e2536e", glow: "#3a0812" })
+});
+
 // Real projectile specs consumed by effects.js's flight primitive. `shape` picks the
 // built figure: "arrow" (shaft + head, rotates to heading), "orb" (glowing magic
 // bolt with a mote tail), "tracer" (a flat, fast rifle streak), "lob" (a tumbling
@@ -261,6 +273,95 @@ const ABILITY_VFX = Object.freeze({
     durationMs: 520,
     windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 6 }),
     colors: Object.freeze({ core: "#dfffd8", trail: "#8cf0a4", impact: "#fff7b8" })
+  }),
+  // Witch Doctor dances — every dance is a GLOBAL effect (a team-wide or board-wide
+  // ritual, never a single-target cast), so they share one recipe type ("ritual"):
+  // a long gather on the dancer, a whole-board color wash, a rippling ring that
+  // sweeps past the edges of any board size, and a beacon pulse that arrives at
+  // every affected tile staggered by distance from the dancer — the wave visibly
+  // propagates outward instead of just appearing everywhere at once.
+  "rain-dance": Object.freeze({
+    type: "ritual",
+    soundKey: "pray",
+    durationMs: 900,
+    particleCount: 16,
+    windup: Object.freeze({ style: "gather", durationMs: 460, particleCount: 10 }),
+    colors: Object.freeze({ core: "#6fb7f2", trail: "#1f4a72", impact: "#e6f4ff" })
+  }),
+  "fire-dance": Object.freeze({
+    type: "ritual",
+    soundKey: "rageActivated",
+    durationMs: 860,
+    particleCount: 18,
+    windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 10 }),
+    colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffe0b8" })
+  }),
+  "spirit-dance": Object.freeze({
+    type: "ritual",
+    soundKey: "handOfLife",
+    durationMs: 860,
+    particleCount: 16,
+    windup: Object.freeze({ style: "gather", durationMs: 400, particleCount: 9 }),
+    colors: Object.freeze({ core: "#bff4d2", trail: "#2e6b4a", impact: "#eafff0" })
+  }),
+  "misfortune-dance": Object.freeze({
+    type: "ritual",
+    soundKey: "banish",
+    durationMs: 940,
+    particleCount: 18,
+    windup: Object.freeze({ style: "gather", durationMs: 480, particleCount: 11 }),
+    colors: Object.freeze({ core: "#c89cff", trail: "#3a1d5c", impact: "#241030" })
+  }),
+  "black-death-dance": Object.freeze({
+    type: "ritual",
+    soundKey: "nuke",
+    durationMs: 980,
+    particleCount: 22,
+    shake: 8,
+    windup: Object.freeze({ style: "gather", durationMs: 520, particleCount: 13 }),
+    colors: Object.freeze({ core: "#e2536e", trail: "#3a0812", impact: "#ff9fb0" })
+  }),
+  // Father Time — Age: a slow amber time-mote glides to the target (a gather winds it
+  // up first), then a soft impact where the ±stat float lands. Ally buff / enemy drain
+  // share the motif; the color of the float (set in main.js) tells them apart.
+  age: Object.freeze({
+    type: "projectileFan",
+    soundKey: "age",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 44,
+    staggerMs: 0,
+    durationMs: 460,
+    impactRadius: 18,
+    windup: Object.freeze({ style: "gather", durationMs: 320, particleCount: 7 }),
+    projectile: Object.freeze({ shape: "orb", arcHeight: 44, durationMs: 460, size: 1, colors: Object.freeze({ core: "#f2d98a", trail: "#8a6a2a" }) }),
+    colors: Object.freeze({ core: "#f2d98a", trail: "#8a6a2a", impact: "#fff0c0" })
+  }),
+  // Time Stretch: a teal chrono-mote flicks to the target (haste on an ally, slow on an
+  // enemy). No windup — it's a quick tempo tweak, not a heavy cast.
+  "time-stretch": Object.freeze({
+    type: "projectileFan",
+    soundKey: "timeStretch",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 48,
+    staggerMs: 0,
+    durationMs: 420,
+    impactRadius: 18,
+    projectile: Object.freeze({ shape: "orb", arcHeight: 48, durationMs: 420, size: 1, colors: Object.freeze({ core: "#7fe0d0", trail: "#2a6a66" }) }),
+    colors: Object.freeze({ core: "#7fe0d0", trail: "#2a6a66", impact: "#d8fff8" })
+  }),
+  // Rewind (RAGE): a golden life-stream pours into the placement tile and the fallen
+  // ally rises from it — reuses the summon-rise signature with a warm, hopeful palette.
+  rewind: Object.freeze({
+    type: "summonRise",
+    soundKey: "rewind",
+    soilCount: 6,
+    miasmaCount: 6,
+    riseDurationMs: 560,
+    windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 10 }),
+    stream: Object.freeze({ shape: "orb", arcHeight: 34, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#f7e9c0", trail: "#c8a24a" }) }),
+    colors: Object.freeze({ core: "#f7e9c0", trail: "#c8a24a", impact: "#fff7d8" })
   })
 });
 
@@ -305,6 +406,13 @@ export function getImpactVfx(kind) {
 // types fall back to a generic gold bolt so a new unit never fires nothing.
 export function getAttackProjectile(unitType) {
   return clone(ATTACK_PROJECTILES[unitType] ?? DEFAULT_ATTACK_PROJECTILE);
+}
+
+// The badge/tag visuals for a Witch-Doctor-style persistent stance, keyed by the
+// same `stance` id carried on `unit.stance` / the catalog's `stances` block. Null
+// for an unknown/no stance so callers can cheaply no-op.
+export function getStanceVfx(stanceId) {
+  return STANCE_VFX[stanceId] ? clone(STANCE_VFX[stanceId]) : null;
 }
 
 export function getStatusVfx(status) {

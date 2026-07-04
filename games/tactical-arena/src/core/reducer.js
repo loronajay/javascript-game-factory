@@ -1,13 +1,13 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
 import { getLineAttackTargets, getProximityBonus, getTeamDamageReduction, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import { applyStatus, isStunned, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
-import { alliesInRadius, getGlobalHealBonus, getGlobalTrueTick, getStanceEffect, getTeamStatusChanceMultiplier, isDamageTypeImmuneByStance } from "../rules/stances.js";
+import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect, isDamageTypeImmuneByStance } from "../rules/stances.js";
 
 const ERR = Object.freeze({
   INVALID_COMMAND: "INVALID_COMMAND",
@@ -254,7 +254,11 @@ const ART_RESOLVERS = new Map([
   ["fire-dance", resolveWitchDance],
   ["spirit-dance", resolveWitchDance],
   ["misfortune-dance", resolveWitchDance],
-  ["black-death-dance", resolveWitchDance]
+  ["black-death-dance", resolveWitchDance],
+  // Father Time: ally-OR-enemy utility casts + a revive.
+  ["age", resolveAge],
+  ["time-stretch", resolveTimeStretch],
+  ["rewind", resolveRewind]
 ]);
 
 function useArt(state, command) {
@@ -338,8 +342,8 @@ function resolveTargetedArt(state, command, art) {
   if (art.effect?.type === "status" && target.hp > 0) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
-    // Misfortune Stance (a living ally of the caster) doubles the status chance.
-    effect = resolveStatusEffect(target, art.effect, roll.value, getTeamStatusChanceMultiplier(next, actor));
+    // Misfortune Stance (any living Witch Doctor) doubles the status chance globally.
+    effect = resolveStatusEffect(target, art.effect, roll.value, getGlobalStatusChanceMultiplier(next));
     if (effect.statuses) target.statuses = effect.statuses;
     delete effect.statuses;
   } else if (art.effect?.type === "heal") {
@@ -440,6 +444,7 @@ function createSummon(id, type, player, position, summonerId) {
     mp: definition.stats.maxMp,
     statModifiers: {},
     statuses: [],
+    linkedStatMods: [],
     defending: false,
     spent: true,
     mageChargeCount: 0,
@@ -584,6 +589,17 @@ function resolveHealAllies(state, command, art) {
   }]);
 }
 
+// "+1 STR" / "+2 STR / +1 DEF / +1 MOVE" — turns a statModifiers object into the
+// label the view floats over a buffed unit. Kept here (not in the view layer) so
+// the wording can never drift from the actual numbers applied above.
+const STAT_MODIFIER_ABBR = Object.freeze({ strength: "STR", defense: "DEF", moveRange: "MOVE", attackRange: "RNG", maxHp: "HP", maxMp: "MP" });
+function formatStatModifierLabel(statModifiers) {
+  return Object.entries(statModifiers ?? {})
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${value > 0 ? "+" : ""}${value} ${STAT_MODIFIER_ABBR[key] ?? key.toUpperCase()}`)
+    .join(" / ");
+}
+
 function resolveWitchDance(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
@@ -626,6 +642,7 @@ function resolveWitchDance(state, command, art) {
       buffed.push(target.id);
     }
     event.buffed = buffed;
+    event.buffLabel = formatStatModifierLabel(art.teamBuff.statModifiers);
   }
 
   if (art.teamMp) {
@@ -663,6 +680,7 @@ function resolveWitchDance(state, command, art) {
     if (result.applied) {
       actor.statuses = result.statuses;
       event.selfBuffed = true;
+      event.selfBuffLabel = formatStatModifierLabel(art.selfBuff.statModifiers);
     }
   }
 
@@ -679,6 +697,16 @@ function resolveWitchDance(state, command, art) {
     }
     event.statusTargets = statusTargets;
   }
+
+  // Every dance is a global effect (team-wide or board-wide, never a single-target
+  // cast), so the view sweeps a beacon pulse across every unit the ritual actually
+  // reaches — a cleanse/global-status dance reaches everyone on the board, a
+  // team-scoped dance (heal/buff/MP) reaches only the caster's living squad — so
+  // the animation's reach can never drift from what the effect actually touched.
+  event.beaconTargetIds = (art.cleanse?.scope === "all" || art.globalStatus
+    ? livingUnits(next)
+    : livingUnits(next, actor.player)
+  ).map((unit) => unit.id);
 
   actor.stance = art.stance ?? null;
   spendAndAdvance(next, actor);
@@ -705,8 +733,8 @@ function resolveStatusCast(state, command, art) {
 
   const roll = drawValue(next.rngState, command.effectRoll);
   next.rngState = roll.rngState;
-  // Misfortune Stance (a living ally of the caster) doubles the status chance.
-  const effect = resolveStatusEffect(target, art.effect, roll.value, getTeamStatusChanceMultiplier(next, actor));
+  // Misfortune Stance (any living Witch Doctor) doubles the status chance globally.
+  const effect = resolveStatusEffect(target, art.effect, roll.value, getGlobalStatusChanceMultiplier(next));
   if (effect.statuses) target.statuses = effect.statuses;
   delete effect.statuses;
 
@@ -749,6 +777,103 @@ function resolveVolleyShot(state, command, art) {
     targetIds,
     damageByTarget,
     mpCost: art.mpCost
+  }]);
+}
+
+// Age: place a SOURCE-LINKED persistent stat modifier on a target in range. On an ally
+// it's a buff (+amount), on an enemy a debuff (-amount); the stat (strength|defense)
+// rides on the command from the stat-picker UI (defaults to strength). The modifier
+// lives on the target's `linkedStatMods` and is folded by getEffectiveStats only while
+// Father Time is alive — so it "lasts until Father Time is defeated" with no cleanup.
+function resolveAge(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  // A wall blocks the cast like any other ranged ability.
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const stat = command.stat === "defense" ? "defense" : "strength";
+  const amount = Math.max(1, Number(art.effect?.amount) || 1);
+  const delta = areEnemies(actorState, targetState) ? -amount : amount;
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  target.linkedStatMods = [...(target.linkedStatMods ?? []), { sourceId: actor.id, stats: { [stat]: delta } }];
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost, stat, delta
+  }]);
+}
+
+// Time Stretch: an ally-OR-enemy timed status. Ally → an `empowered` +MOVE buff; enemy
+// → a `slow` -MOVE debuff. No damage and no roll — it always attempts (immunity is
+// still respected centrally, so a Slow-immune enemy simply resists).
+function resolveTimeStretch(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  const enemy = areEnemies(actorState, targetState);
+  // Slowing an enemy is a ranged ability, so a wall blocks it; a friendly haste is not
+  // shot-gated.
+  if (enemy && isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  actor.mp -= art.mpCost;
+
+  const spec = enemy ? art.enemy : art.ally;
+  const result = applyStatus(target, {
+    type: spec.status,
+    duration: spec.durationTurns,
+    ...(spec.statModifiers ? { statModifiers: { ...spec.statModifiers } } : {})
+  });
+  if (result.applied) target.statuses = result.statuses;
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost,
+    effect: { status: spec.status, applied: result.applied, ...(result.reason ? { reason: result.reason } : {}) }
+  }]);
+}
+
+// Rewind (RAGE): return a fallen ally to the board on a chosen tile within range, fully
+// healed with statuses cleared. Its MP is NOT restored. The revived unit is placed
+// already `spent` so the revival doesn't hand its owner a bonus activation this round.
+function resolveRewind(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const target = getReviveTargets(state, actorState).find((unit) => unit.id === command.targetId);
+  if (!target) return reject(ERR.INVALID_TARGET);
+  const placement = command.targetPosition;
+  if (!placement || !getRevivePlacementTiles(state, actorState, art).has(positionKey(placement))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const revived = findUnit(next, command.targetId);
+  revived.position = { ...placement };
+  revived.statuses = [];
+  revived.defending = false;
+  revived.hp = getEffectiveStats(revived, next).maxHp;
+  revived.spent = true;
+  actor.mp -= art.mpCost;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, revivedUnitId: revived.id, position: { ...placement }, mpCost: art.mpCost
   }]);
 }
 
@@ -908,6 +1033,9 @@ function advanceTurnIfExhausted(state) {
     // Black Death Stance burns EVERY living unit (allies and foes, the Witch Doctor
     // included) for 1 true damage at the same rollover. Lethal, so re-check victory.
     applyBlackDeathTick(state, fireEvents);
+    // Father Time's Time Steal: each living Father Time drains nearby enemies and is
+    // refunded MP for it, at the same rollover. Also lethal.
+    applyTimeStealTick(state, fireEvents);
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
@@ -947,6 +1075,35 @@ function applyBlackDeathTick(state, events) {
     const dealt = Math.min(unit.hp, amount);
     unit.hp = Math.max(0, unit.hp - amount);
     if (dealt > 0) events.push({ type: "BLACK_DEATH_DAMAGE", unitId: unit.id, damage: dealt });
+  }
+}
+
+// Father Time's Time Steal (a `damageAura` passive): at every rollover, each living
+// source deals its aura damage (true) to every enemy within its Chebyshev radius, then
+// is refunded MP for the TOTAL damage it dealt (refundMpPerDamage per point). Board-
+// level like the fire/black-death ticks, and lethal, so the caller re-resolves victory.
+function applyTimeStealTick(state, events) {
+  for (const source of livingUnits(state)) {
+    const effect = getUnitType(source.type).passive?.effect;
+    if (effect?.type !== "damageAura") continue;
+    const radius = effect.radius ?? 2;
+    const amount = effect.amount ?? 1;
+    let totalDealt = 0;
+    for (const target of livingUnits(state)) {
+      if (!areEnemies(source, target)) continue;
+      if (chebyshevDistance(source.position, target.position) > radius) continue;
+      const dealt = Math.min(target.hp, amount);
+      if (dealt <= 0) continue;
+      target.hp = Math.max(0, target.hp - amount);
+      totalDealt += dealt;
+      events.push({ type: "TIME_STEAL", sourceId: source.id, targetId: target.id, position: { ...target.position }, damage: dealt });
+    }
+    if (totalDealt > 0 && effect.refundMpPerDamage) {
+      const before = source.mp;
+      source.mp = Math.min(getEffectiveStats(source, state).maxMp, source.mp + totalDealt * effect.refundMpPerDamage);
+      const gained = source.mp - before;
+      if (gained > 0) events.push({ type: "TIME_STEAL_MP", sourceId: source.id, mpGained: gained });
+    }
   }
 }
 
