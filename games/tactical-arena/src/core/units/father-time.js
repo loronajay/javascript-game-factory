@@ -27,7 +27,7 @@ export const FATHER_TIME = Object.freeze({
     strength: 7,
     defense: 3,
     maxHp: 25,
-    maxMp: 40
+    maxMp: 30
   }),
   passive: Object.freeze({
     id: "time-steal",
