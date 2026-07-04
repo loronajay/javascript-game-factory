@@ -1,5 +1,6 @@
 import { getAvailableArts, getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt, getFootworkSteps } from "../rules/arts.js";
+import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
 
 function escapeAttr(text) {
@@ -27,7 +28,7 @@ export function canMoveInActivation(activation) {
 
 export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
   const color = state.currentPlayer === 1 ? "#5288c6" : "#c4463f";
-  const available = state.units.filter((u) => u.player === state.currentPlayer && u.hp > 0 && !u.spent).length;
+  const available = state.units.filter((u) => u.player === state.currentPlayer && u.hp > 0 && !u.spent && !isStunned(u)).length;
   turnBanner.style.setProperty("--team", color);
   turnTitle.style.setProperty("--team", color);
   turnTitle.textContent = state.phase === "complete" ? `Player ${state.winner} wins` : `Player ${state.currentPlayer} squad turn`;
@@ -201,7 +202,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       const row = document.createElement("div");
       const dead = unit.hp <= 0;
       const active = state.activation?.unitId === unit.id;
-      const selectable = controlsEnabled && unit.player === state.currentPlayer && !unit.spent && !dead;
+      const selectable = controlsEnabled && unit.player === state.currentPlayer && !unit.spent && !dead && !isStunned(unit);
       row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
       const tags = dead
         ? `<span class="unit-tag spent">Fallen</span>`

@@ -244,17 +244,18 @@ only affordances.
 
 Statuses are plain objects in `unit.statuses`. Existing statuses:
 
-- `poison` - permanent by default, deals turn-start damage.
+- `poison` - permanent by default, deals damage when its squad turn charges.
 - `slow` - timed, carries `statModifiers: { moveRange: -1 }`.
 - `blind` - timed, makes attacks miss unless a combat override says otherwise.
 - `silence` - timed, blocks active ART usage.
 
 Use `resolveStatusEffect`, `applyStatus`, `tickStatuses`, and
-`resolveTurnStartStatuses` in `src/rules/statuses.js`. Status immunities are
+`resolveTurnStartStatuses` in `src/rules/statuses.js`. Status damage is applied
+from the reducer's squad-turn rollover. Status immunities are
 centralized through passives/arts/rageArt with `effect.type === "immunity"`.
 
 If adding stun, cleanse, regeneration, shields, or mark-style debuffs, implement
-the lifecycle centrally and add tests around start-of-activation, end-of-
+the lifecycle centrally and add tests around squad-turn rollover, end-of-
 activation, immunity, refresh/replace behavior, and death/victory interactions.
 
 ## Damage types

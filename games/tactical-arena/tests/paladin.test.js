@@ -39,7 +39,7 @@ test("Paladin owns Hand of Life, Chosen, Lightseeker, Heaven's Realm, and Darkse
   });
   assert.equal(UNIT_TYPES.paladin.arts.find((art) => art.id === "chosen").kind, "passive");
   assert.deepEqual(UNIT_TYPES.paladin.arts.find((art) => art.id === "chosen").effect, {
-    type: "immunity", statuses: ["poison", "slow", "blind", "silence"]
+    type: "immunity", statuses: ["poison", "slow", "blind", "silence", "stun"]
   });
   assert.deepEqual(UNIT_TYPES.paladin.arts.find((art) => art.id === "lightseeker").effect, {
     type: "tilePulse", affinity: "light", amount: 1, range: 5
@@ -57,7 +57,7 @@ test("Paladin owns Hand of Life, Chosen, Lightseeker, Heaven's Realm, and Darkse
 test("Chosen prevents all current status effects", () => {
   const paladin = { type: "paladin", statuses: [] };
 
-  for (const type of ["poison", "slow", "blind", "silence"]) {
+  for (const type of ["poison", "slow", "blind", "silence", "stun"]) {
     assert.equal(applyStatus(paladin, { type, duration: 1 }).applied, false);
   }
 });

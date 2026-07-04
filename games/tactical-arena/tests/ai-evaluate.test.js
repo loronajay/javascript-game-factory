@@ -93,6 +93,12 @@ test("statusValue: silence scaled up for casters, capped at threatValue", () => 
   close(statusValue(magician, { status: "silence", durationTurns: 1 }), 5.4 * 1.5);
 });
 
+test("statusValue: stun is valued as full action denial over its duration", () => {
+  const swordsman = makeUnit({ type: "swordsman", player: 2, hp: 25 });
+  close(statusValue(swordsman, { status: "stun", durationTurns: 1 }), 5.4);
+  assert.equal(statusValue(swordsman, { status: "stun", durationTurns: 3 }), 10);
+});
+
 test("statusValue: poison uses the fixed horizon, bounded by surviving HP", () => {
   const target = makeUnit({ type: "swordsman", player: 2, hp: 25 });
   const poison = { status: "poison", duration: "permanent", turnStartDamage: 1 };

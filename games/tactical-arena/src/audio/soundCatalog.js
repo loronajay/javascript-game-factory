@@ -418,7 +418,7 @@ const P_SILENCE_APPLIED = {
   effects: { highpass: 60, lowpass: 4500, saturation: 0.03, compressor: { threshold: -18, ratio: 4, attack: 0.001, release: 0.14 } }
 };
 
-// Poison tick — quiet wet pulse each activation
+// Poison tick — quiet wet pulse each squad-turn charge
 const P_POISON_TICK = {
   id: "ta_poison_tick", duration: 0.22, gain: 0.62,
   layers: [

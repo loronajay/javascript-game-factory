@@ -14,7 +14,12 @@ function createUnit(spec) {
     statuses: (spec.statuses ?? []).map((status) => ({ ...status })),
     defending: false,
     spent: false,
-    mageChargeCount: 0
+    mageChargeCount: 0,
+    // Witch Doctor "Dancing Man" stance (a key into the unit's `stances` data, or
+    // null). Persists across turns; set by each dance ART. `rainCharged` is the
+    // pending Rain-Stance on-attack haste, converted to a buff at the next activation.
+    stance: spec.stance ?? null,
+    rainCharged: spec.rainCharged ?? false
   };
 }
 

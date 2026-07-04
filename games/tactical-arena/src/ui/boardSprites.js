@@ -60,6 +60,7 @@ export const BOARD_SPRITES = Object.freeze({
   magician:    sprite("magician",    458, 572),
   paladin:     sprite("paladin",     572, 566),
   necromancer: sprite("necromancer", 510, 558),
+  "witch-doctor": sprite("witch-doctor", 600, 600),
   sniper:      sprite("sniper",      602, 581),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.

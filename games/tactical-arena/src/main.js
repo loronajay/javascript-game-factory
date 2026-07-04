@@ -1,8 +1,9 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
+import { isStunned } from "./rules/statuses.js";
 import { applyCommand } from "./core/reducer.js";
 import { chooseActivation, cpuRng } from "./ai/cpuController.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
@@ -19,6 +20,7 @@ import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
+import { turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { buildRoster, buildSummary, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 
 // --- DOM refs ---
@@ -214,7 +216,12 @@ function announceTurn(player, { hold = false } = {}) {
     turnFlash.announce({ title: `Player ${state.winner} wins`, sub: "Victory", color: teamColor(state.winner), hold: true });
     return;
   }
-  turnFlash.announce({ title: `Player ${player} squad turn`, sub: "Pass the device", color: teamColor(player), hold });
+  turnFlash.announce({
+    title: `Player ${player} squad turn`,
+    sub: turnAnnouncementSub({ matchMode: matchConfig?.mode, player, mySeat, isCpu: isCpu(player) }),
+    color: teamColor(player),
+    hold
+  });
 }
 
 function announceTurnChange(prevPlayer) {
@@ -805,7 +812,7 @@ function playRolloverFx(events) {
 
 function beginUnit(unit) {
   if (inputLocked()) return;
-  if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0) return;
+  if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0 || isStunned(unit)) return;
   // Re-selecting the already-active unit (e.g. after deselecting mid-activation)
   // should not re-dispatch beginActivation — that would reset moved/primaryUsed.
   if (state.activation?.unitId === unit.id) {
@@ -918,7 +925,7 @@ async function handleTile(position) {
     const art = getAvailableArts(unit).find((a) => a.id === artId);
     if (art?.targeting?.shape === "nukeAura") {
       // Self-centred blast: any click inside the previewed footprint detonates it.
-      const radius = art.targeting.radius ?? 2;
+      const radius = getSelfBlastRadius(state, unit, art);
       if (chebyshevDistance(unit.position, position) > radius) {
         setMessage(`${art.name}: click inside the highlighted blast zone to detonate.`, true);
       } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {

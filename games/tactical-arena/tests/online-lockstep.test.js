@@ -75,8 +75,8 @@ async function broadcast(clients, command, latency) {
 
 // The faithful lockstep contract: the ORIGINATOR applies a command locally first
 // and broadcasts it ONLY if accepted. A planned follow-up can turn invalid on the
-// originator's own board (e.g. the actor dies to turn-start poison on BEGIN, so the
-// queued ATTACK has no activation) — in real play that command is simply never
+// originator's own board (e.g. a prior command ends the match before the
+// queued ATTACK can open an activation), so in real play that command is simply never
 // sent. Returns whether it was accepted/broadcast. A PEER rejecting an accepted
 // command, by contrast, is a true desync and fails hard.
 async function relay(clients, originatorSeat, command, latency) {

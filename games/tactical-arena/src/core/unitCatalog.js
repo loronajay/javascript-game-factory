@@ -8,6 +8,7 @@ import { PALADIN } from "./units/paladin.js";
 import { NECROMANCER } from "./units/necromancer.js";
 import { GHOUL } from "./units/ghoul.js";
 import { SNIPER } from "./units/sniper.js";
+import { WITCH_DOCTOR } from "./units/witch-doctor.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
@@ -17,7 +18,8 @@ export const UNIT_TYPES = Object.freeze({
   paladin: PALADIN,
   necromancer: NECROMANCER,
   ghoul: GHOUL,
-  sniper: SNIPER
+  sniper: SNIPER,
+  "witch-doctor": WITCH_DOCTOR
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -123,6 +125,12 @@ function auraEntries(source, state) {
   return entries;
 }
 
+export function getUnitAuraRadius(source, state) {
+  let radius = 0;
+  for (const { radius: r } of auraEntries(source, state)) radius = Math.max(radius, r);
+  return radius;
+}
+
 // Debuff auras projected by ENEMY units (the Necromancer's Deathly Aura and the
 // Ghoul that carries it). Mirrors teamAuraStats but scans enemy sources and gates
 // on Chebyshev range. A source's RAGE amplification rides on the nested
@@ -155,8 +163,7 @@ export function getAuraSources(state) {
   if (!state?.units) return sources;
   for (const source of state.units) {
     if (source.hp <= 0) continue;
-    let radius = 0;
-    for (const { radius: r } of auraEntries(source, state)) radius = Math.max(radius, r);
+    const radius = getUnitAuraRadius(source, state);
     if (radius > 0) sources.push({ position: source.position, player: source.player, radius });
   }
   return sources;
@@ -175,6 +182,15 @@ export function getEffectiveStats(unit, state = null) {
   }
   for (const [name, value] of Object.entries(enemyAuraStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+
+  // Stance passives (Witch Doctor's Fire Stance +1 STR). Folded generically off
+  // `unit.stance` + the unit's `stances` data so no rule hard-codes the unit.
+  const stanceStats = getUnitType(unit.type).stances?.[unit.stance]?.stats;
+  if (stanceStats) {
+    for (const [name, value] of Object.entries(stanceStats)) {
+      if (name in stats && Number.isFinite(value)) stats[name] += value;
+    }
   }
 
   const passiveEffect = getUnitType(unit.type).passive?.effect;
@@ -226,7 +242,10 @@ export function getAvailableArts(unit) {
 // that the data is authored explicitly. Full schema: CPU_AI_METADATA_SCHEMA.md.
 export const AI_INTENTS = Object.freeze([
   "strike", "statusCast", "coneAoe", "selfBlast", "healAllies",
-  "tilePulse", "reposition", "rush", "summon", "placeObject", "defend"
+  "tilePulse", "reposition", "rush", "summon", "placeObject", "defend",
+  // Self/team support casts with no enemy target (Witch Doctor's Fire/Spirit/
+  // Misfortune/Black Death dances): buff allies, cleanse, or shift stance.
+  "buffAllies"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

@@ -99,7 +99,7 @@ test("the Paladin attaches a bonus tile-pulse variant when it would hit an enemy
   for (const plan of plans) assertPlanReplays(state, 1, plan);
 });
 
-test("summon is suppressed while the Necromancer already has a living Ghoul", () => {
+test("summon is suppressed only once the Necromancer already has two living Ghouls", () => {
   const state = skirmish();
   // Inject a Ghoul owned by the Necromancer (createBattleState can't set summonerId).
   state.units.push({
@@ -108,7 +108,15 @@ test("summon is suppressed while the Necromancer already has a living Ghoul", ()
     mageChargeCount: 0, summonerId: "p1-necro"
   });
   const plans = generatePlans(state, findUnit(state, "p1-necro"));
-  assert.ok(!plans.some((p) => p.primary.kind === "art" && p.primary.artId === "summon-ghoul"));
+  assert.ok(plans.some((p) => p.primary.kind === "art" && p.primary.artId === "summon-ghoul"));
+
+  state.units.push({
+    id: "ghoul-2", type: "ghoul", player: 1, position: { x: 5, y: 8 },
+    hp: 10, mp: 0, statModifiers: {}, statuses: [], defending: false, spent: true,
+    mageChargeCount: 0, summonerId: "p1-necro"
+  });
+  const cappedPlans = generatePlans(state, findUnit(state, "p1-necro"));
+  assert.ok(!cappedPlans.some((p) => p.primary.kind === "art" && p.primary.artId === "summon-ghoul"));
 });
 
 test("the Sniper offers legal tile-placement plans (Build Cover / Throw Cigar)", () => {

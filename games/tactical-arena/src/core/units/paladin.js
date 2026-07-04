@@ -43,9 +43,9 @@ export const PALADIN = Object.freeze({
       mpCost: null,
       effect: Object.freeze({
         type: "immunity",
-        statuses: Object.freeze(["poison", "slow", "blind", "silence"])
+        statuses: Object.freeze(["poison", "slow", "blind", "silence", "stun"])
       }),
-      description: "The Paladin is immune to poison, slow, blind, and silence.",
+      description: "The Paladin is immune to poison, slow, blind, silence, and stun.",
       implemented: true
     })
   ]),

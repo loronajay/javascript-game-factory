@@ -4,8 +4,9 @@ import { createPortrait } from "./portraits.js";
 export const STAT_GLOSSARY = [
   ["Blind", "Afflicted unit's next attack automatically misses. Duration set per ability."],
   ["Silence", "Afflicted unit cannot use ARTS. Duration set per ability."],
-  ["Poison", "Damage at the start of each activation. Permanent until cleansed; amount set per ability."],
-  ["Slow", "Reduces MOVE. Duration and amount set per ability."]
+  ["Poison", "Damage when the afflicted unit's squad turn charges. Permanent until cleansed; amount set per ability."],
+  ["Slow", "Reduces MOVE. Duration and amount set per ability."],
+  ["Stun", "Afflicted unit is auto-spent at the start of its squad turn and cannot be selected. Duration set per ability."]
 ];
 
 // ── Shared detail markup ─────────────────────────────────────────────────────

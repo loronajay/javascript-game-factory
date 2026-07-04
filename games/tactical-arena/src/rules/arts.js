@@ -1,7 +1,8 @@
 import { areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getEffectiveStats, isRaging } from "../core/unitCatalog.js";
+import { getArt, getEffectiveStats, getUnitAuraRadius, isRaging } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
+import { isStunned } from "./statuses.js";
 
 export const FOOTWORK_DAMAGE = 2;
 export const FLEE_RANGE_BONUS = 2;
@@ -153,6 +154,13 @@ export function getTilePulseTargets(state, actor, art) {
   );
 }
 
+export function getSelfBlastRadius(state, actor, art) {
+  const baseRadius = art?.targeting?.radius ?? 0;
+  if (art?.targeting?.shape !== "nukeAura") return baseRadius;
+  if (!art.targeting.matchAuraRadius) return baseRadius;
+  return Math.max(baseRadius, getUnitAuraRadius(actor, state));
+}
+
 // True when a targeted ART lands a real physical attack (the same path the basic
 // ATTACK takes) and is therefore body-blockable. Magic ARTS (Spark, Banish — a
 // `damageType` of "magic") and pure casts (Silence — `resolution: "statusCast"`)
@@ -184,6 +192,7 @@ export function canUseArt(state, actor, artId) {
     activation?.unitId === actor.id &&
     actionAvailable &&
     !actor.spent &&
+    !isStunned(actor) &&
     !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= art.mpCost &&
     (!art.rageLocked || isRaging(actor))

@@ -9,6 +9,9 @@ export function statusImmunities(unit) {
 }
 
 export function applyStatus(unit, status) {
+  if (status.type === "stun" && !isStunDuration(status.duration)) {
+    return { applied: false, reason: "INVALID_DURATION", statuses: [...unit.statuses] };
+  }
   if (statusImmunities(unit).has(status.type)) {
     return { applied: false, reason: "IMMUNE", statuses: [...unit.statuses] };
   }
@@ -16,11 +19,26 @@ export function applyStatus(unit, status) {
   return { applied: true, statuses: [...existing, { ...status }] };
 }
 
-export function resolveStatusEffect(unit, effect, effectRoll) {
+function isStunDuration(duration) {
+  const value = Number(duration);
+  return Number.isFinite(value) && value > 0;
+}
+
+export function isStunned(unit) {
+  return (unit.statuses ?? []).some((status) => {
+    return status.type === "stun" && isStunDuration(status.duration);
+  });
+}
+
+// `chanceMultiplier` scales the effect's base success chance before the roll (the
+// Witch Doctor's Misfortune Stance passes 2 for his team). Clamped to [0,1] so a
+// doubled 70% becomes a capped 100%, never an out-of-range chance.
+export function resolveStatusEffect(unit, effect, effectRoll, chanceMultiplier = 1) {
   if (!Number.isFinite(effectRoll) || effectRoll < 0 || effectRoll >= 1) {
     return { attempted: false, applied: false, reason: "INVALID_ROLL" };
   }
-  if (effectRoll >= effect.chance) return { attempted: true, applied: false, reason: "ROLL_FAILED" };
+  const chance = Math.min(1, effect.chance * (Number.isFinite(chanceMultiplier) ? chanceMultiplier : 1));
+  if (effectRoll >= chance) return { attempted: true, applied: false, reason: "ROLL_FAILED" };
 
   const status = {
     type: effect.status,

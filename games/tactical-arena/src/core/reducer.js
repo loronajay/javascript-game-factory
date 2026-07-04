@@ -1,12 +1,13 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
 import { getLineAttackTargets, getProximityBonus, getTeamDamageReduction, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
-import { resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { applyStatus, isStunned, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { alliesInRadius, getGlobalHealBonus, getGlobalTrueTick, getStanceEffect, getTeamStatusChanceMultiplier, isDamageTypeImmuneByStance } from "../rules/stances.js";
 
 const ERR = Object.freeze({
   INVALID_COMMAND: "INVALID_COMMAND",
@@ -32,6 +33,7 @@ const ERR = Object.freeze({
 });
 
 const reject = (errorCode) => ({ accepted: false, errorCode });
+const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 // Surface any rollover side-effects (fire-tile burns) the turn flip queued onto the
 // state, then clear them so they never persist into the returned state or a clone.
 const accept = (nextState, events = []) => {
@@ -80,24 +82,23 @@ function beginActivation(state, command) {
   if (result.error) return reject(result.error);
   // Summons (Ghouls) never activate — they spawn spent, but guard explicitly so a
   // summon can never open an activation even if some path clears its spent flag.
-  if (!takesTurns(result.unit) || result.unit.spent) return reject(ERR.UNIT_SPENT);
+  // Stun is auto-spent at turn refresh, and this guard keeps hand-built states from
+  // opening an action panel for a stunned unit.
+  if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit)) return reject(ERR.UNIT_SPENT);
   if (state.activation && state.activation.unitId !== result.unit.id &&
       (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
-  const statusEvents = resolveTurnStartStatuses(unit);
-  if (unit.hp <= 0) {
-    // The activating unit died to its own turn-start poison before opening an
-    // activation. Resolve victory, then hand off the turn if this was the player's
-    // last unspent commander (otherwise the match would soft-lock — see
-    // advanceTurnIfExhausted).
-    next.activation = null;
-    resolveVictory(next);
-    advanceTurnIfExhausted(next);
-    return accept(next, statusEvents);
-  }
   unit.defending = false;
+  // Rain Stance's on-attack charge (set last turn) becomes a live +MOVE buff for this
+  // whole activation — applied here, not at attack time, so it lands on the NEXT turn
+  // even if the Witch Doctor attacked-then-moved. It ticks off at this activation's end.
+  if (unit.rainCharged) {
+    const hasted = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { moveRange: unit.rainCharged } });
+    if (hasted.applied) unit.statuses = hasted.statuses;
+    unit.rainCharged = 0;
+  }
   next.activation = {
     unitId: unit.id,
     origin: { ...unit.position },
@@ -106,7 +107,7 @@ function beginActivation(state, command) {
     spellUsed: false,
     bonusActionGroups: []
   };
-  return accept(next, [...statusEvents, { type: "ACTIVATION_BEGAN", unitId: unit.id }]);
+  return accept(next, [{ type: "ACTIVATION_BEGAN", unitId: unit.id }]);
 }
 
 function moveUnit(state, command) {
@@ -160,12 +161,17 @@ function attack(state, command) {
   const nextTarget = findUnit(next, command.targetId);
   next.activation.primaryUsed = true;
 
+  // Witch Doctor stance on-attack triggers fire on the swing itself (hit or miss):
+  // Rain charges next-turn haste, Spirit restores MP to nearby allies. No-op for
+  // every other unit (no stance).
+  const triggerEvents = applyStanceAttackTriggers(next, actor);
+
   // To-hit roll first (miss/crit). Blind and the raging Archer's never-miss are
   // folded into the chance, so a guaranteed miss reads through the same path.
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
   if (swing.missed) {
-    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }]);
+    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }, ...triggerEvents]);
   }
   const targets = getLineAttackTargets(next, actor, nextTarget);
   const targetIds = [];
@@ -188,7 +194,7 @@ function attack(state, command) {
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
     hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget, ...damageFields
-  }, ...healingEvents]);
+  }, ...triggerEvents, ...healingEvents]);
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
@@ -241,7 +247,14 @@ const ART_RESOLVERS = new Map([
   ["build-cover", resolveBuildCover],
   ["throw-cigar", resolveThrowCigar],
   ["lightseeker", resolveTilePulse],
-  ["darkseeker", resolveTilePulse]
+  ["darkseeker", resolveTilePulse],
+  // Witch Doctor dances: each fires a one-shot team/global effect then enters its
+  // stance (the "Dancing Man" passive). One resolver branches on the art's data.
+  ["rain-dance", resolveWitchDance],
+  ["fire-dance", resolveWitchDance],
+  ["spirit-dance", resolveWitchDance],
+  ["misfortune-dance", resolveWitchDance],
+  ["black-death-dance", resolveWitchDance]
 ]);
 
 function useArt(state, command) {
@@ -325,14 +338,16 @@ function resolveTargetedArt(state, command, art) {
   if (art.effect?.type === "status" && target.hp > 0) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
-    effect = resolveStatusEffect(target, art.effect, roll.value);
+    // Misfortune Stance (a living ally of the caster) doubles the status chance.
+    effect = resolveStatusEffect(target, art.effect, roll.value, getTeamStatusChanceMultiplier(next, actor));
     if (effect.statuses) target.statuses = effect.statuses;
     delete effect.statuses;
   } else if (art.effect?.type === "heal") {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     const successful = roll.value >= 0 && roll.value < art.effect.chance;
-    const healing = successful ? Math.round(damage.damage / 2) : 0;
+    // Rain Stance's global heal bonus rides on a successful heal.
+    const healing = successful ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) : 0;
     actor.hp = Math.min(getEffectiveStats(actor, next).maxHp, actor.hp + healing);
     effect = { attempted: true, applied: successful, healing };
   }
@@ -378,7 +393,7 @@ function resolveFlee(state, command, art) {
 function resolveNuke(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
-  const radius = art.targeting.radius;
+  const radius = getSelfBlastRadius(next, actor, art);
   const damageByTarget = {};
   const targetIds = [];
 
@@ -387,8 +402,11 @@ function resolveNuke(state, command, art) {
     if (chebyshevDistance(actor.position, target.position) > radius) continue;
     const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
-    // Dead Zone (and any future magic-reduction host) trims the final magic number.
-    const damage = Math.max(0, result.damage - getTeamDamageReduction(target, next, "magic"));
+    // Black Death Stance nulls magic damage; otherwise Dead Zone-style team reduction
+    // trims the final magic number.
+    const damage = isDamageTypeImmuneByStance(target, "magic")
+      ? 0
+      : Math.max(0, result.damage - getTeamDamageReduction(target, next, "magic"));
     target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
@@ -409,7 +427,7 @@ function resolveNuke(state, command, art) {
 }
 
 // A summoned piece is a full unit object (same shape createUnit produces) plus a
-// `summonerId` so the one-Ghoul-per-Necromancer cap can find it. It spawns already
+// `summonerId` so the per-Necromancer summon cap can find it. It spawns already
 // `spent` so the turn loop never offers it an activation.
 function createSummon(id, type, player, position, summonerId) {
   const definition = getUnitType(type);
@@ -425,6 +443,8 @@ function createSummon(id, type, player, position, summonerId) {
     defending: false,
     spent: true,
     mageChargeCount: 0,
+    stance: null,
+    rainCharged: 0,
     summonerId
   };
 }
@@ -435,9 +455,9 @@ function resolveSummonGhoul(state, command, art) {
   if (!placement || !getSummonPlacementTiles(state, actorState, art).has(positionKey(placement))) {
     return reject(ERR.INVALID_TARGET);
   }
-  // One living Ghoul per Necromancer (legacy petPlaced). Re-summon is blocked
-  // until the current one dies.
-  if (state.units.some((unit) => unit.hp > 0 && unit.summonerId === actorState.id)) {
+  const maxActive = art.summon?.maxActive ?? 1;
+  const activeSummons = state.units.filter((unit) => unit.hp > 0 && unit.summonerId === actorState.id).length;
+  if (activeSummons >= maxActive) {
     return reject(ERR.SUMMON_LIMIT);
   }
 
@@ -540,7 +560,8 @@ function resolveHealAllies(state, command, art) {
   actor.mp -= art.mpCost;
   const healingByTarget = {};
   const targetIds = [];
-  const amount = Math.max(0, Number(art.effect.amount) || 0);
+  // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too).
+  const amount = Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
 
   for (const target of livingUnits(next, actor.player)) {
     if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
@@ -563,6 +584,108 @@ function resolveHealAllies(state, command, art) {
   }]);
 }
 
+function resolveWitchDance(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  actor.mp -= art.mpCost;
+  const event = {
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    mpCost: art.mpCost,
+    stance: art.stance
+  };
+
+  if (art.effect?.type === "healAllies") {
+    const amount = Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
+    const healingByTarget = {};
+    const targetIds = [];
+    for (const target of livingUnits(next, actor.player)) {
+      if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
+      const before = target.hp;
+      target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + amount);
+      const healed = target.hp - before;
+      if (healed <= 0) continue;
+      targetIds.push(target.id);
+      healingByTarget[target.id] = healed;
+    }
+    event.targetIds = targetIds;
+    event.healingByTarget = healingByTarget;
+  }
+
+  if (art.teamBuff) {
+    const buffed = [];
+    for (const target of livingUnits(next, actor.player)) {
+      const result = applyStatus(target, {
+        type: "empowered",
+        duration: art.teamBuff.durationTurns,
+        statModifiers: { ...(art.teamBuff.statModifiers ?? {}) }
+      });
+      if (!result.applied) continue;
+      target.statuses = result.statuses;
+      buffed.push(target.id);
+    }
+    event.buffed = buffed;
+  }
+
+  if (art.teamMp) {
+    const restoredByTarget = {};
+    for (const target of livingUnits(next, actor.player)) {
+      const before = target.mp;
+      target.mp = Math.min(getEffectiveStats(target, next).maxMp, target.mp + art.teamMp.amount);
+      const restored = target.mp - before;
+      if (restored > 0) restoredByTarget[target.id] = restored;
+    }
+    event.restoredByTarget = restoredByTarget;
+  }
+
+  if (art.cleanse?.scope === "all") {
+    const cleansed = [];
+    for (const target of livingUnits(next)) {
+      if (!target.statuses?.length) continue;
+      target.statuses = [];
+      cleansed.push(target.id);
+    }
+    event.cleansed = cleansed;
+  }
+
+  if (art.selfBuff) {
+    // +1 duration so the buff SURVIVES this activation's own end-of-turn tick (the
+    // dance spends the Witch Doctor's turn) and is live on his NEXT turn — otherwise
+    // "+2 STR / +1 DEF / +1 MOVE for 1 turn" would be ticked to nothing before it
+    // could ever be used. Ally buffs (teamBuff) need no bonus: the caster's tick
+    // doesn't touch an ally's statuses, so they already get one buffed activation.
+    const result = applyStatus(actor, {
+      type: "empowered",
+      duration: (art.selfBuff.durationTurns ?? 1) + 1,
+      statModifiers: { ...(art.selfBuff.statModifiers ?? {}) }
+    });
+    if (result.applied) {
+      actor.statuses = result.statuses;
+      event.selfBuffed = true;
+    }
+  }
+
+  if (art.globalStatus) {
+    const statusTargets = [];
+    for (const target of livingUnits(next)) {
+      const result = applyStatus(target, {
+        type: art.globalStatus.status,
+        duration: art.globalStatus.durationTurns
+      });
+      if (!result.applied) continue;
+      target.statuses = result.statuses;
+      statusTargets.push(target.id);
+    }
+    event.statusTargets = statusTargets;
+  }
+
+  actor.stance = art.stance ?? null;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [event]);
+}
+
 function resolveStatusCast(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
@@ -582,7 +705,8 @@ function resolveStatusCast(state, command, art) {
 
   const roll = drawValue(next.rngState, command.effectRoll);
   next.rngState = roll.rngState;
-  const effect = resolveStatusEffect(target, art.effect, roll.value);
+  // Misfortune Stance (a living ally of the caster) doubles the status chance.
+  const effect = resolveStatusEffect(target, art.effect, roll.value, getTeamStatusChanceMultiplier(next, actor));
   if (effect.statuses) target.statuses = effect.statuses;
   delete effect.statuses;
 
@@ -641,10 +765,12 @@ function finishActivation(state, command) {
 function resolvePhysicalDamageHealing(state, actor, damageDealt) {
   const effect = getUnitType(actor.type).passive?.effect;
   if (effect?.type !== "physicalDamageHealAura" || damageDealt <= 0) return [];
-  const amount = effect.rounding === "floor"
+  const base = effect.rounding === "floor"
     ? Math.floor(damageDealt * effect.fraction)
     : Math.round(damageDealt * effect.fraction);
-  if (amount <= 0) return [];
+  if (base <= 0) return [];
+  // Rain Stance's global heal bonus lifts this heal too ("all HP healing globally").
+  const amount = base + getGlobalHealBonus(state);
 
   const healingByTarget = {};
   for (const target of livingUnits(state, actor.player)) {
@@ -659,6 +785,32 @@ function resolvePhysicalDamageHealing(state, actor, damageDealt) {
   return Object.keys(healingByTarget).length
     ? [{ type: "HAND_OF_LIFE", actorId: actor.id, healingByTarget }]
     : [];
+}
+
+function applyStanceAttackTriggers(state, actor) {
+  const trigger = getStanceEffect(actor)?.onAttack;
+  if (!trigger) return [];
+  const events = [];
+
+  if (Number.isFinite(trigger.hasteMove) && trigger.hasteMove > 0) {
+    actor.rainCharged = Math.max(actor.rainCharged ?? 0, trigger.hasteMove);
+    events.push({ type: "STANCE_HASTE_CHARGED", unitId: actor.id, amount: trigger.hasteMove });
+  }
+
+  if (Number.isFinite(trigger.allyMp) && trigger.allyMp > 0) {
+    const restoredByTarget = {};
+    for (const ally of alliesInRadius(state, actor, trigger.allyMpRadius)) {
+      const before = ally.mp;
+      ally.mp = Math.min(getEffectiveStats(ally, state).maxMp, ally.mp + trigger.allyMp);
+      const restored = ally.mp - before;
+      if (restored > 0) restoredByTarget[ally.id] = restored;
+    }
+    if (Object.keys(restoredByTarget).length) {
+      events.push({ type: "STANCE_MP_RESTORED", unitId: actor.id, restoredByTarget });
+    }
+  }
+
+  return events;
 }
 
 function spendAndAdvance(state, unit) {
@@ -684,25 +836,82 @@ function spendAndAdvance(state, unit) {
   advanceTurnIfExhausted(state);
 }
 
+function appendPendingRolloverEvents(state, events) {
+  if (!events.length) return;
+  state.pendingRolloverEvents = [...(state.pendingRolloverEvents ?? []), ...events];
+}
+
+function autoSpendStunnedUnits(state, player) {
+  const events = [];
+  for (const member of livingUnits(state, player)) {
+    if (!takesTurns(member) || member.spent || !isStunned(member)) continue;
+
+    member.defending = false;
+    member.statuses = tickStatuses(member.statuses);
+    member.spent = true;
+    events.push({ type: "UNIT_STUNNED", unitId: member.id });
+  }
+  if (events.length) resolveVictory(state);
+  return events;
+}
+
+function applySquadTurnChargeStatuses(state, player) {
+  const events = [];
+  for (const member of livingUnits(state, player)) {
+    events.push(...resolveTurnStartStatuses(member));
+  }
+  if (events.length) resolveVictory(state);
+  return events;
+}
+
+function releaseStunLoopGuard(state) {
+  const unitIds = [];
+  for (const member of livingUnits(state, state.currentPlayer)) {
+    if (!takesTurns(member)) continue;
+    member.statuses = (member.statuses ?? []).filter((status) => status.type !== "stun");
+    member.spent = false;
+    unitIds.push(member.id);
+  }
+  if (unitIds.length) {
+    appendPendingRolloverEvents(state, [{
+      type: "STUN_LOOP_GUARD",
+      player: state.currentPlayer,
+      unitIds
+    }]);
+  }
+}
+
 // Pass the turn to the other player once the current one has no unspent living
-// commander left. Shared by the normal end-of-activation path AND the rare
-// turn-start death: a unit that dies to poison on BEGIN never opens an activation,
-// so if it was the player's last unspent commander the turn must still hand off here
-// — otherwise that player soft-locks the match with no legal move. Summons never
-// take turns, so they neither keep the turn open nor get their spent flag reset.
+// commander left. Summons never take turns, so they neither keep the turn open nor
+// get their spent flag reset.
 function advanceTurnIfExhausted(state) {
   if (state.phase !== "playing") return;
-  if (livingUnits(state, state.currentPlayer).some((member) => takesTurns(member) && !member.spent)) return;
-  state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
-  state.turnNumber += 1;
-  for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
-  // Board hazards resolve at the rollover, after the turn flips: fire burns whoever
-  // stands on it and counts down. A burn can be lethal, so re-check victory. Burn
-  // events are stashed on the state for accept() to surface (presentation only).
-  const fireEvents = [];
-  applyFireTick(state, fireEvents);
-  resolveVictory(state);
-  if (fireEvents.length) state.pendingRolloverEvents = fireEvents;
+  let rollovers = 0;
+  while (
+    state.phase === "playing" &&
+    !livingUnits(state, state.currentPlayer).some((member) => takesTurns(member) && !member.spent)
+  ) {
+    if (rollovers >= MAX_STUN_FAST_FORWARD_ROLLOVERS) {
+      releaseStunLoopGuard(state);
+      break;
+    }
+    state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
+    state.turnNumber += 1;
+    rollovers += 1;
+    for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
+    appendPendingRolloverEvents(state, applySquadTurnChargeStatuses(state, state.currentPlayer));
+    // Board hazards resolve at the rollover, after the turn flips: fire burns whoever
+    // stands on it and counts down. A burn can be lethal, so re-check victory. Burn
+    // events are stashed on the state for accept() to surface (presentation only).
+    const fireEvents = [];
+    applyFireTick(state, fireEvents);
+    // Black Death Stance burns EVERY living unit (allies and foes, the Witch Doctor
+    // included) for 1 true damage at the same rollover. Lethal, so re-check victory.
+    applyBlackDeathTick(state, fireEvents);
+    resolveVictory(state);
+    appendPendingRolloverEvents(state, fireEvents);
+    appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
+  }
 }
 
 const FIRE_DAMAGE = 1;
@@ -724,6 +933,20 @@ function applyFireTick(state, events) {
     }
     obj.turnsLeft -= 1;
     if (obj.turnsLeft <= 0) delete state.tileObjects[key];
+  }
+}
+
+// Black Death Stance (Witch Doctor): while any living unit holds the stance, every
+// living unit on the board — allies, foes, and the Witch Doctor himself — takes 1
+// TRUE damage at each turn rollover. Board-level like the fire tick, and lethal, so
+// the caller re-resolves victory after.
+function applyBlackDeathTick(state, events) {
+  const amount = getGlobalTrueTick(state);
+  if (amount <= 0) return;
+  for (const unit of livingUnits(state)) {
+    const dealt = Math.min(unit.hp, amount);
+    unit.hp = Math.max(0, unit.hp - amount);
+    if (dealt > 0) events.push({ type: "BLACK_DEATH_DAMAGE", unitId: unit.id, damage: dealt });
   }
 }
 

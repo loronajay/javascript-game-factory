@@ -3,6 +3,7 @@ import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
 import { areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
+import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
 
 // True when an attacker's shot ignores intervening obstacles entirely — the
 // Sniper's Rifle Powered passive (pierces both bodies AND Build Cover walls). Read
@@ -190,7 +191,11 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const actorStats = getEffectiveStats(attacker, state);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
-  const damage = Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
+  // Black Death Stance nulls magic damage entirely; otherwise Dead Zone-style team
+  // reduction trims the final number.
+  const damage = isDamageTypeImmuneByStance(target, "magic")
+    ? 0
+    : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
   return { ...result, critical, proximityBonus: 0, damage };
 }
 
@@ -218,7 +223,10 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
-  let damage = result.damage + proximityBonus + tileStrikeBonus;
+  // Fire Stance adds flat crit damage — only on a landed crit, so the normal-hit
+  // forecast (critical:false) never shows it.
+  const stanceCritBonus = critical ? getStanceCritBonus(attacker) : 0;
+  let damage = result.damage + proximityBonus + tileStrikeBonus + stanceCritBonus;
   // A landed hit (we only reach here past the to-hit roll) is floored by any minimum
   // the attacker's passive sets — last, after every bonus.
   const minimum = getMinimumDamage(attacker);

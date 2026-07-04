@@ -26,8 +26,8 @@ export const GHOUL = Object.freeze({
   passive: Object.freeze({
     id: "aura-carrier",
     name: "Aura Carrier",
-    effect: Object.freeze({ type: "enemyAura", radius: 2, stats: Object.freeze({ defense: -1 }) }),
-    description: "Enemies within 2 tiles of the Ghoul suffer -1 DEF, carrying the Necromancer's Deathly Aura.",
+    effect: Object.freeze({ type: "enemyAura", radius: 3, stats: Object.freeze({ defense: -1 }) }),
+    description: "Enemies within 3 tiles of the Ghoul suffer -1 DEF, carrying the Necromancer's Deathly Aura.",
     implemented: true
   }),
   arts: Object.freeze([])

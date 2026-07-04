@@ -477,11 +477,14 @@ test("Poison Arrow resolves a normal attack, spends the Archer, and applies perm
   assert.equal(result.accepted, true);
   const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
   const actor = result.nextState.units.find((unit) => unit.id === "p1-archer");
-  assert.equal(target.hp, 20);
+  assert.equal(target.hp, 19);
   assert.deepEqual(target.statuses, [{ type: "poison", duration: "permanent", turnStartDamage: 1 }]);
   assert.equal(actor.mp, 18);
   assert.equal(actor.spent, true);
   assert.equal(result.events[0].effect.applied, true);
+  assert.ok(result.events.some((event) =>
+    event.type === "STATUS_DAMAGE" && event.unitId === "p2-swordsman" && event.damage === 1
+  ));
 });
 
 test("Emblem prevents Poison Arrow from adding poison but does not prevent its attack", () => {
@@ -522,7 +525,7 @@ test("status immunities come from passive unit data instead of ART-specific targ
   assert.equal(result.events[0].effect.reason, "IMMUNE");
 });
 
-test("poison damages its owner at the beginning of that unit's activation, defaulting to one damage", () => {
+test("poison does not damage its owner at the beginning of that unit's activation", () => {
   const initial = createBattleState({
     units: [
       { id: "p1-poisoned", player: 1, type: "swordsman", hp: 5, x: 0, y: 0, statuses: [{ type: "poison", duration: "permanent" }] },
@@ -532,22 +535,38 @@ test("poison damages its owner at the beginning of that unit's activation, defau
   const result = applyCommand(initial, beginActivation(1, "p1-poisoned"));
 
   assert.equal(result.accepted, true);
-  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 4);
-  assert.deepEqual(result.events[0], { type: "STATUS_DAMAGE", unitId: "p1-poisoned", status: "poison", damage: 1 });
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 5);
+  assert.equal(result.events.some((event) => event.type === "STATUS_DAMAGE"), false);
 });
 
-test("an ability can specify a stronger poison tick", () => {
+test("poison damages the newly charged squad at turn rollover, honoring configured damage", () => {
   const initial = createBattleState({
     units: [
       { id: "p1-poisoned", player: 1, type: "swordsman", hp: 5, x: 0, y: 0, statuses: [{ type: "poison", duration: "permanent", turnStartDamage: 3 }] },
       { id: "p2-swordsman", player: 2, type: "swordsman", x: 7, y: 7 }
     ]
   });
-  const result = applyCommand(initial, beginActivation(1, "p1-poisoned"));
+  let result = applyCommand(initial, beginActivation(1, "p1-poisoned"));
+  result = applyCommand(result.nextState, defend(1, "p1-poisoned"));
+  result = applyCommand(result.nextState, finishActivation(1, "p1-poisoned"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.currentPlayer, 2);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 5);
+  assert.equal(result.events.some((event) => event.type === "STATUS_DAMAGE"), false);
+
+  result = applyCommand(result.nextState, beginActivation(2, "p2-swordsman"));
+  result = applyCommand(result.nextState, defend(2, "p2-swordsman"));
+  result = applyCommand(result.nextState, finishActivation(2, "p2-swordsman"));
 
   assert.equal(result.accepted, true);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 2);
-  assert.equal(result.events[0].damage, 3);
+  assert.deepEqual(result.events.find((event) => event.type === "STATUS_DAMAGE"), {
+    type: "STATUS_DAMAGE",
+    unitId: "p1-poisoned",
+    status: "poison",
+    damage: 3
+  });
 });
 
 test("Moonstrike applies a one-turn status that expires after the afflicted unit completes an activation", () => {
@@ -569,6 +588,71 @@ test("Moonstrike applies a one-turn status that expires after the afflicted unit
   const enemyDefended = applyCommand(enemySelected.nextState, defend(2, "p2-swordsman"));
   const finished = applyCommand(enemyDefended.nextState, finishActivation(2, "p2-swordsman"));
   assert.deepEqual(finished.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, []);
+});
+
+test("stunned units are auto-spent when their squad turn begins", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-stunned", player: 2, type: "swordsman", x: 7, y: 7, statuses: [{ type: "stun", duration: 1 }] },
+      { id: "p2-ready", player: 2, type: "archer", x: 8, y: 7 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
+  const finished = applyCommand(defended.nextState, finishActivation(1, "p1-swordsman"));
+
+  assert.equal(finished.accepted, true);
+  assert.equal(finished.nextState.currentPlayer, 2);
+  assert.equal(finished.nextState.units.find((unit) => unit.id === "p2-stunned").spent, true);
+  assert.deepEqual(finished.nextState.units.find((unit) => unit.id === "p2-stunned").statuses, []);
+  assert.equal(finished.nextState.units.find((unit) => unit.id === "p2-ready").spent, false);
+  assert.ok(finished.events.some((event) => event.type === "UNIT_STUNNED" && event.unitId === "p2-stunned"));
+});
+
+test("a squad with only stunned units is skipped immediately", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-stunned", player: 2, type: "swordsman", x: 7, y: 7, statuses: [{ type: "stun", duration: 1 }] }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
+  const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
+  const finished = applyCommand(defended.nextState, finishActivation(1, "p1-swordsman"));
+
+  assert.equal(finished.accepted, true);
+  assert.equal(finished.nextState.currentPlayer, 1);
+  assert.equal(finished.nextState.units.find((unit) => unit.id === "p1-swordsman").spent, false);
+  assert.equal(finished.nextState.units.find((unit) => unit.id === "p2-stunned").spent, true);
+  assert.deepEqual(finished.nextState.units.find((unit) => unit.id === "p2-stunned").statuses, []);
+});
+
+test("stun fast-forward has a guard that restores control instead of looping forever", () => {
+  const initial = createBattleState({
+    units: [
+      { id: "p1-stunned", player: 1, type: "swordsman", x: 0, y: 0, statuses: [{ type: "stun", duration: 99 }] },
+      { id: "p2-stunned", player: 2, type: "swordsman", x: 7, y: 7, statuses: [{ type: "stun", duration: 99 }] }
+    ]
+  });
+  initial.activation = {
+    unitId: "p1-stunned",
+    origin: { ...initial.units.find((unit) => unit.id === "p1-stunned").position },
+    moved: false,
+    primaryUsed: true,
+    spellUsed: false,
+    bonusActionGroups: []
+  };
+  const finished = applyCommand(initial, finishActivation(1, "p1-stunned"));
+
+  assert.equal(finished.accepted, true);
+  assert.ok(finished.events.some((event) => event.type === "STUN_LOOP_GUARD"));
+  assert.ok(finished.nextState.units.some((unit) =>
+    unit.player === finished.nextState.currentPlayer &&
+    unit.hp > 0 &&
+    !unit.spent &&
+    !unit.statuses.some((status) => status.type === "stun")
+  ));
 });
 
 test("failed status rolls still resolve the ART attack and report no effect", () => {

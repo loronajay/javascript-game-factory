@@ -16,10 +16,14 @@
 // through `normalizeUnitAi` so a new unit needs no edit to this file.
 
 import { areEnemies, livingUnits } from "../core/state.js";
-import { getEffectiveStats, isDefending, normalizeUnitAi } from "../core/unitCatalog.js";
+import { getEffectiveStats, getUnitType, isDefending, normalizeUnitAi } from "../core/unitCatalog.js";
 import { getCritChance, getMissChance, getTeamDamageReduction, resolveBaseStrike } from "../rules/combat.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { statusImmunities } from "../rules/statuses.js";
+
+// Statuses a unit does NOT want on it — the ones a global cleanse (Misfortune Dance)
+// is worth removing from an ally. `empowered` is a buff, so it is deliberately absent.
+const HARMFUL_STATUSES = new Set(["poison", "blind", "slow", "silence", "stun"]);
 
 // Tuning priors. All values are in the same currency as HP / expected damage, so
 // the difficulty weights in cpuController compose cleanly (decision 3: one currency).
@@ -49,7 +53,7 @@ export function isKeyUnit(unit) {
 }
 
 // Rough expected damage this unit deals on a typical attack — used to value
-// denying it a turn (blind/silence/slow). Casters/controllers deal magic, which
+// denying it a turn (blind/silence/slow/stun). Casters/controllers deal magic, which
 // ignores DEF, so they estimate off raw strength; everyone else off STR − DEF.
 export function offenseEstimate(unit, state = null) {
   const str = getEffectiveStats(unit, state).strength;
@@ -77,6 +81,9 @@ export function statusValue(target, effect, state = null, { survivingHp } = {}) 
     case "blind":
       value = offense * duration;
       break;
+    case "stun":
+      value = offense * duration;
+      break;
     case "silence":
       value = offense * duration * (SILENCE_ROLE_MULT[role] ?? 1);
       break;
@@ -99,6 +106,86 @@ export function statusValue(target, effect, state = null, { survivingHp } = {}) 
 export function expectedHeal(unit, amount, state = null) {
   const maxHp = getEffectiveStats(unit, state).maxHp;
   return Math.max(0, Math.min(amount, maxHp - unit.hp));
+}
+
+// Can `unit` bring a strike to bear on any of `enemies` next turn (move + reach)?
+// The same reach heuristic incomingThreat uses, so the CPU's read of "an ally will
+// fight next turn" matches its read of who threatens it.
+function canReachAnEnemy(state, unit, enemies) {
+  const stats = getEffectiveStats(unit, state);
+  const reach = stats.moveRange + stats.attackRange;
+  return enemies.some((enemy) => chebyshevDistance(unit.position, enemy.position) <= reach);
+}
+
+// True when a unit is short of MP for at least one of its costed active arts, so a
+// small MP top-up (Spirit Dance) could matter to it.
+function isMpStarved(unit) {
+  const definition = getUnitType(unit.type);
+  if (unit.mp >= definition.stats.maxMp) return false;
+  return definition.arts.some((art) => art.kind === "active" && art.mpCost > 0 && unit.mp < art.mpCost);
+}
+
+// Turn a live status entry into the effect shape statusValue reads, so the value of
+// REMOVING a harmful status from an ally reuses the exact prior used to value INFLICTING
+// it on an enemy.
+function statusAsEffect(status) {
+  return { status: status.type, duration: status.duration, turnStartDamage: status.turnStartDamage };
+}
+
+// Value (in damage-equivalent units) of a Witch Doctor "buffAllies" dance — the team
+// buffs / cleanse / disruption casts that project NO HP change, so the controller can't
+// read their worth from the board diff. Returns 0 when the dance would do nothing useful
+// right now; the planner gates generation on `> 0`, so the CPU never dances into a no-op.
+// Reuses statusValue/offenseEstimate, so its numbers stay in the same currency as damage.
+export function buffAlliesValue(state, caster, art) {
+  const allies = livingUnits(state, caster.player);
+  const enemies = livingUnits(state).filter((unit) => areEnemies(caster, unit));
+
+  // Fire Dance: +1 STR to the team for a turn — worth ~1 landed hit's worth of extra
+  // damage for each unit that can actually reach an enemy next turn (the Witch Doctor
+  // included, via the Fire Stance it enters).
+  if (art.teamBuff) {
+    const strength = Number(art.teamBuff.statModifiers?.strength) || 0;
+    if (strength <= 0) return 0;
+    let value = 0;
+    for (const ally of allies) if (canReachAnEnemy(state, ally, enemies)) value += strength * HIT_BASELINE;
+    return value;
+  }
+
+  // Spirit Dance: +1 MP to the team — a minor utility, valued only for allies that are
+  // actually short of MP for one of their arts.
+  if (art.teamMp) {
+    return allies.filter(isMpStarved).length * 0.4;
+  }
+
+  // Misfortune Dance: strip every status globally — worth removing each harmful status
+  // from an ally (the same magnitude as inflicting it). The enemy side keeps its
+  // statuses in the CPU's read (they're cleansed too, but modeling that is a wash we
+  // skip); the clear, immediate gain is protecting the CPU's own team.
+  if (art.cleanse) {
+    let value = 0;
+    for (const ally of allies) {
+      for (const status of ally.statuses ?? []) {
+        if (HARMFUL_STATUSES.has(status.type)) value += statusValue(ally, statusAsEffect(status), state);
+      }
+    }
+    return value;
+  }
+
+  // Black Death Dance (rage ultimate): blind the whole enemy squad + a self power spike.
+  // The blind on every enemy is the concrete immediate value.
+  if (art.globalStatus || art.selfBuff) {
+    let value = 0;
+    if (art.globalStatus?.status) {
+      const effect = { status: art.globalStatus.status, durationTurns: art.globalStatus.durationTurns };
+      for (const enemy of enemies) value += statusValue(enemy, effect, state);
+    }
+    const selfStr = Number(art.selfBuff?.statModifiers?.strength) || 0;
+    if (selfStr > 0) value += selfStr * HIT_BASELINE * (canReachAnEnemy(state, caster, enemies) ? 1 : 0.3);
+    return value;
+  }
+
+  return 0;
 }
 
 // Expected outcome of a rolled strike — the basic ATTACK and every `strike` ART.

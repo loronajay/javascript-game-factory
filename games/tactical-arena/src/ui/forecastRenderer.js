@@ -16,6 +16,19 @@ function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
   forecastLayer.append(group);
 }
 
+function isForecastableStrikeArt(art) {
+  return Boolean(
+    art &&
+    art.kind === "active" &&
+    !art.selfCast &&
+    art.resolution !== "statusCast" &&
+    art.resolution !== "flee" &&
+    art.resolution !== "summon" &&
+    art.effect?.type !== "healAllies" &&
+    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement"].includes(art.targeting?.shape)
+  );
+}
+
 // While in attack or single-target ART mode, every enemy in range wears a badge
 // showing the predicted normal-hit damage (skull when lethal, "miss" when blinded).
 // Uses the same resolvePhysicalStrike the reducer uses — can never drift.
@@ -25,7 +38,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   const isAttack = mode === "attack";
   const artId = mode?.startsWith("art:") ? mode.slice(4) : null;
   const art = artId ? getArt(actor.type, artId) : null;
-  const isStrikeArt = Boolean(artId) && mode !== "art:volley-shot" && art?.resolution !== "statusCast" && art?.resolution !== "flee" && art?.effect?.type !== "healAllies";
+  const isStrikeArt = Boolean(artId) && isForecastableStrikeArt(art);
   if (!isAttack && !isStrikeArt) return;
 
   const metrics = createBoardMetrics(state.size);

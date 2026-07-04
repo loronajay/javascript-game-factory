@@ -1,7 +1,7 @@
 // Necromancer — a midline debuffer-summoner caster. Recovered from the legacy
 // TurboWarp project (HP 23 / Move 3 / Range 5 / STR 6 / DEF 3 / MP 36; Deathly
 // Aura + Dead Zone passives; Summon Ghoul / Dark Bomb / Wither arts). The aura
-// (Chebyshev radius 2) and the ghoul are confirmed canon from the .sb3; the
+// (Chebyshev radius 3) and the ghoul are confirmed canon from the .sb3; the
 // per-art MP/damage numbers below are rebuild balance choices, since the legacy
 // combat-roll model is itself a rebuild override (see LEGACY_TURBOWARP_REFERENCE).
 //
@@ -29,8 +29,8 @@ export const NECROMANCER = Object.freeze({
   passive: Object.freeze({
     id: "deathly-aura",
     name: "Deathly Aura",
-    effect: Object.freeze({ type: "enemyAura", radius: 2, stats: Object.freeze({ defense: -1 }) }),
-    description: "Enemies within 2 tiles of the Necromancer suffer -1 DEF.",
+    effect: Object.freeze({ type: "enemyAura", radius: 3, stats: Object.freeze({ defense: -1 }) }),
+    description: "Enemies within 3 tiles of the Necromancer suffer -1 DEF.",
     implemented: true
   }),
   arts: Object.freeze([
@@ -57,9 +57,9 @@ export const NECROMANCER = Object.freeze({
       kind: "active",
       mpCost: 6,
       selfCast: true,
-      targeting: Object.freeze({ shape: "nukeAura", radius: 2 }),
+      targeting: Object.freeze({ shape: "nukeAura", radius: 3, matchAuraRadius: true }),
       damage: Object.freeze({ type: "magic", amount: 5 }),
-      description: "Detonate dark energy, dealing 5 magic damage to every enemy within 2 tiles of the Necromancer.",
+      description: "Detonate dark energy, dealing 5 magic damage to every enemy within the Necromancer's Deathly Aura.",
       implemented: true,
       ai: Object.freeze({ intent: "selfBlast", evHints: Object.freeze({ minTargets: 2 }) })
     }),
@@ -70,8 +70,8 @@ export const NECROMANCER = Object.freeze({
       mpCost: 8,
       resolution: "summon",
       targeting: Object.freeze({ shape: "placement", radius: 2 }),
-      summon: Object.freeze({ type: "ghoul" }),
-      description: "Raise a Ghoul on an empty tile within 2 tiles. It has 10 HP, takes no turns, and carries the Deathly Aura. Only one Ghoul at a time.",
+      summon: Object.freeze({ type: "ghoul", maxActive: 2 }),
+      description: "Raise a Ghoul on an empty tile within 2 tiles. It has 10 HP, takes no turns, and carries the Deathly Aura. Up to two Ghouls at a time.",
       implemented: true,
       ai: Object.freeze({ intent: "summon", evHints: Object.freeze({ placeNear: "enemy" }), tags: Object.freeze(["zone"]) })
     }),
@@ -89,9 +89,9 @@ export const NECROMANCER = Object.freeze({
   // amplified Deathly Aura (the nested enemyAura block, folded by enemyAuraStats
   // only while the source is raging). Total aura while raging: -2 DEF, -1 STR,
   // -1 MOVE to enemies in range. RAGE also widens the aura's reach by 1 (radius
-  // 2 → 3); that +1 is applied centrally by `auraRadius` in unitCatalog.js — and
+  // 3 -> 4); that +1 is applied centrally by `auraRadius` in unitCatalog.js and
   // it extends any Ghoul this Necromancer raised, not just the Necromancer itself
-  // — so the `radius: 2` below is the base, not the raging value.
+  // — so the `radius: 3` below is the base, not the raging value.
   ragePassive: Object.freeze({
     id: "necromancer-rage",
     name: "Grave Wrath",
@@ -100,9 +100,9 @@ export const NECROMANCER = Object.freeze({
     effect: Object.freeze({
       type: "statModifiers",
       stats: Object.freeze({ moveRange: 1 }),
-      enemyAura: Object.freeze({ radius: 2, stats: Object.freeze({ defense: -1, strength: -1, moveRange: -1 }) })
+      enemyAura: Object.freeze({ radius: 3, stats: Object.freeze({ defense: -1, strength: -1, moveRange: -1 }) })
     }),
-    description: "At 5 HP or lower, gain +1 MOVE and the Deathly Aura reaches 1 tile further (radius 3) while also sapping enemies' STR and MOVE by 1 (total -2 DEF, -1 STR, -1 MOVE within 3 tiles). The wider reach extends to your Ghoul too.",
+    description: "At 5 HP or lower, gain +1 MOVE and the Deathly Aura reaches 1 tile further (radius 4) while also sapping enemies' STR and MOVE by 1 (total -2 DEF, -1 STR, -1 MOVE within 4 tiles). The wider reach extends to your Ghoul too.",
     implemented: true
   })
 });

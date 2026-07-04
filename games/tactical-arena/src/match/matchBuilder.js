@@ -79,6 +79,6 @@ export function readableError(errorCode) {
     TARGET_OBSTRUCTED: "Another unit is blocking the line of fire.",
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",
     FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation.",
-    SUMMON_LIMIT: "This Necromancer already has a Ghoul on the field."
+    SUMMON_LIMIT: "This Necromancer already has two Ghouls on the field."
   })[errorCode] ?? "That action is not legal right now.";
 }

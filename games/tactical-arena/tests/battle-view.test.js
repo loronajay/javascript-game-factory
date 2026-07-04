@@ -6,7 +6,7 @@ import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, moveUnit } from "../src/core/commands.js";
 import { canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
-import { isTargetedMode } from "../src/ui/boardRenderer.js";
+import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createUnitFigure } from "../src/ui/unitRenderer.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes } from "../src/ui/codex.js";
@@ -84,6 +84,18 @@ class TestSvgElement {
     this.attributes = new Map();
     this.listeners = new Map();
     this.className = "";
+    this.classList = {
+      add: (...names) => this.setClasses([...new Set([...this.classNames(), ...names])]),
+      remove: (...names) => this.setClasses(this.classNames().filter((name) => !names.includes(name))),
+      contains: (name) => this.classNames().includes(name),
+      toggle: (name, force) => {
+        const has = this.classNames().includes(name);
+        const shouldAdd = force ?? !has;
+        if (shouldAdd && !has) this.classList.add(name);
+        if (!shouldAdd && has) this.classList.remove(name);
+        return shouldAdd;
+      }
+    };
   }
 
   setAttribute(name, value) {
@@ -99,8 +111,21 @@ class TestSvgElement {
     this.children.push(...children);
   }
 
+  replaceChildren(...children) {
+    this.children = children;
+  }
+
   addEventListener(type, handler) {
     this.listeners.set(type, handler);
+  }
+
+  classNames() {
+    return this.className.split(/\s+/).filter(Boolean);
+  }
+
+  setClasses(names) {
+    this.className = names.join(" ");
+    this.attributes.set("class", this.className);
   }
 
   findByClass(className) {
@@ -296,11 +321,55 @@ test("the board only treats attack and enemy-target ARTS as targeted modes", () 
   assert.equal(isTargetedMode("art:volley-shot", { type: "archer" }), false);
 });
 
+test("Build Cover walls render as low pass-through cover instead of click-blocking slabs", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 10,
+      units: [
+        { id: "p1", player: 1, type: "sniper", x: 0, y: 0 },
+        { id: "p2", player: 2, type: "swordsman", x: 9, y: 9 }
+      ],
+      tileObjects: [{ kind: "wall", x: 4, y: 4, hp: 1 }]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const wall = unitsLayer.findByClass("tile-wall");
+    assert.ok(wall, "wall figure should render");
+    assert.match(wall.getAttribute("class"), /\btile-wall--low-cover\b/);
+    assert.equal(wall.listeners.has("click"), false, "wall body should not intercept clicks meant for tiles behind it");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("the codex describes either-order movement and primary actions", () => {
   const html = buildCodex();
 
   assert.match(html, /Move and act in either order/);
   assert.doesNotMatch(html, /Move, then attack or defend/);
+});
+
+test("the codex lists Stun as an auto-spent status effect", () => {
+  const html = buildCodex();
+
+  assert.match(html, /<span class="ref-tag status">Stun<\/span>/);
+  assert.match(html, /auto-spent/);
 });
 
 test("the Paladin codex entry lists Hand of Life and the full passive stack", () => {

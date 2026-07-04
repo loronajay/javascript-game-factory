@@ -14,7 +14,9 @@
 import { findUnit, livingUnits } from "../core/state.js";
 import { getArt, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
+import { isStunned } from "../rules/statuses.js";
 import {
+  buffAlliesValue,
   expectedStrike,
   incomingThreat,
   isKeyUnit,
@@ -51,7 +53,7 @@ export function chooseActivation(
   state,
   { difficulty = "normal", cpuPlayer = state.currentPlayer, rng = Math.random } = {}
 ) {
-  const units = livingUnits(state, cpuPlayer).filter((u) => !u.spent && takesTurns(u));
+  const units = livingUnits(state, cpuPlayer).filter((u) => !u.spent && takesTurns(u) && !isStunned(u));
   if (units.length === 0) return [];
 
   const weights = WEIGHTS[difficulty] ?? WEIGHTS.normal;
@@ -160,6 +162,11 @@ function planEffectValue(state, unit, plan) {
     const target = findUnit(state, plan.primary.targetId);
     if (!target) return { control: 0, heal: 0 };
     return { control: (art.effect?.chance ?? 1) * statusValue(target, art.effect, state), heal: 0 };
+  }
+  // Witch Doctor dances (team buff / cleanse / global blind) project no HP change, so
+  // their worth rides the same `control` weight as a status cast.
+  if (ai.intent === "buffAllies") {
+    return { control: buffAlliesValue(state, unit, art), heal: 0 };
   }
   return { control: 0, heal: 0 };
 }

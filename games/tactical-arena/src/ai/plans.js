@@ -34,6 +34,7 @@ import {
   getFootworkStepOptions,
   getFootworkSteps,
   getLegalFleeTiles,
+  getSelfBlastRadius,
   getSummonPlacementTiles,
   getTilePulseTargets,
   getVolleyShotAimOptions,
@@ -41,13 +42,15 @@ import {
   getWallPlacementTiles,
   validateFootworkPath
 } from "../rules/arts.js";
-import { expectedFixedHit, expectedStrike, nearestEnemyDistance } from "./evaluate.js";
+import { isStunned } from "../rules/statuses.js";
+import { buffAlliesValue, expectedFixedHit, expectedStrike, nearestEnemyDistance } from "./evaluate.js";
 
 const FOOTWORK_PATH_BUDGET = 3000; // DFS node cap so footwork search stays bounded
 const FOOTWORK_KEEP = 8;           // best N footwork paths kept (decision 2)
 const PLACEMENT_KEEP = 10;         // best N tile-placement candidates kept
 
 export function generatePlans(state, unit) {
+  if (isStunned(unit)) return [];
   const plans = [];
   const origin = { x: unit.position.x, y: unit.position.y };
   const moveTiles = tilesFromKeys(getLegalMoves(state, unit));
@@ -125,7 +128,7 @@ function generateArtPlans(state, unit, art, ai, plans) {
       break;
     }
     case "selfBlast": {
-      const radius = art.targeting.radius;
+      const radius = getSelfBlastRadius(state, unit, art);
       if (enemiesWithin(state, unit, radius).length > 0) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
       }
@@ -150,9 +153,11 @@ function generateArtPlans(state, unit, art, ai, plans) {
       break;
     }
     case "summon": {
-      // Honor the one-Ghoul-per-summoner cap the reducer enforces, so we never emit a
+      // Honor the per-summoner cap the reducer enforces, so we never emit a
       // summon the reducer would reject mid-activation.
-      if (state.units.some((u) => u.hp > 0 && u.summonerId === unit.id)) break;
+      const maxActive = art.summon?.maxActive ?? 1;
+      const activeSummons = state.units.filter((u) => u.hp > 0 && u.summonerId === unit.id).length;
+      if (activeSummons >= maxActive) break;
       for (const tile of summonCandidates(state, unit, art)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile } }));
       }
@@ -161,6 +166,15 @@ function generateArtPlans(state, unit, art, ai, plans) {
     case "placeObject": {
       for (const tile of placementCandidates(state, unit, art, ai)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile } }));
+      }
+      break;
+    }
+    case "buffAllies": {
+      // Self/team/global support dance with no target (Witch Doctor Fire/Spirit/
+      // Misfortune/Black Death). Only offer it when it would actually do something —
+      // buffAlliesValue is 0 for a no-op cast — so the CPU never dances pointlessly.
+      if (buffAlliesValue(state, unit, art) > 0) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
       }
       break;
     }
@@ -227,7 +241,7 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break;
     }
     case "selfBlast": {
-      const radius = art.targeting.radius;
+      const radius = getSelfBlastRadius(state, actor, art);
       for (const target of board) {
         if (!areEnemies(actor, target) || chebyshevDistance(actor.position, target.position) > radius) continue;
         target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: "magic" }).damage);
@@ -265,6 +279,8 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     }
     case "placeObject":
       break; // zone value is a controller score term, not an HP change
+    case "buffAllies":
+      break; // buffs/cleanse/blind change no HP now; value is a controller score term
     default:
       break;
   }
@@ -450,13 +466,14 @@ function makePlan(unit, { bonus = null, moveTo = null, movePhase = null, primary
 }
 
 // Planning-time ART legality. Mirrors canUseArt's SUBSTANTIVE gates (implemented,
-// active, alive, not spent, not silenced, enough MP, rage unlocked) but omits the
+// active, alive, not spent, not stunned/silenced, enough MP, rage unlocked) but omits the
 // open-activation phase checks (moved/primaryUsed/bonus group) — during planning the
 // unit has not acted yet, and the reducer re-validates once the activation opens.
 function artUsableForPlanning(state, unit, art) {
   return Boolean(
     art?.implemented && art.kind === "active" &&
     unit.hp > 0 && !unit.spent &&
+    !isStunned(unit) &&
     !unit.statuses?.some((status) => status.type === "silence") &&
     unit.mp >= art.mpCost &&
     (!art.rageLocked || isRaging(unit))

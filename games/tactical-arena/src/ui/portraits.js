@@ -28,6 +28,7 @@ export const PORTRAITS = Object.freeze({
   magician:    portrait("magician",    { x: 0.145, y: 0.022, w: 0.693, h: 0.937 }),
   paladin:     portrait("paladin",     { x: 0.063, y: 0.038, w: 0.777, h: 0.920 }),
   necromancer: portrait("necromancer", { x: 0.085, y: 0.030, w: 0.737, h: 0.910 }),
+  "witch-doctor": portrait("witch-doctor", { x: 0.080, y: 0.030, w: 0.780, h: 0.920 }),
   sniper:      portrait("sniper",      { x: 0.150, y: 0.030, w: 0.760, h: 0.955 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.

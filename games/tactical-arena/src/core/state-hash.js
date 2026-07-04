@@ -43,6 +43,9 @@ function canonicalUnits(units) {
         `${unit.id}=${unit.player},${unit.type},` +
         `${unit.position.x},${unit.position.y},${unit.hp},${unit.mp},` +
         `${unit.defending ? 1 : 0},${unit.spent ? 1 : 0},${unit.mageChargeCount ?? 0},` +
+        // Witch Doctor stance + pending Rain haste both change future legal actions and
+        // damage, so they are part of the authoritative hash.
+        `${unit.stance ?? "-"},${unit.rainCharged ? 1 : 0},` +
         `${stableStringify(unit.statModifiers ?? {})},` +
         `[${canonicalStatuses(unit.statuses)}]`
     )

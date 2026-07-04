@@ -88,6 +88,7 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .unit-tag.status-silence { color:#d0b6f2; border-color:rgba(160,120,220,.5); background:rgba(130,90,200,.12); }
 .unit-tag.status-blind { color:#e8d9a8; border-color:rgba(200,170,90,.5); background:rgba(170,140,60,.12); }
 .unit-tag.status-slow { color:#a8d4f0; border-color:rgba(100,160,220,.5); background:rgba(70,130,200,.12); }
+.unit-tag.status-stun { color:#ffe45e; border-color:rgba(230,200,70,.55); background:rgba(180,145,30,.14); }
 /* Vital bars — labeled HP/MP tracks with the numbers riding the bar. MP finally
    gets a bar (it was a pill), so spend tracks visually across the match. */
 .vitals { display:grid; gap:.26rem; }
