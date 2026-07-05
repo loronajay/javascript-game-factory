@@ -1,5 +1,5 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
-import { UNIT_TYPES, getArt, getAvailableArts, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
+import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { isWallBetween } from "./rules/combat.js";
@@ -427,6 +427,16 @@ async function resolveWallAttack(command) {
   return true;
 }
 
+// The float label each King command shows over every buffed ally: the stat it reads off
+// the live command fold, plus its color. Higher Ground's ally reach rides the attackRange
+// buff (matching getCommandRangeBonus), so it reads from the same stat as the others.
+const COMMAND_FLOAT = Object.freeze({
+  strike: { stat: "strength", suffix: "STR", color: "#ff9a6b" },
+  hold: { stat: "defense", suffix: "DEF", color: "#8cc0f0" },
+  pursue: { stat: "moveRange", suffix: "MOVE", color: "#8fe08a" },
+  "higher-ground": { stat: "attackRange", suffix: "RANGE", color: "#f2d472" }
+});
+
 async function resolveInstantArt(command) {
   const result = applyCommand(state, command);
   if (!result.accepted) { setMessage(readableError(result.errorCode), true); return false; }
@@ -554,6 +564,27 @@ async function resolveInstantArt(command) {
       if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), "BLIND", "#f0d77a"));
     }
     await Promise.all(floats);
+  } else if (resolved?.command !== undefined && actorBefore) {
+    // A King command (Strike / Hold / Pursue / Higher Ground): a global one-turn team
+    // order. The banner ritual washes over every living squadmate, then each ally floats
+    // the exact buff it just gained — read from getCommandBuffStats on the COMMITTED state
+    // (where the King's command is now recorded), so the number already folds in the
+    // +1-per-raging-ally scaling and Strike's Pursue bonus, just like the Witch Doctor's
+    // dance floats above.
+    const metrics = createBoardMetrics(state.size);
+    const allies = result.nextState.units.filter(
+      (u) => u.hp > 0 && u.player === actorBefore.player && u.id !== actorBefore.id && !getUnitType(u.type).commandOnly
+    );
+    await effects.playAbilityVfx(resolved.artId, { actor: actorBefore, targets: allies });
+    const label = COMMAND_FLOAT[resolved.command];
+    if (label) {
+      await Promise.all(allies.map((ally) => {
+        const amount = getCommandBuffStats(ally, result.nextState)[label.stat] ?? 0;
+        return amount > 0
+          ? effects.floatText(unitCenter(metrics, ally), `+${amount} ${label.suffix}`, label.color)
+          : Promise.resolve();
+      }));
+    }
   } else if (resolved?.artId === "tether-grab" && actorBefore) {
     // Fire the tether, then — on a landed grab — haul the unit to the Juggernaut's side and
     // land the magic hit if it was an enemy. `state` is still pre-commit, so the target
@@ -924,7 +955,8 @@ function playEventSounds(events) {
           artId === "smoke-bomb" || artId === "build-cover" || artId === "throw-cigar" ||
           artId === "age" || artId === "time-stretch" || artId === "rewind" ||
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
-          artId === "self-destruct") continue;
+          artId === "self-destruct" ||
+          artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
       else if (artId === "volley-shot") audio.play("arrowHit");
@@ -942,7 +974,12 @@ function playEventSounds(events) {
 function playRolloverFx(events) {
   const burns = events.filter((e) => e.type === "FIRE_DAMAGE");
   const steals = events.filter((e) => e.type === "TIME_STEAL");
-  if (!burns.length && !steals.length) return;
+  // The King's Dictator/Spectator passive fires after any command that fells or revives an
+  // allied unit, so its reactive HP swings ride whatever command triggered them.
+  const mourns = events.filter((e) => e.type === "KING_MOURNS");
+  const rallies = events.filter((e) => e.type === "SQUAD_RALLY");
+  const restores = events.filter((e) => e.type === "KING_RESTORED");
+  if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -970,6 +1007,27 @@ function playRolloverFx(events) {
       const src = findUnit(state, mp.sourceId);
       if (src) effects.floatText(unitCenter(metrics, src), `+${mp.mpGained} MP`, "#7fd0ff");
     }
+  }
+
+  // King reactions: he bleeds when a squadmate falls (and can be finished off by the
+  // grief), the surviving squad rallies at each fall, and he mends when a fallen ally is
+  // brought back. Float each swing where it lands — fire-and-forget like the ticks above.
+  for (const mourn of mourns) {
+    const king = findUnit(state, mourn.kingId);
+    if (!king) continue;
+    const center = unitCenter(metrics, king);
+    effects.floatText(center, `-${mourn.damage}`, "#ff7684");
+    if (king.hp <= 0) { effects.deathBurst(center, teamColor(king.player)); killed = true; }
+  }
+  for (const rally of rallies) {
+    for (const id of rally.rallied ?? []) {
+      const unit = findUnit(state, id);
+      if (unit) effects.floatText(unitCenter(metrics, unit), `+${rally.healing}`, "#8cf0a4");
+    }
+  }
+  for (const restore of restores) {
+    const king = findUnit(state, restore.kingId);
+    if (king) effects.floatText(unitCenter(metrics, king), `+${restore.healing}`, "#8cf0a4");
   }
 
   if (killed) audio.play("unitDefeated");

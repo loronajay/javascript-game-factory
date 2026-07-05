@@ -1,8 +1,8 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isDefending, takesTurns } from "./unitCatalog.js";
-import { areEnemies, areAllies, cloneState, findUnit, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getUnitType, isCommandOnly, isDefending, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { getLineAttackTargets, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { getBasicAttackDamageType, getCritOnHitStatus, getLineAttackTargets, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -29,7 +29,11 @@ const ERR = Object.freeze({
   TARGET_OBSTRUCTED: "TARGET_OBSTRUCTED",
   INVALID_ART_PATH: "INVALID_ART_PATH",
   FINISH_REQUIRES_ACTION: "FINISH_REQUIRES_ACTION",
-  SUMMON_LIMIT: "SUMMON_LIMIT"
+  SUMMON_LIMIT: "SUMMON_LIMIT",
+  // The King must issue his command before any other unit of his owner may act…
+  KING_MUST_ACT_FIRST: "KING_MUST_ACT_FIRST",
+  // …and the King himself may only command — never move, attack, or defend.
+  COMMANDER_CANNOT_ACT: "COMMANDER_CANNOT_ACT"
 });
 
 const reject = (errorCode) => ({ accepted: false, errorCode });
@@ -47,6 +51,17 @@ const accept = (nextState, events = []) => {
 };
 
 export function applyCommand(state, command) {
+  const result = dispatchCommand(state, command);
+  // A single reconciliation seam runs after EVERY accepted command, diffing the input
+  // state against the result to catch every unit that fell or was revived — regardless
+  // of which resolver or turn-rollover hazard (fire/poison/black-death/time-steal) did
+  // it — and applies the King's reactive HP swings. Deterministic (no RNG), so online
+  // lockstep clients all compute the identical reaction.
+  if (result.accepted) applyCommanderReactions(state, result.nextState, result.events);
+  return result;
+}
+
+function dispatchCommand(state, command) {
   if (!command?.type || state.phase !== "playing") return reject(ERR.INVALID_COMMAND);
   switch (command.type) {
     case COMMANDS.BEGIN_ACTIVATION: return beginActivation(state, command);
@@ -59,6 +74,17 @@ export function applyCommand(state, command) {
     case COMMANDS.CONCEDE: return concede(state, command);
     default: return reject(ERR.INVALID_COMMAND);
   }
+}
+
+// True while this player owns a living, not-yet-commanded acts-first King (the King).
+// He is forced to issue his command before any of his squadmates may begin — so a King
+// waiting on his command blocks the rest of his owner's turn. A player with no King is
+// never gated. `commandTurn !== turnNumber` means "hasn't commanded THIS turn".
+function commanderPending(state, player) {
+  return state.units.some((unit) =>
+    unit.hp > 0 && unit.player === player &&
+    getUnitType(unit.type).actsFirst &&
+    unit.commandTurn !== state.turnNumber);
 }
 
 function validateOwnedLivingUnit(state, player, unitId) {
@@ -87,6 +113,11 @@ function beginActivation(state, command) {
   if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit)) return reject(ERR.UNIT_SPENT);
   if (state.activation && state.activation.unitId !== result.unit.id &&
       (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
+  // The King commands first: no other unit of this owner may open an activation while a
+  // living King still owes his command this turn.
+  if (!getUnitType(result.unit.type).actsFirst && commanderPending(state, command.player)) {
+    return reject(ERR.KING_MUST_ACT_FIRST);
+  }
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
@@ -113,6 +144,7 @@ function beginActivation(state, command) {
 function moveUnit(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
+  if (isCommandOnly(result.unit)) return reject(ERR.COMMANDER_CANNOT_ACT);
   if (state.activation.moved) return reject(ERR.MOVE_ALREADY_USED);
   if (!getLegalMoves(state, result.unit).has(positionKey(command.position))) return reject(ERR.MOVE_OUT_OF_RANGE);
 
@@ -142,6 +174,7 @@ function cancelMove(state, command) {
 function attack(state, command) {
   const result = validateOpenActivation(state, command.player, command.actorId);
   if (result.error) return reject(result.error);
+  if (isCommandOnly(result.unit)) return reject(ERR.COMMANDER_CANNOT_ACT);
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
   // A wall is attacked by tile (no unit there); it resolves through its own path.
   if (command.targetPosition) return attackWall(state, command, result.unit);
@@ -150,10 +183,12 @@ function attack(state, command) {
   if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
-  // Basic attacks are always physical, so a body between attacker and target blocks
-  // the shot (melee never has an intervening tile, so this is a no-op at range 1).
-  // A wall between also blocks it (and walls stop everything — see isWallBetween).
-  if (isShotBlocked(state, result.unit.position, target.position, result.unit) ||
+  // A PHYSICAL basic attack is body-blocked by any unit in between (melee never has an
+  // intervening tile, so this is a no-op at range 1); a magic basic attack (Angel's
+  // Blessed Arrow) reaches through bodies. A wall between blocks EITHER (walls stop
+  // everything — see isWallBetween). Read the damage type once, reused for the strike.
+  const basicDamageType = getBasicAttackDamageType(result.unit);
+  if ((basicDamageType === "physical" && isShotBlocked(state, result.unit.position, target.position, result.unit)) ||
       isWallBetween(state, result.unit.position, target.position, result.unit)) return reject(ERR.TARGET_OBSTRUCTED);
 
   const next = cloneState(state);
@@ -178,22 +213,33 @@ function attack(state, command) {
   const damageByTarget = {};
   let totalDamageDealt = 0;
   let primaryDamage = null;
+  // Blessed Arrow: a critical basic attack also lands a status (blind) on each surviving
+  // target. Immunity is enforced by applyStatus, so a status-immune target simply resists.
+  const critStatus = getCritOnHitStatus(actor);
+  const blinded = [];
+  const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
   for (const targetUnit of targets) {
-    const damage = resolvePhysicalStrike(actor, targetUnit, { proximity: true, critical: swing.critical, state: next });
+    const damage = strike(targetUnit);
     const damageDealt = Math.min(targetUnit.hp, damage.damage);
     targetUnit.hp = Math.max(0, targetUnit.hp - damage.damage);
     targetIds.push(targetUnit.id);
     damageByTarget[targetUnit.id] = damage.damage;
     totalDamageDealt += damageDealt;
+    if (swing.critical && critStatus && targetUnit.hp > 0) {
+      const applied = applyStatus(targetUnit, { type: critStatus.status, duration: critStatus.duration });
+      if (applied.applied) { targetUnit.statuses = applied.statuses; blinded.push(targetUnit.id); }
+    }
     if (targetUnit.id === nextTarget.id) primaryDamage = damage;
   }
-  const damage = primaryDamage ?? resolvePhysicalStrike(actor, nextTarget, { proximity: true, critical: swing.critical, state: next });
-  const healingEvents = resolvePhysicalDamageHealing(next, actor, totalDamageDealt);
+  const damage = primaryDamage ?? strike(nextTarget);
+  // A magic strike (Blessed Arrow) never feeds a physical-damage heal aura (Hand of Life).
+  const healingEvents = basicDamageType === "physical" ? resolvePhysicalDamageHealing(next, actor, totalDamageDealt) : [];
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
-    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget, ...damageFields
+    hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget,
+    ...(blinded.length ? { blinded } : {}), ...damageFields
   }, ...triggerEvents, ...healingEvents]);
 }
 
@@ -224,6 +270,7 @@ function attackWall(state, command, attacker) {
 function defend(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
+  if (isCommandOnly(result.unit)) return reject(ERR.COMMANDER_CANNOT_ACT);
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
   const next = cloneState(state);
   findUnit(next, command.unitId).defending = true;
@@ -248,6 +295,10 @@ const ART_RESOLVERS = new Map([
   ["throw-cigar", resolveThrowCigar],
   ["lightseeker", resolveTilePulse],
   ["darkseeker", resolveTilePulse],
+  ["heavenseeker", resolveTilePulse],
+  // Angel: a friendly-only buff cast and a white-tile team heal.
+  ["anoint", resolveAnoint],
+  ["elevate", resolveHealAllies],
   // Witch Doctor dances: each fires a one-shot team/global effect then enters its
   // stance (the "Dancing Man" passive). One resolver branches on the art's data.
   ["rain-dance", resolveWitchDance],
@@ -263,7 +314,13 @@ const ART_RESOLVERS = new Map([
   ["tether-grab", resolveTetherGrab],
   ["rocket-punch", resolveRocketPunch],
   ["recharge", resolveRecharge],
-  ["self-destruct", resolveSelfDestruct]
+  ["self-destruct", resolveSelfDestruct],
+  // King: the four global commands all record the command and spend the activation; the
+  // buff itself is a live fold (getCommandBuffStats), so the resolver stores no numbers.
+  ["strike", resolveKingCommand],
+  ["hold", resolveKingCommand],
+  ["pursue", resolveKingCommand],
+  ["higher-ground", resolveKingCommand]
 ]);
 
 function useArt(state, command) {
@@ -357,7 +414,7 @@ function resolveTargetedArt(state, command, art) {
     const successful = roll.value >= 0 && roll.value < art.effect.chance;
     // Rain Stance's global heal bonus rides on a successful heal; a raging Juggernaut's
     // Null Zone shuts all healing off (isHealingDisabled) regardless of the roll.
-    const healing = (successful && !isHealingDisabled(next)) ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) : 0;
+    const healing = (successful && !isHealingDisabled(next)) ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor) : 0;
     actor.hp = Math.min(getEffectiveStats(actor, next).maxHp, actor.hp + healing);
     effect = { attempted: true, applied: successful, healing };
   }
@@ -546,6 +603,29 @@ function resolveTilePulse(state, command, art) {
     damageByTarget[target.id] = damage;
   }
 
+  // Optional heal rider (Angel's Heavenseeker): allies standing on the pulse's affinity
+  // tile also restore HP. Reuses the same tile-affinity + heal plumbing as the damage
+  // side, and honors the global heal bonus / healing lockout like every other heal site.
+  const healTargetIds = [];
+  const healingByTarget = {};
+  if (art.effect.heal) {
+    const healAmount = isHealingDisabled(next)
+      ? 0
+      : Math.max(0, Number(art.effect.heal.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+    if (healAmount > 0) {
+      for (const ally of livingTeamUnits(next, actor)) {
+        if (getTileAffinity(next, ally.position) !== art.effect.affinity) continue;
+        if (!art.effect.global && chebyshevDistance(actor.position, ally.position) > (art.effect.range ?? 0)) continue;
+        const before = ally.hp;
+        ally.hp = Math.min(getEffectiveStats(ally, next).maxHp, ally.hp + healAmount);
+        const healed = ally.hp - before;
+        if (healed <= 0) continue;
+        healTargetIds.push(ally.id);
+        healingByTarget[ally.id] = healed;
+      }
+    }
+  }
+
   actor.mp -= art.mpCost;
   if (art.bonusActionGroup) {
     next.activation.bonusActionGroups = [
@@ -562,6 +642,7 @@ function resolveTilePulse(state, command, art) {
     actorId: actor.id,
     targetIds,
     damageByTarget,
+    ...(healTargetIds.length ? { healTargetIds, healingByTarget } : {}),
     mpCost: art.mpCost,
     bonusActionGroup: art.bonusActionGroup ?? null
   }]);
@@ -575,10 +656,12 @@ function resolveHealAllies(state, command, art) {
   const targetIds = [];
   // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too); a
   // raging Juggernaut's Null Zone zeroes all healing.
-  const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
+  const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
 
   for (const target of livingTeamUnits(next, actor)) {
     if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
+    // Tile-affinity-gated heal (Angel's Elevate: only allies on a white/light tile).
+    if (art.effect.affinity && getTileAffinity(next, target.position) !== art.effect.affinity) continue;
     const before = target.hp;
     target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + amount);
     const healed = target.hp - before;
@@ -595,6 +678,37 @@ function resolveHealAllies(state, command, art) {
     targetIds,
     healingByTarget,
     mpCost: art.mpCost
+  }]);
+}
+
+// Anoint: a friendly-only buff (Angel grants an ally +1 range for 1 turn). Cannot target
+// self or an enemy; a wall does NOT block a friendly cast (same as a friendly Time
+// Stretch haste). Reuses the `empowered` status lifecycle.
+function resolveAnoint(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (targetState.id === actorState.id || !areAllies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  actor.mp -= art.mpCost;
+
+  const result = applyStatus(target, {
+    type: art.effect.status,
+    duration: art.effect.durationTurns,
+    ...(art.effect.statModifiers ? { statModifiers: { ...art.effect.statModifiers } } : {})
+  });
+  if (result.applied) target.statuses = result.statuses;
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost,
+    effect: { status: art.effect.status, applied: result.applied, ...(result.reason ? { reason: result.reason } : {}) }
   }]);
 }
 
@@ -622,7 +736,7 @@ function resolveWitchDance(state, command, art) {
   };
 
   if (art.effect?.type === "healAllies") {
-    const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next);
+    const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
     const healingByTarget = {};
     const targetIds = [];
     for (const target of livingTeamUnits(next, actor)) {
@@ -1058,6 +1172,24 @@ function resolveSelfDestruct(state, command, art) {
   }]);
 }
 
+// A King command (Strike/Hold/Pursue/Higher Ground): record which command is now active
+// (and remember the one it replaced — Strike reads it for its Pursue bonus), stamp the
+// turn it was issued on, and spend the activation. The actual team buff is folded live by
+// getEffectiveStats/getCommandHealBonus/getCommandRangeBonus off this stored command, so
+// nothing about the buff's magnitude is baked here — it tracks the board until the turn ends.
+function resolveKingCommand(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  actor.previousCommand = actor.command ?? null;
+  actor.command = art.command.id;
+  actor.commandTurn = next.turnNumber;
+  actor.mp -= getArtMpCost(actor, art); // 0 — commands are free
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, command: art.command.id, mpCost: 0
+  }]);
+}
+
 function finishActivation(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
@@ -1077,7 +1209,7 @@ function resolvePhysicalDamageHealing(state, actor, damageDealt) {
     : Math.round(damageDealt * effect.fraction);
   if (base <= 0) return [];
   // Rain Stance's global heal bonus lifts this heal too ("all HP healing globally").
-  const amount = base + getGlobalHealBonus(state);
+  const amount = base + getGlobalHealBonus(state) + getCommandHealBonus(state, actor);
 
   const healingByTarget = {};
   for (const target of livingTeamUnits(state, actor)) {
@@ -1334,12 +1466,88 @@ function concede(state, command) {
 }
 
 function resolveVictory(state) {
-  // Defeat is decided by living COMMANDERS, not raw bodies: a player whose only
-  // survivor is a turn-less summon (a lone Ghoul) has lost and cannot stall.
-  const livingTeams = new Set(livingUnits(state).filter(takesTurns).map(teamOfUnit));
+  // Defeat is decided by living units that can actually WIN, not raw bodies: a player
+  // whose only survivor is a turn-less summon (a lone Ghoul) or a non-combatant commander
+  // (a lone King) has lost and cannot stall — see unitCatalog.sustainsVictory.
+  const livingTeams = new Set(livingUnits(state).filter(sustainsVictory).map(teamOfUnit));
   if (livingTeams.size === 1) {
     state.winner = [...livingTeams][0];
     state.phase = "complete";
     state.activation = null;
   }
+}
+
+// The King's Dictator/Spectator passive, applied centrally after every command. Diffs the
+// pre-command state against the result: for each of the King's squadmates that newly FELL,
+// the King loses `damagePerAllyFallen` and the rest of the squad rallies for `allyRallyHeal`
+// (the King excluded); for each fallen ally REVIVED (Father Time's Rewind), the King regains
+// `healPerAllyRevived`. Reactions are driven by Kings that were ALIVE when the falls happened
+// (the pre-command snapshot), so a King finished off by the same blast still mourns his squad.
+// Summons and other Kings don't count as "an allied unit"; a global healing lockout (a raging
+// Juggernaut's Null Zone) suppresses the King's HP gains but never the damage.
+function applyCommanderReactions(prevState, next, events) {
+  const reactingKings = prevState.units.filter((u) => u.hp > 0 && isCommandOnly(u));
+  if (!reactingKings.length) return;
+
+  const wasAlive = new Map(prevState.units.map((u) => [u.id, u.hp > 0]));
+  const isAlly = (unit) => takesTurns(unit) && !isCommandOnly(unit); // a real squad unit
+  const fell = [];
+  const revived = [];
+  for (const unit of next.units) {
+    if (!isAlly(unit) || !wasAlive.has(unit.id)) continue;
+    const before = wasAlive.get(unit.id);
+    if (before && unit.hp <= 0) fell.push(unit);
+    else if (!before && unit.hp > 0) revived.push(unit);
+  }
+  if (!fell.length && !revived.length) return;
+
+  const healingOff = isHealingDisabled(next);
+  for (const kingBefore of reactingKings) {
+    const king = findUnit(next, kingBefore.id);
+    if (!king) continue;
+    const effect = getUnitType(king.type).passive?.effect;
+    const teamFell = fell.filter((u) => areAllies(u, king));
+    const teamRevived = revived.filter((u) => areAllies(u, king));
+
+    if (teamFell.length && effect?.damagePerAllyFallen) {
+      const total = effect.damagePerAllyFallen * teamFell.length;
+      const dealt = Math.min(king.hp, total);
+      king.hp = Math.max(0, king.hp - total);
+      if (dealt > 0) events.push({ type: "KING_MOURNS", kingId: king.id, damage: dealt, fallen: teamFell.map((u) => u.id) });
+    }
+    if (teamRevived.length && effect?.healPerAllyRevived && !healingOff) {
+      const before = king.hp;
+      king.hp = Math.min(getEffectiveStats(king, next).maxHp, king.hp + effect.healPerAllyRevived * teamRevived.length);
+      const healed = king.hp - before;
+      if (healed > 0) events.push({ type: "KING_RESTORED", kingId: king.id, healing: healed });
+    }
+  }
+
+  // Rally: once per team that had a living King, heal the rest of that squad (Kings and
+  // summons excluded) by allyRallyHeal for every ally that fell. Not a "heal ART", so
+  // Hold's heal bonus doesn't touch it — it's the passive's own flat number.
+  if (!healingOff) {
+    const teamsWithKing = new Map(); // team -> allyRallyHeal
+    for (const king of reactingKings) {
+      const rally = getUnitType(king.type).passive?.effect?.allyRallyHeal ?? 0;
+      const team = teamOfUnit(king);
+      teamsWithKing.set(team, Math.max(teamsWithKing.get(team) ?? 0, rally));
+    }
+    for (const [team, rally] of teamsWithKing) {
+      const falls = fell.filter((u) => teamOfUnit(u) === team).length;
+      if (!falls || rally <= 0) continue;
+      const rallied = [];
+      for (const ally of next.units) {
+        if (ally.hp <= 0 || teamOfUnit(ally) !== team || !isAlly(ally)) continue;
+        const before = ally.hp;
+        ally.hp = Math.min(getEffectiveStats(ally, next).maxHp, ally.hp + rally * falls);
+        if (ally.hp > before) rallied.push(ally.id);
+      }
+      if (rallied.length) events.push({ type: "SQUAD_RALLY", team, healing: rally * falls, rallied });
+    }
+  }
+
+  // A King finished off by his own mourning doesn't change victory (he never sustained
+  // it), but re-resolve so a rally that outlives the last fighter can't be missed.
+  resolveVictory(next);
 }

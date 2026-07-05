@@ -413,6 +413,45 @@ const ABILITY_VFX = Object.freeze({
     windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 10 }),
     stream: Object.freeze({ shape: "orb", arcHeight: 34, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#f7e9c0", trail: "#c8a24a" }) }),
     colors: Object.freeze({ core: "#f7e9c0", trail: "#c8a24a", impact: "#fff7d8" })
+  }),
+  // The King's four commands (Strike / Hold / Pursue / Higher Ground). Each is a GLOBAL
+  // team order — a decisive battlefield command radiating from the King's banner to every
+  // squadmate — so they reuse the `ritual` motif (a color wash, a ring that ripples past
+  // any board size, and a beacon pulse landing on each ally, staggered by distance). A
+  // short, sharp gather (the King raising his hand) precedes the release; the per-command
+  // color keys the buff it grants: crimson STR / steel DEF / green MOVE / gold range.
+  strike: Object.freeze({
+    type: "ritual",
+    soundKey: "rageActivated",
+    durationMs: 720,
+    particleCount: 14,
+    shake: 4,
+    windup: Object.freeze({ style: "gather", durationMs: 260, particleCount: 7 }),
+    colors: Object.freeze({ core: "#ff6a5c", trail: "#7a2118", impact: "#ffd0c8" })
+  }),
+  hold: Object.freeze({
+    type: "ritual",
+    soundKey: "defend",
+    durationMs: 720,
+    particleCount: 14,
+    windup: Object.freeze({ style: "gather", durationMs: 260, particleCount: 7 }),
+    colors: Object.freeze({ core: "#8cc0f0", trail: "#25507a", impact: "#dbeeff" })
+  }),
+  pursue: Object.freeze({
+    type: "ritual",
+    soundKey: "footwork",
+    durationMs: 700,
+    particleCount: 14,
+    windup: Object.freeze({ style: "gather", durationMs: 240, particleCount: 6 }),
+    colors: Object.freeze({ core: "#8fe08a", trail: "#2a6b32", impact: "#e0ffd8" })
+  }),
+  "higher-ground": Object.freeze({
+    type: "ritual",
+    soundKey: "pray",
+    durationMs: 720,
+    particleCount: 14,
+    windup: Object.freeze({ style: "gather", durationMs: 260, particleCount: 7 }),
+    colors: Object.freeze({ core: "#f2d472", trail: "#8a6a1e", impact: "#fff3c8" })
   })
 });
 

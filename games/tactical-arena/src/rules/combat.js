@@ -92,6 +92,37 @@ function rageCombat(unit) {
   return isRaging(unit) ? (getUnitType(unit.type).rageArt?.combat ?? null) : null;
 }
 
+// The damage type of a unit's BASIC attack. Default physical; a `blessedAttack`
+// passive (Angel's Blessed Arrow) makes basic attacks magic — so they ignore DEF and
+// reach through intervening bodies (a wall still blocks). Read centrally so the
+// reducer, the board highlights, and the forecast all agree.
+export function getBasicAttackDamageType(unit) {
+  return getUnitType(unit.type).passive?.effect?.attackDamageType ?? "physical";
+}
+
+// A status a unit's passive lands on the target when its BASIC attack CRITS (Angel's
+// Blessed Arrow blinds on a crit). Returns { status, duration } or null. Immunity is
+// still enforced by applyStatus, so this never bypasses a status-immune target.
+export function getCritOnHitStatus(unit) {
+  return getUnitType(unit.type).passive?.effect?.critStatus ?? null;
+}
+
+// Passive crit-chance bonus that scales with missing HP (Angel's Inner Strength:
+// +1.5% per 3 HP missing). Scanned off the unit's passive + `kind:"passive"` arts so a
+// new unit needs no edit here. Uses the unit's BASE maxHp (no state needed).
+function getMissingHpCritBonus(attacker) {
+  const definition = getUnitType(attacker.type);
+  let bonus = 0;
+  for (const source of [definition.passive, ...definition.arts]) {
+    const effect = source?.effect;
+    if (effect?.type !== "critPerMissingHp") continue;
+    const per = Math.max(1, Number(effect.per) || 1);
+    const missing = Math.max(0, definition.stats.maxHp - attacker.hp);
+    bonus += Math.floor(missing / per) * (Number(effect.bonus) || 0);
+  }
+  return bonus;
+}
+
 // Probability that this attacker's swing misses *right now*. Never-miss (raging
 // Archer) overrides everything; otherwise a blinded unit always misses; otherwise
 // the base whiff chance.
@@ -102,10 +133,12 @@ export function getMissChance(attacker) {
 }
 
 // Probability that a landed swing crits. The raging Archer's kit raises this to
-// 50%; everyone else uses the base chance.
+// 50%; everyone else uses the base chance. A missing-HP passive (Angel's Inner
+// Strength) adds on top, clamped so the final chance never exceeds 1.
 export function getCritChance(attacker) {
   const crit = rageCombat(attacker)?.criticalChance;
-  return Number.isFinite(crit) ? crit : COMBAT.CRIT_CHANCE;
+  const base = Number.isFinite(crit) ? crit : COMBAT.CRIT_CHANCE;
+  return Math.min(1, base + getMissingHpCritBonus(attacker));
 }
 
 // Resolve a single swing's to-hit and crit against the authoritative seed. Draws

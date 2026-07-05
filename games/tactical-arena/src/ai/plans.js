@@ -25,7 +25,7 @@
 
 import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -54,6 +54,17 @@ const PLACEMENT_KEEP = 10;         // best N tile-placement candidates kept
 
 export function generatePlans(state, unit) {
   if (isStunned(unit)) return [];
+  // The King (commandOnly) never moves/attacks/defends — his only legal plans are his
+  // four global commands. Offering anything else would replay into a COMMANDER_CANNOT_ACT
+  // rejection and stall the CPU turn.
+  if (isCommandOnly(unit)) {
+    const plans = [];
+    for (const art of getUnitType(unit.type).arts) {
+      if (!artUsableForPlanning(state, unit, art)) continue;
+      generateArtPlans(state, unit, art, normalizeArtAi(art), plans);
+    }
+    return plans;
+  }
   const plans = [];
   const origin = { x: unit.position.x, y: unit.position.y };
   const moveTiles = tilesFromKeys(getLegalMoves(state, unit));
@@ -179,6 +190,13 @@ function generateArtPlans(state, unit, art, ai, plans) {
       if (buffAlliesValue(state, unit, art) > 0) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
       }
+      break;
+    }
+    case "commandBuff": {
+      // King commands (Strike/Hold/Pursue/Higher Ground): global, 0 MP, no target — one
+      // plan per command. The King is forced to issue one every turn, so these are always
+      // offered; the controller picks the strongest via commandBuffValue.
+      plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
       break;
     }
     case "statBuff": {

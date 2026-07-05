@@ -11,6 +11,8 @@ import { SNIPER } from "./units/sniper.js";
 import { WITCH_DOCTOR } from "./units/witch-doctor.js";
 import { FATHER_TIME } from "./units/father-time.js";
 import { JUGGERNAUT } from "./units/juggernaut.js";
+import { KING } from "./units/king.js";
+import { ANGEL } from "./units/angel.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -24,7 +26,9 @@ export const UNIT_TYPES = Object.freeze({
   sniper: SNIPER,
   "witch-doctor": WITCH_DOCTOR,
   "father-time": FATHER_TIME,
-  juggernaut: JUGGERNAUT
+  juggernaut: JUGGERNAUT,
+  king: KING,
+  angel: ANGEL
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -38,6 +42,22 @@ function chebyshev(a, b) {
 // by the turn loop, the victory check, the squad picker, and summary counts.
 export function takesTurns(unit) {
   return !getUnitType(unit.type).summon;
+}
+
+// A commander (the King) must act first each turn and can ONLY issue command ARTS —
+// he never moves, attacks, or defends.
+export function isCommander(unit) {
+  return Boolean(getUnitType(unit.type).actsFirst);
+}
+export function isCommandOnly(unit) {
+  return Boolean(getUnitType(unit.type).commandOnly);
+}
+
+// Whether a living unit keeps its team in the match. A turn-less summon (Ghoul) and a
+// non-combatant commander (King) can't win on their own, so neither sustains victory —
+// a player left with only these has lost. Default true for every ordinary unit.
+export function sustainsVictory(unit) {
+  return takesTurns(unit) && !getUnitType(unit.type).commandOnly;
 }
 
 export function getUnitType(type) {
@@ -196,6 +216,80 @@ function linkedStatModTotals(unit, state) {
   return totals;
 }
 
+// --- King commands ----------------------------------------------------------
+// The King's four commands (Strike/Hold/Pursue/Higher Ground) are a DYNAMIC one-turn
+// team buff, not a baked status: the buff is folded live from the King's currently-
+// active command so the RAGE scaling ("+1 per allied unit currently in RAGE") tracks
+// the board in real time, and it vanishes the instant the King's turn passes. A King's
+// command is "active" only during the same turnNumber it was issued (the King is forced
+// to re-issue one every turn — see the beginActivation gate). Kept inline here beside
+// the aura/stance folds (not a separate module) so getEffectiveStats needs no extra
+// import — the same pattern stances use.
+function activeCommandData(king) {
+  if (!king.command) return null;
+  return getArt(king.type, king.command)?.command ?? null;
+}
+function activeCommanderKings(unit, state) {
+  if (!state?.units) return [];
+  return state.units.filter((king) =>
+    king.hp > 0 &&
+    getUnitType(king.type).actsFirst &&
+    king.command &&
+    king.commandTurn === state.turnNumber &&
+    areAllies(king, unit));
+}
+function ragingAllyCount(state, ref) {
+  if (!state?.units) return 0;
+  return state.units.filter((u) => u.hp > 0 && areAllies(u, ref) && isRaging(u)).length;
+}
+
+// The live stat buff an active allied King grants `unit` this turn ({} if none). The
+// King never buffs himself (a Pursue +MOVE must not make the immobile King mobile), so
+// commandOnly units are excluded. Every buffed value gains +1 per allied unit in RAGE;
+// Strike's base is lifted when the King's previous command matches `prevOverride`.
+export function getCommandBuffStats(unit, state) {
+  if (isCommandOnly(unit)) return {};
+  const totals = {};
+  for (const king of activeCommanderKings(unit, state)) {
+    const cmd = activeCommandData(king);
+    if (!cmd?.stats) continue;
+    const base = (cmd.prevOverride && king.previousCommand && cmd.prevOverride[king.previousCommand]) || cmd.stats;
+    const rage = ragingAllyCount(state, king);
+    for (const [name, value] of Object.entries(base)) {
+      if (!Number.isFinite(value)) continue;
+      const scaled = value + rage;
+      // Two Kings on one team don't stack — take the strongest per stat.
+      totals[name] = name in totals ? Math.max(totals[name], scaled) : scaled;
+    }
+  }
+  return totals;
+}
+
+// Hold's "+1 to all healing this turn" (+1 per raging ally). Team-scoped, so it takes
+// the healed unit's actor/team context. 0 when no allied King holds Hold this turn.
+export function getCommandHealBonus(state, actor) {
+  let bonus = 0;
+  for (const king of activeCommanderKings(actor, state)) {
+    const cmd = activeCommandData(king);
+    if (!Number.isFinite(cmd?.healBonus) || cmd.healBonus <= 0) continue;
+    bonus = Math.max(bonus, cmd.healBonus + ragingAllyCount(state, king));
+  }
+  return bonus;
+}
+
+// Higher Ground's "+1 range, area ARTS included" (+1 per raging ally). The attack/
+// targeted-ART range rides on the attackRange stat buff (getCommandBuffStats); this is
+// the extra reach folded into the AOE/placement/line geometry in rules/arts.js.
+export function getCommandRangeBonus(state, actor) {
+  let bonus = 0;
+  for (const king of activeCommanderKings(actor, state)) {
+    const cmd = activeCommandData(king);
+    if (!Number.isFinite(cmd?.rangeBonus) || cmd.rangeBonus <= 0) continue;
+    bonus = Math.max(bonus, cmd.rangeBonus + ragingAllyCount(state, king));
+  }
+  return bonus;
+}
+
 // Runtime modifiers are deliberately numeric and additive. Status effects,
 // map auras, and future ARTS can feed this same seam without teaching every
 // ability about one another. Per-unit passives apply after external modifiers.
@@ -211,6 +305,10 @@ export function getEffectiveStats(unit, state = null) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(linkedStatModTotals(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  // King commands (Strike/Hold/Pursue/Higher Ground): a live one-turn team buff.
+  for (const [name, value] of Object.entries(getCommandBuffStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
 
@@ -253,7 +351,10 @@ export function getEffectiveStats(unit, state = null) {
       if (name in stats && Number.isFinite(value)) stats[name] += value;
     }
   }
-  stats.moveRange = Math.max(1, stats.moveRange);
+  // A slowed unit still gets at least 1 MOVE, but a base-immobile unit (the King) stays
+  // immobile — clamp the floor to the unit's own baseline so debuffs can't lift a 0.
+  const baseMove = getUnitType(unit.type).stats.moveRange;
+  stats.moveRange = Math.max(baseMove <= 0 ? 0 : 1, stats.moveRange);
   return stats;
 }
 
@@ -319,7 +420,11 @@ export const AI_INTENTS = Object.freeze([
   //   grab       — Tether Grab: pull the first ally/enemy on a straight ray.
   //   lineStrike — Rocket Punch: strike the first enemy on a straight ray (+ stun).
   //   recharge   — Recharge: restore this unit's own MP (or 1 HP at full MP).
-  "grab", "lineStrike", "recharge"
+  "grab", "lineStrike", "recharge",
+  // The King's global one-turn team buffs (Strike/Hold/Pursue/Higher Ground):
+  "commandBuff",
+  // Angel's single-ally targeted buff (Anoint: +1 range on a friendly unit):
+  "buffAlly"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

@@ -12,12 +12,13 @@
 // a replay reproduces the same moves.
 
 import { findUnit, livingUnits } from "../core/state.js";
-import { getArt, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
+import { getArt, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { isStunned } from "../rules/statuses.js";
 import {
   ageValue,
   buffAlliesValue,
+  commandBuffValue,
   expectedStrike,
   grabValue,
   hastenValue,
@@ -62,8 +63,14 @@ export function chooseActivation(
 
   const weights = WEIGHTS[difficulty] ?? WEIGHTS.normal;
 
+  // The King commands before any squadmate may act — while an un-commanded King is still
+  // unspent it is the ONLY unit the reducer will let this player activate, so restrict the
+  // search to it (offering another unit would only replay into a KING_MUST_ACT_FIRST stall).
+  const kings = units.filter((u) => isCommandOnly(u));
+  const actable = kings.length ? kings : units;
+
   const scored = [];
-  for (const unit of units) {
+  for (const unit of actable) {
     for (const plan of generatePlans(state, unit)) {
       scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights) });
     }
@@ -171,6 +178,10 @@ function planEffectValue(state, unit, plan) {
   // their worth rides the same `control` weight as a status cast.
   if (ai.intent === "buffAllies") {
     return { control: buffAlliesValue(state, unit, art), heal: 0 };
+  }
+  // King commands (Strike/Hold/Pursue/Higher Ground): a one-turn team buff, no HP change.
+  if (ai.intent === "commandBuff") {
+    return { control: commandBuffValue(state, unit, art), heal: 0 };
   }
   // Father Time's Age (persistent ±stat) and Time Stretch (haste/slow) change no HP now,
   // so their value rides the `control` weight like a status cast. (Rewind's value is the

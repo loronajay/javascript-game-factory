@@ -4,7 +4,7 @@ import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, 
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { isShotBlocked, isWallBetween } from "../rules/combat.js";
+import { getBasicAttackDamageType, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
@@ -142,7 +142,9 @@ export function isTargetedMode(mode, actor) {
     // Juggernaut's line abilities (Tether Grab / Rocket Punch) highlight their own
     // first-contact ray targets below, not the Chebyshev box.
     art.targeting?.shape !== "lineAny" &&
-    art.targeting?.shape !== "lineEnemy"
+    art.targeting?.shape !== "lineEnemy" &&
+    // Angel's Anoint is friendly-only — it does its own ally highlighting below.
+    art.targeting?.shape !== "ally"
   );
 }
 

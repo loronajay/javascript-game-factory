@@ -1,5 +1,5 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getArtMpCost, getEffectiveStats, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -65,7 +65,9 @@ export function getVolleyShotCells(state, actor, origin) {
   const perpendicular = { x: -direction.y, y: direction.x };
   const cells = [];
 
-  for (let depth = 1; depth <= 5; depth += 1) {
+  // Higher Ground extends the rain's reach (an area ART, per the command's promise).
+  const maxDepth = 5 + getCommandRangeBonus(state, actor);
+  for (let depth = 1; depth <= maxDepth; depth += 1) {
     for (let offset = -(depth - 1); offset <= depth - 1; offset += 1) {
       const position = {
         x: actor.position.x + direction.x * depth + perpendicular.x * offset,
@@ -96,7 +98,7 @@ export function getLegalFleeTiles(state, actor) {
 // Necromancer raises a Ghoul on one of these; occupied tiles and off-board cells
 // are excluded. Chebyshev radius, like the rest of the targeting geometry.
 export function getSummonPlacementTiles(state, actor, art) {
-  const radius = art?.targeting?.radius ?? 2;
+  const radius = (art?.targeting?.radius ?? 2) + getCommandRangeBonus(state, actor);
   const tiles = new Set();
   for (let dx = -radius; dx <= radius; dx += 1) {
     for (let dy = -radius; dy <= radius; dy += 1) {
@@ -147,14 +149,14 @@ export function getRevivePlacementTiles(state, actor, art) {
 // Build Cover places a solid wall, so it needs a clear floor tile: no unit and no
 // existing tile object. Chebyshev radius from the art (default 3).
 export function getWallPlacementTiles(state, actor, art) {
-  return tilesInRadius(state, actor, art?.targeting?.radius ?? 3, (pos) =>
+  return tilesInRadius(state, actor, (art?.targeting?.radius ?? 3) + getCommandRangeBonus(state, actor), (pos) =>
     !unitAt(state, pos) && !getTileObject(state, pos));
 }
 
 // Throw Cigar drops a hazard, so it may land on an OCCUPIED tile (fire at an enemy's
 // feet) — it only avoids a wall or an existing fire. Chebyshev radius (default 4).
 export function getFirePlacementTiles(state, actor, art) {
-  return tilesInRadius(state, actor, art?.targeting?.radius ?? 4, (pos) => !getTileObject(state, pos));
+  return tilesInRadius(state, actor, (art?.targeting?.radius ?? 4) + getCommandRangeBonus(state, actor), (pos) => !getTileObject(state, pos));
 }
 
 // The 8 straight rays (orthogonal + diagonal) a line ability fires along.
@@ -170,8 +172,9 @@ const LINE_DIRECTIONS = Object.freeze([
 // destination for a grab is `actor.position + dir` (the tile one step along the ray).
 export function getLineTargets(state, actor, range, { includeAllies = false } = {}) {
   const targets = [];
+  const reach = range + getCommandRangeBonus(state, actor);
   for (const dir of LINE_DIRECTIONS) {
-    for (let d = 1; d <= range; d += 1) {
+    for (let d = 1; d <= reach; d += 1) {
       const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
       if (!isOnBoard(state, pos)) break;
       if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
@@ -193,8 +196,9 @@ export function getLineTargets(state, actor, range, { includeAllies = false } = 
 // which of these tiles is an actual legal target (bright), this just paints the reach.
 export function getLineReachTiles(state, actor, range) {
   const tiles = [];
+  const reach = range + getCommandRangeBonus(state, actor);
   for (const dir of LINE_DIRECTIONS) {
-    for (let d = 1; d <= range; d += 1) {
+    for (let d = 1; d <= reach; d += 1) {
       const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
       if (!isOnBoard(state, pos)) break;
       if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
@@ -208,6 +212,7 @@ export function getLineReachTiles(state, actor, range) {
 export function getTilePulseTargets(state, actor, art) {
   const effect = art.effect;
   if (effect?.type !== "tilePulse") return [];
+  const range = effect.range + getCommandRangeBonus(state, actor);
   return state.units.filter((target) =>
     target.hp > 0 &&
     areEnemies(actor, target) &&
@@ -215,15 +220,17 @@ export function getTilePulseTargets(state, actor, art) {
     (effect.global || Math.max(
       Math.abs(actor.position.x - target.position.x),
       Math.abs(actor.position.y - target.position.y)
-    ) <= effect.range)
+    ) <= range)
   );
 }
 
 export function getSelfBlastRadius(state, actor, art) {
-  const baseRadius = art?.targeting?.radius ?? 0;
+  // Higher Ground widens a self-centred blast (Nuke/Dark Bomb/Self Destruct) — an area ART.
+  const bonus = getCommandRangeBonus(state, actor);
+  const baseRadius = (art?.targeting?.radius ?? 0) + bonus;
   if (art?.targeting?.shape !== "nukeAura") return baseRadius;
   if (!art.targeting.matchAuraRadius) return baseRadius;
-  return Math.max(baseRadius, getUnitAuraRadius(actor, state));
+  return Math.max(baseRadius, getUnitAuraRadius(actor, state) + bonus);
 }
 
 // True when a targeted ART lands a real physical attack (the same path the basic

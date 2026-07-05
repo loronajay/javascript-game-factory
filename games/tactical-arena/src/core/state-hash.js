@@ -46,6 +46,9 @@ function canonicalUnits(units) {
         // Witch Doctor stance + pending Rain haste both change future legal actions and
         // damage, so they are part of the authoritative hash.
         `${unit.stance ?? "-"},${unit.rainCharged ? 1 : 0},` +
+        // King commander state changes future legal actions (the act-first gate) and the
+        // live team buff, so it is part of the authoritative hash.
+        `${unit.command ?? "-"},${unit.commandTurn ?? 0},${unit.previousCommand ?? "-"},` +
         `${stableStringify(unit.statModifiers ?? {})},` +
         // Source-linked modifiers (Father Time's Age) change future effective stats, so
         // they are part of the authoritative hash.

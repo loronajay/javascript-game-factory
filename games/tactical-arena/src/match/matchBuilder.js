@@ -1,6 +1,6 @@
 import { createBattleState } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
-import { takesTurns } from "../core/unitCatalog.js";
+import { getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
 
 export function teamColor(playerOrTeam, state = null) {
@@ -49,17 +49,27 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
       { x: coords.cx + inwardX, y: coords.cy + inwardY }
     ];
   };
+  const CORNER_CELL = 2; // positions[2] is the very corner cell ({cx,cy})
   const units = [];
   for (const slot of players) {
     const positions = slotsForCorner(slot.corner);
-    (squads[slot.id] ?? []).slice(0, positions.length).forEach((type, i) => {
+    const squad = (squads[slot.id] ?? []).slice(0, positions.length);
+    // Every unit keeps its natural index cell, EXCEPT the King ("always in the far
+    // corner"): he swaps onto positions[2] with whoever held it. King-less squads are
+    // untouched (no swap), so the original spawn layout is preserved exactly.
+    const cells = squad.map((_, i) => positions[i]);
+    const kingSlot = squad.findIndex((type) => getUnitType(type).actsFirst);
+    if (kingSlot >= 0 && kingSlot !== CORNER_CELL && cells[CORNER_CELL]) {
+      [cells[kingSlot], cells[CORNER_CELL]] = [cells[CORNER_CELL], cells[kingSlot]];
+    }
+    squad.forEach((type, i) => {
       units.push({
         id: `p${slot.id}-${i}-${type}`,
         player: slot.id,
         team: slot.team,
         type,
-        x: positions[i].x,
-        y: positions[i].y
+        x: cells[i].x,
+        y: cells[i].y
       });
     });
   }
@@ -149,6 +159,8 @@ export function readableError(errorCode) {
     TARGET_OBSTRUCTED: "Another unit is blocking the line of fire.",
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",
     FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation.",
-    SUMMON_LIMIT: "This Necromancer already has two Ghouls on the field."
+    SUMMON_LIMIT: "This Necromancer already has two Ghouls on the field.",
+    KING_MUST_ACT_FIRST: "Your King must issue his command before the rest of the squad may act.",
+    COMMANDER_CANNOT_ACT: "The King only commands — he never moves, attacks, or defends."
   })[errorCode] ?? "That action is not legal right now.";
 }

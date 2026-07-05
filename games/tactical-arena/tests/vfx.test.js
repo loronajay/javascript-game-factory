@@ -142,6 +142,19 @@ test("Father Time's arts declare their recipes (Age/Time Stretch motes, Rewind r
   assert.ok(rewind.stream.shape);
 });
 
+test("the King's four commands declare distinct color-keyed ritual recipes", () => {
+  for (const id of ["strike", "hold", "pursue", "higher-ground"]) {
+    const vfx = getAbilityVfx(id);
+    assert.equal(vfx?.type, "ritual", `${id} should be a global ritual`);
+    assert.equal(vfx.windup?.style, "gather", `${id} should gather before the release`);
+    assert.ok(vfx.colors?.core && vfx.colors?.impact, `${id} needs full colors`);
+    assert.ok(vfx.soundKey, `${id} needs a sound`);
+  }
+  // Each command's wash color is a distinct read-at-a-glance signal for the buff it grants.
+  const cores = ["strike", "hold", "pursue", "higher-ground"].map((id) => getAbilityVfx(id).colors.core);
+  assert.equal(new Set(cores).size, cores.length);
+});
+
 test("impacts are styled per damage type with a physical fallback", () => {
   const kinds = ["physical", "magic", "fire", "true"].map((kind) => getImpactVfx(kind));
   for (const style of kinds) {

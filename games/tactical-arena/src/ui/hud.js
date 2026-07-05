@@ -1,4 +1,4 @@
-import { getAvailableArts, getEffectiveStats, getUnitType, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getAvailableArts, getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt, getFootworkSteps } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
@@ -156,6 +156,19 @@ export function renderActions(
     return;
   }
   const activation = state.activation;
+  // The King only commands: no move/attack/defend/finish, just his four global commands.
+  // A command spends his whole activation, so there is nothing else to offer.
+  if (isCommandOnly(unit)) {
+    actions.innerHTML = getAvailableArts(unit)
+      .filter((art) => art.kind === "active" && art.implemented)
+      .map((art) => `<button class="art-tile command-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}</button>`)
+      .join("");
+    actionHelp.textContent = "Issue a command — it rallies your whole squad for this turn.";
+    actions.querySelectorAll("button").forEach((button) => {
+      button.addEventListener("click", () => { if (!resolving) onActionClick(button.dataset.action); });
+    });
+    return;
+  }
   const hasPrimary = activation.primaryUsed;
   const canMove = canMoveInActivation(activation);
   const canCancelMove = Boolean(activation.moved && !hasPrimary);

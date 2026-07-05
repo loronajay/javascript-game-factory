@@ -24,7 +24,13 @@ function createUnit(spec) {
     // null). Persists across turns; set by each dance ART. `rainCharged` is the
     // pending Rain-Stance on-attack haste, converted to a buff at the next activation.
     stance: spec.stance ?? null,
-    rainCharged: spec.rainCharged ?? false
+    rainCharged: spec.rainCharged ?? false,
+    // King commander state: the currently/last issued command, the one before it (for
+    // Strike's Pursue bonus), and the turnNumber it was issued on (a command only buffs
+    // during that same turn). Meaningless for every non-commander unit (stays null/0).
+    command: spec.command ?? null,
+    previousCommand: spec.previousCommand ?? null,
+    commandTurn: spec.commandTurn ?? 0
   };
 }
 

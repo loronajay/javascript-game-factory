@@ -16,7 +16,7 @@
 // through `normalizeUnitAi` so a new unit needs no edit to this file.
 
 import { areEnemies, livingUnits } from "../core/state.js";
-import { getEffectiveStats, getUnitType, isDefending, normalizeUnitAi } from "../core/unitCatalog.js";
+import { getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging, normalizeUnitAi, takesTurns } from "../core/unitCatalog.js";
 import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, resolveBaseStrike } from "../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../rules/damage.js";
 import { chebyshevDistance } from "../rules/movement.js";
@@ -338,6 +338,43 @@ export function incomingThreat(state, victim, pos, defending = false) {
     threat += expectedStrike(state, enemy, proxy).expDamage;
   }
   return threat;
+}
+
+// Value of a King command (Strike/Hold/Pursue/Higher Ground) — a one-turn team buff
+// that changes stats, not HP, so its worth rides the controller's `control` weight like
+// a status cast. Data-driven: it reads WHICH stat the command buffs (never the command
+// id) and multiplies the buff magnitude (with live RAGE scaling) by the count of allies
+// who actually benefit this turn, so the CPU tends to Strike when its squad can attack,
+// Pursue when it still needs to close, Hold when it is under pressure, and Higher Ground
+// when it fields ranged pieces. Always ≥ a floor so the mandatory command is never a no-op.
+export function commandBuffValue(state, king, art) {
+  const cmd = art.command;
+  if (!cmd) return 0;
+  const allies = livingUnits(state, king.player).filter((u) => u.id !== king.id && takesTurns(u) && !isCommandOnly(u));
+  if (allies.length === 0) return 0;
+  const rage = allies.filter(isRaging).length;
+  const stats = cmd.stats ?? {};
+  const magnitude = Object.values(stats).reduce((sum, v) => sum + v, 0) + (cmd.healBonus ?? 0) + (cmd.rangeBonus ?? 0) + rage;
+
+  let beneficiaries;
+  if ("strength" in stats) beneficiaries = allies.filter((u) => canReachEnemy(state, u));
+  else if ("attackRange" in stats) beneficiaries = allies.filter((u) => getEffectiveStats(u, state).attackRange >= 2);
+  else if ("moveRange" in stats) beneficiaries = allies.filter((u) => !canReachEnemy(state, u));
+  else if ("defense" in stats || cmd.healBonus) beneficiaries = allies.filter((u) => isThreatened(state, u));
+  else beneficiaries = allies;
+
+  return magnitude * Math.max(1, beneficiaries.length);
+}
+
+function canReachEnemy(state, unit) {
+  const stats = getEffectiveStats(unit, state);
+  const reach = stats.attackRange + stats.moveRange;
+  return livingUnits(state).some((e) => areEnemies(unit, e) && chebyshevDistance(unit.position, e.position) <= reach);
+}
+
+function isThreatened(state, unit) {
+  if (unit.hp <= getEffectiveStats(unit, state).maxHp * 0.5) return true;
+  return livingUnits(state).some((e) => areEnemies(unit, e) && chebyshevDistance(unit.position, e.position) <= 2);
 }
 
 // Chebyshev distance from `pos` to the nearest living enemy of `forPlayer`. Used to
