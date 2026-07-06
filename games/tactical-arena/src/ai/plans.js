@@ -30,11 +30,13 @@ import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
   FOOTWORK_DAMAGE,
+  getArtTargetRange,
   getFirePlacementTiles,
   getFootworkStepOptions,
   getFootworkSteps,
   getLegalFleeTiles,
   getLineTargets,
+  getProtectLandingTiles,
   getRevivePlacementTiles,
   getReviveTargets,
   getSelfBlastRadius,
@@ -121,13 +123,13 @@ function generateArtPlans(state, unit, art, ai, plans) {
   switch (ai.intent) {
     case "strike": {
       const physical = (art.damageType ?? "physical") === "physical";
-      for (const enemy of rangedTargetsFrom(state, unit, unit.position, physical)) {
+      for (const enemy of rangedTargetsFrom(state, unit, unit.position, physical, art)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: enemy.id } }));
       }
       break;
     }
     case "statusCast": {
-      for (const enemy of rangedTargetsFrom(state, unit, unit.position, false)) {
+      for (const enemy of rangedTargetsFrom(state, unit, unit.position, false, art)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: enemy.id } }));
       }
       break;
@@ -268,6 +270,14 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "protectAlly": {
+      for (const ally of livingUnits(state, unit.player)) {
+        if (ally.id === unit.id) continue;
+        if (getProtectLandingTiles(state, unit, ally, art).size === 0) continue;
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: ally.id } }));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -401,6 +411,16 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       if (actor.mp >= stats.maxMp) actor.hp = Math.min(stats.maxHp, actor.hp + (art.restore?.hpIfFull ?? 0));
       break;
     }
+    case "protectAlly": {
+      const ally = byId.get(primary.targetId);
+      if (ally) {
+        const step = { x: Math.sign(ally.position.x - actor.position.x), y: Math.sign(ally.position.y - actor.position.y) };
+        actor.position = { x: ally.position.x - step.x, y: ally.position.y - step.y };
+        actor.defending = true;
+        ally.defending = true;
+      }
+      break;
+    }
     case "revive": {
       // Rewind returns the fallen ally to the board at full HP — the material term
       // (unitThreatValue + hp) is exactly the value of the revival.
@@ -464,8 +484,8 @@ function attackTargetsFrom(state, unit, pos) {
 
 // Enemies in range of `pos`, gated by line of sight. `physical` adds the unit
 // body-block on top of the always-on wall block (matches the reducer's split).
-function rangedTargetsFrom(state, actor, pos, physical) {
-  const range = getEffectiveStats(actor, state).attackRange;
+function rangedTargetsFrom(state, actor, pos, physical, art = null) {
+  const range = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
   return livingUnits(state).filter((target) =>
     areEnemies(actor, target) &&
     chebyshevDistance(pos, target.position) <= range &&

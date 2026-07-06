@@ -15,8 +15,9 @@
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js";
 import { createOnlineSession } from "../online/onlineSession.js";
+import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
 
-const RULESET_VERSION = 1; // bump when a wire/rules change makes mixed clients unsafe
+const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
 const PLAYER_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };

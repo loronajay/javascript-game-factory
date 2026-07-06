@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { createBattleState } from "../src/core/state.js";
+import { hashState } from "../src/core/state-hash.js";
 import { createOnlineSession } from "../src/online/onlineSession.js";
 
 function createFakeClient({ clientId = "c_owner" } = {}) {
@@ -81,4 +83,25 @@ test("handoff-buffered remote commands apply before a buffered owner concede", a
   await drainPromises();
 
   assert.deepEqual(applied, ["BEGIN_ACTIVATION", "CONCEDE:2"]);
+});
+
+test("owner publishes the revision-0 hash when the match controller binds", () => {
+  const client = createFakeClient();
+  const session = createOnlineSession({
+    client,
+    mySeat: 1,
+    isOwner: true,
+    members: ["c_owner", "c_guest"],
+    seed: 123,
+    size: 13,
+  });
+  const match = createBattleState({ seed: 123 });
+
+  session.bind({
+    getMatchState: () => match,
+    applyRemoteCommand: async () => {},
+    applyOwnerConcede: async () => {},
+  });
+
+  assert.deepEqual(client.sentHashes, [{ revision: 0, hash: hashState(match) }]);
 });

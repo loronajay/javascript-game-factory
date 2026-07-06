@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { getBasicAttackDamageType, isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -144,7 +144,8 @@ export function isTargetedMode(mode, actor) {
     art.targeting?.shape !== "lineAny" &&
     art.targeting?.shape !== "lineEnemy" &&
     // Angel's Anoint is friendly-only — it does its own ally highlighting below.
-    art.targeting?.shape !== "ally"
+    art.targeting?.shape !== "ally" &&
+    art.targeting?.shape !== "protectAlly"
   );
 }
 
@@ -181,10 +182,10 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (mode === "move") legal = getLegalMoves(state, actor);
 
   if (actor && targeted) {
-    const reach = getEffectiveStats(actor, state).attackRange;
     // Body-blocking only applies to physical strikes (basic attack + physical ARTS);
     // magic ARTS reach through bodies, so their range wash and targets stay unculled.
     const art = mode?.startsWith("art:") ? getArt(actor.type, mode.slice("art:".length)) : null;
+    const reach = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
     const blockable = mode === "attack" || artUsesPhysicalStrike(art);
     for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
       for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
@@ -240,6 +241,24 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));
   // Rewind places a revived ally on an empty tile within range (same rule as a summon).
   if (actor && mode === "art:rewind") legal = getRevivePlacementTiles(state, actor, getArt(actor.type, "rewind"));
+
+  if (actor && mode?.startsWith("art:")) {
+    const protectArt = getArt(actor.type, mode.slice("art:".length));
+    if (protectArt?.targeting?.shape === "protectAlly") {
+      const reach = getArtTargetRange(state, actor, protectArt);
+      for (let dx = -reach; dx <= reach; dx += 1) {
+        for (let dy = -reach; dy <= reach; dy += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > reach) continue;
+          const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+          if (isOnBoard(state, pos)) range.add(positionKey(pos));
+        }
+      }
+      for (const u of state.units) {
+        if (u.hp <= 0 || u.player !== actor.player || u.id === actor.id) continue;
+        for (const key of getProtectLandingTiles(state, actor, u, protectArt)) legal.add(key);
+      }
+    }
+  }
 
   // Self-centred AoE blasts (Dark Bomb, Nuke): preview the whole detonation
   // footprint as a range wash and light every enemy caught inside as a legal

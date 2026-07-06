@@ -452,6 +452,21 @@ const ABILITY_VFX = Object.freeze({
     particleCount: 14,
     windup: Object.freeze({ style: "gather", durationMs: 260, particleCount: 7 }),
     colors: Object.freeze({ core: "#f2d472", trail: "#8a6a1e", impact: "#fff3c8" })
+  }),
+  "front-kick": Object.freeze({
+    type: "statusStrike",
+    soundKey: "attackHit",
+    motif: "impact",
+    particleCount: 8,
+    colors: Object.freeze({ core: "#f0e0b0", trail: "#7a5a30", impact: "#fff1c8" })
+  }),
+  protect: Object.freeze({
+    type: "healPulse",
+    soundKey: "defend",
+    particleCount: 8,
+    radius: 28,
+    durationMs: 460,
+    colors: Object.freeze({ core: "#d8ecff", trail: "#557ca8", impact: "#f5fbff" })
   })
 });
 

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { normalizeRoomCode, resolveWebSocketUrl } from "../src/online/onlineClient.js";
+import { ONLINE_RULESET_VERSION } from "../src/online/ruleset.js";
 
 const PROD = "wss://factory-network-server-production.up.railway.app";
 
@@ -40,4 +41,8 @@ test("room codes normalize pasted or typed input to the server code shape", () =
   assert.equal(normalizeRoomCode("ab cd-e"), "ABCDE");
   assert.equal(normalizeRoomCode(" 12o0!z9 "), "12O0Z");
   assert.equal(normalizeRoomCode(null), "");
+});
+
+test("online ruleset rejects pre-coin-flip client builds", () => {
+  assert.ok(ONLINE_RULESET_VERSION > 1);
 });

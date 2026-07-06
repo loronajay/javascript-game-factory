@@ -1,9 +1,11 @@
 import { svgElement } from "./svgHelpers.js";
 import { createBoardMetrics, gridToScreen } from "./isometric.js";
-import { getArt, getEffectiveStats } from "../core/unitCatalog.js";
+import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
+import { getArtTargetRange } from "../rules/arts.js";
 import { getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike } from "../rules/combat.js";
+import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
@@ -25,7 +27,7 @@ function isForecastableStrikeArt(art) {
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
     art.effect?.type !== "healAllies" &&
-    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement"].includes(art.targeting?.shape)
+    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly"].includes(art.targeting?.shape)
   );
 }
 
@@ -42,7 +44,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   if (!isAttack && !isStrikeArt) return;
 
   const metrics = createBoardMetrics(state.size);
-  const reach = getEffectiveStats(actor, state).attackRange;
+  const reach = isStrikeArt ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
   const guaranteedMiss = (isAttack || isStrikeArt) && getMissChance(actor) >= 1;
   // Physical strikes (basic attack + physical ARTS) can be body-blocked; magic ARTS
   // ignore intervening units, so they keep forecasting through them.
@@ -59,9 +61,23 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
       drawForecastBadge(forecastLayer, metrics, target, "miss", "fc-miss");
       continue;
     }
-    const artDamageType = art?.damageType ?? null;
-    const strike = resolveBaseStrike(actor, target, { proximity: true, state, damageType: artDamageType });
+    const strike = art?.resolution === "frontKick"
+      ? frontKickForecast(actor, target, art, state)
+      : resolveBaseStrike(actor, target, { proximity: true, state, damageType: art?.damageType ?? null });
     const lethal = strike.damage >= target.hp;
     drawForecastBadge(forecastLayer, metrics, target, lethal ? `☠ ${strike.damage}` : `-${strike.damage}`, lethal ? "fc-lethal" : "fc-attack");
   }
+}
+
+function frontKickForecast(actor, target, art, state) {
+  const actorStats = getEffectiveStats(actor, state);
+  const scaleStat = art.damage.scaleStat;
+  const baseStat = art.damage.baseStat ?? actorStats[scaleStat];
+  const power = (art.damage.amount ?? 10) + Math.max(0, actorStats[scaleStat] - baseStat);
+  const result = resolveDamage({
+    attacker: { strength: power },
+    defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
+    type: "physical"
+  });
+  return { ...result, damage: result.damage };
 }

@@ -1,7 +1,7 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { isWallBetween } from "./rules/combat.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
@@ -1231,6 +1231,19 @@ async function handleTile(position) {
         mode = null;
         setMessage(`${art.name} resolved. This unit's activation is complete.`);
       }
+    } else if (art?.targeting?.shape === "protectAlly") {
+      const key = positionKey(position);
+      const target = state.units.find((candidate) =>
+        candidate.hp > 0 &&
+        candidate.player === unit.player &&
+        candidate.id !== unit.id &&
+        getProtectLandingTiles(state, unit, candidate, art).has(key));
+      if (!target) {
+        setMessage(`${art.name}: click a highlighted landing tile beside an ally.`, true);
+      } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }))) {
+        mode = null;
+        setMessage(`${art.name} resolved. This unit's activation is complete.`);
+      }
     } else {
       const target = unitAt(state, position);
       const resolved = art?.resolution === "statusCast"
@@ -1353,6 +1366,8 @@ async function handleActionClick(action, unit) {
                   ? "Click any highlighted ally to confirm."
                   : art?.targeting?.shape === "allyOrEnemy"
                     ? "Click a highlighted ally or enemy in range."
+                    : art?.targeting?.shape === "protectAlly"
+                      ? "Click a highlighted landing tile beside an ally."
                     : art?.targeting?.shape === "lineAny"
                       ? "Click a highlighted ally or enemy on a straight line to grab it."
                       : art?.targeting?.shape === "lineEnemy"

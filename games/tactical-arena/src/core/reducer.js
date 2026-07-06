@@ -1,7 +1,7 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getUnitType, isCommandOnly, isDefending, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getFirePlacementTiles, getLegalFleeTiles, getLineTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getFirePlacementTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
 import { getBasicAttackDamageType, getCritOnHitStatus, getLineAttackTargets, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
@@ -320,7 +320,10 @@ const ART_RESOLVERS = new Map([
   ["strike", resolveKingCommand],
   ["hold", resolveKingCommand],
   ["pursue", resolveKingCommand],
-  ["higher-ground", resolveKingCommand]
+  ["higher-ground", resolveKingCommand],
+  // Monk: fixed-power kick with conditional knockback, and an ally guard reposition.
+  ["front-kick", resolveFrontKick],
+  ["protect", resolveProtect]
 ]);
 
 function useArt(state, command) {
@@ -1118,6 +1121,122 @@ function resolveRocketPunch(state, command, art) {
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     targetIds: [target.id], damageByTarget: { [target.id]: damage },
     hit: true, critical: swing.critical, stunned: Boolean(effect?.applied), mpCost: cost
+  }]);
+}
+
+function knockbackDestination(state, target, direction, distance) {
+  let destination = { ...target.position };
+  for (let step = 1; step <= distance; step += 1) {
+    const next = { x: target.position.x + direction.x * step, y: target.position.y + direction.y * step };
+    if (next.x < 0 || next.y < 0 || next.x >= state.size || next.y >= state.size) break;
+    if (isWallAt(state, next) || unitAt(state, next)) break;
+    destination = next;
+  }
+  return destination;
+}
+
+function resolveFrontKick(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isWallBetween(state, actorState.position, targetState.position, actorState) ||
+      isShotBlocked(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    resolveVictory(next);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, targetIds: [], damageByTarget: {}, knockedBack: false, mpCost: cost
+    }]);
+  }
+
+  const actorStats = getEffectiveStats(actor, next);
+  const scaleStat = art.damage.scaleStat;
+  const baseStat = art.damage.baseStat ?? actorStats[scaleStat];
+  const power = (art.damage.amount ?? 10) + Math.max(0, actorStats[scaleStat] - baseStat);
+  const result = resolveDamage({
+    attacker: { strength: power },
+    defender: { ...getEffectiveStats(target, next), defending: isDefending(target) },
+    type: "physical",
+    critical: swing.critical
+  });
+  const damage = result.damage;
+  const damageDealt = Math.min(target.hp, damage);
+  target.hp = Math.max(0, target.hp - damage);
+
+  const direction = {
+    x: Math.sign(targetState.position.x - actorState.position.x),
+    y: Math.sign(targetState.position.y - actorState.position.y)
+  };
+  const shouldKnockback = target.hp > 0 && (swing.critical || getRageEffectValue(actor, "frontKickAlwaysKnockback", false));
+  const from = { ...target.position };
+  let to = { ...target.position };
+  if (shouldKnockback && (direction.x !== 0 || direction.y !== 0)) {
+    to = knockbackDestination(next, target, direction, art.knockback?.distance ?? 3);
+    target.position = { ...to };
+  }
+
+  const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    targetIds: [target.id], damageByTarget: { [target.id]: damage },
+    hit: true, critical: swing.critical, damage: { ...result, damage },
+    knockedBack: shouldKnockback && (from.x !== to.x || from.y !== to.y),
+    from, to, mpCost: cost
+  }, ...healingEvents]);
+}
+
+function resolveProtect(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areAllies(actorState, targetState) || targetState.id === actorState.id) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  const landing = [...getProtectLandingTiles(state, actorState, targetState, art)][0];
+  if (!landing) return reject(ERR.INVALID_TARGET);
+  const [x, y] = landing.split(",").map(Number);
+  const destination = { x, y };
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const from = { ...actor.position };
+  const cost = getArtMpCost(actor, art);
+  actor.position = destination;
+  actor.defending = true;
+  target.defending = true;
+  actor.mp -= cost;
+
+  let healed = 0;
+  const healAmount = Number(getRageEffectValue(actor, "protectHeal", 0)) || 0;
+  if (healAmount > 0 && !isHealingDisabled(next)) {
+    const before = target.hp;
+    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + healAmount + getGlobalHealBonus(next) + getCommandHealBonus(next, actor));
+    healed = target.hp - before;
+  }
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    from, to: { ...destination }, defended: [actor.id, target.id],
+    healingByTarget: healed > 0 ? { [target.id]: healed } : {},
+    mpCost: cost
   }]);
 }
 

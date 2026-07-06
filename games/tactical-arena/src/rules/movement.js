@@ -1,8 +1,13 @@
-import { getEffectiveStats } from "../core/unitCatalog.js";
+import { getEffectiveStats, getUnitType } from "../core/unitCatalog.js";
 import { isWallAt, unitAt } from "../core/state.js";
 
 export const ORTHOGONAL_DIRECTIONS = Object.freeze([
   { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
+]);
+
+export const ALL_DIRECTIONS = Object.freeze([
+  ...ORTHOGONAL_DIRECTIONS,
+  { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 }
 ]);
 
 export function positionKey({ x, y }) {
@@ -46,6 +51,20 @@ export function traceGridLine(x0, y0, x1, y1) {
 
 export function getLegalMoves(state, unit) {
   const maxSteps = getEffectiveStats(unit, state).moveRange;
+  if (getUnitType(unit.type).passive?.effect?.type === "movementShape" &&
+      getUnitType(unit.type).passive.effect.shape === "radius") {
+    const legal = new Set();
+    for (let dx = -maxSteps; dx <= maxSteps; dx += 1) {
+      for (let dy = -maxSteps; dy <= maxSteps; dy += 1) {
+        if (dx === 0 && dy === 0) continue;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > maxSteps) continue;
+        const pos = { x: unit.position.x + dx, y: unit.position.y + dy };
+        if (!isOnBoard(state, pos) || unitAt(state, pos) || isWallAt(state, pos)) continue;
+        legal.add(positionKey(pos));
+      }
+    }
+    return legal;
+  }
   const queue = [{ ...unit.position, distance: 0 }];
   const visited = new Set([positionKey(unit.position)]);
   const legal = new Set();

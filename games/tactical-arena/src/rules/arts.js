@@ -1,7 +1,7 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
-import { ORTHOGONAL_DIRECTIONS, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
+import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
 
 export const FOOTWORK_DAMAGE = 2;
@@ -91,6 +91,35 @@ export function getLegalFleeTiles(state, actor) {
       legal.add(positionKey(pos));
     }
   }
+  return legal;
+}
+
+export function getArtTargetRange(state, actor, art) {
+  const base = Number.isFinite(art?.targeting?.range)
+    ? art.targeting.range
+    : getEffectiveStats(actor, state).attackRange;
+  return base + getCommandRangeBonus(state, actor) + getRageArtRangeBonus(actor);
+}
+
+function directionStep(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (dx === 0 && dy === 0) return null;
+  return { x: Math.sign(dx), y: Math.sign(dy) };
+}
+
+export function getProtectLandingTiles(state, actor, ally, art = null) {
+  art = art ?? getArt(actor?.type, "protect");
+  const legal = new Set();
+  if (!actor || !ally || actor.id === ally.id || ally.hp <= 0 || !areAllies(actor, ally)) return legal;
+  if (chebyshevDistance(actor.position, ally.position) > getArtTargetRange(state, actor, art)) return legal;
+  const step = directionStep(actor.position, ally.position);
+  if (!step) return legal;
+  const landing = { x: ally.position.x - step.x, y: ally.position.y - step.y };
+  if (!isOnBoard(state, landing) || isWallAt(state, landing)) return legal;
+  const occupant = unitAt(state, landing);
+  if (occupant && occupant.id !== actor.id) return legal;
+  legal.add(positionKey(landing));
   return legal;
 }
 

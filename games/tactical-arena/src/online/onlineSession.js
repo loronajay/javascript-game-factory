@@ -166,7 +166,9 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
   function bind(controller) {
     _controller = controller;
     // Seed our revision-0 hash so an immediate desync (bad seed/size) is caught.
-    _recordLocalHash(controller.getMatchState?.());
+    const match = controller.getMatchState?.();
+    _recordLocalHash(match);
+    if (_owner && match) client.sendHash(match.revision, hashState(match));
     while (_pending.length) _enqueueRemote(_pending.shift());
     while (_pendingOwnerConcedes.length) _enqueueOwnerConcede(_pendingOwnerConcedes.shift());
     client.startPinging();

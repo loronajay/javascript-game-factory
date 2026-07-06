@@ -13,6 +13,7 @@ import { FATHER_TIME } from "./units/father-time.js";
 import { JUGGERNAUT } from "./units/juggernaut.js";
 import { KING } from "./units/king.js";
 import { ANGEL } from "./units/angel.js";
+import { MONK } from "./units/monk.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -28,7 +29,8 @@ export const UNIT_TYPES = Object.freeze({
   "father-time": FATHER_TIME,
   juggernaut: JUGGERNAUT,
   king: KING,
-  angel: ANGEL
+  angel: ANGEL,
+  monk: MONK
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -82,6 +84,10 @@ function passiveSources(definition) {
 
 function rageStatSources(definition) {
   return [definition.ragePassive, definition.rageArt].filter(Boolean);
+}
+
+function allPassiveSources(definition) {
+  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt].filter(Boolean);
 }
 
 function stableValueKey(value) {
@@ -327,6 +333,16 @@ export function getEffectiveStats(unit, state = null) {
       if (name in stats && Number.isFinite(value)) stats[name] += value;
     }
   }
+  for (const source of allPassiveSources(getUnitType(unit.type))) {
+    const boost = source.effect?.missingHpStat;
+    if (!boost || unit.hp <= 0) continue;
+    const stat = boost.stat;
+    const per = Math.max(1, Number(boost.per) || 1);
+    const amount = Number(boost.amount) || 0;
+    const missing = Math.max(0, getUnitType(unit.type).stats.maxHp - unit.hp);
+    const bonus = Math.floor(missing / per) * amount;
+    if (stat in stats && Number.isFinite(bonus)) stats[stat] += bonus;
+  }
   // Bruiser Mode (Juggernaut): a stronger stat block while the unit sits at 0 MP. Folded
   // generically off the passive data so no rule hard-codes the unit. The paired magic
   // vulnerability lives in getSelfMagicVulnerability (rules/combat.js), not here.
@@ -382,6 +398,23 @@ export function getArtMpCost(unit, art) {
   return art.mpCost ?? 0;
 }
 
+export function getRageArtRangeBonus(unit) {
+  if (!unit || !isRaging(unit)) return 0;
+  const definition = getUnitType(unit.type);
+  const bonus = Math.max(
+    0,
+    Number(definition.ragePassive?.effect?.artRangeBonus) || 0,
+    Number(definition.rageArt?.effect?.artRangeBonus) || 0
+  );
+  return bonus;
+}
+
+export function getRageEffectValue(unit, key, fallback = null) {
+  if (!unit || !isRaging(unit)) return fallback;
+  const definition = getUnitType(unit.type);
+  return definition.ragePassive?.effect?.[key] ?? definition.rageArt?.effect?.[key] ?? fallback;
+}
+
 // True when a raging unit projects a board-wide healing lockout (Juggernaut's Null Zone
 // disableHealing). Any living source suffices; read by isHealingDisabled (rules/combat.js).
 export function projectsHealingLockout(unit) {
@@ -424,7 +457,9 @@ export const AI_INTENTS = Object.freeze([
   // The King's global one-turn team buffs (Strike/Hold/Pursue/Higher Ground):
   "commandBuff",
   // Angel's single-ally targeted buff (Anoint: +1 range on a friendly unit):
-  "buffAlly"
+  "buffAlly",
+  // Monk's guarded ally reposition + defend handoff:
+  "protectAlly"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"
