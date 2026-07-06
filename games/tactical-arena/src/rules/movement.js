@@ -49,7 +49,7 @@ export function traceGridLine(x0, y0, x1, y1) {
   return cells;
 }
 
-function canMoveThroughEnemies(unit) {
+export function canTrample(unit) {
   return Math.max(0, Number(getRageEffectValue(unit, "trampleDamage", 0)) || 0) > 0;
 }
 
@@ -69,7 +69,7 @@ export function getLegalMoves(state, unit) {
     }
     return legal;
   }
-  const passEnemies = canMoveThroughEnemies(unit);
+  const passEnemies = canTrample(unit);
   const queue = [{ ...unit.position, distance: 0 }];
   const visited = new Set([positionKey(unit.position)]);
   const legal = new Set();
@@ -93,10 +93,64 @@ export function getLegalMoves(state, unit) {
   return legal;
 }
 
+// RAGE Trample (Fat Knight) targets a NORMAL move the same way Footwork/Stumble
+// target a rushPath ART: click one orthogonal tile at a time, walking through
+// enemies for true damage, rather than a single click straight to a distant
+// destination. Unlike rushPath, the walk is variable-length (0..moveRange) — it
+// simply ends the instant `path` lands on an empty tile, so a click on an empty
+// tile is both "the next step" and "confirm the move" at once. `getTrampleMoveOptions`
+// mirrors getRushStepOptions (rules/arts.js) but bounds by effective moveRange
+// instead of a fixed extraMove length, and never forces "last step must be empty"
+// early — the player can keep walking through further enemies as long as at least
+// one more step remains to land on.
+export function getTrampleMoveOptions(state, actor, path) {
+  const maxSteps = getEffectiveStats(actor, state).moveRange;
+  if (path.length >= maxSteps) return new Set();
+  const prior = path.length ? path[path.length - 1] : actor.position;
+  const visited = new Set([positionKey(actor.position), ...path.map(positionKey)]);
+  const roomAfterThisStep = maxSteps - (path.length + 1);
+  const options = new Set();
+
+  for (const direction of ORTHOGONAL_DIRECTIONS) {
+    const candidate = { x: prior.x + direction.x, y: prior.y + direction.y };
+    const key = positionKey(candidate);
+    if (!isOnBoard(state, candidate) || visited.has(key) || isWallAt(state, candidate)) continue;
+    const occupant = unitAt(state, candidate);
+    if (occupant && (!areEnemies(actor, occupant) || roomAfterThisStep < 1)) continue;
+    options.add(key);
+  }
+  return options;
+}
+
+// Server-side validation for an explicit Trample move path (mirrors validateRushPath
+// in rules/arts.js): each step orthogonally adjacent to the last, on-board, unvisited,
+// never a wall; an occupied tile is only legal mid-path and only if it's an enemy
+// (the final step must land empty).
+export function validateTrampleMovePath(state, actor, path) {
+  const maxSteps = getEffectiveStats(actor, state).moveRange;
+  if (!Array.isArray(path) || path.length === 0 || path.length > maxSteps) return false;
+
+  let previous = actor.position;
+  const visited = new Set([positionKey(actor.position)]);
+  for (let index = 0; index < path.length; index += 1) {
+    const step = path[index];
+    const key = positionKey(step);
+    if (!isOnBoard(state, step) || visited.has(key) || !isOrthogonallyAdjacent(previous, step)) return false;
+    if (isWallAt(state, step)) return false;
+
+    const occupant = unitAt(state, step);
+    const isFinalStep = index === path.length - 1;
+    if (occupant && (!areEnemies(actor, occupant) || isFinalStep)) return false;
+    visited.add(key);
+    previous = step;
+  }
+  return true;
+}
+
 export function getLegalMovePath(state, unit, destination) {
   if (!destination || !getLegalMoves(state, unit).has(positionKey(destination))) return null;
   const maxSteps = getEffectiveStats(unit, state).moveRange;
-  const passEnemies = canMoveThroughEnemies(unit);
+  const passEnemies = canTrample(unit);
   const originKey = positionKey(unit.position);
   const targetKey = positionKey(destination);
   const queue = [{ position: { ...unit.position }, distance: 0, path: [] }];

@@ -3,7 +3,7 @@ import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffective
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
-import { chebyshevDistance, positionKey } from "./rules/movement.js";
+import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
 import { applyCommand } from "./core/reducer.js";
 import { chooseActivation, cpuRng } from "./ai/cpuController.js";
@@ -257,12 +257,18 @@ function announceTurnChange(prevPlayer) {
 
 // --- Command dispatch ---
 
+// Set by every successful dispatch() so a caller that needs the resolved events
+// (e.g. a trampling MOVE_UNIT's harmed/damageByTarget/path) can read them without
+// dispatch() itself growing animation concerns.
+let lastDispatchEvents = [];
+
 function dispatch(command) {
   const result = applyCommand(state, command);
   if (!result.accepted) {
     setMessage(readableError(result.errorCode), true);
     return false;
   }
+  lastDispatchEvents = result.events ?? [];
   const prevPlayer = state.currentPlayer;
   state = result.nextState;
   broadcastIfLocal(command);
@@ -1420,7 +1426,67 @@ async function handleTile(position) {
     render();
     return;
   }
-  if (mode === "move") {
+  if (mode === "move" && canTrample(unit)) {
+    // RAGE Trample (Fat Knight): targeted exactly like Footwork/Stumble — one
+    // adjacent tile at a time via footworkPath, not a single click straight to a
+    // far destination. Landing on an enemy tramples it (true damage) and MUST
+    // continue; landing on an empty tile both is and commits the final step.
+    const options = getTrampleMoveOptions(state, unit, footworkPath);
+    if (!options.has(positionKey(position))) {
+      setMessage("Trample: choose the next highlighted tile.", true);
+      render();
+      return;
+    }
+    footworkPath.push(position);
+    if (unitAt(state, position)) {
+      const maxSteps = getEffectiveStats(unit, state).moveRange;
+      setMessage(`Trample: enemy crossed. Choose step ${footworkPath.length + 1} of up to ${maxSteps}.`);
+      render();
+      return;
+    }
+    const from = { ...unit.position };
+    const actorBefore = unit;
+    const path = [...footworkPath];
+    const dest = path[path.length - 1];
+    footworkPath = [];
+    if (dispatch(moveUnit(state.currentPlayer, unit.id, dest.x, dest.y, path))) {
+      const moved = lastDispatchEvents.find((e) => e.type === "UNIT_MOVED");
+      const completesActivation = state.activation?.primaryUsed;
+      mode = null;
+      setMessage(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish.");
+      resolving = true;
+      render();
+      // Give the harmed tiles the same dash + contact-hit presentation Footwork/
+      // Stumble use, instead of silently sliding past the units it just damaged.
+      if (moved?.harmed?.length) {
+        const metrics = createBoardMetrics(state.size);
+        const harmedByTile = new Map();
+        for (const id of moved.harmed) {
+          const target = findUnit(state, id);
+          if (target) harmedByTile.set(positionKey(target.position), target);
+        }
+        await effects.footworkCharge(actorBefore, moved.path, async (tile) => {
+          const target = harmedByTile.get(positionKey(tile));
+          if (!target) return;
+          const center = unitCenter(metrics, target);
+          audio.play("attackHit");
+          effects.impact(center, false, "true");
+          await effects.hitRecoil(target.id, target.position, false);
+          const amount = moved.damageByTarget?.[target.id] ?? 0;
+          await effects.floatText(center, `-${amount}`, "#ff7684");
+          if (target.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+        });
+      } else {
+        await effects.animateMovement(unit.id, from, dest);
+      }
+      resolving = false;
+      if (completesActivation) maybeAutoFinish();
+      render();
+      return;
+    }
+    render();
+    return;
+  } else if (mode === "move") {
     const from = { ...unit.position };
     if (dispatch(moveUnit(state.currentPlayer, unit.id, position.x, position.y))) {
       const completesActivation = state.activation?.primaryUsed;
@@ -1746,6 +1812,8 @@ async function handleActionClick(action, unit) {
     rewindTargetId = null;
     if (deselect) {
       setMessage("Choose an action below.");
+    } else if (action === "move" && canTrample(unit)) {
+      setMessage(`Trample: choose step 1 of up to ${getEffectiveStats(unit, state).moveRange} — walking into an enemy tramples it for true damage.`);
     } else if (action === "footwork") {
       const footwork = getUnitType(unit.type).arts.find((a) => a.id === "footwork");
       setMessage(`Footwork (${footwork.mpCost} MP): ${footwork.description} Choose step 1 of ${getFootworkSteps(unit)}.`);

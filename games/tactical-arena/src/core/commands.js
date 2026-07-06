@@ -10,7 +10,11 @@ export const COMMANDS = Object.freeze({
 });
 
 export const beginActivation = (player, unitId) => ({ type: COMMANDS.BEGIN_ACTIVATION, player, unitId });
-export const moveUnit = (player, unitId, x, y) => ({ type: COMMANDS.MOVE_UNIT, player, unitId, position: { x, y } });
+// `path` optionally pins the exact tile-by-tile route (Trample's step-by-step
+// targeting, mirroring a rushPath ART) — omit it for a plain destination click,
+// which the reducer resolves via its own shortest-path search.
+export const moveUnit = (player, unitId, x, y, path = null) =>
+  ({ type: COMMANDS.MOVE_UNIT, player, unitId, position: { x, y }, ...(path ? { path } : {}) });
 export const cancelMove = (player, unitId) => ({ type: COMMANDS.CANCEL_MOVE, player, unitId });
 // `rolls` optionally pins the to-hit/crit draws ({ attackRoll, critRoll }) for
 // deterministic tests and recorded replay; live play omits it and the reducer

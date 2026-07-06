@@ -3,7 +3,7 @@ import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from ".
 import { getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getLineAttackTargets, getMeleeDefendRetaliation, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, rollToHit } from "../rules/combat.js";
-import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey } from "../rules/movement.js";
+import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
 import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing } from "./combatEffects.js";
@@ -153,12 +153,23 @@ function moveUnit(state, command) {
   if (result.error) return reject(result.error);
   if (isCommandOnly(result.unit)) return reject(ERR.COMMANDER_CANNOT_ACT);
   if (state.activation.moved) return reject(ERR.MOVE_ALREADY_USED);
-  if (!getLegalMoves(state, result.unit).has(positionKey(command.position))) return reject(ERR.MOVE_OUT_OF_RANGE);
+
+  let path;
+  if (command.path) {
+    // An explicit tile-by-tile route (Trample's step-by-step targeting). Must
+    // validate as a legal walk AND actually end on the clicked destination.
+    if (!validateTrampleMovePath(state, result.unit, command.path)) return reject(ERR.MOVE_OUT_OF_RANGE);
+    const last = command.path[command.path.length - 1];
+    if (last.x !== command.position.x || last.y !== command.position.y) return reject(ERR.MOVE_OUT_OF_RANGE);
+    path = command.path.map((step) => ({ ...step }));
+  } else {
+    if (!getLegalMoves(state, result.unit).has(positionKey(command.position))) return reject(ERR.MOVE_OUT_OF_RANGE);
+    path = getLegalMovePath(state, result.unit, command.position) ?? [{ ...command.position }];
+  }
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
   const from = { ...unit.position };
-  const path = getLegalMovePath(state, result.unit, command.position) ?? [{ ...command.position }];
   const trampleDamage = Math.max(0, Number(getRageEffectValue(unit, "trampleDamage", 0)) || 0);
   const harmed = [];
   const damageByTarget = {};

@@ -6,7 +6,7 @@ import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, cancelMove, moveUnit, useArt } from "../src/core/commands.js";
 import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
 import { getRushSteps } from "../src/rules/arts.js";
-import { getLegalMoves, positionKey } from "../src/rules/movement.js";
+import { getLegalMoves, getTrampleMoveOptions, positionKey } from "../src/rules/movement.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { generatePlans, toCommands } from "../src/ai/plans.js";
 
@@ -123,6 +123,50 @@ test("RAGE Trample lets Fat Knight move through enemies and damages each enemy c
   assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 5 });
   assert.equal(findUnit(result.nextState, "e").hp, 22, "crossed enemy takes 3 true damage");
   assert.equal(getEffectiveStats(findUnit(result.nextState, "fk"), result.nextState).defense, 8);
+});
+
+test("RAGE Trample move is targeted tile-by-tile like Footwork/Stumble, not a single click to a far destination", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "e1", type: "swordsman", player: 2, x: 6, y: 5 },
+    { id: "e2", type: "swordsman", player: 2, x: 8, y: 5 }
+  ]);
+  const fk = findUnit(state, "fk");
+
+  // Step 1 from the origin: only the immediate orthogonal neighbors, not the far
+  // destination — the enemy tile at (6,5) is offered (it can be trampled through,
+  // there's still room to land past it), the ally-free far tile is NOT a one-click option.
+  const step1 = getTrampleMoveOptions(state, fk, []);
+  assert.equal(step1.has(positionKey({ x: 6, y: 5 })), true, "the first enemy in line is a legal next step");
+  assert.equal(step1.has(positionKey({ x: 9, y: 5 })), false, "a distant tile is not directly selectable — must be walked step by step");
+  assert.equal(step1.has(positionKey({ x: 8, y: 5 })), false, "an enemy is only a legal step, not a shortcut past it");
+
+  // After stepping onto the first enemy's tile, the second enemy (adjacent to it) is
+  // NOT offered because trampling it would leave zero steps to land on empty ground
+  // (moveRange 2 only allows one more step after this one).
+  const step2 = getTrampleMoveOptions(state, fk, [{ x: 6, y: 5 }]);
+  assert.equal(step2.has(positionKey({ x: 7, y: 5 })), true, "empty tile beyond the first enemy is reachable and ends the move");
+  assert.equal(step2.has(positionKey({ x: 6, y: 4 })), true, "a sideways empty tile is also reachable");
+
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  const result = run(s, moveUnit(1, "fk", 7, 5, [{ x: 6, y: 5 }, { x: 7, y: 5 }]));
+  assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 5 });
+  assert.equal(findUnit(result.nextState, "e1").hp, 22, "the crossed enemy takes 3 true damage");
+  assert.equal(findUnit(result.nextState, "e2").hp, 25, "an enemy off the walked path is untouched");
+});
+
+test("RAGE Trample rejects an explicit path that doesn't end on the clicked destination or skips a tile", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "fk")).nextState;
+
+  const mismatched = applyCommand(s, moveUnit(1, "fk", 7, 5, [{ x: 6, y: 5 }]));
+  assert.equal(mismatched.accepted, false, "path must end at the declared destination");
+
+  const skipped = applyCommand(s, moveUnit(1, "fk", 8, 5, [{ x: 8, y: 5 }]));
+  assert.equal(skipped.accepted, false, "path steps must be orthogonally adjacent, not a jump");
 });
 
 test("RAGE Trample movement cannot be cancelled after it is committed", () => {

@@ -3,7 +3,7 @@ import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
-import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
+import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
@@ -213,7 +213,10 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   const actor = selectedId ? state.units.find((u) => u.id === selectedId) : null;
   const targeted = isTargetedMode(mode, actor);
 
-  if (mode === "move") legal = getLegalMoves(state, actor);
+  // RAGE Trample (Fat Knight): targeted exactly like Footwork/Stumble's rushPath —
+  // one adjacent tile at a time via footworkPath — instead of the plain
+  // click-anywhere-in-range destination set every other unit's move uses.
+  if (mode === "move") legal = (actor && canTrample(actor)) ? getTrampleMoveOptions(state, actor, footworkPath) : getLegalMoves(state, actor);
 
   if (actor && targeted) {
     // Basic attacks are body-blocked unless the attacker has an explicit pierce passive
