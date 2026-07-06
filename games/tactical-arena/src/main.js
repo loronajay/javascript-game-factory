@@ -9,7 +9,7 @@ import { applyCommand } from "./core/reducer.js";
 import { chooseActivation, cpuRng } from "./ai/cpuController.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
-import { orderedHitTargets } from "./ui/combatPresentation.js";
+import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets } from "./ui/combatPresentation.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
@@ -293,7 +293,34 @@ async function resolveCombat(command) {
   const rolledTargetsBefore = rolled ? orderedHitTargets(rolled, (id) => findUnit(state, id)) : [];
   const targetBefore = rolledTargetsBefore[0] ?? (rolled ? findUnit(state, rolled.targetId) : null);
 
-  if (rolled && attackerBefore && targetBefore) {
+  if (rolled?.artId === "surge" && attackerBefore && targetBefore) {
+    const center = unitCenter(metrics, targetBefore);
+    const healedTargetsBefore = healingPresentationTargets(rolled, (id) => findUnit(state, id));
+    const splashTargetsBefore = clumsySplashTargets(rolled, (id) => findUnit(state, id), "healing");
+    const vfxTargets = [...new Map([...healedTargetsBefore, ...splashTargetsBefore].map((unit) => [unit.id, unit])).values()];
+
+    await effects.rollReveal({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) });
+    if (rolled.missed) await effects.floatText(center, "MISS", "#cbb78b");
+
+    if (!rolled.missed || splashTargetsBefore.length) {
+      await effects.playAbilityVfx("surge", {
+        actor: attackerBefore,
+        targets: vfxTargets.length ? vfxTargets : [targetBefore]
+      });
+    }
+
+    const floats = [];
+    if (splashTargetsBefore.length) floats.push(effects.floatText(center, "CLUMSY", "#d8c2f5"));
+    for (const target of healedTargetsBefore) {
+      const healed = rolled.healingByTarget?.[target.id] ?? 0;
+      if (healed > 0) floats.push(effects.floatText(unitCenter(metrics, target), `+${healed}`, "#8cf0a4"));
+    }
+    for (const target of splashTargetsBefore) {
+      const healed = rolled.splashHealingByTarget?.[target.id] ?? 0;
+      if (healed > 0) floats.push(effects.floatText(unitCenter(metrics, target), `+${healed}`, "#8cf0a4"));
+    }
+    await Promise.all(floats);
+  } else if (rolled && attackerBefore && targetBefore) {
     // A ranged ART fires a projectile even from a melee-range unit (Clod's Stone Throw is
     // range 4), so read the ART's own reach when one is being cast.
     const artRange = rolled.artId ? artDefinition(attackerBefore, rolled.artId)?.targeting?.range : null;
@@ -366,6 +393,22 @@ async function resolveCombat(command) {
         if (!slainExtra || slainExtra.hp <= 0) await effects.deathDissolve(hitTarget.id, hitTarget.position, teamColor(hitTarget.player));
       }
     }
+  }
+
+  const clumsyDamageTargetsBefore = rolled ? clumsySplashTargets(rolled, (id) => findUnit(state, id), "damage") : [];
+  if (rolled?.splashDamageByTarget && attackerBefore && targetBefore && clumsyDamageTargetsBefore.length) {
+    const center = unitCenter(metrics, targetBefore);
+    await effects.floatText(center, "CLUMSY", "#d8c2f5");
+    await Promise.all(clumsyDamageTargetsBefore.map(async (target) => {
+      const damage = rolled.splashDamageByTarget?.[target.id] ?? 0;
+      if (damage <= 0) return;
+      const splashCenter = unitCenter(metrics, target);
+      effects.impact(splashCenter, false, "magic");
+      await effects.hitRecoil(target.id, target.position, false);
+      await effects.floatText(splashCenter, `-${damage}`, "#c89cff");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
   }
 
   const handOfLifeEvent = events.find((e) => e.type === "HAND_OF_LIFE");

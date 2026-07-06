@@ -1,13 +1,15 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getStatusSpreadConfig, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
-import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getRockHardMpRefund, ignoresCriticalDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getRockHardMpRefund, ignoresCriticalDamage, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { applyStatus, isNegativeStatus, isStunned, NEGATIVE_STATUS_TYPES, reflectsStatus, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
-import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect } from "../rules/stances.js";
+import { applyStatus, isNegativeStatus, isStunned, NEGATIVE_STATUS_TYPES, reflectsStatus, resolveStatusEffect } from "../rules/statuses.js";
+import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getStanceEffect } from "../rules/stances.js";
+import { applyPostCommandReactions, consumeOneShotRage, syncOneShotRageArm } from "./reactions.js";
+import { nextActivePlayer, resolveVictory, spendAndAdvance } from "./turnEngine.js";
 
 const ERR = Object.freeze({
   INVALID_COMMAND: "INVALID_COMMAND",
@@ -37,7 +39,6 @@ const ERR = Object.freeze({
 });
 
 const reject = (errorCode) => ({ accepted: false, errorCode });
-const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 // Surface any rollover side-effects (fire-tile burns) the turn flip queued onto the
 // state, then clear them so they never persist into the returned state or a clone.
 const accept = (nextState, events = []) => {
@@ -109,39 +110,6 @@ function stationaryStrengthEffect(unit) {
   return getUnitType(unit.type).arts.find((art) => art.effect?.type === "stationaryStrength")?.effect ?? null;
 }
 
-function oneShotRageEffect(unit) {
-  const definition = getUnitType(unit.type);
-  return [definition.ragePassive, definition.rageArt]
-    .map((source) => source?.effect)
-    .find((effect) => effect?.type === "oneShotStatModifiers") ?? null;
-}
-
-function syncOneShotRageArm(unit) {
-  if (!oneShotRageEffect(unit)) return;
-  if (!isRaging(unit)) {
-    unit.desperationRageArmed = false;
-    unit.desperationShotSpent = false;
-    return;
-  }
-  if (!unit.desperationRageArmed) {
-    unit.desperationRageArmed = true;
-    unit.desperationShotSpent = false;
-  }
-}
-
-function activeOneShotRageEffect(unit) {
-  const effect = oneShotRageEffect(unit);
-  return effect && isRaging(unit) && !unit.desperationShotSpent ? effect : null;
-}
-
-function consumeOneShotRage(unit) {
-  const effect = activeOneShotRageEffect(unit);
-  if (!effect) return [];
-  unit.desperationShotSpent = true;
-  if (effect.skipNextActivation) unit.skipNextActivation = true;
-  return [{ type: "DESPERATION_SHOT", unitId: unit.id }];
-}
-
 export function applyCommand(state, command) {
   const result = dispatchCommand(state, command);
   // A single reconciliation seam runs after EVERY accepted command, diffing the input
@@ -150,14 +118,10 @@ export function applyCommand(state, command) {
   // it — and applies the King's reactive HP swings. Deterministic (no RNG), so online
   // lockstep clients all compute the identical reaction.
   if (result.accepted) {
-    // Virus's Spread propagates any NEW debuff on an enemy to its nearby allies. Diff-based
-    // (like the reactions below) so it catches a status from ANY source — a cast, a crit,
-    // a global blind — deterministically, before the HP-swing reactions read the board.
-    applySpreadReactions(state, result.nextState, result.events);
-    applyNemesisThresholdReactions(state, result.nextState, result.events);
-    applyOneShotRageTransitions(state, result.nextState, result.events);
-    applyRageEntryEffects(state, result.nextState, result.events);
-    applyCommanderReactions(state, result.nextState, result.events);
+    applyPostCommandReactions(state, result.nextState, result.events, {
+      resolveNemesisAutoPulse,
+      resolveVolcanicPyroclasmTick
+    });
   }
   return result;
 }
@@ -321,15 +285,6 @@ function resolveVolcanicPyroclasmTick(state, unit, freeCast, events, { trigger, 
   return true;
 }
 
-function nemesisThresholdBand(hp) {
-  if (hp <= 0) return 0;
-  let crossed = 0;
-  for (const threshold of [20, 15, 10, 5]) {
-    if (hp < threshold) crossed += 1;
-  }
-  return crossed;
-}
-
 function resolveNemesisAutoPulse(state, unit, events, { trigger }) {
   const art = getArt(unit.type, "dark-pulse");
   if (!art || unit.hp <= 0) return false;
@@ -347,155 +302,6 @@ function resolveNemesisAutoPulse(state, unit, events, { trigger }) {
     mpCost: 0
   });
   return true;
-}
-
-function applyNemesisThresholdReactions(prevState, next, events) {
-  if (next.phase !== "playing") return;
-
-  let previousBand = new Map(prevState.units.map((unit) => [unit.id, nemesisThresholdBand(unit.hp)]));
-  for (let guard = 0; guard < next.units.length * 4; guard += 1) {
-    const entrants = next.units.filter((unit) =>
-      unit.hp > 0 &&
-      unit.type === "nemesis" &&
-      nemesisThresholdBand(unit.hp) > (previousBand.get(unit.id) ?? 0)
-    );
-    if (!entrants.length) return;
-
-    const beforeWave = new Map(next.units.map((unit) => [unit.id, nemesisThresholdBand(unit.hp)]));
-    for (const entrant of entrants) {
-      if (next.phase !== "playing") return;
-      const unit = findUnit(next, entrant.id);
-      if (!unit || unit.hp <= 0 || unit.type !== "nemesis") continue;
-      const crossings = nemesisThresholdBand(unit.hp) - (previousBand.get(unit.id) ?? 0);
-      for (let i = 0; i < crossings; i += 1) {
-        if (next.phase !== "playing" || unit.hp <= 0) break;
-        resolveNemesisAutoPulse(next, unit, events, { trigger: "missingHpThreshold" });
-      }
-    }
-    previousBand = beforeWave;
-  }
-}
-
-function hasRageEntryEffect(unit) {
-  const definition = getUnitType(unit.type);
-  const effects = [definition.ragePassive, definition.rageArt].map((source) => source?.effect);
-  return Boolean(
-    effects.some((effect) => effect?.type === "rageEntryRestore") ||
-    getRageEffectValue(unit, "freePyroclasm", null)
-  );
-}
-
-function applyRageEntryEffects(prevState, next, events) {
-  if (next.phase !== "playing") return;
-
-  let previousRage = new Map(prevState.units.map((unit) => [unit.id, isRaging(unit)]));
-  for (let guard = 0; guard < next.units.length; guard += 1) {
-    const entrants = next.units.filter((unit) =>
-      unit.hp > 0 &&
-      !previousRage.get(unit.id) &&
-      isRaging(unit) &&
-      hasRageEntryEffect(unit)
-    );
-    if (!entrants.length) return;
-
-    const beforeWaveRage = new Map(next.units.map((unit) => [unit.id, isRaging(unit)]));
-    for (const entrant of entrants) {
-      if (next.phase !== "playing") return;
-      const unit = findUnit(next, entrant.id);
-      if (!unit || unit.hp <= 0 || !isRaging(unit)) continue;
-      const definition = getUnitType(unit.type);
-      const restore = [definition.ragePassive, definition.rageArt]
-        .map((source) => source?.effect)
-        .find((effect) => effect?.type === "rageEntryRestore");
-      if (restore) {
-        const beforeHp = unit.hp;
-        const beforeMp = unit.mp;
-        unit.hp = Math.min(getEffectiveStats(unit, next).maxHp, unit.hp + (restore.hp ?? 0));
-        unit.mp = Math.min(getEffectiveStats(unit, next).maxMp, unit.mp + (restore.mp ?? 0));
-        events.push({
-          type: "RAGE_REGENERATE",
-          unitId: unit.id,
-          hpRestored: unit.hp - beforeHp,
-          mpRestored: unit.mp - beforeMp
-        });
-      }
-
-      const freeCast = getRageEffectValue(unit, "freePyroclasm", null);
-      if (!freeCast) continue;
-      resolveVolcanicPyroclasmTick(next, unit, freeCast, events, {
-        trigger: "rageEntry",
-        force: true,
-        resetCounter: true
-      });
-    }
-    previousRage = beforeWaveRage;
-  }
-}
-
-function applyOneShotRageTransitions(prevState, next, events) {
-  for (const unit of next.units) {
-    if (!oneShotRageEffect(unit)) continue;
-    const previous = prevState.units.find((entry) => entry.id === unit.id);
-    const wasRaging = previous ? isRaging(previous) : false;
-    const nowRaging = isRaging(unit);
-    if (!nowRaging) {
-      unit.desperationRageArmed = false;
-      unit.desperationShotSpent = false;
-      continue;
-    }
-    if (!wasRaging && nowRaging) {
-      unit.desperationRageArmed = true;
-      unit.desperationShotSpent = false;
-      events.push({ type: "DESPERATION_READY", unitId: unit.id });
-    }
-  }
-}
-
-// Virus's Spread (statusSpread): a NEW debuff on an enemy of a living Virus propagates to
-// that enemy's allies within the Virus's spread radius (RAGE widens it). Diff-based over
-// prev→next so it catches a status from ANY source — a cast, a basic-attack crit, a global
-// blind — in one deterministic pass. Spread statuses are applied but NOT themselves
-// re-spread (one hop, no chain reaction), because the newly-afflicted set is captured from
-// the initial diff before any propagation runs. No RNG, so lockstep clients all agree.
-function applySpreadReactions(prevState, next, events) {
-  if (next.phase !== "playing") return;
-  const spreaders = next.units
-    .map((unit) => ({ unit, config: unit.hp > 0 ? getStatusSpreadConfig(unit) : null }))
-    .filter((entry) => entry.config);
-  if (!spreaders.length) return;
-
-  const before = new Map(prevState.units.map((unit) =>
-    [unit.id, new Set((unit.statuses ?? []).map((status) => status.type))]));
-
-  // Capture every (unit, new-status) pair up front so a spread we add below is never
-  // itself re-processed into a second hop.
-  const newlyAfflicted = [];
-  for (const unit of next.units) {
-    if (unit.hp <= 0) continue;
-    const had = before.get(unit.id) ?? new Set();
-    for (const status of unit.statuses ?? []) {
-      if (!had.has(status.type)) newlyAfflicted.push({ unit, status });
-    }
-  }
-
-  for (const { unit, status } of newlyAfflicted) {
-    const relevant = spreaders.filter(({ unit: virus, config }) =>
-      virus.hp > 0 && areEnemies(virus, unit) && config.statuses.has(status.type));
-    if (!relevant.length) continue;
-    const radius = Math.max(...relevant.map(({ config }) => config.radius));
-    if (radius <= 0) continue;
-
-    const spreadTo = [];
-    for (const ally of next.units) {
-      if (ally.hp <= 0 || ally.id === unit.id || !areAllies(ally, unit)) continue;
-      if (chebyshevDistance(unit.position, ally.position) > radius) continue;
-      const applied = applyStatus(ally, { ...status });
-      if (applied.applied) { ally.statuses = applied.statuses; spreadTo.push(ally.id); }
-    }
-    if (spreadTo.length) {
-      events.push({ type: "STATUS_SPREAD", sourceUnitId: unit.id, status: status.type, spreadTo });
-    }
-  }
 }
 
 // Shared Pyroclasm damage: 5 magic to every enemy on any of the 8 straight rays within
@@ -2748,196 +2554,6 @@ function applyStanceAttackTriggers(state, actor) {
   return events;
 }
 
-function spendAndAdvance(state, unit) {
-  unit.statuses = tickStatuses(unit.statuses);
-  unit.spent = true;
-
-  const spellUsed = state.activation?.spellUsed ?? false;
-  const realmTraversalActive = state.activation?.unitId === unit.id && state.activation?.realmTraversalActive;
-  const passive = getUnitType(unit.type)?.passive;
-  if (passive?.effect?.type === "mpRegen") {
-    if (spellUsed) {
-      unit.mageChargeCount = 0;
-    } else {
-      unit.mageChargeCount = (unit.mageChargeCount ?? 0) + 1;
-      if (unit.mageChargeCount >= passive.effect.interval) {
-        const maxMp = getEffectiveStats(unit, state).maxMp;
-        unit.mp = Math.min(maxMp, unit.mp + passive.effect.amount);
-        unit.mageChargeCount = 0;
-      }
-    }
-  }
-
-  if (realmTraversalActive) unit.realmTraversalLocked = false;
-  state.activation = null;
-  advanceTurnIfExhausted(state);
-}
-
-function appendPendingRolloverEvents(state, events) {
-  if (!events.length) return;
-  state.pendingRolloverEvents = [...(state.pendingRolloverEvents ?? []), ...events];
-}
-
-function autoSpendStunnedUnits(state, player) {
-  const events = [];
-  for (const member of livingUnits(state, player)) {
-    if (!takesTurns(member) || member.spent || !isStunned(member)) continue;
-
-    member.defending = false;
-    member.statuses = tickStatuses(member.statuses);
-    member.spent = true;
-    events.push({ type: "UNIT_STUNNED", unitId: member.id });
-  }
-  if (events.length) resolveVictory(state);
-  return events;
-}
-
-function applySquadTurnChargeStatuses(state, player) {
-  const events = [];
-  for (const member of livingUnits(state, player)) {
-    events.push(...resolveTurnStartStatuses(member));
-  }
-  if (events.length) resolveVictory(state);
-  return events;
-}
-
-function releaseStunLoopGuard(state) {
-  const unitIds = [];
-  for (const member of livingUnits(state, state.currentPlayer)) {
-    if (!takesTurns(member)) continue;
-    member.statuses = (member.statuses ?? []).filter((status) => status.type !== "stun");
-    member.spent = false;
-    unitIds.push(member.id);
-  }
-  if (unitIds.length) {
-    appendPendingRolloverEvents(state, [{
-      type: "STUN_LOOP_GUARD",
-      player: state.currentPlayer,
-      unitIds
-    }]);
-  }
-}
-
-function playerHasUnspentUnits(state, player) {
-  return livingUnits(state, player).some((member) => takesTurns(member) && !member.spent);
-}
-
-function playerHasLivingTurnUnits(state, player) {
-  return livingUnits(state, player).some(takesTurns);
-}
-
-function nextActivePlayer(state, fromPlayer) {
-  const order = state.turnOrder?.length ? state.turnOrder : [1, 2];
-  const start = Math.max(0, order.indexOf(fromPlayer));
-  for (let step = 1; step <= order.length; step += 1) {
-    const player = order[(start + step) % order.length];
-    if (playerHasLivingTurnUnits(state, player)) return player;
-  }
-  return fromPlayer;
-}
-
-// Pass the turn to the other player once the current one has no unspent living
-// commander left. Summons never take turns, so they neither keep the turn open nor
-// get their spent flag reset.
-function advanceTurnIfExhausted(state) {
-  if (state.phase !== "playing") return;
-  let rollovers = 0;
-  while (
-    state.phase === "playing" &&
-    !livingUnits(state, state.currentPlayer).some((member) => takesTurns(member) && !member.spent)
-  ) {
-    if (rollovers >= MAX_STUN_FAST_FORWARD_ROLLOVERS) {
-      releaseStunLoopGuard(state);
-      break;
-    }
-    state.currentPlayer = nextActivePlayer(state, state.currentPlayer);
-    state.turnNumber += 1;
-    rollovers += 1;
-    for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
-    appendPendingRolloverEvents(state, applySquadTurnChargeStatuses(state, state.currentPlayer));
-    // Board hazards resolve at the rollover, after the turn flips: fire burns whoever
-    // stands on it and counts down. A burn can be lethal, so re-check victory. Burn
-    // events are stashed on the state for accept() to surface (presentation only).
-    const fireEvents = [];
-    applyFireTick(state, fireEvents);
-    // Black Death Stance burns EVERY living unit (allies and foes, the Witch Doctor
-    // included) for 1 true damage at the same rollover. Lethal, so re-check victory.
-    applyBlackDeathTick(state, fireEvents);
-    // Father Time's Time Steal: each living Father Time drains nearby enemies and is
-    // refunded MP for it, at the same rollover. Also lethal.
-    applyTimeStealTick(state, fireEvents);
-    resolveVictory(state);
-    appendPendingRolloverEvents(state, fireEvents);
-    appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
-  }
-}
-
-const FIRE_DAMAGE = 1;
-
-// Throw Cigar fire: at every turn rollover, any unit (friend OR foe) standing on a
-// fire tile takes 1 TRUE damage — it ignores DEF and Defend, so this subtracts HP
-// directly. The fire then counts down and is removed once its turns run out. Board
-// level, so it lives beside the rollover rather than in the per-unit status tick.
-// Pushes a FIRE_DAMAGE event per burn so the view can voice + float it.
-function applyFireTick(state, events) {
-  for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
-    if (obj.kind !== "fire") continue;
-    const [x, y] = key.split(",").map(Number);
-    const occupant = unitAt(state, { x, y });
-    if (occupant && !isFireDamageImmune(occupant)) {
-      const dealt = Math.min(occupant.hp, FIRE_DAMAGE);
-      occupant.hp = Math.max(0, occupant.hp - FIRE_DAMAGE);
-      if (dealt > 0) events.push({ type: "FIRE_DAMAGE", unitId: occupant.id, position: { x, y }, damage: dealt });
-    }
-    if (obj.permanent) continue;
-    obj.turnsLeft -= 1;
-    if (obj.turnsLeft <= 0) delete state.tileObjects[key];
-  }
-}
-
-// Black Death Stance (Witch Doctor): while any living unit holds the stance, every
-// living unit on the board — allies, foes, and the Witch Doctor himself — takes 1
-// TRUE damage at each turn rollover. Board-level like the fire tick, and lethal, so
-// the caller re-resolves victory after.
-function applyBlackDeathTick(state, events) {
-  const amount = getGlobalTrueTick(state);
-  if (amount <= 0) return;
-  for (const unit of livingUnits(state)) {
-    const dealt = Math.min(unit.hp, amount);
-    unit.hp = Math.max(0, unit.hp - amount);
-    if (dealt > 0) events.push({ type: "BLACK_DEATH_DAMAGE", unitId: unit.id, damage: dealt });
-  }
-}
-
-// Father Time's Time Steal (a `damageAura` passive): at every rollover, each living
-// source deals its aura damage (true) to every enemy within its Chebyshev radius, then
-// is refunded MP for the TOTAL damage it dealt (refundMpPerDamage per point). Board-
-// level like the fire/black-death ticks, and lethal, so the caller re-resolves victory.
-function applyTimeStealTick(state, events) {
-  for (const source of livingUnits(state)) {
-    const effect = getUnitType(source.type).passive?.effect;
-    if (effect?.type !== "damageAura") continue;
-    const radius = effect.radius ?? 2;
-    const amount = effect.amount ?? 1;
-    let totalDealt = 0;
-    for (const target of livingUnits(state)) {
-      if (!areEnemies(source, target)) continue;
-      if (chebyshevDistance(source.position, target.position) > radius) continue;
-      const dealt = Math.min(target.hp, amount);
-      if (dealt <= 0) continue;
-      target.hp = Math.max(0, target.hp - amount);
-      totalDealt += dealt;
-      events.push({ type: "TIME_STEAL", sourceId: source.id, targetId: target.id, position: { ...target.position }, damage: dealt });
-    }
-    if (totalDealt > 0 && effect.refundMpPerDamage) {
-      const before = source.mp;
-      source.mp = Math.min(getEffectiveStats(source, state).maxMp, source.mp + totalDealt * effect.refundMpPerDamage);
-      const gained = source.mp - before;
-      if (gained > 0) events.push({ type: "TIME_STEAL_MP", sourceId: source.id, mpGained: gained });
-    }
-  }
-}
-
 // A player resigns. Their living units all drop out, then victory is re-resolved
 // (in a 1v1 this always completes the match for the opponent). Written
 // player-generically so it carries forward to FFA/teams: if the match continues and
@@ -2964,89 +2580,3 @@ function concede(state, command) {
   return accept(next, events);
 }
 
-function resolveVictory(state) {
-  // Defeat is decided by living units that can actually WIN, not raw bodies: a player
-  // whose only survivor is a turn-less summon (a lone Ghoul) or a non-combatant commander
-  // (a lone King) has lost and cannot stall — see unitCatalog.sustainsVictory.
-  const livingTeams = new Set(livingUnits(state).filter(sustainsVictory).map(teamOfUnit));
-  if (livingTeams.size === 1) {
-    state.winner = [...livingTeams][0];
-    state.phase = "complete";
-    state.activation = null;
-  }
-}
-
-// The King's Dictator/Spectator passive, applied centrally after every command. Diffs the
-// pre-command state against the result: for each of the King's squadmates that newly FELL,
-// the King loses `damagePerAllyFallen` and the rest of the squad rallies for `allyRallyHeal`
-// (the King excluded); for each fallen ally REVIVED (Father Time's Rewind), the King regains
-// `healPerAllyRevived`. Reactions are driven by Kings that were ALIVE when the falls happened
-// (the pre-command snapshot), so a King finished off by the same blast still mourns his squad.
-// Summons and other Kings don't count as "an allied unit"; a global healing lockout (a raging
-// Juggernaut's Null Zone) suppresses the King's HP gains but never the damage.
-function applyCommanderReactions(prevState, next, events) {
-  const reactingKings = prevState.units.filter((u) => u.hp > 0 && isCommandOnly(u));
-  if (!reactingKings.length) return;
-
-  const wasAlive = new Map(prevState.units.map((u) => [u.id, u.hp > 0]));
-  const isAlly = (unit) => takesTurns(unit) && !isCommandOnly(unit); // a real squad unit
-  const fell = [];
-  const revived = [];
-  for (const unit of next.units) {
-    if (!isAlly(unit) || !wasAlive.has(unit.id)) continue;
-    const before = wasAlive.get(unit.id);
-    if (before && unit.hp <= 0) fell.push(unit);
-    else if (!before && unit.hp > 0) revived.push(unit);
-  }
-  if (!fell.length && !revived.length) return;
-
-  const healingOff = isHealingDisabled(next);
-  for (const kingBefore of reactingKings) {
-    const king = findUnit(next, kingBefore.id);
-    if (!king) continue;
-    const effect = getUnitType(king.type).passive?.effect;
-    const teamFell = fell.filter((u) => areAllies(u, king));
-    const teamRevived = revived.filter((u) => areAllies(u, king));
-
-    if (teamFell.length && effect?.damagePerAllyFallen) {
-      const total = effect.damagePerAllyFallen * teamFell.length;
-      const dealt = Math.min(king.hp, total);
-      king.hp = Math.max(0, king.hp - total);
-      if (dealt > 0) events.push({ type: "KING_MOURNS", kingId: king.id, damage: dealt, fallen: teamFell.map((u) => u.id) });
-    }
-    if (teamRevived.length && effect?.healPerAllyRevived && !healingOff) {
-      const before = king.hp;
-      king.hp = Math.min(getEffectiveStats(king, next).maxHp, king.hp + effect.healPerAllyRevived * teamRevived.length);
-      const healed = king.hp - before;
-      if (healed > 0) events.push({ type: "KING_RESTORED", kingId: king.id, healing: healed });
-    }
-  }
-
-  // Rally: once per team that had a living King, heal the rest of that squad (Kings and
-  // summons excluded) by allyRallyHeal for every ally that fell. Not a "heal ART", so
-  // Hold's heal bonus doesn't touch it — it's the passive's own flat number.
-  if (!healingOff) {
-    const teamsWithKing = new Map(); // team -> allyRallyHeal
-    for (const king of reactingKings) {
-      const rally = getUnitType(king.type).passive?.effect?.allyRallyHeal ?? 0;
-      const team = teamOfUnit(king);
-      teamsWithKing.set(team, Math.max(teamsWithKing.get(team) ?? 0, rally));
-    }
-    for (const [team, rally] of teamsWithKing) {
-      const falls = fell.filter((u) => teamOfUnit(u) === team).length;
-      if (!falls || rally <= 0) continue;
-      const rallied = [];
-      for (const ally of next.units) {
-        if (ally.hp <= 0 || teamOfUnit(ally) !== team || !isAlly(ally)) continue;
-        const before = ally.hp;
-        ally.hp = Math.min(getEffectiveStats(ally, next).maxHp, ally.hp + rally * falls);
-        if (ally.hp > before) rallied.push(ally.id);
-      }
-      if (rallied.length) events.push({ type: "SQUAD_RALLY", team, healing: rally * falls, rallied });
-    }
-  }
-
-  // A King finished off by his own mourning doesn't change victory (he never sustained
-  // it), but re-resolve so a rally that outlives the last fighter can't be missed.
-  resolveVictory(next);
-}
