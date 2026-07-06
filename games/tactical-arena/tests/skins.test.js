@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,7 @@ import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { getBoardSprite } from "../src/ui/boardSprites.js";
 import { getPortrait } from "../src/ui/portraits.js";
+import { SKIN_MANIFEST } from "../src/ui/skinManifest.generated.js";
 import {
   SKIN_COLLECTIONS,
   SKINS_BY_UNIT,
@@ -20,6 +21,24 @@ import {
 } from "../src/ui/skinModel.js";
 
 const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+function expectedSkinEntriesFromDisk() {
+  const skinRoot = join(GAME_ROOT, "assets", "units", "skins");
+  return Object.keys(UNIT_TYPES).flatMap((type) => {
+    const unitDir = join(skinRoot, type);
+    return readdirSync(unitDir)
+      .filter((file) => file.toLowerCase().endsWith(".png"))
+      .map((file) => {
+        const basename = file.replace(/\.png$/i, "");
+        const suffix = `-${type}`;
+        const slug = basename.endsWith(suffix) ? basename.slice(0, -suffix.length) : basename;
+        return { type, slug, file };
+      });
+  }).sort((left, right) =>
+    left.type.localeCompare(right.type) ||
+    left.slug.localeCompare(right.slug) ||
+    left.file.localeCompare(right.file));
+}
 
 test("summer-vibes is the first authored skin collection slug", () => {
   assert.equal(SKIN_COLLECTIONS[0].slug, SUMMER_VIBES_SKIN_SLUG);
@@ -37,6 +56,22 @@ test("every registered unit has an unlocked summer-vibes skin asset", () => {
       `${type} summer-vibes asset is missing`
     );
   }
+});
+
+test("generated skin manifest matches every png dropped in unit skin folders", () => {
+  assert.deepEqual(
+    [...SKIN_MANIFEST].sort((left, right) =>
+      left.type.localeCompare(right.type) ||
+      left.slug.localeCompare(right.slug) ||
+      left.file.localeCompare(right.file)),
+    expectedSkinEntriesFromDisk()
+  );
+});
+
+test("newly dropped skin files become selectable by inferred slug", () => {
+  assert.equal(getSkin("swordsman", "medieval")?.portraitSrc, "assets/units/skins/swordsman/medieval-swordsman.png");
+  assert.equal(getSkin("sniper", "medieval")?.portraitSrc, "assets/units/skins/sniper/medieval-sniper.png");
+  assert.equal(getSkin("nemesis", "infernal")?.portraitSrc, "assets/units/skins/nemesis/infernal-nemesis.png");
 });
 
 test("unknown or locked skin slugs normalize to classic", () => {
