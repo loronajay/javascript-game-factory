@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artIsBodyBlocked, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -217,11 +217,11 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
 
   if (actor && targeted) {
     // Basic attacks are body-blocked unless the attacker has an explicit pierce passive
-    // (Sniper). Magic strike ARTS reach through bodies, so their range wash and targets
-    // stay unculled.
+    // (Sniper). Physical ARTS can opt out with pierceUnits (Curve Shot), and magic
+    // strike ARTS reach through bodies, so their range wash and targets stay unculled.
     const art = mode?.startsWith("art:") ? getArt(actor.type, mode.slice("art:".length)) : null;
     const reach = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
-    const blockable = mode === "attack" || artUsesPhysicalStrike(art);
+    const blockable = mode === "attack" || artIsBodyBlocked(art);
     for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
       for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
         const cell = { x, y };

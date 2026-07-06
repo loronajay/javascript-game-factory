@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, moveUnit } from "../src/core/commands.js";
-import { canMoveInActivation } from "../src/ui/hud.js";
+import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createUnitFigure } from "../src/ui/unitRenderer.js";
@@ -194,6 +194,15 @@ class TestSvgElement {
     }
     return null;
   }
+
+  findAllByClass(className) {
+    const matches = [];
+    if (this.className.split(/\s+/).includes(className)) matches.push(this);
+    for (const child of this.children) {
+      matches.push(...(child.findAllByClass?.(className) ?? []));
+    }
+    return matches;
+  }
 }
 
 test("the default duel uses the standard thirteen-tile map and four-unit corner staging", () => {
@@ -262,6 +271,34 @@ test("the action bar enables Cancel Move only after an uncommitted move", () => 
   });
   assert.match(actions.innerHTML, /data-action="cancel-move"/);
   assert.doesNotMatch(actions.innerHTML, /data-action="cancel-move"[^>]*disabled/);
+});
+
+test("the action bar disables Cancel Move after raging Fat Knight Trample movement", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 7,
+    units: [
+      { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, hp: 5 },
+      { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
+    ]
+  });
+  const started = applyCommand(state, beginActivation(1, "fk"));
+  assert.equal(started.accepted, true);
+  const moved = applyCommand(started.nextState, moveUnit(1, "fk", 7, 5));
+  assert.equal(moved.accepted, true);
+  const unit = moved.nextState.units.find((candidate) => candidate.id === "fk");
+  const actions = { innerHTML: "", querySelectorAll: () => [] };
+  const actionHelp = { textContent: "" };
+
+  assert.equal(canCancelMoveInActivation(moved.nextState.activation, unit), false);
+  renderActions(unit, moved.nextState, null, { actions, actionHelp }, {
+    resolving: false,
+    controlsEnabled: true,
+    onActionClick: () => {}
+  });
+
+  assert.match(actions.innerHTML, /data-action="cancel-move"[^>]*disabled/);
+  assert.match(actionHelp.textContent, /Trample movement is committed/);
 });
 
 test("the squad HUD renders each player as four stacked unit rows", () => {
@@ -446,6 +483,40 @@ test("the board only treats attack and enemy-target ARTS as targeted modes", () 
   assert.equal(isTargetedMode("art:volley-shot", { type: "archer" }), false);
 });
 
+test("Curve Shot highlights an enemy behind an intervening unit as a legal target", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      units: [
+        { id: "fb", player: 1, type: "fat-bowman", x: 0, y: 0 },
+        { id: "screen", player: 1, type: "swordsman", x: 1, y: 0 },
+        { id: "target", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:curve-shot",
+      selectedId: "fb",
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    assert.equal(boardLayer.findAllByClass("legal-art").length, 1);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("Build Cover walls render as low pass-through cover instead of click-blocking slabs", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
@@ -561,4 +632,17 @@ test("the Paladin codex entry lists Hand of Life and the full passive stack", ()
   assert.match(html, /Chosen/);
   assert.match(html, /Heaven's Realm/);
   assert.match(html, /Darkseeker/);
+});
+
+test("the fat squad and Nemesis codex entries include rage-passive details", () => {
+  const html = buildCodexForTypes([
+    UNIT_TYPES["fat-knight"],
+    UNIT_TYPES["fat-bowman"],
+    UNIT_TYPES.nemesis
+  ]);
+
+  assert.match(html, /Trample/);
+  assert.match(html, /Desperation Shot/);
+  assert.match(html, /20, 15, 10, and 5 HP/);
+  assert.match(html, /no MP cost/);
 });

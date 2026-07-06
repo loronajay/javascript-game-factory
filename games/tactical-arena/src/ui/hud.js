@@ -1,4 +1,4 @@
-import { getAvailableArts, getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getAvailableArts, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt, getFootworkSteps } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
@@ -26,6 +26,12 @@ function toggleClass(element, className, enabled) {
 
 export function canMoveInActivation(activation) {
   return Boolean(activation && !activation.moved);
+}
+
+export function canCancelMoveInActivation(activation, unit) {
+  if (!activation?.moved || activation.primaryUsed || !unit) return false;
+  const trampleDamage = Math.max(0, Number(getRageEffectValue(unit, "trampleDamage", 0)) || 0);
+  return trampleDamage <= 0;
 }
 
 export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
@@ -60,7 +66,7 @@ function unitTagsHtml(unit, definition, { includePassive = true, includeSpent = 
   return [
     includePassive && definition.passive ? { label: definition.passive.name, cls: "passive", title: definition.passive.description } : null,
     stance ? { label: stance.name, cls: `stance stance-${unit.stance}`, title: definition.passive?.description } : null,
-    isRaging(unit) ? { label: "RAGE", cls: "rage", title: definition.rageArt?.description } : null,
+    isRaging(unit) ? { label: "RAGE", cls: "rage", title: definition.rageArt?.description ?? definition.ragePassive?.description } : null,
     isDefending(unit) ? { label: "Defending", cls: "on" } : null,
     includeSpent && unit.spent ? { label: spentLabel, cls: "spent" } : null,
     ...(unit.statuses ?? []).map((s) => ({ label: s.type, cls: `status status-${s.type}` }))
@@ -171,7 +177,7 @@ export function renderActions(
   }
   const hasPrimary = activation.primaryUsed;
   const canMove = canMoveInActivation(activation);
-  const canCancelMove = Boolean(activation.moved && !hasPrimary);
+  const canCancelMove = canCancelMoveInActivation(activation, unit);
   const stats = getEffectiveStats(unit, state);
   const footwork = getUnitType(unit.type).arts.find((art) => art.id === "footwork");
   const footworkBtn = footwork
@@ -193,7 +199,7 @@ export function renderActions(
   ].join("");
 
   actionHelp.textContent = activation.moved && !hasPrimary
-    ? "Now attack, defend, or cancel the move."
+    ? (canCancelMove ? "Now attack, defend, or cancel the move." : "Trample movement is committed. Now attack or defend.")
     : hasPrimary && !activation.moved
       ? "Now move or finish this unit's turn."
       : `Move up to ${stats.moveRange} tiles before or after your primary action.`;

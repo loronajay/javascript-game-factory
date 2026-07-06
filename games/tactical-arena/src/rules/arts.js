@@ -426,6 +426,15 @@ export function artUsesPhysicalStrike(art) {
   );
 }
 
+// True when a targeted ART intentionally shoots through intervening units.
+export function artPiercesUnits(art) {
+  return Boolean(art?.effect?.pierceUnits);
+}
+
+export function artIsBodyBlocked(art) {
+  return artUsesPhysicalStrike(art) && !artPiercesUnits(art);
+}
+
 // True when at least one living enemy of `actor` is poisoned — the gate for Virus's
 // Explosion (requiresPoisonedEnemy), so the rage ultimate is only offered/accepted when
 // it would actually detonate something.

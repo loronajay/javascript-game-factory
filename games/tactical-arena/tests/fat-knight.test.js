@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { attack, beginActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, cancelMove, moveUnit, useArt } from "../src/core/commands.js";
 import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
 import { getRushSteps } from "../src/rules/arts.js";
+import { getLegalMoves, positionKey } from "../src/rules/movement.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { generatePlans, toCommands } from "../src/ai/plans.js";
 
@@ -112,12 +113,31 @@ test("RAGE Trample lets Fat Knight move through enemies and damages each enemy c
     { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, hp: 5 },
     { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
   ]);
+  const legal = getLegalMoves(state, findUnit(state, "fk"));
+  assert.equal(legal.has(positionKey({ x: 7, y: 5 })), true, "Trample movement can target a landing tile behind an enemy");
+  assert.equal(legal.has(positionKey({ x: 6, y: 5 })), false, "Trample movement still cannot end on an occupied enemy tile");
+
   let s = run(state, beginActivation(1, "fk")).nextState;
   const result = run(s, moveUnit(1, "fk", 7, 5));
 
   assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 5 });
   assert.equal(findUnit(result.nextState, "e").hp, 22, "crossed enemy takes 3 true damage");
   assert.equal(getEffectiveStats(findUnit(result.nextState, "fk"), result.nextState).defense, 8);
+});
+
+test("RAGE Trample movement cannot be cancelled after it is committed", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  s = run(s, moveUnit(1, "fk", 7, 5)).nextState;
+
+  const cancelled = applyCommand(s, cancelMove(1, "fk"));
+  assert.equal(cancelled.accepted, false);
+  assert.equal(cancelled.errorCode, "CANCEL_NOT_AVAILABLE");
+  assert.deepEqual(findUnit(s, "fk").position, { x: 7, y: 5 });
+  assert.equal(findUnit(s, "e").hp, 22);
 });
 
 test("RAGE Trample stacks with Stumble contact damage and extends Stumble by 3", () => {

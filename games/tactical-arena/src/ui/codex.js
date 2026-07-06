@@ -55,7 +55,8 @@ export function unitDetailHtml(def) {
   const passiveEntries = [
     def.passive ? { tag: "Passive", ...def.passive } : null,
     ...def.arts.filter((a) => a.kind === "passive").map((a) => ({ tag: "Passive", ...a })),
-    def.ragePassive ? { tag: "RAGE Passive", ...def.ragePassive } : null
+    def.ragePassive ? { tag: "RAGE Passive", ...def.ragePassive } : null,
+    def.rageArt?.kind === "passive" ? { tag: "RAGE Passive", ...def.rageArt } : null
   ].filter(Boolean);
 
   const passives = passiveEntries

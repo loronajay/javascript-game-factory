@@ -3,7 +3,7 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
-import { getArtTargetRange } from "../rules/arts.js";
+import { artIsBodyBlocked, getArtTargetRange } from "../rules/arts.js";
 import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
@@ -19,15 +19,18 @@ function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
 }
 
 function isForecastableStrikeArt(art) {
+  const hasDamagePayload = Boolean(art?.damage || art?.damageType);
+  const isAuthoredStrike = art?.ai?.intent === "strike";
   return Boolean(
     art &&
     art.kind === "active" &&
+    (hasDamagePayload || isAuthoredStrike) &&
     !art.selfCast &&
     art.resolution !== "statusCast" &&
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
     art.effect?.type !== "healAllies" &&
-    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly", "ally", "targetedBlast"].includes(art.targeting?.shape)
+    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly", "ally", "targetedBlast", "rushPath"].includes(art.targeting?.shape)
   );
 }
 
@@ -50,8 +53,9 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   // (Angel's Blessed Arrow is magic); an ART carries its own damageType.
   const damageType = isAttack ? getBasicAttackDamageType(actor) : (art?.damageType ?? null);
   // Basic attacks are body-blocked unless the attacker has an explicit pierce passive
-  // (Sniper). Magic strike ARTS still reach through bodies.
-  const blockable = isAttack || (isStrikeArt && (damageType ?? "physical") === "physical");
+  // (Sniper). Physical ARTS can opt out with pierceUnits (Curve Shot), and magic strike
+  // ARTS still reach through bodies.
+  const blockable = isAttack || (isStrikeArt && artIsBodyBlocked(art));
 
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;

@@ -148,6 +148,17 @@ test("Relay Power transfers 2 HP and 2 MP from Fat Wizard to an ally", () => {
   assert.equal(findUnit(result.nextState, "fw").mp, 18);
   assert.equal(findUnit(result.nextState, "ally").hp, 12);
   assert.equal(findUnit(result.nextState, "ally").mp, 5);
+  assert.deepEqual(result.events.find((event) => event.type === "ART_RESOLVED"), {
+    type: "ART_RESOLVED",
+    artId: "relay-power",
+    actorId: "fw",
+    targetId: "ally",
+    mpCost: 0,
+    hpPaid: 2,
+    mpPaid: 2,
+    healingByTarget: { ally: 2 },
+    restoredByTarget: { ally: 2 }
+  });
 });
 
 test("Brothers in Arms is authored as Fat Wizard's team-composition passive", () => {

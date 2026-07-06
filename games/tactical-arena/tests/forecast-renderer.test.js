@@ -79,6 +79,40 @@ test("targeted spell arts still render their normal damage forecast", () => {
   });
 });
 
+test("targeted utility arts do not render damage forecast badges", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-fat-wizard", player: 1, type: "fat-wizard", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-fat-wizard");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:study", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 0);
+  });
+});
+
+test("rush-path arts do not render single-target forecast badges", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "fk", player: 1, type: "fat-knight", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 2, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "fk");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:stumble", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 0);
+  });
+});
+
 test("Angel basic attack forecast uses magic damage instead of physical chip", () => {
   withSvgDocument(() => {
     const state = createBattleState({
@@ -113,5 +147,24 @@ test("Angel basic attack forecast does not show through an intervening body", ()
 
     assert.equal(forecastLayer.children.length, 1);
     assert.equal(textContentOf(forecastLayer), "-3");
+  });
+});
+
+test("Curve Shot forecast shows through an intervening unit", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "fb", player: 1, type: "fat-bowman", x: 0, y: 0 },
+        { id: "screen", player: 1, type: "swordsman", x: 1, y: 0 },
+        { id: "target", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "fb");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:curve-shot", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-4");
   });
 });

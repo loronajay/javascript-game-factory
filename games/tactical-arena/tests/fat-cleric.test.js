@@ -131,6 +131,10 @@ test("Focus Prayer: a landed prayer restores 5 HP to an ally", () => {
   const res = run(s, useArt(1, "fc", "focus-prayer", { targetId: "ally", ...HIT }));
   assert.equal(findUnit(res.nextState, "ally").hp, 15, "5 HP restored on a hit");
   assert.equal(findUnit(res.nextState, "fc").mp, 15, "5 MP spent");
+  const ev = res.events.find((e) => e.type === "ART_RESOLVED");
+  assert.equal(ev.missed, false, "the presentation can reveal the landed roll");
+  assert.equal(ev.critical, false);
+  assert.ok(!("hit" in ev), "Focus Prayer is not a rolled strike event (routes to the instant path)");
 });
 
 test("Focus Prayer: a MISS backfires and inflicts a random negative status on the ally", () => {
@@ -145,6 +149,8 @@ test("Focus Prayer: a MISS backfires and inflicts a random negative status on th
   const statuses = findUnit(res.nextState, "ally").statuses.map((x) => x.type);
   assert.deepEqual(statuses, [NEGATIVE_STATUS_TYPES[0]], "the botched prayer inflicts the seeded status");
   const ev = res.events.find((e) => e.type === "ART_RESOLVED");
+  assert.equal(ev.missed, true, "the presentation can reveal the missed roll");
+  assert.equal(ev.critical, false);
   assert.equal(ev.effect.applied, true);
   assert.ok(!("hit" in ev), "Focus Prayer is not a rolled strike event (routes to the instant path)");
 });

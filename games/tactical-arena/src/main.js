@@ -517,6 +517,28 @@ async function resolveInstantArt(command) {
     // The cigar visibly tumbles from the Sniper to the tile before the fire takes
     // (the lob recipe plays the throwCigar sound and lands its own impact).
     await effects.playAbilityVfx("throw-cigar", { actor: actorBefore, targetPosition: resolved.position });
+  } else if (resolved?.artId === "study" && actorBefore) {
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("study", { actor: actorBefore, targets: targetsBefore });
+    if (targetBefore) {
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "STUDIED", "#f2d98a");
+    }
+  } else if (resolved?.artId === "relay-power" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("relay-power", { actor: actorBefore, targets: targetsBefore });
+    const actorCenter = unitCenter(metrics, actorBefore);
+    const floats = [];
+    if ((resolved.hpPaid ?? 0) > 0) floats.push(effects.floatText({ ...actorCenter, y: actorCenter.y - 10 }, `-${resolved.hpPaid}`, "#ff7684"));
+    if ((resolved.mpPaid ?? 0) > 0) floats.push(effects.floatText({ ...actorCenter, y: actorCenter.y + 10 }, `-${resolved.mpPaid} MP`, "#8cc8ff"));
+    if (targetBefore) {
+      const targetCenter = unitCenter(metrics, targetBefore);
+      const healed = resolved.healingByTarget?.[targetBefore.id] ?? 0;
+      const restored = resolved.restoredByTarget?.[targetBefore.id] ?? 0;
+      if (healed > 0) floats.push(effects.floatText({ ...targetCenter, y: targetCenter.y - 10 }, `+${healed}`, "#8cf0a4"));
+      if (restored > 0) floats.push(effects.floatText({ ...targetCenter, y: targetCenter.y + 10 }, `+${restored} MP`, "#8cc8ff"));
+    }
+    await Promise.all(floats);
   } else if (resolved?.artId === "age" && actorBefore) {
     // A time-mote glides to the target; the ±stat change floats where it lands.
     const targetBefore = targetsBefore[0];
@@ -834,6 +856,31 @@ async function resolveInstantArt(command) {
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
+  } else if (resolved?.artId === "focus-prayer" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    const targetBefore = targetsBefore[0];
+    await effects.rollReveal({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) });
+    if (!resolved.missed) {
+      await effects.playAbilityVfx("focus-prayer", { actor: actorBefore, targets: targetsBefore });
+      const healed = resolved.healingByTarget?.[targetBefore?.id] ?? 0;
+      if (targetBefore && healed > 0) {
+        await effects.floatText(unitCenter(metrics, targetBefore), `+${healed}`, "#8cf0a4");
+      }
+    } else if (targetBefore && resolved.effect?.attempted) {
+      const statusLabel = resolved.effect.status?.toUpperCase() ?? "STATUS";
+      await effects.rollReveal(
+        { missed: !resolved.effect.applied, critical: false },
+        resolved.effect.applied ? statusLabel : "RESISTED"
+      );
+      if (resolved.effect.applied) {
+        await effects.playAbilityVfx(resolved.artId, {
+          actor: actorBefore,
+          target: targetBefore,
+          effect: resolved.effect
+        });
+        await effects.floatText(unitCenter(metrics, targetBefore), statusLabel, "#c89cff");
+      }
+    }
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -1600,9 +1647,13 @@ async function handleTile(position) {
       }
     } else {
       const target = unitAt(state, position);
-      const resolved = art?.resolution === "statusCast"
-        ? target && await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }))
-        : target && await resolveCombat(useArt(state.currentPlayer, unit.id, artId, { targetId: target.id }));
+      let resolved = false;
+      if (target) {
+        const command = useArt(state.currentPlayer, unit.id, artId, { targetId: target.id });
+        const peek = applyCommand(state, command);
+        const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event);
+        resolved = rolled ? await resolveCombat(command) : await resolveInstantArt(command);
+      }
       if (resolved) {
         const artName = art?.name ?? artId;
         setMessage(`${artName} resolved. This unit's activation is complete.`);

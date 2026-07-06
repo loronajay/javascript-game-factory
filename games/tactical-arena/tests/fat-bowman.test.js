@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { attack, beginActivation, defend, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, cancelMove, defend, moveUnit, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
@@ -121,6 +121,26 @@ test("Planted gains +1 STR per stationary turn up to +4, then resets after a con
   s = resetTurn(s);
   s = run(s, beginActivation(1, "fb")).nextState;
   assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 9, "stationary count restarts at +1 next turn");
+});
+
+test("Planted strength is restored when Fat Bowman cancels her move", () => {
+  const state = scenario([
+    { id: "fb", type: "fat-bowman", player: 1, x: 5, y: 5, stationaryStrength: 2 },
+    { id: "e", type: "swordsman", player: 2, x: 9, y: 9 }
+  ]);
+
+  let s = run(state, beginActivation(1, "fb")).nextState;
+  assert.equal(findUnit(s, "fb").stationaryStrength, 3);
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 11);
+
+  s = run(s, moveUnit(1, "fb", 5, 6)).nextState;
+  assert.equal(findUnit(s, "fb").stationaryStrength, 0);
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 8);
+
+  const res = run(s, cancelMove(1, "fb"));
+  assert.deepEqual(findUnit(res.nextState, "fb").position, { x: 5, y: 5 });
+  assert.equal(findUnit(res.nextState, "fb").stationaryStrength, 3);
+  assert.equal(getEffectiveStats(findUnit(res.nextState, "fb"), res.nextState).strength, 11);
 });
 
 test("Brothers in Arms grants +1 range with the full fat family on her team", () => {

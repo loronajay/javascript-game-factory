@@ -1,7 +1,7 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getStatusSpreadConfig, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
+import { artIsBodyBlocked, canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getRockHardMpRefund, ignoresCriticalDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
@@ -545,7 +545,10 @@ function moveUnit(state, command) {
     }
   }
   unit.position = { ...command.position };
-  if (stationaryStrengthEffect(unit)) unit.stationaryStrength = 0;
+  if (stationaryStrengthEffect(unit)) {
+    next.activation.stationaryStrengthBeforeMove = unit.stationaryStrength ?? 0;
+    unit.stationaryStrength = 0;
+  }
   next.activation.moved = true;
   resolveVictory(next);
   return accept(next, [{
@@ -557,17 +560,26 @@ function moveUnit(state, command) {
   }]);
 }
 
+function trampleMoveCancelLocked(unit) {
+  return Math.max(0, Number(getRageEffectValue(unit, "trampleDamage", 0)) || 0) > 0;
+}
+
 function cancelMove(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
   if (!state.activation.moved) return reject(ERR.CANCEL_NOT_AVAILABLE);
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
+  if (trampleMoveCancelLocked(result.unit)) return reject(ERR.CANCEL_NOT_AVAILABLE);
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
   const restoredTo = { ...next.activation.origin };
   unit.position = restoredTo;
   next.activation.moved = false;
+  if (Number.isFinite(next.activation.stationaryStrengthBeforeMove) && stationaryStrengthEffect(unit)) {
+    unit.stationaryStrength = next.activation.stationaryStrengthBeforeMove;
+    delete next.activation.stationaryStrengthBeforeMove;
+  }
 
   return accept(next, [{ type: "MOVE_CANCELLED", unitId: unit.id, restoredTo: { ...restoredTo } }]);
 }
@@ -913,14 +925,13 @@ function resolveTargetedArt(state, command, art) {
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
-  // ARTS that resolve as a physical strike (Poison Arrow, Leg Shot) are body-blocked
-  // just like a basic attack; magic ARTS (Spark, Banish) reach their target directly.
+  // ARTS that resolve as a physical strike are body-blocked like a basic attack unless
+  // they explicitly pierce units (Curve Shot). Magic ARTS reach their target directly.
   // A wall, however, blocks BOTH physical and magic ARTS (only the Sniper pierces it).
   if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
     return reject(ERR.TARGET_OBSTRUCTED);
   }
-  if ((art.damageType ?? "physical") === "physical" &&
-      !art.effect?.pierceUnits &&
+  if (artIsBodyBlocked(art) &&
       isShotBlocked(state, actorState.position, targetState.position, actorState)) {
     return reject(ERR.TARGET_OBSTRUCTED);
   }
@@ -2010,7 +2021,15 @@ function resolveFocusPrayer(state, command, art) {
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
 
-  const event = { type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost };
+  const event = {
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    mpCost: cost,
+    missed: swing.missed,
+    critical: swing.critical
+  };
   if (!swing.missed) {
     const heal = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.heal?.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
     const beforeHp = target.hp;
