@@ -16,6 +16,7 @@ import { ANGEL } from "./units/angel.js";
 import { MONK } from "./units/monk.js";
 import { GARGOYLE } from "./units/gargoyle.js";
 import { NEMESIS } from "./units/nemesis.js";
+import { VIRUS } from "./units/virus.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -34,7 +35,8 @@ export const UNIT_TYPES = Object.freeze({
   angel: ANGEL,
   monk: MONK,
   gargoyle: GARGOYLE,
-  nemesis: NEMESIS
+  nemesis: NEMESIS,
+  virus: VIRUS
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -466,6 +468,41 @@ export function getRageEffectValue(unit, key, fallback = null) {
   return definition.ragePassive?.effect?.[key] ?? definition.rageArt?.effect?.[key] ?? fallback;
 }
 
+// --- Virus (contagion) ------------------------------------------------------
+// Spread: a status inflicted on an enemy of a living Virus propagates to that enemy's
+// nearby allies. The radius grows by `rageRadiusBonus` while the Virus rages (Infectious
+// Affinity). Read centrally by the reducer's applySpreadReactions so no ability hard-codes
+// the contagion. Returns null for any unit without the passive.
+export function getStatusSpreadConfig(unit) {
+  const effect = getUnitType(unit.type).passive?.effect;
+  if (effect?.type !== "statusSpread") return null;
+  const radius = Math.max(0, Number(effect.radius) || 0) +
+    (isRaging(unit) ? Math.max(0, Number(effect.rageRadiusBonus) || 0) : 0);
+  return { radius, statuses: new Set(effect.statuses ?? []) };
+}
+
+// Growth: the MP a unit restores each time it poisons an enemy. Scans every passive
+// source so a unit can carry it as a passive ART entry. 0 for any unit without it.
+export function getPoisonMpRefund(unit) {
+  for (const source of allPassiveSources(getUnitType(unit.type))) {
+    if (source.effect?.type === "poisonMpRefund") return Math.max(0, Number(source.effect.amount) || 0);
+  }
+  return 0;
+}
+
+// A status a raging unit's kit lands on EVERY landed basic attack (Virus's Infectious
+// Affinity poison). Returns { status, duration } or null (also null when not raging).
+export function getRageAttackStatus(unit) {
+  return getRageEffectValue(unit, "attackStatus", null);
+}
+
+// The set of status types a raging unit inflicts with a guaranteed (100%) roll — Virus's
+// poison, once Infectious Affinity is live. Empty for any non-raging unit.
+export function getGuaranteedStatuses(unit) {
+  const list = getRageEffectValue(unit, "guaranteedStatuses", null);
+  return new Set(Array.isArray(list) ? list : []);
+}
+
 // True when a raging unit projects a board-wide healing lockout (Juggernaut's Null Zone
 // disableHealing). Any living source suffices; read by isHealingDisabled (rules/combat.js).
 export function projectsHealingLockout(unit) {
@@ -516,7 +553,11 @@ export const AI_INTENTS = Object.freeze([
   // Gargoyle's abilities:
   //   flightStrike — Flight: reposition (Move + 1) then a small TRUE blast on landing.
   //   lineBurst    — Pyroclasm: hit every enemy on any of the 8 straight rays in range.
-  "flightStrike", "lineBurst"
+  "flightStrike", "lineBurst",
+  // Virus's contagion casts:
+  //   statusAoe    — Smog: a self-centred blind cloud (no damage, no roll).
+  //   poisonBurst  — Poison Tick / Explosion: true damage to every poisoned enemy.
+  "statusAoe", "poisonBurst"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

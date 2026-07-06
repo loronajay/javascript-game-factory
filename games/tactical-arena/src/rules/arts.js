@@ -356,6 +356,14 @@ export function artUsesPhysicalStrike(art) {
   );
 }
 
+// True when at least one living enemy of `actor` is poisoned — the gate for Virus's
+// Explosion (requiresPoisonedEnemy), so the rage ultimate is only offered/accepted when
+// it would actually detonate something.
+export function hasPoisonedEnemy(state, actor) {
+  return (state.units ?? []).some((unit) =>
+    unit.hp > 0 && areEnemies(actor, unit) && (unit.statuses ?? []).some((status) => status.type === "poison"));
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   const activation = state.activation;
@@ -381,6 +389,7 @@ export function canUseArt(state, actor, artId) {
     !isStunned(actor) &&
     !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= getArtMpCost(actor, art, state) &&
-    (!art.rageLocked || isRaging(actor))
+    (!art.rageLocked || isRaging(actor)) &&
+    (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor))
   );
 }

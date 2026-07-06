@@ -231,6 +231,48 @@ const ABILITY_VFX = Object.freeze({
     projectile: Object.freeze({ shape: "orb", arcHeight: 50, durationMs: 450, size: 1, colors: Object.freeze({ core: "#9b8cff", trail: "#2a1746" }) }),
     colors: Object.freeze({ core: "#9b8cff", trail: "#2a1746", impact: "#cdbcff" })
   }),
+  // Virus — Cough flies a toxic orb that poisons on the roll; the three globals are
+  // self-centred green bursts (Smog blind cloud, Poison Tick convulsion, Explosion).
+  cough: Object.freeze({
+    type: "statusStrike",
+    soundKey: "poisonArrow",
+    status: "poison",
+    motif: "venom",
+    particleCount: 14,
+    windup: Object.freeze({ style: "gather", durationMs: 340, particleCount: 8 }),
+    projectile: Object.freeze({ shape: "orb", arcHeight: 52, durationMs: 440, size: 1.1, colors: Object.freeze({ core: "#9be86b", trail: "#2f6b1f" }) }),
+    colors: Object.freeze({ core: "#78d46b", trail: "#2f6b1f", impact: "#c6ff9e" })
+  }),
+  smog: Object.freeze({
+    type: "magicBurst",
+    soundKey: "smokeBomb",
+    particleCount: 20,
+    radius: 46,
+    durationMs: 620,
+    windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 8 }),
+    colors: Object.freeze({ core: "#a8b89a", trail: "#3d4a34", impact: "#d7e0c8" })
+  }),
+  "poison-tick": Object.freeze({
+    type: "magicBurst",
+    soundKey: "poisonArrow",
+    particleCount: 14,
+    radius: 32,
+    durationMs: 500,
+    colors: Object.freeze({ core: "#9be86b", trail: "#2f6b1f", impact: "#c6ff9e" })
+  }),
+  explosion: Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    blast: true,
+    blastTiles: 2,
+    shake: 12,
+    particleCount: 24,
+    radius: 46,
+    durationMs: 700,
+    windup: Object.freeze({ style: "gather", durationMs: 300, particleCount: 10 }),
+    afterglow: true,
+    colors: Object.freeze({ core: "#9be86b", trail: "#2f6b1f", impact: "#e6ffcc" })
+  }),
   lightseeker: Object.freeze({
     type: "magicBurst",
     soundKey: "lightseeker",

@@ -11,9 +11,11 @@
 // from the match state (cpuRng) so it never disturbs the authoritative dice stream and
 // a replay reproduces the same moves.
 
-import { findUnit, livingUnits } from "../core/state.js";
+import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getArt, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
+import { getSelfBlastRadius } from "../rules/arts.js";
+import { chebyshevDistance } from "../rules/movement.js";
 import { isStunned } from "../rules/statuses.js";
 import {
   ageValue,
@@ -224,6 +226,17 @@ function planEffectValue(state, unit, plan) {
   // Recharge: refuel MP / mend 1 HP at full MP — a small tempo term (the mend is material).
   if (ai.intent === "recharge") {
     return { control: rechargeValue(state, unit), heal: 0 };
+  }
+  // Smog (Virus): a self-centred blind cloud, no HP change — sum the status value of
+  // blinding every enemy caught in the radius, so it rides the `control` weight.
+  if (ai.intent === "statusAoe") {
+    const radius = getSelfBlastRadius(state, unit, art);
+    let control = 0;
+    for (const enemy of livingUnits(state)) {
+      if (!areEnemies(unit, enemy) || chebyshevDistance(unit.position, enemy.position) > radius) continue;
+      control += statusValue(enemy, { status: art.effect.status, durationTurns: art.effect.durationTurns }, state);
+    }
+    return { control, heal: 0 };
   }
   return { control: 0, heal: 0 };
 }

@@ -328,6 +328,26 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "statusAoe": {
+      // Smog: a self-centred blind cloud. Offer only when an enemy stands in the radius,
+      // so the CPU never fogs empty air.
+      const radius = getSelfBlastRadius(state, unit, art);
+      if (enemiesWithin(state, unit, radius).length > 0) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
+      }
+      break;
+    }
+    case "poisonBurst": {
+      // Poison Tick / Explosion: detonate poisoned enemies. Offer only when at least one
+      // enemy is poisoned — this also keeps every plan legal for Explosion
+      // (requiresPoisonedEnemy), so it replays cleanly through the reducer.
+      const poisoned = livingUnits(state).some((u) =>
+        areEnemies(unit, u) && (u.statuses ?? []).some((s) => s.type === "poison"));
+      if (poisoned) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -500,6 +520,25 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
         if (!ids.has(target.id)) continue;
         target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: dtype, affinity }).damage);
       }
+      break;
+    }
+    case "statusAoe":
+      break; // Smog changes no HP now; the blind value is a controller score term.
+    case "poisonBurst": {
+      // Poison Tick / Explosion: TRUE damage (no DEF/Defend) to every poisoned enemy, plus
+      // a splash to enemies near a poisoned one. Explosion consumes the caster (selfKill).
+      const amount = Math.max(0, Number(art.damage?.amount) || 0);
+      const splash = art.splash ?? null;
+      const poisoned = board.filter((u) => areEnemies(actor, u) && (u.statuses ?? []).some((s) => s.type === "poison"));
+      const poisonedIds = new Set(poisoned.map((u) => u.id));
+      for (const target of board) {
+        if (!areEnemies(actor, target)) continue;
+        let dmg = 0;
+        if (poisonedIds.has(target.id)) dmg = amount;
+        else if (splash && poisoned.some((p) => chebyshevDistance(p.position, target.position) <= splash.radius)) dmg = Math.max(0, Number(splash.amount) || 0);
+        if (dmg > 0) target.hp = Math.max(0, target.hp - dmg);
+      }
+      if (art.selfKill) actor.hp = 0;
       break;
     }
     case "revive": {

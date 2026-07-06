@@ -705,6 +705,44 @@ async function resolveInstantArt(command) {
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
+  } else if (resolved?.artId === "smog" && actorBefore) {
+    // A blind cloud rolls out from Virus; every caught enemy floats BLIND (no roll).
+    const metrics = createBoardMetrics(state.size);
+    const clouded = (resolved.statusTargets ?? []).map((id) => findUnit(state, id)).filter(Boolean);
+    await effects.playAbilityVfx("smog", { actor: actorBefore, targets: clouded });
+    await Promise.all(clouded.map((target) => effects.floatText(unitCenter(metrics, target), "BLIND", "#f0d77a")));
+  } else if (resolved?.artId === "poison-tick" && actorBefore) {
+    // Every poisoned enemy convulses for true damage (ignores DEF/Defend).
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("poison-tick", { actor: actorBefore, targets: targetsBefore });
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "true");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#9be86b");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+  } else if (resolved?.artId === "explosion" && actorBefore) {
+    // The rage ultimate detonates every poisoned enemy, then consumes Virus itself.
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("explosion", { actor: actorBefore, targets: targetsBefore });
+    effects.shake(10);
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "true");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#9be86b");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+    await effects.deathDissolve(actorBefore.id, actorBefore.position, teamColor(actorBefore.player));
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {

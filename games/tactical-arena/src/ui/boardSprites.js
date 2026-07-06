@@ -77,6 +77,9 @@ export const BOARD_SPRITES = Object.freeze({
   // (wings spread wide; padded to keep the body dead-centre on the coin).
   gargoyle:    sprite("gargoyle",    535, 574),
   nemesis:     sprite("nemesis",     600, 600),
+  // Cropped from the 600×600 portrait, centered on the measured feet-band stance x
+  // (padded to keep the wide blob body dead-centre on the coin). Held a touch smaller.
+  virus:       sprite("virus",       578, 506, { scale: 0.94 }),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })

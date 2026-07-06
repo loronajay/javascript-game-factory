@@ -1,8 +1,8 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getStatusSpreadConfig, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getDarkPulseTargets, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -66,6 +66,16 @@ function applyRolledStatus(target, effect, rollValue, offender, chanceMultiplier
   return result;
 }
 
+// Growth (Virus): restore `amount` MP to `actor` (clamped to its max) and surface a
+// GROWTH_MP event, whenever it poisons an enemy. Returns [] when nothing was restored.
+function applyGrowth(state, actor, amount) {
+  if (!(amount > 0)) return [];
+  const before = actor.mp;
+  actor.mp = Math.min(getEffectiveStats(actor, state).maxMp, actor.mp + amount);
+  const gained = actor.mp - before;
+  return gained > 0 ? [{ type: "GROWTH_MP", unitId: actor.id, mpGained: gained }] : [];
+}
+
 export function applyCommand(state, command) {
   const result = dispatchCommand(state, command);
   // A single reconciliation seam runs after EVERY accepted command, diffing the input
@@ -74,6 +84,10 @@ export function applyCommand(state, command) {
   // it — and applies the King's reactive HP swings. Deterministic (no RNG), so online
   // lockstep clients all compute the identical reaction.
   if (result.accepted) {
+    // Virus's Spread propagates any NEW debuff on an enemy to its nearby allies. Diff-based
+    // (like the reactions below) so it catches a status from ANY source — a cast, a crit,
+    // a global blind — deterministically, before the HP-swing reactions read the board.
+    applySpreadReactions(state, result.nextState, result.events);
     applyNemesisThresholdReactions(state, result.nextState, result.events);
     applyRageEntryEffects(state, result.nextState, result.events);
     applyCommanderReactions(state, result.nextState, result.events);
@@ -303,6 +317,53 @@ function applyRageEntryEffects(prevState, next, events) {
   }
 }
 
+// Virus's Spread (statusSpread): a NEW debuff on an enemy of a living Virus propagates to
+// that enemy's allies within the Virus's spread radius (RAGE widens it). Diff-based over
+// prev→next so it catches a status from ANY source — a cast, a basic-attack crit, a global
+// blind — in one deterministic pass. Spread statuses are applied but NOT themselves
+// re-spread (one hop, no chain reaction), because the newly-afflicted set is captured from
+// the initial diff before any propagation runs. No RNG, so lockstep clients all agree.
+function applySpreadReactions(prevState, next, events) {
+  if (next.phase !== "playing") return;
+  const spreaders = next.units
+    .map((unit) => ({ unit, config: unit.hp > 0 ? getStatusSpreadConfig(unit) : null }))
+    .filter((entry) => entry.config);
+  if (!spreaders.length) return;
+
+  const before = new Map(prevState.units.map((unit) =>
+    [unit.id, new Set((unit.statuses ?? []).map((status) => status.type))]));
+
+  // Capture every (unit, new-status) pair up front so a spread we add below is never
+  // itself re-processed into a second hop.
+  const newlyAfflicted = [];
+  for (const unit of next.units) {
+    if (unit.hp <= 0) continue;
+    const had = before.get(unit.id) ?? new Set();
+    for (const status of unit.statuses ?? []) {
+      if (!had.has(status.type)) newlyAfflicted.push({ unit, status });
+    }
+  }
+
+  for (const { unit, status } of newlyAfflicted) {
+    const relevant = spreaders.filter(({ unit: virus, config }) =>
+      virus.hp > 0 && areEnemies(virus, unit) && config.statuses.has(status.type));
+    if (!relevant.length) continue;
+    const radius = Math.max(...relevant.map(({ config }) => config.radius));
+    if (radius <= 0) continue;
+
+    const spreadTo = [];
+    for (const ally of next.units) {
+      if (ally.hp <= 0 || ally.id === unit.id || !areAllies(ally, unit)) continue;
+      if (chebyshevDistance(unit.position, ally.position) > radius) continue;
+      const applied = applyStatus(ally, { ...status });
+      if (applied.applied) { ally.statuses = applied.statuses; spreadTo.push(ally.id); }
+    }
+    if (spreadTo.length) {
+      events.push({ type: "STATUS_SPREAD", sourceUnitId: unit.id, status: status.type, spreadTo });
+    }
+  }
+}
+
 // Shared Pyroclasm damage: 5 magic to every enemy on any of the 8 straight rays within
 // range. Magic honors Defend halving, Dead Zone team reduction, Black Death immunity,
 // and Bruiser-Mode magic vulnerability — exactly like resolveNuke, so a manual cast and
@@ -393,12 +454,17 @@ function attack(state, command) {
   const damageByTarget = {};
   let totalDamageDealt = 0;
   let primaryDamage = null;
-  // Blessed Arrow: a critical basic attack also lands a status (blind) on each surviving
-  // target. Immunity is enforced by applyStatus, so a status-immune target simply resists.
+  // On-hit status riders. A raging kit that poisons EVERY landed hit (Virus's Infectious
+  // Affinity) applies unconditionally; otherwise a crit rider (Angel's Blessed Arrow blind,
+  // Virus's Spread crit-poison) applies only on a critical. Immunity is enforced by
+  // applyStatus, so a status-immune target simply resists.
   const critStatus = getCritOnHitStatus(actor);
+  const rageAttackStatus = getRageAttackStatus(actor);
+  const poisonRefund = getPoisonMpRefund(actor);
   const critFire = getCritCreatesFire(actor);
-  const blinded = [];
+  const blinded = []; // targets that received an on-hit status (event key kept for back-compat)
   const fireTiles = [];
+  let poisonedByAttack = 0;
   const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
   for (const targetUnit of targets) {
     const damage = strike(targetUnit);
@@ -407,9 +473,14 @@ function attack(state, command) {
     targetIds.push(targetUnit.id);
     damageByTarget[targetUnit.id] = damage.damage;
     totalDamageDealt += damageDealt;
-    if (swing.critical && critStatus && targetUnit.hp > 0) {
-      const applied = applyStatus(targetUnit, { type: critStatus.status, duration: critStatus.duration });
-      if (applied.applied) { targetUnit.statuses = applied.statuses; blinded.push(targetUnit.id); }
+    const onHit = rageAttackStatus ?? (swing.critical ? critStatus : null);
+    if (onHit && targetUnit.hp > 0) {
+      const applied = applyStatus(targetUnit, { type: onHit.status, duration: onHit.duration });
+      if (applied.applied) {
+        targetUnit.statuses = applied.statuses;
+        blinded.push(targetUnit.id);
+        if (onHit.status === "poison") poisonedByAttack += 1;
+      }
     }
     if (swing.critical && critFire) {
       const position = { ...targetUnit.position };
@@ -433,6 +504,8 @@ function attack(state, command) {
     actor.hp = Math.max(0, actor.hp - thorns);
     if (dealt > 0) retaliationEvents.push({ type: "STONE_RETALIATION", offenderId: actor.id, sourceId: nextTarget.id, damage: dealt });
   }
+  // Growth (Virus): restore MP for each enemy this attack poisoned.
+  const growthEvents = poisonRefund > 0 ? applyGrowth(next, actor, poisonRefund * poisonedByAttack) : [];
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
@@ -441,7 +514,7 @@ function attack(state, command) {
     ...(blinded.length ? { blinded } : {}),
     ...(fireTiles.length ? { fireTiles } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents]);
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
@@ -532,7 +605,11 @@ const ART_RESOLVERS = new Map([
   ["pyroclasm", resolvePyroclasm],
   // Nemesis: all-ray first-contact magic and the move+Pulse next-turn setup.
   ["dark-pulse", resolveDarkPulse],
-  ["realm-traversal", resolveRealmTraversal]
+  ["realm-traversal", resolveRealmTraversal],
+  // Virus: a self-centred blind cloud and the two poison detonations (Poison Tick + Explosion).
+  ["smog", resolveSmog],
+  ["poison-tick", resolvePoisonBurst],
+  ["explosion", resolvePoisonBurst]
 ]);
 
 function useArt(state, command) {
@@ -609,18 +686,28 @@ function resolveTargetedArt(state, command, art) {
   if (art.damageType === "magic") next.activation.spellUsed = true;
 
   // Targeted attack ARTS resolve via the attacker's base strike type. `art.damageType`
-  // overrides to magic for ARTS like Spark and Banish (magic ignores proximity bonuses).
-  const damage = resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null, damageAffinity: art.damageAffinity ?? art.damage?.affinity ?? null });
+  // overrides to magic for ARTS like Spark and Banish (magic ignores proximity bonuses). A
+  // FIXED-amount magic art (Virus's Cough "5 magic") stands its `damage.amount` in for STR
+  // via resolveFixedMagicStrike instead of scaling off effective STR.
+  const fixedMagic = art.damageType === "magic" && Number.isFinite(art.damage?.amount);
+  const damage = fixedMagic
+    ? resolveFixedMagicStrike(actor, target, art.damage.amount, { critical: swing.critical, state: next, art })
+    : resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null, damageAffinity: art.damageAffinity ?? art.damage?.affinity ?? null });
   const damageDealt = Math.min(target.hp, damage.damage);
   target.hp = Math.max(0, target.hp - damage.damage);
 
   let effect = null;
+  let poisonedEnemy = false;
   if (art.effect?.type === "status" && target.hp > 0) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     // Misfortune Stance (any living Witch Doctor) doubles the status chance globally.
+    // Virus's Infectious Affinity forces its poison to 100% while raging.
     // Stone Body reflects a targeted status back onto the caster (applyRolledStatus).
-    effect = applyRolledStatus(target, art.effect, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+    const guaranteed = getGuaranteedStatuses(actor).has(art.effect.status);
+    const effectSpec = guaranteed ? { ...art.effect, chance: 1 } : art.effect;
+    effect = applyRolledStatus(target, effectSpec, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+    poisonedEnemy = Boolean(effect.applied && !effect.reflected && art.effect.status === "poison");
   } else if (art.effect?.type === "heal") {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
@@ -633,6 +720,8 @@ function resolveTargetedArt(state, command, art) {
   }
 
   const healingEvents = damage.type === "physical" ? resolvePhysicalDamageHealing(next, actor, damageDealt) : [];
+  // Growth (Virus): restore MP when this cast poisons an enemy (Cough).
+  const growthEvents = poisonedEnemy ? applyGrowth(next, actor, getPoisonMpRefund(actor)) : [];
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -646,7 +735,7 @@ function resolveTargetedArt(state, command, art) {
     roll: swing.hitRoll,
     damage,
     ...(effect ? { effect } : {})
-  }, ...healingEvents]);
+  }, ...healingEvents, ...growthEvents]);
 }
 
 function resolveFlee(state, command, art) {
@@ -755,6 +844,72 @@ function resolvePyroclasm(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget, mpCost: cost
+  }]);
+}
+
+// Smog (Virus): a self-centred blind CLOUD — every enemy within the blast radius is
+// blinded with no roll. A board-wide AoE status, so it applies directly (immunity
+// respected) and is NOT reflected the way a single-target cast is (mirrors the Witch
+// Doctor's global blind). Shares the nukeAura radius plumbing for its preview + reach.
+function resolveSmog(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const radius = getSelfBlastRadius(next, actor, art);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  const statusTargets = [];
+  for (const target of livingUnits(next)) {
+    if (!areEnemies(actor, target)) continue;
+    if (chebyshevDistance(actor.position, target.position) > radius) continue;
+    const applied = applyStatus(target, { type: art.effect.status, duration: art.effect.durationTurns });
+    if (applied.applied) { target.statuses = applied.statuses; statusTargets.push(target.id); }
+  }
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, statusTargets, mpCost: cost
+  }]);
+}
+
+// Poison Tick / Explosion (Virus): a global detonation of poisoned enemies. Every
+// poisoned enemy takes `damage.amount` TRUE damage (ignores DEF, Defend, team reduction);
+// an optional `splash` also hits enemies within `splash.radius` of a poisoned enemy.
+// `selfKill` consumes Virus (Explosion). No target, no roll.
+function resolvePoisonBurst(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const amount = Math.max(0, Number(art.damage?.amount) || 0);
+  const splash = art.splash ?? null;
+  const poisoned = livingUnits(next).filter((unit) =>
+    areEnemies(actor, unit) && (unit.statuses ?? []).some((status) => status.type === "poison"));
+  const poisonedIds = new Set(poisoned.map((unit) => unit.id));
+
+  const damageByTarget = {};
+  const targetIds = [];
+  for (const target of livingUnits(next)) {
+    if (!areEnemies(actor, target)) continue;
+    let dealt = 0;
+    if (poisonedIds.has(target.id)) {
+      dealt = amount;
+    } else if (splash && poisoned.some((p) => chebyshevDistance(p.position, target.position) <= splash.radius)) {
+      dealt = Math.max(0, Number(splash.amount) || 0);
+    }
+    if (dealt <= 0) continue;
+    const applied = Math.min(target.hp, dealt);
+    target.hp = Math.max(0, target.hp - dealt);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = applied;
+  }
+
+  if (art.selfKill) actor.hp = 0; // Explosion consumes Virus
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
+    ...(art.selfKill ? { selfDestruct: true } : {}), mpCost: cost
   }]);
 }
 

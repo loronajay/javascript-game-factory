@@ -1,6 +1,6 @@
 import { getEffectiveStats, getTeamMagicDamageBonus, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
-import { resolveDamage } from "./damage.js";
+import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
 import { areAllies, areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
 import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
@@ -101,10 +101,15 @@ export function getBasicAttackDamageType(unit) {
 }
 
 // A status a unit's passive lands on the target when its BASIC attack CRITS (Angel's
-// Blessed Arrow blinds on a crit). Returns { status, duration } or null. Immunity is
-// still enforced by applyStatus, so this never bypasses a status-immune target.
+// Blessed Arrow blinds on a crit; Virus's Spread poisons on a crit). Scans every passive
+// source so a unit can carry it on its main passive or a passive ART entry. Returns
+// { status, duration } or null. Immunity is still enforced by applyStatus, so this never
+// bypasses a status-immune target.
 export function getCritOnHitStatus(unit) {
-  return getUnitType(unit.type).passive?.effect?.critStatus ?? null;
+  for (const effect of passiveEffects(unit)) {
+    if (effect.critStatus) return effect.critStatus;
+  }
+  return null;
 }
 
 function passiveEffects(unit) {
@@ -286,6 +291,20 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
   const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, damageAffinity });
+  return { ...result, critical, proximityBonus: 0, damage };
+}
+
+// A FIXED-amount magic strike (Virus's Cough "5 magic", vs the STR-scaled magic of
+// Spark/Banish). `amount` stands in for the attacker's strength, so magic ignores DEF,
+// Defend halves it, and Dead Zone / fire-immunity fold through finalizeMagicDamage —
+// exactly like the self-centred blasts (resolveNuke/applyPyroclasmDamage). Shared by the
+// reducer AND the forecast so the number can never drift. Same return shape as
+// resolvePhysicalStrike/resolveBaseStrike.
+export function resolveFixedMagicStrike(attacker, target, amount, { critical = false, state = null, art = null } = {}) {
+  const base = critical ? Math.ceil(Math.max(0, amount) * CRIT_MULTIPLIER) : Math.max(0, amount);
+  const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+  const result = resolveDamage({ attacker: { strength: base }, defender: targetStats, type: "magic" });
+  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, art });
   return { ...result, critical, proximityBonus: 0, damage };
 }
 

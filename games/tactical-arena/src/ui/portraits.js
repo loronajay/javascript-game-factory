@@ -41,6 +41,9 @@ export const PORTRAITS = Object.freeze({
   // Winged stone bruiser; measured alpha bbox off the 600×600 source (wings spread wide).
   gargoyle:    portrait("gargoyle",    { x: 0.04, y: 0.017, w: 0.878, h: 0.957 }),
   nemesis:     portrait("nemesis",     { x: 0.080, y: 0.030, w: 0.780, h: 0.920 }),
+  // Wide gaseous blob; measured alpha bbox off the 600×600 source. Held a touch smaller
+  // so a short-but-wide figure doesn't normalize up into an oversized silhouette.
+  virus:       portrait("virus",       { x: 0.057, y: 0.087, w: 0.915, h: 0.833 }, { scale: 0.94 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

@@ -4,7 +4,7 @@ import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getArtTargetRange } from "../rules/arts.js";
-import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike } from "../rules/combat.js";
+import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
@@ -64,9 +64,14 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
       drawForecastBadge(forecastLayer, metrics, target, "miss", "fc-miss");
       continue;
     }
+    // A fixed-amount magic art (Virus's Cough) forecasts its authored amount, not a
+    // STR-scaled hit — the same resolver the reducer uses, so the number can't drift.
+    const fixedMagic = isStrikeArt && art?.damageType === "magic" && Number.isFinite(art?.damage?.amount);
     const strike = art?.resolution === "frontKick"
       ? frontKickForecast(actor, target, art, state)
-      : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
+      : fixedMagic
+        ? resolveFixedMagicStrike(actor, target, art.damage.amount, { state, art })
+        : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
     const lethal = strike.damage >= target.hp;
     drawForecastBadge(forecastLayer, metrics, target, lethal ? `☠ ${strike.damage}` : `-${strike.damage}`, lethal ? "fc-lethal" : "fc-attack");
   }
