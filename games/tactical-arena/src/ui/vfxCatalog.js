@@ -31,7 +31,8 @@ const ATTACK_PROJECTILES = Object.freeze({
   necromancer: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 450, size: 1, colors: Object.freeze({ core: "#9be08a", trail: "#38256f" }) }),
   nemesis: Object.freeze({ shape: "orb", arcHeight: 44, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#c89cff", trail: "#241030" }) }),
   // Angel is a bow user — a radiant, gold-white blessed arrow (its magic tint reads holy).
-  angel: Object.freeze({ shape: "arrow", arcHeight: 58, durationMs: 430, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#d8c078" }) })
+  angel: Object.freeze({ shape: "arrow", arcHeight: 58, durationMs: 430, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#d8c078" }) }),
+  "fat-bowman": Object.freeze({ shape: "arrow", arcHeight: 64, durationMs: 450, size: 1.08, colors: Object.freeze({ core: "#ffd9a0", trail: "#8a5a30" }) })
 });
 
 const DEFAULT_ATTACK_PROJECTILE = Object.freeze({
@@ -139,6 +140,23 @@ const ABILITY_VFX = Object.freeze({
     // basic-attack projectile); the venom motif then blooms from the arrow that landed.
     projectile: Object.freeze({ shape: "arrow", arcHeight: 62, durationMs: 430, size: 1, colors: Object.freeze({ core: "#a8ff91", trail: "#315f29" }) }),
     colors: Object.freeze({ core: "#78d46b", trail: "#315f29", impact: "#a8ff91" })
+  }),
+  "curve-shot": Object.freeze({
+    type: "statusStrike",
+    soundKey: "poisonArrow",
+    motif: "impact",
+    particleCount: 8,
+    projectile: Object.freeze({ shape: "arrow", arcHeight: 76, durationMs: 460, size: 1.08, colors: Object.freeze({ core: "#ffd9a0", trail: "#8a5a30" }) }),
+    colors: Object.freeze({ core: "#ffd9a0", trail: "#8a5a30", impact: "#fff0c8" })
+  }),
+  dragonsbane: Object.freeze({
+    type: "statusStrike",
+    soundKey: "poisonArrow",
+    status: "poison",
+    motif: "venom",
+    particleCount: 16,
+    projectile: Object.freeze({ shape: "arrow", arcHeight: 66, durationMs: 450, size: 1.12, colors: Object.freeze({ core: "#c6ff9e", trail: "#2f6b1f" }) }),
+    colors: Object.freeze({ core: "#78d46b", trail: "#2f6b1f", impact: "#c6ff9e" })
   }),
   "leg-shot": Object.freeze({
     type: "statusStrike",
@@ -388,6 +406,40 @@ const ABILITY_VFX = Object.freeze({
     windup: Object.freeze({ style: "gather", durationMs: 380, particleCount: 8 }),
     projectile: Object.freeze({ shape: "orb", arcHeight: 52, durationMs: 460, size: 1, colors: Object.freeze({ core: "#dfffd8", trail: "#64d99a" }) }),
     colors: Object.freeze({ core: "#dfffd8", trail: "#64d99a", impact: "#ffffff" })
+  }),
+  // Fat Cleric — Hope: a warm radiant heal-pulse washing over the whole nearby squad.
+  hope: Object.freeze({
+    type: "healPulse",
+    soundKey: "pray",
+    particleCount: 11,
+    radius: 36,
+    durationMs: 620,
+    windup: Object.freeze({ style: "gather", durationMs: 400, particleCount: 8 }),
+    colors: Object.freeze({ core: "#ffe9b0", trail: "#f0c874", impact: "#fff7d8" })
+  }),
+  // Fat Cleric — Cleanse: a clean gold-white mote that lifts the negative statuses off.
+  cleanse: Object.freeze({
+    type: "projectileFan",
+    soundKey: "pray",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 52,
+    staggerMs: 0,
+    durationMs: 460,
+    impactRadius: 24,
+    windup: Object.freeze({ style: "gather", durationMs: 380, particleCount: 8 }),
+    projectile: Object.freeze({ shape: "orb", arcHeight: 52, durationMs: 460, size: 1, colors: Object.freeze({ core: "#fff2c0", trail: "#e0b45a" }) }),
+    colors: Object.freeze({ core: "#fff2c0", trail: "#e0b45a", impact: "#ffffff" })
+  }),
+  // Fat Cleric — Focus Prayer: a focused single-target radiant heal-pulse.
+  "focus-prayer": Object.freeze({
+    type: "healPulse",
+    soundKey: "wish",
+    particleCount: 9,
+    radius: 28,
+    durationMs: 560,
+    windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 7 }),
+    colors: Object.freeze({ core: "#ffe9b0", trail: "#e6b45a", impact: "#fffbe0" })
   }),
   // Witch Doctor dances — every dance is a GLOBAL effect (a team-wide or board-wide
   // ritual, never a single-target cast), so they share one recipe type ("ritual"):

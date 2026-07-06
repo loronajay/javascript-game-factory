@@ -52,6 +52,12 @@ function canonicalUnits(units) {
         // Gargoyle's Volcanic Rage free-Pyroclasm counter changes future cadence
         // side-effects, so it is part of the authoritative hash.
         `${unit.volcanicCounter ?? 0},` +
+        // Fat Cleric's Emergency Snacks proc counter caps her RAGE regen (3/battle), so it
+        // changes future side-effects and is part of the authoritative hash.
+        `${unit.emergencySnackCount ?? 0},` +
+        // Fat Bowman's Planted and Desperation Shot flags alter future stats/turn legality.
+        `${unit.stationaryStrength ?? 0},${unit.desperationShotSpent ? 1 : 0},` +
+        `${unit.desperationRageArmed ? 1 : 0},${unit.skipNextActivation ? 1 : 0},` +
         `${unit.studiedTargetId ?? "-"},` +
         `${stableStringify(unit.statModifiers ?? {})},` +
         // Source-linked modifiers (Father Time's Age) change future effective stats, so

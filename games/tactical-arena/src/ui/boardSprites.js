@@ -85,6 +85,8 @@ export const BOARD_SPRITES = Object.freeze({
   clod:        sprite("clod",        510, 533),
   "fat-knight": sprite("fat-knight", 600, 600),
   "fat-wizard": sprite("fat-wizard", 600, 600),
+  "fat-cleric": sprite("fat-cleric", 600, 600),
+  "fat-bowman": sprite("fat-bowman", 600, 600),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })

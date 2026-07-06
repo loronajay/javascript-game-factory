@@ -20,6 +20,8 @@ import { VIRUS } from "./units/virus.js";
 import { CLOD } from "./units/clod.js";
 import { FAT_KNIGHT } from "./units/fat-knight.js";
 import { FAT_WIZARD } from "./units/fat-wizard.js";
+import { FAT_CLERIC } from "./units/fat-cleric.js";
+import { FAT_BOWMAN } from "./units/fat-bowman.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -42,7 +44,9 @@ export const UNIT_TYPES = Object.freeze({
   virus: VIRUS,
   clod: CLOD,
   "fat-knight": FAT_KNIGHT,
-  "fat-wizard": FAT_WIZARD
+  "fat-wizard": FAT_WIZARD,
+  "fat-cleric": FAT_CLERIC,
+  "fat-bowman": FAT_BOWMAN
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -525,6 +529,12 @@ export function getEffectiveStats(unit, state = null) {
     const bonus = Math.floor(missing / per) * amount;
     if (stat in stats && Number.isFinite(bonus)) stats[stat] += bonus;
   }
+  for (const source of allPassiveSources(getUnitType(unit.type))) {
+    const effect = source.effect;
+    if (effect?.type !== "stationaryStrength") continue;
+    const bonus = Math.min(Math.max(0, unit.stationaryStrength ?? 0), Math.max(0, Number(effect.max) || 0));
+    if (bonus > 0) stats.strength += bonus;
+  }
   // Bruiser Mode (Juggernaut): a stronger stat block while the unit sits at 0 MP. Folded
   // generically off the passive data so no rule hard-codes the unit. The paired magic
   // vulnerability lives in getSelfMagicVulnerability (rules/combat.js), not here.
@@ -539,6 +549,12 @@ export function getEffectiveStats(unit, state = null) {
       // may also carry a nested `enemyAura` (handled by enemyAuraStats); that must
       // not leak onto the raging unit itself.
       if (source.effect?.type !== "statModifiers") continue;
+      for (const [name, value] of Object.entries(source.effect?.stats ?? {})) {
+        if (name in stats && Number.isFinite(value)) stats[name] += value;
+      }
+    }
+    for (const source of rageStatSources(getUnitType(unit.type))) {
+      if (source.effect?.type !== "oneShotStatModifiers" || unit.desperationShotSpent) continue;
       for (const [name, value] of Object.entries(source.effect?.stats ?? {})) {
         if (name in stats && Number.isFinite(value)) stats[name] += value;
       }

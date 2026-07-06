@@ -6,7 +6,7 @@ import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getC
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { applyStatus, isStunned, reflectsStatus, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { applyStatus, isNegativeStatus, isStunned, NEGATIVE_STATUS_TYPES, reflectsStatus, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect } from "../rules/stances.js";
 
 const ERR = Object.freeze({
@@ -105,6 +105,43 @@ function applyMagicDamageReaction(target, damageDealt) {
   return { type: "BATTLE_TRAUMA", unitId: target.id, applied: result.applied };
 }
 
+function stationaryStrengthEffect(unit) {
+  return getUnitType(unit.type).arts.find((art) => art.effect?.type === "stationaryStrength")?.effect ?? null;
+}
+
+function oneShotRageEffect(unit) {
+  const definition = getUnitType(unit.type);
+  return [definition.ragePassive, definition.rageArt]
+    .map((source) => source?.effect)
+    .find((effect) => effect?.type === "oneShotStatModifiers") ?? null;
+}
+
+function syncOneShotRageArm(unit) {
+  if (!oneShotRageEffect(unit)) return;
+  if (!isRaging(unit)) {
+    unit.desperationRageArmed = false;
+    unit.desperationShotSpent = false;
+    return;
+  }
+  if (!unit.desperationRageArmed) {
+    unit.desperationRageArmed = true;
+    unit.desperationShotSpent = false;
+  }
+}
+
+function activeOneShotRageEffect(unit) {
+  const effect = oneShotRageEffect(unit);
+  return effect && isRaging(unit) && !unit.desperationShotSpent ? effect : null;
+}
+
+function consumeOneShotRage(unit) {
+  const effect = activeOneShotRageEffect(unit);
+  if (!effect) return [];
+  unit.desperationShotSpent = true;
+  if (effect.skipNextActivation) unit.skipNextActivation = true;
+  return [{ type: "DESPERATION_SHOT", unitId: unit.id }];
+}
+
 export function applyCommand(state, command) {
   const result = dispatchCommand(state, command);
   // A single reconciliation seam runs after EVERY accepted command, diffing the input
@@ -118,6 +155,7 @@ export function applyCommand(state, command) {
     // a global blind — deterministically, before the HP-swing reactions read the board.
     applySpreadReactions(state, result.nextState, result.events);
     applyNemesisThresholdReactions(state, result.nextState, result.events);
+    applyOneShotRageTransitions(state, result.nextState, result.events);
     applyRageEntryEffects(state, result.nextState, result.events);
     applyCommanderReactions(state, result.nextState, result.events);
   }
@@ -189,6 +227,21 @@ function beginActivation(state, command) {
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
   unit.defending = false;
+  syncOneShotRageArm(unit);
+  if (unit.skipNextActivation) {
+    unit.skipNextActivation = false;
+    spendAndAdvance(next, unit);
+    return accept(next, [{ type: "DESPERATION_EXHAUSTED", unitId: unit.id }]);
+  }
+  if (fresh) {
+    const planted = stationaryStrengthEffect(unit);
+    if (planted) {
+      unit.stationaryStrength = Math.min(
+        Math.max(0, Number(planted.max) || 0),
+        (unit.stationaryStrength ?? 0) + Math.max(0, Number(planted.amount) || 0)
+      );
+    }
+  }
   // Rain Stance's on-attack charge (set last turn) becomes a live +MOVE buff for this
   // whole activation — applied here, not at attack time, so it lands on the NEXT turn
   // even if the Witch Doctor attacked-then-moved. It ticks off at this activation's end.
@@ -216,7 +269,39 @@ function beginActivation(state, command) {
   if (freeCast && isRaging(unit)) {
     resolveVolcanicPyroclasmTick(next, unit, freeCast, events, { trigger: "activation" });
   }
+  // Emergency Snacks (Fat Cleric RAGE): a per-turn self-regen while raging, fired at the
+  // start of each fresh turn (deterministic, no roll — so online lockstep clients agree).
+  if (fresh) applyRageRegen(next, unit, events);
   return accept(next, events);
+}
+
+// Emergency Snacks (a `rageRegen` ragePassive): while raging, nibble `hp` HP back at the
+// start of the turn. The turn that nibble lifts her back above the 5-HP rage threshold she
+// also restores `exitMp`. Capped at `maxProcs` procs per battle (unit.emergencySnackCount,
+// a hashed field). A board-wide healing lockout (a raging Juggernaut's Null Zone) shuts it
+// off — and does NOT burn a proc. Returns true when it actually restored something.
+function getRageRegen(unit) {
+  if (!isRaging(unit)) return null;
+  const effect = getUnitType(unit.type).ragePassive?.effect;
+  return effect?.type === "rageRegen" ? effect : null;
+}
+
+function applyRageRegen(state, unit, events) {
+  const regen = getRageRegen(unit);
+  if (!regen) return false;
+  if ((unit.emergencySnackCount ?? 0) >= (regen.maxProcs ?? Infinity)) return false;
+  if (isHealingDisabled(state)) return false;
+  const stats = getEffectiveStats(unit, state);
+  const beforeHp = unit.hp;
+  const beforeMp = unit.mp;
+  const wasBelowThreshold = beforeHp <= 5;
+  unit.hp = Math.min(stats.maxHp, unit.hp + (regen.hp ?? 0));
+  unit.emergencySnackCount = (unit.emergencySnackCount ?? 0) + 1;
+  if (wasBelowThreshold && unit.hp > 5) {
+    unit.mp = Math.min(stats.maxMp, unit.mp + (regen.exitMp ?? 0));
+  }
+  events.push({ type: "EMERGENCY_SNACK", unitId: unit.id, hpRestored: unit.hp - beforeHp, mpRestored: unit.mp - beforeMp });
+  return true;
 }
 
 function resolveVolcanicPyroclasmTick(state, unit, freeCast, events, { trigger, force = false, resetCounter = false } = {}) {
@@ -347,6 +432,25 @@ function applyRageEntryEffects(prevState, next, events) {
   }
 }
 
+function applyOneShotRageTransitions(prevState, next, events) {
+  for (const unit of next.units) {
+    if (!oneShotRageEffect(unit)) continue;
+    const previous = prevState.units.find((entry) => entry.id === unit.id);
+    const wasRaging = previous ? isRaging(previous) : false;
+    const nowRaging = isRaging(unit);
+    if (!nowRaging) {
+      unit.desperationRageArmed = false;
+      unit.desperationShotSpent = false;
+      continue;
+    }
+    if (!wasRaging && nowRaging) {
+      unit.desperationRageArmed = true;
+      unit.desperationShotSpent = false;
+      events.push({ type: "DESPERATION_READY", unitId: unit.id });
+    }
+  }
+}
+
 // Virus's Spread (statusSpread): a NEW debuff on an enemy of a living Virus propagates to
 // that enemy's allies within the Virus's spread radius (RAGE widens it). Diff-based over
 // prev→next so it catches a status from ANY source — a cast, a basic-attack crit, a global
@@ -441,6 +545,7 @@ function moveUnit(state, command) {
     }
   }
   unit.position = { ...command.position };
+  if (stationaryStrengthEffect(unit)) unit.stationaryStrength = 0;
   next.activation.moved = true;
   resolveVictory(next);
   return accept(next, [{
@@ -501,7 +606,8 @@ function attack(state, command) {
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
   if (swing.missed) {
-    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }, ...triggerEvents]);
+    const desperationEvents = consumeOneShotRage(actor);
+    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }, ...triggerEvents, ...desperationEvents]);
   }
   const targets = getLineAttackTargets(next, actor, nextTarget);
   const targetIds = [];
@@ -565,6 +671,7 @@ function attack(state, command) {
   }
   // Growth (Virus): restore MP for each enemy this attack poisoned.
   const growthEvents = poisonRefund > 0 ? applyGrowth(next, actor, poisonRefund * poisonedByAttack) : [];
+  const desperationEvents = consumeOneShotRage(actor);
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
@@ -573,7 +680,7 @@ function attack(state, command) {
     ...(blinded.length ? { blinded } : {}),
     ...(fireTiles.length ? { fireTiles } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...rockHardEvents, ...magicReactionEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents]);
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
@@ -606,9 +713,27 @@ function defend(state, command) {
   if (isCommandOnly(result.unit)) return reject(ERR.COMMANDER_CANNOT_ACT);
   if (state.activation.primaryUsed) return reject(ERR.PRIMARY_ALREADY_USED);
   const next = cloneState(state);
-  findUnit(next, command.unitId).defending = true;
+  const unit = findUnit(next, command.unitId);
+  unit.defending = true;
   next.activation.primaryUsed = true;
-  return accept(next, [{ type: "UNIT_DEFENDED", unitId: command.unitId }]);
+  const events = [{ type: "UNIT_DEFENDED", unitId: command.unitId }];
+  // Snack Break (Fat Cleric): bracing without having moved this activation restores a
+  // little HP (honoring a board-wide healing lockout) and MP. Read centrally off the
+  // passive so no rule hard-codes the unit.
+  const snack = getUnitType(unit.type).passive?.effect;
+  if (snack?.type === "defendRestore" && !next.activation.moved) {
+    const stats = getEffectiveStats(unit, next);
+    const beforeHp = unit.hp;
+    const beforeMp = unit.mp;
+    if (!isHealingDisabled(next)) unit.hp = Math.min(stats.maxHp, unit.hp + (snack.hp ?? 0));
+    unit.mp = Math.min(stats.maxMp, unit.mp + (snack.mp ?? 0));
+    const hpRestored = unit.hp - beforeHp;
+    const mpRestored = unit.mp - beforeMp;
+    if (hpRestored > 0 || mpRestored > 0) {
+      events.push({ type: "SNACK_BREAK", unitId: unit.id, hpRestored, mpRestored });
+    }
+  }
+  return accept(next, events);
 }
 
 // New art mechanics register here instead of adding branches to useArt.
@@ -680,7 +805,12 @@ const ART_RESOLVERS = new Map([
   ["zap", resolveFatWizardZap],
   ["study", resolveStudy],
   ["surge", resolveFatWizardSurge],
-  ["relay-power", resolveRelayPower]
+  ["relay-power", resolveRelayPower],
+  // Fat Cleric: a random-value team heal, a negative-only ally cleanse, and a roll-or-
+  // backfire single-ally heal.
+  ["hope", resolveHealAllies],
+  ["cleanse", resolveCleanseAlly],
+  ["focus-prayer", resolveFocusPrayer]
 ]);
 
 function useArt(state, command) {
@@ -789,7 +919,9 @@ function resolveTargetedArt(state, command, art) {
   if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
     return reject(ERR.TARGET_OBSTRUCTED);
   }
-  if ((art.damageType ?? "physical") === "physical" && isShotBlocked(state, actorState.position, targetState.position, actorState)) {
+  if ((art.damageType ?? "physical") === "physical" &&
+      !art.effect?.pierceUnits &&
+      isShotBlocked(state, actorState.position, targetState.position, actorState)) {
     return reject(ERR.TARGET_OBSTRUCTED);
   }
 
@@ -805,8 +937,9 @@ function resolveTargetedArt(state, command, art) {
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
   if (swing.missed) {
+    const desperationEvents = consumeOneShotRage(actor);
     spendAndAdvance(next, actor);
-    return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost, hit: false, missed: true, roll: swing.hitRoll }]);
+    return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost, hit: false, missed: true, roll: swing.hitRoll }, ...desperationEvents]);
   }
 
   if (art.damageType === "magic") next.activation.spellUsed = true;
@@ -826,14 +959,28 @@ function resolveTargetedArt(state, command, art) {
   let effect = null;
   let poisonedEnemy = false;
   if (art.effect?.type === "status" && target.hp > 0) {
-    const roll = drawValue(next.rngState, command.effectRoll);
-    next.rngState = roll.rngState;
     // Misfortune Stance (any living Witch Doctor) doubles the status chance globally.
     // Virus's Infectious Affinity forces its poison to 100% while raging.
     // Stone Body reflects a targeted status back onto the caster (applyRolledStatus).
-    const guaranteed = getGuaranteedStatuses(actor).has(art.effect.status);
+    const guaranteed = getGuaranteedStatuses(actor).has(art.effect.status) || (art.effect.criticalGuarantees && swing.critical);
     const effectSpec = guaranteed ? { ...art.effect, chance: 1 } : art.effect;
-    effect = applyRolledStatus(target, effectSpec, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+    const attempts = guaranteed ? 1 : Math.max(1, Number(art.effect.rolls) || 1);
+    const rolls = [];
+    for (let index = 0; index < attempts; index += 1) {
+      const override = index === 0 ? command.effectRoll : command[`effectRoll${index + 1}`];
+      const roll = guaranteed
+        ? { value: 0, rngState: next.rngState }
+        : drawValue(next.rngState, override);
+      next.rngState = roll.rngState;
+      rolls.push(roll.value);
+      effect = applyRolledStatus(target, effectSpec, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+      if (effect.applied || effect.reflected) break;
+    }
+    effect = {
+      ...effect,
+      ...(!guaranteed && attempts > 1 ? { rolls } : {}),
+      ...(guaranteed ? { guaranteed: true } : {})
+    };
     poisonedEnemy = Boolean(effect.applied && !effect.reflected && art.effect.status === "poison");
   } else if (art.effect?.type === "heal") {
     const roll = drawValue(next.rngState, command.effectRoll);
@@ -852,6 +999,7 @@ function resolveTargetedArt(state, command, art) {
   // Rock Hard (Clod): a defending Clod struck by a physical ART refunds MP (its damage
   // was already negated by resolveBaseStrike).
   const rockHardEvents = applyRockHardDefense(next, target, damage.type === "physical");
+  const desperationEvents = consumeOneShotRage(actor);
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -865,7 +1013,7 @@ function resolveTargetedArt(state, command, art) {
     roll: swing.hitRoll,
     damage,
     ...(effect ? { effect } : {})
-  }, ...healingEvents, ...growthEvents, ...rockHardEvents, ...(magicReaction ? [magicReaction] : [])]);
+  }, ...healingEvents, ...growthEvents, ...desperationEvents, ...rockHardEvents, ...(magicReaction ? [magicReaction] : [])]);
 }
 
 function clumsyEffect(actor) {
@@ -1716,9 +1864,19 @@ function resolveHealAllies(state, command, art) {
   actor.mp -= cost;
   const healingByTarget = {};
   const targetIds = [];
+  // A randomAmount heal (Fat Cleric's Hope) rolls ONE shared value in [min,max] from the
+  // authoritative RNG and applies it to every ally — deterministic, so online clients agree.
+  let base = Math.max(0, Number(art.effect.amount) || 0);
+  if (!isHealingDisabled(next) && art.effect.randomAmount) {
+    const roll = drawValue(next.rngState, command.effectRoll);
+    next.rngState = roll.rngState;
+    const min = Math.max(0, Number(art.effect.randomAmount.min) || 0);
+    const max = Math.max(min, Number(art.effect.randomAmount.max) || 0);
+    base = min + Math.floor(roll.value * (max - min + 1));
+  }
   // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too); a
   // raging Juggernaut's Null Zone zeroes all healing.
-  const amount = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.effect.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+  const amount = isHealingDisabled(next) ? 0 : base + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
 
   for (const target of livingTeamUnits(next, actor)) {
     if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
@@ -1793,8 +1951,12 @@ function resolveCleanseAlly(state, command, art) {
   const target = findUnit(next, command.targetId);
   actor.mp -= cost;
 
-  const hadStatuses = Boolean(target.statuses?.length);
-  target.statuses = [];
+  // A scoped cleanse (Fat Cleric's Cleanse) strips only the NEGATIVE statuses, leaving
+  // friendly buffs intact; the default (Mystic's Purify) wipes the whole status stack.
+  const before = target.statuses ?? [];
+  const kept = art.effect?.scope === "negative" ? before.filter((status) => !isNegativeStatus(status)) : [];
+  const hadStatuses = before.length > kept.length;
+  target.statuses = kept;
 
   spendAndAdvance(next, actor);
   return accept(next, [{
@@ -1805,6 +1967,70 @@ function resolveCleanseAlly(state, command, art) {
     mpCost: cost,
     cleansed: hadStatuses ? [target.id] : []
   }]);
+}
+
+// Deterministically pick a status from a WEIGHTED misfire table using a [0,1) roll: an
+// entry's chance is its weight over the total. Falls back to a uniform draw across the
+// standard negative statuses when no table is authored. Higher weight → more likely.
+function pickMisfireStatus(pool, roll) {
+  if (!Array.isArray(pool) || !pool.length) {
+    return NEGATIVE_STATUS_TYPES[Math.min(NEGATIVE_STATUS_TYPES.length - 1, Math.floor(roll * NEGATIVE_STATUS_TYPES.length))];
+  }
+  const total = pool.reduce((sum, entry) => sum + Math.max(0, Number(entry.weight) || 0), 0);
+  if (total <= 0) return pool[0].status;
+  let threshold = roll * total;
+  for (const entry of pool) {
+    threshold -= Math.max(0, Number(entry.weight) || 0);
+    if (threshold < 0) return entry.status;
+  }
+  return pool[pool.length - 1].status;
+}
+
+// Focus Prayer (Fat Cleric): a friendly heal that ROLLS to-hit. A landed prayer heals the
+// ally (heal bonuses + the global healing lockout apply, like every heal site); a MISS makes
+// the prayer backfire and inflict ONE random NEGATIVE status on the ally for a turn (immunity
+// respected centrally). Cannot self-cast. A blinded Cleric always misses, so she always
+// backfires — the gamble is real. No "hit" key on the event, so the CPU/online routers treat
+// it as an instant (non-combat) art.
+function resolveFocusPrayer(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (targetState.id === actorState.id || !areAllies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+
+  const event = { type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost };
+  if (!swing.missed) {
+    const heal = isHealingDisabled(next) ? 0 : Math.max(0, Number(art.heal?.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+    const beforeHp = target.hp;
+    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + heal);
+    const healed = target.hp - beforeHp;
+    event.healingByTarget = healed > 0 ? { [target.id]: healed } : {};
+  } else {
+    // Pick one random negative status from a seeded draw and try to apply it for a turn.
+    // A weighted misfire table (art.misfire.pool) biases the pick — Fat Cleric's stun is
+    // rare; with no table it falls back to a uniform draw over the standard negatives.
+    const roll = drawValue(next.rngState, command.effectRoll);
+    next.rngState = roll.rngState;
+    const status = pickMisfireStatus(art.misfire?.pool, roll.value);
+    const result = applyStatus(target, { type: status, duration: art.misfire?.durationTurns ?? 1 });
+    if (result.applied) target.statuses = result.statuses;
+    event.effect = { attempted: true, applied: result.applied, status, ...(result.reason ? { reason: result.reason } : {}) };
+  }
+
+  spendAndAdvance(next, actor);
+  return accept(next, [event]);
 }
 
 const STAT_MODIFIER_ABBR = Object.freeze({ strength: "STR", defense: "DEF", moveRange: "MOVE", attackRange: "RNG", maxHp: "HP", maxMp: "MP" });

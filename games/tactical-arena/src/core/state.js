@@ -36,6 +36,15 @@ function createUnit(spec) {
     // raging activations so a free Pyroclasm fires on cadence. Meaningless for every
     // other unit (stays 0).
     volcanicCounter: spec.volcanicCounter ?? 0,
+    // Fat Cleric Emergency Snacks: counts how many per-turn RAGE regen procs she has spent
+    // (capped at 3/battle). Meaningless for every other unit (stays 0).
+    emergencySnackCount: spec.emergencySnackCount ?? 0,
+    // Fat Bowman Planted / Desperation Shot state. Stationary strength is the current
+    // Planted STR bonus; the rage flags arm and consume her one enhanced shot.
+    stationaryStrength: spec.stationaryStrength ?? 0,
+    desperationShotSpent: spec.desperationShotSpent ?? false,
+    desperationRageArmed: spec.desperationRageArmed ?? false,
+    skipNextActivation: spec.skipNextActivation ?? false,
     // Nemesis Realm Traversal: charged means the NEXT activation may move before
     // Dark Pulse; locked prevents re-arming until that charged activation finishes.
     realmTraversalCharged: spec.realmTraversalCharged ?? false,

@@ -221,6 +221,17 @@ export function getProximityBonus(attacker, target) {
   return 0;
 }
 
+// Fat Bowman Heavy Handed: a distance curve for physical shots. The neutral point is
+// range 2, so each tile beyond that adds damage and adjacency subtracts damage.
+export function getRangeDamageBonus(attacker, target) {
+  const effect = getUnitType(attacker.type).passive?.effect;
+  if (effect?.type !== "rangeDamageCurve") return 0;
+  const distance = effect.metric === "euclidean"
+    ? Math.hypot(attacker.position.x - target.position.x, attacker.position.y - target.position.y)
+    : Math.max(Math.abs(attacker.position.x - target.position.x), Math.abs(attacker.position.y - target.position.y));
+  return Math.floor(distance) - (effect.neutralDistance ?? 2);
+}
+
 // A hard floor a passive places under a landed physical hit (the Sniper's Rifle
 // Powered: never below 2), so heavy DEF can't chip the attacker to the physical
 // minimum. Returns 0 (no floor) for any unit without one.
@@ -344,11 +355,16 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
     critical: effectiveCritical
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
+  const rangeDamageBonus = proximity ? getRangeDamageBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
   // Fire Stance adds flat crit damage — only on a landed crit, so the normal-hit
   // forecast (critical:false) never shows it.
   const stanceCritBonus = effectiveCritical ? getStanceCritBonus(attacker) : 0;
-  let damage = result.damage + proximityBonus + tileStrikeBonus + stanceCritBonus;
+  let damage = result.damage + proximityBonus + rangeDamageBonus + tileStrikeBonus + stanceCritBonus;
+  if (damage >= 1 || result.damage >= 1) {
+    const passiveMinimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
+    if (Number.isFinite(passiveMinimum)) damage = Math.max(passiveMinimum, damage);
+  }
   // A landed hit (we only reach here past the to-hit roll) is floored by any minimum
   // the attacker's passive sets — last, after every bonus.
   const minimum = getMinimumDamage(attacker);
@@ -357,7 +373,7 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   // absolutely last so no bonus/floor can leak through, and honestly (the forecast
   // resolves through here too, so it shows 0 against a braced Clod).
   if (negatesPhysicalWhileDefending(target)) damage = 0;
-  return { ...result, critical: effectiveCritical, proximityBonus, tileStrikeBonus, damage };
+  return { ...result, critical: effectiveCritical, proximityBonus, rangeDamageBonus, tileStrikeBonus, damage };
 }
 
 // A blinded unit's attack roll is a guaranteed miss unless a combat override (the

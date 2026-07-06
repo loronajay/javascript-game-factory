@@ -701,6 +701,13 @@ async function resolveInstantArt(command) {
     if (targetBefore && resolved.cleansed?.includes(targetBefore.id)) {
       await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "PURIFIED", "#dfffd8");
     }
+  } else if (resolved?.artId === "cleanse" && actorBefore) {
+    // A gold-white mote lifts the negative statuses off the ally (buffs stay).
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("cleanse", { actor: actorBefore, targets: targetsBefore });
+    if (targetBefore && resolved.cleansed?.includes(targetBefore.id)) {
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "CLEANSED", "#fff2c0");
+    }
   } else if (resolved?.artId === "flight" && actorBefore) {
     // The Gargoyle surges to the landing tile (dash trail), then a TRUE blast pops on
     // every enemy within a tile of it. `state` is pre-commit, so victims read at their
@@ -1147,6 +1154,7 @@ function playEventSounds(events) {
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
           artId === "self-destruct" ||
           artId === "anoint" || artId === "purify" || artId === "elevate" || artId === "heavenseeker" ||
+          artId === "hope" || artId === "cleanse" || artId === "focus-prayer" ||
           artId === "flight" || artId === "pyroclasm" ||
           artId === "dark-pulse" || artId === "realm-traversal" ||
           artId === "quake" || artId === "thunderous-charge" ||
@@ -1178,8 +1186,11 @@ function playRolloverFx(events) {
   // Body's melee/displacement recoil both surface here as fire-and-forget floats.
   const erupts = events.filter((e) => e.type === "PYROCLASM_ERUPT");
   const retaliations = events.filter((e) => e.type === "STONE_RETALIATION");
+  // Fat Cleric's Snack Break (defend top-up) and Emergency Snacks (per-turn RAGE regen)
+  // both surface as fire-and-forget HP/MP floats over her.
+  const snacks = events.filter((e) => e.type === "SNACK_BREAK" || e.type === "EMERGENCY_SNACK");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
-      !darkPulses.length && !erupts.length && !retaliations.length) return;
+      !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -1270,6 +1281,16 @@ function playRolloverFx(events) {
   for (const restore of restores) {
     const king = findUnit(state, restore.kingId);
     if (king) effects.floatText(unitCenter(metrics, king), `+${restore.healing}`, "#8cf0a4");
+  }
+
+  // Fat Cleric snacks: a small +HP / +MP top-up (Snack Break on defend, Emergency Snacks
+  // at the start of a raging turn). Fire-and-forget floats over her.
+  for (const snack of snacks) {
+    const unit = findUnit(state, snack.unitId);
+    if (!unit) continue;
+    const center = unitCenter(metrics, unit);
+    if (snack.hpRestored > 0) effects.floatText(center, `+${snack.hpRestored}`, "#8cf0a4");
+    if (snack.mpRestored > 0) effects.floatText(center, `+${snack.mpRestored} MP`, "#8cc8ff");
   }
 
   if (killed) audio.play("unitDefeated");
@@ -1471,6 +1492,32 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "purify", { targetId: target.id }))) {
       mode = null;
       setMessage("Purify resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:cleanse") {
+    // Friendly-only negative-status cleanse: click a highlighted ally in range (never self).
+    const target = unitAt(state, position);
+    const art = getArt(unit.type, "cleanse");
+    const reach = art?.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+    const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
+      chebyshevDistance(unit.position, target.position) <= reach;
+    if (!inReach) {
+      setMessage("Cleanse: click a highlighted ally in range (not yourself).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "cleanse", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Cleanse resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:focus-prayer") {
+    // Friendly-only heal-or-backfire prayer: click a highlighted ally in range (never self).
+    const target = unitAt(state, position);
+    const art = getArt(unit.type, "focus-prayer");
+    const reach = art?.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+    const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
+      chebyshevDistance(unit.position, target.position) <= reach;
+    if (!inReach) {
+      setMessage("Focus Prayer: click a highlighted ally in range (not yourself).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "focus-prayer", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Focus Prayer resolved. This unit's activation is complete.");
     }
   } else if (mode === "art:tether-grab") {
     // Grab the first ally OR enemy on a straight ray within range.

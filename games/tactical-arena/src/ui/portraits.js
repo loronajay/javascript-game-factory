@@ -49,6 +49,9 @@ export const PORTRAITS = Object.freeze({
   clod:        portrait("clod",        { x: 0.080, y: 0.068, w: 0.827, h: 0.878 }),
   "fat-knight": portrait("fat-knight", { x: 0.163, y: 0.067, w: 0.662, h: 0.853 }),
   "fat-wizard": portrait("fat-wizard", { x: 0.090, y: 0.055, w: 0.812, h: 0.885 }),
+  // Round battlefield priestess; measured alpha bbox off the 600×600 source.
+  "fat-cleric": portrait("fat-cleric", { x: 0.068, y: 0.060, w: 0.878, h: 0.860 }),
+  "fat-bowman": portrait("fat-bowman", { x: 0.080, y: 0.050, w: 0.840, h: 0.880 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

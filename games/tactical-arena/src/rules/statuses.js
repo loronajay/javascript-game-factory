@@ -1,5 +1,15 @@
 import { getUnitType } from "../core/unitCatalog.js";
 
+// The negative (debuff) statuses — the ones a cleanse should strip and a Focus Prayer
+// misfire can inflict. Positive statuses (empowered, battle-trauma) are deliberately
+// excluded so a scoped cleanse never removes a friendly buff. Ordered so a seeded roll
+// (Fat Cleric's Focus Prayer) picks deterministically across clients.
+export const NEGATIVE_STATUS_TYPES = Object.freeze(["blind", "silence", "poison", "slow", "stun"]);
+
+export function isNegativeStatus(status) {
+  return NEGATIVE_STATUS_TYPES.includes(status?.type);
+}
+
 export function statusImmunities(unit) {
   const definition = getUnitType(unit.type);
   const sources = [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt];
