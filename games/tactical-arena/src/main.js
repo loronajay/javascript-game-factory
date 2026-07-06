@@ -1,7 +1,7 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
@@ -681,6 +681,23 @@ async function resolveInstantArt(command) {
     if (targetBefore && resolved.effect?.applied) {
       await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "+1 RNG", "#f7e9c0");
     }
+  } else if (resolved?.artId === "flight" && actorBefore) {
+    // The Gargoyle surges to the landing tile (dash trail), then a TRUE blast pops on
+    // every enemy within a tile of it. `state` is pre-commit, so victims read at their
+    // current tiles; the token relocates when the board re-renders after commit.
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("flight", { actor: actorBefore, targets: [], path: resolved.path ?? [actorBefore.position] });
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "true");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#ffffff");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -987,6 +1004,7 @@ function playEventSounds(events) {
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
           artId === "self-destruct" ||
           artId === "anoint" || artId === "elevate" || artId === "heavenseeker" ||
+          artId === "flight" || artId === "pyroclasm" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
@@ -1010,9 +1028,37 @@ function playRolloverFx(events) {
   const mourns = events.filter((e) => e.type === "KING_MOURNS");
   const rallies = events.filter((e) => e.type === "SQUAD_RALLY");
   const restores = events.filter((e) => e.type === "KING_RESTORED");
-  if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length) return;
+  // Gargoyle: a free Volcanic-Rage Pyroclasm (fired at beginActivation) and Stone Body's
+  // melee/displacement recoil both surface here as fire-and-forget floats.
+  const erupts = events.filter((e) => e.type === "PYROCLASM_ERUPT");
+  const retaliations = events.filter((e) => e.type === "STONE_RETALIATION");
+  if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
+      !erupts.length && !retaliations.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
+
+  // Free Pyroclasm eruption (Volcanic Rage): float the magic damage on every enemy the
+  // rays caught, with a fiery impact. The state here is already post-eruption.
+  if (erupts.length) audio.play("nuke");
+  for (const erupt of erupts) {
+    for (const [id, amount] of Object.entries(erupt.damageByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      const center = unitCenter(metrics, unit ?? { position: { x: 0, y: 0 } });
+      effects.impact(center, false, "fire");
+      effects.floatText(center, `-${amount}`, "#ff9a3c");
+      if (!unit || unit.hp <= 0) { effects.deathBurst(center, teamColor(unit?.player ?? 1)); killed = true; }
+    }
+  }
+
+  // Stone Body recoil: a melee attacker / displacer takes true damage, floated over it.
+  for (const bite of retaliations) {
+    const offender = findUnit(state, bite.offenderId);
+    const center = unitCenter(metrics, offender ?? { position: { x: 0, y: 0 } });
+    effects.impact(center, false, "true");
+    effects.floatText(center, `-${bite.damage}`, "#e8f4ff");
+    if (!offender || offender.hp <= 0) { effects.deathBurst(center, teamColor(offender?.player ?? 1)); killed = true; }
+  }
 
   if (burns.length) audio.play("fireTick");
   for (const burn of burns) {
@@ -1146,6 +1192,14 @@ async function handleTile(position) {
       mode = null;
       setMessage("Flee complete. This unit's activation is complete.");
     }
+  } else if (mode === "art:flight") {
+    const flightLegal = getFlightTiles(state, unit, getArt(unit.type, "flight"));
+    if (!flightLegal.has(positionKey(position))) {
+      setMessage("Flight: choose a highlighted empty tile to fly onto.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "flight", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Flight complete. This unit's activation is complete.");
+    }
   } else if (mode === "art:volley-shot") {
     if (!getVolleyShotAimOptions(state, unit).some((c) => positionKey(c) === positionKey(position))) {
       setMessage("Hover a highlighted direction to preview the cone, then click to fire.", true);
@@ -1266,6 +1320,12 @@ async function handleTile(position) {
         mode = null;
         setMessage(`${art.name} resolved. This unit's activation is complete.`);
       }
+    } else if (art?.targeting?.shape === "lineBurst") {
+      // Self-centred line burst (Pyroclasm): any click confirms the eruption.
+      if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
+        mode = null;
+        setMessage(`${art.name} resolved. This unit's activation is complete.`);
+      }
     } else if (art?.effect?.type === "healAllies") {
       const clickedAlly = unitAt(state, position);
       if (!clickedAlly || clickedAlly.player !== unit.player) {
@@ -1378,12 +1438,17 @@ async function handleActionClick(action, unit) {
         return;
       }
       if (art?.selfCast) {
-        // Self-centred AoE blasts (Dark Bomb, Nuke) preview their detonation
-        // footprint first — staying in art mode lets the board light the blast
-        // zone and its victims; a click inside the zone confirms (see handleTile).
-        // Every other selfCast resolves immediately.
+        // Self-centred AoE blasts (Dark Bomb, Nuke) and the Gargoyle's Pyroclasm line
+        // burst preview their footprint first — staying in art mode lets the board light
+        // the zone and its victims; a click confirms (see handleTile). Every other
+        // selfCast resolves immediately.
         if (art.targeting?.shape === "nukeAura") {
           setMessage(`${art.name} (${art.mpCost} MP): ${art.description} Click inside the highlighted blast zone to detonate.`);
+          render();
+          return;
+        }
+        if (art.targeting?.shape === "lineBurst") {
+          setMessage(`${art.name} (${art.mpCost} MP): ${art.description} Click to erupt.`);
           render();
           return;
         }
@@ -1397,6 +1462,8 @@ async function handleActionClick(action, unit) {
       }
       const lead = action === "art:volley-shot"
         ? "Hover a direction to preview the cone, then click to fire."
+        : action === "art:flight"
+          ? "Choose a highlighted empty tile to fly onto."
         : action === "art:flee"
           ? "Choose a highlighted empty tile to teleport to."
           : action === "art:summon-ghoul"

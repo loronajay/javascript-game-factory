@@ -8,6 +8,13 @@ export function statusImmunities(unit) {
   ));
 }
 
+// True when a unit reflects a TARGETED status back onto the offender instead of taking
+// it (the Gargoyle's Stone Body). Read off passive data so no rule hard-codes the unit;
+// the reducer's single-target status sites redirect the application when this is set.
+export function reflectsStatus(unit) {
+  return Boolean(getUnitType(unit.type).passive?.effect?.reflectStatus);
+}
+
 export function applyStatus(unit, status) {
   if (status.type === "stun" && !isStunDuration(status.duration)) {
     return { applied: false, reason: "INVALID_DURATION", statuses: [...unit.statuses] };

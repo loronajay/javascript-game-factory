@@ -73,6 +73,9 @@ export const BOARD_SPRITES = Object.freeze({
   // Cropped from the 600×600 portrait, centered on the measured stance x=285 (the bow
   // overhang to the right + the wing spread are ignored, per the centering trap notes).
   angel:       sprite("angel",       520, 554),
+  // Cropped from the 600×600 portrait, centered on the measured feet-band stance x=291
+  // (wings spread wide; padded to keep the body dead-centre on the coin).
+  gargoyle:    sprite("gargoyle",    535, 574),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })

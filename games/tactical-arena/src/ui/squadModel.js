@@ -9,7 +9,8 @@ export const UNIT_CLASS_GROUPS = Object.freeze([
   Object.freeze({ id: "ranger", label: "Rangers" }),
   Object.freeze({ id: "support", label: "Supports" }),
   Object.freeze({ id: "mage", label: "Mages" }),
-  Object.freeze({ id: "tank", label: "Tanks" })
+  Object.freeze({ id: "tank", label: "Tanks" }),
+  Object.freeze({ id: "summon", label: "Summons" })
 ]);
 
 // Summons (Ghouls) are raised in-match, never drafted, so they are not pickable.

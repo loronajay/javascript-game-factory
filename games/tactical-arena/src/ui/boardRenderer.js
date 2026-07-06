@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { getBasicAttackDamageType, isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -145,7 +145,11 @@ export function isTargetedMode(mode, actor) {
     art.targeting?.shape !== "lineEnemy" &&
     // Angel's Anoint is friendly-only — it does its own ally highlighting below.
     art.targeting?.shape !== "ally" &&
-    art.targeting?.shape !== "protectAlly"
+    art.targeting?.shape !== "protectAlly" &&
+    // Gargoyle's Flight (empty-tile reposition) and Pyroclasm (self-centred line burst)
+    // do their own highlighting below, not the enemy-only Chebyshev box.
+    art.targeting?.shape !== "flightMove" &&
+    art.targeting?.shape !== "lineBurst"
   );
 }
 
@@ -236,6 +240,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
 
   if (actor && mode === "footwork") legal = getFootworkStepOptions(state, actor, footworkPath);
   if (actor && mode === "art:flee") legal = getLegalFleeTiles(state, actor);
+  // Flight: fly onto a highlighted empty tile (Chebyshev, diagonals allowed).
+  if (actor && mode === "art:flight") legal = getFlightTiles(state, actor, getArt(actor.type, "flight"));
   if (actor && mode === "art:summon-ghoul") legal = getSummonPlacementTiles(state, actor, getArt(actor.type, "summon-ghoul"));
   if (actor && mode === "art:build-cover") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "build-cover"));
   if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));
@@ -383,6 +389,19 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
+  // Gargoyle's Pyroclasm (lineBurst): wash the full reach of all 8 rays and light every
+  // enemy standing on a ray as a legal (bright) target — the burst burns through bodies,
+  // so a screened enemy is still lit.
+  let isPyroclasm = false;
+  if (actor && mode?.startsWith("art:")) {
+    const burstArt = getArt(actor.type, mode.slice("art:".length));
+    if (burstArt?.targeting?.shape === "lineBurst") {
+      isPyroclasm = true;
+      for (const tile of getPyroclasmReachTiles(state, actor, burstArt)) range.add(positionKey(tile));
+      for (const target of getPyroclasmTargets(state, actor, burstArt)) legal.add(positionKey(target.position));
+    }
+  }
+
   const path = new Set(footworkPath.map(positionKey));
   const metrics = createBoardMetrics(state.size);
   const view = createBoardViewBox(metrics, state.size);
@@ -455,7 +474,9 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
           // Anoint reticles an in-range ally (never self).
           (isAllyArt && u.id !== actor.id && u.player === actor.player) ||
           // Line abilities reticle their first-contact target (ally or enemy).
-          (isLineArt && u.id !== actor.id)
+          (isLineArt && u.id !== actor.id) ||
+          // Pyroclasm reticles every enemy caught on its rays.
+          (isPyroclasm && u.player !== actor.player)
         );
         return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state });
       }

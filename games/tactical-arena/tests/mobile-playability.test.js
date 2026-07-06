@@ -68,6 +68,7 @@ test("the document exposes the mobile playability shell", () => {
     "utf8",
   );
   const menusCss = readFileSync(new URL("../menus.css", import.meta.url), "utf8");
+  const styleCss = readFileSync(new URL("../style.css", import.meta.url), "utf8");
 
   assert.match(
     html,
@@ -80,6 +81,26 @@ test("the document exposes the mobile playability shell", () => {
     "every screen needs a return-to-arcade link",
   );
   assert.match(html, /id="landscapeGate"/, "portrait phones need a rotate gate");
+  assert.match(
+    html,
+    /class="ref-card manual-card"/,
+    "the Field Manual shell should have its own fixed-size card class",
+  );
+  assert.match(
+    styleCss,
+    /\.manual-card\s*\{[^}]*height:\s*min\(640px,\s*88vh\)/,
+    "the Field Manual card should hold a fixed height so Codex unit changes do not recenter the menu",
+  );
+  assert.match(
+    styleCss,
+    /#refBody\s*\{[^}]*display:\s*flex[\s\S]*?flex:\s*1[\s\S]*?min-height:\s*0/,
+    "the dynamic Codex mount point must flex inside the fixed manual card instead of clipping overflow",
+  );
+  assert.match(
+    styleCss,
+    /\.codex-detail\s*\{[^}]*min-height:\s*0[\s\S]*?overflow-y:\s*auto/,
+    "the Codex detail pane should be the vertical scroll container for long unit cards",
+  );
   assert.match(
     responsiveCss,
     /\[data-landscape-gate="on"\]\s+\.landscape-gate/,

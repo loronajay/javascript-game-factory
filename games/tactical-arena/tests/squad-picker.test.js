@@ -36,7 +36,10 @@ test("unit picker groups draftable units by class in roster order", () => {
     { id: "ranger", label: "Rangers", types: ["archer", "sniper", "angel"] },
     { id: "support", label: "Supports", types: ["mystic", "witch-doctor", "father-time", "king"] },
     { id: "mage", label: "Mages", types: ["magician", "necromancer"] },
-    { id: "tank", label: "Tanks", types: ["juggernaut"] }
+    { id: "tank", label: "Tanks", types: ["juggernaut", "gargoyle"] }
+  ]);
+  assert.deepEqual(groupedUnitTypes(["ghoul"]), [
+    { id: "summon", label: "Summons", types: ["ghoul"] }
   ]);
 });
 

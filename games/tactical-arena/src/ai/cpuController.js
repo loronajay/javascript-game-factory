@@ -135,7 +135,7 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
 
   // 5. Don't burn a costly blast on too few targets for no kill (decision 1/5 economy).
   const primaryArtAi = artAiFor(unit, plan);
-  if (primaryArtAi && (primaryArtAi.intent === "selfBlast" || primaryArtAi.intent === "coneAoe")) {
+  if (primaryArtAi && ["selfBlast", "coneAoe", "lineBurst", "flightStrike"].includes(primaryArtAi.intent)) {
     const minTargets = primaryArtAi.evHints?.minTargets ?? 1;
     if (enemyHits < minTargets && kills === 0) score -= AOE_WASTE_PENALTY;
   }

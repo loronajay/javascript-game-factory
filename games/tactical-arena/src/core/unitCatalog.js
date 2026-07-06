@@ -14,6 +14,7 @@ import { JUGGERNAUT } from "./units/juggernaut.js";
 import { KING } from "./units/king.js";
 import { ANGEL } from "./units/angel.js";
 import { MONK } from "./units/monk.js";
+import { GARGOYLE } from "./units/gargoyle.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -30,7 +31,8 @@ export const UNIT_TYPES = Object.freeze({
   juggernaut: JUGGERNAUT,
   king: KING,
   angel: ANGEL,
-  monk: MONK
+  monk: MONK,
+  gargoyle: GARGOYLE
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -367,6 +369,12 @@ export function getEffectiveStats(unit, state = null) {
       if (name in stats && Number.isFinite(value)) stats[name] += value;
     }
   }
+  // Heavy (Gargoyle): a hard Move ceiling no speed buff can exceed. Applied after every
+  // additive fold, before the floor clamp — folded generically off the passive data.
+  for (const source of allPassiveSources(getUnitType(unit.type))) {
+    const cap = source.effect?.maxMoveRange;
+    if (Number.isFinite(cap)) stats.moveRange = Math.min(stats.moveRange, cap);
+  }
   // A slowed unit still gets at least 1 MOVE, but a base-immobile unit (the King) stays
   // immobile — clamp the floor to the unit's own baseline so debuffs can't lift a 0.
   const baseMove = getUnitType(unit.type).stats.moveRange;
@@ -459,7 +467,11 @@ export const AI_INTENTS = Object.freeze([
   // Angel's single-ally targeted buff (Anoint: +1 range on a friendly unit):
   "buffAlly",
   // Monk's guarded ally reposition + defend handoff:
-  "protectAlly"
+  "protectAlly",
+  // Gargoyle's abilities:
+  //   flightStrike — Flight: reposition (Move + 1) then a small TRUE blast on landing.
+  //   lineBurst    — Pyroclasm: hit every enemy on any of the 8 straight rays in range.
+  "flightStrike", "lineBurst"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

@@ -9,7 +9,7 @@ import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createUnitFigure } from "../src/ui/unitRenderer.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
-import { buildCodex, buildCodexForTypes } from "../src/ui/codex.js";
+import { buildCodex, buildCodexForTypes, mountCodex } from "../src/ui/codex.js";
 
 class TestStyle {
   constructor() {
@@ -32,7 +32,21 @@ class TestElement {
     this.className = "";
     this.style = new TestStyle();
     this.listeners = new Map();
+    this.dataset = {};
+    this.textContent = "";
     this._innerHTML = "";
+    this.classList = {
+      add: (...names) => this.setClasses([...new Set([...this.classNames(), ...names])]),
+      remove: (...names) => this.setClasses(this.classNames().filter((name) => !names.includes(name))),
+      contains: (name) => this.classNames().includes(name),
+      toggle: (name, force) => {
+        const has = this.classNames().includes(name);
+        const shouldAdd = force ?? !has;
+        if (shouldAdd && !has) this.classList.add(name);
+        if (!shouldAdd && has) this.classList.remove(name);
+        return shouldAdd;
+      }
+    };
   }
 
   set innerHTML(value) {
@@ -49,8 +63,13 @@ class TestElement {
     return this._innerHTML;
   }
 
-  append(child) {
+  append(...children) {
+    this.children.push(...children);
+  }
+
+  appendChild(child) {
     this.children.push(child);
+    return child;
   }
 
   replaceChildren(...children) {
@@ -67,6 +86,12 @@ class TestElement {
     return this.findByClass(className);
   }
 
+  querySelectorAll(selector) {
+    if (!selector.startsWith(".")) return [];
+    const className = selector.slice(1);
+    return this.findAllByClass(className);
+  }
+
   findByClass(className) {
     if (this.className.split(/\s+/).includes(className)) return this;
     for (const child of this.children) {
@@ -74,6 +99,23 @@ class TestElement {
       if (match) return match;
     }
     return null;
+  }
+
+  findAllByClass(className) {
+    const matches = [];
+    if (this.className.split(/\s+/).includes(className)) matches.push(this);
+    for (const child of this.children) {
+      matches.push(...(child.findAllByClass?.(className) ?? []));
+    }
+    return matches;
+  }
+
+  classNames() {
+    return this.className.split(/\s+/).filter(Boolean);
+  }
+
+  setClasses(names) {
+    this.className = names.join(" ");
   }
 }
 
@@ -398,6 +440,63 @@ test("the codex lists Stun as an auto-spent status effect", () => {
 
   assert.match(html, /<span class="ref-tag status">Stun<\/span>/);
   assert.match(html, /auto-spent/);
+});
+
+test("the mounted codex separates unit categories from the statuses tab", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const container = new TestElement("div");
+    mountCodex(container, [
+      UNIT_TYPES.swordsman,
+      UNIT_TYPES.archer,
+      UNIT_TYPES.mystic,
+      UNIT_TYPES.paladin
+    ]);
+
+    const layout = container.children[0];
+    const categoryTabs = layout.findByClass("codex-category-tabs");
+    const body = layout.findByClass("codex-body");
+    const nav = layout.findByClass("codex-nav");
+    const detail = layout.findByClass("codex-detail");
+
+    assert.ok(categoryTabs, "codex should render a top-level category tab strip");
+    assert.deepEqual(
+      categoryTabs.children.map((tab) => tab.textContent),
+      ["Melees", "Rangers", "Supports", "Statuses"]
+    );
+    assert.deepEqual(
+      nav.children.map((button) => button.dataset.unitId),
+      ["swordsman", "paladin"]
+    );
+    assert.equal(nav.children.some((button) => button.dataset.unitId === "__status__"), false);
+
+    const statusTab = categoryTabs.children.find((tab) => tab.dataset.categoryId === "__status__");
+    statusTab.listeners.get("click")();
+
+    assert.match(body.className, /\bis-status-view\b/);
+    assert.equal(nav.children.length, 0);
+    assert.match(detail.innerHTML, /Status Effects/);
+
+    const rangerTab = categoryTabs.children.find((tab) => tab.dataset.categoryId === "ranger");
+    rangerTab.listeners.get("click")();
+
+    assert.doesNotMatch(body.className, /\bis-status-view\b/);
+    assert.deepEqual(nav.children.map((button) => button.dataset.unitId), ["archer"]);
+
+    const fullContainer = new TestElement("div");
+    mountCodex(fullContainer, Object.values(UNIT_TYPES));
+    const fullTabs = fullContainer.children[0].findByClass("codex-category-tabs");
+    assert.ok(fullTabs.children.some((tab) => tab.textContent === "Summons"));
+
+    const summonTab = fullTabs.children.find((tab) => tab.dataset.categoryId === "summon");
+    summonTab.listeners.get("click")();
+    const fullNav = fullContainer.children[0].findByClass("codex-nav");
+    assert.deepEqual(fullNav.children.map((button) => button.dataset.unitId), ["ghoul"]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
 });
 
 test("the Paladin codex entry lists Hand of Life and the full passive stack", () => {

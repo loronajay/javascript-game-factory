@@ -1,5 +1,8 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
+import { groupedUnitTypes } from "./squadModel.js";
+
+const STATUS_CATEGORY_ID = "__status__";
 
 export const STAT_GLOSSARY = [
   ["Blind", "Afflicted unit's next attack automatically misses. Duration set per ability."],
@@ -105,8 +108,17 @@ export function buildCodex() {
 export function mountCodex(containerEl, unitTypeDefs) {
   containerEl.replaceChildren();
 
+  const groups = codexUnitGroups(unitTypeDefs);
+
   const layout = document.createElement("div");
   layout.className = "codex-layout";
+
+  const categoryTabs = document.createElement("div");
+  categoryTabs.className = "codex-category-tabs";
+  categoryTabs.setAttribute?.("role", "tablist");
+
+  const bodyShell = document.createElement("div");
+  bodyShell.className = "codex-body";
 
   const nav = document.createElement("nav");
   nav.className = "codex-nav";
@@ -114,14 +126,22 @@ export function mountCodex(containerEl, unitTypeDefs) {
   const detail = document.createElement("div");
   detail.className = "codex-detail";
 
-  function activate(id) {
+  function activateCategory(id) {
+    for (const tab of categoryTabs.querySelectorAll(".codex-category-tab")) {
+      const active = tab.dataset.categoryId === id;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute?.("aria-selected", active ? "true" : "false");
+    }
+  }
+
+  function activateUnit(id) {
     for (const item of nav.querySelectorAll(".codex-nav-item")) {
       item.classList.toggle("is-active", item.dataset.unitId === id);
     }
   }
 
   function showUnit(def) {
-    activate(def.id);
+    activateUnit(def.id);
     const section = document.createElement("section");
     section.className = "ref-unit codex-unit-detail";
     // Hero band: the painted portrait beside the name, so the Codex reads as a
@@ -139,41 +159,73 @@ export function mountCodex(containerEl, unitTypeDefs) {
     detail.replaceChildren(section);
   }
 
+  function renderNav(defs) {
+    nav.replaceChildren();
+    for (const def of defs) {
+      const btn = document.createElement("button");
+      btn.className = "codex-nav-item";
+      btn.dataset.unitId = def.id;
+      btn.type = "button";
+      btn.appendChild(createPortrait(def, { variant: "is-thumb" }));
+      const navName = document.createElement("span");
+      navName.className = "codex-nav-name";
+      navName.textContent = def.name;
+      btn.appendChild(navName);
+      btn.addEventListener("click", () => showUnit(def));
+      nav.appendChild(btn);
+    }
+  }
+
+  function showGroup(group) {
+    bodyShell.classList.remove("is-status-view");
+    activateCategory(group.id);
+    renderNav(group.defs);
+    if (group.defs.length > 0) showUnit(group.defs[0]);
+  }
+
   function showStatus() {
-    activate("__status__");
+    activateCategory(STATUS_CATEGORY_ID);
+    bodyShell.classList.add("is-status-view");
+    nav.replaceChildren();
     detail.innerHTML = `<section class="ref-unit codex-unit-detail">${statusDetailHtml()}</section>`;
   }
 
-  // Build unit nav items.
-  for (const def of unitTypeDefs) {
+  for (const group of groups) {
     const btn = document.createElement("button");
-    btn.className = "codex-nav-item";
-    btn.dataset.unitId = def.id;
+    btn.className = "codex-category-tab";
+    btn.dataset.categoryId = group.id;
     btn.type = "button";
-    btn.appendChild(createPortrait(def, { variant: "is-thumb" }));
-    const navName = document.createElement("span");
-    navName.className = "codex-nav-name";
-    navName.textContent = def.name;
-    btn.appendChild(navName);
-    btn.addEventListener("click", () => showUnit(def));
-    nav.appendChild(btn);
+    btn.setAttribute?.("role", "tab");
+    btn.textContent = group.label;
+    btn.addEventListener("click", () => showGroup(group));
+    categoryTabs.appendChild(btn);
   }
 
-  // Status effects entry — always present regardless of unit subset.
   const statusBtn = document.createElement("button");
-  statusBtn.className = "codex-nav-item codex-nav-status";
-  statusBtn.dataset.unitId = "__status__";
+  statusBtn.className = "codex-category-tab codex-category-status";
+  statusBtn.dataset.categoryId = STATUS_CATEGORY_ID;
   statusBtn.type = "button";
-  statusBtn.innerHTML =
-    `<span class="codex-nav-glyph">⚡</span>` +
-    `<span class="codex-nav-name">Statuses</span>`;
+  statusBtn.setAttribute?.("role", "tab");
+  statusBtn.textContent = "Statuses";
   statusBtn.addEventListener("click", showStatus);
-  nav.appendChild(statusBtn);
+  categoryTabs.appendChild(statusBtn);
 
-  layout.appendChild(nav);
-  layout.appendChild(detail);
+  bodyShell.appendChild(nav);
+  bodyShell.appendChild(detail);
+  layout.appendChild(categoryTabs);
+  layout.appendChild(bodyShell);
   containerEl.appendChild(layout);
 
-  // Default: first unit.
-  if (unitTypeDefs.length > 0) showUnit(unitTypeDefs[0]);
+  if (groups.length > 0) showGroup(groups[0]);
+  else showStatus();
+}
+
+function codexUnitGroups(unitTypeDefs) {
+  const defsById = new Map(unitTypeDefs.map((def) => [def.id, def]));
+  return groupedUnitTypes(unitTypeDefs.map((def) => def.id))
+    .map((group) => ({
+      ...group,
+      defs: group.types.map((type) => defsById.get(type)).filter(Boolean)
+    }))
+    .filter((group) => group.defs.length > 0);
 }

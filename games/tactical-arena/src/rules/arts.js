@@ -238,6 +238,68 @@ export function getLineReachTiles(state, actor, range) {
   return tiles;
 }
 
+// Flight (Gargoyle): empty on-board, non-wall tiles the Gargoyle can fly onto — a
+// Chebyshev radius (diagonals allowed) of (effective Move + moveBonus). Move already
+// folds Heavy's cap + any King MOVE buff via getEffectiveStats, so the reach can't
+// drift from the live stat. Reuses the flee-style empty-tile sweep.
+export function getFlightRange(state, actor, art) {
+  return getEffectiveStats(actor, state).moveRange + (art?.targeting?.moveBonus ?? 1);
+}
+export function getFlightTiles(state, actor, art) {
+  const range = getFlightRange(state, actor, art);
+  const legal = new Set();
+  for (let dx = -range; dx <= range; dx += 1) {
+    for (let dy = -range; dy <= range; dy += 1) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > range) continue;
+      if (dx === 0 && dy === 0) continue;
+      const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+      if (!isOnBoard(state, pos) || unitAt(state, pos) || isWallAt(state, pos)) continue;
+      legal.add(positionKey(pos));
+    }
+  }
+  return legal;
+}
+
+// Pyroclasm (Gargoyle): every ENEMY standing on any of the 8 straight rays within range.
+// UNLIKE the Juggernaut's line targeting, the ray does NOT stop at the first body — it
+// burns through units ("all enemies touching the lines"), so a screen of allies/enemies
+// doesn't shield the ones behind them. Only a wall or the board edge stops a ray. Range
+// folds Higher Ground + Volcanic Rage's +2 via getArtTargetRange.
+export function getPyroclasmTargets(state, actor, art) {
+  const reach = getArtTargetRange(state, actor, art);
+  const targets = [];
+  const seen = new Set();
+  for (const dir of LINE_DIRECTIONS) {
+    for (let d = 1; d <= reach; d += 1) {
+      const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
+      if (!isOnBoard(state, pos)) break;
+      if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
+      const occupant = unitAt(state, pos);
+      if (occupant && areEnemies(actor, occupant) && !seen.has(occupant.id)) {
+        seen.add(occupant.id);
+        targets.push(occupant);
+      }
+    }
+  }
+  return targets;
+}
+
+// Every tile Pyroclasm's rays reach (for the range wash the player sees). Each ray runs
+// to the board edge or a wall (exclusive); it does NOT stop at a unit, matching the burn.
+export function getPyroclasmReachTiles(state, actor, art) {
+  const reach = getArtTargetRange(state, actor, art);
+  const tiles = [];
+  for (const dir of LINE_DIRECTIONS) {
+    for (let d = 1; d <= reach; d += 1) {
+      const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
+      if (!isOnBoard(state, pos)) break;
+      if (isWallAt(state, pos)) break;
+      tiles.push(pos);
+    }
+  }
+  return tiles;
+}
+
 export function getTilePulseTargets(state, actor, art) {
   const effect = art.effect;
   if (effect?.type !== "tilePulse") return [];

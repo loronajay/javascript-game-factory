@@ -1,12 +1,12 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getFirePlacementTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { getBasicAttackDamageType, getCritOnHitStatus, getLineAttackTargets, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { getBasicAttackDamageType, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
-import { applyStatus, isStunned, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { applyStatus, isStunned, reflectsStatus, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect, isDamageTypeImmuneByStance } from "../rules/stances.js";
 
 const ERR = Object.freeze({
@@ -49,6 +49,22 @@ const accept = (nextState, events = []) => {
   if (rollover) delete nextState.pendingRolloverEvents;
   return { accepted: true, nextState, events: rollover ? [...events, ...rollover] : events };
 };
+
+// Apply a rolled status, honoring Stone Body reflection: a status TARGETED at a
+// reflecting unit (Gargoyle) is issued to the OFFENDER instead of the target. One roll,
+// one application — `rollValue`/`chanceMultiplier` pass straight through to
+// resolveStatusEffect. Returns the effect result plus `reflected` so the caller can
+// report it. The recipient's statuses are written here; the caller reads no statuses.
+function applyRolledStatus(target, effect, rollValue, offender, chanceMultiplier = 1) {
+  const recipient = (offender && offender.id !== target.id && reflectsStatus(target)) ? offender : target;
+  const result = resolveStatusEffect(recipient, effect, rollValue, chanceMultiplier);
+  if (result.statuses) { recipient.statuses = result.statuses; }
+  delete result.statuses;
+  // Only tag a reflection when it actually happened, so the common (non-reflect) event
+  // shape stays identical to the pre-Stone-Body reducer.
+  if (recipient.id !== target.id) result.reflected = true;
+  return result;
+}
 
 export function applyCommand(state, command) {
   const result = dispatchCommand(state, command);
@@ -119,6 +135,10 @@ function beginActivation(state, command) {
     return reject(ERR.KING_MUST_ACT_FIRST);
   }
 
+  // A genuinely fresh activation (not a re-open of the same unit's already-open one),
+  // so a one-shot begin effect (Gargoyle's free Pyroclasm) can't double-fire.
+  const fresh = state.activation?.unitId !== result.unit.id;
+
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
   unit.defending = false;
@@ -138,7 +158,46 @@ function beginActivation(state, command) {
     spellUsed: false,
     bonusActionGroups: []
   };
-  return accept(next, [{ type: "ACTIVATION_BEGAN", unitId: unit.id }]);
+  // Volcanic Rage (Gargoyle): every Nth raging activation, erupt a free Pyroclasm BEFORE
+  // the turn opens. It spends no MP and no action — the Gargoyle still takes its full turn.
+  // Fired here (deterministic, no roll — magic AoE) so online lockstep clients all agree.
+  const events = [{ type: "ACTIVATION_BEGAN", unitId: unit.id }];
+  const freeCast = fresh ? getRageEffectValue(unit, "freePyroclasm", null) : null;
+  if (freeCast && isRaging(unit)) {
+    unit.volcanicCounter = (unit.volcanicCounter ?? 0) + 1;
+    if (unit.volcanicCounter % Math.max(1, freeCast.every ?? 3) === 0) {
+      const art = getArt(unit.type, freeCast.artId);
+      if (art) {
+        const { targetIds, damageByTarget } = applyPyroclasmDamage(next, unit, art);
+        resolveVictory(next);
+        if (next.phase !== "playing") next.activation = null; // the eruption ended the match
+        events.push({ type: "PYROCLASM_ERUPT", actorId: unit.id, targetIds, damageByTarget });
+      }
+    }
+  }
+  return accept(next, events);
+}
+
+// Shared Pyroclasm damage: 5 magic to every enemy on any of the 8 straight rays within
+// range. Magic honors Defend halving, Dead Zone team reduction, Black Death immunity,
+// and Bruiser-Mode magic vulnerability — exactly like resolveNuke, so a manual cast and
+// the free Volcanic-Rage eruption resolve identically. Mutates `state`; returns the hit
+// set for the event. Does NOT resolve victory (the caller does, after).
+function applyPyroclasmDamage(state, actor, art) {
+  const damageByTarget = {};
+  const targetIds = [];
+  for (const target of getPyroclasmTargets(state, actor, art)) {
+    const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+    const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
+    const reduced = isDamageTypeImmuneByStance(target, "magic")
+      ? 0
+      : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
+    const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+    const dealt = Math.min(target.hp, damage);
+    target.hp = Math.max(0, target.hp - damage);
+    if (dealt > 0 || damage > 0) { targetIds.push(target.id); damageByTarget[target.id] = damage; }
+  }
+  return { targetIds, damageByTarget };
 }
 
 function moveUnit(state, command) {
@@ -234,13 +293,25 @@ function attack(state, command) {
   const damage = primaryDamage ?? strike(nextTarget);
   // A magic strike (Blessed Arrow) never feeds a physical-damage heal aura (Hand of Life).
   const healingEvents = basicDamageType === "physical" ? resolvePhysicalDamageHealing(next, actor, totalDamageDealt) : [];
+  // Stone Body (Gargoyle): a landed MELEE strike on a DEFENDING Gargoyle returns TRUE
+  // damage to the attacker (ignoring the attacker's DEF/Defend). Melee = the attacker
+  // stands adjacent; a ranged shot (distance > 1) never triggers it. A Gargoyle raging
+  // under Volcanic Rage is always defending, so it always bites a melee attacker.
+  const retaliationEvents = [];
+  const thorns = getMeleeDefendRetaliation(nextTarget);
+  if (thorns > 0 && nextTarget.hp > 0 && isDefending(nextTarget) &&
+      chebyshevDistance(actor.position, nextTarget.position) === 1) {
+    const dealt = Math.min(actor.hp, thorns);
+    actor.hp = Math.max(0, actor.hp - thorns);
+    if (dealt > 0) retaliationEvents.push({ type: "STONE_RETALIATION", offenderId: actor.id, sourceId: nextTarget.id, damage: dealt });
+  }
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
     hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget,
     ...(blinded.length ? { blinded } : {}), ...damageFields
-  }, ...triggerEvents, ...healingEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents]);
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
@@ -323,7 +394,10 @@ const ART_RESOLVERS = new Map([
   ["higher-ground", resolveKingCommand],
   // Monk: fixed-power kick with conditional knockback, and an ally guard reposition.
   ["front-kick", resolveFrontKick],
-  ["protect", resolveProtect]
+  ["protect", resolveProtect],
+  // Gargoyle: fly-then-blast reposition, and a self-centred line burst.
+  ["flight", resolveFlight],
+  ["pyroclasm", resolvePyroclasm]
 ]);
 
 function useArt(state, command) {
@@ -408,9 +482,8 @@ function resolveTargetedArt(state, command, art) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     // Misfortune Stance (any living Witch Doctor) doubles the status chance globally.
-    effect = resolveStatusEffect(target, art.effect, roll.value, getGlobalStatusChanceMultiplier(next));
-    if (effect.statuses) target.statuses = effect.statuses;
-    delete effect.statuses;
+    // Stone Body reflects a targeted status back onto the caster (applyRolledStatus).
+    effect = applyRolledStatus(target, art.effect, roll.value, actor, getGlobalStatusChanceMultiplier(next));
   } else if (art.effect?.type === "heal") {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
@@ -494,6 +567,58 @@ function resolveNuke(state, command, art) {
     targetIds,
     damageByTarget,
     mpCost: art.mpCost
+  }]);
+}
+
+// Flight (Gargoyle): fly onto a chosen empty tile within (Move + 1) Chebyshev spaces,
+// then deal a small TRUE blast to every enemy within `blastRadius` of the landing tile
+// (true damage ignores DEF and Defend). Spends MP + the whole activation like any ART.
+function resolveFlight(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const placement = command.targetPosition;
+  if (!placement || !getFlightTiles(state, actorState, art).has(positionKey(placement))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const from = { ...actor.position };
+  actor.position = { ...placement };
+  actor.mp -= art.mpCost;
+
+  const radius = art.blastRadius ?? 1;
+  const amount = art.damage?.amount ?? 0;
+  const damageByTarget = {};
+  const targetIds = [];
+  for (const target of livingUnits(next)) {
+    if (!areEnemies(actor, target)) continue;
+    if (chebyshevDistance(actor.position, target.position) > radius) continue;
+    const dealt = Math.min(target.hp, amount);
+    target.hp = Math.max(0, target.hp - amount);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = dealt;
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id,
+    path: [from, { ...placement }], targetIds, damageByTarget, mpCost: art.mpCost
+  }]);
+}
+
+// Pyroclasm (Gargoyle): a self-centred line burst — 5 magic to every enemy standing on
+// any of the 8 straight rays within range (a wall/edge stops a ray; a body does NOT).
+// Shares the magic-damage math with the free Volcanic-Rage eruption (applyPyroclasmDamage).
+function resolvePyroclasm(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const { targetIds, damageByTarget } = applyPyroclasmDamage(next, actor, art);
+  actor.mp -= art.mpCost;
+  next.activation.spellUsed = true;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget, mpCost: art.mpCost
   }]);
 }
 
@@ -860,9 +985,8 @@ function resolveStatusCast(state, command, art) {
   const roll = drawValue(next.rngState, command.effectRoll);
   next.rngState = roll.rngState;
   // Misfortune Stance (any living Witch Doctor) doubles the status chance globally.
-  const effect = resolveStatusEffect(target, art.effect, roll.value, getGlobalStatusChanceMultiplier(next));
-  if (effect.statuses) target.statuses = effect.statuses;
-  delete effect.statuses;
+  // Stone Body reflects a targeted status back onto the caster (applyRolledStatus).
+  const effect = applyRolledStatus(target, art.effect, roll.value, actor, getGlobalStatusChanceMultiplier(next));
 
   spendAndAdvance(next, actor);
   return accept(next, [{
@@ -961,12 +1085,15 @@ function resolveTimeStretch(state, command, art) {
   actor.mp -= art.mpCost;
 
   const spec = enemy ? art.enemy : art.ally;
-  const result = applyStatus(target, {
+  // Stone Body reflects a slow (the enemy branch) back onto Father Time; a friendly
+  // haste is never reflected.
+  const recipient = (enemy && reflectsStatus(target)) ? actor : target;
+  const result = applyStatus(recipient, {
     type: spec.status,
     duration: spec.durationTurns,
     ...(spec.statModifiers ? { statModifiers: { ...spec.statModifiers } } : {})
   });
-  if (result.applied) target.statuses = result.statuses;
+  if (result.applied) recipient.statuses = result.statuses;
 
   spendAndAdvance(next, actor);
   return accept(next, [{
@@ -1038,7 +1165,13 @@ function resolveTetherGrab(state, command, art) {
     }
   }
 
-  const destination = { x: actor.position.x + hit.dir.x, y: actor.position.y + hit.dir.y };
+  // Stone Body: a displacement-immune target (Gargoyle) cannot be hauled — it stays put
+  // and the grabber takes displacement-recoil TRUE damage. The grab's magic hit (below)
+  // still lands; only the pull is negated.
+  const immobile = resistsDisplacement(target);
+  const destination = immobile
+    ? { ...target.position }
+    : { x: actor.position.x + hit.dir.x, y: actor.position.y + hit.dir.y };
   const from = { ...target.position };
   target.position = { ...destination };
 
@@ -1060,13 +1193,23 @@ function resolveTetherGrab(state, command, art) {
     }
   }
 
+  const stoneEvents = [];
+  if (immobile && target.hp > 0) {
+    const retaliation = getDisplacementRetaliation(target);
+    if (retaliation > 0) {
+      const dealt = Math.min(actor.hp, retaliation);
+      actor.hp = Math.max(0, actor.hp - retaliation);
+      if (dealt > 0) stoneEvents.push({ type: "STONE_RETALIATION", offenderId: actor.id, sourceId: target.id, damage: dealt });
+    }
+  }
+
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     from, to: { ...destination }, damage, hit: true, rolled: grabsEnemy, critical: Boolean(swing?.critical),
-    targetIds, damageByTarget, mpCost: cost
-  }]);
+    displaced: !immobile, targetIds, damageByTarget, mpCost: cost
+  }, ...stoneEvents]);
 }
 
 // Rocket Punch: a fixed-power physical strike on the first ENEMY on a straight ray within
@@ -1110,9 +1253,8 @@ function resolveRocketPunch(state, command, art) {
   if (target.hp > 0) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
-    effect = resolveStatusEffect(target, art.effect, roll.value, getGlobalStatusChanceMultiplier(next));
-    if (effect.statuses) target.statuses = effect.statuses;
-    delete effect.statuses;
+    // Stone Body reflects the stun back onto the Juggernaut (applyRolledStatus).
+    effect = applyRolledStatus(target, art.effect, roll.value, actor, getGlobalStatusChanceMultiplier(next));
   }
 
   spendAndAdvance(next, actor);
@@ -1120,7 +1262,7 @@ function resolveRocketPunch(state, command, art) {
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     targetIds: [target.id], damageByTarget: { [target.id]: damage },
-    hit: true, critical: swing.critical, stunned: Boolean(effect?.applied), mpCost: cost
+    hit: true, critical: swing.critical, stunned: Boolean(effect?.applied && !effect.reflected), mpCost: cost
   }]);
 }
 
@@ -1183,11 +1325,24 @@ function resolveFrontKick(state, command, art) {
     y: Math.sign(targetState.position.y - actorState.position.y)
   };
   const shouldKnockback = target.hp > 0 && (swing.critical || getRageEffectValue(actor, "frontKickAlwaysKnockback", false));
+  // Stone Body: a displacement-immune target (Gargoyle) is never knocked back — the kick
+  // still deals its damage, but the recoil TRUE damage lands on the kicker instead.
+  const immobile = resistsDisplacement(target);
+  const stoneEvents = [];
   const from = { ...target.position };
   let to = { ...target.position };
   if (shouldKnockback && (direction.x !== 0 || direction.y !== 0)) {
-    to = knockbackDestination(next, target, direction, art.knockback?.distance ?? 3);
-    target.position = { ...to };
+    if (immobile) {
+      const retaliation = getDisplacementRetaliation(target);
+      if (retaliation > 0) {
+        const dealt = Math.min(actor.hp, retaliation);
+        actor.hp = Math.max(0, actor.hp - retaliation);
+        if (dealt > 0) stoneEvents.push({ type: "STONE_RETALIATION", offenderId: actor.id, sourceId: target.id, damage: dealt });
+      }
+    } else {
+      to = knockbackDestination(next, target, direction, art.knockback?.distance ?? 3);
+      target.position = { ...to };
+    }
   }
 
   const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
@@ -1199,7 +1354,7 @@ function resolveFrontKick(state, command, art) {
     hit: true, critical: swing.critical, damage: { ...result, damage },
     knockedBack: shouldKnockback && (from.x !== to.x || from.y !== to.y),
     from, to, mpCost: cost
-  }, ...healingEvents]);
+  }, ...healingEvents, ...stoneEvents]);
 }
 
 function resolveProtect(state, command, art) {

@@ -30,7 +30,10 @@ function createUnit(spec) {
     // during that same turn). Meaningless for every non-commander unit (stays null/0).
     command: spec.command ?? null,
     previousCommand: spec.previousCommand ?? null,
-    commandTurn: spec.commandTurn ?? 0
+    commandTurn: spec.commandTurn ?? 0,
+    // Gargoyle Volcanic Rage: counts raging activations so a free Pyroclasm fires
+    // every 3rd. Meaningless for every other unit (stays 0).
+    volcanicCounter: spec.volcanicCounter ?? 0
   };
 }
 

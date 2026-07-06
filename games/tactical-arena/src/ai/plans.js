@@ -32,11 +32,13 @@ import {
   FOOTWORK_DAMAGE,
   getArtTargetRange,
   getFirePlacementTiles,
+  getFlightTiles,
   getFootworkStepOptions,
   getFootworkSteps,
   getLegalFleeTiles,
   getLineTargets,
   getProtectLandingTiles,
+  getPyroclasmTargets,
   getRevivePlacementTiles,
   getReviveTargets,
   getSelfBlastRadius,
@@ -289,6 +291,27 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "flightStrike": {
+      // Flight: fly to an empty tile, then a small TRUE blast around the landing. Only
+      // offer landings that would actually catch an enemy in the blast (capped), so the
+      // Gargoyle repositions purposefully instead of blinking to empty air.
+      const radius = art.blastRadius ?? 1;
+      const tiles = tilesFromKeys(getFlightTiles(state, unit, art))
+        .filter((tile) => livingUnits(state).some((u) => areEnemies(unit, u) && chebyshevDistance(tile, u.position) <= radius))
+        .sort((a, b) => nearestEnemyDistance(state, unit.player, a) - nearestEnemyDistance(state, unit.player, b))
+        .slice(0, PLACEMENT_KEEP);
+      for (const tile of tiles) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile } }));
+      }
+      break;
+    }
+    case "lineBurst": {
+      // Pyroclasm: a self-centred burst hitting every enemy on the 8 rays in range.
+      if (getPyroclasmTargets(state, unit, art).length > 0) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -430,6 +453,30 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
         actor.position = { x: ally.position.x - step.x, y: ally.position.y - step.y };
         actor.defending = true;
         ally.defending = true;
+      }
+      break;
+    }
+    case "flightStrike": {
+      // Fly to the landing tile, then a TRUE blast (ignores DEF/Defend) to enemies within
+      // blastRadius of it. Set the projected final position so exposure scoring reads it.
+      actor.position = { ...primary.targetPosition };
+      const radius = art.blastRadius ?? 1;
+      const amount = art.damage?.amount ?? 0;
+      for (const target of board) {
+        if (!areEnemies(actor, target) || chebyshevDistance(actor.position, target.position) > radius) continue;
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: "true" }).damage);
+      }
+      break;
+    }
+    case "lineBurst": {
+      // Pyroclasm: magic to every enemy on the rays (Defend/Dead Zone honored). The cast
+      // has no move, so the ray geometry reads from the real state at the origin.
+      const amount = art.damage?.amount ?? 0;
+      const dtype = art.damage?.type ?? "magic";
+      const ids = new Set(getPyroclasmTargets(state, actor, art).map((u) => u.id));
+      for (const target of board) {
+        if (!ids.has(target.id)) continue;
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: dtype }).damage);
       }
       break;
     }

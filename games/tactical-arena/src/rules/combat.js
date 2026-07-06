@@ -290,3 +290,26 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
 export function isBlinded(unit) {
   return (unit.statuses ?? []).some((status) => status.type === "blind");
 }
+
+// --- Stone Body (Gargoyle) ---------------------------------------------------
+// Passive-data predicates read centrally by the reducer so no strike/displacement
+// path hard-codes the unit. All return 0 (no effect) for any unit without Stone Body.
+
+// TRUE damage a DEFENDING unit returns to a MELEE attacker (the Gargoyle's thorns).
+export function getMeleeDefendRetaliation(target) {
+  const effect = getUnitType(target.type).passive?.effect;
+  return effect?.type === "stoneBody" ? Math.max(0, Number(effect.meleeDefendRetaliation) || 0) : 0;
+}
+
+// True when a unit cannot be displaced (pulled / knocked back). The paired retaliation
+// is read from getDisplacementRetaliation.
+export function resistsDisplacement(unit) {
+  return Boolean(getUnitType(unit.type).passive?.effect?.displacementImmune);
+}
+
+// TRUE damage the source of a displacement ART takes when it targets a displacement-immune
+// unit (the Gargoyle bites back). 0 for any unit without Stone Body.
+export function getDisplacementRetaliation(unit) {
+  const effect = getUnitType(unit.type).passive?.effect;
+  return effect?.type === "stoneBody" ? Math.max(0, Number(effect.displacementRetaliation) || 0) : 0;
+}

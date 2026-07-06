@@ -19,6 +19,7 @@ function begin(state, unitId, player = 1) {
 }
 
 test("Angel is a holy Ranger with Blessed Arrow, Anoint, Elevate, and Heaven's Wrath", () => {
+  assert.equal(UNIT_TYPES.angel.glyph, "\u{1FABD}");
   assert.deepEqual(UNIT_TYPES.angel.stats, {
     moveRange: 2, attackRange: 5, strength: 3, defense: 3, maxHp: 24, maxMp: 37
   });

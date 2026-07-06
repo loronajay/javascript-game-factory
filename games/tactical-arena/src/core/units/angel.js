@@ -24,7 +24,7 @@
 export const ANGEL = Object.freeze({
   id: "angel",
   name: "Angel",
-  glyph: "😇",
+  glyph: "\u{1FABD}",
   classType: "ranger",
   ai: Object.freeze({ threatValue: 15, role: "support", protect: true }),
   stats: Object.freeze({

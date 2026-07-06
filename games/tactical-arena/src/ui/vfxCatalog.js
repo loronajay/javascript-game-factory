@@ -504,6 +504,30 @@ const ABILITY_VFX = Object.freeze({
     durationMs: 640,
     windup: Object.freeze({ style: "gather", durationMs: 380, particleCount: 9 }),
     colors: Object.freeze({ core: "#fff2a8", trail: "#f0e0b0", impact: "#ffffff" })
+  }),
+  // Gargoyle — Flight: a heavy stone-winged surge from origin to landing tile (a motion
+  // art, so no windup), trailing dust; the landing blast is floated by main.js.
+  flight: Object.freeze({
+    type: "dashTrail",
+    soundKey: "flee",
+    durationMs: 420,
+    afterimageCount: 3,
+    sparkCount: 10,
+    colors: Object.freeze({ core: "#d8cdbc", trail: "#8a8478", impact: "#f0e6d0" })
+  }),
+  // Gargoyle — Pyroclasm: a self-centred eruption of molten fire along the rays. A short
+  // gather (the stone drawing heat inward) precedes the burst; fiery palette + shake.
+  pyroclasm: Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    blast: true,
+    blastTiles: 3,
+    shake: 9,
+    particleCount: 22,
+    radius: 50,
+    durationMs: 680,
+    windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 11 }),
+    colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffd9a0" })
   })
 });
 
