@@ -12,7 +12,8 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
 import { createPortrait } from "./portraits.js";
-import { SLOT_LAYOUT, normalizeSquad, availableTypesForSlot, groupedUnitTypes } from "./squadModel.js";
+import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes } from "./squadModel.js";
+import { getUnitSkins, normalizeSkinSlug, skinLabel } from "./skinModel.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 
@@ -29,7 +30,10 @@ function ensureHost() {
 // squad on Done, or null if cancelled (Escape / overlay / ✕ / Cancel).
 export function openRosterPicker({ title = "Squad", accent = null, initial = null, allowDuplicates = true, startSlot = 0 } = {}) {
   const overlay = ensureHost();
-  const squad = normalizeSquad(initial);
+  const loadout = normalizeSquadLoadout(initial);
+  const squad = [...loadout.composition];
+  const skins = [...loadout.skins];
+  const selectedSkinByType = new Map(squad.map((type, index) => [type, skins[index] ?? null]));
   let activeSlot = clampSlot(startSlot);
   let focusedType = squad[activeSlot];
 
@@ -89,8 +93,13 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         tag.textContent = `${slot.index + 1} · ${slot.row === "front" ? "Front" : "Back"}`;
         const name = el("span", "roster-slot-name");
         name.textContent = def.name;
-        btn.append(tag, createPortrait(squad[slot.index], { variant: "is-slot", eager: true }), name);
-        btn.addEventListener("click", () => { activeSlot = slot.index; focusedType = squad[slot.index]; paintAll(); });
+        btn.append(tag, createPortrait(squad[slot.index], { variant: "is-slot", eager: true, skin: skins[slot.index] }), name);
+        btn.addEventListener("click", () => {
+          activeSlot = slot.index;
+          focusedType = squad[slot.index];
+          selectedSkinByType.set(focusedType, skins[slot.index] ?? null);
+          paintAll();
+        });
         tray.appendChild(btn);
       }
     }
@@ -110,7 +119,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
           const unitBtn = el("button", `roster-unit${type === focusedType ? " is-focused" : ""}${disabled ? " is-disabled" : ""}`);
           unitBtn.type = "button";
           unitBtn.dataset.type = type;
-          unitBtn.append(createPortrait(type, { variant: "is-card", eager: true }));
+          unitBtn.append(createPortrait(type, { variant: "is-card", eager: true, skin: selectedSkinForType(type) }));
           const name = el("span", "roster-unit-name");
           name.textContent = def.name;
           unitBtn.append(name);
@@ -154,10 +163,11 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       // portrait self-frames to a consistent scale (see portraits.js).
       const scroll = el("div", "roster-detail-scroll");
       const split = el("div", "roster-detail-split");
-      const portrait = createPortrait(focusedType, { variant: "is-hero", eager: true });
+      const portrait = createPortrait(focusedType, { variant: "is-hero", eager: true, skin: selectedSkinForType(focusedType) });
       portrait.style.setProperty("--team", accent || "var(--p1)");
       const info = el("div", "roster-detail-info");
       info.innerHTML = unitDetailHtml(def);
+      info.prepend(createSkinShelf(focusedType));
       split.append(portrait, info);
       scroll.append(split);
       detail.replaceChildren(bar, scroll);
@@ -181,9 +191,50 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     // can tap straight down the roster.
     function assign(type) {
       squad[activeSlot] = type;
+      skins[activeSlot] = selectedSkinForType(type);
       focusedType = type;
       activeSlot = (activeSlot + 1) % squad.length;
       paintAll();
+    }
+
+    function selectedSkinForType(type) {
+      return normalizeSkinSlug(type, selectedSkinByType.get(type));
+    }
+
+    function createSkinShelf(type) {
+      const shelf = el("div", "skin-shelf");
+      const title = el("div", "skin-shelf-title");
+      title.textContent = "Skins";
+      const options = el("div", "skin-options");
+      const current = selectedSkinForType(type);
+      const choices = [
+        { slug: null, name: "Classic", unlocked: true },
+        ...getUnitSkins(type)
+      ];
+
+      for (const choice of choices) {
+        const selected = (choice.slug ?? null) === current;
+        const locked = !choice.unlocked;
+        const btn = el("button", `skin-option${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`);
+        btn.type = "button";
+        btn.dataset.skin = choice.slug ?? "";
+        btn.appendChild(createPortrait(type, { variant: "is-skin", eager: true, skin: choice.slug }));
+        const name = el("span", "skin-option-name");
+        name.textContent = choice.name ?? skinLabel(type, choice.slug);
+        const status = el("span", "skin-option-status");
+        status.textContent = locked ? "Locked" : "Unlocked";
+        btn.append(name, status);
+        btn.addEventListener("click", () => {
+          if (locked) return;
+          selectedSkinByType.set(type, choice.slug ?? null);
+          if (squad[activeSlot] === type) skins[activeSlot] = selectedSkinForType(type);
+          paintAll();
+        });
+        options.appendChild(btn);
+      }
+
+      shelf.append(title, options);
+      return shelf;
     }
 
     paintAll();
@@ -196,7 +247,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       overlay.replaceChildren();
       resolve(result);
     }
-    function finish() { close([...squad]); }
+    function finish() { close({ composition: [...squad], skins: [...skins] }); }
     function cancel() { close(null); }
 
     function onOverlay(event) { if (event.target === overlay) cancel(); }

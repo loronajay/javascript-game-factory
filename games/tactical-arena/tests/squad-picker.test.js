@@ -7,7 +7,8 @@ import {
   DEFAULT_SQUAD,
   UNIT_CLASS_GROUPS,
   availableTypesForSlot,
-  groupedUnitTypes
+  groupedUnitTypes,
+  normalizeSquadLoadout
 } from "../src/ui/squadModel.js";
 // Importing through squadPicker.js also loads rosterPicker.js — this guards that
 // the picker modules don't touch the DOM at import time (Node has no `document`).
@@ -62,4 +63,18 @@ test("duplicates blocked: types used in other slots drop out, the slot's own sta
 test("squadPicker re-exports the model without DOM access at import time", () => {
   assert.equal(typeof availableViaPicker, "function");
   assert.deepEqual(normalizeSquad(["archer"]), ["archer", "archer", "mystic", "magician"]);
+});
+
+test("squad loadouts preserve legacy composition arrays and normalize slot skins", () => {
+  assert.deepEqual(normalizeSquadLoadout(["archer"]), {
+    composition: ["archer", "archer", "mystic", "magician"],
+    skins: [null, null, null, null]
+  });
+  assert.deepEqual(normalizeSquadLoadout({
+    composition: ["swordsman", "archer", "mystic", "magician"],
+    skins: ["summer-vibes", "missing", null, "summer-vibes"]
+  }), {
+    composition: ["swordsman", "archer", "mystic", "magician"],
+    skins: ["summer-vibes", null, null, "summer-vibes"]
+  });
 });

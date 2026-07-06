@@ -9,6 +9,7 @@ function createUnit(spec) {
     player: spec.player,
     team: spec.team ?? spec.player,
     type: spec.type,
+    skin: spec.skin ?? null,
     position: { x: spec.x, y: spec.y },
     hp: spec.hp ?? definition.stats.maxHp,
     mp: spec.mp ?? definition.stats.maxMp,

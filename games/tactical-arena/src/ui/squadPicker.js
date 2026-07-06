@@ -12,6 +12,7 @@ import {
   DEFAULT_SQUAD,
   SLOT_LAYOUT,
   normalizeSquad,
+  normalizeSquadLoadout,
   availableTypesForSlot,
   UNIT_CLASS_GROUPS,
   groupedUnitTypes
@@ -19,10 +20,10 @@ import {
 import { openRosterPicker } from "./rosterPicker.js";
 import { createPortrait } from "./portraits.js";
 
-export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
+export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, normalizeSquadLoadout, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
 
 export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true } = {}) {
-  let squad = normalizeSquad(initial);
+  let loadout = normalizeSquadLoadout(initial);
 
   const el = document.createElement("div");
   el.className = "squad-picker";
@@ -45,18 +46,19 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
 
   // Open the roster pop-up on the slot the player tapped (or slot 0 from Edit).
   async function edit(startSlot = 0) {
-    const result = await openRosterPicker({ title, accent, initial: squad, allowDuplicates, startSlot });
-    if (result) { squad = result; paintChips(); }
+    const result = await openRosterPicker({ title, accent, initial: loadout, allowDuplicates, startSlot });
+    if (result) { loadout = normalizeSquadLoadout(result); paintChips(); }
   }
 
   function paintChips() {
     chips.replaceChildren();
     for (const slot of SLOT_LAYOUT) {
-      const def = UNIT_TYPES[squad[slot.index]];
+      const type = loadout.composition[slot.index];
+      const def = UNIT_TYPES[type];
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `squad-chip row-${slot.row}`;
-      chip.append(createPortrait(squad[slot.index], { variant: "is-chip", eager: true }));
+      chip.append(createPortrait(type, { variant: "is-chip", eager: true, skin: loadout.skins[slot.index] }));
       const name = document.createElement("span");
       name.className = "squad-chip-name";
       name.textContent = def.name;
@@ -71,6 +73,8 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
 
   return {
     el,
-    getSquad: () => [...squad]
+    getSquad: () => [...loadout.composition],
+    getSkins: () => [...loadout.skins],
+    getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] })
   };
 }

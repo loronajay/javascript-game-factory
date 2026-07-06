@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeRoomCode, resolveWebSocketUrl } from "../src/online/onlineClient.js";
+import { createOnlineClient, normalizeRoomCode, resolveWebSocketUrl } from "../src/online/onlineClient.js";
 import { ONLINE_RULESET_VERSION } from "../src/online/ruleset.js";
 
 const PROD = "wss://factory-network-server-production.up.railway.app";
@@ -45,4 +45,37 @@ test("room codes normalize pasted or typed input to the server code shape", () =
 
 test("online ruleset rejects pre-coin-flip client builds", () => {
   assert.ok(ONLINE_RULESET_VERSION > 1);
+});
+
+test("online setup payload relays skin selections with the squad composition", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener() {}
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.sendSetup({
+      seat: 1,
+      composition: ["swordsman", "archer", "mystic", "magician"],
+      skins: ["summer-vibes", null, null, "summer-vibes"]
+    });
+    assert.deepEqual(sent, [{
+      type: "lobby_message",
+      messageType: "setup",
+      value: JSON.stringify({
+        seat: 1,
+        composition: ["swordsman", "archer", "mystic", "magician"],
+        skins: ["summer-vibes", null, null, "summer-vibes"]
+      })
+    }]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
 });

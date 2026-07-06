@@ -92,6 +92,16 @@
 .roster-detail-info { flex:1; min-width:0; }
 .roster-detail-split .unit-portrait.is-hero { width:172px; height:240px; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 24px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--p1)) 45%,transparent); }
 .roster-detail-split .is-glyph-fallback { font-size:3rem; }
+.skin-shelf { display:grid; gap:.4rem; margin:0 0 .75rem; padding:.55rem; border:1px solid rgba(80,120,150,.35); border-radius:8px; background:rgba(8,18,30,.34); }
+.skin-shelf-title { color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.skin-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(5.7rem,1fr)); gap:.4rem; }
+.skin-option { display:grid; gap:.22rem; justify-items:center; min-width:0; padding:.38rem .3rem .42rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.48),rgba(14,24,40,.42)); color:var(--text); cursor:pointer; }
+.skin-option:hover:not(.is-locked),.skin-option.is-selected { border-color:var(--team,var(--brass)); filter:brightness(1.08); }
+.skin-option.is-selected { box-shadow:inset 0 0 0 1px var(--team,var(--brass)); }
+.skin-option.is-locked { opacity:.5; filter:grayscale(.6); cursor:not-allowed; }
+.skin-option .unit-portrait.is-skin { width:54px; height:64px; border-radius:6px; }
+.skin-option-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 .58rem var(--font-display); letter-spacing:.04em; }
+.skin-option-status { color:var(--muted); font:700 .48rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
 .roster-foot { display:flex; align-items:center; gap:.6rem; padding:.8rem 1.1rem; border-top:1px solid var(--parchment-edge); background:linear-gradient(0deg,var(--console-hi),var(--console-lo)); flex-shrink:0; }
 .roster-foot .menu-btn { width:auto; min-width:7rem; }
 /* Contextual Place button — the primary build action; strong brass call-to-action. */
@@ -146,6 +156,20 @@
 @media (max-width:480px) { .menu-card { padding:1.5rem 1.2rem; } .title-name { font-size:1.9rem; } }
 
 /* ── Online Versus lobby ─────────────────────────────────────────────────── */
+/* Skin gallery */
+.skin-gallery-card { width:min(960px,96vw); height:min(720px,90vh); }
+.skin-gallery-body { flex:1; min-height:0; overflow-y:auto; display:grid; align-content:start; gap:1rem; padding:1rem; }
+.skin-gallery-section { display:grid; gap:.45rem; }
+.skin-gallery-title { margin:0; color:color-mix(in srgb,var(--brass) 70%,var(--muted)); font:800 .66rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.skin-gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr)); gap:.55rem; }
+.skin-gallery-item { display:grid; grid-template-columns:54px minmax(0,1fr); gap:.55rem; align-items:center; min-width:0; padding:.5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.42)); }
+.skin-gallery-item.is-locked { opacity:.55; filter:grayscale(.5); }
+.skin-gallery-item .unit-portrait.is-skin-card { width:54px; height:66px; border-radius:7px; }
+.skin-gallery-copy { display:grid; gap:.12rem; min-width:0; }
+.skin-gallery-unit { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:800 .68rem var(--font-display); letter-spacing:.03em; }
+.skin-gallery-skin { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--brass-hi); font:700 .62rem var(--font-display); letter-spacing:.04em; }
+.skin-gallery-status { color:var(--muted); font:700 .5rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+
 .online-join { display:grid; grid-auto-flow:column; grid-template-columns:1fr auto; gap:.5rem; align-items:center; }
 .online-code-input {
   width:100%; padding:.7rem .8rem; border:1px solid var(--parchment-edge); border-radius:var(--radius-tile);

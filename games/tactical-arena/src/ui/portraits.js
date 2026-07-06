@@ -17,6 +17,7 @@
 // scratchpad measure script that produced them); re-measure if the art is replaced.
 
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { getSkin } from "./skinModel.js";
 
 // box: { x, y, w, h } — content bounding box as fractions [0..1] of the 600×600 source.
 // scale: per-unit visual-size fudge (1 = normalize to the shared height). Lower it for
@@ -64,13 +65,16 @@ function portrait(type, box, { scale = 1, src = `assets/units/${type}.png` } = {
 // Safe lookup. Returns the portrait meta for a unit type (or its def), or null if no
 // portrait is registered — callers fall back to the glyph so a portrait-less unit
 // never breaks a panel.
-export function getPortrait(typeOrDef) {
-  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id;
-  return PORTRAITS[type] ?? null;
+export function getPortrait(typeOrDef, skinSlug = null) {
+  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
+  const base = PORTRAITS[type] ?? null;
+  if (!base) return null;
+  const skin = getSkin(type, skinSlug);
+  return skin?.portraitSrc ? { ...base, src: skin.portraitSrc, skinSlug: skin.slug } : base;
 }
 
-export function hasPortrait(typeOrDef) {
-  return getPortrait(typeOrDef) !== null;
+export function hasPortrait(typeOrDef, skinSlug = null) {
+  return getPortrait(typeOrDef, skinSlug) !== null;
 }
 
 // Pure framing math (tested headlessly). Turns a portrait's measured box into the
@@ -106,12 +110,13 @@ function round(n) {
 // Build a framed portrait node: <figure class="unit-portrait"><img …></figure>.
 // `variant` adds a modifier class (e.g. "is-hero", "is-thumb") for CSS sizing; the
 // framing math is variant-independent. Browser-only (touches document).
-export function createPortrait(typeOrDef, { variant = "", alt = "", frame, eager = false } = {}) {
-  const meta = getPortrait(typeOrDef);
-  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id;
+export function createPortrait(typeOrDef, { variant = "", alt = "", frame, eager = false, skin = null } = {}) {
+  const meta = getPortrait(typeOrDef, skin);
+  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
   const wrap = document.createElement("figure");
   wrap.className = `unit-portrait${variant ? ` ${variant}` : ""}`;
   wrap.dataset.type = type ?? "";
+  if (meta?.skinSlug) wrap.dataset.skin = meta.skinSlug;
   if (!meta) {
     // Glyph fallback keeps a portrait-less unit from rendering an empty box.
     const def = UNIT_TYPES[type];

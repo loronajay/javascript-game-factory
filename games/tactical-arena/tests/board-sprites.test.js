@@ -29,7 +29,7 @@ test("no board sprite exists for an unknown unit type", () => {
 
 test("each board sprite points at an asset file that exists on disk", () => {
   for (const [type, meta] of Object.entries(BOARD_SPRITES)) {
-    assert.ok(meta.src.startsWith("assets/units/board-units/game-ready/"), `${type} src should live under the game-ready folder`);
+    assert.ok(meta.src.startsWith("assets/units/"), `${type} src should live under assets/units/`);
     assert.ok(existsSync(join(GAME_ROOT, meta.src)), `${type} board sprite asset is missing: ${meta.src}`);
   }
 });

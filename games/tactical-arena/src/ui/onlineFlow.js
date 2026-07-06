@@ -71,6 +71,7 @@ export function createOnlineFlow({ onStartMatch }) {
   let mySeat = null;
   let membersAtStart = null;
   const compositionsBySeat = {};
+  const skinsBySeat = {};
 
   // ── view helpers ───────────────────────────────────────────────────────────
   function setPanel(name) {
@@ -248,15 +249,18 @@ export function createOnlineFlow({ onStartMatch }) {
       setStatus("Match starting…");
 
       const composition = squadPicker.getSquad();
+      const skins = squadPicker.getSkins();
       compositionsBySeat[mySeat] = composition;
-      client.sendSetup({ seat: mySeat, composition });
+      skinsBySeat[mySeat] = skins;
+      client.sendSetup({ seat: mySeat, composition, skins });
       if (isOwner) pushConfig(); // ensure the final framing is out
       tryStart();
     };
 
-    cb.onRemoteSetup = ({ seat, composition }) => {
+    cb.onRemoteSetup = ({ seat, composition, skins }) => {
       if (!seat) return;
       compositionsBySeat[seat] = Array.isArray(composition) ? composition : [...DEFAULT_SQUAD];
+      skinsBySeat[seat] = Array.isArray(skins) ? skins : [null, null, null, null];
       tryStart();
     };
 
@@ -298,7 +302,11 @@ export function createOnlineFlow({ onStartMatch }) {
     handedOff = true; // onExit must NOT disconnect — the match owns the client now
 
     const squads = {};
-    for (let seat = 1; seat <= count; seat += 1) squads[seat] = compositionsBySeat[seat];
+    const skins = {};
+    for (let seat = 1; seat <= count; seat += 1) {
+      squads[seat] = compositionsBySeat[seat];
+      skins[seat] = skinsBySeat[seat] ?? [null, null, null, null];
+    }
 
     const format = matchTypeConfig().format;
     onStartMatch({
@@ -308,6 +316,7 @@ export function createOnlineFlow({ onStartMatch }) {
       size: cfg.size,
       mySeat,
       squads,
+      skins,
       playerCount: count,
       format,
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
@@ -323,6 +332,7 @@ export function createOnlineFlow({ onStartMatch }) {
     mySeat = null;
     membersAtStart = null;
     for (const key of Object.keys(compositionsBySeat)) delete compositionsBySeat[key];
+    for (const key of Object.keys(skinsBySeat)) delete skinsBySeat[key];
     roomCodeEl.hidden = true;
   }
 

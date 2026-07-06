@@ -2,6 +2,7 @@ import { createBattleState } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
+import { normalizeSkinLoadout } from "../ui/skinModel.js";
 
 export function teamColor(playerOrTeam, state = null) {
   if (state?.players) {
@@ -31,7 +32,7 @@ export function hpRemaining(state, player) {
 
 // Map squad compositions onto the four-cell corner spawn blocks. The first two
 // slots preserve the original 2v2 staging, and the extra pair fills the block.
-export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 })) {
+export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }), skins = null) {
   const slotsForCorner = (corner) => {
     const max = size - 1;
     const coords = [
@@ -54,6 +55,7 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
   for (const slot of players) {
     const positions = slotsForCorner(slot.corner);
     const squad = (squads[slot.id] ?? []).slice(0, positions.length);
+    const skinLoadout = normalizeSkinLoadout(squad, skins?.[slot.id]);
     // Every unit keeps its natural index cell, EXCEPT the King ("always in the far
     // corner"): he swaps onto positions[2] with whoever held it. King-less squads are
     // untouched (no swap), so the original spawn layout is preserved exactly.
@@ -68,6 +70,7 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
         player: slot.id,
         team: slot.team,
         type,
+        skin: skinLoadout[i] ?? null,
         x: cells[i].x,
         y: cells[i].y
       });
@@ -83,7 +86,8 @@ export function createMatchState({
   playerCount = squads ? Object.keys(squads).length : 2,
   format = FORMATS.FFA,
   teamColors = null,
-  teamNames = null
+  teamNames = null,
+  skins = null
 } = {}) {
   const players = createRoster({ playerCount, format, teamColors });
   const state = createBattleState({
@@ -94,7 +98,7 @@ export function createMatchState({
     format,
     teamColors,
     teamNames,
-    units: squads ? buildRoster(squads, size, players) : undefined,
+    units: squads ? buildRoster(squads, size, players, skins) : undefined,
   });
   const flip = nextRandom(state.rngState);
   const turnOrder = state.turnOrder ?? players.map((slot) => slot.id);

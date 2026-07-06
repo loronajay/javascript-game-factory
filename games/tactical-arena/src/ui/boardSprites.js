@@ -1,5 +1,5 @@
 // On-board unit sprites — the painted board pieces that stand on the team coin
-// (assets/units/board-units/game-ready/<type>.png). This REPLACES the carved SVG
+// (assets/units/<type>.png by default, or a skin asset when equipped). This REPLACES the carved SVG
 // figurine as the on-board token (unitRenderer.js falls back to the figurine only
 // for a type with no sprite registered). Pure presentation, so it lives in ui/ and
 // keeps core/ free of asset framing data.
@@ -16,6 +16,7 @@
 // tint wash applied to the <image> via the #teamTintP1/#teamTintP2 SVG filters.
 
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { getSkin } from "./skinModel.js";
 
 // Figure-space standing height a `scale: 1` unit normalizes to. Figure space puts the
 // feet at (0,0) and rises into -y (see unitRenderer.js), matching the old figurine.
@@ -92,20 +93,29 @@ export const BOARD_SPRITES = Object.freeze({
   ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })
 });
 
-function sprite(type, w, h, { scale = 1, src = `assets/units/board-units/game-ready/${type}.png` } = {}) {
+function sprite(type, w, h, { scale = 1, src = `assets/units/${type}.png` } = {}) {
   return Object.freeze({ src, w, h, scale });
 }
 
 // Safe lookup. Returns the sprite meta for a unit type (or its def), or null if none
 // is registered — callers fall back to the carved figurine so a sprite-less unit
 // never breaks the board.
-export function getBoardSprite(typeOrDef) {
-  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id;
-  return BOARD_SPRITES[type] ?? null;
+export function getBoardSprite(typeOrDef, skinSlug = null) {
+  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
+  const base = BOARD_SPRITES[type] ?? null;
+  if (!base) return null;
+  const skin = getSkin(type, skinSlug);
+  if (!skin?.boardSrc) return base;
+  return {
+    ...base,
+    ...(skin.board ?? {}),
+    src: skin.boardSrc,
+    skinSlug: skin.slug
+  };
 }
 
-export function hasBoardSprite(typeOrDef) {
-  return getBoardSprite(typeOrDef) !== null;
+export function hasBoardSprite(typeOrDef, skinSlug = null) {
+  return getBoardSprite(typeOrDef, skinSlug) !== null;
 }
 
 // Pure framing math (tested headlessly). Turns a sprite's native size + scale into the
@@ -129,12 +139,14 @@ function round(n) {
 
 // Build the on-board sprite figure: <g class="sprite-figure"><image …></g>. Browser-
 // only (touches document via svgElement). `svgElement` sets href for SVG2 user agents.
-export function createBoardSpriteFigure(typeOrDef, svgElement, frame) {
-  const meta = getBoardSprite(typeOrDef);
+export function createBoardSpriteFigure(typeOrDef, svgElement, frame, { skin = null } = {}) {
+  const meta = getBoardSprite(typeOrDef, skin);
   if (!meta) return null;
-  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id;
-  const f = boardSpriteFrameStyle(meta, frame);
-  const g = svgElement("g", { class: "sprite-figure" });
+  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
+  const f = boardSpriteFrameStyle(meta, frame ?? undefined);
+  const attrs = { class: "sprite-figure" };
+  if (meta.skinSlug) attrs["data-skin"] = meta.skinSlug;
+  const g = svgElement("g", attrs);
   g.append(svgElement("image", {
     class: "sprite-img",
     href: meta.src,

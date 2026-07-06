@@ -48,12 +48,12 @@ export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
 // HUD portrait as an HTML string (renderUnitCard builds the card via innerHTML).
 // Mirrors createPortrait (portraits.js) but eager-loads — the HUD card swaps on
 // every selection and a lazy image pops in late.
-function portraitHtml(type, variant = "is-hud") {
-  const meta = getPortrait(type);
+function portraitHtml(type, variant = "is-hud", skin = null) {
+  const meta = getPortrait(type, skin);
   const definition = getUnitType(type);
   if (!meta) return `<figure class="unit-portrait ${variant} is-glyph-fallback">${definition.glyph}</figure>`;
   const style = portraitFrameStyle(meta);
-  return `<figure class="unit-portrait ${variant}" data-type="${escapeAttr(type)}">
+  return `<figure class="unit-portrait ${variant}" data-type="${escapeAttr(type)}"${meta.skinSlug ? ` data-skin="${escapeAttr(meta.skinSlug)}"` : ""}>
     <img class="unit-portrait-img" src="${meta.src}" alt="" style="height:${style.cssHeight};transform:${style.cssTransform}">
   </figure>`;
 }
@@ -122,7 +122,7 @@ export function renderUnitCard(unit, state, unitCard) {
 
   const tags = unitTagsHtml(unit, definition);
 
-  unitCard.innerHTML = `${portraitHtml(unit.type)}
+  unitCard.innerHTML = `${portraitHtml(unit.type, "is-hud", unit.skin)}
     <div class="unit-info">
       <div class="unit-title-row">
         <span class="unit-name">${definition.name}</span>
@@ -233,7 +233,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       const tags = dead
         ? `<span class="unit-tag spent">Fallen</span>`
         : unitTagsHtml(unit, definition, { includePassive: false, includeSpent: true, spentLabel: "Done" });
-      row.innerHTML = `${portraitHtml(unit.type, "is-squad")}
+      row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
         <div class="squad-unit-body">
           <div class="squad-unit-head">
             <span class="squad-unit-name">${definition.name}</span>

@@ -173,6 +173,7 @@ function startMatch(config) {
   state = createMatchState({
     size: config.size,
     squads: config.squads,
+    skins: config.skins,
     seed: online ? config.seed : undefined,
     playerCount: config.playerCount,
     format: config.format,

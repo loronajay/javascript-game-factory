@@ -3,6 +3,7 @@
 // renderer-independent means the roster modal and a future draft/blind-pick
 // controller can both drive the same rules without importing each other's UI.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { normalizeSkinLoadout } from "./skinModel.js";
 
 export const UNIT_CLASS_GROUPS = Object.freeze([
   Object.freeze({ id: "melee", label: "Melees" }),
@@ -34,6 +35,18 @@ export function normalizeSquad(squad) {
     out.push(UNIT_TYPE_KEYS.includes(type) ? type : DEFAULT_SQUAD[i]);
   }
   return out;
+}
+
+export function normalizeSquadLoadout(loadout, skins = null) {
+  const compositionInput = Array.isArray(loadout)
+    ? loadout
+    : (loadout?.composition ?? loadout?.squad ?? loadout?.units);
+  const composition = normalizeSquad(compositionInput);
+  const skinInput = skins ?? (Array.isArray(loadout) ? null : loadout?.skins);
+  return {
+    composition,
+    skins: normalizeSkinLoadout(composition, skinInput)
+  };
 }
 
 // Which roster types may fill `slotIndex` given the rest of the squad. With

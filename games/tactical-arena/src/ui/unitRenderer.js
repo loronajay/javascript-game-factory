@@ -439,7 +439,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   // into -y. Prefer the painted board sprite (normalized to a shared standing height
   // by boardSprites.js); a type with no registered sprite falls back to the carved
   // SVG figurine, scaled by FIGURE_SCALE so a tall figurine doesn't swamp its tile.
-  const figure = createBoardSpriteFigure(unit.type, svgElement);
+  const figure = createBoardSpriteFigure(unit.type, svgElement, null, { skin: unit.skin });
   if (figure) {
     // Red team (player 2) faces the enemy: mirror the painted sprite horizontally.
     // The <image> is centred on x=0 in the sprite-figure group, so scale(-1 1)

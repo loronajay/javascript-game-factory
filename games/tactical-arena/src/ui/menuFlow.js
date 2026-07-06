@@ -8,6 +8,7 @@ import { ScreenManager } from "./screenManager.js";
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
+import { openSkinGallery } from "./skinGallery.js";
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
@@ -82,8 +83,11 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     const playerCount = Number(selectedValue(hsSetup, "playerCount", "count")) || 2;
     const format = playerCount === 4 ? (selectedValue(hsSetup, "format", "format") || "ffa") : "ffa";
     const squads = {};
+    const skins = {};
     for (let player = 1; player <= playerCount; player += 1) {
-      squads[player] = ensureHotSeatPicker(player).getSquad();
+      const picker = ensureHotSeatPicker(player);
+      squads[player] = picker.getSquad();
+      skins[player] = picker.getSkins();
     }
     return {
       mode: "hotseat",
@@ -92,13 +96,20 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       format,
       teamColors: format === "teams" ? { 1: TEAM_COLOR[1], 2: TEAM_COLOR[2] } : null,
       squads,
+      skins,
     };
   }
 
   function gatherSingleConfig() {
     const size = Number(selectedValue(spSetup, "boardSize", "size")) || 13;
     const difficulty = selectedValue(spSetup, "difficulty", "difficulty") || "normal";
-    return { mode: "single", difficulty, size, squads: { 1: spPickers.p1.getSquad(), 2: spPickers.p2.getSquad() } };
+    return {
+      mode: "single",
+      difficulty,
+      size,
+      squads: { 1: spPickers.p1.getSquad(), 2: spPickers.p2.getSquad() },
+      skins: { 1: spPickers.p1.getSkins(), 2: spPickers.p2.getSkins() }
+    };
   }
 
   // ── Results ──────────────────────────────────────────────────────────────
@@ -185,6 +196,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     if (!actionBtn || actionBtn.disabled) return;
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
+      case "skins": openSkinGallery(); break;
       case "settings": openSettings(); break;
       case "startHotSeat": { startMatchTracked(gatherHotSeatConfig()); break; }
       case "startSingle": { startMatchTracked(gatherSingleConfig()); break; }

@@ -17,7 +17,7 @@
 //
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
-//   each  -> all : setup     { seat, composition }              blind squad pick
+//   each  -> all : setup     { seat, composition, skins }       blind squad pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
 //   each  -> all : profile   { playerId, displayName, seat }    name exchange
@@ -140,7 +140,10 @@ function parseSetupMessage(value) {
   const composition = Array.isArray(p.composition)
     ? p.composition.slice(0, 4).map((type) => (typeof type === "string" ? type : null))
     : null;
-  return { seat: Math.floor(seat), composition };
+  const skins = Array.isArray(p.skins)
+    ? p.skins.slice(0, 4).map((slug) => (typeof slug === "string" ? slug : null))
+    : null;
+  return { seat: Math.floor(seat), composition, skins };
 }
 
 // A command is a plain serializable object { type, player, ...payload }. The core
@@ -410,8 +413,8 @@ export function createOnlineClient() {
   function sendConfig(config) {
     _lobbyMsg("config", JSON.stringify(config || {}));
   }
-  function sendSetup({ seat, composition = null } = {}) {
-    _lobbyMsg("setup", JSON.stringify({ seat, composition }));
+  function sendSetup({ seat, composition = null, skins = null } = {}) {
+    _lobbyMsg("setup", JSON.stringify({ seat, composition, skins }));
   }
   function sendCommand(command) {
     _lobbyMsg("command", JSON.stringify({ command }));
