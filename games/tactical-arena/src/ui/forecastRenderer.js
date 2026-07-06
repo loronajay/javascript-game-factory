@@ -4,7 +4,7 @@ import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getArtTargetRange } from "../rules/arts.js";
-import { getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike } from "../rules/combat.js";
+import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
@@ -27,7 +27,7 @@ function isForecastableStrikeArt(art) {
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
     art.effect?.type !== "healAllies" &&
-    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly"].includes(art.targeting?.shape)
+    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly", "ally"].includes(art.targeting?.shape)
   );
 }
 
@@ -46,9 +46,12 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   const metrics = createBoardMetrics(state.size);
   const reach = isStrikeArt ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
   const guaranteedMiss = (isAttack || isStrikeArt) && getMissChance(actor) >= 1;
-  // Physical strikes (basic attack + physical ARTS) can be body-blocked; magic ARTS
+  // The damage type of what's being aimed: a basic attack reads the unit's passive
+  // (Angel's Blessed Arrow is magic); an ART carries its own damageType.
+  const damageType = isAttack ? getBasicAttackDamageType(actor) : (art?.damageType ?? null);
+  // Physical strikes (basic attack + physical ARTS) can be body-blocked; magic strikes
   // ignore intervening units, so they keep forecasting through them.
-  const blockable = isAttack || (isStrikeArt && (art?.damageType ?? "physical") === "physical");
+  const blockable = (isAttack || isStrikeArt) && (damageType ?? "physical") === "physical";
 
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;
@@ -63,7 +66,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
     }
     const strike = art?.resolution === "frontKick"
       ? frontKickForecast(actor, target, art, state)
-      : resolveBaseStrike(actor, target, { proximity: true, state, damageType: art?.damageType ?? null });
+      : resolveBaseStrike(actor, target, { proximity: true, state, damageType });
     const lethal = strike.damage >= target.hp;
     drawForecastBadge(forecastLayer, metrics, target, lethal ? `☠ ${strike.damage}` : `-${strike.damage}`, lethal ? "fc-lethal" : "fc-attack");
   }

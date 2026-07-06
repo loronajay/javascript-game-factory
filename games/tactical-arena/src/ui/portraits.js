@@ -36,6 +36,8 @@ export const PORTRAITS = Object.freeze({
   // Centered standing figure; measured alpha bbox off the 600×600 source.
   king:        portrait("king",        { x: 0.160, y: 0.030, w: 0.707, h: 0.943 }),
   monk:        portrait("monk",        { x: 0.162, y: 0.027, w: 0.652, h: 0.955 }),
+  // Winged holy archer; measured alpha bbox off the 600×600 source (wings + bow spread wide).
+  angel:       portrait("angel",       { x: 0.093, y: 0.032, w: 0.810, h: 0.913 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

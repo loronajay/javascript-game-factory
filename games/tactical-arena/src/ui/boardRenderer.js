@@ -337,6 +337,32 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
+  // Angel's Anoint (shape "ally"): a Chebyshev range wash (walls block, bodies don't —
+  // it's a friendly cast) plus every ALLY in range EXCEPT self as a legal target.
+  let isAllyArt = false;
+  if (actor && mode?.startsWith("art:")) {
+    const buffArt = getArt(actor.type, mode.slice("art:".length));
+    if (buffArt?.targeting?.shape === "ally") {
+      isAllyArt = true;
+      const reach = getEffectiveStats(actor, state).attackRange;
+      for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
+        for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
+          const cell = { x, y };
+          if (!isOnBoard(state, cell)) continue;
+          if (chebyshevDistance(actor.position, cell) === 0) continue;
+          if (isWallBetween(state, actor.position, cell, actor)) continue;
+          range.add(positionKey(cell));
+        }
+      }
+      for (const u of state.units) {
+        if (u.hp <= 0 || u.id === actor.id || u.player !== actor.player) continue;
+        if (chebyshevDistance(actor.position, u.position) > reach) continue;
+        if (isWallBetween(state, actor.position, u.position, actor)) continue;
+        legal.add(positionKey(u.position));
+      }
+    }
+  }
+
   // Juggernaut's line abilities (Tether Grab / Rocket Punch): always wash the FULL reach
   // of all 8 straight rays so the ability's range reads even when nothing is in line (no
   // more "clicked it and nothing happened"), then light the actual first-contact target as
@@ -426,6 +452,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
           ((targeted || Boolean(nukeArt)) && u.player !== actor.player) ||
           // Age / Time Stretch reticle every in-range unit they can target (ally or enemy).
           (isAllyOrEnemyArt && u.id !== actor.id) ||
+          // Anoint reticles an in-range ally (never self).
+          (isAllyArt && u.id !== actor.id && u.player === actor.player) ||
           // Line abilities reticle their first-contact target (ally or enemy).
           (isLineArt && u.id !== actor.id)
         );

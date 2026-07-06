@@ -151,6 +151,22 @@ export function hastenValue(state, caster, target, isAlly) {
   return helps ? 1.5 : 0.4;
 }
 
+// Value of one Anoint cast (Angel's +1 range on an ally for a turn). +1 range mostly
+// matters when it lets a friendly attacker reach an enemy it otherwise couldn't this
+// turn — the concrete payoff; otherwise it is minor setup utility. Only meaningful for
+// an ally that can actually attack (a summon/commander gains nothing from more reach).
+export function anointValue(state, caster, target) {
+  const stats = getEffectiveStats(target, state);
+  if (stats.attackRange < 1 || isCommandOnly(target) || !takesTurns(target)) return 0;
+  const enemies = livingUnits(state).filter((unit) => areEnemies(caster, unit));
+  const reachNow = stats.moveRange + stats.attackRange;
+  const unlocks = enemies.some((enemy) => {
+    const distance = chebyshevDistance(target.position, enemy.position);
+    return distance > reachNow && distance <= reachNow + 1;
+  });
+  return unlocks ? 1.6 : 0.4;
+}
+
 // Value of one Tether Grab pull (the 3 magic itself is scored by the HP diff). Dragging
 // an enemy that wants distance — a ranged unit or caster/support — into the bruiser's
 // face is the real payoff; hauling another melee body around is minor tempo.

@@ -2,7 +2,7 @@ import { attack, attackTile, beginActivation, cancelMove, concede, defend, finis
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
-import { isWallBetween } from "./rules/combat.js";
+import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
 import { applyCommand } from "./core/reducer.js";
@@ -304,7 +304,9 @@ async function resolveCombat(command) {
       await effects.floatText(center, "MISS", "#cbb78b");
     } else {
       const dmg = typeof rolled.damage === "number" ? rolled.damage : (rolled.damage?.damage ?? 0);
-      const impactKind = rolled.artId && artDefinition(attackerBefore, rolled.artId)?.damageType === "magic" ? "magic" : "physical";
+      const impactKind = (rolled.artId
+        ? artDefinition(attackerBefore, rolled.artId)?.damageType === "magic"
+        : getBasicAttackDamageType(attackerBefore) === "magic") ? "magic" : "physical";
       if (rolled.critical) { effects.critFlash(); effects.shake(11); }
       else effects.shake(Math.min(8, 2.5 + dmg * 1.4));
       effects.impact(center, Boolean(rolled.critical), impactKind);
@@ -651,6 +653,34 @@ async function resolveInstantArt(command) {
     }));
     // The core overloads — the Juggernaut is consumed.
     await effects.deathDissolve(actorBefore.id, actorBefore.position, teamColor(actorBefore.player));
+  } else if (resolved?.artId === "heavenseeker" && actorBefore) {
+    // A holy pulse: true damage to enemies on white tiles AND a heal to allies on them.
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("heavenseeker", { actor: actorBefore, targets: targetsBefore });
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "true");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#fff2a8");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+    await Promise.all(Object.entries(resolved.healingByTarget ?? {}).map(([id, amount]) => {
+      const ally = findUnit(state, id);
+      return ally && amount > 0
+        ? effects.floatText(unitCenter(metrics, ally), `+${amount}`, "#8cf0a4")
+        : Promise.resolve();
+    }));
+  } else if (resolved?.artId === "anoint" && actorBefore) {
+    // A holy mote glides to the ally; the +1 range float lands where it lights.
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("anoint", { actor: actorBefore, targets: targetsBefore });
+    if (targetBefore && resolved.effect?.applied) {
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "+1 RNG", "#f7e9c0");
+    }
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -956,6 +986,7 @@ function playEventSounds(events) {
           artId === "age" || artId === "time-stretch" || artId === "rewind" ||
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
           artId === "self-destruct" ||
+          artId === "anoint" || artId === "elevate" || artId === "heavenseeker" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
@@ -1180,6 +1211,18 @@ async function handleTile(position) {
       mode = null;
       setMessage("Time Stretch resolved. This unit's activation is complete.");
     }
+  } else if (mode === "art:anoint") {
+    // Friendly-only buff: click a highlighted ally in range (never self). A wall does not
+    // block a friendly cast.
+    const target = unitAt(state, position);
+    const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
+      chebyshevDistance(unit.position, target.position) <= getEffectiveStats(unit, state).attackRange;
+    if (!inReach) {
+      setMessage("Anoint: click a highlighted ally in range (not yourself).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "anoint", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Anoint resolved. This unit's activation is complete.");
+    }
   } else if (mode === "art:tether-grab") {
     // Grab the first ally OR enemy on a straight ray within range.
     const target = unitAt(state, position);
@@ -1364,6 +1407,8 @@ async function handleActionClick(action, unit) {
                 ? "Choose a highlighted tile to set alight."
                 : art?.effect?.type === "healAllies"
                   ? "Click any highlighted ally to confirm."
+                  : art?.targeting?.shape === "ally"
+                    ? "Click a highlighted ally in range (not yourself)."
                   : art?.targeting?.shape === "allyOrEnemy"
                     ? "Click a highlighted ally or enemy in range."
                     : art?.targeting?.shape === "protectAlly"

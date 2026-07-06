@@ -17,6 +17,7 @@ import { createRngState, nextRandom } from "../core/rng.js";
 import { isStunned } from "../rules/statuses.js";
 import {
   ageValue,
+  anointValue,
   buffAlliesValue,
   commandBuffValue,
   expectedStrike,
@@ -195,6 +196,12 @@ function planEffectValue(state, unit, plan) {
     const target = findUnit(state, plan.primary.targetId);
     if (!target) return { control: 0, heal: 0 };
     return { control: hastenValue(state, unit, target, target.player === unit.player), heal: 0 };
+  }
+  // Angel's Anoint (+1 range on an ally): a one-turn buff, no HP change, rides `control`.
+  if (ai.intent === "buffAlly") {
+    const target = findUnit(state, plan.primary.targetId);
+    if (!target) return { control: 0, heal: 0 };
+    return { control: anointValue(state, unit, target), heal: 0 };
   }
   // Juggernaut. Rocket Punch's 10 damage rides the HP diff; only its stun is uncounted.
   if (ai.intent === "lineStrike") {

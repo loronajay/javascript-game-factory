@@ -28,7 +28,9 @@ const ATTACK_PROJECTILES = Object.freeze({
   sniper: Object.freeze({ shape: "tracer", arcHeight: 8, durationMs: 230, size: 1, colors: Object.freeze({ core: "#ffd9a0", trail: "#c0653a" }) }),
   magician: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 430, size: 1, colors: Object.freeze({ core: "#a0c8ff", trail: "#4488dd" }) }),
   mystic: Object.freeze({ shape: "orb", arcHeight: 50, durationMs: 460, size: 0.9, colors: Object.freeze({ core: "#bff4d2", trail: "#64d99a" }) }),
-  necromancer: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 450, size: 1, colors: Object.freeze({ core: "#9be08a", trail: "#38256f" }) })
+  necromancer: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 450, size: 1, colors: Object.freeze({ core: "#9be08a", trail: "#38256f" }) }),
+  // Angel is a bow user — a radiant, gold-white blessed arrow (its magic tint reads holy).
+  angel: Object.freeze({ shape: "arrow", arcHeight: 58, durationMs: 430, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#d8c078" }) })
 });
 
 const DEFAULT_ATTACK_PROJECTILE = Object.freeze({
@@ -467,6 +469,41 @@ const ABILITY_VFX = Object.freeze({
     radius: 28,
     durationMs: 460,
     colors: Object.freeze({ core: "#d8ecff", trail: "#557ca8", impact: "#f5fbff" })
+  }),
+  // Angel — Anoint: a warm gold blessing-mote glides to the ally (a quick tempo cast, no
+  // heavy gather), then a soft impact where the +1 range float lands.
+  anoint: Object.freeze({
+    type: "projectileFan",
+    soundKey: "handOfLife",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 46,
+    staggerMs: 0,
+    durationMs: 440,
+    impactRadius: 18,
+    projectile: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 440, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#c8a24a" }) }),
+    colors: Object.freeze({ core: "#fff2a8", trail: "#c8a24a", impact: "#fff7d8" })
+  }),
+  // Angel — Elevate: a soft radiant heal-pulse washing over the white-tile allies.
+  elevate: Object.freeze({
+    type: "healPulse",
+    soundKey: "pray",
+    particleCount: 10,
+    radius: 32,
+    durationMs: 560,
+    windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 7 }),
+    colors: Object.freeze({ core: "#fff2c0", trail: "#d8b45a", impact: "#fffbe0" })
+  }),
+  // Angel — Heavenseeker (RAGE): a holy burst sweeping every white tile — the seeker
+  // motif (like Light/Darkseeker) in a radiant gold-white palette.
+  heavenseeker: Object.freeze({
+    type: "magicBurst",
+    soundKey: "lightseeker",
+    particleCount: 18,
+    radius: 52,
+    durationMs: 640,
+    windup: Object.freeze({ style: "gather", durationMs: 380, particleCount: 9 }),
+    colors: Object.freeze({ core: "#fff2a8", trail: "#f0e0b0", impact: "#ffffff" })
   })
 });
 

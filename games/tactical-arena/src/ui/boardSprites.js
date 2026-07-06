@@ -70,6 +70,9 @@ export const BOARD_SPRITES = Object.freeze({
   // Cropped from the 600×600 portrait, centered on the measured feet x=300.
   king:        sprite("king",        448, 574),
   monk:        sprite("monk",        397, 579),
+  // Cropped from the 600×600 portrait, centered on the measured stance x=285 (the bow
+  // overhang to the right + the wing spread are ignored, per the centering trap notes).
+  angel:       sprite("angel",       520, 554),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })

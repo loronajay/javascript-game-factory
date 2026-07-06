@@ -228,6 +228,17 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "buffAlly": {
+      // Anoint: a friendly-only +range buff. One plan per ALLY in range (never self);
+      // a wall does not block a friendly cast, matching resolveAnoint.
+      const range = getEffectiveStats(unit, state).attackRange;
+      for (const target of livingUnits(state, unit.player)) {
+        if (target.id === unit.id) continue;
+        if (chebyshevDistance(unit.position, target.position) > range) continue;
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
+      }
+      break;
+    }
     case "revive": {
       // Rewind (rage-gated by artUsableForPlanning): each fallen ally × a few safe
       // placement tiles (preferring tiles far from the enemy).
@@ -387,7 +398,8 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break; // buffs/cleanse/blind change no HP now; value is a controller score term
     case "statBuff":
     case "hasten":
-      break; // Age/Time Stretch change stats, not HP now; value is a controller term
+    case "buffAlly":
+      break; // Age/Time Stretch/Anoint change stats, not HP now; value is a controller term
     case "grab": {
       // Tether Grab: an EV-weighted 3 magic (foe only, rolls to-hit) + the pull to the
       // tile one step from the actor along the ray. The planner only ever grabs enemies;
