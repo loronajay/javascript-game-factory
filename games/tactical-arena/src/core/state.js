@@ -31,8 +31,9 @@ function createUnit(spec) {
     command: spec.command ?? null,
     previousCommand: spec.previousCommand ?? null,
     commandTurn: spec.commandTurn ?? 0,
-    // Gargoyle Volcanic Rage: counts raging activations so a free Pyroclasm fires
-    // every 3rd. Meaningless for every other unit (stays 0).
+    // Gargoyle Volcanic Rage: counts the immediate rage-entry eruption plus later
+    // raging activations so a free Pyroclasm fires on cadence. Meaningless for every
+    // other unit (stays 0).
     volcanicCounter: spec.volcanicCounter ?? 0
   };
 }

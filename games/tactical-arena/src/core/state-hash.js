@@ -49,7 +49,7 @@ function canonicalUnits(units) {
         // King commander state changes future legal actions (the act-first gate) and the
         // live team buff, so it is part of the authoritative hash.
         `${unit.command ?? "-"},${unit.commandTurn ?? 0},${unit.previousCommand ?? "-"},` +
-        // Gargoyle's Volcanic Rage free-Pyroclasm counter changes future beginActivation
+        // Gargoyle's Volcanic Rage free-Pyroclasm counter changes future cadence
         // side-effects, so it is part of the authoritative hash.
         `${unit.volcanicCounter ?? 0},` +
         `${stableStringify(unit.statModifiers ?? {})},` +

@@ -211,7 +211,7 @@ test("Volcanic Rage: at ≤5 HP the Gargoyle is +2 DEF, always defending, and Py
   assert.equal(getArtTargetRange(healthyState, healthy, getArt("gargoyle", "pyroclasm")), 3);
 });
 
-test("Volcanic Rage: every 3rd raging activation erupts a free Pyroclasm before the turn", () => {
+test("Volcanic Rage: erupts on the first raging activation, then every 3rd raging activation after", () => {
   const state = scenario([
     { id: "g", type: "gargoyle", player: 1, x: 6, y: 6, hp: 5 },
     { id: "foe", type: "swordsman", player: 2, x: 6, y: 8, hp: 30 }
@@ -233,7 +233,7 @@ test("Volcanic Rage: every 3rd raging activation erupts a free Pyroclasm before 
 
   let s = state;
   let erupted = [];
-  for (let round = 1; round <= 3; round += 1) {
+  for (let round = 1; round <= 4; round += 1) {
     const res = gargBegin(s);
     assert.ok(res.accepted);
     erupted.push(res.events.some((e) => e.type === "PYROCLASM_ERUPT"));
@@ -241,8 +241,26 @@ test("Volcanic Rage: every 3rd raging activation erupts a free Pyroclasm before 
     if (s.phase === "playing") s = foeTurn(s);
   }
 
-  assert.deepEqual(erupted, [false, false, true], "the 3rd raging begin erupts, the first two do not");
+  assert.deepEqual(erupted, [true, false, false, true], "the first and fourth raging begins erupt");
   assert.ok(findUnit(s, "foe").hp < 30, "the free eruption damaged an enemy on a ray");
+});
+
+test("Volcanic Rage: entering rage from damage immediately erupts Pyroclasm", () => {
+  const state = scenario([
+    { id: "arc", type: "archer", player: 1, x: 6, y: 9 },
+    { id: "g", type: "gargoyle", player: 2, x: 6, y: 6, hp: 6 }
+  ]);
+
+  let s = run(state, beginActivation(1, "arc")).nextState;
+  const res = run(s, attack(1, "arc", "g", NORMAL_HIT));
+  s = res.nextState;
+
+  const erupt = res.events.find((e) => e.type === "PYROCLASM_ERUPT");
+  assert.ok(erupt, "dropping into rage should immediately trigger the free eruption");
+  assert.equal(erupt.actorId, "g");
+  assert.deepEqual(erupt.targetIds, ["arc"]);
+  assert.equal(findUnit(s, "g").volcanicCounter, 1, "the immediate eruption starts the cadence");
+  assert.equal(findUnit(s, "arc").hp, getUnitType("archer").stats.maxHp - 5, "the attacker is caught on the ray");
 });
 
 test("A non-raging Gargoyle never erupts on begin", () => {

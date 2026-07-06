@@ -73,7 +73,10 @@ export function applyCommand(state, command) {
   // of which resolver or turn-rollover hazard (fire/poison/black-death/time-steal) did
   // it — and applies the King's reactive HP swings. Deterministic (no RNG), so online
   // lockstep clients all compute the identical reaction.
-  if (result.accepted) applyCommanderReactions(state, result.nextState, result.events);
+  if (result.accepted) {
+    applyVolcanicRageEntries(state, result.nextState, result.events);
+    applyCommanderReactions(state, result.nextState, result.events);
+  }
   return result;
 }
 
@@ -158,24 +161,63 @@ function beginActivation(state, command) {
     spellUsed: false,
     bonusActionGroups: []
   };
-  // Volcanic Rage (Gargoyle): every Nth raging activation, erupt a free Pyroclasm BEFORE
-  // the turn opens. It spends no MP and no action — the Gargoyle still takes its full turn.
+  // Volcanic Rage (Gargoyle): the first raging activation and every Nth one after erupt
+  // a free Pyroclasm BEFORE the turn opens. It spends no MP and no action — the Gargoyle
+  // still takes its full turn.
   // Fired here (deterministic, no roll — magic AoE) so online lockstep clients all agree.
   const events = [{ type: "ACTIVATION_BEGAN", unitId: unit.id }];
   const freeCast = fresh ? getRageEffectValue(unit, "freePyroclasm", null) : null;
   if (freeCast && isRaging(unit)) {
-    unit.volcanicCounter = (unit.volcanicCounter ?? 0) + 1;
-    if (unit.volcanicCounter % Math.max(1, freeCast.every ?? 3) === 0) {
-      const art = getArt(unit.type, freeCast.artId);
-      if (art) {
-        const { targetIds, damageByTarget } = applyPyroclasmDamage(next, unit, art);
-        resolveVictory(next);
-        if (next.phase !== "playing") next.activation = null; // the eruption ended the match
-        events.push({ type: "PYROCLASM_ERUPT", actorId: unit.id, targetIds, damageByTarget });
-      }
-    }
+    resolveVolcanicPyroclasmTick(next, unit, freeCast, events, { trigger: "activation" });
   }
   return accept(next, events);
+}
+
+function resolveVolcanicPyroclasmTick(state, unit, freeCast, events, { trigger, force = false, resetCounter = false } = {}) {
+  if (resetCounter) unit.volcanicCounter = 0;
+  unit.volcanicCounter = (unit.volcanicCounter ?? 0) + 1;
+  // Fires immediately on rage entry / first raging activation, then every Nth tick after
+  // that, so the cadence is 1, 1+N, 1+2N, ... rather than N, 2N, ...
+  const every = Math.max(1, freeCast.every ?? 3);
+  if (!force && (unit.volcanicCounter - 1) % every !== 0) return false;
+
+  const art = getArt(unit.type, freeCast.artId);
+  if (!art) return false;
+  const { targetIds, damageByTarget } = applyPyroclasmDamage(state, unit, art);
+  resolveVictory(state);
+  if (state.phase !== "playing") state.activation = null; // the eruption ended the match
+  events.push({ type: "PYROCLASM_ERUPT", actorId: unit.id, targetIds, damageByTarget, trigger });
+  return true;
+}
+
+function applyVolcanicRageEntries(prevState, next, events) {
+  if (next.phase !== "playing") return;
+
+  let previousRage = new Map(prevState.units.map((unit) => [unit.id, isRaging(unit)]));
+  for (let guard = 0; guard < next.units.length; guard += 1) {
+    const entrants = next.units.filter((unit) =>
+      unit.hp > 0 &&
+      !previousRage.get(unit.id) &&
+      isRaging(unit) &&
+      getRageEffectValue(unit, "freePyroclasm", null)
+    );
+    if (!entrants.length) return;
+
+    const beforeWaveRage = new Map(next.units.map((unit) => [unit.id, isRaging(unit)]));
+    for (const entrant of entrants) {
+      if (next.phase !== "playing") return;
+      const unit = findUnit(next, entrant.id);
+      if (!unit || unit.hp <= 0 || !isRaging(unit)) continue;
+      const freeCast = getRageEffectValue(unit, "freePyroclasm", null);
+      if (!freeCast) continue;
+      resolveVolcanicPyroclasmTick(next, unit, freeCast, events, {
+        trigger: "rageEntry",
+        force: true,
+        resetCounter: true
+      });
+    }
+    previousRage = beforeWaveRage;
+  }
 }
 
 // Shared Pyroclasm damage: 5 magic to every enemy on any of the 8 straight rays within

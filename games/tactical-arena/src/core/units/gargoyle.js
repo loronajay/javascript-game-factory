@@ -21,9 +21,10 @@
 //     blast to enemies around the landing tile.
 //   • `lineBurst` targeting + the `pyroclasm` resolution — a self-centred burst that
 //     hits EVERY enemy standing on any of the 8 straight rays within range.
-//   • Volcanic Rage's `freePyroclasm` — every N raging activations the Gargoyle erupts
-//     a free (0 MP) Pyroclasm at the START of its activation and still takes its full
-//     turn (fired in the reducer's beginActivation; counted on `unit.volcanicCounter`).
+//   • Volcanic Rage's `freePyroclasm` — when the Gargoyle enters rage it erupts a free
+//     (0 MP) Pyroclasm immediately, then does it again every N raging activations at
+//     the START of its activation and still takes its full turn (counted on
+//     `unit.volcanicCounter`).
 //
 // Stone immunity + Heavy both live as `kind:"passive"` entries in `arts` — the same
 // multi-passive pattern the Necromancer's Dead Zone and Angel's Holy Being use, so
@@ -109,10 +110,10 @@ export const GARGOYLE = Object.freeze({
     })
   ]),
   // Volcanic Rage: at 5 HP or lower the Gargoyle is +2 DEF, ALWAYS defending (and still
-  // takes full turns), Pyroclasm gains +2 range, and every 3rd raging activation it
-  // erupts a free Pyroclasm before acting. The +2 DEF rides the statModifiers rage fold;
-  // `defending` is read by isDefending; `artRangeBonus` by getRageArtRangeBonus;
-  // `freePyroclasm` by the reducer's beginActivation.
+  // takes full turns), Pyroclasm gains +2 range, entering rage immediately erupts a
+  // free Pyroclasm, and every 3rd raging activation after that erupts again before
+  // acting. The +2 DEF rides the statModifiers rage fold; `defending` is read by
+  // isDefending; `artRangeBonus` by getRageArtRangeBonus; `freePyroclasm` by the reducer.
   ragePassive: Object.freeze({
     id: "volcanic-rage",
     name: "Volcanic Rage",
@@ -125,7 +126,7 @@ export const GARGOYLE = Object.freeze({
       artRangeBonus: 2,
       freePyroclasm: Object.freeze({ artId: "pyroclasm", every: 3 })
     }),
-    description: "At 5 HP or lower: +2 DEF, always defending (and still acts), Pyroclasm gains +2 range, and every 3rd turn the Gargoyle erupts a free Pyroclasm before its turn.",
+    description: "At 5 HP or lower: +2 DEF, always defending (and still acts), Pyroclasm gains +2 range, entering rage erupts a free Pyroclasm immediately, and every 3rd turn after that erupts again before acting.",
     implemented: true
   })
 });

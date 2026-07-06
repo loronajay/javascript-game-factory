@@ -1028,8 +1028,8 @@ function playRolloverFx(events) {
   const mourns = events.filter((e) => e.type === "KING_MOURNS");
   const rallies = events.filter((e) => e.type === "SQUAD_RALLY");
   const restores = events.filter((e) => e.type === "KING_RESTORED");
-  // Gargoyle: a free Volcanic-Rage Pyroclasm (fired at beginActivation) and Stone Body's
-  // melee/displacement recoil both surface here as fire-and-forget floats.
+  // Gargoyle: a free Volcanic-Rage Pyroclasm (fired on rage entry / cadence) and Stone
+  // Body's melee/displacement recoil both surface here as fire-and-forget floats.
   const erupts = events.filter((e) => e.type === "PYROCLASM_ERUPT");
   const retaliations = events.filter((e) => e.type === "STONE_RETALIATION");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
