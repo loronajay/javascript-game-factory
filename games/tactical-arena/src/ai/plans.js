@@ -29,26 +29,28 @@ import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isCommandOnly, is
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
-  FOOTWORK_DAMAGE,
   getArtTargetRange,
   getDarkPulseTargets,
   getFirePlacementTiles,
   getFlightTiles,
-  getFootworkStepOptions,
-  getFootworkSteps,
   getLegalFleeTiles,
   getLineTargets,
   getProtectLandingTiles,
   getPyroclasmTargets,
   getRevivePlacementTiles,
   getReviveTargets,
+  getRushContactDamage,
+  getRushStepOptions,
+  getRushSteps,
   getSelfBlastRadius,
   getSummonPlacementTiles,
+  getTargetedBlastAimTiles,
+  getTargetedBlastTargets,
   getTilePulseTargets,
   getVolleyShotAimOptions,
   getVolleyShotCells,
   getWallPlacementTiles,
-  validateFootworkPath
+  validateRushPath
 } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { buffAlliesValue, expectedFixedHit, expectedLineStrikeDamage, expectedStrike, nearestEnemyDistance } from "./evaluate.js";
@@ -166,7 +168,7 @@ function generateArtPlans(state, unit, art, ai, plans) {
       break;
     }
     case "rush": {
-      for (const path of generateFootworkPaths(state, unit)) {
+      for (const path of generateRushPaths(state, unit, art)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, path } }));
       }
       break;
@@ -238,6 +240,22 @@ function generateArtPlans(state, unit, art, ai, plans) {
       for (const target of livingUnits(state, unit.player)) {
         if (target.id === unit.id) continue;
         if (chebyshevDistance(unit.position, target.position) > range) continue;
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
+      }
+      break;
+    }
+    case "healAlly": {
+      const range = art.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+      const excludeSelf = Boolean(art.targeting?.excludeSelf);
+      for (const target of livingUnits(state, unit.player)) {
+        if (excludeSelf && target.id === unit.id) continue;
+        if (chebyshevDistance(unit.position, target.position) > range) continue;
+        const stats = getEffectiveStats(target, state);
+        const relay = art.effect?.type === "relayPower";
+        const useful = relay
+          ? (target.hp < stats.maxHp || target.mp < stats.maxMp)
+          : target.hp < stats.maxHp;
+        if (!useful) continue;
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
       }
       break;
@@ -348,6 +366,21 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "targetedBlast": {
+      // Thunderous Charge: a chosen tile that detonates a radius blast. Offer only tiles
+      // whose blast catches an enemy (never an enemy-occupied tile — getTargetedBlastAimTiles
+      // already excludes those), most-enemies-first and capped, so it replays cleanly.
+      const radius = art.targeting?.radius ?? 2;
+      const tiles = tilesFromKeys(getTargetedBlastAimTiles(state, unit, art))
+        .map((tile) => ({ tile, count: getTargetedBlastTargets(state, unit, tile, radius).length }))
+        .filter((entry) => entry.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, PLACEMENT_KEEP);
+      for (const { tile } of tiles) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile } }));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -436,9 +469,10 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       actor.position = { ...primary.targetPosition };
       break;
     case "rush": {
+      const rushDamage = getRushContactDamage(actor, art);
       for (const step of primary.path) {
         const victim = board.find((u) => areEnemies(actor, u) && u.position.x === step.x && u.position.y === step.y);
-        if (victim) victim.hp = Math.max(0, victim.hp - FOOTWORK_DAMAGE);
+        if (victim) victim.hp = Math.max(0, victim.hp - rushDamage);
       }
       actor.position = { ...primary.path.at(-1) };
       break;
@@ -461,6 +495,20 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "buffAlly":
     case "cleanseAlly":
       break; // Utility casts change stats/statuses, not HP now; value is a controller term
+    case "healAlly": {
+      const ally = byId.get(primary.targetId);
+      if (ally) {
+        if (art.effect?.type === "relayPower") {
+          actor.hp = Math.max(0, actor.hp - (art.effect.hp ?? 0));
+          actor.mp = Math.max(0, actor.mp - (art.effect.mp ?? 0));
+          ally.hp = Math.min(getEffectiveStats(ally, state).maxHp, ally.hp + (art.effect.hp ?? 0));
+          ally.mp = Math.min(getEffectiveStats(ally, state).maxMp, ally.mp + (art.effect.mp ?? 0));
+        } else {
+          ally.hp = Math.min(getEffectiveStats(ally, state).maxHp, ally.hp + (art.heal?.amount ?? 0));
+        }
+      }
+      break;
+    }
     case "grab": {
       // Tether Grab: an EV-weighted 3 magic (foe only, rolls to-hit) + the pull to the
       // tile one step from the actor along the ray. The planner only ever grabs enemies;
@@ -519,6 +567,18 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       for (const target of board) {
         if (!ids.has(target.id)) continue;
         target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: dtype, affinity }).damage);
+      }
+      break;
+    }
+    case "targetedBlast": {
+      // Thunderous Charge: fixed physical to every enemy within the blast radius of the
+      // chosen tile (DEF + Defend apply, like resolveDamage). The stun is a controller term.
+      const radius = art.targeting?.radius ?? 2;
+      const amount = art.damage?.amount ?? 0;
+      for (const target of board) {
+        if (!areEnemies(actor, target)) continue;
+        if (chebyshevDistance(primary.targetPosition, target.position) > radius) continue;
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: "physical" }).damage);
       }
       break;
     }
@@ -669,18 +729,18 @@ function bestBonusAction(state, unit) {
 
 // Bounded DFS for footwork: enumerate up to a node budget of full-length legal paths,
 // then keep the few that thread through the most enemies (decision 2).
-function generateFootworkPaths(state, unit) {
-  const steps = getFootworkSteps(unit);
+function generateRushPaths(state, unit, art) {
+  const steps = getRushSteps(unit, art, state);
   const results = [];
   let budget = FOOTWORK_PATH_BUDGET;
 
   const dfs = (path) => {
     if (budget <= 0) return;
     if (path.length === steps) {
-      if (validateFootworkPath(state, unit, path)) results.push(path);
+      if (validateRushPath(state, unit, path, art)) results.push(path);
       return;
     }
-    for (const key of getFootworkStepOptions(state, unit, path)) {
+    for (const key of getRushStepOptions(state, unit, path, art)) {
       if (budget <= 0) break;
       budget -= 1;
       const [x, y] = key.split(",").map(Number);
@@ -752,7 +812,9 @@ function artUsableForPlanning(state, unit, art) {
     !isStunned(unit) &&
     !unit.statuses?.some((status) => status.type === "silence") &&
     unit.mp >= getArtMpCost(unit, art, state) &&
-    (!art.rageLocked || isRaging(unit))
+    (!art.rageLocked || isRaging(unit)) &&
+    !(art.effect?.type === "studyTarget" && unit.studiedTargetId && state.units.some((target) => target.id === unit.studiedTargetId && target.hp > 0)) &&
+    !(art.effect?.type === "relayPower" && (unit.hp <= (art.effect.hp ?? 0) || unit.mp < (art.effect.mp ?? 0)))
   );
 }
 

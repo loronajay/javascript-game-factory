@@ -1,7 +1,7 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
 import { chebyshevDistance, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
@@ -285,6 +285,7 @@ async function resolveCombat(command) {
   const prevPlayer = state.currentPlayer;
   resolving = true;
   mode = null; footworkPath = []; volleyShotOrigin = null;
+  playArtCallout(events.find((e) => e.type === "ART_RESOLVED" && e.artId));
   render();
 
   const metrics = createBoardMetrics(state.size);
@@ -293,7 +294,12 @@ async function resolveCombat(command) {
   const targetBefore = rolledTargetsBefore[0] ?? (rolled ? findUnit(state, rolled.targetId) : null);
 
   if (rolled && attackerBefore && targetBefore) {
-    const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
+    // A ranged ART fires a projectile even from a melee-range unit (Clod's Stone Throw is
+    // range 4), so read the ART's own reach when one is being cast.
+    const artRange = rolled.artId ? artDefinition(attackerBefore, rolled.artId)?.targeting?.range : null;
+    const ranged = Number.isFinite(artRange)
+      ? artRange > 1
+      : getUnitType(attackerBefore.type).stats.attackRange > 1;
     const center = unitCenter(metrics, targetBefore);
 
     await effects.animateAttack(attackerBefore, targetBefore, ranged, rolled.artId ?? null);
@@ -346,6 +352,11 @@ async function resolveCombat(command) {
             if (rolled.effect.healing > 0) await effects.floatText(unitCenter(metrics, attackerBefore), `+${rolled.effect.healing}`, "#8cf0a4");
           }
         }
+      }
+      // Stone Throw (Clod): a guaranteed slow / crit-stun with no separate roll — float it
+      // directly on a surviving target (the reducer already applied it).
+      if (rolled.appliedStatus) {
+        await effects.floatText(center, rolled.appliedStatus.toUpperCase(), rolled.appliedStatus === "stun" ? "#ffe45e" : "#70b7ff");
       }
       const slain = findUnit(result.nextState, rolled.targetId);
       if (!slain || slain.hp <= 0) await effects.deathDissolve(targetBefore.id, targetBefore.position, teamColor(targetBefore.player));
@@ -451,9 +462,10 @@ async function resolveInstantArt(command) {
 
   resolving = true;
   mode = null; footworkPath = []; volleyShotOrigin = null;
+  playArtCallout(resolved);
   render();
 
-  if (resolved?.artId === "footwork" && actorBefore) {
+  if ((resolved?.artId === "footwork" || resolved?.artId === "stumble") && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     // Map each harmed enemy to its tile so we can strike it as the dasher arrives there,
     // instead of dumping every hit after the slide. The dasher glides tile-by-tile and
@@ -466,7 +478,8 @@ async function resolveInstantArt(command) {
       audio.play("attackHit");
       effects.impact(center, false, "true");
       await effects.hitRecoil(target.id, target.position, false);
-      await effects.floatText(center, "-2", "#ff7684");
+      const amount = resolved.damageByTarget?.[target.id] ?? 2;
+      await effects.floatText(center, `-${amount}`, "#ff7684");
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     });
@@ -743,6 +756,77 @@ async function resolveInstantArt(command) {
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
     await effects.deathDissolve(actorBefore.id, actorBefore.position, teamColor(actorBefore.player));
+  } else if (resolved?.artId === "quake" && actorBefore) {
+    // A self-centred ground slam: earthen magic ripples out and shakes everyone caught.
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("quake", { actor: actorBefore, targets: targetsBefore });
+    effects.shake(9);
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "magic");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#c8b06a");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+    if (resolved.refunded) await effects.floatText(unitCenter(metrics, actorBefore), "MP REFUND", "#8cc8ff");
+  } else if (resolved?.artId === "dark-pulse" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("dark-pulse", {
+      actor: actorBefore,
+      targets: targetsBefore,
+      rays: resolved.pulseRays ?? []
+    });
+    const feedback = [];
+    for (const target of targetsBefore) {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const healed = resolved.healingByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        feedback.push((async () => {
+          await effects.hitRecoil(target.id, target.position, false);
+          await effects.floatText(center, `-${dmg}`, "#c89cff");
+          const after = findUnit(result.nextState, target.id);
+          if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+        })());
+      } else if (healed > 0) {
+        feedback.push(effects.floatText(center, `+${healed}`, "#8cf0a4"));
+      }
+    }
+    await Promise.all(feedback);
+    if (resolved.refunded) await effects.floatText(unitCenter(metrics, actorBefore), "MP REFUND", "#8cc8ff");
+  } else if (resolved?.artId === "thunderous-charge" && actorBefore) {
+    // The RAGE ultimate: Clod CHARGES to the chosen tile, then quakes a 2-tile radius —
+    // physical damage + a mass stun, launching everyone caught up into a brief pop.
+    const metrics = createBoardMetrics(state.size);
+    const from = resolved.from ?? actorBefore.position;
+    const dest = resolved.center ?? actorBefore.position;
+    // Move the live token to the landing tile and slide it in, so the charge reads as a
+    // charge (mutating the about-to-be-replaced input state is safe — result.nextState,
+    // a clone, already stands Clod on `dest` and overwrites it right after this branch).
+    if (from.x !== dest.x || from.y !== dest.y) {
+      const live = findUnit(state, actorBefore.id);
+      if (live) { live.position = { ...dest }; render(); }
+      await effects.animateMovement(actorBefore.id, from, dest);
+    }
+    await effects.playAbilityVfx("thunderous-charge", { actor: { ...actorBefore, position: dest }, targets: targetsBefore, targetPosition: dest });
+    effects.shake(13);
+    effects.impact(unitCenter(metrics, { position: dest }), true, "physical");
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) effects.impact(center, false, "physical");
+      // Launch the target up and let it drop right back down.
+      const bounce = effects.knockUp(target.id, target.position);
+      if (dmg > 0) await effects.floatText(center, `-${dmg}`, "#ff7684");
+      await bounce;
+      if ((resolved.stunnedIds ?? []).includes(target.id)) await effects.floatText(center, "STUN", "#ffe45e");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -1024,7 +1108,21 @@ function playAttackImpactSound(rolled, ranged) {
 }
 
 function artDefinition(unit, artId) {
-  return getUnitType(unit.type).arts.find((art) => art.id === artId);
+  return getArt(unit.type, artId);
+}
+
+function artCalloutLabel(unit, artId) {
+  const art = unit ? artDefinition(unit, artId) : null;
+  if (art?.name) return art.name;
+  return String(artId ?? "ART").split("-").filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function playArtCallout(event) {
+  if (!event?.actorId || !event?.artId) return;
+  const actor = findUnit(state, event.actorId);
+  if (actor) effects.artCallout(actor, artCalloutLabel(actor, event.artId));
 }
 
 function unitCenter(metrics, unit) {
@@ -1051,6 +1149,7 @@ function playEventSounds(events) {
           artId === "anoint" || artId === "purify" || artId === "elevate" || artId === "heavenseeker" ||
           artId === "flight" || artId === "pyroclasm" ||
           artId === "dark-pulse" || artId === "realm-traversal" ||
+          artId === "quake" || artId === "thunderous-charge" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
@@ -1074,12 +1173,13 @@ function playRolloverFx(events) {
   const mourns = events.filter((e) => e.type === "KING_MOURNS");
   const rallies = events.filter((e) => e.type === "SQUAD_RALLY");
   const restores = events.filter((e) => e.type === "KING_RESTORED");
+  const darkPulses = events.filter((e) => e.type === "DARK_PULSE_AUTO");
   // Gargoyle: a free Volcanic-Rage Pyroclasm (fired on rage entry / cadence) and Stone
   // Body's melee/displacement recoil both surface here as fire-and-forget floats.
   const erupts = events.filter((e) => e.type === "PYROCLASM_ERUPT");
   const retaliations = events.filter((e) => e.type === "STONE_RETALIATION");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
-      !erupts.length && !retaliations.length) return;
+      !darkPulses.length && !erupts.length && !retaliations.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -1095,6 +1195,25 @@ function playRolloverFx(events) {
       effects.floatText(center, `-${amount}`, "#ff9a3c");
       if (!unit || unit.hp <= 0) { effects.deathBurst(center, teamColor(unit?.player ?? 1)); killed = true; }
     }
+  }
+
+  for (const pulse of darkPulses) {
+    const actor = findUnit(state, pulse.actorId);
+    if (!actor) continue;
+    const targets = (pulse.targetIds ?? []).map((id) => findUnit(state, id)).filter(Boolean);
+    effects.playAbilityVfx("dark-pulse", { actor, targets, rays: pulse.pulseRays ?? [] }).then(() => {
+      for (const target of targets) {
+        const center = unitCenter(metrics, target);
+        const damage = pulse.damageByTarget?.[target.id] ?? 0;
+        const healing = pulse.healingByTarget?.[target.id] ?? 0;
+        if (damage > 0) {
+          effects.floatText(center, `-${damage}`, "#c89cff");
+          if (target.hp <= 0) { effects.deathBurst(center, teamColor(target.player)); audio.play("unitDefeated"); }
+        } else if (healing > 0) {
+          effects.floatText(center, `+${healing}`, "#8cf0a4");
+        }
+      }
+    }).catch(() => {});
   }
 
   // Stone Body recoil: a melee attacker / displacer takes true damage, floated over it.
@@ -1230,6 +1349,21 @@ async function handleTile(position) {
         setMessage(`Footwork: choose step ${footworkPath.length + 1} of ${steps}.`);
       }
     }
+  } else if (mode?.startsWith("art:") && getAvailableArts(unit).find((a) => a.id === mode.slice("art:".length))?.targeting?.shape === "rushPath") {
+    const artId = mode.slice("art:".length);
+    const art = getAvailableArts(unit).find((a) => a.id === artId);
+    const options = getRushStepOptions(state, unit, footworkPath, art);
+    if (!options.has(positionKey(position))) { setMessage(`${art.name}: choose the next highlighted tile.`, true); }
+    else {
+      footworkPath.push(position);
+      const steps = getRushSteps(unit, art, state);
+      if (footworkPath.length === steps) {
+        if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, [...footworkPath])))
+          setMessage(`${art.name} complete. This unit's activation is complete.`);
+      } else {
+        setMessage(`${art.name}: choose step ${footworkPath.length + 1} of ${steps}.`);
+      }
+    }
   } else if (mode === "art:flee") {
     const fleeLegal = getLegalFleeTiles(state, unit);
     if (!fleeLegal.has(positionKey(position))) {
@@ -1357,6 +1491,15 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "rocket-punch", { targetId: target.id }))) {
       mode = null;
       setMessage("Rocket Punch resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:thunderous-charge") {
+    // Charge a highlighted aim tile (never an enemy's tile); the blast hits a 2-tile radius.
+    const art = getAvailableArts(unit).find((a) => a.id === "thunderous-charge");
+    if (!art || !getTargetedBlastAimTiles(state, unit, art).has(positionKey(position))) {
+      setMessage("Thunderous Charge: click a highlighted tile (not one an enemy stands on).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "thunderous-charge", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Thunderous Charge resolved. This unit's activation is complete.");
     }
   } else if (mode === "art:rewind") {
     const placement = getRevivePlacementTiles(state, unit, getAvailableArts(unit).find((a) => a.id === "rewind"));
@@ -1523,6 +1666,10 @@ async function handleActionClick(action, unit) {
       }
       const lead = action === "art:volley-shot"
         ? "Hover a direction to preview the cone, then click to fire."
+        : action === "art:thunderous-charge"
+          ? "Hover a highlighted tile to preview the blast, then click to charge (not an enemy's tile)."
+        : art?.targeting?.shape === "rushPath"
+          ? `Choose step 1 of ${getRushSteps(unit, art, state)}.`
         : action === "art:flight"
           ? "Choose a highlighted empty tile to fly onto."
         : action === "art:flee"

@@ -1,0 +1,161 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { createBattleState, findUnit } from "../src/core/state.js";
+import { applyCommand } from "../src/core/reducer.js";
+import { attack, beginActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
+import { getRushSteps } from "../src/rules/arts.js";
+import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
+import { generatePlans, toCommands } from "../src/ai/plans.js";
+
+const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
+const CRIT = { attackRoll: 0.5, critRoll: 0.01 };
+
+function run(state, command) {
+  const result = applyCommand(state, command);
+  assert.ok(result.accepted, `command ${command.type} rejected (${result.errorCode})`);
+  return result;
+}
+
+function scenario(units, extra = {}) {
+  return createBattleState({ size: 13, seed: 7, units, ...extra });
+}
+
+test("Fat Knight is registered with his melee stat block and arts", () => {
+  const def = getUnitType("fat-knight");
+  assert.equal(def.name, "Fat Knight");
+  assert.equal(def.classType, "melee");
+  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 1, strength: 10, defense: 6, maxHp: 30, maxMp: 20 });
+  assert.deepEqual(def.arts.filter((art) => art.kind === "active").map((art) => art.id), ["stumble", "fart"]);
+});
+
+test("Battle Trauma: magic crits do not crit Fat Knight, but still deal +1 and grant +1 STR once", () => {
+  const state = scenario([
+    { id: "mage", type: "magician", player: 1, x: 5, y: 5 },
+    { id: "fk", type: "fat-knight", player: 2, x: 5, y: 8 }
+  ]);
+  let s = run(state, beginActivation(1, "mage")).nextState;
+  const result = run(s, useArt(1, "mage", "spark", { targetId: "fk", ...CRIT }));
+  const fk = findUnit(result.nextState, "fk");
+
+  assert.equal(fk.hp, 23, "Spark deals 6 magic + 1 vulnerability, with no crit multiplier");
+  assert.equal(getEffectiveStats(fk, result.nextState).strength, 11, "magic damage grants +1 STR");
+  assert.equal(fk.statuses.filter((status) => status.type === "battle-trauma").length, 1);
+});
+
+test("Battle Trauma: critical basic attacks are not amplified against Fat Knight", () => {
+  const state = scenario([
+    { id: "sw", type: "swordsman", player: 1, x: 5, y: 5 },
+    { id: "fk", type: "fat-knight", player: 2, x: 5, y: 6 }
+  ]);
+  let s = run(state, beginActivation(1, "sw")).nextState;
+  const result = run(s, attack(1, "sw", "fk", CRIT));
+  assert.equal(findUnit(result.nextState, "fk").hp, 26, "10 STR - 6 DEF = 4, not crit-amplified to 6");
+});
+
+test("Thick Boi: Fat Knight resists the first status effect, then later statuses can land", () => {
+  const state = scenario([
+    { id: "m1", type: "mystic", player: 1, x: 4, y: 4 },
+    { id: "m2", type: "mystic", player: 1, x: 6, y: 4 },
+    { id: "fk", type: "fat-knight", player: 2, x: 5, y: 7 }
+  ]);
+
+  let s = run(state, beginActivation(1, "m1")).nextState;
+  let first = run(s, useArt(1, "m1", "silence", { targetId: "fk", effectRoll: 0 }));
+  let fk = findUnit(first.nextState, "fk");
+  assert.equal(fk.statusResistUsed, true);
+  assert.deepEqual(fk.statuses, [], "first status is resisted");
+  assert.equal(first.events[0].effect.reason, "RESISTED");
+
+  s = run(first.nextState, beginActivation(1, "m2")).nextState;
+  const second = run(s, useArt(1, "m2", "silence", { targetId: "fk", effectRoll: 0 }));
+  fk = findUnit(second.nextState, "fk");
+  assert.deepEqual(fk.statuses.map((status) => status.type), ["silence"], "second status lands");
+});
+
+test("Stumble uses Move +2 steps and deals 3 true damage to contacted enemies", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5 },
+    { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
+  ]);
+  assert.equal(getRushSteps(findUnit(state, "fk"), getUnitType("fat-knight").arts[0], state), 4);
+
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  const path = [{ x: 6, y: 5 }, { x: 7, y: 5 }, { x: 7, y: 6 }, { x: 7, y: 7 }];
+  const result = run(s, useArt(1, "fk", "stumble", path));
+  assert.equal(findUnit(result.nextState, "e").hp, 22);
+  assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 7 });
+  assert.equal(findUnit(result.nextState, "fk").mp, 17);
+});
+
+test("Fart pushes nearby enemies away, or deals true damage when blocked", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5 },
+    { id: "push", type: "swordsman", player: 2, x: 6, y: 5 },
+    { id: "blocked", type: "swordsman", player: 2, x: 5, y: 4 },
+    { id: "wall", type: "swordsman", player: 1, x: 5, y: 3 },
+    { id: "ally", type: "swordsman", player: 1, x: 4, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  const result = run(s, useArt(1, "fk", "fart"));
+
+  assert.deepEqual(findUnit(result.nextState, "push").position, { x: 7, y: 5 }, "enemy is shoved one tile away");
+  assert.deepEqual(findUnit(result.nextState, "blocked").position, { x: 5, y: 4 }, "blocked enemy stays put");
+  assert.equal(findUnit(result.nextState, "blocked").hp, 23, "blocked enemy takes 2 true damage");
+  assert.deepEqual(findUnit(result.nextState, "ally").position, { x: 4, y: 5 }, "allies are ignored");
+});
+
+test("RAGE Trample lets Fat Knight move through enemies and damages each enemy crossed", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  const result = run(s, moveUnit(1, "fk", 7, 5));
+
+  assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 5 });
+  assert.equal(findUnit(result.nextState, "e").hp, 22, "crossed enemy takes 3 true damage");
+  assert.equal(getEffectiveStats(findUnit(result.nextState, "fk"), result.nextState).defense, 8);
+});
+
+test("RAGE Trample stacks with Stumble contact damage and extends Stumble by 3", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 2, y: 2, hp: 5 },
+    { id: "e", type: "swordsman", player: 2, x: 3, y: 2 }
+  ]);
+  const art = getUnitType("fat-knight").arts.find((entry) => entry.id === "stumble");
+  assert.equal(getRushSteps(findUnit(state, "fk"), art, state), 8);
+
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  const path = [
+    { x: 3, y: 2 }, { x: 4, y: 2 }, { x: 5, y: 2 }, { x: 6, y: 2 },
+    { x: 7, y: 2 }, { x: 8, y: 2 }, { x: 9, y: 2 }, { x: 10, y: 2 }
+  ];
+  const result = run(s, useArt(1, "fk", "stumble", path));
+  assert.equal(findUnit(result.nextState, "e").hp, 19, "3 Stumble + 3 Trample true damage");
+});
+
+test("Fat Knight's active ARTS register VFX recipes", () => {
+  assert.equal(getAbilityVfx("stumble").type, "dashTrail");
+  assert.equal(getAbilityVfx("fart").type, "magicBurst");
+});
+
+test("CPU: Fat Knight plans replay cleanly, including Stumble and Fart", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5, mp: 20 },
+    { id: "e1", type: "swordsman", player: 2, x: 6, y: 5 },
+    { id: "e2", type: "archer", player: 2, x: 8, y: 5 }
+  ]);
+  const plans = generatePlans(state, findUnit(state, "fk"));
+  assert.ok(plans.some((plan) => plan.primary.artId === "stumble"), "expected a Stumble plan");
+  assert.ok(plans.some((plan) => plan.primary.artId === "fart"), "expected a Fart plan");
+  for (const plan of plans) {
+    let s = state;
+    for (const command of toCommands(1, plan)) {
+      const result = applyCommand(s, command);
+      assert.ok(result.accepted, `${plan.primary.artId ?? plan.primary.kind} -> ${command.type} rejected (${result.errorCode})`);
+      s = result.nextState;
+    }
+  }
+});

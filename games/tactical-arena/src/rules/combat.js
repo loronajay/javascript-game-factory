@@ -1,4 +1,4 @@
-import { getEffectiveStats, getTeamMagicDamageBonus, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
+import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
@@ -152,8 +152,12 @@ export function finalizeMagicDamage({ attacker, target, state = null, rawDamage,
   if (immune) return 0;
   const reduced = Math.max(0, rawDamage - getTeamDamageReduction(target, state, "magic"));
   return reduced > 0
-    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSelfMagicVulnerability(target)
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target)
     : reduced;
+}
+
+export function ignoresCriticalDamage(unit) {
+  return passiveEffects(unit).some((effect) => effect.ignoreCriticalDamage);
 }
 
 // Passive crit-chance bonus that scales with missing HP (Angel's Inner Strength:
@@ -269,8 +273,15 @@ export function getTeamDamageReduction(target, state, damageType) {
 // any unit without the passive or with MP to spare. Applied only to landed magic damage.
 export function getSelfMagicVulnerability(target) {
   const effect = getUnitType(target.type).passive?.effect;
-  if (effect?.type !== "emptyMpBoost" || (target?.mp ?? 0) > 0) return 0;
-  return Math.max(0, Number(effect.magicVulnerability) || 0);
+  let vulnerability = 0;
+  if (effect?.type === "emptyMpBoost" && (target?.mp ?? 0) <= 0) {
+    vulnerability += Math.max(0, Number(effect.magicVulnerability) || 0);
+  }
+  for (const passiveEffect of passiveEffects(target)) {
+    if (passiveEffect?.type === "emptyMpBoost") continue;
+    vulnerability += Math.max(0, Number(passiveEffect.magicVulnerability) || 0);
+  }
+  return vulnerability;
 }
 
 // True when any living unit is projecting a board-wide healing lockout (a raging
@@ -289,7 +300,7 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   }
   const actorStats = getEffectiveStats(attacker, state);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
-  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
+  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical: critical && !ignoresCriticalDamage(target) });
   const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, damageAffinity });
   return { ...result, critical, proximityBonus: 0, damage };
 }
@@ -301,11 +312,12 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
 // reducer AND the forecast so the number can never drift. Same return shape as
 // resolvePhysicalStrike/resolveBaseStrike.
 export function resolveFixedMagicStrike(attacker, target, amount, { critical = false, state = null, art = null } = {}) {
-  const base = critical ? Math.ceil(Math.max(0, amount) * CRIT_MULTIPLIER) : Math.max(0, amount);
+  const effectiveCritical = critical && !ignoresCriticalDamage(target);
+  const base = effectiveCritical ? Math.ceil(Math.max(0, amount) * CRIT_MULTIPLIER) : Math.max(0, amount);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: { strength: base }, defender: targetStats, type: "magic" });
   const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, art });
-  return { ...result, critical, proximityBonus: 0, damage };
+  return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
 }
 
 // THE single source of truth for the damage a physical strike will deal *right now*.
@@ -324,23 +336,28 @@ export function resolveFixedMagicStrike(attacker, target, amount, { critical = f
 // `proximity` gates the proximity passive for callers that represent attacks. The
 // current Archer kit opts in for basic ATTACK, targeted attack ARTS, and Volley Shot.
 export function resolvePhysicalStrike(attacker, target, { proximity = false, critical = false, state = null } = {}) {
+  const effectiveCritical = critical && !ignoresCriticalDamage(target);
   const result = resolveDamage({
     attacker: getEffectiveStats(attacker, state),
     defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
     type: "physical",
-    critical
+    critical: effectiveCritical
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
   // Fire Stance adds flat crit damage — only on a landed crit, so the normal-hit
   // forecast (critical:false) never shows it.
-  const stanceCritBonus = critical ? getStanceCritBonus(attacker) : 0;
+  const stanceCritBonus = effectiveCritical ? getStanceCritBonus(attacker) : 0;
   let damage = result.damage + proximityBonus + tileStrikeBonus + stanceCritBonus;
   // A landed hit (we only reach here past the to-hit roll) is floored by any minimum
   // the attacker's passive sets — last, after every bonus.
   const minimum = getMinimumDamage(attacker);
   if (minimum > 0 && damage >= 1) damage = Math.max(minimum, damage);
-  return { ...result, critical, proximityBonus, tileStrikeBonus, damage };
+  // Rock Hard (Clod): a defending target negates physical damage entirely — applied
+  // absolutely last so no bonus/floor can leak through, and honestly (the forecast
+  // resolves through here too, so it shows 0 against a braced Clod).
+  if (negatesPhysicalWhileDefending(target)) damage = 0;
+  return { ...result, critical: effectiveCritical, proximityBonus, tileStrikeBonus, damage };
 }
 
 // A blinded unit's attack roll is a guaranteed miss unless a combat override (the
@@ -370,4 +387,26 @@ export function resistsDisplacement(unit) {
 export function getDisplacementRetaliation(unit) {
   const effect = getUnitType(unit.type).passive?.effect;
   return effect?.type === "stoneBody" ? Math.max(0, Number(effect.displacementRetaliation) || 0) : 0;
+}
+
+// --- Rock Hard (Clod) --------------------------------------------------------
+// Read centrally so no strike path hard-codes the unit; scans every passive source (Rock
+// Hard is a passive ART entry, not the main passive) like the crit-status / fire seams.
+
+function rockHardEffect(unit) {
+  for (const effect of passiveEffects(unit)) if (effect.type === "rockHard") return effect;
+  return null;
+}
+
+// True when a DEFENDING unit shrugs off physical damage entirely (Clod's Rock Hard). The
+// caller folds this into the final physical damage, so the on-board forecast reads 0 too.
+export function negatesPhysicalWhileDefending(unit) {
+  return Boolean(rockHardEffect(unit)?.negatePhysical) && isDefending(unit);
+}
+
+// MP a unit restores each time a physical attack lands on it while defending (Rock Hard).
+// 0 for any unit without the passive; the reducer applies it at every physical strike site.
+export function getRockHardMpRefund(unit) {
+  const effect = rockHardEffect(unit);
+  return effect ? Math.max(0, Number(effect.mpOnPhysical) || 0) : 0;
 }

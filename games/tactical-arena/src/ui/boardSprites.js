@@ -80,6 +80,11 @@ export const BOARD_SPRITES = Object.freeze({
   // Cropped from the 600×600 portrait, centered on the measured feet-band stance x
   // (padded to keep the wide blob body dead-centre on the coin). Held a touch smaller.
   virus:       sprite("virus",       578, 506, { scale: 0.94 }),
+  // Cropped from the 600×600 portrait, centered on the measured stance x=300 (symmetric
+  // golem; the head leans slightly right, ignored per the centering trap in the header).
+  clod:        sprite("clod",        510, 533),
+  "fat-knight": sprite("fat-knight", 600, 600),
+  "fat-wizard": sprite("fat-wizard", 600, 600),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })

@@ -32,11 +32,11 @@ test("every draftable unit declares a picker class", () => {
 
 test("unit picker groups draftable units by class in roster order", () => {
   assert.deepEqual(groupedUnitTypes(), [
-    { id: "melee", label: "Melees", types: ["swordsman", "paladin", "monk"] },
+    { id: "melee", label: "Melees", types: ["swordsman", "paladin", "monk", "fat-knight"] },
     { id: "ranger", label: "Rangers", types: ["archer", "sniper", "angel"] },
     { id: "support", label: "Supports", types: ["mystic", "witch-doctor", "father-time", "king"] },
-    { id: "mage", label: "Mages", types: ["magician", "necromancer", "nemesis", "virus"] },
-    { id: "tank", label: "Tanks", types: ["juggernaut", "gargoyle"] }
+    { id: "mage", label: "Mages", types: ["magician", "necromancer", "nemesis", "virus", "fat-wizard"] },
+    { id: "tank", label: "Tanks", types: ["juggernaut", "gargoyle", "clod"] }
   ]);
   assert.deepEqual(groupedUnitTypes(["ghoul"]), [
     { id: "summon", label: "Summons", types: ["ghoul"] }

@@ -1,11 +1,11 @@
 import { COMMANDS } from "./commands.js";
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getStatusSpreadConfig, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getStatusSpreadConfig, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getDarkPulseTargets, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
+import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getRockHardMpRefund, ignoresCriticalDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
-import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
+import { chebyshevDistance, getLegalMovePath, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { applyStatus, isStunned, reflectsStatus, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect } from "../rules/stances.js";
 
@@ -74,6 +74,35 @@ function applyGrowth(state, actor, amount) {
   actor.mp = Math.min(getEffectiveStats(actor, state).maxMp, actor.mp + amount);
   const gained = actor.mp - before;
   return gained > 0 ? [{ type: "GROWTH_MP", unitId: actor.id, mpGained: gained }] : [];
+}
+
+// Rock Hard (Clod): a physical attack landing on a DEFENDING Clod is negated by the
+// strike resolvers (see negatesPhysicalWhileDefending), and here it also feeds him MP.
+// Fired at every physical strike site; a no-op for any unit without the passive or not
+// defending. Returns [] or a single ROCK_HARD_MP event.
+function applyRockHardDefense(state, target, isPhysical) {
+  if (!isPhysical || target.hp <= 0 || !isDefending(target)) return [];
+  const refund = getRockHardMpRefund(target);
+  if (refund <= 0) return [];
+  const before = target.mp;
+  target.mp = Math.min(getEffectiveStats(target, state).maxMp, target.mp + refund);
+  const gained = target.mp - before;
+  return gained > 0 ? [{ type: "ROCK_HARD_MP", unitId: target.id, mpGained: gained }] : [];
+}
+
+function applyMagicDamageReaction(target, damageDealt) {
+  if (damageDealt <= 0 || target.hp <= 0) return null;
+  const effect = getUnitType(target.type).passive?.effect;
+  if (effect?.type !== "magicTrauma") return null;
+  const status = effect.status ?? { type: "battle-trauma", duration: 1, statModifiers: { strength: 1 } };
+  const result = applyStatus(target, {
+    type: status.type,
+    duration: status.duration,
+    statModifiers: { ...(status.statModifiers ?? {}) },
+    ignoreResistance: true
+  });
+  if (result.applied) target.statuses = result.statuses;
+  return { type: "BATTLE_TRAUMA", unitId: target.id, applied: result.applied };
 }
 
 export function applyCommand(state, command) {
@@ -219,7 +248,7 @@ function nemesisThresholdBand(hp) {
 function resolveNemesisAutoPulse(state, unit, events, { trigger }) {
   const art = getArt(unit.type, "dark-pulse");
   if (!art || unit.hp <= 0) return false;
-  const { targetIds, damageByTarget, healingByTarget } = applyDarkPulse(state, unit, art);
+  const { targetIds, damageByTarget, healingByTarget, pulseRays } = applyDarkPulse(state, unit, art);
   resolveVictory(state);
   events.push({
     type: "DARK_PULSE_AUTO",
@@ -229,6 +258,7 @@ function resolveNemesisAutoPulse(state, unit, events, { trigger }) {
     targetIds,
     damageByTarget,
     healingByTarget,
+    pulseRays,
     mpCost: 0
   });
   return true;
@@ -372,15 +402,18 @@ function applySpreadReactions(prevState, next, events) {
 function applyPyroclasmDamage(state, actor, art) {
   const damageByTarget = {};
   const targetIds = [];
+  const reactionEvents = [];
   for (const target of getPyroclasmTargets(state, actor, art)) {
     const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
     const damage = finalizeMagicDamage({ attacker: actor, target, state, rawDamage: result.damage, art });
     const dealt = Math.min(target.hp, damage);
     target.hp = Math.max(0, target.hp - damage);
+    const reaction = applyMagicDamageReaction(target, dealt);
+    if (reaction) reactionEvents.push(reaction);
     if (dealt > 0 || damage > 0) { targetIds.push(target.id); damageByTarget[target.id] = damage; }
   }
-  return { targetIds, damageByTarget };
+  return { targetIds, damageByTarget, reactionEvents };
 }
 
 function moveUnit(state, command) {
@@ -393,9 +426,30 @@ function moveUnit(state, command) {
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
   const from = { ...unit.position };
+  const path = getLegalMovePath(state, result.unit, command.position) ?? [{ ...command.position }];
+  const trampleDamage = Math.max(0, Number(getRageEffectValue(unit, "trampleDamage", 0)) || 0);
+  const harmed = [];
+  const damageByTarget = {};
+  if (trampleDamage > 0) {
+    for (const step of path) {
+      const target = unitAt(next, step);
+      if (!target || !areEnemies(unit, target)) continue;
+      const dealt = Math.min(target.hp, trampleDamage);
+      target.hp = Math.max(0, target.hp - trampleDamage);
+      harmed.push(target.id);
+      damageByTarget[target.id] = (damageByTarget[target.id] ?? 0) + dealt;
+    }
+  }
   unit.position = { ...command.position };
   next.activation.moved = true;
-  return accept(next, [{ type: "UNIT_MOVED", unitId: unit.id, from, to: { ...unit.position } }]);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "UNIT_MOVED",
+    unitId: unit.id,
+    from,
+    to: { ...unit.position },
+    ...(harmed.length ? { path: path.map((step) => ({ ...step })), harmed, damageByTarget } : {})
+  }]);
 }
 
 function cancelMove(state, command) {
@@ -464,15 +518,20 @@ function attack(state, command) {
   const critFire = getCritCreatesFire(actor);
   const blinded = []; // targets that received an on-hit status (event key kept for back-compat)
   const fireTiles = [];
+  const rockHardEvents = []; // Rock Hard (Clod): MP refunded per physical strike while defending
+  const magicReactionEvents = [];
   let poisonedByAttack = 0;
   const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
   for (const targetUnit of targets) {
     const damage = strike(targetUnit);
     const damageDealt = Math.min(targetUnit.hp, damage.damage);
     targetUnit.hp = Math.max(0, targetUnit.hp - damage.damage);
+    const magicReaction = basicDamageType === "magic" ? applyMagicDamageReaction(targetUnit, damageDealt) : null;
+    if (magicReaction) magicReactionEvents.push(magicReaction);
     targetIds.push(targetUnit.id);
     damageByTarget[targetUnit.id] = damage.damage;
     totalDamageDealt += damageDealt;
+    rockHardEvents.push(...applyRockHardDefense(next, targetUnit, basicDamageType === "physical"));
     const onHit = rageAttackStatus ?? (swing.critical ? critStatus : null);
     if (onHit && targetUnit.hp > 0) {
       const applied = applyStatus(targetUnit, { type: onHit.status, duration: onHit.duration });
@@ -514,7 +573,7 @@ function attack(state, command) {
     ...(blinded.length ? { blinded } : {}),
     ...(fireTiles.length ? { fireTiles } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...rockHardEvents, ...magicReactionEvents]);
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
@@ -555,7 +614,9 @@ function defend(state, command) {
 // New art mechanics register here instead of adding branches to useArt.
 // Default (targeted attack + optional status/heal effect) needs no entry.
 const ART_RESOLVERS = new Map([
-  ["footwork", resolveFootwork],
+  ["footwork", resolveRushPath],
+  ["stumble", resolveRushPath],
+  ["fart", resolveFart],
   ["volley-shot", resolveVolleyShot],
   ["pray", resolveHealAllies],
   ["wish", resolveHealAllies],
@@ -609,7 +670,17 @@ const ART_RESOLVERS = new Map([
   // Virus: a self-centred blind cloud and the two poison detonations (Poison Tick + Explosion).
   ["smog", resolveSmog],
   ["poison-tick", resolvePoisonBurst],
-  ["explosion", resolvePoisonBurst]
+  ["explosion", resolvePoisonBurst],
+  // Clod: a self-centred quake (variable magic + MP refund on a full-team hit), a STR-
+  // scaling boulder throw with a guaranteed slow/crit-stun, and the RAGE targeted blast.
+  ["quake", resolveQuake],
+  ["stone-throw", resolveStoneThrow],
+  ["thunderous-charge", resolveThunderousCharge],
+  // Fat Wizard: Study mark, Clumsy splash casts, and direct HP/MP transfer.
+  ["zap", resolveFatWizardZap],
+  ["study", resolveStudy],
+  ["surge", resolveFatWizardSurge],
+  ["relay-power", resolveRelayPower]
 ]);
 
 function useArt(state, command) {
@@ -621,19 +692,23 @@ function useArt(state, command) {
   return resolver(state, command, art);
 }
 
-function resolveFootwork(state, command, art) {
+function resolveRushPath(state, command, art) {
   const actorState = findUnit(state, command.unitId);
-  if (!validateFootworkPath(state, actorState, command.path)) return reject(ERR.INVALID_ART_PATH);
+  if (!validateRushPath(state, actorState, command.path, art)) return reject(ERR.INVALID_ART_PATH);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const cost = getArtMpCost(actor, art, next);
   const harmed = [];
+  const damageByTarget = {};
+  const damage = getRushContactDamage(actor, art);
   for (const step of command.path) {
     const target = unitAt(next, step);
     if (target && areEnemies(actor, target)) {
-      target.hp = Math.max(0, target.hp - FOOTWORK_DAMAGE);
+      const dealt = Math.min(target.hp, damage);
+      target.hp = Math.max(0, target.hp - damage);
       harmed.push(target.id);
+      damageByTarget[target.id] = (damageByTarget[target.id] ?? 0) + dealt;
     }
   }
   actor.position = { ...command.path.at(-1) };
@@ -646,6 +721,57 @@ function resolveFootwork(state, command, art) {
     actorId: actor.id,
     path: command.path.map((step) => ({ ...step })),
     harmed,
+    damageByTarget,
+    mpCost: cost
+  }]);
+}
+
+function fartPushDestination(actor, target) {
+  const dx = Math.sign(target.position.x - actor.position.x);
+  const dy = Math.sign(target.position.y - actor.position.y);
+  if (Math.abs(target.position.x - actor.position.x) >= Math.abs(target.position.y - actor.position.y)) {
+    return { x: target.position.x + dx, y: target.position.y };
+  }
+  return { x: target.position.x, y: target.position.y + dy };
+}
+
+function resolveFart(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const radius = art.targeting?.radius ?? 1;
+  const amount = art.damage?.amount ?? 2;
+  const originalOccupied = new Set(livingUnits(next).map((unit) => positionKey(unit.position)));
+  const pushed = {};
+  const blocked = [];
+  const damageByTarget = {};
+
+  for (const target of livingUnits(next)) {
+    if (!areEnemies(actor, target)) continue;
+    if (chebyshevDistance(actor.position, target.position) > radius) continue;
+    const destination = fartPushDestination(actor, target);
+    if (!isOnBoard(next, destination) || isWallAt(next, destination) || originalOccupied.has(positionKey(destination))) {
+      const dealt = Math.min(target.hp, amount);
+      target.hp = Math.max(0, target.hp - amount);
+      blocked.push(target.id);
+      damageByTarget[target.id] = dealt;
+      continue;
+    }
+    const from = { ...target.position };
+    target.position = destination;
+    pushed[target.id] = { from, to: { ...destination } };
+  }
+
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    pushed,
+    blocked,
+    damageByTarget,
     mpCost: cost
   }]);
 }
@@ -695,6 +821,7 @@ function resolveTargetedArt(state, command, art) {
     : resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null, damageAffinity: art.damageAffinity ?? art.damage?.affinity ?? null });
   const damageDealt = Math.min(target.hp, damage.damage);
   target.hp = Math.max(0, target.hp - damage.damage);
+  const magicReaction = damage.type === "magic" ? applyMagicDamageReaction(target, damageDealt) : null;
 
   let effect = null;
   let poisonedEnemy = false;
@@ -722,6 +849,9 @@ function resolveTargetedArt(state, command, art) {
   const healingEvents = damage.type === "physical" ? resolvePhysicalDamageHealing(next, actor, damageDealt) : [];
   // Growth (Virus): restore MP when this cast poisons an enemy (Cough).
   const growthEvents = poisonedEnemy ? applyGrowth(next, actor, getPoisonMpRefund(actor)) : [];
+  // Rock Hard (Clod): a defending Clod struck by a physical ART refunds MP (its damage
+  // was already negated by resolveBaseStrike).
+  const rockHardEvents = applyRockHardDefense(next, target, damage.type === "physical");
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -735,7 +865,270 @@ function resolveTargetedArt(state, command, art) {
     roll: swing.hitRoll,
     damage,
     ...(effect ? { effect } : {})
-  }, ...healingEvents, ...growthEvents]);
+  }, ...healingEvents, ...growthEvents, ...rockHardEvents, ...(magicReaction ? [magicReaction] : [])]);
+}
+
+function clumsyEffect(actor) {
+  return getUnitType(actor.type).passive?.effect?.type === "clumsyCast"
+    ? getUnitType(actor.type).passive.effect
+    : null;
+}
+
+function validateTargetedEnemyCast(state, actor, target, art) {
+  if (!target || target.hp <= 0 || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
+  if (chebyshevDistance(actor.position, target.position) > getArtTargetRange(state, actor, art)) return ERR.TARGET_OUT_OF_RANGE;
+  if (isWallBetween(state, actor.position, target.position, actor)) return ERR.TARGET_OBSTRUCTED;
+  return null;
+}
+
+function applyStudyLeech(state, actor, target, damageDealt, events) {
+  if (damageDealt <= 0) return;
+  const reward = getMagicDamageReward(actor, target);
+  if (!reward) return;
+  const beforeHp = actor.hp;
+  const beforeMp = actor.mp;
+  actor.hp = Math.min(getEffectiveStats(actor, state).maxHp, actor.hp + reward.hp);
+  actor.mp = Math.min(getEffectiveStats(actor, state).maxMp, actor.mp + reward.mp);
+  const hpRestored = actor.hp - beforeHp;
+  const mpRestored = actor.mp - beforeMp;
+  if (hpRestored > 0 || mpRestored > 0) {
+    events.push({ type: "STUDY_LEECH", actorId: actor.id, targetId: target.id, hpRestored, mpRestored });
+  }
+}
+
+function applyMagicSplash(state, actor, center, { amount, excludeId, art, damageByTarget, targetIds, reactionEvents, leechEvents }) {
+  if (!(amount > 0)) return;
+  for (const target of livingUnits(state)) {
+    if (target.id === excludeId) continue;
+    if (chebyshevDistance(center.position, target.position) > (clumsyEffect(actor)?.radius ?? 1)) continue;
+    const damage = resolveFixedMagicStrike(actor, target, amount, { state, art });
+    const dealt = Math.min(target.hp, damage.damage);
+    target.hp = Math.max(0, target.hp - damage.damage);
+    if (dealt <= 0) continue;
+    targetIds.push(target.id);
+    damageByTarget[target.id] = (damageByTarget[target.id] ?? 0) + dealt;
+    const reaction = applyMagicDamageReaction(target, dealt);
+    if (reaction) reactionEvents.push(reaction);
+    applyStudyLeech(state, actor, target, dealt, leechEvents);
+  }
+}
+
+function applyAreaHeal(state, actor, center, { amount, excludeId, healingByTarget, targetIds }) {
+  if (!(amount > 0) || isHealingDisabled(state)) return;
+  const boosted = amount + getGlobalHealBonus(state) + getCommandHealBonus(state, actor);
+  for (const target of livingUnits(state)) {
+    if (target.id === excludeId) continue;
+    if (chebyshevDistance(center.position, target.position) > (clumsyEffect(actor)?.radius ?? 1)) continue;
+    const before = target.hp;
+    target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + boosted);
+    const healed = target.hp - before;
+    if (healed <= 0) continue;
+    targetIds.push(target.id);
+    healingByTarget[target.id] = (healingByTarget[target.id] ?? 0) + healed;
+  }
+}
+
+function resolveFatWizardZap(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  const invalid = validateTargetedEnemyCast(state, actorState, targetState, art);
+  if (invalid) return reject(invalid);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  next.activation.spellUsed = true;
+
+  const splashDamageByTarget = {};
+  const splashTargetIds = [];
+  const reactionEvents = [];
+  const leechEvents = [];
+  const clumsy = clumsyEffect(actor);
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    applyMagicSplash(next, actor, target, {
+      amount: clumsy?.missMagicDamage ?? 0,
+      excludeId: target.id,
+      art,
+      damageByTarget: splashDamageByTarget,
+      targetIds: splashTargetIds,
+      reactionEvents,
+      leechEvents
+    });
+    spendAndAdvance(next, actor);
+    resolveVictory(next);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      mpCost: cost, hit: false, missed: true, roll: swing.hitRoll,
+      splashTargetIds, splashDamageByTarget
+    }, ...reactionEvents, ...leechEvents]);
+  }
+
+  const amount = (art.damage?.amount ?? 0) + Math.max(0, Number(getRageEffectValue(actor, "zapDamageBonus", 0)) || 0);
+  const damage = resolveFixedMagicStrike(actor, target, amount, { critical: swing.critical, state: next, art });
+  const damageDealt = Math.min(target.hp, damage.damage);
+  target.hp = Math.max(0, target.hp - damage.damage);
+  const magicReaction = applyMagicDamageReaction(target, damageDealt);
+  if (magicReaction) reactionEvents.push(magicReaction);
+  applyStudyLeech(next, actor, target, damageDealt, leechEvents);
+
+  let effect = null;
+  if (swing.critical && target.hp > 0) {
+    const rageStatus = getRageEffectValue(actor, "zapCritStatus", null);
+    const spec = rageStatus ?? { status: art.effect?.status, durationTurns: art.effect?.durationTurns ?? 1 };
+    const applied = applyStatus(target, { type: spec.status, duration: spec.durationTurns });
+    if (applied.applied) target.statuses = applied.statuses;
+    effect = { status: spec.status, applied: applied.applied, ...(applied.reason ? { reason: applied.reason } : {}) };
+  }
+
+  const rageSplash = getRageEffectValue(actor, "zapSplashOnHit", null);
+  const splashAmount = swing.critical
+    ? (rageSplash?.critAmount ?? clumsy?.critMagicDamage ?? 0)
+    : (rageSplash?.amount ?? 0);
+  applyMagicSplash(next, actor, target, {
+    amount: splashAmount,
+    excludeId: target.id,
+    art,
+    damageByTarget: splashDamageByTarget,
+    targetIds: splashTargetIds,
+    reactionEvents,
+    leechEvents
+  });
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    mpCost: cost, hit: true, critical: swing.critical, roll: swing.hitRoll, damage,
+    ...(effect ? { effect } : {}),
+    ...(splashTargetIds.length ? { splashTargetIds, splashDamageByTarget } : {})
+  }, ...reactionEvents, ...leechEvents]);
+}
+
+function resolveStudy(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  const invalid = validateTargetedEnemyCast(state, actorState, targetState, art);
+  if (invalid) return reject(invalid);
+  if (actorState.studiedTargetId && state.units.some((unit) => unit.id === actorState.studiedTargetId && unit.hp > 0)) {
+    return reject(ERR.ART_NOT_AVAILABLE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  actor.studiedTargetId = target.id;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, studiedTargetId: target.id, mpCost: cost
+  }]);
+}
+
+function resolveFatWizardSurge(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areAllies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const healingByTarget = {};
+  const splashHealingByTarget = {};
+  const healTargetIds = [];
+  const splashTargetIds = [];
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+
+  const clumsy = clumsyEffect(actor);
+  if (swing.missed) {
+    applyAreaHeal(next, actor, target, {
+      amount: clumsy?.surgeHeal ?? 0,
+      excludeId: target.id,
+      healingByTarget: splashHealingByTarget,
+      targetIds: splashTargetIds
+    });
+  } else {
+    const amount = swing.critical ? (art.heal?.critAmount ?? art.heal?.amount ?? 0) : (art.heal?.amount ?? 0);
+    if (!isHealingDisabled(next)) {
+      const boosted = amount + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+      const before = target.hp;
+      target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + boosted);
+      const healed = target.hp - before;
+      if (healed > 0) {
+        healTargetIds.push(target.id);
+        healingByTarget[target.id] = healed;
+      }
+    }
+    const rageSplash = getRageEffectValue(actor, "surgeSplashOnHit", null);
+    const splashAmount = swing.critical ? (clumsy?.surgeHeal ?? 0) : (rageSplash?.amount ?? 0);
+    applyAreaHeal(next, actor, target, {
+      amount: splashAmount,
+      excludeId: target.id,
+      healingByTarget: splashHealingByTarget,
+      targetIds: splashTargetIds
+    });
+  }
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    mpCost: cost, hit: !swing.missed, missed: swing.missed, critical: swing.critical, roll: swing.hitRoll,
+    healTargetIds, healingByTarget,
+    ...(splashTargetIds.length ? { splashTargetIds, splashHealingByTarget } : {})
+  }]);
+}
+
+function resolveRelayPower(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || targetState.id === actorState.id || !areAllies(actorState, targetState)) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  const hp = Math.max(0, Number(art.effect?.hp) || 0);
+  const mp = Math.max(0, Number(art.effect?.mp) || 0);
+  if (actorState.hp <= hp || actorState.mp < mp) return reject(ERR.ART_NOT_AVAILABLE);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  actor.hp = Math.max(0, actor.hp - hp);
+  actor.mp = Math.max(0, actor.mp - mp);
+  const beforeHp = target.hp;
+  const beforeMp = target.mp;
+  if (!isHealingDisabled(next)) {
+    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + hp + getGlobalHealBonus(next) + getCommandHealBonus(next, actor));
+  }
+  target.mp = Math.min(getEffectiveStats(target, next).maxMp, target.mp + mp);
+  const healed = target.hp - beforeHp;
+  const restored = target.mp - beforeMp;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    mpCost: 0,
+    hpPaid: hp,
+    mpPaid: mp,
+    healingByTarget: healed > 0 ? { [target.id]: healed } : {},
+    restoredByTarget: restored > 0 ? { [target.id]: restored } : {}
+  }]);
 }
 
 function resolveFlee(state, command, art) {
@@ -767,6 +1160,7 @@ function resolveNuke(state, command, art) {
   const radius = getSelfBlastRadius(next, actor, art);
   const damageByTarget = {};
   const targetIds = [];
+  const reactionEvents = [];
 
   for (const target of livingUnits(next)) {
     if (!areEnemies(actor, target)) continue;
@@ -774,7 +1168,10 @@ function resolveNuke(state, command, art) {
     const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
     const damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: result.damage, art });
+    const dealt = Math.min(target.hp, damage);
     target.hp = Math.max(0, target.hp - damage);
+    const reaction = applyMagicDamageReaction(target, dealt);
+    if (reaction) reactionEvents.push(reaction);
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
   }
@@ -790,7 +1187,7 @@ function resolveNuke(state, command, art) {
     targetIds,
     damageByTarget,
     mpCost: cost
-  }]);
+  }, ...reactionEvents]);
 }
 
 // Flight (Gargoyle): fly onto a chosen empty tile within (Move + 1) Chebyshev spaces,
@@ -836,7 +1233,7 @@ function resolveFlight(state, command, art) {
 function resolvePyroclasm(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
-  const { targetIds, damageByTarget } = applyPyroclasmDamage(next, actor, art);
+  const { targetIds, damageByTarget, reactionEvents } = applyPyroclasmDamage(next, actor, art);
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   next.activation.spellUsed = true;
@@ -844,7 +1241,7 @@ function resolvePyroclasm(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget, mpCost: cost
-  }]);
+  }, ...reactionEvents]);
 }
 
 // Smog (Virus): a self-centred blind CLOUD — every enemy within the blast radius is
@@ -913,11 +1310,180 @@ function resolvePoisonBurst(state, command, art) {
   }]);
 }
 
+// Quake (Clod): a self-centred ground slam. Every enemy within the radius takes the SAME
+// (base + number caught) magic damage — magic honors Defend halving / Dead Zone / immunity
+// like every self-centred blast. If the quake catches the ENTIRE enemy team, the MP is
+// refunded (mirrors the Nemesis Dark Pulse refund).
+function resolveQuake(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const radius = getSelfBlastRadius(next, actor, art);
+  const enemies = livingUnits(next).filter((u) => areEnemies(actor, u) && chebyshevDistance(actor.position, u.position) <= radius);
+  const totalEnemies = livingUnits(next).filter((u) => areEnemies(actor, u)).length;
+  const amount = (art.damage?.amount ?? 3) + enemies.length;
+
+  const damageByTarget = {};
+  const targetIds = [];
+  const reactionEvents = [];
+  for (const target of enemies) {
+    const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
+    const result = resolveDamage({ attacker: { strength: amount }, defender: targetStats, type: "magic" });
+    const damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: result.damage, art });
+    const dealt = Math.min(target.hp, damage);
+    target.hp = Math.max(0, target.hp - damage);
+    const reaction = applyMagicDamageReaction(target, dealt);
+    if (reaction) reactionEvents.push(reaction);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = dealt;
+  }
+
+  const refunded = enemies.length > 0 && enemies.length === totalEnemies;
+  const cost = getArtMpCost(actor, art, next);
+  if (!refunded) actor.mp -= cost;
+  next.activation.spellUsed = true;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
+    mpCost: cost, refunded, quakeAmount: amount
+  }, ...reactionEvents]);
+}
+
+// Stone Throw (Clod): a STR-scaling physical boulder (fixed power that rises with STR above
+// Clod's base, like Front Kick) that rolls to-hit/crit. On a LANDED hit it also applies a
+// guaranteed status with NO roll — a crit stuns, otherwise it slows. A defending Rock-Hard
+// target negates the damage but still eats the status; Stone Body reflects the status.
+function resolveStoneThrow(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  // A thrown boulder is a physical ranged strike: a body OR a wall between blocks it.
+  if (isShotBlocked(state, actorState.position, targetState.position, actorState) ||
+      isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    resolveVictory(next);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, targetIds: [], damageByTarget: {}, mpCost: cost
+    }]);
+  }
+
+  const actorStats = getEffectiveStats(actor, next);
+  const scaleStat = art.damage.scaleStat;
+  const baseStat = art.damage.baseStat ?? actorStats[scaleStat];
+  const power = (art.damage.amount ?? 8) + Math.max(0, actorStats[scaleStat] - baseStat);
+  const result = resolveDamage({
+    attacker: { strength: power },
+    defender: { ...getEffectiveStats(target, next), defending: isDefending(target) },
+    type: "physical", critical: swing.critical && !ignoresCriticalDamage(target)
+  });
+  const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+  const damageDealt = Math.min(target.hp, damage);
+  target.hp = Math.max(0, target.hp - damage);
+  const rockHardEvents = applyRockHardDefense(next, target, true);
+
+  let appliedStatus = null;
+  if (target.hp > 0) {
+    const spec = swing.critical ? art.onCrit : art.onHit;
+    const res = applyRolledStatus(target, { ...spec, chance: 1 }, 0, actor);
+    if (res.applied && !res.reflected) appliedStatus = spec.status;
+  }
+
+  const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    targetIds: [target.id], damageByTarget: { [target.id]: damage },
+    hit: true, critical: swing.critical, roll: swing.hitRoll, damage, appliedStatus, mpCost: cost
+  }, ...healingEvents, ...rockHardEvents]);
+}
+
+// Thunderous Charge (Clod, RAGE): Clod CHARGES to a clear tile within range and quakes a
+// Chebyshev radius on landing: 10 physical (DEF + Defend still apply; a defending Rock Hard
+// enemy negates it) and a guaranteed 1-turn stun to every enemy caught. He ends the turn
+// standing on that tile. The stun is an AoE application (immunity respected, never reflected),
+// like Smog.
+function resolveThunderousCharge(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const center = command.targetPosition;
+  if (!center || !getTargetedBlastAimTiles(state, actorState, art).has(positionKey(center))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const from = { ...actor.position };
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  // The blast is centered on where Clod lands; move him there first so the footprint (and
+  // his committed position) agree. The tile is a validated clear landing spot.
+  actor.position = { ...center };
+
+  const radius = art.targeting?.radius ?? 2;
+  const damageByTarget = {};
+  const targetIds = [];
+  const stunnedIds = [];
+  const rockHardEvents = [];
+  for (const target of getTargetedBlastTargets(next, actor, center, radius)) {
+    const result = resolveDamage({
+      attacker: { strength: art.damage.amount },
+      defender: { ...getEffectiveStats(target, next), defending: isDefending(target) },
+      type: "physical"
+    });
+    const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+    const dealt = Math.min(target.hp, damage);
+    target.hp = Math.max(0, target.hp - damage);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = dealt;
+    rockHardEvents.push(...applyRockHardDefense(next, target, true));
+    if (target.hp > 0) {
+      const applied = applyStatus(target, { type: "stun", duration: art.stun?.durationTurns ?? 1 });
+      if (applied.applied) { target.statuses = applied.statuses; stunnedIds.push(target.id); }
+    }
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, from, center: { ...center },
+    targetIds, damageByTarget, stunnedIds, mpCost: cost
+  }, ...rockHardEvents]);
+}
+
+function serializePulseRays(rays) {
+  return rays.map((ray) => ({
+    dir: { ...ray.dir },
+    distance: ray.distance,
+    stopKind: ray.stopKind,
+    position: { ...ray.position },
+    ...(ray.targetId ? { targetId: ray.targetId } : {})
+  }));
+}
+
 function applyDarkPulse(state, actor, art) {
   const targetIds = [];
   const damageByTarget = {};
   const healingByTarget = {};
-  for (const { unit: targetRef } of getDarkPulseTargets(state, actor)) {
+  const reactionEvents = [];
+  const pulseRays = getDarkPulseRays(state, actor);
+  for (const { unit: targetRef } of pulseRays) {
+    if (!targetRef) continue;
     const target = findUnit(state, targetRef.id);
     if (!target || target.hp <= 0) continue;
     targetIds.push(target.id);
@@ -933,17 +1499,20 @@ function applyDarkPulse(state, actor, art) {
     const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
     const damage = finalizeMagicDamage({ attacker: actor, target, state, rawDamage: result.damage, art });
+    const dealt = Math.min(target.hp, damage);
     target.hp = Math.max(0, target.hp - damage);
+    const reaction = applyMagicDamageReaction(target, dealt);
+    if (reaction) reactionEvents.push(reaction);
     damageByTarget[target.id] = damage;
   }
-  return { targetIds, damageByTarget, healingByTarget };
+  return { targetIds, damageByTarget, healingByTarget, pulseRays: serializePulseRays(pulseRays), reactionEvents };
 }
 
 function resolveDarkPulse(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const cost = getArtMpCost(actor, art, next);
-  const { targetIds, damageByTarget, healingByTarget } = applyDarkPulse(next, actor, art);
+  const { targetIds, damageByTarget, healingByTarget, pulseRays, reactionEvents } = applyDarkPulse(next, actor, art);
   const refunded = targetIds.length >= (art.refundTargets ?? 4);
   if (!refunded) actor.mp -= cost;
   next.activation.spellUsed = true;
@@ -956,9 +1525,10 @@ function resolveDarkPulse(state, command, art) {
     targetIds,
     damageByTarget,
     healingByTarget,
+    pulseRays,
     mpCost: cost,
     refunded
-  }]);
+  }, ...reactionEvents]);
 }
 
 function resolveRealmTraversal(state, command, art) {
@@ -1581,10 +2151,13 @@ function resolveTetherGrab(state, command, art) {
   if (grabsEnemy) {
     // A landed grab crits like any strike — the fixed 3 scales ×1.5 before the reduction
     // fold (magic ignores DEF; Tether Grab does not halve under Defend).
-    const baseAmount = swing.critical ? Math.ceil(art.damage.amount * CRIT_MULTIPLIER) : art.damage.amount;
+    const critical = swing.critical && !ignoresCriticalDamage(target);
+    const baseAmount = critical ? Math.ceil(art.damage.amount * CRIT_MULTIPLIER) : art.damage.amount;
     damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: baseAmount, art });
     if (damage > 0) {
+      const dealt = Math.min(target.hp, damage);
       target.hp = Math.max(0, target.hp - damage);
+      applyMagicDamageReaction(target, dealt);
       damageByTarget[target.id] = damage;
       targetIds.push(target.id);
     }
@@ -1604,7 +2177,7 @@ function resolveTetherGrab(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
-    from, to: { ...destination }, damage, hit: true, rolled: grabsEnemy, critical: Boolean(swing?.critical),
+    from, to: { ...destination }, damage, hit: true, rolled: grabsEnemy, critical: Boolean(swing?.critical && !ignoresCriticalDamage(target)),
     displaced: !immobile, targetIds, damageByTarget, mpCost: cost
   }, ...stoneEvents]);
 }
@@ -1643,8 +2216,10 @@ function resolveRocketPunch(state, command, art) {
     type: "physical",
     critical: swing.critical
   });
-  const damage = result.damage;
+  // Rock Hard (Clod): a defending Clod negates this physical hit entirely.
+  const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
   target.hp = Math.max(0, target.hp - damage);
+  const rockHardEvents = applyRockHardDefense(next, target, true);
 
   let effect = null;
   if (target.hp > 0) {
@@ -1660,7 +2235,7 @@ function resolveRocketPunch(state, command, art) {
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     targetIds: [target.id], damageByTarget: { [target.id]: damage },
     hit: true, critical: swing.critical, stunned: Boolean(effect?.applied && !effect.reflected), mpCost: cost
-  }]);
+  }, ...rockHardEvents]);
 }
 
 function knockbackDestination(state, target, direction, distance) {
@@ -1713,9 +2288,12 @@ function resolveFrontKick(state, command, art) {
     type: "physical",
     critical: swing.critical
   });
-  const damage = result.damage;
+  // Rock Hard (Clod): a defending Clod negates the kick's damage (the knockback below
+  // is still governed by displacement rules, which Clod does not resist).
+  const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
   const damageDealt = Math.min(target.hp, damage);
   target.hp = Math.max(0, target.hp - damage);
+  const rockHardEvents = applyRockHardDefense(next, target, true);
 
   const direction = {
     x: Math.sign(targetState.position.x - actorState.position.x),
@@ -1751,7 +2329,7 @@ function resolveFrontKick(state, command, art) {
     hit: true, critical: swing.critical, damage: { ...result, damage },
     knockedBack: shouldKnockback && (from.x !== to.x || from.y !== to.y),
     from, to, mpCost: cost
-  }, ...healingEvents, ...stoneEvents]);
+  }, ...healingEvents, ...stoneEvents, ...rockHardEvents]);
 }
 
 function resolveProtect(state, command, art) {

@@ -4,7 +4,7 @@ import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getArtTargetRange } from "../rules/arts.js";
-import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
+import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
@@ -27,7 +27,7 @@ function isForecastableStrikeArt(art) {
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
     art.effect?.type !== "healAllies" &&
-    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly", "ally"].includes(art.targeting?.shape)
+    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly", "ally", "targetedBlast"].includes(art.targeting?.shape)
   );
 }
 
@@ -67,8 +67,10 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
     // A fixed-amount magic art (Virus's Cough) forecasts its authored amount, not a
     // STR-scaled hit — the same resolver the reducer uses, so the number can't drift.
     const fixedMagic = isStrikeArt && art?.damageType === "magic" && Number.isFinite(art?.damage?.amount);
-    const strike = art?.resolution === "frontKick"
-      ? frontKickForecast(actor, target, art, state)
+    // Fixed-power physical ARTS that scale with STR above a base (Front Kick, Stone Throw)
+    // resolve their own power formula, not a plain STR strike.
+    const strike = art?.damage?.scaleStat
+      ? scaledPowerForecast(actor, target, art, state)
       : fixedMagic
         ? resolveFixedMagicStrike(actor, target, art.damage.amount, { state, art })
         : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
@@ -77,7 +79,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   }
 }
 
-function frontKickForecast(actor, target, art, state) {
+function scaledPowerForecast(actor, target, art, state) {
   const actorStats = getEffectiveStats(actor, state);
   const scaleStat = art.damage.scaleStat;
   const baseStat = art.damage.baseStat ?? actorStats[scaleStat];
@@ -87,5 +89,7 @@ function frontKickForecast(actor, target, art, state) {
     defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
     type: "physical"
   });
-  return { ...result, damage: result.damage };
+  // Honest against a braced Clod: Rock Hard negates physical entirely while defending.
+  const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+  return { ...result, damage };
 }

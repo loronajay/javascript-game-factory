@@ -44,6 +44,11 @@ export const PORTRAITS = Object.freeze({
   // Wide gaseous blob; measured alpha bbox off the 600×600 source. Held a touch smaller
   // so a short-but-wide figure doesn't normalize up into an oversized silhouette.
   virus:       portrait("virus",       { x: 0.057, y: 0.087, w: 0.915, h: 0.833 }, { scale: 0.94 }),
+  // Hulking rock golem; measured alpha bbox off the 600×600 source (fills nearly the whole
+  // canvas, feet planted at the bottom, arms spread wide).
+  clod:        portrait("clod",        { x: 0.080, y: 0.068, w: 0.827, h: 0.878 }),
+  "fat-knight": portrait("fat-knight", { x: 0.163, y: 0.067, w: 0.662, h: 0.853 }),
+  "fat-wizard": portrait("fat-wizard", { x: 0.090, y: 0.055, w: 0.812, h: 0.885 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

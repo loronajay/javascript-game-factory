@@ -1,5 +1,5 @@
-import { getEffectiveStats, getUnitType } from "../core/unitCatalog.js";
-import { isWallAt, unitAt } from "../core/state.js";
+import { getEffectiveStats, getRageEffectValue, getUnitType } from "../core/unitCatalog.js";
+import { areEnemies, isWallAt, unitAt } from "../core/state.js";
 
 export const ORTHOGONAL_DIRECTIONS = Object.freeze([
   { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
@@ -49,6 +49,10 @@ export function traceGridLine(x0, y0, x1, y1) {
   return cells;
 }
 
+function canMoveThroughEnemies(unit) {
+  return Math.max(0, Number(getRageEffectValue(unit, "trampleDamage", 0)) || 0) > 0;
+}
+
 export function getLegalMoves(state, unit) {
   const maxSteps = getEffectiveStats(unit, state).moveRange;
   if (getUnitType(unit.type).passive?.effect?.type === "movementShape" &&
@@ -65,6 +69,7 @@ export function getLegalMoves(state, unit) {
     }
     return legal;
   }
+  const passEnemies = canMoveThroughEnemies(unit);
   const queue = [{ ...unit.position, distance: 0 }];
   const visited = new Set([positionKey(unit.position)]);
   const legal = new Set();
@@ -77,11 +82,40 @@ export function getLegalMoves(state, unit) {
       const next = { x: current.x + direction.x, y: current.y + direction.y };
       const key = positionKey(next);
       // A wall occupies its tile like a body: you can't step onto it or path through it.
-      if (!isOnBoard(state, next) || visited.has(key) || unitAt(state, next) || isWallAt(state, next)) continue;
+      if (!isOnBoard(state, next) || visited.has(key) || isWallAt(state, next)) continue;
+      const occupant = unitAt(state, next);
+      if (occupant && (!passEnemies || !areEnemies(unit, occupant))) continue;
       visited.add(key);
-      legal.add(key);
+      if (!occupant) legal.add(key);
       queue.push({ ...next, distance: current.distance + 1 });
     }
   }
   return legal;
+}
+
+export function getLegalMovePath(state, unit, destination) {
+  if (!destination || !getLegalMoves(state, unit).has(positionKey(destination))) return null;
+  const maxSteps = getEffectiveStats(unit, state).moveRange;
+  const passEnemies = canMoveThroughEnemies(unit);
+  const originKey = positionKey(unit.position);
+  const targetKey = positionKey(destination);
+  const queue = [{ position: { ...unit.position }, distance: 0, path: [] }];
+  const visited = new Set([originKey]);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (positionKey(current.position) === targetKey) return current.path;
+    if (current.distance === maxSteps) continue;
+
+    for (const direction of ORTHOGONAL_DIRECTIONS) {
+      const next = { x: current.position.x + direction.x, y: current.position.y + direction.y };
+      const key = positionKey(next);
+      if (!isOnBoard(state, next) || visited.has(key) || isWallAt(state, next)) continue;
+      const occupant = unitAt(state, next);
+      if (occupant && (!passEnemies || !areEnemies(unit, occupant))) continue;
+      visited.add(key);
+      queue.push({ position: next, distance: current.distance + 1, path: [...current.path, next] });
+    }
+  }
+  return null;
 }

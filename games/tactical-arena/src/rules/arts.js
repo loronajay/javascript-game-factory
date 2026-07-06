@@ -1,5 +1,5 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getUnitAuraRadius, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -7,13 +7,21 @@ import { isStunned } from "./statuses.js";
 export const FOOTWORK_DAMAGE = 2;
 export const FLEE_RANGE_BONUS = 2;
 
-export function getFootworkSteps(actor) {
-  const footwork = getArt(actor.type, "footwork");
-  return getEffectiveStats(actor).moveRange + (footwork?.extraMove ?? 0);
+export function getRushSteps(actor, art = getArt(actor.type, "footwork"), state = null) {
+  const rageBonus = isRaging(actor) ? Math.max(0, Number(art?.rageExtraMove) || 0) : 0;
+  return getEffectiveStats(actor, state).moveRange + (art?.extraMove ?? 0) + rageBonus;
 }
 
-export function validateFootworkPath(state, actor, path) {
-  if (!Array.isArray(path) || path.length !== getFootworkSteps(actor)) return false;
+export function getRushContactDamage(actor, art) {
+  return (art?.contactDamage ?? FOOTWORK_DAMAGE) + Math.max(0, Number(getRageEffectValue(actor, "trampleDamage", 0)) || 0);
+}
+
+export function getFootworkSteps(actor) {
+  return getRushSteps(actor, getArt(actor.type, "footwork"));
+}
+
+export function validateRushPath(state, actor, path, art = getArt(actor.type, "footwork")) {
+  if (!Array.isArray(path) || path.length !== getRushSteps(actor, art, state)) return false;
 
   let previous = actor.position;
   const visited = new Set([positionKey(actor.position)]);
@@ -32,11 +40,15 @@ export function validateFootworkPath(state, actor, path) {
   return true;
 }
 
-export function getFootworkStepOptions(state, actor, path) {
-  if (path.length >= getFootworkSteps(actor)) return new Set();
+export function validateFootworkPath(state, actor, path) {
+  return validateRushPath(state, actor, path, getArt(actor.type, "footwork"));
+}
+
+export function getRushStepOptions(state, actor, path, art = getArt(actor.type, "footwork")) {
+  if (path.length >= getRushSteps(actor, art, state)) return new Set();
   const prior = path.length ? path[path.length - 1] : actor.position;
   const visited = new Set([positionKey(actor.position), ...path.map(positionKey)]);
-  const lastStep = path.length === getFootworkSteps(actor) - 1;
+  const lastStep = path.length === getRushSteps(actor, art, state) - 1;
   const options = new Set();
 
   for (const candidate of [
@@ -49,6 +61,10 @@ export function getFootworkStepOptions(state, actor, path) {
     options.add(positionKey(candidate));
   }
   return options;
+}
+
+export function getFootworkStepOptions(state, actor, path) {
+  return getRushStepOptions(state, actor, path, getArt(actor.type, "footwork"));
 }
 
 export function getVolleyShotAimOptions(state, actor) {
@@ -239,21 +255,35 @@ export function getLineReachTiles(state, actor, range) {
 }
 
 export function getDarkPulseTargets(state, actor) {
-  const targets = [];
-  if (!actor) return targets;
+  return getDarkPulseRays(state, actor)
+    .filter((ray) => ray.stopKind === "unit" && ray.unit)
+    .map((ray) => ({ unit: ray.unit, dir: ray.dir, distance: ray.distance }));
+}
+
+export function getDarkPulseRays(state, actor) {
+  const rays = [];
+  if (!actor) return rays;
   for (const dir of LINE_DIRECTIONS) {
+    let lastOnBoard = null;
     for (let d = 1; ; d += 1) {
       const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
-      if (!isOnBoard(state, pos)) break;
-      if (isWallAt(state, pos)) break;
+      if (!isOnBoard(state, pos)) {
+        rays.push({ dir, distance: d - 1, stopKind: "border", position: lastOnBoard ?? { ...actor.position } });
+        break;
+      }
+      lastOnBoard = pos;
+      if (isWallAt(state, pos)) {
+        rays.push({ dir, distance: d, stopKind: "wall", position: { ...pos } });
+        break;
+      }
       const occupant = unitAt(state, pos);
       if (occupant) {
-        targets.push({ unit: occupant, dir, distance: d });
+        rays.push({ dir, distance: d, stopKind: "unit", position: { ...pos }, targetId: occupant.id, unit: occupant });
         break;
       }
     }
   }
-  return targets;
+  return rays;
 }
 
 // Flight (Gargoyle): empty on-board, non-wall tiles the Gargoyle can fly onto — a
@@ -333,6 +363,46 @@ export function getTilePulseTargets(state, actor, art) {
   );
 }
 
+// Thunderous Charge (Clod): a targeted-tile blast Clod CHARGES to — he ends up standing on
+// the tile, so it must be a clear landing spot. The pickable tiles are every on-board,
+// non-wall tile within the art's reach (Chebyshev, Higher Ground + rage bonus folded via
+// getArtTargetRange) that is empty OR the actor's own tile (charge in place). Any other
+// occupant — ally or enemy — blocks it.
+export function getTargetedBlastAimTiles(state, actor, art) {
+  const reach = getArtTargetRange(state, actor, art);
+  const tiles = new Set();
+  for (let dx = -reach; dx <= reach; dx += 1) {
+    for (let dy = -reach; dy <= reach; dy += 1) {
+      const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
+      if (!isOnBoard(state, pos) || isWallAt(state, pos)) continue;
+      const occupant = unitAt(state, pos);
+      if (occupant && occupant.id !== actor.id) continue; // land only on a clear tile (or in place)
+      tiles.add(positionKey(pos));
+    }
+  }
+  return tiles;
+}
+
+// Every on-board tile within `radius` (Chebyshev) of a blast's center — the detonation
+// footprint the board renderer previews on hover.
+export function getTargetedBlastFootprint(state, center, radius) {
+  const tiles = [];
+  for (let dx = -radius; dx <= radius; dx += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      const pos = { x: center.x + dx, y: center.y + dy };
+      if (isOnBoard(state, pos)) tiles.push(pos);
+    }
+  }
+  return tiles;
+}
+
+// Every enemy of `actor` caught inside a blast centered on `center` (Chebyshev radius).
+export function getTargetedBlastTargets(state, actor, center, radius) {
+  return state.units.filter((unit) =>
+    unit.hp > 0 && areEnemies(actor, unit) &&
+    Math.max(Math.abs(unit.position.x - center.x), Math.abs(unit.position.y - center.y)) <= radius);
+}
+
 export function getSelfBlastRadius(state, actor, art) {
   // Higher Ground widens a self-centred blast (Nuke/Dark Bomb/Self Destruct) — an area ART.
   const bonus = getCommandRangeBonus(state, actor);
@@ -390,6 +460,8 @@ export function canUseArt(state, actor, artId) {
     !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= getArtMpCost(actor, art, state) &&
     (!art.rageLocked || isRaging(actor)) &&
-    (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor))
+    (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor)) &&
+    !(art.effect?.type === "studyTarget" && hasLivingStudiedTarget(actor, state)) &&
+    !(art.effect?.type === "relayPower" && (actor.hp <= (art.effect.hp ?? 0) || actor.mp < (art.effect.mp ?? 0)))
   );
 }

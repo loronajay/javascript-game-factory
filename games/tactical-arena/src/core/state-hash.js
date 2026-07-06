@@ -52,6 +52,7 @@ function canonicalUnits(units) {
         // Gargoyle's Volcanic Rage free-Pyroclasm counter changes future cadence
         // side-effects, so it is part of the authoritative hash.
         `${unit.volcanicCounter ?? 0},` +
+        `${unit.studiedTargetId ?? "-"},` +
         `${stableStringify(unit.statModifiers ?? {})},` +
         // Source-linked modifiers (Father Time's Age) change future effective stats, so
         // they are part of the authoritative hash.

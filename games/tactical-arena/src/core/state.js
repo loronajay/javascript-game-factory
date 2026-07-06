@@ -14,6 +14,7 @@ function createUnit(spec) {
     mp: spec.mp ?? definition.stats.maxMp,
     statModifiers: { ...(spec.statModifiers ?? {}) },
     statuses: (spec.statuses ?? []).map((status) => ({ ...status })),
+    statusResistUsed: spec.statusResistUsed ?? false,
     // Source-linked persistent stat modifiers (Father Time's Age). Each entry is
     // { sourceId, stats }; folded by getEffectiveStats only while the source lives.
     linkedStatMods: (spec.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
@@ -38,7 +39,8 @@ function createUnit(spec) {
     // Nemesis Realm Traversal: charged means the NEXT activation may move before
     // Dark Pulse; locked prevents re-arming until that charged activation finishes.
     realmTraversalCharged: spec.realmTraversalCharged ?? false,
-    realmTraversalLocked: spec.realmTraversalLocked ?? false
+    realmTraversalLocked: spec.realmTraversalLocked ?? false,
+    studiedTargetId: spec.studiedTargetId ?? null
   };
 }
 
@@ -184,7 +186,8 @@ export function cloneState(state) {
       statuses: unit.statuses.map((status) => ({ ...status })),
       // Deep-copy the source-linked modifier list (Age) — a shallow `...unit` spread
       // would share the array across clones and leak mutations between states.
-      linkedStatMods: (unit.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } }))
+      linkedStatMods: (unit.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
+      studiedTargetId: unit.studiedTargetId ?? null
     })),
     activation: state.activation ? {
       ...state.activation,

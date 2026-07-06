@@ -386,6 +386,48 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     element.remove();
   }
 
+  function artCallout(actor, label) {
+    if (!effectsLayer || !actor || !label) return;
+    const text = String(label);
+    const width = Math.min(156, Math.max(54, text.length * 7.4 + 24));
+    const height = 24;
+    const origin = effectPoint(actor.position, 78);
+    const group = svg("g", {
+      class: "fx-art-callout",
+      "aria-label": text
+    });
+    group.append(
+      svg("rect", { class: "fx-art-callout-box", x: -width / 2, y: -height / 2, width, height, rx: 6 }),
+      svg("path", { class: "fx-art-callout-tail", d: "M -5 11 L 0 18 L 5 11 Z" })
+    );
+    const labelText = svg("text", {
+      class: "fx-art-callout-label",
+      x: 0,
+      y: 4,
+      "text-anchor": "middle",
+      "dominant-baseline": "middle",
+      textLength: Math.max(0, width - 18),
+      lengthAdjust: "spacingAndGlyphs"
+    });
+    labelText.textContent = text;
+    group.append(labelText);
+    effectsLayer.appendChild(group);
+
+    if (reducedMotion()) {
+      group.setAttribute("transform", `translate(${origin.x} ${origin.y - 18})`);
+      window.setTimeout(() => group.remove(), 700);
+      return;
+    }
+
+    group.animate([
+      { transform: `translate(${origin.x}px, ${origin.y + 8}px) scale(.84)`, opacity: 0 },
+      { transform: `translate(${origin.x}px, ${origin.y}px) scale(1)`, opacity: 1, offset: 0.18 },
+      { transform: `translate(${origin.x}px, ${origin.y - 16}px) scale(1)`, opacity: 1, offset: 0.72 },
+      { transform: `translate(${origin.x}px, ${origin.y - 34}px) scale(.96)`, opacity: 0 }
+    ], { duration: 1050, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" })
+      .finished.catch(() => {}).then(() => group.remove());
+  }
+
   async function projectileFan(actor, targets, targetPosition, vfx) {
     if (reducedMotion()) {
       sound.play(vfx.soundKey ?? "arrowAirborne");
@@ -560,6 +602,79 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
         animations.push(waitForAnimation(animation).then(() => mote.remove()));
       }
     }
+    await Promise.all(animations);
+  }
+
+  function darkPulseDissipate(point, vfx, stopKind = "unit") {
+    const flash = svg("circle", {
+      class: "fx-flash",
+      cx: point.x,
+      cy: point.y,
+      r: stopKind === "border" ? 5 : 7,
+      fill: vfx.colors.core,
+      filter: "url(#softGlow)"
+    });
+    effectsLayer.appendChild(flash);
+    flash.animate([
+      { r: stopKind === "wall" ? 9 : 6, opacity: 0.9 },
+      { r: stopKind === "unit" ? 24 : 18, opacity: 0 }
+    ], { duration: stopKind === "unit" ? 260 : 220, easing: "ease-out" })
+      .finished.catch(() => {}).then(() => flash.remove());
+
+    const count = vfx.particleCount ?? 4;
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.55;
+      const reach = (stopKind === "unit" ? 18 : 12) + (i % 2) * 5;
+      const mote = svg("circle", {
+        class: "fx-mote",
+        cx: 0,
+        cy: 0,
+        r: 2 + (i % 2) * 0.7,
+        fill: i % 2 ? vfx.colors.impact : vfx.colors.trail,
+        filter: "url(#softGlow)"
+      });
+      effectsLayer.appendChild(mote);
+      mote.animate([
+        { transform: `translate(${point.x}px, ${point.y}px) scale(.6)`, opacity: 0.95 },
+        { transform: `translate(${point.x + Math.cos(angle) * reach}px, ${point.y + Math.sin(angle) * reach * 0.55 - 8}px) scale(1)`, opacity: 0.65, offset: 0.45 },
+        { transform: `translate(${point.x + Math.cos(angle) * reach * 1.35}px, ${point.y + Math.sin(angle) * reach * 0.6 - 20}px) scale(.25)`, opacity: 0 }
+      ], { duration: 360, delay: i * 18, easing: "ease-out", fill: "backwards" })
+        .finished.catch(() => {}).then(() => mote.remove());
+    }
+  }
+
+  async function darkPulseScatter(actor, targets, rays, vfx) {
+    if (reducedMotion()) {
+      if (vfx.soundKey) sound.play(vfx.soundKey);
+      return;
+    }
+    await playWindup(actor, vfx);
+    if (vfx.soundKey) sound.play(vfx.soundKey);
+    if (vfx.shake) shake(vfx.shake);
+
+    const from = effectPoint(actor.position, 22);
+    const targetPositions = targets.map((target) => ({
+      stopKind: "unit",
+      targetId: target.id,
+      position: target.position
+    }));
+    const stops = rays?.length ? rays : targetPositions;
+    const spec = vfx.projectile ?? { shape: "orb", arcHeight: 14, durationMs: vfx.durationMs, colors: vfx.colors };
+    const animations = stops
+      .filter((ray) => ray?.position)
+      .map((ray, index) => {
+        const lift = ray.stopKind === "border" ? 6 : 16;
+        const to = effectPoint(ray.position, lift);
+        const distance = Math.max(1, ray.distance ?? 1);
+        const raySpec = {
+          ...spec,
+          durationMs: Math.max(260, (spec.durationMs ?? vfx.durationMs ?? 430) + distance * 12),
+          arcHeight: spec.arcHeight ?? 14
+        };
+        return flyProjectile(from, to, raySpec, { delay: index * (vfx.staggerMs ?? 18) })
+          .then(() => darkPulseDissipate(to, vfx, ray.stopKind));
+      });
+
     await Promise.all(animations);
   }
 
@@ -1115,7 +1230,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     await Promise.all(animations);
   }
 
-  async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect, coneCells } = {}) {
+  async function playAbilityVfx(artId, { actor, target, targets = [], targetPosition, path = [], effect, coneCells, rays = [] } = {}) {
     const vfx = getAbilityVfx(artId);
     if (!vfx || !actor) return;
     if (vfx.type === "dashTrail") {
@@ -1136,6 +1251,10 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
     if (vfx.type === "healPulse") {
       await healPulse(actor, targets, vfx);
+      return;
+    }
+    if (vfx.type === "darkPulseScatter") {
+      await darkPulseScatter(actor, targets, rays, vfx);
       return;
     }
     if (vfx.type === "magicBurst") {
@@ -1278,6 +1397,23 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     if (!reducedMotion()) await sleep(critical ? 120 : 60);
   }
 
+  // The token is launched straight up and drops right back onto its tile — a brief pop
+  // for a shockwave/quake (Clod's Thunderous Charge). Absolute coords around the token's
+  // base (a CSS transform REPLACES the SVG transform attribute), so the last keyframe
+  // equals the resting translate and the next render() snaps it cleanly into place.
+  async function knockUp(unitId, position, { height = 30 } = {}) {
+    const element = unitElement(unitId);
+    if (!element || reducedMotion()) return;
+    const base = unitBase(position);
+    await element.animate([
+      { transform: `translate(${base.x}px, ${base.y}px) scale(1)`, easing: "cubic-bezier(.2,.7,.4,1)" },
+      { transform: `translate(${base.x}px, ${base.y - height}px) scale(1.02,1.04)`, offset: 0.4 },
+      { transform: `translate(${base.x}px, ${base.y - height * 0.9}px) scale(1.02,1.04)`, offset: 0.52, easing: "cubic-bezier(.5,0,.7,.4)" },
+      { transform: `translate(${base.x}px, ${base.y}px) scale(1.1,.9)`, offset: 0.88 },
+      { transform: `translate(${base.x}px, ${base.y}px) scale(1)` }
+    ], { duration: 520, easing: "ease-in" }).finished.catch(() => {});
+  }
+
   // A defeated figurine dissolves: it squashes, sinks, and fades while its shards
   // burst outward. Runs on the LIVE token before the committing render removes it.
   async function deathDissolve(unitId, position, color) {
@@ -1318,5 +1454,5 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     await sleep(120);
   }
 
-  return { setMetrics, shake, critFlash, impact, statusBurst, floatText, deathBurst, animateMovement, animateAttack, hitRecoil, deathDissolve, rollReveal, playAbilityVfx, footworkCharge };
+  return { setMetrics, shake, critFlash, impact, statusBurst, floatText, artCallout, deathBurst, animateMovement, animateAttack, hitRecoil, knockUp, deathDissolve, rollReveal, playAbilityVfx, footworkCharge };
 }

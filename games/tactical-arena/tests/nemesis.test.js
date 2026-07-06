@@ -5,7 +5,7 @@ import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { UNIT_TYPES, getArt, getArtMpCost, getUnitType } from "../src/core/unitCatalog.js";
-import { getDarkPulseTargets } from "../src/rules/arts.js";
+import { getDarkPulseRays, getDarkPulseTargets } from "../src/rules/arts.js";
 import { resolveBaseStrike } from "../src/rules/combat.js";
 import { applyStatus, statusImmunities } from "../src/rules/statuses.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
@@ -84,6 +84,54 @@ test("Dark Pulse hits the first unit on each ray, damaging enemies and healing a
   assert.equal(findUnit(s, "behind").hp, UNIT_TYPES.swordsman.stats.maxHp, "ally contact stops that ray");
 });
 
+test("Dark Pulse ray data includes unit, wall, and arena-border stops for animation", () => {
+  const state = createBattleState({
+    size: 5,
+    seed: 5,
+    units: [
+      { id: "nem", type: "nemesis", player: 1, x: 2, y: 2 },
+      { id: "enemy", type: "swordsman", player: 2, x: 4, y: 2 }
+    ],
+    tileObjects: [{ kind: "wall", x: 1, y: 2, hp: 1 }]
+  });
+  const rays = getDarkPulseRays(state, findUnit(state, "nem"));
+  assert.equal(rays.length, 8);
+  assert.deepEqual(rays.find((ray) => ray.dir.x === 1 && ray.dir.y === 0), {
+    dir: { x: 1, y: 0 },
+    distance: 2,
+    stopKind: "unit",
+    position: { x: 4, y: 2 },
+    targetId: "enemy",
+    unit: findUnit(state, "enemy")
+  });
+  assert.deepEqual(rays.find((ray) => ray.dir.x === -1 && ray.dir.y === 0), {
+    dir: { x: -1, y: 0 },
+    distance: 1,
+    stopKind: "wall",
+    position: { x: 1, y: 2 }
+  });
+  assert.deepEqual(rays.find((ray) => ray.dir.x === 0 && ray.dir.y === -1), {
+    dir: { x: 0, y: -1 },
+    distance: 2,
+    stopKind: "border",
+    position: { x: 2, y: 0 }
+  });
+
+  let s = run(state, beginActivation(1, "nem")).nextState;
+  const result = run(s, useArt(1, "nem", "dark-pulse", {}));
+  const event = result.events.find((e) => e.artId === "dark-pulse");
+  assert.equal(event.pulseRays.length, 8);
+  assert.deepEqual(event.pulseRays.find((ray) => ray.stopKind === "wall").position, { x: 1, y: 2 });
+  assert.ok(event.pulseRays.some((ray) => ray.stopKind === "border"));
+
+  const corner = createBattleState({
+    size: 5,
+    seed: 5,
+    units: [{ id: "nem", type: "nemesis", player: 1, x: 0, y: 0 }]
+  });
+  assert.equal(getDarkPulseRays(corner, findUnit(corner, "nem")).length, 8);
+});
+
 test("Dark Pulse refunds its effective MP cost when it hits four targets", () => {
   const state = scenario([
     { id: "nem", type: "nemesis", player: 1, x: 6, y: 6, mp: 20 },
@@ -146,6 +194,8 @@ test("Regenerate restores HP and MP when Nemesis reaches rage", () => {
 });
 
 test("Nemesis VFX entries exist", () => {
-  assert.equal(getAbilityVfx("dark-pulse")?.type, "magicBurst");
+  const pulse = getAbilityVfx("dark-pulse");
+  assert.equal(pulse?.type, "darkPulseScatter");
+  assert.equal(pulse.projectile.shape, "orb");
   assert.equal(getAbilityVfx("realm-traversal")?.type, "dashTrail");
 });

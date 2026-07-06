@@ -8,6 +8,7 @@ import { canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createUnitFigure } from "../src/ui/unitRenderer.js";
+import { createEffects } from "../src/ui/effects.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes, mountCodex } from "../src/ui/codex.js";
 
@@ -153,12 +154,27 @@ class TestSvgElement {
     this.children.push(...children);
   }
 
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+
   replaceChildren(...children) {
     this.children = children;
   }
 
   addEventListener(type, handler) {
     this.listeners.set(type, handler);
+  }
+
+  animate(frames, options) {
+    this.animations ??= [];
+    this.animations.push({ frames, options });
+    return { finished: Promise.resolve() };
+  }
+
+  remove() {
+    this.removed = true;
   }
 
   classNames() {
@@ -343,6 +359,45 @@ test("board sprite facing follows player ownership instead of board position", (
     assert.equal(p2Token.findByClass("sprite-figure").getAttribute("transform"), "scale(-1 1)");
   } finally {
     globalThis.document = previousDocument;
+  }
+});
+
+test("an ART callout is a fixed one-shot overlay instead of a unit child", () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const effectsLayer = new TestSvgElement("g");
+    const effects = createEffects({
+      board: null,
+      unitsLayer: { querySelector: () => null },
+      effectsLayer,
+      diceOverlay: null,
+      dieFace: null,
+      metrics,
+      audio: { play() {} }
+    });
+
+    effects.artCallout({ id: "p1-caster", position: { x: 1, y: 2 } }, "Spark");
+
+    assert.equal(effectsLayer.children.length, 1);
+    const callout = effectsLayer.children[0];
+    assert.match(callout.getAttribute("class"), /\bfx-art-callout\b/);
+    assert.equal(callout.getAttribute("aria-label"), "Spark");
+    assert.equal(callout.findByClass("fx-art-callout-label").textContent, "Spark");
+
+    const firstFrame = callout.animations[0].frames[0];
+    const lastFrame = callout.animations[0].frames.at(-1);
+    assert.match(firstFrame.transform, /^translate\([^)]*\) scale/);
+    assert.match(lastFrame.transform, /^translate\([^)]*\) scale/);
+    assert.equal(firstFrame.opacity, 0);
+    assert.equal(lastFrame.opacity, 0);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
   }
 });
 

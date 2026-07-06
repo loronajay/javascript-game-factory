@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -149,7 +149,10 @@ export function isTargetedMode(mode, actor) {
     // Gargoyle's Flight (empty-tile reposition) and Pyroclasm (self-centred line burst)
     // do their own highlighting below, not the enemy-only Chebyshev box.
     art.targeting?.shape !== "flightMove" &&
-    art.targeting?.shape !== "lineBurst"
+    art.targeting?.shape !== "lineBurst" &&
+    // Clod's Thunderous Charge picks a tile (targetedBlast) — it highlights its own aim
+    // tiles + hover footprint below, not the enemy-only Chebyshev box.
+    art.targeting?.shape !== "targetedBlast"
   );
 }
 
@@ -174,6 +177,33 @@ function wireVolleyHover(cones, tileByKey, unitsLayer, state) {
     };
     aimTile.addEventListener("mouseenter", enter);
     aimTile.addEventListener("mouseleave", leave);
+  }
+}
+
+// Hovering a Thunderous Charge aim tile lights its detonation footprint and the enemies
+// inside it, so the player sees the blast before committing. Reuses the volley hot-tile /
+// hit-glow classes; pure DOM class toggling (no re-render), so it can't loop on mouseenter.
+function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKeys) {
+  const radius = art.targeting?.radius ?? 2;
+  for (const key of aimKeys) {
+    const tile = tileByKey.get(key);
+    if (!tile) continue;
+    const [cx, cy] = key.split(",").map(Number);
+    const footprint = getTargetedBlastFootprint(state, { x: cx, y: cy }, radius).map(positionKey);
+    const enter = () => {
+      for (const k of footprint) tileByKey.get(k)?.classList.add("cone-hot");
+      for (const occupant of state.units) {
+        if (occupant.hp > 0 && areEnemies(actor, occupant) && footprint.includes(positionKey(occupant.position))) {
+          unitsLayer.querySelector(`[data-key="${positionKey(occupant.position)}"]`)?.classList.add("volley-hit");
+        }
+      }
+    };
+    const leave = () => {
+      for (const k of footprint) tileByKey.get(k)?.classList.remove("cone-hot");
+      unitsLayer.querySelectorAll(".volley-hit").forEach((el) => el.classList.remove("volley-hit"));
+    };
+    tile.addEventListener("mouseenter", enter);
+    tile.addEventListener("mouseleave", leave);
   }
 }
 
@@ -240,6 +270,10 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   }
 
   if (actor && mode === "footwork") legal = getFootworkStepOptions(state, actor, footworkPath);
+  if (actor && mode?.startsWith("art:")) {
+    const rushArt = getArt(actor.type, mode.slice("art:".length));
+    if (rushArt?.targeting?.shape === "rushPath") legal = getRushStepOptions(state, actor, footworkPath, rushArt);
+  }
   if (actor && mode === "art:flee") legal = getLegalFleeTiles(state, actor);
   // Flight: fly onto a highlighted empty tile (Chebyshev, diagonals allowed).
   if (actor && mode === "art:flight") legal = getFlightTiles(state, actor, getArt(actor.type, "flight"));
@@ -401,6 +435,18 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
+  // Clod's Thunderous Charge (targetedBlast): every legal aim tile is a clickable target
+  // (like a placement ART); hovering one previews the 2-tile detonation footprint + the
+  // enemies it would catch (wired after the tiles are built, below).
+  let blastArt = null;
+  if (actor && mode?.startsWith("art:")) {
+    const candidate = getArt(actor.type, mode.slice("art:".length));
+    if (candidate?.targeting?.shape === "targetedBlast") {
+      blastArt = candidate;
+      for (const key of getTargetedBlastAimTiles(state, actor, candidate)) legal.add(key);
+    }
+  }
+
   const path = new Set(footworkPath.map(positionKey));
   const metrics = createBoardMetrics(state.size);
   const view = createBoardViewBox(metrics, state.size);
@@ -451,6 +497,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   }
 
   if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state);
+  if (blastArt) wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal);
 
   // Units and tile props (Build Cover walls, Throw Cigar fire) share ONE depth-
   // sorted layer so isometric occlusion is correct: a prop closer to the viewer

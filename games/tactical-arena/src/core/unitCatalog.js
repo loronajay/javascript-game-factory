@@ -17,6 +17,9 @@ import { MONK } from "./units/monk.js";
 import { GARGOYLE } from "./units/gargoyle.js";
 import { NEMESIS } from "./units/nemesis.js";
 import { VIRUS } from "./units/virus.js";
+import { CLOD } from "./units/clod.js";
+import { FAT_KNIGHT } from "./units/fat-knight.js";
+import { FAT_WIZARD } from "./units/fat-wizard.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -36,7 +39,10 @@ export const UNIT_TYPES = Object.freeze({
   monk: MONK,
   gargoyle: GARGOYLE,
   nemesis: NEMESIS,
-  virus: VIRUS
+  virus: VIRUS,
+  clod: CLOD,
+  "fat-knight": FAT_KNIGHT,
+  "fat-wizard": FAT_WIZARD
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -126,6 +132,90 @@ function teamAuraStats(unit, state) {
   return totals;
 }
 
+// Brick House (Clod): a PROXIMITY team buff. Unlike teamAura (unconditional while the
+// source lives), this only reaches allies within the source's Chebyshev radius — so it
+// reads live positions each call and evaporates the instant an ally steps away. Scans
+// allied sources OTHER than `unit` ("allies standing near Clod"), so the source never
+// buffs itself through this path (its own bonus is selfAllyAuraStats below).
+function allyAuraStats(unit, state) {
+  const totals = {};
+  if (!state?.units) return totals;
+  const applied = new Set();
+  for (const source of state.units) {
+    if (source.hp <= 0 || source.id === unit.id || !areAllies(source, unit)) continue;
+    const effect = getUnitType(source.type).passive?.effect;
+    if (effect?.type !== "allyAura") continue;
+    const radius = Math.max(0, Number(effect.radius) || 0);
+    if (chebyshev(source.position, unit.position) > radius) continue;
+    const key = passiveStackKey(getUnitType(source.type).passive, effect);
+    if (applied.has(key)) continue;
+    applied.add(key);
+    for (const [name, value] of Object.entries(effect.stats ?? {})) {
+      if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
+    }
+  }
+  return totals;
+}
+
+// The source side of Brick House: `unit` gains `selfPerAlly` for every living ally
+// currently standing inside its own aura radius (+1 STR each). Read live off positions,
+// so it tracks the board turn by turn.
+function selfAllyAuraStats(unit, state) {
+  const totals = {};
+  const effect = getUnitType(unit.type).passive?.effect;
+  if (effect?.type !== "allyAura" || !effect.selfPerAlly || !state?.units) return totals;
+  const radius = Math.max(0, Number(effect.radius) || 0);
+  let count = 0;
+  for (const ally of state.units) {
+    if (ally.hp <= 0 || ally.id === unit.id || !areAllies(ally, unit)) continue;
+    if (chebyshev(unit.position, ally.position) <= radius) count += 1;
+  }
+  if (count <= 0) return totals;
+  for (const [name, value] of Object.entries(effect.selfPerAlly)) {
+    if (Number.isFinite(value)) totals[name] = value * count;
+  }
+  return totals;
+}
+
+function teamCompositionStats(unit, state) {
+  const totals = {};
+  if (!state?.units) return totals;
+  const applied = new Set();
+  for (const source of allPassiveSources(getUnitType(unit.type))) {
+    const effect = source.effect;
+    if (effect?.type !== "teamCompositionStats") continue;
+    const required = effect.requiredTypes ?? [];
+    const hasTeam = required.every((type) => state.units.some((ally) =>
+      ally.hp > 0 &&
+      ally.type === type &&
+      areAllies(ally, unit)));
+    if (!hasTeam) continue;
+    const key = passiveStackKey(source, effect);
+    if (applied.has(key)) continue;
+    applied.add(key);
+    for (const [name, value] of Object.entries(effect.stats ?? {})) {
+      if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
+    }
+  }
+  return totals;
+}
+
+function teamCompositionEffectActive(unit, state, effect) {
+  const required = effect?.requiredTypes ?? [];
+  if (!required.length || !state?.units) return false;
+  return required.every((type) => state.units.some((ally) =>
+    ally.hp > 0 &&
+    ally.type === type &&
+    areAllies(ally, unit)));
+}
+
+// The Chebyshev radius of a unit's ally-buff aura (Brick House), for the board overlay.
+// 0 for any unit without one.
+function friendlyAuraRadius(source) {
+  const effect = getUnitType(source.type).passive?.effect;
+  return effect?.type === "allyAura" ? Math.max(0, Number(effect.radius) || 0) : 0;
+}
+
 function teamMagicSupportSources(unit, state) {
   const sources = [];
   if (!state?.units) return sources;
@@ -151,6 +241,42 @@ export function getTeamMagicDamageBonus(attacker, state) {
     bonus += Math.max(0, Number(effect.magicDamage) || 0);
   }
   return bonus;
+}
+
+export function getSourceDamageBonus(attacker, target, state, damageType) {
+  if (!attacker || !target) return 0;
+  let bonus = 0;
+  for (const source of allPassiveSources(getUnitType(attacker.type))) {
+    const effect = source.effect;
+    if (effect?.type === "studyTarget" && attacker.studiedTargetId === target.id) {
+      bonus += Math.max(0, Number(effect.damageBonus) || 0);
+    }
+    if (effect?.type === "teamCompositionStats" && teamCompositionEffectActive(attacker, state, effect)) {
+      bonus += Math.max(0, Number(effect.sourceDamage?.[damageType]) || 0);
+    }
+  }
+  return bonus;
+}
+
+export function getMagicDamageReward(attacker, target) {
+  if (!attacker || !target || attacker.studiedTargetId !== target.id) return null;
+  for (const source of allPassiveSources(getUnitType(attacker.type))) {
+    const effect = source.effect;
+    if (effect?.type === "studyTarget" && effect.magicReward) {
+      return {
+        hp: Math.max(0, Number(effect.magicReward.hp) || 0),
+        mp: Math.max(0, Number(effect.magicReward.mp) || 0)
+      };
+    }
+  }
+  return null;
+}
+
+export function hasLivingStudiedTarget(unit, state) {
+  return Boolean(unit?.studiedTargetId && state?.units?.some((target) =>
+    target.id === unit.studiedTargetId &&
+    target.hp > 0 &&
+    areEnemies(unit, target)));
 }
 
 function getTeamMpCostReduction(unit, state) {
@@ -206,6 +332,8 @@ export function getUnitAuraRadius(source, state) {
   // FLAT radius (no RAGE extension) so the drawn overlay matches applyTimeStealTick.
   const passiveEffect = getUnitType(source.type).passive?.effect;
   if (passiveEffect?.type === "damageAura") radius = Math.max(radius, passiveEffect.radius ?? 2);
+  // Brick House (Clod): a friendly buff aura also projects a visible zone.
+  radius = Math.max(radius, friendlyAuraRadius(source));
   return radius;
 }
 
@@ -350,6 +478,17 @@ export function getEffectiveStats(unit, state = null) {
   for (const [name, value] of Object.entries(teamAuraStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
+  // Brick House (Clod): +DEF received from a nearby allied source, and +STR to the
+  // source itself per sheltered ally. Both proximity-gated, folded live off positions.
+  for (const [name, value] of Object.entries(allyAuraStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  for (const [name, value] of Object.entries(selfAllyAuraStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  for (const [name, value] of Object.entries(teamCompositionStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
   for (const [name, value] of Object.entries(enemyAuraStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
@@ -439,10 +578,18 @@ function hasFreeArts(unit) {
   return Boolean(definition.ragePassive?.effect?.freeArts || definition.rageArt?.effect?.freeArts);
 }
 
+function hasFreeSelectedArt(unit, art) {
+  if (!isRaging(unit) || !art) return false;
+  const definition = getUnitType(unit.type);
+  const sources = [definition.ragePassive, definition.rageArt].filter(Boolean);
+  return sources.some((source) => Array.isArray(source.effect?.freeSelectedArts) && source.effect.freeSelectedArts.includes(art.id));
+}
+
 // The MP an ART actually costs this unit right now: 0 for a raging Juggernaut (freeArts),
 // the catalog cost for everyone else. The single seam every MP check reads.
 export function getArtMpCost(unit, art, state = null) {
   if (!art) return 0;
+  if (hasFreeSelectedArt(unit, art)) return 0;
   if (hasFreeArts(unit)) return 0;
   const base = art.mpCost ?? 0;
   if (base <= 0) return base;
@@ -545,7 +692,7 @@ export const AI_INTENTS = Object.freeze([
   // The King's global one-turn team buffs (Strike/Hold/Pursue/Higher Ground):
   "commandBuff",
   // Angel's single-ally targeted buff (Anoint: +1 range on a friendly unit):
-  "buffAlly",
+  "buffAlly", "healAlly",
   // Mystic's single-ally targeted cleanse (Purify: remove all statuses):
   "cleanseAlly",
   // Monk's guarded ally reposition + defend handoff:
@@ -557,7 +704,10 @@ export const AI_INTENTS = Object.freeze([
   // Virus's contagion casts:
   //   statusAoe    — Smog: a self-centred blind cloud (no damage, no roll).
   //   poisonBurst  — Poison Tick / Explosion: true damage to every poisoned enemy.
-  "statusAoe", "poisonBurst"
+  "statusAoe", "poisonBurst",
+  // Clod's Thunderous Charge: a RANGE-picked tile that detonates a radius blast (damage +
+  // a mass stun) — a targeted-tile AoE, distinct from the self-centred selfBlast.
+  "targetedBlast"
 ]);
 export const AI_ROLES = Object.freeze([
   "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"

@@ -52,6 +52,63 @@ const ABILITY_VFX = Object.freeze({
     sparkCount: 10,
     colors: Object.freeze({ core: "#f8f2c0", trail: "#7fd7ff", impact: "#fff1a6" })
   }),
+  stumble: Object.freeze({
+    type: "dashTrail",
+    soundKey: "footwork",
+    durationMs: 820,
+    stepMs: 170,
+    afterimageCount: 3,
+    sparkCount: 12,
+    colors: Object.freeze({ core: "#fff0a8", trail: "#d7c07f", impact: "#ffd074" })
+  }),
+  fart: Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    radius: 1,
+    ringCount: 2,
+    particleCount: 16,
+    colors: Object.freeze({ core: "#b7e878", trail: "#6b8f35", impact: "#e4ff9a" })
+  }),
+  zap: Object.freeze({
+    type: "projectileFan",
+    soundKey: "spark",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 48,
+    staggerMs: 0,
+    durationMs: 390,
+    impactRadius: 22,
+    windup: Object.freeze({ style: "gather", durationMs: 260, particleCount: 7 }),
+    projectile: Object.freeze({ shape: "orb", arcHeight: 44, durationMs: 390, size: 1.05, colors: Object.freeze({ core: "#f7e27d", trail: "#7a5aa8" }) }),
+    colors: Object.freeze({ core: "#f7e27d", trail: "#7a5aa8", impact: "#fff3b0" })
+  }),
+  study: Object.freeze({
+    type: "statusStrike",
+    soundKey: "age",
+    motif: "silenceRune",
+    runeCount: 3,
+    particleCount: 10,
+    windup: Object.freeze({ style: "gather", durationMs: 300, particleCount: 6 }),
+    castProjectile: Object.freeze({ shape: "orb", arcHeight: 42, durationMs: 410, size: 0.9, colors: Object.freeze({ core: "#f2d98a", trail: "#6a4a8a" }) }),
+    colors: Object.freeze({ core: "#f2d98a", trail: "#6a4a8a", impact: "#fff0c0" })
+  }),
+  surge: Object.freeze({
+    type: "healPulse",
+    soundKey: "pray",
+    particleCount: 10,
+    radius: 30,
+    durationMs: 560,
+    windup: Object.freeze({ style: "gather", durationMs: 300, particleCount: 7 }),
+    colors: Object.freeze({ core: "#8cf0d0", trail: "#2a8a72", impact: "#e0fff8" })
+  }),
+  "relay-power": Object.freeze({
+    type: "healPulse",
+    soundKey: "recharge",
+    particleCount: 8,
+    radius: 26,
+    durationMs: 500,
+    colors: Object.freeze({ core: "#a0c8ff", trail: "#4c6fb0", impact: "#e0f0ff" })
+  }),
   "volley-shot": Object.freeze({
     type: "volleyRain",
     staggerMs: 65,
@@ -586,15 +643,14 @@ const ABILITY_VFX = Object.freeze({
     colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffd9a0" })
   }),
   "dark-pulse": Object.freeze({
-    type: "magicBurst",
+    type: "darkPulseScatter",
     soundKey: "darkseeker",
-    blast: true,
-    blastTiles: 5,
     shake: 8,
-    particleCount: 24,
-    radius: 50,
-    durationMs: 680,
+    particleCount: 4,
+    durationMs: 520,
+    staggerMs: 22,
     windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 12 }),
+    projectile: Object.freeze({ shape: "orb", arcHeight: 14, durationMs: 430, size: 1.05, colors: Object.freeze({ core: "#c89cff", trail: "#241030" }) }),
     colors: Object.freeze({ core: "#c89cff", trail: "#241030", impact: "#ead6ff" })
   }),
   "realm-traversal": Object.freeze({
@@ -604,6 +660,44 @@ const ABILITY_VFX = Object.freeze({
     afterimageCount: 3,
     sparkCount: 12,
     colors: Object.freeze({ core: "#c89cff", trail: "#3a1d5c", impact: "#ead6ff" })
+  }),
+  // Clod — Quake: a self-centred ground slam. A short gather (stone drawing in) then an
+  // earthen shockwave rippling out. Dusty tan/moss palette.
+  quake: Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    shake: 8,
+    particleCount: 20,
+    radius: 46,
+    durationMs: 640,
+    windup: Object.freeze({ style: "gather", durationMs: 340, particleCount: 9 }),
+    colors: Object.freeze({ core: "#c8b06a", trail: "#5a4a2a", impact: "#e6d8a8" })
+  }),
+  // Clod — Stone Throw: a heaved boulder that tumbles on a high arc (toss windup), landing
+  // a heavy physical impact. Its impact/floats are driven by resolveCombat.
+  "stone-throw": Object.freeze({
+    type: "statusStrike",
+    soundKey: "attackHit",
+    motif: "impact",
+    windup: Object.freeze({ style: "toss" }),
+    projectile: Object.freeze({ shape: "lob", arcHeight: 72, durationMs: 540, size: 1.2, colors: Object.freeze({ core: "#9a8c70", trail: "#5a4c38" }) }),
+    colors: Object.freeze({ core: "#b7a888", trail: "#5a4c38", impact: "#d8ccb0" })
+  }),
+  // Clod — Thunderous Charge (RAGE): a full ground-shattering slam — board bloom, screen
+  // shake, a 2-tile shockwave, and a lingering scorch, in a stony tan palette.
+  "thunderous-charge": Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    blast: true,
+    blastTiles: 2,
+    shake: 12,
+    particleCount: 24,
+    radius: 50,
+    durationMs: 720,
+    windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 10 }),
+    boardFlash: true,
+    afterglow: true,
+    colors: Object.freeze({ core: "#c9b37a", trail: "#5a4326", impact: "#efe0b0" })
   })
 });
 

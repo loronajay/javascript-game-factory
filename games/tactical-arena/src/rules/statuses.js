@@ -16,6 +16,13 @@ export function damageTypeImmunities(unit) {
   ));
 }
 
+function resistsNextStatus(unit) {
+  const definition = getUnitType(unit.type);
+  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt]
+    .some((source) => source?.effect?.type === "statusResistOnce") &&
+    !unit.statusResistUsed;
+}
+
 // True when a unit reflects a TARGETED status back onto the offender instead of taking
 // it (the Gargoyle's Stone Body). Read off passive data so no rule hard-codes the unit;
 // the reducer's single-target status sites redirect the application when this is set.
@@ -30,8 +37,13 @@ export function applyStatus(unit, status) {
   if (statusImmunities(unit).has(status.type)) {
     return { applied: false, reason: "IMMUNE", statuses: [...unit.statuses] };
   }
+  if (!status.ignoreResistance && resistsNextStatus(unit)) {
+    unit.statusResistUsed = true;
+    return { applied: false, reason: "RESISTED", statuses: [...unit.statuses] };
+  }
+  const { ignoreResistance: _ignoreResistance, ...storedStatus } = status;
   const existing = unit.statuses.filter((entry) => entry.type !== status.type);
-  return { applied: true, statuses: [...existing, { ...status }] };
+  return { applied: true, statuses: [...existing, { ...storedStatus }] };
 }
 
 function isStunDuration(duration) {

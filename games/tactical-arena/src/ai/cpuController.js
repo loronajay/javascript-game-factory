@@ -138,7 +138,7 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
 
   // 5. Don't burn a costly blast on too few targets for no kill (decision 1/5 economy).
   const primaryArtAi = artAiFor(unit, plan);
-  if (primaryArtAi && ["selfBlast", "coneAoe", "lineBurst", "flightStrike"].includes(primaryArtAi.intent)) {
+  if (primaryArtAi && ["selfBlast", "coneAoe", "lineBurst", "flightStrike", "targetedBlast"].includes(primaryArtAi.intent)) {
     const minTargets = primaryArtAi.evHints?.minTargets ?? 1;
     if (enemyHits < minTargets && kills === 0) score -= AOE_WASTE_PENALTY;
   }
@@ -226,6 +226,18 @@ function planEffectValue(state, unit, plan) {
   // Recharge: refuel MP / mend 1 HP at full MP — a small tempo term (the mend is material).
   if (ai.intent === "recharge") {
     return { control: rechargeValue(state, unit), heal: 0 };
+  }
+  // Thunderous Charge (Clod): the 10 physical to each enemy rides the HP diff; the mass
+  // 1-turn stun is the uncounted value — sum it over every enemy caught in the blast.
+  if (ai.intent === "targetedBlast") {
+    const center = plan.primary.targetPosition;
+    const radius = art.targeting?.radius ?? 2;
+    let control = 0;
+    for (const enemy of livingUnits(state)) {
+      if (!areEnemies(unit, enemy) || !center || chebyshevDistance(center, enemy.position) > radius) continue;
+      control += statusValue(enemy, { status: "stun", durationTurns: art.stun?.durationTurns ?? 1 }, state);
+    }
+    return { control, heal: 0 };
   }
   // Smog (Virus): a self-centred blind cloud, no HP change — sum the status value of
   // blinding every enemy caught in the radius, so it rides the `control` weight.
