@@ -30,6 +30,7 @@ function resetTurn(state, player = 1) {
 test("Fat Bowman is registered with her ranger stat block and arts", () => {
   const def = getUnitType("fat-bowman");
   assert.equal(def.name, "Fat Bowman");
+  assert.equal(def.glyph, "🏹");
   assert.equal(def.classType, "ranger");
   assert.deepEqual(def.stats, { moveRange: 2, attackRange: 4, strength: 8, defense: 6, maxHp: 30, maxMp: 25 });
   assert.deepEqual(def.arts.map((art) => art.id), ["curve-shot", "dragonsbane", "planted", "brothers-in-arms"]);

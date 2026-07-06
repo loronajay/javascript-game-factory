@@ -1,7 +1,7 @@
 export const FAT_WIZARD = Object.freeze({
   id: "fat-wizard",
   name: "Fat Wizard",
-  glyph: "FW",
+  glyph: "🪄",
   classType: "mage",
   ai: Object.freeze({ threatValue: 15, role: "caster", protect: true }),
   stats: Object.freeze({

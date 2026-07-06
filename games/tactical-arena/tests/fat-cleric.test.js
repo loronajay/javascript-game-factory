@@ -27,6 +27,7 @@ function scenario(units, extra = {}) {
 test("Fat Cleric is registered with her support stat block", () => {
   const def = getUnitType("fat-cleric");
   assert.equal(def.name, "Fat Cleric");
+  assert.equal(def.glyph, "✚");
   assert.equal(def.classType, "support");
   assert.deepEqual(def.stats, { moveRange: 2, attackRange: 4, strength: 7, defense: 6, maxHp: 30, maxMp: 35 });
 });

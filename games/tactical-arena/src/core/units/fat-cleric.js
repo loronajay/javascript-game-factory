@@ -27,7 +27,7 @@
 export const FAT_CLERIC = Object.freeze({
   id: "fat-cleric",
   name: "Fat Cleric",
-  glyph: "FC",
+  glyph: "✚",
   classType: "support",
   ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
   stats: Object.freeze({

@@ -24,6 +24,7 @@ function scenario(units, extra = {}) {
 test("Fat Wizard is registered with his mage stat block and arts", () => {
   const def = getUnitType("fat-wizard");
   assert.equal(def.name, "Fat Wizard");
+  assert.equal(def.glyph, "🪄");
   assert.equal(def.classType, "mage");
   assert.deepEqual(def.stats, { moveRange: 2, attackRange: 3, strength: 7, defense: 7, maxHp: 30, maxMp: 35 });
   assert.deepEqual(def.arts.map((art) => art.id), ["zap", "study", "surge", "relay-power", "brothers-in-arms"]);

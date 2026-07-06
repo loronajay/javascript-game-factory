@@ -8,7 +8,7 @@
 export const FAT_BOWMAN = Object.freeze({
   id: "fat-bowman",
   name: "Fat Bowman",
-  glyph: "FB",
+  glyph: "🏹",
   classType: "ranger",
   ai: Object.freeze({ threatValue: 14, role: "ranged", protect: true }),
   stats: Object.freeze({

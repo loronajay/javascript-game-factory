@@ -25,6 +25,7 @@ function scenario(units, extra = {}) {
 test("Fat Knight is registered with his melee stat block and arts", () => {
   const def = getUnitType("fat-knight");
   assert.equal(def.name, "Fat Knight");
+  assert.equal(def.glyph, "♞");
   assert.equal(def.classType, "melee");
   assert.deepEqual(def.stats, { moveRange: 2, attackRange: 1, strength: 10, defense: 6, maxHp: 30, maxMp: 20 });
   assert.deepEqual(def.arts.filter((art) => art.kind === "active").map((art) => art.id), ["stumble", "fart"]);
