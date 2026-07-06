@@ -29,6 +29,7 @@ const ATTACK_PROJECTILES = Object.freeze({
   magician: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 430, size: 1, colors: Object.freeze({ core: "#a0c8ff", trail: "#4488dd" }) }),
   mystic: Object.freeze({ shape: "orb", arcHeight: 50, durationMs: 460, size: 0.9, colors: Object.freeze({ core: "#bff4d2", trail: "#64d99a" }) }),
   necromancer: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 450, size: 1, colors: Object.freeze({ core: "#9be08a", trail: "#38256f" }) }),
+  nemesis: Object.freeze({ shape: "orb", arcHeight: 44, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#c89cff", trail: "#241030" }) }),
   // Angel is a bow user — a radiant, gold-white blessed arrow (its magic tint reads holy).
   angel: Object.freeze({ shape: "arrow", arcHeight: 58, durationMs: 430, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#d8c078" }) })
 });
@@ -541,6 +542,26 @@ const ABILITY_VFX = Object.freeze({
     durationMs: 680,
     windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 11 }),
     colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffd9a0" })
+  }),
+  "dark-pulse": Object.freeze({
+    type: "magicBurst",
+    soundKey: "darkseeker",
+    blast: true,
+    blastTiles: 5,
+    shake: 8,
+    particleCount: 24,
+    radius: 50,
+    durationMs: 680,
+    windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 12 }),
+    colors: Object.freeze({ core: "#c89cff", trail: "#241030", impact: "#ead6ff" })
+  }),
+  "realm-traversal": Object.freeze({
+    type: "dashTrail",
+    soundKey: "flee",
+    durationMs: 430,
+    afterimageCount: 3,
+    sparkCount: 12,
+    colors: Object.freeze({ core: "#c89cff", trail: "#3a1d5c", impact: "#ead6ff" })
   })
 });
 

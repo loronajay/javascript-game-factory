@@ -34,7 +34,11 @@ function createUnit(spec) {
     // Gargoyle Volcanic Rage: counts the immediate rage-entry eruption plus later
     // raging activations so a free Pyroclasm fires on cadence. Meaningless for every
     // other unit (stays 0).
-    volcanicCounter: spec.volcanicCounter ?? 0
+    volcanicCounter: spec.volcanicCounter ?? 0,
+    // Nemesis Realm Traversal: charged means the NEXT activation may move before
+    // Dark Pulse; locked prevents re-arming until that charged activation finishes.
+    realmTraversalCharged: spec.realmTraversalCharged ?? false,
+    realmTraversalLocked: spec.realmTraversalLocked ?? false
   };
 }
 

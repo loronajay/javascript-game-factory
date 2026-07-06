@@ -15,6 +15,7 @@ import { KING } from "./units/king.js";
 import { ANGEL } from "./units/angel.js";
 import { MONK } from "./units/monk.js";
 import { GARGOYLE } from "./units/gargoyle.js";
+import { NEMESIS } from "./units/nemesis.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -32,7 +33,8 @@ export const UNIT_TYPES = Object.freeze({
   king: KING,
   angel: ANGEL,
   monk: MONK,
-  gargoyle: GARGOYLE
+  gargoyle: GARGOYLE,
+  nemesis: NEMESIS
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -120,6 +122,43 @@ function teamAuraStats(unit, state) {
     }
   }
   return totals;
+}
+
+function teamMagicSupportSources(unit, state) {
+  const sources = [];
+  if (!state?.units) return sources;
+  const applied = new Set();
+  for (const source of state.units) {
+    if (source.hp <= 0 || !areAllies(source, unit)) continue;
+    const definition = getUnitType(source.type);
+    for (const passive of passiveSources(definition)) {
+      if (passive.kind && passive.kind !== "passive") continue;
+      if (passive.effect?.type !== "teamMagicSupport") continue;
+      const key = passiveStackKey(passive);
+      if (applied.has(key)) continue;
+      applied.add(key);
+      sources.push(passive.effect);
+    }
+  }
+  return sources;
+}
+
+export function getTeamMagicDamageBonus(attacker, state) {
+  let bonus = 0;
+  for (const effect of teamMagicSupportSources(attacker, state)) {
+    bonus += Math.max(0, Number(effect.magicDamage) || 0);
+  }
+  return bonus;
+}
+
+function getTeamMpCostReduction(unit, state) {
+  let reduction = 0;
+  let minCost = 0;
+  for (const effect of teamMagicSupportSources(unit, state)) {
+    reduction += Math.max(0, Number(effect.mpCostReduction) || 0);
+    minCost = Math.max(minCost, Number(effect.minMpCost) || 0);
+  }
+  return { reduction, minCost };
 }
 
 // The Chebyshev radius an enemy-debuff aura currently reaches from `source`. An
@@ -400,10 +439,14 @@ function hasFreeArts(unit) {
 
 // The MP an ART actually costs this unit right now: 0 for a raging Juggernaut (freeArts),
 // the catalog cost for everyone else. The single seam every MP check reads.
-export function getArtMpCost(unit, art) {
+export function getArtMpCost(unit, art, state = null) {
   if (!art) return 0;
   if (hasFreeArts(unit)) return 0;
-  return art.mpCost ?? 0;
+  const base = art.mpCost ?? 0;
+  if (base <= 0) return base;
+  const support = getTeamMpCostReduction(unit, state);
+  if (support.reduction <= 0) return base;
+  return Math.max(support.minCost, base - support.reduction);
 }
 
 export function getRageArtRangeBonus(unit) {

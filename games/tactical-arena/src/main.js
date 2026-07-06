@@ -1012,6 +1012,7 @@ function playEventSounds(events) {
           artId === "self-destruct" ||
           artId === "anoint" || artId === "purify" || artId === "elevate" || artId === "heavenseeker" ||
           artId === "flight" || artId === "pyroclasm" ||
+          artId === "dark-pulse" || artId === "realm-traversal" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");

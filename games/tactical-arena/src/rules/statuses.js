@@ -8,6 +8,14 @@ export function statusImmunities(unit) {
   ));
 }
 
+export function damageTypeImmunities(unit) {
+  const definition = getUnitType(unit.type);
+  const sources = [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt];
+  return new Set(sources.flatMap((source) =>
+    source?.effect?.type === "immunity" ? source.effect.damageTypes ?? [] : []
+  ));
+}
+
 // True when a unit reflects a TARGETED status back onto the offender instead of taking
 // it (the Gargoyle's Stone Body). Read off passive data so no rule hard-codes the unit;
 // the reducer's single-target status sites redirect the application when this is set.

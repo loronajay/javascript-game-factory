@@ -31,6 +31,7 @@ import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement
 import {
   FOOTWORK_DAMAGE,
   getArtTargetRange,
+  getDarkPulseTargets,
   getFirePlacementTiles,
   getFlightTiles,
   getFootworkStepOptions,
@@ -317,8 +318,12 @@ function generateArtPlans(state, unit, art, ai, plans) {
       break;
     }
     case "lineBurst": {
-      // Pyroclasm: a self-centred burst hitting every enemy on the 8 rays in range.
-      if (getPyroclasmTargets(state, unit, art).length > 0) {
+      // Pyroclasm burns every enemy on its rays; Dark Pulse hits first contact on
+      // each ray and is worth considering when it contacts any enemy.
+      const targets = art.targeting?.shape === "darkPulse"
+        ? getDarkPulseTargets(state, unit).filter(({ unit: target }) => areEnemies(unit, target))
+        : getPyroclasmTargets(state, unit, art);
+      if (targets.length > 0) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
       }
       break;
@@ -483,12 +488,14 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break;
     }
     case "lineBurst": {
-      // Pyroclasm: magic to every enemy on the rays (Defend/Dead Zone honored). The cast
-      // has no move, so the ray geometry reads from the real state at the origin.
+      // Pyroclasm burns rays; Dark Pulse damages first-contact enemies on each ray.
+      // The cast has no move, so the ray geometry reads from the real state at origin.
       const amount = art.damage?.amount ?? 0;
       const dtype = art.damage?.type ?? "magic";
       const affinity = art.damage?.affinity ?? art.damageAffinity ?? null;
-      const ids = new Set(getPyroclasmTargets(state, actor, art).map((u) => u.id));
+      const ids = new Set((art.targeting?.shape === "darkPulse"
+        ? getDarkPulseTargets(state, actor).filter(({ unit: target }) => areEnemies(actor, target)).map(({ unit: target }) => target.id)
+        : getPyroclasmTargets(state, actor, art).map((u) => u.id)));
       for (const target of board) {
         if (!ids.has(target.id)) continue;
         target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: dtype, affinity }).damage);
@@ -540,8 +547,8 @@ export function planMpCost(state, plan) {
   let cost = 0;
   // getArtMpCost honors a raging Juggernaut's freeArts (0-cost ARTS), so the CPU doesn't
   // over-count MP it won't actually spend.
-  if (plan.bonus) cost += getArtMpCost(unit, getArt(unit.type, plan.bonus.artId));
-  if (plan.primary.kind === "art") cost += getArtMpCost(unit, getArt(unit.type, plan.primary.artId));
+  if (plan.bonus) cost += getArtMpCost(unit, getArt(unit.type, plan.bonus.artId), state);
+  if (plan.primary.kind === "art") cost += getArtMpCost(unit, getArt(unit.type, plan.primary.artId), state);
   return cost;
 }
 
@@ -705,7 +712,7 @@ function artUsableForPlanning(state, unit, art) {
     unit.hp > 0 && !unit.spent &&
     !isStunned(unit) &&
     !unit.statuses?.some((status) => status.type === "silence") &&
-    unit.mp >= getArtMpCost(unit, art) &&
+    unit.mp >= getArtMpCost(unit, art, state) &&
     (!art.rageLocked || isRaging(unit))
   );
 }

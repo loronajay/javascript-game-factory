@@ -1,13 +1,13 @@
 import { COMMANDS } from "./commands.js";
 import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getDarkPulseTargets, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
+import { finalizeMagicDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import { applyStatus, isStunned, reflectsStatus, resolveStatusEffect, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
-import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect, isDamageTypeImmuneByStance } from "../rules/stances.js";
+import { alliesInRadius, getGlobalHealBonus, getGlobalStatusChanceMultiplier, getGlobalTrueTick, getStanceEffect } from "../rules/stances.js";
 
 const ERR = Object.freeze({
   INVALID_COMMAND: "INVALID_COMMAND",
@@ -74,7 +74,8 @@ export function applyCommand(state, command) {
   // it — and applies the King's reactive HP swings. Deterministic (no RNG), so online
   // lockstep clients all compute the identical reaction.
   if (result.accepted) {
-    applyVolcanicRageEntries(state, result.nextState, result.events);
+    applyNemesisThresholdReactions(state, result.nextState, result.events);
+    applyRageEntryEffects(state, result.nextState, result.events);
     applyCommanderReactions(state, result.nextState, result.events);
   }
   return result;
@@ -159,8 +160,10 @@ function beginActivation(state, command) {
     moved: false,
     primaryUsed: false,
     spellUsed: false,
-    bonusActionGroups: []
+    bonusActionGroups: [],
+    realmTraversalActive: Boolean(unit.realmTraversalCharged)
   };
+  if (unit.realmTraversalCharged) unit.realmTraversalCharged = false;
   // Volcanic Rage (Gargoyle): the first raging activation and every Nth one after erupt
   // a free Pyroclasm BEFORE the turn opens. It spends no MP and no action — the Gargoyle
   // still takes its full turn.
@@ -190,7 +193,70 @@ function resolveVolcanicPyroclasmTick(state, unit, freeCast, events, { trigger, 
   return true;
 }
 
-function applyVolcanicRageEntries(prevState, next, events) {
+function nemesisThresholdBand(hp) {
+  if (hp <= 0) return 0;
+  let crossed = 0;
+  for (const threshold of [20, 15, 10, 5]) {
+    if (hp < threshold) crossed += 1;
+  }
+  return crossed;
+}
+
+function resolveNemesisAutoPulse(state, unit, events, { trigger }) {
+  const art = getArt(unit.type, "dark-pulse");
+  if (!art || unit.hp <= 0) return false;
+  const { targetIds, damageByTarget, healingByTarget } = applyDarkPulse(state, unit, art);
+  resolveVictory(state);
+  events.push({
+    type: "DARK_PULSE_AUTO",
+    actorId: unit.id,
+    artId: art.id,
+    trigger,
+    targetIds,
+    damageByTarget,
+    healingByTarget,
+    mpCost: 0
+  });
+  return true;
+}
+
+function applyNemesisThresholdReactions(prevState, next, events) {
+  if (next.phase !== "playing") return;
+
+  let previousBand = new Map(prevState.units.map((unit) => [unit.id, nemesisThresholdBand(unit.hp)]));
+  for (let guard = 0; guard < next.units.length * 4; guard += 1) {
+    const entrants = next.units.filter((unit) =>
+      unit.hp > 0 &&
+      unit.type === "nemesis" &&
+      nemesisThresholdBand(unit.hp) > (previousBand.get(unit.id) ?? 0)
+    );
+    if (!entrants.length) return;
+
+    const beforeWave = new Map(next.units.map((unit) => [unit.id, nemesisThresholdBand(unit.hp)]));
+    for (const entrant of entrants) {
+      if (next.phase !== "playing") return;
+      const unit = findUnit(next, entrant.id);
+      if (!unit || unit.hp <= 0 || unit.type !== "nemesis") continue;
+      const crossings = nemesisThresholdBand(unit.hp) - (previousBand.get(unit.id) ?? 0);
+      for (let i = 0; i < crossings; i += 1) {
+        if (next.phase !== "playing" || unit.hp <= 0) break;
+        resolveNemesisAutoPulse(next, unit, events, { trigger: "missingHpThreshold" });
+      }
+    }
+    previousBand = beforeWave;
+  }
+}
+
+function hasRageEntryEffect(unit) {
+  const definition = getUnitType(unit.type);
+  const effects = [definition.ragePassive, definition.rageArt].map((source) => source?.effect);
+  return Boolean(
+    effects.some((effect) => effect?.type === "rageEntryRestore") ||
+    getRageEffectValue(unit, "freePyroclasm", null)
+  );
+}
+
+function applyRageEntryEffects(prevState, next, events) {
   if (next.phase !== "playing") return;
 
   let previousRage = new Map(prevState.units.map((unit) => [unit.id, isRaging(unit)]));
@@ -199,7 +265,7 @@ function applyVolcanicRageEntries(prevState, next, events) {
       unit.hp > 0 &&
       !previousRage.get(unit.id) &&
       isRaging(unit) &&
-      getRageEffectValue(unit, "freePyroclasm", null)
+      hasRageEntryEffect(unit)
     );
     if (!entrants.length) return;
 
@@ -208,6 +274,23 @@ function applyVolcanicRageEntries(prevState, next, events) {
       if (next.phase !== "playing") return;
       const unit = findUnit(next, entrant.id);
       if (!unit || unit.hp <= 0 || !isRaging(unit)) continue;
+      const definition = getUnitType(unit.type);
+      const restore = [definition.ragePassive, definition.rageArt]
+        .map((source) => source?.effect)
+        .find((effect) => effect?.type === "rageEntryRestore");
+      if (restore) {
+        const beforeHp = unit.hp;
+        const beforeMp = unit.mp;
+        unit.hp = Math.min(getEffectiveStats(unit, next).maxHp, unit.hp + (restore.hp ?? 0));
+        unit.mp = Math.min(getEffectiveStats(unit, next).maxMp, unit.mp + (restore.mp ?? 0));
+        events.push({
+          type: "RAGE_REGENERATE",
+          unitId: unit.id,
+          hpRestored: unit.hp - beforeHp,
+          mpRestored: unit.mp - beforeMp
+        });
+      }
+
       const freeCast = getRageEffectValue(unit, "freePyroclasm", null);
       if (!freeCast) continue;
       resolveVolcanicPyroclasmTick(next, unit, freeCast, events, {
@@ -231,11 +314,7 @@ function applyPyroclasmDamage(state, actor, art) {
   for (const target of getPyroclasmTargets(state, actor, art)) {
     const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
-    const reduced = isDamageTypeImmuneByStance(target, "magic")
-      || (isFireBasedDamage({ art }) && isFireDamageImmune(target))
-      ? 0
-      : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
-    const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+    const damage = finalizeMagicDamage({ attacker: actor, target, state, rawDamage: result.damage, art });
     const dealt = Math.min(target.hp, damage);
     target.hp = Math.max(0, target.hp - damage);
     if (dealt > 0 || damage > 0) { targetIds.push(target.id); damageByTarget[target.id] = damage; }
@@ -450,7 +529,10 @@ const ART_RESOLVERS = new Map([
   ["protect", resolveProtect],
   // Gargoyle: fly-then-blast reposition, and a self-centred line burst.
   ["flight", resolveFlight],
-  ["pyroclasm", resolvePyroclasm]
+  ["pyroclasm", resolvePyroclasm],
+  // Nemesis: all-ray first-contact magic and the move+Pulse next-turn setup.
+  ["dark-pulse", resolveDarkPulse],
+  ["realm-traversal", resolveRealmTraversal]
 ]);
 
 function useArt(state, command) {
@@ -468,6 +550,7 @@ function resolveFootwork(state, command, art) {
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
   const harmed = [];
   for (const step of command.path) {
     const target = unitAt(next, step);
@@ -477,7 +560,7 @@ function resolveFootwork(state, command, art) {
     }
   }
   actor.position = { ...command.path.at(-1) };
-  actor.mp -= art.mpCost;
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -486,7 +569,7 @@ function resolveFootwork(state, command, art) {
     actorId: actor.id,
     path: command.path.map((step) => ({ ...step })),
     harmed,
-    mpCost: art.mpCost
+    mpCost: cost
   }]);
 }
 
@@ -510,7 +593,8 @@ function resolveTargetedArt(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
 
   // ART attacks roll to-hit like a basic attack (the ART's own status/heal check is
   // a SECOND, separate roll below). A missed swing deals no damage and lands no
@@ -519,7 +603,7 @@ function resolveTargetedArt(state, command, art) {
   next.rngState = swing.rngState;
   if (swing.missed) {
     spendAndAdvance(next, actor);
-    return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost, hit: false, missed: true, roll: swing.hitRoll }]);
+    return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost, hit: false, missed: true, roll: swing.hitRoll }]);
   }
 
   if (art.damageType === "magic") next.activation.spellUsed = true;
@@ -556,7 +640,7 @@ function resolveTargetedArt(state, command, art) {
     artId: art.id,
     actorId: actor.id,
     targetId: target.id,
-    mpCost: art.mpCost,
+    mpCost: cost,
     hit: true,
     critical: swing.critical,
     roll: swing.hitRoll,
@@ -575,20 +659,22 @@ function resolveFlee(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const from = { ...actor.position };
   actor.position = { ...command.targetPosition };
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   return accept(next, [{
     type: "ART_RESOLVED",
     artId: art.id,
     actorId: actor.id,
     path: [from, { ...command.targetPosition }],
-    mpCost: art.mpCost
+    mpCost: cost
   }]);
 }
 
 function resolveNuke(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
   const radius = getSelfBlastRadius(next, actor, art);
   const damageByTarget = {};
   const targetIds = [];
@@ -598,19 +684,13 @@ function resolveNuke(state, command, art) {
     if (chebyshevDistance(actor.position, target.position) > radius) continue;
     const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
-    // Black Death Stance nulls magic damage; otherwise Dead Zone-style team reduction
-    // trims the final magic number, and Bruiser Mode adds +1 to a landed hit.
-    const reduced = isDamageTypeImmuneByStance(target, "magic")
-      || (isFireBasedDamage({ art }) && isFireDamageImmune(target))
-      ? 0
-      : Math.max(0, result.damage - getTeamDamageReduction(target, next, "magic"));
-    const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+    const damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: result.damage, art });
     target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
   }
 
-  actor.mp -= art.mpCost;
+  actor.mp -= cost;
   next.activation.spellUsed = true;
   spendAndAdvance(next, actor);
   resolveVictory(next);
@@ -620,7 +700,7 @@ function resolveNuke(state, command, art) {
     actorId: actor.id,
     targetIds,
     damageByTarget,
-    mpCost: art.mpCost
+    mpCost: cost
   }]);
 }
 
@@ -637,7 +717,8 @@ function resolveFlight(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const from = { ...actor.position };
   actor.position = { ...placement };
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
 
   const radius = art.blastRadius ?? 1;
   const amount = art.damage?.amount ?? 0;
@@ -656,7 +737,7 @@ function resolveFlight(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id,
-    path: [from, { ...placement }], targetIds, damageByTarget, mpCost: art.mpCost
+    path: [from, { ...placement }], targetIds, damageByTarget, mpCost: cost
   }]);
 }
 
@@ -667,12 +748,79 @@ function resolvePyroclasm(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const { targetIds, damageByTarget } = applyPyroclasmDamage(next, actor, art);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   next.activation.spellUsed = true;
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget, mpCost: art.mpCost
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget, mpCost: cost
+  }]);
+}
+
+function applyDarkPulse(state, actor, art) {
+  const targetIds = [];
+  const damageByTarget = {};
+  const healingByTarget = {};
+  for (const { unit: targetRef } of getDarkPulseTargets(state, actor)) {
+    const target = findUnit(state, targetRef.id);
+    if (!target || target.hp <= 0) continue;
+    targetIds.push(target.id);
+    if (areAllies(actor, target)) {
+      if (isHealingDisabled(state)) continue;
+      const before = target.hp;
+      target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + 1 + getGlobalHealBonus(state) + getCommandHealBonus(state, actor));
+      const healed = target.hp - before;
+      if (healed > 0) healingByTarget[target.id] = healed;
+      continue;
+    }
+
+    const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
+    const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
+    const damage = finalizeMagicDamage({ attacker: actor, target, state, rawDamage: result.damage, art });
+    target.hp = Math.max(0, target.hp - damage);
+    damageByTarget[target.id] = damage;
+  }
+  return { targetIds, damageByTarget, healingByTarget };
+}
+
+function resolveDarkPulse(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  const { targetIds, damageByTarget, healingByTarget } = applyDarkPulse(next, actor, art);
+  const refunded = targetIds.length >= (art.refundTargets ?? 4);
+  if (!refunded) actor.mp -= cost;
+  next.activation.spellUsed = true;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetIds,
+    damageByTarget,
+    healingByTarget,
+    mpCost: cost,
+    refunded
+  }]);
+}
+
+function resolveRealmTraversal(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  if (actor.realmTraversalLocked) return reject(ERR.ART_NOT_AVAILABLE);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  actor.realmTraversalCharged = true;
+  actor.realmTraversalLocked = true;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    mpCost: cost,
+    realmTraversalCharged: true
   }]);
 }
 
@@ -697,6 +845,8 @@ function createSummon(id, type, player, team, position, summonerId) {
     mageChargeCount: 0,
     stance: null,
     rainCharged: 0,
+    realmTraversalCharged: false,
+    realmTraversalLocked: false,
     summonerId
   };
 }
@@ -721,7 +871,8 @@ function resolveSummonGhoul(state, command, art) {
   const ghoulId = `${actor.id}-${art.summon.type}-${seq}`;
   const ghoul = createSummon(ghoulId, art.summon.type, actor.player, teamOfUnit(actor), placement, actor.id);
   next.units.push(ghoul);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   return accept(next, [{
     type: "ART_RESOLVED",
@@ -729,7 +880,7 @@ function resolveSummonGhoul(state, command, art) {
     actorId: actor.id,
     summonedUnitId: ghoulId,
     position: { ...placement },
-    mpCost: art.mpCost
+    mpCost: cost
   }]);
 }
 
@@ -744,10 +895,11 @@ function resolveBuildCover(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   next.tileObjects[positionKey(placement)] = { kind: "wall", hp: art.wall?.hp ?? 1 };
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, position: { ...placement }, mpCost: art.mpCost
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, position: { ...placement }, mpCost: cost
   }]);
 }
 
@@ -762,10 +914,11 @@ function resolveThrowCigar(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   next.tileObjects[positionKey(placement)] = { kind: "fire", turnsLeft: art.fire?.turns ?? 3 };
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, position: { ...placement }, mpCost: art.mpCost
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, position: { ...placement }, mpCost: cost
   }]);
 }
 
@@ -808,7 +961,8 @@ function resolveTilePulse(state, command, art) {
     }
   }
 
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   if (art.bonusActionGroup) {
     next.activation.bonusActionGroups = [
       ...(next.activation.bonusActionGroups ?? []),
@@ -825,7 +979,7 @@ function resolveTilePulse(state, command, art) {
     targetIds,
     damageByTarget,
     ...(healTargetIds.length ? { healTargetIds, healingByTarget } : {}),
-    mpCost: art.mpCost,
+    mpCost: cost,
     bonusActionGroup: art.bonusActionGroup ?? null
   }]);
 }
@@ -833,7 +987,8 @@ function resolveTilePulse(state, command, art) {
 function resolveHealAllies(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   const healingByTarget = {};
   const targetIds = [];
   // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too); a
@@ -859,7 +1014,7 @@ function resolveHealAllies(state, command, art) {
     actorId: actor.id,
     targetIds,
     healingByTarget,
-    mpCost: art.mpCost
+    mpCost: cost
   }]);
 }
 
@@ -878,7 +1033,8 @@ function resolveAnoint(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
 
   const result = applyStatus(target, {
     type: art.effect.status,
@@ -889,7 +1045,7 @@ function resolveAnoint(state, command, art) {
 
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost,
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost,
     effect: { status: art.effect.status, applied: result.applied, ...(result.reason ? { reason: result.reason } : {}) }
   }]);
 }
@@ -908,8 +1064,8 @@ function resolveCleanseAlly(state, command, art) {
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
   const target = findUnit(next, command.targetId);
-  const cost = getArtMpCost(actor, art);
   actor.mp -= cost;
 
   const hadStatuses = Boolean(target.statuses?.length);
@@ -937,12 +1093,13 @@ function formatStatModifierLabel(statModifiers) {
 function resolveWitchDance(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   const event = {
     type: "ART_RESOLVED",
     artId: art.id,
     actorId: actor.id,
-    mpCost: art.mpCost,
+    mpCost: cost,
     stance: art.stance
   };
 
@@ -1063,7 +1220,8 @@ function resolveStatusCast(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
 
   const roll = drawValue(next.rngState, command.effectRoll);
   next.rngState = roll.rngState;
@@ -1077,7 +1235,7 @@ function resolveStatusCast(state, command, art) {
     artId: art.id,
     actorId: actor.id,
     targetId: target.id,
-    mpCost: art.mpCost,
+    mpCost: cost,
     effect: { ...effect, status: art.effect.status }
   }]);
 }
@@ -1099,7 +1257,8 @@ function resolveVolleyShot(state, command, art) {
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
   }
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -1109,7 +1268,7 @@ function resolveVolleyShot(state, command, art) {
     targetPosition: { ...command.targetPosition },
     targetIds,
     damageByTarget,
-    mpCost: art.mpCost
+    mpCost: cost
   }]);
 }
 
@@ -1138,10 +1297,11 @@ function resolveAge(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
   target.linkedStatMods = [...(target.linkedStatMods ?? []), { sourceId: actor.id, stats: { [stat]: delta } }];
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost, stat, delta
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost, stat, delta
   }]);
 }
 
@@ -1165,7 +1325,8 @@ function resolveTimeStretch(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
 
   const spec = enemy ? art.enemy : art.ally;
   // Stone Body reflects a slow (the enemy branch) back onto Father Time; a friendly
@@ -1180,7 +1341,7 @@ function resolveTimeStretch(state, command, art) {
 
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: art.mpCost,
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost,
     effect: { status: spec.status, applied: result.applied, ...(result.reason ? { reason: result.reason } : {}) }
   }]);
 }
@@ -1205,11 +1366,12 @@ function resolveRewind(state, command, art) {
   revived.defending = false;
   revived.hp = getEffectiveStats(revived, next).maxHp;
   revived.spent = true;
-  actor.mp -= art.mpCost;
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, revivedUnitId: revived.id, position: { ...placement }, mpCost: art.mpCost
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, revivedUnitId: revived.id, position: { ...placement }, mpCost: cost
   }]);
 }
 
@@ -1226,7 +1388,7 @@ function resolveTetherGrab(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  const cost = getArtMpCost(actor, art);
+  const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
   const grabsEnemy = areEnemies(actor, target);
@@ -1265,10 +1427,7 @@ function resolveTetherGrab(state, command, art) {
     // A landed grab crits like any strike — the fixed 3 scales ×1.5 before the reduction
     // fold (magic ignores DEF; Tether Grab does not halve under Defend).
     const baseAmount = swing.critical ? Math.ceil(art.damage.amount * CRIT_MULTIPLIER) : art.damage.amount;
-    const reduced = isDamageTypeImmuneByStance(target, "magic")
-      ? 0
-      : Math.max(0, baseAmount - getTeamDamageReduction(target, next, "magic"));
-    damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+    damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: baseAmount, art });
     if (damage > 0) {
       target.hp = Math.max(0, target.hp - damage);
       damageByTarget[target.id] = damage;
@@ -1309,7 +1468,7 @@ function resolveRocketPunch(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  const cost = getArtMpCost(actor, art);
+  const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
@@ -1375,7 +1534,7 @@ function resolveFrontKick(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
-  const cost = getArtMpCost(actor, art);
+  const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
@@ -1455,7 +1614,7 @@ function resolveProtect(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
   const from = { ...actor.position };
-  const cost = getArtMpCost(actor, art);
+  const cost = getArtMpCost(actor, art, next);
   actor.position = destination;
   actor.defending = true;
   target.defending = true;
@@ -1498,7 +1657,7 @@ function resolveRecharge(state, command, art) {
   }
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpRestored, hpHealed, mpCost: getArtMpCost(actor, art)
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpRestored, hpHealed, mpCost: getArtMpCost(actor, art, next)
   }]);
 }
 
@@ -1519,13 +1678,14 @@ function resolveSelfDestruct(state, command, art) {
     targetIds.push(target.id);
     damageByTarget[target.id] = dealt;
   }
-  actor.mp -= getArtMpCost(actor, art);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
   actor.hp = 0; // the core is spent — the Juggernaut is consumed
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
-    selfDestruct: true, mpCost: getArtMpCost(actor, art)
+    selfDestruct: true, mpCost: cost
   }]);
 }
 
@@ -1540,7 +1700,8 @@ function resolveKingCommand(state, command, art) {
   actor.previousCommand = actor.command ?? null;
   actor.command = art.command.id;
   actor.commandTurn = next.turnNumber;
-  actor.mp -= getArtMpCost(actor, art); // 0 — commands are free
+  const cost = getArtMpCost(actor, art, next); // 0 — commands are free
+  actor.mp -= cost;
   spendAndAdvance(next, actor);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, command: art.command.id, mpCost: 0
@@ -1614,6 +1775,7 @@ function spendAndAdvance(state, unit) {
   unit.spent = true;
 
   const spellUsed = state.activation?.spellUsed ?? false;
+  const realmTraversalActive = state.activation?.unitId === unit.id && state.activation?.realmTraversalActive;
   const passive = getUnitType(unit.type)?.passive;
   if (passive?.effect?.type === "mpRegen") {
     if (spellUsed) {
@@ -1628,6 +1790,7 @@ function spendAndAdvance(state, unit) {
     }
   }
 
+  if (realmTraversalActive) unit.realmTraversalLocked = false;
   state.activation = null;
   advanceTurnIfExhausted(state);
 }

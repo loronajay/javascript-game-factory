@@ -1,9 +1,10 @@
-import { getEffectiveStats, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
+import { getEffectiveStats, getTeamMagicDamageBonus, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
 import { areAllies, areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
 import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
+import { damageTypeImmunities } from "./statuses.js";
 
 // True when an attacker's shot ignores intervening obstacles entirely — the
 // Sniper's Rifle Powered passive (pierces both bodies AND Build Cover walls). Read
@@ -133,6 +134,21 @@ export function isFireBasedDamage({ damageAffinity = null, art = null } = {}) {
     art?.damageAffinity === "fire" ||
     art?.damage?.affinity === "fire" ||
     art?.fireDamage === true;
+}
+
+export function isDamageTypeImmune(unit, damageType) {
+  return damageTypeImmunities(unit).has(damageType);
+}
+
+export function finalizeMagicDamage({ attacker, target, state = null, rawDamage, damageAffinity = null, art = null }) {
+  const immune = isDamageTypeImmune(target, "magic") ||
+    isDamageTypeImmuneByStance(target, "magic") ||
+    (isFireBasedDamage({ damageAffinity, art }) && isFireDamageImmune(target));
+  if (immune) return 0;
+  const reduced = Math.max(0, rawDamage - getTeamDamageReduction(target, state, "magic"));
+  return reduced > 0
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSelfMagicVulnerability(target)
+    : reduced;
 }
 
 // Passive crit-chance bonus that scales with missing HP (Angel's Inner Strength:
@@ -269,12 +285,7 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const actorStats = getEffectiveStats(attacker, state);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
-  // Black Death Stance nulls magic damage entirely; otherwise Dead Zone-style team
-  // reduction trims the final number, and Bruiser Mode adds +1 to a landed magic hit.
-  const reduced = (isDamageTypeImmuneByStance(target, "magic") || (isFireBasedDamage({ damageAffinity }) && isFireDamageImmune(target)))
-    ? 0
-    : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
-  const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
+  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, damageAffinity });
   return { ...result, critical, proximityBonus: 0, damage };
 }
 

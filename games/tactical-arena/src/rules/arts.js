@@ -189,7 +189,7 @@ export function getFirePlacementTiles(state, actor, art) {
 }
 
 // The 8 straight rays (orthogonal + diagonal) a line ability fires along.
-const LINE_DIRECTIONS = Object.freeze([
+export const LINE_DIRECTIONS = Object.freeze([
   { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
   { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 }
 ]);
@@ -236,6 +236,24 @@ export function getLineReachTiles(state, actor, range) {
     }
   }
   return tiles;
+}
+
+export function getDarkPulseTargets(state, actor) {
+  const targets = [];
+  if (!actor) return targets;
+  for (const dir of LINE_DIRECTIONS) {
+    for (let d = 1; ; d += 1) {
+      const pos = { x: actor.position.x + dir.x * d, y: actor.position.y + dir.y * d };
+      if (!isOnBoard(state, pos)) break;
+      if (isWallAt(state, pos)) break;
+      const occupant = unitAt(state, pos);
+      if (occupant) {
+        targets.push({ unit: occupant, dir, distance: d });
+        break;
+      }
+    }
+  }
+  return targets;
 }
 
 // Flight (Gargoyle): empty on-board, non-wall tiles the Gargoyle can fly onto — a
@@ -347,17 +365,22 @@ export function canUseArt(state, actor, artId) {
     activation?.unitId === actor.id &&
     !usedBonusGroups.includes(art.bonusActionGroup)
   );
+  const realmTraversalPulse = art?.id === "dark-pulse" &&
+    activation?.unitId === actor.id &&
+    activation?.realmTraversalActive &&
+    !activation?.primaryUsed;
   const actionAvailable = art?.bonusActionGroup
     ? bonusActionAvailable
-    : (!activation?.moved && !activation?.primaryUsed);
+    : ((!activation?.moved && !activation?.primaryUsed) || realmTraversalPulse);
   return Boolean(
     art?.implemented && art.kind === "active" &&
     activation?.unitId === actor.id &&
     actionAvailable &&
     !actor.spent &&
+    !(art.id === "realm-traversal" && actor.realmTraversalLocked) &&
     !isStunned(actor) &&
     !actor.statuses?.some((status) => status.type === "silence") &&
-    actor.mp >= getArtMpCost(actor, art) &&
+    actor.mp >= getArtMpCost(actor, art, state) &&
     (!art.rageLocked || isRaging(actor))
   );
 }
