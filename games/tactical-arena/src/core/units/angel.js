@@ -4,7 +4,7 @@
 //
 // Engine seams this unit introduced (see UNIT_AUTHORING_GUIDE.md / CLAUDE.md):
 //   • `blessedAttack` — a passive that changes the unit's BASIC attack damage type
-//     (Angel's shots deal magic, so they ignore DEF and reach through bodies) and can
+//     (Angel's shots deal magic, so they ignore DEF) and can
 //     apply a status on a critical basic attack (Blessed Arrow blinds on a crit).
 //     Folded centrally by getBasicAttackDamageType / getCritOnHitStatus (rules/combat.js),
 //     so no attack path hard-codes the unit.

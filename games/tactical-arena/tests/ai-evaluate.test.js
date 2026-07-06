@@ -122,6 +122,11 @@ test("expectedFixedHit: true ignores Defend, magic honors it", () => {
   assert.equal(expectedFixedHit(null, bracing, { amount: 2, type: "true" }).damage, 2); // true unaffected
 });
 
+test("expectedFixedHit: fire-tagged magic is zero against a fire-immune target", () => {
+  const gargoyle = makeUnit({ type: "gargoyle", player: 2, hp: 30 });
+  assert.equal(expectedFixedHit(null, gargoyle, { amount: 5, type: "magic", affinity: "fire" }).damage, 0);
+});
+
 test("incomingThreat: only in-reach enemies count, defending lowers it", () => {
   const victim = makeUnit({ type: "swordsman", player: 1, hp: 25, position: { x: 0, y: 0 } });
   const adjacent = makeUnit({ type: "swordsman", player: 2, hp: 25, position: { x: 1, y: 0 } });

@@ -63,7 +63,9 @@ function normalizeTileObjects(objects = []) {
     if (obj.kind === "wall") {
       map[tileKey(obj)] = { kind: "wall", hp: Number.isFinite(obj.hp) ? obj.hp : 1 };
     } else if (obj.kind === "fire") {
-      map[tileKey(obj)] = { kind: "fire", turnsLeft: Number.isFinite(obj.turnsLeft) ? obj.turnsLeft : 3 };
+      map[tileKey(obj)] = obj.permanent
+        ? { kind: "fire", permanent: true }
+        : { kind: "fire", turnsLeft: Number.isFinite(obj.turnsLeft) ? obj.turnsLeft : 3 };
     }
   }
   return map;

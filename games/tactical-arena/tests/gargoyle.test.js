@@ -49,6 +49,65 @@ test("Stone Ward: immune to every status effect", () => {
   }
 });
 
+test("One With The Flames: fire tiles do not damage the Gargoyle", () => {
+  const state = scenario(
+    [
+      { id: "p1", type: "swordsman", player: 1, x: 0, y: 0 },
+      { id: "g", type: "gargoyle", player: 2, x: 5, y: 5 }
+    ],
+    { tileObjects: [{ x: 5, y: 5, kind: "fire", turnsLeft: 3 }] }
+  );
+
+  let s = run(state, beginActivation(1, "p1")).nextState;
+  s = run(s, defend(1, "p1")).nextState;
+  const res = run(s, finishActivation(1, "p1"));
+
+  assert.equal(findUnit(res.nextState, "g").hp, 30, "Gargoyle ignores fire tile damage");
+  assert.ok(!res.events.some((e) => e.type === "FIRE_DAMAGE" && e.unitId === "g"), "no burn event is surfaced");
+  assert.equal(res.nextState.tileObjects["5,5"].turnsLeft, 2, "the fire still counts down");
+});
+
+test("One With The Flames: fire-based ARTS do not damage the Gargoyle", () => {
+  const state = scenario([
+    { id: "g1", type: "gargoyle", player: 1, x: 6, y: 6 },
+    { id: "g2", type: "gargoyle", player: 2, x: 6, y: 8 },
+    { id: "sw", type: "swordsman", player: 2, x: 8, y: 8 }
+  ]);
+
+  let s = run(state, beginActivation(1, "g1")).nextState;
+  s = run(s, useArt(1, "g1", "pyroclasm", {})).nextState;
+
+  assert.equal(findUnit(s, "g2").hp, 30, "enemy Gargoyle ignores Pyroclasm's fire-based damage");
+  assert.equal(findUnit(s, "sw").hp, getUnitType("swordsman").stats.maxHp - 5, "non-immune enemies still burn");
+});
+
+test("One With The Flames: a critical basic attack makes the target tile permanent fire", () => {
+  const state = scenario([
+    { id: "g", type: "gargoyle", player: 1, x: 5, y: 5 },
+    { id: "sw", type: "swordsman", player: 2, x: 5, y: 6 }
+  ]);
+
+  let s = run(state, beginActivation(1, "g")).nextState;
+  s = run(s, attack(1, "g", "sw", CRIT)).nextState;
+
+  assert.deepEqual(s.tileObjects["5,6"], { kind: "fire", permanent: true });
+});
+
+test("One With The Flames: crit-created fire persists after burning", () => {
+  const state = scenario([
+    { id: "g", type: "gargoyle", player: 1, x: 5, y: 5 },
+    { id: "sw", type: "swordsman", player: 2, x: 5, y: 6 }
+  ]);
+
+  let s = run(state, beginActivation(1, "g")).nextState;
+  s = run(s, attack(1, "g", "sw", CRIT)).nextState;
+  const hpAfterCrit = findUnit(s, "sw").hp;
+  s = run(s, finishActivation(1, "g")).nextState;
+
+  assert.equal(findUnit(s, "sw").hp, hpAfterCrit - 1, "the new fire burns at rollover");
+  assert.deepEqual(s.tileObjects["5,6"], { kind: "fire", permanent: true }, "permanent fire does not count down");
+});
+
 test("Stone Body: a status targeted at the Gargoyle is reflected onto the offender", () => {
   const state = scenario([
     { id: "arc", type: "archer", player: 1, x: 3, y: 6 },

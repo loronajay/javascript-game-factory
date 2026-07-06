@@ -4,7 +4,7 @@ import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, 
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { chebyshevDistance, getLegalMoves, isOnBoard, positionKey } from "../rules/movement.js";
-import { getBasicAttackDamageType, isShotBlocked, isWallBetween } from "../rules/combat.js";
+import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { artUsesPhysicalStrike, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getSelfBlastRadius, getSummonPlacementTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
@@ -186,8 +186,9 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (mode === "move") legal = getLegalMoves(state, actor);
 
   if (actor && targeted) {
-    // Body-blocking only applies to physical strikes (basic attack + physical ARTS);
-    // magic ARTS reach through bodies, so their range wash and targets stay unculled.
+    // Basic attacks are body-blocked unless the attacker has an explicit pierce passive
+    // (Sniper). Magic strike ARTS reach through bodies, so their range wash and targets
+    // stay unculled.
     const art = mode?.startsWith("art:") ? getArt(actor.type, mode.slice("art:".length)) : null;
     const reach = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
     const blockable = mode === "attack" || artUsesPhysicalStrike(art);
@@ -350,20 +351,18 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     const buffArt = getArt(actor.type, mode.slice("art:".length));
     if (buffArt?.targeting?.shape === "ally") {
       isAllyArt = true;
-      const reach = getEffectiveStats(actor, state).attackRange;
+      const reach = buffArt.targeting?.range ?? getEffectiveStats(actor, state).attackRange;
       for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
         for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
           const cell = { x, y };
           if (!isOnBoard(state, cell)) continue;
           if (chebyshevDistance(actor.position, cell) === 0) continue;
-          if (isWallBetween(state, actor.position, cell, actor)) continue;
           range.add(positionKey(cell));
         }
       }
       for (const u of state.units) {
         if (u.hp <= 0 || u.id === actor.id || u.player !== actor.player) continue;
         if (chebyshevDistance(actor.position, u.position) > reach) continue;
-        if (isWallBetween(state, actor.position, u.position, actor)) continue;
         legal.add(positionKey(u.position));
       }
     }

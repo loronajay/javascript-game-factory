@@ -276,6 +276,19 @@ const ABILITY_VFX = Object.freeze({
     windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 6 }),
     colors: Object.freeze({ core: "#dfffd8", trail: "#8cf0a4", impact: "#fff7b8" })
   }),
+  purify: Object.freeze({
+    type: "projectileFan",
+    soundKey: "pray",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 52,
+    staggerMs: 0,
+    durationMs: 460,
+    impactRadius: 24,
+    windup: Object.freeze({ style: "gather", durationMs: 380, particleCount: 8 }),
+    projectile: Object.freeze({ shape: "orb", arcHeight: 52, durationMs: 460, size: 1, colors: Object.freeze({ core: "#dfffd8", trail: "#64d99a" }) }),
+    colors: Object.freeze({ core: "#dfffd8", trail: "#64d99a", impact: "#ffffff" })
+  }),
   // Witch Doctor dances — every dance is a GLOBAL effect (a team-wide or board-wide
   // ritual, never a single-target cast), so they share one recipe type ("ritual"):
   // a long gather on the dancer, a whole-board color wash, a rippling ring that

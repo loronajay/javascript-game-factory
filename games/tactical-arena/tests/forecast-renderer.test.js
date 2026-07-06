@@ -78,3 +78,40 @@ test("targeted spell arts still render their normal damage forecast", () => {
     assert.equal(textContentOf(forecastLayer), "-6");
   });
 });
+
+test("Angel basic attack forecast uses magic damage instead of physical chip", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-angel", player: 1, type: "angel", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-angel");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-3");
+  });
+});
+
+test("Angel basic attack forecast does not show through an intervening body", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-angel", player: 1, type: "angel", x: 0, y: 0 },
+        { id: "p2-block", player: 2, type: "swordsman", x: 1, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 2, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-angel");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-3");
+  });
+});

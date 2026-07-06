@@ -33,7 +33,7 @@ function isForecastableStrikeArt(art) {
 
 // While in attack or single-target ART mode, every enemy in range wears a badge
 // showing the predicted normal-hit damage (skull when lethal, "miss" when blinded).
-// Uses the same resolvePhysicalStrike the reducer uses — can never drift.
+// Uses the same strike resolver the reducer uses, so damage-type changes stay honest.
 export function renderForecast({ forecastLayer, state, mode, actor, resolving }) {
   forecastLayer.replaceChildren();
   if (!actor || state.phase !== "playing" || resolving) return;
@@ -49,9 +49,9 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
   // The damage type of what's being aimed: a basic attack reads the unit's passive
   // (Angel's Blessed Arrow is magic); an ART carries its own damageType.
   const damageType = isAttack ? getBasicAttackDamageType(actor) : (art?.damageType ?? null);
-  // Physical strikes (basic attack + physical ARTS) can be body-blocked; magic strikes
-  // ignore intervening units, so they keep forecasting through them.
-  const blockable = (isAttack || isStrikeArt) && (damageType ?? "physical") === "physical";
+  // Basic attacks are body-blocked unless the attacker has an explicit pierce passive
+  // (Sniper). Magic strike ARTS still reach through bodies.
+  const blockable = isAttack || (isStrikeArt && (damageType ?? "physical") === "physical");
 
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;
@@ -66,7 +66,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
     }
     const strike = art?.resolution === "frontKick"
       ? frontKickForecast(actor, target, art, state)
-      : resolveBaseStrike(actor, target, { proximity: true, state, damageType });
+      : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
     const lethal = strike.damage >= target.hp;
     drawForecastBadge(forecastLayer, metrics, target, lethal ? `☠ ${strike.damage}` : `-${strike.damage}`, lethal ? "fc-lethal" : "fc-attack");
   }

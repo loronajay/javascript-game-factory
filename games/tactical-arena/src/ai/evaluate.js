@@ -17,7 +17,7 @@
 
 import { areEnemies, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging, normalizeUnitAi, takesTurns } from "../core/unitCatalog.js";
-import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, resolveBaseStrike } from "../rules/combat.js";
+import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike } from "../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../rules/damage.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { statusImmunities } from "../rules/statuses.js";
@@ -170,6 +170,14 @@ export function anointValue(state, caster, target) {
 // Value of one Tether Grab pull (the 3 magic itself is scored by the HP diff). Dragging
 // an enemy that wants distance — a ranged unit or caster/support — into the bruiser's
 // face is the real payoff; hauling another melee body around is minor tempo.
+export function cleanseAllyValue(state, target) {
+  let value = 0;
+  for (const status of target.statuses ?? []) {
+    if (HARMFUL_STATUSES.has(status.type)) value += statusValue(target, statusAsEffect(status), state);
+  }
+  return value;
+}
+
 export function grabValue(state, caster, target) {
   const role = normalizeUnitAi(target.type).role;
   const kites = role === "ranged" || role === "caster" || role === "controller" || role === "support";
@@ -235,9 +243,7 @@ export function buffAlliesValue(state, caster, art) {
   if (art.cleanse) {
     let value = 0;
     for (const ally of allies) {
-      for (const status of ally.statuses ?? []) {
-        if (HARMFUL_STATUSES.has(status.type)) value += statusValue(ally, statusAsEffect(status), state);
-      }
+      value += cleanseAllyValue(state, ally);
     }
     return value;
   }
@@ -265,8 +271,9 @@ export function buffAlliesValue(state, caster, art) {
 // if the target survives the hit.
 export function expectedStrike(state, attacker, target, art = null) {
   const damageType = art?.damageType ?? "physical";
-  const normal = resolveBaseStrike(attacker, target, { proximity: true, critical: false, state, damageType }).damage;
-  const crit = resolveBaseStrike(attacker, target, { proximity: true, critical: true, state, damageType }).damage;
+  const damageAffinity = art?.damageAffinity ?? art?.damage?.affinity ?? null;
+  const normal = resolveBaseStrike(attacker, target, { proximity: true, critical: false, state, damageType, damageAffinity }).damage;
+  const crit = resolveBaseStrike(attacker, target, { proximity: true, critical: true, state, damageType, damageAffinity }).damage;
 
   const pMiss = getMissChance(attacker);
   const pHit = 1 - pMiss;
@@ -297,14 +304,16 @@ export function expectedStrike(state, attacker, target, art = null) {
 // pulse ARTS (the planner sums this over the ability's target set). `true` damage
 // ignores DEF, Defend, and team reduction (Volley Shot, tile pulses); `magic`
 // honors Defend halving and Dead Zone, matching resolveNuke / resolveDamage.
-export function expectedFixedHit(state, target, { amount, type }) {
+export function expectedFixedHit(state, target, { amount, type, affinity = null }) {
   let damage;
   if (type === "true") {
     damage = Math.max(0, amount);
   } else if (type === "magic") {
     const defender = { ...getEffectiveStats(target, state), defending: isDefending(target) };
     const base = defender.defending ? Math.ceil(Math.max(0, amount) / 2) : Math.max(0, amount);
-    damage = Math.max(0, base - getTeamDamageReduction(target, state, "magic"));
+    damage = (isFireBasedDamage({ damageAffinity: affinity }) && isFireDamageImmune(target))
+      ? 0
+      : Math.max(0, base - getTeamDamageReduction(target, state, "magic"));
   } else if (type === "physical") {
     // Fixed-power physical (Rocket Punch): Defense reduces it, Defend halves it, like
     // resolveDamage's physical branch with a fixed `strength`.

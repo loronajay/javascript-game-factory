@@ -31,7 +31,7 @@ test("Volley Shot declares a cone rain of recolorable projectiles", () => {
 
 test("every implemented active ART declares a distinct VFX recipe", () => {
   assert.deepEqual(
-    ["footwork", "moonstrike", "mage-killer", "life-sap", "volley-shot", "poison-arrow", "leg-shot", "pray", "wish", "silence", "spark", "flee", "banish", "nuke"].map((id) => [id, getAbilityVfx(id)?.type]),
+    ["footwork", "moonstrike", "mage-killer", "life-sap", "volley-shot", "poison-arrow", "leg-shot", "pray", "wish", "purify", "silence", "spark", "flee", "banish", "nuke"].map((id) => [id, getAbilityVfx(id)?.type]),
     [
       ["footwork", "dashTrail"],
       ["moonstrike", "statusStrike"],
@@ -42,6 +42,7 @@ test("every implemented active ART declares a distinct VFX recipe", () => {
       ["leg-shot", "statusStrike"],
       ["pray", "healPulse"],
       ["wish", "healPulse"],
+      ["purify", "projectileFan"],
       ["silence", "statusStrike"],
       ["spark", "projectileFan"],
       ["flee", "dashTrail"],
@@ -86,7 +87,7 @@ test("rolled attack ARTS carry their own attack projectile; pure casts carry a c
 
 test("magic and casts declare a gather windup; thrown objects declare a toss windup", () => {
   // Gathers: motes converge on the caster + castCharge riser before the release.
-  for (const id of ["nuke", "dark-bomb", "summon-ghoul", "lightseeker", "darkseeker", "pray", "wish", "hand-of-life", "silence", "spark", "banish", "wither"]) {
+  for (const id of ["nuke", "dark-bomb", "summon-ghoul", "lightseeker", "darkseeker", "pray", "wish", "purify", "hand-of-life", "silence", "spark", "banish", "wither"]) {
     assert.equal(getAbilityVfx(id)?.windup?.style, "gather", `${id} should gather`);
   }
   // The rage ultimate earns the heaviest gather.

@@ -100,9 +100,9 @@ test("mystic is available with healing ARTS, Silence, Guardian, and RAGE data", 
     type: "immunity", statuses: ["silence"]
   });
   assert.deepEqual(UNIT_TYPES.mystic.arts.map((art) => art.name), [
-    "Pray", "Wish", "Silence", "Guardian"
+    "Pray", "Wish", "Silence", "Purify", "Guardian"
   ]);
-  assert.deepEqual(UNIT_TYPES.mystic.arts.map((art) => art.mpCost), [4, 2, 3, null]);
+  assert.deepEqual(UNIT_TYPES.mystic.arts.map((art) => art.mpCost), [4, 2, 3, 8, null]);
   assert.deepEqual(UNIT_TYPES.mystic.arts.find((art) => art.id === "pray").effect, {
     type: "healAllies", amount: 3, radius: 3
   });

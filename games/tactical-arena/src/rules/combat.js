@@ -93,9 +93,8 @@ function rageCombat(unit) {
 }
 
 // The damage type of a unit's BASIC attack. Default physical; a `blessedAttack`
-// passive (Angel's Blessed Arrow) makes basic attacks magic — so they ignore DEF and
-// reach through intervening bodies (a wall still blocks). Read centrally so the
-// reducer, the board highlights, and the forecast all agree.
+// passive (Angel's Blessed Arrow) makes basic attack damage magic, so it ignores DEF.
+// Targeting/line-of-sight is separate: only explicit pierce passives shoot through bodies.
 export function getBasicAttackDamageType(unit) {
   return getUnitType(unit.type).passive?.effect?.attackDamageType ?? "physical";
 }
@@ -105,6 +104,35 @@ export function getBasicAttackDamageType(unit) {
 // still enforced by applyStatus, so this never bypasses a status-immune target.
 export function getCritOnHitStatus(unit) {
   return getUnitType(unit.type).passive?.effect?.critStatus ?? null;
+}
+
+function passiveEffects(unit) {
+  const definition = getUnitType(unit.type);
+  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt]
+    .map((source) => source?.effect)
+    .filter(Boolean);
+}
+
+// True when a unit ignores fire-tagged damage sources. Scans every authored passive
+// source so a unit can carry this as its main passive or as a passive ART entry.
+export function isFireDamageImmune(unit) {
+  return passiveEffects(unit).some((effect) => effect.fireDamageImmune || effect.type === "fireImmunity");
+}
+
+// A crit rider that turns the struck target's tile into fire. Returns the authored
+// fire object details, or null for units without the rider.
+export function getCritCreatesFire(unit) {
+  for (const effect of passiveEffects(unit)) {
+    if (effect.critCreatesFire) return effect.critCreatesFire;
+  }
+  return null;
+}
+
+export function isFireBasedDamage({ damageAffinity = null, art = null } = {}) {
+  return damageAffinity === "fire" ||
+    art?.damageAffinity === "fire" ||
+    art?.damage?.affinity === "fire" ||
+    art?.fireDamage === true;
 }
 
 // Passive crit-chance bonus that scales with missing HP (Angel's Inner Strength:
@@ -234,7 +262,7 @@ export function isHealingDisabled(state) {
 // Resolves a strike with an explicit damage type override (used by magic-damage ARTS
 // like Spark and Banish). Falls back to a physical strike when no override is given.
 // Returns the same shape as resolvePhysicalStrike so callers and the forecast are interchangeable.
-export function resolveBaseStrike(attacker, target, { proximity = false, critical = false, state = null, damageType = null } = {}) {
+export function resolveBaseStrike(attacker, target, { proximity = false, critical = false, state = null, damageType = null, damageAffinity = null } = {}) {
   if (!damageType || damageType === "physical") {
     return resolvePhysicalStrike(attacker, target, { proximity, critical, state });
   }
@@ -243,7 +271,7 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical });
   // Black Death Stance nulls magic damage entirely; otherwise Dead Zone-style team
   // reduction trims the final number, and Bruiser Mode adds +1 to a landed magic hit.
-  const reduced = isDamageTypeImmuneByStance(target, "magic")
+  const reduced = (isDamageTypeImmuneByStance(target, "magic") || (isFireBasedDamage({ damageAffinity }) && isFireDamageImmune(target)))
     ? 0
     : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
   const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;

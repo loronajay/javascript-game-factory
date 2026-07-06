@@ -54,6 +54,18 @@ export const MYSTIC = Object.freeze({
       ai: Object.freeze({ intent: "statusCast", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
+      id: "purify",
+      name: "Purify",
+      kind: "active",
+      mpCost: 8,
+      resolution: "cleanseAlly",
+      targeting: Object.freeze({ shape: "ally", range: 5 }),
+      effect: Object.freeze({ type: "cleanse" }),
+      description: "Remove all status effects from one allied unit within 5 tiles. Cannot target self.",
+      implemented: true,
+      ai: Object.freeze({ intent: "cleanseAlly", tags: Object.freeze(["cleanse"]) })
+    }),
+    Object.freeze({
       id: "guardian",
       name: "Guardian",
       kind: "passive",

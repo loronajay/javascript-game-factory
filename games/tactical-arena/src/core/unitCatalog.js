@@ -466,6 +466,8 @@ export const AI_INTENTS = Object.freeze([
   "commandBuff",
   // Angel's single-ally targeted buff (Anoint: +1 range on a friendly unit):
   "buffAlly",
+  // Mystic's single-ally targeted cleanse (Purify: remove all statuses):
+  "cleanseAlly",
   // Monk's guarded ally reposition + defend handoff:
   "protectAlly",
   // Gargoyle's abilities:

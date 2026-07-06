@@ -52,7 +52,7 @@ test("Blessed Arrow makes basic attacks deal MAGIC damage (ignores DEF)", () => 
   assert.equal(findUnit(result.nextState, "p2-sword").hp, 22); // 25 - 3 magic
 });
 
-test("Blessed Arrow reaches through an intervening body (magic ignores body-block)", () => {
+test("Blessed Arrow is still body-blocked like other non-piercing basic attacks", () => {
   const state = createBattleState({
     size: 7,
     units: [
@@ -63,8 +63,8 @@ test("Blessed Arrow reaches through an intervening body (magic ignores body-bloc
   });
   const opened = begin(state, "p1-angel");
   const result = applyCommand(opened, attack(1, "p1-angel", "p2-sword", NORMAL_HIT));
-  assert.ok(result.accepted, `a magic shot should pass the body (${result.errorCode})`);
-  assert.equal(findUnit(result.nextState, "p2-sword").hp, 22);
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "TARGET_OBSTRUCTED");
 });
 
 test("a critical basic attack also blinds the target (Blessed Arrow)", () => {

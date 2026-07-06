@@ -233,10 +233,21 @@ function generateArtPlans(state, unit, art, ai, plans) {
     case "buffAlly": {
       // Anoint: a friendly-only +range buff. One plan per ALLY in range (never self);
       // a wall does not block a friendly cast, matching resolveAnoint.
-      const range = getEffectiveStats(unit, state).attackRange;
+      const range = art.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
       for (const target of livingUnits(state, unit.player)) {
         if (target.id === unit.id) continue;
         if (chebyshevDistance(unit.position, target.position) > range) continue;
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
+      }
+      break;
+    }
+    case "cleanseAlly": {
+      // Purify: only offer allied targets that actually carry statuses worth removing.
+      const range = art.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+      for (const target of livingUnits(state, unit.player)) {
+        if (target.id === unit.id) continue;
+        if (chebyshevDistance(unit.position, target.position) > range) continue;
+        if (!target.statuses?.length) continue;
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
       }
       break;
@@ -377,9 +388,10 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "selfBlast": {
       const radius = getSelfBlastRadius(state, actor, art);
       const dtype = art.damage.type ?? "magic";
+      const affinity = art.damage?.affinity ?? art.damageAffinity ?? null;
       for (const target of board) {
         if (!areEnemies(actor, target) || chebyshevDistance(actor.position, target.position) > radius) continue;
-        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: dtype }).damage);
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount: art.damage.amount, type: dtype, affinity }).damage);
       }
       // A self-sacrifice blast (Juggernaut's Self Destruct) consumes the caster — model the
       // loss so the CPU only detonates when the enemies wiped are worth its own life.
@@ -422,7 +434,8 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "statBuff":
     case "hasten":
     case "buffAlly":
-      break; // Age/Time Stretch/Anoint change stats, not HP now; value is a controller term
+    case "cleanseAlly":
+      break; // Utility casts change stats/statuses, not HP now; value is a controller term
     case "grab": {
       // Tether Grab: an EV-weighted 3 magic (foe only, rolls to-hit) + the pull to the
       // tile one step from the actor along the ray. The planner only ever grabs enemies;
@@ -462,9 +475,10 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       actor.position = { ...primary.targetPosition };
       const radius = art.blastRadius ?? 1;
       const amount = art.damage?.amount ?? 0;
+      const affinity = art.damage?.affinity ?? art.damageAffinity ?? null;
       for (const target of board) {
         if (!areEnemies(actor, target) || chebyshevDistance(actor.position, target.position) > radius) continue;
-        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: "true" }).damage);
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: "true", affinity }).damage);
       }
       break;
     }
@@ -473,10 +487,11 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       // has no move, so the ray geometry reads from the real state at the origin.
       const amount = art.damage?.amount ?? 0;
       const dtype = art.damage?.type ?? "magic";
+      const affinity = art.damage?.affinity ?? art.damageAffinity ?? null;
       const ids = new Set(getPyroclasmTargets(state, actor, art).map((u) => u.id));
       for (const target of board) {
         if (!ids.has(target.id)) continue;
-        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: dtype }).damage);
+        target.hp = Math.max(0, target.hp - expectedFixedHit(state, target, { amount, type: dtype, affinity }).damage);
       }
       break;
     }

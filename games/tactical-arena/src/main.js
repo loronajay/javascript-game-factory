@@ -681,6 +681,13 @@ async function resolveInstantArt(command) {
     if (targetBefore && resolved.effect?.applied) {
       await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "+1 RNG", "#f7e9c0");
     }
+  } else if (resolved?.artId === "purify" && actorBefore) {
+    // A clean green-white mote lifts the status stack off the ally.
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("purify", { actor: actorBefore, targets: targetsBefore });
+    if (targetBefore && resolved.cleansed?.includes(targetBefore.id)) {
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), "PURIFIED", "#dfffd8");
+    }
   } else if (resolved?.artId === "flight" && actorBefore) {
     // The Gargoyle surges to the landing tile (dash trail), then a TRUE blast pops on
     // every enemy within a tile of it. `state` is pre-commit, so victims read at their
@@ -1003,7 +1010,7 @@ function playEventSounds(events) {
           artId === "age" || artId === "time-stretch" || artId === "rewind" ||
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
           artId === "self-destruct" ||
-          artId === "anoint" || artId === "elevate" || artId === "heavenseeker" ||
+          artId === "anoint" || artId === "purify" || artId === "elevate" || artId === "heavenseeker" ||
           artId === "flight" || artId === "pyroclasm" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
@@ -1269,13 +1276,28 @@ async function handleTile(position) {
     // Friendly-only buff: click a highlighted ally in range (never self). A wall does not
     // block a friendly cast.
     const target = unitAt(state, position);
+    const art = getArt(unit.type, "anoint");
+    const reach = art?.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
     const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
-      chebyshevDistance(unit.position, target.position) <= getEffectiveStats(unit, state).attackRange;
+      chebyshevDistance(unit.position, target.position) <= reach;
     if (!inReach) {
       setMessage("Anoint: click a highlighted ally in range (not yourself).", true);
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "anoint", { targetId: target.id }))) {
       mode = null;
       setMessage("Anoint resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:purify") {
+    // Friendly-only cleanse: click a highlighted ally in range (never self).
+    const target = unitAt(state, position);
+    const art = getArt(unit.type, "purify");
+    const reach = art?.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+    const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
+      chebyshevDistance(unit.position, target.position) <= reach;
+    if (!inReach) {
+      setMessage("Purify: click a highlighted ally in range (not yourself).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "purify", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Purify resolved. This unit's activation is complete.");
     }
   } else if (mode === "art:tether-grab") {
     // Grab the first ally OR enemy on a straight ray within range.

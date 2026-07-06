@@ -2,7 +2,7 @@ import { COMMANDS } from "./commands.js";
 import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { canUseArt, FOOTWORK_DAMAGE, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getSelfBlastRadius, getSummonPlacementTiles, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateFootworkPath } from "../rules/arts.js";
-import { getBasicAttackDamageType, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getDisplacementRetaliation, getLineAttackTargets, getMeleeDefendRetaliation, getProximityBonus, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, resistsDisplacement, resolveBaseStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -232,6 +232,7 @@ function applyPyroclasmDamage(state, actor, art) {
     const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
     const result = resolveDamage({ attacker: { strength: art.damage.amount }, defender: targetStats, type: "magic" });
     const reduced = isDamageTypeImmuneByStance(target, "magic")
+      || (isFireBasedDamage({ art }) && isFireDamageImmune(target))
       ? 0
       : Math.max(0, result.damage - getTeamDamageReduction(target, state, "magic"));
     const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
@@ -284,12 +285,11 @@ function attack(state, command) {
   if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
-  // A PHYSICAL basic attack is body-blocked by any unit in between (melee never has an
-  // intervening tile, so this is a no-op at range 1); a magic basic attack (Angel's
-  // Blessed Arrow) reaches through bodies. A wall between blocks EITHER (walls stop
-  // everything — see isWallBetween). Read the damage type once, reused for the strike.
+  // A basic attack is body-blocked by any unit in between unless the attacker has an
+  // explicit pierce passive (Sniper). Angel's Blessed Arrow changes damage type, not
+  // targeting. A wall between blocks too, unless pierce says otherwise.
   const basicDamageType = getBasicAttackDamageType(result.unit);
-  if ((basicDamageType === "physical" && isShotBlocked(state, result.unit.position, target.position, result.unit)) ||
+  if (isShotBlocked(state, result.unit.position, target.position, result.unit) ||
       isWallBetween(state, result.unit.position, target.position, result.unit)) return reject(ERR.TARGET_OBSTRUCTED);
 
   const next = cloneState(state);
@@ -317,7 +317,9 @@ function attack(state, command) {
   // Blessed Arrow: a critical basic attack also lands a status (blind) on each surviving
   // target. Immunity is enforced by applyStatus, so a status-immune target simply resists.
   const critStatus = getCritOnHitStatus(actor);
+  const critFire = getCritCreatesFire(actor);
   const blinded = [];
+  const fireTiles = [];
   const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
   for (const targetUnit of targets) {
     const damage = strike(targetUnit);
@@ -329,6 +331,11 @@ function attack(state, command) {
     if (swing.critical && critStatus && targetUnit.hp > 0) {
       const applied = applyStatus(targetUnit, { type: critStatus.status, duration: critStatus.duration });
       if (applied.applied) { targetUnit.statuses = applied.statuses; blinded.push(targetUnit.id); }
+    }
+    if (swing.critical && critFire) {
+      const position = { ...targetUnit.position };
+      next.tileObjects[positionKey(position)] = { kind: critFire.kind ?? "fire", permanent: Boolean(critFire.permanent) };
+      fireTiles.push(position);
     }
     if (targetUnit.id === nextTarget.id) primaryDamage = damage;
   }
@@ -352,7 +359,9 @@ function attack(state, command) {
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
     hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget,
-    ...(blinded.length ? { blinded } : {}), ...damageFields
+    ...(blinded.length ? { blinded } : {}),
+    ...(fireTiles.length ? { fireTiles } : {}),
+    ...damageFields
   }, ...triggerEvents, ...healingEvents, ...retaliationEvents]);
 }
 
@@ -412,6 +421,8 @@ const ART_RESOLVERS = new Map([
   // Angel: a friendly-only buff cast and a white-tile team heal.
   ["anoint", resolveAnoint],
   ["elevate", resolveHealAllies],
+  // Mystic: friendly-only single-target cleanse.
+  ["purify", resolveCleanseAlly],
   // Witch Doctor dances: each fires a one-shot team/global effect then enters its
   // stance (the "Dancing Man" passive). One resolver branches on the art's data.
   ["rain-dance", resolveWitchDance],
@@ -483,7 +494,7 @@ function resolveTargetedArt(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
   // ARTS that resolve as a physical strike (Poison Arrow, Leg Shot) are body-blocked
@@ -515,7 +526,7 @@ function resolveTargetedArt(state, command, art) {
 
   // Targeted attack ARTS resolve via the attacker's base strike type. `art.damageType`
   // overrides to magic for ARTS like Spark and Banish (magic ignores proximity bonuses).
-  const damage = resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null });
+  const damage = resolveBaseStrike(actor, target, { proximity: true, critical: swing.critical, state: next, damageType: art.damageType ?? null, damageAffinity: art.damageAffinity ?? art.damage?.affinity ?? null });
   const damageDealt = Math.min(target.hp, damage.damage);
   target.hp = Math.max(0, target.hp - damage.damage);
 
@@ -590,6 +601,7 @@ function resolveNuke(state, command, art) {
     // Black Death Stance nulls magic damage; otherwise Dead Zone-style team reduction
     // trims the final magic number, and Bruiser Mode adds +1 to a landed hit.
     const reduced = isDamageTypeImmuneByStance(target, "magic")
+      || (isFireBasedDamage({ art }) && isFireDamageImmune(target))
       ? 0
       : Math.max(0, result.damage - getTeamDamageReduction(target, next, "magic"));
     const damage = reduced > 0 ? reduced + getSelfMagicVulnerability(target) : reduced;
@@ -859,7 +871,7 @@ function resolveAnoint(state, command, art) {
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
   if (targetState.id === actorState.id || !areAllies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
 
@@ -885,6 +897,35 @@ function resolveAnoint(state, command, art) {
 // "+1 STR" / "+2 STR / +1 DEF / +1 MOVE" — turns a statModifiers object into the
 // label the view floats over a buffed unit. Kept here (not in the view layer) so
 // the wording can never drift from the actual numbers applied above.
+function resolveCleanseAlly(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (targetState.id === actorState.id || !areAllies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art);
+  actor.mp -= cost;
+
+  const hadStatuses = Boolean(target.statuses?.length);
+  target.statuses = [];
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    mpCost: cost,
+    cleansed: hadStatuses ? [target.id] : []
+  }]);
+}
+
 const STAT_MODIFIER_ABBR = Object.freeze({ strength: "STR", defense: "DEF", moveRange: "MOVE", attackRange: "RNG", maxHp: "HP", maxMp: "MP" });
 function formatStatModifierLabel(statModifiers) {
   return Object.entries(statModifiers ?? {})
@@ -1702,11 +1743,12 @@ function applyFireTick(state, events) {
     if (obj.kind !== "fire") continue;
     const [x, y] = key.split(",").map(Number);
     const occupant = unitAt(state, { x, y });
-    if (occupant) {
+    if (occupant && !isFireDamageImmune(occupant)) {
       const dealt = Math.min(occupant.hp, FIRE_DAMAGE);
       occupant.hp = Math.max(0, occupant.hp - FIRE_DAMAGE);
       if (dealt > 0) events.push({ type: "FIRE_DAMAGE", unitId: occupant.id, position: { x, y }, damage: dealt });
     }
+    if (obj.permanent) continue;
     obj.turnsLeft -= 1;
     if (obj.turnsLeft <= 0) delete state.tileObjects[key];
   }

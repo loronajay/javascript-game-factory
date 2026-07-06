@@ -19,6 +19,7 @@ import {
   ageValue,
   anointValue,
   buffAlliesValue,
+  cleanseAllyValue,
   commandBuffValue,
   expectedStrike,
   grabValue,
@@ -202,6 +203,11 @@ function planEffectValue(state, unit, plan) {
     const target = findUnit(state, plan.primary.targetId);
     if (!target) return { control: 0, heal: 0 };
     return { control: anointValue(state, unit, target), heal: 0 };
+  }
+  if (ai.intent === "cleanseAlly") {
+    const target = findUnit(state, plan.primary.targetId);
+    if (!target) return { control: 0, heal: 0 };
+    return { control: cleanseAllyValue(state, target), heal: 0 };
   }
   // Juggernaut. Rocket Punch's 10 damage rides the HP diff; only its stun is uncounted.
   if (ai.intent === "lineStrike") {

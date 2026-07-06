@@ -82,10 +82,23 @@ export const GARGOYLE = Object.freeze({
       selfCast: true,
       targeting: Object.freeze({ shape: "lineBurst", range: 3 }),
       damageType: "magic",
-      damage: Object.freeze({ type: "magic", amount: 5 }),
+      damage: Object.freeze({ type: "magic", amount: 5, affinity: "fire" }),
       description: "Erupt lines of fire from all 8 directions: 5 magic damage to every enemy standing on a line within range. (Volcanic Rage: +2 range.)",
       implemented: true,
       ai: Object.freeze({ intent: "lineBurst", evHints: Object.freeze({ minTargets: 2 }), tags: Object.freeze(["aoe"]) })
+    }),
+    Object.freeze({
+      id: "one-with-the-flames",
+      name: "One With The Flames",
+      kind: "passive",
+      mpCost: null,
+      effect: Object.freeze({
+        type: "fireImmunity",
+        fireDamageImmune: true,
+        critCreatesFire: Object.freeze({ kind: "fire", permanent: true })
+      }),
+      description: "The Gargoyle takes no damage from fire-based ARTS or fire tiles. Whenever the Gargoyle crits with a basic attack, the target's tile becomes permanent fire.",
+      implemented: true
     }),
     // Heavy: a hard Move ceiling that no speed buff can exceed (folded by getEffectiveStats).
     Object.freeze({
