@@ -51,7 +51,7 @@ function skin(entry, { status = SKIN_STATUS.UNLOCKED } = {}) {
     unlocked: status === SKIN_STATUS.UNLOCKED,
     portraitSrc: src,
     boardSrc: src,
-    board: Object.freeze({ w: 600, h: 600, scale: 1 })
+    board: Object.freeze({ w: 600, h: 600 })
   });
 }
 

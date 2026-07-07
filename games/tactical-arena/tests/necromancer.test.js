@@ -287,6 +287,21 @@ test("Summon Ghoul places a 10 HP Ghoul on an empty tile and spends the Necroman
   assert.equal(findId(r.nextState, "p1-necro").mp, 36 - 8);
 });
 
+test("Summon Ghoul inherits the Necromancer's skin collection", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-necro", player: 1, type: "necromancer", skin: "arcane", x: 0, y: 0 },
+      { id: "p2-sword", player: 2, type: "swordsman", x: 9, y: 9 }
+    ]
+  });
+
+  const s1 = activate(state, "p1-necro");
+  const r = applyCommand(s1, useArt(1, "p1-necro", "summon-ghoul", { targetPosition: { x: 1, y: 1 } }));
+
+  assert.ok(r.accepted);
+  assert.equal(r.nextState.units.find((u) => u.type === "ghoul").skin, "arcane");
+});
+
 test("Summon Ghoul rejects occupied and out-of-range tiles", () => {
   const state = createBattleState({
     units: [

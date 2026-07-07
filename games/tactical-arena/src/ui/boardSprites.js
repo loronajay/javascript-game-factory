@@ -4,12 +4,12 @@
 // for a type with no sprite registered). Pure presentation, so it lives in ui/ and
 // keeps core/ free of asset framing data.
 //
-// Same trap the portraits set (see portraits.js): the sprites are tightly cropped
-// (alpha bbox == full canvas) but their canvases differ a lot — the necromancer is
-// 120×150, the hunched ghoul only 88×93. Dropping them into one fixed box would make
-// the ghoul as tall as the swordsman. So each sprite carries its native pixel size +
-// a hand-tunable `scale`, and `boardSpriteFrameStyle` normalizes every figure to the
-// SAME standing height (× its own scale) with its feet seated on the coin at y=0.
+// Same trap the portraits set (see portraits.js): every source image is a uniform
+// full canvas, but the painted figure inside that canvas is not. Dropping those
+// images into one fixed box makes narrow/padded units render tiny and nearly-full
+// canvas units render huge. So each sprite reuses the portrait alpha box plus a
+// hand-tunable `scale`, and `boardSpriteFrameStyle` normalizes the visible figure
+// to the SAME standing height (times its own scale) with its feet seated on the coin.
 //
 // Team identity is NOT baked into the art (these are full-color paintings): it reads
 // from the recolored coin/ring (var(--team), already team-driven) so skins stay
@@ -17,6 +17,7 @@
 
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { getSkin } from "./skinModel.js";
+import { PORTRAITS } from "./portraits.js";
 
 // Figure-space standing height a `scale: 1` unit normalizes to. Figure space puts the
 // feet at (0,0) and rises into -y (see unitRenderer.js), matching the old figurine.
@@ -32,15 +33,14 @@ export const STAND_HEIGHT = 52;
 // calibrated foot offset, reused so both fallbacks land in the same spot.
 export const FIGURINE_FOOT_Y = 8;
 
-// w/h are the sprite's native pixel size (drives aspect ratio only — absolute px are
-// irrelevant once normalized). scale: per-unit visual-size fudge (1 = normalize to the
+// w/h are the source image size (drives aspect ratio only; absolute px are
+// irrelevant once normalized). box is the measured visible content box, as fractions
+// of that source image. scale: per-unit visual-size fudge (1 = normalize to the
 // shared standing height). Lower it for a hunched figure whose full-canvas height
 // over-reads its "creature size" so it doesn't tower (the ghoul, same as its portrait).
-// 2026-07-01: re-cropped from the 600×600 portrait source (tight alpha bbox + 3px
-// pad) instead of the old ~100-150px exports — those were being upscaled by the
-// browser to fill their on-screen space, which was the source of the blur. Native
-// sizes below are now several times the old pixel count, so the same normalize-to-
-// STAND_HEIGHT framing reads sharp instead of smoothed.
+// The base board sprites currently use the 600x600 portrait sources directly; skins
+// do the same and inherit their unit's box/scale unless a future skin supplies a
+// bespoke board override.
 //
 // Two follow-up misses before this landed: (1) centering the crop on the alpha
 // bbox drifts toward whichever hand holds a sword/bow/staff/rifle/flame-effect
@@ -55,46 +55,46 @@ export const FIGURINE_FOOT_Y = 8;
 // side rather than clamped, so the stance stays dead-center regardless of how far
 // a held weapon reaches past the source canvas edge.
 export const BOARD_SPRITES = Object.freeze({
-  swordsman:   sprite("swordsman",   584, 574),
-  archer:      sprite("archer",      462, 595),
-  mystic:      sprite("mystic",      396, 581),
-  magician:    sprite("magician",    458, 572),
-  paladin:     sprite("paladin",     572, 566),
-  necromancer: sprite("necromancer", 510, 558),
-  "witch-doctor": sprite("witch-doctor", 600, 600),
+  swordsman:   sprite("swordsman"),
+  archer:      sprite("archer"),
+  mystic:      sprite("mystic"),
+  magician:    sprite("magician"),
+  paladin:     sprite("paladin"),
+  necromancer: sprite("necromancer"),
+  "witch-doctor": sprite("witch-doctor"),
   // Re-cropped from the 600×600 portrait, centered on the measured stance x=300 (the
   // staff overhang to the right is ignored, per the centering trap in the header notes).
-  "father-time": sprite("father-time", 488, 552),
+  "father-time": sprite("father-time"),
   // Cropped from the 600×600 portrait, centered on the measured feet x=304.
-  juggernaut:  sprite("juggernaut",  448, 576),
-  sniper:      sprite("sniper",      602, 581),
+  juggernaut:  sprite("juggernaut"),
+  sniper:      sprite("sniper"),
   // Cropped from the 600×600 portrait, centered on the measured feet x=300.
-  king:        sprite("king",        448, 574),
-  monk:        sprite("monk",        397, 579),
+  king:        sprite("king"),
+  monk:        sprite("monk"),
   // Cropped from the 600×600 portrait, centered on the measured stance x=285 (the bow
   // overhang to the right + the wing spread are ignored, per the centering trap notes).
-  angel:       sprite("angel",       520, 554),
+  angel:       sprite("angel"),
   // Cropped from the 600×600 portrait, centered on the measured feet-band stance x=291
   // (wings spread wide; padded to keep the body dead-centre on the coin).
-  gargoyle:    sprite("gargoyle",    535, 574),
-  nemesis:     sprite("nemesis",     600, 600),
+  gargoyle:    sprite("gargoyle"),
+  nemesis:     sprite("nemesis"),
   // Cropped from the 600×600 portrait, centered on the measured feet-band stance x
   // (padded to keep the wide blob body dead-centre on the coin). Held a touch smaller.
-  virus:       sprite("virus",       578, 506, { scale: 0.94 }),
+  virus:       sprite("virus", { scale: 0.94 }),
   // Cropped from the 600×600 portrait, centered on the measured stance x=300 (symmetric
   // golem; the head leans slightly right, ignored per the centering trap in the header).
-  clod:        sprite("clod",        510, 533),
-  "fat-knight": sprite("fat-knight", 600, 600),
-  "fat-wizard": sprite("fat-wizard", 600, 600),
-  "fat-cleric": sprite("fat-cleric", 600, 600),
-  "fat-bowman": sprite("fat-bowman", 600, 600),
+  clod:        sprite("clod"),
+  "fat-knight": sprite("fat-knight"),
+  "fat-wizard": sprite("fat-wizard"),
+  "fat-cleric": sprite("fat-cleric"),
+  "fat-bowman": sprite("fat-bowman"),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
-  ghoul:       sprite("ghoul",       436, 410, { scale: 0.82 })
+  ghoul:       sprite("ghoul", { scale: 0.82 })
 });
 
-function sprite(type, w, h, { scale = 1, src = `assets/units/${type}.png` } = {}) {
-  return Object.freeze({ src, w, h, scale });
+function sprite(type, { scale = 1, src = `assets/units/${type}.png`, w = 600, h = 600, box = PORTRAITS[type]?.box } = {}) {
+  return Object.freeze({ src, w, h, scale, box });
 }
 
 // Safe lookup. Returns the sprite meta for a unit type (or its def), or null if none
@@ -122,14 +122,17 @@ export function hasBoardSprite(typeOrDef, skinSlug = null) {
 // SVG <image> rect in figure space: every figure ends up the same standing height
 // (× its own scale), horizontally centred, with its feet seated on the coin at footY.
 export function boardSpriteFrameStyle(meta, { standHeight = STAND_HEIGHT, footY = FIGURINE_FOOT_Y } = {}) {
-  const { w, h, scale = 1 } = meta;
-  const height = standHeight * scale;
+  const { w, h, scale = 1, box = null } = meta;
+  const visibleHeight = standHeight * scale;
+  const height = box ? visibleHeight / box.h : visibleHeight;
   const width = height * (w / h);
+  const anchorX = box ? box.x + box.w / 2 : 0.5;
+  const foot = box ? box.y + box.h : 1;
   return {
     width: round(width),
     height: round(height),
-    x: round(-width / 2),
-    y: round(footY - height)
+    x: round(-width * anchorX),
+    y: round(footY - height * foot)
   };
 }
 

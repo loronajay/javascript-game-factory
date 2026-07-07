@@ -100,6 +100,14 @@ test("portrait and board sprite metadata swap to a skin asset by slug", () => {
   assert.equal(getPortrait("swordsman", "missing").src, "assets/units/swordsman.png");
 });
 
+test("skinned board sprites inherit base framing metadata", () => {
+  const base = getBoardSprite("ghoul");
+  const summer = getBoardSprite("ghoul", "summer-vibes");
+  assert.equal(summer.src, "assets/units/skins/ghoul/summer-vibes-ghoul.png");
+  assert.equal(summer.scale, base.scale);
+  assert.deepEqual(summer.box, base.box);
+});
+
 test("match state carries normalized skin selections for roster units", () => {
   const state = createMatchState({
     seed: 1,

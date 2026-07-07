@@ -9,7 +9,7 @@ import { BOARD_SPRITES, getBoardSprite, hasBoardSprite, boardSpriteFrameStyle, S
 
 // Teeth (mirrors portraits.test.js / ai-metadata.test.js): a new unit that forgets its
 // board sprite fails the suite instead of silently falling back to the carved figurine.
-// Every registered unit type — including the summon-only Ghoul — must declare a sprite
+// Every registered unit type, including the summon-only Ghoul, must declare a sprite
 // whose asset exists on disk, and the framing math must produce a sane <image> rect.
 
 const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -47,24 +47,34 @@ test("framing math yields a centred, foot-seated <image> rect", () => {
     const f = boardSpriteFrameStyle(meta);
     assert.ok(Number.isFinite(f.width) && f.width > 0, `${type} width must be positive`);
     assert.ok(Number.isFinite(f.height) && f.height > 0, `${type} height must be positive`);
-    // Centred horizontally, feet on the coin at FIGURINE_FOOT_Y (the carved
-    // figurine's calibrated foot offset, not the plinth origin — see boardSprites.js).
-    assert.ok(Math.abs(f.x + f.width / 2) < 0.02, `${type} should be horizontally centred`);
-    assert.ok(Math.abs(f.y + f.height - FIGURINE_FOOT_Y) < 0.02, `${type} feet should sit at FIGURINE_FOOT_Y`);
+    const box = meta.box ?? { x: 0, y: 0, w: 1, h: 1 };
+    // The visible content box, not necessarily the full transparent PNG canvas, is
+    // centred horizontally and has its feet on the coin at FIGURINE_FOOT_Y.
+    assert.ok(Math.abs(f.x + f.width * (box.x + box.w / 2)) < 0.02, `${type} should be visibly centred`);
+    assert.ok(Math.abs(f.y + f.height * (box.y + box.h) - FIGURINE_FOOT_Y) < 0.02, `${type} visible feet should sit at FIGURINE_FOOT_Y`);
     // Aspect ratio is preserved from the native size.
     assert.ok(Math.abs(f.width / f.height - meta.w / meta.h) < 1e-3, `${type} should keep native aspect ratio`);
   }
 });
 
-test("normalization gives a constant standing height (× scale) across units", () => {
+test("normalization gives a constant visible standing height (x scale) across units", () => {
   for (const [type, meta] of Object.entries(BOARD_SPRITES)) {
     const f = boardSpriteFrameStyle(meta);
-    assert.ok(Math.abs(f.height - STAND_HEIGHT * meta.scale) < 1e-6, `${type} height should be STAND_HEIGHT × scale`);
+    const box = meta.box ?? { h: 1 };
+    assert.ok(Math.abs(f.height * box.h - STAND_HEIGHT * meta.scale) < 0.02, `${type} visible height should be STAND_HEIGHT x scale`);
   }
 });
 
 test("scale < 1 shrinks a figure (the ghoul reads shorter than a full normalize)", () => {
   assert.ok(BOARD_SPRITES.ghoul.scale < 1, "ghoul should be held below a full normalize");
   const ghoul = boardSpriteFrameStyle(BOARD_SPRITES.ghoul);
-  assert.ok(ghoul.height < STAND_HEIGHT, "ghoul standing height should be below the shared height");
+  assert.ok(ghoul.height * BOARD_SPRITES.ghoul.box.h < STAND_HEIGHT, "ghoul standing height should be below the shared height");
+});
+
+test("full-canvas portrait sprites still normalize by measured content box", () => {
+  const fatKnight = BOARD_SPRITES["fat-knight"];
+  assert.ok(fatKnight.box.h < 1, "regression guard: fat knight has transparent vertical padding");
+  const frame = boardSpriteFrameStyle(fatKnight);
+  assert.ok(frame.height > STAND_HEIGHT, "full source image is enlarged so visible art reaches stand height");
+  assert.ok(Math.abs(frame.height * fatKnight.box.h - STAND_HEIGHT) < 0.02);
 });

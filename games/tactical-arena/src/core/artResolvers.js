@@ -1033,13 +1033,14 @@ function resolveRealmTraversal(state, command, art) {
 // A summoned piece is a full unit object (same shape createUnit produces) plus a
 // `summonerId` so the per-Necromancer summon cap can find it. It spawns already
 // `spent` so the turn loop never offers it an activation.
-function createSummon(id, type, player, team, position, summonerId) {
+function createSummon(id, type, player, team, position, summonerId, skin = null) {
   const definition = getUnitType(type);
   return {
     id,
     player,
     team,
     type,
+    skin,
     position: { ...position },
     hp: definition.stats.maxHp,
     mp: definition.stats.maxMp,
@@ -1075,7 +1076,7 @@ function resolveSummonGhoul(state, command, art) {
   // the units array), so findUnit never collides with a previous corpse.
   const seq = next.units.filter((unit) => unit.summonerId === actor.id).length;
   const ghoulId = `${actor.id}-${art.summon.type}-${seq}`;
-  const ghoul = createSummon(ghoulId, art.summon.type, actor.player, teamOfUnit(actor), placement, actor.id);
+  const ghoul = createSummon(ghoulId, art.summon.type, actor.player, teamOfUnit(actor), placement, actor.id, actor.skin ?? null);
   next.units.push(ghoul);
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
