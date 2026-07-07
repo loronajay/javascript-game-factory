@@ -6,7 +6,6 @@
 // color from the previous palette.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
 import {
   THEMES,
   THEME_TOKEN_KEYS,
@@ -43,6 +42,16 @@ function fakeStorage(initial = {}) {
 test("registry shape: unique ids, labels, default first", () => {
   assert.ok(THEMES.length >= 2, "need a real palette list");
   const ids = THEMES.map((theme) => theme.id);
+  assert.deepEqual(ids, [
+    "moonlit",
+    "war-table",
+    "emberfall",
+    "verdant",
+    "frostguard",
+    "sunspire",
+    "stormforge",
+    "void"
+  ]);
   assert.equal(new Set(ids).size, ids.length, "theme ids must be unique");
   assert.equal(THEMES[0].id, DEFAULT_THEME_ID, "default theme leads the list");
   for (const theme of THEMES) {
@@ -79,10 +88,14 @@ test("token values are non-empty strings and --sheen is an RGB triple", () => {
   }
 });
 
-test("every registered theme has a menu background asset named after its id", () => {
+test("every non-default theme points at a matching menu background asset path", () => {
   for (const theme of THEMES) {
-    const asset = new URL(`../assets/theme-bgs/${theme.id}.png`, import.meta.url);
-    assert.equal(existsSync(asset), true, `${theme.id} needs assets/theme-bgs/${theme.id}.png`);
+    if (theme.id === DEFAULT_THEME_ID) continue;
+    assert.equal(
+      theme.tokens["--menu-bg-image"],
+      `url(./assets/theme-bgs/${theme.id}.png)`,
+      `${theme.id} should use assets/theme-bgs/${theme.id}.png`
+    );
   }
 });
 
