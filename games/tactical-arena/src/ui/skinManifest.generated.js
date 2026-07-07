@@ -37,6 +37,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-archer.png"
   },
   {
+    type: "archer",
+    slug: "blood-moon",
+    file: "blood-moon-archer.png"
+  },
+  {
     type: "mystic",
     slug: "summer-vibes",
     file: "summer-vibes-mystic.png"
@@ -47,6 +52,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-mystic.png"
   },
   {
+    type: "mystic",
+    slug: "blood-moon",
+    file: "blood-moon-mystic.png"
+  },
+  {
     type: "magician",
     slug: "summer-vibes",
     file: "summer-vibes-magician.png"
@@ -55,6 +65,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "magician",
     slug: "arcane",
     file: "arcane-magician.png"
+  },
+  {
+    type: "magician",
+    slug: "blood-moon",
+    file: "blood-moon-magician.png"
   },
   {
     type: "paladin",
@@ -77,6 +92,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-necromancer.png"
   },
   {
+    type: "necromancer",
+    slug: "blood-moon",
+    file: "blood-moon-necromancer.png"
+  },
+  {
     type: "ghoul",
     slug: "summer-vibes",
     file: "summer-vibes-ghoul.png"
@@ -85,6 +105,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "ghoul",
     slug: "arcane",
     file: "arcane-ghoul.png"
+  },
+  {
+    type: "ghoul",
+    slug: "blood-moon",
+    file: "blood-moon-ghoul.png"
   },
   {
     type: "sniper",
@@ -132,6 +157,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-witch-doctor.png"
   },
   {
+    type: "witch-doctor",
+    slug: "blood-moon",
+    file: "blood-moon-witch-doctor.png"
+  },
+  {
     type: "father-time",
     slug: "summer-vibes",
     file: "summer-vibes-father-time.png"
@@ -170,6 +200,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "monk",
     slug: "summer-vibes",
     file: "summer-vibes-monk.png"
+  },
+  {
+    type: "monk",
+    slug: "blood-moon",
+    file: "blood-moon-monk.png"
   },
   {
     type: "gargoyle",
@@ -222,6 +257,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-fat-knight.png"
   },
   {
+    type: "fat-knight",
+    slug: "arcane",
+    file: "arcane-fat-knight.png"
+  },
+  {
     type: "fat-wizard",
     slug: "summer-vibes",
     file: "summer-vibes-fat-wizard.png"
@@ -237,8 +277,18 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-fat-cleric.png"
   },
   {
+    type: "fat-cleric",
+    slug: "arcane",
+    file: "arcane-fat-cleric.png"
+  },
+  {
     type: "fat-bowman",
     slug: "summer-vibes",
     file: "summer-vibes-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "arcane",
+    file: "arcane-fat-bowman.png"
   }
 ]);
