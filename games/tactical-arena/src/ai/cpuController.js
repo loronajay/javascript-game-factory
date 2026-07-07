@@ -242,6 +242,7 @@ function planEffectValue(state, unit, plan) {
   // Smog (Virus): a self-centred blind cloud, no HP change — sum the status value of
   // blinding every enemy caught in the radius, so it rides the `control` weight.
   if (ai.intent === "statusAoe") {
+    if (art.effect?.type !== "status" || !art.effect.status) return { control: 0, heal: 0 };
     const radius = getSelfBlastRadius(state, unit, art);
     let control = 0;
     for (const enemy of livingUnits(state)) {

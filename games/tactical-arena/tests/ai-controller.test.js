@@ -105,3 +105,18 @@ test("Easy and Hard both yield legal activations", () => {
     replay(state, commands);
   }
 });
+
+test("the CPU can score Fat Knight's non-status aura without crashing", () => {
+  const state = createBattleState({
+    size: 13, seed: 11,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 5, y: 4 },
+      { id: "p2-fat-knight", type: "fat-knight", player: 2, x: 5, y: 5 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(commands.length > 0);
+  replay(state, commands);
+});
