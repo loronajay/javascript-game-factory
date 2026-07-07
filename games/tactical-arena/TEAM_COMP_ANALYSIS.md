@@ -1,0 +1,221 @@
+# Tactical Arena — Strongest Team Comps (balance analysis)
+
+A grounded read of the current roster for balancing. Every claim here is traced to
+the actual unit data (`src/core/units/*.js`) and the resolvers
+(`rules/combat.js`, `rules/damage.js`, `core/unitCatalog.js`) as of 2026-07-07.
+Squads are **4 units**, duplicates allowed in casual/hot-seat, board 13×13 or 15×15,
+RAGE auto-triggers at **≤5 HP**.
+
+---
+
+## The math that drives synergy (read first)
+
+- **Physical** = `max(1, STR − DEF)`. Every point of enemy DEF removed (or ally STR
+  added) is worth +1 per swing — cheap stat swings matter a lot on 5-damage hits.
+- **Magic** = a flat `amount` (or the caster's STR) that **ignores DEF entirely**.
+  There is **no DEF-equivalent stat against magic** — the *only* mitigations are
+  **Defend (halves it)**, `teamDamageReduction` (Necromancer's Dead Zone, −1),
+  and outright magic immunity (Witch Doctor's Black Death stance). This is the
+  single most important balance fact in the game.
+- **True** = fixed `amount`, bypasses **both DEF and Defend**. This is the great
+  equalizer against walls (Volley, Footwork, Time Steal, Fart, Flight, Poison Tick,
+  Juggernaut/Virus rage blasts, Clod's charge).
+- **Crit** = `ceil(base × 1.5)` before Defend; base 15% / miss 10%.
+- **Defend** halves physical *and* magic (round up), so a defending tank is soft
+  only to true damage and status.
+
+**Non-stacking rules (so you don't nerf the wrong thing):** team auras dedup by a
+`stackKey`, so **doubling a buff unit does nothing**:
+- Two Mystics ≠ +2 DEF (Guardian applies once).
+- Necromancer + its Ghoul's Deathly Aura do **not** stack the −1 DEF; the Ghoul only
+  *extends the coverage area*.
+- Duplicate Dead Zone / Realm of Magic / Realm-support don't stack.
+This already pushes players toward diverse comps — good. It also means the power of
+these auras is entirely in the *first* copy.
+
+---
+
+## Stat reference
+
+| Unit | HP | MP | MOV | RNG | STR | DEF | Class | Role |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| Swordsman | 25 | 20 | 3 | 1 | 10 | 5 | melee | bruiser |
+| Paladin | 26 | 24 | 3 | 1 | 10 | 5 | melee | bruiser + heal-aura |
+| Monk | 26 | 25 | 2 | 1 | 9 | 6 | melee | skirmisher |
+| Archer | 24 | 22 | 2 | 5 | 8 | 4 | ranger | ranged |
+| Sniper | 23 | 18 | 2 | 6 | 8 | 3 | ranger | ranged/pierce |
+| Angel | 24 | 37 | 2 | 5 | 3 | 3 | ranger | support |
+| Mystic | 23 | 38 | 2 | 5 | 5 | 3 | support | healer/DEF aura |
+| Witch Doctor | 24 | 30 | 2 | 4 | 8 | 3 | support | stance-caster |
+| Father Time | 25 | 30 | 2 | 5 | 7 | 3 | support | controller/revive |
+| Magician | 23 | 40 | 2 | 5 | 6 | 3 | mage | nuker |
+| Necromancer | 23 | 36 | 3 | 5 | 6 | 3 | mage | debuff/summon |
+| Nemesis | 25 | 45 | 3 | 5 | 7 | 2 | mage | **magic amplifier** |
+| Virus | 25 | 36 | 3 | 5 | 6 | 3 | mage | contagion |
+| Juggernaut | 30 | 5 | 2 | 1 | 8 | 7 | tank | bruiser (STR10/MOV3 @0MP) |
+| Gargoyle | 30 | 20 | 2 | 1 | 10 | 7 | tank | thorns/immunity |
+| Clod | 30 | 20 | 2 | 1 | 9 | 8 | tank | phys-negate |
+| King | 30 | 0 | 0 | 0 | 0 | 0 | support | non-combatant commander |
+| Fat Knight | 30 | 20 | 2 | 1 | 10 | 6 | melee | bruiser |
+| Fat Wizard | 30 | 35 | 2 | 3 | 7 | 4 | mage | splash caster |
+| Fat Cleric | 30 | 35 | 2 | 4 | 7 | 5 | support | healer |
+| Fat Bowman | 30 | 25 | 2 | 4 | 8 | 5 | ranger | ranged |
+
+---
+
+## Tier S — the comps I'd watch for over-tuning
+
+### 1. "Realm Stack" — all-magic DEF-bypass
+**Nemesis + Magician + Fat Wizard + Necromancer** (swap Necromancer↔Virus)
+
+Why it's the scariest comp in the game: it **opts out of the entire DEF axis**.
+- **Nemesis / Realm of Magic** gives the whole team **+1 magic damage** and **−1 MP
+  cost (min 1)** while it lives. Applies to *every* magic source, AoE included.
+- **Necromancer / Dead Zone** gives the team **−1 magic damage taken**, and Deathly
+  Aura strips −1 DEF off enemies (irrelevant to your magic, but nice if you dip melee).
+- Every hit ignores DEF, so the enemy's tanks (Clod DEF 8, Gargoyle DEF 7, Juggernaut
+  DEF 7) provide **zero** value on defense. A 30-HP DEF-8 Clod dies exactly as fast as
+  a 23-HP DEF-3 mage.
+
+Real numbers with Nemesis up:
+- Fat Wizard **Zap 6** (range 4), splashes on miss/crit via Clumsy.
+- Magician **Spark 7**, **Banish 8** + silence, **Nuke 13** AoE r3 (rage).
+- Necromancer **Dark Bomb 6** AoE, **Wither** magic + slow.
+- MP costs drop (Spark 4→3, Banish 8→7, Nuke 16→15, Zap 5→4), and **Magic Pipe**
+  (Magician) + **Growth** (Virus) + **Nemesis Regenerate** (rage: +5 HP/+15 MP) keep
+  the tank topped up.
+
+**Balance flag:** this is the clearest evidence that **magic has no counter-stat**.
+DEF, tanks, and the whole "wall" archetype are dead weight against it. Counterplay
+exists (Defend halves magic; Silence shuts the casters down — but Nemesis is
+silence-immune and Mystic is too), it's just thin. Consider: a magic-resist stat or
+`teamDamageReduction` on a tank, capping Nemesis's bonus, or making Realm of Magic a
+proximity aura rather than team-wide-while-alive.
+
+### 2. "Attrition Wall" — un-killable sustain core
+**Mystic + Fat Cleric + Paladin + Gargoyle** (or Clod)
+
+Three stacked healing engines behind a +1-DEF-team wall, and heals have **no global
+lockout** (only a raging *enemy* Juggernaut can shut healing off).
+- **Mystic / Guardian**: unconditional **+1 DEF to the whole team** while alive, plus
+  Pray (3 AoE r3), Wish (1 global), Purify (cleanse), Silence.
+- **Paladin / Hand of Life**: every physical hit he lands heals allies within 2 for
+  **half the damage** — a lifesteal aura attached to a STR-10 body.
+- **Fat Cleric**: **Hope** (1–4 AoE r3, 3 MP), Focus Prayer (5 single), Cleanse,
+  Snack Break (+1 HP/+1 MP on a no-move defend), Emergency Snacks rage regen.
+- **Gargoyle** (DEF 7 → **8** under Guardian, 30 HP): Stone Body thorns, total
+  displacement immunity, **status reflection**, and rage = **always defending +2 DEF**
+  (DEF 10, halving everything). Clod alternative negates *all* physical while defending.
+
+Against physical this core is a brick: a STR-10 attacker into a Guardian'd defending
+Gargoyle does `max(1, 10−9)=1`, halved… ~1 per swing, out-healed instantly.
+
+**Balance flag:** potential stalemate / unwinnable-by-attrition. Guardian being
+**unconditional + team-wide** is the load-bearing lever; combined with two more healers
+and a tank the opponent needs pure burst or true damage to break it. The intended
+counter (true damage, status) should be verified to actually be enough.
+
+### 3. "Contagion Lock" — status soft-lock
+**Virus + Witch Doctor + Necromancer + Archer**
+
+Turns single-target control into board-wide lockdown:
+- **Witch Doctor / Misfortune Dance** sets a stance that **doubles status-effect
+  chance GLOBALLY** (everyone). Poison Arrow 60%, Wither slow 70%, Moonstrike blind
+  70%, Cough poison 60%, Leg Shot slow 60% all land dramatically more often.
+- **Virus / Spread**: whenever an enemy gets a debuff (from *any* source), it jumps to
+  that enemy's allies within 2 tiles. One Wither slows a whole cluster; one Poison
+  Arrow poisons three.
+- Payoff: **Poison Tick** (2 true to *every* poisoned enemy, 2 MP) and **Explosion**
+  (rage: 10 true to every poisoned enemy + 5 splash) convert the spread poison into
+  guaranteed, DEF-and-Defend-ignoring burst.
+
+**Balance flag:** the Misfortune ×2-global multiplier stacked with Spread's
+single-target→AoE conversion is a genuine soft-lock engine — a team can be kept
+perma-blinded/slowed. Note that **Paladin, Angel, Gargoyle, King** are fully
+status-immune and hard-counter this, and Mystic/Fat Cleric can cleanse, so it's
+answerable — but a comp with no immunity/cleanse gets run over. Watch Misfortune
+especially; a global ×2 is a very strong, low-cost switch.
+
+---
+
+## Tier A — strong, more conditional
+
+### 4. "King Rush" — rage-scaling command snowball
+**King + Fat Knight + Swordsman + Paladin/Gargoyle**
+
+King's commands are global one-turn team buffs that **scale +1 per allied unit
+currently in RAGE**. As your bruisers drop to ≤5 HP (which they *want* to, for their
+own rage payoffs), the commands balloon:
+- **Strike!** +2 STR base (+3 if last command was Pursue!), **+1 per raging ally** →
+  easily +4/+5 STR to the whole team late.
+- **Hold!** +1 DEF + +1 healing received (both scale), **Pursue!** +1 MOVE,
+  **Higher Ground!** +1 range (attacks *and* area ARTS).
+- Rally: every ally that falls heals the rest of the squad +5.
+
+**Balance flag / risk:** the King eats **−10 HP per ally that falls**, must act first
+every turn (mis-sequencing can soft-lock), and **doesn't sustain victory alone**. The
+command buff getting *stronger the more of your team is dying* is a comeback mechanic
+that can read as swingy — a losing King player suddenly hands out +5 STR to everyone.
+High skill ceiling, fragile floor. Probably fair, but the rage-scaling is the thing to
+model.
+
+### 5. "Fat Squad" — the *designed* synergy (your balance benchmark)
+**Fat Knight + Fat Wizard + Fat Cleric + Fat Bowman** (all four required)
+
+This is the intended-synergy comp, so it's the yardstick for whether the others are
+over/under-tuned. With **Brothers in Arms** all live:
+- Fat Knight +1 STR/+1 MOVE, Fat Wizard +1 STR/+1 magic dmg, Fat Cleric +1 MOVE/+1 DEF,
+  Fat Bowman +1 RANGE. Every body is **30 HP**.
+- Self-contained kit: Cleric heals (Hope/Focus/Relay-via-Wizard), Wizard splashes
+  (Clumsy) + Study + Surge, Knight frontlines + Fart displacement, Bowman pokes with
+  Heavy Handed (up to +2 at range 4) and Planted (+1 STR/turn stationary, max +4).
+
+**Assessment:** durable and cohesive, but the synergy payoffs are individually *small*
+and you spend **all four slots** to unlock them. Head-to-head it is almost certainly
+**weaker than the Realm Stack** (which bypasses the fat squad's whole DEF advantage)
+and roughly even with the Attrition Wall. If the "designed" comp is a tier below an
+emergent magic pile, that's the balancing signal: either buff Brothers in Arms or rein
+in Nemesis-led magic.
+
+### 6. "Rage Snowball" — the balanced baseline
+**Magician + Mystic + Swordsman + Paladin** (≈ the default squad)
+
+A clean midline benchmark. Rage unlocks Magician's Nuke, Mystic goes +6 MOVE +
+damage-halving, Swordsman +3 MOVE/+1 STR (+3 STR under 3 HP via Last Stand), Paladin
++2 STR/+1 range with light-tile bonus. Mystic's Guardian + Pray sustains. Nothing
+degenerate — this is what "fair and strong" should feel like; measure the Tier-S comps
+against it.
+
+---
+
+## Individual units worth a second look
+
+- **Mystic** — appears in nearly every top comp. Unconditional team +1 DEF (Guardian)
+  + heals + cleanse + silence + a genuinely absurd rage (**+6 MOVE and passively halves
+  ALL incoming damage**). The single best support; Guardian is the lever.
+- **Nemesis** — the strongest *offensive* team buff in the game and the enabler of the
+  DEF-bypass problem. Also a big personal statline (MP 45, MOVE 3, silence-immune,
+  Dark Pulse 8-ray with self-heal, Regenerate rage).
+- **Clod / Rock Hard** — binary: negates **all** physical while defending (+3 MP per
+  hit). Either dead weight (magic team) or unbreakable (physical team). Swingy design.
+- **Juggernaut / Self Destruct** — 10 true AoE r4, guaranteed, only "cost" is the unit
+  itself; a very efficient trade/finisher. Bruiser Mode (STR 10/MOVE 3 at 0 MP) means
+  it *wants* to be empty.
+- **Witch Doctor / Misfortune** — a global ×2 status multiplier on one cheap dance is
+  the strongest status enabler; watch it with any status comp.
+- **Angel** — flagged as possibly **under-tuned for a ranger**: basic attacks deal
+  magic (ignore DEF) but STR is only **3**, so the damage is trivial; it's really a
+  support (Anoint/Elevate/Heavenseeker). Fine as support, weak as a "ranger."
+- **Sniper** — excellent poke (range 6, pierces walls *and* bodies, min-2 floor) but a
+  small MP pool (18) and no team synergy; a solo carry rather than a comp piece.
+
+## Counterplay axes (so nerfs target the right thing)
+
+- **True damage** is the universal wall-breaker (ignores DEF *and* Defend): Volley,
+  Footwork/Stumble, Time Steal, Fart, Flight, Poison Tick, Juggernaut/Virus rage
+  blasts, Clod's Thunderous Charge. If walls feel unbreakable, it's because a comp
+  lacks a true-damage source — check that enough units carry one.
+- **Silence** neuters ART-dependent comps (the whole Realm Stack) — but Nemesis and
+  Mystic are silence-immune, which is exactly why they anchor those comps.
+- **Status immunity** (Paladin, Angel, Gargoyle, King, Monk-vs-blind) hard-counters the
+  Contagion Lock; **cleanse** (Mystic Purify, Fat Cleric Cleanse) softens it.
