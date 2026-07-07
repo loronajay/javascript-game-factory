@@ -219,6 +219,11 @@ function resetBattle() {
   startMatch(matchConfig ?? { size: 13, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
 }
 
+function resumeActiveMusic() {
+  if (muted || !audioUnlocked) return;
+  audio.startMusic(menu.active === "match" ? "battle" : "menu");
+}
+
 // Called by the menu when the match screen is left. Abandon a still-live online
 // match (the remaining peer wins by walkover); a cleanly finished one already ran
 // net.endMatch(), so we only null our handles here.
@@ -1936,12 +1941,13 @@ muteBtn.addEventListener("click", () => {
   muteBtn.setAttribute("aria-pressed", String(muted));
   muteBtn.classList.toggle("is-muted", muted);
   muteBtn.textContent = muted ? "Muted" : "Sound";
-  if (!muted && audioUnlocked && menu.active === "match") audio.startMusic("battle");
+  resumeActiveMusic();
 });
 
 document.addEventListener("click", (event) => {
   if (!audioUnlocked) {
     audioUnlocked = true;
+    resumeActiveMusic();
   }
   const button = event.target.closest("button");
   if (button && !button.disabled) audio.play("buttonClick");

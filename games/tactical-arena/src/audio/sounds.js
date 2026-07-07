@@ -1,12 +1,12 @@
 // AudioManager — wraps HybridAudioEngine for SFX and keeps HTMLAudioElement for
-// the looping battle music track. Public API is identical to the old version so
+// the looping music tracks. Public API is identical to the old version so
 // nothing else needs to change: play(key), startMusic(key), stopMusic(),
 // setEnabled(), setMasterVolume(), setVolume(), setMusicVolume().
 
 import { HybridAudioEngine } from "./hybridAudioEngine.js";
 import { SOUND_CATALOG, SAMPLE_SOURCES } from "./soundCatalog.js";
 
-const MUSIC_FILES = Object.freeze({ battle: "battle.mp3" });
+export const MUSIC_FILES = Object.freeze({ battle: "battle.mp3", menu: "menu.mp3" });
 const MUSIC_BASE = new URL("../../sounds/", import.meta.url);
 
 export class AudioManager {
@@ -65,10 +65,6 @@ export class AudioManager {
     const file = MUSIC_FILES[key];
     if (!file) return;
 
-    if (this._currentMusic && this._currentMusic !== this._musicTracks.get(key)) {
-      this.stopMusic();
-    }
-
     let track = this._musicTracks.get(key);
     if (!track) {
       track = new Audio(new URL(file, MUSIC_BASE).href);
@@ -78,6 +74,16 @@ export class AudioManager {
     }
 
     track.volume = this.masterVolume * this.musicVolume;
+    if (this._currentMusic === track) {
+      if (track.paused) {
+        const resumed = track.play();
+        if (resumed?.catch) resumed.catch(() => {});
+      }
+      return;
+    }
+
+    if (this._currentMusic) this.stopMusic();
+
     track.currentTime = 0;
     this._currentMusic = track;
     const played = track.play();

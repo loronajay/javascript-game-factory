@@ -13,6 +13,12 @@ import { openSkinGallery } from "./skinGallery.js";
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
 
+export function syncScreenMusic(audio, screenName) {
+  if (!screenName) return;
+  if (screenName === "match") audio.stopMusic();
+  else audio.startMusic("menu");
+}
+
 export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -34,7 +40,13 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   // screen + Rematch) tracks hot-seat, single-player, AND online identically.
   function startMatchTracked(config) {
     lastConfig = config;
+    audio.stopMusic();
     onStartMatch(config);
+  }
+
+  function showScreen(name, params) {
+    screens.show(name, params);
+    syncScreenMusic(audio, name);
   }
 
   // ── Setup screens: board size + custom squads (and difficulty for solo) ───
@@ -137,7 +149,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     addStat(stats, "Ended by", "Squad eliminated");
     // A finished online session can't be locally replayed — Main Menu only.
     if (rematchBtn) rematchBtn.hidden = online;
-    screens.show("results");
+    showScreen("results");
     spawnConfetti(burstEl, TEAM_COLOR[summary.winner]);
   }
 
@@ -170,7 +182,10 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   }
   function closeSettings() { settingsModal.hidden = true; }
 
-  soundToggle.addEventListener("change", () => audio.setEnabled(soundToggle.checked));
+  soundToggle.addEventListener("change", () => {
+    audio.setEnabled(soundToggle.checked);
+    syncScreenMusic(audio, screens.active);
+  });
   sfxRange.addEventListener("input", () => audio.setVolume(Number(sfxRange.value) / 100));
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));
   $("#setCloseBtn", settingsModal).addEventListener("click", closeSettings);
@@ -180,8 +195,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   document.addEventListener("click", (event) => {
     const navBtn = event.target.closest("[data-nav]");
     if (navBtn && !navBtn.disabled) {
-      if (navBtn.dataset.nav !== "match") audio.stopMusic();
-      screens.show(navBtn.dataset.nav);
+      showScreen(navBtn.dataset.nav);
       return;
     }
 
@@ -210,7 +224,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   });
 
   return {
-    show: (name) => screens.show(name),
+    show: showScreen,
     showResults,
     get active() { return screens.active; }
   };
