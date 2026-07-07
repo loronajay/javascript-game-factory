@@ -18,6 +18,20 @@ function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
   forecastLayer.append(group);
 }
 
+// Shapes whose real resolver does NOT run a plain single-target strike through
+// resolveBaseStrike/resolveFixedMagicStrike (the two paths this file mirrors) — either
+// because they hit an area, land at a chosen TILE rather than the hovered enemy, or
+// use a custom fixed-power formula. A forecast badge for one of these would show a
+// number (or a target) the ability doesn't actually produce, so they're excluded here
+// rather than special-cased. New shapes with a bespoke resolver must be added here
+// UNLESS they route through resolveBaseStrike/resolveFixedMagicStrike/scaleStat like a
+// normal single-target strike (see the scaledPowerForecast/fixedMagic branches below).
+const NON_STRIKE_FORECAST_SHAPES = [
+  "cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement",
+  "protectAlly", "ally", "targetedBlast", "rushPath", "flightMove", "lineEnemy",
+  "lineBurst", "darkPulse"
+];
+
 function isForecastableStrikeArt(art) {
   const hasDamagePayload = Boolean(art?.damage || art?.damageType);
   const isAuthoredStrike = art?.ai?.intent === "strike";
@@ -30,7 +44,7 @@ function isForecastableStrikeArt(art) {
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
     art.effect?.type !== "healAllies" &&
-    !["cone", "globalAllies", "nukeAura", "placement", "selfAura", "tilePlacement", "protectAlly", "ally", "targetedBlast", "rushPath"].includes(art.targeting?.shape)
+    !NON_STRIKE_FORECAST_SHAPES.includes(art.targeting?.shape)
   );
 }
 

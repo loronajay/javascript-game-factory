@@ -150,6 +150,49 @@ test("Angel basic attack forecast does not show through an intervening body", ()
   });
 });
 
+test("Rocket Punch (fixed-power line strike) does not render a badge derived from live STR", () => {
+  // Regression: Rocket Punch is a FIXED 10-power physical strike (resolveRocketPunch),
+  // not a STR-scaled attack. Before this fix, its "lineEnemy" shape slipped through
+  // isForecastableStrikeArt and got a badge from resolveBaseStrike/resolvePhysicalStrike,
+  // which uses the Juggernaut's live effective STR instead of the authored fixed amount
+  // — showing a number the ability could never actually deal.
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "jug", player: 1, type: "juggernaut", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "jug");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:rocket-punch", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 0);
+  });
+});
+
+test("Flight (tile-placement blast) does not render a badge against the attacker's own tile", () => {
+  // Regression: Flight lands its true-damage blast around a chosen destination TILE, not
+  // the attacker's current position. Its "flightMove" shape used to slip through the
+  // filter and show a physical STR-vs-DEF badge on enemies near the attacker instead of
+  // the correct flat-2-true-damage blast near wherever the player lands.
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "gar", player: 1, type: "gargoyle", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 1, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "gar");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:flight", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 0);
+  });
+});
+
 test("Curve Shot forecast shows through an intervening unit", () => {
   withSvgDocument(() => {
     const state = createBattleState({
