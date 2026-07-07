@@ -167,6 +167,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-father-time.png"
   },
   {
+    type: "father-time",
+    slug: "arcane",
+    file: "arcane-father-time.png"
+  },
+  {
     type: "juggernaut",
     slug: "summer-vibes",
     file: "summer-vibes-juggernaut.png"
@@ -210,6 +215,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "gargoyle",
     slug: "summer-vibes",
     file: "summer-vibes-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
+    slug: "arcane",
+    file: "arcane-gargoyle.png"
   },
   {
     type: "nemesis",

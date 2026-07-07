@@ -27,7 +27,7 @@ export const JUGGERNAUT = Object.freeze({
     moveRange: 2,
     attackRange: 1,
     strength: 8,
-    defense: 6,
+    defense: 7,
     maxHp: 30,
     maxMp: 5
   }),

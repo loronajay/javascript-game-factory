@@ -39,7 +39,7 @@ function scenario(overrides = {}) {
 test("Juggernaut is registered with its stat block", () => {
   const def = getUnitType("juggernaut");
   assert.equal(def.name, "Juggernaut");
-  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 1, strength: 8, defense: 6, maxHp: 30, maxMp: 5 });
+  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 1, strength: 8, defense: 7, maxHp: 30, maxMp: 5 });
 });
 
 test("Bruiser Mode: at 0 MP base STR becomes 10 and Move 3; full MP keeps 8/2", () => {
