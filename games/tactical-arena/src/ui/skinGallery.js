@@ -32,27 +32,62 @@ export function openSkinGallery() {
   card.appendChild(head);
 
   const body = el("div", "skin-gallery-body");
-  for (const group of groupedUnitTypes(Object.keys(UNIT_TYPES))) {
-    const section = el("section", "skin-gallery-section");
-    section.appendChild(el("h3", "skin-gallery-title", group.label));
-    const grid = el("div", "skin-gallery-grid");
-    for (const type of group.types) {
-      const def = UNIT_TYPES[type];
-      for (const skin of getUnitSkins(type)) {
-        const item = el("article", `skin-gallery-item${skin.unlocked ? "" : " is-locked"}`);
-        item.appendChild(createPortrait(type, { variant: "is-skin-card", eager: true, skin: skin.slug }));
-        const copy = el("div", "skin-gallery-copy");
-        copy.appendChild(el("b", "skin-gallery-unit", def.name));
-        copy.appendChild(el("span", "skin-gallery-skin", skin.name));
-        copy.appendChild(el("span", "skin-gallery-status", skin.unlocked ? "Unlocked" : "Locked"));
-        item.appendChild(copy);
-        grid.appendChild(item);
-      }
-    }
-    section.appendChild(grid);
-    body.appendChild(section);
-  }
+  renderList();
   card.appendChild(body);
+
+  function renderList() {
+    body.replaceChildren();
+    for (const group of groupedUnitTypes(Object.keys(UNIT_TYPES))) {
+      const section = el("section", "skin-gallery-section");
+      section.appendChild(el("h3", "skin-gallery-title", group.label));
+      const grid = el("div", "skin-gallery-grid");
+      for (const type of group.types) {
+        const def = UNIT_TYPES[type];
+        for (const skin of getUnitSkins(type)) {
+          const item = el("button", `skin-gallery-item${skin.unlocked ? "" : " is-locked"}`);
+          item.type = "button";
+          item.dataset.type = type;
+          item.dataset.skin = skin.slug;
+          item.setAttribute("aria-label", `View ${skin.name} skin for ${def.name}`);
+          item.appendChild(createPortrait(type, { variant: "is-skin-card", eager: true, skin: skin.slug }));
+          const copy = el("div", "skin-gallery-copy");
+          copy.appendChild(el("b", "skin-gallery-unit", def.name));
+          copy.appendChild(el("span", "skin-gallery-skin", skin.name));
+          copy.appendChild(el("span", "skin-gallery-status", skin.unlocked ? "Unlocked" : "Locked"));
+          item.appendChild(copy);
+          item.addEventListener("click", () => renderDetail(type, skin));
+          grid.appendChild(item);
+        }
+      }
+      section.appendChild(grid);
+      body.appendChild(section);
+    }
+  }
+
+  function renderDetail(type, skin) {
+    const def = UNIT_TYPES[type];
+    const detail = el("section", "skin-gallery-detail");
+    const closeDetail = el("button", "skin-gallery-detail-close", "X");
+    closeDetail.type = "button";
+    closeDetail.setAttribute("aria-label", "Return to skins list");
+    closeDetail.addEventListener("click", renderList);
+    detail.appendChild(closeDetail);
+
+    detail.appendChild(createPortrait(type, {
+      variant: "is-skin-detail",
+      eager: true,
+      skin: skin.slug,
+      alt: `${def.name} ${skin.name} skin`
+    }));
+
+    const copy = el("div", "skin-gallery-detail-copy");
+    copy.appendChild(el("span", "skin-gallery-detail-kicker", def.name));
+    copy.appendChild(el("h3", "skin-gallery-detail-title", skin.name));
+    copy.appendChild(el("span", "skin-gallery-detail-status", skin.unlocked ? "Unlocked" : "Locked"));
+    detail.appendChild(copy);
+
+    body.replaceChildren(detail);
+  }
 
   function close() {
     overlay.hidden = true;

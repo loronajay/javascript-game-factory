@@ -189,9 +189,7 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .unit { cursor:pointer; transform-box:fill-box; transform-origin:center bottom; }.unit .shadow { fill:rgba(0,0,0,.4); filter:blur(2px); }.unit .base-side { fill:#0e1a26; }.unit .base-top { fill:color-mix(in srgb,var(--team,var(--p1)) 40%,#060e18); stroke:rgba(var(--sheen),.22); stroke-width:1.2; vector-effect:non-scaling-stroke; }.unit .rim { fill:none; stroke:var(--team,var(--p1)); stroke-width:3; vector-effect:non-scaling-stroke; }.unit.player-1 { --team:var(--p1); }.unit.player-2 { --team:var(--p2); }.unit .hp-back { fill:rgba(0,0,0,.65); stroke:rgba(0,0,0,.5); }.unit .hp-front { fill:var(--hp-high); }.unit .spent-mark,.unit .defend-mark { opacity:0; }.unit.spent { opacity:.46; filter:grayscale(.55) sepia(.1); }.unit.spent .spent-mark { opacity:1; }.unit.active { filter:drop-shadow(0 0 10px rgba(100,180,240,.85)); }.unit.active .rim { stroke:var(--gold); stroke-dasharray:9 5; animation:rim-spin 1.2s linear infinite; }.shield-ring { fill:none; stroke:var(--gold); stroke-width:2.2; stroke-dasharray:8 5; opacity:0; transform-box:fill-box; transform-origin:center; }.unit.defending .shield-ring,.unit.defending .defend-mark { opacity:1; }.unit.defending .shield-ring { animation:shield-orbit 1.6s linear infinite; }.defend-mark .defend-shield { fill:var(--gold); stroke:rgba(6,14,24,.7); stroke-width:.8; }.unit.spent.defending { opacity:.9; filter:none; }.unit.idle:not(.spent) .body-group { transform-box:fill-box; transform-origin:center bottom; animation:idle-bob 2.4s ease-in-out infinite; }
 .unit .rage-aura { fill:rgba(255,32,24,.13); stroke:#ff5548; stroke-width:2.8; stroke-dasharray:11 7; opacity:0; transform-box:fill-box; transform-origin:center; filter:drop-shadow(0 0 9px rgba(255,42,30,.78)); vector-effect:non-scaling-stroke; }
 .unit.is-raging .rage-aura { opacity:1; animation:rage-pulse 1.1s ease-in-out infinite alternate, rim-spin 1.6s linear infinite; }
-.unit.is-raging .base-top { fill:color-mix(in srgb,#b71f1a 52%,#080e16); stroke:rgba(255,118,96,.42); }
-.unit.is-raging .base-inlay { fill:rgba(126,18,16,.58); stroke:rgba(255,118,96,.38); }
-.unit.is-raging .rim { stroke:#ff5d50; filter:drop-shadow(0 0 7px rgba(255,48,34,.8)); }
+.unit.is-raging .rim { filter:drop-shadow(0 0 7px color-mix(in srgb,var(--team,var(--p1)) 75%,transparent)); }
 .unit.is-raging .hp-front { fill:#e84d45; }
 .unit.spent.is-raging { opacity:.82; filter:grayscale(.18) sepia(.32) saturate(1.35); }
 /* Plinth inlay — a faintly team-tinted inset on the base top so the figure reads
@@ -213,14 +211,10 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .unit .figure { transform-box:view-box; transform-origin:0 0; }
 .unit .figure path,.unit .figure rect,.unit .figure circle,.unit .figure ellipse,.unit .figure line { stroke-linejoin:round; }
 /* Painted board sprite (boardSprites.js) — the on-board token for units that have a
-   sprite. Team identity is the recolored coin + a team-color tint wash (the
-   #teamTintP* filters); a soft drop-shadow grounds the piece on the disc. */
+   sprite. Keep the artwork true-color so skins stay readable; team identity comes
+   from the recolored coin/ring. A soft drop-shadow grounds the piece on the disc. */
 .unit .sprite-img { filter:drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
-.unit.player-1 .sprite-img { filter:url(#teamTintP1) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
-.unit.player-2 .sprite-img { filter:url(#teamTintP2) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
 .unit.is-raging .sprite-img { filter:drop-shadow(0 0 8px rgba(255,48,34,.86)) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
-.unit.player-1.is-raging .sprite-img { filter:url(#teamTintP1) drop-shadow(0 0 8px rgba(255,48,34,.86)) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
-.unit.player-2.is-raging .sprite-img { filter:url(#teamTintP2) drop-shadow(0 0 8px rgba(255,48,34,.86)) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
 .unit .fig-body { fill:url(#ivory); stroke:#281e12; stroke-width:1.1; vector-effect:non-scaling-stroke; }
 .unit .fig-shade { fill:rgba(38,27,14,.30); stroke:none; }
 .unit .fig-light { fill:rgba(255,250,236,.55); stroke:none; }

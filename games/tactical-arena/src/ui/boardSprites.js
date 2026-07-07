@@ -12,8 +12,8 @@
 // SAME standing height (× its own scale) with its feet seated on the coin at y=0.
 //
 // Team identity is NOT baked into the art (these are full-color paintings): it reads
-// from the recolored coin/ring (var(--team), already team-driven) plus a team-color
-// tint wash applied to the <image> via the #teamTintP1/#teamTintP2 SVG filters.
+// from the recolored coin/ring (var(--team), already team-driven) so skins stay
+// visible at true color.
 
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { getSkin } from "./skinModel.js";

@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
@@ -11,6 +14,9 @@ import { createUnitFigure, UNIT_VISUAL_LIFT } from "../src/ui/unitRenderer.js";
 import { createEffects } from "../src/ui/effects.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes, mountCodex } from "../src/ui/codex.js";
+
+const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const STYLE_CSS = readFileSync(join(GAME_ROOT, "style.css"), "utf8");
 
 class TestStyle {
   constructor() {
@@ -369,6 +375,24 @@ test("raging board units carry a rage state class and aura element", () => {
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+test("painted board sprites render without a team-color tint wash", () => {
+  const spriteRules = STYLE_CSS
+    .split("}")
+    .filter((rule) => rule.includes(".sprite-img"))
+    .join("}");
+
+  assert.doesNotMatch(spriteRules, /url\(#teamTintP[12]\)/, "sprite art should stay true-color so skins remain readable");
+});
+
+test("rage styling leaves the ownership coin in the parent team color", () => {
+  const ragingCoinRules = STYLE_CSS
+    .split("}")
+    .filter((rule) => /\.unit\.is-raging\s+\.(?:base-top|base-inlay|rim)\b/.test(rule))
+    .join("}");
+
+  assert.doesNotMatch(ragingCoinRules, /#(?:b71f1a|ff5d50)|rgba\(255,\s*(?:48|118),|rgba\(126,\s*18,/i);
 });
 
 test("board sprite facing follows player ownership instead of board position", () => {
