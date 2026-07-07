@@ -113,6 +113,54 @@ test("online lock-in payload relays readiness without exposing the squad", () =>
   }
 });
 
+test("online draft pick payload relays the pick index and unit type", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener() {}
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.sendDraftPick({ pickIndex: 3, seat: 1, type: "magician" });
+    assert.deepEqual(sent, [{
+      type: "lobby_message",
+      messageType: "draft_pick",
+      value: JSON.stringify({ pickIndex: 3, seat: 1, type: "magician" })
+    }]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
+test("online lobby search includes match type settings for separate queues", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener() {}
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.findLobby({ minPlayers: 2, maxPlayers: 2, settings: { matchType: "draft1v1" } });
+    assert.equal(sent[0].type, "find_lobby");
+    assert.equal(sent[0].gameId, "tactical-arena");
+    assert.equal(sent[0].settings.matchType, "draft1v1");
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
 test("online client parses remote squad lock-in readiness by sender", () => {
   const previous = globalThis.WebSocket;
   let messageHandler = null;
@@ -151,6 +199,37 @@ test("online client parses remote squad lock-in readiness by sender", () => {
       { clientId: "c_guest", ready: true },
       { clientId: "c_guest", ready: false }
     ]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
+test("online client parses remote draft picks", () => {
+  const previous = globalThis.WebSocket;
+  let messageHandler = null;
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener(type, handler) {
+        if (type === "message") messageHandler = handler;
+      }
+      send() {}
+    };
+    const client = createOnlineClient();
+    const picks = [];
+    client.cb.onRemoteDraftPick = (payload) => picks.push(payload);
+    client.connect();
+    messageHandler({
+      data: JSON.stringify({
+        event: "message",
+        scope: "lobby",
+        senderId: "c_guest",
+        messageType: "draft_pick",
+        value: JSON.stringify({ pickIndex: 1, seat: 2, type: "archer" })
+      })
+    });
+    assert.deepEqual(picks, [{ pickIndex: 1, seat: 2, type: "archer" }]);
   } finally {
     globalThis.WebSocket = previous;
   }

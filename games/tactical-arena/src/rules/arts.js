@@ -4,7 +4,7 @@ import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
 
-export const FOOTWORK_DAMAGE = 2;
+export const FOOTWORK_DAMAGE = 3;
 export const FLEE_RANGE_BONUS = 2;
 
 export function getRushSteps(actor, art = getArt(actor.type, "footwork"), state = null) {

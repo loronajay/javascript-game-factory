@@ -182,6 +182,7 @@
               <span class="setup-label">Match type</span>
               <div class="segmented" data-field="onlineMatchType">
                 <button type="button" class="seg is-selected" data-match-type="duel">Classic 1v1</button>
+                <button type="button" class="seg" data-match-type="draft1v1">Draft 1v1</button>
                 <button type="button" class="seg" data-match-type="ffa4">4 Player FFA</button>
                 <button type="button" class="seg" data-match-type="teams4">2v2 Teams</button>
               </div>
@@ -217,6 +218,14 @@
               <p class="setup-hint">Blind pick — your opponent can't see your squad until the match begins.</p>
               <div class="squad-pickers" data-online="squadHost"></div>
               <button type="button" class="menu-btn" data-online="lockBtn">Lock Squad</button>
+            </div>
+
+            <div class="setup-field online-draft" data-online="draftField" hidden>
+              <span class="setup-label">Draft</span>
+              <p class="setup-hint" data-online="draftHint">Draft starts when both commanders are in the room.</p>
+              <div class="draft-track" data-online="draftTrack"></div>
+              <div class="draft-squads" data-online="draftSquads"></div>
+              <div class="draft-roster" data-online="draftRoster"></div>
             </div>
 
             <div class="menu-buttons">

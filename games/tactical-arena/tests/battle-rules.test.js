@@ -426,8 +426,8 @@ test("Footwork requires six sequential unique steps, crosses enemies for true da
 
   assert.equal(result.accepted, true);
   assert.deepEqual(result.nextState.units.find((unit) => unit.id === "p1-swordsman").position, { x: 6, y: 0 });
-  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-a").hp, 23);
-  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-b").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-a").hp, 22); // 25 − 3 true
+  assert.equal(result.nextState.units.find((unit) => unit.id === "enemy-b").hp, 22); // 25 − 3 true
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").mp, 16);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-swordsman").spent, true);
 });

@@ -6,6 +6,19 @@ the actual unit data (`src/core/units/*.js`) and the resolvers
 Squads are **4 units**, duplicates allowed in casual/hot-seat, board 13×13 or 15×15,
 RAGE auto-triggers at **≤5 HP**.
 
+## Balance changelog
+
+- **2026-07-07 — first true-damage nudge (anti-wall):** **Footwork** (Swordsman)
+  `2 → 3` true and **Fart** (Fat Knight) `2 → 3` true. Motivated by the sim finding that
+  the dedicated true-damage comp couldn't out-pace stacked healers. More true-damage
+  sources are planned; the Nemesis passive→aura change is still under consideration.
+  **The simulation tables below predate this buff** — they need a re-run to reflect it.
+- **King left as-is (by design):** an earlier note floated reducing the King's −10-HP-per-
+  ally-fallen. That was reverted — **it is intentional**: the King is a non-combatant whose
+  HP *is* a readout of squad cohesion (30 HP ≈ 3 allies × 10). His fragility is the cost of
+  the command engine, not a bug to patch. Any King buff should come from elsewhere (base
+  HP, command strength, or a small always-on aura), not from softening the fall penalty.
+
 ---
 
 ## The math that drives synergy (read first)
@@ -163,12 +176,14 @@ own rage payoffs), the commands balloon:
   **Higher Ground!** +1 range (attacks *and* area ARTS).
 - Rally: every ally that falls heals the rest of the squad +5.
 
-**Balance flag / risk:** the King eats **−10 HP per ally that falls**, must act first
-every turn (mis-sequencing can soft-lock), and **doesn't sustain victory alone**. The
-command buff getting *stronger the more of your team is dying* is a comeback mechanic
-that can read as swingy — a losing King player suddenly hands out +5 STR to everyone.
-High skill ceiling, fragile floor. Probably fair, but the rage-scaling is the thing to
-model.
+**By design, not a flag:** the King eats **−10 HP per ally that falls** — this is
+*intentional*, his HP is a readout of squad cohesion (he's a non-combatant, 30 HP ≈ 3
+allies). He also must act first every turn (mis-sequencing can soft-lock) and **doesn't
+sustain victory alone**. The command buff getting *stronger the more of your team is dying*
+is a deliberate comeback mechanic. High skill ceiling, fragile floor — if he's buffed, it
+should come from base HP / command strength / an always-on aura, **not** from softening the
+fall penalty (that's the whole identity). The rage-scaling is still the thing to model for
+balance.
 
 ### 5. "Fat Squad" — the *designed* synergy (your balance benchmark)
 **Fat Knight + Fat Wizard + Fat Cleric + Fat Bowman** (all four required)
@@ -239,7 +254,9 @@ against it.
   dedicated true-damage comp (`truedmg`) lost to Wall **96%**, because the *throughput* of
   the CPU-usable true sources is far below what three stacked healers repair each turn. The
   practical wall-breaker turned out to be **out-tanking + magic reduction** (Fortress),
-  not chip true damage. Worth checking whether true-damage numbers should be higher.
+  not chip true damage. **First nudge applied (2026-07-07): Footwork and Fart both `2 → 3`
+  true** — a small down-payment on this; more true-damage sources are planned. Re-sim to
+  see whether it moves `truedmg` vs Wall.
 - **Silence** neuters ART-dependent comps (the whole Realm Stack) — but Nemesis and
   Mystic are silence-immune, which is exactly why they anchor those comps.
 - **Status immunity** (Paladin, Angel, Gargoyle, King, Monk-vs-blind) hard-counters the
@@ -248,6 +265,11 @@ against it.
 ---
 
 ## Simulation results (empirical backing)
+
+> ⚠ **These tables predate the 2026-07-07 Footwork/Fart buff** (see the changelog up top).
+> The comps that use those arts — `classic`, `baseline`, `king`, `truedmg`, `fatsquad` —
+> should now perform somewhat better than shown; re-run `node scripts/comp-sim.mjs --seeds 12`
+> to refresh before drawing new conclusions.
 
 The comps below were run head-to-head through the **real reducer + real CPU** — no
 synthetic model. `scripts/comp-sim.mjs` builds each match with `createMatchState` (same
@@ -334,7 +356,8 @@ true default squad and several purpose-built counters):
   but is a narrow specialist (loses to everything durable). `truedmg` **failed as an
   anti-wall (4%)** — true damage breaks walls *in theory*, but the actual CPU-usable
   true-damage throughput (Footwork, Fart, Time Steal aura) is far too low to out-pace three
-  healers. `poke` (kite) is simply too low-HP-throughput (23%).
+  healers. `poke` (kite) is simply too low-HP-throughput (23%). *(Follow-up: Footwork/Fart
+  buffed `2 → 3` on 2026-07-07 as a first step — this table predates it.)*
 
 ### The piloting caveat, quantified (still applies)
 

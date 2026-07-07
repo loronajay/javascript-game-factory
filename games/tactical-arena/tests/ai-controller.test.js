@@ -40,7 +40,11 @@ function replay(state, commands) {
 test("chooseActivation returns a legal command sequence", () => {
   const state = skirmish();
   const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
-  assert.ok(commands.length >= 3, "expected at least begin → primary → finish");
+  // An ART primary (e.g. Footwork) spends the activation itself, so the minimum legal
+  // sequence is begin → primary (2 commands, no trailing finish); a basic attack/defend
+  // adds the finish. Either way it must begin an activation and then act.
+  assert.ok(commands.length >= 2, "expected at least begin → primary");
+  assert.equal(commands[0].type, "BEGIN_ACTIVATION");
   replay(state, commands);
 });
 

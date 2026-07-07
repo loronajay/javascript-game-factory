@@ -16,6 +16,10 @@ import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js";
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
+import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { UNIT_TYPE_KEYS, groupedUnitTypes } from "./squadModel.js";
+import { createPortrait } from "./portraits.js";
+import { DRAFT_PICK_ORDER, applyDraftPick, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -23,6 +27,7 @@ const PLAYER_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f" };
 const MATCH_TYPES = Object.freeze({
   duel: Object.freeze({ minPlayers: 2, maxPlayers: 2, format: "ffa", label: "Classic 1v1" }),
+  draft1v1: Object.freeze({ minPlayers: 2, maxPlayers: 2, format: "ffa", label: "Draft 1v1", draft: true }),
   ffa4: Object.freeze({ minPlayers: 4, maxPlayers: 4, format: "ffa", label: "4 Player FFA" }),
   teams4: Object.freeze({ minPlayers: 4, maxPlayers: 4, format: "teams", label: "2v2 Teams" }),
 });
@@ -42,6 +47,12 @@ export function createOnlineFlow({ onStartMatch }) {
   const startBtn = $('[data-online="startBtn"]');
   const lockBtn = $('[data-online="lockBtn"]');
   const squadHost = $('[data-online="squadHost"]');
+  const blindPickField = $('[data-online="blindPickField"]') ?? squadHost.closest(".setup-field");
+  const draftField = $('[data-online="draftField"]');
+  const draftHint = $('[data-online="draftHint"]');
+  const draftTrack = $('[data-online="draftTrack"]');
+  const draftSquads = $('[data-online="draftSquads"]');
+  const draftRoster = $('[data-online="draftRoster"]');
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
   const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
 
@@ -54,6 +65,8 @@ export function createOnlineFlow({ onStartMatch }) {
   let selectedMatchType = "duel";
   let localLocked = false;
   const readyByClientId = new Map();
+  let draft = null;
+  let draftMembersKey = "";
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -116,6 +129,10 @@ export function createOnlineFlow({ onStartMatch }) {
     return MATCH_TYPES[normalizeMatchType(matchType)];
   }
 
+  function isDraftMatch(matchType = activeMatchType()) {
+    return !!matchTypeConfig(matchType).draft;
+  }
+
   function selectMatchType(type) {
     selectedMatchType = normalizeMatchType(type);
     for (const seg of matchTypeSegs) {
@@ -131,6 +148,32 @@ export function createOnlineFlow({ onStartMatch }) {
       maxPlayers: cfg.maxPlayers,
       settings: { matchType: type },
     };
+  }
+
+  function syncDraftMembership() {
+    const cfg = matchTypeConfig();
+    const key = isDraftMatch() && lobby?.members?.length === cfg.maxPlayers
+      ? lobby.members.join("|")
+      : "";
+    if (!key) {
+      draft = null;
+      draftMembersKey = "";
+      return;
+    }
+    if (key !== draftMembersKey) {
+      draft = createDraftState({ seats: [1, 2] });
+      draftMembersKey = key;
+    }
+  }
+
+  function draftPlayer(seat) {
+    return lobbyPlayers().find((p) => p.seat === Number(seat));
+  }
+
+  function draftPlayerLabel(seat) {
+    const player = draftPlayer(seat);
+    if (!player) return `Player ${seat}`;
+    return player.id === myClientId ? "You" : player.name;
   }
 
   function identity() {
@@ -158,17 +201,27 @@ export function createOnlineFlow({ onStartMatch }) {
   function renderRoster() {
     rosterEl.replaceChildren();
     const teams = activeMatchType() === "teams4";
+    const draftMode = isDraftMatch();
     for (const p of lobby?.players ?? []) {
       const li = document.createElement("li");
       li.className = "lobby-roster-item";
       const tags = [];
       if (p.id === lobby?.ownerId) tags.push('<span class="lobby-tag host">Host</span>');
       if (p.id === myClientId) tags.push('<span class="lobby-tag you">You</span>');
-      tags.push(
-        readyByClientId.get(p.id) === true
-          ? '<span class="lobby-tag ready">Locked</span>'
-          : '<span class="lobby-tag picking">Picking</span>',
-      );
+      if (draftMode) {
+        const pickCount = draft?.picks?.[p.seat]?.length ?? 0;
+        tags.push(
+          pickCount >= 4
+            ? '<span class="lobby-tag ready">Drafted</span>'
+            : '<span class="lobby-tag picking">Drafting</span>',
+        );
+      } else {
+        tags.push(
+          readyByClientId.get(p.id) === true
+            ? '<span class="lobby-tag ready">Locked</span>'
+            : '<span class="lobby-tag picking">Picking</span>',
+        );
+      }
       if (teams) {
         const team = p.seat % 2 === 1 ? 1 : 2;
         li.style.setProperty("--team", TEAM_COLOR[team] ?? PLAYER_COLOR[1]);
@@ -185,15 +238,22 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function syncUI() {
+    syncDraftMembership();
     const cfg = activeConfig() ?? config;
     cfg.format = matchTypeConfig().format;
     selectSeg(cfg.size);
     for (const seg of sizeSegs) seg.disabled = !isOwner;
     hostHintEl.textContent = isOwner ? "(you set it)" : "(set by host)";
-    squadPicker.setLocked(localLocked);
-    lockBtn.textContent = localLocked ? "Change Squad" : "Lock Squad";
-    lockBtn.classList.toggle("primary", !localLocked);
+    const draftMode = isDraftMatch();
+    if (blindPickField) blindPickField.hidden = draftMode;
+    if (draftField) draftField.hidden = !draftMode;
+    if (!draftMode) {
+      squadPicker.setLocked(localLocked);
+      lockBtn.textContent = localLocked ? "Change Squad" : "Lock Squad";
+      lockBtn.classList.toggle("primary", !localLocked);
+    }
     renderRoster();
+    renderDraft();
     syncStart();
   }
 
@@ -205,7 +265,9 @@ export function createOnlineFlow({ onStartMatch }) {
     const count = playerCount();
     const type = matchTypeConfig();
     const full = count === type.maxPlayers;
-    const locked = full && allPlayersLocked();
+    const draftMode = isDraftMatch();
+    const draftDone = draftMode && full && isDraftComplete(draft);
+    const locked = draftMode ? draftDone : full && allPlayersLocked();
     const missingLocks = full ? lobbyPlayers().filter((p) => readyByClientId.get(p.id) !== true).length : 0;
     startBtn.hidden = !isOwner;
     startBtn.disabled = !(isOwner && full && locked);
@@ -213,6 +275,9 @@ export function createOnlineFlow({ onStartMatch }) {
       lobbyHintEl.hidden = full && locked;
       if (!full) {
         lobbyHintEl.textContent = `Waiting for ${type.maxPlayers - count} more player${type.maxPlayers - count === 1 ? "" : "s"} for ${type.label}.`;
+      } else if (draftMode && !draftDone) {
+        const seat = currentDraftSeat(draft);
+        lobbyHintEl.textContent = seat === mySeat ? "Your draft pick is up." : `Waiting for ${draftPlayerLabel(seat)} to draft.`;
       } else if (!locked) {
         lobbyHintEl.textContent = `Waiting for ${missingLocks} squad lock-in${missingLocks === 1 ? "" : "s"}.`;
       } else {
@@ -220,7 +285,9 @@ export function createOnlineFlow({ onStartMatch }) {
       }
     } else {
       lobbyHintEl.hidden = false;
-      lobbyHintEl.textContent = localLocked
+      lobbyHintEl.textContent = draftMode
+        ? (draftDone ? "Draft complete. Waiting for the host to start..." : "Draft your squad, then wait for the host.")
+        : localLocked
         ? (locked ? "Locked in. Waiting for the host to start..." : "Locked in. Waiting for the other squad lock-ins...")
         : "Lock in when your squad is ready.";
     }
@@ -231,6 +298,114 @@ export function createOnlineFlow({ onStartMatch }) {
     if (myClientId) readyByClientId.set(myClientId, localLocked);
     squadPicker.setLocked(localLocked);
     if (broadcast) client?.sendReady(localLocked);
+    syncUI();
+  }
+
+  function renderDraft() {
+    if (!draftField || draftField.hidden) return;
+    const full = playerCount() === matchTypeConfig().maxPlayers;
+    if (!full || !draft) {
+      draftHint.textContent = "Draft starts when both commanders are in the room.";
+      draftTrack.replaceChildren();
+      draftSquads.replaceChildren();
+      draftRoster.replaceChildren();
+      return;
+    }
+
+    const currentSeat = currentDraftSeat(draft);
+    const complete = isDraftComplete(draft);
+    draftHint.textContent = complete
+      ? "Draft complete. No duplicate units are allowed across either squad."
+      : currentSeat === mySeat
+        ? "Your pick. Choose one available unit for your squad."
+        : `${draftPlayerLabel(currentSeat)} is picking. Taken units are locked for both sides.`;
+
+    draftTrack.replaceChildren();
+    for (let i = 0; i < DRAFT_PICK_ORDER.length; i += 1) {
+      const seat = DRAFT_PICK_ORDER[i];
+      const dot = document.createElement("span");
+      dot.className = `draft-step${i < draft.pickIndex ? " is-done" : ""}${i === draft.pickIndex ? " is-current" : ""}`;
+      dot.style.setProperty("--team", PLAYER_COLOR[seat] ?? PLAYER_COLOR[1]);
+      dot.textContent = String(i + 1);
+      draftTrack.appendChild(dot);
+    }
+
+    draftSquads.replaceChildren();
+    for (const seat of [1, 2]) {
+      const panel = document.createElement("section");
+      panel.className = `draft-side${seat === currentSeat && !complete ? " is-picking" : ""}`;
+      panel.style.setProperty("--team", PLAYER_COLOR[seat] ?? PLAYER_COLOR[1]);
+      const title = document.createElement("h3");
+      title.textContent = draftPlayerLabel(seat);
+      const list = document.createElement("div");
+      list.className = "draft-picks";
+      const picks = draft.picks?.[seat] ?? [];
+      for (let i = 0; i < 4; i += 1) {
+        const type = picks[i];
+        const slot = document.createElement("div");
+        slot.className = `draft-pick${type ? " is-filled" : ""}`;
+        if (type) {
+          slot.append(createPortrait(type, { variant: "is-chip", eager: true }));
+          const name = document.createElement("span");
+          name.textContent = UNIT_TYPES[type]?.name ?? type;
+          slot.append(name);
+        } else {
+          slot.textContent = `Pick ${i + 1}`;
+        }
+        list.appendChild(slot);
+      }
+      panel.append(title, list);
+      draftSquads.appendChild(panel);
+    }
+
+    const taken = draftedTypes(draft);
+    draftRoster.replaceChildren();
+    for (const group of groupedUnitTypes(UNIT_TYPE_KEYS)) {
+      const section = document.createElement("section");
+      section.className = "draft-class";
+      const heading = document.createElement("h3");
+      heading.textContent = group.label;
+      const units = document.createElement("div");
+      units.className = "draft-class-units";
+      for (const type of group.types) {
+        const disabled = complete || currentSeat !== mySeat || !canDraftType(draft, mySeat, type);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `draft-unit${taken.has(type) ? " is-taken" : ""}`;
+        btn.disabled = disabled;
+        btn.dataset.type = type;
+        btn.append(createPortrait(type, { variant: "is-card", eager: true }));
+        const name = document.createElement("span");
+        name.textContent = UNIT_TYPES[type]?.name ?? type;
+        btn.append(name);
+        if (taken.has(type)) {
+          const flag = document.createElement("i");
+          flag.textContent = "Taken";
+          btn.append(flag);
+        }
+        btn.addEventListener("click", () => submitDraftPick(type));
+        units.appendChild(btn);
+      }
+      section.append(heading, units);
+      draftRoster.appendChild(section);
+    }
+  }
+
+  function submitDraftPick(type) {
+    if (!draft || currentDraftSeat(draft) !== mySeat) {
+      setStatus("Wait for your draft turn.");
+      return;
+    }
+    const pickIndex = draft.pickIndex;
+    const result = applyDraftPick(draft, { seat: mySeat, type });
+    if (!result.accepted) {
+      setStatus("That unit is already drafted.");
+      renderDraft();
+      return;
+    }
+    draft = result.nextState;
+    client?.sendDraftPick({ pickIndex, seat: mySeat, type });
+    setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : "Pick locked.");
     syncUI();
   }
 
@@ -296,7 +471,15 @@ export function createOnlineFlow({ onStartMatch }) {
       myClientId = id ?? myClientId;
       membersAtStart = Array.isArray(members) ? members.slice() : [];
       const playersAtStart = membersAtStart.map((clientId, index) => ({ id: clientId, seat: index + 1 }));
-      if (!allPlayersLocked(playersAtStart)) {
+      if (isDraftMatch()) {
+        syncDraftMembership();
+        if (!isDraftComplete(draft)) {
+          membersAtStart = null;
+          setStatus("Start blocked until the draft is complete.");
+          syncUI();
+          return;
+        }
+      } else if (!allPlayersLocked(playersAtStart)) {
         membersAtStart = null;
         setStatus("Start blocked until every squad is locked in.");
         syncUI();
@@ -307,8 +490,8 @@ export function createOnlineFlow({ onStartMatch }) {
       seed = matchSeed;
       setStatus("Match starting…");
 
-      const composition = squadPicker.getSquad();
-      const skins = squadPicker.getSkins();
+      const composition = isDraftMatch() ? [...(draft?.picks?.[mySeat] ?? DEFAULT_SQUAD)] : squadPicker.getSquad();
+      const skins = isDraftMatch() ? [null, null, null, null] : squadPicker.getSkins();
       compositionsBySeat[mySeat] = composition;
       skinsBySeat[mySeat] = skins;
       client.sendSetup({ seat: mySeat, composition, skins });
@@ -321,6 +504,15 @@ export function createOnlineFlow({ onStartMatch }) {
       compositionsBySeat[seat] = Array.isArray(composition) ? composition : [...DEFAULT_SQUAD];
       skinsBySeat[seat] = Array.isArray(skins) ? skins : [null, null, null, null];
       tryStart();
+    };
+
+    cb.onRemoteDraftPick = ({ pickIndex, seat, type }) => {
+      if (!isDraftMatch() || !draft || pickIndex !== draft.pickIndex) return;
+      const result = applyDraftPick(draft, { seat, type });
+      if (!result.accepted) return;
+      draft = result.nextState;
+      setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : `${draftPlayerLabel(seat)} locked a pick.`);
+      syncUI();
     };
 
     cb.onError = (_code, message) => {
@@ -388,6 +580,8 @@ export function createOnlineFlow({ onStartMatch }) {
     isOwner = false;
     localLocked = false;
     readyByClientId.clear();
+    draft = null;
+    draftMembersKey = "";
     squadPicker.setLocked(false);
     lockBtn.textContent = "Lock Squad";
     lockBtn.classList.add("primary");
@@ -421,7 +615,8 @@ export function createOnlineFlow({ onStartMatch }) {
   });
   lockBtn.addEventListener("click", () => setLocalLocked(!localLocked));
   startBtn.addEventListener("click", () => {
-    if (isOwner && playerCount() === matchTypeConfig().maxPlayers && allPlayersLocked()) client?.startLobby();
+    const readyToStart = isDraftMatch() ? isDraftComplete(draft) : allPlayersLocked();
+    if (isOwner && playerCount() === matchTypeConfig().maxPlayers && readyToStart) client?.startLobby();
     else syncStart();
   });
   $('[data-action="leaveLobby"]').addEventListener("click", () => {

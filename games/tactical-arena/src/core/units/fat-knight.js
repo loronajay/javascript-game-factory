@@ -47,8 +47,8 @@ export const FAT_KNIGHT = Object.freeze({
       resolution: "shoveAura",
       selfCast: true,
       targeting: Object.freeze({ shape: "selfAura", radius: 1 }),
-      damage: Object.freeze({ type: "true", amount: 2 }),
-      description: "Push every enemy within 1 tile one orthogonal space away. If blocked by a unit, wall, or arena edge, that enemy takes 2 true damage instead.",
+      damage: Object.freeze({ type: "true", amount: 3 }),
+      description: "Push every enemy within 1 tile one orthogonal space away. If blocked by a unit, wall, or arena edge, that enemy takes 3 true damage instead.",
       implemented: true,
       ai: Object.freeze({ intent: "statusAoe", tags: Object.freeze(["control"]) })
     }),

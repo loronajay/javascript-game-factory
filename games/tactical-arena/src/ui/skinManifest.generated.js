@@ -38,6 +38,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "archer",
+    slug: "black-widow",
+    file: "black-widow-archer.png"
+  },
+  {
+    type: "archer",
     slug: "blood-moon",
     file: "blood-moon-archer.png"
   },
@@ -77,6 +82,16 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "scarlet-rose-archer.png"
   },
   {
+    type: "archer",
+    slug: "vampire-slayer",
+    file: "vampire-slayer-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "velvet",
+    file: "velvet-archer.png"
+  },
+  {
     type: "mystic",
     slug: "summer-vibes",
     file: "summer-vibes-mystic.png"
@@ -90,6 +105,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "mystic",
     slug: "blood-moon",
     file: "blood-moon-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "discord-kitten",
+    file: "discord-kitten-mystic.png"
   },
   {
     type: "mystic",
@@ -108,8 +128,18 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "mystic",
+    slug: "heartbreaker",
+    file: "heartbreaker-mystic.png"
+  },
+  {
+    type: "mystic",
     slug: "lunar-goddess",
     file: "lunar-goddess-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "moon-guardian",
+    file: "moon-guardian-mystic.png"
   },
   {
     type: "mystic",

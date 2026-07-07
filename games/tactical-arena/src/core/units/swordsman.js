@@ -26,7 +26,7 @@ export const SWORDSMAN = Object.freeze({
       kind: "active",
       mpCost: 4,
       extraMove: 3,
-      description: "Walk your current MOVE + 3 as unique tiles, passing through enemies for 2 true damage. End on empty ground.",
+      description: "Walk your current MOVE + 3 as unique tiles, passing through enemies for 3 true damage. End on empty ground.",
       implemented: true,
       ai: Object.freeze({ intent: "rush", tags: Object.freeze(["setup"]) })
     }),

@@ -18,7 +18,8 @@
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
 //   each  -> all : ready     { ready }                          lobby squad lock-in flag
-//   each  -> all : setup     { seat, composition, skins }       blind squad pick
+//   each  -> all : setup     { seat, composition, skins }       blind squad pick / completed draft squad
+//   each  -> all : draft_pick { pickIndex, seat, type }         draft phase pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
 //   each  -> all : profile   { playerId, displayName, seat }    name exchange
@@ -153,6 +154,15 @@ function parseSetupMessage(value) {
   return { seat: Math.floor(seat), composition, skins };
 }
 
+function parseDraftPickMessage(value) {
+  const p = parseJson(value);
+  if (!p || typeof p !== "object") return null;
+  const pickIndex = Number(p.pickIndex);
+  const seat = Number(p.seat);
+  if (!Number.isFinite(pickIndex) || !Number.isFinite(seat) || typeof p.type !== "string") return null;
+  return { pickIndex: Math.floor(pickIndex), seat: Math.floor(seat), type: p.type };
+}
+
 // A command is a plain serializable object { type, player, ...payload }. The core
 // reducer is the real validator — here we only confirm the wire shape.
 function parseCommandMessage(value) {
@@ -218,6 +228,7 @@ export function createOnlineClient() {
     onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteReady: null, // ({ clientId, ready })
     onRemoteSetup: null, // ({ seat, composition?, skins? })
+    onRemoteDraftPick: null, // ({ pickIndex, seat, type })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
     onRemoteProfile: null, // ({ playerId, displayName, seat })
@@ -253,6 +264,11 @@ export function createOnlineClient() {
       case "setup": {
         const m = parseSetupMessage(value);
         if (m) cb.onRemoteSetup?.(m);
+        return;
+      }
+      case "draft_pick": {
+        const m = parseDraftPickMessage(value);
+        if (m) cb.onRemoteDraftPick?.(m);
         return;
       }
       case "command": {
@@ -429,6 +445,9 @@ export function createOnlineClient() {
   function sendSetup({ seat, composition = null, skins = null } = {}) {
     _lobbyMsg("setup", JSON.stringify({ seat, composition, skins }));
   }
+  function sendDraftPick({ pickIndex, seat, type } = {}) {
+    _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type }));
+  }
   function sendReady(ready) {
     _lobbyMsg("ready", JSON.stringify({ ready: !!ready }));
   }
@@ -490,6 +509,7 @@ export function createOnlineClient() {
     sendConfig,
     sendReady,
     sendSetup,
+    sendDraftPick,
     sendCommand,
     sendHash,
     sendProfile,

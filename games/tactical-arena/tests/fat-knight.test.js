@@ -104,7 +104,7 @@ test("Fart pushes nearby enemies away, or deals true damage when blocked", () =>
 
   assert.deepEqual(findUnit(result.nextState, "push").position, { x: 7, y: 5 }, "enemy is shoved one tile away");
   assert.deepEqual(findUnit(result.nextState, "blocked").position, { x: 5, y: 4 }, "blocked enemy stays put");
-  assert.equal(findUnit(result.nextState, "blocked").hp, 23, "blocked enemy takes 2 true damage");
+  assert.equal(findUnit(result.nextState, "blocked").hp, 22, "blocked enemy takes 3 true damage");
   assert.deepEqual(findUnit(result.nextState, "ally").position, { x: 4, y: 5 }, "allies are ignored");
 });
 
