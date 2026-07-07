@@ -19,6 +19,7 @@ import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { UNIT_TYPE_KEYS, groupedUnitTypes } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
+import { openSkinPicker } from "./skinPicker.js";
 import { DRAFT_PICK_ORDER, applyDraftPick, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
@@ -340,12 +341,13 @@ export function createOnlineFlow({ onStartMatch }) {
       const list = document.createElement("div");
       list.className = "draft-picks";
       const picks = draft.picks?.[seat] ?? [];
+      const skins = draft.skins?.[seat] ?? [];
       for (let i = 0; i < 4; i += 1) {
         const type = picks[i];
         const slot = document.createElement("div");
         slot.className = `draft-pick${type ? " is-filled" : ""}`;
         if (type) {
-          slot.append(createPortrait(type, { variant: "is-chip", eager: true }));
+          slot.append(createPortrait(type, { variant: "is-chip", eager: true, skin: skins[i] ?? null }));
           const name = document.createElement("span");
           name.textContent = UNIT_TYPES[type]?.name ?? type;
           slot.append(name);
@@ -391,20 +393,33 @@ export function createOnlineFlow({ onStartMatch }) {
     }
   }
 
-  function submitDraftPick(type) {
+  async function submitDraftPick(type) {
     if (!draft || currentDraftSeat(draft) !== mySeat) {
       setStatus("Wait for your draft turn.");
       return;
     }
     const pickIndex = draft.pickIndex;
-    const result = applyDraftPick(draft, { seat: mySeat, type });
+    setStatus("Choose a skin for this draft pick.");
+    const chosen = await openSkinPicker({ type, initial: null, accent: PLAYER_COLOR[mySeat] ?? PLAYER_COLOR[1] });
+    if (!chosen) {
+      setStatus("Draft pick cancelled.");
+      syncUI();
+      return;
+    }
+    if (!draft || currentDraftSeat(draft) !== mySeat || draft.pickIndex !== pickIndex) {
+      setStatus("Draft changed before that pick locked.");
+      syncUI();
+      return;
+    }
+    const skin = chosen.skin ?? null;
+    const result = applyDraftPick(draft, { seat: mySeat, type, skin });
     if (!result.accepted) {
       setStatus("That unit is already drafted.");
       renderDraft();
       return;
     }
     draft = result.nextState;
-    client?.sendDraftPick({ pickIndex, seat: mySeat, type });
+    client?.sendDraftPick({ pickIndex, seat: mySeat, type, skin });
     setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : "Pick locked.");
     syncUI();
   }
@@ -491,7 +506,7 @@ export function createOnlineFlow({ onStartMatch }) {
       setStatus("Match starting…");
 
       const composition = isDraftMatch() ? [...(draft?.picks?.[mySeat] ?? DEFAULT_SQUAD)] : squadPicker.getSquad();
-      const skins = isDraftMatch() ? [null, null, null, null] : squadPicker.getSkins();
+      const skins = isDraftMatch() ? draftSkinsForSeat(mySeat) : squadPicker.getSkins();
       compositionsBySeat[mySeat] = composition;
       skinsBySeat[mySeat] = skins;
       client.sendSetup({ seat: mySeat, composition, skins });
@@ -506,9 +521,9 @@ export function createOnlineFlow({ onStartMatch }) {
       tryStart();
     };
 
-    cb.onRemoteDraftPick = ({ pickIndex, seat, type }) => {
+    cb.onRemoteDraftPick = ({ pickIndex, seat, type, skin }) => {
       if (!isDraftMatch() || !draft || pickIndex !== draft.pickIndex) return;
-      const result = applyDraftPick(draft, { seat, type });
+      const result = applyDraftPick(draft, { seat, type, skin });
       if (!result.accepted) return;
       draft = result.nextState;
       setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : `${draftPlayerLabel(seat)} locked a pick.`);
@@ -525,6 +540,12 @@ export function createOnlineFlow({ onStartMatch }) {
       setStatus("Disconnected. Try again.");
       resetLobbyState();
     };
+  }
+
+  function draftSkinsForSeat(seat) {
+    const skins = [...(draft?.skins?.[seat] ?? [])];
+    while (skins.length < 4) skins.push(null);
+    return skins.slice(0, 4);
   }
 
   // Build the session and hand off — only once the shared seed, the owner's config,

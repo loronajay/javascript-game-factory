@@ -19,7 +19,7 @@
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
 //   each  -> all : ready     { ready }                          lobby squad lock-in flag
 //   each  -> all : setup     { seat, composition, skins }       blind squad pick / completed draft squad
-//   each  -> all : draft_pick { pickIndex, seat, type }         draft phase pick
+//   each  -> all : draft_pick { pickIndex, seat, type, skin }   draft phase pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
 //   each  -> all : profile   { playerId, displayName, seat }    name exchange
@@ -160,7 +160,12 @@ function parseDraftPickMessage(value) {
   const pickIndex = Number(p.pickIndex);
   const seat = Number(p.seat);
   if (!Number.isFinite(pickIndex) || !Number.isFinite(seat) || typeof p.type !== "string") return null;
-  return { pickIndex: Math.floor(pickIndex), seat: Math.floor(seat), type: p.type };
+  return {
+    pickIndex: Math.floor(pickIndex),
+    seat: Math.floor(seat),
+    type: p.type,
+    skin: typeof p.skin === "string" ? p.skin : null,
+  };
 }
 
 // A command is a plain serializable object { type, player, ...payload }. The core
@@ -228,7 +233,7 @@ export function createOnlineClient() {
     onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteReady: null, // ({ clientId, ready })
     onRemoteSetup: null, // ({ seat, composition?, skins? })
-    onRemoteDraftPick: null, // ({ pickIndex, seat, type })
+    onRemoteDraftPick: null, // ({ pickIndex, seat, type, skin? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
     onRemoteProfile: null, // ({ playerId, displayName, seat })
@@ -445,8 +450,8 @@ export function createOnlineClient() {
   function sendSetup({ seat, composition = null, skins = null } = {}) {
     _lobbyMsg("setup", JSON.stringify({ seat, composition, skins }));
   }
-  function sendDraftPick({ pickIndex, seat, type } = {}) {
-    _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type }));
+  function sendDraftPick({ pickIndex, seat, type, skin = null } = {}) {
+    _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type, skin }));
   }
   function sendReady(ready) {
     _lobbyMsg("ready", JSON.stringify({ ready: !!ready }));

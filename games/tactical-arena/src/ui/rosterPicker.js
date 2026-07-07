@@ -13,7 +13,8 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
 import { createPortrait } from "./portraits.js";
 import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes } from "./squadModel.js";
-import { getUnitSkins, normalizeSkinSlug, skinLabel } from "./skinModel.js";
+import { normalizeSkinSlug, skinLabel } from "./skinModel.js";
+import { openSkinPicker } from "./skinPicker.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 
@@ -33,7 +34,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
   const loadout = normalizeSquadLoadout(initial);
   const squad = [...loadout.composition];
   const skins = [...loadout.skins];
-  const selectedSkinByType = new Map(squad.map((type, index) => [type, skins[index] ?? null]));
+  const skinDrafts = squad.map((type, index) => ({ type, slug: skins[index] ?? null }));
   let activeSlot = clampSlot(startSlot);
   let focusedType = squad[activeSlot];
 
@@ -97,7 +98,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         btn.addEventListener("click", () => {
           activeSlot = slot.index;
           focusedType = squad[slot.index];
-          selectedSkinByType.set(focusedType, skins[slot.index] ?? null);
+          primeSlotDraft(activeSlot);
           paintAll();
         });
         tray.appendChild(btn);
@@ -167,7 +168,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       portrait.style.setProperty("--team", accent || "var(--p1)");
       const info = el("div", "roster-detail-info");
       info.innerHTML = unitDetailHtml(def);
-      info.prepend(createSkinShelf(focusedType));
+      info.prepend(createSkinSummary(focusedType));
       split.append(portrait, info);
       scroll.append(split);
       detail.replaceChildren(bar, scroll);
@@ -190,51 +191,61 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     // Place `type` in the active slot, then advance to the next slot so a player
     // can tap straight down the roster.
     function assign(type) {
-      squad[activeSlot] = type;
-      skins[activeSlot] = selectedSkinForType(type);
+      const slotIndex = activeSlot;
+      const skin = selectedSkinForType(type);
+      squad[slotIndex] = type;
+      skins[slotIndex] = skin;
+      skinDrafts[slotIndex] = { type, slug: skin };
       focusedType = type;
       activeSlot = (activeSlot + 1) % squad.length;
       paintAll();
     }
 
     function selectedSkinForType(type) {
-      return normalizeSkinSlug(type, selectedSkinByType.get(type));
+      const draft = skinDrafts[activeSlot];
+      return normalizeSkinSlug(type, draft?.type === type ? draft.slug : null);
     }
 
-    function createSkinShelf(type) {
-      const shelf = el("div", "skin-shelf");
-      const title = el("div", "skin-shelf-title");
-      title.textContent = "Skins";
-      const options = el("div", "skin-options");
+    function setSkinForFocusedType(skin) {
+      const slug = normalizeSkinSlug(focusedType, skin);
+      skinDrafts[activeSlot] = { type: focusedType, slug };
+      if (squad[activeSlot] === focusedType) skins[activeSlot] = slug;
+    }
+
+    function primeSlotDraft(slotIndex) {
+      skinDrafts[slotIndex] = {
+        type: squad[slotIndex],
+        slug: normalizeSkinSlug(squad[slotIndex], skins[slotIndex])
+      };
+    }
+
+    function createSkinSummary(type) {
       const current = selectedSkinForType(type);
-      const choices = [
-        { slug: null, name: "Classic", unlocked: true },
-        ...getUnitSkins(type)
-      ];
+      const slot = SLOT_LAYOUT.find((item) => item.index === activeSlot) ?? SLOT_LAYOUT[0];
+      const summary = el("div", "skin-summary");
+      summary.appendChild(createPortrait(type, { variant: "is-skin-summary", eager: true, skin: current }));
 
-      for (const choice of choices) {
-        const selected = (choice.slug ?? null) === current;
-        const locked = !choice.unlocked;
-        const btn = el("button", `skin-option${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`);
-        btn.type = "button";
-        btn.dataset.skin = choice.slug ?? "";
-        btn.appendChild(createPortrait(type, { variant: "is-skin", eager: true, skin: choice.slug }));
-        const name = el("span", "skin-option-name");
-        name.textContent = choice.name ?? skinLabel(type, choice.slug);
-        const status = el("span", "skin-option-status");
-        status.textContent = locked ? "Locked" : "Unlocked";
-        btn.append(name, status);
-        btn.addEventListener("click", () => {
-          if (locked) return;
-          selectedSkinByType.set(type, choice.slug ?? null);
-          if (squad[activeSlot] === type) skins[activeSlot] = selectedSkinForType(type);
-          paintAll();
-        });
-        options.appendChild(btn);
-      }
+      const copy = el("div", "skin-summary-copy");
+      const title = el("div", "skin-summary-title");
+      title.textContent = `Slot ${activeSlot + 1} Skin`;
+      const name = el("div", "skin-summary-name");
+      name.textContent = skinLabel(type, current);
+      const hint = el("div", "skin-summary-hint");
+      hint.textContent = `${slot.row === "front" ? "Front" : "Back"} row cosmetic`;
+      copy.append(title, name, hint);
 
-      shelf.append(title, options);
-      return shelf;
+      const btn = el("button", "skin-summary-btn");
+      btn.type = "button";
+      btn.textContent = "Change Skin";
+      btn.addEventListener("click", async () => {
+        const result = await openSkinPicker({ type, initial: selectedSkinForType(type), accent });
+        if (!result) return;
+        setSkinForFocusedType(result.skin);
+        paintAll();
+      });
+
+      summary.append(copy, btn);
+      return summary;
     }
 
     paintAll();
@@ -252,7 +263,10 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
     function onOverlay(event) { if (event.target === overlay) cancel(); }
     function onKey(event) {
-      if (event.key === "Escape") { event.stopPropagation(); cancel(); }
+      if (event.key !== "Escape") return;
+      if (isSkinPickerOpen()) return;
+      event.stopPropagation();
+      cancel();
     }
 
     card.addEventListener("click", (event) => {
@@ -280,4 +294,11 @@ function el(tag, className) {
 
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+function isSkinPickerOpen() {
+  return Boolean(
+    typeof document.querySelector === "function" &&
+    document.querySelector(".skin-picker-modal:not([hidden])")
+  );
 }

@@ -152,8 +152,22 @@ body:has(.ref-modal:not([hidden])) .back-link {
       max(.35rem, env(safe-area-inset-left));
   }
 
+  .skin-picker-modal {
+    padding:
+      max(.35rem, env(safe-area-inset-top))
+      max(.35rem, env(safe-area-inset-right))
+      max(.35rem, env(safe-area-inset-bottom))
+      max(.35rem, env(safe-area-inset-left));
+  }
+
   .roster-card {
     width: min(980px, 100%);
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+  }
+
+  .skin-picker-card {
     height: calc(var(--app-height, 100vh) - .7rem);
     max-height: calc(var(--app-height, 100vh) - .7rem);
     border-radius: 10px;
@@ -521,6 +535,21 @@ body:has(.ref-modal:not([hidden])) .back-link {
     min-width: 0;
     padding-inline: .55rem;
   }
+
+  .skin-picker-card {
+    width: min(100%, 96vw);
+  }
+
+  .skin-picker-foot {
+    gap: .45rem;
+    padding: .48rem .6rem calc(.48rem + env(safe-area-inset-bottom));
+  }
+
+  .skin-picker-foot .menu-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: .55rem;
+  }
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
@@ -727,6 +756,50 @@ body:has(.ref-modal:not([hidden])) .back-link {
   }
 
   .roster-foot .menu-btn {
+    min-width: 5.5rem;
+    padding: .5rem .7rem;
+  }
+
+  .skin-picker-card {
+    width: min(760px, 98vw);
+    height: 94vh;
+    max-height: 94vh;
+  }
+
+  .skin-picker-body {
+    grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
+  }
+
+  .skin-picker-preview {
+    padding: .65rem;
+  }
+
+  .skin-picker-preview .unit-portrait.is-skin-preview {
+    width: 92px;
+    height: 122px;
+  }
+
+  .skin-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr));
+    gap: .38rem;
+    padding: .55rem;
+  }
+
+  .skin-picker-choice {
+    padding: .32rem .22rem .34rem;
+  }
+
+  .skin-picker-choice .unit-portrait.is-skin-choice {
+    width: 50px;
+    height: 62px;
+  }
+
+  .skin-picker-foot {
+    gap: .45rem;
+    padding: .45rem .7rem;
+  }
+
+  .skin-picker-foot .menu-btn {
     min-width: 5.5rem;
     padding: .5rem .7rem;
   }

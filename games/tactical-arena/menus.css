@@ -95,6 +95,14 @@
 .roster-detail-info { flex:1; min-width:0; }
 .roster-detail-split .unit-portrait.is-hero { width:10.75rem; height:15rem; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 24px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--p1)) 45%,transparent); }
 .roster-detail-split .is-glyph-fallback { font-size:3rem; }
+.skin-summary { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.55rem; margin:0 0 .75rem; padding:.5rem; border:1px solid rgba(80,120,150,.35); border-radius:8px; background:rgba(8,18,30,.34); }
+.skin-summary .unit-portrait.is-skin-summary { width:3.25rem; height:3.9rem; border-radius:6px; }
+.skin-summary-copy { display:grid; gap:.08rem; min-width:0; }
+.skin-summary-title { color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .54rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.skin-summary-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:800 .72rem var(--font-display); letter-spacing:.03em; }
+.skin-summary-hint { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:700 .52rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.skin-summary-btn { width:auto; min-height:2.35rem; padding:.45rem .62rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 48%,var(--parchment-edge)); border-radius:7px; background:linear-gradient(180deg,rgba(var(--sheen),.08),rgba(var(--sheen),0) 50%),rgba(12,22,36,.6); color:var(--text); font:800 .58rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.skin-summary-btn:hover { border-color:var(--team,var(--brass)); filter:brightness(1.12); transform:none; }
 .skin-shelf { display:grid; gap:.4rem; margin:0 0 .75rem; padding:.55rem; border:1px solid rgba(80,120,150,.35); border-radius:8px; background:rgba(8,18,30,.34); }
 .skin-shelf-title { color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .skin-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(5.7rem,1fr)); gap:.4rem; }
@@ -114,6 +122,14 @@
 @media (max-width:560px) {
   .roster-body { flex-direction:column; }
   .roster-grid { width:auto; max-width:none; border-right:0; border-bottom:1px solid rgba(70,100,130,.35); }
+  .skin-summary { grid-template-columns:auto minmax(0,1fr); }
+  .skin-summary-btn { grid-column:1 / -1; width:100%; }
+  .skin-picker-body { grid-template-columns:1fr; }
+  .skin-picker-preview { grid-template-columns:auto minmax(0,1fr); align-content:center; justify-items:start; text-align:left; border-right:0; border-bottom:1px solid rgba(70,100,130,.35); }
+  .skin-picker-preview .unit-portrait.is-skin-preview { width:5.5rem; height:7rem; }
+  .skin-picker-copy { justify-items:start; }
+  .skin-picker-grid { grid-template-columns:repeat(auto-fill,minmax(5.8rem,1fr)); padding:.65rem; }
+  .skin-picker-choice .unit-portrait.is-skin-choice { width:3.35rem; height:4.05rem; }
 }
 
 /* Results */
@@ -160,6 +176,24 @@
 
 /* ── Online Versus lobby ─────────────────────────────────────────────────── */
 /* Skin gallery */
+.skin-picker-modal { z-index:55; }
+.skin-picker-card { width:min(48rem,96vw); height:min(38rem,90vh); }
+.skin-picker-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(12rem,16rem) minmax(0,1fr); overflow:hidden; }
+.skin-picker-preview { display:grid; align-content:center; justify-items:center; gap:.75rem; min-width:0; padding:1rem; border-right:1px solid rgba(70,100,130,.35); background:rgba(8,18,30,.3); text-align:center; }
+.skin-picker-preview .unit-portrait.is-skin-preview { width:min(12rem,32vw); height:min(16rem,50vh); border:1px solid var(--parchment-edge); border-radius:8px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 28px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--brass)) 32%,transparent); }
+.skin-picker-copy { display:grid; gap:.16rem; justify-items:center; min-width:0; }
+.skin-picker-kicker { color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.13em; text-transform:uppercase; }
+.skin-picker-title { max-width:100%; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--brass-hi); font:900 1rem var(--font-display); letter-spacing:.04em; }
+.skin-picker-status { color:var(--muted); font:800 .52rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+.skin-picker-grid { min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(7rem,1fr)); align-content:start; gap:.5rem; padding:.9rem; }
+.skin-picker-choice { display:grid; gap:.26rem; justify-items:center; min-width:0; padding:.45rem .36rem .48rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.42)); color:inherit; cursor:pointer; }
+.skin-picker-choice:hover:not(.is-locked),.skin-picker-choice.is-selected { border-color:var(--team,var(--brass)); filter:brightness(1.08); transform:none; }
+.skin-picker-choice.is-selected { box-shadow:inset 0 0 0 1px var(--team,var(--brass)); }
+.skin-picker-choice.is-locked { opacity:.55; filter:grayscale(.55); cursor:not-allowed; }
+.skin-picker-choice .unit-portrait.is-skin-choice { width:4.25rem; height:5.15rem; border-radius:7px; }
+.skin-picker-choice-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:800 .62rem var(--font-display); letter-spacing:.03em; }
+.skin-picker-choice-status { color:var(--muted); font:800 .48rem var(--font-display); letter-spacing:.09em; text-transform:uppercase; }
+.skin-picker-foot .menu-btn { width:auto; min-width:7rem; }
 .skin-gallery-card { width:min(60rem,96vw); height:min(45rem,90vh); }
 .skin-gallery-body { flex:1; min-height:0; overflow-y:auto; display:grid; align-content:start; gap:1rem; padding:1rem; }
 .skin-gallery-section { display:grid; gap:.45rem; }

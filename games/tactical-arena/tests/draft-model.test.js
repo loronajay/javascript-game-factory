@@ -50,3 +50,20 @@ test("draft completes with four unique units per seat", () => {
   assert.deepEqual(draft.picks[2], ["archer", "mystic", "sniper", "angel"]);
   assert.equal(draftedTypes(draft).size, 8);
 });
+
+test("draft stores normalized skin selections alongside each seat's picks", () => {
+  let draft = createDraftState();
+
+  let result = applyDraftPick(draft, { seat: 1, type: "swordsman", skin: "summer-vibes" });
+  assert.equal(result.accepted, true);
+  draft = result.nextState;
+
+  result = applyDraftPick(draft, { seat: 2, type: "archer", skin: "not-real" });
+  assert.equal(result.accepted, true);
+  draft = result.nextState;
+
+  assert.deepEqual(draft.picks[1], ["swordsman"]);
+  assert.deepEqual(draft.skins[1], ["summer-vibes"]);
+  assert.deepEqual(draft.picks[2], ["archer"]);
+  assert.deepEqual(draft.skins[2], [null]);
+});
