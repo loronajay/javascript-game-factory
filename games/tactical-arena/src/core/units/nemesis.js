@@ -49,8 +49,8 @@ export const NEMESIS = Object.freeze({
       name: "Nullify",
       kind: "passive",
       mpCost: null,
-      effect: Object.freeze({ type: "immunity", statuses: Object.freeze(["silence"]), damageTypes: Object.freeze(["magic"]) }),
-      description: "Nemesis is immune to silence and magic damage.",
+      effect: Object.freeze({ type: "immunity", statuses: Object.freeze(["silence"]) }),
+      description: "Nemesis is immune to silence.",
       implemented: true
     })
   ]),

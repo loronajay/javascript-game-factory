@@ -29,7 +29,7 @@ test("Fat Cleric is registered with her support stat block", () => {
   assert.equal(def.name, "Fat Cleric");
   assert.equal(def.glyph, "✚");
   assert.equal(def.classType, "support");
-  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 4, strength: 7, defense: 6, maxHp: 30, maxMp: 35 });
+  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 4, strength: 7, defense: 5, maxHp: 30, maxMp: 35 });
 });
 
 // --- Snack Break ------------------------------------------------------------
@@ -189,7 +189,7 @@ test("Brothers in Arms: dormant without the full fat family on her team", () => 
   ]);
   const stats = getEffectiveStats(findUnit(state, "fc"), state);
   assert.equal(stats.moveRange, 2, "no +1 MOVE without the whole family");
-  assert.equal(stats.defense, 6, "no +1 DEF without the whole family");
+  assert.equal(stats.defense, 5, "no +1 DEF without the whole family");
   // The passive requires all three siblings, so it lights up once Fat Bowman exists.
   const passive = getUnitType("fat-cleric").arts.find((a) => a.id === "brothers-in-arms");
   assert.deepEqual([...passive.effect.requiredTypes].sort(), ["fat-bowman", "fat-knight", "fat-wizard"]);

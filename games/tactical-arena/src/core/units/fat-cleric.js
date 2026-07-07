@@ -34,7 +34,7 @@ export const FAT_CLERIC = Object.freeze({
     moveRange: 2,
     attackRange: 4,
     strength: 7,
-    defense: 6,
+    defense: 5,
     maxHp: 30,
     maxMp: 35
   }),

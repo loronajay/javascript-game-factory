@@ -8,7 +8,7 @@ export const FAT_WIZARD = Object.freeze({
     moveRange: 2,
     attackRange: 3,
     strength: 7,
-    defense: 7,
+    defense: 4,
     maxHp: 30,
     maxMp: 35
   }),

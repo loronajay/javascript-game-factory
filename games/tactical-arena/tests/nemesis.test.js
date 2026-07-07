@@ -51,7 +51,7 @@ test("Realm of Magic boosts allied magic damage and floors allied MP costs at 1"
   assert.equal(getArtMpCost(mag, { id: "cheap", mpCost: 1 }, state), 1);
 });
 
-test("Nullify grants silence and magic-damage immunity", () => {
+test("Nullify grants silence immunity, but Nemesis is no longer immune to magic damage", () => {
   const state = scenario([
     { id: "nem", type: "nemesis", player: 1, x: 0, y: 0 },
     { id: "mag", type: "magician", player: 2, x: 3, y: 0 }
@@ -59,7 +59,9 @@ test("Nullify grants silence and magic-damage immunity", () => {
   const nem = findUnit(state, "nem");
   assert.ok(statusImmunities(nem).has("silence"));
   assert.equal(applyStatus(nem, { type: "silence", duration: 1 }).applied, false);
-  assert.equal(resolveBaseStrike(findUnit(state, "mag"), nem, { damageType: "magic", state }).damage, 0);
+  // Magic immunity was removed (reserved for a future dedicated magic-immune unit); an
+  // enemy Magician's STR-6 magic bolt now lands in full, ignoring Nemesis's DEF.
+  assert.equal(resolveBaseStrike(findUnit(state, "mag"), nem, { damageType: "magic", state }).damage, 6);
 });
 
 test("Dark Pulse hits the first unit on each ray, damaging enemies and healing allies", () => {
