@@ -18,6 +18,7 @@
   --pill-text: #c7d0dd;
   --chip-base: rgba(10,20,32,.65);
   --body-bg: radial-gradient(circle at 50% 22%, rgba(20,50,90,.22), transparent 46%), radial-gradient(circle at 50% 118%, rgba(4,10,20,.6), transparent 60%), repeating-linear-gradient(92deg, rgba(0,0,0,.06) 0 4px, transparent 4px 9px), linear-gradient(180deg, #0e1520, #060c14);
+  --menu-bg-image: url("./assets/theme-bgs/moonlit.png");
   /* board */
   --tile-light: #5e7182; --tile-dark: #333f4d; --tile-stroke: rgba(8,14,22,.65); --tile-hover: #7c93a6;
   --tile-side-a: #1a2836; --tile-side-b: #0e1822;

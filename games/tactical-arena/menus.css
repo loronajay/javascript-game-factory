@@ -315,7 +315,12 @@
     radial-gradient(70% 50% at 74% 35%, rgba(216, 163, 63, .16), transparent 58%),
     radial-gradient(58% 44% at 20% 22%, rgba(82, 136, 198, .28), transparent 62%),
     radial-gradient(60% 55% at 50% 110%, rgba(72, 168, 111, .12), transparent 65%),
+    linear-gradient(180deg, rgba(5, 10, 16, .42), rgba(3, 7, 12, .72)),
+    var(--menu-bg-image),
     linear-gradient(180deg, rgba(5, 10, 16, .86), rgba(3, 7, 12, .96));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: auto, auto, auto, auto, cover, auto;
 }
 
 .menu-screen.is-active::before,

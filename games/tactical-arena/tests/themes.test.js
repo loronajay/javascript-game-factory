@@ -6,6 +6,7 @@
 // color from the previous palette.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import {
   THEMES,
   THEME_TOKEN_KEYS,
@@ -78,6 +79,13 @@ test("token values are non-empty strings and --sheen is an RGB triple", () => {
   }
 });
 
+test("every registered theme has a menu background asset named after its id", () => {
+  for (const theme of THEMES) {
+    const asset = new URL(`../assets/theme-bgs/${theme.id}.png`, import.meta.url);
+    assert.equal(existsSync(asset), true, `${theme.id} needs assets/theme-bgs/${theme.id}.png`);
+  }
+});
+
 test("normalizeThemeId: known ids pass, junk falls back to default", () => {
   for (const theme of THEMES) assert.equal(normalizeThemeId(theme.id), theme.id);
   assert.equal(normalizeThemeId("nonsense"), DEFAULT_THEME_ID);
@@ -93,6 +101,7 @@ test("applyTheme sets the palette's tokens and tags the root", () => {
   assert.equal(root.dataset.theme, warm.id);
   assert.equal(root.props.size, Object.keys(warm.tokens).length);
   assert.equal(root.props.get("--tile-light"), warm.tokens["--tile-light"]);
+  assert.equal(root.props.get("--menu-bg-image"), `url(./assets/theme-bgs/${warm.id}.png)`);
 });
 
 test("applyTheme back to default clears every override", () => {
