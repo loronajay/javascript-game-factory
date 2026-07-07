@@ -42,6 +42,41 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "blood-moon-archer.png"
   },
   {
+    type: "archer",
+    slug: "blood-rose",
+    file: "blood-rose-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "desert-warrior",
+    file: "desert-warrior-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "floral",
+    file: "floral-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "geisha",
+    file: "geisha-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "masquerade",
+    file: "masquerade-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "nature-guardian",
+    file: "nature-guardian-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "scarlet-rose",
+    file: "scarlet-rose-archer.png"
+  },
+  {
     type: "mystic",
     slug: "summer-vibes",
     file: "summer-vibes-mystic.png"
@@ -55,6 +90,46 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "mystic",
     slug: "blood-moon",
     file: "blood-moon-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "enlightened",
+    file: "enlightened-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "floral",
+    file: "floral-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "geisha",
+    file: "geisha-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "lunar-goddess",
+    file: "lunar-goddess-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "nirvana",
+    file: "nirvana-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "ruby",
+    file: "ruby-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "star-princess",
+    file: "star-princess-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "sun-goddess",
+    file: "sun-goddess-mystic.png"
   },
   {
     type: "magician",
@@ -292,6 +367,21 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-fat-cleric.png"
   },
   {
+    type: "fat-cleric",
+    slug: "mystic-cosplay",
+    file: "mystic-cosplay-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
+    slug: "nirvana",
+    file: "nirvana-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
+    slug: "sun-goddess",
+    file: "sun-goddess-fat-cleric.png"
+  },
+  {
     type: "fat-bowman",
     slug: "summer-vibes",
     file: "summer-vibes-fat-bowman.png"
@@ -300,5 +390,25 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-bowman",
     slug: "arcane",
     file: "arcane-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "enchanted",
+    file: "enchanted-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "geisha",
+    file: "geisha-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "scarlet-rose",
+    file: "scarlet-rose-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "violet",
+    file: "violet-fat-bowman.png"
   }
 ]);

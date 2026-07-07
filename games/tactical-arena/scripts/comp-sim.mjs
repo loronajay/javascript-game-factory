@@ -37,14 +37,36 @@ function bumpRage(comp, key, n = 1) {
   (rageStats[comp] ??= { activations: 0, raging: 0, rageArt: 0, scaledCommand: 0 })[key] += n;
 }
 
-// ---- named comps (from TEAM_COMP_ANALYSIS.md) ------------------------------
+// ---- named comps -----------------------------------------------------------
+// The three "supers" (realm/wall/contagion) plus a deliberately DIVERSE field:
+// classic variants, and several comps designed to COUNTER a specific super
+// (true-damage vs the wall, Dead-Zone tanks vs the magic pile, status-immunity
+// vs the contagion lock). The point is to stop testing a shallow pool.
 const COMPS = {
-  realm:     ["nemesis", "magician", "fat-wizard", "necromancer"], // all-magic DEF-bypass
-  wall:      ["mystic", "fat-cleric", "paladin", "gargoyle"],      // attrition wall
-  contagion: ["virus", "witch-doctor", "necromancer", "archer"],   // status lock
-  king:      ["king", "fat-knight", "swordsman", "paladin"],       // rage-scaling commands
+  // --- the three top comps under scrutiny ---
+  realm:     ["nemesis", "magician", "fat-wizard", "necromancer"],   // all-magic DEF-bypass
+  wall:      ["mystic", "fat-cleric", "paladin", "gargoyle"],        // attrition wall
+  contagion: ["virus", "witch-doctor", "necromancer", "archer"],     // status lock
+  // --- prior extras ---
   fatsquad:  ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"], // designed synergy
-  baseline:  ["magician", "mystic", "swordsman", "paladin"]        // fair benchmark
+  king:      ["king", "fat-knight", "swordsman", "paladin"],          // rage-scaling commands
+  // --- classic / benchmark squads ---
+  classic:   ["swordsman", "archer", "mystic", "magician"],           // the true default squad
+  baseline:  ["magician", "mystic", "swordsman", "paladin"],          // near-classic (archer→paladin)
+  // --- purpose-built challengers ---
+  // anti-contagion: four status-immune-or-cleansing bodies. Paladin/Angel/Gargoyle are
+  // fully immune, Mystic cleanses + team +1 DEF. Should walk through the status lock.
+  immune:    ["paladin", "angel", "gargoyle", "mystic"],
+  // anti-wall: true damage bypasses DEF *and* Defend. Time Steal (auto aura), Footwork,
+  // Fart/Stumble, Hand-of-Life sustain — most of it CPU-usable without rage.
+  truedmg:   ["father-time", "swordsman", "fat-knight", "paladin"],
+  // anti-realm / grind: Dead Zone (−1 team magic) behind two 30-HP Defend tanks + a healer.
+  // Aims to outlast the magic pile until it stalls on MP (realm already draws ~44%).
+  fortress:  ["gargoyle", "clod", "necromancer", "fat-cleric"],
+  // ranged kite: pierce + magic + DEF aura, tries to poke from outside melee threat.
+  poke:      ["sniper", "fat-bowman", "angel", "mystic"],
+  // buff-stack: pile every team multiplier (magic +1, DEF aura, Age ±stat) onto one carry.
+  hybrid:    ["nemesis", "mystic", "father-time", "paladin"]
 };
 
 // ---- args ------------------------------------------------------------------
@@ -139,15 +161,16 @@ console.log("Head-to-head (win% for the ROW comp):\n");
 // header
 const pad = (s, n) => String(s).padEnd(n);
 const padL = (s, n) => String(s).padStart(n);
-process.stdout.write(pad("", 11));
-for (const n of names) process.stdout.write(padL(n, 11));
+const W = 10; // matrix column width
+process.stdout.write(pad("", W));
+for (const n of names) process.stdout.write(padL(n, W));
 process.stdout.write("\n");
 
 const matrix = {};
 for (const a of names) {
-  process.stdout.write(pad(a, 11));
+  process.stdout.write(pad(a, W));
   for (const b of names) {
-    if (a === b) { process.stdout.write(padL("—", 11)); continue; }
+    if (a === b) { process.stdout.write(padL("—", W)); continue; }
     const key = [a, b].join(">");
     let r = matrix[key];
     if (!r) {
@@ -157,7 +180,7 @@ for (const a of names) {
     }
     const decided = r.aWins + r.bWins;
     const winPct = decided > 0 ? Math.round((r.aWins / decided) * 100) : 0;
-    process.stdout.write(padL(`${winPct}%`, 11));
+    process.stdout.write(padL(`${winPct}%`, W));
     tally[a].w += r.aWins; tally[a].l += r.bWins; tally[a].d += r.draws; tally[a].g += r.games;
   }
   process.stdout.write("\n");
@@ -175,6 +198,25 @@ console.log(pad("comp", 12) + padL("win%", 8) + padL("W", 6) + padL("L", 6) + pa
 for (const row of ranked) {
   console.log(pad(row.n, 12) + padL(row.winPct.toFixed(1), 8) + padL(row.w, 6) + padL(row.l, 6) + padL(row.d, 8) + padL(row.g, 8));
 }
+
+// ---- focused: can anything fight the supers? -------------------------------
+// Each comp's win% (of decided games) against wall / realm / contagion specifically.
+const SUPERS = ["wall", "realm", "contagion"];
+console.log("\nVs the supers — win% for the ROW comp against each (decided games; >50% = beats it):\n");
+console.log(pad("comp", 12) + SUPERS.map((s) => padL(s, 11)).join(""));
+for (const a of names) {
+  let line = pad(a, 12);
+  for (const s of SUPERS) {
+    if (a === s) { line += padL("—", 11); continue; }
+    const r = matrix[[a, s].join(">")];
+    const decided = r.aWins + r.bWins;
+    const winPct = decided > 0 ? Math.round((r.aWins / decided) * 100) : 0;
+    const draws = r.draws;
+    line += padL(`${winPct}%(${draws}d)`, 11);
+  }
+  console.log(line);
+}
+console.log("  format: win%(Nd) where N = draws in that matchup out of " + (SEEDS * 2) + " games.");
 
 // ---- draw / length diagnostics --------------------------------------------
 let totalDraws = 0, totalGames = 0, totalAct = 0;

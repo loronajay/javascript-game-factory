@@ -65,6 +65,16 @@ these auras is entirely in the *first* copy.
 
 ## Tier S — the comps I'd watch for over-tuning
 
+> **Added after simulation:** a comp not in my original list — **"Fortress"
+> (Gargoyle + Clod + Necromancer + Fat Cleric)** — topped the whole field at **94%** and
+> beats all three comps below (Wall 91%, Realm 62%, Contagion 100%). It's a *durable
+> magic-reduction grind*: two 30-HP Defend tanks (Clod's Rock Hard negates physical
+> outright) behind **Dead Zone (−1 team magic)**, the **Deathly Aura (−1 enemy DEF)**, and
+> a healer. The lesson is that the single strongest lever in the roster right now is
+> **stacked damage mitigation**, not damage output — DEF-bypass magic (Realm) and
+> attrition heals (Wall) both lose to a core that simply refuses to die *and* dampens the
+> one thing (magic) that ignores its armor. See the simulation section for the numbers.
+
 ### 1. "Realm Stack" — all-magic DEF-bypass
 **Nemesis + Magician + Fat Wizard + Necromancer** (swap Necromancer↔Virus)
 
@@ -223,10 +233,13 @@ against it.
 
 ## Counterplay axes (so nerfs target the right thing)
 
-- **True damage** is the universal wall-breaker (ignores DEF *and* Defend): Volley,
-  Footwork/Stumble, Time Steal, Fart, Flight, Poison Tick, Juggernaut/Virus rage
-  blasts, Clod's Thunderous Charge. If walls feel unbreakable, it's because a comp
-  lacks a true-damage source — check that enough units carry one.
+- **True damage** ignores DEF *and* Defend (Volley, Footwork/Stumble, Time Steal, Fart,
+  Flight, Poison Tick, Juggernaut/Virus rage blasts, Clod's Thunderous Charge) — the
+  theoretical answer to a wall. **But the sim showed the theory doesn't carry:** the
+  dedicated true-damage comp (`truedmg`) lost to Wall **96%**, because the *throughput* of
+  the CPU-usable true sources is far below what three stacked healers repair each turn. The
+  practical wall-breaker turned out to be **out-tanking + magic reduction** (Fortress),
+  not chip true damage. Worth checking whether true-damage numbers should be higher.
 - **Silence** neuters ART-dependent comps (the whole Realm Stack) — but Nemesis and
   Mystic are silence-immune, which is exactly why they anchor those comps.
 - **Status immunity** (Paladin, Angel, Gargoyle, King, Monk-vs-blind) hard-counters the
@@ -236,102 +249,132 @@ against it.
 
 ## Simulation results (empirical backing)
 
-The comps above were run head-to-head through the **real reducer + real CPU** — no
+The comps below were run head-to-head through the **real reducer + real CPU** — no
 synthetic model. `scripts/comp-sim.mjs` builds each match with `createMatchState` (same
 coin flip as a live game) and lets `chooseActivation` drive both sides, replaying every
-command through `applyCommand`. Each pairing = **24 seeds × both sides = 48 games** at
-**Normal** difficulty on a 13×13 board (seeds played both ways to cancel spawn/first-turn
-bias). Reproduce with `node scripts/comp-sim.mjs --seeds 24` (flags: `--difficulty`,
-`--size`, `--seeds`).
+command through `applyCommand`. **13 comps, full round-robin, 12 seeds × both sides = 24
+games/pairing (264 games per comp)** at Normal difficulty on 13×13 (seeds played both ways
+to cancel spawn/first-turn bias). Reproduce with `node scripts/comp-sim.mjs --seeds 12`.
 
-**Head-to-head — win% for the ROW comp (of *decided* games):**
+**The comps** (the field was deliberately widened past the original five to include the
+true default squad and several purpose-built counters):
 
-| | realm | wall | contagion | king | fatsquad | baseline |
-|---|---:|---:|---:|---:|---:|---:|
-| **realm** | — | 68% | 48% | 93% | 77% | 90% |
-| **wall** | 32% | — | 85% | 94% | 58% | 100% |
-| **contagion** | 52% | 15% | — | 90% | 67% | 94% |
-| **king** | 7% | 6% | 10% | — | 13% | 40% |
-| **fatsquad** | 23% | 42% | 33% | 88% | — | 76% |
-| **baseline** | 10% | 0% | 6% | 60% | 24% | — |
+| comp | squad | intent |
+|---|---|---|
+| realm | nemesis, magician, fat-wizard, necromancer | all-magic DEF-bypass |
+| wall | mystic, fat-cleric, paladin, gargoyle | attrition + heals |
+| contagion | virus, witch-doctor, necromancer, archer | status lock |
+| fatsquad | fat-knight/wizard/cleric/bowman | designed synergy |
+| king | king, fat-knight, swordsman, paladin | rage-scaling commands |
+| **classic** | swordsman, archer, mystic, magician | the true default squad |
+| baseline | magician, mystic, swordsman, paladin | near-classic (archer→paladin) |
+| immune | paladin, angel, gargoyle, mystic | status-immune → anti-contagion |
+| truedmg | father-time, swordsman, fat-knight, paladin | true damage → anti-wall |
+| fortress | gargoyle, clod, necromancer, fat-cleric | Dead-Zone tanks → anti-realm grind |
+| poke | sniper, fat-bowman, angel, mystic | long-range kite |
+| hybrid | nemesis, mystic, father-time, paladin | stack team multipliers on one carry |
 
-**Overall (all pairings, decided games):**
+**Overall ranking (decided games; 264 games/comp):**
 
-| rank | comp | win% | W | L | draws / 240 |
+| rank | comp | win% | W | L | draws |
 |---:|---|---:|---:|---:|---:|
-| 1 | wall | 77.1% | 172 | 51 | 17 |
-| 2 | realm | 76.3% | 103 | 32 | **105** |
-| 3 | contagion | 64.8% | 138 | 75 | 27 |
-| 4 | fatsquad | 55.5% | 116 | 93 | 31 |
-| 5 | baseline | 21.0% | 46 | 173 | 21 |
-| 6 | king | 15.8% | 35 | 186 | 19 |
+| 1 | **fortress** | **94.0%** | 235 | 15 | 14 |
+| 2 | realm | 83.1% | 133 | 27 | **104** |
+| 3 | hybrid | 76.7% | 132 | 40 | **92** |
+| 4 | wall | 74.6% | 182 | 62 | 20 |
+| 5 | fatsquad | 60.6% | 146 | 95 | 23 |
+| 6 | contagion | 57.4% | 140 | 104 | 20 |
+| 7 | immune | 52.0% | 117 | 108 | 39 |
+| 8 | truedmg | 34.2% | 83 | 160 | 21 |
+| 9 | baseline | 30.4% | 75 | 172 | 17 |
+| 10 | king | 25.4% | 64 | 188 | 12 |
+| 11 | poke | 22.9% | 53 | 178 | 33 |
+| 12 | **classic** | **8.0%** | 20 | 231 | 13 |
 
-### What the sim confirms and refines
+**Vs the supers — win% for the ROW comp against each (>50% = beats it; draws in parens):**
 
-- **The Tier-S trio is real.** Wall, Realm, and Contagion are the top three by a wide
-  margin, exactly as predicted. The "designed" **Fat Squad lands 4th** — a clear tier
-  below the emergent comps, which is the intended-comp-is-underpowered signal called out
-  above.
-- **Wall is as strong as Realm and far more reliable.** Realm beats Wall *head-to-head*
-  (68% of decided games), but Realm **draws 105 of 240 games (44%)** — it wins the damage
-  race (DEF-bypass) yet frequently **can't close**, stalling out on MP starvation once its
-  casters are dry against a healing wall. Wall only draws 17. So "strongest" depends on
-  what you're optimizing: Realm has the highest ceiling, Wall the highest floor.
-- **Contagion hard-counters Wall (85%)** — status-lock walks straight through the
-  attrition wall's defenses, as expected. Realm ≈ Contagion (roughly even).
-- **King is the *worst* comp (15.8%).** Partly piloting, but — importantly — **not only
-  piloting.** The instrumentation below shows the CPU *did* land the rage-scaling command
-  buff 310 times across its 200 games, so the signature mechanic was online, and King still
-  lost ~85% of the time. Its structural problems dominate: a non-combatant eats one of four
-  slots, −10 HP per ally that falls means the scaling turns on exactly as the King is being
-  chipped out, and acts-first is a liability. A coordinated human would do better, but this
-  is closer to "genuinely fragile" than "the AI just can't play it."
-- **Rankings are stable across difficulty.** A Hard-CPU run (16 seeds) reproduces the same
-  tiers — wall 76.7% ≈ realm 74.3% > contagion 63.3% > fatsquad 52.1% > king 20.9% ≈
-  baseline 20.4% — so the ordering isn't a Normal-AI artifact (King ticks up on Hard but
-  stays near the bottom).
+| comp | vs wall | vs realm | vs contagion |
+|---|---:|---:|---:|
+| fortress | **91%** | **62%** (11d) | **100%** |
+| hybrid | **82%** | 20% (14d) | **65%** |
+| realm | **71%** | — | **55%** (13d) |
+| immune | 5% | 0% | **82%** |
+| fatsquad | 50% | 23% | 22% |
+| truedmg | 4% | 6% | 17% |
+| poke | 0% | 15% | 25% |
+| king | 4% | 6% | 8% |
+| baseline | 0% | 0% | 4% |
+| classic | 0% | 0% | 4% |
 
-### The piloting caveat, quantified
+### Headline findings from the wider pool
 
-You were right to distrust a pure CPU-vs-CPU read: **the CPU never *seeks* rage.** It only
-reaches ≤5 HP by taking damage and never sets up the payoffs (baiting its own units into
-rage, timing Nuke/Self Destruct, managing Realm's MP curve, ordering the Contagion lock).
-The sim now measures exactly how large that blind spot is (20-seed Normal run):
+- **Widening the pool found a comp that beats all three "supers": `fortress` (94%).**
+  Two 30-HP Defend tanks (Gargoyle DEF 7 + Clod DEF 8, Rock Hard negating physical) behind
+  **Dead Zone (−1 team magic)**, the **Deathly Aura (−1 enemy DEF)**, and a Fat Cleric
+  healer. It beats Wall **91%** (out-walls the wall), Realm **62%** (Dead Zone + Defend
+  halve the magic while the tanks refuse to die and Realm stalls on MP), and Contagion
+  **100%**. The original "supers" were an artifact of a shallow pool — the real apex is a
+  *durable magic-reduction grind*, and it says the strongest lever in the game is stacked
+  **damage mitigation**, not damage output.
+- **Correction to my earlier writeup: Wall BEATS Contagion (~100%), not the reverse.** I
+  had this inverted. The reason is decisive and mechanical: the wall is **stuffed with
+  status counters** — Paladin and Gargoyle are fully status-immune, Mystic (Purify) and Fat
+  Cleric (Cleanse) strip what lands. The contagion lock does almost nothing to it. The
+  general rule holds (**status immunity + cleanse hard-counter Contagion**) — I just
+  attributed the 85% to the wrong side.
+- **The true default squad `classic` is DEAD LAST (8%).** Swordsman/Archer/Mystic/Magician
+  beats almost nothing in the current roster (0% vs wall/realm/fortress, 4% vs contagion).
+  This is a stark **power-creep** signal: the rebuild-original units have outrun the legacy
+  four. And it is *not* a piloting excuse (see below) — classic had the **highest** rage
+  usage of any comp and still lost 92% of its games.
+- **Realm is #2 but still can't close** — 104 draws of 264 (39%). `hybrid` (a leaner
+  Nemesis buff-stack) is #3 and inherits the same problem (92 draws). Both win the damage
+  race and stall out; Nemesis comps are boom-or-draw.
+- **The purpose-built counters split:** `immune` worked as designed **vs Contagion (82%)**
+  but is a narrow specialist (loses to everything durable). `truedmg` **failed as an
+  anti-wall (4%)** — true damage breaks walls *in theory*, but the actual CPU-usable
+  true-damage throughput (Footwork, Fart, Time Steal aura) is far too low to out-pace three
+  healers. `poke` (kite) is simply too low-HP-throughput (23%).
 
-| comp | unit-turns | **raging%** | rage-locked arts fired | King scaled commands |
+### The piloting caveat, quantified (still applies)
+
+The CPU **never seeks rage** — it only reaches ≤5 HP by taking damage and never sets up the
+payoffs. The sim measures how large that blind spot is (this 12-seed run):
+
+| comp | unit-turns | **raging%** | rage-locked arts fired | King scaled cmds |
 |---|---:|---:|---:|---:|
-| realm | 23,336 | 0.5% | 14 | — |
-| wall | 8,667 | 4.1% | 16 | — |
-| contagion | 6,657 | 3.9% | 32 | — |
-| king | 5,787 | 5.8% | 24 | 310 |
-| fatsquad | 7,212 | 4.9% | 0 | — |
-| baseline | 6,097 | 6.8% | 47 | — |
+| classic | 8,064 | **7.9%** | 47 | — |
+| baseline | 8,805 | 6.3% | 69 | — |
+| truedmg | 7,994 | 6.5% | 103 | — |
+| immune | 10,643 | 5.9% | 97 | — |
+| king | 7,926 | 5.2% | 32 | 388 |
+| wall | 12,617 | 4.5% | 16 | — |
+| fatsquad | 9,958 | 4.3% | 0 | — |
+| contagion | 9,529 | 3.9% | 37 | — |
+| fortress | 11,130 | **2.9%** | 13 | — |
+| hybrid | 17,500 | 0.7% | 27 | — |
+| realm | 30,459 | 0.4% | 23 | — |
 
-- **`raging%`** — units act while raging **0.5%–7% of the time**. So every RAGE *passive*
-  (Archer never-miss + 50% crit, Swordsman +3 MOVE/Last Stand, Mystic +6 MOVE + damage-halve,
-  Paladin/Angel seekers, Gargoyle Volcanic, the fat squad's Trample/Lazy Cast/Desperation/
-  Emergency Snacks, Necromancer's amplified aura) is online in a rounding-error fraction of
-  turns. The sim essentially measures these comps **with rage switched off.**
-- **rage-locked arts** — the marquee ultimates (Nuke, Self Destruct, Rewind, Black Death
-  Dance, Explosion, Thunderous Charge, Heavenseeker, Darkseeker) fire **a few dozen times
-  across ~200 games** — i.e. almost never. Realm's whole finisher plan (Nuke) fired 14
-  times total.
+Units act while raging **0.4%–8% of the time**, and rage-locked ultimates (Nuke, Self
+Destruct, Explosion, …) fire a few dozen times across hundreds of games — i.e. the sim
+scores every rage-dependent comp near its **floor**. Two readings that matter for trust:
 
-**So which comps are scored at their FLOOR, not their ceiling?** Any comp whose power lives
-in rage or setup: **King** (command scaling), **baseline & any Magician comp** (Nuke),
-**Fat Squad** (all four rage payoffs are passive → 0 in the "arts" column but suppressed by
-the 4.9% raging rate), **Juggernaut/Clod/Virus/Angel** shells (Self Destruct / Thunderous
-Charge / Explosion / Heavenseeker). Comps that win on **always-on** value — Wall's
-Guardian + heal auras, Realm's team magic buff — are measured much closer to their true
-strength. That asymmetry is the single biggest reason to treat the ladder as *directional*,
-not final: the brute always-on comps are flattered, the rage/combo comps are undersold.
+- **`classic` being worst is a *genuine* power gap, not a floor artifact** — it had the
+  *most* rage online of any comp and still finished last. Same for `truedmg`/`baseline`,
+  which fire the most rage-arts and still sit near the bottom.
+- **`fortress`'s dominance is trustworthy, not inflated** — it has the *lowest* rage usage
+  (2.9%, tanks rarely dip to 5 HP) yet tops the ladder. It wins purely on **always-on**
+  value (tank DEF + Dead Zone + Deathly Aura + heals), so 94% is close to its real strength,
+  not a number propped up by rage the CPU can't reach.
 
-### Caveats on reading these numbers
-- **Both sides are the same greedy CPU.** No setup sequencing, no rage baiting, limited
-  positioning — see the quantified gap above.
-- **Draws are excluded from win%.** Realm's 76.3% is over 135 decided games; its 105 draws
-  are a finding in their own right (a comp that can't finish is a soft balance problem too).
-- **The honest use of this data:** trust it for the *always-on* comparisons (Guardian vs
-  Deathly Aura vs Realm, wall durability, DEF-bypass) and the draw/stall diagnostics; treat
-  every rage-or-setup verdict as a lower bound. For those, the resolver-level capability
-  read in the unit notes above is the better guide until a rage-seeking driver exists.
+The comps still undersold by the CPU are the rage/setup ones: King (structural problems
+aside), any Magician/Nuke shell, and the Juggernaut/Clod/Virus/Angel finisher units. Read
+those as lower bounds; read the always-on comps (fortress, wall, realm) as close to true.
+
+### Caveats
+- **Both sides are the same greedy CPU** — no setup sequencing, no rage baiting, limited
+  positioning. Rankings are stable across Normal/Hard, but the rage floor applies to both.
+- **Draws are excluded from win%** — Realm's and hybrid's high draw counts are themselves a
+  finding (comps that can't finish are a soft balance problem too).
+- **Head-to-head cells are 24 games** (±~10%); trust the overall column and the clear gaps,
+  not 1–2 point differences.
