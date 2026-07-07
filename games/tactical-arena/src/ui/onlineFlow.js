@@ -171,6 +171,10 @@ export function createOnlineFlow({ onStartMatch }) {
     return lobbyPlayers().find((p) => p.seat === Number(seat));
   }
 
+  function localLobbySeat() {
+    return lobbyPlayers().find((p) => p.id === myClientId)?.seat ?? mySeat;
+  }
+
   function draftPlayerLabel(seat) {
     const player = draftPlayer(seat);
     if (!player) return `Player ${seat}`;
@@ -278,7 +282,7 @@ export function createOnlineFlow({ onStartMatch }) {
         lobbyHintEl.textContent = `Waiting for ${type.maxPlayers - count} more player${type.maxPlayers - count === 1 ? "" : "s"} for ${type.label}.`;
       } else if (draftMode && !draftDone) {
         const seat = currentDraftSeat(draft);
-        lobbyHintEl.textContent = seat === mySeat ? "Your draft pick is up." : `Waiting for ${draftPlayerLabel(seat)} to draft.`;
+        lobbyHintEl.textContent = seat === localLobbySeat() ? "Your draft pick is up." : `Waiting for ${draftPlayerLabel(seat)} to draft.`;
       } else if (!locked) {
         lobbyHintEl.textContent = `Waiting for ${missingLocks} squad lock-in${missingLocks === 1 ? "" : "s"}.`;
       } else {
@@ -314,10 +318,11 @@ export function createOnlineFlow({ onStartMatch }) {
     }
 
     const currentSeat = currentDraftSeat(draft);
+    const localSeat = localLobbySeat();
     const complete = isDraftComplete(draft);
     draftHint.textContent = complete
       ? "Draft complete. No duplicate units are allowed across either squad."
-      : currentSeat === mySeat
+      : currentSeat === localSeat
         ? "Your pick. Choose one available unit for your squad."
         : `${draftPlayerLabel(currentSeat)} is picking. Taken units are locked for both sides.`;
 
@@ -370,7 +375,7 @@ export function createOnlineFlow({ onStartMatch }) {
       const units = document.createElement("div");
       units.className = "draft-class-units";
       for (const type of group.types) {
-        const disabled = complete || currentSeat !== mySeat || !canDraftType(draft, mySeat, type);
+        const disabled = complete || currentSeat !== localSeat || !canDraftType(draft, localSeat, type);
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `draft-unit${taken.has(type) ? " is-taken" : ""}`;
@@ -394,32 +399,33 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   async function submitDraftPick(type) {
-    if (!draft || currentDraftSeat(draft) !== mySeat) {
+    const localSeat = localLobbySeat();
+    if (!draft || currentDraftSeat(draft) !== localSeat) {
       setStatus("Wait for your draft turn.");
       return;
     }
     const pickIndex = draft.pickIndex;
     setStatus("Choose a skin for this draft pick.");
-    const chosen = await openSkinPicker({ type, initial: null, accent: PLAYER_COLOR[mySeat] ?? PLAYER_COLOR[1] });
+    const chosen = await openSkinPicker({ type, initial: null, accent: PLAYER_COLOR[localSeat] ?? PLAYER_COLOR[1] });
     if (!chosen) {
       setStatus("Draft pick cancelled.");
       syncUI();
       return;
     }
-    if (!draft || currentDraftSeat(draft) !== mySeat || draft.pickIndex !== pickIndex) {
+    if (!draft || currentDraftSeat(draft) !== localSeat || draft.pickIndex !== pickIndex) {
       setStatus("Draft changed before that pick locked.");
       syncUI();
       return;
     }
     const skin = chosen.skin ?? null;
-    const result = applyDraftPick(draft, { seat: mySeat, type, skin });
+    const result = applyDraftPick(draft, { seat: localSeat, type, skin });
     if (!result.accepted) {
       setStatus("That unit is already drafted.");
       renderDraft();
       return;
     }
     draft = result.nextState;
-    client?.sendDraftPick({ pickIndex, seat: mySeat, type, skin });
+    client?.sendDraftPick({ pickIndex, seat: localSeat, type, skin });
     setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : "Pick locked.");
     syncUI();
   }
