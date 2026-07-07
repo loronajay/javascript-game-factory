@@ -95,6 +95,7 @@ test("magic and casts declare a gather windup; thrown objects declare a toss win
   // Tosses: the token leans back and snaps forward before the lob.
   assert.equal(getAbilityVfx("smoke-bomb").windup.style, "toss");
   assert.equal(getAbilityVfx("throw-cigar").windup.style, "toss");
+  assert.equal(getAbilityVfx("stone-throw").windup.style, "toss");
   // Physical draws and motion arts stay windup-free (pace + no gather fantasy).
   for (const id of ["poison-arrow", "leg-shot", "volley-shot", "footwork", "flee", "life-sap", "moonstrike", "mage-killer"]) {
     assert.equal(getAbilityVfx(id)?.windup, undefined, `${id} should not wind up`);
@@ -107,6 +108,9 @@ test("Volley Shot rains real arrows and Throw Cigar is a tumbling lob", () => {
   assert.equal(cigar.type, "lob");
   assert.equal(cigar.projectile.shape, "lob");
   assert.equal(cigar.soundKey, "throwCigar");
+  const stone = getAbilityVfx("stone-throw");
+  assert.equal(stone.projectile.shape, "rock");
+  assert.notEqual(stone.projectile.shape, cigar.projectile.shape);
 });
 
 test("signature abilities carry their bespoke recipe flags", () => {

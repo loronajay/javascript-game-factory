@@ -21,7 +21,7 @@ const STANCE_VFX = Object.freeze({
 // Real projectile specs consumed by effects.js's flight primitive. `shape` picks the
 // built figure: "arrow" (shaft + head, rotates to heading), "orb" (glowing magic
 // bolt with a mote tail), "tracer" (a flat, fast rifle streak), "lob" (a tumbling
-// thrown object on a high arc). Every ranged BASIC attack resolves its projectile
+// cigar/smoke canister), "rock" (an irregular boulder on a high arc). Every ranged BASIC attack resolves its projectile
 // here by unit type; rolled attack ARTS override it via their recipe's `projectile`.
 const ATTACK_PROJECTILES = Object.freeze({
   archer: Object.freeze({ shape: "arrow", arcHeight: 62, durationMs: 430, size: 1, colors: Object.freeze({ core: "#f2e4b8", trail: "#8a6d3a" }) }),
@@ -732,7 +732,7 @@ const ABILITY_VFX = Object.freeze({
     soundKey: "attackHit",
     motif: "impact",
     windup: Object.freeze({ style: "toss" }),
-    projectile: Object.freeze({ shape: "lob", arcHeight: 72, durationMs: 540, size: 1.2, colors: Object.freeze({ core: "#9a8c70", trail: "#5a4c38" }) }),
+    projectile: Object.freeze({ shape: "rock", arcHeight: 72, durationMs: 540, size: 1.2, colors: Object.freeze({ core: "#9a8c70", trail: "#5a4c38" }) }),
     colors: Object.freeze({ core: "#b7a888", trail: "#5a4c38", impact: "#d8ccb0" })
   }),
   // Clod — Thunderous Charge (RAGE): a full ground-shattering slam — board bloom, screen

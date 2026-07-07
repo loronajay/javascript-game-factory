@@ -62,6 +62,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-paladin.png"
   },
   {
+    type: "paladin",
+    slug: "blood-moon",
+    file: "blood-moon-paladin.png"
+  },
+  {
     type: "necromancer",
     slug: "summer-vibes",
     file: "summer-vibes-necromancer.png"
@@ -137,6 +142,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-juggernaut.png"
   },
   {
+    type: "juggernaut",
+    slug: "arcane",
+    file: "arcane-juggernaut.png"
+  },
+  {
     type: "king",
     slug: "summer-vibes",
     file: "summer-vibes-king.png"
@@ -173,6 +183,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "nemesis",
+    slug: "arcane",
+    file: "arcane-nemesis.png"
+  },
+  {
+    type: "nemesis",
     slug: "infernal",
     file: "infernal-nemesis.png"
   },
@@ -182,9 +197,19 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-virus.png"
   },
   {
+    type: "virus",
+    slug: "arcane",
+    file: "arcane-virus.png"
+  },
+  {
     type: "clod",
     slug: "summer-vibes",
     file: "summer-vibes-clod.png"
+  },
+  {
+    type: "clod",
+    slug: "arcane",
+    file: "arcane-clod.png"
   },
   {
     type: "clod",

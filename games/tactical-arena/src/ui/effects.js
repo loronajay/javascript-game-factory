@@ -181,6 +181,38 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       const ember = svg("circle", { cx: 5.5 * size, cy: 0, r: 2 * size, fill: "#ff8a4c", filter: "url(#softGlow)" });
       group.appendChild(ember);
       return group;
+    },
+    rock(colors, size) {
+      const group = svg("g", { class: "fx-projectile" });
+      group.appendChild(svg("polygon", {
+        points: [
+          `${-7 * size},${-2.5 * size}`,
+          `${-3.5 * size},${-6.2 * size}`,
+          `${2.5 * size},${-5.4 * size}`,
+          `${7.2 * size},${-1.4 * size}`,
+          `${5.6 * size},${4.1 * size}`,
+          `${-1.2 * size},${6.2 * size}`,
+          `${-6.4 * size},${3.1 * size}`
+        ].join(" "),
+        fill: colors.core,
+        stroke: colors.trail,
+        "stroke-width": 1.4 * size,
+        "stroke-linejoin": "round"
+      }));
+      const ridge = svg("path", {
+        d: `M ${-3.8 * size} ${-2.2 * size} L ${0.5 * size} ${-3.9 * size} L ${4.1 * size} ${-0.7 * size}`,
+        fill: "none",
+        stroke: "#d2c4a8",
+        "stroke-width": 1.1 * size,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round"
+      });
+      ridge.style.opacity = "0.45";
+      group.appendChild(ridge);
+      const chip = svg("circle", { cx: -1.8 * size, cy: 2.1 * size, r: 1.1 * size, fill: colors.trail });
+      chip.style.opacity = "0.5";
+      group.appendChild(chip);
+      return group;
     }
   };
 
@@ -218,7 +250,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     // Sampled quadratic-bezier keyframes: position from the curve, rotation from its
     // tangent (a lob also tumbles end-over-end on top of its heading).
     const steps = 22;
-    const tumble = spec.shape === "lob" ? 540 : 0;
+    const tumble = spec.shape === "lob" || spec.shape === "rock" ? 540 : 0;
     const frames = [];
     for (let i = 0; i <= steps; i += 1) {
       const t = i / steps;

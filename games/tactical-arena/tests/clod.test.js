@@ -226,7 +226,7 @@ test("Thunderous Charge: a 2-tile blast deals 10 physical and stuns every enemy 
 
 test("Clod's active ARTS all register a VFX recipe", () => {
   assert.equal(getAbilityVfx("quake").type, "magicBurst");
-  assert.equal(getAbilityVfx("stone-throw").projectile.shape, "lob");
+  assert.equal(getAbilityVfx("stone-throw").projectile.shape, "rock");
   assert.equal(getAbilityVfx("thunderous-charge").type, "magicBurst");
 });
 
