@@ -2,8 +2,8 @@ import { mountCodex } from "./codex.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 
 // Global "Field Manual" overlay — tabbed reference reachable from the title,
-// main menu, and in-match topbar. Three tabs: Basics (rules), Codex (unit data),
-// Advanced (strategy). Opening from a live match passes only the unit types
+// main menu, and in-match topbar. Tabs cover Basics (rules), Codex (unit data),
+// Advanced (strategy), and Synergy Tips. Opening from a live match passes only the unit types
 // present in that battle so the Codex tab stays focused; opening from menus
 // passes null and builds the full roster.
 export class RulesModal {

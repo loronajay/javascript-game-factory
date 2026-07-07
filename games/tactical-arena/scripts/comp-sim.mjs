@@ -21,6 +21,21 @@ import { createMatchState } from "../src/match/matchBuilder.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
 import { hpRemaining } from "../src/match/matchBuilder.js";
+import { getArt, isRaging } from "../src/core/unitCatalog.js";
+import { areAllies, findUnit, livingUnits } from "../src/core/state.js";
+
+// Rage-usage instrumentation, keyed by comp name. This is the whole point of the
+// user's critique: the CPU never *seeks* rage (it only drops to ≤5 HP by taking
+// damage) and never orchestrates rage payoffs, so these counters quantify HOW MUCH
+// the sim under-plays each comp's rage-dependent ceiling.
+//   activations   — unit-turns taken
+//   raging        — of those, how many were taken while the acting unit was raging
+//   rageArt       — rage-LOCKED arts actually fired (Nuke, Self Destruct, Rewind, …)
+//   scaledCommand — King commands issued with ≥1 raging ally (the buff actually scaled)
+const rageStats = {};
+function bumpRage(comp, key, n = 1) {
+  (rageStats[comp] ??= { activations: 0, raging: 0, rageArt: 0, scaledCommand: 0 })[key] += n;
+}
 
 // ---- named comps (from TEAM_COMP_ANALYSIS.md) ------------------------------
 const COMPS = {
@@ -44,9 +59,10 @@ const ACTIVATION_CAP = 500; // hard stop so a stalemate can't hang the sim
 
 // ---- one match -------------------------------------------------------------
 // aSeat: which player id (1 or 2) comp A occupies this game. Returns "A" | "B" | "draw".
-function playMatch(squadA, squadB, seed, aSeat) {
+function playMatch(squadA, squadB, seed, aSeat, nameA, nameB) {
   const bSeat = aSeat === 1 ? 2 : 1;
   const squads = { [aSeat]: squadA, [bSeat]: squadB };
+  const compForSeat = (p) => (p === aSeat ? nameA : nameB);
   let state = createMatchState({ size: SIZE, seed, squads });
 
   let activations = 0;
@@ -58,6 +74,18 @@ function playMatch(squadA, squadB, seed, aSeat) {
 
     const revisionBefore = state.revision;
     for (const command of commands) {
+      // Measure rage usage against the state as it stands BEFORE the command applies.
+      if (command.type === "BEGIN_ACTIVATION") {
+        const unit = findUnit(state, command.unitId);
+        if (unit) { bumpRage(compForSeat(player), "activations"); if (isRaging(unit)) bumpRage(compForSeat(player), "raging"); }
+      } else if (command.type === "USE_ART") {
+        const unit = findUnit(state, command.unitId);
+        const art = unit && getArt(unit.type, command.artId);
+        if (art?.rageLocked) bumpRage(compForSeat(player), "rageArt");
+        if (art?.command && unit && livingUnits(state, player).some((a) => a.id !== unit.id && areAllies(a, unit) && isRaging(a))) {
+          bumpRage(compForSeat(player), "scaledCommand");
+        }
+      }
       const result = applyCommand(state, command);
       // The CPU plans against EXPECTED values, so a rolled outcome can invalidate the
       // tail of its own sequence (a kill ends the match; the acting unit dying to a
@@ -89,7 +117,7 @@ function playPairing(nameA, nameB) {
     // Each seed played both ways to cancel spawn/first-turn bias.
     for (const aSeat of [1, 2]) {
       const seed = s * 2 + 1; // odd, nonzero seeds
-      const m = playMatch(squadA, squadB, seed, aSeat);
+      const m = playMatch(squadA, squadB, seed, aSeat, nameA, nameB);
       r.games += 1;
       r.totalActivations += m.activations;
       if (m.outcome === "A") r.aWins += 1;
@@ -162,4 +190,17 @@ const reasonStr = Object.entries(reasonTotals).map(([k, v]) => `${k}=${v}`).join
 console.log(`\nDraws: ${totalDraws}/${totalGames} (${(100 * totalDraws / totalGames).toFixed(1)}%). Reasons: ${reasonStr}.`);
 console.log(`  (cap = hit ${ACTIVATION_CAP}-activation limit; no-move = a side had no legal activation; stall = no command advanced state)`);
 console.log(`Avg activations/game: ${(totalAct / totalGames).toFixed(0)}.`);
+
+// ---- rage-usage report (quantifies how much the CPU under-plays rage) -------
+console.log("\nRage usage by the CPU (how often rage payoffs were actually online):\n");
+console.log(pad("comp", 12) + padL("acts", 8) + padL("raging%", 10) + padL("rageArts", 10) + padL("scaledCmd", 11));
+for (const n of names) {
+  const r = rageStats[n] ?? { activations: 0, raging: 0, rageArt: 0, scaledCommand: 0 };
+  const ragingPct = r.activations ? (100 * r.raging / r.activations).toFixed(1) : "0.0";
+  console.log(pad(n, 12) + padL(r.activations, 8) + padL(`${ragingPct}%`, 10) + padL(r.rageArt, 10) + padL(r.scaledCommand, 11));
+}
+console.log("\n  raging%   = share of unit-turns taken while the acting unit was at ≤5 HP (rage passives live)");
+console.log("  rageArts  = rage-LOCKED arts the CPU actually fired (Nuke / Self Destruct / Rewind / Black Death / Explosion / …)");
+console.log("  scaledCmd = King commands issued with ≥1 raging ally (the +1-per-raging-ally scaling actually realized)");
+console.log("  Low numbers here = the sim is scoring that comp near its FLOOR, not its rage ceiling.");
 console.log(`\nDone in ${((Date.now() - startedAt) / 1000).toFixed(1)}s.`);

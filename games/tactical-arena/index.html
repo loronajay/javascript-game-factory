@@ -344,8 +344,8 @@
       </section>
     </div>
 
-    <!-- Field Manual — three-tab reference overlay reachable from the title,
-         main menu, and in-match topbar. Basics and Advanced are static content;
+    <!-- Field Manual — four-tab reference overlay reachable from the title,
+         main menu, and in-match topbar. Basics, Advanced, and Synergy Tips are static content;
          the Codex tab is populated dynamically by rulesModal.js. When opened
          from a live match, the Codex tab is filtered to units in that battle. -->
     <div id="refModal" class="ref-modal" hidden>
@@ -359,6 +359,7 @@
             <button class="ref-tab is-active" data-tab="basics" type="button">Basics</button>
             <button class="ref-tab" data-tab="codex" type="button">Codex</button>
             <button class="ref-tab" data-tab="advanced" type="button">Advanced</button>
+            <button class="ref-tab" data-tab="synergy" type="button">Synergy Tips</button>
           </nav>
         </header>
 
@@ -401,6 +402,23 @@
             <li><strong>Auras reward positioning, not just targeting.</strong> A unit with a buff/debuff aura is doing work just by standing still — pull your units out of an enemy's debuff zone, or hold formation inside your own buff zone.</li>
             <li><strong>Commanders must be managed first.</strong> If your side has a non-combatant commander unit, its command is spent before anyone else can act each squad turn — plan that command around what your squad needs that turn.</li>
             <li><strong>Destructible walls buy time, not kills.</strong> Use them to block a lane or protect a low-HP ally for a turn, but remember they can be knocked down.</li>
+          </ul>
+        </div>
+
+        <!-- Synergy Tips: grounded pairings and squad ideas without solved-team prescriptions. -->
+        <div class="ref-panel" data-panel="synergy">
+          <ul class="ref-tips">
+            <li><strong>Count the support turn.</strong> Age, Time Stretch, Anoint, dances, heals, and commands usually spend the caster's whole activation. They are strongest when they create an immediate reach break, deny an enemy turn, or make one ally's next several activations worth more than the support turn you spent.</li>
+            <li><strong>Try Father Time with Sniper or Angel as a super carry.</strong> Age can stack +STR or +DEF on the same ally and lasts until Father Time falls. Sniper converts that STR into long-range, wall-and-body-piercing shots; Angel converts it into DEF-ignoring magic basics while staying status-immune. Time Stretch is the tempo button when +1 MOVE creates the shot this turn.</li>
+            <li><strong>Try cover around the carry plan.</strong> Sniper's Build Cover blocks movement and line of sight for most pieces, but Sniper still shoots through it. That makes cover more than defense: it can buy the extra turns Father Time needs to Age the carry, then let the carry keep firing through the barricade.</li>
+            <li><strong>Try magic next to magic support.</strong> Nemesis makes allied magic hit +1 harder and trims MP costs while alive. Magician, Fat Wizard, Angel basics, Necromancer, Virus, and Gargoyle's Pyroclasm all care because magic ignores DEF; Defend, silence, and magic reduction are the things that answer it.</li>
+            <li><strong>Try status chains before the damage payoff.</strong> Virus spreads debuffs from an afflicted enemy to nearby enemy allies, Witch Doctor's Misfortune Stance doubles status chances for everyone, and Archer, Swordsman, Mystic, Necromancer, Sniper, Fat Wizard, and Virus all bring statuses. The setup turn is worth it when poison enables board-wide true damage or blind/silence denies key enemy activations.</li>
+            <li><strong>Try sustain around a real anchor.</strong> Mystic's Guardian gives the team +1 DEF, Paladin heals nearby allies when his physical hits land, and Fat Cleric or Fat Wizard can patch damage directly. Put those tools near a tank like Gargoyle, Clod, Juggernaut, or Fat Knight when you want the fight to take longer, but keep a damage plan so healing turns do not just stall.</li>
+            <li><strong>Try true damage when armor is the problem.</strong> Footwork, Volley Shot, Time Steal, Fart, Flight, Poison Tick, Self Destruct, Explosion, Thunderous Charge, and several light-tile effects ignore DEF and Defend. They are the pressure valves against high-DEF walls and permanent defending plans.</li>
+            <li><strong>Try Clod as a formation piece.</strong> Brick House gives adjacent allies +1 DEF and gives Clod +1 STR per sheltered ally, while Rock Hard blanks physical damage when he defends. The reward is real, but it asks you to keep pieces close enough to benefit without donating an easy area target.</li>
+            <li><strong>Try King when you want timing puzzles.</strong> Commands are global for the turn and scale with allied RAGE: Strike for damage, Hold for DEF and healing, Pursue for MOVE, Higher Ground for range. He must act first and bleeds when allies fall, so the fun is sequencing, not autopilot power.</li>
+            <li><strong>Try the fat family for the designed combo.</strong> Fat Knight, Fat Wizard, Fat Cleric, and Fat Bowman each unlock a small Brothers in Arms bonus when the other three are alive. You get four 30-HP bodies with healing, splash magic, ranged scaling, and frontline shove tools instead of one single trick.</li>
+            <li><strong>Try immunity as part of the plan.</strong> Paladin, Angel, Gargoyle, and King ignore every status, Mystic and Nemesis ignore silence, Father Time ignores stun and slow, and cleanses from Mystic or Fat Cleric can reset a bad turn. A synergy that folds to blind, poison, or silence needs one of those answers nearby.</li>
           </ul>
         </div>
       </div>

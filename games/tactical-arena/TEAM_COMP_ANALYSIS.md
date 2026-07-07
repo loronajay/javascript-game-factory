@@ -279,19 +279,59 @@ bias). Reproduce with `node scripts/comp-sim.mjs --seeds 24` (flags: `--difficul
   what you're optimizing: Realm has the highest ceiling, Wall the highest floor.
 - **Contagion hard-counters Wall (85%)** — status-lock walks straight through the
   attrition wall's defenses, as expected. Realm ≈ Contagion (roughly even).
-- **King is the *worst* comp (15.8%), not Tier A.** Its rage-scaling command payoff needs
-  deliberate rage management the greedy CPU never orchestrates, and its fragility (−10 per
-  fall, acts-first) dominates. **Caveat:** this is heavily a *CPU-piloting* result — King
-  (and to a lesser degree Realm's MP economy and Contagion's lock sequencing) are the
-  comps most likely to score much higher in skilled human hands. Read King's number as
-  "unplayable by the current AI," not settled "this comp is weak."
+- **King is the *worst* comp (15.8%).** Partly piloting, but — importantly — **not only
+  piloting.** The instrumentation below shows the CPU *did* land the rage-scaling command
+  buff 310 times across its 200 games, so the signature mechanic was online, and King still
+  lost ~85% of the time. Its structural problems dominate: a non-combatant eats one of four
+  slots, −10 HP per ally that falls means the scaling turns on exactly as the King is being
+  chipped out, and acts-first is a liability. A coordinated human would do better, but this
+  is closer to "genuinely fragile" than "the AI just can't play it."
+- **Rankings are stable across difficulty.** A Hard-CPU run (16 seeds) reproduces the same
+  tiers — wall 76.7% ≈ realm 74.3% > contagion 63.3% > fatsquad 52.1% > king 20.9% ≈
+  baseline 20.4% — so the ordering isn't a Normal-AI artifact (King ticks up on Hard but
+  stays near the bottom).
+
+### The piloting caveat, quantified
+
+You were right to distrust a pure CPU-vs-CPU read: **the CPU never *seeks* rage.** It only
+reaches ≤5 HP by taking damage and never sets up the payoffs (baiting its own units into
+rage, timing Nuke/Self Destruct, managing Realm's MP curve, ordering the Contagion lock).
+The sim now measures exactly how large that blind spot is (20-seed Normal run):
+
+| comp | unit-turns | **raging%** | rage-locked arts fired | King scaled commands |
+|---|---:|---:|---:|---:|
+| realm | 23,336 | 0.5% | 14 | — |
+| wall | 8,667 | 4.1% | 16 | — |
+| contagion | 6,657 | 3.9% | 32 | — |
+| king | 5,787 | 5.8% | 24 | 310 |
+| fatsquad | 7,212 | 4.9% | 0 | — |
+| baseline | 6,097 | 6.8% | 47 | — |
+
+- **`raging%`** — units act while raging **0.5%–7% of the time**. So every RAGE *passive*
+  (Archer never-miss + 50% crit, Swordsman +3 MOVE/Last Stand, Mystic +6 MOVE + damage-halve,
+  Paladin/Angel seekers, Gargoyle Volcanic, the fat squad's Trample/Lazy Cast/Desperation/
+  Emergency Snacks, Necromancer's amplified aura) is online in a rounding-error fraction of
+  turns. The sim essentially measures these comps **with rage switched off.**
+- **rage-locked arts** — the marquee ultimates (Nuke, Self Destruct, Rewind, Black Death
+  Dance, Explosion, Thunderous Charge, Heavenseeker, Darkseeker) fire **a few dozen times
+  across ~200 games** — i.e. almost never. Realm's whole finisher plan (Nuke) fired 14
+  times total.
+
+**So which comps are scored at their FLOOR, not their ceiling?** Any comp whose power lives
+in rage or setup: **King** (command scaling), **baseline & any Magician comp** (Nuke),
+**Fat Squad** (all four rage payoffs are passive → 0 in the "arts" column but suppressed by
+the 4.9% raging rate), **Juggernaut/Clod/Virus/Angel** shells (Self Destruct / Thunderous
+Charge / Explosion / Heavenseeker). Comps that win on **always-on** value — Wall's
+Guardian + heal auras, Realm's team magic buff — are measured much closer to their true
+strength. That asymmetry is the single biggest reason to treat the ladder as *directional*,
+not final: the brute always-on comps are flattered, the rage/combo comps are undersold.
 
 ### Caveats on reading these numbers
-- **Normal-difficulty CPU on both sides.** It's greedy expected-value play — no setup
-  sequencing, no rage baiting, limited positioning. Combos that reward planning (King,
-  Realm's MP curve, Contagion's lock order) are *under*-represented; brute stat/heal comps
-  (Wall, Fat Squad) are flattered.
+- **Both sides are the same greedy CPU.** No setup sequencing, no rage baiting, limited
+  positioning — see the quantified gap above.
 - **Draws are excluded from win%.** Realm's 76.3% is over 135 decided games; its 105 draws
   are a finding in their own right (a comp that can't finish is a soft balance problem too).
-- Numbers shift with `--difficulty hard` and `--size 15` — worth a couple of runs before
-  acting on any single figure.
+- **The honest use of this data:** trust it for the *always-on* comparisons (Guardian vs
+  Deathly Aura vs Realm, wall durability, DEF-bypass) and the draw/stall diagnostics; treat
+  every rage-or-setup verdict as a lower bound. For those, the resolver-level capability
+  read in the unit notes above is the better guide until a rage-seeking driver exists.
