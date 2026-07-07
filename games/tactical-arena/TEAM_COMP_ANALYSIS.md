@@ -79,7 +79,7 @@ Why it's the scariest comp in the game: it **opts out of the entire DEF axis**.
 
 Real numbers with Nemesis up:
 - Fat Wizard **Zap 6** (range 4), splashes on miss/crit via Clumsy.
-- Magician **Spark 7**, **Banish 8** + silence, **Nuke 13** AoE r3 (rage).
+- Magician **Spark 7**, **Banish 7** + silence, **Nuke 13** AoE r3 (rage).
 - Necromancer **Dark Bomb 6** AoE, **Wither** magic + slow.
 - MP costs drop (Spark 4→3, Banish 8→7, Nuke 16→15, Zap 5→4), and **Magic Pipe**
   (Magician) + **Growth** (Virus) + **Nemesis Regenerate** (rage: +5 HP/+15 MP) keep
@@ -108,7 +108,8 @@ lockout** (only a raging *enemy* Juggernaut can shut healing off).
   (DEF 10, halving everything). Clod alternative negates *all* physical while defending.
 
 Against physical this core is a brick: a STR-10 attacker into a Guardian'd defending
-Gargoyle does `max(1, 10−9)=1`, halved… ~1 per swing, out-healed instantly.
+Gargoyle (DEF 7 +1 = 8) does `max(1, 10−8)=2`, halved by Defend to **1** — out-healed
+instantly (and a raging Gargoyle at DEF 10 floors it at 1 before the halving).
 
 **Balance flag:** potential stalemate / unwinnable-by-attrition. Guardian being
 **unconditional + team-wide** is the load-bearing lever; combined with two more healers
@@ -196,16 +197,27 @@ against it.
 - **Nemesis** — the strongest *offensive* team buff in the game and the enabler of the
   DEF-bypass problem. Also a big personal statline (MP 45, MOVE 3, silence-immune,
   Dark Pulse 8-ray with self-heal, Regenerate rage).
-- **Clod / Rock Hard** — binary: negates **all** physical while defending (+3 MP per
-  hit). Either dead weight (magic team) or unbreakable (physical team). Swingy design.
+- **Clod / Rock Hard** — the *passive* is binary: while defending it negates **all**
+  physical damage (+3 MP per hit), so Clod is a hard wall against physical teams and the
+  passive is simply inert against magic. The unit itself is not dead weight vs magic
+  (Quake AoE, Stone Throw control, Brick House +1-DEF aura / +1 STR per sheltered ally,
+  Thunderous Charge) — but the all-or-nothing physical negation is a swingy design lever
+  worth watching.
 - **Juggernaut / Self Destruct** — 10 true AoE r4, guaranteed, only "cost" is the unit
   itself; a very efficient trade/finisher. Bruiser Mode (STR 10/MOVE 3 at 0 MP) means
   it *wants* to be empty.
 - **Witch Doctor / Misfortune** — a global ×2 status multiplier on one cheap dance is
   the strongest status enabler; watch it with any status comp.
-- **Angel** — flagged as possibly **under-tuned for a ranger**: basic attacks deal
-  magic (ignore DEF) but STR is only **3**, so the damage is trivial; it's really a
-  support (Anoint/Elevate/Heavenseeker). Fine as support, weak as a "ranger."
+- **Angel** — a *specialist*, not a weak ranger (correcting an earlier shallow read).
+  Its basic attack deals **magic that scales with effective STR and ignores DEF**, so the
+  low base STR (3) is misleading: it *out-damages physical rangers against armor* (3 into
+  a DEF-8 Clod, where a STR-8 Swordsman does 1) and it grows with **every** STR source —
+  King's Strike, Fire Dance, its own +2 rage, and Nemesis's team +1 magic all stack onto
+  it. Pair that with **full status immunity** (Holy Being — a hard anti-Contagion anchor,
+  see the counterplay list), Inner Strength ramping crit-and-blind as it drops, and ally
+  utility (Anoint +range, Elevate / Heavenseeker white-tile heal+damage). Judge it as
+  anti-armor support, not by raw STR — it wasn't tested in the sim and shouldn't be
+  flagged for a buff on the "STR 3 = trivial" reasoning.
 - **Sniper** — excellent poke (range 6, pierces walls *and* bodies, min-2 floor) but a
   small MP pool (18) and no team synergy; a solo carry rather than a comp piece.
 
@@ -219,3 +231,67 @@ against it.
   Mystic are silence-immune, which is exactly why they anchor those comps.
 - **Status immunity** (Paladin, Angel, Gargoyle, King, Monk-vs-blind) hard-counters the
   Contagion Lock; **cleanse** (Mystic Purify, Fat Cleric Cleanse) softens it.
+
+---
+
+## Simulation results (empirical backing)
+
+The comps above were run head-to-head through the **real reducer + real CPU** — no
+synthetic model. `scripts/comp-sim.mjs` builds each match with `createMatchState` (same
+coin flip as a live game) and lets `chooseActivation` drive both sides, replaying every
+command through `applyCommand`. Each pairing = **24 seeds × both sides = 48 games** at
+**Normal** difficulty on a 13×13 board (seeds played both ways to cancel spawn/first-turn
+bias). Reproduce with `node scripts/comp-sim.mjs --seeds 24` (flags: `--difficulty`,
+`--size`, `--seeds`).
+
+**Head-to-head — win% for the ROW comp (of *decided* games):**
+
+| | realm | wall | contagion | king | fatsquad | baseline |
+|---|---:|---:|---:|---:|---:|---:|
+| **realm** | — | 68% | 48% | 93% | 77% | 90% |
+| **wall** | 32% | — | 85% | 94% | 58% | 100% |
+| **contagion** | 52% | 15% | — | 90% | 67% | 94% |
+| **king** | 7% | 6% | 10% | — | 13% | 40% |
+| **fatsquad** | 23% | 42% | 33% | 88% | — | 76% |
+| **baseline** | 10% | 0% | 6% | 60% | 24% | — |
+
+**Overall (all pairings, decided games):**
+
+| rank | comp | win% | W | L | draws / 240 |
+|---:|---|---:|---:|---:|---:|
+| 1 | wall | 77.1% | 172 | 51 | 17 |
+| 2 | realm | 76.3% | 103 | 32 | **105** |
+| 3 | contagion | 64.8% | 138 | 75 | 27 |
+| 4 | fatsquad | 55.5% | 116 | 93 | 31 |
+| 5 | baseline | 21.0% | 46 | 173 | 21 |
+| 6 | king | 15.8% | 35 | 186 | 19 |
+
+### What the sim confirms and refines
+
+- **The Tier-S trio is real.** Wall, Realm, and Contagion are the top three by a wide
+  margin, exactly as predicted. The "designed" **Fat Squad lands 4th** — a clear tier
+  below the emergent comps, which is the intended-comp-is-underpowered signal called out
+  above.
+- **Wall is as strong as Realm and far more reliable.** Realm beats Wall *head-to-head*
+  (68% of decided games), but Realm **draws 105 of 240 games (44%)** — it wins the damage
+  race (DEF-bypass) yet frequently **can't close**, stalling out on MP starvation once its
+  casters are dry against a healing wall. Wall only draws 17. So "strongest" depends on
+  what you're optimizing: Realm has the highest ceiling, Wall the highest floor.
+- **Contagion hard-counters Wall (85%)** — status-lock walks straight through the
+  attrition wall's defenses, as expected. Realm ≈ Contagion (roughly even).
+- **King is the *worst* comp (15.8%), not Tier A.** Its rage-scaling command payoff needs
+  deliberate rage management the greedy CPU never orchestrates, and its fragility (−10 per
+  fall, acts-first) dominates. **Caveat:** this is heavily a *CPU-piloting* result — King
+  (and to a lesser degree Realm's MP economy and Contagion's lock sequencing) are the
+  comps most likely to score much higher in skilled human hands. Read King's number as
+  "unplayable by the current AI," not settled "this comp is weak."
+
+### Caveats on reading these numbers
+- **Normal-difficulty CPU on both sides.** It's greedy expected-value play — no setup
+  sequencing, no rage baiting, limited positioning. Combos that reward planning (King,
+  Realm's MP curve, Contagion's lock order) are *under*-represented; brute stat/heal comps
+  (Wall, Fat Squad) are flattered.
+- **Draws are excluded from win%.** Realm's 76.3% is over 135 decided games; its 105 draws
+  are a finding in their own right (a comp that can't finish is a soft balance problem too).
+- Numbers shift with `--difficulty hard` and `--size 15` — worth a couple of runs before
+  acting on any single figure.
