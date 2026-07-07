@@ -8,6 +8,21 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "swordsman",
+    slug: "arcane",
+    file: "arcane-swordsman.png"
+  },
+  {
+    type: "swordsman",
+    slug: "blood-moon",
+    file: "blood-moon-swordsman.png"
+  },
+  {
+    type: "swordsman",
+    slug: "grim-reaper",
+    file: "grim-reaper-swordsman.png"
+  },
+  {
+    type: "swordsman",
     slug: "medieval",
     file: "medieval-swordsman.png"
   },
@@ -17,14 +32,29 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-archer.png"
   },
   {
+    type: "archer",
+    slug: "arcane",
+    file: "arcane-archer.png"
+  },
+  {
     type: "mystic",
     slug: "summer-vibes",
     file: "summer-vibes-mystic.png"
   },
   {
+    type: "mystic",
+    slug: "arcane",
+    file: "arcane-mystic.png"
+  },
+  {
     type: "magician",
     slug: "summer-vibes",
     file: "summer-vibes-magician.png"
+  },
+  {
+    type: "magician",
+    slug: "arcane",
+    file: "arcane-magician.png"
   },
   {
     type: "paladin",
@@ -37,9 +67,19 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-necromancer.png"
   },
   {
+    type: "necromancer",
+    slug: "arcane",
+    file: "arcane-necromancer.png"
+  },
+  {
     type: "ghoul",
     slug: "summer-vibes",
     file: "summer-vibes-ghoul.png"
+  },
+  {
+    type: "ghoul",
+    slug: "arcane",
+    file: "arcane-ghoul.png"
   },
   {
     type: "sniper",
@@ -48,13 +88,43 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "sniper",
+    slug: "arcane",
+    file: "arcane-sniper.png"
+  },
+  {
+    type: "sniper",
+    slug: "blood-moon",
+    file: "blood-moon-sniper.png"
+  },
+  {
+    type: "sniper",
+    slug: "desert-ops",
+    file: "desert-ops-sniper.png"
+  },
+  {
+    type: "sniper",
+    slug: "grim-reaper",
+    file: "grim-reaper-sniper.png"
+  },
+  {
+    type: "sniper",
     slug: "medieval",
     file: "medieval-sniper.png"
+  },
+  {
+    type: "sniper",
+    slug: "swamp-combat",
+    file: "swamp-combat-sniper.png"
   },
   {
     type: "witch-doctor",
     slug: "summer-vibes",
     file: "summer-vibes-witch-doctor.png"
+  },
+  {
+    type: "witch-doctor",
+    slug: "arcane",
+    file: "arcane-witch-doctor.png"
   },
   {
     type: "father-time",
@@ -72,9 +142,19 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-king.png"
   },
   {
+    type: "king",
+    slug: "arcane",
+    file: "arcane-king.png"
+  },
+  {
     type: "angel",
     slug: "summer-vibes",
     file: "summer-vibes-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "fallen",
+    file: "fallen-angel.png"
   },
   {
     type: "monk",
@@ -107,6 +187,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "summer-vibes-clod.png"
   },
   {
+    type: "clod",
+    slug: "infernal",
+    file: "infernal-clod.png"
+  },
+  {
     type: "fat-knight",
     slug: "summer-vibes",
     file: "summer-vibes-fat-knight.png"
@@ -115,6 +200,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-wizard",
     slug: "summer-vibes",
     file: "summer-vibes-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "arcane",
+    file: "arcane-fat-wizard.png"
   },
   {
     type: "fat-cleric",
