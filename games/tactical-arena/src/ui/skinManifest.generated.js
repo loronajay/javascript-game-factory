@@ -18,6 +18,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "swordsman",
+    slug: "enchanted",
+    file: "enchanted-swordsman.png"
+  },
+  {
+    type: "swordsman",
     slug: "grim-reaper",
     file: "grim-reaper-swordsman.png"
   },
@@ -25,6 +30,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "swordsman",
     slug: "medieval",
     file: "medieval-swordsman.png"
+  },
+  {
+    type: "swordsman",
+    slug: "pumpkin-knight",
+    file: "pumpkin-knight-swordsman.png"
   },
   {
     type: "archer",
@@ -68,6 +78,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "archer",
+    slug: "kitty-kat",
+    file: "kitty-kat-archer.png"
+  },
+  {
+    type: "archer",
     slug: "masquerade",
     file: "masquerade-archer.png"
   },
@@ -80,6 +95,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "archer",
     slug: "scarlet-rose",
     file: "scarlet-rose-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "vampire",
+    file: "vampire-archer.png"
   },
   {
     type: "archer",
@@ -105,6 +125,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "mystic",
     slug: "blood-moon",
     file: "blood-moon-mystic.png"
+  },
+  {
+    type: "mystic",
+    slug: "candy-witch",
+    file: "candy-witch-mystic.png"
   },
   {
     type: "mystic",
@@ -177,6 +202,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "blood-moon-magician.png"
   },
   {
+    type: "magician",
+    slug: "ghostly",
+    file: "ghostly-magician.png"
+  },
+  {
     type: "paladin",
     slug: "summer-vibes",
     file: "summer-vibes-paladin.png"
@@ -185,6 +215,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "paladin",
     slug: "blood-moon",
     file: "blood-moon-paladin.png"
+  },
+  {
+    type: "paladin",
+    slug: "count",
+    file: "count-paladin.png"
   },
   {
     type: "necromancer",
@@ -202,6 +237,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "blood-moon-necromancer.png"
   },
   {
+    type: "necromancer",
+    slug: "trick-or-treat",
+    file: "trick-or-treat-necromancer.png"
+  },
+  {
     type: "ghoul",
     slug: "summer-vibes",
     file: "summer-vibes-ghoul.png"
@@ -215,6 +255,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "ghoul",
     slug: "blood-moon",
     file: "blood-moon-ghoul.png"
+  },
+  {
+    type: "ghoul",
+    slug: "trick-or-treat",
+    file: "trick-or-treat-ghoul.png"
   },
   {
     type: "sniper",
@@ -248,6 +293,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "sniper",
+    slug: "spooky-ops",
+    file: "spooky-ops-sniper.png"
+  },
+  {
+    type: "sniper",
     slug: "swamp-combat",
     file: "swamp-combat-sniper.png"
   },
@@ -260,6 +310,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "witch-doctor",
     slug: "arcane",
     file: "arcane-witch-doctor.png"
+  },
+  {
+    type: "witch-doctor",
+    slug: "black-mage",
+    file: "black-mage-witch-doctor.png"
   },
   {
     type: "witch-doctor",
@@ -277,6 +332,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-father-time.png"
   },
   {
+    type: "father-time",
+    slug: "steampunk-wizard",
+    file: "steampunk-wizard-father-time.png"
+  },
+  {
     type: "juggernaut",
     slug: "summer-vibes",
     file: "summer-vibes-juggernaut.png"
@@ -285,6 +345,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "juggernaut",
     slug: "arcane",
     file: "arcane-juggernaut.png"
+  },
+  {
+    type: "juggernaut",
+    slug: "pumpkin-mech",
+    file: "pumpkin-mech-juggernaut.png"
   },
   {
     type: "king",
@@ -297,9 +362,19 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-king.png"
   },
   {
+    type: "king",
+    slug: "pumpkin",
+    file: "pumpkin-king.png"
+  },
+  {
     type: "angel",
     slug: "summer-vibes",
     file: "summer-vibes-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "devilish",
+    file: "devilish-angel.png"
   },
   {
     type: "angel",
@@ -317,6 +392,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "blood-moon-monk.png"
   },
   {
+    type: "monk",
+    slug: "mummy",
+    file: "mummy-monk.png"
+  },
+  {
     type: "gargoyle",
     slug: "summer-vibes",
     file: "summer-vibes-gargoyle.png"
@@ -325,6 +405,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "gargoyle",
     slug: "arcane",
     file: "arcane-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
+    slug: "dragon",
+    file: "dragon-gargoyle.png"
   },
   {
     type: "nemesis",
@@ -342,6 +427,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "infernal-nemesis.png"
   },
   {
+    type: "nemesis",
+    slug: "spooky",
+    file: "spooky-nemesis.png"
+  },
+  {
     type: "virus",
     slug: "summer-vibes",
     file: "summer-vibes-virus.png"
@@ -350,6 +440,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "virus",
     slug: "arcane",
     file: "arcane-virus.png"
+  },
+  {
+    type: "virus",
+    slug: "jack-o-lantern",
+    file: "jack-o-lantern-virus.png"
   },
   {
     type: "clod",
@@ -367,6 +462,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "infernal-clod.png"
   },
   {
+    type: "clod",
+    slug: "scarecrow",
+    file: "scarecrow-clod.png"
+  },
+  {
     type: "fat-knight",
     slug: "summer-vibes",
     file: "summer-vibes-fat-knight.png"
@@ -377,6 +477,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "arcane-fat-knight.png"
   },
   {
+    type: "fat-knight",
+    slug: "franken-fatigue",
+    file: "franken-fatigue-fat-knight.png"
+  },
+  {
     type: "fat-wizard",
     slug: "summer-vibes",
     file: "summer-vibes-fat-wizard.png"
@@ -385,6 +490,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-wizard",
     slug: "arcane",
     file: "arcane-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "black-mage",
+    file: "black-mage-fat-wizard.png"
   },
   {
     type: "fat-cleric",
@@ -412,6 +522,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "sun-goddess-fat-cleric.png"
   },
   {
+    type: "fat-cleric",
+    slug: "sweet-bliss-angel",
+    file: "sweet-bliss-angel-fat-cleric.png"
+  },
+  {
     type: "fat-bowman",
     slug: "summer-vibes",
     file: "summer-vibes-fat-bowman.png"
@@ -430,6 +545,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-bowman",
     slug: "geisha",
     file: "geisha-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "kitty-kat",
+    file: "kitty-kat-fat-bowman.png"
   },
   {
     type: "fat-bowman",
