@@ -40,6 +40,7 @@ export function createOnlineFlow({ onStartMatch }) {
   const hostHintEl = $('[data-online="hostHint"]');
   const lobbyHintEl = $('[data-online="lobbyHint"]');
   const startBtn = $('[data-online="startBtn"]');
+  const lockBtn = $('[data-online="lockBtn"]');
   const squadHost = $('[data-online="squadHost"]');
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
   const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
@@ -51,6 +52,8 @@ export function createOnlineFlow({ onStartMatch }) {
   let myClientId = null;
   let isOwner = false;
   let selectedMatchType = "duel";
+  let localLocked = false;
+  const readyByClientId = new Map();
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -86,6 +89,19 @@ export function createOnlineFlow({ onStartMatch }) {
   }
   function playerCount() {
     return lobby?.players?.length ?? 0;
+  }
+  function lobbyPlayers() {
+    return lobby?.players ?? [];
+  }
+  function allPlayersLocked(players = lobbyPlayers()) {
+    return players.length > 0 && players.every((p) => readyByClientId.get(p.id) === true);
+  }
+  function forgetDepartedReadyStates() {
+    const members = new Set(lobby?.members ?? []);
+    for (const clientId of readyByClientId.keys()) {
+      if (!members.has(clientId)) readyByClientId.delete(clientId);
+    }
+    if (myClientId) readyByClientId.set(myClientId, localLocked);
   }
 
   function normalizeMatchType(matchType) {
@@ -148,6 +164,11 @@ export function createOnlineFlow({ onStartMatch }) {
       const tags = [];
       if (p.id === lobby?.ownerId) tags.push('<span class="lobby-tag host">Host</span>');
       if (p.id === myClientId) tags.push('<span class="lobby-tag you">You</span>');
+      tags.push(
+        readyByClientId.get(p.id) === true
+          ? '<span class="lobby-tag ready">Locked</span>'
+          : '<span class="lobby-tag picking">Picking</span>',
+      );
       if (teams) {
         const team = p.seat % 2 === 1 ? 1 : 2;
         li.style.setProperty("--team", TEAM_COLOR[team] ?? PLAYER_COLOR[1]);
@@ -169,6 +190,9 @@ export function createOnlineFlow({ onStartMatch }) {
     selectSeg(cfg.size);
     for (const seg of sizeSegs) seg.disabled = !isOwner;
     hostHintEl.textContent = isOwner ? "(you set it)" : "(set by host)";
+    squadPicker.setLocked(localLocked);
+    lockBtn.textContent = localLocked ? "Change Squad" : "Lock Squad";
+    lockBtn.classList.toggle("primary", !localLocked);
     renderRoster();
     syncStart();
   }
@@ -180,16 +204,34 @@ export function createOnlineFlow({ onStartMatch }) {
   function syncStart() {
     const count = playerCount();
     const type = matchTypeConfig();
-    const ready = count === type.maxPlayers;
+    const full = count === type.maxPlayers;
+    const locked = full && allPlayersLocked();
+    const missingLocks = full ? lobbyPlayers().filter((p) => readyByClientId.get(p.id) !== true).length : 0;
     startBtn.hidden = !isOwner;
-    startBtn.disabled = !(isOwner && ready);
+    startBtn.disabled = !(isOwner && full && locked);
     if (isOwner) {
-      lobbyHintEl.hidden = ready;
-      lobbyHintEl.textContent = `Waiting for ${type.maxPlayers - count} more player${type.maxPlayers - count === 1 ? "" : "s"} for ${type.label}.`;
+      lobbyHintEl.hidden = full && locked;
+      if (!full) {
+        lobbyHintEl.textContent = `Waiting for ${type.maxPlayers - count} more player${type.maxPlayers - count === 1 ? "" : "s"} for ${type.label}.`;
+      } else if (!locked) {
+        lobbyHintEl.textContent = `Waiting for ${missingLocks} squad lock-in${missingLocks === 1 ? "" : "s"}.`;
+      } else {
+        lobbyHintEl.textContent = "";
+      }
     } else {
       lobbyHintEl.hidden = false;
-      lobbyHintEl.textContent = "Waiting for the host to start…";
+      lobbyHintEl.textContent = localLocked
+        ? (locked ? "Locked in. Waiting for the host to start..." : "Locked in. Waiting for the other squad lock-ins...")
+        : "Lock in when your squad is ready.";
     }
+  }
+
+  function setLocalLocked(locked, { broadcast = true } = {}) {
+    localLocked = !!locked;
+    if (myClientId) readyByClientId.set(myClientId, localLocked);
+    squadPicker.setLocked(localLocked);
+    if (broadcast) client?.sendReady(localLocked);
+    syncUI();
   }
 
   function describeRelay(url) {
@@ -212,6 +254,8 @@ export function createOnlineFlow({ onStartMatch }) {
       selectedMatchType = normalizeMatchType(lobby.settings?.matchType ?? selectedMatchType);
       myClientId = client.getClientId();
       isOwner = lobby.ownerId === myClientId;
+      localLocked = false;
+      forgetDepartedReadyStates();
       setPanel("lobby");
       setStatus(isOwner ? "Your room — invite an opponent, then start." : "Joined the room.");
       roomCodeEl.hidden = false;
@@ -226,7 +270,9 @@ export function createOnlineFlow({ onStartMatch }) {
       isOwner = lobby.ownerId === myClientId;
       // Promoted to owner (previous host left): adopt the last shared config.
       if (isOwner && !wasOwner && receivedConfig) Object.assign(config, receivedConfig);
+      forgetDepartedReadyStates();
       syncUI();
+      if (localLocked) client?.sendReady(true);
     };
 
     cb.onRemoteConfig = (cfg) => {
@@ -240,9 +286,22 @@ export function createOnlineFlow({ onStartMatch }) {
       tryStart();
     };
 
+    cb.onRemoteReady = ({ clientId, ready }) => {
+      if (!clientId) return;
+      readyByClientId.set(clientId, !!ready);
+      syncUI();
+    };
+
     cb.onLobbyStarted = ({ seed: matchSeed, members, myClientId: id }) => {
       myClientId = id ?? myClientId;
       membersAtStart = Array.isArray(members) ? members.slice() : [];
+      const playersAtStart = membersAtStart.map((clientId, index) => ({ id: clientId, seat: index + 1 }));
+      if (!allPlayersLocked(playersAtStart)) {
+        membersAtStart = null;
+        setStatus("Start blocked until every squad is locked in.");
+        syncUI();
+        return;
+      }
       mySeat = membersAtStart.indexOf(myClientId) + 1;
       isOwner = lobby?.ownerId === myClientId;
       seed = matchSeed;
@@ -327,6 +386,11 @@ export function createOnlineFlow({ onStartMatch }) {
   function resetLobbyState() {
     lobby = null;
     isOwner = false;
+    localLocked = false;
+    readyByClientId.clear();
+    squadPicker.setLocked(false);
+    lockBtn.textContent = "Lock Squad";
+    lockBtn.classList.add("primary");
     receivedConfig = null;
     seed = null;
     mySeat = null;
@@ -355,7 +419,11 @@ export function createOnlineFlow({ onStartMatch }) {
     const normalized = normalizeRoomCode(codeInput.value);
     if (codeInput.value !== normalized) codeInput.value = normalized;
   });
-  startBtn.addEventListener("click", () => { if (isOwner) client?.startLobby(); });
+  lockBtn.addEventListener("click", () => setLocalLocked(!localLocked));
+  startBtn.addEventListener("click", () => {
+    if (isOwner && playerCount() === matchTypeConfig().maxPlayers && allPlayersLocked()) client?.startLobby();
+    else syncStart();
+  });
   $('[data-action="leaveLobby"]').addEventListener("click", () => {
     client?.leaveLobby();
     resetLobbyState();

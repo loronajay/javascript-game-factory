@@ -38,6 +38,11 @@ const E = svgElement;
 // size, then shrunk so a tall piece stays comfortably within its tile.
 const FIGURE_SCALE = 0.82;
 
+// The token's root stays aligned to the tile hit diamond. The visible plinth/art
+// rides a few SVG units higher so it reads as sitting on the tile face instead
+// of sliding into the front/lower tile.
+export const UNIT_VISUAL_LIFT = 4;
+
 // A team plume / crest helper (small fan above a helmet or hat tip).
 function plume(x, y, h = 11, w = 4) {
   return E("path", {
@@ -425,6 +430,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
     transform: `translate(${point.x} ${point.y + metrics.tileHeight * 0.45})`
   });
 
+  const visual = svgElement("g", { class: "unit-visual", transform: `translate(0 ${-UNIT_VISUAL_LIFT})` });
   const body = svgElement("g", { class: "body-group" });
   body.append(
     svgElement("circle", { class: "rage-aura", cx: 0, cy: -9, r: 37 }),
@@ -493,7 +499,8 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
     points: `0,${-0.45 * th} ${hw},${0.05 * th} 0,${0.55 * th} ${-hw},${0.05 * th}`
   });
 
-  token.append(svgElement("ellipse", { class: "shadow", cx: 0, cy: 18, rx: 24, ry: 8 }), body, hit);
+  visual.append(svgElement("ellipse", { class: "shadow", cx: 0, cy: 18, rx: 24, ry: 8 }), body);
+  token.append(visual, hit);
   token.addEventListener("click", (event) => { event.stopPropagation(); onUnitClick(unit.position); });
   return token;
 }

@@ -17,6 +17,7 @@
 //
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
+//   each  -> all : ready     { ready }                          lobby squad lock-in flag
 //   each  -> all : setup     { seat, composition, skins }       blind squad pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
@@ -129,6 +130,12 @@ function parseConfigMessage(value) {
   return out;
 }
 
+function parseReadyMessage(value) {
+  const p = parseJson(value);
+  if (!p || typeof p !== "object" || typeof p.ready !== "boolean") return null;
+  return { ready: p.ready };
+}
+
 // A player's blind squad pick, keyed by its seat so every client builds the same
 // { seat: composition } map. The composition is re-normalized at match build
 // (squadModel.normalizeSquad); here we only confirm the wire shape.
@@ -209,7 +216,8 @@ export function createOnlineClient() {
     onLobbyStarted: null, // ({ seed, ownerId, members, myClientId })
     onPlayerLeft: null, // ({ clientId, ownerId, playerCount })
     onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
-    onRemoteSetup: null, // ({ seat, composition? })
+    onRemoteReady: null, // ({ clientId, ready })
+    onRemoteSetup: null, // ({ seat, composition?, skins? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
     onRemoteProfile: null, // ({ playerId, displayName, seat })
@@ -230,11 +238,16 @@ export function createOnlineClient() {
     });
   }
 
-  function _handleLobbyMessage(messageType, value) {
+  function _handleLobbyMessage(messageType, value, senderId = null) {
     switch (messageType) {
       case "config": {
         const m = parseConfigMessage(value);
         if (m) cb.onRemoteConfig?.(m);
+        return;
+      }
+      case "ready": {
+        const m = parseReadyMessage(value);
+        if (m && senderId) cb.onRemoteReady?.({ clientId: senderId, ready: m.ready });
         return;
       }
       case "setup": {
@@ -316,7 +329,7 @@ export function createOnlineClient() {
       case "message":
         if (data.scope !== "lobby") return;
         if (data.senderId === _clientId) return; // drop our own echo
-        _handleLobbyMessage(String(data.messageType || ""), String(data.value ?? ""));
+        _handleLobbyMessage(String(data.messageType || ""), String(data.value ?? ""), data.senderId || null);
         return;
       case "error":
         cb.onError?.(data.code, data.message);
@@ -416,6 +429,9 @@ export function createOnlineClient() {
   function sendSetup({ seat, composition = null, skins = null } = {}) {
     _lobbyMsg("setup", JSON.stringify({ seat, composition, skins }));
   }
+  function sendReady(ready) {
+    _lobbyMsg("ready", JSON.stringify({ ready: !!ready }));
+  }
   function sendCommand(command) {
     _lobbyMsg("command", JSON.stringify({ command }));
   }
@@ -472,6 +488,7 @@ export function createOnlineClient() {
     startLobby,
     leaveLobby,
     sendConfig,
+    sendReady,
     sendSetup,
     sendCommand,
     sendHash,

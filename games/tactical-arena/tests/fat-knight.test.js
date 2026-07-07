@@ -141,16 +141,18 @@ test("RAGE Trample move is targeted tile-by-tile like Footwork/Stumble, not a si
   assert.equal(step1.has(positionKey({ x: 9, y: 5 })), false, "a distant tile is not directly selectable — must be walked step by step");
   assert.equal(step1.has(positionKey({ x: 8, y: 5 })), false, "an enemy is only a legal step, not a shortcut past it");
 
-  // After stepping onto the first enemy's tile, the second enemy (adjacent to it) is
-  // NOT offered because trampling it would leave zero steps to land on empty ground
-  // (moveRange 2 only allows one more step after this one).
+  const afterEmptyStep = getTrampleMoveOptions(state, fk, [{ x: 5, y: 4 }]);
+  assert.equal(afterEmptyStep.size > 0, true, "an empty first step continues the Trample path instead of confirming the move");
+
+  // After stepping onto the first enemy's tile, empty continuation tiles are
+  // offered; the final third step must still land on empty ground.
   const step2 = getTrampleMoveOptions(state, fk, [{ x: 6, y: 5 }]);
-  assert.equal(step2.has(positionKey({ x: 7, y: 5 })), true, "empty tile beyond the first enemy is reachable and ends the move");
+  assert.equal(step2.has(positionKey({ x: 7, y: 5 })), true, "empty tile beyond the first enemy is reachable");
   assert.equal(step2.has(positionKey({ x: 6, y: 4 })), true, "a sideways empty tile is also reachable");
 
   let s = run(state, beginActivation(1, "fk")).nextState;
-  const result = run(s, moveUnit(1, "fk", 7, 5, [{ x: 6, y: 5 }, { x: 7, y: 5 }]));
-  assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 5 });
+  const result = run(s, moveUnit(1, "fk", 7, 6, [{ x: 6, y: 5 }, { x: 7, y: 5 }, { x: 7, y: 6 }]));
+  assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 7, y: 6 });
   assert.equal(findUnit(result.nextState, "e1").hp, 22, "the crossed enemy takes 3 true damage");
   assert.equal(findUnit(result.nextState, "e2").hp, 25, "an enemy off the walked path is untouched");
 });
@@ -162,10 +164,13 @@ test("RAGE Trample rejects an explicit path that doesn't end on the clicked dest
   ]);
   let s = run(state, beginActivation(1, "fk")).nextState;
 
+  const short = applyCommand(s, moveUnit(1, "fk", 7, 5, [{ x: 6, y: 5 }, { x: 7, y: 5 }]));
+  assert.equal(short.accepted, false, "explicit Trample paths must use the full movement length like Footwork/Stumble");
+
   const mismatched = applyCommand(s, moveUnit(1, "fk", 7, 5, [{ x: 6, y: 5 }]));
   assert.equal(mismatched.accepted, false, "path must end at the declared destination");
 
-  const skipped = applyCommand(s, moveUnit(1, "fk", 8, 5, [{ x: 8, y: 5 }]));
+  const skipped = applyCommand(s, moveUnit(1, "fk", 10, 5, [{ x: 8, y: 5 }, { x: 9, y: 5 }, { x: 10, y: 5 }]));
   assert.equal(skipped.accepted, false, "path steps must be orthogonally adjacent, not a jump");
 });
 

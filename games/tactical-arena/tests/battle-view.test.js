@@ -7,7 +7,7 @@ import { beginActivation, moveUnit } from "../src/core/commands.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
-import { createUnitFigure } from "../src/ui/unitRenderer.js";
+import { createUnitFigure, UNIT_VISUAL_LIFT } from "../src/ui/unitRenderer.js";
 import { createEffects } from "../src/ui/effects.js";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes, mountCodex } from "../src/ui/codex.js";
@@ -394,6 +394,41 @@ test("board sprite facing follows player ownership instead of board position", (
 
     assert.equal(p1Token.findByClass("sprite-figure").getAttribute("transform"), null);
     assert.equal(p2Token.findByClass("sprite-figure").getAttribute("transform"), "scale(-1 1)");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("board unit visuals sit higher without moving the tile hit diamond", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const state = createBattleState();
+    const unit = {
+      id: "p1-swordsman",
+      player: 1,
+      type: "swordsman",
+      hp: 25,
+      mp: 20,
+      position: { x: 0, y: 0 },
+      statuses: [],
+      statModifiers: {}
+    };
+
+    const token = createUnitFigure(metrics, unit, { state, onUnitClick: () => {} });
+    const visual = token.findByClass("unit-visual");
+    const hit = token.findByClass("unit-hit");
+    const points = hit.getAttribute("points").split(" ").map((pair) => pair.split(",").map(Number));
+
+    assert.equal(visual.getAttribute("transform"), `translate(0 ${-UNIT_VISUAL_LIFT})`);
+    assert.deepEqual(points, [
+      [0, -0.45 * metrics.tileHeight],
+      [metrics.tileWidth / 2, 0.05 * metrics.tileHeight],
+      [0, 0.55 * metrics.tileHeight],
+      [-metrics.tileWidth / 2, 0.05 * metrics.tileHeight]
+    ]);
   } finally {
     globalThis.document = previousDocument;
   }

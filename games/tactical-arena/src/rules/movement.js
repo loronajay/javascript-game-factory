@@ -96,19 +96,14 @@ export function getLegalMoves(state, unit) {
 // RAGE Trample (Fat Knight) targets a NORMAL move the same way Footwork/Stumble
 // target a rushPath ART: click one orthogonal tile at a time, walking through
 // enemies for true damage, rather than a single click straight to a distant
-// destination. Unlike rushPath, the walk is variable-length (0..moveRange) — it
-// simply ends the instant `path` lands on an empty tile, so a click on an empty
-// tile is both "the next step" and "confirm the move" at once. `getTrampleMoveOptions`
-// mirrors getRushStepOptions (rules/arts.js) but bounds by effective moveRange
-// instead of a fixed extraMove length, and never forces "last step must be empty"
-// early — the player can keep walking through further enemies as long as at least
-// one more step remains to land on.
+// destination. Like rushPath, the path must use the full effective moveRange and
+// the final step must land on an empty tile.
 export function getTrampleMoveOptions(state, actor, path) {
   const maxSteps = getEffectiveStats(actor, state).moveRange;
   if (path.length >= maxSteps) return new Set();
   const prior = path.length ? path[path.length - 1] : actor.position;
   const visited = new Set([positionKey(actor.position), ...path.map(positionKey)]);
-  const roomAfterThisStep = maxSteps - (path.length + 1);
+  const lastStep = path.length === maxSteps - 1;
   const options = new Set();
 
   for (const direction of ORTHOGONAL_DIRECTIONS) {
@@ -116,7 +111,7 @@ export function getTrampleMoveOptions(state, actor, path) {
     const key = positionKey(candidate);
     if (!isOnBoard(state, candidate) || visited.has(key) || isWallAt(state, candidate)) continue;
     const occupant = unitAt(state, candidate);
-    if (occupant && (!areEnemies(actor, occupant) || roomAfterThisStep < 1)) continue;
+    if (occupant && (!areEnemies(actor, occupant) || lastStep)) continue;
     options.add(key);
   }
   return options;
@@ -128,7 +123,7 @@ export function getTrampleMoveOptions(state, actor, path) {
 // (the final step must land empty).
 export function validateTrampleMovePath(state, actor, path) {
   const maxSteps = getEffectiveStats(actor, state).moveRange;
-  if (!Array.isArray(path) || path.length === 0 || path.length > maxSteps) return false;
+  if (!Array.isArray(path) || path.length !== maxSteps) return false;
 
   let previous = actor.position;
   const visited = new Set([positionKey(actor.position)]);

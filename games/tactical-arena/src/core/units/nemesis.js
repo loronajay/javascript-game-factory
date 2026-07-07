@@ -39,6 +39,7 @@ export const NEMESIS = Object.freeze({
       kind: "active",
       mpCost: 0,
       resolution: "realmTraversal",
+      selfCast: true,
       description: "Charge the next Nemesis turn: that turn may move and still cast Dark Pulse. Locks until the charged turn ends.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAlly", tags: Object.freeze(["selfBuff"]) })

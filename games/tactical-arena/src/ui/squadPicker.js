@@ -24,6 +24,7 @@ export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, normalizeSquadLoadout, a
 
 export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true } = {}) {
   let loadout = normalizeSquadLoadout(initial);
+  let locked = false;
 
   const el = document.createElement("div");
   el.className = "squad-picker";
@@ -46,11 +47,15 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
 
   // Open the roster pop-up on the slot the player tapped (or slot 0 from Edit).
   async function edit(startSlot = 0) {
+    if (locked) return;
     const result = await openRosterPicker({ title, accent, initial: loadout, allowDuplicates, startSlot });
     if (result) { loadout = normalizeSquadLoadout(result); paintChips(); }
   }
 
   function paintChips() {
+    el.classList.toggle("is-locked", locked);
+    editBtn.disabled = locked;
+    editBtn.textContent = locked ? "Squad Locked" : "Edit Squad";
     chips.replaceChildren();
     for (const slot of SLOT_LAYOUT) {
       const type = loadout.composition[slot.index];
@@ -58,6 +63,7 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `squad-chip row-${slot.row}`;
+      chip.disabled = locked;
       chip.append(createPortrait(type, { variant: "is-chip", eager: true, skin: loadout.skins[slot.index] }));
       const name = document.createElement("span");
       name.className = "squad-chip-name";
@@ -73,6 +79,11 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
 
   return {
     el,
+    setLocked(value) {
+      locked = !!value;
+      paintChips();
+    },
+    isLocked: () => locked,
     getSquad: () => [...loadout.composition],
     getSkins: () => [...loadout.skins],
     getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] })

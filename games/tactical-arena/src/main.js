@@ -1429,8 +1429,7 @@ async function handleTile(position) {
   if (mode === "move" && canTrample(unit)) {
     // RAGE Trample (Fat Knight): targeted exactly like Footwork/Stumble — one
     // adjacent tile at a time via footworkPath, not a single click straight to a
-    // far destination. Landing on an enemy tramples it (true damage) and MUST
-    // continue; landing on an empty tile both is and commits the final step.
+    // far destination. The move commits only after the full movement-length path.
     const options = getTrampleMoveOptions(state, unit, footworkPath);
     if (!options.has(positionKey(position))) {
       setMessage("Trample: choose the next highlighted tile.", true);
@@ -1438,9 +1437,10 @@ async function handleTile(position) {
       return;
     }
     footworkPath.push(position);
-    if (unitAt(state, position)) {
-      const maxSteps = getEffectiveStats(unit, state).moveRange;
-      setMessage(`Trample: enemy crossed. Choose step ${footworkPath.length + 1} of up to ${maxSteps}.`);
+    const maxSteps = getEffectiveStats(unit, state).moveRange;
+    if (footworkPath.length < maxSteps) {
+      const crossedEnemy = Boolean(unitAt(state, position));
+      setMessage(`Trample: ${crossedEnemy ? "enemy crossed. " : ""}Choose step ${footworkPath.length + 1} of ${maxSteps}.`);
       render();
       return;
     }

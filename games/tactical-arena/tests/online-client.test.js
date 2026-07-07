@@ -79,3 +79,79 @@ test("online setup payload relays skin selections with the squad composition", (
     globalThis.WebSocket = previous;
   }
 });
+
+test("online lock-in payload relays readiness without exposing the squad", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener() {}
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.sendReady(true);
+    client.sendReady(false);
+    assert.deepEqual(sent, [
+      {
+        type: "lobby_message",
+        messageType: "ready",
+        value: JSON.stringify({ ready: true })
+      },
+      {
+        type: "lobby_message",
+        messageType: "ready",
+        value: JSON.stringify({ ready: false })
+      }
+    ]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
+test("online client parses remote squad lock-in readiness by sender", () => {
+  const previous = globalThis.WebSocket;
+  let messageHandler = null;
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener(type, handler) {
+        if (type === "message") messageHandler = handler;
+      }
+      send() {}
+    };
+    const client = createOnlineClient();
+    const ready = [];
+    client.cb.onRemoteReady = (payload) => ready.push(payload);
+    client.connect();
+    messageHandler({
+      data: JSON.stringify({
+        event: "message",
+        scope: "lobby",
+        senderId: "c_guest",
+        messageType: "ready",
+        value: JSON.stringify({ ready: true })
+      })
+    });
+    messageHandler({
+      data: JSON.stringify({
+        event: "message",
+        scope: "lobby",
+        senderId: "c_guest",
+        messageType: "ready",
+        value: JSON.stringify({ ready: false, composition: ["swordsman"] })
+      })
+    });
+    assert.deepEqual(ready, [
+      { clientId: "c_guest", ready: true },
+      { clientId: "c_guest", ready: false }
+    ]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});

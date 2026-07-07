@@ -34,6 +34,7 @@ test("Nemesis is registered with mage stats and authored abilities", () => {
   });
   assert.equal(def.passive.id, "realm-of-magic");
   assert.deepEqual(def.arts.map((art) => art.id), ["dark-pulse", "realm-traversal", "nullify"]);
+  assert.equal(getArt("nemesis", "realm-traversal").selfCast, true);
   assert.equal(def.ragePassive.id, "regenerate");
 });
 
