@@ -13,6 +13,8 @@
 // start; the match builds only once every seat's squad is in. A future draft-pick
 // mode (back-and-forth with bans) will replace the blind exchange, not this transport.
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
+import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
+import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js";
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
@@ -20,7 +22,8 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { UNIT_TYPE_KEYS, groupedUnitTypes } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
-import { DRAFT_PICK_ORDER, applyDraftPick, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
+import { openDraftFormationPicker } from "./draftFormationPicker.js";
+import { DRAFT_PICK_ORDER, applyDraftPick, arrangeDraftLoadout, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -54,6 +57,7 @@ export function createOnlineFlow({ onStartMatch }) {
   const draftTrack = $('[data-online="draftTrack"]');
   const draftSquads = $('[data-online="draftSquads"]');
   const draftRoster = $('[data-online="draftRoster"]');
+  const draftActions = $('[data-online="draftActions"]') ?? document.createElement("div");
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
   const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
 
@@ -68,6 +72,8 @@ export function createOnlineFlow({ onStartMatch }) {
   const readyByClientId = new Map();
   let draft = null;
   let draftMembersKey = "";
+  let localFormationOrder = null;
+  let formationPromptOpen = false;
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -159,11 +165,17 @@ export function createOnlineFlow({ onStartMatch }) {
     if (!key) {
       draft = null;
       draftMembersKey = "";
+      localFormationOrder = null;
+      formationPromptOpen = false;
       return;
     }
     if (key !== draftMembersKey) {
       draft = createDraftState({ seats: [1, 2] });
       draftMembersKey = key;
+      localFormationOrder = null;
+      formationPromptOpen = false;
+      localLocked = false;
+      if (myClientId) readyByClientId.set(myClientId, false);
     }
   }
 
@@ -181,14 +193,19 @@ export function createOnlineFlow({ onStartMatch }) {
     return player.id === myClientId ? "You" : player.name;
   }
 
+  function allDraftFormationsLocked(players = lobbyPlayers()) {
+    return isDraftComplete(draft) && players.length > 0 && players.every((p) => readyByClientId.get(p.id) === true);
+  }
+
   function identity() {
+    // Pull the canonical Javascript Game Factory profile so the lobby shows the
+    // player's real pilot name (not a generic tag) whenever a profile is registered.
+    // createOnlineIdentityPayload returns { playerId, displayName }; a guest with no
+    // profile name falls through to onlineClient's "Commander" default.
     try {
-      return {
-        playerId: window.FactoryIdentity?.getPlayerId?.() ?? "",
-        displayName: window.FactoryIdentity?.getProfileName?.() ?? "Commander",
-      };
+      return createOnlineIdentityPayload(loadFactoryProfile());
     } catch {
-      return { playerId: "", displayName: "Commander" };
+      return { playerId: "", displayName: "" };
     }
   }
 
@@ -216,7 +233,9 @@ export function createOnlineFlow({ onStartMatch }) {
       if (draftMode) {
         const pickCount = draft?.picks?.[p.seat]?.length ?? 0;
         tags.push(
-          pickCount >= 4
+          readyByClientId.get(p.id) === true
+            ? '<span class="lobby-tag ready">Formation</span>'
+            : pickCount >= 4
             ? '<span class="lobby-tag ready">Drafted</span>'
             : '<span class="lobby-tag picking">Drafting</span>',
         );
@@ -272,7 +291,8 @@ export function createOnlineFlow({ onStartMatch }) {
     const full = count === type.maxPlayers;
     const draftMode = isDraftMatch();
     const draftDone = draftMode && full && isDraftComplete(draft);
-    const locked = draftMode ? draftDone : full && allPlayersLocked();
+    const draftReady = draftDone && allDraftFormationsLocked();
+    const locked = draftMode ? draftReady : full && allPlayersLocked();
     const missingLocks = full ? lobbyPlayers().filter((p) => readyByClientId.get(p.id) !== true).length : 0;
     startBtn.hidden = !isOwner;
     startBtn.disabled = !(isOwner && full && locked);
@@ -283,6 +303,10 @@ export function createOnlineFlow({ onStartMatch }) {
       } else if (draftMode && !draftDone) {
         const seat = currentDraftSeat(draft);
         lobbyHintEl.textContent = seat === localLobbySeat() ? "Your draft pick is up." : `Waiting for ${draftPlayerLabel(seat)} to draft.`;
+      } else if (draftMode && !draftReady) {
+        lobbyHintEl.textContent = localLocked
+          ? `Waiting for ${missingLocks} formation lock-in${missingLocks === 1 ? "" : "s"}.`
+          : "Arrange and lock your formation.";
       } else if (!locked) {
         lobbyHintEl.textContent = `Waiting for ${missingLocks} squad lock-in${missingLocks === 1 ? "" : "s"}.`;
       } else {
@@ -291,7 +315,7 @@ export function createOnlineFlow({ onStartMatch }) {
     } else {
       lobbyHintEl.hidden = false;
       lobbyHintEl.textContent = draftMode
-        ? (draftDone ? "Draft complete. Waiting for the host to start..." : "Draft your squad, then wait for the host.")
+        ? (!draftDone ? "Draft your squad, then arrange formation." : localLocked ? "Formation locked. Waiting for the host to start..." : "Arrange and lock your formation.")
         : localLocked
         ? (locked ? "Locked in. Waiting for the host to start..." : "Locked in. Waiting for the other squad lock-ins...")
         : "Lock in when your squad is ready.";
@@ -313,6 +337,7 @@ export function createOnlineFlow({ onStartMatch }) {
       draftHint.textContent = "Draft starts when both commanders are in the room.";
       draftTrack.replaceChildren();
       draftSquads.replaceChildren();
+      draftActions.replaceChildren();
       draftRoster.replaceChildren();
       return;
     }
@@ -321,7 +346,7 @@ export function createOnlineFlow({ onStartMatch }) {
     const localSeat = localLobbySeat();
     const complete = isDraftComplete(draft);
     draftHint.textContent = complete
-      ? "Draft complete. No duplicate units are allowed across either squad."
+      ? (localLocked ? "Formation locked. The host can start once both sides are ready." : "Draft complete. Arrange your starting slots before the match starts.")
       : currentSeat === localSeat
         ? "Your pick. Choose one available unit for your squad."
         : `${draftPlayerLabel(currentSeat)} is picking. Taken units are locked for both sides.`;
@@ -366,6 +391,25 @@ export function createOnlineFlow({ onStartMatch }) {
     }
 
     const taken = draftedTypes(draft);
+    draftActions.replaceChildren();
+    if (complete) {
+      const arrangeBtn = document.createElement("button");
+      arrangeBtn.type = "button";
+      arrangeBtn.className = `menu-btn${localLocked ? "" : " primary"}`;
+      arrangeBtn.textContent = localLocked ? "Change Formation" : "Arrange Formation";
+      arrangeBtn.addEventListener("click", () => openLocalFormation());
+      const status = document.createElement("p");
+      status.className = "setup-hint";
+      status.textContent = localLocked ? "Your formation is locked." : "Pick your spawn-slot order.";
+      draftActions.append(arrangeBtn, status);
+      draftRoster.replaceChildren();
+      if (!localLocked && !localFormationOrder && !formationPromptOpen && localSeat) {
+        formationPromptOpen = true;
+        window.setTimeout(() => { formationPromptOpen = false; openLocalFormation(); }, 0);
+      }
+      return;
+    }
+
     draftRoster.replaceChildren();
     for (const group of groupedUnitTypes(UNIT_TYPE_KEYS)) {
       const section = document.createElement("section");
@@ -428,6 +472,34 @@ export function createOnlineFlow({ onStartMatch }) {
     client?.sendDraftPick({ pickIndex, seat: localSeat, type, skin });
     setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : "Pick locked.");
     syncUI();
+  }
+
+  async function openLocalFormation() {
+    const seat = localLobbySeat();
+    if (!draft || !isDraftComplete(draft) || !seat || formationPromptOpen) return;
+    const picks = [...(draft.picks?.[seat] ?? [])];
+    const skins = [...(draft.skins?.[seat] ?? [])];
+    if (picks.length < 4) return;
+
+    const wasLocked = localLocked;
+    if (wasLocked) setLocalLocked(false);
+    formationPromptOpen = true;
+    const result = await openDraftFormationPicker({
+      title: "Arrange Formation",
+      composition: picks,
+      skins,
+      order: localFormationOrder,
+      accent: PLAYER_COLOR[seat] ?? PLAYER_COLOR[1],
+    });
+    formationPromptOpen = false;
+    if (!result?.order) {
+      if (wasLocked && localFormationOrder) setLocalLocked(true);
+      else syncUI();
+      return;
+    }
+    localFormationOrder = result.order;
+    setStatus("Formation locked. Waiting for the other side.");
+    setLocalLocked(true);
   }
 
   function describeRelay(url) {
@@ -494,9 +566,9 @@ export function createOnlineFlow({ onStartMatch }) {
       const playersAtStart = membersAtStart.map((clientId, index) => ({ id: clientId, seat: index + 1 }));
       if (isDraftMatch()) {
         syncDraftMembership();
-        if (!isDraftComplete(draft)) {
+        if (!isDraftComplete(draft) || !allDraftFormationsLocked(playersAtStart)) {
           membersAtStart = null;
-          setStatus("Start blocked until the draft is complete.");
+          setStatus("Start blocked until every formation is locked.");
           syncUI();
           return;
         }
@@ -511,8 +583,9 @@ export function createOnlineFlow({ onStartMatch }) {
       seed = matchSeed;
       setStatus("Match starting…");
 
-      const composition = isDraftMatch() ? [...(draft?.picks?.[mySeat] ?? DEFAULT_SQUAD)] : squadPicker.getSquad();
-      const skins = isDraftMatch() ? draftSkinsForSeat(mySeat) : squadPicker.getSkins();
+      const arrangedDraft = isDraftMatch() ? arrangeDraftLoadout(draft, mySeat, localFormationOrder) : null;
+      const composition = arrangedDraft ? arrangedDraft.composition : squadPicker.getSquad();
+      const skins = arrangedDraft ? arrangedDraft.skins : squadPicker.getSkins();
       compositionsBySeat[mySeat] = composition;
       skinsBySeat[mySeat] = skins;
       client.sendSetup({ seat: mySeat, composition, skins });
@@ -532,7 +605,7 @@ export function createOnlineFlow({ onStartMatch }) {
       const result = applyDraftPick(draft, { seat, type, skin });
       if (!result.accepted) return;
       draft = result.nextState;
-      setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : `${draftPlayerLabel(seat)} locked a pick.`);
+      setStatus(isDraftComplete(draft) ? "Draft complete. Arrange your formation." : `${draftPlayerLabel(seat)} locked a pick.`);
       syncUI();
     };
 
@@ -546,12 +619,6 @@ export function createOnlineFlow({ onStartMatch }) {
       setStatus("Disconnected. Try again.");
       resetLobbyState();
     };
-  }
-
-  function draftSkinsForSeat(seat) {
-    const skins = [...(draft?.skins?.[seat] ?? [])];
-    while (skins.length < 4) skins.push(null);
-    return skins.slice(0, 4);
   }
 
   // Build the session and hand off — only once the shared seed, the owner's config,
@@ -609,6 +676,8 @@ export function createOnlineFlow({ onStartMatch }) {
     readyByClientId.clear();
     draft = null;
     draftMembersKey = "";
+    localFormationOrder = null;
+    formationPromptOpen = false;
     squadPicker.setLocked(false);
     lockBtn.textContent = "Lock Squad";
     lockBtn.classList.add("primary");
@@ -642,7 +711,7 @@ export function createOnlineFlow({ onStartMatch }) {
   });
   lockBtn.addEventListener("click", () => setLocalLocked(!localLocked));
   startBtn.addEventListener("click", () => {
-    const readyToStart = isDraftMatch() ? isDraftComplete(draft) : allPlayersLocked();
+    const readyToStart = isDraftMatch() ? allDraftFormationsLocked() : allPlayersLocked();
     if (isOwner && playerCount() === matchTypeConfig().maxPlayers && readyToStart) client?.startLobby();
     else syncStart();
   });

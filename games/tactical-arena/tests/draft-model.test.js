@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   DRAFT_PICK_ORDER,
   applyDraftPick,
+  arrangeDraftLoadout,
   canDraftType,
   createDraftState,
   currentDraftSeat,
@@ -13,6 +14,50 @@ import {
 
 test("draft uses a snake pick order for two four-unit squads", () => {
   assert.deepEqual(DRAFT_PICK_ORDER, [1, 2, 2, 1, 1, 2, 2, 1]);
+});
+
+test("draft formation order reorders composition and skins without changing picks", () => {
+  let draft = createDraftState();
+  for (const [seat, type, skin] of [
+    [1, "swordsman", "summer-vibes"],
+    [2, "archer", null],
+    [2, "mystic", "summer-vibes"],
+    [1, "magician", "summer-vibes"],
+    [1, "paladin", "summer-vibes"],
+    [2, "sniper", null],
+    [2, "angel", "summer-vibes"],
+    [1, "witch-doctor", "summer-vibes"],
+  ]) {
+    const result = applyDraftPick(draft, { seat, type, skin });
+    assert.equal(result.accepted, true);
+    draft = result.nextState;
+  }
+
+  const loadout = arrangeDraftLoadout(draft, 1, [2, 0, 3, 1]);
+  assert.deepEqual(loadout.composition, ["paladin", "swordsman", "witch-doctor", "magician"]);
+  assert.deepEqual(loadout.skins, ["summer-vibes", "summer-vibes", "summer-vibes", "summer-vibes"]);
+  assert.deepEqual(draft.picks[1], ["swordsman", "magician", "paladin", "witch-doctor"]);
+});
+
+test("draft formation falls back to pick order unless order is a full permutation", () => {
+  let draft = createDraftState();
+  for (const [seat, type] of [
+    [1, "swordsman"],
+    [2, "archer"],
+    [2, "mystic"],
+    [1, "magician"],
+    [1, "paladin"],
+    [2, "sniper"],
+    [2, "angel"],
+    [1, "witch-doctor"],
+  ]) {
+    const result = applyDraftPick(draft, { seat, type });
+    assert.equal(result.accepted, true);
+    draft = result.nextState;
+  }
+
+  assert.deepEqual(arrangeDraftLoadout(draft, 1, [0, 0, 1, 2]).composition, draft.picks[1]);
+  assert.deepEqual(arrangeDraftLoadout(draft, 1, null).composition, draft.picks[1]);
 });
 
 test("draft rejects duplicates across both teams", () => {

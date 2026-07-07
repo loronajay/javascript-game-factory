@@ -51,3 +51,22 @@ export function applyDraftPick(draft, { seat, type, skin = null } = {}) {
   next.skins[numericSeat] = [...(next.skins[numericSeat] ?? []), normalizeSkinSlug(type, skin)];
   return { accepted: true, nextState: next };
 }
+
+function normalizedFormationOrder(order, length) {
+  const fallback = Array.from({ length }, (_, index) => index);
+  if (!Array.isArray(order) || order.length !== length) return fallback;
+  const normalized = order.map((index) => Number(index));
+  if (normalized.some((index) => !Number.isInteger(index) || index < 0 || index >= length)) return fallback;
+  if (new Set(normalized).size !== length) return fallback;
+  return normalized;
+}
+
+export function arrangeDraftLoadout(draft, seat, order = null) {
+  const picks = [...(draft?.picks?.[seat] ?? [])].slice(0, 4);
+  const skins = [...(draft?.skins?.[seat] ?? [])].slice(0, picks.length);
+  const formationOrder = normalizedFormationOrder(order, picks.length);
+  return {
+    composition: formationOrder.map((index) => picks[index]),
+    skins: formationOrder.map((index) => normalizeSkinSlug(picks[index], skins[index] ?? null)),
+  };
+}

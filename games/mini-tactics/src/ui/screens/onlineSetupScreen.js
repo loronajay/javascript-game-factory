@@ -7,6 +7,8 @@ import {
   selectSeg,
 } from "./common.js";
 import { BOARD_SIZES, PLAYER_COLORS, RULESET_VERSION } from "../../config.js";
+import { loadFactoryProfile } from "../../../../../js/platform/identity/factory-profile.mjs";
+import { createOnlineIdentityPayload } from "../../../../../js/platform/identity/match-identity.mjs";
 import { createOnlineClient } from "../../online/onlineClient.js";
 import { createOnlineSession } from "../../online/onlineSession.js";
 import { createSquadPicker } from "./squadBuilder.js";
@@ -155,13 +157,14 @@ export function createOnlineSetupScreen(ctx) {
   }
 
   function identity() {
+    // Pull the canonical Javascript Game Factory profile so the lobby shows the
+    // player's real pilot name (not a generic tag) whenever a profile is registered.
+    // createOnlineIdentityPayload returns { playerId, displayName }; a guest with no
+    // profile name falls through to onlineClient's "Commander" default.
     try {
-      return {
-        playerId: window.FactoryIdentity?.getPlayerId?.() ?? "",
-        displayName: window.FactoryIdentity?.getProfileName?.() ?? "Commander",
-      };
+      return createOnlineIdentityPayload(loadFactoryProfile());
     } catch {
-      return { playerId: "", displayName: "Commander" };
+      return { playerId: "", displayName: "" };
     }
   }
 
