@@ -69,15 +69,17 @@
 
       <!-- ============================ MAIN MENU =========================== -->
       <section class="screen menu-screen" data-screen="mainMenu">
-        <div class="menu-card">
+        <div class="menu-card hub-card">
           <h2 class="menu-heading">Main Menu</h2>
-          <div class="menu-buttons">
-            <button data-nav="spSetup" class="primary menu-btn">Single Player</button>
-            <button data-nav="hsSetup" class="menu-btn">Hot Seat</button>
-            <button data-nav="onlineSetup" class="menu-btn">Online Versus</button>
-            <button data-action="rules" class="menu-btn">How to Play</button>
-            <button data-action="skins" class="menu-btn">Skins</button>
-            <button data-action="settings" class="menu-btn">Settings</button>
+          <div class="menu-buttons menu-choice-list">
+            <button data-nav="spSetup" class="primary menu-btn menu-choice"><span>Single Player</span></button>
+            <button data-nav="hsSetup" class="menu-btn menu-choice"><span>Hot Seat</span></button>
+            <button data-nav="onlineSetup" class="menu-btn menu-choice"><span>Online Versus</span></button>
+          </div>
+          <div class="menu-secondary-actions">
+            <button data-action="rules" class="menu-btn ghost">Codex</button>
+            <button data-action="skins" class="menu-btn ghost">Skins</button>
+            <button data-action="settings" class="menu-btn ghost">Settings</button>
             <button data-nav="title" class="menu-btn ghost">Back</button>
           </div>
         </div>
