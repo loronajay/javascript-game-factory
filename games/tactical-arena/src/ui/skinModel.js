@@ -55,12 +55,16 @@ function skin(entry, { status = SKIN_STATUS.UNLOCKED } = {}) {
   });
 }
 
+// All skins are locked until the skin-choice/unlock UI is built — the manifest
+// still enumerates every painted skin so it can be browsed (see the "visible
+// but locked" UX), but none are selectable yet. Flip individual entries back to
+// SKIN_STATUS.UNLOCKED once a real unlock path exists.
 export const SKINS_BY_UNIT = Object.freeze(Object.fromEntries(
   Object.keys(UNIT_TYPES).map((type) => {
     const entries = SKIN_MANIFEST
       .filter((entry) => entry.type === type)
       .sort(sortSkinEntries);
-    return [type, Object.freeze(entries.map((entry) => skin(entry)))];
+    return [type, Object.freeze(entries.map((entry) => skin(entry, { status: SKIN_STATUS.LOCKED })))];
   })
 ));
 

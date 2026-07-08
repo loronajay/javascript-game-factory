@@ -19,6 +19,17 @@ export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES).filter((key) => !UNIT_TYPE
 export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
 export const SQUAD_SIZE = DEFAULT_SQUAD.length;
 
+// Campaign unlock gate. No unlock-progress system exists yet — every non-starter
+// unit is locked out of PLAYER squad-picking surfaces (roster picker, online
+// draft) until the campaign gating lands. CPU-controlled squads and the
+// hand-scripted tutorial battles build their units directly via core/state.js,
+// bypassing this list entirely, so they stay unaffected.
+export const STARTER_UNIT_TYPES = Object.freeze([...DEFAULT_SQUAD]);
+
+export function isUnitUnlocked(type) {
+  return STARTER_UNIT_TYPES.includes(type);
+}
+
 // The four corner-spawn cells, labelled front/back to mirror the staging block.
 export const SLOT_LAYOUT = [
   { index: 0, row: "front" },
@@ -53,9 +64,10 @@ export function normalizeSquadLoadout(loadout, skins = null) {
 // duplicates allowed (hot-seat / blind / casual) every type is selectable; with
 // duplicates blocked (draft / ranked) a type already used in another slot is out.
 export function availableTypesForSlot(squad, slotIndex, allowDuplicates = true) {
-  if (allowDuplicates) return [...UNIT_TYPE_KEYS];
+  const unlocked = UNIT_TYPE_KEYS.filter(isUnitUnlocked);
+  if (allowDuplicates) return unlocked;
   const usedElsewhere = new Set(squad.filter((_, i) => i !== slotIndex));
-  return UNIT_TYPE_KEYS.filter((type) => !usedElsewhere.has(type));
+  return unlocked.filter((type) => !usedElsewhere.has(type));
 }
 
 export function groupedUnitTypes(types = UNIT_TYPE_KEYS) {

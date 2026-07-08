@@ -28,14 +28,16 @@ test("draft formation order reorders composition and skins without changing pick
     [2, "angel", "summer-vibes"],
     [1, "witch-doctor", "summer-vibes"],
   ]) {
-    const result = applyDraftPick(draft, { seat, type, skin });
+    const result = applyDraftPick(draft, { seat, type, skin, isUnlocked: () => true });
     assert.equal(result.accepted, true);
     draft = result.nextState;
   }
 
   const loadout = arrangeDraftLoadout(draft, 1, [2, 0, 3, 1]);
   assert.deepEqual(loadout.composition, ["paladin", "swordsman", "witch-doctor", "magician"]);
-  assert.deepEqual(loadout.skins, ["summer-vibes", "summer-vibes", "summer-vibes", "summer-vibes"]);
+  // Skins are all locked right now, so every slug normalizes to classic (null)
+  // regardless of what was picked during the draft.
+  assert.deepEqual(loadout.skins, [null, null, null, null]);
   assert.deepEqual(draft.picks[1], ["swordsman", "magician", "paladin", "witch-doctor"]);
 });
 
@@ -51,7 +53,7 @@ test("draft formation falls back to pick order unless order is a full permutatio
     [2, "angel"],
     [1, "witch-doctor"],
   ]) {
-    const result = applyDraftPick(draft, { seat, type });
+    const result = applyDraftPick(draft, { seat, type, isUnlocked: () => true });
     assert.equal(result.accepted, true);
     draft = result.nextState;
   }
@@ -85,7 +87,7 @@ test("draft completes with four unique units per seat", () => {
     [2, "angel"],
     [1, "witch-doctor"],
   ]) {
-    const result = applyDraftPick(draft, { seat, type });
+    const result = applyDraftPick(draft, { seat, type, isUnlocked: () => true });
     assert.equal(result.accepted, true, `${seat} should draft ${type}`);
     draft = result.nextState;
   }
@@ -94,6 +96,20 @@ test("draft completes with four unique units per seat", () => {
   assert.deepEqual(draft.picks[1], ["swordsman", "magician", "paladin", "witch-doctor"]);
   assert.deepEqual(draft.picks[2], ["archer", "mystic", "sniper", "angel"]);
   assert.equal(draftedTypes(draft).size, 8);
+});
+
+test("draft blocks non-starter units by default (campaign lock, no unlock system yet)", () => {
+  let draft = createDraftState();
+  assert.equal(canDraftType(draft, 1, "paladin"), false);
+
+  let result = applyDraftPick(draft, { seat: 1, type: "paladin" });
+  assert.equal(result.accepted, false);
+
+  assert.equal(canDraftType(draft, 1, "swordsman"), true);
+  result = applyDraftPick(draft, { seat: 1, type: "swordsman" });
+  assert.equal(result.accepted, true);
+  draft = result.nextState;
+  assert.deepEqual(draft.picks[1], ["swordsman"]);
 });
 
 test("draft stores normalized skin selections alongside each seat's picks", () => {
@@ -108,7 +124,8 @@ test("draft stores normalized skin selections alongside each seat's picks", () =
   draft = result.nextState;
 
   assert.deepEqual(draft.picks[1], ["swordsman"]);
-  assert.deepEqual(draft.skins[1], ["summer-vibes"]);
+  // Skins are all locked right now, so a picked slug normalizes to classic (null).
+  assert.deepEqual(draft.skins[1], [null]);
   assert.deepEqual(draft.picks[2], ["archer"]);
   assert.deepEqual(draft.skins[2], [null]);
 });

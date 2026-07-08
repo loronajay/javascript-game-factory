@@ -5,9 +5,11 @@ import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import {
   UNIT_TYPE_KEYS,
   DEFAULT_SQUAD,
+  STARTER_UNIT_TYPES,
   UNIT_CLASS_GROUPS,
   availableTypesForSlot,
   groupedUnitTypes,
+  isUnitUnlocked,
   normalizeSquadLoadout
 } from "../src/ui/squadModel.js";
 // Importing through squadPicker.js also loads rosterPicker.js — this guards that
@@ -44,9 +46,9 @@ test("unit picker groups draftable units by class in roster order", () => {
   ]);
 });
 
-test("duplicates allowed: every roster type stays selectable for any slot", () => {
+test("duplicates allowed: every unlocked (starter) type stays selectable for any slot", () => {
   const squad = ["swordsman", "swordsman", "archer", "mystic"];
-  assert.deepEqual(availableTypesForSlot(squad, 1, true), [...UNIT_TYPE_KEYS]);
+  assert.deepEqual(availableTypesForSlot(squad, 1, true), [...STARTER_UNIT_TYPES]);
 });
 
 test("duplicates blocked: types used in other slots drop out, the slot's own stays", () => {
@@ -58,6 +60,18 @@ test("duplicates blocked: types used in other slots drop out, the slot's own sta
   assert.ok(!available.includes("archer"));
   assert.ok(!available.includes("mystic"));
   assert.ok(!available.includes("magician"));
+});
+
+test("campaign lock: only the four starter units are selectable, the rest of the roster is locked", () => {
+  for (const type of STARTER_UNIT_TYPES) assert.equal(isUnitUnlocked(type), true, `${type} should be unlocked`);
+  const lockedSample = UNIT_TYPE_KEYS.filter((type) => !STARTER_UNIT_TYPES.includes(type));
+  assert.ok(lockedSample.length > 0);
+  for (const type of lockedSample) assert.equal(isUnitUnlocked(type), false, `${type} should be locked`);
+
+  const squad = ["swordsman", "archer", "mystic", "magician"];
+  const available = availableTypesForSlot(squad, 0, true);
+  assert.ok(!available.includes("paladin"));
+  assert.ok(!available.includes("sniper"));
 });
 
 test("squadPicker re-exports the model without DOM access at import time", () => {
@@ -75,6 +89,6 @@ test("squad loadouts preserve legacy composition arrays and normalize slot skins
     skins: ["summer-vibes", "missing", null, "summer-vibes"]
   }), {
     composition: ["swordsman", "archer", "mystic", "magician"],
-    skins: ["summer-vibes", null, null, "summer-vibes"]
+    skins: [null, null, null, null]
   });
 });

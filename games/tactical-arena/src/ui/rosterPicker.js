@@ -12,7 +12,7 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
 import { createPortrait } from "./portraits.js";
-import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes } from "./squadModel.js";
+import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import { normalizeSkinSlug, skinLabel } from "./skinModel.js";
 import { openSkinPicker } from "./skinPicker.js";
 
@@ -116,15 +116,20 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         const units = el("div", "roster-class-units");
         for (const type of group.types) {
           const def = UNIT_TYPES[type];
+          const locked = !isUnitUnlocked(type);
           const disabled = !available.has(type);
-          const unitBtn = el("button", `roster-unit${type === focusedType ? " is-focused" : ""}${disabled ? " is-disabled" : ""}`);
+          const unitBtn = el("button", `roster-unit${type === focusedType ? " is-focused" : ""}${disabled ? " is-disabled" : ""}${locked ? " is-locked" : ""}`);
           unitBtn.type = "button";
           unitBtn.dataset.type = type;
           unitBtn.append(createPortrait(type, { variant: "is-card", eager: true, skin: selectedSkinForType(type) }));
           const name = el("span", "roster-unit-name");
           name.textContent = def.name;
           unitBtn.append(name);
-          if (disabled) {
+          if (locked) {
+            const flag = el("span", "roster-unit-flag");
+            flag.textContent = "🔒 Locked";
+            unitBtn.append(flag);
+          } else if (disabled) {
             const flag = el("span", "roster-unit-flag");
             flag.textContent = "In squad";
             unitBtn.append(flag);
@@ -183,7 +188,9 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const rowLabel = activeSlotDef.row === "front" ? "Front" : "Back";
       const canAssign = available.has(focusedType);
       assignBtn.disabled = !canAssign;
-      assignBtn.textContent = canAssign ? `▸ Place in Slot ${activeSlot + 1} · ${rowLabel}` : "Already in squad";
+      assignBtn.textContent = canAssign
+        ? `▸ Place in Slot ${activeSlot + 1} · ${rowLabel}`
+        : isUnitUnlocked(focusedType) ? "Already in squad" : "🔒 Locked";
     }
 
     function paintAll() { paintTray(); paintGrid(); paintDetail(); }

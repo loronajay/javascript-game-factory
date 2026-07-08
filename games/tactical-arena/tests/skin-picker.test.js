@@ -122,7 +122,7 @@ test("skin picker imports without DOM access", () => {
   assert.equal(typeof openSkinPicker, "function");
 });
 
-test("skin picker confirms a selected authored skin", async () => {
+test("skin picker offers every authored skin locked (no unlock UI yet); classic stays selectable", async () => {
   globalThis.document = new FakeDocument();
 
   const picking = openSkinPicker({ type: "swordsman", initial: "summer-vibes", accent: "#67a4ff" });
@@ -134,14 +134,17 @@ test("skin picker confirms a selected authored skin", async () => {
   const arcane = walk(overlay, (node) => node.tagName === "BUTTON" && node.dataset.skin === "arcane")[0];
   assert.ok(classic, "classic skin choice should be present");
   assert.ok(arcane, "authored skin choice should be present");
+  assert.equal(arcane.disabled, true, "locked skin choices should be disabled");
 
+  // Clicking a locked skin does nothing — selection stays classic since the
+  // requested initial slug (also locked) already normalized down to null.
   arcane.click();
 
   const useButton = walk(overlay, (node) =>
     node.tagName === "BUTTON" && node.dataset.skinAction === "use")[0];
   useButton.click();
 
-  assert.deepEqual(await picking, { skin: "arcane" });
+  assert.deepEqual(await picking, { skin: null });
   assert.equal(overlay.hidden, true);
 });
 

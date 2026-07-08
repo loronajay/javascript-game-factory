@@ -45,11 +45,11 @@ test("summer-vibes is the first authored skin collection slug", () => {
   assert.equal(SUMMER_VIBES_SKIN_SLUG, "summer-vibes");
 });
 
-test("every registered unit has an unlocked summer-vibes skin asset", () => {
+test("every registered unit has a summer-vibes skin asset, currently locked (no unlock UI yet)", () => {
   for (const type of Object.keys(UNIT_TYPES)) {
     const skins = getUnitSkins(type);
     assert.equal(skins[0]?.slug, SUMMER_VIBES_SKIN_SLUG, `${type} first skin should be summer-vibes`);
-    assert.equal(skins[0]?.unlocked, true, `${type} summer-vibes should be unlocked`);
+    assert.equal(skins[0]?.unlocked, false, `${type} summer-vibes should be locked until the skin-choice UI ships`);
     assert.equal(skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG), `assets/units/skins/${type}/summer-vibes-${type}.png`);
     assert.ok(
       existsSync(join(GAME_ROOT, skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG))),
@@ -74,8 +74,8 @@ test("newly dropped skin files become selectable by inferred slug", () => {
   assert.equal(getSkin("nemesis", "infernal")?.portraitSrc, "assets/units/skins/nemesis/infernal-nemesis.png");
 });
 
-test("unknown or locked skin slugs normalize to classic", () => {
-  assert.equal(normalizeSkinSlug("swordsman", "summer-vibes"), "summer-vibes");
+test("unknown or locked skin slugs normalize to classic (every skin is currently locked)", () => {
+  assert.equal(normalizeSkinSlug("swordsman", "summer-vibes"), null);
   assert.equal(normalizeSkinSlug("swordsman", "not-real"), null);
   assert.equal(normalizeSkinSlug("dragon", "summer-vibes"), null);
   assert.equal(getSkin("swordsman", null), null);
@@ -85,7 +85,7 @@ test("skin loadouts normalize against the unit in the same squad slot", () => {
   const composition = ["swordsman", "archer", "mystic", "magician"];
   assert.deepEqual(
     normalizeSkinLoadout(composition, ["summer-vibes", "missing", null, "summer-vibes"]),
-    ["summer-vibes", null, null, "summer-vibes"]
+    [null, null, null, null]
   );
 });
 
@@ -108,7 +108,7 @@ test("skinned board sprites inherit base framing metadata", () => {
   assert.deepEqual(summer.box, base.box);
 });
 
-test("match state carries normalized skin selections for roster units", () => {
+test("match state normalizes every skin selection to classic while skins are locked", () => {
   const state = createMatchState({
     seed: 1,
     squads: { 1: ["swordsman", "archer", "mystic", "magician"], 2: ["swordsman", "archer", "mystic", "magician"] },
@@ -116,10 +116,10 @@ test("match state carries normalized skin selections for roster units", () => {
   });
   assert.deepEqual(
     state.units.filter((unit) => unit.player === 1).map((unit) => [unit.type, unit.skin]),
-    [["swordsman", "summer-vibes"], ["archer", null], ["mystic", null], ["magician", "summer-vibes"]]
+    [["swordsman", null], ["archer", null], ["mystic", null], ["magician", null]]
   );
   assert.deepEqual(
     state.units.filter((unit) => unit.player === 2).map((unit) => [unit.type, unit.skin]),
-    [["swordsman", null], ["archer", "summer-vibes"], ["mystic", null], ["magician", null]]
+    [["swordsman", null], ["archer", null], ["mystic", null], ["magician", null]]
   );
 });

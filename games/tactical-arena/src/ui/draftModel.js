@@ -1,4 +1,4 @@
-import { UNIT_TYPE_KEYS } from "./squadModel.js";
+import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
 import { normalizeSkinSlug } from "./skinModel.js";
 
 export const DRAFT_SEATS = Object.freeze([1, 2]);
@@ -27,18 +27,22 @@ export function isDraftComplete(draft) {
   return !!draft && draft.pickIndex >= DRAFT_PICK_ORDER.length;
 }
 
-export function canDraftType(draft, seat, type) {
+// `isUnlocked` is injectable so draft-engine tests (pick order, uniqueness) can
+// exercise the full roster without being coupled to the campaign content gate;
+// production callers rely on the default (only starter units are unlocked).
+export function canDraftType(draft, seat, type, { isUnlocked = isUnitUnlocked } = {}) {
   if (!draft || isDraftComplete(draft)) return false;
   if (currentDraftSeat(draft) !== Number(seat)) return false;
   if (!UNIT_TYPE_KEYS.includes(type)) return false;
+  if (!isUnlocked(type)) return false;
   if (draftedTypes(draft).has(type)) return false;
   const picks = draft.picks?.[seat] ?? [];
   return picks.length < DRAFT_PICK_ORDER.filter((draftSeat) => draftSeat === Number(seat)).length;
 }
 
-export function applyDraftPick(draft, { seat, type, skin = null } = {}) {
+export function applyDraftPick(draft, { seat, type, skin = null, isUnlocked = isUnitUnlocked } = {}) {
   const numericSeat = Number(seat);
-  if (!canDraftType(draft, numericSeat, type)) {
+  if (!canDraftType(draft, numericSeat, type, { isUnlocked })) {
     return { accepted: false, errorCode: "INVALID_DRAFT_PICK", nextState: draft };
   }
   const next = {

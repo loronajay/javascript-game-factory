@@ -19,7 +19,7 @@ import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { UNIT_TYPE_KEYS, groupedUnitTypes } from "./squadModel.js";
+import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { openDraftFormationPicker } from "./draftFormationPicker.js";
@@ -60,6 +60,7 @@ export function createOnlineFlow({ onStartMatch }) {
   const draftActions = $('[data-online="draftActions"]') ?? document.createElement("div");
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
   const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
+  const matchTypeHintEl = $('[data-online="matchTypeHint"]');
 
   let client = null;
   let handedOff = false;
@@ -140,11 +141,44 @@ export function createOnlineFlow({ onStartMatch }) {
     return !!matchTypeConfig(matchType).draft;
   }
 
+  // Draft needs DRAFT_PICK_ORDER.length (8) unique units across both seats — one
+  // per pick, no duplicate types. With the campaign lock on, there just aren't
+  // enough unlocked units yet, so the mode stays greyed out until enough are.
+  function unlockedUnitCount() {
+    return UNIT_TYPE_KEYS.filter(isUnitUnlocked).length;
+  }
+
+  function isDraftUnlockable() {
+    return unlockedUnitCount() >= DRAFT_PICK_ORDER.length;
+  }
+
+  function syncMatchTypeAvailability() {
+    const draftReady = isDraftUnlockable();
+    for (const seg of matchTypeSegs) {
+      const locked = normalizeMatchType(seg.dataset.matchType) === "draft1v1" && !draftReady;
+      seg.disabled = locked;
+      seg.classList.toggle("is-locked", locked);
+      seg.title = locked
+        ? `Must own ${DRAFT_PICK_ORDER.length} unique units to draft (${unlockedUnitCount()} unlocked)`
+        : "";
+    }
+    if (matchTypeHintEl) {
+      const showHint = !draftReady && normalizeMatchType(selectedMatchType) === "draft1v1";
+      matchTypeHintEl.hidden = !showHint;
+      matchTypeHintEl.textContent = showHint
+        ? `Draft 1v1 needs ${DRAFT_PICK_ORDER.length} unique units — you have ${unlockedUnitCount()} unlocked.`
+        : "";
+    }
+  }
+
   function selectMatchType(type) {
-    selectedMatchType = normalizeMatchType(type);
+    const normalized = normalizeMatchType(type);
+    if (normalized === "draft1v1" && !isDraftUnlockable()) return;
+    selectedMatchType = normalized;
     for (const seg of matchTypeSegs) {
       seg.classList.toggle("is-selected", normalizeMatchType(seg.dataset.matchType) === selectedMatchType);
     }
+    syncMatchTypeAvailability();
   }
 
   function lobbyOptions() {
@@ -419,17 +453,22 @@ export function createOnlineFlow({ onStartMatch }) {
       const units = document.createElement("div");
       units.className = "draft-class-units";
       for (const type of group.types) {
+        const locked = !isUnitUnlocked(type);
         const disabled = complete || currentSeat !== localSeat || !canDraftType(draft, localSeat, type);
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = `draft-unit${taken.has(type) ? " is-taken" : ""}`;
+        btn.className = `draft-unit${taken.has(type) ? " is-taken" : ""}${locked ? " is-locked" : ""}`;
         btn.disabled = disabled;
         btn.dataset.type = type;
         btn.append(createPortrait(type, { variant: "is-card", eager: true }));
         const name = document.createElement("span");
         name.textContent = UNIT_TYPES[type]?.name ?? type;
         btn.append(name);
-        if (taken.has(type)) {
+        if (locked) {
+          const flag = document.createElement("i");
+          flag.textContent = "🔒 Locked";
+          btn.append(flag);
+        } else if (taken.has(type)) {
           const flag = document.createElement("i");
           flag.textContent = "Taken";
           btn.append(flag);
@@ -697,6 +736,7 @@ export function createOnlineFlow({ onStartMatch }) {
       selectMatchType(seg.dataset.matchType);
     });
   }
+  syncMatchTypeAvailability();
   $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby(lobbyOptions()));
   $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby(lobbyOptions()));
   $('[data-action="joinRoom"]').addEventListener("click", () => {
