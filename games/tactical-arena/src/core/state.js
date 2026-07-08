@@ -2,7 +2,7 @@ import { getUnitType } from "./unitCatalog.js";
 import { createRngState } from "./rng.js";
 import { createRoster, FORMATS, playerColor } from "./roster.js";
 
-function createUnit(spec) {
+export function createUnit(spec) {
   const definition = getUnitType(spec.type);
   return {
     id: spec.id,

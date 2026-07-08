@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
+import { createUnit } from "../src/core/state.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { getVolleyShotCells } from "../src/rules/arts.js";
 import { positionKey } from "../src/rules/movement.js";
@@ -16,6 +17,11 @@ import {
   TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
   TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID,
   TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID,
+  TUTORIAL_RAGE_ID,
+  TUTORIAL_RAGE_PLAYER_MAGICIAN_ID,
+  TUTORIAL_RAGE_PLAYER_ARCHER_ID,
+  TUTORIAL_RAGE_CPU_SWORDSMAN_ID,
+  TUTORIAL_RAGE_CPU_MAGICIAN_ID,
   chooseTutorialCpuActivation,
   completeTutorial,
   createBasicsTutorial,
@@ -291,6 +297,12 @@ test("next tutorial lookup routes tutorial 1 completion into the playable arts/m
 
   completeTutorial(adapter, TUTORIAL_ARTS_MP_ID);
   assert.equal(getNextTutorialId(adapter, TUTORIAL_ARTS_MP_ID), TUTORIAL_DAMAGE_TYPES_ID);
+
+  completeTutorial(adapter, TUTORIAL_DAMAGE_TYPES_ID);
+  assert.equal(getNextTutorialId(adapter, TUTORIAL_DAMAGE_TYPES_ID), TUTORIAL_RAGE_ID);
+
+  completeTutorial(adapter, TUTORIAL_RAGE_ID);
+  assert.equal(getNextTutorialId(adapter, TUTORIAL_RAGE_ID), null);
 });
 
 test("arts/mp tutorial config and setup create the volley formation with mystic hidden", () => {
@@ -478,6 +490,139 @@ test("damage-types tutorial walks physical, Rock Hard true damage, and defended 
   assert.equal(applied.match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID).hp, 22);
   assert.equal(tutorial.completed, true);
   assert.match(applied.update.prompt, /Tutorial complete/i);
+});
+
+test("rage tutorial config traps a raging Magician behind 3 Ghouls and a 10 HP Swordsman", () => {
+  const config = createTutorialMatchConfig(TUTORIAL_RAGE_ID);
+  const match = prepareTutorialMatchState(createMatchState(config), TUTORIAL_RAGE_ID);
+  const tutorials = getTutorialList();
+  const rage = tutorials.find((tutorial) => tutorial.id === TUTORIAL_RAGE_ID);
+
+  assert.equal(config.tutorialId, TUTORIAL_RAGE_ID);
+  assert.deepEqual(config.squads[1], ["magician", "archer"]);
+  assert.deepEqual(config.squads[2], ["ghoul", "ghoul", "ghoul", "swordsman"]);
+  assert.equal(rage.available, true);
+  assert.equal(rage.title, "Tutorial 4");
+
+  const magician = match.units.find((unit) => unit.id === TUTORIAL_RAGE_PLAYER_MAGICIAN_ID);
+  const archer = match.units.find((unit) => unit.id === TUTORIAL_RAGE_PLAYER_ARCHER_ID);
+  const swordsman = match.units.find((unit) => unit.id === TUTORIAL_RAGE_CPU_SWORDSMAN_ID);
+
+  assert.deepEqual(magician.position, { x: 6, y: 6 });
+  assert.ok(magician.hp > 0 && magician.hp <= 5, "Magician should start raging");
+  assert.equal(archer.hp, 0);
+  assert.equal(archer.spent, true);
+  assert.equal(swordsman.hp, 10);
+  assert.deepEqual(swordsman.position, { x: 7, y: 6 });
+  assert.equal(match.currentPlayer, 1);
+  // The enemy Magician for the second formation doesn't exist yet — it's spawned
+  // mid-match by main.js once Nuke clears the trap (a squad tops out at 4 units).
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_RAGE_CPU_MAGICIAN_ID), undefined);
+
+  const blockers = ["p2-0-ghoul", "p2-1-ghoul", "p2-2-ghoul", TUTORIAL_RAGE_CPU_SWORDSMAN_ID].map((id) =>
+    match.units.find((unit) => unit.id === id).position
+  );
+  assert.deepEqual(new Set(blockers.map(positionKey)), new Set([
+    positionKey({ x: 6, y: 5 }),
+    positionKey({ x: 6, y: 7 }),
+    positionKey({ x: 5, y: 6 }),
+    positionKey({ x: 7, y: 6 }),
+  ]));
+});
+
+test("rage tutorial walks Nuke through the trap, the formation swap, the Archer's crit, and the idle enemy", () => {
+  const tutorial = createTutorial(TUTORIAL_RAGE_ID);
+  let match = prepareTutorialMatchState(createMatchState(createTutorialMatchConfig(TUTORIAL_RAGE_ID)), TUTORIAL_RAGE_ID);
+
+  assert.equal(tutorial.stage, "await_nuke");
+  assert.match(tutorial.dialogue.map((line) => line.text).join(" "), /RAGE/);
+
+  let blocked = validateTutorialCommand(tutorial, beginActivation(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID), match);
+  assert.equal(blocked.accepted, false);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_RAGE_PLAYER_MAGICIAN_ID)));
+  const nuked = applyTutorial(tutorial, match, useArt(1, TUTORIAL_RAGE_PLAYER_MAGICIAN_ID, "nuke"));
+  const nukeEvent = nuked.events.find((event) => event.type === "ART_RESOLVED");
+
+  assert.deepEqual(new Set(nukeEvent.targetIds), new Set(["p2-0-ghoul", "p2-1-ghoul", "p2-2-ghoul", TUTORIAL_RAGE_CPU_SWORDSMAN_ID]));
+  assert.equal(nuked.match.units.find((unit) => unit.id === TUTORIAL_RAGE_CPU_SWORDSMAN_ID).hp, 0);
+  // Wiping out every real enemy commander (the Ghouls never counted toward
+  // victory) genuinely ends the reducer's own match right here.
+  assert.equal(nuked.match.phase, "complete");
+  assert.equal(nuked.match.winner, 1);
+  assert.equal(tutorial.stage, "await_rage_attack");
+  assert.equal(nuked.update.revertVictory, true);
+  assert.match(nuked.update.dialogue.map((line) => line.text).join(" "), /RAGE/);
+  assert.equal(nuked.update.afterDialogueAction.type, "formationSwap");
+  assert.deepEqual(nuked.update.afterDialogueAction.hideUnitIds, [TUTORIAL_RAGE_PLAYER_MAGICIAN_ID]);
+  assert.equal(nuked.update.afterDialogueAction.revealUnits[0].unitId, TUTORIAL_RAGE_PLAYER_ARCHER_ID);
+  assert.equal(nuked.update.afterDialogueAction.spawnUnits[0].id, TUTORIAL_RAGE_CPU_MAGICIAN_ID);
+  match = nuked.match;
+
+  // Simulate main.js's formationSwap: revert the tutorial-only victory, hide the
+  // spent Magician, reveal the raging Archer, and spawn the fresh enemy Magician.
+  match = {
+    ...match,
+    phase: "playing",
+    winner: null,
+    currentPlayer: 1,
+    activation: null,
+    units: [
+      ...match.units.map((unit) => {
+        if (unit.id === TUTORIAL_RAGE_PLAYER_MAGICIAN_ID) return { ...unit, hp: 0, spent: true };
+        if (unit.id === TUTORIAL_RAGE_PLAYER_ARCHER_ID) {
+          return { ...unit, hp: 4, position: { x: 5, y: 6 }, spent: false };
+        }
+        return unit;
+      }),
+      createUnit({ id: TUTORIAL_RAGE_CPU_MAGICIAN_ID, type: "magician", player: 2, x: 11, y: 6 }),
+    ],
+  };
+
+  blocked = validateTutorialCommand(tutorial, moveUnit(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID, 4, 6), match);
+  assert.equal(blocked.accepted, false);
+  assert.match(blocked.message, /Attack first/i);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID)));
+  const shot = applyTutorial(tutorial, match, attack(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID, TUTORIAL_RAGE_CPU_MAGICIAN_ID));
+  const attackEvent = shot.events.find((event) => event.type === "ATTACK_RESOLVED");
+  assert.equal(attackEvent.hit, true);
+  assert.equal(attackEvent.critical, true);
+  assert.equal(tutorial.stage, "await_rage_move");
+  match = shot.match;
+
+  blocked = validateTutorialCommand(tutorial, moveUnit(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID, 4, 6), match);
+  assert.equal(blocked.accepted, false);
+
+  ({ match } = applyTutorial(tutorial, match, moveUnit(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID, 3, 6)));
+  assert.equal(tutorial.stage, "await_enemy_idle");
+  // main.js auto-dispatches FINISH_ACTIVATION once a unit has both attacked and moved.
+  ({ match } = applyTutorial(tutorial, match, finishActivation(1, TUTORIAL_RAGE_PLAYER_ARCHER_ID)));
+  assert.equal(match.currentPlayer, 2);
+
+  const idleCommands = chooseTutorialCpuActivation(match, tutorial);
+  assert.deepEqual(idleCommands.map((command) => command.type), ["BEGIN_ACTIVATION", "DEFEND", "FINISH_ACTIVATION"]);
+  assert.equal(idleCommands[0].unitId, TUTORIAL_RAGE_CPU_MAGICIAN_ID);
+
+  let finalUpdate = null;
+  for (const command of idleCommands) {
+    const applied = applyTutorial(tutorial, match, command);
+    match = applied.match;
+    if (applied.update.dialogue) finalUpdate = applied.update;
+  }
+
+  assert.equal(tutorial.completed, true);
+  assert.match(finalUpdate.prompt, /Tutorial complete/i);
+});
+
+test("rage tutorial idles the enemy Magician outside its scripted stage", () => {
+  const tutorial = createTutorial(TUTORIAL_RAGE_ID);
+  const match = {
+    ...prepareTutorialMatchState(createMatchState(createTutorialMatchConfig(TUTORIAL_RAGE_ID)), TUTORIAL_RAGE_ID),
+    currentPlayer: 2,
+  };
+
+  assert.deepEqual(chooseTutorialCpuActivation(match, tutorial), []);
 });
 
 test("a completed tutorial idles the CPU instead of sneaking in a final move/defend", () => {

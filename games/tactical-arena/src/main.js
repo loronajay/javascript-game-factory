@@ -1,6 +1,6 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
-import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
+import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
 import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "./rules/movement.js";
@@ -27,9 +27,9 @@ import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
-  TUTORIAL_ARTS_MP_ID,
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
   TUTORIAL_BASICS_ID,
+  TUTORIAL_CATALOG,
   chooseTutorialCpuActivation,
   completeTutorial,
   createTutorial,
@@ -358,6 +358,15 @@ function recordTutorialProgress(command, result, previousPlayer) {
     match: state,
     previousPlayer,
   });
+  // Some scripted moments (the RAGE tutorial's Nuke wiping every real enemy
+  // commander) trigger a genuine victory the tutorial isn't ready to end on yet.
+  // This must revert synchronously, before the caller's announceTurnChange() reads
+  // state.phase, or a results screen flashes in ahead of the follow-up dialogue.
+  if (update.revertVictory && state.phase === "complete") {
+    state.phase = "playing";
+    state.winner = null;
+    state.activation = null;
+  }
   queueTutorialPresentation(update);
 }
 
@@ -452,7 +461,29 @@ function applyTutorialPresentationAction(action) {
     if (Number.isInteger(action.currentPlayer)) state.currentPlayer = action.currentPlayer;
     state.activation = null;
     render();
+    return;
   }
+  if (action.type === "formationSwap") {
+    for (const unitId of action.hideUnitIds ?? []) hideTutorialUnit(unitId);
+    for (const spawn of action.revealUnits ?? []) revealTutorialUnit(spawn.unitId, spawn.position, spawn.hp, spawn.mp);
+    for (const spawn of action.spawnUnits ?? []) spawnTutorialUnit(spawn);
+    if (Number.isInteger(action.currentPlayer)) state.currentPlayer = action.currentPlayer;
+    state.activation = null;
+    render();
+    if (action.dialogue || action.prompt) queueTutorialPresentation({ dialogue: action.dialogue, prompt: action.prompt });
+  }
+}
+
+// Introduces a brand-new unit mid-match for a scripted formation swap (the RAGE
+// tutorial's second enemy Magician "arriving" for its new formation) rather than
+// revealing one already present in the squad — buildRoster caps a squad at the
+// four corner-block cells, so a fresh unit can't just ride in the initial squads.
+function spawnTutorialUnit({ id, type, player, position, hp = null, mp = null, skin = null }) {
+  if (findUnit(state, id)) return;
+  const unit = createUnit({ id, type, player, x: position.x, y: position.y, skin });
+  if (Number.isFinite(hp)) unit.hp = hp;
+  if (Number.isFinite(mp)) unit.mp = mp;
+  state.units.push(unit);
 }
 
 function finishTutorialIfReady() {
@@ -479,7 +510,8 @@ function finishTutorialIfReady() {
 }
 
 function tutorialCompleteTitle(tutorialId) {
-  return tutorialId === TUTORIAL_ARTS_MP_ID ? "Tutorial 2 Complete" : "Tutorial 1 Complete";
+  const entry = TUTORIAL_CATALOG.find((candidate) => candidate.id === tutorialId);
+  return entry ? `${entry.title} Complete` : "Tutorial Complete";
 }
 
 function showTutorialSpotlight(kind) {
@@ -494,18 +526,29 @@ function clearTutorialSpotlight() {
   document.body.classList.remove("tutorial-spotlight-hp", "tutorial-spotlight-mp");
 }
 
-function revealTutorialUnit(unitId, position = null) {
+function revealTutorialUnit(unitId, position = null, hp = null, mp = null) {
   const unit = findUnit(state, unitId);
   if (!unit) return;
   const definition = getUnitType(unit.type);
   if (position) unit.position = { ...position };
-  unit.hp = definition.stats.maxHp;
-  unit.mp = definition.stats.maxMp;
+  unit.hp = Number.isFinite(hp) ? hp : definition.stats.maxHp;
+  unit.mp = Number.isFinite(mp) ? mp : definition.stats.maxMp;
   unit.spent = false;
   unit.defending = false;
   if (unitId === TUTORIAL_ARTS_PLAYER_MYSTIC_ID) {
     setMessage("The Mystic joins the field. Activate her and use Pray to heal the Archer.");
   }
+}
+
+// Kills a unit outside combat for a scripted formation swap (e.g. the RAGE tutorial's
+// trapped Magician "disappearing" once Nuke resolves). Mirrors revealTutorialUnit in
+// reverse; hp<=0 already excludes it from rendering and turn order everywhere else.
+function hideTutorialUnit(unitId) {
+  const unit = findUnit(state, unitId);
+  if (!unit) return;
+  unit.hp = 0;
+  unit.spent = true;
+  unit.defending = false;
 }
 
 // Async resolution for rolled actions (basic ATTACK and targeted ARTS). Reveals

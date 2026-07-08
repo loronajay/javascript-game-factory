@@ -686,6 +686,31 @@ body:has(.ref-modal:not([hidden])) .back-link {
     max-height: 94vh;
   }
 
+  /* Draft formation picker: shrink the four slots + chrome so both rows AND the
+     Lock Formation footer fit a short landscape phone (they were clipped off). */
+  .draft-formation-card {
+    max-height: 94vh;
+  }
+
+  .draft-formation-grid {
+    gap: .4rem;
+    padding: .5rem;
+  }
+
+  .draft-formation-slot {
+    min-height: 5.4rem;
+    padding: .4rem .3rem;
+  }
+
+  .draft-formation-slot .unit-portrait.is-slot {
+    width: 2.5rem;
+    height: 3rem;
+  }
+
+  .draft-formation-name {
+    font-size: .62rem;
+  }
+
   /* Header: drop the long instruction line, shrink the title + padding. */
   .roster-head {
     padding: .45rem .8rem;

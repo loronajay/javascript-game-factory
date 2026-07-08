@@ -7,12 +7,18 @@ import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
 export const TUTORIAL_DAMAGE_TYPES_ID = "damage-types";
+export const TUTORIAL_RAGE_ID = "rage-status";
 export const TUTORIAL_ARTS_PLAYER_ARCHER_ID = "p1-0-archer";
 export const TUTORIAL_ARTS_PLAYER_MYSTIC_ID = "p1-1-mystic";
 export const TUTORIAL_ARTS_CPU_ARCHER_ID = "p2-3-archer";
 export const TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID = "p1-0-swordsman";
 export const TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID = "p1-1-magician";
 export const TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID = "p2-0-clod";
+export const TUTORIAL_RAGE_PLAYER_MAGICIAN_ID = "p1-0-magician";
+export const TUTORIAL_RAGE_PLAYER_ARCHER_ID = "p1-1-archer";
+export const TUTORIAL_RAGE_CPU_GHOUL_IDS = Object.freeze(["p2-0-ghoul", "p2-1-ghoul", "p2-2-ghoul"]);
+export const TUTORIAL_RAGE_CPU_SWORDSMAN_ID = "p2-3-swordsman";
+export const TUTORIAL_RAGE_CPU_MAGICIAN_ID = "p2-4-magician";
 export const TUTORIAL_CATALOG = Object.freeze([
   Object.freeze({
     id: TUTORIAL_BASICS_ID,
@@ -25,22 +31,22 @@ export const TUTORIAL_CATALOG = Object.freeze([
     id: TUTORIAL_ARTS_MP_ID,
     title: "Tutorial 2",
     subtitle: "ARTS and MP",
-    description: "Check ART ranges, set up Volley Shot, spend MP wisely, and heal with Pray.",
+    description: "Check ART ranges, set up Volley Shot, learn about MP, and target allies with Pray.",
     available: true,
   }),
   Object.freeze({
     id: TUTORIAL_DAMAGE_TYPES_ID,
     title: "Tutorial 3",
     subtitle: "Damage Types",
-    description: "Physical damage checks DEF, magic ignores DEF, and true damage bypasses DEF and Defend.",
+    description: "Learn about the 3 damage types in Tactical Arena.",
     available: true,
   }),
   Object.freeze({
-    id: "synergy",
+    id: TUTORIAL_RAGE_ID,
     title: "Tutorial 4",
-    subtitle: "Squad Synergy",
-    description: "Auras, support turns, focus fire, and team plans.",
-    available: false,
+    subtitle: "RAGE Status",
+    description: "See the RAGE threshold unlock unique ARTS and passives, then use them to break out of a deadly trap.",
+    available: true,
   }),
 ]);
 export const TUTORIAL_IDS = Object.freeze(TUTORIAL_CATALOG.map((tutorial) => tutorial.id));
@@ -72,30 +78,49 @@ const DAMAGE_TYPES_FOOTWORK_PATH = Object.freeze([
   Object.freeze({ x: 9, y: 5 }),
   Object.freeze({ x: 8, y: 5 }),
 ]);
+const RAGE_TRAP_CENTER = Object.freeze({ x: 6, y: 6 });
+const RAGE_GHOUL_POSITIONS = Object.freeze({
+  "p2-0-ghoul": Object.freeze({ x: 6, y: 5 }),
+  "p2-1-ghoul": Object.freeze({ x: 6, y: 7 }),
+  "p2-2-ghoul": Object.freeze({ x: 5, y: 6 }),
+});
+const RAGE_SWORDSMAN_POSITION = Object.freeze({ x: 7, y: 6 });
+const RAGE_SWORDSMAN_HP = 10;
+const RAGE_MAGICIAN_HP = 4;
+const RAGE_ARCHER_HP = 4;
+const RAGE_CPU_MAGICIAN_POSITION = Object.freeze({ x: 11, y: 6 });
+const RAGE_ARCHER_START = Object.freeze({ x: 5, y: 6 });
+const RAGE_ARCHER_RETREAT = Object.freeze({ x: 3, y: 6 });
 
 export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
   const artsMp = tutorialId === TUTORIAL_ARTS_MP_ID;
   const damageTypes = tutorialId === TUTORIAL_DAMAGE_TYPES_ID;
+  const rage = tutorialId === TUTORIAL_RAGE_ID;
   return {
     mode: "tutorial",
-    tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : TUTORIAL_BASICS_ID,
+    tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : rage ? TUTORIAL_RAGE_ID : TUTORIAL_BASICS_ID,
     size: 13,
-    seed: artsMp ? 23 : damageTypes ? 31 : 7,
+    seed: artsMp ? 23 : damageTypes ? 31 : rage ? 41 : 7,
     squads: artsMp
       ? { 1: ["archer", "mystic"], 2: ["ghoul", "ghoul", "ghoul", "archer"] }
       : damageTypes
         ? { 1: ["swordsman", "magician"], 2: ["clod"] }
+      : rage
+        ? { 1: ["magician", "archer"], 2: ["ghoul", "ghoul", "ghoul", "swordsman"] }
       : { 1: [...TUTORIAL_SQUAD], 2: [...TUTORIAL_SQUAD] },
     skins: artsMp
       ? { 1: [null, null], 2: [null, null, null, null] }
       : damageTypes
         ? { 1: [null, null], 2: [null] }
+      : rage
+        ? { 1: [null, null], 2: [null, null, null, null] }
       : { 1: [null, null, null, null], 2: [null, null, null, null] },
   };
 }
 
 export function createTutorial(tutorialId = TUTORIAL_BASICS_ID) {
   if (tutorialId === TUTORIAL_DAMAGE_TYPES_ID) return createDamageTypesTutorial();
+  if (tutorialId === TUTORIAL_RAGE_ID) return createRageTutorial();
   return tutorialId === TUTORIAL_ARTS_MP_ID ? createArtsMpTutorial() : createBasicsTutorial();
 }
 
@@ -126,6 +151,16 @@ export function createDamageTypesTutorial() {
     completed: false,
     prompt: damageTypesOpeningPrompt(),
     dialogue: damageTypesOpeningDialogue(),
+  };
+}
+
+export function createRageTutorial() {
+  return {
+    id: TUTORIAL_RAGE_ID,
+    stage: "await_nuke",
+    completed: false,
+    prompt: rageOpeningPrompt(),
+    dialogue: rageOpeningDialogue(),
   };
 }
 
@@ -184,7 +219,63 @@ export function damageTypesOpeningDialogue() {
   ];
 }
 
+export function rageOpeningPrompt() {
+  return "Tutorial 4: RAGE. Activate your Magician and use Nuke to blast every enemy caught in the trap.";
+}
+
+export function rageOpeningDialogue() {
+  return [
+    {
+      name: "Instructor",
+      text: "RAGE triggers automatically once a unit's HP drops to 5 or lower.",
+    },
+    {
+      name: "Instructor",
+      text: "While raging, many units unlock ARTS or passives that stay locked away at full health — tools built for exactly this kind of trouble.",
+    },
+    {
+      name: "Instructor",
+      text: "Look at your position. Your Magician is raging and boxed in on all four sides: up, down, left, and right. There is nowhere left to walk.",
+    },
+    {
+      speakerId: TUTORIAL_RAGE_PLAYER_MAGICIAN_ID,
+      text: "No footing to retreat to. But RAGE means Nuke is finally mine to cast.",
+    },
+    {
+      name: "Instructor",
+      text: "Activate the Magician and use Nuke. It will detonate on every enemy within reach at once.",
+    },
+  ];
+}
+
 export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID) {
+  if (tutorialId === TUTORIAL_RAGE_ID) {
+    const positions = {
+      [TUTORIAL_RAGE_PLAYER_MAGICIAN_ID]: RAGE_TRAP_CENTER,
+      ...RAGE_GHOUL_POSITIONS,
+      [TUTORIAL_RAGE_CPU_SWORDSMAN_ID]: RAGE_SWORDSMAN_POSITION,
+    };
+    return {
+      ...match,
+      currentPlayer: 1,
+      activation: null,
+      units: match.units.map((unit) => {
+        const definition = getUnitType(unit.type);
+        const isArcher = unit.id === TUTORIAL_RAGE_PLAYER_ARCHER_ID;
+        const isTrapMagician = unit.id === TUTORIAL_RAGE_PLAYER_MAGICIAN_ID;
+        const isSwordsman = unit.id === TUTORIAL_RAGE_CPU_SWORDSMAN_ID;
+        return {
+          ...unit,
+          position: { ...(positions[unit.id] ?? unit.position) },
+          hp: isTrapMagician ? RAGE_MAGICIAN_HP : isArcher ? 0 : isSwordsman ? RAGE_SWORDSMAN_HP : definition.stats.maxHp,
+          mp: definition.stats.maxMp,
+          spent: isArcher,
+          defending: false,
+        };
+      }),
+    };
+  }
+
   if (tutorialId === TUTORIAL_DAMAGE_TYPES_ID) {
     const positions = {
       [TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID]: { x: 4, y: 6 },
@@ -260,6 +351,17 @@ export function prepareTutorialCommand(tutorial, command) {
     return command;
   }
 
+  if (tutorial.id === TUTORIAL_RAGE_ID) {
+    if (
+      command?.type === COMMANDS.ATTACK &&
+      command.actorId === TUTORIAL_RAGE_PLAYER_ARCHER_ID &&
+      tutorial.stage === "await_rage_attack"
+    ) {
+      return { ...command, ...FORCED_CRIT };
+    }
+    return command;
+  }
+
   if (command?.type !== COMMANDS.ATTACK) return command;
 
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) {
@@ -292,6 +394,8 @@ export function validateTutorialCommand(tutorial, command, match) {
 
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) return validateArtsMpCommand(tutorial, command, match);
 
+  if (tutorial.id === TUTORIAL_RAGE_ID) return validateRageCommand(tutorial, command, match);
+
   if (
     tutorial.stage === "await_kite_attack" &&
     command.player === 1 &&
@@ -313,6 +417,9 @@ export function recordTutorialCommand(tutorial, { command, events = [], match, p
   }
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) {
     return recordArtsMpCommand(tutorial, { command, events, match, previousPlayer });
+  }
+  if (tutorial.id === TUTORIAL_RAGE_ID) {
+    return recordRageCommand(tutorial, { command, events, match, previousPlayer });
   }
 
   const attackEvent = events.find((event) => event.type === "ATTACK_RESOLVED");
@@ -382,6 +489,17 @@ export function chooseTutorialCpuActivation(match, tutorial) {
   // turn to Clod (both player units spent by the final Spark) and he shuffles +
   // braces right before the results screen — an out-of-place artifact.
   if (tutorial?.completed) return [];
+
+  if (tutorial?.id === TUTORIAL_RAGE_ID) {
+    if (tutorial.stage !== "await_enemy_idle") return [];
+    const magician = findUnit(match, TUTORIAL_RAGE_CPU_MAGICIAN_ID);
+    if (!canAct(match, magician)) return [];
+    return [
+      beginActivation(player, magician.id),
+      defend(player, magician.id),
+      finishActivation(player, magician.id),
+    ];
+  }
 
   if (tutorial?.id === TUTORIAL_DAMAGE_TYPES_ID && tutorial.stage === "await_clod_defend") {
     const clod = findUnit(match, TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID);
@@ -674,6 +792,130 @@ function validateArtsMpCommand(tutorial, command) {
   return tutorialAllowed();
 }
 
+function validateRageCommand(tutorial, command) {
+  const unitId = activeCommandUnitId(command);
+  const isMagician = unitId === TUTORIAL_RAGE_PLAYER_MAGICIAN_ID;
+  const isArcher = unitId === TUTORIAL_RAGE_PLAYER_ARCHER_ID;
+
+  if (tutorial.stage === "await_nuke") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isMagician) return tutorialAllowed();
+    if (command.type === COMMANDS.USE_ART && isMagician && command.artId === "nuke") return tutorialAllowed();
+    return tutorialBlocked("You're surrounded. Activate the Magician and use Nuke — RAGE just unlocked it.");
+  }
+
+  if (tutorial.stage === "await_rage_attack") {
+    if (!isArcher) return tutorialAllowed();
+    if (
+      command.type === COMMANDS.BEGIN_ACTIVATION ||
+      command.type === COMMANDS.ATTACK ||
+      command.type === COMMANDS.CANCEL_MOVE
+    ) {
+      return tutorialAllowed();
+    }
+    return tutorialBlocked("Attack first with your Archer. You can move her to safety after the shot lands.");
+  }
+
+  if (tutorial.stage === "await_rage_move") {
+    if (command.type === COMMANDS.MOVE_UNIT && command.unitId === TUTORIAL_RAGE_PLAYER_ARCHER_ID) {
+      return samePosition(command.position, RAGE_ARCHER_RETREAT)
+        ? tutorialAllowed()
+        : tutorialBlocked("Retreat to the marked tile at column 3, row 6 so the Magician's counter can't reach.");
+    }
+    return tutorialBlocked("Move the Archer out of the enemy Magician's range to finish the activation.");
+  }
+
+  return tutorialAllowed();
+}
+
+function recordRageCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
+  const artEvent = events.find((event) => event.type === "ART_RESOLVED");
+  if (
+    artEvent?.actorId === TUTORIAL_RAGE_PLAYER_MAGICIAN_ID &&
+    artEvent.artId === "nuke" &&
+    tutorial.stage === "await_nuke"
+  ) {
+    return setStage(tutorial, "await_rage_attack", {
+      // Nuke wipes out every real commander on the enemy team (the Ghouls never
+      // counted toward victory anyway), which would otherwise end the match right
+      // here. This tutorial has a second formation still to show, so the natural
+      // victory this turn is deliberately reverted once, in main.js.
+      revertVictory: true,
+      dialogue: [
+        {
+          name: "Instructor",
+          text: "That is the shape of RAGE: dangerous for the unit carrying it, but it unlocks tools nothing else in the roster can use.",
+        },
+        {
+          name: "Instructor",
+          text: "Every RAGE ART and passive is different. Some, like Nuke, are a one-time burst finisher. Others quietly reshape how a unit fights for as long as it stays raging.",
+        },
+      ],
+      afterDialogueAction: {
+        type: "formationSwap",
+        hideUnitIds: [TUTORIAL_RAGE_PLAYER_MAGICIAN_ID],
+        revealUnits: [{ unitId: TUTORIAL_RAGE_PLAYER_ARCHER_ID, position: RAGE_ARCHER_START, hp: RAGE_ARCHER_HP }],
+        spawnUnits: [{ id: TUTORIAL_RAGE_CPU_MAGICIAN_ID, type: "magician", player: 2, position: RAGE_CPU_MAGICIAN_POSITION }],
+        currentPlayer: 1,
+        dialogue: [
+          {
+            speakerId: TUTORIAL_RAGE_PLAYER_ARCHER_ID,
+            text: "I'm raging too, and that enemy Magician is standing right at the edge of my reach.",
+          },
+          {
+            name: "Instructor",
+            text: "RAGE passives don't need to be activated: they're just always on. At 5 HP or lower, the Archer gains +1 STR, +1 range, never misses, and gains a 50% critical chance.",
+          },
+          {
+            name: "Instructor",
+            text: "Attack the enemy Magician, then move the Archer back out of his attack range before ending the activation.",
+          },
+        ],
+        prompt: "Attack the enemy Magician with your raging Archer, then move her to safety.",
+      },
+    });
+  }
+
+  const attackEvent = events.find((event) => event.type === "ATTACK_RESOLVED");
+  if (attackEvent?.actorId === TUTORIAL_RAGE_PLAYER_ARCHER_ID && tutorial.stage === "await_rage_attack") {
+    return setStage(tutorial, "await_rage_move", {
+      prompt: "Critical strike: RAGE's guaranteed hits and 50% crit chance at work. Now move the Archer to the retreat tile at column 3, row 6.",
+    });
+  }
+
+  if (
+    tutorial.stage === "await_rage_move" &&
+    command?.type === COMMANDS.MOVE_UNIT &&
+    command.unitId === TUTORIAL_RAGE_PLAYER_ARCHER_ID &&
+    samePosition(command.position, RAGE_ARCHER_RETREAT)
+  ) {
+    return setStage(tutorial, "await_enemy_idle", {
+      prompt: "Out of range. Watch how the enemy Magician responds.",
+    });
+  }
+
+  if (
+    tutorial.stage === "await_enemy_idle" &&
+    events.some((event) => event.type === "UNIT_DEFENDED" && event.unitId === TUTORIAL_RAGE_CPU_MAGICIAN_ID)
+  ) {
+    return setStage(tutorial, "complete", {
+      prompt: "Tutorial complete. Every RAGE ART and passive is listed in the Field Manual whenever you need the exact numbers.",
+      completed: true,
+      dialogue: [
+        {
+          name: "Instructor",
+          text: "With the Archer out of range, the enemy Magician has nothing to answer with this turn.",
+        },
+        {
+          name: "Instructor",
+          text: "RAGE comes in a vast variety of shapes across the roster. Open the Field Manual's Codex any time you want a unit's exact RAGE ART or passive.",
+        },
+      ],
+    });
+  }
+
+  return noUpdate();
+}
+
 function recordDamageTypesCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
   const attackEvent = events.find((event) => event.type === "ATTACK_RESOLVED");
   if (
@@ -873,15 +1115,15 @@ function recordArtsMpCommand(tutorial, { command, events = [], match, previousPl
   return noUpdate();
 }
 
-function setStage(tutorial, stage, { prompt, dialogue = null, completed = false, spotlight = null, selectUnitId = null, beforeDialogueAction = null, afterDialogueAction = null } = {}) {
+function setStage(tutorial, stage, { prompt, dialogue = null, completed = false, spotlight = null, selectUnitId = null, beforeDialogueAction = null, afterDialogueAction = null, revertVictory = false } = {}) {
   tutorial.stage = stage;
   tutorial.prompt = prompt ?? tutorial.prompt ?? null;
   if (completed) tutorial.completed = true;
-  return { prompt: tutorial.prompt, dialogue, completed: Boolean(completed), spotlight, selectUnitId, beforeDialogueAction, afterDialogueAction };
+  return { prompt: tutorial.prompt, dialogue, completed: Boolean(completed), spotlight, selectUnitId, beforeDialogueAction, afterDialogueAction, revertVictory: Boolean(revertVictory) };
 }
 
 function noUpdate() {
-  return { prompt: null, dialogue: null, completed: false, spotlight: null, selectUnitId: null, beforeDialogueAction: null, afterDialogueAction: null };
+  return { prompt: null, dialogue: null, completed: false, spotlight: null, selectUnitId: null, beforeDialogueAction: null, afterDialogueAction: null, revertVictory: false };
 }
 
 function tutorialAllowed() {
