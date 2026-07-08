@@ -6,9 +6,13 @@ import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 
 export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
+export const TUTORIAL_DAMAGE_TYPES_ID = "damage-types";
 export const TUTORIAL_ARTS_PLAYER_ARCHER_ID = "p1-0-archer";
 export const TUTORIAL_ARTS_PLAYER_MYSTIC_ID = "p1-1-mystic";
 export const TUTORIAL_ARTS_CPU_ARCHER_ID = "p2-3-archer";
+export const TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID = "p1-0-swordsman";
+export const TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID = "p1-1-magician";
+export const TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID = "p2-0-clod";
 export const TUTORIAL_CATALOG = Object.freeze([
   Object.freeze({
     id: TUTORIAL_BASICS_ID,
@@ -25,11 +29,11 @@ export const TUTORIAL_CATALOG = Object.freeze([
     available: true,
   }),
   Object.freeze({
-    id: "positioning",
+    id: TUTORIAL_DAMAGE_TYPES_ID,
     title: "Tutorial 3",
-    subtitle: "Positioning",
-    description: "Line of sight, body blocks, walls, and threat ranges.",
-    available: false,
+    subtitle: "Damage Types",
+    description: "Physical damage checks DEF, magic ignores DEF, and true damage bypasses DEF and Defend.",
+    available: true,
   }),
   Object.freeze({
     id: "synergy",
@@ -59,24 +63,39 @@ const FORCED_CRIT = Object.freeze({ attackRoll: 0.5, critRoll: 0.01 });
 const ARTS_MP_ARCHER_MOVE = Object.freeze({ x: 4, y: 5 });
 const ARTS_MP_VOLLEY_ORIGIN = Object.freeze({ x: 5, y: 5 });
 const ARTS_MP_ENEMY_IDS = Object.freeze(["p2-0-ghoul", "p2-1-ghoul", "p2-2-ghoul", TUTORIAL_ARTS_CPU_ARCHER_ID]);
+const DAMAGE_TYPES_SWORDSMAN_MOVE = Object.freeze({ x: 7, y: 6 });
+const DAMAGE_TYPES_FOOTWORK_PATH = Object.freeze([
+  Object.freeze({ x: 8, y: 6 }),
+  Object.freeze({ x: 9, y: 6 }),
+  Object.freeze({ x: 10, y: 6 }),
+  Object.freeze({ x: 10, y: 5 }),
+  Object.freeze({ x: 9, y: 5 }),
+  Object.freeze({ x: 8, y: 5 }),
+]);
 
 export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
   const artsMp = tutorialId === TUTORIAL_ARTS_MP_ID;
+  const damageTypes = tutorialId === TUTORIAL_DAMAGE_TYPES_ID;
   return {
     mode: "tutorial",
-    tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : TUTORIAL_BASICS_ID,
+    tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : TUTORIAL_BASICS_ID,
     size: 13,
-    seed: artsMp ? 23 : 7,
+    seed: artsMp ? 23 : damageTypes ? 31 : 7,
     squads: artsMp
       ? { 1: ["archer", "mystic"], 2: ["ghoul", "ghoul", "ghoul", "archer"] }
+      : damageTypes
+        ? { 1: ["swordsman", "magician"], 2: ["clod"] }
       : { 1: [...TUTORIAL_SQUAD], 2: [...TUTORIAL_SQUAD] },
     skins: artsMp
       ? { 1: [null, null], 2: [null, null, null, null] }
+      : damageTypes
+        ? { 1: [null, null], 2: [null] }
       : { 1: [null, null, null, null], 2: [null, null, null, null] },
   };
 }
 
 export function createTutorial(tutorialId = TUTORIAL_BASICS_ID) {
+  if (tutorialId === TUTORIAL_DAMAGE_TYPES_ID) return createDamageTypesTutorial();
   return tutorialId === TUTORIAL_ARTS_MP_ID ? createArtsMpTutorial() : createBasicsTutorial();
 }
 
@@ -97,6 +116,16 @@ export function createArtsMpTutorial() {
     completed: false,
     prompt: artsMpOpeningPrompt(),
     dialogue: artsMpOpeningDialogue(),
+  };
+}
+
+export function createDamageTypesTutorial() {
+  return {
+    id: TUTORIAL_DAMAGE_TYPES_ID,
+    stage: "await_swordsman_attack",
+    completed: false,
+    prompt: damageTypesOpeningPrompt(),
+    dialogue: damageTypesOpeningDialogue(),
   };
 }
 
@@ -134,7 +163,52 @@ export function artsMpOpeningDialogue() {
   ];
 }
 
+export function damageTypesOpeningPrompt() {
+  return "Tutorial 3: Damage Types. Activate your Swordsman, move to the marked adjacent tile, then attack Clod.";
+}
+
+export function damageTypesOpeningDialogue() {
+  return [
+    {
+      name: "Instructor",
+      text: "Damage comes in three types. Physical damage is checked against DEF, so heavily armored targets can reduce it to a scrape.",
+    },
+    {
+      name: "Instructor",
+      text: "Magic ignores DEF, but Defend still halves it. True damage ignores both defensive stats and the Defend stance.",
+    },
+    {
+      speakerId: TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID,
+      text: "So blade first, footwork second, spell last. I can feel the lesson forming.",
+    },
+  ];
+}
+
 export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID) {
+  if (tutorialId === TUTORIAL_DAMAGE_TYPES_ID) {
+    const positions = {
+      [TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID]: { x: 4, y: 6 },
+      [TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID]: { x: 4, y: 4 },
+      [TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID]: { x: 8, y: 6 },
+    };
+    return {
+      ...match,
+      currentPlayer: 1,
+      activation: null,
+      units: match.units.map((unit) => {
+        const definition = getUnitType(unit.type);
+        return {
+          ...unit,
+          position: { ...(positions[unit.id] ?? unit.position) },
+          hp: definition.stats.maxHp,
+          mp: definition.stats.maxMp,
+          spent: unit.id === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
+          defending: false,
+        };
+      }),
+    };
+  }
+
   if (tutorialId !== TUTORIAL_ARTS_MP_ID) return match;
   const positions = {
     [TUTORIAL_ARTS_PLAYER_ARCHER_ID]: { x: 2, y: 5 },
@@ -165,7 +239,28 @@ export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID
 }
 
 export function prepareTutorialCommand(tutorial, command) {
-  if (!tutorial || tutorial.completed || command?.type !== COMMANDS.ATTACK) return command;
+  if (!tutorial || tutorial.completed) return command;
+
+  if (tutorial.id === TUTORIAL_DAMAGE_TYPES_ID) {
+    if (
+      command?.type === COMMANDS.ATTACK &&
+      command.actorId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID &&
+      tutorial.stage === "await_swordsman_attack"
+    ) {
+      return { ...command, ...NORMAL_HIT };
+    }
+    if (
+      command?.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID &&
+      command.artId === "spark" &&
+      tutorial.stage === "await_spark"
+    ) {
+      return { ...command, ...NORMAL_HIT };
+    }
+    return command;
+  }
+
+  if (command?.type !== COMMANDS.ATTACK) return command;
 
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) {
     if (
@@ -193,6 +288,8 @@ export function prepareTutorialCommand(tutorial, command) {
 export function validateTutorialCommand(tutorial, command, match) {
   if (!tutorial || tutorial.completed || !command) return tutorialAllowed();
 
+  if (tutorial.id === TUTORIAL_DAMAGE_TYPES_ID) return validateDamageTypesCommand(tutorial, command, match);
+
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) return validateArtsMpCommand(tutorial, command, match);
 
   if (
@@ -211,6 +308,9 @@ export function validateTutorialCommand(tutorial, command, match) {
 
 export function recordTutorialCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
   if (!tutorial || tutorial.completed) return noUpdate();
+  if (tutorial.id === TUTORIAL_DAMAGE_TYPES_ID) {
+    return recordDamageTypesCommand(tutorial, { command, events, match, previousPlayer });
+  }
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) {
     return recordArtsMpCommand(tutorial, { command, events, match, previousPlayer });
   }
@@ -276,6 +376,22 @@ export function recordTutorialCommand(tutorial, { command, events = [], match, p
 
 export function chooseTutorialCpuActivation(match, tutorial) {
   const player = match?.currentPlayer ?? 2;
+
+  // Once a tutorial has completed, the CPU idles instead of sneaking in one last
+  // move/defend after the closing dialogue. Without this, tutorial 3 passes the
+  // turn to Clod (both player units spent by the final Spark) and he shuffles +
+  // braces right before the results screen — an out-of-place artifact.
+  if (tutorial?.completed) return [];
+
+  if (tutorial?.id === TUTORIAL_DAMAGE_TYPES_ID && tutorial.stage === "await_clod_defend") {
+    const clod = findUnit(match, TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID);
+    if (!canAct(match, clod)) return [];
+    return [
+      beginActivation(player, clod.id),
+      defend(player, clod.id),
+      finishActivation(player, clod.id),
+    ];
+  }
 
   if (
     tutorial?.id === TUTORIAL_ARTS_MP_ID &&
@@ -449,6 +565,61 @@ function recordAttack(tutorial, attackEvent) {
   return noUpdate();
 }
 
+function validateDamageTypesCommand(tutorial, command) {
+  if (command.player !== 1) return tutorialAllowed();
+  const unitId = activeCommandUnitId(command);
+  const isSwordsman = unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID;
+  const isMagician = unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID;
+
+  if (tutorial.stage === "await_swordsman_attack") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isSwordsman) return tutorialAllowed();
+    if (command.type === COMMANDS.MOVE_UNIT && command.unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID) {
+      return samePosition(command.position, DAMAGE_TYPES_SWORDSMAN_MOVE)
+        ? tutorialAllowed()
+        : tutorialBlocked("Move the Swordsman to the adjacent setup tile at column 7, row 6 before attacking Clod.");
+    }
+    if (command.type === COMMANDS.ATTACK && command.actorId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID && command.targetId === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID) {
+      return tutorialAllowed();
+    }
+    if (command.type === COMMANDS.CANCEL_MOVE && isSwordsman) return tutorialAllowed();
+    return tutorialBlocked("Start with the Swordsman: move adjacent to Clod, then use a basic Attack.");
+  }
+
+  if (tutorial.stage === "await_swordsman_finish") {
+    if (command.type === COMMANDS.FINISH_ACTIVATION && command.unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID) return tutorialAllowed();
+    return tutorialBlocked("Finish the Swordsman's activation so Clod can demonstrate defending.");
+  }
+
+  if (tutorial.stage === "await_footwork") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isSwordsman) return tutorialAllowed();
+    if (
+      command.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID &&
+      command.artId === "footwork"
+    ) {
+      return footworkPathHitsClod(command.path)
+        ? tutorialAllowed()
+        : tutorialBlocked("Route Footwork through Clod so the true damage lands before you end on empty ground.");
+    }
+    return tutorialBlocked("Activate the Swordsman and use Footwork through Clod. True damage ignores Clod's Defend stance.");
+  }
+
+  if (tutorial.stage === "await_spark") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isMagician) return tutorialAllowed();
+    if (
+      command.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID &&
+      command.artId === "spark" &&
+      command.targetId === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID
+    ) {
+      return tutorialAllowed();
+    }
+    return tutorialBlocked("Now activate the Magician and cast Spark at Clod to show magic ignoring DEF but still being halved by Defend.");
+  }
+
+  return tutorialAllowed();
+}
+
 function validateArtsMpCommand(tutorial, command) {
   const unitId = activeCommandUnitId(command);
   const isArcher = unitId === TUTORIAL_ARTS_PLAYER_ARCHER_ID;
@@ -501,6 +672,97 @@ function validateArtsMpCommand(tutorial, command) {
   }
 
   return tutorialAllowed();
+}
+
+function recordDamageTypesCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
+  const attackEvent = events.find((event) => event.type === "ATTACK_RESOLVED");
+  if (
+    attackEvent?.actorId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID &&
+    attackEvent.targetId === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID &&
+    tutorial.stage === "await_swordsman_attack"
+  ) {
+    return setStage(tutorial, "await_swordsman_finish", {
+      prompt: "Physical hit landed. Clod's high DEF cut the Swordsman's STR down to a tiny hit. Finish the activation so Clod can Defend.",
+      dialogue: [{
+        name: "Instructor",
+        text: "That was physical damage: Swordsman's STR met Clod's high DEF, so the blow barely got through.",
+      }, {
+        name: "Instructor",
+        text: "High DEF opponents are strong against basic physical attacks. You need a different damage type to crack them cleanly.",
+      }],
+    });
+  }
+
+  if (
+    tutorial.stage === "await_swordsman_finish" &&
+    command?.type === COMMANDS.FINISH_ACTIVATION &&
+    command.unitId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID &&
+    previousPlayer === 1 &&
+    match?.currentPlayer === 2
+  ) {
+    return setStage(tutorial, "await_clod_defend", {
+      prompt: "Clod is bracing. Watch the enemy Defend, then the real damage-type lesson begins.",
+    });
+  }
+
+  if (
+    tutorial.stage === "await_clod_defend" &&
+    events.some((event) => event.type === "UNIT_DEFENDED" && event.unitId === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID)
+  ) {
+    return setStage(tutorial, "await_footwork", {
+      prompt: "Clod is defending. Activate Swordsman and use Footwork through Clod, then cast Spark with Magician.",
+      selectUnitId: TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID,
+      dialogue: [{
+        speakerId: TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID,
+        text: "Rock Hard. While I Defend, physical damage breaks on me completely.",
+      }, {
+        name: "Instructor",
+        text: "Clod's Rock Hard passive ignores physical damage while he is defending. Footwork deals true damage, so route it through Clod now.",
+      }, {
+        name: "Instructor",
+        text: "After that, Spark will show the key difference: magic ignores DEF, but Defend still halves magic. True damage ignores both.",
+      }],
+    });
+  }
+
+  const artEvent = events.find((event) => event.type === "ART_RESOLVED");
+  if (
+    artEvent?.actorId === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID &&
+    artEvent.artId === "footwork" &&
+    tutorial.stage === "await_footwork"
+  ) {
+    return setStage(tutorial, "await_spark", {
+      prompt: "Footwork slipped true damage through Rock Hard. Now activate Magician and cast Spark at Clod.",
+      selectUnitId: TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
+      dialogue: [{
+        speakerId: TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID,
+        text: "No armor math, no bracing math. Footwork just landed the damage.",
+      }, {
+        name: "Instructor",
+        text: "Exactly. True damage is the clean bypass. Now compare it with magic damage while Clod is still defending.",
+      }],
+    });
+  }
+
+  if (
+    artEvent?.actorId === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID &&
+    artEvent.artId === "spark" &&
+    tutorial.stage === "await_spark"
+  ) {
+    return setStage(tutorial, "complete", {
+      prompt: "Tutorial complete. Physical checks DEF, magic ignores DEF but respects Defend, and true damage bypasses both.",
+      completed: true,
+      dialogue: [{
+        speakerId: TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
+        text: "Spark ignored the stone shell, but the brace still softened it.",
+      }, {
+        name: "Instructor",
+        text: "That is the whole split: physical fights DEF, magic skips DEF, true damage skips defensive stats and Defend entirely.",
+      }],
+    });
+  }
+
+  return noUpdate();
 }
 
 function recordArtsMpCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
@@ -708,6 +970,10 @@ function parseTileKey(key) {
 
 function samePosition(a, b) {
   return positionKey(a) === positionKey(b);
+}
+
+function footworkPathHitsClod(path) {
+  return Array.isArray(path) && path.some((step) => samePosition(step, DAMAGE_TYPES_FOOTWORK_PATH[0]));
 }
 
 function chebyshev(a, b) {

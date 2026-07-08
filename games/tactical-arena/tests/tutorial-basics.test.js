@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { attack, beginActivation, defend, finishActivation, moveUnit } from "../src/core/commands.js";
+import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { getVolleyShotCells } from "../src/rules/arts.js";
@@ -12,6 +12,10 @@ import {
   TUTORIAL_ARTS_PLAYER_ARCHER_ID,
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
   TUTORIAL_BASICS_ID,
+  TUTORIAL_DAMAGE_TYPES_ID,
+  TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
+  TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID,
+  TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID,
   chooseTutorialCpuActivation,
   completeTutorial,
   createBasicsTutorial,
@@ -24,7 +28,6 @@ import {
   recordTutorialCommand,
   validateTutorialCommand,
 } from "../src/tutorials/basics.js";
-import { useArt } from "../src/core/commands.js";
 
 function applyTutorial(tutorial, match, command) {
   const prepared = prepareTutorialCommand(tutorial, command);
@@ -287,7 +290,7 @@ test("next tutorial lookup routes tutorial 1 completion into the playable arts/m
   assert.equal(getNextTutorialId(adapter, TUTORIAL_BASICS_ID), TUTORIAL_ARTS_MP_ID);
 
   completeTutorial(adapter, TUTORIAL_ARTS_MP_ID);
-  assert.equal(getNextTutorialId(adapter, TUTORIAL_ARTS_MP_ID), null);
+  assert.equal(getNextTutorialId(adapter, TUTORIAL_ARTS_MP_ID), TUTORIAL_DAMAGE_TYPES_ID);
 });
 
 test("arts/mp tutorial config and setup create the volley formation with mystic hidden", () => {
@@ -386,6 +389,107 @@ test("arts/mp tutorial gates range check, move and defend, volley, then pray", (
   const prayEvent = pray.events.find((event) => event.type === "ART_RESOLVED");
   assert.equal(prayEvent.artId, "pray");
   assert.equal(tutorial.completed, true);
+});
+
+test("damage-types tutorial config and setup replace the placeholder third lesson", () => {
+  const config = createTutorialMatchConfig(TUTORIAL_DAMAGE_TYPES_ID);
+  const match = prepareTutorialMatchState(createMatchState(config), TUTORIAL_DAMAGE_TYPES_ID);
+  const tutorials = getTutorialList();
+  const damageTypes = tutorials.find((tutorial) => tutorial.id === TUTORIAL_DAMAGE_TYPES_ID);
+
+  assert.equal(config.tutorialId, TUTORIAL_DAMAGE_TYPES_ID);
+  assert.deepEqual(config.squads[1], ["swordsman", "magician"]);
+  assert.deepEqual(config.squads[2], ["clod"]);
+  assert.equal(damageTypes.available, true);
+  assert.equal(damageTypes.title, "Tutorial 3");
+  assert.equal(damageTypes.subtitle, "Damage Types");
+  assert.deepEqual(match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID).position, { x: 4, y: 6 });
+  assert.deepEqual(match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID).position, { x: 4, y: 4 });
+  assert.deepEqual(match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID).position, { x: 8, y: 6 });
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID).spent, true);
+  assert.equal(match.currentPlayer, 1);
+});
+
+test("damage-types tutorial walks physical, Rock Hard true damage, and defended magic", () => {
+  const tutorial = createTutorial(TUTORIAL_DAMAGE_TYPES_ID);
+  let match = prepareTutorialMatchState(createMatchState(createTutorialMatchConfig(TUTORIAL_DAMAGE_TYPES_ID)), TUTORIAL_DAMAGE_TYPES_ID);
+
+  assert.equal(tutorial.stage, "await_swordsman_attack");
+  assert.match(tutorial.dialogue.map((line) => line.text).join(" "), /Physical damage/i);
+  assert.match(tutorial.dialogue.map((line) => line.text).join(" "), /Magic ignores DEF/i);
+  assert.match(tutorial.dialogue.map((line) => line.text).join(" "), /True damage/i);
+  assert.equal(validateTutorialCommand(tutorial, beginActivation(1, TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID), match).accepted, false);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID)));
+  ({ match } = applyTutorial(tutorial, match, moveUnit(1, TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID, 7, 6)));
+  let applied = applyTutorial(tutorial, match, attack(1, TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID, TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID));
+  let attackEvent = applied.events.find((event) => event.type === "ATTACK_RESOLVED");
+  assert.equal(attackEvent.hit, true);
+  assert.equal(attackEvent.critical, false);
+  assert.equal(attackEvent.damage, 2);
+  assert.equal(applied.match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID).hp, 28);
+  assert.equal(tutorial.stage, "await_swordsman_finish");
+  assert.match(applied.update.dialogue.map((line) => line.text).join(" "), /high DEF/i);
+  match = applied.match;
+
+  ({ match } = applyTutorial(tutorial, match, finishActivation(1, TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID)));
+  assert.equal(match.currentPlayer, 2);
+  assert.equal(tutorial.stage, "await_clod_defend");
+
+  let cpuUpdate = null;
+  for (const command of chooseTutorialCpuActivation(match, tutorial)) {
+    const result = applyTutorial(tutorial, match, command);
+    match = result.match;
+    if (result.update.dialogue) cpuUpdate = result.update;
+  }
+
+  assert.equal(match.currentPlayer, 1);
+  assert.equal(tutorial.stage, "await_footwork");
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID).defending, true);
+  assert.match(cpuUpdate.dialogue.map((line) => line.text).join(" "), /Rock Hard/i);
+  assert.match(cpuUpdate.dialogue.map((line) => line.text).join(" "), /true damage/i);
+  assert.match(cpuUpdate.dialogue.map((line) => line.text).join(" "), /magic/i);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID)));
+  const footworkPath = [
+    { x: 8, y: 6 },
+    { x: 9, y: 6 },
+    { x: 10, y: 6 },
+    { x: 10, y: 5 },
+    { x: 9, y: 5 },
+    { x: 8, y: 5 },
+  ];
+  applied = applyTutorial(tutorial, match, useArt(1, TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID, "footwork", footworkPath));
+  const footworkEvent = applied.events.find((event) => event.type === "ART_RESOLVED");
+  assert.equal(footworkEvent.artId, "footwork");
+  assert.deepEqual(footworkEvent.harmed, [TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID]);
+  assert.equal(footworkEvent.damageByTarget[TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID], 3);
+  assert.equal(applied.match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID).hp, 25);
+  assert.equal(tutorial.stage, "await_spark");
+  match = applied.match;
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID)));
+  applied = applyTutorial(tutorial, match, useArt(1, TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID, "spark", { targetId: TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID }));
+  const sparkEvent = applied.events.find((event) => event.type === "ART_RESOLVED");
+  assert.equal(sparkEvent.artId, "spark");
+  assert.equal(sparkEvent.damage.type, "magic");
+  assert.equal(sparkEvent.damage.defended, true);
+  assert.equal(sparkEvent.damage.damage, 3);
+  assert.equal(applied.match.units.find((unit) => unit.id === TUTORIAL_DAMAGE_TYPES_CPU_CLOD_ID).hp, 22);
+  assert.equal(tutorial.completed, true);
+  assert.match(applied.update.prompt, /Tutorial complete/i);
+});
+
+test("a completed tutorial idles the CPU instead of sneaking in a final move/defend", () => {
+  const tutorial = createTutorial(TUTORIAL_DAMAGE_TYPES_ID);
+  tutorial.stage = "complete";
+  tutorial.completed = true;
+  const match = {
+    ...prepareTutorialMatchState(createMatchState(createTutorialMatchConfig(TUTORIAL_DAMAGE_TYPES_ID)), TUTORIAL_DAMAGE_TYPES_ID),
+    currentPlayer: 2,
+  };
+
+  assert.deepEqual(chooseTutorialCpuActivation(match, tutorial), []);
 });
 
 test("completing the first tutorial saves progress without granting the future skin choice", () => {

@@ -22,7 +22,7 @@ test("sample URLs resolve inside this game's local sounds directory", () => {
 });
 
 test("music tracks include local battle and menu loops", () => {
-  assert.equal(MUSIC_FILES.battle, "battle.mp3");
+  assert.equal(MUSIC_FILES.battle, "battle-2.mp3");
   assert.equal(MUSIC_FILES.menu, "menu.mp3");
 });
 
@@ -70,7 +70,7 @@ test("starting the same music track is idempotent while switching tracks stops t
     audio.startMusic("battle");
     assert.equal(menuTrack.pauseCount, 1);
     assert.equal(menuTrack.currentTime, 0);
-    assert.match(created[1].src, /battle\.mp3$/);
+    assert.match(created[1].src, /battle-2\.mp3$/);
   } finally {
     globalThis.Audio = OriginalAudio;
   }

@@ -6,7 +6,7 @@
 import { HybridAudioEngine } from "./hybridAudioEngine.js";
 import { SOUND_CATALOG, SAMPLE_SOURCES } from "./soundCatalog.js";
 
-export const MUSIC_FILES = Object.freeze({ battle: "battle.mp3", menu: "menu.mp3" });
+export const MUSIC_FILES = Object.freeze({ battle: "battle-2.mp3", menu: "menu.mp3" });
 const MUSIC_BASE = new URL("../../sounds/", import.meta.url);
 
 export class AudioManager {
