@@ -331,6 +331,42 @@ body:has(.ref-modal:not([hidden])) .back-link {
     height: 54px;
   }
 
+  .dialogue-layer {
+    padding: .45rem;
+  }
+
+  .dialogue-card {
+    gap: .55rem;
+    padding: .55rem;
+    border-radius: 10px;
+  }
+
+  .unit-portrait.is-dialogue {
+    width: 4rem;
+    height: 5.25rem;
+  }
+
+  .dialogue-speaker {
+    margin-bottom: .24rem;
+    font-size: .58rem;
+  }
+
+  .dialogue-text {
+    min-height: 2.45rem;
+    font-size: .72rem;
+    line-height: 1.32;
+  }
+
+  .dialogue-foot {
+    margin-top: .35rem;
+  }
+
+  .dialogue-btn {
+    min-height: 34px;
+    padding: .32rem .52rem;
+    font-size: .56rem;
+  }
+
   .unit-name {
     font-size: .72rem;
     line-height: 1.05;

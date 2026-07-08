@@ -95,6 +95,17 @@ export function getVolleyShotCells(state, actor, origin) {
   return cells;
 }
 
+export function getVolleyShotOriginForTarget(state, actor, targetPosition) {
+  if (!targetPosition || !isOnBoard(state, targetPosition)) return null;
+  const targetKey = positionKey(targetPosition);
+  for (const origin of getVolleyShotAimOptions(state, actor)) {
+    if (getVolleyShotCells(state, actor, origin)?.some((cell) => positionKey(cell) === targetKey)) {
+      return origin;
+    }
+  }
+  return null;
+}
+
 export function getLegalFleeTiles(state, actor) {
   const range = getEffectiveStats(actor).moveRange + FLEE_RANGE_BONUS;
   const legal = new Set();

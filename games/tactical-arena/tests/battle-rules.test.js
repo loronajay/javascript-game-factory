@@ -789,6 +789,28 @@ test("Volley Shot damages every enemy in its five-deep expanding cone", () => {
   });
 });
 
+test("Volley Shot can be aimed by clicking any tile inside the desired cone", () => {
+  const initial = createBattleState({
+    size: 10,
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 4, y: 5 },
+      { id: "depth-one", player: 2, type: "swordsman", x: 4, y: 4 },
+      { id: "clicked-target", player: 2, type: "swordsman", x: 3, y: 3 },
+      { id: "outside-cone", player: 2, type: "swordsman", x: 8, y: 3 }
+    ]
+  });
+  const selected = applyCommand(initial, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "volley-shot", {
+    targetPosition: { x: 3, y: 3 }
+  }));
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(result.events[0].targetPosition, { x: 4, y: 4 });
+  assert.equal(result.nextState.units.find((unit) => unit.id === "depth-one").hp, 21);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "clicked-target").hp, 23);
+  assert.equal(result.nextState.units.find((unit) => unit.id === "outside-cone").hp, 25);
+});
+
 test("Mage Killer silence prevents the afflicted unit from starting an ART", () => {
   const initial = createBattleState({
     units: [

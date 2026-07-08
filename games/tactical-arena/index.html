@@ -72,6 +72,7 @@
         <div class="menu-card hub-card">
           <h2 class="menu-heading">Main Menu</h2>
           <div class="menu-buttons menu-choice-list">
+            <button data-nav="tutorialSelect" class="primary menu-btn menu-choice"><span>Tutorials</span></button>
             <button data-nav="spSetup" class="primary menu-btn menu-choice"><span>Single Player</span></button>
             <button data-nav="hsSetup" class="menu-btn menu-choice"><span>Hot Seat</span></button>
             <button data-nav="onlineSetup" class="menu-btn menu-choice"><span>Online Versus</span></button>
@@ -81,6 +82,18 @@
             <button data-action="skins" class="menu-btn ghost">Skins</button>
             <button data-action="settings" class="menu-btn ghost">Settings</button>
             <button data-nav="title" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= TUTORIAL SELECT ======================== -->
+      <section class="screen menu-screen" data-screen="tutorialSelect">
+        <div class="menu-card tutorial-select-card">
+          <h2 class="menu-heading">Tutorials</h2>
+          <p class="menu-note">Pick a lesson. Completed tutorials can be replayed; locked lessons open as earlier tutorials are finished.</p>
+          <div class="tutorial-list" data-tutorial-list></div>
+          <div class="menu-buttons">
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
           </div>
         </div>
       </section>
@@ -257,6 +270,18 @@
         </div>
       </section>
 
+      <!-- ======================= TUTORIAL COMPLETE ======================= -->
+      <section class="screen menu-screen" data-screen="tutorialComplete">
+        <div class="menu-card results-card tutorial-complete-card">
+          <h2 class="menu-heading" data-tutorial-complete="title">Tutorial Complete</h2>
+          <p class="menu-note" data-tutorial-complete="reward">Tutorial progress saved.</p>
+          <div class="menu-buttons">
+            <button type="button" class="primary menu-btn" data-action="startTutorial" data-tutorial-complete="next" disabled>Next Tutorial</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
+          </div>
+        </div>
+      </section>
+
       <!-- ============================= MATCH ============================== -->
       <section class="screen match-screen" data-screen="match">
         <header class="topbar">
@@ -334,6 +359,7 @@
               <div class="turn-flash-sub"></div>
             </div>
           </div>
+          <div id="dialogueLayer" class="dialogue-layer" hidden></div>
           <div id="squadOverlays" class="squad-overlays"></div>
           <div id="message" role="status" aria-live="polite">Select an unspent piece.</div>
         </main>

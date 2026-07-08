@@ -52,6 +52,7 @@
 
         <div class="menu-buttons">
           <button data-nav="spSetup" class="primary menu-btn">Single Player</button>
+          <button data-action="startTutorial" class="menu-btn">Tutorials</button>
           <button data-nav="hsSetup" class="menu-btn">Hot Seat</button>
           <button data-nav="onlineSetup" class="menu-btn">Online Versus</button>
           <button data-action="rules" class="menu-btn">How to Play</button>
@@ -305,6 +306,19 @@
             <button type="button" data-action="startMatch" class="primary menu-btn" data-online="startBtn">Start Match</button>
             <button type="button" data-action="leaveLobby" class="menu-btn ghost">Leave</button>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= TUTORIAL COMPLETE ======================== -->
+    <section class="screen menu-screen" data-screen="tutorialComplete">
+      <div class="menu-card">
+        <h2 class="menu-heading" data-tutorial-complete="title">Tutorial Complete</h2>
+        <p class="menu-note" data-tutorial-complete="reward">Tutorial progress saved.</p>
+
+        <div class="menu-buttons">
+          <button type="button" data-action="nextTutorial" class="primary menu-btn" disabled>Next Tutorial Coming Soon</button>
+          <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
         </div>
       </div>
     </section>

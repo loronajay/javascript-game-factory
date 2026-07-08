@@ -1,6 +1,6 @@
 import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { artIsBodyBlocked, canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
+import { artIsBodyBlocked, canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
@@ -1535,8 +1535,9 @@ function resolveStatusCast(state, command, art) {
 
 function resolveVolleyShot(state, command, art) {
   const actorState = findUnit(state, command.unitId);
-  const cells = getVolleyShotCells(state, actorState, command.targetPosition);
-  if (!cells) return reject(ERR.INVALID_TARGET);
+  const origin = getVolleyShotOriginForTarget(state, actorState, command.targetPosition);
+  if (!origin) return reject(ERR.INVALID_TARGET);
+  const cells = getVolleyShotCells(state, actorState, origin);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
@@ -1558,7 +1559,7 @@ function resolveVolleyShot(state, command, art) {
     type: "ART_RESOLVED",
     artId: art.id,
     actorId: actor.id,
-    targetPosition: { ...command.targetPosition },
+    targetPosition: { ...origin },
     targetIds,
     damageByTarget,
     mpCost: cost

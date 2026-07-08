@@ -23,6 +23,7 @@ import {
 import {
   createBoardMetrics,
   createBoardViewBox,
+  chebyshevDistance,
   screenToGrid,
   tileKey,
 } from "../geometry/isometric.js";
@@ -53,9 +54,17 @@ import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
 import { renderAmbient } from "../render/ambient.js";
 import { scale } from "../render/timing.js";
+import {
+  TUTORIAL_BASICS_ID,
+  completeTutorial,
+  createBasicsTutorial,
+  openingPrompt,
+  prepareTutorialCommand,
+  recordTutorialCommand,
+} from "../tutorials/basics.js";
 
 export class GameController {
-  constructor({ elements, messages, audio, confirm, onMatchComplete, turnAnnouncer }) {
+  constructor({ elements, messages, audio, confirm, onMatchComplete, onTutorialComplete, turnAnnouncer }) {
     this.elements = elements;
     this.messages = messages;
     // Presentation-only turn-change sweep. Defaults to a no-op so the controller
@@ -70,6 +79,7 @@ export class GameController {
     // Routed to the results screen when a match ends. Defaults to a no-op so the
     // controller stays usable headlessly / in isolation.
     this.onMatchComplete = onMatchComplete ?? (() => {});
+    this.onTutorialComplete = onTutorialComplete ?? (() => {});
 
     // Current match framing. `mode` drives mode-specific chrome (e.g. the Restart
     // button only exists for local play); `startedAt` backs the results duration.
@@ -89,6 +99,9 @@ export class GameController {
     // CPU control for single-player. Null in hot-seat/online; in single-player it
     // names the difficulty and which seats the computer drives (P2 in v1).
     this.cpu = null;
+    this.tutorial = null;
+    this.pendingTutorialPrompt = null;
+    this.pendingTutorialComplete = false;
 
     // Online session (onlineSession.js) when mode === "online"; null otherwise.
     // Owns the relay link; the controller only calls a couple of small hooks on
@@ -161,6 +174,9 @@ export class GameController {
     this.matchConfig = { size, playerCount, format, teamColors, teamNames, compositions, difficulty, seed };
     // Single-player drives Player 2 with the CPU; every other mode is human-only.
     this.cpu = mode === "single" ? { difficulty, players: new Set([2]) } : null;
+    this.tutorial = mode === "tutorial" ? createBasicsTutorial() : null;
+    this.pendingTutorialPrompt = null;
+    this.pendingTutorialComplete = false;
     this._onlineEnded = false;
     this.startedAt = Date.now();
     this.applyLocalControlVisibility();
@@ -181,12 +197,16 @@ export class GameController {
   // unilaterally reset a shared match, and conceding online will route through
   // the host instead, so both are hidden outside single-player and hot-seat.
   applyLocalControlVisibility() {
-    const local = this.mode === "single" || this.mode === "hotseat";
+    const local = this.mode === "single" || this.mode === "hotseat" || this.mode === "tutorial";
     // Restart never makes sense online — a shared match can't be unilaterally
     // reset. Concede stays available online; it routes through the normal command
     // broadcast (the conceding player drops, the duel ends).
     this.elements.restartBtn.hidden = !local;
-    this.elements.concedeBtn.hidden = !(local || this.mode === "online");
+    this.elements.concedeBtn.hidden = !(
+      this.mode === "single" ||
+      this.mode === "hotseat" ||
+      this.mode === "online"
+    );
   }
 
   reset() {
@@ -237,6 +257,8 @@ export class GameController {
       // lobby → match handoff) and lock input unless we move first.
       this.net?.bind(this);
       this.applyOnlineTurnLock();
+    } else if (this.mode === "tutorial") {
+      this.messages.show(openingPrompt());
     } else {
       this.messages.show("Player 1 begins. Select any unspent piece.");
     }
@@ -259,6 +281,10 @@ export class GameController {
   // state and return the result (with events). On reject, surface the reason
   // and return null. Never partially applies.
   dispatch(command) {
+    if (this.mode === "tutorial") {
+      this.match = prepareTutorialCommand(this.tutorial, this.match, command);
+    }
+
     const result = applyCommand(this.match, command);
 
     if (!result.accepted) {
@@ -268,6 +294,7 @@ export class GameController {
 
     this.match = result.nextState;
     this.recordStats(result.events);
+    this.recordTutorialProgress(command, result);
 
     // Online: a locally-accepted command is broadcast so the opponent replays it
     // through the same seeded reducer. Remote commands arrive via
@@ -504,7 +531,7 @@ export class GameController {
     this.clearMode();
     this.syncSelection();
     this.renderDynamic();
-    this.messages.show(`${UNIT_TYPES[unit.type].name} selected.`);
+    this.messages.show(this.consumeTutorialPrompt(`${UNIT_TYPES[unit.type].name} selected.`));
   }
 
   handleTileClick(x, y) {
@@ -714,6 +741,10 @@ export class GameController {
       return;
     }
 
+    if (this.finishTutorialIfReady()) {
+      return;
+    }
+
     this.afterActionResolved("Attack complete. Move now or finish this activation.");
   }
 
@@ -851,8 +882,18 @@ export class GameController {
       (event) => event.type === EVENTS.TURN_CHANGED,
     );
     if (turnChanged) {
-      this.messages.show(`Player ${turnChanged.player} squad turn.`);
+      this.messages.show(this.consumeTutorialPrompt(`Player ${turnChanged.player} squad turn.`));
       this.announceTurn(turnChanged.player);
+    }
+
+    if (
+      turnChanged &&
+      this.mode === "tutorial" &&
+      this.match.phase === "playing" &&
+      this.match.currentPlayer === 2
+    ) {
+      void this.runTutorialCpuTurn();
+      return;
     }
 
     // In single-player, when the human hands the turn to the computer, let it
@@ -994,21 +1035,118 @@ export class GameController {
     this.messages.show("Your squad turn. Select an unspent piece.");
   }
 
+  async runTutorialCpuTurn() {
+    this.ui.locked = true;
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.renderDynamic();
+    this.messages.show("Tutorial opponent advances and braces.");
+    await sleep(CPU_TURN_LEAD_MS);
+
+    if (this.tutorial?.stage === "await_counter_turn") {
+      this.tutorial.stage = "cpu_counterattack";
+      await this.runTutorialRangerCounter();
+    }
+
+    await this.runTutorialAdvanceRemainder();
+
+    this.ui.locked = false;
+
+    if (this.match.phase === "complete") {
+      this.handleMatchComplete();
+      return;
+    }
+
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.renderDynamic();
+    this.announceTurn(this.match.currentPlayer);
+    this.messages.show(
+      this.consumeTutorialPrompt("Your squad turn. Keep positioning until the Ranger has a shot."),
+    );
+  }
+
+  async runTutorialRangerCounter() {
+    const ranger = findUnit(this.match, "p2-ranger");
+    const target = findUnit(this.match, "p1-ranger");
+    if (!ranger || !target || ranger.hp <= 0 || target.hp <= 0 || ranger.spent) return;
+
+    if (!(await this.applyCpuCommand(cmd.beginActivation(2, ranger.id)))) return;
+
+    let activeRanger = findUnit(this.match, ranger.id);
+    if (!getLegalAttackTargets(this.match, activeRanger).has(tileKey(target.x, target.y))) {
+      const move = chooseMoveThatEnablesAttack(this.match, activeRanger, target);
+      if (move && !(await this.applyCpuCommand(cmd.moveUnit(2, activeRanger.id, move.x, move.y)))) {
+        return;
+      }
+    }
+
+    activeRanger = findUnit(this.match, ranger.id);
+    if (getLegalAttackTargets(this.match, activeRanger).has(tileKey(target.x, target.y))) {
+      if (!(await this.applyCpuCommand(cmd.attack(2, activeRanger.id, target.id)))) return;
+    } else if (!(await this.applyCpuCommand(cmd.defend(2, activeRanger.id)))) {
+      return;
+    }
+
+    if (this.match.activation?.unitId === ranger.id) {
+      await this.applyCpuCommand(cmd.finishActivation(2, ranger.id));
+    }
+  }
+
+  async runTutorialAdvanceRemainder() {
+    let guard = 0;
+    while (
+      this.match.phase === "playing" &&
+      this.match.currentPlayer === 2 &&
+      guard < CPU_MAX_ACTIVATIONS
+    ) {
+      guard += 1;
+      const unit = this.match.units.find(
+        (candidate) => candidate.player === 2 && candidate.hp > 0 && !candidate.spent,
+      );
+      if (!unit) break;
+
+      if (!(await this.applyCpuCommand(cmd.beginActivation(2, unit.id)))) return;
+
+      const active = findUnit(this.match, unit.id);
+      const move = chooseApproachMove(this.match, active);
+      if (move && !(await this.applyCpuCommand(cmd.moveUnit(2, active.id, move.x, move.y)))) {
+        return;
+      }
+
+      const moved = findUnit(this.match, unit.id);
+      if (moved.type === "tank") {
+        if (!(await this.applyCpuCommand(cmd.guard(2, moved.id, moved.id)))) return;
+      } else if (!(await this.applyCpuCommand(cmd.defend(2, moved.id)))) {
+        return;
+      }
+
+      if (this.match.activation?.unitId === unit.id) {
+        await this.applyCpuCommand(cmd.finishActivation(2, unit.id));
+      }
+
+      await sleep(CPU_ACTIVATION_GAP_MS);
+    }
+  }
+
   // Fire the turn-change sweep for the seat now on the clock, tinted to its
   // roster color. Sub-line adapts to who is holding the device.
   announceTurn(player) {
     const cpu = this.isCpu(player);
     const online = this.mode === "online";
+    const tutorialOpponent = this.mode === "tutorial" && player === 2;
     const mine = online && player === this.net?.mySeat;
 
     let sub;
-    if (cpu) sub = "CPU is planning";
+    if (tutorialOpponent) sub = "Guided opponent";
+    else if (cpu) sub = "CPU is planning";
     else if (online) sub = mine ? "Your move" : "Opponent's move";
     else if (this.mode === "hotseat") sub = "Pass the device";
     else sub = "Your move";
 
     let title = `Player ${player}`;
-    if (cpu) title = `Player ${player} · CPU`;
+    if (tutorialOpponent) title = "Tutorial Opponent";
+    else if (cpu) title = `Player ${player} · CPU`;
     else if (online && !mine) title = `Player ${player} · ${this.remoteSquadLabel(player)}`;
 
     this.turnAnnouncer.announce({
@@ -1165,6 +1303,10 @@ export class GameController {
   // Returns false (stopping the driver) if the reducer rejects it — that would be
   // an AI bug, never a normal player action, so it fails safe instead of looping.
   async applyCpuCommand(command) {
+    if (this.mode === "tutorial") {
+      this.match = prepareTutorialCommand(this.tutorial, this.match, command);
+    }
+
     const result = applyCommand(this.match, command);
     if (!result.accepted) {
       console.warn("CPU command rejected:", command.type, result.errorCode);
@@ -1173,6 +1315,7 @@ export class GameController {
 
     this.match = result.nextState;
     this.recordStats(result.events);
+    this.recordTutorialProgress(command, result);
     await this.animateCpuEvents(result.events);
     return true;
   }
@@ -1340,7 +1483,48 @@ export class GameController {
 
     this.syncSelection();
     this.renderDynamic();
-    this.messages.show(prompt);
+    this.messages.show(this.consumeTutorialPrompt(prompt));
+  }
+
+  consumeTutorialPrompt(fallback) {
+    if (this.pendingTutorialPrompt) {
+      const prompt = this.pendingTutorialPrompt;
+      this.pendingTutorialPrompt = null;
+      return prompt;
+    }
+    return fallback;
+  }
+
+  recordTutorialProgress(command, result) {
+    if (this.mode !== "tutorial" || !this.tutorial) return;
+    const update = recordTutorialCommand(this.tutorial, {
+      command,
+      events: result.events,
+      match: this.match,
+    });
+    if (update.prompt) this.pendingTutorialPrompt = update.prompt;
+    if (update.completed) this.pendingTutorialComplete = true;
+  }
+
+  finishTutorialIfReady() {
+    if (this.mode !== "tutorial" || !this.pendingTutorialComplete) return false;
+
+    this.pendingTutorialComplete = false;
+    this.ui.selectedId = null;
+    this.clearMode();
+    this.ui.locked = true;
+    this.renderDynamic();
+    this.messages.show(this.consumeTutorialPrompt("Tutorial complete."));
+
+    const progress = completeTutorial(globalThis.localStorage, TUTORIAL_BASICS_ID);
+    this.onTutorialComplete({
+      tutorialId: TUTORIAL_BASICS_ID,
+      title: "Tutorial 1 Complete",
+      rewardSkin: progress.rewardSkin,
+      rewardGranted: progress.rewardGranted,
+      allTutorialsComplete: progress.allTutorialsComplete,
+    });
+    return true;
   }
 
   handleMatchComplete() {
@@ -1496,6 +1680,61 @@ export class GameController {
       ...extra,
     };
   }
+}
+
+function chooseMoveThatEnablesAttack(match, unit, target) {
+  return rankedMoves(match, unit, target).find((move) => {
+    const projected = projectUnit(match, unit.id, move);
+    const projectedUnit = findUnit(projected, unit.id);
+    return getLegalAttackTargets(projected, projectedUnit).has(tileKey(target.x, target.y));
+  }) ?? null;
+}
+
+function chooseApproachMove(match, unit) {
+  const target = nearestEnemy(match, unit);
+  if (!target) return null;
+  return rankedMoves(match, unit, target)[0] ?? null;
+}
+
+function rankedMoves(match, unit, target) {
+  const moves = [...getLegalMoves(match, unit)].map(parseTileKey);
+  moves.sort((a, b) => {
+    const distance = chebyshevDistance(a, target) - chebyshevDistance(b, target);
+    if (distance !== 0) return distance;
+    const center = (match.size - 1) / 2;
+    const aCenter = Math.abs(a.x - center) + Math.abs(a.y - center);
+    const bCenter = Math.abs(b.x - center) + Math.abs(b.y - center);
+    return aCenter - bCenter;
+  });
+  return moves;
+}
+
+function nearestEnemy(match, unit) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const candidate of match.units) {
+    if (candidate.player === unit.player || candidate.hp <= 0) continue;
+    const distance = chebyshevDistance(unit, candidate);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function projectUnit(match, unitId, position) {
+  return {
+    ...match,
+    units: match.units.map((unit) =>
+      unit.id === unitId ? { ...unit, x: position.x, y: position.y } : unit,
+    ),
+  };
+}
+
+function parseTileKey(key) {
+  const [x, y] = key.split(",").map(Number);
+  return { x, y };
 }
 
 // Pacing for the CPU's turn so it reads as a deliberate opponent rather than an

@@ -161,8 +161,6 @@ export function isTargetedMode(mode, actor) {
 // loop on mouseenter.
 function wireVolleyHover(cones, tileByKey, unitsLayer, state) {
   for (const cone of cones) {
-    const aimTile = tileByKey.get(cone.key);
-    if (!aimTile) continue;
     const enter = () => {
       for (const k of cone.cells) tileByKey.get(k)?.classList.add("cone-hot");
       for (const occupant of state.units) {
@@ -175,8 +173,13 @@ function wireVolleyHover(cones, tileByKey, unitsLayer, state) {
       for (const k of cone.cells) tileByKey.get(k)?.classList.remove("cone-hot");
       unitsLayer.querySelectorAll(".volley-hit").forEach((el) => el.classList.remove("volley-hit"));
     };
-    aimTile.addEventListener("mouseenter", enter);
-    aimTile.addEventListener("mouseleave", leave);
+    const hoverKeys = new Set([cone.key, ...cone.cells]);
+    for (const key of hoverKeys) {
+      const tile = tileByKey.get(key);
+      if (!tile) continue;
+      tile.addEventListener("mouseenter", enter);
+      tile.addEventListener("mouseleave", leave);
+    }
   }
 }
 
@@ -493,6 +496,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         range: inRange ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null,
         aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null
       });
+      tile.setAttribute("data-key", key);
       tile.addEventListener("click", () => onTileClick(position));
       boardLayer.append(tile);
       tileByKey.set(key, tile);

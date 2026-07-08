@@ -173,6 +173,18 @@ class TestSvgElement {
     this.listeners.set(type, handler);
   }
 
+  querySelector(selector) {
+    if (selector.startsWith(".")) return this.findByClass(selector.slice(1));
+    const attr = selector.match(/^\[([^=]+)="([^"]+)"\]$/);
+    if (attr) return findSvgByAttribute(this, attr[1], attr[2]);
+    return null;
+  }
+
+  querySelectorAll(selector) {
+    if (!selector.startsWith(".")) return [];
+    return this.findAllByClass(selector.slice(1));
+  }
+
   animate(frames, options) {
     this.animations ??= [];
     this.animations.push({ frames, options });
@@ -209,6 +221,15 @@ class TestSvgElement {
     }
     return matches;
   }
+}
+
+function findSvgByAttribute(root, name, value) {
+  if (root.getAttribute?.(name) === value) return root;
+  for (const child of root.children ?? []) {
+    const match = findSvgByAttribute(child, name, value);
+    if (match) return match;
+  }
+  return null;
 }
 
 test("the default duel uses the standard thirteen-tile map and four-unit corner staging", () => {
@@ -540,6 +561,46 @@ test("the board only treats attack and enemy-target ARTS as targeted modes", () 
   assert.equal(isTargetedMode("art:pray", actor), false);
   assert.equal(isTargetedMode("art:wish", actor), false);
   assert.equal(isTargetedMode("art:volley-shot", { type: "archer" }), false);
+});
+
+test("Volley Shot previews its cone when hovering any tile inside that cone", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 10,
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 4, y: 5 },
+        { id: "p2-target", player: 2, type: "swordsman", x: 3, y: 3 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:volley-shot",
+      selectedId: "p1-archer",
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const coneTile = findSvgByAttribute(boardLayer, "data-key", "3,3");
+    assert.ok(coneTile, "the clicked cone tile should be addressable");
+    assert.equal(coneTile.listeners.has("mouseenter"), true);
+
+    coneTile.listeners.get("mouseenter")();
+
+    assert.ok(findSvgByAttribute(boardLayer, "data-key", "4,4").classList.contains("cone-hot"));
+    assert.ok(coneTile.classList.contains("cone-hot"));
+  } finally {
+    globalThis.document = previousDocument;
+  }
 });
 
 test("Curve Shot highlights an enemy behind an intervening unit as a legal target", () => {

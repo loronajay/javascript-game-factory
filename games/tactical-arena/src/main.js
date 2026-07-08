@@ -1,7 +1,7 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "./rules/arts.js";
+import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
 import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
@@ -24,7 +24,20 @@ import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewpor
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
+import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
+import {
+  TUTORIAL_ARTS_MP_ID,
+  TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
+  TUTORIAL_BASICS_ID,
+  chooseTutorialCpuActivation,
+  completeTutorial,
+  createTutorial,
+  prepareTutorialMatchState,
+  prepareTutorialCommand,
+  recordTutorialCommand,
+  validateTutorialCommand,
+} from "./tutorials/basics.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -43,6 +56,7 @@ const actionHelp = document.querySelector("#actionHelp");
 const squadOverlays = document.querySelector("#squadOverlays");
 const message = document.querySelector("#message");
 const refModal = document.querySelector("#refModal");
+const dialogueLayer = document.querySelector("#dialogueLayer");
 
 // --- View state ---
 let state = createBattleState();
@@ -61,6 +75,15 @@ let resolving = false;
 let cpu = null;
 let cpuThinking = false;
 let matchEpoch = 0;
+let tutorial = null;
+let pendingTutorialPrompt = null;
+let pendingTutorialDialogue = null;
+let pendingTutorialComplete = false;
+let pendingTutorialSpotlight = null;
+let pendingTutorialSelectUnitId = null;
+let pendingTutorialBeforeDialogueAction = null;
+let pendingTutorialAfterDialogueAction = null;
+let tutorialPresentationTimer = 0;
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const CPU_TURN_LEAD_MS = 480;        // pause before the CPU's first move
 const CPU_ACTIVATION_GAP_MS = 320;   // between one unit finishing and the next
@@ -79,6 +102,7 @@ function currentPlayerIsLocal() {
 
 function lockedActionMessage() {
   if (state.phase === "complete") return "The duel is complete.";
+  if (dialogue.isOpen()) return "Dialogue is open.";
   if (isCpu(state.currentPlayer)) return `Player ${state.currentPlayer} (CPU) is taking its turn.`;
   if (net != null && state.currentPlayer !== mySeat) return `Player ${state.currentPlayer}'s turn - please wait.`;
   return "Wait for your turn.";
@@ -100,7 +124,7 @@ let applyingRemote = false;
 // without the seat check a player could open the OPPONENT's activation on their turn
 // (both beginUnit and the reducer only check currentPlayer), breaking lockstep.
 function inputLocked() {
-  return resolving || !currentPlayerIsLocal();
+  return resolving || dialogue.isOpen() || !currentPlayerIsLocal();
 }
 
 // Broadcast a locally-originated accepted command to the opponent. Skipped while
@@ -125,7 +149,9 @@ let audioUnlocked = false;
 const rulesModal = new RulesModal(refModal, document.querySelector("#refCloseBtn"));
 const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
 const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
+const dialogue = createDialogueSystem(dialogueLayer, { getState: () => state, onOpen: render, onClose: render });
 const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex, onLeaveMatch });
+window.tacticalArenaDialogue = dialogue;
 
 // Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
 // once — it's independent of board size and presentation only.
@@ -143,7 +169,7 @@ function selectedUnit() {
 
 function render() {
   const unit = selectedUnit();
-  const controlsEnabled = currentPlayerIsLocal();
+  const controlsEnabled = currentPlayerIsLocal() && !dialogue.isOpen();
   renderHeader(state, { turnTitle, turnSub, turnBanner });
   renderUnitCard(unit, state, unitCard);
   renderActions(unit, state, mode, { actions, actionHelp }, {
@@ -166,6 +192,7 @@ function setMessage(text, isError = false) {
 
 function startMatch(config) {
   window.clearTimeout(resultsTimer);
+  window.clearTimeout(tutorialPresentationTimer);
   matchEpoch += 1;
   const online = config.mode === "online";
   // Online builds from the relay's shared seed so every client draws identical dice;
@@ -174,19 +201,31 @@ function startMatch(config) {
     size: config.size,
     squads: config.squads,
     skins: config.skins,
-    seed: online ? config.seed : undefined,
+    seed: online || config.mode === "tutorial" ? config.seed : undefined,
     playerCount: config.playerCount,
     format: config.format,
     teamColors: config.teamColors,
     teamNames: config.teamNames,
   });
+  if (config.mode === "tutorial") state = prepareTutorialMatchState(state, config.tutorialId ?? TUTORIAL_BASICS_ID);
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
   initialHpByPlayer = {};
   for (const player of state.turnOrder ?? [1, 2]) initialHpByPlayer[player] = hpRemaining(state, player);
-  // Single-player drives Player 2 with the CPU; hot-seat and online leave cpu null.
-  cpu = config.mode === "single" ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) } : null;
+  tutorial = config.mode === "tutorial" ? createTutorial(config.tutorialId ?? TUTORIAL_BASICS_ID) : null;
+  pendingTutorialPrompt = null;
+  pendingTutorialDialogue = null;
+  pendingTutorialComplete = false;
+  pendingTutorialSpotlight = null;
+  pendingTutorialSelectUnitId = null;
+  pendingTutorialBeforeDialogueAction = null;
+  pendingTutorialAfterDialogueAction = null;
+  // Single-player drives Player 2 with the CPU. Tutorial mode uses the same turn lock,
+  // but swaps in a scripted no-ART teaching driver.
+  cpu = config.mode === "single" || config.mode === "tutorial"
+    ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) }
+    : null;
   cpuThinking = false;
   // Online wiring: bind the lockstep session, remember our seat. Mutually exclusive
   // with cpu. A networked match can't be unilaterally restarted, so hide Restart.
@@ -204,6 +243,7 @@ function startMatch(config) {
   setMessage(online
     ? (state.currentPlayer === mySeat ? "You open the battle." : `Player ${state.currentPlayer}'s turn — please wait.`)
     : `${isCpu(state.currentPlayer) ? `Player ${state.currentPlayer} (CPU)` : `Player ${state.currentPlayer}`} opens the battle.`);
+  if (tutorial) setMessage(tutorial.prompt);
   menu.show("match");
   if (audioUnlocked && !muted) audio.startMusic("battle");
   // Bind AFTER the match screen + state exist so any remote commands buffered during
@@ -211,6 +251,7 @@ function startMatch(config) {
   if (online) net.bind(onlineController);
   render();
   announceTurn(state.currentPlayer);
+  if (tutorial) queueTutorialPresentation({ dialogue: tutorial.dialogue });
   maybeStartCpuTurn();
 }
 
@@ -267,16 +308,40 @@ function announceTurnChange(prevPlayer) {
 // dispatch() itself growing animation concerns.
 let lastDispatchEvents = [];
 
+function resolveCommand(command) {
+  const validation = tutorial ? validateTutorialCommand(tutorial, command, state) : { accepted: true };
+  if (!validation.accepted) {
+    if (tutorial && hasTutorialPresentation(validation)) {
+      queueTutorialPresentation(validation);
+    }
+    return {
+      prepared: command,
+      result: {
+        accepted: false,
+        errorCode: "TUTORIAL_BLOCKED",
+        message: validation.message,
+      },
+    };
+  }
+  const prepared = tutorial ? prepareTutorialCommand(tutorial, command) : command;
+  return { prepared, result: applyCommand(state, prepared) };
+}
+
+function commandErrorMessage(result) {
+  return result.message ?? readableError(result.errorCode);
+}
+
 function dispatch(command) {
-  const result = applyCommand(state, command);
+  const prevPlayer = state.currentPlayer;
+  const { prepared, result } = resolveCommand(command);
   if (!result.accepted) {
-    setMessage(readableError(result.errorCode), true);
+    setMessage(commandErrorMessage(result), true);
     return false;
   }
   lastDispatchEvents = result.events ?? [];
-  const prevPlayer = state.currentPlayer;
   state = result.nextState;
-  broadcastIfLocal(command);
+  recordTutorialProgress(prepared, result, prevPlayer);
+  broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -285,16 +350,174 @@ function dispatch(command) {
   return true;
 }
 
+function recordTutorialProgress(command, result, previousPlayer) {
+  if (!tutorial) return;
+  const update = recordTutorialCommand(tutorial, {
+    command,
+    events: result.events ?? [],
+    match: state,
+    previousPlayer,
+  });
+  queueTutorialPresentation(update);
+}
+
+function queueTutorialPresentation(update = {}) {
+  if (!tutorial) return;
+  if (update.prompt) pendingTutorialPrompt = update.prompt;
+  if (update.dialogue) pendingTutorialDialogue = update.dialogue;
+  if (update.spotlight) pendingTutorialSpotlight = update.spotlight;
+  if (update.selectUnitId) pendingTutorialSelectUnitId = update.selectUnitId;
+  if (update.beforeDialogueAction) pendingTutorialBeforeDialogueAction = update.beforeDialogueAction;
+  if (update.afterDialogueAction) pendingTutorialAfterDialogueAction = update.afterDialogueAction;
+  if (update.completed) pendingTutorialComplete = true;
+  window.clearTimeout(tutorialPresentationTimer);
+  tutorialPresentationTimer = window.setTimeout(flushTutorialPresentation, 0);
+}
+
+function hasTutorialPresentation(update = {}) {
+  return Boolean(
+    update.prompt ||
+    update.dialogue ||
+    update.spotlight ||
+    update.selectUnitId ||
+    update.beforeDialogueAction ||
+    update.afterDialogueAction ||
+    update.completed
+  );
+}
+
+function consumeTutorialPrompt(fallback) {
+  if (!pendingTutorialPrompt) return fallback;
+  const prompt = pendingTutorialPrompt;
+  pendingTutorialPrompt = null;
+  return prompt;
+}
+
+function flushTutorialPresentation() {
+  if (!tutorial) return;
+  if (resolving || cpuThinking || dialogue.isOpen()) return;
+  applyPendingTutorialBeforeDialogueAction();
+  applyPendingTutorialSelection();
+  const spotlightShown = Boolean(pendingTutorialSpotlight);
+  if (pendingTutorialSpotlight) showTutorialSpotlight(pendingTutorialSpotlight);
+  if (pendingTutorialDialogue && !dialogue.isOpen()) {
+    const script = pendingTutorialDialogue;
+    pendingTutorialDialogue = null;
+    void dialogue.show(script).then(() => {
+      clearTutorialSpotlight();
+      applyPendingTutorialAfterDialogueAction();
+      showPendingTutorialPromptForLocalTurn();
+      maybeStartCpuTurn();
+      flushTutorialPresentation();
+    });
+    return;
+  }
+  if (spotlightShown) window.setTimeout(clearTutorialSpotlight, 1700);
+  showPendingTutorialPromptForLocalTurn();
+  finishTutorialIfReady();
+  maybeStartCpuTurn();
+}
+
+function showPendingTutorialPromptForLocalTurn() {
+  if (!pendingTutorialPrompt || dialogue.isOpen() || isCpu(state.currentPlayer)) return;
+  setMessage(consumeTutorialPrompt("Your squad turn. Select a ready commander."));
+}
+
+function applyPendingTutorialSelection() {
+  if (!pendingTutorialSelectUnitId) return;
+  selectedId = pendingTutorialSelectUnitId;
+  pendingTutorialSelectUnitId = null;
+  mode = null;
+  footworkPath = [];
+  volleyShotOrigin = null;
+  render();
+}
+
+function applyPendingTutorialBeforeDialogueAction() {
+  const action = pendingTutorialBeforeDialogueAction;
+  pendingTutorialBeforeDialogueAction = null;
+  applyTutorialPresentationAction(action);
+}
+
+function applyPendingTutorialAfterDialogueAction() {
+  const action = pendingTutorialAfterDialogueAction;
+  pendingTutorialAfterDialogueAction = null;
+  applyTutorialPresentationAction(action);
+}
+
+function applyTutorialPresentationAction(action) {
+  if (!action) return;
+  if (action.type === "revealUnit") {
+    revealTutorialUnit(action.unitId, action.position);
+    if (Number.isInteger(action.currentPlayer)) state.currentPlayer = action.currentPlayer;
+    state.activation = null;
+    render();
+  }
+}
+
+function finishTutorialIfReady() {
+  if (!tutorial || !pendingTutorialComplete || dialogue.isOpen() || pendingTutorialDialogue) return false;
+  pendingTutorialComplete = false;
+  resolving = true;
+  selectedId = null;
+  mode = null;
+  footworkPath = [];
+  volleyShotOrigin = null;
+  render();
+
+  const progress = completeTutorial(globalThis.localStorage, tutorial.id ?? TUTORIAL_BASICS_ID);
+  setMessage(consumeTutorialPrompt("Tutorial complete."));
+  menu.showTutorialComplete({
+    title: tutorialCompleteTitle(tutorial.id),
+    tutorialId: tutorial.id,
+    rewardChoices: progress.rewardChoices,
+    selectedRewardSkin: progress.selectedRewardSkin,
+    rewardGranted: progress.rewardGranted,
+    allTutorialsComplete: progress.allTutorialsComplete,
+  });
+  return true;
+}
+
+function tutorialCompleteTitle(tutorialId) {
+  return tutorialId === TUTORIAL_ARTS_MP_ID ? "Tutorial 2 Complete" : "Tutorial 1 Complete";
+}
+
+function showTutorialSpotlight(kind) {
+  clearTutorialSpotlight();
+  if (kind === "hp" || kind === "mp") {
+    document.body.classList.add(`tutorial-spotlight-${kind}`);
+  }
+  pendingTutorialSpotlight = null;
+}
+
+function clearTutorialSpotlight() {
+  document.body.classList.remove("tutorial-spotlight-hp", "tutorial-spotlight-mp");
+}
+
+function revealTutorialUnit(unitId, position = null) {
+  const unit = findUnit(state, unitId);
+  if (!unit) return;
+  const definition = getUnitType(unit.type);
+  if (position) unit.position = { ...position };
+  unit.hp = definition.stats.maxHp;
+  unit.mp = definition.stats.maxMp;
+  unit.spent = false;
+  unit.defending = false;
+  if (unitId === TUTORIAL_ARTS_PLAYER_MYSTIC_ID) {
+    setMessage("The Mystic joins the field. Activate her and use Pray to heal the Archer.");
+  }
+}
+
 // Async resolution for rolled actions (basic ATTACK and targeted ARTS). Reveals
 // the roll, commits the resolved state, then plays impact FX. Input stays locked
 // across the animation via `resolving`. Non-rolled actions use synchronous dispatch.
 async function resolveCombat(command) {
-  const result = applyCommand(state, command);
-  if (!result.accepted) { setMessage(readableError(result.errorCode), true); return false; }
+  const prevPlayer = state.currentPlayer;
+  const { prepared, result } = resolveCommand(command);
+  if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
   const events = result.events ?? [];
   const rolled = events.find((e) => (e.type === "ATTACK_RESOLVED" || e.type === "ART_RESOLVED") && "hit" in e);
 
-  const prevPlayer = state.currentPlayer;
   resolving = true;
   mode = null; footworkPath = []; volleyShotOrigin = null;
   playArtCallout(events.find((e) => e.type === "ART_RESOLVED" && e.artId));
@@ -441,7 +664,8 @@ async function resolveCombat(command) {
   }
 
   state = result.nextState;
-  broadcastIfLocal(command);
+  recordTutorialProgress(prepared, result, prevPlayer);
+  broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -449,6 +673,7 @@ async function resolveCombat(command) {
   announceTurnChange(prevPlayer);
   resolving = false;
   maybeStartCpuTurn();
+  flushTutorialPresentation();
   return true;
 }
 
@@ -456,11 +681,11 @@ async function resolveCombat(command) {
 // the SAME attacker lunge/projectile animation as a normal strike instead of just
 // popping. Impact lands on the wall; a destroyed wall bursts into stone shards.
 async function resolveWallAttack(command) {
-  const result = applyCommand(state, command);
-  if (!result.accepted) { setMessage(readableError(result.errorCode), true); return false; }
+  const prevPlayer = state.currentPlayer;
+  const { prepared, result } = resolveCommand(command);
+  if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
   const event = (result.events ?? []).find((e) => e.type === "WALL_ATTACKED");
 
-  const prevPlayer = state.currentPlayer;
   resolving = true;
   mode = null; footworkPath = []; volleyShotOrigin = null;
   render();
@@ -484,7 +709,8 @@ async function resolveWallAttack(command) {
   }
 
   state = result.nextState;
-  broadcastIfLocal(command);
+  recordTutorialProgress(prepared, result, prevPlayer);
+  broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -492,6 +718,7 @@ async function resolveWallAttack(command) {
   announceTurnChange(prevPlayer);
   resolving = false;
   maybeStartCpuTurn();
+  flushTutorialPresentation();
   return true;
 }
 
@@ -506,14 +733,14 @@ const COMMAND_FLOAT = Object.freeze({
 });
 
 async function resolveInstantArt(command) {
-  const result = applyCommand(state, command);
-  if (!result.accepted) { setMessage(readableError(result.errorCode), true); return false; }
+  const prevPlayer = state.currentPlayer;
+  const { prepared, result } = resolveCommand(command);
+  if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
   const events = result.events ?? [];
   const resolved = events.find((e) => e.type === "ART_RESOLVED");
   const actorBefore = resolved ? findUnit(state, resolved.actorId) : null;
   const targetIds = resolved?.targetIds ?? resolved?.harmed ?? (resolved?.targetId ? [resolved.targetId] : []);
   const targetsBefore = targetIds.map((id) => findUnit(state, id)).filter(Boolean);
-  const prevPlayer = state.currentPlayer;
 
   resolving = true;
   mode = null; footworkPath = []; volleyShotOrigin = null;
@@ -984,7 +1211,8 @@ async function resolveInstantArt(command) {
   }
 
   state = result.nextState;
-  broadcastIfLocal(command);
+  recordTutorialProgress(prepared, result, prevPlayer);
+  broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
   if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
@@ -992,6 +1220,7 @@ async function resolveInstantArt(command) {
   announceTurnChange(prevPlayer);
   resolving = false;
   maybeStartCpuTurn();
+  flushTutorialPresentation();
   return true;
 }
 
@@ -1008,8 +1237,25 @@ async function resolveInstantArt(command) {
 // passes to a computer-controlled seat; guarded so it never re-enters or stacks.
 function maybeStartCpuTurn() {
   if (cpuThinking || state.phase !== "playing" || !isCpu(state.currentPlayer)) return;
+  if (shouldDelayCpuForTutorialPresentation()) {
+    window.clearTimeout(tutorialPresentationTimer);
+    tutorialPresentationTimer = window.setTimeout(flushTutorialPresentation, 0);
+    return;
+  }
   cpuThinking = true;
-  void runCpuTurn().finally(() => { cpuThinking = false; });
+  void runCpuTurn().finally(() => {
+    cpuThinking = false;
+    flushTutorialPresentation();
+  });
+}
+
+function shouldDelayCpuForTutorialPresentation() {
+  return Boolean(tutorial && (
+    dialogue.isOpen() ||
+    pendingTutorialDialogue ||
+    pendingTutorialSpotlight ||
+    pendingTutorialBeforeDialogueAction
+  ));
 }
 
 async function runCpuTurn() {
@@ -1025,11 +1271,13 @@ async function runCpuTurn() {
   let guard = 0;
   while (epoch === matchEpoch && state.phase === "playing" && isCpu(state.currentPlayer) && guard < CPU_MAX_ACTIVATIONS) {
     guard += 1;
-    const commands = chooseActivation(state, {
-      difficulty: cpu.difficulty,
-      cpuPlayer: state.currentPlayer,
-      rng: cpuRng(state)
-    });
+    const commands = tutorial
+      ? chooseTutorialCpuActivation(state, tutorial)
+      : chooseActivation(state, {
+        difficulty: cpu.difficulty,
+        cpuPlayer: state.currentPlayer,
+        rng: cpuRng(state)
+      });
     if (!commands.length) break;
 
     for (const command of commands) {
@@ -1049,7 +1297,11 @@ async function runCpuTurn() {
   if (state.phase === "complete") { render(); return; }
   selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
   render();
-  setMessage("Your squad turn. Select a ready commander.");
+  if (pendingTutorialDialogue) {
+    setMessage("Your squad turn. Select a ready commander.");
+  } else {
+    setMessage(consumeTutorialPrompt("Your squad turn. Select a ready commander."));
+  }
 }
 
 // Route one CPU command to the resolver that animates its events — the same resolvers
@@ -1193,7 +1445,7 @@ function maybeAutoFinish() {
   const activation = state.activation;
   if (activation && activation.moved && activation.primaryUsed) {
     dispatch(finishActivation(state.currentPlayer, activation.unitId));
-    setMessage("Activation complete. The next commander takes the field.");
+    setMessage(consumeTutorialPrompt("Activation complete. The next commander takes the field."));
   }
 }
 
@@ -1201,7 +1453,7 @@ function finishNow() {
   const activation = state.activation;
   if (activation && activation.primaryUsed) {
     dispatch(finishActivation(state.currentPlayer, activation.unitId));
-    setMessage("Activation complete. The next commander takes the field.");
+    setMessage(consumeTutorialPrompt("Activation complete. The next commander takes the field."));
   }
 }
 
@@ -1410,7 +1662,7 @@ function beginUnit(unit) {
     mode = null;
     volleyShotOrigin = null;
     audio.play("unitSelect");
-    setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
+    setMessage(consumeTutorialPrompt(`${getUnitType(unit.type).name} ready. Choose an action.`));
     return;
   }
   if (dispatch(beginActivation(unit.player, unit.id))) {
@@ -1418,7 +1670,7 @@ function beginUnit(unit) {
     mode = null;
     volleyShotOrigin = null;
     audio.play("unitSelect");
-    setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
+    setMessage(consumeTutorialPrompt(`${getUnitType(unit.type).name} ready. Choose an action.`));
   }
 }
 
@@ -1458,7 +1710,7 @@ async function handleTile(position) {
       const moved = lastDispatchEvents.find((e) => e.type === "UNIT_MOVED");
       const completesActivation = state.activation?.primaryUsed;
       mode = null;
-      setMessage(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish.");
+      setMessage(consumeTutorialPrompt(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish."));
       resolving = true;
       render();
       // Give the harmed tiles the same dash + contact-hit presentation Footwork/
@@ -1496,7 +1748,7 @@ async function handleTile(position) {
     if (dispatch(moveUnit(state.currentPlayer, unit.id, position.x, position.y))) {
       const completesActivation = state.activation?.primaryUsed;
       mode = null;
-      setMessage(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish.");
+      setMessage(consumeTutorialPrompt(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish."));
       resolving = true;
       render();
       await effects.animateMovement(unit.id, from, position);
@@ -1510,7 +1762,7 @@ async function handleTile(position) {
     if (target) {
       if (await resolveCombat(attack(state.currentPlayer, unit.id, target.id))) {
         mode = null;
-        setMessage("Attack resolved.");
+        setMessage(consumeTutorialPrompt("Attack resolved."));
         maybeAutoFinish();
       }
     } else if (isWallAt(state, position)) {
@@ -1564,9 +1816,10 @@ async function handleTile(position) {
       setMessage("Flight complete. This unit's activation is complete.");
     }
   } else if (mode === "art:volley-shot") {
-    if (!getVolleyShotAimOptions(state, unit).some((c) => positionKey(c) === positionKey(position))) {
-      setMessage("Hover a highlighted direction to preview the cone, then click to fire.", true);
-    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "volley-shot", { targetPosition: position }))) {
+    const origin = getVolleyShotOriginForTarget(state, unit, position);
+    if (!origin) {
+      setMessage("Click a tile inside a highlighted Volley Shot cone.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "volley-shot", { targetPosition: origin }))) {
       setMessage("Volley Shot resolved. This unit's activation is complete.");
     }
   } else if (mode === "art:summon-ghoul") {
@@ -1794,7 +2047,7 @@ async function handleActionClick(action, unit) {
   if (inputLocked()) return;
   if (action === "defend") {
     if (dispatch(defend(state.currentPlayer, unit.id))) {
-      setMessage("Defending: incoming physical and magic damage is halved.");
+      setMessage(consumeTutorialPrompt("Defending: incoming physical and magic damage is halved."));
       finishNow();
     }
     mode = null;
@@ -1808,7 +2061,7 @@ async function handleActionClick(action, unit) {
     }
   } else if (action === "finish") {
     if (dispatch(finishActivation(state.currentPlayer, unit.id)))
-      setMessage("Activation complete. The next commander takes the field.");
+      setMessage(consumeTutorialPrompt("Activation complete. The next commander takes the field."));
   } else {
     const deselect = mode === action;
     mode = deselect ? null : action;
@@ -1983,7 +2236,7 @@ function openCodex() {
 
 const HOTKEY_ACTIONS = { "1": "move", "2": "attack", "3": "defend", a: "footwork", A: "footwork", c: "cancel-move", C: "cancel-move", f: "finish", F: "finish", Enter: "finish" };
 document.addEventListener("keydown", (event) => {
-  if (rulesModal.isOpen || resolving) return;
+  if (rulesModal.isOpen || dialogue.isOpen() || resolving) return;
   if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
   const tag = event.target?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || event.target?.isContentEditable) return;

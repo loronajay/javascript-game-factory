@@ -9,6 +9,7 @@ import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 import { openSkinGallery } from "./skinGallery.js";
+import { createTutorialMatchConfig, getNextTutorialId, getTutorialList } from "../tutorials/basics.js";
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
@@ -24,7 +25,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
-  for (const name of ["title", "mainMenu", "hsSetup", "spSetup", "results"]) {
+  for (const name of ["title", "mainMenu", "hsSetup", "spSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
   // The match screen disposes a live online session when left mid-game.
@@ -153,6 +154,55 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     spawnConfetti(burstEl, TEAM_COLOR[summary.winner]);
   }
 
+  const tutorialComplete = screenEl("tutorialComplete");
+  const tutorialSelect = screenEl("tutorialSelect");
+  const tutorialList = $("[data-tutorial-list]", tutorialSelect);
+  screens.register("tutorialSelect", { el: tutorialSelect, onEnter: renderTutorialSelect });
+
+  function renderTutorialSelect() {
+    tutorialList.replaceChildren();
+    for (const tutorial of getTutorialList()) {
+      const item = document.createElement("article");
+      item.className = `tutorial-choice is-${tutorial.status}${tutorial.available ? "" : " is-placeholder"}`;
+      const statusLabel = tutorial.status === "completed"
+        ? "Completed"
+        : tutorial.status === "locked"
+          ? "Locked"
+          : "Unlocked";
+      const buttonLabel = tutorial.available
+        ? tutorial.completed ? "Replay Tutorial" : "Start Tutorial"
+        : tutorial.locked ? "Locked" : "Coming Soon";
+      item.innerHTML =
+        `<div class="tutorial-choice-copy">` +
+        `<div class="tutorial-choice-kicker">${escapeHtml(tutorial.title)}</div>` +
+        `<h3>${escapeHtml(tutorial.subtitle)}</h3>` +
+        `<p>${escapeHtml(tutorial.description)}</p>` +
+        `</div>` +
+        `<div class="tutorial-choice-state">` +
+        `<span class="tutorial-status">${statusLabel}</span>` +
+        `<button type="button" class="menu-btn${tutorial.available ? " primary" : ""}" data-action="startTutorial" data-tutorial-id="${escapeHtml(tutorial.id)}"${tutorial.available ? "" : " disabled"}>${buttonLabel}</button>` +
+        `</div>`;
+      tutorialList.append(item);
+    }
+  }
+
+  function showTutorialComplete(summary = {}) {
+    lastConfig = null;
+    $("[data-tutorial-complete='title']", tutorialComplete).textContent = summary.title || "Tutorial Complete";
+    $("[data-tutorial-complete='reward']", tutorialComplete).textContent =
+      summary.rewardGranted && summary.selectedRewardSkin
+        ? `Reward selected: ${skinRewardLabel(summary.selectedRewardSkin)}.`
+        : "Tutorial progress saved. Complete every tutorial to choose one reward skin from the curated list.";
+    const nextBtn = $("[data-tutorial-complete='next']", tutorialComplete);
+    const nextTutorialId = getNextTutorialId(globalThis.localStorage, summary.tutorialId ?? null);
+    if (nextBtn) {
+      nextBtn.dataset.tutorialId = nextTutorialId ?? "";
+      nextBtn.disabled = !nextTutorialId;
+      nextBtn.textContent = nextTutorialId ? "Next Tutorial" : "Next Tutorial Coming Soon";
+    }
+    showScreen("tutorialComplete");
+  }
+
   // ── Settings overlay ─────────────────────────────────────────────────────
   const settingsModal = $("#settingsModal");
   const soundToggle = $("#setSoundToggle", settingsModal);
@@ -212,6 +262,10 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       case "rules": openCodex(); break;
       case "skins": openSkinGallery(); break;
       case "settings": openSettings(); break;
+      case "startTutorial": {
+        startMatchTracked(createTutorialMatchConfig(actionBtn.dataset.tutorialId || "basics"));
+        break;
+      }
       case "startHotSeat": { startMatchTracked(gatherHotSeatConfig()); break; }
       case "startSingle": { startMatchTracked(gatherSingleConfig()); break; }
       case "rematch": if (lastConfig && lastConfig.mode !== "online") startMatchTracked(lastConfig); break;
@@ -226,6 +280,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   return {
     show: showScreen,
     showResults,
+    showTutorialComplete,
     get active() { return screens.active; }
   };
 }
@@ -267,6 +322,20 @@ function addStat(listEl, label, value) {
   const dd = document.createElement("dd");
   dd.textContent = value;
   listEl.append(dt, dd);
+}
+
+function skinRewardLabel(reward) {
+  const unit = String(reward?.type ?? "unit")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  const skin = String(reward?.slug ?? "skin")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  return `${skin} ${unit}`;
 }
 
 function formatDuration(ms) {

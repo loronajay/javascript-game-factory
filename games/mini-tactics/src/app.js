@@ -24,6 +24,7 @@ import { createHotSeatSetupScreen } from "./ui/screens/hotSeatSetupScreen.js";
 import { createOnlineSetupScreen } from "./ui/screens/onlineSetupScreen.js";
 import { createMatchScreen } from "./ui/screens/matchScreen.js";
 import { createResultsScreen } from "./ui/screens/resultsScreen.js";
+import { createTutorialCompleteScreen } from "./ui/screens/tutorialCompleteScreen.js";
 
 export function createApp(documentRef = document) {
   const elements = getUiElements(documentRef);
@@ -89,6 +90,7 @@ export function createApp(documentRef = document) {
     turnAnnouncer,
     confirm: (options) => confirmDialog.ask(options),
     onMatchComplete: (summary) => ctx.nav("results", summary),
+    onTutorialComplete: (summary) => ctx.nav("tutorialComplete", summary),
   });
 
   manager
@@ -98,7 +100,8 @@ export function createApp(documentRef = document) {
     .register("hsSetup", createHotSeatSetupScreen(ctx))
     .register("onlineSetup", createOnlineSetupScreen(ctx))
     .register("match", createMatchScreen({ ...ctx, controller, audio }))
-    .register("results", createResultsScreen(ctx));
+    .register("results", createResultsScreen(ctx))
+    .register("tutorialComplete", createTutorialCompleteScreen(ctx));
 
   return {
     start() {
