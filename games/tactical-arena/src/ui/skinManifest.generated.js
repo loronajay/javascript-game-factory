@@ -348,6 +348,26 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "juggernaut",
+    slug: "bio-mech",
+    file: "bio-mech-juggernaut.png"
+  },
+  {
+    type: "juggernaut",
+    slug: "blood-moon",
+    file: "blood-moon-juggernaut.png"
+  },
+  {
+    type: "juggernaut",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-juggernaut.png"
+  },
+  {
+    type: "juggernaut",
+    slug: "holy-mech",
+    file: "holy-mech-juggernaut.png"
+  },
+  {
+    type: "juggernaut",
     slug: "pumpkin-mech",
     file: "pumpkin-mech-juggernaut.png"
   },
