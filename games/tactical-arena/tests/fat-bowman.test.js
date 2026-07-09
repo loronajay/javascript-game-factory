@@ -32,12 +32,12 @@ test("Fat Bowman is registered with her ranger stat block and arts", () => {
   assert.equal(def.name, "Fat Bowman");
   assert.equal(def.glyph, "🏹");
   assert.equal(def.classType, "ranger");
-  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 4, strength: 8, defense: 5, maxHp: 30, maxMp: 25 });
+  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 4, strength: 7, defense: 5, maxHp: 30, maxMp: 25 });
   assert.deepEqual(def.arts.map((art) => art.id), ["curve-shot", "dragonsbane", "planted", "brothers-in-arms"]);
 });
 
 test("Heavy Handed scales physical shot damage by distance and effective range", () => {
-  for (const [targetId, distance, expectedDamage] of [["near", 1, 3], ["two", 2, 4], ["three", 3, 5], ["far", 4, 6]]) {
+  for (const [targetId, distance, expectedDamage] of [["near", 1, 2], ["two", 2, 3], ["three", 3, 4], ["far", 4, 5]]) {
     const testState = scenario([
       { id: "fb", type: "fat-bowman", player: 1, x: 0, y: 0 },
       { id: targetId, type: "swordsman", player: 2, x: distance, y: 0 }
@@ -53,7 +53,7 @@ test("Heavy Handed scales physical shot damage by distance and effective range",
   ]);
   let s = run(buffed, beginActivation(1, "fb")).nextState;
   const result = run(s, attack(1, "fb", "five", HIT));
-  assert.equal(findUnit(result.nextState, "five").hp, 18, "range 5 grants +3 damage, plus first-turn Planted");
+  assert.equal(findUnit(result.nextState, "five").hp, 19, "range 5 grants +3 damage, plus first-turn Planted");
 });
 
 test("Curve Shot is a normal piercing attack that can shoot past units", () => {
@@ -67,7 +67,7 @@ test("Curve Shot is a normal piercing attack that can shoot past units", () => {
   assert.equal(applyCommand(s, attack(1, "fb", "target", HIT)).accepted, false, "basic shot is blocked");
 
   const result = run(s, useArt(1, "fb", "curve-shot", { targetId: "target", ...HIT }));
-  assert.equal(findUnit(result.nextState, "target").hp, 20, "8 STR + 1 Planted - 5 DEF + 1 Heavy Handed");
+  assert.equal(findUnit(result.nextState, "target").hp, 21, "7 STR + 1 Planted - 5 DEF + 1 Heavy Handed");
   assert.equal(findUnit(result.nextState, "fb").mp, 22);
 });
 
@@ -108,19 +108,19 @@ test("Planted gains +1 STR per stationary turn up to +4, then resets after a con
   for (let expected = 1; expected <= 4; expected += 1) {
     s = resetTurn(s);
     s = run(s, beginActivation(1, "fb")).nextState;
-    assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 8 + expected);
+    assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 7 + expected);
     s = run(s, defend(1, "fb")).nextState;
   }
   s = resetTurn(s);
   s = run(s, beginActivation(1, "fb")).nextState;
-  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 12, "cap stays at +4");
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 11, "cap stays at +4");
 
   s = run(s, moveUnit(1, "fb", 5, 6)).nextState;
-  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 8, "moving clears the current planted bonus");
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 7, "moving clears the current planted bonus");
   s = run(s, defend(1, "fb")).nextState;
   s = resetTurn(s);
   s = run(s, beginActivation(1, "fb")).nextState;
-  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 9, "stationary count restarts at +1 next turn");
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 8, "stationary count restarts at +1 next turn");
 });
 
 test("Planted strength is restored when Fat Bowman cancels her move", () => {
@@ -131,16 +131,16 @@ test("Planted strength is restored when Fat Bowman cancels her move", () => {
 
   let s = run(state, beginActivation(1, "fb")).nextState;
   assert.equal(findUnit(s, "fb").stationaryStrength, 3);
-  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 11);
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 10);
 
   s = run(s, moveUnit(1, "fb", 5, 6)).nextState;
   assert.equal(findUnit(s, "fb").stationaryStrength, 0);
-  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 8);
+  assert.equal(getEffectiveStats(findUnit(s, "fb"), s).strength, 7);
 
   const res = run(s, cancelMove(1, "fb"));
   assert.deepEqual(findUnit(res.nextState, "fb").position, { x: 5, y: 5 });
   assert.equal(findUnit(res.nextState, "fb").stationaryStrength, 3);
-  assert.equal(getEffectiveStats(findUnit(res.nextState, "fb"), res.nextState).strength, 11);
+  assert.equal(getEffectiveStats(findUnit(res.nextState, "fb"), res.nextState).strength, 10);
 });
 
 test("Brothers in Arms grants +1 range with the full fat family on her team", () => {
@@ -163,7 +163,7 @@ test("Desperation Shot empowers one shot, then Fat Bowman skips her next turn un
   let s = run(state, beginActivation(1, "fb")).nextState;
   assert.equal(getEffectiveStats(findUnit(s, "fb"), s).attackRange, 5);
   const result = run(s, attack(1, "fb", "target", HIT));
-  assert.equal(findUnit(result.nextState, "target").hp, 14, "+4 STR, +1 range, and first-turn Planted apply to the shot");
+  assert.equal(findUnit(result.nextState, "target").hp, 15, "+4 STR, +1 range, and first-turn Planted apply to the shot");
   assert.equal(findUnit(result.nextState, "fb").desperationShotSpent, true);
   assert.equal(findUnit(result.nextState, "fb").skipNextActivation, true);
 

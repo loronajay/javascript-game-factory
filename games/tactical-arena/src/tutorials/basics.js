@@ -66,23 +66,6 @@ export const PLAYER_ARCHER_ID = "p1-1-archer";
 export const CPU_ARCHER_ID = "p2-1-archer";
 
 const BASICS_PLAYER_IDS = Object.freeze(["p1-0-swordsman", PLAYER_ARCHER_ID, "p1-2-mystic", "p1-3-magician"]);
-const BASICS_SETUP_MOVES = Object.freeze({
-  "p1-0-swordsman": Object.freeze({ x: 3, y: 5 }),
-  [PLAYER_ARCHER_ID]: Object.freeze({ x: 3, y: 4 }),
-  "p1-2-mystic": Object.freeze({ x: 2, y: 6 }),
-  "p1-3-magician": Object.freeze({ x: 2, y: 3 }),
-});
-const BASICS_ARCHER_RETREAT = Object.freeze({ x: 1, y: 4 });
-const BASICS_POSITIONS = Object.freeze({
-  "p1-0-swordsman": Object.freeze({ x: 1, y: 5 }),
-  [PLAYER_ARCHER_ID]: Object.freeze({ x: 1, y: 4 }),
-  "p1-2-mystic": Object.freeze({ x: 1, y: 6 }),
-  "p1-3-magician": Object.freeze({ x: 1, y: 3 }),
-  "p2-0-swordsman": Object.freeze({ x: 6, y: 5 }),
-  [CPU_ARCHER_ID]: Object.freeze({ x: 6, y: 4 }),
-  "p2-2-mystic": Object.freeze({ x: 7, y: 6 }),
-  "p2-3-magician": Object.freeze({ x: 7, y: 3 }),
-});
 
 const NORMAL_HIT = Object.freeze({ attackRoll: 0.5, critRoll: 0.99 });
 const FORCED_MISS = Object.freeze({ attackRoll: 0.01 });
@@ -120,7 +103,7 @@ export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
   return {
     mode: "tutorial",
     tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : rage ? TUTORIAL_RAGE_ID : TUTORIAL_BASICS_ID,
-    size: artsMp || damageTypes || rage ? 13 : 9,
+    size: 13,
     seed: artsMp ? 23 : damageTypes ? 31 : rage ? 41 : 7,
     squads: artsMp
       ? { 1: ["archer", "mystic"], 2: ["ghoul", "ghoul", "ghoul", "archer"] }
@@ -186,7 +169,7 @@ export function createRageTutorial() {
 }
 
 export function openingPrompt() {
-  return "Tutorial 1: The Basics. Activate each unit, move to its setup tile with a tile click/tap or key 1, then Defend with the button or key 3.";
+  return "Tutorial 1: The Basics. Activate each unit, move with a tile click/tap or key 1, then Defend with the button or key 3.";
 }
 
 export function openingDialogue() {
@@ -197,7 +180,7 @@ export function openingDialogue() {
     },
     {
       speaker: "swordsman",
-      text: "Select each base unit once: Swordsman, Archer, Mystic, and Magician. Take the marked setup step, then use key 3 to defend.",
+      text: "Select each base unit once: Swordsman, Archer, Mystic, and Magician. Choose useful ground, then use key 3 to defend.",
     },
   ];
 }
@@ -270,25 +253,6 @@ export function rageOpeningDialogue() {
 }
 
 export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID) {
-  if (tutorialId === TUTORIAL_BASICS_ID) {
-    return {
-      ...match,
-      currentPlayer: 1,
-      activation: null,
-      units: match.units.map((unit) => {
-        const definition = getUnitType(unit.type);
-        return {
-          ...unit,
-          position: { ...(BASICS_POSITIONS[unit.id] ?? unit.position) },
-          hp: definition.stats.maxHp,
-          mp: definition.stats.maxMp,
-          spent: false,
-          defending: false,
-        };
-      }),
-    };
-  }
-
   if (tutorialId === TUTORIAL_RAGE_ID) {
     const positions = {
       [TUTORIAL_RAGE_PLAYER_MAGICIAN_ID]: RAGE_TRAP_CENTER,
@@ -559,20 +523,25 @@ export function chooseTutorialCpuActivation(match, tutorial) {
     const commands = [beginActivation(player, archer.id)];
     let actingMatch = match;
     let actingArcher = archer;
-    let target = findLegalTarget(actingMatch, actingArcher);
+    let target = findCounterattackTarget(actingMatch, actingArcher);
     if (!target) {
-      const step = approachMove(match, archer);
+      const playerArcher = findUnit(match, PLAYER_ARCHER_ID);
+      const step = findAttackSetupMove(match, archer, playerArcher) ?? approachMove(match, archer, playerArcher);
       if (step) {
         commands.push(moveUnit(player, archer.id, step.x, step.y));
         actingMatch = moveUnitInMatch(match, archer.id, step);
         actingArcher = findUnit(actingMatch, archer.id);
-        target = findLegalTarget(actingMatch, actingArcher);
+        target = findCounterattackTarget(actingMatch, actingArcher);
       }
     }
     if (target) commands.push(attack(player, archer.id, target.id));
     else commands.push(defend(player, archer.id));
     commands.push(finishActivation(player, archer.id));
     return commands;
+  }
+
+  if (tutorial?.id === TUTORIAL_BASICS_ID && tutorial.stage === "await_kite_attack") {
+    return holdNextTutorialCpuUnit(match, player);
   }
 
   const unit = livingUnits(match, player).find((candidate) => canAct(match, candidate));
@@ -700,19 +669,15 @@ function validateBasicsCommand(tutorial, command, match) {
 
   if (tutorial.stage === "practice_defense") {
     if (command.type === COMMANDS.BEGIN_ACTIVATION && isBasicsPlayer) return tutorialAllowed();
-    if (command.type === COMMANDS.MOVE_UNIT && isBasicsPlayer) {
-      return samePosition(command.position, BASICS_SETUP_MOVES[command.unitId])
-        ? tutorialAllowed()
-        : tutorialBlocked(openingMoveMessage(command.unitId));
-    }
+    if (command.type === COMMANDS.MOVE_UNIT && isBasicsPlayer) return tutorialAllowed();
     if (command.type === COMMANDS.DEFEND && isBasicsPlayer) {
       return match?.activation?.unitId === command.unitId && match.activation.moved
         ? tutorialAllowed()
-        : tutorialBlocked("Move to the setup tile first, then Defend.");
+        : tutorialBlocked("Move first, then Defend.");
     }
     if (command.type === COMMANDS.FINISH_ACTIVATION && isBasicsPlayer) return tutorialAllowed();
     if (command.type === COMMANDS.CANCEL_MOVE && isBasicsPlayer) return tutorialAllowed();
-    return tutorialBlocked("For the opening, activate a unit, move to its setup tile, then Defend.");
+    return tutorialBlocked("For the opening, practice movement and defense: move a unit, then Defend.");
   }
 
   if (tutorial.stage === "await_first_attack") {
@@ -754,13 +719,9 @@ function validateBasicsCommand(tutorial, command, match) {
   }
 
   if (tutorial.stage === "await_kite_move") {
-    if (command.type === COMMANDS.MOVE_UNIT && command.unitId === PLAYER_ARCHER_ID) {
-      return samePosition(command.position, BASICS_ARCHER_RETREAT)
-        ? tutorialAllowed()
-        : tutorialBlocked("Move the Archer back to the retreat tile at column 1, row 4.");
-    }
+    if (command.type === COMMANDS.MOVE_UNIT && command.unitId === PLAYER_ARCHER_ID) return tutorialAllowed();
     if (command.type === COMMANDS.BEGIN_ACTIVATION && isArcher) return tutorialAllowed();
-    return tutorialBlocked("Move the Archer to the retreat tile before ending the activation.");
+    return tutorialBlocked("Move the Archer after attacking to create space before ending the activation.");
   }
 
   if (tutorial.stage === "await_final_crit") {
@@ -791,12 +752,6 @@ function validateBasicsCommand(tutorial, command, match) {
   }
 
   return tutorialAllowed();
-}
-
-function openingMoveMessage(unitId) {
-  const target = BASICS_SETUP_MOVES[unitId];
-  if (!target) return "Move to the marked setup tile, then Defend.";
-  return `Move to the setup tile at column ${target.x}, row ${target.y}, then Defend.`;
 }
 
 function validateDamageTypesCommand(tutorial, command) {
@@ -1276,12 +1231,41 @@ function findLegalTarget(match, attacker) {
     .find((target) => canTargetUnit(match, attacker, target)) ?? null;
 }
 
+function findCounterattackTarget(match, archer) {
+  const playerArcher = findUnit(match, PLAYER_ARCHER_ID);
+  return canTargetUnit(match, archer, playerArcher) ? playerArcher : null;
+}
+
 function canTargetUnit(match, attacker, target) {
   if (!match || !attacker || !target || target.hp <= 0 || !areEnemies(attacker, target)) return false;
   const range = getEffectiveStats(attacker, match).attackRange;
   return chebyshev(attacker.position, target.position) <= range &&
     !isShotBlocked(match, attacker.position, target.position, attacker) &&
     !isWallBetween(match, attacker.position, target.position, attacker);
+}
+
+function findAttackSetupMove(match, attacker, target) {
+  if (!target?.hp) return null;
+  const moves = [...getLegalMoves(match, attacker)].map(parseTileKey);
+  moves.sort((left, right) => {
+    const distance = chebyshev(left, target.position) - chebyshev(right, target.position);
+    if (distance !== 0) return distance;
+    return positionKey(left).localeCompare(positionKey(right));
+  });
+  return moves.find((move) => {
+    const movedMatch = moveUnitInMatch(match, attacker.id, move);
+    return canTargetUnit(movedMatch, findUnit(movedMatch, attacker.id), target);
+  }) ?? null;
+}
+
+function holdNextTutorialCpuUnit(match, player) {
+  const unit = livingUnits(match, player).find((candidate) => canAct(match, candidate));
+  if (!unit) return [];
+  return [
+    beginActivation(player, unit.id),
+    defend(player, unit.id),
+    finishActivation(player, unit.id),
+  ];
 }
 
 function approachMove(match, unit, preferredTarget = null) {

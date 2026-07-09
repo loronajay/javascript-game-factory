@@ -247,6 +247,6 @@ test("Curve Shot forecast shows through an intervening unit", () => {
     renderForecast({ forecastLayer, state, mode: "art:curve-shot", actor, resolving: false });
 
     assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-4");
+    assert.equal(textContentOf(forecastLayer), "-3");
   });
 });

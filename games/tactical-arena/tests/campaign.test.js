@@ -426,30 +426,45 @@ test("Witch Doctor mission appears as the third swamp stop once enough stars are
   assert.equal(node.biome, "swamp");
 });
 
-test("Witch Doctor mission builds a 15x15 solo gauntlet with permanent fire and summoner-less Ghouls", () => {
+test("Witch Doctor mission builds an 11x11 solo gauntlet with permanent fire and summoner-less Ghouls", () => {
   const config = createCampaignMatchConfig(WITCH_DOCTOR_MISSION_ID, ["archer", "mystic"]);
   const match = witchDoctorMatchState(["archer", "mystic"]);
   const ghouls = match.units.filter((unit) => unit.type === "ghoul");
   const fires = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "fire");
 
   assert.equal(config.mode, "campaign");
-  assert.equal(config.size, 15);
+  assert.equal(config.size, 11);
   assert.deepEqual(config.squads[1], ["archer"]);
   assert.deepEqual(config.squads[2], ["witch-doctor"]);
   assert.equal(config.teamNames[2], "Swamp Coven");
   assert.equal(match.currentPlayer, 1);
 
-  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 1, y: 13 });
-  assert.deepEqual(findUnit(match, "p2-0-witch-doctor").position, { x: 13, y: 1 });
+  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 0, y: 10 });
+  assert.deepEqual(findUnit(match, "p2-0-witch-doctor").position, { x: 10, y: 0 });
   assert.equal(findUnit(match, "p1-0-archer").hp, 12);
   assert.equal(findUnit(match, "p2-0-witch-doctor").hp, 12);
-  assert.equal(ghouls.length >= 5, true);
+  assert.equal(ghouls.length, 9); // a 3x3 lattice
   assert.equal(ghouls.every((unit) => unit.hp === 5 && unit.mp === 0 && unit.spent === true), true);
   assert.equal(ghouls.every((unit) => unit.summonerId == null), true);
-  assert.equal(fires.length >= 18, true);
+  assert.equal(fires.length >= 45, true);
   assert.equal(fires.every((obj) => obj.permanent === true), true);
   assert.equal(Object.values(match.tileObjects ?? {}).some((obj) => obj.kind === "wall"), false);
-  assert.ok(ghouls.some((unit) => unit.position.x === 7 && unit.position.y === 7), "a Ghoul blocks the straight diagonal shot");
+  assert.equal(ghouls.some((unit) => unit.position.x === 5 && unit.position.y === 5), false);
+  assert.ok(ghouls.some((unit) => unit.position.x === 6 && unit.position.y === 6), "a central Ghoul blocks shot lines");
+
+  const fireAt = (x, y) => (match.tileObjects ?? {})[`${x},${y}`]?.kind === "fire";
+  const occupied = (x, y) => match.units.some((unit) => unit.position.x === x && unit.position.y === y);
+  // Fire marks a Ghoul's FULL bite range (all eight neighbours, diagonals included), so a
+  // no-fire tile is safe from both fire and Ghoul Bite.
+  for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
+    assert.ok(fireAt(6 + dx, 6 + dy), `a Ghoul's bite tile (${dx},${dy}) burns`);
+  }
+  // The avenues between clusters (rows/cols 0, 4, 8) stay clear of fire AND units.
+  for (const [x, y] of [[4, 4], [4, 0], [0, 4], [8, 8], [0, 0], [8, 0], [0, 8]]) {
+    assert.ok(!fireAt(x, y) && !occupied(x, y), `avenue tile (${x},${y}) is walkable`);
+  }
+  // The spawn and Witch Doctor corners are hazard-free even though a unit stands on each.
+  assert.ok(!fireAt(0, 10) && !fireAt(10, 0), "the spawn/Witch-Doctor corners never burn");
 });
 
 test("Witch Doctor mission dialogue covers body-block, fire, Ghoul bite, and RAGE warnings", () => {

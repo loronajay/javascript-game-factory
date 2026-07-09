@@ -29,6 +29,7 @@ import { buildSummary, createMatchState, hpRemaining, readableError, teamColor }
 import {
   CLOD_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
   clodRageWarningScript,
@@ -138,6 +139,7 @@ function createCampaignMeta() {
     fireDamageTakenCount: 0,
     ghoulBiteTakenCount: 0,
     blackDeathDanceUsed: false,
+    witchDoctorHealCastCount: 0,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -436,6 +438,15 @@ function dispatch(command) {
   return true;
 }
 
+// Mission-scoped CPU ART denylist, threaded into chooseActivation's excludeArtIds.
+// Currently only Mission 3's Rain Dance heal-stall cap (see WITCH_DOCTOR_HEAL_CAST_CAP).
+function campaignCpuExcludedArtIds() {
+  if (matchConfig?.mode !== "campaign") return null;
+  if (campaignMissionId !== WITCH_DOCTOR_MISSION_ID) return null;
+  if (campaignMeta.witchDoctorHealCastCount < WITCH_DOCTOR_HEAL_CAST_CAP) return null;
+  return ["rain-dance"];
+}
+
 function recordCampaignRejection(command, result) {
   if (matchConfig?.mode !== "campaign") return;
   if (campaignMissionId !== WITCH_DOCTOR_MISSION_ID) return;
@@ -491,6 +502,15 @@ function recordCampaignProgressHooks(result) {
       if (event.type === "ART_RESOLVED" && event.stance === "blackDeath") {
         const actor = findUnit(state, event.actorId);
         if (actor?.player === 2 && actor.type === "witch-doctor") campaignMeta.blackDeathDanceUsed = true;
+      }
+      // Count every Rain Dance cast against the mission's heal-cast cap so the CPU
+      // can't stall to full HP while the player crosses the Ghoul lattice — see
+      // WITCH_DOCTOR_HEAL_CAST_CAP in campaign.js.
+      if (event.type === "ART_RESOLVED" && event.artId === "rain-dance") {
+        const actor = findUnit(state, event.actorId);
+        if (actor?.player === 2 && actor.type === "witch-doctor") {
+          campaignMeta.witchDoctorHealCastCount += 1;
+        }
       }
     }
   }
@@ -1543,7 +1563,8 @@ async function runCpuTurn() {
       : chooseActivation(state, {
         difficulty: cpu.difficulty,
         cpuPlayer: state.currentPlayer,
-        rng: cpuRng(state)
+        rng: cpuRng(state),
+        excludeArtIds: campaignCpuExcludedArtIds()
       });
     if (!commands.length) break;
 

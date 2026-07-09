@@ -14,7 +14,7 @@ export const FAT_BOWMAN = Object.freeze({
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 4,
-    strength: 8,
+    strength: 7,
     defense: 5,
     maxHp: 30,
     maxMp: 25

@@ -224,6 +224,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
 
     for (const unit of state.units.filter((u) => u.player === player)) {
       const definition = getUnitType(unit.type);
+      if (definition.summon) continue;
       const stats = getEffectiveStats(unit, state);
       const row = document.createElement("div");
       const dead = unit.hp <= 0;

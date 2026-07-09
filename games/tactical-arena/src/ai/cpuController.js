@@ -60,7 +60,7 @@ const AOE_WASTE_PENALTY = 8; // sink an AoE that hits too few targets for no kil
 
 export function chooseActivation(
   state,
-  { difficulty = "normal", cpuPlayer = state.currentPlayer, rng = Math.random } = {}
+  { difficulty = "normal", cpuPlayer = state.currentPlayer, rng = Math.random, excludeArtIds = null } = {}
 ) {
   const units = livingUnits(state, cpuPlayer).filter((u) => !u.spent && takesTurns(u) && !isStunned(u));
   if (units.length === 0) return [];
@@ -73,9 +73,15 @@ export function chooseActivation(
   const kings = units.filter((u) => isCommandOnly(u));
   const actable = kings.length ? kings : units;
 
+  // Optional per-call ART denylist. Used by scripted content (e.g. a campaign mission
+  // capping how many times a stalling unit may re-cast a self-heal) to remove a plan
+  // from consideration without touching the scoring model itself.
+  const excluded = excludeArtIds && excludeArtIds.length ? new Set(excludeArtIds) : null;
+
   const scored = [];
   for (const unit of actable) {
     for (const plan of generatePlans(state, unit)) {
+      if (excluded && plan.primary.kind === "art" && excluded.has(plan.primary.artId)) continue;
       scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights) });
     }
   }

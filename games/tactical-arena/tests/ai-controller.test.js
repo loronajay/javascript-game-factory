@@ -110,6 +110,32 @@ test("Easy and Hard both yield legal activations", () => {
   }
 });
 
+test("excludeArtIds removes a plan from consideration (Rain Dance heal-cap seam)", () => {
+  // A damaged, alone Witch Doctor with nothing in range would normally re-cast Rain
+  // Dance (its only productive action). With rain-dance excluded, chooseActivation
+  // must fall back to something else (e.g. defend) instead of ever emitting a
+  // USE_ART for it — the seam campaign.js's WITCH_DOCTOR_HEAL_CAST_CAP relies on.
+  const state = createBattleState({
+    size: 13, seed: 3,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 1, y: 1 },
+      { id: "p2-wd", type: "witch-doctor", player: 2, x: 10, y: 10, hp: 10, mp: 30, stance: "rain" }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const allowed = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(allowed.some((c) => c.type === "USE_ART" && c.artId === "rain-dance"),
+    "sanity check: without exclusion the CPU heals itself");
+
+  const excluded = chooseActivation(state, {
+    difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state), excludeArtIds: ["rain-dance"]
+  });
+  assert.ok(!excluded.some((c) => c.type === "USE_ART" && c.artId === "rain-dance"),
+    "rain-dance must not appear once excluded");
+  replay(state, excluded);
+});
+
 test("the CPU can score Fat Knight's non-status aura without crashing", () => {
   const state = createBattleState({
     size: 13, seed: 11,

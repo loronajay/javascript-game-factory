@@ -1,7 +1,7 @@
 import { getUnitType } from "../core/unitCatalog.js";
 import { createUnit, findUnit } from "../core/state.js";
 import { isNegativeStatus } from "../rules/statuses.js";
-import { positionKey } from "../rules/movement.js";
+import { ALL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
@@ -11,6 +11,18 @@ export const CAMPAIGN_PROGRESS_KEY = "tacticalArenaCampaignProgressV1";
 export const CLOD_MISSION_ID = "clod-trial";
 export const NECROMANCER_MISSION_ID = "necromancer-rise";
 export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
+// Small board on purpose: a 3×3 Ghoul lattice fills an 11×11 grid so the swamp reads as
+// dense without the unit count of a bigger lattice.
+export const WITCH_DOCTOR_BOARD_SIZE = 11;
+// Rain Dance may only be cast this many times over the whole mission. Without a cap,
+// the Witch Doctor's 30 MP pool lets the CPU stall on Rain Dance every turn while the
+// player is still crossing the Ghoul lattice (1 HP the first cast, then +1 more per cast
+// once Rain Stance is active), fully undoing any ranged chip damage landed during the
+// approach and turning the final 1v1 into a full-HP boss against a unit worn down by
+// fire/Ghoul Bite — the opposite of the intended "race the heal" read. Capping casts at
+// 3 (a 1+2+2 = 5 HP ceiling) keeps the heal-before-you-arrive telegraph (see
+// witchDoctorFireWarningScript) without letting it fully negate approach damage.
+export const WITCH_DOCTOR_HEAL_CAST_CAP = 3;
 export const MIN_CAMPAIGN_SQUAD_SIZE = 1;
 export const MAX_CAMPAIGN_SQUAD_SIZE = 4;
 // The campaign map is capped for now so the whole journey stays surveyable at once;
@@ -56,7 +68,7 @@ const AUTHORED_MISSIONS = Object.freeze({
     rewardUnits: Object.freeze(["witch-doctor"]),
     playerSlots: 1,
     enemySquad: Object.freeze(["witch-doctor"]),
-    size: 15,
+    size: WITCH_DOCTOR_BOARD_SIZE,
   },
 });
 
@@ -358,26 +370,36 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
   };
 }
 
-const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze([
-  Object.freeze({ x: 4, y: 11 }),
-  Object.freeze({ x: 5, y: 9 }),
-  Object.freeze({ x: 7, y: 7 }),
-  Object.freeze({ x: 9, y: 5 }),
-  Object.freeze({ x: 10, y: 3 }),
-  Object.freeze({ x: 11, y: 6 }),
-]);
+// The swamp lattice: a 3×3 grid of Ghoul bodies spaced 4 tiles apart (x,y each in
+// {2,6,10}). Fire fills EVERY tile a Ghoul can bite — all eight neighbours (Chebyshev 1),
+// diagonals included — so the flames mark the exact danger zone: any tile without fire is
+// safe from BOTH fire and Ghoul Bite. Because the clusters sit 4 apart, that leaves clean
+// one-tile "avenues" (rows/columns 0, 4, 8) running between them — the obvious, safe route
+// the player walks toward the Witch Doctor.
+const WITCH_DOCTOR_GHOUL_LATTICE = Object.freeze([2, 6, 10]);
+const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze(
+  WITCH_DOCTOR_GHOUL_LATTICE.flatMap((y) =>
+    WITCH_DOCTOR_GHOUL_LATTICE.map((x) => Object.freeze({ x, y }))
+  )
+);
 
-const WITCH_DOCTOR_FIRE_POSITIONS = Object.freeze([
-  Object.freeze({ x: 2, y: 12 }), Object.freeze({ x: 3, y: 10 }), Object.freeze({ x: 5, y: 12 }),
-  Object.freeze({ x: 6, y: 10 }), Object.freeze({ x: 8, y: 12 }), Object.freeze({ x: 9, y: 10 }),
-  Object.freeze({ x: 11, y: 12 }), Object.freeze({ x: 12, y: 10 }),
-  Object.freeze({ x: 2, y: 8 }), Object.freeze({ x: 4, y: 8 }), Object.freeze({ x: 6, y: 8 }),
-  Object.freeze({ x: 8, y: 8 }), Object.freeze({ x: 10, y: 8 }), Object.freeze({ x: 12, y: 8 }),
-  Object.freeze({ x: 2, y: 6 }), Object.freeze({ x: 3, y: 4 }), Object.freeze({ x: 5, y: 6 }),
-  Object.freeze({ x: 6, y: 4 }), Object.freeze({ x: 8, y: 6 }), Object.freeze({ x: 9, y: 4 }),
-  Object.freeze({ x: 11, y: 4 }), Object.freeze({ x: 12, y: 2 }),
-  Object.freeze({ x: 4, y: 2 }), Object.freeze({ x: 6, y: 2 }), Object.freeze({ x: 8, y: 2 }),
-]);
+// Fire is derived from the Ghoul lattice — each Ghoul's eight neighbours (its full bite
+// range), clipped to the board and deduped — so "fire === bite zone" can't drift from the
+// Ghoul positions above.
+const WITCH_DOCTOR_FIRE_POSITIONS = Object.freeze(
+  [...new Set(
+    WITCH_DOCTOR_GHOUL_POSITIONS.flatMap((ghoul) =>
+      ALL_DIRECTIONS
+        .map((dir) => ({ x: ghoul.x + dir.x, y: ghoul.y + dir.y }))
+        .filter((p) =>
+          p.x >= 0 && p.y >= 0 && p.x < WITCH_DOCTOR_BOARD_SIZE && p.y < WITCH_DOCTOR_BOARD_SIZE)
+        .map((p) => positionKey(p))
+    )
+  )].map((key) => {
+    const [x, y] = key.split(",").map(Number);
+    return Object.freeze({ x, y });
+  })
+);
 
 function createCampaignGhoul(index, position) {
   return {
@@ -427,17 +449,18 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 4, y: 9 })
         : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 8, y: 5 }),
   },
-  // Cursed Swamp (15x15): one drafted unit starts in the lower-left shallows and
-  // pushes toward the Witch Doctor in the upper-right. Ghouls and permanent fires
-  // form a readable lattice, with a Ghoul sitting on the direct diagonal shot line.
+  // Cursed Swamp (11x11): one drafted unit starts in the lower-left corner and pushes
+  // toward the Witch Doctor in the upper-right corner. A 3×3 Ghoul lattice fills the small
+  // board; fire marks every Ghoul's bite range, so the safe avenues (rows/cols 0, 4, 8)
+  // read clearly and the corners stay clear so nobody spawns on a hazard.
   [WITCH_DOCTOR_MISSION_ID]: {
     positions: {
-      "p2-0-witch-doctor": { x: 13, y: 1 },
+      "p2-0-witch-doctor": { x: 10, y: 0 },
     },
     fallback: (unit) =>
       unit.player === 1
-        ? { x: 1, y: 13 }
-        : { x: 13, y: 1 },
+        ? { x: 0, y: 10 }
+        : { x: 10, y: 0 },
     extraUnits: () => WITCH_DOCTOR_GHOUL_POSITIONS.map((position, index) => createCampaignGhoul(index, position)),
     tileObjects: () => Object.fromEntries(
       WITCH_DOCTOR_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])
