@@ -5,7 +5,7 @@ import { UNIT_TYPES, getArt, getEffectiveStats } from "../src/core/unitCatalog.j
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
-import { resolvePhysicalStrike } from "../src/rules/combat.js";
+import { isFireDamageImmune, resolvePhysicalStrike } from "../src/rules/combat.js";
 import { buffAlliesValue } from "../src/ai/evaluate.js";
 import { chooseActivation } from "../src/ai/cpuController.js";
 import { getAbilityVfx, getStanceVfx } from "../src/ui/vfxCatalog.js";
@@ -435,6 +435,33 @@ test("team-scoped dances (heal/buff/MP) beacon every living ally, not the whole 
     const event = r.events.find((e) => e.type === "ART_RESOLVED");
     assert.deepEqual(new Set(event.beaconTargetIds), new Set(["wd", "ally"]), `${artId} beacons allies only`);
   }
+});
+
+// --- Coal Walker: fire immunity (the same seam Gargoyle's One With The Flames uses) ---
+
+test("Coal Walker: the Witch Doctor is flagged fire-damage immune", () => {
+  const state = createBattleState({
+    units: [{ id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0 }]
+  });
+  assert.ok(isFireDamageImmune(findId(state, "wd")));
+});
+
+test("Coal Walker: fire tiles do not damage the Witch Doctor", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1", type: "swordsman", player: 1, x: 0, y: 0 },
+      { id: "wd", type: "witch-doctor", player: 2, x: 5, y: 5 }
+    ],
+    tileObjects: [{ x: 5, y: 5, kind: "fire", turnsLeft: 3 }]
+  });
+
+  let s = activate(state, "p1");
+  s = applyCommand(s, defend(1, "p1")).nextState;
+  const res = applyCommand(s, finishActivation(1, "p1"));
+
+  assert.equal(findId(res.nextState, "wd").hp, 24, "Witch Doctor ignores fire tile damage");
+  assert.ok(!res.events.some((e) => e.type === "FIRE_DAMAGE" && e.unitId === "wd"), "no burn event is surfaced");
+  assert.equal(res.nextState.tileObjects["5,5"].turnsLeft, 2, "the fire still counts down");
 });
 
 function freshWdState(hp = 24) {

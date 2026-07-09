@@ -158,6 +158,18 @@ export const WITCH_DOCTOR = Object.freeze({
       description: "RAGE: Gain +2 STR / +1 DEF / +1 MOVE for 1 turn and blind every unit for 1 turn, then enter Black Death Stance: you are immune to magic, and every unit takes 1 true damage each turn.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["stance", "rageOnly"]) })
+    }),
+    // Coal Walker: the same fireDamageImmune seam Gargoyle's One With The Flames uses
+    // (isFireDamageImmune in rules/combat.js), authored as its own passive ART entry so
+    // it stacks alongside the stance-driven Dancing Man passive rather than replacing it.
+    Object.freeze({
+      id: "coal-walker",
+      name: "Coal Walker",
+      kind: "passive",
+      mpCost: null,
+      effect: Object.freeze({ type: "fireImmunity", fireDamageImmune: true }),
+      description: "The Witch Doctor takes no damage from fire-based ARTS or fire tiles.",
+      implemented: true
     })
   ]),
   ragePassive: Object.freeze({
