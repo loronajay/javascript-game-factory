@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { syncResultsActions } from "../src/ui/menuFlow.js";
+import { isCampaignMapPanTarget, syncResultsActions } from "../src/ui/menuFlow.js";
 
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
@@ -35,4 +35,18 @@ test("non-campaign results hide Campaign Map while preserving normal rematch rul
 
   assert.equal(rematchBtn.hidden, false);
   assert.equal(campaignMapBtn.hidden, true);
+});
+
+test("campaign map panning does not capture mission node clicks", () => {
+  const host = {};
+  const missionNodeTarget = {
+    closest: (selector) => selector === "[data-action='selectCampaignMission']" ? {} : null,
+  };
+  const mapBackgroundTarget = {
+    closest: () => null,
+  };
+
+  assert.equal(isCampaignMapPanTarget(host, host), true);
+  assert.equal(isCampaignMapPanTarget(mapBackgroundTarget, host), true);
+  assert.equal(isCampaignMapPanTarget(missionNodeTarget, host), false);
 });

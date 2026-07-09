@@ -300,6 +300,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
     host.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
+      if (!isCampaignMapPanTarget(event.target, host)) return;
       drag = {
         pointerId: event.pointerId,
         x: event.clientX,
@@ -724,6 +725,11 @@ export function syncResultsActions({ rematchBtn, campaignMapBtn } = {}, { online
   // primary post-mission action while still leaving Main Menu available.
   if (rematchBtn) rematchBtn.hidden = online || isCampaign;
   if (campaignMapBtn) campaignMapBtn.hidden = !isCampaign;
+}
+
+export function isCampaignMapPanTarget(target, host) {
+  if (!target || target === host) return true;
+  return !target.closest?.("[data-action='selectCampaignMission']");
 }
 
 export function createResetProgressConfirmation({
