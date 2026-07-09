@@ -29,9 +29,14 @@ Two enemy passives create converging pressure, and the intended answer
 
 1. **Dead Zone** (Necromancer) — the enemy team takes 1 less magic damage.
    Bringing a mage squad into this fight is a trap; physical is better.
-2. **Deathly Aura** (Necromancer) — enemies within 3 tiles (4 while raging)
-   suffer -1 DEF. Fighting up close with physical damage gets *better*, not
-   worse, reinforcing the same answer from a second angle.
+2. **Deathly Aura** (Necromancer) — `enemyAura` debuffs ENEMIES of the
+   Necromancer, i.e. the player's own units, -1 DEF within 3 tiles (4 while
+   raging). This is a *punishment for closing distance*, not a perk — a
+   melee unit fighting the Necromancer up close eats more incoming damage
+   the whole time it's adjacent, creating real tension against "just go
+   physical." (Do not write this as a benefit to the attacker — it lowers
+   the *victim's* defense, and the victim near the Necromancer is the
+   player.)
 3. **Spread** (Virus) — any debuff landed on an enemy (poison, blind,
    silence, slow, stun) auto-propagates to that enemy's allies within 2
    tiles. Standing your squad close together turns one status hit into two.
@@ -48,9 +53,15 @@ Two enemy passives create converging pressure, and the intended answer
 
 **Why Mystic + Swordsman answers all of it:** Purify (Mystic, 8 MP, cleanse
 all statuses on one ally within 5) directly answers poison/slow before they
-compound via Spread. Swordsman is pure physical, untouched by Dead Zone, and
-benefits from Deathly Aura's DEF drop up close. Don't state this pairing
-explicitly in dialogue — the hints below should let a player *derive* it.
+compound via Spread. Swordsman is pure physical, untouched by Dead Zone. And
+critically: Mystic's **Guardian** passive (`teamAura`, always-on +1 DEF to
+allies while Mystic lives) exactly cancels Deathly Aura's -1 DEF — so a
+Swordsman fighting the Necromancer at close range with a Mystic nearby takes
+*neutral* DEF instead of the penalty every other melee pairing eats. The
+puzzle isn't "physical beats magic here" alone; it's "physical only works
+cleanly here if you bring the one passive that neutralizes the proximity
+tax." Don't state this pairing explicitly in dialogue — the hints below
+should let a player *derive* it.
 
 ## Dialogue beats (condition-triggered, same pattern as
 `clodMissionOpeningScript` / `shouldShowClodRageWarning`)
@@ -84,26 +95,28 @@ with it via `matchAuraRadius`):
 
 ## Objectives / stars (mirrors `evaluateCampaignMission`'s shape)
 
-Base three (same as mission 1):
+Base three (same shape as mission 1, cleanse locked in as canon):
 1. `complete` — win.
 2. `survive` — both chosen units end alive.
-3. **New spacing objective:** `spread` — no single status application should
-   hit more than 1 of your units via Virus's Spread (i.e., keep the squad
-   apart so a poison/slow lands on one unit, not both via propagation).
-   Needs a new tracked meta counter, e.g. `spreadHitCount`, computed the
-   same way mission 1 tracks `clodChargeHitCount` (event-counting hook in
-   `main.js`, passed into `evaluateCampaignMission`'s `meta` arg).
+3. **`cleansed`** — win after successfully using a cleanse (Purify or
+   equivalent) at least once. This is the mission's signature lesson made
+   explicit as a required objective, not left optional. Requires tracking a
+   `cleanseUsed` flag off the accepted-command stream in `main.js` (watch
+   for a `resolution: "cleanseAlly"` command succeeding).
 
-Bonus (pick one, lean toward the second — cheaper to compute and it
-reinforces the "kill the commander, not the summon" lesson from a fresh
-angle):
-- `cleansed` — win after successfully using a cleanse (Purify or
-  equivalent) at least once. Requires tracking a `cleanseUsed` flag off the
-  accepted-command stream in `main.js` (watch for a `resolution:
-  "cleanseAlly"` command succeeding).
-- `noGhoulKill` — win without killing a Ghoul (post-match check: no unit
-  with `type === "ghoul"` and `hp <= 0` in `state.units`). Simple, no new
-  live-tracking needed — computable entirely from final `state`.
+Bonus:
+- **`spread`** — no single status application hit more than 1 of your units
+  via Virus's Spread (i.e., keep the squad apart so a poison/slow lands on
+  one unit, not both via propagation). Moved from the base three to bonus —
+  it's the "mastery" layer on top of the required "know your cure" lesson.
+  Needs a new tracked meta counter, e.g. `spreadHitCount`, computed the same
+  way mission 1 tracks `clodChargeHitCount` (event-counting hook in
+  `main.js`, passed into `evaluateCampaignMission`'s `meta` arg).
+
+(Considered and cut: `noGhoulKill`, win without killing a Ghoul — dropped in
+favor of keeping a single, sharply-focused bonus tied to the mission's core
+status-pressure theme rather than splitting attention across two unrelated
+bonus ideas.)
 
 ## Implementation notes (for whoever picks this up)
 
