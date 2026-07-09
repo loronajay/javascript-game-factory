@@ -166,6 +166,8 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   let campaignSquad = emptyCampaignSquad();
   let selectedCampaignNode = null;
   let progressionAnnouncementRunning = false;
+  let campaignMapResizeObserver = null;
+  enableCampaignMapPanning(campaignMapHost);
   screens.register("campaign", { el: campaignScreen, onEnter: renderCampaign });
 
   function showQueuedProgressionAnnouncements({ audit = false, delay = 0 } = {}) {
@@ -207,15 +209,12 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     campaignStars.textContent = `${map.totalStars} ★`;
     campaignMapHost.replaceChildren();
 
-    // The map is a single pannable canvas sized from the grid; every node + trail
-    // is positioned as a percent of it, so the whole 20-stop overview scrolls as one
-    // piece instead of each mission carrying hand-placed viewport coordinates.
+    // The map is a single draggable image canvas. Mission positions are authored
+    // as percentages against the painted map, so tokens sit on its baked node bases.
     const canvas = document.createElement("div");
     canvas.className = "campaign-map-canvas";
     canvas.style.setProperty("--map-cols", String(map.grid?.cols ?? 7));
     canvas.style.setProperty("--map-rows", String(map.grid?.rows ?? 5));
-    renderCampaignTerrain(canvas, map.regions);
-    canvas.append(createCampaignTrails(map.edges));
 
     for (const node of map.nodes) {
       const button = document.createElement("button");
@@ -247,56 +246,38 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     }
 
     campaignMapHost.append(canvas);
-    scrollNodeIntoView(campaignMapHost, canvas, selectedNode);
+    syncCampaignMapCanvas(campaignMapHost, canvas, selectedNode);
     renderCampaignDetail(selectedNode);
     renderCampaignSquad();
   }
 
-  // Terrain layer: one biome blob per region plus its place-name label. Boxes are
-  // derived from the missions in each region, so the map's geography grows with it.
-  function renderCampaignTerrain(canvas, regions = []) {
-    for (const region of regions) {
-      const terrain = document.createElement("div");
-      terrain.className = `campaign-terrain is-${region.biome}`;
-      terrain.style.left = `${region.x}%`;
-      terrain.style.top = `${region.y}%`;
-      terrain.style.width = `${region.w}%`;
-      terrain.style.height = `${region.h}%`;
-      terrain.setAttribute("aria-hidden", "true");
-      canvas.append(terrain);
+  const CAMPAIGN_MAP_ASPECT = 1672 / 941;
 
-      const label = document.createElement("span");
-      label.className = "campaign-region-label";
-      label.textContent = region.label;
-      label.style.left = `${region.labelX}%`;
-      label.style.top = `${region.labelY}%`;
-      label.setAttribute("aria-hidden", "true");
-      canvas.append(label);
+  function sizeCampaignMapCanvas(host, canvas) {
+    const hostWidth = host?.clientWidth ?? 0;
+    const hostHeight = host?.clientHeight ?? 0;
+    if (!hostWidth || !hostHeight) return false;
+    const width = Math.max(hostWidth, hostHeight * CAMPAIGN_MAP_ASPECT);
+    const height = Math.max(hostHeight, width / CAMPAIGN_MAP_ASPECT);
+    canvas.style.width = `${Math.ceil(width)}px`;
+    canvas.style.height = `${Math.ceil(height)}px`;
+    return true;
+  }
+
+  function syncCampaignMapCanvas(host, canvas, selectedNode) {
+    campaignMapResizeObserver?.disconnect();
+    const sync = () => sizeCampaignMapCanvas(host, canvas);
+    requestAnimationFrame(() => {
+      if (sync()) scrollNodeIntoView(host, canvas, selectedNode);
+    });
+    if (typeof ResizeObserver === "function") {
+      campaignMapResizeObserver = new ResizeObserver(sync);
+      campaignMapResizeObserver.observe(host);
     }
   }
 
-  // SVG trail layer: one <path> per graph edge, in the same 0..100 percent space the
-  // nodes use (preserveAspectRatio="none" so it stretches with the canvas). Stroke
-  // stays crisp via non-scaling-stroke; open vs locked stretches are styled in CSS.
-  function createCampaignTrails(edges = []) {
-    const NS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("class", "campaign-trails");
-    svg.setAttribute("viewBox", "0 0 100 100");
-    svg.setAttribute("preserveAspectRatio", "none");
-    svg.setAttribute("aria-hidden", "true");
-    for (const edge of edges) {
-      const path = document.createElementNS(NS, "path");
-      path.setAttribute("class", `campaign-trail is-${edge.status}`);
-      path.setAttribute("d", edge.d);
-      path.setAttribute("vector-effect", "non-scaling-stroke");
-      svg.append(path);
-    }
-    return svg;
-  }
-
-  // Pan the (possibly oversized) map so the selected stop is roughly centered. Runs
-  // after layout settles; a no-op when the screen isn't measured yet.
+  // Pan the oversized map so the selected stop is roughly centered. Runs after
+  // layout settles; a no-op when the screen isn't measured yet.
   function scrollNodeIntoView(host, canvas, node) {
     if (!node) return;
     requestAnimationFrame(() => {
@@ -309,6 +290,55 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
         behavior: "auto",
       });
     });
+  }
+
+  function enableCampaignMapPanning(host) {
+    if (!host) return;
+    let drag = null;
+    let suppressClick = false;
+    const threshold = 5;
+
+    host.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      drag = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        scrollLeft: host.scrollLeft,
+        scrollTop: host.scrollTop,
+        moved: false,
+      };
+      host.setPointerCapture?.(event.pointerId);
+    });
+
+    host.addEventListener("pointermove", (event) => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < threshold) return;
+      drag.moved = true;
+      host.classList.add("is-dragging");
+      host.scrollLeft = drag.scrollLeft - dx;
+      host.scrollTop = drag.scrollTop - dy;
+      event.preventDefault();
+    });
+
+    function finishDrag(event) {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      suppressClick = drag.moved;
+      drag = null;
+      host.classList.remove("is-dragging");
+      window.setTimeout(() => { suppressClick = false; }, 120);
+    }
+
+    host.addEventListener("pointerup", finishDrag);
+    host.addEventListener("pointercancel", finishDrag);
+    host.addEventListener("lostpointercapture", finishDrag);
+    host.addEventListener("click", (event) => {
+      if (!suppressClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
   }
 
   function renderCampaignDetail(node) {

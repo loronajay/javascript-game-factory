@@ -70,6 +70,14 @@ test("computeCampaignGeometry dedupes undirected trails and paths every edge", (
   for (const edge of geo.edges) assert.match(edge.d, /^M /);
 });
 
+test("computeCampaignGeometry prefers authored image points over grid cells", () => {
+  const geo = computeCampaignGeometry([
+    { id: "a", cell: { col: 0, row: 0 }, point: { x: 12.345, y: 67.891 }, connections: [] },
+  ]);
+
+  assert.deepEqual(geo.positions.a, { x: 12.35, y: 67.89 });
+});
+
 test("computeCampaignGeometry ignores connections to unknown nodes", () => {
   const geo = computeCampaignGeometry([
     { id: "a", cell: { col: 0, row: 0 }, connections: ["ghost"] },

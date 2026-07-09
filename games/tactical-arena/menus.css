@@ -284,22 +284,18 @@
   .tutorial-choice-state .menu-btn { min-width:0; }
 }
 
-.campaign-card { display:flex; flex-direction:column; width:min(76rem,calc(100vw - 2rem)); min-height:min(45rem,calc(100vh - 2rem)); padding:1.25rem; text-align:left; }
+.campaign-card { display:flex; flex-direction:column; width:min(76rem,calc(100vw - 2rem)); height:min(45rem,calc(100dvh - 2rem)); max-height:calc(100dvh - 2rem); padding:1.25rem; text-align:left; overflow:hidden; }
 .campaign-head { display:flex; align-items:start; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
 .campaign-head .menu-note { max-width:34rem; margin-bottom:0; }
 .campaign-star-bank { display:inline-flex; align-items:center; min-height:2.25rem; padding:.45rem .8rem; border:1px solid rgba(230,192,101,.5); border-radius:7px; color:var(--brass-hi); background:rgba(8,20,34,.56); box-shadow:inset 0 1px 0 rgba(var(--sheen),.08); font:900 .82rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
-.campaign-layout { flex:1; min-height:0; display:grid; grid-template-columns:minmax(28rem,1fr) minmax(17rem,22rem); gap:1rem; align-items:stretch; }
-/* The map is one big pannable surface (a scroll frame + an oversized canvas), so
-   the whole 20-stop overview scrolls as a piece. Terrain, trails, and nodes all
-   position as a percent of the canvas. */
-.campaign-map { position:relative; min-height:34rem; border:1px solid rgba(188,214,236,.24); border-radius:8px; overflow:auto; background:linear-gradient(135deg, rgba(16,40,52,.92), rgba(6,14,24,.96)); box-shadow:inset 0 1px 0 rgba(var(--sheen),.1), inset 0 0 56px rgba(0,10,20,.6), 0 18px 44px rgba(0,0,0,.28); scrollbar-width:thin; scrollbar-color:rgba(230,192,101,.4) transparent; }
+.campaign-layout { flex:1; min-height:0; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) minmax(17rem,22rem); gap:1rem; align-items:stretch; }
+/* The map is one big draggable painted canvas. Scrollbars stay hidden; pointer
+   drag pans the map while mission tokens keep their percent anchors. */
+.campaign-map { position:relative; min-width:0; min-height:0; height:100%; border:1px solid rgba(188,214,236,.24); border-radius:8px; overflow:hidden; cursor:grab; touch-action:none; user-select:none; background:linear-gradient(135deg, rgba(16,40,52,.92), rgba(6,14,24,.96)); box-shadow:inset 0 1px 0 rgba(var(--sheen),.1), inset 0 0 56px rgba(0,10,20,.6), 0 18px 44px rgba(0,0,0,.28); scrollbar-width:none; -ms-overflow-style:none; }
+.campaign-map::-webkit-scrollbar { display:none; }
+.campaign-map.is-dragging { cursor:grabbing; }
 .campaign-map::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:6; background:radial-gradient(120% 96% at 50% 46%, transparent 68%, rgba(0,4,10,.42) 100%); }
-.campaign-map-canvas { position:relative; width:max(100%, calc(var(--map-cols,7) * 12.5rem)); height:max(100%, calc(var(--map-rows,5) * 9.3rem)); background:
-  repeating-linear-gradient(24deg, rgba(255,255,255,.026) 0 1px, transparent 1px 48px),
-  repeating-linear-gradient(-24deg, rgba(0,0,0,.05) 0 1px, transparent 1px 48px),
-  radial-gradient(58% 54% at 28% 80%, rgba(44,72,58,.32), transparent 62%),
-  radial-gradient(56% 50% at 84% 38%, rgba(36,64,94,.28), transparent 60%);
-}
+.campaign-map-canvas { position:relative; min-width:100%; min-height:100%; background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.08)), url("assets/campaign-map.png") center / 100% 100% no-repeat; }
 /* Terrain: soft biome blobs painted under the trails + nodes. */
 .campaign-terrain { position:absolute; z-index:0; pointer-events:none; opacity:.6; filter:blur(3px); border-radius:46% 54% 52% 48% / 54% 46% 56% 44%; }
 .campaign-terrain.is-rock { background:radial-gradient(circle at 42% 44%, rgba(178,160,122,.55), transparent 66%), radial-gradient(circle at 64% 62%, rgba(122,112,98,.42), transparent 60%); }
@@ -316,19 +312,23 @@
 .campaign-trail { fill:none; stroke-width:3.5px; stroke-linecap:round; stroke-linejoin:round; }
 .campaign-trail.is-open { stroke:rgba(230,192,101,.72); filter:drop-shadow(0 0 5px rgba(230,192,101,.32)); }
 .campaign-trail.is-locked { stroke:rgba(150,178,206,.26); stroke-dasharray:5 7; }
-.campaign-node { --node-lift:0px; position:absolute; z-index:3; transform:translate(-50%,calc(-50% + var(--node-lift))); display:grid; justify-items:center; gap:.22rem; width:7rem; min-height:6.9rem; padding:.42rem .38rem .48rem; border:1px solid rgba(188,214,236,.32); border-radius:8px; color:var(--text); background:linear-gradient(180deg,rgba(24,40,54,.94),rgba(5,13,22,.9)); cursor:pointer; box-shadow:0 .75rem 1.6rem rgba(0,0,0,.4), inset 0 1px 0 rgba(var(--sheen),.08); }
+.campaign-node { --node-lift:0px; position:absolute; z-index:3; transform:translate(-50%,calc(-50% + var(--node-lift))); display:grid; place-items:center; width:3.25rem; height:3.25rem; padding:.3rem; border:2px solid rgba(246,222,174,.88); border-radius:999px; color:var(--text); background:radial-gradient(circle at 50% 40%,rgba(24,40,54,.88),rgba(5,13,22,.72)); cursor:pointer; box-shadow:0 .38rem .85rem rgba(0,0,0,.38), inset 0 0 0 2px rgba(53,29,12,.5), inset 0 1px 0 rgba(var(--sheen),.12); }
 .campaign-node:hover:not(:disabled) { --node-lift:-4px; transform:translate(-50%,calc(-50% + var(--node-lift))); border-color:var(--brass-hi); filter:brightness(1.1); }
 .campaign-node:disabled { cursor:default; }
-.campaign-node.is-selected { border-color:var(--brass); box-shadow:0 0 0 2px rgba(230,192,101,.2),0 1rem 2rem rgba(0,0,0,.38), inset 0 1px 0 rgba(var(--sheen),.1); }
-.campaign-node.is-locked { opacity:.74; filter:grayscale(.45); }
-.campaign-node.is-coming-soon { border-style:dashed; }
-.campaign-node-flag { min-height:1.1rem; padding:.12rem .44rem; border-radius:999px; color:#07111d; background:linear-gradient(180deg,var(--brass-hi),var(--brass)); font:900 .5rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+.campaign-node.is-selected { border-color:var(--brass-hi); box-shadow:0 0 0 3px rgba(230,192,101,.35),0 .65rem 1.2rem rgba(0,0,0,.42), inset 0 0 0 2px rgba(53,29,12,.52), inset 0 1px 0 rgba(var(--sheen),.12); }
+.campaign-node.is-locked { width:4.4rem; height:4.4rem; padding:0; border:0; background:transparent; box-shadow:none; opacity:1; filter:none; pointer-events:none; }
+.campaign-node.is-locked > * { display:none; }
+.campaign-node.is-coming-soon { border-style:dashed; opacity:.72; }
+.campaign-node-flag { position:absolute; top:-.62rem; left:50%; transform:translateX(-50%); min-height:1rem; padding:.1rem .36rem; border-radius:999px; color:#07111d; background:linear-gradient(180deg,var(--brass-hi),var(--brass)); font:900 .46rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; box-shadow:0 .2rem .5rem rgba(0,0,0,.38); }
 .campaign-node.is-locked .campaign-node-flag,.campaign-node.is-coming-soon .campaign-node-flag { color:var(--muted); background:rgba(8,20,34,.72); border:1px solid rgba(188,214,236,.2); }
-.campaign-node-icon { display:grid; place-items:center; width:3.05rem; height:3.55rem; border:1px solid rgba(188,214,236,.18); border-radius:6px; color:var(--brass-hi); font:900 1.6rem var(--font-display); background:rgba(8,20,34,.72); overflow:hidden; box-shadow:inset 0 0 18px rgba(0,0,0,.32); }
-.campaign-node-icon .unit-portrait.is-campaign-node { width:3.05rem; height:3.55rem; border-radius:6px; }
-.campaign-node-label { max-width:100%; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; text-align:center; line-height:1.12; font:800 .6rem var(--font-display); letter-spacing:.04em; text-transform:uppercase; }
-.campaign-node-stars { color:var(--brass-hi); font:900 .72rem var(--font-display); letter-spacing:.08em; }
-.campaign-panel { display:grid; grid-template-rows:auto auto 1fr; gap:.8rem; align-content:start; min-width:0; }
+.campaign-node-icon { display:grid; place-items:center; width:2.08rem; height:2.08rem; border:1px solid rgba(188,214,236,.18); border-radius:999px; color:var(--brass-hi); font:900 1.2rem var(--font-display); background:rgba(8,20,34,.72); overflow:hidden; box-shadow:inset 0 0 18px rgba(0,0,0,.32); }
+.campaign-node-icon .unit-portrait.is-campaign-node { width:2.08rem; height:2.45rem; border-radius:0; }
+.campaign-node-label { position:absolute; top:calc(100% + .24rem); left:50%; transform:translateX(-50%); width:max-content; max-width:8.5rem; padding:.16rem .42rem; border:1px solid rgba(230,192,101,.34); border-radius:999px; overflow:hidden; text-align:center; text-overflow:ellipsis; white-space:nowrap; line-height:1.1; color:var(--text); background:rgba(5,13,22,.82); font:800 .56rem var(--font-display); letter-spacing:.04em; text-transform:uppercase; opacity:0; pointer-events:none; box-shadow:0 .35rem .8rem rgba(0,0,0,.42); transition:opacity .12s ease; }
+.campaign-node:hover .campaign-node-label,.campaign-node.is-selected .campaign-node-label { opacity:1; }
+.campaign-node-stars { position:absolute; right:-.3rem; bottom:-.3rem; min-width:1.2rem; min-height:1.2rem; display:grid; place-items:center; padding:.1rem; border-radius:999px; color:#07111d; background:linear-gradient(180deg,var(--brass-hi),var(--brass)); font:900 .5rem var(--font-display); letter-spacing:.02em; box-shadow:0 .2rem .5rem rgba(0,0,0,.38); }
+.campaign-panel { display:grid; grid-template-rows:auto auto auto; gap:.8rem; align-content:start; min-width:0; overflow:auto; padding-right:.15rem; scrollbar-width:thin; scrollbar-color:rgba(230,192,101,.35) transparent; }
+.campaign-panel > .menu-buttons { display:grid; grid-template-columns:1fr; gap:.55rem; }
+.campaign-panel > .menu-buttons .menu-btn { min-height:2.6rem; padding:.62rem .8rem; font-size:.74rem; }
 .campaign-detail { padding:1rem; border:1px solid rgba(188,214,236,.18); border-radius:8px; background:linear-gradient(180deg,rgba(var(--sheen),.055),transparent 56%),rgba(4,11,19,.38); box-shadow:inset 0 1px 0 rgba(var(--sheen),.06); }
 .campaign-kicker { color:var(--brass-hi); font:800 .58rem var(--font-display); letter-spacing:.13em; text-transform:uppercase; }
 .campaign-detail h3 { margin:.18rem 0 .32rem; color:var(--text); font:900 1.18rem var(--font-display); letter-spacing:.04em; }
@@ -351,7 +351,9 @@
   .campaign-layout { grid-template-columns:1fr; }
   .campaign-map { min-height:26rem; }
   .campaign-panel { grid-template-rows:auto; }
-  .campaign-node { width:6.4rem; min-height:6.4rem; }
+  .campaign-node { width:3.45rem; height:3.45rem; }
+  .campaign-node-icon { width:2.28rem; height:2.28rem; }
+  .campaign-node-icon .unit-portrait.is-campaign-node { width:2.28rem; height:2.68rem; }
 }
 
 .online-join { display:grid; grid-auto-flow:column; grid-template-columns:1fr auto; gap:.5rem; align-items:center; }

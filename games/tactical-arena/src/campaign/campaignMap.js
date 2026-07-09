@@ -38,6 +38,14 @@ export function cellToPercent(cell, grid = CAMPAIGN_GRID) {
   };
 }
 
+function authoredPointToPercent(point) {
+  if (!point) return null;
+  return {
+    x: round(clamp(Number(point.x) || 0, 0, 100)),
+    y: round(clamp(Number(point.y) || 0, 0, 100)),
+  };
+}
+
 function edgeKey(a, b) {
   return [a, b].sort().join("::");
 }
@@ -111,7 +119,7 @@ export function computeRegionBoxes(missions = [], regionDefs = [], grid = CAMPAI
 export function computeCampaignGeometry(missions = [], grid = CAMPAIGN_GRID) {
   const positions = {};
   for (const mission of missions) {
-    positions[mission.id] = cellToPercent(mission.cell, grid);
+    positions[mission.id] = authoredPointToPercent(mission.point) ?? cellToPercent(mission.cell, grid);
   }
   const seen = new Set();
   const edges = [];
