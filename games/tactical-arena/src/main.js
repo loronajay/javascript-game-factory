@@ -36,17 +36,20 @@ import {
 } from "./core/tempoBattle.js";
 import {
   CLOD_MISSION_ID,
+  FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
   clodRageWarningScript,
   completeCampaignMission,
+  fatherTimeRageWarningScript,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
   prepareCampaignMatchState,
   shouldShowClodRageWarning,
+  shouldShowFatherTimeRageWarning,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
@@ -130,14 +133,24 @@ let tempoRenderSignature = "";
 // In Tempo Battle the bottom command HUD (unit card + action bar) belongs to the PLAYER
 // alone. The CPU lives entirely on the board — it never renders the command HUD, never
 // writes the message line, never touches the player's selection. `tempoCpuActing` is true
-// only while a CPU activation is animating; render()/setMessage() consult it so CPU work
-// stays off the player's HUD. The player always has priority: clicking a ready unit while
-// the CPU is mid-activation queues a preempt (`tempoPendingBegin`) — the CPU finishes its
-// current activation instantly (no more animation) and control snaps to the player, so
-// there is never an artificial wait before you can command your own piece.
+// only while a CPU activation runs; render()/setMessage() consult it so CPU work stays off
+// the player's HUD.
+//
+// Input is NEVER blocked by an animation in tempo. Rolled actions (attack/ART) commit their
+// state UP FRONT (see resolveCombat's tempo branch) and only then animate, so the player can
+// command another ready unit mid-animation without the old end-of-animation commit clobbering
+// it. `tempoAnimating` counts in-flight animations purely so the real-time loop doesn't rebuild
+// the board out from under one. Clicking a ready unit frees the shared activation slot
+// instantly (releaseTempoSlot) — if the CPU held it, `tempoCpuAbort` tells its loop to stand
+// down — so there is never a wait before you can command your own piece.
 let tempoCpuActing = false;
-let tempoPreempt = false;
-let tempoPendingBegin = null;
+let tempoCpuAbort = false;
+let tempoAnimating = 0;
+// The one place tempo still briefly blocks input: an instant-ART cast (Nuke, Pray, Summon,
+// Footwork, …) commits its state at the END of its animation, so we hold input for that ~1s
+// to avoid a concurrent command clobbering it. Basic attacks/walls (commit-early) and moves
+// (commit via dispatch) never set this — they stay fully non-blocking.
+let tempoBusy = false;
 // Per-mission bookkeeping for objective grading + condition-triggered dialogue beats.
 // Reset in startMatch; both missions read/write their own keys.
 let campaignMeta = createCampaignMeta();
@@ -166,6 +179,11 @@ function createCampaignMeta() {
     ghoulBiteTakenCount: 0,
     blackDeathDanceUsed: false,
     witchDoctorHealCastCount: 0,
+    // Father Time (mission 4)
+    fatherTimeRageWarningShown: false,
+    archerDefeatedBeforeFatherTime: false,
+    archerBlinded: false,
+    rewindUsed: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -215,6 +233,10 @@ let applyingRemote = false;
 // without the seat check a player could open the OPPONENT's activation on their turn
 // (both beginUnit and the reducer only check currentPlayer), breaking lockstep.
 function inputLocked() {
+  // Tempo is real-time: animations never block input. The player can always reach their
+  // ready units (rolled actions commit their state before animating, so nothing is lost).
+  // The lone exception is an instant-ART cast (tempoBusy), which commits at animation end.
+  if (isTempoBattle(state)) return dialogue.isOpen() || state.phase !== "playing" || tempoBusy;
   return resolving || dialogue.isOpen() || !currentPlayerIsLocal();
 }
 
@@ -261,8 +283,12 @@ function selectedUnit() {
 function render() {
   // Tempo Battle: while the CPU animates on the board, its work must stay OFF the player's
   // command HUD (the unit card + action bar are the player's alone). Redraw the board and
-  // readiness rail only and leave the command HUD exactly as the player left it.
-  if (isTempoBattle(state) && tempoCpuActing) {
+  // readiness rail only and leave the command HUD as the player left it — UNLESS the player
+  // has just taken the slot (a preempt mid-CPU-animation), in which case their command panel
+  // must appear immediately even though the CPU loop is still unwinding.
+  const holder = state.activation ? findUnit(state, state.activation.unitId) : null;
+  const playerCommanding = holder && !isCpu(holder.player);
+  if (isTempoBattle(state) && tempoCpuActing && !playerCommanding) {
     renderBoardAndRail();
     return;
   }
@@ -424,8 +450,9 @@ function stopTempoLoop() {
   tempoLastFrameAt = 0;
   tempoRenderSignature = "";
   tempoCpuActing = false;
-  tempoPreempt = false;
-  tempoPendingBegin = null;
+  tempoCpuAbort = false;
+  tempoAnimating = 0;
+  tempoBusy = false;
 }
 
 function startTempoLoop() {
@@ -441,13 +468,13 @@ function startTempoLoop() {
       if (advanced.state !== state) {
         state = advanced.state;
         if (advanced.events?.length) playRolloverFx(advanced.events);
-        // While an action is animating, leave the board/HUD to the resolve loop and
-        // only nudge the gauge bars — a full render here would rebuild the SVG mid-
-        // animation and tear down the buttons the player is clicking. Otherwise, do a
-        // full render ONLY when something structural changed (a unit became ready, HP
-        // moved, an activation opened/closed, the match ended); a plain gauge fill just
-        // updates the existing bars, so the HUD stops churning 60×/second.
-        if (resolving) {
+        // While an action is animating, leave the board to the resolve loop and only nudge
+        // the gauge bars — a full render here would rebuild the SVG mid-animation and tear
+        // down the tokens being animated. Otherwise, do a full render ONLY when something
+        // structural changed (a unit became ready, HP moved, an activation opened/closed,
+        // the match ended); a plain gauge fill just updates the existing bars, so the HUD
+        // stops churning 60×/second.
+        if (resolving || tempoAnimating > 0) {
           updateTempoGauges();
         } else {
           const signature = tempoStructuralSignature();
@@ -669,6 +696,23 @@ function recordCampaignProgressHooks(result) {
         }
       }
     }
+  } else if (campaignMissionId === FATHER_TIME_MISSION_ID) {
+    const fatherTime = state.units.find((unit) => unit.player === 2 && unit.type === "father-time") ?? null;
+    const archer = state.units.find((unit) => unit.player === 2 && unit.type === "archer") ?? null;
+    if (archer?.hp <= 0 && fatherTime?.hp > 0) {
+      campaignMeta.archerDefeatedBeforeFatherTime = true;
+    }
+    if (archer?.statuses?.some((status) => status.type === "blind")) {
+      campaignMeta.archerBlinded = true;
+    }
+    for (const event of events) {
+      if (event.type !== "ART_RESOLVED") continue;
+      const actor = findUnit(state, event.actorId);
+      if (actor?.player !== 2 || actor.type !== "father-time") continue;
+      if (event.artId === "rewind") {
+        campaignMeta.rewindUsed = true;
+      }
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -724,6 +768,15 @@ function nextCampaignDialogueBeat() {
       blackDeathDanceUsed: campaignMeta.blackDeathDanceUsed,
     })) {
       return { markShown: () => { campaignMeta.witchDoctorRageWarningShown = true; }, script: witchDoctorRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === FATHER_TIME_MISSION_ID) {
+    if (shouldShowFatherTimeRageWarning(state, {
+      warningShown: campaignMeta.fatherTimeRageWarningShown,
+      rewindUsed: campaignMeta.rewindUsed,
+    })) {
+      return { markShown: () => { campaignMeta.fatherTimeRageWarningShown = true; }, script: fatherTimeRageWarningScript };
     }
     return null;
   }
@@ -954,9 +1007,59 @@ async function revealRoll(outcome, label = null, originUnit = null) {
   await effects.rollReveal(outcome, label);
 }
 
+// Rolled actions (attack / wall) commit their resolved state and then animate. In CLASSIC
+// play the commit lands at the END (endResolve) and input stays locked across the animation
+// via `resolving`. In TEMPO it lands HERE, up front — so the player can command another ready
+// unit mid-animation without the end-of-animation commit clobbering it; `tempoAnimating` only
+// tells the real-time loop not to rebuild the board under the animation. Either way the
+// pre-commit board is drawn first so a dying target is still present to animate. NOTE: capture
+// every pre-command snapshot the animation needs BEFORE calling this — `state` becomes the
+// post-command board the instant it returns in tempo.
+function beginResolve(result, artCalloutEvent = null) {
+  mode = null; footworkPath = []; volleyShotOrigin = null;
+  if (artCalloutEvent) playArtCallout(artCalloutEvent);
+  if (isTempoBattle(state)) {
+    render();                 // pre-command board (targeting cleared, nothing committed yet)
+    state = result.nextState; // commit up front, before animating
+    tempoAnimating += 1;
+  } else {
+    resolving = true;
+    render();
+  }
+}
+
+// Retire a rolled action once its animation finishes. Classic commits here; tempo already
+// committed in beginResolve and only reconciles the board + selection.
+function endResolve(prepared, result, prevPlayer) {
+  const events = result.events ?? [];
+  const tempo = isTempoBattle(state);
+  if (tempo) tempoAnimating = Math.max(0, tempoAnimating - 1);
+  else state = result.nextState;
+  recordTutorialProgress(prepared, result, prevPlayer);
+  recordCampaignProgressHooks(result);
+  broadcastIfLocal(prepared);
+  playEventSounds(events);
+  playRolloverFx(events);
+  if (tempo) {
+    // Only drop the selection if the piece we were commanding is spent/gone — never clobber a
+    // unit the player switched to mid-animation.
+    const sel = selectedUnit();
+    if (!sel || sel.spent || sel.hp <= 0) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+    if (tempoAnimating === 0) render();
+  } else {
+    if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+    render();
+    resolving = false;
+  }
+  announceTurnChange(prevPlayer);
+  maybeStartCpuTurn();
+  flushTutorialPresentation();
+  return true;
+}
+
 // Async resolution for rolled actions (basic ATTACK and targeted ARTS). Reveals
-// the roll, commits the resolved state, then plays impact FX. Input stays locked
-// across the animation via `resolving`. Non-rolled actions use synchronous dispatch.
+// the roll, commits the resolved state, then plays impact FX. Non-rolled actions use
+// synchronous dispatch; instant ARTs use resolveInstantArt (commit-at-end).
 async function resolveCombat(command) {
   const prevPlayer = state.currentPlayer;
   const { prepared, result } = resolveCommand(command);
@@ -964,20 +1067,21 @@ async function resolveCombat(command) {
   const events = result.events ?? [];
   const rolled = events.find((e) => (e.type === "ATTACK_RESOLVED" || e.type === "ART_RESOLVED") && "hit" in e);
 
-  resolving = true;
-  mode = null; footworkPath = []; volleyShotOrigin = null;
-  playArtCallout(events.find((e) => e.type === "ART_RESOLVED" && e.artId));
-  render();
-
+  // Capture every pre-command snapshot BEFORE beginResolve commits (in tempo `state` becomes
+  // the post-command board the instant beginResolve runs). `before` pins the deeper animation
+  // lookups (surge/clumsy/Hand of Life) to the pre-command board; in classic it === state.
   const metrics = createBoardMetrics(state.size);
+  const before = state;
   const attackerBefore = rolled ? findUnit(state, rolled.actorId) : null;
   const rolledTargetsBefore = rolled ? orderedHitTargets(rolled, (id) => findUnit(state, id)) : [];
   const targetBefore = rolledTargetsBefore[0] ?? (rolled ? findUnit(state, rolled.targetId) : null);
 
+  beginResolve(result, events.find((e) => e.type === "ART_RESOLVED" && e.artId));
+
   if (rolled?.artId === "surge" && attackerBefore && targetBefore) {
     const center = unitCenter(metrics, targetBefore);
-    const healedTargetsBefore = healingPresentationTargets(rolled, (id) => findUnit(state, id));
-    const splashTargetsBefore = clumsySplashTargets(rolled, (id) => findUnit(state, id), "healing");
+    const healedTargetsBefore = healingPresentationTargets(rolled, (id) => findUnit(before, id));
+    const splashTargetsBefore = clumsySplashTargets(rolled, (id) => findUnit(before, id), "healing");
     const vfxTargets = [...new Map([...healedTargetsBefore, ...splashTargetsBefore].map((unit) => [unit.id, unit])).values()];
 
     await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
@@ -1078,7 +1182,7 @@ async function resolveCombat(command) {
     }
   }
 
-  const clumsyDamageTargetsBefore = rolled ? clumsySplashTargets(rolled, (id) => findUnit(state, id), "damage") : [];
+  const clumsyDamageTargetsBefore = rolled ? clumsySplashTargets(rolled, (id) => findUnit(before, id), "damage") : [];
   if (rolled?.splashDamageByTarget && attackerBefore && targetBefore && clumsyDamageTargetsBefore.length) {
     const center = unitCenter(metrics, targetBefore);
     await effects.floatText(center, "CLUMSY", "#d8c2f5");
@@ -1096,9 +1200,9 @@ async function resolveCombat(command) {
 
   const handOfLifeEvent = events.find((e) => e.type === "HAND_OF_LIFE");
   if (handOfLifeEvent) {
-    const paladinBefore = findUnit(state, handOfLifeEvent.actorId);
+    const paladinBefore = findUnit(before, handOfLifeEvent.actorId);
     const healedUnitsBefore = Object.keys(handOfLifeEvent.healingByTarget)
-      .map((id) => findUnit(state, id))
+      .map((id) => findUnit(before, id))
       .filter(Boolean);
     if (paladinBefore && healedUnitsBefore.length) {
       await effects.playAbilityVfx("hand-of-life", { actor: paladinBefore, targets: healedUnitsBefore });
@@ -1111,19 +1215,7 @@ async function resolveCombat(command) {
     }
   }
 
-  state = result.nextState;
-  recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(result);
-  broadcastIfLocal(prepared);
-  playEventSounds(events);
-  playRolloverFx(events);
-  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
-  render();
-  announceTurnChange(prevPlayer);
-  resolving = false;
-  maybeStartCpuTurn();
-  flushTutorialPresentation();
-  return true;
+  return endResolve(prepared, result, prevPlayer);
 }
 
 // A wall is attacked like a unit (it can't dodge, so there's no roll), but it gets
@@ -1135,12 +1227,9 @@ async function resolveWallAttack(command) {
   if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
   const event = (result.events ?? []).find((e) => e.type === "WALL_ATTACKED");
 
-  resolving = true;
-  mode = null; footworkPath = []; volleyShotOrigin = null;
-  render();
-
   const metrics = createBoardMetrics(state.size);
-  const attackerBefore = findUnit(state, command.actorId);
+  const attackerBefore = findUnit(state, command.actorId); // captured before beginResolve commits
+  beginResolve(result);
   if (event && attackerBefore) {
     const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
     const center = unitCenter(metrics, { position: event.position });
@@ -1157,19 +1246,7 @@ async function resolveWallAttack(command) {
     }
   }
 
-  state = result.nextState;
-  recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(result);
-  broadcastIfLocal(prepared);
-  playEventSounds(result.events ?? []);
-  playRolloverFx(result.events ?? []);
-  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
-  render();
-  announceTurnChange(prevPlayer);
-  resolving = false;
-  maybeStartCpuTurn();
-  flushTutorialPresentation();
-  return true;
+  return endResolve(prepared, result, prevPlayer);
 }
 
 // The float label each King command shows over every buffed ally: the stat it reads off
@@ -1193,6 +1270,9 @@ async function resolveInstantArt(command) {
   const targetsBefore = targetIds.map((id) => findUnit(state, id)).filter(Boolean);
 
   resolving = true;
+  // Instant ARTs commit at the END of their animation, so in tempo we briefly hold input to
+  // keep a concurrent command from clobbering the pending commit. Cleared in the tail below.
+  if (isTempoBattle(state)) tempoBusy = true;
   mode = null; footworkPath = []; volleyShotOrigin = null;
   playArtCallout(resolved);
   render();
@@ -1672,6 +1752,7 @@ async function resolveInstantArt(command) {
   render();
   announceTurnChange(prevPlayer);
   resolving = false;
+  tempoBusy = false;
   maybeStartCpuTurn();
   flushTutorialPresentation();
   return true;
@@ -1718,42 +1799,29 @@ function shouldDelayCpuForTutorialPresentation() {
 }
 
 // Real-time mode shares ONE activation slot between the player and the CPU, but the player
-// always has priority. The CPU only takes the slot when it is free AND the player has no
-// command queued; the moment the player clicks a ready unit (even mid-CPU-activation) that
-// pending begin is honored first (see runTempoCpuActivation's preempt path). There is no
-// artificial reaction delay — the CPU acts as soon as a unit of its is ready and the board
-// is idle, and the player never waits to command their own piece.
+// always has priority and NEVER waits. There is no reaction delay — the CPU acts as soon as a
+// unit of its is ready and the board is free. The instant the player clicks a ready unit,
+// beginTempoUnit frees the slot synchronously (releaseTempoSlot) and, if the CPU held it,
+// sets tempoCpuAbort so its loop stands down after the current animation. Because rolled
+// actions commit their state up front, the player's command can never be clobbered.
 function maybeStartTempoCpuTurn() {
-  if (!isTempoBattle(state) || cpuThinking || resolving || state.activation || state.phase !== "playing") return;
-  if (dialogue.isOpen()) return;
-  // The player's queued command always wins a free slot.
-  if (tempoPendingBegin) { flushTempoPendingBegin(); return; }
+  if (!isTempoBattle(state) || cpuThinking || resolving || tempoBusy || state.activation || state.phase !== "playing") return;
+  if (dialogue.isOpen() || tempoAnimating > 0) return;
   const player = [...(cpu?.players ?? [])].find((p) =>
     state.units.some((unit) => unit.player === p && isTempoUnitReady(state, unit))
   );
   if (player == null) return;
   cpuThinking = true;
+  tempoCpuAbort = false;
   void runTempoCpuActivation(player).finally(() => {
     cpuThinking = false;
     maybeStartTempoCpuTurn();
   });
 }
 
-// The player clicked a ready unit while the board was busy; now that it is free, open that
-// unit's command panel. Runs on the same free-slot path the CPU would have used.
-function flushTempoPendingBegin() {
-  const id = tempoPendingBegin;
-  tempoPendingBegin = null;
-  tempoPreempt = false;
-  const unit = id ? findUnit(state, id) : null;
-  if (unit && isLocalTempoCommander(unit)) beginUnit(unit);
-  render();
-}
-
 async function runTempoCpuActivation(player) {
   const epoch = matchEpoch;
   tempoCpuActing = true;   // keeps this whole activation off the player's command HUD
-  resolving = true;        // serializes the board animation (the player can still preempt)
   render();
   const planningState = { ...state, currentPlayer: player };
   const commands = chooseActivation(planningState, {
@@ -1761,29 +1829,20 @@ async function runTempoCpuActivation(player) {
     cpuPlayer: player,
     rng: cpuRng(planningState)
   });
-  for (let i = 0; i < commands.length; i++) {
-    if (epoch !== matchEpoch || state.phase !== "playing") break;
-    // Player preempt: they want the slot. Finish the CPU's remaining plan instantly (state
-    // only, no animation) so the slot frees, then bail — control snaps to the player.
-    if (tempoPreempt) { fastFinishCpuCommands(commands.slice(i)); break; }
-    const applied = await applyCpuCommand(commands[i]);
-    resolving = true;
+  for (const command of commands) {
+    if (epoch !== matchEpoch || state.phase !== "playing" || tempoCpuAbort) break;
+    const applied = await applyCpuCommand(command);
+    if (epoch !== matchEpoch || tempoCpuAbort) break;
     if (!applied || state.phase !== "playing") break;
   }
   tempoCpuActing = false;
+  // resolveCpuMove keeps `resolving` set across the move (keepResolving) — clear it here so the
+  // next CPU activation (guarded on `resolving`) and the real-time loop resume.
   resolving = false;
-  selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
+  // If the player preempted, they now hold the slot and their unit is selected — don't clobber
+  // that. Otherwise clear the CPU's leftover board selection.
+  if (!tempoCpuAbort) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   render();
-}
-
-// Resolve the tail of a CPU activation with no animation (used when the player preempts) so
-// its state completes and the activation slot frees. dispatch() replays each command
-// through the reducer exactly as an animated apply would, minus the presentation.
-function fastFinishCpuCommands(commands) {
-  for (const command of commands) {
-    if (state.phase !== "playing") break;
-    if (!dispatch(command)) break;
-  }
 }
 
 async function runCpuTurn() {
@@ -2231,11 +2290,12 @@ function beginUnit(unit) {
   }
 }
 
-// Command one of my ready units in real-time. If the board is free it opens the command HUD
-// at once; if the CPU (or an animation) is busy, it queues a preempt so the CPU stands down
-// and control snaps here — the player never waits to command their own piece.
+// Command one of my ready units in real-time — instantly, no matter what is on the board.
+// Frees the shared activation slot from whoever holds it (a CPU mid-animation, or my own
+// previous piece) and opens this unit's command HUD right away. The one thing that defers a
+// click is an instant-ART cast in flight (tempoBusy), guarded by beginUnit/inputLocked.
 function beginTempoUnit(unit) {
-  if (state.phase !== "playing" || dialogue.isOpen()) return;
+  if (state.phase !== "playing" || dialogue.isOpen() || tempoBusy) return;
   if (!isLocalTempoCommander(unit)) return;
   // Already commanding this unit — just refocus its panel.
   if (state.activation?.unitId === unit.id) {
@@ -2247,15 +2307,9 @@ function beginTempoUnit(unit) {
     render();
     return;
   }
-  // Board busy (CPU animating, an action resolving, or a slot already held) — queue this as
-  // a preempt; maybeStartTempoCpuTurn honors it the instant the slot frees.
-  if (tempoCpuActing || resolving || state.activation) {
-    tempoPendingBegin = unit.id;
-    tempoPreempt = true;
-    audio.play("unitSelect");
-    return;
-  }
-  // Board free — take the slot now.
+  releaseTempoSlot(unit.id);
+  // beginActivation replaces a fresh (un-acted) foreign activation and starts on a freed slot,
+  // so we just dispatch — releaseTempoSlot already retired any activation that had acted/moved.
   if (dispatch(beginActivation(unit.player, unit.id))) {
     selectedId = unit.id;
     mode = null;
@@ -2266,12 +2320,30 @@ function beginTempoUnit(unit) {
   }
 }
 
+// Free the single activation slot for the player, whoever holds it. A CPU holder is told to
+// stand down (tempoCpuAbort). Whatever it had already done in state stays; because rolled
+// actions commit up front, the board is consistent. A slot that has already acted is finished;
+// a move-only one is reverted (cancelMove) so the piece keeps its readiness for a retry; a
+// fresh one is simply left for beginActivation to replace.
+function releaseTempoSlot(exceptId) {
+  const activation = state.activation;
+  if (!activation || activation.unitId === exceptId) return;
+  const holder = findUnit(state, activation.unitId);
+  if (isCpu(holder?.player)) tempoCpuAbort = true;
+  if (!holder) return;
+  if (activation.primaryUsed) dispatch(finishActivation(holder.player, holder.id));
+  else if (activation.moved) dispatch(cancelMove(holder.player, holder.id));
+}
+
 async function handleTile(position) {
-  // Tempo: clicking one of my ready units always tries to command it — even while the board
-  // is busy (that queues a preempt). beginTempoUnit gates ownership/readiness itself.
-  if (isTempoBattle(state) && !selectedUnit()) {
+  // Tempo: clicking one of my ready units always commands it instantly — even mid-animation,
+  // even while another of mine is selected (it switches). beginTempoUnit frees the slot and
+  // gates ownership/readiness/tempoBusy itself.
+  if (isTempoBattle(state)) {
     const clicked = unitAt(state, position);
-    if (clicked && isLocalTempoCommander(clicked)) { beginUnit(clicked); render(); return; }
+    if (clicked && clicked.id !== selectedId && isLocalTempoCommander(clicked)) {
+      beginUnit(clicked); render(); return;
+    }
   }
   if (inputLocked()) return;
   const unit = selectedUnit();

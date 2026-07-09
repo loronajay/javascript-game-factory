@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { findUnit } from "../src/core/state.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
   CLOD_MISSION_ID,
+  FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
   WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
@@ -14,6 +16,8 @@ import {
   createCampaignMatchConfig,
   completeCampaignMission,
   evaluateCampaignMission,
+  fatherTimeMissionOpeningScript,
+  fatherTimeRageWarningScript,
   getCampaignMap,
   necromancerMissionOpeningScript,
   necromancerRageWarningScript,
@@ -22,6 +26,7 @@ import {
   normalizeCampaignSquad,
   prepareCampaignMatchState,
   shouldShowClodRageWarning,
+  shouldShowFatherTimeRageWarning,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
@@ -249,6 +254,13 @@ function witchDoctorMatchState(squad = ["archer"]) {
   );
 }
 
+function fatherTimeMatchState(squad = ["swordsman", "archer"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(FATHER_TIME_MISSION_ID, squad)),
+    FATHER_TIME_MISSION_ID,
+  );
+}
+
 test("Necromancer mission builds a 13x13 board with the enemy caster pair spawned at half HP", () => {
   const config = createCampaignMatchConfig(NECROMANCER_MISSION_ID, ["swordsman", "mystic"]);
   const match = necromancerMatchState(["swordsman", "mystic"]);
@@ -266,8 +278,8 @@ test("Necromancer mission builds a 13x13 board with the enemy caster pair spawne
   assert.equal(findUnit(match, "p2-1-virus").hp, 13);       // ceil(25/2)
   // Player units spawn by slot index regardless of which units were drafted, well
   // outside the Virus's turn-one Cough range (6 > 5).
-  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 2, y: 10 });
-  assert.deepEqual(findUnit(match, "p1-1-mystic").position, { x: 4, y: 9 });
+  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 4, y: 9 });
+  assert.deepEqual(findUnit(match, "p1-1-mystic").position, { x: 2, y: 10 });
 });
 
 test("Necromancer mission opens with a Dead Zone + Spread taunt and a cure/spacing hint", () => {
@@ -596,6 +608,163 @@ test("completing the Witch Doctor mission unlocks Witch Doctor and records its s
   assert.deepEqual(completed.newRewardUnits, ["witch-doctor"]);
   assert.equal(isUnitUnlocked("witch-doctor", storage), true);
   assert.equal(readCampaignProgressStars(storage, WITCH_DOCTOR_MISSION_ID), 3);
+});
+
+// --- Mission 4: Timeless Woods ------------------------------------------------
+
+test("Timeless Woods replaces the fourth placeholder once enough stars are banked", () => {
+  const storage = storageAdapter();
+  const mapBefore = getCampaignMap(storage);
+  assert.equal(mapBefore.nodes[3].id, FATHER_TIME_MISSION_ID);
+  assert.equal(mapBefore.nodes[3].status, "locked");
+  assert.equal(mapBefore.nodes[3].displayType, null);
+
+  // Six banked stars from earlier missions reveal Mission 4.
+  const clod = prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+  );
+  completeCampaignMission(storage, CLOD_MISSION_ID, {
+    ...clod,
+    phase: "complete",
+    winner: 1,
+    units: clod.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : unit),
+  }, { clodChargeHitCount: 1 });
+  const necro = necromancerMatchState();
+  completeCampaignMission(storage, NECROMANCER_MISSION_ID, {
+    ...necro,
+    phase: "complete",
+    winner: 1,
+    units: necro.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : unit),
+  }, { cleanseUsed: true, spreadHitCount: 0 });
+
+  const node = getCampaignMap(storage).nodes[3];
+  assert.equal(node.id, FATHER_TIME_MISSION_ID);
+  assert.equal(node.title, "Timeless Woods");
+  assert.equal(node.status, "available");
+  assert.equal(node.displayType, "father-time");
+  assert.equal(node.biome, "forest");
+});
+
+test("Timeless Woods builds an 11x11 normal-placement fight against Father Time and an Archer", () => {
+  const config = createCampaignMatchConfig(FATHER_TIME_MISSION_ID, ["swordsman", "mystic"]);
+  const match = fatherTimeMatchState(["swordsman", "mystic"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 11);
+  assert.deepEqual(config.squads[1], ["swordsman", "mystic"]);
+  assert.deepEqual(config.squads[2], ["father-time", "archer"]);
+  assert.equal(config.teamNames[2], "Timeless Court");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 1, y: 10 });
+  assert.deepEqual(findUnit(match, "p1-1-mystic").position, { x: 0, y: 9 });
+  assert.deepEqual(findUnit(match, "p2-0-father-time").position, { x: 9, y: 0 });
+  assert.deepEqual(findUnit(match, "p2-1-archer").position, { x: 10, y: 1 });
+  assert.equal(findUnit(match, "p2-0-father-time").hp, 13);
+  assert.equal(findUnit(match, "p2-1-archer").hp, 12);
+});
+
+test("Timeless Woods opening and RAGE warning teach Age buffs and Rewind", () => {
+  const state = fatherTimeMatchState();
+  const dispatched = campaignOpeningScript(FATHER_TIME_MISSION_ID, state);
+  const direct = fatherTimeMissionOpeningScript(state);
+
+  assert.deepEqual(dispatched, direct);
+  assert.equal(direct.length >= 4, true);
+  assert.equal(direct[0].speakerId, "p2-0-father-time");
+  assert.equal(direct[1].speakerId, "p2-1-archer");
+  assert.match(direct.map((line) => line.text).join(" "), /Age/i);
+  assert.match(direct.map((line) => line.text).join(" "), /STR|DEF|stat/i);
+  assert.match(direct.map((line) => line.text).join(" "), /Rewind|revive|fallen/i);
+
+  const withHp = (hp) => ({
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) => unit.id === "p2-0-father-time" ? { ...unit, hp } : unit),
+  });
+  assert.equal(shouldShowFatherTimeRageWarning(withHp(6)), false);
+  assert.equal(shouldShowFatherTimeRageWarning(withHp(5)), true);
+  assert.equal(shouldShowFatherTimeRageWarning(withHp(5), { warningShown: true }), false);
+  assert.match(fatherTimeRageWarningScript(withHp(5)).map((line) => line.text).join(" "), /Rewind|fallen|revive/i);
+});
+
+test("Father Time opens Timeless Woods by Aging the Archer's strength", () => {
+  const state = { ...fatherTimeMatchState(["swordsman", "mystic"]), currentPlayer: 2 };
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+
+  assert.ok(commands.some((command) =>
+    command.type === "USE_ART" &&
+    command.unitId === "p2-0-father-time" &&
+    command.artId === "age" &&
+    command.targetId === "p2-1-archer" &&
+    command.stat === "strength"
+  ));
+});
+
+test("Timeless Woods grading rewards no losses, Archer first, no Rewind, and a blind bonus", () => {
+  const base = fatherTimeMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(FATHER_TIME_MISSION_ID, won, {
+    archerDefeatedBeforeFatherTime: true,
+    rewindUsed: false,
+    archerBlinded: true,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["survive", "archerFirst", "noRewind"]);
+  assert.equal(perfect.bonusObjectives[0].id, "blindArcher");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const fatherTimeFirst = evaluateCampaignMission(FATHER_TIME_MISSION_ID, won, {
+    archerDefeatedBeforeFatherTime: false,
+    rewindUsed: true,
+    archerBlinded: false,
+  });
+  assert.equal(fatherTimeFirst.objectives.find((objective) => objective.id === "archerFirst").earned, false);
+  assert.equal(fatherTimeFirst.objectives.find((objective) => objective.id === "noRewind").earned, false);
+  assert.equal(fatherTimeFirst.bonusObjectives[0].earned, false);
+  assert.equal(fatherTimeFirst.stars, 1);
+
+  const archerStillBlind = {
+    ...won,
+    units: won.units.map((unit) =>
+      unit.id === "p2-1-archer" ? { ...unit, statuses: [{ type: "blind", duration: 1 }] } : unit),
+  };
+  const finalStatusBonus = evaluateCampaignMission(FATHER_TIME_MISSION_ID, archerStillBlind, {
+    archerDefeatedBeforeFatherTime: false,
+    rewindUsed: false,
+  });
+  assert.equal(finalStatusBonus.bonusObjectives[0].earned, true);
+});
+
+test("completing Timeless Woods unlocks Father Time and records its stars", () => {
+  const storage = storageAdapter();
+  const base = fatherTimeMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, FATHER_TIME_MISSION_ID, won, {
+    archerDefeatedBeforeFatherTime: true,
+    rewindUsed: false,
+    archerBlinded: true,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["father-time"]);
+  assert.equal(isUnitUnlocked("father-time", storage), true);
+  assert.equal(readCampaignProgressStars(storage, FATHER_TIME_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {

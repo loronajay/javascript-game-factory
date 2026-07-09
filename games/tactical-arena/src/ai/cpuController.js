@@ -144,6 +144,11 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
   const { control, heal } = planEffectValue(state, unit, plan);
   score += weights.control * control + weights.heal * heal;
 
+  // Mission-specific CPU personalities can add tiny tactical priors without changing
+  // global unit tuning. Timeless Woods uses this to make Father Time actively build the
+  // Archer into a carry instead of simply advancing while the squads are still far apart.
+  score += missionPlanBias(state, unit, plan);
+
   // 4. Zone control from a placed wall / fire.
   score += weights.zone * planZoneValue(unit, plan);
 
@@ -280,6 +285,22 @@ function planZoneValue(unit, plan) {
 function artAiFor(unit, plan) {
   if (plan.primary.kind !== "art") return null;
   return normalizeArtAi(getArt(unit.type, plan.primary.artId));
+}
+
+function missionPlanBias(state, unit, plan) {
+  const carry = state.aiProfile?.fatherTimeCarry;
+  if (!carry || unit.id !== carry.sourceId || plan.primary.kind !== "art") return 0;
+  const primary = plan.primary;
+  if (primary.artId === "age" && primary.targetId === carry.targetId) {
+    return primary.stat === "strength" ? 18 : 12;
+  }
+  if (primary.artId === "time-stretch" && primary.targetId === carry.targetId) {
+    return 4;
+  }
+  if (primary.artId === "rewind" && primary.targetId === carry.targetId) {
+    return 24;
+  }
+  return 0;
 }
 
 // Greedy: the highest score wins, ties broken by the state-seeded rng so the choice is

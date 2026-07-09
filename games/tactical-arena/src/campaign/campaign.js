@@ -11,6 +11,7 @@ export const CAMPAIGN_PROGRESS_KEY = "tacticalArenaCampaignProgressV1";
 export const CLOD_MISSION_ID = "clod-trial";
 export const NECROMANCER_MISSION_ID = "necromancer-rise";
 export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
+export const FATHER_TIME_MISSION_ID = "timeless-woods";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -78,6 +79,18 @@ const AUTHORED_MISSIONS = Object.freeze({
     enemySquad: Object.freeze(["witch-doctor"]),
     size: WITCH_DOCTOR_BOARD_SIZE,
   },
+  [FATHER_TIME_MISSION_ID]: {
+    id: FATHER_TIME_MISSION_ID,
+    title: "Timeless Woods",
+    subtitle: "Lesson: permanent stat buffs and RAGE revives",
+    description: "Bring two chosen units into the old woods against Father Time and an Archer. Father Time will try to turn the Archer into a carry with Age, then threaten Rewind if he reaches RAGE.",
+    unitType: "father-time",
+    requiredStars: 6,
+    rewardUnits: Object.freeze(["father-time"]),
+    playerSlots: 2,
+    enemySquad: Object.freeze(["father-time", "archer"]),
+    size: 11,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -110,8 +123,8 @@ const CAMPAIGN_TRAIL = [
   { id: NECROMANCER_MISSION_ID, cell: { col: 1, row: 4 }, point: { x: 19.0, y: 76.5 }, region: "barrow", locationName: "The Old Gate" },
   { id: WITCH_DOCTOR_MISSION_ID, cell: { col: 2, row: 4 }, point: { x: 31.4, y: 86.2 }, region: "mire", locationName: "Mirefen Shallows",
     blurb: "Foul water swallows the causeway. Something chants in the reeds — a witch doctor's dance, they say, that turns your own curses against you." },
-  { id: "uncharted-04", cell: { col: 3, row: 4 }, point: { x: 21.3, y: 48.4 }, region: "mire", locationName: "Witch's Hollow",
-    blurb: "Deeper in the mire, stilt-huts hang with charms. Fire won't take here, and the fog rots armor and resolve alike." },
+  { id: FATHER_TIME_MISSION_ID, cell: { col: 3, row: 4 }, point: { x: 21.3, y: 48.4 }, region: "wood", locationName: "Timeless Woods",
+    blurb: "Ancient trees lean over a path where seconds fall like leaves. A clock-crowned keeper waits beside a patient archer." },
   { id: "uncharted-05", cell: { col: 4, row: 4 }, point: { x: 11.4, y: 44.7 }, region: "mire", locationName: "Gravemarsh",
     blurb: "Where the swamp drains to the sea, the drowned don't stay drowned. Footing is everything." },
   { id: "uncharted-06", cell: { col: 5, row: 4 }, point: { x: 29.1, y: 34.2 }, region: "coast", locationName: "Tidewatch Harbor",
@@ -374,7 +387,9 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     },
     teamNames: {
       1: "Player Vanguard",
-      2: mission.id === WITCH_DOCTOR_MISSION_ID
+      2: mission.id === FATHER_TIME_MISSION_ID
+        ? "Timeless Court"
+        : mission.id === WITCH_DOCTOR_MISSION_ID
         ? "Swamp Coven"
         : mission.id === NECROMANCER_MISSION_ID
           ? "Gatekeepers"
@@ -493,7 +508,7 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     },
     fallback: (unit) =>
       unit.player === 1
-        ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 4, y: 9 })
+        ? (unit.id.includes("-0-") ? { x: 4, y: 9 } : { x: 2, y: 10 })
         : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 8, y: 5 }),
   },
   // Cursed Swamp (9x9): the Archer starts in the bottom-left corner, boxed in by the map-edge
@@ -512,6 +527,13 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     tileObjects: () => Object.fromEntries(
       WITCH_DOCTOR_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])
     ),
+  },
+  // Timeless Woods (11x11): normal corner placement. The default match builder already
+  // creates the intended two-slot corner blocks, so this layout only gives the mission
+  // deterministic half-HP starts and stable enemy ids for dialogue/objectives.
+  [FATHER_TIME_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
   },
 });
 
@@ -537,6 +559,9 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
     ...match,
     currentPlayer: 1,
     activation: null,
+    ...(missionId === FATHER_TIME_MISSION_ID
+      ? { aiProfile: { fatherTimeCarry: { sourceId: "p2-0-father-time", targetId: "p2-1-archer" } } }
+      : {}),
     tileObjects,
     units: [...units, ...(layout.extraUnits?.(match) ?? [])],
   };
@@ -595,6 +620,28 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       fireDamageTakenCount,
       ghoulBiteTakenCount,
       blackDeathDanceUsed,
+    };
+  } else if (missionId === FATHER_TIME_MISSION_ID) {
+    const archer = enemyUnits.find((unit) => unit.type === "archer") ?? null;
+    const archerDefeatedBeforeFatherTime = Boolean(meta.archerDefeatedBeforeFatherTime);
+    const archerBlinded = Boolean(meta.archerBlinded) ||
+      Boolean(archer?.statuses?.some((status) => status.type === "blind"));
+    const rewindUsed = Boolean(meta.rewindUsed);
+    const fatherTime = enemyUnits.find((unit) => unit.type === "father-time") ?? null;
+    objectives = [
+      { id: "survive", label: "Lose no units", earned: allSurvived },
+      { id: "archerFirst", label: "Defeat the Archer before Father Time", earned: victory && archerDefeatedBeforeFatherTime },
+      { id: "noRewind", label: "Prevent Rewind from happening", earned: victory && !rewindUsed },
+    ];
+    bonusObjectives = [
+      { id: "blindArcher", label: "Bonus: blind the Archer", earned: victory && archerBlinded },
+    ];
+    extra = {
+      fatherTimeDefeated: Boolean(fatherTime && fatherTime.hp <= 0),
+      archerDefeated: Boolean(archer && archer.hp <= 0),
+      archerDefeatedBeforeFatherTime,
+      archerBlinded,
+      rewindUsed,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -901,9 +948,61 @@ export function witchDoctorRageWarningScript(state) {
   ];
 }
 
+// --- Mission 4: Timeless Woods dialogue --------------------------------------
+// Father Time's enemy plan is intentionally readable: make the Archer bigger with
+// Age, then threaten Rewind once RAGE unlocks.
+
+export function fatherTimeMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const fatherTime = findUnit(state, "p2-0-father-time");
+  const archer = findUnit(state, "p2-1-archer");
+  return [
+    {
+      speakerId: fatherTime?.id,
+      text: "The woods remember every arrow ever loosed here. Mine has not been fired yet.",
+    },
+    {
+      speakerId: archer?.id,
+      text: "Give me a little time, old man, and I will make one shot count for all of them.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Watch the buffs. Age can stack +1 STR or +1 DEF on an ally, or drain one of ours, and it lasts until Father Time falls.",
+    },
+    {
+      speaker: "swordsman",
+      text: "If Father Time drops into RAGE, Rewind can revive a fallen ally nearby. Decide whether to break the Archer first or end the clock.",
+    },
+  ];
+}
+
+export function shouldShowFatherTimeRageWarning(state, { warningShown = false, rewindUsed = false } = {}) {
+  if (warningShown || rewindUsed || state?.phase !== "playing") return false;
+  const fatherTime = findUnit(state, "p2-0-father-time");
+  return Boolean(fatherTime && fatherTime.hp > 0 && fatherTime.hp <= 5);
+}
+
+export function fatherTimeRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const fatherTime = findUnit(state, "p2-0-father-time");
+  return [
+    {
+      speakerId: fatherTime?.id,
+      text: "A broken hour is still an hour. RAGE opens the way backward.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Rewind is live now. If the Archer falls while Father Time survives, he can bring her back.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === FATHER_TIME_MISSION_ID) return fatherTimeMissionOpeningScript(state);
   if (missionId === WITCH_DOCTOR_MISSION_ID) return witchDoctorMissionOpeningScript(state);
   if (missionId === NECROMANCER_MISSION_ID) return necromancerMissionOpeningScript(state);
   if (missionId === CLOD_MISSION_ID) return clodMissionOpeningScript(state);
