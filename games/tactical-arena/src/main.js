@@ -27,9 +27,10 @@ import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
+  TEMPO_GAUGE_MAX,
   advanceTempoBattle,
-  canBeginTempoActivation,
   enableTempoBattle,
+  getTempoReadiness,
   isTempoBattle,
   isTempoUnitReady
 } from "./core/tempoBattle.js";
@@ -121,6 +122,22 @@ let tutorialPresentationTimer = 0;
 let campaignMissionId = null;
 let tempoFrame = 0;
 let tempoLastFrameAt = 0;
+// Cheap fingerprint of everything render() cares about beyond the readiness-gauge
+// widths. The real-time loop rebuilds the full board/HUD only when this changes; a
+// plain gauge fill just nudges the existing bars (see the tempo loop + updateTempoGauges).
+let tempoRenderSignature = "";
+// --- Tempo (real-time) command ownership ---
+// In Tempo Battle the bottom command HUD (unit card + action bar) belongs to the PLAYER
+// alone. The CPU lives entirely on the board — it never renders the command HUD, never
+// writes the message line, never touches the player's selection. `tempoCpuActing` is true
+// only while a CPU activation is animating; render()/setMessage() consult it so CPU work
+// stays off the player's HUD. The player always has priority: clicking a ready unit while
+// the CPU is mid-activation queues a preempt (`tempoPendingBegin`) — the CPU finishes its
+// current activation instantly (no more animation) and control snaps to the player, so
+// there is never an artificial wait before you can command your own piece.
+let tempoCpuActing = false;
+let tempoPreempt = false;
+let tempoPendingBegin = null;
 // Per-mission bookkeeping for objective grading + condition-triggered dialogue beats.
 // Reset in startMatch; both missions read/write their own keys.
 let campaignMeta = createCampaignMeta();
@@ -242,9 +259,22 @@ function selectedUnit() {
 }
 
 function render() {
+  // Tempo Battle: while the CPU animates on the board, its work must stay OFF the player's
+  // command HUD (the unit card + action bar are the player's alone). Redraw the board and
+  // readiness rail only and leave the command HUD exactly as the player left it.
+  if (isTempoBattle(state) && tempoCpuActing) {
+    renderBoardAndRail();
+    return;
+  }
+  renderCommandHud();
+  renderBoardAndRail();
+}
+
+// The player's command surface: the selected unit's card + its action buttons. In tempo
+// this is driven ONLY by the player's own selection — never by the CPU or the clock.
+function renderCommandHud() {
   const unit = selectedUnit();
   const controlsEnabled = currentPlayerIsLocal() && !dialogue.isOpen();
-  renderHeader(state, { turnTitle, turnSub, turnBanner });
   renderUnitCard(unit, state, unitCard);
   renderActions(unit, state, mode, { actions, actionHelp }, {
     resolving,
@@ -252,7 +282,22 @@ function render() {
     lockedMessage: lockedActionMessage(),
     onActionClick: (action) => handleActionClick(action, unit)
   });
-  renderSquads(state, squadOverlays, (u) => { beginUnit(u); render(); }, { controlsEnabled });
+}
+
+// The board, the turn/tempo header, the readiness rail, and the forecast — the shared
+// battlefield surface. Safe to redraw from the real-time loop and from CPU animations.
+function renderBoardAndRail() {
+  const unit = selectedUnit();
+  renderHeader(state, { turnTitle, turnSub, turnBanner });
+  // In tempo the rail is the player's selection surface at all times — a ready unit of
+  // theirs stays clickable even while the CPU is acting, so a click can preempt it.
+  const railEnabled = isTempoBattle(state)
+    ? (state.phase === "playing" && !dialogue.isOpen())
+    : (currentPlayerIsLocal() && !dialogue.isOpen());
+  renderSquads(state, squadOverlays, (u) => { beginUnit(u); render(); }, {
+    controlsEnabled: railEnabled,
+    tempoCanSelect: isLocalTempoCommander
+  });
   const currentAreaCenter = areaForecastMode === mode ? areaForecastCenter : null;
   renderBoard({
     board,
@@ -272,7 +317,17 @@ function render() {
   renderForecast({ forecastLayer, state, mode, actor: unit, resolving, areaCenter: currentAreaCenter });
 }
 
+// A living, ready, human-controlled unit the local player may command right now (readiness
+// only — it ignores the single activation slot, so a click can preempt a CPU that holds it).
+function isLocalTempoCommander(unit) {
+  if (!unit || isCpu(unit.player)) return false;
+  if (net != null && unit.player !== mySeat) return false;
+  return isTempoUnitReady(state, unit) && !isStunned(unit);
+}
+
 function setMessage(text, isError = false) {
+  // The CPU never speaks through the player's message line in tempo.
+  if (isTempoBattle(state) && tempoCpuActing) return;
   message.textContent = text;
   message.classList.toggle("error", isError);
 }
@@ -367,6 +422,10 @@ function stopTempoLoop() {
   if (tempoFrame) window.cancelAnimationFrame(tempoFrame);
   tempoFrame = 0;
   tempoLastFrameAt = 0;
+  tempoRenderSignature = "";
+  tempoCpuActing = false;
+  tempoPreempt = false;
+  tempoPendingBegin = null;
 }
 
 function startTempoLoop() {
@@ -382,14 +441,55 @@ function startTempoLoop() {
       if (advanced.state !== state) {
         state = advanced.state;
         if (advanced.events?.length) playRolloverFx(advanced.events);
-        render();
-        announceTurnChange(null);
-        maybeStartTempoCpuTurn();
+        // While an action is animating, leave the board/HUD to the resolve loop and
+        // only nudge the gauge bars — a full render here would rebuild the SVG mid-
+        // animation and tear down the buttons the player is clicking. Otherwise, do a
+        // full render ONLY when something structural changed (a unit became ready, HP
+        // moved, an activation opened/closed, the match ended); a plain gauge fill just
+        // updates the existing bars, so the HUD stops churning 60×/second.
+        if (resolving) {
+          updateTempoGauges();
+        } else {
+          const signature = tempoStructuralSignature();
+          if (advanced.events?.length || signature !== tempoRenderSignature) {
+            tempoRenderSignature = signature;
+            render();
+            announceTurnChange(null); // no-op in tempo except to fire the victory/results flow
+            maybeStartTempoCpuTurn();
+          } else {
+            updateTempoGauges();
+          }
+        }
       }
     }
     tempoFrame = window.requestAnimationFrame(tick);
   };
   tempoFrame = window.requestAnimationFrame(tick);
+}
+
+// Everything render() depends on beyond the moment-to-moment gauge widths. When this is
+// unchanged we skip the full rebuild and only animate the readiness bars.
+function tempoStructuralSignature() {
+  const ready = state.units.filter((u) => u.hp > 0 && isTempoUnitReady(state, u)).map((u) => u.id).join(",");
+  const vitals = state.units.map((u) => `${u.id}:${u.hp}:${u.mp}:${u.spent ? 1 : 0}:${(u.statuses ?? []).length}`).join("|");
+  return `${state.phase}#${state.activation?.unitId ?? ""}#${ready}#${vitals}`;
+}
+
+// Lightweight per-frame update of just the readiness gauges (and the "N units ready"
+// header count) without rebuilding the board or the action bar. The gauge nodes carry a
+// data-tempo-unit attribute (see hud.js) so we can target them in place.
+function updateTempoGauges() {
+  if (!isTempoBattle(state)) return;
+  for (const el of document.querySelectorAll(".vital-tempo[data-tempo-unit]")) {
+    const unitId = el.dataset.tempoUnit;
+    const pct = Math.max(0, Math.min(100, Math.round(getTempoReadiness(state, unitId) / TEMPO_GAUGE_MAX * 100)));
+    const ready = pct >= 100;
+    const fill = el.querySelector(".vital-fill");
+    const num = el.querySelector(".vital-num");
+    if (fill) fill.style.width = `${pct}%`;
+    if (num) num.textContent = ready ? "READY" : `${pct}%`;
+    el.classList.toggle("is-ready", ready);
+  }
 }
 
 function resumeActiveMusic() {
@@ -1617,47 +1717,73 @@ function shouldDelayCpuForTutorialPresentation() {
   ));
 }
 
+// Real-time mode shares ONE activation slot between the player and the CPU, but the player
+// always has priority. The CPU only takes the slot when it is free AND the player has no
+// command queued; the moment the player clicks a ready unit (even mid-CPU-activation) that
+// pending begin is honored first (see runTempoCpuActivation's preempt path). There is no
+// artificial reaction delay — the CPU acts as soon as a unit of its is ready and the board
+// is idle, and the player never waits to command their own piece.
 function maybeStartTempoCpuTurn() {
   if (!isTempoBattle(state) || cpuThinking || resolving || state.activation || state.phase !== "playing") return;
   if (dialogue.isOpen()) return;
-  const readyCpuPlayers = [...(cpu?.players ?? [])].filter((player) =>
-    state.units.some((unit) => unit.player === player && isTempoUnitReady(state, unit))
+  // The player's queued command always wins a free slot.
+  if (tempoPendingBegin) { flushTempoPendingBegin(); return; }
+  const player = [...(cpu?.players ?? [])].find((p) =>
+    state.units.some((unit) => unit.player === p && isTempoUnitReady(state, unit))
   );
-  if (!readyCpuPlayers.length) return;
+  if (player == null) return;
   cpuThinking = true;
-  void runTempoCpuActivation(readyCpuPlayers[0]).finally(() => {
+  void runTempoCpuActivation(player).finally(() => {
     cpuThinking = false;
+    maybeStartTempoCpuTurn();
   });
+}
+
+// The player clicked a ready unit while the board was busy; now that it is free, open that
+// unit's command panel. Runs on the same free-slot path the CPU would have used.
+function flushTempoPendingBegin() {
+  const id = tempoPendingBegin;
+  tempoPendingBegin = null;
+  tempoPreempt = false;
+  const unit = id ? findUnit(state, id) : null;
+  if (unit && isLocalTempoCommander(unit)) beginUnit(unit);
+  render();
 }
 
 async function runTempoCpuActivation(player) {
   const epoch = matchEpoch;
-  resolving = true;
-  selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
+  tempoCpuActing = true;   // keeps this whole activation off the player's command HUD
+  resolving = true;        // serializes the board animation (the player can still preempt)
   render();
-  setMessage(`Player ${player} (CPU) is acting...`);
-  await sleep(CPU_TURN_LEAD_MS);
-  if (epoch !== matchEpoch || state.phase !== "playing" || dialogue.isOpen()) {
-    resolving = false;
-    render();
-    return;
-  }
   const planningState = { ...state, currentPlayer: player };
   const commands = chooseActivation(planningState, {
     difficulty: cpu?.difficulty ?? "normal",
     cpuPlayer: player,
     rng: cpuRng(planningState)
   });
-  for (const command of commands) {
+  for (let i = 0; i < commands.length; i++) {
     if (epoch !== matchEpoch || state.phase !== "playing") break;
-    const applied = await applyCpuCommand(command);
+    // Player preempt: they want the slot. Finish the CPU's remaining plan instantly (state
+    // only, no animation) so the slot frees, then bail — control snaps to the player.
+    if (tempoPreempt) { fastFinishCpuCommands(commands.slice(i)); break; }
+    const applied = await applyCpuCommand(commands[i]);
     resolving = true;
     if (!applied || state.phase !== "playing") break;
   }
+  tempoCpuActing = false;
   resolving = false;
   selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
   render();
-  maybeStartTempoCpuTurn();
+}
+
+// Resolve the tail of a CPU activation with no animation (used when the player preempts) so
+// its state completes and the activation slot frees. dispatch() replays each command
+// through the reducer exactly as an animated apply would, minus the presentation.
+function fastFinishCpuCommands(commands) {
+  for (const command of commands) {
+    if (state.phase !== "playing") break;
+    if (!dispatch(command)) break;
+  }
 }
 
 async function runCpuTurn() {
@@ -1727,9 +1853,12 @@ async function applyCpuCommand(command) {
       if (!dispatch(command)) return false;
       selectedId = command.unitId;
       const unit = findUnit(state, command.unitId);
+      // setMessage/render are HUD-silent during a tempo CPU activation (see their guards);
+      // this line only surfaces in the classic turn-based CPU turn.
       if (unit) setMessage(`Player ${unit.player} (CPU) activates its ${getUnitType(unit.type).name}.`);
       render();
-      await sleep(CPU_STEP_MS);
+      // No artificial "thinking" beat in real-time tempo — it would just delay the board.
+      await sleep(isTempoBattle(state) ? 0 : CPU_STEP_MS);
       return true;
     }
     case "MOVE_UNIT":
@@ -2078,14 +2207,11 @@ function playRolloverFx(events) {
 // --- Input ---
 
 function beginUnit(unit) {
+  // Tempo has its own ownership rules (readiness gauges, player-priority preempt) and must
+  // accept a click even while the board is busy, so it bypasses the turn-based input lock.
+  if (isTempoBattle(state)) { beginTempoUnit(unit); return; }
   if (inputLocked()) return;
-  if (isTempoBattle(state)) {
-    if (!canBeginTempoActivation(state, unit)) return;
-    if (isCpu(unit.player)) return;
-    if (net != null && unit.player !== mySeat) return;
-  } else {
-    if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0 || isStunned(unit)) return;
-  }
+  if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0 || isStunned(unit)) return;
   // Re-selecting the already-active unit (e.g. after deselecting mid-activation)
   // should not re-dispatch beginActivation — that would reset moved/primaryUsed.
   if (state.activation?.unitId === unit.id) {
@@ -2105,7 +2231,48 @@ function beginUnit(unit) {
   }
 }
 
+// Command one of my ready units in real-time. If the board is free it opens the command HUD
+// at once; if the CPU (or an animation) is busy, it queues a preempt so the CPU stands down
+// and control snaps here — the player never waits to command their own piece.
+function beginTempoUnit(unit) {
+  if (state.phase !== "playing" || dialogue.isOpen()) return;
+  if (!isLocalTempoCommander(unit)) return;
+  // Already commanding this unit — just refocus its panel.
+  if (state.activation?.unitId === unit.id) {
+    selectedId = unit.id;
+    mode = null;
+    volleyShotOrigin = null;
+    audio.play("unitSelect");
+    setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
+    render();
+    return;
+  }
+  // Board busy (CPU animating, an action resolving, or a slot already held) — queue this as
+  // a preempt; maybeStartTempoCpuTurn honors it the instant the slot frees.
+  if (tempoCpuActing || resolving || state.activation) {
+    tempoPendingBegin = unit.id;
+    tempoPreempt = true;
+    audio.play("unitSelect");
+    return;
+  }
+  // Board free — take the slot now.
+  if (dispatch(beginActivation(unit.player, unit.id))) {
+    selectedId = unit.id;
+    mode = null;
+    volleyShotOrigin = null;
+    audio.play("unitSelect");
+    setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
+    render();
+  }
+}
+
 async function handleTile(position) {
+  // Tempo: clicking one of my ready units always tries to command it — even while the board
+  // is busy (that queues a preempt). beginTempoUnit gates ownership/readiness itself.
+  if (isTempoBattle(state) && !selectedUnit()) {
+    const clicked = unitAt(state, position);
+    if (clicked && isLocalTempoCommander(clicked)) { beginUnit(clicked); render(); return; }
+  }
   if (inputLocked()) return;
   const unit = selectedUnit();
   if (!unit) {

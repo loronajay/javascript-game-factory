@@ -120,7 +120,7 @@ function tempoGaugeHtml(state, unit) {
   const pct = Math.round((getTempoReadiness(state, unit.id) / TEMPO_GAUGE_MAX) * 100);
   const clamped = Math.max(0, Math.min(100, pct));
   const ready = clamped >= 100;
-  return `<div class="vital vital-tempo${ready ? " is-ready" : ""}">
+  return `<div class="vital vital-tempo${ready ? " is-ready" : ""}" data-tempo-unit="${escapeAttr(unit.id)}">
     <span class="vital-label">AGI ${getUnitAgility(unit)}</span>
     <span class="vital-track"><span class="vital-fill" style="width:${clamped}%"></span></span>
     <span class="vital-num">${ready ? "READY" : `${clamped}%`}</span>
@@ -238,7 +238,7 @@ export function renderActions(
   });
 }
 
-export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnabled = true } = {}) {
+export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnabled = true, tempoCanSelect = null } = {}) {
   squadOverlays.replaceChildren();
   for (const player of state.turnOrder ?? [1, 2]) {
     const panel = document.createElement("section");
@@ -258,7 +258,10 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       const tempoReady = isTempoBattle(state) && isTempoUnitReady(state, unit);
       const selectable = controlsEnabled && !dead && !isStunned(unit) && (
         isTempoBattle(state)
-          ? canBeginTempoActivation(state, unit)
+          // Tempo: readiness-only so a ready unit stays clickable even while the CPU holds
+          // the single activation slot (the click preempts it). Falls back to the strict
+          // slot-aware check when no predicate is supplied (e.g. tests).
+          ? (tempoCanSelect ? tempoCanSelect(unit) : canBeginTempoActivation(state, unit))
           : unit.player === state.currentPlayer && !unit.spent
       );
       row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
