@@ -117,6 +117,8 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .vital-hp .vital-fill { background:linear-gradient(90deg,#3fbf86,var(--hp-high)); }
 .vital-hp.is-low .vital-fill { background:linear-gradient(90deg,#e0566a,var(--hp-low)); }
 .vital-mp .vital-fill { background:linear-gradient(90deg,#4a7fc0,#7db4ea); }
+.vital-tempo .vital-fill { background:linear-gradient(90deg,#d8a33f,#f3dc86); }
+.vital-tempo.is-ready .vital-num { color:#f3dc86; }
 .vital-num { min-width:2.9rem; color:var(--text); font:800 .68rem var(--font-display); letter-spacing:.03em; text-align:right; }
 .vital-num i { color:var(--muted); font-style:normal; font-size:.86em; }
 .vital-hp.is-low .vital-num { color:#ffb3ab; }

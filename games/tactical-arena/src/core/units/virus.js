@@ -29,6 +29,7 @@ export const VIRUS = Object.freeze({
   glyph: "\u{1F9A0}", // 🦠 microbe
   classType: "mage",
   ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
+  tempo: Object.freeze({ agility: 6 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 5,

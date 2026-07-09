@@ -4,6 +4,7 @@ import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
 import { colorOf } from "../core/state.js";
 import { teamLabel, teamOf } from "../match/matchBuilder.js";
+import { TEMPO_GAUGE_MAX, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
 
 function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -35,6 +36,18 @@ export function canCancelMoveInActivation(activation, unit) {
 }
 
 export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
+  if (isTempoBattle(state)) {
+    const ready = state.units.filter((u) => u.hp > 0 && isTempoUnitReady(state, u)).length;
+    const active = state.activation?.unitId ? state.units.find((u) => u.id === state.activation.unitId) : null;
+    const color = active ? colorOf(state, active.player) : "#d8a33f";
+    turnBanner.style.setProperty("--team", color);
+    turnTitle.style.setProperty("--team", color);
+    turnTitle.textContent = state.phase === "complete"
+      ? `${teamLabel(state, state.winner)} wins`
+      : "Tempo Battle";
+    turnSub.textContent = state.phase === "complete" ? "Restart to play again" : `${ready} unit${ready === 1 ? "" : "s"} ready`;
+    return;
+  }
   const color = colorOf(state, state.currentPlayer);
   const available = state.units.filter((u) => u.player === state.currentPlayer && u.hp > 0 && !u.spent && !isStunned(u)).length;
   turnBanner.style.setProperty("--team", color);
@@ -102,6 +115,18 @@ function statLineHtml(definition, stats) {
   return `<div class="unit-statline">${cells}</div>`;
 }
 
+function tempoGaugeHtml(state, unit) {
+  if (!isTempoBattle(state)) return "";
+  const pct = Math.round((getTempoReadiness(state, unit.id) / TEMPO_GAUGE_MAX) * 100);
+  const clamped = Math.max(0, Math.min(100, pct));
+  const ready = clamped >= 100;
+  return `<div class="vital vital-tempo${ready ? " is-ready" : ""}">
+    <span class="vital-label">AGI ${getUnitAgility(unit)}</span>
+    <span class="vital-track"><span class="vital-fill" style="width:${clamped}%"></span></span>
+    <span class="vital-num">${ready ? "READY" : `${clamped}%`}</span>
+  </div>`;
+}
+
 export function renderUnitCard(unit, state, unitCard) {
   if (!unit) {
     toggleClass(unitCard, "is-raging", false);
@@ -109,7 +134,7 @@ export function renderUnitCard(unit, state, unitCard) {
     unitCard.innerHTML = `<figure class="unit-portrait is-hud is-glyph-fallback is-empty">?</figure>
       <div class="unit-info">
         <div class="unit-title-row"><span class="unit-name is-muted">No piece selected</span></div>
-        <div class="unit-meta">Choose an unspent Player ${state.currentPlayer} unit.</div>
+        <div class="unit-meta">${isTempoBattle(state) ? "Choose a ready unit." : `Choose an unspent Player ${state.currentPlayer} unit.`}</div>
         <div class="vitals">${vitalHtml("hp", "HP", 0, 0)}${vitalHtml("mp", "MP", 0, 0)}</div>
       </div>`;
     return;
@@ -132,6 +157,7 @@ export function renderUnitCard(unit, state, unitCard) {
       <div class="vitals">
         ${vitalHtml("hp", "HP", unit.hp, stats.maxHp, { low: unit.hp <= stats.maxHp * 0.3 })}
         ${vitalHtml("mp", "MP", unit.mp, stats.maxMp)}
+        ${tempoGaugeHtml(state, unit)}
       </div>
       ${statLineHtml(definition, stats)}
     </div>`;
@@ -229,7 +255,12 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       const row = document.createElement("div");
       const dead = unit.hp <= 0;
       const active = state.activation?.unitId === unit.id;
-      const selectable = controlsEnabled && unit.player === state.currentPlayer && !unit.spent && !dead && !isStunned(unit);
+      const tempoReady = isTempoBattle(state) && isTempoUnitReady(state, unit);
+      const selectable = controlsEnabled && !dead && !isStunned(unit) && (
+        isTempoBattle(state)
+          ? tempoReady && !state.activation
+          : unit.player === state.currentPlayer && !unit.spent
+      );
       row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
       const tags = dead
         ? `<span class="unit-tag spent">Fallen</span>`
@@ -243,6 +274,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
           <div class="vitals">
             ${vitalHtml("hp", "HP", Math.max(0, unit.hp), stats.maxHp, { low: !dead && unit.hp <= stats.maxHp * 0.3 })}
             ${vitalHtml("mp", "MP", unit.mp, stats.maxMp)}
+            ${tempoGaugeHtml(state, unit)}
           </div>
           ${statLineHtml(definition, stats)}
         </div>`;

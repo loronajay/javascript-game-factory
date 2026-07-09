@@ -11,23 +11,26 @@ import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } fro
 import { applyPostCommandReactions, consumeOneShotRage, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
 import { nextActivePlayer, resolveVictory, spendAndAdvance } from "./turnEngine.js";
+import { isTempoBattle, normalizeTempoStateAfterCommand, prepareTempoStateForCommand } from "./tempoBattle.js";
 
 function stationaryStrengthEffect(unit) {
   return getUnitType(unit.type).arts.find((art) => art.effect?.type === "stationaryStrength")?.effect ?? null;
 }
 
 export function applyCommand(state, command) {
-  const result = dispatchCommand(state, command);
+  const commandState = isTempoBattle(state) ? prepareTempoStateForCommand(state, command) : state;
+  const result = dispatchCommand(commandState, command);
   // A single reconciliation seam runs after EVERY accepted command, diffing the input
   // state against the result to catch every unit that fell or was revived — regardless
   // of which resolver or turn-rollover hazard (fire/poison/black-death/time-steal) did
   // it — and applies the King's reactive HP swings. Deterministic (no RNG), so online
   // lockstep clients all compute the identical reaction.
   if (result.accepted) {
-    applyPostCommandReactions(state, result.nextState, result.events, {
+    applyPostCommandReactions(commandState, result.nextState, result.events, {
       resolveNemesisAutoPulse,
       resolveVolcanicPyroclasmTick
     });
+    normalizeTempoStateAfterCommand(result.nextState);
   }
   return result;
 }

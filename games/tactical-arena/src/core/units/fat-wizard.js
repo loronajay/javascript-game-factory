@@ -4,6 +4,7 @@ export const FAT_WIZARD = Object.freeze({
   glyph: "🪄",
   classType: "mage",
   ai: Object.freeze({ threatValue: 15, role: "caster", protect: true }),
+  tempo: Object.freeze({ agility: 4 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 3,

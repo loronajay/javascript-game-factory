@@ -11,9 +11,12 @@ export const CAMPAIGN_PROGRESS_KEY = "tacticalArenaCampaignProgressV1";
 export const CLOD_MISSION_ID = "clod-trial";
 export const NECROMANCER_MISSION_ID = "necromancer-rise";
 export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
-// Small board on purpose: a 3×3 Ghoul lattice fills an 11×11 grid so the swamp reads as
-// dense without the unit count of a bigger lattice.
-export const WITCH_DOCTOR_BOARD_SIZE = 11;
+// A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
+// clearance from the board edge on every side, so none of its own orthogonal fire gets
+// clipped off-board. A separate fire border runs along the true map edge itself (all four
+// sides, minus the spawn tile), closing the gap between the lattice's own fire and the
+// board boundary so there's no ring left to walk around the whole thing on.
+export const WITCH_DOCTOR_BOARD_SIZE = 9;
 // Rain Dance may only be cast this many times over the whole mission. Without a cap,
 // the Witch Doctor's 30 MP pool lets the CPU stall on Rain Dance every turn while the
 // player is still crossing the Ghoul lattice (1 HP the first cast, then +1 more per cast
@@ -62,11 +65,16 @@ const AUTHORED_MISSIONS = Object.freeze({
     id: WITCH_DOCTOR_MISSION_ID,
     title: "Cursed Swamp of the Witch Doctor",
     subtitle: "Lesson: body-blocks, fire lanes, and Volley Shot",
-    description: "Send one unit through a swamp lattice of permanent fire and Ghoul bodies. Range keeps the bites off, Volley Shot reaches through blockers, and speed denies Black Death Dance.",
+    description: "Send the Archer alone into a solid Ghoul block pinned in the swamp's far corner. Orthogonal fire marks the only tiles that don't bite twice, Volley Shot reaches through blockers, and speed denies Black Death Dance.",
     unitType: "witch-doctor",
     requiredStars: 4,
     rewardUnits: Object.freeze(["witch-doctor"]),
     playerSlots: 1,
+    // This mission's puzzle is specifically "use the Archer's Volley Shot to break a
+    // body-blocked line," not "figure out which unit to bring" — squadLocked pins the
+    // squad to the Archer so the mission always tests that exact lesson.
+    defaultSquad: Object.freeze(["archer"]),
+    squadLocked: true,
     enemySquad: Object.freeze(["witch-doctor"]),
     size: WITCH_DOCTOR_BOARD_SIZE,
   },
@@ -348,7 +356,12 @@ export function getCampaignMap(storage = defaultStorage()) {
 export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedSquad = null) {
   const mission = getCampaignMission(missionId);
   if (!mission || mission.comingSoon) throw new Error(`Campaign mission is not playable: ${missionId}`);
-  const playerSquad = normalizeCampaignSquad(selectedSquad ?? mission.defaultSquad ?? DEFAULT_SQUAD, mission);
+  // squadLocked missions test a specific unit's kit, not squad choice — the authored
+  // defaultSquad always wins, even if a caller (or a stale UI selection) passes something
+  // else in.
+  const playerSquad = mission.squadLocked
+    ? normalizeCampaignSquad(mission.defaultSquad ?? DEFAULT_SQUAD, mission)
+    : normalizeCampaignSquad(selectedSquad ?? mission.defaultSquad ?? DEFAULT_SQUAD, mission);
   return {
     mode: "campaign",
     campaignMissionId: mission.id,
@@ -370,34 +383,66 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
   };
 }
 
-// The swamp lattice: a 3×3 grid of Ghoul bodies spaced 4 tiles apart (x,y each in
-// {2,6,10}). Fire fills each Ghoul's four ORTHOGONAL neighbours only (not the full
-// Chebyshev-1 bite range) — the flames mark a cross around each Ghoul rather than a solid
-// block, so the diagonal tiles stay bite-range but fire-free (a Ghoul Bite risk without a
-// burn). Because the clusters sit 4 apart, that leaves clean one-tile "avenues" (rows/columns
-// 0, 4, 8) running between them — the obvious, safe route the player walks toward the Witch
-// Doctor.
-const WITCH_DOCTOR_GHOUL_LATTICE = Object.freeze([2, 6, 10]);
+// The swamp lattice: a SPREAD 3×3 Ghoul grid, spacing 2 (x,y each in {2,4,6}) — close enough
+// that every gap between Ghouls is covered by either a Ghoul's orthogonal fire or another
+// Ghoul's diagonal Bite range (Chebyshev 1), so nothing inside the lattice's own footprint is
+// free to walk except a Ghoul's own tile once it's dead. Spacing 2 (not the old spacing-4
+// lattice) is what closes the "avenue" loophole those wider gaps used to leave open. The
+// lattice's own top-right slot is left empty for the Witch Doctor rather than a ninth Ghoul.
+const WITCH_DOCTOR_LATTICE_VALUES = Object.freeze([2, 4, 6]);
+const WITCH_DOCTOR_SLOT = Object.freeze({ x: 6, y: 2 }); // top-right of the lattice
+const WITCH_DOCTOR_SPAWN = Object.freeze({ x: 0, y: WITCH_DOCTOR_BOARD_SIZE - 1 });
 const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze(
-  WITCH_DOCTOR_GHOUL_LATTICE.flatMap((y) =>
-    WITCH_DOCTOR_GHOUL_LATTICE.map((x) => Object.freeze({ x, y }))
-  )
+  WITCH_DOCTOR_LATTICE_VALUES.flatMap((y) => WITCH_DOCTOR_LATTICE_VALUES.map((x) => ({ x, y })))
+    .filter((p) => !(p.x === WITCH_DOCTOR_SLOT.x && p.y === WITCH_DOCTOR_SLOT.y))
+    .map((p) => Object.freeze(p))
 );
+const WITCH_DOCTOR_GHOUL_POSITION_KEYS = new Set(WITCH_DOCTOR_GHOUL_POSITIONS.map(positionKey));
 
-// Fire is derived from the Ghoul lattice — each Ghoul's four orthogonal neighbours, clipped
-// to the board and deduped. Orthogonal-only (not the full 8-tile bite range) so the burn
-// pattern reads as a clean cross around each Ghoul rather than a solid 3x3 block, leaving the
-// diagonal tiles as a tighter (but still bite-range) way to thread past a cluster.
+// Fire has two unioned sources:
+// 1. Each Ghoul's four ORTHOGONAL neighbours, clipped to the board and excluding any tile
+//    that's itself a Ghoul position (spacing 2 means that never actually happens here, but
+//    the guard stays cheap insurance against a future spacing change). This lattice fire only
+//    reaches 1 tile past the outermost Ghouls, so on its own it leaves the true board edge
+//    open — a gap the old spacing-4 layout let a player walk clean around.
+// 2. A full 1-tile fire border along the true edges of the map itself (all four sides),
+//    minus the player's spawn tile. This is what actually stops the edge-creep: the lattice
+//    is positioned with exactly 1 tile of clearance from the board edge, so its own outward
+//    fire sits immediately adjacent to this border with no safe ring left between them.
+function ghoulOrthogonalFireKeys() {
+  const keys = new Set();
+  for (const ghoul of WITCH_DOCTOR_GHOUL_POSITIONS) {
+    for (const dir of ORTHOGONAL_DIRECTIONS) {
+      const p = { x: ghoul.x + dir.x, y: ghoul.y + dir.y };
+      if (p.x < 0 || p.y < 0 || p.x >= WITCH_DOCTOR_BOARD_SIZE || p.y >= WITCH_DOCTOR_BOARD_SIZE) continue;
+      if (WITCH_DOCTOR_GHOUL_POSITION_KEYS.has(positionKey(p))) continue;
+      keys.add(positionKey(p));
+    }
+  }
+  return keys;
+}
+
+function mapBorderFireKeys() {
+  const keys = new Set();
+  const max = WITCH_DOCTOR_BOARD_SIZE - 1;
+  const spawnKey = positionKey(WITCH_DOCTOR_SPAWN);
+  for (let x = 0; x <= max; x += 1) {
+    for (const y of [0, max]) {
+      const key = positionKey({ x, y });
+      if (key !== spawnKey) keys.add(key);
+    }
+  }
+  for (let y = 0; y <= max; y += 1) {
+    for (const x of [0, max]) {
+      const key = positionKey({ x, y });
+      if (key !== spawnKey) keys.add(key);
+    }
+  }
+  return keys;
+}
+
 const WITCH_DOCTOR_FIRE_POSITIONS = Object.freeze(
-  [...new Set(
-    WITCH_DOCTOR_GHOUL_POSITIONS.flatMap((ghoul) =>
-      ORTHOGONAL_DIRECTIONS
-        .map((dir) => ({ x: ghoul.x + dir.x, y: ghoul.y + dir.y }))
-        .filter((p) =>
-          p.x >= 0 && p.y >= 0 && p.x < WITCH_DOCTOR_BOARD_SIZE && p.y < WITCH_DOCTOR_BOARD_SIZE)
-        .map((p) => positionKey(p))
-    )
-  )].map((key) => {
+  [...new Set([...ghoulOrthogonalFireKeys(), ...mapBorderFireKeys()])].map((key) => {
     const [x, y] = key.split(",").map(Number);
     return Object.freeze({ x, y });
   })
@@ -451,18 +496,18 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 4, y: 9 })
         : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 8, y: 5 }),
   },
-  // Cursed Swamp (11x11): one drafted unit starts in the lower-left corner and pushes
-  // toward the Witch Doctor in the upper-right corner. A 3×3 Ghoul lattice fills the small
-  // board; fire marks every Ghoul's bite range, so the safe avenues (rows/cols 0, 4, 8)
-  // read clearly and the corners stay clear so nobody spawns on a hazard.
+  // Cursed Swamp (9x9): the Archer starts in the bottom-left corner, boxed in by the map-edge
+  // fire border on two sides, and pushes toward the Witch Doctor standing in the spread
+  // lattice's own vacated top-right slot (see WITCH_DOCTOR_GHOUL_POSITIONS + the fire-source
+  // comment above it).
   [WITCH_DOCTOR_MISSION_ID]: {
     positions: {
-      "p2-0-witch-doctor": { x: 10, y: 0 },
+      "p2-0-witch-doctor": { ...WITCH_DOCTOR_SLOT },
     },
     fallback: (unit) =>
       unit.player === 1
-        ? { x: 0, y: 10 }
-        : { x: 10, y: 0 },
+        ? { ...WITCH_DOCTOR_SPAWN }
+        : { ...WITCH_DOCTOR_SLOT },
     extraUnits: () => WITCH_DOCTOR_GHOUL_POSITIONS.map((position, index) => createCampaignGhoul(index, position)),
     tileObjects: () => Object.fromEntries(
       WITCH_DOCTOR_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])

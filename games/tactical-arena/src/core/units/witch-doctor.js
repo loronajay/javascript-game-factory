@@ -30,6 +30,7 @@ export const WITCH_DOCTOR = Object.freeze({
   glyph: "🪘",
   classType: "support",
   ai: Object.freeze({ threatValue: 15, role: "support", protect: true }),
+  tempo: Object.freeze({ agility: 5 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 4,

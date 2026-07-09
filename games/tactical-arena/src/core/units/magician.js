@@ -2,6 +2,7 @@ export const MAGICIAN = Object.freeze({
   id: "magician",
   name: "Magician",
   ai: Object.freeze({ threatValue: 13, role: "caster", protect: true }),
+  tempo: Object.freeze({ agility: 5 }),
   glyph: "✦",
   classType: "mage",
   stats: Object.freeze({

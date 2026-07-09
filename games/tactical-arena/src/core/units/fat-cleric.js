@@ -30,6 +30,7 @@ export const FAT_CLERIC = Object.freeze({
   glyph: "✚",
   classType: "support",
   ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
+  tempo: Object.freeze({ agility: 4 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 4,

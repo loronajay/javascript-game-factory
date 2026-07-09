@@ -63,7 +63,9 @@ function isStunDuration(duration) {
 
 export function isStunned(unit) {
   return (unit.statuses ?? []).some((status) => {
-    return status.type === "stun" && isStunDuration(status.duration);
+    if (status.type !== "stun") return false;
+    if (status.duration === "timer") return Math.max(0, Number(status.remainingMs) || 0) > 0;
+    return isStunDuration(status.duration);
   });
 }
 

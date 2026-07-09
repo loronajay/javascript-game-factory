@@ -37,6 +37,7 @@ export const KING = Object.freeze({
   commandOnly: true,
   sustainsVictory: false,
   ai: Object.freeze({ threatValue: 22, role: "support", protect: true }),
+  tempo: Object.freeze({ agility: 2 }),
   stats: Object.freeze({
     moveRange: 0,
     attackRange: 0,

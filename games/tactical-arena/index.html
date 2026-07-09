@@ -73,6 +73,7 @@
           <h2 class="menu-heading">Main Menu</h2>
           <div class="menu-buttons menu-choice-list">
             <button data-nav="campaign" class="primary menu-btn menu-choice"><span>Campaign</span></button>
+            <button data-nav="tempoMenu" class="primary menu-btn menu-choice"><span>Tempo Battle</span></button>
             <button data-nav="onlineSetup" class="menu-btn menu-choice"><span>Online Versus</span></button>
             <button data-nav="spSetup" class="primary menu-btn menu-choice"><span>Vs CPU</span></button>
             <button data-nav="tutorialSelect" class="primary menu-btn menu-choice"><span>Tutorials</span></button>
@@ -83,6 +84,22 @@
             <button data-action="skins" class="menu-btn ghost">Skins</button>
             <button data-action="settings" class="menu-btn ghost">Settings</button>
             <button data-nav="title" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================== TEMPO BATTLE ========================== -->
+      <section class="screen menu-screen" data-screen="tempoMenu">
+        <div class="menu-card hub-card">
+          <h2 class="menu-heading">Tempo Battle</h2>
+          <p class="menu-note">Real-time readiness battles. Units act when their AGILITY-driven command gauge fills.</p>
+          <div class="menu-buttons menu-choice-list">
+            <button data-nav="tempoSpSetup" class="primary menu-btn menu-choice"><span>Vs CPU</span></button>
+            <button class="menu-btn menu-choice" disabled><span>Online Versus</span></button>
+            <button class="menu-btn menu-choice" disabled><span>Hot Seat</span></button>
+          </div>
+          <div class="menu-secondary-actions">
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
           </div>
         </div>
       </section>
@@ -207,6 +224,44 @@
           <div class="menu-buttons">
             <button data-action="startSingle" class="primary menu-btn">Start Match</button>
             <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================== TEMPO SINGLE PLAYER ====================== -->
+      <section class="screen menu-screen" data-screen="tempoSpSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Tempo Battle Vs CPU</h2>
+          <p class="menu-note">Command Player 1 in real time as units become ready.</p>
+
+          <div class="setup-field">
+            <span class="setup-label">Difficulty</span>
+            <div class="segmented" data-field="difficulty">
+              <button type="button" class="seg" data-difficulty="easy">Easy</button>
+              <button type="button" class="seg is-selected" data-difficulty="normal">Normal</button>
+              <button type="button" class="seg" data-difficulty="hard">Hard</button>
+            </div>
+          </div>
+
+          <div class="setup-field">
+            <span class="setup-label">Board size</span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="13">13 Ã— 13</button>
+              <button type="button" class="seg" data-size="15">15 Ã— 15</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Squads</span>
+            <p class="setup-hint">
+              Each unit has an AGILITY value in Tempo Battle. Faster units become ready more often.
+            </p>
+            <div class="squad-pickers" data-tempo-sp-squad-pickers></div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-action="startTempoSingle" class="primary menu-btn">Start Tempo Battle</button>
+            <button data-nav="tempoMenu" class="menu-btn ghost">Back</button>
           </div>
         </div>
       </section>

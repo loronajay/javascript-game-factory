@@ -426,48 +426,78 @@ test("Witch Doctor mission appears as the third swamp stop once enough stars are
   assert.equal(node.biome, "swamp");
 });
 
-test("Witch Doctor mission builds an 11x11 solo gauntlet with permanent fire and summoner-less Ghouls", () => {
-  const config = createCampaignMatchConfig(WITCH_DOCTOR_MISSION_ID, ["archer", "mystic"]);
-  const match = witchDoctorMatchState(["archer", "mystic"]);
+test("Witch Doctor mission builds a 9x9 solo gauntlet: a spread Ghoul lattice ringed by a map-edge fire border", () => {
+  // squadLocked pins the squad to the Archer regardless of what's passed in.
+  const config = createCampaignMatchConfig(WITCH_DOCTOR_MISSION_ID, ["mystic"]);
+  const match = witchDoctorMatchState(["mystic"]);
   const ghouls = match.units.filter((unit) => unit.type === "ghoul");
   const fires = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "fire");
 
   assert.equal(config.mode, "campaign");
-  assert.equal(config.size, 11);
+  assert.equal(config.size, 9);
   assert.deepEqual(config.squads[1], ["archer"]);
   assert.deepEqual(config.squads[2], ["witch-doctor"]);
   assert.equal(config.teamNames[2], "Swamp Coven");
   assert.equal(match.currentPlayer, 1);
 
-  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 0, y: 10 });
-  assert.deepEqual(findUnit(match, "p2-0-witch-doctor").position, { x: 10, y: 0 });
+  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 0, y: 8 });
+  assert.deepEqual(findUnit(match, "p2-0-witch-doctor").position, { x: 6, y: 2 });
   assert.equal(findUnit(match, "p1-0-archer").hp, 12);
   assert.equal(findUnit(match, "p2-0-witch-doctor").hp, 12);
-  assert.equal(ghouls.length, 9); // a 3x3 lattice
+  assert.equal(ghouls.length, 8); // a spread 3x3 lattice (spacing 2) minus the Witch Doctor's slot
   assert.equal(ghouls.every((unit) => unit.hp === 5 && unit.mp === 0 && unit.spent === true), true);
   assert.equal(ghouls.every((unit) => unit.summonerId == null), true);
-  assert.equal(fires.length, 30);
-  assert.equal(fires.every((obj) => obj.permanent === true), true);
   assert.equal(Object.values(match.tileObjects ?? {}).some((obj) => obj.kind === "wall"), false);
-  assert.equal(ghouls.some((unit) => unit.position.x === 5 && unit.position.y === 5), false);
-  assert.ok(ghouls.some((unit) => unit.position.x === 6 && unit.position.y === 6), "a central Ghoul blocks shot lines");
+  assert.equal(fires.length, 53);
+  assert.equal(fires.every((obj) => obj.permanent === true), true);
+
+  const ghoulKeys = new Set(ghouls.map((unit) => `${unit.position.x},${unit.position.y}`));
+  // The lattice fills the full 3x3 spacing-2 grid (x,y each in {2,4,6}) except the Witch
+  // Doctor's own top-right slot (6,2) — no ninth Ghoul there.
+  for (const x of [2, 4, 6]) {
+    for (const y of [2, 4, 6]) {
+      if (x === 6 && y === 2) continue;
+      assert.ok(ghoulKeys.has(`${x},${y}`), `lattice tile (${x},${y}) is occupied`);
+    }
+  }
+  assert.ok(!ghoulKeys.has("6,2"), "the Witch Doctor's slot has no Ghoul");
 
   const fireAt = (x, y) => (match.tileObjects ?? {})[`${x},${y}`]?.kind === "fire";
-  const occupied = (x, y) => match.units.some((unit) => unit.position.x === x && unit.position.y === y);
-  // Fire marks only a Ghoul's four ORTHOGONAL neighbours (a cross, not the full 3x3 bite
-  // block), so diagonal bite tiles stay fire-free.
-  for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
-    assert.ok(fireAt(6 + dx, 6 + dy), `a Ghoul's orthogonal bite tile (${dx},${dy}) burns`);
+  // A full 1-tile fire border runs along every true map edge except the Archer's own
+  // spawn tile — this is what closes the edge-creep loophole.
+  for (let x = 0; x <= 8; x += 1) assert.ok(fireAt(x, 0), `top edge (${x},0) burns`);
+  for (let x = 1; x <= 8; x += 1) assert.ok(fireAt(x, 8), `bottom edge (${x},8) burns`);
+  for (let y = 0; y <= 8; y += 1) assert.ok(fireAt(8, y), `right edge (8,${y}) burns`);
+  for (let y = 0; y <= 7; y += 1) assert.ok(fireAt(0, y), `left edge (0,${y}) burns`);
+  assert.ok(!fireAt(0, 8), "the Archer's own spawn tile never burns");
+
+  // Each Ghoul's own orthogonal (not diagonal) neighbours burn too, sitting immediately
+  // adjacent to the map-edge border with no safe gap between them.
+  for (const [x, y] of [[2, 1], [4, 1], [2, 3], [1, 2], [3, 2]]) {
+    assert.ok(fireAt(x, y), `lattice orthogonal fire tile (${x},${y}) burns`);
   }
-  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    assert.ok(!fireAt(6 + dx, 6 + dy), `a Ghoul's diagonal bite tile (${dx},${dy}) doesn't burn`);
+  // A diagonal gap between Ghouls stays fire-free but is still covered by Ghoul-Bite range
+  // (Chebyshev 1) from more than one neighbour — orthogonal-only fire, diagonal bite risk.
+  assert.ok(!fireAt(3, 3), "a diagonal lattice gap doesn't burn even though it's bite range");
+
+  // No fully hazard-free path exists from the Archer's spawn corner to the Witch Doctor:
+  // other than his own tile and the spawn, the only tiles with neither fire nor any Ghoul
+  // within Bite range (Chebyshev 1) sit isolated right next to his vacated lattice slot,
+  // unreachable without first crossing a covered tile.
+  const chebyshev = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  const biteFree = (x, y) => ghouls.every((g) => chebyshev(g.position, { x, y }) > 1);
+  const clear = (x, y) => !fireAt(x, y) && biteFree(x, y) && !ghoulKeys.has(`${x},${y}`);
+  const clearTiles = [];
+  for (let x = 0; x <= 8; x += 1) {
+    for (let y = 0; y <= 8; y += 1) {
+      if (clear(x, y)) clearTiles.push(`${x},${y}`);
+    }
   }
-  // The avenues between clusters (rows/cols 0, 4, 8) stay clear of fire AND units.
-  for (const [x, y] of [[4, 4], [4, 0], [0, 4], [8, 8], [0, 0], [8, 0], [0, 8]]) {
-    assert.ok(!fireAt(x, y) && !occupied(x, y), `avenue tile (${x},${y}) is walkable`);
-  }
-  // The spawn and Witch Doctor corners are hazard-free even though a unit stands on each.
-  assert.ok(!fireAt(0, 10) && !fireAt(10, 0), "the spawn/Witch-Doctor corners never burn");
+  assert.deepEqual(
+    clearTiles.sort(),
+    ["0,8", "6,1", "6,2", "7,1", "7,2"].sort(),
+    "the only fully-clear tiles are the spawn and a small pocket around the Witch Doctor's slot"
+  );
 });
 
 test("Witch Doctor mission dialogue covers body-block, fire, Ghoul bite, and RAGE warnings", () => {

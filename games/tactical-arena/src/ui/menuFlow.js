@@ -65,7 +65,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
-  for (const name of ["title", "hsSetup", "spSetup", "results", "tutorialComplete"]) {
+  for (const name of ["title", "hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
   screens.register("mainMenu", {
@@ -108,9 +108,11 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   const hsSetup = screenEl("hsSetup");
   const spSetup = screenEl("spSetup");
+  const tempoSpSetup = screenEl("tempoSpSetup");
   const hsSquadHost = $("[data-squad-pickers]", hsSetup);
   const hsPickers = new Map();
   const spPickers = buildSquadPickers($("[data-sp-squad-pickers]", spSetup), "Computer");
+  const tempoSpPickers = buildSquadPickers($("[data-tempo-sp-squad-pickers]", tempoSpSetup), "Computer");
 
   function ensureHotSeatPicker(player) {
     if (!hsPickers.has(player)) {
@@ -166,6 +168,19 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       size,
       squads: { 1: spPickers.p1.getSquad(), 2: spPickers.p2.getSquad() },
       skins: { 1: spPickers.p1.getSkins(), 2: spPickers.p2.getSkins() }
+    };
+  }
+
+  function gatherTempoSingleConfig() {
+    const size = Number(selectedValue(tempoSpSetup, "boardSize", "size")) || 13;
+    const difficulty = selectedValue(tempoSpSetup, "difficulty", "difficulty") || "normal";
+    return {
+      mode: "tempo-single",
+      battleMode: "tempo",
+      difficulty,
+      size,
+      squads: { 1: tempoSpPickers.p1.getSquad(), 2: tempoSpPickers.p2.getSquad() },
+      skins: { 1: tempoSpPickers.p1.getSkins(), 2: tempoSpPickers.p2.getSkins() }
     };
   }
 
@@ -225,7 +240,14 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     }
     const selectedNode = map.nodes.find((node) => node.id === selectedCampaignMissionId) ?? map.nodes[0];
     selectedCampaignNode = selectedNode;
-    normalizeCampaignSquadForProgress(selectedCampaignMissionId, campaignSquadSize(selectedNode));
+    // A squad-locked mission (e.g. the Witch Doctor's solo Archer gauntlet) always deploys
+    // its authored defaultSquad — the puzzle there is using that unit's kit, not picking it.
+    if (selectedNode?.squadLocked) {
+      campaignSquad = [...(selectedNode.defaultSquad ?? [])];
+      campaignSquadMissionId = selectedCampaignMissionId;
+    } else {
+      normalizeCampaignSquadForProgress(selectedCampaignMissionId, campaignSquadSize(selectedNode));
+    }
     campaignStars.textContent = `${map.totalStars} ★`;
     campaignMapHost.replaceChildren();
 
@@ -393,17 +415,24 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   function renderCampaignSquad() {
     campaignSquadHost.replaceChildren();
+    const locked = Boolean(selectedCampaignNode?.squadLocked);
     campaignSquad.forEach((type, index) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `campaign-squad-slot${type ? "" : " is-empty"}`;
-      button.dataset.action = "chooseCampaignUnit";
-      button.dataset.slot = String(index);
+      button.className = `campaign-squad-slot${type ? "" : " is-empty"}${locked ? " is-locked" : ""}`;
+      if (locked) {
+        button.disabled = true;
+      } else {
+        button.dataset.action = "chooseCampaignUnit";
+        button.dataset.slot = String(index);
+      }
       const copy = document.createElement("span");
       if (type) {
         const def = UNIT_TYPES[type];
         button.append(createPortrait(type, { variant: "is-chip", eager: true }));
-        copy.innerHTML = `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)}</i>`;
+        copy.innerHTML = locked
+          ? `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)} · Required</i>`
+          : `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)}</i>`;
       } else {
         copy.innerHTML = `<b>Slot ${index + 1}</b><i>Choose a unit…</i>`;
       }
@@ -461,6 +490,8 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       ? "Online Versus"
       : lastConfig?.mode === "campaign"
         ? "Campaign"
+      : lastConfig?.mode === "tempo-single"
+        ? `Tempo Battle Â· ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
       : lastConfig?.mode === "single"
         ? `Single Player · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
         : "Hot Seat");
@@ -624,6 +655,8 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     campaignSquadMissionId = null;
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
+    tempoSpPickers.p1.setLoadout(DEFAULT_SQUAD);
+    tempoSpPickers.p2.setLoadout(DEFAULT_SQUAD);
     for (const picker of hsPickers.values()) picker.setLoadout(DEFAULT_SQUAD);
     if (screens.active === "tutorialSelect") renderTutorialSelect();
     if (screens.active === "hsSetup") syncHotSeatSetup();
@@ -686,6 +719,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       }
       case "startHotSeat": { startMatchTracked(gatherHotSeatConfig()); break; }
       case "startSingle": { startMatchTracked(gatherSingleConfig()); break; }
+      case "startTempoSingle": { startMatchTracked(gatherTempoSingleConfig()); break; }
       case "rematch": if (lastConfig && lastConfig.mode !== "online") startMatchTracked(lastConfig); break;
       default: break;
     }

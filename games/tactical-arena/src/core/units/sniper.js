@@ -9,6 +9,7 @@ export const SNIPER = Object.freeze({
   id: "sniper",
   name: "Sniper",
   ai: Object.freeze({ threatValue: 13, role: "ranged", protect: true }),
+  tempo: Object.freeze({ agility: 8 }),
   glyph: "🎯",
   classType: "ranger",
   stats: Object.freeze({

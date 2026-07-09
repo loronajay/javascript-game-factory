@@ -4,6 +4,7 @@ export const NEMESIS = Object.freeze({
   glyph: "N",
   classType: "mage",
   ai: Object.freeze({ threatValue: 16, role: "caster", protect: true }),
+  tempo: Object.freeze({ agility: 6 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 5,

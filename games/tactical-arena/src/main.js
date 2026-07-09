@@ -27,6 +27,12 @@ import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
+  advanceTempoBattle,
+  enableTempoBattle,
+  isTempoBattle,
+  isTempoUnitReady
+} from "./core/tempoBattle.js";
+import {
   CLOD_MISSION_ID,
   NECROMANCER_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
@@ -112,6 +118,8 @@ let pendingTutorialBeforeDialogueAction = null;
 let pendingTutorialAfterDialogueAction = null;
 let tutorialPresentationTimer = 0;
 let campaignMissionId = null;
+let tempoFrame = 0;
+let tempoLastFrameAt = 0;
 // Per-mission bookkeeping for objective grading + condition-triggered dialogue beats.
 // Reset in startMatch; both missions read/write their own keys.
 let campaignMeta = createCampaignMeta();
@@ -153,6 +161,12 @@ function isCpu(player) {
 }
 
 function currentPlayerIsLocal() {
+  if (isTempoBattle(state)) {
+    const active = state.activation?.unitId ? findUnit(state, state.activation.unitId) : null;
+    if (active && isCpu(active.player)) return false;
+    if (net != null && active && active.player !== mySeat) return false;
+    return true;
+  }
   if (isCpu(state.currentPlayer)) return false;
   if (net != null && state.currentPlayer !== mySeat) return false;
   return true;
@@ -161,6 +175,7 @@ function currentPlayerIsLocal() {
 function lockedActionMessage() {
   if (state.phase === "complete") return "The duel is complete.";
   if (dialogue.isOpen()) return "Dialogue is open.";
+  if (isTempoBattle(state)) return state.activation ? "That unit is acting." : "Wait for a ready unit.";
   if (isCpu(state.currentPlayer)) return `Player ${state.currentPlayer} (CPU) is taking its turn.`;
   if (net != null && state.currentPlayer !== mySeat) return `Player ${state.currentPlayer}'s turn - please wait.`;
   return "Wait for your turn.";
@@ -266,6 +281,7 @@ function setMessage(text, isError = false) {
 function startMatch(config) {
   window.clearTimeout(resultsTimer);
   window.clearTimeout(tutorialPresentationTimer);
+  stopTempoLoop();
   matchEpoch += 1;
   const online = config.mode === "online";
   // Online builds from the relay's shared seed so every client draws identical dice;
@@ -282,6 +298,7 @@ function startMatch(config) {
   });
   if (config.mode === "tutorial") state = prepareTutorialMatchState(state, config.tutorialId ?? TUTORIAL_BASICS_ID);
   if (config.mode === "campaign") state = prepareCampaignMatchState(state, config.campaignMissionId);
+  if (config.battleMode === "tempo" || config.mode?.startsWith("tempo-")) state = enableTempoBattle(state);
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
@@ -299,7 +316,7 @@ function startMatch(config) {
   pendingTutorialAfterDialogueAction = null;
   // Single-player drives Player 2 with the CPU. Tutorial mode uses the same turn lock,
   // but swaps in a scripted no-ART teaching driver.
-  cpu = config.mode === "single" || config.mode === "tutorial" || config.mode === "campaign"
+  cpu = config.mode === "single" || config.mode === "tempo-single" || config.mode === "tutorial" || config.mode === "campaign"
     ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) }
     : null;
   cpuThinking = false;
@@ -319,6 +336,7 @@ function startMatch(config) {
   setMessage(online
     ? (state.currentPlayer === mySeat ? "You open the battle." : `Player ${state.currentPlayer}'s turn — please wait.`)
     : `${isCpu(state.currentPlayer) ? `Player ${state.currentPlayer} (CPU)` : `Player ${state.currentPlayer}`} opens the battle.`);
+  if (isTempoBattle(state)) setMessage("Tempo Battle begins. Units become ready by AGILITY.");
   if (tutorial) setMessage(tutorial.prompt);
   menu.show("match");
   if (audioUnlocked && !muted) audio.startMusic(musicKeyForMatchMode(config.mode));
@@ -326,7 +344,7 @@ function startMatch(config) {
   // the lobby→match handoff flush onto a live board.
   if (online) net.bind(onlineController);
   render();
-  announceTurn(state.currentPlayer);
+  if (!isTempoBattle(state)) announceTurn(state.currentPlayer);
   if (tutorial) queueTutorialPresentation({ dialogue: tutorial.dialogue });
   else if (matchConfig?.mode === "campaign" && campaignMissionId) {
     const script = campaignOpeningScript(campaignMissionId, state);
@@ -335,12 +353,42 @@ function startMatch(config) {
       maybeStartCpuTurn();
     });
   }
+  if (isTempoBattle(state)) startTempoLoop();
   maybeStartCpuTurn();
 }
 
 function resetBattle() {
   if (net) return; // a networked match can't be unilaterally restarted
   startMatch(matchConfig ?? { size: 13, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
+}
+
+function stopTempoLoop() {
+  if (tempoFrame) window.cancelAnimationFrame(tempoFrame);
+  tempoFrame = 0;
+  tempoLastFrameAt = 0;
+}
+
+function startTempoLoop() {
+  stopTempoLoop();
+  tempoLastFrameAt = performance.now();
+  const tick = (now) => {
+    tempoFrame = 0;
+    if (!isTempoBattle(state) || menu.active !== "match") return;
+    const delta = Math.min(250, Math.max(0, now - tempoLastFrameAt));
+    tempoLastFrameAt = now;
+    if (state.phase === "playing" && !dialogue.isOpen()) {
+      const advanced = advanceTempoBattle(state, delta);
+      if (advanced.state !== state) {
+        state = advanced.state;
+        if (advanced.events?.length) playRolloverFx(advanced.events);
+        render();
+        announceTurnChange(null);
+        maybeStartTempoCpuTurn();
+      }
+    }
+    tempoFrame = window.requestAnimationFrame(tick);
+  };
+  tempoFrame = window.requestAnimationFrame(tick);
 }
 
 function resumeActiveMusic() {
@@ -352,6 +400,7 @@ function resumeActiveMusic() {
 // match (the remaining peer wins by walkover); a cleanly finished one already ran
 // net.endMatch(), so we only null our handles here.
 function onLeaveMatch() {
+  stopTempoLoop();
   if (net && state.phase === "playing") net.dispose();
   net = null;
   mySeat = null;
@@ -785,6 +834,19 @@ function hideTutorialUnit(unitId) {
   unit.defending = false;
 }
 
+async function revealRoll(outcome, label = null, originUnit = null) {
+  if (isTempoBattle(state)) {
+    const unit = originUnit ?? selectedUnit();
+    if (unit) {
+      const text = label ?? (outcome.missed ? "MISS" : outcome.critical ? "CRIT" : "HIT");
+      const color = outcome.missed ? "#cbb78b" : outcome.critical ? "#ffd26a" : "#f3dc86";
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), unit), text, color);
+      return;
+    }
+  }
+  await effects.rollReveal(outcome, label);
+}
+
 // Async resolution for rolled actions (basic ATTACK and targeted ARTS). Reveals
 // the roll, commits the resolved state, then plays impact FX. Input stays locked
 // across the animation via `resolving`. Non-rolled actions use synchronous dispatch.
@@ -811,7 +873,7 @@ async function resolveCombat(command) {
     const splashTargetsBefore = clumsySplashTargets(rolled, (id) => findUnit(state, id), "healing");
     const vfxTargets = [...new Map([...healedTargetsBefore, ...splashTargetsBefore].map((unit) => [unit.id, unit])).values()];
 
-    await effects.rollReveal({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) });
+    await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
     if (rolled.missed) await effects.floatText(center, "MISS", "#cbb78b");
 
     if (!rolled.missed || splashTargetsBefore.length) {
@@ -842,7 +904,7 @@ async function resolveCombat(command) {
     const center = unitCenter(metrics, targetBefore);
 
     await effects.animateAttack(attackerBefore, targetBefore, ranged, rolled.artId ?? null);
-    await effects.rollReveal({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) });
+    await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
     playAttackImpactSound(rolled, ranged);
 
     if (rolled.missed) {
@@ -869,9 +931,10 @@ async function resolveCombat(command) {
         const art = artDefinition(attackerBefore, rolled.artId);
         if (art?.effect?.type === "status" && rolled.effect?.attempted) {
           const statusName = (art.effect.status ?? "status").toUpperCase();
-          await effects.rollReveal(
+          await revealRoll(
             { missed: !rolled.effect.applied, critical: false },
-            rolled.effect.applied ? statusName : "RESISTED"
+            rolled.effect.applied ? statusName : "RESISTED",
+            attackerBefore
           );
           if (rolled.effect.applied) {
             await effects.playAbilityVfx(rolled.artId, {
@@ -882,9 +945,10 @@ async function resolveCombat(command) {
           }
         }
         if (art?.effect?.type === "heal" && rolled.effect?.attempted) {
-          await effects.rollReveal(
+          await revealRoll(
             { missed: !rolled.effect.applied, critical: false },
-            rolled.effect.applied ? "HEALED" : "NO HEAL"
+            rolled.effect.applied ? "HEALED" : "NO HEAL",
+            attackerBefore
           );
           if (rolled.effect.applied) {
             await effects.playAbilityVfx(rolled.artId, { actor: attackerBefore, target: targetBefore, effect: rolled.effect });
@@ -1192,7 +1256,7 @@ async function resolveInstantArt(command) {
     await effects.playAbilityVfx("tether-grab", { actor: actorBefore, targets: target ? [target] : [] });
     // An enemy grab rolls to-hit like any strike — reveal the die before hauling/damaging.
     // An ally grab (rolled === false) is pure repositioning and always lands, so no reveal.
-    if (resolved.rolled) await effects.rollReveal({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) });
+    if (resolved.rolled) await revealRoll({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) }, null, actorBefore);
     if (resolved.missed) {
       if (target) await effects.floatText(unitCenter(metrics, target), "MISS", "#c9d4e8");
     } else {
@@ -1210,7 +1274,7 @@ async function resolveInstantArt(command) {
     const target = findUnit(state, resolved.targetId);
     await effects.playAbilityVfx("rocket-punch", { actor: actorBefore, targets: target ? [target] : [] });
     // Rocket Punch always rolls to-hit — reveal the die before the impact resolves.
-    await effects.rollReveal({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) });
+    await revealRoll({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) }, null, actorBefore);
     if (target) {
       if (resolved.missed) {
         await effects.floatText(unitCenter(metrics, target), "MISS", "#c9d4e8");
@@ -1420,7 +1484,7 @@ async function resolveInstantArt(command) {
   } else if (resolved?.artId === "focus-prayer" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     const targetBefore = targetsBefore[0];
-    await effects.rollReveal({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) });
+    await revealRoll({ missed: Boolean(resolved.missed), critical: Boolean(resolved.critical) }, null, actorBefore);
     if (!resolved.missed) {
       await effects.playAbilityVfx("focus-prayer", { actor: actorBefore, targets: targetsBefore });
       const healed = resolved.healingByTarget?.[targetBefore?.id] ?? 0;
@@ -1429,9 +1493,10 @@ async function resolveInstantArt(command) {
       }
     } else if (targetBefore && resolved.effect?.attempted) {
       const statusLabel = resolved.effect.status?.toUpperCase() ?? "STATUS";
-      await effects.rollReveal(
+      await revealRoll(
         { missed: !resolved.effect.applied, critical: false },
-        resolved.effect.applied ? statusLabel : "RESISTED"
+        resolved.effect.applied ? statusLabel : "RESISTED",
+        actorBefore
       );
       if (resolved.effect.applied) {
         await effects.playAbilityVfx(resolved.artId, {
@@ -1474,9 +1539,10 @@ async function resolveInstantArt(command) {
     const targetBefore = targetsBefore[0];
     if (targetBefore && resolved.effect.attempted) {
       const statusLabel = resolved.effect.status?.toUpperCase() ?? "STATUS";
-      await effects.rollReveal(
+      await revealRoll(
         { missed: !resolved.effect.applied, critical: false },
-        resolved.effect.applied ? statusLabel : "RESISTED"
+        resolved.effect.applied ? statusLabel : "RESISTED",
+        actorBefore
       );
       if (resolved.effect.applied) {
         await effects.playAbilityVfx(resolved.artId, {
@@ -1516,6 +1582,10 @@ async function resolveInstantArt(command) {
 // Fired at the tail of every human commit path. Kicks the CPU turn the moment the turn
 // passes to a computer-controlled seat; guarded so it never re-enters or stacks.
 function maybeStartCpuTurn() {
+  if (isTempoBattle(state)) {
+    maybeStartTempoCpuTurn();
+    return;
+  }
   if (cpuThinking || state.phase !== "playing" || !isCpu(state.currentPlayer)) return;
   maybeShowCampaignDialogue();
   if (dialogue.isOpen()) return;
@@ -1538,6 +1608,49 @@ function shouldDelayCpuForTutorialPresentation() {
     pendingTutorialSpotlight ||
     pendingTutorialBeforeDialogueAction
   ));
+}
+
+function maybeStartTempoCpuTurn() {
+  if (!isTempoBattle(state) || cpuThinking || resolving || state.activation || state.phase !== "playing") return;
+  if (dialogue.isOpen()) return;
+  const readyCpuPlayers = [...(cpu?.players ?? [])].filter((player) =>
+    state.units.some((unit) => unit.player === player && isTempoUnitReady(state, unit))
+  );
+  if (!readyCpuPlayers.length) return;
+  cpuThinking = true;
+  void runTempoCpuActivation(readyCpuPlayers[0]).finally(() => {
+    cpuThinking = false;
+  });
+}
+
+async function runTempoCpuActivation(player) {
+  const epoch = matchEpoch;
+  resolving = true;
+  selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
+  render();
+  setMessage(`Player ${player} (CPU) is acting...`);
+  await sleep(CPU_TURN_LEAD_MS);
+  if (epoch !== matchEpoch || state.phase !== "playing" || dialogue.isOpen()) {
+    resolving = false;
+    render();
+    return;
+  }
+  const planningState = { ...state, currentPlayer: player };
+  const commands = chooseActivation(planningState, {
+    difficulty: cpu?.difficulty ?? "normal",
+    cpuPlayer: player,
+    rng: cpuRng(planningState)
+  });
+  for (const command of commands) {
+    if (epoch !== matchEpoch || state.phase !== "playing") break;
+    const applied = await applyCpuCommand(command);
+    resolving = true;
+    if (!applied || state.phase !== "playing") break;
+  }
+  resolving = false;
+  selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;
+  render();
+  maybeStartTempoCpuTurn();
 }
 
 async function runCpuTurn() {
@@ -1959,7 +2072,13 @@ function playRolloverFx(events) {
 
 function beginUnit(unit) {
   if (inputLocked()) return;
+  if (isTempoBattle(state)) {
+    if (state.activation || unit.hp <= 0 || isStunned(unit) || !isTempoUnitReady(state, unit)) return;
+    if (isCpu(unit.player)) return;
+    if (net != null && unit.player !== mySeat) return;
+  } else {
   if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0 || isStunned(unit)) return;
+  }
   // Re-selecting the already-active unit (e.g. after deselecting mid-activation)
   // should not re-dispatch beginActivation — that would reset moved/primaryUsed.
   if (state.activation?.unitId === unit.id) {

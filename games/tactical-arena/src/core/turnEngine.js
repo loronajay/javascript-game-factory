@@ -5,11 +5,16 @@ import { isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
 import { isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { drawValue } from "./rng.js";
+import { finishTempoActivation, isTempoBattle } from "./tempoBattle.js";
 
 const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 const FIRE_DAMAGE = 1;
 
 export function spendAndAdvance(state, unit) {
+  if (isTempoBattle(state)) {
+    finishTempoActivation(state, unit);
+    return;
+  }
   unit.statuses = tickStatuses(unit.statuses);
   unit.spent = true;
 

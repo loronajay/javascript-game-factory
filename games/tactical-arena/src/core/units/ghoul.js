@@ -24,6 +24,7 @@ export const GHOUL = Object.freeze({
   classType: "summon",
   summon: true,
   ai: Object.freeze({ threatValue: 5, role: "summon", protect: false }),
+  tempo: Object.freeze({ agility: 0 }),
   stats: Object.freeze({
     moveRange: 1,
     attackRange: 0,

@@ -345,6 +345,9 @@
 .campaign-squad-slot i { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-style:normal; font-weight:800; }
 .campaign-squad-slot.is-empty { border-style:dashed; border-color:rgba(188,214,236,.4); background:rgba(4,11,19,.2); }
 .campaign-squad-slot.is-empty i { color:var(--muted); font-weight:600; }
+.campaign-squad-slot.is-locked { cursor:default; opacity:.85; }
+.campaign-squad-slot.is-locked:hover { border-color:rgba(188,214,236,.25); filter:none; }
+.campaign-squad-slot.is-locked i { color:var(--brass); }
 @media (max-width:760px) {
   .campaign-card { min-height:0; padding:1rem; }
   .campaign-head { flex-direction:column; }

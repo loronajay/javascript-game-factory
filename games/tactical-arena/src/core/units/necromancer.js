@@ -17,6 +17,7 @@ export const NECROMANCER = Object.freeze({
   id: "necromancer",
   name: "Necromancer",
   ai: Object.freeze({ threatValue: 13, role: "controller", protect: true }),
+  tempo: Object.freeze({ agility: 5 }),
   glyph: "☠",
   classType: "mage",
   stats: Object.freeze({

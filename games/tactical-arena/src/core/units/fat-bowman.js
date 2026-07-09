@@ -11,6 +11,7 @@ export const FAT_BOWMAN = Object.freeze({
   glyph: "🏹",
   classType: "ranger",
   ai: Object.freeze({ threatValue: 14, role: "ranged", protect: true }),
+  tempo: Object.freeze({ agility: 4 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 4,

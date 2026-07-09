@@ -689,9 +689,23 @@ function validateBasicsCommand(tutorial, command, match) {
 
   if (tutorial.stage === "await_cpu_counterattack") {
     if (isArcher) {
-      return command.type === COMMANDS.FINISH_ACTIVATION || command.type === COMMANDS.BEGIN_ACTIVATION
-        ? tutorialAllowed()
-        : tutorialBlocked("Finish the Archer's activation after the shot.");
+      // On the shot turn the Archer has already attacked, so only FINISH is legal
+      // (DEFEND/MOVE get rejected by the reducer as PRIMARY_ALREADY_USED and the
+      // player finishes). But if the enemy Archer was too far to answer in one turn
+      // and the squad turn returns with a FRESH Archer, she must be spendable too —
+      // otherwise the turn can never pass back so the enemy Archer can close in and
+      // fire. Allow bracing/repositioning (never a second attack — the enemy answers
+      // first) so the counter-shot lesson can't soft-lock.
+      if (
+        command.type === COMMANDS.FINISH_ACTIVATION ||
+        command.type === COMMANDS.BEGIN_ACTIVATION ||
+        command.type === COMMANDS.DEFEND ||
+        command.type === COMMANDS.MOVE_UNIT ||
+        command.type === COMMANDS.CANCEL_MOVE
+      ) {
+        return tutorialAllowed();
+      }
+      return tutorialBlocked("Finish the Archer's activation after the shot, then brace your squad so the enemy Archer can answer.");
     }
     if (isBasicsPlayer) {
       if (

@@ -4,6 +4,7 @@ export const FAT_KNIGHT = Object.freeze({
   glyph: "♞",
   classType: "melee",
   ai: Object.freeze({ threatValue: 14, role: "bruiser", protect: false }),
+  tempo: Object.freeze({ agility: 3 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 1,

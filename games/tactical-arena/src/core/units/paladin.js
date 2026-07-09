@@ -2,6 +2,7 @@ export const PALADIN = Object.freeze({
   id: "paladin",
   name: "Paladin",
   ai: Object.freeze({ threatValue: 12, role: "bruiser", protect: false }),
+  tempo: Object.freeze({ agility: 5 }),
   glyph: "🛡️",
   classType: "melee",
   stats: Object.freeze({

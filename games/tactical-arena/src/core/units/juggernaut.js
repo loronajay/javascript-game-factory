@@ -23,6 +23,7 @@ export const JUGGERNAUT = Object.freeze({
   glyph: "\u{1F916}",
   classType: "tank",
   ai: Object.freeze({ threatValue: 15, role: "bruiser", protect: false }),
+  tempo: Object.freeze({ agility: 3 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 1,

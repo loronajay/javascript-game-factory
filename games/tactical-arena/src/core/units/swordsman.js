@@ -4,6 +4,7 @@ export const SWORDSMAN = Object.freeze({
   glyph: "⚔",
   classType: "melee",
   ai: Object.freeze({ threatValue: 10, role: "bruiser", protect: false }),
+  tempo: Object.freeze({ agility: 6 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 1,
