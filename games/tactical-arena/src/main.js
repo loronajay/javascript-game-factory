@@ -27,11 +27,19 @@ import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
-  clodMissionOpeningScript,
+  CLOD_MISSION_ID,
+  NECROMANCER_MISSION_ID,
+  campaignOpeningScript,
   clodRageWarningScript,
   completeCampaignMission,
+  necromancerRageWarningScript,
+  necromancerStatusWarningScript,
+  necromancerSummonWarningScript,
   prepareCampaignMatchState,
   shouldShowClodRageWarning,
+  shouldShowNecromancerRageWarning,
+  shouldShowNecromancerStatusWarning,
+  shouldShowNecromancerSummonWarning,
 } from "./campaign/campaign.js";
 import {
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
@@ -94,10 +102,25 @@ let pendingTutorialBeforeDialogueAction = null;
 let pendingTutorialAfterDialogueAction = null;
 let tutorialPresentationTimer = 0;
 let campaignMissionId = null;
-let campaignClodWarningShown = false;
-let campaignClodChargeUsed = false;
-let campaignClodChargeHitCount = 0;
-let campaignChargeDefended = false;
+// Per-mission bookkeeping for objective grading + condition-triggered dialogue beats.
+// Reset in startMatch; both missions read/write their own keys.
+let campaignMeta = createCampaignMeta();
+
+function createCampaignMeta() {
+  return {
+    // Clod (mission 1)
+    clodWarningShown: false,
+    clodChargeUsed: false,
+    clodChargeHitCount: 0,
+    chargeDefended: false,
+    // Necromancer (mission 2)
+    statusWarningShown: false,
+    summonWarningShown: false,
+    rageWarningShown: false,
+    cleanseUsed: false,
+    spreadHitCount: 0,
+  };
+}
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const CPU_TURN_LEAD_MS = 480;        // pause before the CPU's first move
 const CPU_ACTIVATION_GAP_MS = 320;   // between one unit finishing and the next
@@ -245,10 +268,7 @@ function startMatch(config) {
   for (const player of state.turnOrder ?? [1, 2]) initialHpByPlayer[player] = hpRemaining(state, player);
   tutorial = config.mode === "tutorial" ? createTutorial(config.tutorialId ?? TUTORIAL_BASICS_ID) : null;
   campaignMissionId = config.mode === "campaign" ? config.campaignMissionId : null;
-  campaignClodWarningShown = false;
-  campaignClodChargeUsed = false;
-  campaignClodChargeHitCount = 0;
-  campaignChargeDefended = false;
+  campaignMeta = createCampaignMeta();
   pendingTutorialPrompt = null;
   pendingTutorialDialogue = null;
   pendingTutorialComplete = false;
@@ -288,9 +308,9 @@ function startMatch(config) {
   announceTurn(state.currentPlayer);
   if (tutorial) queueTutorialPresentation({ dialogue: tutorial.dialogue });
   else if (matchConfig?.mode === "campaign" && campaignMissionId) {
-    const script = clodMissionOpeningScript(state);
+    const script = campaignOpeningScript(campaignMissionId, state);
     if (script.length) void dialogue.show(script).then(() => {
-      maybeShowCampaignClodWarning();
+      maybeShowCampaignDialogue();
       maybeStartCpuTurn();
     });
   }
@@ -336,10 +356,7 @@ function announceTurnChange(prevPlayer) {
     announceTurn(state.winner);
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
     if (matchConfig?.mode === "campaign" && campaignMissionId) {
-      summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, {
-        clodChargeHitCount: campaignClodChargeHitCount,
-        chargeDefended: campaignChargeDefended,
-      });
+      summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
     }
     window.clearTimeout(resultsTimer);
     resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
@@ -401,29 +418,69 @@ function dispatch(command) {
 
 function recordCampaignProgressHooks(result) {
   if (matchConfig?.mode !== "campaign") return;
-  const charge = (result.events ?? []).find((event) =>
-    event.type === "ART_RESOLVED" &&
-    event.actorId === "p2-0-clod" &&
-    event.artId === "thunderous-charge");
-  if (charge) {
-    campaignClodChargeUsed = true;
-    const playerHitIds = (charge.targetIds ?? []).filter((id) => findUnit(state, id)?.player === 1);
-    campaignClodChargeHitCount = Math.max(campaignClodChargeHitCount, playerHitIds.length);
-    campaignChargeDefended ||= playerHitIds.some((id) => findUnit(state, id)?.defending);
+  const events = result.events ?? [];
+  if (campaignMissionId === CLOD_MISSION_ID) {
+    const charge = events.find((event) =>
+      event.type === "ART_RESOLVED" &&
+      event.actorId === "p2-0-clod" &&
+      event.artId === "thunderous-charge");
+    if (charge) {
+      campaignMeta.clodChargeUsed = true;
+      const playerHitIds = (charge.targetIds ?? []).filter((id) => findUnit(state, id)?.player === 1);
+      campaignMeta.clodChargeHitCount = Math.max(campaignMeta.clodChargeHitCount, playerHitIds.length);
+      campaignMeta.chargeDefended ||= playerHitIds.some((id) => findUnit(state, id)?.defending);
+    }
+  } else if (campaignMissionId === NECROMANCER_MISSION_ID) {
+    // A cleanse (Mystic Purify / Fat Cleric Cleanse) that actually stripped something
+    // reports a non-empty `cleansed` list; only the player's own cast counts.
+    const cleansed = events.some((event) =>
+      event.type === "ART_RESOLVED" &&
+      Array.isArray(event.cleansed) && event.cleansed.length > 0 &&
+      findUnit(state, event.actorId)?.player === 1);
+    if (cleansed) campaignMeta.cleanseUsed = true;
+    // Virus's Spread jumping a debuff onto a second player unit fails the spacing bonus.
+    for (const event of events) {
+      if (event.type !== "STATUS_SPREAD") continue;
+      if ((event.spreadTo ?? []).some((id) => findUnit(state, id)?.player === 1)) {
+        campaignMeta.spreadHitCount += 1;
+      }
+    }
   }
-  maybeShowCampaignClodWarning();
+  maybeShowCampaignDialogue();
 }
 
-function maybeShowCampaignClodWarning() {
-  if (!shouldShowClodRageWarning(state, {
-    warningShown: campaignClodWarningShown,
-    chargeUsed: campaignClodChargeUsed,
-  })) return;
-  if (dialogue.isOpen()) return;
-  const script = clodRageWarningScript(state);
+// Returns the next eligible condition-triggered dialogue beat for the active mission
+// (or null). Each beat marks its own once-only flag so the same warning never repeats.
+function nextCampaignDialogueBeat() {
+  if (campaignMissionId === CLOD_MISSION_ID) {
+    if (shouldShowClodRageWarning(state, { warningShown: campaignMeta.clodWarningShown, chargeUsed: campaignMeta.clodChargeUsed })) {
+      return { markShown: () => { campaignMeta.clodWarningShown = true; }, script: clodRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === NECROMANCER_MISSION_ID) {
+    if (shouldShowNecromancerStatusWarning(state, { warningShown: campaignMeta.statusWarningShown })) {
+      return { markShown: () => { campaignMeta.statusWarningShown = true; }, script: necromancerStatusWarningScript };
+    }
+    if (shouldShowNecromancerSummonWarning(state, { warningShown: campaignMeta.summonWarningShown })) {
+      return { markShown: () => { campaignMeta.summonWarningShown = true; }, script: necromancerSummonWarningScript };
+    }
+    if (shouldShowNecromancerRageWarning(state, { warningShown: campaignMeta.rageWarningShown })) {
+      return { markShown: () => { campaignMeta.rageWarningShown = true; }, script: necromancerRageWarningScript };
+    }
+    return null;
+  }
+  return null;
+}
+
+function maybeShowCampaignDialogue() {
+  if (matchConfig?.mode !== "campaign" || dialogue.isOpen() || state.phase !== "playing") return;
+  const beat = nextCampaignDialogueBeat();
+  if (!beat) return;
+  beat.markShown();
+  const script = beat.script(state);
   if (!script.length) return;
-  campaignClodWarningShown = true;
-  if (state.phase === "playing") void dialogue.show(script).then(() => maybeStartCpuTurn());
+  void dialogue.show(script).then(() => maybeStartCpuTurn());
 }
 
 function recordTutorialProgress(command, result, previousPlayer) {
@@ -1359,7 +1416,7 @@ async function resolveInstantArt(command) {
 // passes to a computer-controlled seat; guarded so it never re-enters or stacks.
 function maybeStartCpuTurn() {
   if (cpuThinking || state.phase !== "playing" || !isCpu(state.currentPlayer)) return;
-  maybeShowCampaignClodWarning();
+  maybeShowCampaignDialogue();
   if (dialogue.isOpen()) return;
   if (shouldDelayCpuForTutorialPresentation()) {
     window.clearTimeout(tutorialPresentationTimer);

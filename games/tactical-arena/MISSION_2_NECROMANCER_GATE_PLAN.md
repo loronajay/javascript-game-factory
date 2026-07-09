@@ -1,11 +1,14 @@
 # Campaign Mission 2 — "Necromancer's Gate" — Beat Plan
 
-Status: **designed, not yet implemented.** Manifest stub already exists in
-`src/campaign/campaign.js` (`NECROMANCER_MISSION_ID = "necromancer-rise"`,
-`comingSoon: true`). This doc is the spec to implement against once the
-session limit resets. Mirrors the shape of `CLOD_MISSION_ID` ("Clod on the
-Ridge") — read that mission's code in `campaign.js` before implementing;
-this doc only calls out what's new/different for mission 2.
+Status: **IMPLEMENTED (2026-07-08).** Live in `src/campaign/campaign.js`
+(`NECROMANCER_MISSION_ID = "necromancer-rise"`, `comingSoon` removed;
+`enemySquad: ["necromancer","virus"]`, `size: 13`, `playerSlots: 2`) and wired
+into `src/main.js`. Objectives = complete / survive / **cleansed**, bonus =
+**spread** (no status jumped between your units). All four dialogue beats are in
+(opening + status/summon/rage warnings). Covered by `tests/campaign.test.js`
+(full suite 700/700 green) and verified booting end-to-end in a headless-Chrome
+playthrough (board + half-HP spawns + Deathly Aura overlay + opening line, no
+runtime errors). What follows is the original spec, kept for reference.
 
 ## Premise
 

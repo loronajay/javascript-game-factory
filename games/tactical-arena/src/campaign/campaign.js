@@ -1,5 +1,6 @@
 import { getUnitType } from "../core/unitCatalog.js";
 import { findUnit } from "../core/state.js";
+import { isNegativeStatus } from "../rules/statuses.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
@@ -30,12 +31,14 @@ export const CAMPAIGN_MISSIONS = Object.freeze([
   Object.freeze({
     id: NECROMANCER_MISSION_ID,
     title: "Necromancer's Gate",
-    subtitle: "Coming soon",
-    description: "The next canon mission will unlock Necromancer. For now, the node reveals once you prove the Clod lesson.",
+    subtitle: "Lesson: status pressure and cleansing",
+    description: "Two units against a Necromancer and a Virus at the old gate. Physical damage slips past Dead Zone, spacing starves Spread, and a cure keeps permanent poison from becoming a losing clock.",
     unitType: "necromancer",
     requiredStars: 2,
     rewardUnits: Object.freeze(["necromancer"]),
-    comingSoon: true,
+    playerSlots: 2,
+    enemySquad: Object.freeze(["necromancer", "virus"]),
+    size: 13,
     position: Object.freeze({ x: 58, y: 32 }),
     routeFrom: Object.freeze({ x: 10, y: 72 }),
     routeTo: Object.freeze({ x: 58, y: 32 }),
@@ -180,19 +183,47 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     },
     teamNames: {
       1: "Player Vanguard",
-      2: "Ridge Guard",
+      2: mission.id === NECROMANCER_MISSION_ID ? "Gatekeepers" : "Ridge Guard",
     },
   };
 }
 
+// Each campaign mission owns a spawn layout: hardcoded coordinates for the fixed
+// enemy pieces (their ids are deterministic), plus a slot-index fallback that places
+// whatever units the player drafted (the squad is player-chosen, so player ids are not
+// known ahead of time). Keyed by mission id so a new mission only adds a table entry.
+const CAMPAIGN_LAYOUTS = Object.freeze({
+  [CLOD_MISSION_ID]: {
+    positions: {
+      "p1-0-mystic": { x: 2, y: 6 },
+      "p1-1-magician": { x: 2, y: 4 },
+      "p2-0-clod": { x: 7, y: 5 },
+      "p2-1-juggernaut": { x: 8, y: 7 },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? (unit.id.includes("-0-") ? { x: 2, y: 6 } : { x: 2, y: 4 })
+        : (unit.id.includes("-0-") ? { x: 7, y: 5 } : { x: 8, y: 7 }),
+  },
+  // Necromancer's Gate (13×13): the Necromancer holds the backline; the Virus sits
+  // forward enough to threaten but stays focusable; the player's two units spawn in the
+  // opposite corner, spread one tile apart with a clean approach outside turn-one Cough
+  // range (Virus range 5, opening distance 6).
+  [NECROMANCER_MISSION_ID]: {
+    positions: {
+      "p2-0-necromancer": { x: 10, y: 2 },
+      "p2-1-virus": { x: 8, y: 5 },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 4, y: 9 })
+        : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 8, y: 5 }),
+  },
+});
+
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
-  if (missionId !== CLOD_MISSION_ID) return match;
-  const positions = {
-    "p1-0-mystic": { x: 2, y: 6 },
-    "p1-1-magician": { x: 2, y: 4 },
-    "p2-0-clod": { x: 7, y: 5 },
-    "p2-1-juggernaut": { x: 8, y: 7 },
-  };
+  const layout = CAMPAIGN_LAYOUTS[missionId];
+  if (!layout) return match;
   return {
     ...match,
     currentPlayer: 1,
@@ -201,7 +232,7 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       const definition = getUnitType(unit.type);
       return {
         ...unit,
-        position: { ...(positions[unit.id] ?? defaultCampaignPosition(unit)) },
+        position: { ...(layout.positions[unit.id] ?? layout.fallback(unit)) },
         hp: Math.ceil(definition.stats.maxHp / 2),
         mp: definition.stats.maxMp,
         spent: false,
@@ -211,29 +242,58 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
   };
 }
 
-function defaultCampaignPosition(unit) {
-  if (unit.player === 1) return unit.id.includes("-0-") ? { x: 2, y: 6 } : { x: 2, y: 4 };
-  return unit.id.includes("-0-") ? { x: 7, y: 5 } : { x: 8, y: 7 };
-}
-
-export function evaluateCampaignMission(missionId, state, {
-  clodChargeHitCount = 0,
-  chargeDefended = false,
-} = {}) {
+export function evaluateCampaignMission(missionId, state, meta = {}) {
   const mission = getCampaignMission(missionId);
   const victory = state?.winner === 1;
   const playerUnits = (state?.units ?? []).filter((unit) => unit.player === 1);
   const enemyUnits = (state?.units ?? []).filter((unit) => unit.player === 2);
   const survivingPlayerUnits = playerUnits.filter((unit) => unit.hp > 0).length;
-  const clod = enemyUnits.find((unit) => unit.type === "clod") ?? null;
-  const objectives = [
-    { id: "complete", label: "Complete the mission", earned: victory },
-    { id: "survive", label: "Keep both chosen units alive", earned: victory && survivingPlayerUnits === playerUnits.length },
-    { id: "spacing", label: "Have Clod only hit one unit with Thunderous Charge", earned: victory && clodChargeHitCount <= 1 },
-  ];
-  const bonusObjectives = [
-    { id: "brace", label: "Bonus: defend against Thunderous Charge", earned: victory && chargeDefended },
-  ];
+  const allSurvived = victory && survivingPlayerUnits === playerUnits.length;
+
+  // Base objectives shared by every mission; the third star + the bonus are the
+  // mission's signature lesson. Only two missions exist, so branch rather than build a
+  // premature objective DSL (see MISSION_2 plan's implementation notes).
+  const complete = { id: "complete", label: "Complete the mission", earned: victory };
+  const survive = { id: "survive", label: "Keep both chosen units alive", earned: allSurvived };
+
+  let objectives;
+  let bonusObjectives;
+  let extra;
+  if (missionId === NECROMANCER_MISSION_ID) {
+    const cleanseUsed = Boolean(meta.cleanseUsed);
+    const spreadHitCount = Math.max(0, Math.floor(Number(meta.spreadHitCount) || 0));
+    objectives = [
+      complete,
+      survive,
+      { id: "cleansed", label: "Win after curing a status with a cleanse", earned: victory && cleanseUsed },
+    ];
+    bonusObjectives = [
+      { id: "spread", label: "Bonus: never let a status spread between your units", earned: victory && spreadHitCount === 0 },
+    ];
+    extra = {
+      cleanseUsed,
+      spreadHitCount,
+      necromancerDefeated: Boolean((enemyUnits.find((unit) => unit.type === "necromancer") ?? { hp: 0 }).hp <= 0),
+    };
+  } else {
+    const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
+    const chargeDefended = Boolean(meta.chargeDefended);
+    const clod = enemyUnits.find((unit) => unit.type === "clod") ?? null;
+    objectives = [
+      complete,
+      survive,
+      { id: "spacing", label: "Have Clod only hit one unit with Thunderous Charge", earned: victory && clodChargeHitCount <= 1 },
+    ];
+    bonusObjectives = [
+      { id: "brace", label: "Bonus: defend against Thunderous Charge", earned: victory && chargeDefended },
+    ];
+    extra = {
+      clodDefeated: Boolean(clod && clod.hp <= 0),
+      clodChargeHitCount,
+      chargeDefended,
+    };
+  }
+
   const earnedObjectiveStars = objectives.filter((objective) => objective.earned).length;
   const earnedBonusStars = bonusObjectives.filter((objective) => objective.earned).length;
   const stars = Math.min(3, earnedObjectiveStars + earnedBonusStars);
@@ -251,9 +311,7 @@ export function evaluateCampaignMission(missionId, state, {
     totalPlayerUnits: playerUnits.length,
     playerHpRemaining: playerUnits.reduce((sum, unit) => sum + Math.max(0, unit.hp), 0),
     enemyHpRemaining: enemyUnits.reduce((sum, unit) => sum + Math.max(0, unit.hp), 0),
-    clodDefeated: Boolean(clod && clod.hp <= 0),
-    clodChargeHitCount: Math.max(0, Math.floor(Number(clodChargeHitCount) || 0)),
-    chargeDefended: Boolean(chargeDefended),
+    ...extra,
   };
 }
 
@@ -328,4 +386,109 @@ export function clodRageWarningScript(state) {
       text: "The ridge shakes under Clod's feet. Thunderous Charge is online.",
     },
   ];
+}
+
+// --- Mission 2: Necromancer's Gate dialogue -----------------------------------
+// The hints let a player derive "physical + spacing + a cure" without naming the
+// intended Mystic + Swordsman pairing outright.
+
+function firstLivingPlayerUnit(state) {
+  return (state?.units ?? []).find((unit) => unit.player === 1 && unit.hp > 0) ?? null;
+}
+
+export function necromancerMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const necromancer = findUnit(state, "p2-0-necromancer");
+  const virus = findUnit(state, "p2-1-virus");
+  return [
+    {
+      speakerId: necromancer?.id,
+      text: "The gate drinks magic before it ever lands. Bring spells if you like — they will die quietly at my wall.",
+    },
+    {
+      speakerId: virus?.id,
+      text: "And keep your friends close together. Whatever I give one of you, I will happily share with the rest.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Something here punishes crowding, and a curse could hurt worse than any blade. Steel over sorcery — and whatever can lift a curse may matter more than raw damage this time.",
+    },
+  ];
+}
+
+export function shouldShowNecromancerStatusWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return (state?.units ?? []).some((unit) =>
+    unit.player === 1 && unit.hp > 0 && (unit.statuses ?? []).some(isNegativeStatus));
+}
+
+export function necromancerStatusWarningScript(state) {
+  const afflicted = (state?.units ?? []).find((unit) =>
+    unit.player === 1 && unit.hp > 0 && (unit.statuses ?? []).some(isNegativeStatus));
+  const speaker = afflicted ?? firstLivingPlayerUnit(state);
+  const virus = findUnit(state, "p2-1-virus");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: virus?.id,
+      text: "It takes hold. Stand shoulder to shoulder and it will leap to whoever is nearest.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Break apart so it can't jump, and cure it before it stacks. Left alone, this rot only gets worse.",
+    },
+  ];
+}
+
+export function shouldShowNecromancerSummonWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return (state?.units ?? []).some((unit) =>
+    unit.player === 2 && unit.hp > 0 && Boolean(unit.summonerId));
+}
+
+export function necromancerSummonWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const ghoul = (state?.units ?? []).find((unit) => unit.player === 2 && unit.hp > 0 && Boolean(unit.summonerId));
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: ghoul?.id,
+      text: "A ghoul claws its way up from the stones.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "The ghoul isn't the win — the caster is. But it'll gnaw at anyone who lingers beside it, so don't camp next to it.",
+    },
+  ];
+}
+
+export function shouldShowNecromancerRageWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  const necromancer = findUnit(state, "p2-0-necromancer");
+  return Boolean(necromancer && necromancer.hp > 0 && necromancer.hp <= 5);
+}
+
+export function necromancerRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const necromancer = findUnit(state, "p2-0-necromancer");
+  return [
+    {
+      speakerId: necromancer?.id,
+      text: "Cornered, am I? Then the gate's shadow spreads — and my bomb reaches farther than it did.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Its aura just widened and Dark Bomb will catch more ground now. Don't dawdle in the dark — finish it.",
+    },
+  ];
+}
+
+// Dispatcher so the match seam can ask for a mission's opening without a per-mission
+// branch of its own.
+export function campaignOpeningScript(missionId, state) {
+  if (missionId === NECROMANCER_MISSION_ID) return necromancerMissionOpeningScript(state);
+  if (missionId === CLOD_MISSION_ID) return clodMissionOpeningScript(state);
+  return [];
 }

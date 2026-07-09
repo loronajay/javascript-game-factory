@@ -6,15 +6,24 @@ import { findUnit } from "../src/core/state.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
   CLOD_MISSION_ID,
+  NECROMANCER_MISSION_ID,
+  campaignOpeningScript,
   clodMissionOpeningScript,
   clodRageWarningScript,
   createCampaignMatchConfig,
   completeCampaignMission,
   evaluateCampaignMission,
   getCampaignMap,
+  necromancerMissionOpeningScript,
+  necromancerRageWarningScript,
+  necromancerStatusWarningScript,
+  necromancerSummonWarningScript,
   normalizeCampaignSquad,
   prepareCampaignMatchState,
   shouldShowClodRageWarning,
+  shouldShowNecromancerRageWarning,
+  shouldShowNecromancerStatusWarning,
+  shouldShowNecromancerSummonWarning,
 } from "../src/campaign/campaign.js";
 
 function storageAdapter() {
@@ -193,7 +202,7 @@ test("completing Clod mission saves best stars, unlocks Clod, and reveals Necrom
   const map = getCampaignMap(storage);
   assert.equal(map.totalStars, 3);
   assert.equal(map.nodes[0].stars, 3);
-  assert.equal(map.nodes[1].status, "coming-soon");
+  assert.equal(map.nodes[1].status, "available");
   assert.equal(map.nodes[1].displayType, "necromancer");
 
   const lowerReplay = completeCampaignMission(storage, CLOD_MISSION_ID, {
@@ -202,3 +211,160 @@ test("completing Clod mission saves best stars, unlocks Clod, and reveals Necrom
   }, { clodChargeHitCount: 2 });
   assert.equal(lowerReplay.progress.missionStars[CLOD_MISSION_ID], 3);
 });
+
+// --- Mission 2: Necromancer's Gate --------------------------------------------
+
+function necromancerMatchState(squad = ["swordsman", "mystic"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(NECROMANCER_MISSION_ID, squad)),
+    NECROMANCER_MISSION_ID,
+  );
+}
+
+test("Necromancer mission builds a 13x13 board with the enemy caster pair spawned at half HP", () => {
+  const config = createCampaignMatchConfig(NECROMANCER_MISSION_ID, ["swordsman", "mystic"]);
+  const match = necromancerMatchState(["swordsman", "mystic"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 13);
+  assert.deepEqual(config.squads[1], ["swordsman", "mystic"]);
+  assert.deepEqual(config.squads[2], ["necromancer", "virus"]);
+  assert.equal(config.teamNames[2], "Gatekeepers");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.deepEqual(findUnit(match, "p2-0-necromancer").position, { x: 10, y: 2 });
+  assert.deepEqual(findUnit(match, "p2-1-virus").position, { x: 8, y: 5 });
+  assert.equal(findUnit(match, "p2-0-necromancer").hp, 12); // ceil(23/2)
+  assert.equal(findUnit(match, "p2-1-virus").hp, 13);       // ceil(25/2)
+  // Player units spawn by slot index regardless of which units were drafted, well
+  // outside the Virus's turn-one Cough range (6 > 5).
+  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 2, y: 10 });
+  assert.deepEqual(findUnit(match, "p1-1-mystic").position, { x: 4, y: 9 });
+});
+
+test("Necromancer mission opens with a Dead Zone + Spread taunt and a cure/spacing hint", () => {
+  const state = necromancerMatchState();
+  const dispatched = campaignOpeningScript(NECROMANCER_MISSION_ID, state);
+  const direct = necromancerMissionOpeningScript(state);
+
+  assert.deepEqual(dispatched, direct);
+  assert.equal(direct.length >= 3, true);
+  assert.equal(direct[0].speakerId, "p2-0-necromancer");
+  assert.match(direct[0].text, /magic/i);
+  assert.equal(direct[1].speakerId, "p2-1-virus");
+  assert.match(direct[1].text, /close|near/i);
+  assert.match(direct.at(-1).speakerId, /^p1-/);
+  assert.match(direct.at(-1).text, /curse|cure/i);
+});
+
+test("status warning fires once a player unit is debuffed and cures nothing when clean", () => {
+  const base = necromancerMatchState();
+  const clean = { ...base, phase: "playing" };
+  const poisoned = {
+    ...base,
+    phase: "playing",
+    units: base.units.map((unit) =>
+      unit.id === "p1-0-swordsman"
+        ? { ...unit, statuses: [{ type: "poison", damage: 1 }] }
+        : unit),
+  };
+
+  assert.equal(shouldShowNecromancerStatusWarning(clean), false);
+  assert.equal(shouldShowNecromancerStatusWarning(poisoned), true);
+  assert.equal(shouldShowNecromancerStatusWarning(poisoned, { warningShown: true }), false);
+  assert.equal(necromancerStatusWarningScript(poisoned).length >= 2, true);
+});
+
+test("summon warning fires when a Necromancer ghoul is on the board", () => {
+  const base = necromancerMatchState();
+  const withGhoul = {
+    ...base,
+    phase: "playing",
+    units: [
+      ...base.units,
+      { id: "p2-0-necromancer-ghoul-0", type: "ghoul", player: 2, hp: 8, position: { x: 9, y: 3 }, summonerId: "p2-0-necromancer", statuses: [] },
+    ],
+  };
+
+  assert.equal(shouldShowNecromancerSummonWarning(base), false);
+  assert.equal(shouldShowNecromancerSummonWarning(withGhoul), true);
+  assert.equal(shouldShowNecromancerSummonWarning(withGhoul, { warningShown: true }), false);
+  assert.equal(necromancerSummonWarningScript(withGhoul).length >= 2, true);
+});
+
+test("rage warning fires only once the Necromancer is alive and at RAGE HP", () => {
+  const base = necromancerMatchState();
+  const withHp = (hp) => ({
+    ...base,
+    phase: "playing",
+    units: base.units.map((unit) => unit.id === "p2-0-necromancer" ? { ...unit, hp } : unit),
+  });
+
+  assert.equal(shouldShowNecromancerRageWarning(withHp(6)), false);
+  assert.equal(shouldShowNecromancerRageWarning(withHp(5)), true);
+  assert.equal(shouldShowNecromancerRageWarning(withHp(0)), false);
+  assert.equal(shouldShowNecromancerRageWarning(withHp(5), { warningShown: true }), false);
+  assert.equal(necromancerRageWarningScript(withHp(5)).length >= 2, true);
+});
+
+test("Necromancer grading rewards completion, survival, cleansing, and a no-spread bonus", () => {
+  const base = necromancerMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(NECROMANCER_MISSION_ID, won, { cleanseUsed: true, spreadHitCount: 0 });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "survive", "cleansed"]);
+  assert.equal(perfect.bonusObjectives[0].id, "spread");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  // No cleanse → the third objective star is missing (spread hit removes the bonus too,
+  // isolating the cleanse objective at complete + survive = 2 stars).
+  const noCleanse = evaluateCampaignMission(NECROMANCER_MISSION_ID, won, { cleanseUsed: false, spreadHitCount: 1 });
+  assert.equal(noCleanse.stars, 2);
+  assert.equal(noCleanse.objectives.find((o) => o.id === "cleansed").earned, false);
+  // A spread between your units drops the bonus but keeps the three base stars capped at 3.
+  const spread = evaluateCampaignMission(NECROMANCER_MISSION_ID, won, { cleanseUsed: true, spreadHitCount: 2 });
+  assert.equal(spread.stars, 3);
+  assert.equal(spread.bonusObjectives[0].earned, false);
+
+  // A dead unit fails survival.
+  const oneDown = {
+    ...won,
+    units: won.units.map((unit) => unit.id === "p1-1-mystic" ? { ...unit, hp: 0 } : unit),
+  };
+  assert.equal(evaluateCampaignMission(NECROMANCER_MISSION_ID, oneDown, { cleanseUsed: true, spreadHitCount: 0 }).stars, 3);
+  assert.equal(
+    evaluateCampaignMission(NECROMANCER_MISSION_ID, oneDown, { cleanseUsed: true, spreadHitCount: 0 }).objectives.find((o) => o.id === "survive").earned,
+    false,
+  );
+});
+
+test("completing the Necromancer mission unlocks Necromancer and records its stars", () => {
+  const storage = storageAdapter();
+  // Seed enough stars to have the node unlocked in progress terms (grading itself does
+  // not gate on unlock, but this mirrors real play reaching mission 2).
+  const base = necromancerMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, NECROMANCER_MISSION_ID, won, { cleanseUsed: true, spreadHitCount: 0 });
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.equal(completed.newRewardUnits.includes("necromancer"), true);
+  assert.equal(isUnitUnlocked("necromancer", storage), true);
+  assert.equal(readCampaignProgressStars(storage, NECROMANCER_MISSION_ID), 3);
+});
+
+function readCampaignProgressStars(storage, missionId) {
+  return getCampaignMap(storage).nodes.find((node) => node.id === missionId)?.stars ?? 0;
+}
