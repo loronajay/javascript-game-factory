@@ -55,7 +55,7 @@ export function openChoiceModal({ title = "", subtitle = "", accent = null, choi
       btn.type = "button";
       if (choice.type) {
         btn.classList.add("has-portrait");
-        btn.appendChild(createPortrait(choice.type, { variant: "is-chip", eager: true }));
+        btn.appendChild(createPortrait(choice.type, { variant: "is-chip", eager: true, skin: choice.skin ?? null }));
       }
       const text = el("span", "choice-option-text");
       text.appendChild(el("span", "choice-option-label", choice.label));

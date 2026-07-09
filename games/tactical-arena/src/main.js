@@ -27,6 +27,13 @@ import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
+  clodMissionOpeningScript,
+  clodRageWarningScript,
+  completeCampaignMission,
+  prepareCampaignMatchState,
+  shouldShowClodRageWarning,
+} from "./campaign/campaign.js";
+import {
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
   TUTORIAL_BASICS_ID,
   TUTORIAL_CATALOG,
@@ -84,6 +91,11 @@ let pendingTutorialSelectUnitId = null;
 let pendingTutorialBeforeDialogueAction = null;
 let pendingTutorialAfterDialogueAction = null;
 let tutorialPresentationTimer = 0;
+let campaignMissionId = null;
+let campaignClodWarningShown = false;
+let campaignClodChargeUsed = false;
+let campaignClodChargeHitCount = 0;
+let campaignChargeDefended = false;
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const CPU_TURN_LEAD_MS = 480;        // pause before the CPU's first move
 const CPU_ACTIVATION_GAP_MS = 320;   // between one unit finishing and the next
@@ -208,12 +220,18 @@ function startMatch(config) {
     teamNames: config.teamNames,
   });
   if (config.mode === "tutorial") state = prepareTutorialMatchState(state, config.tutorialId ?? TUTORIAL_BASICS_ID);
+  if (config.mode === "campaign") state = prepareCampaignMatchState(state, config.campaignMissionId);
   effects.setMetrics(createBoardMetrics(config.size));
   matchConfig = config;
   matchStartedAt = Date.now();
   initialHpByPlayer = {};
   for (const player of state.turnOrder ?? [1, 2]) initialHpByPlayer[player] = hpRemaining(state, player);
   tutorial = config.mode === "tutorial" ? createTutorial(config.tutorialId ?? TUTORIAL_BASICS_ID) : null;
+  campaignMissionId = config.mode === "campaign" ? config.campaignMissionId : null;
+  campaignClodWarningShown = false;
+  campaignClodChargeUsed = false;
+  campaignClodChargeHitCount = 0;
+  campaignChargeDefended = false;
   pendingTutorialPrompt = null;
   pendingTutorialDialogue = null;
   pendingTutorialComplete = false;
@@ -223,7 +241,7 @@ function startMatch(config) {
   pendingTutorialAfterDialogueAction = null;
   // Single-player drives Player 2 with the CPU. Tutorial mode uses the same turn lock,
   // but swaps in a scripted no-ART teaching driver.
-  cpu = config.mode === "single" || config.mode === "tutorial"
+  cpu = config.mode === "single" || config.mode === "tutorial" || config.mode === "campaign"
     ? { difficulty: config.difficulty ?? "normal", players: new Set([2]) }
     : null;
   cpuThinking = false;
@@ -252,6 +270,13 @@ function startMatch(config) {
   render();
   announceTurn(state.currentPlayer);
   if (tutorial) queueTutorialPresentation({ dialogue: tutorial.dialogue });
+  else if (matchConfig?.mode === "campaign" && campaignMissionId) {
+    const script = clodMissionOpeningScript(state);
+    if (script.length) void dialogue.show(script).then(() => {
+      maybeShowCampaignClodWarning();
+      maybeStartCpuTurn();
+    });
+  }
   maybeStartCpuTurn();
 }
 
@@ -293,6 +318,12 @@ function announceTurnChange(prevPlayer) {
     net?.endMatch(); // clean finish: let the session keep the socket alive briefly for the peer
     announceTurn(state.winner);
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
+    if (matchConfig?.mode === "campaign" && campaignMissionId) {
+      summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, {
+        clodChargeHitCount: campaignClodChargeHitCount,
+        chargeDefended: campaignChargeDefended,
+      });
+    }
     window.clearTimeout(resultsTimer);
     resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
   } else if (state.currentPlayer !== prevPlayer) {
@@ -341,6 +372,7 @@ function dispatch(command) {
   lastDispatchEvents = result.events ?? [];
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
+  recordCampaignProgressHooks(result);
   broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
@@ -348,6 +380,33 @@ function dispatch(command) {
   announceTurnChange(prevPlayer);
   maybeStartCpuTurn();
   return true;
+}
+
+function recordCampaignProgressHooks(result) {
+  if (matchConfig?.mode !== "campaign") return;
+  const charge = (result.events ?? []).find((event) =>
+    event.type === "ART_RESOLVED" &&
+    event.actorId === "p2-0-clod" &&
+    event.artId === "thunderous-charge");
+  if (charge) {
+    campaignClodChargeUsed = true;
+    const playerHitIds = (charge.targetIds ?? []).filter((id) => findUnit(state, id)?.player === 1);
+    campaignClodChargeHitCount = Math.max(campaignClodChargeHitCount, playerHitIds.length);
+    campaignChargeDefended ||= playerHitIds.some((id) => findUnit(state, id)?.defending);
+  }
+  maybeShowCampaignClodWarning();
+}
+
+function maybeShowCampaignClodWarning() {
+  if (!shouldShowClodRageWarning(state, {
+    warningShown: campaignClodWarningShown,
+    chargeUsed: campaignClodChargeUsed,
+  })) return;
+  if (dialogue.isOpen()) return;
+  const script = clodRageWarningScript(state);
+  if (!script.length) return;
+  campaignClodWarningShown = true;
+  if (state.phase === "playing") void dialogue.show(script).then(() => maybeStartCpuTurn());
 }
 
 function recordTutorialProgress(command, result, previousPlayer) {
@@ -708,6 +767,7 @@ async function resolveCombat(command) {
 
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
+  recordCampaignProgressHooks(result);
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
@@ -753,6 +813,7 @@ async function resolveWallAttack(command) {
 
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
+  recordCampaignProgressHooks(result);
   broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
@@ -1255,6 +1316,7 @@ async function resolveInstantArt(command) {
 
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
+  recordCampaignProgressHooks(result);
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
@@ -1280,6 +1342,8 @@ async function resolveInstantArt(command) {
 // passes to a computer-controlled seat; guarded so it never re-enters or stacks.
 function maybeStartCpuTurn() {
   if (cpuThinking || state.phase !== "playing" || !isCpu(state.currentPlayer)) return;
+  maybeShowCampaignClodWarning();
+  if (dialogue.isOpen()) return;
   if (shouldDelayCpuForTutorialPresentation()) {
     window.clearTimeout(tutorialPresentationTimer);
     tutorialPresentationTimer = window.setTimeout(flushTutorialPresentation, 0);
@@ -1308,11 +1372,16 @@ async function runCpuTurn() {
   render();
   setMessage(`Player ${state.currentPlayer} (CPU) is planning…`);
   await sleep(CPU_TURN_LEAD_MS);
+  if (dialogue.isOpen()) {
+    resolving = false;
+    render();
+    return;
+  }
 
   // The guard is belt-and-braces against a planning bug; chooseActivation always
   // returns at least a defend, so a living squad cannot truly stall.
   let guard = 0;
-  while (epoch === matchEpoch && state.phase === "playing" && isCpu(state.currentPlayer) && guard < CPU_MAX_ACTIVATIONS) {
+  while (epoch === matchEpoch && state.phase === "playing" && isCpu(state.currentPlayer) && !dialogue.isOpen() && guard < CPU_MAX_ACTIVATIONS) {
     guard += 1;
     const commands = tutorial
       ? chooseTutorialCpuActivation(state, tutorial)
@@ -1333,9 +1402,15 @@ async function runCpuTurn() {
     if (epoch !== matchEpoch) return;
     if (state.phase !== "playing") break;
     await sleep(CPU_ACTIVATION_GAP_MS);
+    if (dialogue.isOpen()) break;
   }
 
   if (epoch !== matchEpoch) return;
+  if (dialogue.isOpen()) {
+    resolving = false;
+    render();
+    return;
+  }
   resolving = false;
   if (state.phase === "complete") { render(); return; }
   selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null;

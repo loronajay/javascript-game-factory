@@ -637,7 +637,7 @@ test("a completed tutorial idles the CPU instead of sneaking in a final move/def
   assert.deepEqual(chooseTutorialCpuActivation(match, tutorial), []);
 });
 
-test("completing the first tutorial saves progress without granting the future skin choice", () => {
+test("completing the first tutorial saves progress without granting the tutorial skin choice", () => {
   const storage = new Map();
   const adapter = {
     getItem: (key) => storage.get(key) ?? null,
@@ -650,7 +650,7 @@ test("completing the first tutorial saves progress without granting the future s
   assert.equal(progress.allTutorialsComplete, false);
   assert.equal(progress.rewardGranted, false);
   assert.equal(progress.selectedRewardSkin, null);
-  assert.ok(progress.rewardChoices.some((choice) => choice.type === "archer" && choice.slug === "summer-vibes"));
+  assert.ok(progress.rewardChoices.some((choice) => choice.type === "juggernaut" && choice.slug === "bio-mech"));
 });
 
 test("basics tutorial copy teaches kiting without claiming the player is live-battle ready", () => {

@@ -9,10 +9,24 @@ import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 import { openSkinGallery } from "./skinGallery.js";
-import { createTutorialMatchConfig, getNextTutorialId, getTutorialList } from "../tutorials/basics.js";
+import { openChoiceModal } from "./choiceModal.js";
+import { resetUnlockProgress, selectTutorialRewardSkin } from "../progression/unlocks.js";
+import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { createPortrait } from "./portraits.js";
+import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
+import {
+  CLOD_MISSION_ID,
+  campaignSquadSize,
+  createCampaignMatchConfig,
+  getCampaignMap,
+  normalizeCampaignSquad,
+  resetCampaignProgress
+} from "../campaign/campaign.js";
+import { createTutorialMatchConfig, getNextTutorialId, getTutorialList, readProgress } from "../tutorials/basics.js";
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
+const DEFAULT_CAMPAIGN_SQUAD = Object.freeze(["mystic", "magician"]);
 
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
@@ -126,6 +140,162 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   }
 
   // ── Results ──────────────────────────────────────────────────────────────
+  const campaignScreen = screenEl("campaign");
+  const campaignMapHost = $("[data-campaign-map]", campaignScreen);
+  const campaignDetail = $("[data-campaign-detail]", campaignScreen);
+  const campaignSquadHost = $("[data-campaign-squad]", campaignScreen);
+  const campaignStars = $("[data-campaign-stars]", campaignScreen);
+  const campaignStartBtn = $("[data-action='startCampaignMission']", campaignScreen);
+  let selectedCampaignMissionId = CLOD_MISSION_ID;
+  let campaignSquad = [...DEFAULT_CAMPAIGN_SQUAD];
+  screens.register("campaign", { el: campaignScreen, onEnter: renderCampaign });
+
+  function campaignUnlockedTypes() {
+    return UNIT_TYPE_KEYS.filter((type) => isUnitUnlocked(type, globalThis.localStorage));
+  }
+
+  function normalizeCampaignSquadForProgress(slotCount = 2) {
+    const unlocked = campaignUnlockedTypes();
+    campaignSquad = normalizeCampaignSquad(campaignSquad, slotCount)
+      .map((type, index) => unlocked.includes(type) ? type : (unlocked[index] ?? DEFAULT_SQUAD[index]));
+  }
+
+  function renderCampaign() {
+    const map = getCampaignMap(globalThis.localStorage);
+    const playable = map.nodes.find((node) => node.status === "available" || node.status === "completed");
+    if (!map.nodes.some((node) => node.id === selectedCampaignMissionId && node.status !== "locked")) {
+      selectedCampaignMissionId = playable?.id ?? CLOD_MISSION_ID;
+    }
+    const selectedNode = map.nodes.find((node) => node.id === selectedCampaignMissionId) ?? map.nodes[0];
+    normalizeCampaignSquadForProgress(campaignSquadSize(selectedNode));
+    campaignStars.textContent = `${map.totalStars} ★`;
+    campaignMapHost.replaceChildren();
+    renderCampaignMapBase(campaignMapHost, map.nodes);
+    for (const node of map.nodes) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `campaign-node is-${node.status}${node.id === selectedCampaignMissionId ? " is-selected" : ""}`;
+      button.style.left = `${node.position.x}%`;
+      button.style.top = `${node.position.y}%`;
+      button.setAttribute("aria-pressed", node.id === selectedCampaignMissionId ? "true" : "false");
+      button.dataset.action = "selectCampaignMission";
+      button.dataset.missionId = node.id;
+      button.disabled = node.status === "locked";
+      const flag = document.createElement("span");
+      flag.className = "campaign-node-flag";
+      flag.textContent = node.status === "completed" ? "Cleared" : node.status === "coming-soon" ? "Soon" : node.status === "locked" ? "Locked" : "Mission";
+      const icon = document.createElement("span");
+      icon.className = "campaign-node-icon";
+      if (node.displayType) icon.append(createPortrait(node.displayType, { variant: "is-campaign-node", eager: true }));
+      else icon.textContent = "?";
+      const label = document.createElement("span");
+      label.className = "campaign-node-label";
+      label.textContent = node.status === "locked" ? "Unknown" : node.title;
+      const stars = document.createElement("span");
+      stars.className = "campaign-node-stars";
+      stars.textContent = node.stars ? "★".repeat(node.stars) : `${node.requiredStars}★`;
+      button.append(flag, icon, label, stars);
+      campaignMapHost.append(button);
+    }
+    renderCampaignDetail(selectedNode);
+    renderCampaignSquad();
+  }
+
+  function renderCampaignMapBase(host, nodes) {
+    const terrain = document.createElement("div");
+    terrain.className = "campaign-map-terrain";
+    terrain.setAttribute("aria-hidden", "true");
+    terrain.innerHTML = [
+      `<span class="campaign-landmark is-keep"></span>`,
+      `<span class="campaign-landmark is-ridge"></span>`,
+      `<span class="campaign-landmark is-woods"></span>`,
+      `<span class="campaign-label is-home">Vanguard Camp</span>`,
+      `<span class="campaign-label is-ridge">Clod Ridge</span>`,
+      `<span class="campaign-label is-gate">Old Gate</span>`,
+    ].join("");
+    host.append(terrain);
+    for (const node of nodes) {
+      if (node.routeFrom && node.routeTo) host.append(createCampaignRoute(node));
+    }
+  }
+
+  function createCampaignRoute(node) {
+    const segment = document.createElement("span");
+    const from = node.routeFrom;
+    const to = node.routeTo;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    segment.className = `campaign-route is-${node.status}`;
+    segment.style.left = `${from.x}%`;
+    segment.style.top = `${from.y}%`;
+    segment.style.width = `${length}%`;
+    segment.style.transform = `rotate(${angle}deg)`;
+    segment.setAttribute("aria-hidden", "true");
+    return segment;
+  }
+
+  function renderCampaignDetail(node) {
+    const playable = node && (node.status === "available" || node.status === "completed") && !node.comingSoon;
+    campaignDetail.innerHTML =
+      `<div class="campaign-detail-copy">` +
+      `<div class="campaign-kicker">${escapeHtml(node?.subtitle ?? "Campaign")}</div>` +
+      `<h3>${escapeHtml(node?.title ?? "Unknown Mission")}</h3>` +
+      `<p>${escapeHtml(node?.description ?? "Earn more stars to reveal this stage.")}</p>` +
+      `</div>` +
+      `<dl class="campaign-rewards">` +
+      `<dt>Requires</dt><dd>${node?.requiredStars ?? 0} ★</dd>` +
+      `<dt>Best</dt><dd>${node?.stars ? `${node.stars} / 3 ★` : "No clear"}</dd>` +
+      `<dt>Squad</dt><dd>${campaignSquadSize(node)} units</dd>` +
+      `<dt>Reward</dt><dd>${(node?.rewardUnits ?? []).map(unitLabel).join(", ") || "TBD"}</dd>` +
+      `</dl>`;
+    campaignStartBtn.disabled = !playable;
+    campaignStartBtn.textContent = node?.status === "completed" ? "Replay Mission" : node?.comingSoon ? "Coming Soon" : "Start Mission";
+    campaignStartBtn.dataset.missionId = node?.id ?? "";
+  }
+
+  function renderCampaignSquad() {
+    campaignSquadHost.replaceChildren();
+    campaignSquad.forEach((type, index) => {
+      const def = UNIT_TYPES[type];
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "campaign-squad-slot";
+      button.dataset.action = "chooseCampaignUnit";
+      button.dataset.slot = String(index);
+      button.append(createPortrait(type, { variant: "is-chip", eager: true }));
+      const copy = document.createElement("span");
+      copy.innerHTML = `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)}</i>`;
+      button.append(copy);
+      campaignSquadHost.append(button);
+    });
+  }
+
+  async function chooseCampaignUnit(slot) {
+    const choices = campaignUnlockedTypes()
+      .filter((type) => !campaignSquad.includes(type) || campaignSquad[slot] === type)
+      .map((type) => ({
+        value: type,
+        label: UNIT_TYPES[type].name,
+        sub: `${UNIT_TYPES[type].classType} · unlocked`,
+        type,
+      }));
+    const picked = await openChoiceModal({
+      title: `Choose Slot ${slot + 1}`,
+      subtitle: `This mission deploys ${campaignSquad.length} unit${campaignSquad.length === 1 ? "" : "s"}. Pick around the lesson.`,
+      accent: TEAM_COLOR[1],
+      choices,
+    });
+    if (!picked) return;
+    campaignSquad[slot] = picked;
+    renderCampaignSquad();
+  }
+
+  function unitLabel(type) {
+    return UNIT_TYPES[type]?.name ?? type;
+  }
+
   const results = screenEl("results");
   const burstEl = $("[data-results='burst']", results);
   let lastConfig = null;
@@ -134,22 +304,36 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   function showResults(summary) {
     const online = lastConfig?.mode === "online";
-    $("[data-results='winner']", results).textContent = `${summary.winnerLabel ?? `Player ${summary.winner}`} wins.`;
+    const campaign = summary.campaign ?? null;
+    $("[data-results='title']", results).textContent = campaign ? (campaign.victory ? "Mission Complete" : "Mission Failed") : "Victory";
+    $("[data-results='winner']", results).textContent = campaign
+      ? `${campaign.missionTitle}: ${campaign.stars}/3 stars, grade ${campaign.grade}.`
+      : `${summary.winnerLabel ?? `Player ${summary.winner}`} wins.`;
     $("[data-results='winner']", results).style.setProperty("--team", summary.winnerColor ?? TEAM_COLOR[summary.winner]);
     renderReport($("[data-results='report']", results), summary.teams);
     const stats = $("[data-results='stats']", results);
     stats.innerHTML = "";
     addStat(stats, "Mode", online
       ? "Online Versus"
+      : lastConfig?.mode === "campaign"
+        ? "Campaign"
       : lastConfig?.mode === "single"
         ? `Single Player · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
         : "Hot Seat");
+    if (campaign) {
+      addStat(stats, "Stars", `${campaign.stars} / 3`);
+      addStat(stats, "Grade", campaign.grade);
+      if (campaign.bonusObjectives?.some((objective) => objective.earned)) {
+        addStat(stats, "Bonus", campaign.bonusObjectives.filter((objective) => objective.earned).map((objective) => objective.label.replace(/^Bonus:\s*/i, "")).join(", "));
+      }
+      addStat(stats, "Reward", campaign.newRewardUnits?.length ? campaign.newRewardUnits.map(unitLabel).join(", ") : campaign.victory ? "Already unlocked" : "Win to unlock");
+    }
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));
     addStat(stats, "Duration", formatDuration(summary.durationMs));
     addStat(stats, "Ended by", "Squad eliminated");
     // A finished online session can't be locally replayed — Main Menu only.
-    if (rematchBtn) rematchBtn.hidden = online;
+    if (rematchBtn) rematchBtn.hidden = online || Boolean(campaign);
     showScreen("results");
     spawnConfetti(burstEl, TEAM_COLOR[summary.winner]);
   }
@@ -188,11 +372,14 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   function showTutorialComplete(summary = {}) {
     lastConfig = null;
+    const rewardPending = summary.allTutorialsComplete && !summary.rewardGranted;
     $("[data-tutorial-complete='title']", tutorialComplete).textContent = summary.title || "Tutorial Complete";
     $("[data-tutorial-complete='reward']", tutorialComplete).textContent =
       summary.rewardGranted && summary.selectedRewardSkin
         ? `Reward selected: ${skinRewardLabel(summary.selectedRewardSkin)}.`
-        : "Tutorial progress saved. Complete every tutorial to choose one reward skin from the curated list.";
+        : rewardPending
+          ? "Juggernaut unlocked. Choose one starter reward skin to add to your collection."
+          : "Tutorial progress saved. Complete every tutorial to unlock Juggernaut and choose one reward skin.";
     const nextBtn = $("[data-tutorial-complete='next']", tutorialComplete);
     const nextTutorialId = getNextTutorialId(globalThis.localStorage, summary.tutorialId ?? null);
     if (nextBtn) {
@@ -200,7 +387,37 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       nextBtn.disabled = !nextTutorialId;
       nextBtn.textContent = nextTutorialId ? "Next Tutorial" : "Next Tutorial Coming Soon";
     }
+    const rewardBtn = $("[data-tutorial-complete='reward-choice']", tutorialComplete);
+    if (rewardBtn) rewardBtn.hidden = !rewardPending;
     showScreen("tutorialComplete");
+    if (rewardPending) window.setTimeout(() => openTutorialRewardChoice(summary), 0);
+  }
+
+  async function openTutorialRewardChoice(summary = {}) {
+    const current = readProgress(globalThis.localStorage);
+    if (!current.allTutorialsComplete || current.rewardGranted) return;
+    const choice = await openChoiceModal({
+      title: "Juggernaut Unlocked",
+      subtitle: "Your first tank joins the roster. Choose one skin reward for this fresh playthrough.",
+      accent: TEAM_COLOR[1],
+      cancelLabel: "Choose Later",
+      choices: current.rewardChoices.map((reward) => ({
+        value: reward,
+        label: skinRewardLabel(reward),
+        sub: reward.type === "juggernaut" ? "New Juggernaut skin" : "Starter unit skin",
+        type: reward.type,
+        skin: reward.slug,
+      })),
+    });
+    if (!choice) return;
+    const result = selectTutorialRewardSkin(globalThis.localStorage, choice);
+    if (result.accepted) {
+      showTutorialComplete({
+        ...summary,
+        ...result.progress,
+        title: "Juggernaut Unlocked",
+      });
+    }
   }
 
   // ── Settings overlay ─────────────────────────────────────────────────────
@@ -209,6 +426,9 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const sfxRange = $("#setSfxVolume", settingsModal);
   const musicRange = $("#setMusicVolume", settingsModal);
   const themeSelect = $("#setTheme", settingsModal);
+  const resetProgressBtn = $("#setResetProgressBtn", settingsModal);
+  const progressStatus = $("#setProgressStatus", settingsModal);
+  let progressStatusTimer = null;
 
   // Palette list comes straight from the registry so a new theme in themes.js
   // shows up here with no markup change. Applied live + persisted on change.
@@ -228,9 +448,27 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     sfxRange.value = String(Math.round((audio.volume ?? 0.85) * 100));
     musicRange.value = String(Math.round((audio.musicVolume ?? 0.32) * 100));
     themeSelect.value = loadSavedThemeId();
+    if (progressStatus) progressStatus.textContent = "";
     settingsModal.hidden = false;
   }
   function closeSettings() { settingsModal.hidden = true; }
+
+  function resetLocalProgress() {
+    resetUnlockProgress(globalThis.localStorage);
+    resetCampaignProgress(globalThis.localStorage);
+    campaignSquad = [...DEFAULT_CAMPAIGN_SQUAD];
+    spPickers.p1.setLoadout(DEFAULT_SQUAD);
+    spPickers.p2.setLoadout(DEFAULT_SQUAD);
+    for (const picker of hsPickers.values()) picker.setLoadout(DEFAULT_SQUAD);
+    if (screens.active === "tutorialSelect") renderTutorialSelect();
+    if (screens.active === "hsSetup") syncHotSeatSetup();
+    if (screens.active === "campaign") renderCampaign();
+    if (progressStatus) {
+      progressStatus.textContent = "Progress reset. Tutorials, campaign stars, units, and skins are fresh.";
+      window.clearTimeout(progressStatusTimer);
+      progressStatusTimer = window.setTimeout(() => { progressStatus.textContent = ""; }, 3600);
+    }
+  }
 
   soundToggle.addEventListener("change", () => {
     audio.setEnabled(soundToggle.checked);
@@ -239,6 +477,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   sfxRange.addEventListener("input", () => audio.setVolume(Number(sfxRange.value) / 100));
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));
   $("#setCloseBtn", settingsModal).addEventListener("click", closeSettings);
+  resetProgressBtn?.addEventListener("click", resetLocalProgress);
   settingsModal.addEventListener("click", (event) => { if (event.target === settingsModal) closeSettings(); });
 
   // ── Global delegated wiring (nav + actions + segmented controls) ──────────
@@ -261,7 +500,21 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
       case "skins": openSkinGallery(); break;
+      case "chooseTutorialReward": openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;
       case "settings": openSettings(); break;
+      case "selectCampaignMission": {
+        selectedCampaignMissionId = actionBtn.dataset.missionId || CLOD_MISSION_ID;
+        renderCampaign();
+        break;
+      }
+      case "chooseCampaignUnit": {
+        void chooseCampaignUnit(Number(actionBtn.dataset.slot) || 0);
+        break;
+      }
+      case "startCampaignMission": {
+        startMatchTracked(createCampaignMatchConfig(actionBtn.dataset.missionId || selectedCampaignMissionId, campaignSquad));
+        break;
+      }
       case "startTutorial": {
         startMatchTracked(createTutorialMatchConfig(actionBtn.dataset.tutorialId || "basics"));
         break;

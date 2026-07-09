@@ -3,6 +3,13 @@ import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { getLegalMoves, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
+import {
+  TUTORIAL_PROGRESS_KEY,
+  TUTORIAL_REWARD_SKIN_CHOICES,
+  normalizeUnlockProgress,
+  readUnlockProgress,
+  writeUnlockProgress
+} from "../progression/unlocks.js";
 
 export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
@@ -50,14 +57,7 @@ export const TUTORIAL_CATALOG = Object.freeze([
   }),
 ]);
 export const TUTORIAL_IDS = Object.freeze(TUTORIAL_CATALOG.map((tutorial) => tutorial.id));
-export const TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgress";
-
-export const TUTORIAL_REWARD_SKIN_CHOICES = Object.freeze([
-  Object.freeze({ type: "archer", slug: "summer-vibes" }),
-  Object.freeze({ type: "swordsman", slug: "summer-vibes" }),
-  Object.freeze({ type: "mystic", slug: "summer-vibes" }),
-  Object.freeze({ type: "magician", slug: "summer-vibes" }),
-]);
+export { TUTORIAL_PROGRESS_KEY, TUTORIAL_REWARD_SKIN_CHOICES };
 
 export const TUTORIAL_SQUAD = Object.freeze(["swordsman", "archer", "mystic", "magician"]);
 export const PLAYER_ARCHER_ID = "p1-1-archer";
@@ -562,47 +562,23 @@ export function completeTutorial(storage, tutorialId) {
   if (TUTORIAL_IDS.includes(tutorialId)) completed.add(tutorialId);
 
   const completedTutorials = TUTORIAL_IDS.filter((id) => completed.has(id));
-  // More tutorials are still coming, so Tutorial #1 should not grant a skin yet.
-  // The reward model is a curated choice pool; a later completion flow can unlock
-  // selection from this list once the full tutorial set exists.
-  const next = {
+  const allTutorialsComplete = TUTORIAL_IDS.every((id) => completed.has(id));
+  const next = writeUnlockProgress(storage, {
+    ...current,
     completedTutorials,
-    rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
-    selectedRewardSkin: normalizeRewardSkin(current.selectedRewardSkin),
-    rewardGranted: false,
-    allTutorialsComplete: false,
-  };
-  writeProgress(storage, next);
+    allTutorialsComplete,
+  });
   return next;
 }
 
 export function readProgress(storage = globalThis.localStorage) {
-  const fallback = {
-    completedTutorials: [],
-    rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
-    selectedRewardSkin: null,
-    rewardGranted: false,
-    allTutorialsComplete: false,
-  };
-
-  try {
-    const raw = storage?.getItem?.(TUTORIAL_PROGRESS_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    const completedTutorials = Array.isArray(parsed.completedTutorials)
-      ? [...new Set(parsed.completedTutorials.filter((id) => TUTORIAL_IDS.includes(id)))]
-      : [];
-    const selectedRewardSkin = normalizeRewardSkin(parsed.selectedRewardSkin);
-    return {
-      completedTutorials,
-      rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
-      selectedRewardSkin,
-      rewardGranted: false,
-      allTutorialsComplete: false,
-    };
-  } catch {
-    return fallback;
-  }
+  const progress = readUnlockProgress(storage);
+  const completedTutorials = progress.completedTutorials.filter((id) => TUTORIAL_IDS.includes(id));
+  return normalizeUnlockProgress({
+    ...progress,
+    completedTutorials,
+    allTutorialsComplete: TUTORIAL_IDS.every((id) => completedTutorials.includes(id)),
+  });
 }
 
 export function getTutorialList(storage = globalThis.localStorage) {
@@ -1220,17 +1196,4 @@ function footworkPathHitsClod(path) {
 
 function chebyshev(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-}
-
-function normalizeRewardSkin(value) {
-  if (!value || typeof value !== "object") return null;
-  return TUTORIAL_REWARD_SKIN_CHOICES.find((skin) => skin.type === value.type && skin.slug === value.slug) ?? null;
-}
-
-function writeProgress(storage, progress) {
-  try {
-    storage?.setItem?.(TUTORIAL_PROGRESS_KEY, JSON.stringify(progress));
-  } catch {
-    // Blocked storage should never stop the tutorial flow.
-  }
 }

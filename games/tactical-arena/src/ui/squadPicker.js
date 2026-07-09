@@ -86,6 +86,10 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     isLocked: () => locked,
     getSquad: () => [...loadout.composition],
     getSkins: () => [...loadout.skins],
-    getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] })
+    getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] }),
+    setLoadout(nextLoadout) {
+      loadout = normalizeSquadLoadout(nextLoadout);
+      paintChips();
+    }
   };
 }

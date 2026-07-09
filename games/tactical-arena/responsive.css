@@ -668,6 +668,15 @@ body:has(.ref-modal:not([hidden])) .back-link {
     padding: .5rem .78rem;
     font-size: .82rem;
   }
+
+  [data-screen="campaign"] .campaign-card {
+    width: min(980px, 98vw);
+    min-height: 0;
+  }
+
+  [data-screen="campaign"] .campaign-map {
+    min-height: 280px;
+  }
 }
 
 /* -----------------------------------------------------------------------

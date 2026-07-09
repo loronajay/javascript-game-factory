@@ -3,6 +3,7 @@
 // renderer-independent means the roster modal and a future draft/blind-pick
 // controller can both drive the same rules without importing each other's UI.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { STARTER_UNIT_TYPES, isProgressUnitUnlocked } from "../progression/unlocks.js";
 import { normalizeSkinLoadout } from "./skinModel.js";
 
 export const UNIT_CLASS_GROUPS = Object.freeze([
@@ -19,15 +20,14 @@ export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES).filter((key) => !UNIT_TYPE
 export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
 export const SQUAD_SIZE = DEFAULT_SQUAD.length;
 
-// Campaign unlock gate. No unlock-progress system exists yet — every non-starter
-// unit is locked out of PLAYER squad-picking surfaces (roster picker, online
-// draft) until the campaign gating lands. CPU-controlled squads and the
-// hand-scripted tutorial battles build their units directly via core/state.js,
-// bypassing this list entirely, so they stay unaffected.
-export const STARTER_UNIT_TYPES = Object.freeze([...DEFAULT_SQUAD]);
+// Campaign unlock gate. Player-facing squad pickers read the thin progression
+// record. CPU squads and
+// scripted tutorial battles build units directly through core/state.js, so
+// authored encounters can still field locked units.
+export { STARTER_UNIT_TYPES };
 
-export function isUnitUnlocked(type) {
-  return STARTER_UNIT_TYPES.includes(type);
+export function isUnitUnlocked(type, storage = globalThis.localStorage) {
+  return isProgressUnitUnlocked(type, storage);
 }
 
 // The four corner-spawn cells, labelled front/back to mirror the staging block.
@@ -63,8 +63,8 @@ export function normalizeSquadLoadout(loadout, skins = null) {
 // Which roster types may fill `slotIndex` given the rest of the squad. With
 // duplicates allowed (hot-seat / blind / casual) every type is selectable; with
 // duplicates blocked (draft / ranked) a type already used in another slot is out.
-export function availableTypesForSlot(squad, slotIndex, allowDuplicates = true) {
-  const unlocked = UNIT_TYPE_KEYS.filter(isUnitUnlocked);
+export function availableTypesForSlot(squad, slotIndex, allowDuplicates = true, storage = globalThis.localStorage) {
+  const unlocked = UNIT_TYPE_KEYS.filter((type) => isUnitUnlocked(type, storage));
   if (allowDuplicates) return unlocked;
   const usedElsewhere = new Set(squad.filter((_, i) => i !== slotIndex));
   return unlocked.filter((type) => !usedElsewhere.has(type));

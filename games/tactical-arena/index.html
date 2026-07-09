@@ -72,6 +72,7 @@
         <div class="menu-card hub-card">
           <h2 class="menu-heading">Main Menu</h2>
           <div class="menu-buttons menu-choice-list">
+            <button data-nav="campaign" class="primary menu-btn menu-choice"><span>Campaign</span></button>
             <button data-nav="onlineSetup" class="menu-btn menu-choice"><span>Online Versus</span></button>
             <button data-nav="spSetup" class="primary menu-btn menu-choice"><span>Vs CPU</span></button>
             <button data-nav="tutorialSelect" class="primary menu-btn menu-choice"><span>Tutorials</span></button>
@@ -82,6 +83,33 @@
             <button data-action="skins" class="menu-btn ghost">Skins</button>
             <button data-action="settings" class="menu-btn ghost">Settings</button>
             <button data-nav="title" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ CAMPAIGN ============================ -->
+      <section class="screen menu-screen" data-screen="campaign">
+        <div class="menu-card campaign-card">
+          <header class="campaign-head">
+            <div>
+              <h2 class="menu-heading">Campaign</h2>
+              <p class="menu-note">Cross the map, earn stars, and unlock units from canon missions.</p>
+            </div>
+            <div class="campaign-star-bank" data-campaign-stars>0 stars</div>
+          </header>
+          <div class="campaign-layout">
+            <div class="campaign-map" data-campaign-map aria-label="Campaign map"></div>
+            <aside class="campaign-panel">
+              <div class="campaign-detail" data-campaign-detail></div>
+              <div class="setup-field">
+                <span class="setup-label">Mission Squad</span>
+                <div class="campaign-squad" data-campaign-squad></div>
+              </div>
+              <div class="menu-buttons">
+                <button type="button" data-action="startCampaignMission" class="primary menu-btn">Start Mission</button>
+                <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+              </div>
+            </aside>
           </div>
         </div>
       </section>
@@ -277,6 +305,7 @@
           <h2 class="menu-heading" data-tutorial-complete="title">Tutorial Complete</h2>
           <p class="menu-note" data-tutorial-complete="reward">Tutorial progress saved.</p>
           <div class="menu-buttons">
+            <button type="button" class="primary menu-btn" data-action="chooseTutorialReward" data-tutorial-complete="reward-choice" hidden>Choose Skin</button>
             <button type="button" class="primary menu-btn" data-action="startTutorial" data-tutorial-complete="next" disabled>Next Tutorial</button>
             <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
           </div>
@@ -487,6 +516,13 @@
             <span class="set-label">Music volume</span>
             <input id="setMusicVolume" type="range" min="0" max="100" value="32">
           </label>
+          <div class="set-row set-action-row">
+            <span class="set-label">Progress</span>
+            <div class="set-action-stack">
+              <button id="setResetProgressBtn" class="menu-btn danger" type="button">Reset Progress</button>
+              <span id="setProgressStatus" class="set-hint" aria-live="polite"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

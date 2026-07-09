@@ -1,4 +1,5 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { isProgressSkinUnlocked } from "../progression/unlocks.js";
 import { SKIN_MANIFEST } from "./skinManifest.generated.js";
 
 export const BASE_SKIN_SLUG = null;
@@ -55,10 +56,9 @@ function skin(entry, { status = SKIN_STATUS.UNLOCKED } = {}) {
   });
 }
 
-// All skins are locked until the skin-choice/unlock UI is built — the manifest
-// still enumerates every painted skin so it can be browsed (see the "visible
-// but locked" UX), but none are selectable yet. Flip individual entries back to
-// SKIN_STATUS.UNLOCKED once a real unlock path exists.
+// The manifest enumerates every painted skin so galleries can show a visible but
+// locked collection. getUnitSkins overlays account progress onto these base
+// entries at read time.
 export const SKINS_BY_UNIT = Object.freeze(Object.fromEntries(
   Object.keys(UNIT_TYPES).map((type) => {
     const entries = SKIN_MANIFEST
@@ -68,38 +68,47 @@ export const SKINS_BY_UNIT = Object.freeze(Object.fromEntries(
   })
 ));
 
-export function getUnitSkins(typeOrDef) {
+export function getUnitSkins(typeOrDef, storage = globalThis.localStorage) {
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
-  return SKINS_BY_UNIT[type] ?? Object.freeze([]);
+  const skins = SKINS_BY_UNIT[type] ?? Object.freeze([]);
+  return Object.freeze(skins.map((entry) => {
+    const unlocked = isProgressSkinUnlocked(type, entry.slug, storage);
+    if (entry.unlocked === unlocked) return entry;
+    return Object.freeze({
+      ...entry,
+      status: unlocked ? SKIN_STATUS.UNLOCKED : SKIN_STATUS.LOCKED,
+      unlocked,
+    });
+  }));
 }
 
-export function getSkin(typeOrDef, slug) {
+export function getSkin(typeOrDef, slug, storage = globalThis.localStorage) {
   if (!slug) return null;
-  return getUnitSkins(typeOrDef).find((entry) => entry.slug === slug) ?? null;
+  return getUnitSkins(typeOrDef, storage).find((entry) => entry.slug === slug) ?? null;
 }
 
-export function isSkinUnlocked(typeOrDef, slug) {
-  const entry = getSkin(typeOrDef, slug);
+export function isSkinUnlocked(typeOrDef, slug, storage = globalThis.localStorage) {
+  const entry = getSkin(typeOrDef, slug, storage);
   return Boolean(entry?.unlocked);
 }
 
-export function normalizeSkinSlug(typeOrDef, slug) {
-  const entry = getSkin(typeOrDef, typeof slug === "string" ? slug.trim() : slug);
+export function normalizeSkinSlug(typeOrDef, slug, storage = globalThis.localStorage) {
+  const entry = getSkin(typeOrDef, typeof slug === "string" ? slug.trim() : slug, storage);
   return entry?.unlocked ? entry.slug : BASE_SKIN_SLUG;
 }
 
-export function skinAssetPath(typeOrDef, slug, kind = "portrait") {
-  const entry = getSkin(typeOrDef, slug);
+export function skinAssetPath(typeOrDef, slug, kind = "portrait", storage = globalThis.localStorage) {
+  const entry = getSkin(typeOrDef, slug, storage);
   if (!entry) return null;
   return kind === "board" ? entry.boardSrc : entry.portraitSrc;
 }
 
-export function normalizeSkinLoadout(composition, skins) {
+export function normalizeSkinLoadout(composition, skins, storage = globalThis.localStorage) {
   const raw = Array.isArray(skins) ? skins : [];
-  return composition.map((type, index) => normalizeSkinSlug(type, raw[index]));
+  return composition.map((type, index) => normalizeSkinSlug(type, raw[index], storage));
 }
 
-export function skinLabel(typeOrDef, slug) {
-  const entry = getSkin(typeOrDef, slug);
+export function skinLabel(typeOrDef, slug, storage = globalThis.localStorage) {
+  const entry = getSkin(typeOrDef, slug, storage);
   return entry?.name ?? "Classic";
 }
