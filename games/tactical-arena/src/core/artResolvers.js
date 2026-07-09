@@ -1803,7 +1803,7 @@ function resolveRocketPunch(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
-    targetIds: [target.id], damageByTarget: { [target.id]: damage },
+    targetIds: [target.id], damageByTarget: { [target.id]: damage }, damage,
     hit: true, critical: swing.critical, stunned: Boolean(effect?.applied && !effect.reflected), mpCost: cost
   }, ...rockHardEvents]);
 }
