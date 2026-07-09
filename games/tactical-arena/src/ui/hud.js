@@ -4,7 +4,7 @@ import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
 import { colorOf } from "../core/state.js";
 import { teamLabel, teamOf } from "../match/matchBuilder.js";
-import { TEMPO_GAUGE_MAX, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
+import { TEMPO_GAUGE_MAX, canBeginTempoActivation, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
 
 function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -258,7 +258,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       const tempoReady = isTempoBattle(state) && isTempoUnitReady(state, unit);
       const selectable = controlsEnabled && !dead && !isStunned(unit) && (
         isTempoBattle(state)
-          ? tempoReady && !state.activation
+          ? canBeginTempoActivation(state, unit)
           : unit.player === state.currentPlayer && !unit.spent
       );
       row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;

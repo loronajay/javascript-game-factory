@@ -40,6 +40,12 @@ export function isTempoUnitReady(state, unitOrId) {
   return Boolean(unit && unit.hp > 0 && takesTurns(unit) && getTempoReadiness(state, unit.id) >= TEMPO_GAUGE_MAX);
 }
 
+export function canBeginTempoActivation(state, unitOrId) {
+  if (!isTempoBattle(state) || state.activation) return false;
+  const unit = typeof unitOrId === "string" ? findUnit(state, unitOrId) : unitOrId;
+  return Boolean(unit && isTempoUnitEligible(unit) && !isStunned(unit) && isTempoUnitReady(state, unit));
+}
+
 export function enableTempoBattle(state, options = {}) {
   const next = cloneState(state);
   const readiness = {};

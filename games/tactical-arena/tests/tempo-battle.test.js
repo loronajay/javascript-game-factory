@@ -11,6 +11,7 @@ import {
   TEMPO_POISON_TICK_MS,
   TEMPO_STATUS_TURN_MS,
   advanceTempoBattle,
+  canBeginTempoActivation,
   enableTempoBattle,
   getTempoReadiness,
   getUnitAgility,
@@ -160,4 +161,24 @@ test("tempo ready units can activate and finishing resets only their readiness",
   assert.equal(getTempoReadiness(result.nextState, "p1-archer"), 0);
   assert.equal(getTempoReadiness(result.nextState, "p2-clod"), 400);
   assert.equal(result.nextState.turnNumber, 0);
+});
+
+test("tempo activation does not require a classic squad-turn current player", () => {
+  const state = enableTempoBattle(createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-clod", player: 2, type: "clod", x: 7, y: 7 }
+    ]
+  }), { readiness: { "p1-archer": TEMPO_GAUGE_MAX, "p2-clod": TEMPO_GAUGE_MAX } });
+
+  assert.equal(state.currentPlayer, null);
+  assert.equal(state.units.find((unit) => unit.id === "p1-archer").spent, false);
+  assert.equal(state.units.find((unit) => unit.id === "p2-clod").spent, false);
+
+  const p2Result = applyCommand(state, beginActivation(2, "p2-clod"));
+  assert.equal(p2Result.accepted, true);
+  assert.equal(p2Result.nextState.currentPlayer, 2);
+  assert.equal(p2Result.nextState.activation.unitId, "p2-clod");
+  assert.equal(canBeginTempoActivation(state, "p1-archer"), true);
+  assert.equal(canBeginTempoActivation(p2Result.nextState, "p1-archer"), false);
 });

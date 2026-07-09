@@ -22,12 +22,13 @@ import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
-import { turnAnnouncementSub } from "./ui/turnAnnouncement.js";
+import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
   advanceTempoBattle,
+  canBeginTempoActivation,
   enableTempoBattle,
   isTempoBattle,
   isTempoUnitReady
@@ -421,6 +422,12 @@ function announceTurn(player, { hold = false } = {}) {
 }
 
 function announceTurnChange(prevPlayer) {
+  if (!shouldShowTurnAnnouncement({
+    tempo: isTempoBattle(state),
+    phase: state.phase,
+    currentPlayer: state.currentPlayer,
+    prevPlayer
+  })) return;
   if (state.phase === "complete") {
     net?.endMatch(); // clean finish: let the session keep the socket alive briefly for the peer
     announceTurn(state.winner);
@@ -2073,11 +2080,11 @@ function playRolloverFx(events) {
 function beginUnit(unit) {
   if (inputLocked()) return;
   if (isTempoBattle(state)) {
-    if (state.activation || unit.hp <= 0 || isStunned(unit) || !isTempoUnitReady(state, unit)) return;
+    if (!canBeginTempoActivation(state, unit)) return;
     if (isCpu(unit.player)) return;
     if (net != null && unit.player !== mySeat) return;
   } else {
-  if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0 || isStunned(unit)) return;
+    if (unit.player !== state.currentPlayer || unit.spent || unit.hp <= 0 || isStunned(unit)) return;
   }
   // Re-selecting the already-active unit (e.g. after deselecting mid-activation)
   // should not re-dispatch beginActivation — that would reset moved/primaryUsed.

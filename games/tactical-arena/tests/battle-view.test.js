@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, moveUnit } from "../src/core/commands.js";
+import { TEMPO_GAUGE_MAX, enableTempoBattle } from "../src/core/tempoBattle.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
@@ -370,6 +371,45 @@ test("spent defending squad rows keep Done in the status tag strip", () => {
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+test("tempo squad rows are selectable for ready units while no squad turn is active", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const state = enableTempoBattle(createBattleState({
+      units: [
+        { id: "p1-ready", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p1-waiting", player: 1, type: "swordsman", x: 1, y: 0 },
+        { id: "p2-ready", player: 2, type: "clod", x: 7, y: 7 }
+      ]
+    }), { readiness: { "p1-ready": TEMPO_GAUGE_MAX, "p2-ready": TEMPO_GAUGE_MAX } });
+    const selected = [];
+    const overlay = new TestElement("div");
+
+    renderSquads(state, overlay, (unit) => selected.push(unit.id));
+
+    const rows = overlay.children.flatMap((panel) => panel.querySelector(".squad-list").children);
+    const readyRow = rows.find((row) => row.innerHTML.includes("Archer"));
+    const waitingRow = rows.find((row) => row.innerHTML.includes("Swordsman"));
+    assert.match(readyRow.className, /\bselectable\b/);
+    assert.doesNotMatch(waitingRow.className, /\bselectable\b/);
+
+    readyRow.listeners.get("click")();
+    assert.deepEqual(selected, ["p1-ready"]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("tempo setup board-size labels use the same readable multiplication sign as other setup screens", () => {
+  const html = readFileSync(join(GAME_ROOT, "index.html"), "utf8");
+  const tempoSetup = html.match(/data-screen="tempoSpSetup"[\s\S]*?data-action="startTempoSingle"/)?.[0] ?? "";
+
+  assert.match(tempoSetup, /13 × 13/);
+  assert.match(tempoSetup, /15 × 15/);
+  assert.doesNotMatch(tempoSetup, /Ã/);
 });
 
 test("raging board units carry a rage state class and aura element", () => {

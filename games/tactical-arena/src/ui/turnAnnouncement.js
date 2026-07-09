@@ -1,3 +1,9 @@
+export function shouldShowTurnAnnouncement({ tempo = false, phase, currentPlayer, prevPlayer } = {}) {
+  if (phase === "complete") return true;
+  if (tempo) return false;
+  return currentPlayer !== prevPlayer;
+}
+
 export function turnAnnouncementSub({ matchMode, player, mySeat, isCpu }) {
   if (matchMode === "hotseat" || matchMode == null) return "Pass the device";
   if (matchMode === "online") return player === mySeat ? "Your turn" : "Opponent's turn";
