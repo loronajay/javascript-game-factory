@@ -20,10 +20,13 @@ plus several hand-placed **Ghoul** obstacles that guard the swamp. Reward:
 `rewardUnits: ["witch-doctor"]`.
 
 **No unit unlocked from a later mission is assumed here** — the intended
-answer, like Mission 1 and 2, is a **base-roster** unit (Swordsman, Archer,
-Mystic, Magician, Paladin are always available; Sniper and everything else
-is behind its own later unlock and isn't in play yet). This mission's
-intended pick is the **Archer**.
+answer, like Mission 1 and 2, is a **base-roster** unit. Per
+`STARTER_UNIT_TYPES` (`progression/unlocks.js`), the actually-always-
+available roster is just **Swordsman, Archer, Mystic, Magician** — Paladin
+is *not* a starter unit and shouldn't be assumed available for this
+mission's puzzle (it, Sniper, and everything else sit behind their own
+unlocks, none of which are guaranteed cleared by this point in the
+campaign). This mission's intended pick is the **Archer**.
 
 Board: suggest **15×15** — the biggest campaign board yet, needed for a
 gauntlet with real length. Mission 1 was 11, Mission 2 was 13.
@@ -136,29 +139,35 @@ existing `AUTO_STRIKE` event stream, gate on `ghoulWarningShown`):
 ## Objectives / stars (mirrors `evaluateCampaignMission`'s shape)
 
 Base three:
-1. `complete` — win the duel.
-2. `survive` — the chosen unit ends the mission alive (there's only one, so
-   this is a flat "don't die").
-3. **`unburned`** — win having taken fire-tile damage **zero** times. This
-   is the mission's signature terrain lesson made explicit and required,
-   not optional: it's directly gradeable off the existing `FIRE_DAMAGE`
-   event stream (filter to `unit.player === 1`), no new resolver needed.
-   Requires a `fireDamageTakenCount` meta counter, computed the same way
-   Mission 1 tracks `clodChargeHitCount` — an event-counting hook in
-   `main.js`, passed into `evaluateCampaignMission`'s `meta` arg.
+1. **`ghoulCleared`** — defeated at least one Ghoul during the run. Since
+   Ghouls are set to 5 HP specifically so clearing one is a live one-turn
+   option (see puzzle point 5), this star rewards actually taking that
+   option at least once rather than only ever routing around — a
+   `ghoulsDefeatedCount` meta counter (>= 1), built off unit-death events
+   the same way other missions already track kills.
+2. **`unscathed`** — win having taken **zero** fire-tile damage *and* zero
+   Ghoul Bite hits. This is the mission's signature terrain-and-spacing
+   lesson made explicit and required, combined into a single star rather
+   than split across two: it's directly gradeable off the existing
+   `FIRE_DAMAGE` and `AUTO_STRIKE` event streams (both filtered to
+   `unit.player === 1`), no new resolver needed. Requires
+   `fireDamageTakenCount` and `ghoulBiteTakenCount` meta counters, computed
+   the same way Mission 1 tracks `clodChargeHitCount` — event-counting
+   hooks in `main.js`, passed into `evaluateCampaignMission`'s `meta` arg;
+   the star is earned when both are 0.
+3. `complete` — win the duel.
 
 Bonus:
-- **`sharpshooter`** — win having never had a physical attack/ART rejected
-  as blocked (`errorCode === "TARGET_OBSTRUCTED"` on a player-issued
-  command, tracked as an `obstructedShotCount` meta counter incremented in
-  `main.js`'s dispatch wrapper, the same place errorCodes already surface
-  to the UI). This is the mission's real mastery layer — it rewards reading
-  a blocked lane *before* attempting it (via Volley Shot or repositioning),
-  not just recovering after the rejection.
-- **`unbitten`** — win having taken zero Ghoul Bite hits (`AUTO_STRIKE`
-  events filtered to `unit.player === 1`), a `ghoulBiteTakenCount` counter
-  built the same way. Reinforces "stay at range," the same role `spread`
-  plays in Mission 2.
+- **`noBlackDeath`** — win without the Witch Doctor's Black Death Dance
+  ever resolving. Tracked as a `blackDeathDanceUsed` boolean meta flag, set
+  when an accepted command resolves `resolution: "witchDance"` with
+  `stance: "blackDeath"` for the enemy unit (mirrors how Mission 1/2 track
+  one-shot event flags off the accepted-command stream in `main.js`). Since
+  Black Death Dance is `rageLocked` (only available at ≤5 HP), this really
+  rewards closing the duel out in the same turn the Witch Doctor enters
+  RAGE rather than giving him another turn to dance it — the same "don't
+  dawdle near a RAGE trigger" lesson as the Beat 5 dialogue warning, now
+  made a scoreable objective instead of just flavor.
 
 ## Implementation notes (for whoever picks this up)
 
@@ -229,5 +238,5 @@ Bonus:
   screen.
 - Tests to extend: `tests/campaign.test.js` (layout/positions, permanent-
   fire placement, summoner-less Ghoul behavior, dialogue triggers),
-  `tests/campaign-results.test.js` (star grading for `unburned`/
-  `sharpshooter`/`unbitten`).
+  `tests/campaign-results.test.js` (star grading for `ghoulCleared`/
+  `unscathed`/`noBlackDeath`).
