@@ -1,18 +1,27 @@
 import { getUnitType } from "../core/unitCatalog.js";
-import { findUnit } from "../core/state.js";
+import { createUnit, findUnit } from "../core/state.js";
 import { isNegativeStatus } from "../rules/statuses.js";
+import { positionKey } from "../rules/movement.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import { computeCampaignGeometry, computeRegionBoxes } from "./campaignMap.js";
 
 export const CAMPAIGN_PROGRESS_KEY = "tacticalArenaCampaignProgressV1";
 export const CLOD_MISSION_ID = "clod-trial";
 export const NECROMANCER_MISSION_ID = "necromancer-rise";
+export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
 export const MIN_CAMPAIGN_SQUAD_SIZE = 1;
 export const MAX_CAMPAIGN_SQUAD_SIZE = 4;
+// The campaign map is capped for now so the whole journey stays surveyable at once;
+// authored missions fill placeholder stops one at a time up to this count.
+export const MAX_CAMPAIGN_MISSIONS = 20;
 
-export const CAMPAIGN_MISSIONS = Object.freeze([
-  Object.freeze({
+// Fully-authored, playable missions. Everything OTHER than the map graph lives here
+// (squads, lesson copy, rewards); the mission's cell + trail wiring comes from
+// CAMPAIGN_TRAIL below so this object never carries hand-placed map coordinates.
+const AUTHORED_MISSIONS = Object.freeze({
+  [CLOD_MISSION_ID]: {
     id: CLOD_MISSION_ID,
     title: "Clod on the Ridge",
     subtitle: "Lesson: armor, magic, and RAGE spacing",
@@ -24,11 +33,8 @@ export const CAMPAIGN_MISSIONS = Object.freeze([
     defaultSquad: Object.freeze(["mystic", "magician"]),
     enemySquad: Object.freeze(["clod", "juggernaut"]),
     size: 11,
-    position: Object.freeze({ x: 10, y: 72 }),
-    routeFrom: Object.freeze({ x: 12, y: 84 }),
-    routeTo: Object.freeze({ x: 10, y: 72 }),
-  }),
-  Object.freeze({
+  },
+  [NECROMANCER_MISSION_ID]: {
     id: NECROMANCER_MISSION_ID,
     title: "Necromancer's Gate",
     subtitle: "Lesson: status pressure and cleansing",
@@ -39,11 +45,149 @@ export const CAMPAIGN_MISSIONS = Object.freeze([
     playerSlots: 2,
     enemySquad: Object.freeze(["necromancer", "virus"]),
     size: 13,
-    position: Object.freeze({ x: 58, y: 32 }),
-    routeFrom: Object.freeze({ x: 10, y: 72 }),
-    routeTo: Object.freeze({ x: 58, y: 32 }),
-  }),
+  },
+  [WITCH_DOCTOR_MISSION_ID]: {
+    id: WITCH_DOCTOR_MISSION_ID,
+    title: "Cursed Swamp of the Witch Doctor",
+    subtitle: "Lesson: body-blocks, fire lanes, and Volley Shot",
+    description: "Send one unit through a swamp lattice of permanent fire and Ghoul bodies. Range keeps the bites off, Volley Shot reaches through blockers, and speed denies Black Death Dance.",
+    unitType: "witch-doctor",
+    requiredStars: 4,
+    rewardUnits: Object.freeze(["witch-doctor"]),
+    playerSlots: 1,
+    enemySquad: Object.freeze(["witch-doctor"]),
+    size: 15,
+  },
+});
+
+// The overworld trail: index = traversal order, each entry pins a mission's grid
+// cell {col,row} on the CAMPAIGN_GRID. The two authored missions lead; the rest are
+// charted-but-unbuilt placeholder stops so the entire 20-mission map is visible
+// (as "coming soon" / "?" nodes) from day one. Cells wind across the grid so the
+// path reads like a real map. Promoting a placeholder to a real mission is purely
+// additive: give its id an AUTHORED_MISSIONS entry — the cell + trails already exist.
+// The map's geography: named biome regions the trail passes through, in paint order
+// (earlier = drawn first / underneath). Each region auto-sizes to the missions
+// assigned to it, so the terrain is data-driven — no hand-placed landmark coords.
+// `biome` keys the CSS terrain styling; `label` is the on-map place name.
+export const CAMPAIGN_REGIONS = Object.freeze([
+  Object.freeze({ id: "ridge", biome: "rock", label: "Stoneback Ridge" }),
+  Object.freeze({ id: "barrow", biome: "burial", label: "The Old Gate" }),
+  Object.freeze({ id: "mire", biome: "swamp", label: "Mirefen Swamp" }),
+  Object.freeze({ id: "coast", biome: "water", label: "Tidewatch Coast" }),
+  Object.freeze({ id: "ashfall", biome: "volcanic", label: "Ashfall Caldera" }),
+  Object.freeze({ id: "wood", biome: "forest", label: "Whisperwood" }),
+  Object.freeze({ id: "frost", biome: "snow", label: "Frostcrown Peaks" }),
+  Object.freeze({ id: "waste", biome: "ruins", label: "The Shattered Waste" }),
 ]);
+
+// The overworld trail: index = traversal order. Each stop pins a grid cell, the
+// region it sits in, and its own place name (`locationName`) shown on the map even
+// while the mission itself is still gated. `blurb` seeds the placeholder's flavor +
+// a hint at the challenge a real mission there might explore (a mission-idea backlog).
+const CAMPAIGN_TRAIL = [
+  { id: CLOD_MISSION_ID, cell: { col: 0, row: 4 }, region: "ridge", locationName: "Stoneback Ridge" },
+  { id: NECROMANCER_MISSION_ID, cell: { col: 1, row: 4 }, region: "barrow", locationName: "The Old Gate" },
+  { id: WITCH_DOCTOR_MISSION_ID, cell: { col: 2, row: 4 }, region: "mire", locationName: "Mirefen Shallows",
+    blurb: "Foul water swallows the causeway. Something chants in the reeds — a witch doctor's dance, they say, that turns your own curses against you." },
+  { id: "uncharted-04", cell: { col: 3, row: 4 }, region: "mire", locationName: "Witch's Hollow",
+    blurb: "Deeper in the mire, stilt-huts hang with charms. Fire won't take here, and the fog rots armor and resolve alike." },
+  { id: "uncharted-05", cell: { col: 4, row: 4 }, region: "mire", locationName: "Gravemarsh",
+    blurb: "Where the swamp drains to the sea, the drowned don't stay drowned. Footing is everything." },
+  { id: "uncharted-06", cell: { col: 5, row: 4 }, region: "coast", locationName: "Tidewatch Harbor",
+    blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
+  { id: "uncharted-07", cell: { col: 6, row: 4 }, region: "coast", locationName: "Saltbreak Pier",
+    blurb: "Narrow jetties over deep water. Get shoved off and the sea keeps you." },
+  { id: "uncharted-08", cell: { col: 6, row: 3 }, region: "coast", locationName: "Wreckers' Cliffs",
+    blurb: "Cliffside wreckers lure ships to the rocks. High ground and hard falls decide this one." },
+  { id: "uncharted-09", cell: { col: 5, row: 3 }, region: "ashfall", locationName: "Ashfall Flats",
+    blurb: "The land turns black and warm. Cinders drift; a stone sentinel stirs in the heat haze." },
+  { id: "uncharted-10", cell: { col: 4, row: 3 }, region: "ashfall", locationName: "The Caldera",
+    blurb: "The mountain's open mouth. Lava seams split the field — fire immunity is worth more than armor here." },
+  { id: "uncharted-11", cell: { col: 3, row: 3 }, region: "ashfall", locationName: "Cinderwood",
+    blurb: "A forest burned to charcoal spires. Everything here is kindling, including the plans." },
+  { id: "uncharted-12", cell: { col: 2, row: 3 }, region: "wood", locationName: "Whisperwood Eaves",
+    blurb: "Living green at last. The canopy blocks arrows and hides watchers with longbows." },
+  { id: "uncharted-13", cell: { col: 1, row: 3 }, region: "wood", locationName: "Elderroot",
+    blurb: "An old grove said to shelter a blindfolded, winged archer whose arrows never truly miss." },
+  { id: "uncharted-14", cell: { col: 0, row: 3 }, region: "wood", locationName: "Thornhollow",
+    blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
+  { id: "uncharted-15", cell: { col: 0, row: 2 }, region: "frost", locationName: "Frostcrown Foothills",
+    blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
+  { id: "uncharted-16", cell: { col: 1, row: 2 }, region: "frost", locationName: "Rimefang Pass",
+    blurb: "A knife-edge pass walled by ice. Cover shatters; nowhere stays safe for long." },
+  { id: "uncharted-17", cell: { col: 2, row: 2 }, region: "frost", locationName: "The White Summit",
+    blurb: "Above the clouds, a frostguard holds the peak. Bring warmth, or bring numbers." },
+  { id: "uncharted-18", cell: { col: 3, row: 2 }, region: "waste", locationName: "The Shattered Waste",
+    blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
+  { id: "uncharted-19", cell: { col: 4, row: 2 }, region: "waste", locationName: "Ruins of Vael",
+    blurb: "A dead capital picked clean by mages. A caster here bends magic and the years to spite you." },
+  { id: "uncharted-20", cell: { col: 5, row: 2 }, region: "waste", locationName: "The Iron Citadel",
+    blurb: "The last gate. A crowned commander waits on the throne — end the campaign or serve it." },
+];
+
+// Extra visual branches on top of the linear spine, so the map reads as a network
+// with forks rather than one snaking line. Purely cosmetic — unlock stays star-gated.
+const CAMPAIGN_FORKS = [
+  [WITCH_DOCTOR_MISSION_ID, "uncharted-12"],
+  ["uncharted-06", "uncharted-09"],
+  ["uncharted-11", "uncharted-18"],
+];
+
+function placeholderMission(stop, trailIndex) {
+  // requiredStars climbs with distance along the trail so nearer stops reveal first
+  // as the player banks stars; distant ones stay "?" until the map fills out.
+  return {
+    id: stop.id,
+    title: stop.locationName,
+    subtitle: "Campaign · coming soon",
+    description: stop.blurb ?? "This stretch of the war map hasn't been charted yet. New campaigns are on the way.",
+    comingSoon: true,
+    requiredStars: 4 + (trailIndex - 2) * 2,
+    rewardUnits: Object.freeze([]),
+    playerSlots: 2,
+    enemySquad: Object.freeze([]),
+  };
+}
+
+function buildCampaignMissions() {
+  const byId = new Map();
+  CAMPAIGN_TRAIL.forEach((stop, index) => {
+    const base = AUTHORED_MISSIONS[stop.id] ?? placeholderMission(stop, index);
+    byId.set(stop.id, {
+      ...base,
+      id: stop.id,
+      cell: { ...stop.cell },
+      connections: [],
+      region: stop.region,
+      locationName: stop.locationName,
+    });
+  });
+  // Spine: every stop trails to the next one in traversal order.
+  for (let i = 0; i < CAMPAIGN_TRAIL.length - 1; i += 1) {
+    byId.get(CAMPAIGN_TRAIL[i].id).connections.push(CAMPAIGN_TRAIL[i + 1].id);
+  }
+  // Forks: extra branch trails.
+  for (const [from, to] of CAMPAIGN_FORKS) {
+    if (byId.has(from) && byId.has(to)) byId.get(from).connections.push(to);
+  }
+  return CAMPAIGN_TRAIL.map((stop) => {
+    const mission = byId.get(stop.id);
+    return Object.freeze({
+      ...mission,
+      cell: Object.freeze(mission.cell),
+      connections: Object.freeze(mission.connections),
+    });
+  });
+}
+
+export const CAMPAIGN_MISSIONS = Object.freeze(buildCampaignMissions().slice(0, MAX_CAMPAIGN_MISSIONS));
+
+// Node positions, trail path geometry, and terrain region boxes are derived once
+// from the mission graph + region metadata.
+const CAMPAIGN_GEOMETRY = computeCampaignGeometry(CAMPAIGN_MISSIONS);
+const CAMPAIGN_REGION_BOXES = computeRegionBoxes(CAMPAIGN_MISSIONS, CAMPAIGN_REGIONS);
+const REGION_BIOME_BY_ID = new Map(CAMPAIGN_REGIONS.map((region) => [region.id, region.biome]));
 
 function defaultStorage() {
   return globalThis.localStorage;
@@ -141,29 +285,49 @@ export function getCampaignMap(storage = defaultStorage()) {
   const progress = readCampaignProgress(storage);
   const totalStars = totalCampaignStars(progress);
   const completed = new Set(progress.completedMissions);
+  const nodes = CAMPAIGN_MISSIONS.map((mission) => {
+    const stars = progress.missionStars[mission.id] ?? 0;
+    const unlocked = totalStars >= mission.requiredStars;
+    const complete = completed.has(mission.id);
+    const status = !unlocked
+      ? "locked"
+      : mission.comingSoon
+        ? "coming-soon"
+        : complete
+          ? "completed"
+          : "available";
+    const point = CAMPAIGN_GEOMETRY.positions[mission.id] ?? { x: 50, y: 50 };
+    return {
+      ...mission,
+      stars,
+      complete,
+      locked: !unlocked,
+      status,
+      displayType: unlocked ? mission.unitType ?? null : null,
+      biome: REGION_BIOME_BY_ID.get(mission.region) ?? null,
+      // Position is a percent of the map canvas, derived from the mission's grid cell.
+      position: { x: point.x, y: point.y },
+    };
+  });
+
+  // A trail reads as "open" only when both of its endpoints are revealed, so locked
+  // stretches of the map draw dim/dashed and the charted route glows.
+  const statusById = new Map(nodes.map((node) => [node.id, node.status]));
+  const edges = CAMPAIGN_GEOMETRY.edges.map((edge) => ({
+    ...edge,
+    status:
+      statusById.get(edge.from) !== "locked" && statusById.get(edge.to) !== "locked"
+        ? "open"
+        : "locked",
+  }));
+
   return {
     totalStars,
     progress,
-    nodes: CAMPAIGN_MISSIONS.map((mission) => {
-      const stars = progress.missionStars[mission.id] ?? 0;
-      const unlocked = totalStars >= mission.requiredStars;
-      const complete = completed.has(mission.id);
-      const status = !unlocked
-        ? "locked"
-        : mission.comingSoon
-          ? "coming-soon"
-          : complete
-            ? "completed"
-            : "available";
-      return {
-        ...mission,
-        stars,
-        complete,
-        locked: !unlocked,
-        status,
-        displayType: unlocked ? mission.unitType : null,
-      };
-    }),
+    grid: CAMPAIGN_GEOMETRY.grid,
+    nodes,
+    edges,
+    regions: CAMPAIGN_REGION_BOXES,
   };
 }
 
@@ -183,8 +347,50 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     },
     teamNames: {
       1: "Player Vanguard",
-      2: mission.id === NECROMANCER_MISSION_ID ? "Gatekeepers" : "Ridge Guard",
+      2: mission.id === WITCH_DOCTOR_MISSION_ID
+        ? "Swamp Coven"
+        : mission.id === NECROMANCER_MISSION_ID
+          ? "Gatekeepers"
+          : "Ridge Guard",
     },
+  };
+}
+
+const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze([
+  Object.freeze({ x: 4, y: 11 }),
+  Object.freeze({ x: 5, y: 9 }),
+  Object.freeze({ x: 7, y: 7 }),
+  Object.freeze({ x: 9, y: 5 }),
+  Object.freeze({ x: 10, y: 3 }),
+  Object.freeze({ x: 11, y: 6 }),
+]);
+
+const WITCH_DOCTOR_FIRE_POSITIONS = Object.freeze([
+  Object.freeze({ x: 2, y: 12 }), Object.freeze({ x: 3, y: 10 }), Object.freeze({ x: 5, y: 12 }),
+  Object.freeze({ x: 6, y: 10 }), Object.freeze({ x: 8, y: 12 }), Object.freeze({ x: 9, y: 10 }),
+  Object.freeze({ x: 11, y: 12 }), Object.freeze({ x: 12, y: 10 }),
+  Object.freeze({ x: 2, y: 8 }), Object.freeze({ x: 4, y: 8 }), Object.freeze({ x: 6, y: 8 }),
+  Object.freeze({ x: 8, y: 8 }), Object.freeze({ x: 10, y: 8 }), Object.freeze({ x: 12, y: 8 }),
+  Object.freeze({ x: 2, y: 6 }), Object.freeze({ x: 3, y: 4 }), Object.freeze({ x: 5, y: 6 }),
+  Object.freeze({ x: 6, y: 4 }), Object.freeze({ x: 8, y: 6 }), Object.freeze({ x: 9, y: 4 }),
+  Object.freeze({ x: 11, y: 4 }), Object.freeze({ x: 12, y: 2 }),
+  Object.freeze({ x: 4, y: 2 }), Object.freeze({ x: 6, y: 2 }), Object.freeze({ x: 8, y: 2 }),
+]);
+
+function createCampaignGhoul(index, position) {
+  return {
+    ...createUnit({
+      id: `p2-swamp-ghoul-${index}`,
+      player: 2,
+      team: 2,
+      type: "ghoul",
+      x: position.x,
+      y: position.y,
+      hp: 5,
+      mp: 0,
+    }),
+    spent: true,
+    summonerId: null,
   };
 }
 
@@ -219,26 +425,48 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 4, y: 9 })
         : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 8, y: 5 }),
   },
+  // Cursed Swamp (15x15): one drafted unit starts in the lower-left shallows and
+  // pushes toward the Witch Doctor in the upper-right. Ghouls and permanent fires
+  // form a readable lattice, with a Ghoul sitting on the direct diagonal shot line.
+  [WITCH_DOCTOR_MISSION_ID]: {
+    positions: {
+      "p2-0-witch-doctor": { x: 13, y: 1 },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? { x: 1, y: 13 }
+        : { x: 13, y: 1 },
+    extraUnits: () => WITCH_DOCTOR_GHOUL_POSITIONS.map((position, index) => createCampaignGhoul(index, position)),
+    tileObjects: () => Object.fromEntries(
+      WITCH_DOCTOR_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])
+    ),
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
   const layout = CAMPAIGN_LAYOUTS[missionId];
   if (!layout) return match;
+  const tileObjects = {
+    ...(match.tileObjects ?? {}),
+    ...(layout.tileObjects?.() ?? {}),
+  };
+  const units = match.units.map((unit) => {
+    const definition = getUnitType(unit.type);
+    return {
+      ...unit,
+      position: { ...(layout.positions[unit.id] ?? layout.fallback(unit)) },
+      hp: Math.ceil(definition.stats.maxHp / 2),
+      mp: definition.stats.maxMp,
+      spent: false,
+      defending: false,
+    };
+  });
   return {
     ...match,
     currentPlayer: 1,
     activation: null,
-    units: match.units.map((unit) => {
-      const definition = getUnitType(unit.type);
-      return {
-        ...unit,
-        position: { ...(layout.positions[unit.id] ?? layout.fallback(unit)) },
-        hp: Math.ceil(definition.stats.maxHp / 2),
-        mp: definition.stats.maxMp,
-        spent: false,
-        defending: false,
-      };
-    }),
+    tileObjects,
+    units: [...units, ...(layout.extraUnits?.(match) ?? [])],
   };
 }
 
@@ -274,6 +502,27 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       cleanseUsed,
       spreadHitCount,
       necromancerDefeated: Boolean((enemyUnits.find((unit) => unit.type === "necromancer") ?? { hp: 0 }).hp <= 0),
+    };
+  } else if (missionId === WITCH_DOCTOR_MISSION_ID) {
+    const ghoulsDefeatedCount = Math.max(0, Math.floor(Number(meta.ghoulsDefeatedCount) || 0));
+    const fireDamageTakenCount = Math.max(0, Math.floor(Number(meta.fireDamageTakenCount) || 0));
+    const ghoulBiteTakenCount = Math.max(0, Math.floor(Number(meta.ghoulBiteTakenCount) || 0));
+    const blackDeathDanceUsed = Boolean(meta.blackDeathDanceUsed);
+    const witchDoctor = enemyUnits.find((unit) => unit.type === "witch-doctor") ?? null;
+    objectives = [
+      complete,
+      { id: "ghoulCleared", label: "Defeat at least one Ghoul", earned: victory && ghoulsDefeatedCount >= 1 },
+      { id: "unscathed", label: "Avoid fire damage and Ghoul Bite hits", earned: victory && fireDamageTakenCount === 0 && ghoulBiteTakenCount === 0 },
+    ];
+    bonusObjectives = [
+      { id: "noBlackDeath", label: "Bonus: win before Black Death Dance resolves", earned: victory && !blackDeathDanceUsed },
+    ];
+    extra = {
+      witchDoctorDefeated: Boolean(witchDoctor && witchDoctor.hp <= 0),
+      ghoulsDefeatedCount,
+      fireDamageTakenCount,
+      ghoulBiteTakenCount,
+      blackDeathDanceUsed,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -485,9 +734,105 @@ export function necromancerRageWarningScript(state) {
   ];
 }
 
+// --- Mission 3: Cursed Swamp dialogue ----------------------------------------
+// These hints point at the level's actual lesson: body-blocked physical shots,
+// fire lanes, Ghoul proximity, and the Witch Doctor's RAGE dance.
+
+export function witchDoctorMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const witchDoctor = findUnit(state, "p2-0-witch-doctor");
+  return [
+    {
+      speakerId: witchDoctor?.id,
+      text: "Careful where you step. The flame and I go way back, and the swamp remembers its friends.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Those things are standing shoulder to shoulder. A straight shot will not always find a straight line.",
+    },
+  ];
+}
+
+export function shouldShowWitchDoctorFireWarning(state, { warningShown = false, fireDamageTakenCount = 0 } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return Math.max(0, Math.floor(Number(fireDamageTakenCount) || 0)) > 0;
+}
+
+export function witchDoctorFireWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const witchDoctor = findUnit(state, "p2-0-witch-doctor");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: speaker.id,
+      text: "The swamp burns anyone careless, but he barely flinches. The fire is not hurting both sides equally.",
+    },
+    {
+      speakerId: witchDoctor?.id,
+      text: "Old friends do not bite.",
+    },
+  ];
+}
+
+export function shouldShowWitchDoctorBlockedShotWarning(state, { warningShown = false, blockedShotQueued = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return Boolean(blockedShotQueued);
+}
+
+export function witchDoctorBlockedShotWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: speaker.id,
+      text: "An arrow does not turn corners. A wider spread might not care what is standing in the way.",
+    },
+  ];
+}
+
+export function shouldShowWitchDoctorGhoulWarning(state, { warningShown = false, ghoulBiteTakenCount = 0 } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return Math.max(0, Math.floor(Number(ghoulBiteTakenCount) || 0)) > 0;
+}
+
+export function witchDoctorGhoulWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: speaker.id,
+      text: "They get meaner up close. Keep distance unless you are ready to pay for the tile.",
+    },
+  ];
+}
+
+export function shouldShowWitchDoctorRageWarning(state, { warningShown = false, blackDeathDanceUsed = false } = {}) {
+  if (warningShown || blackDeathDanceUsed || state?.phase !== "playing") return false;
+  const witchDoctor = findUnit(state, "p2-0-witch-doctor");
+  return Boolean(witchDoctor && witchDoctor.hp > 0 && witchDoctor.hp <= 5);
+}
+
+export function witchDoctorRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const witchDoctor = findUnit(state, "p2-0-witch-doctor");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: witchDoctor?.id,
+      text: "Now the swamp dances with me. One more step and everything goes dark.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Black Death is coming if this drags on. Finish the duel before he gets another dance.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === WITCH_DOCTOR_MISSION_ID) return witchDoctorMissionOpeningScript(state);
   if (missionId === NECROMANCER_MISSION_ID) return necromancerMissionOpeningScript(state);
   if (missionId === CLOD_MISSION_ID) return clodMissionOpeningScript(state);
   return [];

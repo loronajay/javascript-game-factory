@@ -206,7 +206,17 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     normalizeCampaignSquadForProgress(campaignSquadSize(selectedNode));
     campaignStars.textContent = `${map.totalStars} ★`;
     campaignMapHost.replaceChildren();
-    renderCampaignMapBase(campaignMapHost, map.nodes);
+
+    // The map is a single pannable canvas sized from the grid; every node + trail
+    // is positioned as a percent of it, so the whole 20-stop overview scrolls as one
+    // piece instead of each mission carrying hand-placed viewport coordinates.
+    const canvas = document.createElement("div");
+    canvas.className = "campaign-map-canvas";
+    canvas.style.setProperty("--map-cols", String(map.grid?.cols ?? 7));
+    canvas.style.setProperty("--map-rows", String(map.grid?.rows ?? 5));
+    renderCampaignTerrain(canvas, map.regions);
+    canvas.append(createCampaignTrails(map.edges));
+
     for (const node of map.nodes) {
       const button = document.createElement("button");
       button.type = "button";
@@ -226,50 +236,79 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       else icon.textContent = "?";
       const label = document.createElement("span");
       label.className = "campaign-node-label";
-      label.textContent = node.status === "locked" ? "Unknown" : node.title;
+      // Locked stops still name their place on the map (geography stays visible),
+      // but keep the specific mission title/portrait hidden until unlocked.
+      label.textContent = node.status === "locked" ? (node.locationName ?? "Unknown") : node.title;
       const stars = document.createElement("span");
       stars.className = "campaign-node-stars";
       stars.textContent = node.stars ? "★".repeat(node.stars) : `${node.requiredStars}★`;
       button.append(flag, icon, label, stars);
-      campaignMapHost.append(button);
+      canvas.append(button);
     }
+
+    campaignMapHost.append(canvas);
+    scrollNodeIntoView(campaignMapHost, canvas, selectedNode);
     renderCampaignDetail(selectedNode);
     renderCampaignSquad();
   }
 
-  function renderCampaignMapBase(host, nodes) {
-    const terrain = document.createElement("div");
-    terrain.className = "campaign-map-terrain";
-    terrain.setAttribute("aria-hidden", "true");
-    terrain.innerHTML = [
-      `<span class="campaign-landmark is-keep"></span>`,
-      `<span class="campaign-landmark is-ridge"></span>`,
-      `<span class="campaign-landmark is-woods"></span>`,
-      `<span class="campaign-label is-home">Vanguard Camp</span>`,
-      `<span class="campaign-label is-ridge">Clod Ridge</span>`,
-      `<span class="campaign-label is-gate">Old Gate</span>`,
-    ].join("");
-    host.append(terrain);
-    for (const node of nodes) {
-      if (node.routeFrom && node.routeTo) host.append(createCampaignRoute(node));
+  // Terrain layer: one biome blob per region plus its place-name label. Boxes are
+  // derived from the missions in each region, so the map's geography grows with it.
+  function renderCampaignTerrain(canvas, regions = []) {
+    for (const region of regions) {
+      const terrain = document.createElement("div");
+      terrain.className = `campaign-terrain is-${region.biome}`;
+      terrain.style.left = `${region.x}%`;
+      terrain.style.top = `${region.y}%`;
+      terrain.style.width = `${region.w}%`;
+      terrain.style.height = `${region.h}%`;
+      terrain.setAttribute("aria-hidden", "true");
+      canvas.append(terrain);
+
+      const label = document.createElement("span");
+      label.className = "campaign-region-label";
+      label.textContent = region.label;
+      label.style.left = `${region.labelX}%`;
+      label.style.top = `${region.labelY}%`;
+      label.setAttribute("aria-hidden", "true");
+      canvas.append(label);
     }
   }
 
-  function createCampaignRoute(node) {
-    const segment = document.createElement("span");
-    const from = node.routeFrom;
-    const to = node.routeTo;
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const length = Math.hypot(dx, dy);
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    segment.className = `campaign-route is-${node.status}`;
-    segment.style.left = `${from.x}%`;
-    segment.style.top = `${from.y}%`;
-    segment.style.width = `${length}%`;
-    segment.style.transform = `rotate(${angle}deg)`;
-    segment.setAttribute("aria-hidden", "true");
-    return segment;
+  // SVG trail layer: one <path> per graph edge, in the same 0..100 percent space the
+  // nodes use (preserveAspectRatio="none" so it stretches with the canvas). Stroke
+  // stays crisp via non-scaling-stroke; open vs locked stretches are styled in CSS.
+  function createCampaignTrails(edges = []) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "campaign-trails");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-hidden", "true");
+    for (const edge of edges) {
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("class", `campaign-trail is-${edge.status}`);
+      path.setAttribute("d", edge.d);
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.append(path);
+    }
+    return svg;
+  }
+
+  // Pan the (possibly oversized) map so the selected stop is roughly centered. Runs
+  // after layout settles; a no-op when the screen isn't measured yet.
+  function scrollNodeIntoView(host, canvas, node) {
+    if (!node) return;
+    requestAnimationFrame(() => {
+      const cw = canvas.scrollWidth || canvas.offsetWidth;
+      const ch = canvas.scrollHeight || canvas.offsetHeight;
+      if (!cw || !ch || !host.clientWidth) return;
+      host.scrollTo({
+        left: (node.position.x / 100) * cw - host.clientWidth / 2,
+        top: (node.position.y / 100) * ch - host.clientHeight / 2,
+        behavior: "auto",
+      });
+    });
   }
 
   function renderCampaignDetail(node) {

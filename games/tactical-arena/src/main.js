@@ -29,6 +29,7 @@ import { buildSummary, createMatchState, hpRemaining, readableError, teamColor }
 import {
   CLOD_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
   clodRageWarningScript,
   completeCampaignMission,
@@ -40,6 +41,14 @@ import {
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowWitchDoctorBlockedShotWarning,
+  shouldShowWitchDoctorFireWarning,
+  shouldShowWitchDoctorGhoulWarning,
+  shouldShowWitchDoctorRageWarning,
+  witchDoctorBlockedShotWarningScript,
+  witchDoctorFireWarningScript,
+  witchDoctorGhoulWarningScript,
+  witchDoctorRageWarningScript,
 } from "./campaign/campaign.js";
 import {
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
@@ -119,6 +128,16 @@ function createCampaignMeta() {
     rageWarningShown: false,
     cleanseUsed: false,
     spreadHitCount: 0,
+    // Witch Doctor (mission 3)
+    fireWarningShown: false,
+    blockedShotWarningShown: false,
+    blockedShotQueued: false,
+    ghoulWarningShown: false,
+    witchDoctorRageWarningShown: false,
+    ghoulsDefeatedCount: 0,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -400,6 +419,7 @@ function dispatch(command) {
   const prevPlayer = state.currentPlayer;
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) {
+    recordCampaignRejection(prepared, result);
     setMessage(commandErrorMessage(result), true);
     return false;
   }
@@ -414,6 +434,15 @@ function dispatch(command) {
   announceTurnChange(prevPlayer);
   maybeStartCpuTurn();
   return true;
+}
+
+function recordCampaignRejection(command, result) {
+  if (matchConfig?.mode !== "campaign") return;
+  if (campaignMissionId !== WITCH_DOCTOR_MISSION_ID) return;
+  if (result?.errorCode !== "TARGET_OBSTRUCTED") return;
+  if (command?.player !== 1) return;
+  campaignMeta.blockedShotQueued = true;
+  maybeShowCampaignDialogue();
 }
 
 function recordCampaignProgressHooks(result) {
@@ -445,6 +474,25 @@ function recordCampaignProgressHooks(result) {
         campaignMeta.spreadHitCount += 1;
       }
     }
+  } else if (campaignMissionId === WITCH_DOCTOR_MISSION_ID) {
+    campaignMeta.ghoulsDefeatedCount = Math.max(
+      campaignMeta.ghoulsDefeatedCount,
+      state.units.filter((unit) => unit.player === 2 && unit.type === "ghoul" && unit.hp <= 0).length,
+    );
+    for (const event of events) {
+      if (event.type === "FIRE_DAMAGE" && findUnit(state, event.unitId)?.player === 1) {
+        campaignMeta.fireDamageTakenCount += 1;
+      }
+      if (event.type === "AUTO_STRIKE") {
+        const source = findUnit(state, event.sourceId);
+        const target = findUnit(state, event.targetId);
+        if (source?.type === "ghoul" && target?.player === 1) campaignMeta.ghoulBiteTakenCount += 1;
+      }
+      if (event.type === "ART_RESOLVED" && event.stance === "blackDeath") {
+        const actor = findUnit(state, event.actorId);
+        if (actor?.player === 2 && actor.type === "witch-doctor") campaignMeta.blackDeathDanceUsed = true;
+      }
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -467,6 +515,39 @@ function nextCampaignDialogueBeat() {
     }
     if (shouldShowNecromancerRageWarning(state, { warningShown: campaignMeta.rageWarningShown })) {
       return { markShown: () => { campaignMeta.rageWarningShown = true; }, script: necromancerRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === WITCH_DOCTOR_MISSION_ID) {
+    if (shouldShowWitchDoctorFireWarning(state, {
+      warningShown: campaignMeta.fireWarningShown,
+      fireDamageTakenCount: campaignMeta.fireDamageTakenCount,
+    })) {
+      return { markShown: () => { campaignMeta.fireWarningShown = true; }, script: witchDoctorFireWarningScript };
+    }
+    if (shouldShowWitchDoctorBlockedShotWarning(state, {
+      warningShown: campaignMeta.blockedShotWarningShown,
+      blockedShotQueued: campaignMeta.blockedShotQueued,
+    })) {
+      return {
+        markShown: () => {
+          campaignMeta.blockedShotWarningShown = true;
+          campaignMeta.blockedShotQueued = false;
+        },
+        script: witchDoctorBlockedShotWarningScript,
+      };
+    }
+    if (shouldShowWitchDoctorGhoulWarning(state, {
+      warningShown: campaignMeta.ghoulWarningShown,
+      ghoulBiteTakenCount: campaignMeta.ghoulBiteTakenCount,
+    })) {
+      return { markShown: () => { campaignMeta.ghoulWarningShown = true; }, script: witchDoctorGhoulWarningScript };
+    }
+    if (shouldShowWitchDoctorRageWarning(state, {
+      warningShown: campaignMeta.witchDoctorRageWarningShown,
+      blackDeathDanceUsed: campaignMeta.blackDeathDanceUsed,
+    })) {
+      return { markShown: () => { campaignMeta.witchDoctorRageWarningShown = true; }, script: witchDoctorRageWarningScript };
     }
     return null;
   }

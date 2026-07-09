@@ -65,6 +65,25 @@ export const TUTORIAL_SQUAD = Object.freeze(["swordsman", "archer", "mystic", "m
 export const PLAYER_ARCHER_ID = "p1-1-archer";
 export const CPU_ARCHER_ID = "p2-1-archer";
 
+const BASICS_PLAYER_IDS = Object.freeze(["p1-0-swordsman", PLAYER_ARCHER_ID, "p1-2-mystic", "p1-3-magician"]);
+const BASICS_SETUP_MOVES = Object.freeze({
+  "p1-0-swordsman": Object.freeze({ x: 3, y: 5 }),
+  [PLAYER_ARCHER_ID]: Object.freeze({ x: 3, y: 4 }),
+  "p1-2-mystic": Object.freeze({ x: 2, y: 6 }),
+  "p1-3-magician": Object.freeze({ x: 2, y: 3 }),
+});
+const BASICS_ARCHER_RETREAT = Object.freeze({ x: 1, y: 4 });
+const BASICS_POSITIONS = Object.freeze({
+  "p1-0-swordsman": Object.freeze({ x: 1, y: 5 }),
+  [PLAYER_ARCHER_ID]: Object.freeze({ x: 1, y: 4 }),
+  "p1-2-mystic": Object.freeze({ x: 1, y: 6 }),
+  "p1-3-magician": Object.freeze({ x: 1, y: 3 }),
+  "p2-0-swordsman": Object.freeze({ x: 6, y: 5 }),
+  [CPU_ARCHER_ID]: Object.freeze({ x: 6, y: 4 }),
+  "p2-2-mystic": Object.freeze({ x: 7, y: 6 }),
+  "p2-3-magician": Object.freeze({ x: 7, y: 3 }),
+});
+
 const NORMAL_HIT = Object.freeze({ attackRoll: 0.5, critRoll: 0.99 });
 const FORCED_MISS = Object.freeze({ attackRoll: 0.01 });
 const FORCED_CRIT = Object.freeze({ attackRoll: 0.5, critRoll: 0.01 });
@@ -101,7 +120,7 @@ export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
   return {
     mode: "tutorial",
     tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : rage ? TUTORIAL_RAGE_ID : TUTORIAL_BASICS_ID,
-    size: 13,
+    size: artsMp || damageTypes || rage ? 13 : 9,
     seed: artsMp ? 23 : damageTypes ? 31 : rage ? 41 : 7,
     squads: artsMp
       ? { 1: ["archer", "mystic"], 2: ["ghoul", "ghoul", "ghoul", "archer"] }
@@ -167,7 +186,7 @@ export function createRageTutorial() {
 }
 
 export function openingPrompt() {
-  return "Tutorial 1: The Basics. Activate each unit, move with a tile click/tap or key 1, then Defend with the button or key 3.";
+  return "Tutorial 1: The Basics. Activate each unit, move to its setup tile with a tile click/tap or key 1, then Defend with the button or key 3.";
 }
 
 export function openingDialogue() {
@@ -178,7 +197,7 @@ export function openingDialogue() {
     },
     {
       speaker: "swordsman",
-      text: "Select each base unit once: Swordsman, Archer, Mystic, and Magician. Use key 1 to move and key 3 to defend.",
+      text: "Select each base unit once: Swordsman, Archer, Mystic, and Magician. Take the marked setup step, then use key 3 to defend.",
     },
   ];
 }
@@ -251,6 +270,25 @@ export function rageOpeningDialogue() {
 }
 
 export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID) {
+  if (tutorialId === TUTORIAL_BASICS_ID) {
+    return {
+      ...match,
+      currentPlayer: 1,
+      activation: null,
+      units: match.units.map((unit) => {
+        const definition = getUnitType(unit.type);
+        return {
+          ...unit,
+          position: { ...(BASICS_POSITIONS[unit.id] ?? unit.position) },
+          hp: definition.stats.maxHp,
+          mp: definition.stats.maxMp,
+          spent: false,
+          defending: false,
+        };
+      }),
+    };
+  }
+
   if (tutorialId === TUTORIAL_RAGE_ID) {
     const positions = {
       [TUTORIAL_RAGE_PLAYER_MAGICIAN_ID]: RAGE_TRAP_CENTER,
@@ -398,18 +436,7 @@ export function validateTutorialCommand(tutorial, command, match) {
 
   if (tutorial.id === TUTORIAL_RAGE_ID) return validateRageCommand(tutorial, command, match);
 
-  if (
-    tutorial.stage === "await_kite_attack" &&
-    command.player === 1 &&
-    activeCommandUnitId(command) === PLAYER_ARCHER_ID &&
-    command.type !== COMMANDS.BEGIN_ACTIVATION &&
-    command.type !== COMMANDS.ATTACK &&
-    command.type !== COMMANDS.CANCEL_MOVE
-  ) {
-    return tutorialBlocked("Attack first with your Archer. After that shot, you can move her before ending the activation.");
-  }
-
-  return tutorialAllowed();
+  return validateBasicsCommand(tutorial, command, match);
 }
 
 export function recordTutorialCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
@@ -619,7 +646,7 @@ function recordAttack(tutorial, attackEvent) {
   if (attackEvent.actorId === PLAYER_ARCHER_ID) {
     if (tutorial.stage === "await_first_attack") {
       return setStage(tutorial, "await_cpu_counterattack", {
-        prompt: "Hit confirmed. Attacks roll to hit: very low rolls miss, normal rolls land, and strong rolls can crit. Finish your squad turn so the enemy Archer can answer with a basic attack.",
+        prompt: "Hit confirmed. Attacks roll to hit: very low rolls miss, normal rolls land, and strong rolls can crit. Finish the Archer, then Defend with anyone still ready so the enemy Archer can answer.",
         dialogue: [{
           name: "Instructor",
           text: "That shot hit. Every attack rolls: some miss, most hit, and critical strikes hit harder.",
@@ -663,6 +690,113 @@ function recordAttack(tutorial, attackEvent) {
   }
 
   return noUpdate();
+}
+
+function validateBasicsCommand(tutorial, command, match) {
+  if (command.type === COMMANDS.CONCEDE || command.player !== 1) return tutorialAllowed();
+  const unitId = activeCommandUnitId(command);
+  const isArcher = unitId === PLAYER_ARCHER_ID;
+  const isBasicsPlayer = BASICS_PLAYER_IDS.includes(unitId);
+
+  if (tutorial.stage === "practice_defense") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isBasicsPlayer) return tutorialAllowed();
+    if (command.type === COMMANDS.MOVE_UNIT && isBasicsPlayer) {
+      return samePosition(command.position, BASICS_SETUP_MOVES[command.unitId])
+        ? tutorialAllowed()
+        : tutorialBlocked(openingMoveMessage(command.unitId));
+    }
+    if (command.type === COMMANDS.DEFEND && isBasicsPlayer) {
+      return match?.activation?.unitId === command.unitId && match.activation.moved
+        ? tutorialAllowed()
+        : tutorialBlocked("Move to the setup tile first, then Defend.");
+    }
+    if (command.type === COMMANDS.FINISH_ACTIVATION && isBasicsPlayer) return tutorialAllowed();
+    if (command.type === COMMANDS.CANCEL_MOVE && isBasicsPlayer) return tutorialAllowed();
+    return tutorialBlocked("For the opening, activate a unit, move to its setup tile, then Defend.");
+  }
+
+  if (tutorial.stage === "await_first_attack") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isArcher) return tutorialAllowed();
+    if (command.type === COMMANDS.ATTACK && command.actorId === PLAYER_ARCHER_ID) return tutorialAllowed();
+    if (command.type === COMMANDS.CANCEL_MOVE && isArcher) return tutorialAllowed();
+    return tutorialBlocked("Use the Archer's basic Attack now. Other actions can wait until this shot lands.");
+  }
+
+  if (tutorial.stage === "await_cpu_counterattack") {
+    if (isArcher) {
+      return command.type === COMMANDS.FINISH_ACTIVATION || command.type === COMMANDS.BEGIN_ACTIVATION
+        ? tutorialAllowed()
+        : tutorialBlocked("Finish the Archer's activation after the shot.");
+    }
+    if (isBasicsPlayer) {
+      if (
+        command.type === COMMANDS.BEGIN_ACTIVATION ||
+        command.type === COMMANDS.DEFEND ||
+        command.type === COMMANDS.FINISH_ACTIVATION ||
+        command.type === COMMANDS.CANCEL_MOVE
+      ) {
+        return tutorialAllowed();
+      }
+      return tutorialBlocked("Brace the remaining units in place so the enemy Archer can answer.");
+    }
+  }
+
+  if (tutorial.stage === "await_kite_attack") {
+    if (!isArcher) return tutorialBlocked("Select your Archer for the kiting lesson.");
+    if (
+      command.type === COMMANDS.BEGIN_ACTIVATION ||
+      command.type === COMMANDS.ATTACK ||
+      command.type === COMMANDS.CANCEL_MOVE
+    ) {
+      return tutorialAllowed();
+    }
+    return tutorialBlocked("Attack first with your Archer. After that shot, you can move her before ending the activation.");
+  }
+
+  if (tutorial.stage === "await_kite_move") {
+    if (command.type === COMMANDS.MOVE_UNIT && command.unitId === PLAYER_ARCHER_ID) {
+      return samePosition(command.position, BASICS_ARCHER_RETREAT)
+        ? tutorialAllowed()
+        : tutorialBlocked("Move the Archer back to the retreat tile at column 1, row 4.");
+    }
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isArcher) return tutorialAllowed();
+    return tutorialBlocked("Move the Archer to the retreat tile before ending the activation.");
+  }
+
+  if (tutorial.stage === "await_final_crit") {
+    if (match?.activation?.unitId === PLAYER_ARCHER_ID && command.type === COMMANDS.FINISH_ACTIVATION) {
+      return tutorialAllowed();
+    }
+    if (isArcher) {
+      if (
+        command.type === COMMANDS.BEGIN_ACTIVATION ||
+        command.type === COMMANDS.ATTACK ||
+        command.type === COMMANDS.CANCEL_MOVE
+      ) {
+        return tutorialAllowed();
+      }
+      return tutorialBlocked("Bring the Archer back online and attack to see a critical strike.");
+    }
+    if (isBasicsPlayer) {
+      if (
+        command.type === COMMANDS.BEGIN_ACTIVATION ||
+        command.type === COMMANDS.DEFEND ||
+        command.type === COMMANDS.FINISH_ACTIVATION ||
+        command.type === COMMANDS.CANCEL_MOVE
+      ) {
+        return tutorialAllowed();
+      }
+      return tutorialBlocked("Keep the rest of the squad braced; the next lesson is the Archer's critical strike.");
+    }
+  }
+
+  return tutorialAllowed();
+}
+
+function openingMoveMessage(unitId) {
+  const target = BASICS_SETUP_MOVES[unitId];
+  if (!target) return "Move to the marked setup tile, then Defend.";
+  return `Move to the setup tile at column ${target.x}, row ${target.y}, then Defend.`;
 }
 
 function validateDamageTypesCommand(tutorial, command) {

@@ -7,6 +7,7 @@ import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
   CLOD_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
   clodMissionOpeningScript,
   clodRageWarningScript,
@@ -24,6 +25,15 @@ import {
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowWitchDoctorBlockedShotWarning,
+  shouldShowWitchDoctorFireWarning,
+  shouldShowWitchDoctorGhoulWarning,
+  shouldShowWitchDoctorRageWarning,
+  witchDoctorBlockedShotWarningScript,
+  witchDoctorFireWarningScript,
+  witchDoctorGhoulWarningScript,
+  witchDoctorMissionOpeningScript,
+  witchDoctorRageWarningScript,
 } from "../src/campaign/campaign.js";
 
 function storageAdapter() {
@@ -35,19 +45,30 @@ function storageAdapter() {
   };
 }
 
-test("fresh campaign map starts on Clod and hides the next node behind a question mark", () => {
+test("fresh campaign map surveys the whole 20-stop graph with Clod live and the rest gated", () => {
   const map = getCampaignMap(storageAdapter());
 
   assert.equal(map.totalStars, 0);
+  // The full journey is always visible so the player gets an overview.
+  assert.equal(map.nodes.length, 20);
   assert.equal(map.nodes[0].id, CLOD_MISSION_ID);
   assert.equal(map.nodes[0].status, "available");
   assert.equal(map.nodes[0].displayType, "clod");
-  assert.deepEqual(map.nodes[0].routeFrom, { x: 12, y: 84 });
-  assert.deepEqual(map.nodes[0].routeTo, map.nodes[0].position);
+  assert.equal(map.nodes[1].id, NECROMANCER_MISSION_ID);
   assert.equal(map.nodes[1].status, "locked");
   assert.equal(map.nodes[1].displayType, null);
-  assert.deepEqual(map.nodes[1].routeFrom, map.nodes[0].position);
-  assert.deepEqual(map.nodes[1].routeTo, map.nodes[1].position);
+
+  // Every node carries a derived canvas position; the graph carries trail edges.
+  for (const node of map.nodes) {
+    assert.equal(typeof node.position.x, "number");
+    assert.equal(typeof node.position.y, "number");
+  }
+  assert.ok(map.edges.length >= map.nodes.length - 1, "trails connect the graph");
+  const clodEdge = map.edges.find((edge) => edge.from === CLOD_MISSION_ID || edge.to === CLOD_MISSION_ID);
+  assert.ok(clodEdge, "the opening stop is on a trail");
+  assert.match(clodEdge.d, /^M /, "trail carries an SVG path");
+  // Trails into locked ground stay locked; the opener touches only itself so far.
+  assert.ok(map.edges.every((edge) => edge.status === "open" || edge.status === "locked"));
 });
 
 test("Clod mission config creates a two-unit player squad against Clod and Juggernaut at half HP", () => {
@@ -221,6 +242,13 @@ function necromancerMatchState(squad = ["swordsman", "mystic"]) {
   );
 }
 
+function witchDoctorMatchState(squad = ["archer"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(WITCH_DOCTOR_MISSION_ID, squad)),
+    WITCH_DOCTOR_MISSION_ID,
+  );
+}
+
 test("Necromancer mission builds a 13x13 board with the enemy caster pair spawned at half HP", () => {
   const config = createCampaignMatchConfig(NECROMANCER_MISSION_ID, ["swordsman", "mystic"]);
   const match = necromancerMatchState(["swordsman", "mystic"]);
@@ -363,6 +391,163 @@ test("completing the Necromancer mission unlocks Necromancer and records its sta
   assert.equal(completed.newRewardUnits.includes("necromancer"), true);
   assert.equal(isUnitUnlocked("necromancer", storage), true);
   assert.equal(readCampaignProgressStars(storage, NECROMANCER_MISSION_ID), 3);
+});
+
+// --- Mission 3: Cursed Swamp of the Witch Doctor ------------------------------
+
+test("Witch Doctor mission appears as the third swamp stop once enough stars are banked", () => {
+  const storage = storageAdapter();
+  const clod = prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+  );
+  const wonClod = {
+    ...clod,
+    phase: "complete",
+    winner: 1,
+    units: clod.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : unit),
+  };
+  completeCampaignMission(storage, CLOD_MISSION_ID, wonClod, { clodChargeHitCount: 1 });
+
+  const necro = necromancerMatchState();
+  const wonNecro = {
+    ...necro,
+    phase: "complete",
+    winner: 1,
+    units: necro.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : unit),
+  };
+  completeCampaignMission(storage, NECROMANCER_MISSION_ID, wonNecro, { cleanseUsed: true, spreadHitCount: 0 });
+
+  const map = getCampaignMap(storage);
+  const node = map.nodes[2];
+  assert.equal(node.id, WITCH_DOCTOR_MISSION_ID);
+  assert.equal(node.status, "available");
+  assert.equal(node.displayType, "witch-doctor");
+  assert.equal(node.biome, "swamp");
+});
+
+test("Witch Doctor mission builds a 15x15 solo gauntlet with permanent fire and summoner-less Ghouls", () => {
+  const config = createCampaignMatchConfig(WITCH_DOCTOR_MISSION_ID, ["archer", "mystic"]);
+  const match = witchDoctorMatchState(["archer", "mystic"]);
+  const ghouls = match.units.filter((unit) => unit.type === "ghoul");
+  const fires = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "fire");
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 15);
+  assert.deepEqual(config.squads[1], ["archer"]);
+  assert.deepEqual(config.squads[2], ["witch-doctor"]);
+  assert.equal(config.teamNames[2], "Swamp Coven");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 1, y: 13 });
+  assert.deepEqual(findUnit(match, "p2-0-witch-doctor").position, { x: 13, y: 1 });
+  assert.equal(findUnit(match, "p1-0-archer").hp, 12);
+  assert.equal(findUnit(match, "p2-0-witch-doctor").hp, 12);
+  assert.equal(ghouls.length >= 5, true);
+  assert.equal(ghouls.every((unit) => unit.hp === 5 && unit.mp === 0 && unit.spent === true), true);
+  assert.equal(ghouls.every((unit) => unit.summonerId == null), true);
+  assert.equal(fires.length >= 18, true);
+  assert.equal(fires.every((obj) => obj.permanent === true), true);
+  assert.equal(Object.values(match.tileObjects ?? {}).some((obj) => obj.kind === "wall"), false);
+  assert.ok(ghouls.some((unit) => unit.position.x === 7 && unit.position.y === 7), "a Ghoul blocks the straight diagonal shot");
+});
+
+test("Witch Doctor mission dialogue covers body-block, fire, Ghoul bite, and RAGE warnings", () => {
+  const state = witchDoctorMatchState();
+  const dispatched = campaignOpeningScript(WITCH_DOCTOR_MISSION_ID, state);
+  const direct = witchDoctorMissionOpeningScript(state);
+
+  assert.deepEqual(dispatched, direct);
+  assert.equal(direct.length >= 2, true);
+  assert.equal(direct[0].speakerId, "p2-0-witch-doctor");
+  assert.match(direct[0].text, /flame|fire/i);
+  assert.match(direct.at(-1).text, /straight line|straight shot|line/i);
+
+  assert.equal(shouldShowWitchDoctorFireWarning({ ...state, phase: "playing" }, { fireDamageTakenCount: 1 }), true);
+  assert.equal(shouldShowWitchDoctorFireWarning({ ...state, phase: "playing" }, { fireDamageTakenCount: 1, warningShown: true }), false);
+  assert.match(witchDoctorFireWarningScript(state)[0].text, /swamp|fire/i);
+
+  assert.equal(shouldShowWitchDoctorBlockedShotWarning({ ...state, phase: "playing" }, { blockedShotQueued: true }), true);
+  assert.equal(shouldShowWitchDoctorBlockedShotWarning({ ...state, phase: "playing" }, { blockedShotQueued: false }), false);
+  assert.match(witchDoctorBlockedShotWarningScript(state)[0].text, /arrow|spread|wide/i);
+
+  assert.equal(shouldShowWitchDoctorGhoulWarning({ ...state, phase: "playing" }, { ghoulBiteTakenCount: 1 }), true);
+  assert.match(witchDoctorGhoulWarningScript(state)[0].text, /close|near/i);
+
+  const withHp = (hp) => ({
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) => unit.id === "p2-0-witch-doctor" ? { ...unit, hp } : unit),
+  });
+  assert.equal(shouldShowWitchDoctorRageWarning(withHp(6)), false);
+  assert.equal(shouldShowWitchDoctorRageWarning(withHp(5)), true);
+  assert.equal(shouldShowWitchDoctorRageWarning(withHp(5), { warningShown: true }), false);
+  assert.match(witchDoctorRageWarningScript(withHp(5))[0].text, /dance|dark|swamp/i);
+});
+
+test("Witch Doctor grading rewards a cleared Ghoul, no hazard damage, and a no-Black-Death bonus", () => {
+  const base = witchDoctorMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(WITCH_DOCTOR_MISSION_ID, won, {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "ghoulCleared", "unscathed"]);
+  assert.equal(perfect.bonusObjectives[0].id, "noBlackDeath");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const routedOnly = evaluateCampaignMission(WITCH_DOCTOR_MISSION_ID, won, {
+    ghoulsDefeatedCount: 0,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+  assert.equal(routedOnly.objectives.find((objective) => objective.id === "ghoulCleared").earned, false);
+  assert.equal(routedOnly.stars, 3, "the bonus can cover one missed base objective");
+
+  const scorched = evaluateCampaignMission(WITCH_DOCTOR_MISSION_ID, won, {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 1,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: true,
+  });
+  assert.equal(scorched.objectives.find((objective) => objective.id === "unscathed").earned, false);
+  assert.equal(scorched.bonusObjectives[0].earned, false);
+  assert.equal(scorched.stars, 2);
+});
+
+test("completing the Witch Doctor mission unlocks Witch Doctor and records its stars", () => {
+  const storage = storageAdapter();
+  const base = witchDoctorMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, WITCH_DOCTOR_MISSION_ID, won, {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["witch-doctor"]);
+  assert.equal(isUnitUnlocked("witch-doctor", storage), true);
+  assert.equal(readCampaignProgressStars(storage, WITCH_DOCTOR_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {
