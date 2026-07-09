@@ -82,6 +82,17 @@ test("Tether Grab hauls an enemy adjacent and deals 3 magic; MP is spent", () =>
   assert.equal(findUnit(s, "p1-jug").mp, 0); // 5 - 5
 });
 
+test("Tether Grab reports only the HP actually lost for its damage float", () => {
+  const state = scenario({ foe: { hp: 1 } });
+  let r = run(state, beginActivation(1, "p1-jug"));
+  r = run(r.nextState, useArt(1, "p1-jug", "tether-grab", { targetId: "p2-foe", ...NORMAL_HIT }));
+  const resolved = r.events.find((event) => event.type === "ART_RESOLVED" && event.artId === "tether-grab");
+
+  assert.equal(findUnit(r.nextState, "p2-foe").hp, 0);
+  assert.equal(resolved.damage, 1);
+  assert.deepEqual(resolved.damageByTarget, { "p2-foe": 1 });
+});
+
 test("Tether Grab that misses its to-hit roll hauls no one and deals no damage (ART still spent)", () => {
   const state = scenario();
   const foeHp = findUnit(state, "p2-foe").hp;

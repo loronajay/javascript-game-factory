@@ -2,6 +2,7 @@ import { getUnitType } from "../core/unitCatalog.js";
 import { findUnit } from "../core/state.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
+import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 
 export const CAMPAIGN_PROGRESS_KEY = "tacticalArenaCampaignProgressV1";
 export const CLOD_MISSION_ID = "clod-trial";
@@ -282,6 +283,7 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
     ...unlockProgress,
     unlockedUnits: [...existing, ...evaluation.rewardUnits],
   });
+  enqueueUnitUnlockAnnouncements(storage, newRewardUnits);
 
   return { ...evaluation, progress, newRewardUnits };
 }
@@ -292,12 +294,16 @@ export function clodMissionOpeningScript(state) {
   if (!speaker) return [];
   return [
     {
-      speakerId: speaker.id,
-      text: "Before we close in, keep our units spread out. Clod punishes tight formations.",
+      speakerId: clod?.id,
+      text: "This ridge belongs to Clod. Step closer, and the stones will remember you.",
     },
     {
-      speakerId: clod?.id,
-      text: "If Clod drops into RAGE, Thunderous Charge can slam a wide area. Do not stand shoulder to shoulder.",
+      speakerId: speaker.id,
+      text: "Big words for a pile of rocks. We came for the ridge, and we are not leaving empty-handed.",
+    },
+    {
+      speaker: "swordsman",
+      text: "Stay spread out. If Clod drops into RAGE, Thunderous Charge punishes anyone standing shoulder to shoulder.",
     },
   ];
 }

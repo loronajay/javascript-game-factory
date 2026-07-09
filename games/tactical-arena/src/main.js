@@ -71,6 +71,8 @@ let selectedId = null;
 let mode = null;
 let footworkPath = [];
 let volleyShotOrigin = null;
+let areaForecastCenter = null;
+let areaForecastMode = null;
 // The fallen ally chosen for Father Time's Rewind, awaiting a placement-tile click.
 let rewindTargetId = null;
 let resolving = false;
@@ -191,8 +193,23 @@ function render() {
     onActionClick: (action) => handleActionClick(action, unit)
   });
   renderSquads(state, squadOverlays, (u) => { beginUnit(u); render(); }, { controlsEnabled });
-  renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick: handleTile });
-  renderForecast({ forecastLayer, state, mode, actor: unit, resolving });
+  const currentAreaCenter = areaForecastMode === mode ? areaForecastCenter : null;
+  renderBoard({
+    board,
+    boardLayer,
+    unitsLayer,
+    state,
+    mode,
+    selectedId,
+    footworkPath,
+    onTileClick: handleTile,
+    onAreaHover: (center) => {
+      areaForecastCenter = center;
+      areaForecastMode = center ? mode : null;
+      renderForecast({ forecastLayer, state, mode, actor: selectedUnit(), resolving, areaCenter: center });
+    }
+  });
+  renderForecast({ forecastLayer, state, mode, actor: unit, resolving, areaCenter: currentAreaCenter });
 }
 
 function setMessage(text, isError = false) {
@@ -673,7 +690,7 @@ async function resolveCombat(command) {
     if (rolled.missed) {
       await effects.floatText(center, "MISS", "#cbb78b");
     } else {
-      const dmg = typeof rolled.damage === "number" ? rolled.damage : (rolled.damage?.damage ?? 0);
+      const dmg = Math.max(0, typeof rolled.damage === "number" ? rolled.damage : (rolled.damage?.damage ?? 0));
       const impactKind = (rolled.artId
         ? artDefinition(attackerBefore, rolled.artId)?.damageType === "magic"
         : getBasicAttackDamageType(attackerBefore) === "magic") ? "magic" : "physical";
@@ -681,14 +698,14 @@ async function resolveCombat(command) {
       else effects.shake(Math.min(8, 2.5 + dmg * 1.4));
       effects.impact(center, Boolean(rolled.critical), impactKind);
       await effects.hitRecoil(targetBefore.id, targetBefore.position, Boolean(rolled.critical));
-      await effects.floatText(center, rolled.critical ? `✦ ${dmg}` : `-${dmg}`, rolled.critical ? "#ffd26a" : "#ff7684");
+      await effects.floatText(center, dmg > 0 ? (rolled.critical ? `✦ ${dmg}` : `-${dmg}`) : "0", rolled.critical ? "#ffd26a" : "#ff7684");
       for (const hitTarget of rolledTargetsBefore) {
         if (hitTarget.id === targetBefore.id) continue;
         const hitCenter = unitCenter(metrics, hitTarget);
-        const hitDamage = rolled.damageByTarget?.[hitTarget.id] ?? dmg;
+        const hitDamage = Math.max(0, rolled.damageByTarget?.[hitTarget.id] ?? dmg);
         effects.impact(hitCenter, Boolean(rolled.critical), impactKind);
         await effects.hitRecoil(hitTarget.id, hitTarget.position, Boolean(rolled.critical));
-        await effects.floatText(hitCenter, rolled.critical ? `âœ¦ ${hitDamage}` : `-${hitDamage}`, rolled.critical ? "#ffd26a" : "#ff7684");
+        await effects.floatText(hitCenter, hitDamage > 0 ? (rolled.critical ? `âœ¦ ${hitDamage}` : `-${hitDamage}`) : "0", rolled.critical ? "#ffd26a" : "#ff7684");
       }
       if (rolled.artId) {
         const art = artDefinition(attackerBefore, rolled.artId);

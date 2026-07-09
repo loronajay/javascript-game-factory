@@ -57,16 +57,20 @@ test("Clod mission config creates a two-unit player squad against Clod and Jugge
   assert.deepEqual(findUnit(match, "p2-0-clod").position, { x: 7, y: 5 });
 });
 
-test("Clod mission opens by warning the player to spread out", () => {
+test("Clod mission opens with team banter, then Swordsman warns the player to spread out", () => {
   const state = prepareCampaignMatchState(
     createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
     CLOD_MISSION_ID,
   );
   const script = clodMissionOpeningScript(state);
 
-  assert.equal(script.length >= 2, true);
-  assert.match(script.map((line) => line.text).join(" "), /spread/i);
-  assert.match(script.map((line) => line.text).join(" "), /Thunderous Charge/i);
+  assert.equal(script.length >= 3, true);
+  assert.equal(script[0].speakerId, "p2-0-clod");
+  assert.match(script[0].text, /ridge/i);
+  assert.match(script[1].speakerId, /^p1-/);
+  assert.equal(script.at(-1).speaker, "swordsman");
+  assert.match(script.at(-1).text, /spread/i);
+  assert.match(script.at(-1).text, /Thunderous Charge/i);
 });
 
 test("Clod rage warning queues only once Clod is alive and raging", () => {

@@ -2,9 +2,9 @@ import { svgElement } from "./svgHelpers.js";
 import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
-import { chebyshevDistance } from "../rules/movement.js";
-import { artIsBodyBlocked, getArtTargetRange } from "../rules/arts.js";
-import { getBasicAttackDamageType, getMissChance, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
+import { chebyshevDistance, positionKey } from "../rules/movement.js";
+import { artIsBodyBlocked, getArtTargetRange, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets, getVolleyShotCells } from "../rules/arts.js";
+import { finalizeMagicDamage, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
@@ -32,6 +32,18 @@ const NON_STRIKE_FORECAST_SHAPES = [
   "lineBurst", "darkPulse"
 ];
 
+const AREA_FORECAST_SHAPES = new Set(["cone", "nukeAura", "targetedBlast", "lineBurst"]);
+
+function damageLabel(damage, target) {
+  const amount = Object.is(damage, -0) ? 0 : damage;
+  if (amount <= 0) return "0";
+  return amount >= target.hp ? `☠ ${amount}` : `-${amount}`;
+}
+
+function damageClass(damage, target) {
+  return damage > 0 && damage >= target.hp ? "fc-lethal" : "fc-attack";
+}
+
 function isForecastableStrikeArt(art) {
   const hasDamagePayload = Boolean(art?.damage || art?.damageType);
   const isAuthoredStrike = art?.ai?.intent === "strike";
@@ -48,19 +60,92 @@ function isForecastableStrikeArt(art) {
   );
 }
 
+function isForecastableAreaArt(art) {
+  return Boolean(
+    art &&
+    art.kind === "active" &&
+    AREA_FORECAST_SHAPES.has(art.targeting?.shape) &&
+    (art.damage || art.damageType || art.effect?.amount)
+  );
+}
+
+function areaDamage(actor, target, art, state, amount, type) {
+  if (type === "true") return Math.max(0, amount);
+  if (type === "magic") {
+    const result = resolveDamage({
+      attacker: { strength: amount },
+      defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
+      type: "magic"
+    });
+    return finalizeMagicDamage({ attacker: actor, target, state, rawDamage: result.damage, art });
+  }
+  const result = resolveDamage({
+    attacker: { strength: amount },
+    defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
+    type: "physical"
+  });
+  return negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+}
+
+function areaForecastEntries(state, actor, art, areaCenter) {
+  const shape = art.targeting?.shape;
+  if (shape === "nukeAura") {
+    const radius = getSelfBlastRadius(state, actor, art);
+    const targets = state.units.filter((unit) =>
+      unit.hp > 0 && areEnemies(actor, unit) && chebyshevDistance(actor.position, unit.position) <= radius);
+    const amount = art.id === "quake"
+      ? (art.damage?.amount ?? 3) + targets.length
+      : Math.max(0, Number(art.damage?.amount) || 0);
+    const type = art.damage?.type ?? art.damageType ?? "magic";
+    return targets.map((target) => ({ target, damage: areaDamage(actor, target, art, state, amount, type) }));
+  }
+  if (shape === "targetedBlast") {
+    if (!areaCenter) return [];
+    const radius = art.targeting?.radius ?? 2;
+    const amount = Math.max(0, Number(art.damage?.amount) || 0);
+    const type = art.damage?.type ?? "physical";
+    return getTargetedBlastTargets(state, actor, areaCenter, radius)
+      .map((target) => ({ target, damage: areaDamage(actor, target, art, state, amount, type) }));
+  }
+  if (shape === "cone") {
+    if (!areaCenter) return [];
+    const cells = getVolleyShotCells(state, actor, areaCenter) ?? [];
+    const cellKeys = new Set(cells.map(positionKey));
+    const amount = Math.max(0, Number(art.damage?.amount) || 0);
+    return state.units
+      .filter((target) => target.hp > 0 && areEnemies(actor, target) && cellKeys.has(positionKey(target.position)))
+      .map((target) => ({ target, damage: amount + getProximityBonus(actor, target) }));
+  }
+  if (shape === "lineBurst") {
+    const amount = Math.max(0, Number(art.damage?.amount) || 0);
+    const type = art.damage?.type ?? art.damageType ?? "magic";
+    return getPyroclasmTargets(state, actor, art)
+      .map((target) => ({ target, damage: areaDamage(actor, target, art, state, amount, type) }));
+  }
+  return [];
+}
+
 // While in attack or single-target ART mode, every enemy in range wears a badge
 // showing the predicted normal-hit damage (skull when lethal, "miss" when blinded).
 // Uses the same strike resolver the reducer uses, so damage-type changes stay honest.
-export function renderForecast({ forecastLayer, state, mode, actor, resolving }) {
+export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null }) {
   forecastLayer.replaceChildren();
   if (!actor || state.phase !== "playing" || resolving) return;
   const isAttack = mode === "attack";
   const artId = mode?.startsWith("art:") ? mode.slice(4) : null;
   const art = artId ? getArt(actor.type, artId) : null;
   const isStrikeArt = Boolean(artId) && isForecastableStrikeArt(art);
-  if (!isAttack && !isStrikeArt) return;
+  const isAreaArt = Boolean(artId) && isForecastableAreaArt(art);
+  if (!isAttack && !isStrikeArt && !isAreaArt) return;
 
   const metrics = createBoardMetrics(state.size);
+  if (isAreaArt && !isStrikeArt && !isAttack) {
+    for (const { target, damage } of areaForecastEntries(state, actor, art, areaCenter)) {
+      drawForecastBadge(forecastLayer, metrics, target, damageLabel(damage, target), damageClass(damage, target));
+    }
+    return;
+  }
+
   const reach = isStrikeArt ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
   const guaranteedMiss = (isAttack || isStrikeArt) && getMissChance(actor) >= 1;
   // The damage type of what's being aimed: a basic attack reads the unit's passive
@@ -92,8 +177,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving })
       : fixedMagic
         ? resolveFixedMagicStrike(actor, target, art.damage.amount, { state, art })
         : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
-    const lethal = strike.damage >= target.hp;
-    drawForecastBadge(forecastLayer, metrics, target, lethal ? `☠ ${strike.damage}` : `-${strike.damage}`, lethal ? "fc-lethal" : "fc-attack");
+    drawForecastBadge(forecastLayer, metrics, target, damageLabel(strike.damage, target), damageClass(strike.damage, target));
   }
 }
 

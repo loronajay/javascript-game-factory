@@ -4,12 +4,14 @@ import { getEffectiveStats, getUnitType, takesTurns } from "../core/unitCatalog.
 import { getLegalMoves, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 import {
+  TUTORIAL_JUGGERNAUT_REWARD_UNIT,
   TUTORIAL_PROGRESS_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
   normalizeUnlockProgress,
   readUnlockProgress,
   writeUnlockProgress
 } from "../progression/unlocks.js";
+import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 
 export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
@@ -558,6 +560,7 @@ export function chooseTutorialCpuActivation(match, tutorial) {
 
 export function completeTutorial(storage, tutorialId) {
   const current = readProgress(storage);
+  const previouslyComplete = current.allTutorialsComplete;
   const completed = new Set(current.completedTutorials);
   if (TUTORIAL_IDS.includes(tutorialId)) completed.add(tutorialId);
 
@@ -568,6 +571,9 @@ export function completeTutorial(storage, tutorialId) {
     completedTutorials,
     allTutorialsComplete,
   });
+  if (!previouslyComplete && next.allTutorialsComplete) {
+    enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT]);
+  }
   return next;
 }
 

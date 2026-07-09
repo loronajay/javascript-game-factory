@@ -43,21 +43,60 @@ function textContentOf(element) {
   return [element.textContent, ...element.children.flatMap(textContentOf)].join("");
 }
 
-test("self-centered blast arts do not render single-target forecast badges", () => {
+test("self-centered blast arts render damage forecast badges for enemies in the blast", () => {
   withSvgDocument(() => {
     const state = createBattleState({
       units: [
-        { id: "p1-necro", player: 1, type: "necromancer", x: 5, y: 5 },
+        { id: "p1-mag", player: 1, type: "magician", x: 5, y: 5, hp: 4 },
         { id: "p2-in", player: 2, type: "swordsman", x: 5, y: 8 },
         { id: "p2-out", player: 2, type: "swordsman", x: 9, y: 5 }
       ]
     });
-    const actor = state.units.find((unit) => unit.id === "p1-necro");
+    const actor = state.units.find((unit) => unit.id === "p1-mag");
     const forecastLayer = new TestSvgElement("g");
 
-    renderForecast({ forecastLayer, state, mode: "art:dark-bomb", actor, resolving: false });
+    renderForecast({ forecastLayer, state, mode: "art:nuke", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 0);
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-12");
+  });
+});
+
+test("targeted blast arts render damage forecasts around the hovered tile", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-clod", player: 1, type: "clod", x: 5, y: 5, hp: 4 },
+        { id: "p2-in", player: 2, type: "swordsman", x: 6, y: 6 },
+        { id: "p2-out", player: 2, type: "swordsman", x: 9, y: 9 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-clod");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:thunderous-charge", actor, resolving: false, areaCenter: { x: 5, y: 5 } });
+
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-5");
+  });
+});
+
+test("cone arts render damage forecasts around the hovered cone", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 5, y: 5 },
+        { id: "p2-near", player: 2, type: "swordsman", x: 5, y: 6 },
+        { id: "p2-out", player: 2, type: "swordsman", x: 6, y: 5 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-archer");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:volley-shot", actor, resolving: false, areaCenter: { x: 5, y: 6 } });
+
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-4");
   });
 });
 

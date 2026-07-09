@@ -11,6 +11,11 @@ import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openChoiceModal } from "./choiceModal.js";
 import { resetUnlockProgress, selectTutorialRewardSkin } from "../progression/unlocks.js";
+import {
+  resetProgressionAnnouncements,
+  syncMissingUnitUnlockAnnouncements
+} from "../progression/announcements.js";
+import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
 import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
@@ -27,6 +32,10 @@ import { createTutorialMatchConfig, getNextTutorialId, getTutorialList, readProg
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
 const DEFAULT_CAMPAIGN_SQUAD = Object.freeze(["mystic", "magician"]);
+const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
+const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
+const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase tutorials, campaign stars, units, and skins.";
+const RESET_PROGRESS_CONFIRM_MS = 6000;
 
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
@@ -39,9 +48,13 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
-  for (const name of ["title", "mainMenu", "hsSetup", "spSetup", "results", "tutorialComplete"]) {
+  for (const name of ["title", "hsSetup", "spSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
+  screens.register("mainMenu", {
+    el: screenEl("mainMenu"),
+    onEnter: () => showQueuedProgressionAnnouncements({ audit: true }),
+  });
   // The match screen disposes a live online session when left mid-game.
   screens.register("match", { el: screenEl("match"), onExit: () => onLeaveMatch?.() });
 
@@ -148,7 +161,18 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const campaignStartBtn = $("[data-action='startCampaignMission']", campaignScreen);
   let selectedCampaignMissionId = CLOD_MISSION_ID;
   let campaignSquad = [...DEFAULT_CAMPAIGN_SQUAD];
+  let progressionAnnouncementRunning = false;
   screens.register("campaign", { el: campaignScreen, onEnter: renderCampaign });
+
+  function showQueuedProgressionAnnouncements({ audit = false, delay = 0 } = {}) {
+    if (progressionAnnouncementRunning) return;
+    if (audit) syncMissingUnitUnlockAnnouncements(globalThis.localStorage);
+    progressionAnnouncementRunning = true;
+    window.setTimeout(() => {
+      showPendingProgressionAnnouncements(globalThis.localStorage)
+        .finally(() => { progressionAnnouncementRunning = false; });
+    }, delay);
+  }
 
   function campaignUnlockedTypes() {
     return UNIT_TYPE_KEYS.filter((type) => isUnitUnlocked(type, globalThis.localStorage));
@@ -301,6 +325,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   let lastConfig = null;
 
   const rematchBtn = $("[data-action='rematch']", results);
+  const campaignMapBtn = $("[data-results='campaign-map']", results);
 
   function showResults(summary) {
     const online = lastConfig?.mode === "online";
@@ -333,9 +358,10 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     addStat(stats, "Duration", formatDuration(summary.durationMs));
     addStat(stats, "Ended by", "Squad eliminated");
     // A finished online session can't be locally replayed — Main Menu only.
-    if (rematchBtn) rematchBtn.hidden = online || Boolean(campaign);
+    syncResultsActions({ rematchBtn, campaignMapBtn }, { online, campaign });
     showScreen("results");
     spawnConfetti(burstEl, TEAM_COLOR[summary.winner]);
+    if (campaign?.victory) showQueuedProgressionAnnouncements({ delay: 550 });
   }
 
   const tutorialComplete = screenEl("tutorialComplete");
@@ -390,7 +416,12 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     const rewardBtn = $("[data-tutorial-complete='reward-choice']", tutorialComplete);
     if (rewardBtn) rewardBtn.hidden = !rewardPending;
     showScreen("tutorialComplete");
-    if (rewardPending) window.setTimeout(() => openTutorialRewardChoice(summary), 0);
+    if (rewardPending) {
+      window.setTimeout(async () => {
+        await showPendingProgressionAnnouncements(globalThis.localStorage);
+        await openTutorialRewardChoice(summary);
+      }, 0);
+    }
   }
 
   async function openTutorialRewardChoice(summary = {}) {
@@ -429,6 +460,16 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const resetProgressBtn = $("#setResetProgressBtn", settingsModal);
   const progressStatus = $("#setProgressStatus", settingsModal);
   let progressStatusTimer = null;
+  const resetProgressConfirmation = createResetProgressConfirmation({
+    button: resetProgressBtn,
+    status: progressStatus,
+    onArm: () => {
+      window.clearTimeout(progressStatusTimer);
+      progressStatusTimer = null;
+    },
+    onConfirm: resetLocalProgress,
+    timeoutMs: RESET_PROGRESS_CONFIRM_MS,
+  });
 
   // Palette list comes straight from the registry so a new theme in themes.js
   // shows up here with no markup change. Applied live + persisted on change.
@@ -448,14 +489,18 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     sfxRange.value = String(Math.round((audio.volume ?? 0.85) * 100));
     musicRange.value = String(Math.round((audio.musicVolume ?? 0.32) * 100));
     themeSelect.value = loadSavedThemeId();
-    if (progressStatus) progressStatus.textContent = "";
+    resetProgressConfirmation.disarm({ clearStatus: true });
     settingsModal.hidden = false;
   }
-  function closeSettings() { settingsModal.hidden = true; }
+  function closeSettings() {
+    resetProgressConfirmation.disarm({ clearStatus: true });
+    settingsModal.hidden = true;
+  }
 
   function resetLocalProgress() {
     resetUnlockProgress(globalThis.localStorage);
     resetCampaignProgress(globalThis.localStorage);
+    resetProgressionAnnouncements(globalThis.localStorage);
     campaignSquad = [...DEFAULT_CAMPAIGN_SQUAD];
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
@@ -477,7 +522,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   sfxRange.addEventListener("input", () => audio.setVolume(Number(sfxRange.value) / 100));
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));
   $("#setCloseBtn", settingsModal).addEventListener("click", closeSettings);
-  resetProgressBtn?.addEventListener("click", resetLocalProgress);
+  resetProgressBtn?.addEventListener("click", resetProgressConfirmation.requestReset);
   settingsModal.addEventListener("click", (event) => { if (event.target === settingsModal) closeSettings(); });
 
   // ── Global delegated wiring (nav + actions + segmented controls) ──────────
@@ -575,6 +620,72 @@ function addStat(listEl, label, value) {
   const dd = document.createElement("dd");
   dd.textContent = value;
   listEl.append(dt, dd);
+}
+
+export function syncResultsActions({ rematchBtn, campaignMapBtn } = {}, { online = false, campaign = null } = {}) {
+  const isCampaign = Boolean(campaign);
+  // Campaign rewards and newly opened missions live on the map, so make that the
+  // primary post-mission action while still leaving Main Menu available.
+  if (rematchBtn) rematchBtn.hidden = online || isCampaign;
+  if (campaignMapBtn) campaignMapBtn.hidden = !isCampaign;
+}
+
+export function createResetProgressConfirmation({
+  button,
+  status,
+  onArm,
+  onConfirm,
+  idleLabel = RESET_PROGRESS_IDLE_LABEL,
+  confirmLabel = RESET_PROGRESS_CONFIRM_LABEL,
+  warningText = RESET_PROGRESS_WARNING,
+  timeoutMs = RESET_PROGRESS_CONFIRM_MS,
+  setTimeoutFn = globalThis.setTimeout.bind(globalThis),
+  clearTimeoutFn = globalThis.clearTimeout.bind(globalThis),
+} = {}) {
+  let armed = false;
+  let timer = null;
+
+  function clearTimer() {
+    if (timer !== null) clearTimeoutFn(timer);
+    timer = null;
+  }
+
+  function render() {
+    if (button) {
+      button.textContent = armed ? confirmLabel : idleLabel;
+      button.classList?.toggle("is-confirming", armed);
+      button.setAttribute?.("aria-pressed", String(armed));
+    }
+  }
+
+  function disarm({ clearStatus = false } = {}) {
+    clearTimer();
+    armed = false;
+    render();
+    if (clearStatus && status) status.textContent = "";
+  }
+
+  function arm() {
+    clearTimer();
+    armed = true;
+    onArm?.();
+    render();
+    if (status) status.textContent = warningText;
+    timer = setTimeoutFn(() => disarm(), timeoutMs);
+  }
+
+  function requestReset() {
+    if (!armed) {
+      arm();
+      return false;
+    }
+    disarm();
+    onConfirm?.();
+    return true;
+  }
+
+  render();
+  return { requestReset, disarm, get armed() { return armed; } };
 }
 
 function skinRewardLabel(reward) {

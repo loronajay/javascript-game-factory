@@ -159,7 +159,7 @@ export function isTargetedMode(mode, actor) {
 // Hovering a Volley direction lights that cone's tiles so the player sees the
 // shot before clicking. Pure DOM class toggling — no re-render — so it can't
 // loop on mouseenter.
-function wireVolleyHover(cones, tileByKey, unitsLayer, state) {
+function wireVolleyHover(cones, tileByKey, unitsLayer, state, onAreaHover) {
   for (const cone of cones) {
     const enter = () => {
       for (const k of cone.cells) tileByKey.get(k)?.classList.add("cone-hot");
@@ -168,10 +168,12 @@ function wireVolleyHover(cones, tileByKey, unitsLayer, state) {
           unitsLayer.querySelector(`[data-key="${positionKey(occupant.position)}"]`)?.classList.add("volley-hit");
         }
       }
+      onAreaHover?.(cone.origin);
     };
     const leave = () => {
       for (const k of cone.cells) tileByKey.get(k)?.classList.remove("cone-hot");
       unitsLayer.querySelectorAll(".volley-hit").forEach((el) => el.classList.remove("volley-hit"));
+      onAreaHover?.(null);
     };
     const hoverKeys = new Set([cone.key, ...cone.cells]);
     for (const key of hoverKeys) {
@@ -186,7 +188,7 @@ function wireVolleyHover(cones, tileByKey, unitsLayer, state) {
 // Hovering a Thunderous Charge aim tile lights its detonation footprint and the enemies
 // inside it, so the player sees the blast before committing. Reuses the volley hot-tile /
 // hit-glow classes; pure DOM class toggling (no re-render), so it can't loop on mouseenter.
-function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKeys) {
+function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKeys, onAreaHover) {
   const radius = art.targeting?.radius ?? 2;
   for (const key of aimKeys) {
     const tile = tileByKey.get(key);
@@ -200,17 +202,19 @@ function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKey
           unitsLayer.querySelector(`[data-key="${positionKey(occupant.position)}"]`)?.classList.add("volley-hit");
         }
       }
+      onAreaHover?.({ x: cx, y: cy });
     };
     const leave = () => {
       for (const k of footprint) tileByKey.get(k)?.classList.remove("cone-hot");
       unitsLayer.querySelectorAll(".volley-hit").forEach((el) => el.classList.remove("volley-hit"));
+      onAreaHover?.(null);
     };
     tile.addEventListener("mouseenter", enter);
     tile.addEventListener("mouseleave", leave);
   }
 }
 
-export function renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick }) {
+export function renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick, onAreaHover = null }) {
   let legal = new Set();
   let range = new Set();
   const actor = selectedId ? state.units.find((u) => u.id === selectedId) : null;
@@ -503,8 +507,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
-  if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state);
-  if (blastArt) wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal);
+  if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state, onAreaHover);
+  if (blastArt) wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal, onAreaHover);
 
   // Units and tile props (Build Cover walls, Throw Cigar fire) share ONE depth-
   // sorted layer so isometric occlusion is correct: a prop closer to the viewer
