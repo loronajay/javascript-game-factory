@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { UNIT_TYPES, getArt, getAuraSources, getEffectiveStats, isRaging, takesTurns } from "../src/core/unitCatalog.js";
+import { UNIT_TYPES, getArt, getAuraSources, getEffectiveStats, getUnitType, isRaging, takesTurns } from "../src/core/unitCatalog.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
@@ -370,6 +370,47 @@ test("A Ghoul never takes a turn: it stays spent across the round and cannot act
   assert.equal(ghoul.spent, true, "ghoul should not be refreshed at turn start");
   assert.equal(findId(r3.nextState, "p1-necro").spent, false, "commander should refresh");
   assert.ok(!applyCommand(r3.nextState, beginActivation(1, ghoul.id)).accepted, "ghoul must not activate");
+});
+
+test("Ghoul carries a Ghoul Bite passive: autoStrike, 1 true damage, range 1", () => {
+  const ghoul = UNIT_TYPES.ghoul;
+  const bite = ghoul.arts.find((a) => a.id === "ghoul-bite");
+  assert.ok(bite, "ghoul is missing the ghoul-bite passive");
+  assert.equal(bite.kind, "passive");
+  assert.equal(bite.effect.type, "autoStrike");
+  assert.equal(bite.effect.damage, 1);
+  assert.equal(bite.effect.damageType, "true");
+  assert.equal(bite.effect.range, 1);
+});
+
+test("Ghoul Bite mauls one random adjacent enemy for 1 true damage at the turn rollover", () => {
+  const state = createBattleState({
+    size: 13, seed: 1,
+    units: [
+      { id: "p1-necro", type: "necromancer", player: 1, x: 0, y: 0 },
+      { id: "p2-near", type: "swordsman", player: 2, x: 8, y: 9 }, // adjacent to the ghoul
+      { id: "p2-far", type: "archer", player: 2, x: 1, y: 1 } // out of the ghoul's range
+    ]
+  });
+  state.units.push(ghoulUnit("p1-ghoul", 1, 8, 8, "p1-necro"));
+
+  // P1's only commander is the necromancer; finishing its activation rolls the turn
+  // over to P2 and fires the rollover ticks, including Ghoul Bite.
+  const s1 = activate(state, "p1-necro");
+  const r = applyCommand(s1, defend(1, "p1-necro"));
+  assert.ok(r.accepted);
+  const r2 = applyCommand(r.nextState, finishActivation(1, "p1-necro"));
+  assert.ok(r2.accepted);
+  assert.equal(r2.nextState.currentPlayer, 2);
+
+  assert.equal(findId(r2.nextState, "p2-near").hp, getUnitType("swordsman").stats.maxHp - 1);
+  assert.equal(findId(r2.nextState, "p2-far").hp, getUnitType("archer").stats.maxHp);
+
+  const bites = r2.events.filter((e) => e.type === "AUTO_STRIKE");
+  assert.equal(bites.length, 1);
+  assert.equal(bites[0].sourceId, "p1-ghoul");
+  assert.equal(bites[0].targetId, "p2-near");
+  assert.equal(bites[0].damage, 1);
 });
 
 test("A player whose only survivor is a Ghoul is defeated", () => {

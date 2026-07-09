@@ -8,6 +8,14 @@
 // so summoning extends where the -1 DEF debuff applies. It never rages, so it only
 // ever projects the base aura, never the amplified rage version.
 //
+// A Ghoul never activates, but it still bites: Ghoul Bite is a second `kind:"passive"`
+// arts entry (the same multi-passive pattern other units use) carrying a reusable
+// `autoStrike` effect — read centrally by `applyAutoStrikeTick` in `turnEngine.js` at
+// every turn rollover. It picks ONE random living enemy within `range` (Chebyshev) of
+// the Ghoul off the authoritative RNG and deals `damage` true (DEF/Defend-bypassing,
+// unrollable) damage, matching the Fire/Time-Steal rollover-tick convention rather than
+// costing an activation the Ghoul doesn't have.
+//
 // Legacy canon (.sb3): 10 HP, DEF 2, carries the aura, takes no turns.
 export const GHOUL = Object.freeze({
   id: "ghoul",
@@ -31,5 +39,14 @@ export const GHOUL = Object.freeze({
     description: "Enemies within 3 tiles of the Ghoul suffer -1 DEF, carrying the Necromancer's Deathly Aura.",
     implemented: true
   }),
-  arts: Object.freeze([])
+  arts: Object.freeze([
+    Object.freeze({
+      id: "ghoul-bite",
+      name: "Ghoul Bite",
+      kind: "passive",
+      effect: Object.freeze({ type: "autoStrike", damage: 1, damageType: "true", range: 1 }),
+      description: "At the start of each turn, the Ghoul bites one random enemy standing directly next to it for 1 true damage.",
+      implemented: true
+    })
+  ])
 });

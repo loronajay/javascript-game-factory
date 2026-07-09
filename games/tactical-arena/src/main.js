@@ -1665,6 +1665,8 @@ function playEventSounds(events) {
 function playRolloverFx(events) {
   const burns = events.filter((e) => e.type === "FIRE_DAMAGE");
   const steals = events.filter((e) => e.type === "TIME_STEAL");
+  // Ghoul Bite (autoStrike): a Ghoul mauls one random adjacent enemy at the rollover.
+  const bites = events.filter((e) => e.type === "AUTO_STRIKE");
   // The King's Dictator/Spectator passive fires after any command that fells or revives an
   // allied unit, so its reactive HP swings ride whatever command triggered them.
   const mourns = events.filter((e) => e.type === "KING_MOURNS");
@@ -1679,7 +1681,7 @@ function playRolloverFx(events) {
   // both surface as fire-and-forget HP/MP floats over her.
   const snacks = events.filter((e) => e.type === "SNACK_BREAK" || e.type === "EMERGENCY_SNACK");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
-      !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length) return;
+      !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -1723,6 +1725,15 @@ function playRolloverFx(events) {
     effects.impact(center, false, "true");
     effects.floatText(center, `-${bite.damage}`, "#e8f4ff");
     if (!offender || offender.hp <= 0) { effects.deathBurst(center, teamColor(offender?.player ?? 1)); killed = true; }
+  }
+
+  if (bites.length) audio.play("attackHit");
+  for (const bite of bites) {
+    const center = unitCenter(metrics, { position: bite.position });
+    effects.impact(center, false, "true");
+    effects.floatText(center, `-${bite.damage}`, "#e8f4ff");
+    const after = findUnit(state, bite.targetId);
+    if (!after || after.hp <= 0) { effects.deathBurst(center, teamColor(after?.player ?? 1)); killed = true; }
   }
 
   if (burns.length) audio.play("fireTick");

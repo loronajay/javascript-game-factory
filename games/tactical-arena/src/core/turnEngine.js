@@ -4,6 +4,7 @@ import { chebyshevDistance } from "../rules/movement.js";
 import { isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
 import { isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { drawValue } from "./rng.js";
 
 const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 const FIRE_DAMAGE = 1;
@@ -115,6 +116,7 @@ function advanceTurnIfExhausted(state) {
     applyFireTick(state, fireEvents);
     applyBlackDeathTick(state, fireEvents);
     applyTimeStealTick(state, fireEvents);
+    applyAutoStrikeTick(state, fireEvents);
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
@@ -147,6 +149,44 @@ function applyBlackDeathTick(state, events) {
     const dealt = Math.min(unit.hp, amount);
     unit.hp = Math.max(0, unit.hp - amount);
     if (dealt > 0) events.push({ type: "BLACK_DEATH_DAMAGE", unitId: unit.id, damage: dealt });
+  }
+}
+
+// Ghoul Bite (and any future unit sharing the `autoStrike` passive effect): at every
+// turn rollover, a living source with the effect picks ONE random living enemy within
+// `range` (Chebyshev) of it off the authoritative RNG and deals `damage` (true by
+// default, so it bypasses DEF/Defend like Fire/Time Steal) — a real activation-free
+// melee reflex rather than a costed ART.
+function autoStrikeSources(definition) {
+  return [definition.passive, ...definition.arts].filter(Boolean);
+}
+
+function applyAutoStrikeTick(state, events) {
+  for (const source of livingUnits(state)) {
+    const definition = getUnitType(source.type);
+    for (const passive of autoStrikeSources(definition)) {
+      if (passive.kind && passive.kind !== "passive") continue;
+      const effect = passive.effect;
+      if (effect?.type !== "autoStrike") continue;
+      const range = effect.range ?? 1;
+      const targets = livingUnits(state).filter((target) =>
+        areEnemies(source, target) && chebyshevDistance(source.position, target.position) <= range);
+      if (!targets.length) continue;
+      const pick = drawValue(state.rngState);
+      state.rngState = pick.rngState;
+      const target = targets[Math.min(targets.length - 1, Math.floor(pick.value * targets.length))];
+      const amount = Math.max(0, Number(effect.damage) || 0);
+      const dealt = Math.min(target.hp, amount);
+      if (dealt <= 0) continue;
+      target.hp = Math.max(0, target.hp - dealt);
+      events.push({
+        type: "AUTO_STRIKE",
+        sourceId: source.id,
+        targetId: target.id,
+        position: { ...target.position },
+        damage: dealt
+      });
+    }
   }
 }
 
