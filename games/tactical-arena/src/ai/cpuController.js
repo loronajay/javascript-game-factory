@@ -15,7 +15,8 @@ import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getArt, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { getSelfBlastRadius } from "../rules/arts.js";
-import { chebyshevDistance } from "../rules/movement.js";
+import { isFireDamageImmune } from "../rules/combat.js";
+import { chebyshevDistance, positionKey } from "../rules/movement.js";
 import { isStunned } from "../rules/statuses.js";
 import {
   ageValue,
@@ -57,6 +58,10 @@ const WEIGHTS = Object.freeze({
 const HP_WEIGHT = 1;       // value per current HP point in the material term
 const THREAT_CAP = 3;      // cap on exposure threat so two squads don't freeze apart
 const AOE_WASTE_PENALTY = 8; // sink an AoE that hits too few targets for no kill
+// A fire-immune unit takes no damage from a burning tile, so it reads as free ground worth
+// camping — melee attackers who follow it in eat the burn every rollover. Scaled by the same
+// `zone` weight as a placed wall/fire (in units of that authored evHints.zoneValue scale).
+const FIRE_CAMP_ZONE_VALUE = 6;
 
 export function chooseActivation(
   state,
@@ -162,6 +167,11 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
   score -= weights.exposure * threat;
   if (isKeyUnit(unit)) score -= weights.keyExposure * threat;
   score -= weights.advance * nearestEnemyDistance(state, cpuPlayer, finalPos);
+
+  // 9. A fire-immune unit baits melee by camping on a burning tile it can't be hurt by.
+  if (isFireDamageImmune(unit) && state.tileObjects?.[positionKey(finalPos)]?.kind === "fire") {
+    score += weights.zone * FIRE_CAMP_ZONE_VALUE;
+  }
 
   return score;
 }

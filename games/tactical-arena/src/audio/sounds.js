@@ -6,8 +6,16 @@
 import { HybridAudioEngine } from "./hybridAudioEngine.js";
 import { SOUND_CATALOG, SAMPLE_SOURCES } from "./soundCatalog.js";
 
-export const MUSIC_FILES = Object.freeze({ battle: "battle-2.mp3", menu: "menu.mp3" });
+export const MUSIC_FILES = Object.freeze({
+  menu: "menu.mp3",
+  missionBattle: "mission-battle.mp3",
+  vsBattle: "vs-battle.mp3",
+});
 const MUSIC_BASE = new URL("../../sounds/", import.meta.url);
+
+export function musicKeyForMatchMode(mode) {
+  return mode === "campaign" ? "missionBattle" : "vsBattle";
+}
 
 export class AudioManager {
   constructor({ enabled = true, masterVolume = 1, volume = 0.8, musicVolume = 0.35 } = {}) {

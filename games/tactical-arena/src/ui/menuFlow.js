@@ -18,7 +18,7 @@ import {
 import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
-import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
+import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import {
   CLOD_MISSION_ID,
   MAX_CAMPAIGN_SQUAD_SIZE,
@@ -39,6 +39,20 @@ const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
 const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase tutorials, campaign stars, units, and skins.";
 const RESET_PROGRESS_CONFIRM_MS = 6000;
+
+export function campaignUnitChoiceGroups(unlockedTypes = [], squad = [], slot = 0) {
+  const pickableTypes = unlockedTypes.filter((type) => !squad.includes(type) || squad[slot] === type);
+  return groupedUnitTypes(pickableTypes).map((group) => ({
+    id: group.id,
+    label: group.label,
+    choices: group.types.map((type) => ({
+      value: type,
+      label: UNIT_TYPES[type].name,
+      sub: "Unlocked",
+      type,
+    })),
+  }));
+}
 
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
@@ -164,6 +178,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const campaignStartBtn = $("[data-action='startCampaignMission']", campaignScreen);
   let selectedCampaignMissionId = CLOD_MISSION_ID;
   let campaignSquad = emptyCampaignSquad();
+  let campaignSquadMissionId = null;
   let selectedCampaignNode = null;
   let progressionAnnouncementRunning = false;
   let campaignMapResizeObserver = null;
@@ -186,15 +201,20 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
 
   // Resizes the squad slot array to the mission's slot count WITHOUT inferring
   // any pick — choosing a squad is part of the mission puzzle, so an unfilled
-  // slot stays null until the player explicitly chooses a unit for it.
-  function normalizeCampaignSquadForProgress(slotCount = 2) {
+  // slot stays null until the player explicitly chooses a unit for it. Switching to a
+  // DIFFERENT mission always starts from empty slots too — otherwise a pick made for one
+  // mission (e.g. slot 0 = Archer on a 2-slot mission) silently carries over as a
+  // pre-filled slot 0 on the next mission selected, masquerading as an auto-pick.
+  function normalizeCampaignSquadForProgress(missionId, slotCount = 2) {
     const unlocked = campaignUnlockedTypes();
+    const carryForward = missionId === campaignSquadMissionId;
     const next = [];
     for (let i = 0; i < slotCount; i += 1) {
-      const type = campaignSquad[i];
+      const type = carryForward ? campaignSquad[i] : null;
       next.push(type && unlocked.includes(type) ? type : null);
     }
     campaignSquad = next;
+    campaignSquadMissionId = missionId;
   }
 
   function renderCampaign() {
@@ -205,7 +225,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     }
     const selectedNode = map.nodes.find((node) => node.id === selectedCampaignMissionId) ?? map.nodes[0];
     selectedCampaignNode = selectedNode;
-    normalizeCampaignSquadForProgress(campaignSquadSize(selectedNode));
+    normalizeCampaignSquadForProgress(selectedCampaignMissionId, campaignSquadSize(selectedNode));
     campaignStars.textContent = `${map.totalStars} ★`;
     campaignMapHost.replaceChildren();
 
@@ -394,6 +414,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   }
 
   async function chooseCampaignUnit(slot) {
+    const groups = campaignUnitChoiceGroups(campaignUnlockedTypes(), campaignSquad, slot);
     const choices = campaignUnlockedTypes()
       .filter((type) => !campaignSquad.includes(type) || campaignSquad[slot] === type)
       .map((type) => ({
@@ -407,6 +428,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       subtitle: `This mission deploys ${campaignSquad.length} unit${campaignSquad.length === 1 ? "" : "s"}. Pick around the lesson.`,
       accent: TEAM_COLOR[1],
       choices,
+      groups,
     });
     if (!picked) return;
     campaignSquad[slot] = picked;
@@ -599,6 +621,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     resetCampaignProgress(globalThis.localStorage);
     resetProgressionAnnouncements(globalThis.localStorage);
     campaignSquad = emptyCampaignSquad();
+    campaignSquadMissionId = null;
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
     for (const picker of hsPickers.values()) picker.setLoadout(DEFAULT_SQUAD);

@@ -13,7 +13,7 @@ import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets } fr
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
-import { AudioManager } from "./audio/sounds.js";
+import { AudioManager, musicKeyForMatchMode } from "./audio/sounds.js";
 import { renderBoard } from "./ui/boardRenderer.js";
 import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
@@ -321,7 +321,7 @@ function startMatch(config) {
     : `${isCpu(state.currentPlayer) ? `Player ${state.currentPlayer} (CPU)` : `Player ${state.currentPlayer}`} opens the battle.`);
   if (tutorial) setMessage(tutorial.prompt);
   menu.show("match");
-  if (audioUnlocked && !muted) audio.startMusic("battle");
+  if (audioUnlocked && !muted) audio.startMusic(musicKeyForMatchMode(config.mode));
   // Bind AFTER the match screen + state exist so any remote commands buffered during
   // the lobby→match handoff flush onto a live board.
   if (online) net.bind(onlineController);
@@ -345,7 +345,7 @@ function resetBattle() {
 
 function resumeActiveMusic() {
   if (muted || !audioUnlocked) return;
-  audio.startMusic(menu.active === "match" ? "battle" : "menu");
+  audio.startMusic(menu.active === "match" ? musicKeyForMatchMode(matchConfig?.mode) : "menu");
 }
 
 // Called by the menu when the match screen is left. Abandon a still-live online

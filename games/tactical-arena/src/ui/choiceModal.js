@@ -19,7 +19,7 @@ function ensureHost() {
 }
 
 // choices: [{ value, label, sub?, type? }]  — `type` (a unit type) shows a portrait thumb.
-export function openChoiceModal({ title = "", subtitle = "", accent = null, choices = [], cancelLabel = "Cancel" } = {}) {
+export function openChoiceModal({ title = "", subtitle = "", accent = null, choices = [], groups = null, cancelLabel = "Cancel" } = {}) {
   const overlay = ensureHost();
   return new Promise((resolve) => {
     overlay.replaceChildren();
@@ -50,7 +50,24 @@ export function openChoiceModal({ title = "", subtitle = "", accent = null, choi
     function onOverlay(event) { if (event.target === overlay) close(null); }
     function onKey(event) { if (event.key === "Escape") close(null); }
 
-    for (const choice of choices) {
+    const groupedChoices = Array.isArray(groups)
+      ? groups.filter((group) => Array.isArray(group.choices) && group.choices.length > 0)
+      : [];
+    if (groupedChoices.length > 0) {
+      for (const group of groupedChoices) {
+        const section = el("section", "choice-group");
+        section.dataset.group = group.id ?? "";
+        section.appendChild(el("h3", "choice-group-title", group.label ?? "Choices"));
+        const groupList = el("div", "choice-group-options");
+        for (const choice of group.choices) renderChoice(choice, groupList);
+        section.appendChild(groupList);
+        list.appendChild(section);
+      }
+    } else {
+      for (const choice of choices) renderChoice(choice, list);
+    }
+
+    function renderChoice(choice, parent) {
       const btn = el("button", "choice-option");
       btn.type = "button";
       if (choice.type) {
@@ -62,7 +79,7 @@ export function openChoiceModal({ title = "", subtitle = "", accent = null, choi
       if (choice.sub) text.appendChild(el("span", "choice-option-sub", choice.sub));
       btn.appendChild(text);
       btn.addEventListener("click", () => close(choice.value));
-      list.appendChild(btn);
+      parent.appendChild(btn);
     }
 
     const foot = el("footer", "choice-foot");

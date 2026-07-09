@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AudioManager, MUSIC_FILES } from "../src/audio/sounds.js";
+import { AudioManager, MUSIC_FILES, musicKeyForMatchMode } from "../src/audio/sounds.js";
 import { SAMPLE_SOURCES, SOUND_CATALOG } from "../src/audio/soundCatalog.js";
 import { syncScreenMusic } from "../src/ui/menuFlow.js";
 
@@ -21,9 +21,19 @@ test("sample URLs resolve inside this game's local sounds directory", () => {
   assert.ok(normalizedPaths.every((path) => path.includes("/tactical-arena/sounds/")));
 });
 
-test("music tracks include local battle and menu loops", () => {
-  assert.equal(MUSIC_FILES.battle, "battle-2.mp3");
+test("music tracks include local menu, mission battle, and versus battle loops", () => {
+  assert.equal(MUSIC_FILES.missionBattle, "mission-battle.mp3");
+  assert.equal(MUSIC_FILES.vsBattle, "vs-battle.mp3");
   assert.equal(MUSIC_FILES.menu, "menu.mp3");
+});
+
+test("campaign battles use mission music and every other battle uses versus music", () => {
+  assert.equal(musicKeyForMatchMode("campaign"), "missionBattle");
+  assert.equal(musicKeyForMatchMode("single"), "vsBattle");
+  assert.equal(musicKeyForMatchMode("hotseat"), "vsBattle");
+  assert.equal(musicKeyForMatchMode("online"), "vsBattle");
+  assert.equal(musicKeyForMatchMode("tutorial"), "vsBattle");
+  assert.equal(musicKeyForMatchMode(undefined), "vsBattle");
 });
 
 test("starting the same music track is idempotent while switching tracks stops the previous loop", () => {
@@ -67,10 +77,10 @@ test("starting the same music track is idempotent while switching tracks stops t
     assert.equal(menuTrack.playCount, 1);
     assert.equal(menuTrack.currentTime, 12);
 
-    audio.startMusic("battle");
+    audio.startMusic("vsBattle");
     assert.equal(menuTrack.pauseCount, 1);
     assert.equal(menuTrack.currentTime, 0);
-    assert.match(created[1].src, /battle-2\.mp3$/);
+    assert.match(created[1].src, /vs-battle\.mp3$/);
   } finally {
     globalThis.Audio = OriginalAudio;
   }

@@ -446,7 +446,7 @@ test("Witch Doctor mission builds an 11x11 solo gauntlet with permanent fire and
   assert.equal(ghouls.length, 9); // a 3x3 lattice
   assert.equal(ghouls.every((unit) => unit.hp === 5 && unit.mp === 0 && unit.spent === true), true);
   assert.equal(ghouls.every((unit) => unit.summonerId == null), true);
-  assert.equal(fires.length >= 45, true);
+  assert.equal(fires.length, 30);
   assert.equal(fires.every((obj) => obj.permanent === true), true);
   assert.equal(Object.values(match.tileObjects ?? {}).some((obj) => obj.kind === "wall"), false);
   assert.equal(ghouls.some((unit) => unit.position.x === 5 && unit.position.y === 5), false);
@@ -454,10 +454,13 @@ test("Witch Doctor mission builds an 11x11 solo gauntlet with permanent fire and
 
   const fireAt = (x, y) => (match.tileObjects ?? {})[`${x},${y}`]?.kind === "fire";
   const occupied = (x, y) => match.units.some((unit) => unit.position.x === x && unit.position.y === y);
-  // Fire marks a Ghoul's FULL bite range (all eight neighbours, diagonals included), so a
-  // no-fire tile is safe from both fire and Ghoul Bite.
-  for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
-    assert.ok(fireAt(6 + dx, 6 + dy), `a Ghoul's bite tile (${dx},${dy}) burns`);
+  // Fire marks only a Ghoul's four ORTHOGONAL neighbours (a cross, not the full 3x3 bite
+  // block), so diagonal bite tiles stay fire-free.
+  for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+    assert.ok(fireAt(6 + dx, 6 + dy), `a Ghoul's orthogonal bite tile (${dx},${dy}) burns`);
+  }
+  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    assert.ok(!fireAt(6 + dx, 6 + dy), `a Ghoul's diagonal bite tile (${dx},${dy}) doesn't burn`);
   }
   // The avenues between clusters (rows/cols 0, 4, 8) stay clear of fire AND units.
   for (const [x, y] of [[4, 4], [4, 0], [0, 4], [8, 8], [0, 0], [8, 0], [0, 8]]) {

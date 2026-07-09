@@ -1,7 +1,7 @@
 import { getUnitType } from "../core/unitCatalog.js";
 import { createUnit, findUnit } from "../core/state.js";
 import { isNegativeStatus } from "../rules/statuses.js";
-import { ALL_DIRECTIONS, positionKey } from "../rules/movement.js";
+import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
@@ -371,11 +371,12 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
 }
 
 // The swamp lattice: a 3×3 grid of Ghoul bodies spaced 4 tiles apart (x,y each in
-// {2,6,10}). Fire fills EVERY tile a Ghoul can bite — all eight neighbours (Chebyshev 1),
-// diagonals included — so the flames mark the exact danger zone: any tile without fire is
-// safe from BOTH fire and Ghoul Bite. Because the clusters sit 4 apart, that leaves clean
-// one-tile "avenues" (rows/columns 0, 4, 8) running between them — the obvious, safe route
-// the player walks toward the Witch Doctor.
+// {2,6,10}). Fire fills each Ghoul's four ORTHOGONAL neighbours only (not the full
+// Chebyshev-1 bite range) — the flames mark a cross around each Ghoul rather than a solid
+// block, so the diagonal tiles stay bite-range but fire-free (a Ghoul Bite risk without a
+// burn). Because the clusters sit 4 apart, that leaves clean one-tile "avenues" (rows/columns
+// 0, 4, 8) running between them — the obvious, safe route the player walks toward the Witch
+// Doctor.
 const WITCH_DOCTOR_GHOUL_LATTICE = Object.freeze([2, 6, 10]);
 const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze(
   WITCH_DOCTOR_GHOUL_LATTICE.flatMap((y) =>
@@ -383,13 +384,14 @@ const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze(
   )
 );
 
-// Fire is derived from the Ghoul lattice — each Ghoul's eight neighbours (its full bite
-// range), clipped to the board and deduped — so "fire === bite zone" can't drift from the
-// Ghoul positions above.
+// Fire is derived from the Ghoul lattice — each Ghoul's four orthogonal neighbours, clipped
+// to the board and deduped. Orthogonal-only (not the full 8-tile bite range) so the burn
+// pattern reads as a clean cross around each Ghoul rather than a solid 3x3 block, leaving the
+// diagonal tiles as a tighter (but still bite-range) way to thread past a cluster.
 const WITCH_DOCTOR_FIRE_POSITIONS = Object.freeze(
   [...new Set(
     WITCH_DOCTOR_GHOUL_POSITIONS.flatMap((ghoul) =>
-      ALL_DIRECTIONS
+      ORTHOGONAL_DIRECTIONS
         .map((dir) => ({ x: ghoul.x + dir.x, y: ghoul.y + dir.y }))
         .filter((p) =>
           p.x >= 0 && p.y >= 0 && p.x < WITCH_DOCTOR_BOARD_SIZE && p.y < WITCH_DOCTOR_BOARD_SIZE)

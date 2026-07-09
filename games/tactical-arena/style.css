@@ -290,11 +290,15 @@ body.tutorial-spotlight-mp .dialogue-layer {
 
 /* Father Time choice pop-up (Age stat pick / Rewind fallen-ally pick) — reuses the
    .ref-modal backdrop + .ref-card shell. */
-.choice-modal .choice-card { width:min(27.5rem,94vw); }
+.choice-modal .choice-card { width:min(33rem,94vw); }
 .choice-head { padding:.9rem 1.1rem .7rem; border-bottom:1px solid var(--parchment-edge); background:linear-gradient(180deg,var(--console-hi),var(--console-lo)); }
 .choice-title { margin:0 0 .3rem; color:var(--brass-hi); font:800 1rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }
 .choice-sub { margin:0; color:var(--text); opacity:.8; font-size:.82rem; line-height:1.4; }
 .choice-list { display:flex; flex-direction:column; gap:.5rem; padding:1rem 1.1rem; overflow-y:auto; }
+.choice-group { display:grid; gap:.4rem; min-width:0; }
+.choice-group + .choice-group { padding-top:.2rem; border-top:1px solid rgba(188,214,236,.14); }
+.choice-group-title { margin:0; color:color-mix(in srgb,var(--team,var(--brass)) 62%,var(--muted)); font:800 .62rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.choice-group-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(11rem,1fr)); gap:.5rem; }
 .choice-option { display:flex; align-items:center; gap:.7rem; width:100%; padding:.6rem .8rem; border:1px solid var(--brass); border-radius:10px; background:linear-gradient(180deg,var(--btn-hi),var(--btn-lo)); color:var(--text); cursor:pointer; text-align:left; transition:transform .08s ease,border-color .1s,box-shadow .1s; }
 .choice-option:hover { transform:translateY(-1px); border-color:var(--team,var(--brass-hi)); box-shadow:0 6px 16px rgba(0,0,0,.4); }
 .choice-option.has-portrait .unit-portrait { width:2.875rem; height:2.875rem; flex:0 0 auto; border:1px solid var(--brass); border-radius:8px; overflow:hidden; }
