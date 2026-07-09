@@ -22,11 +22,7 @@ plus several hand-placed **Ghoul** obstacles that guard the swamp. Reward:
 **No unit unlocked from a later mission is assumed here** — the intended
 answer, like Mission 1 and 2, is a **base-roster** unit. Per
 `STARTER_UNIT_TYPES` (`progression/unlocks.js`), the actually-always-
-available roster is just **Swordsman, Archer, Mystic, Magician** — Paladin
-is *not* a starter unit and shouldn't be assumed available for this
-mission's puzzle (it, Sniper, and everything else sit behind their own
-unlocks, none of which are guaranteed cleared by this point in the
-campaign). This mission's intended pick is the **Archer**.
+available roster is just **Swordsman, Archer, Mystic, Magician** — This mission's intended pick is the **Archer**.
 
 Board: suggest **15×15** — the biggest campaign board yet, needed for a
 gauntlet with real length. Mission 1 was 11, Mission 2 was 13.
@@ -36,29 +32,36 @@ puzzle, so don't pre-select a "correct" pick.
 
 ## The puzzle (what the player has to figure out)
 
-The swamp is built from two hazards that reuse existing engine rules in a
-new combination, and the Archer's kit is the one already in the roster that
-answers both cleanly.
+**This is not a maze.** There's no branching corridor network and no dedicated
+wall geometry anywhere in this mission. It's a single open swamp laid out more
+like a **regular grid/lattice of hazards** than a hand-carved path: Ghouls and
+permanent fire tiles are placed in a repeating pattern (e.g. alternating rows/
+columns, or a checkerboard-style spacing) across the open board between the
+Archer's spawn and the Witch Doctor, so that only a **small, regularly-spaced
+set of tiles is actually safe to stand on** — everywhere else is either
+occupied by a Ghoul or burning. The puzzle is reading the grid's safe-tile
+pattern and threading it, not navigating branching maze passages.
 
-1. **Ghouls are the maze walls.** There's no dedicated wall geometry in this
-   mission — hand-placed Ghouls do double duty as the maze structure, for
-   free, off two rules that already exist:
+1. **Ghouls remove tiles from play, they don't build corridors.** Off two
+   rules that already exist:
    - They **occupy tiles**, so `getLegalMoves` already treats them as
-     impassable the same as any unit — a cluster of Ghouls blocks a
-     corridor just by standing in it.
+     impassable the same as any unit — each Ghoul is one less tile in an
+     already-sparse safe set, not a wall segment in a maze layout.
    - They **block physical ranged line of sight.** `isShotBlocked`
      (`rules/combat.js`) already stops any physical strike — basic attacks,
      Poison Arrow, Leg Shot — if *any* unit, friend or foe, stands between
      attacker and target. A Ghoul standing between the Archer and the Witch
      Doctor doesn't just occupy space, it blinds the Archer's straight shot
      entirely (`TARGET_OBSTRUCTED`).
-2. **Fire tiles are the hazard, not the structure.** Fire tiles don't block
-   movement or LOS (`applyFireTick` never gates either) — they only punish
-   standing on them, 1 true damage per turn rollover, and (per the mission
-   spec) never expire (`permanent: true`, already supported by the engine —
-   see Implementation notes). Ring them around the Ghoul clusters so the
-   "walk around the blocker instead of clearing it" option costs HP instead
-   of being free.
+2. **Fire tiles remove even more tiles from play.** Fire tiles don't block
+   movement or LOS (`applyFireTick` never gates either) — a player CAN stand
+   on one — but they punish it, 1 true damage per turn rollover, and (per the
+   mission spec) never expire (`permanent: true`, already supported by the
+   engine — see Implementation notes). Placed densely around and between the
+   Ghoul clusters, fire tiles shrink the safe-tile set further, so the
+   remaining walkable-for-free ground is a thin, specific set of tiles rather
+   than an open corridor. Walking off that set is always a choice to eat
+   burn damage, not a blocked move.
 3. **The Archer's Volley Shot is the answer to the body-block wall.** Per
    the CLAUDE.md targeting model, Volley Shot's cone is **true damage** and
    is explicitly *not* gated by `isShotBlocked` (only `(damageType ??
@@ -184,8 +187,9 @@ Bonus:
   countdown/expiry entirely), no engine change needed. `positionKey` is
   exported from `rules/movement.js` and formats as `"x,y"`, matching the key
   `applyFireTick` splits on.
-- **No wall tileObjects in this mission** — Ghoul bodies are the maze
-  structure (see puzzle point 1), so there's nothing to author or test on
+- **No wall tileObjects in this mission** — Ghoul bodies plus fire tiles are
+  what shrink the safe-tile set (see puzzle points 1-2); there's no separate
+  maze/corridor geometry to author, so there's nothing to author or test on
   the destructible-wall path. Keep it that way unless the fire/Ghoul-only
   gauntlet plays too flat in practice; `attackWall`/wall tileObjects exist
   and would slot in later without new engine work if needed.
@@ -211,13 +215,19 @@ Bonus:
   since this is the first time a Ghoul exists with no Necromancer on the
   board at all.
 - **Layout authoring:** plain `positions` map like Mission 1/2, but larger —
-  hand-place the Witch Doctor at the far side, Ghoul clusters at the
-  natural chokepoints between spawn and him, fire tiles filling the "go
-  around" tiles so the direct (blocked) line and the detour are both
-  costly in different currencies (a rejected shot vs. burn damage), forcing
-  an actual Volley Shot decision rather than a free walk-around. Sketch the
-  layout in the sandbox tool (`sandbox.html`) first — it already supports
-  placing units and fire and exporting the scenario as JSON, which drops
+  hand-place the Witch Doctor at the far side, then lay Ghouls and permanent
+  fire tiles out in a **regular grid/lattice pattern** across the open board
+  (e.g. hazards on every other row, or a checkerboard spacing) rather than
+  loose/random dense placement, so the safe tiles read as a clear repeating
+  pattern the player can pick out at a glance. **Not** a branching maze/
+  corridor layout — there is no wall geometry here, just a gridded hazard
+  field. Leave a Ghoul (or a cluster of two) standing directly in the
+  straight line between the Archer's spawn and the Witch Doctor so the
+  blocked-shot lesson (`TARGET_OBSTRUCTED`) actually lands, while the
+  grid's safe tiles route around rather than through that line — that's
+  what forces the real Volley Shot decision instead of a free walk-around.
+  Sketch the layout in the sandbox tool (`sandbox.html`) first — it already
+  supports placing units and fire and exporting the scenario as JSON, which drops
   straight into a `tests/campaign.test.js` fixture.
 - **Manifest entry:** `defaultSquad` omitted, `playerSlots: 1`,
   `enemySquad` for match-config purposes should probably just be

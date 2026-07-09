@@ -21,17 +21,20 @@ import { createPortrait } from "./portraits.js";
 import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
 import {
   CLOD_MISSION_ID,
+  MAX_CAMPAIGN_SQUAD_SIZE,
   campaignSquadSize,
   createCampaignMatchConfig,
   getCampaignMap,
-  normalizeCampaignSquad,
   resetCampaignProgress
 } from "../campaign/campaign.js";
 import { createTutorialMatchConfig, getNextTutorialId, getTutorialList, readProgress } from "../tutorials/basics.js";
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
-const DEFAULT_CAMPAIGN_SQUAD = Object.freeze(["mystic", "magician"]);
+
+function emptyCampaignSquad(size = MAX_CAMPAIGN_SQUAD_SIZE) {
+  return new Array(size).fill(null);
+}
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
 const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase tutorials, campaign stars, units, and skins.";
@@ -160,7 +163,8 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
   const campaignStars = $("[data-campaign-stars]", campaignScreen);
   const campaignStartBtn = $("[data-action='startCampaignMission']", campaignScreen);
   let selectedCampaignMissionId = CLOD_MISSION_ID;
-  let campaignSquad = [...DEFAULT_CAMPAIGN_SQUAD];
+  let campaignSquad = emptyCampaignSquad();
+  let selectedCampaignNode = null;
   let progressionAnnouncementRunning = false;
   screens.register("campaign", { el: campaignScreen, onEnter: renderCampaign });
 
@@ -178,10 +182,17 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     return UNIT_TYPE_KEYS.filter((type) => isUnitUnlocked(type, globalThis.localStorage));
   }
 
+  // Resizes the squad slot array to the mission's slot count WITHOUT inferring
+  // any pick — choosing a squad is part of the mission puzzle, so an unfilled
+  // slot stays null until the player explicitly chooses a unit for it.
   function normalizeCampaignSquadForProgress(slotCount = 2) {
     const unlocked = campaignUnlockedTypes();
-    campaignSquad = normalizeCampaignSquad(campaignSquad, slotCount)
-      .map((type, index) => unlocked.includes(type) ? type : (unlocked[index] ?? DEFAULT_SQUAD[index]));
+    const next = [];
+    for (let i = 0; i < slotCount; i += 1) {
+      const type = campaignSquad[i];
+      next.push(type && unlocked.includes(type) ? type : null);
+    }
+    campaignSquad = next;
   }
 
   function renderCampaign() {
@@ -191,6 +202,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       selectedCampaignMissionId = playable?.id ?? CLOD_MISSION_ID;
     }
     const selectedNode = map.nodes.find((node) => node.id === selectedCampaignMissionId) ?? map.nodes[0];
+    selectedCampaignNode = selectedNode;
     normalizeCampaignSquadForProgress(campaignSquadSize(selectedNode));
     campaignStars.textContent = `${map.totalStars} ★`;
     campaignMapHost.replaceChildren();
@@ -274,26 +286,41 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
       `<dt>Squad</dt><dd>${campaignSquadSize(node)} units</dd>` +
       `<dt>Reward</dt><dd>${(node?.rewardUnits ?? []).map(unitLabel).join(", ") || "TBD"}</dd>` +
       `</dl>`;
-    campaignStartBtn.disabled = !playable;
     campaignStartBtn.textContent = node?.status === "completed" ? "Replay Mission" : node?.comingSoon ? "Coming Soon" : "Start Mission";
     campaignStartBtn.dataset.missionId = node?.id ?? "";
+    updateCampaignStartAvailability();
+  }
+
+  function campaignSquadReady() {
+    return campaignSquad.length > 0 && campaignSquad.every((type) => typeof type === "string" && type);
+  }
+
+  function updateCampaignStartAvailability() {
+    const node = selectedCampaignNode;
+    const playable = node && (node.status === "available" || node.status === "completed") && !node.comingSoon;
+    campaignStartBtn.disabled = !playable || !campaignSquadReady();
   }
 
   function renderCampaignSquad() {
     campaignSquadHost.replaceChildren();
     campaignSquad.forEach((type, index) => {
-      const def = UNIT_TYPES[type];
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "campaign-squad-slot";
+      button.className = `campaign-squad-slot${type ? "" : " is-empty"}`;
       button.dataset.action = "chooseCampaignUnit";
       button.dataset.slot = String(index);
-      button.append(createPortrait(type, { variant: "is-chip", eager: true }));
       const copy = document.createElement("span");
-      copy.innerHTML = `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)}</i>`;
+      if (type) {
+        const def = UNIT_TYPES[type];
+        button.append(createPortrait(type, { variant: "is-chip", eager: true }));
+        copy.innerHTML = `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)}</i>`;
+      } else {
+        copy.innerHTML = `<b>Slot ${index + 1}</b><i>Choose a unit…</i>`;
+      }
       button.append(copy);
       campaignSquadHost.append(button);
     });
+    updateCampaignStartAvailability();
   }
 
   async function chooseCampaignUnit(slot) {
@@ -501,7 +528,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     resetUnlockProgress(globalThis.localStorage);
     resetCampaignProgress(globalThis.localStorage);
     resetProgressionAnnouncements(globalThis.localStorage);
-    campaignSquad = [...DEFAULT_CAMPAIGN_SQUAD];
+    campaignSquad = emptyCampaignSquad();
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
     for (const picker of hsPickers.values()) picker.setLoadout(DEFAULT_SQUAD);

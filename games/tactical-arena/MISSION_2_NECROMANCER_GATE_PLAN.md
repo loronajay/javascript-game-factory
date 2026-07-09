@@ -16,11 +16,17 @@ already-available roster, playing a pure antagonist role.
 Board: **13×13** (bigger than mission 1's 11, to give room for aura/spread
 radii and kiting).
 
-**No curated `defaultSquad`.** Mission 1 accidentally telegraphed its answer
-by pre-selecting the "correct" duo. For mission 2, leave `defaultSquad`
-unset so `createCampaignMatchConfig` falls through to the generic global
-default — the player has to actually draft into the right answer, not just
-accept a hint. Squad choice is part of the puzzle.
+**No pre-picked squad.** The campaign UI (`menuFlow.js`) now generically
+starts every mission with empty squad slots (`emptyCampaignSquad`) and gates
+the Start button on `campaignSquadReady()` — the player must explicitly pick
+a unit for every slot before a mission can start, regardless of any
+`defaultSquad` a mission's data declares. This already applies to mission 1;
+mission 2 gets it for free and needs no special-casing. (`defaultSquad` on
+`CLOD_MISSION_ID` still exists in `campaign.js` as a fallback the match-config
+builder reads if a squad is ever missing, but live play never hits it since
+the UI always supplies a fully-chosen squad.) The player has to actually
+draft into the right answer, not just accept a hint — squad choice is part
+of the puzzle.
 
 ## The puzzle (what the player has to figure out)
 
@@ -128,9 +134,10 @@ bonus ideas.)
   poisons both units; player spawn corner should give both a melee unit and
   a ranged/support unit a clean approach without forcing them through Virus's
   Cough range on turn one.
-- Manifest entry needs `defaultSquad` **omitted** (not just empty array —
-  confirm `createCampaignMatchConfig`'s `selectedSquad ?? mission.defaultSquad
-  ?? DEFAULT_SQUAD` fallback behaves correctly with the key absent),
+- Manifest entry needs no `defaultSquad` at all — the UI's empty-slot pattern
+  (see Premise) means the player always supplies an explicit squad, so there's
+  nothing for `createCampaignMatchConfig`'s `selectedSquad ?? mission.defaultSquad
+  ?? DEFAULT_SQUAD` fallback to fall through to in practice. Just needs
   `enemySquad: ["necromancer", "virus"]`, `size: 13`, plus `position`/
   `routeFrom`/`routeTo` map coordinates (already stubbed, just needs real
   coords once the campaign map layout is decided).
