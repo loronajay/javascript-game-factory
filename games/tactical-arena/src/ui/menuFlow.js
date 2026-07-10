@@ -9,8 +9,16 @@ import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 import { openSkinGallery } from "./skinGallery.js";
+import { openSkinPicker } from "./skinPicker.js";
+import { normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
-import { resetUnlockProgress, selectTutorialRewardSkin } from "../progression/unlocks.js";
+import {
+  getCampaignSkinRewardChoices,
+  isCampaignSkinRewardGranted,
+  resetUnlockProgress,
+  selectCampaignRewardSkin,
+  selectTutorialRewardSkin,
+} from "../progression/unlocks.js";
 import {
   resetProgressionAnnouncements,
   syncMissingUnitUnlockAnnouncements
@@ -22,6 +30,7 @@ import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.j
 import {
   CLOD_MISSION_ID,
   MAX_CAMPAIGN_SQUAD_SIZE,
+  WANDERING_PARTY_MISSION_ID,
   campaignSquadSize,
   createCampaignMatchConfig,
   getCampaignMap,
@@ -60,7 +69,7 @@ export function syncScreenMusic(audio, screenName) {
   else audio.startMusic("menu");
 }
 
-export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, openCodex, onLeaveMatch }) {
+export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
@@ -201,11 +210,23 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   let selectedCampaignMissionId = CLOD_MISSION_ID;
   let campaignSquad = emptyCampaignSquad();
   let campaignSquadMissionId = null;
+  // Skins are kept keyed by unit TYPE rather than slot index — normalizeCampaignSquad
+  // dedupes/reorders types, and a per-unit skin choice should survive that untouched.
+  let campaignSquadSkins = {};
   let selectedCampaignNode = null;
   let progressionAnnouncementRunning = false;
   let campaignMapResizeObserver = null;
   enableCampaignMapPanning(campaignMapHost);
-  screens.register("campaign", { el: campaignScreen, onEnter: renderCampaign });
+  // On entering the campaign map, render it, then hand off to the host so a pending
+  // post-mission sequence (The Wandering Party's farewell cutscene + skin reward pick)
+  // can run once the player has been routed back onto the map from the results screen.
+  screens.register("campaign", {
+    el: campaignScreen,
+    onEnter: () => {
+      renderCampaign();
+      void onCampaignMapEntered?.({ openCampaignRewardChoice });
+    },
+  });
 
   function showQueuedProgressionAnnouncements({ audit = false, delay = 0 } = {}) {
     if (progressionAnnouncementRunning) return;
@@ -413,7 +434,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       `<dt>Requires</dt><dd>${node?.requiredStars ?? 0} ★</dd>` +
       `<dt>Best</dt><dd>${node?.stars ? `${node.stars} / 3 ★` : "No clear"}</dd>` +
       `<dt>Squad</dt><dd>${campaignSquadSize(node)} units</dd>` +
-      `<dt>Reward</dt><dd>${(node?.rewardUnits ?? []).map(unitLabel).join(", ") || "TBD"}</dd>` +
+      `<dt>Reward</dt><dd>${escapeHtml((node?.rewardUnits ?? []).map(unitLabel).join(", ") || node?.rewardLabel || "TBD")}</dd>` +
       `</dl>`;
     campaignStartBtn.textContent = node?.status === "completed" ? "Replay Mission" : node?.comingSoon ? "Coming Soon" : "Start Mission";
     campaignStartBtn.dataset.missionId = node?.id ?? "";
@@ -437,9 +458,12 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     campaignSquad.forEach((type, index) => {
       // A slot is locked either by a whole-squad lock or by a per-slot pin (lockedSlots).
       const locked = squadLocked || Boolean(lockedSlots && lockedSlots[index] != null);
+      const wrap = document.createElement("div");
+      wrap.className = `campaign-squad-slot${type ? "" : " is-empty"}${locked ? " is-locked" : ""}`;
+
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `campaign-squad-slot${type ? "" : " is-empty"}${locked ? " is-locked" : ""}`;
+      button.className = "campaign-squad-slot-main";
       if (locked) {
         button.disabled = true;
       } else {
@@ -449,7 +473,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       const copy = document.createElement("span");
       if (type) {
         const def = UNIT_TYPES[type];
-        button.append(createPortrait(type, { variant: "is-chip", eager: true }));
+        const skin = normalizeSkinSlug(type, campaignSquadSkins[type]);
+        button.append(createPortrait(type, { variant: "is-chip", eager: true, skin }));
         copy.innerHTML = locked
           ? `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)} · Required</i>`
           : `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)}</i>`;
@@ -457,9 +482,31 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         copy.innerHTML = `<b>Slot ${index + 1}</b><i>Choose a unit…</i>`;
       }
       button.append(copy);
-      campaignSquadHost.append(button);
+      wrap.append(button);
+
+      // A skin choice pins to a *chosen appearance*, not the slot lock — even a
+      // locked slot's required unit can still wear any skin the player has unlocked.
+      if (type) {
+        const skinBtn = document.createElement("button");
+        skinBtn.type = "button";
+        skinBtn.className = "campaign-squad-skin-btn";
+        skinBtn.dataset.action = "chooseCampaignSkin";
+        skinBtn.dataset.type = type;
+        skinBtn.setAttribute("aria-label", `Change ${UNIT_TYPES[type]?.name ?? type} skin`);
+        skinBtn.textContent = "Skin";
+        wrap.append(skinBtn);
+      }
+      campaignSquadHost.append(wrap);
     });
     updateCampaignStartAvailability();
+  }
+
+  async function chooseCampaignSkin(type) {
+    if (!type) return;
+    const result = await openSkinPicker({ type, initial: campaignSquadSkins[type] ?? null, accent: TEAM_COLOR[1] });
+    if (!result) return;
+    campaignSquadSkins = { ...campaignSquadSkins, [type]: result.skin };
+    renderCampaignSquad();
   }
 
   async function chooseCampaignUnit(slot) {
@@ -494,6 +541,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
 
   const rematchBtn = $("[data-action='rematch']", results);
   const campaignMapBtn = $("[data-results='campaign-map']", results);
+  const resultsMainMenuBtn = $("[data-nav='mainMenu']", results);
 
   function showResults(summary) {
     const online = lastConfig?.mode === "online";
@@ -529,6 +577,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     addStat(stats, "Ended by", "Squad eliminated");
     // A finished online session can't be locally replayed — Main Menu only.
     syncResultsActions({ rematchBtn, campaignMapBtn }, { online, campaign });
+    // Some campaign missions (The Wandering Party) must route the player back through the
+    // map so a post-match cutscene + reward pick can run without the player escaping to
+    // the menu first. In that case Campaign Map is the only exit off the results screen.
+    if (resultsMainMenuBtn) resultsMainMenuBtn.hidden = Boolean(campaign?.forceMapReturn);
     showScreen("results");
     spawnConfetti(burstEl, TEAM_COLOR[summary.winner]);
     if (campaign?.victory) showQueuedProgressionAnnouncements({ delay: 550 });
@@ -621,6 +673,30 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     }
   }
 
+  // The Wandering Party's reward: pick ONE skin from the wandering pack. The grant is
+  // final (selectCampaignRewardSkin rejects a second pick), so the pack can't be farmed
+  // by replaying the mission. Called by the host after the post-match cutscene resolves.
+  async function openCampaignRewardChoice(packId) {
+    const choices = getCampaignSkinRewardChoices(packId);
+    if (!choices || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return;
+    const choice = await openChoiceModal({
+      title: "A Traveler's Gift",
+      subtitle: "The wandering party shares one costume from their packs. Choose a look — this choice is final.",
+      accent: TEAM_COLOR[1],
+      cancelLabel: "Decide Later",
+      choices: choices.map((reward) => ({
+        value: reward,
+        label: skinRewardLabel(reward),
+        sub: `${unitLabel(reward.type)} costume`,
+        type: reward.type,
+        skin: reward.slug,
+      })),
+    });
+    if (!choice) return;
+    selectCampaignRewardSkin(globalThis.localStorage, packId, choice);
+    if (screens.active === "campaign") renderCampaign();
+  }
+
   // ── Settings overlay ─────────────────────────────────────────────────────
   const settingsModal = $("#settingsModal");
   const soundToggle = $("#setSoundToggle", settingsModal);
@@ -673,6 +749,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     resetProgressionAnnouncements(globalThis.localStorage);
     campaignSquad = emptyCampaignSquad();
     campaignSquadMissionId = null;
+    campaignSquadSkins = {};
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
     tempoSpPickers.p1.setLoadout(DEFAULT_SQUAD);
@@ -736,8 +813,12 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         void chooseCampaignUnit(Number(actionBtn.dataset.slot) || 0);
         break;
       }
+      case "chooseCampaignSkin": {
+        void chooseCampaignSkin(actionBtn.dataset.type);
+        break;
+      }
       case "startCampaignMission": {
-        void startCampaignMatchTracked(createCampaignMatchConfig(actionBtn.dataset.missionId || selectedCampaignMissionId, campaignSquad));
+        void startCampaignMatchTracked(createCampaignMatchConfig(actionBtn.dataset.missionId || selectedCampaignMissionId, campaignSquad, campaignSquadSkins));
         break;
       }
       case "startTutorial": {

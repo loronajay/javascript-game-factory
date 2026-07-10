@@ -43,16 +43,20 @@ import {
   PALADIN_MISSION_ID,
   SNIPER_MISSION_ID,
   VIRUS_MISSION_ID,
+  WANDERING_PARTY_MISSION_ID,
+  WANDERING_PARTY_SKIN_PACK,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
   applyMonkTrialIntroBeat,
   campaignMapCutsceneScript,
   campaignOpeningScript,
+  campaignPostMatchCutsceneScript,
   clodRageWarningScript,
   completeCampaignMission,
   fatherTimeRageWarningScript,
   gargoyleRageWarningScript,
   markCampaignMapCutsceneSeen,
+  markCampaignPostMatchCutsceneSeen,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
@@ -63,6 +67,7 @@ import {
   prepareCampaignMatchState,
   sniperFireWarningScript,
   shouldShowCampaignMapCutscene,
+  shouldShowCampaignPostMatchCutscene,
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
   shouldShowGargoyleRageWarning,
@@ -86,6 +91,7 @@ import {
   witchDoctorGhoulWarningScript,
   witchDoctorRageWarningScript,
 } from "./campaign/campaign.js";
+import { isCampaignSkinRewardGranted } from "./progression/unlocks.js";
 import {
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
   TUTORIAL_BASICS_ID,
@@ -147,6 +153,10 @@ let pendingTutorialBeforeDialogueAction = null;
 let pendingTutorialAfterDialogueAction = null;
 let tutorialPresentationTimer = 0;
 let campaignMissionId = null;
+// Set at the end of a mission whose reward flow must run on the map (The Wandering
+// Party): { missionId, packId }. Consumed by onCampaignMapEntered when the player is
+// routed back to the campaign map from the results screen. Cleared once consumed.
+let pendingCampaignReward = null;
 let tempoFrame = 0;
 let tempoLastFrameAt = 0;
 // Cheap fingerprint of everything render() cares about beyond the readiness-gauge
@@ -314,7 +324,7 @@ const dialogue = createDialogueSystem(dialogueLayer, {
   onClose: render,
   onLineAction: handleDialogueLineAction,
 });
-const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, openCodex, onLeaveMatch });
+const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch });
 window.tacticalArenaDialogue = dialogue;
 
 // Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
@@ -426,6 +436,22 @@ async function onCampaignMissionSelected(missionId) {
 
 function onStartCampaignMission(config) {
   startMatch(config);
+}
+
+// Runs when the campaign map screen is entered. If a mission's reward flow is pending
+// (currently only The Wandering Party), play its post-match farewell cutscene — flag-
+// gated so it only shows once — then open the one-time skin reward pick. The player was
+// forced back here from the results screen so this sequence can't be skipped to the menu.
+async function onCampaignMapEntered({ openCampaignRewardChoice } = {}) {
+  const pending = pendingCampaignReward;
+  if (!pending) return;
+  pendingCampaignReward = null;
+  if (shouldShowCampaignPostMatchCutscene(globalThis.localStorage, pending.missionId)) {
+    const script = campaignPostMatchCutsceneScript(pending.missionId, state);
+    if (script.length) await dialogue.show(script);
+    markCampaignPostMatchCutsceneSeen(globalThis.localStorage, pending.missionId);
+  }
+  await openCampaignRewardChoice?.(pending.packId);
 }
 
 async function handleDialogueLineAction(action) {
@@ -662,6 +688,17 @@ function announceTurnChange(prevPlayer) {
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
     if (matchConfig?.mode === "campaign" && campaignMissionId) {
       summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
+      // The Wandering Party's skin reward runs on the map after results. Only queue it on
+      // a win whose reward hasn't already been granted, and force the results screen to
+      // route back through the map so the cutscene + reward pick can't be skipped.
+      if (
+        campaignMissionId === WANDERING_PARTY_MISSION_ID &&
+        state.winner === 1 &&
+        !isCampaignSkinRewardGranted(globalThis.localStorage, WANDERING_PARTY_SKIN_PACK)
+      ) {
+        pendingCampaignReward = { missionId: campaignMissionId, packId: WANDERING_PARTY_SKIN_PACK };
+        summary.campaign.forceMapReturn = true;
+      }
     }
     const showResults = () => {
       window.clearTimeout(resultsTimer);

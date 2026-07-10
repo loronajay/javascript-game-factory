@@ -337,18 +337,25 @@
 .campaign-rewards { display:grid; grid-template-columns:auto 1fr; gap:.38rem .8rem; margin:0; font-size:.8rem; }
 .campaign-rewards dt { color:var(--muted); }
 .campaign-rewards dd { margin:0; color:var(--text); font-weight:800; text-align:right; }
-.campaign-squad { display:grid; grid-template-columns:repeat(auto-fit,minmax(8rem,1fr)); gap:.55rem; }
-.campaign-squad-slot { display:flex; align-items:center; gap:.52rem; min-width:0; padding:.5rem; border:1px solid rgba(188,214,236,.25); border-radius:7px; color:var(--text); background:rgba(4,11,19,.38); cursor:pointer; text-align:left; }
-.campaign-squad-slot:hover { border-color:var(--brass); filter:brightness(1.1); transform:none; }
+/* auto-fill (not auto-fit) so a short final row's empty tracks stay reserved-but-blank
+   instead of handing their space to the last real item — otherwise a lone unit button
+   on its own row stretches to fill the whole row width. */
+.campaign-squad { display:grid; grid-template-columns:repeat(auto-fill,minmax(8rem,1fr)); gap:.55rem; }
+.campaign-squad-slot { display:flex; flex-direction:column; gap:.32rem; min-width:0; padding:.5rem; border:1px solid rgba(188,214,236,.25); border-radius:7px; color:var(--text); background:rgba(4,11,19,.38); }
+.campaign-squad-slot:hover { border-color:var(--brass); filter:brightness(1.1); }
+.campaign-squad-slot-main { display:flex; align-items:center; gap:.52rem; min-width:0; padding:0; border:0; background:none; color:inherit; cursor:pointer; text-align:left; font:inherit; }
+.campaign-squad-slot-main:disabled { cursor:default; }
 .campaign-squad-slot .unit-portrait.is-chip { width:2.5rem; height:2.95rem; border-radius:5px; }
-.campaign-squad-slot span { display:grid; min-width:0; }
-.campaign-squad-slot b { color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
-.campaign-squad-slot i { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-style:normal; font-weight:800; }
+.campaign-squad-slot-main span { display:grid; min-width:0; }
+.campaign-squad-slot-main b { color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+.campaign-squad-slot-main i { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-style:normal; font-weight:800; }
 .campaign-squad-slot.is-empty { border-style:dashed; border-color:rgba(188,214,236,.4); background:rgba(4,11,19,.2); }
 .campaign-squad-slot.is-empty i { color:var(--muted); font-weight:600; }
-.campaign-squad-slot.is-locked { cursor:default; opacity:.85; }
+.campaign-squad-slot.is-locked { opacity:.85; }
 .campaign-squad-slot.is-locked:hover { border-color:rgba(188,214,236,.25); filter:none; }
 .campaign-squad-slot.is-locked i { color:var(--brass); }
+.campaign-squad-skin-btn { align-self:flex-start; padding:.16rem .5rem; border:1px solid rgba(188,214,236,.3); border-radius:5px; background:rgba(4,11,19,.3); color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.campaign-squad-skin-btn:hover { border-color:var(--brass); color:var(--text); }
 @media (max-width:760px) {
   .campaign-card { min-height:0; padding:1rem; }
   .campaign-head { flex-direction:column; }

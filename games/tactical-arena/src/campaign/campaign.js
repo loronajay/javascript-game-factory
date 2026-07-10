@@ -18,6 +18,10 @@ export const PALADIN_MISSION_ID = "wandering-paladin";
 export const MONK_MISSION_ID = "monk-temple-trial";
 export const GARGOYLE_MISSION_ID = "gargoyle-inferno";
 export const SNIPER_MISSION_ID = "sniper-highground";
+export const WANDERING_PARTY_MISSION_ID = "wandering-party";
+// The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
+// pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
+export const WANDERING_PARTY_SKIN_PACK = "wandering";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -171,6 +175,27 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 13,
     fullHp: true,
   },
+  // The Wandering Party (13×13): a friendly, standard 4v4 duel with no puzzle and no
+  // per-objective grading — a win is a flat 3 stars. Its reward is a SKIN, not a unit
+  // (rewardUnits is empty; rewardSkinPack points at the "wandering" pack). The enemy
+  // party wears the wandering skins (applied by the layout's skinFor). This mission owns
+  // two flag-gated cutscenes: an overworld meeting BEFORE the brief, and a post-match
+  // farewell AFTER the results screen that leads into the one-time skin reward pick.
+  [WANDERING_PARTY_MISSION_ID]: {
+    id: WANDERING_PARTY_MISSION_ID,
+    title: "The Wandering Party",
+    subtitle: "Four travelers offer a friendly wager",
+    description: "A party of wanderers blocks the road with a grin and a challenge: beat them in a fair four-on-four and they will gift you a traveler's costume. Bring any squad you like.",
+    unitType: "swordsman",
+    requiredStars: 18,
+    rewardUnits: Object.freeze([]),
+    rewardLabel: "A traveler's costume",
+    rewardSkinPack: WANDERING_PARTY_SKIN_PACK,
+    playerSlots: 4,
+    enemySquad: Object.freeze(["swordsman", "archer", "mystic", "magician"]),
+    size: 13,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -216,8 +241,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "A low ruin mouth exhales heat from beneath the flats. Something stone-winged waits in the old dark." },
   { id: SNIPER_MISSION_ID, cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "plateau", locationName: "The High Cliffs",
     blurb: "Flat cliffs and long sightlines. Whoever holds the plateau's height holds every lane across it." },
-  { id: "uncharted-11", cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood",
-    blurb: "A forest burned to charcoal spires. Everything here is kindling, including the plans." },
+  { id: WANDERING_PARTY_MISSION_ID, cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood" },
   { id: "uncharted-12", cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves",
     blurb: "Living green at last. The canopy blocks arrows and hides watchers with longbows." },
   { id: "uncharted-13", cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "wood", locationName: "Elderroot",
@@ -243,7 +267,7 @@ const CAMPAIGN_TRAIL = [
 const CAMPAIGN_FORKS = [
   [WITCH_DOCTOR_MISSION_ID, "uncharted-12"],
   ["uncharted-06", "uncharted-09"],
-  ["uncharted-11", "uncharted-18"],
+  [WANDERING_PARTY_MISSION_ID, "uncharted-18"],
 ];
 
 function placeholderMission(stop, trailIndex) {
@@ -316,6 +340,7 @@ function progressFallback() {
     completedMissions: [],
     missionStars: {},
     seenMapCutscenes: [],
+    seenPostMatchCutscenes: [],
   };
 }
 
@@ -323,6 +348,7 @@ export function normalizeCampaignProgress(value = {}) {
   const missionIds = new Set(CAMPAIGN_MISSIONS.map((mission) => mission.id));
   const completedMissions = uniqueStrings(value.completedMissions).filter((id) => missionIds.has(id));
   const seenMapCutscenes = uniqueStrings(value.seenMapCutscenes).filter((id) => missionIds.has(id));
+  const seenPostMatchCutscenes = uniqueStrings(value.seenPostMatchCutscenes).filter((id) => missionIds.has(id));
   const missionStars = {};
   for (const mission of CAMPAIGN_MISSIONS) {
     const stars = Math.max(0, Math.min(3, Math.floor(Number(value.missionStars?.[mission.id]) || 0)));
@@ -331,7 +357,7 @@ export function normalizeCampaignProgress(value = {}) {
   for (const id of completedMissions) {
     missionStars[id] = Math.max(1, missionStars[id] ?? 0);
   }
-  return { completedMissions, missionStars, seenMapCutscenes };
+  return { completedMissions, missionStars, seenMapCutscenes, seenPostMatchCutscenes };
 }
 
 export function readCampaignProgress(storage = defaultStorage()) {
@@ -363,7 +389,26 @@ export function resetCampaignProgress(storage = defaultStorage()) {
   return progressFallback();
 }
 
+// The wandering party's dialogue portraits wear their "wandering" skins — the skin is
+// declared directly on each line (side/player/name too) since these cutscenes play on the
+// overworld map with no live match units to read a skin off of.
+const WANDERING_LINE = Object.freeze({ skin: "wandering", side: "right", player: 2 });
+
 export function campaignMapCutsceneScript(missionId) {
+  if (missionId === WANDERING_PARTY_MISSION_ID) {
+    return [
+      { ...WANDERING_LINE, type: "swordsman", name: "Wandering Swordsman",
+        text: "Ho there, travelers! Easy — we mean no trouble. We are wanderers, same as you, just passing through Cinderwood." },
+      { speaker: "swordsman", side: "left",
+        text: "Wanderers, and yet you have the whole road blocked." },
+      { ...WANDERING_LINE, type: "mystic", name: "Wandering Mystic",
+        text: "Only for a moment. The road is long and dull. How about a friendly bout to pass the time? Four of us, four of you." },
+      { ...WANDERING_LINE, type: "archer", name: "Wandering Archer",
+        text: "Win, and we will gift you one of the costumes we have gathered on our travels. A little souvenir of the meeting." },
+      { speaker: "swordsman", side: "left",
+        text: "A new look and a good scrap? You have a deal." },
+    ];
+  }
   if (missionId === GARGOYLE_MISSION_ID) {
     return [
       {
@@ -412,6 +457,38 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
   return writeCampaignProgress(storage, {
     ...current,
     seenMapCutscenes: [...current.seenMapCutscenes, missionId],
+  });
+}
+
+// Post-match cutscene: the beat that plays AFTER the results screen (once the player is
+// forced back onto the map) and BEFORE the skin reward pick. Flag-gated by the same
+// seen-list pattern the overworld map cutscene uses, but tracked separately per mission
+// so the two cutscenes never burn each other's flag.
+export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId !== WANDERING_PARTY_MISSION_ID) return [];
+  return [
+    { ...WANDERING_LINE, type: "mystic", name: "Wandering Mystic",
+      text: "Well fought! Truly. You have real skill — the road is safer with a party like yours walking it." },
+    { speaker: "swordsman", side: "left",
+      text: "You did not make it easy on us. Not for a moment." },
+    { ...WANDERING_LINE, type: "swordsman", name: "Wandering Swordsman",
+      text: "Ha! We have more wandering ahead of us, but a promise is a promise. Take a costume from our packs and wear it well." },
+    { ...WANDERING_LINE, type: "archer", name: "Wandering Archer",
+      text: "Safe travels, friends. Perhaps our roads will cross again someday." },
+  ];
+}
+
+export function shouldShowCampaignPostMatchCutscene(storage = defaultStorage(), missionId) {
+  return campaignPostMatchCutsceneScript(missionId).length > 0 &&
+    !readCampaignProgress(storage).seenPostMatchCutscenes.includes(missionId);
+}
+
+export function markCampaignPostMatchCutsceneSeen(storage = defaultStorage(), missionId) {
+  const current = readCampaignProgress(storage);
+  if (current.seenPostMatchCutscenes.includes(missionId)) return current;
+  return writeCampaignProgress(storage, {
+    ...current,
+    seenPostMatchCutscenes: [...current.seenPostMatchCutscenes, missionId],
   });
 }
 
@@ -517,7 +594,7 @@ export function applyLockedSlots(squad, mission) {
   return out;
 }
 
-export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedSquad = null) {
+export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedSquad = null, selectedSkins = null) {
   const mission = getCampaignMission(missionId);
   if (!mission || mission.comingSoon) throw new Error(`Campaign mission is not playable: ${missionId}`);
   // squadLocked missions test a specific unit's kit, not squad choice — the authored
@@ -539,9 +616,16 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
       1: playerSquad,
       2: [...mission.enemySquad],
     },
+    // Skins are chosen by the player keyed by unit TYPE (see menuFlow.js), matched
+    // back onto the normalized squad's slot order here for buildRoster.
+    skins: {
+      1: playerSquad.map((type) => selectedSkins?.[type] ?? null),
+    },
     teamNames: {
       1: "Player Vanguard",
-      2: mission.id === SNIPER_MISSION_ID
+      2: mission.id === WANDERING_PARTY_MISSION_ID
+        ? "The Wanderers"
+        : mission.id === SNIPER_MISSION_ID
         ? "The High Guard"
         : mission.id === FATHER_TIME_MISSION_ID
         ? "Timeless Court"
@@ -750,24 +834,26 @@ export function applyMonkTrialIntroBeat(state, beat) {
 }
 
 // The High Ground plateau (13×13): destructible cover walls (hp 1) and permanent
-// cliff-fire tiles scattered through the contested midfield. Walls block both physical
-// and magic sightlines (isWallBetween) and are the "destroy a wall" objective's targets;
-// the permanent fire never burns out, so "avoid fire damage" is a full-match route
-// constraint. Neither set sits on a spawn tile (see SNIPER_MISSION_ID layout below).
+// cliff-fire tiles spread across the whole board, not clustered into one lane — the
+// plateau should read as a contested field with cover and hazards in every quadrant.
+// Walls block both physical and magic sightlines (isWallBetween) and are the
+// "destroy a wall" objective's targets; the permanent fire never burns out, so
+// "avoid fire damage" is a full-match route constraint. Neither set sits on or beside
+// a spawn tile (see SNIPER_MISSION_ID's standard-formation layout below).
 const SNIPER_WALL_POSITIONS = Object.freeze([
-  Object.freeze({ x: 4, y: 9 }),
-  Object.freeze({ x: 6, y: 6 }),
-  Object.freeze({ x: 5, y: 7 }),
-  Object.freeze({ x: 7, y: 5 }),
-  Object.freeze({ x: 8, y: 4 }),
+  Object.freeze({ x: 3, y: 9 }),
+  Object.freeze({ x: 9, y: 3 }),
+  Object.freeze({ x: 2, y: 2 }),
+  Object.freeze({ x: 10, y: 10 }),
+  Object.freeze({ x: 6, y: 7 }),
 ]);
 const SNIPER_FIRE_POSITIONS = Object.freeze([
-  Object.freeze({ x: 6, y: 9 }),
-  Object.freeze({ x: 3, y: 8 }),
-  Object.freeze({ x: 5, y: 5 }),
-  Object.freeze({ x: 7, y: 7 }),
-  Object.freeze({ x: 9, y: 6 }),
-  Object.freeze({ x: 6, y: 3 }),
+  Object.freeze({ x: 7, y: 2 }),
+  Object.freeze({ x: 2, y: 7 }),
+  Object.freeze({ x: 10, y: 4 }),
+  Object.freeze({ x: 4, y: 10 }),
+  Object.freeze({ x: 6, y: 6 }),
+  Object.freeze({ x: 9, y: 9 }),
 ]);
 
 // Each campaign mission owns a spawn layout: hardcoded coordinates for the fixed
@@ -867,25 +953,31 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fullHp: true,
     missionRules: () => ({ randomFire: { sourceId: "p2-0-gargoyle", turnsLeft: 3 } }),
   },
-  // The High Ground of the Sniper (13×13): a full-HP 2v2. The Archer (pinned to slot
-  // one) and her chosen ally start in the near corner; the enemy Sniper holds the high
-  // backline with Clod pushed forward as a wall. Cover walls + permanent cliff-fire are
-  // scattered through the midfield (see SNIPER_WALL/FIRE_POSITIONS above).
+  // The High Ground of the Sniper (13×13): a full-HP 2v2 on the STANDARD corner
+  // formation — the Archer (pinned to slot one) and her chosen ally spawn in the
+  // player's usual corner block, the enemy Sniper and Clod spawn in theirs, same as
+  // every other default-formation mission. Cover walls + permanent cliff-fire are
+  // scattered across the whole board (see SNIPER_WALL/FIRE_POSITIONS above).
   [SNIPER_MISSION_ID]: {
-    positions: {
-      "p1-0-archer": { x: 2, y: 10 },
-      "p2-0-sniper": { x: 10, y: 2 },
-      "p2-1-clod": { x: 9, y: 4 },
-    },
-    fallback: (unit) =>
-      unit.player === 1
-        ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 1, y: 11 })
-        : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 9, y: 4 }),
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
     fullHp: true,
     tileObjects: () => ({
       ...Object.fromEntries(SNIPER_WALL_POSITIONS.map((position) => [positionKey(position), { kind: "wall", hp: 1 }])),
       ...Object.fromEntries(SNIPER_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])),
     }),
+  },
+  // The Wandering Party (13×13): a plain full-HP 4v4 on the default corner blocks. The
+  // only twist is skinFor, which paints the enemy party in its "wandering" skins so the
+  // travelers read as the costumed party the cutscenes describe (board sprites + any
+  // dialogue portrait that reads a live unit's skin). skinFor bypasses the account
+  // unlock gate on purpose — the player has not earned these skins yet, they are just
+  // seeing the wanderers wear them.
+  [WANDERING_PARTY_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    skinFor: (unit) => (unit.player === 2 ? "wandering" : unit.skin ?? null),
   },
 });
 
@@ -906,6 +998,7 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       mp: definition.stats.maxMp,
       spent: false,
       defending: false,
+      ...(layout.skinFor ? { skin: layout.skinFor(unit) } : {}),
     };
   });
   const trial = layout.prepareTrial?.(match, units) ?? { units, rngState: match.rngState, missionRules: null };
@@ -1086,6 +1179,16 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       fireDamageTakenCount,
       gargoyleEnteredRage,
     };
+  } else if (missionId === WANDERING_PARTY_MISSION_ID) {
+    // A friendly duel with no puzzle: winning is the whole objective. All three stars are
+    // tied to the win so a victory is a flat 3/3, and there is no bonus objective.
+    objectives = [
+      { id: "complete", label: "Win the friendly challenge", earned: victory },
+      { id: "bestParty", label: "Best all four wanderers", earned: victory },
+      { id: "costume", label: "Earn the traveler's costume", earned: victory },
+    ];
+    bonusObjectives = [];
+    extra = { rewardSkinPack: mission?.rewardSkinPack ?? WANDERING_PARTY_SKIN_PACK };
   } else if (missionId === SNIPER_MISSION_ID) {
     const wallDestroyedCount = Math.max(0, Math.floor(Number(meta.wallDestroyedCount) || 0));
     const fireDamageTakenCount = Math.max(0, Math.floor(Number(meta.fireDamageTakenCount) || 0));

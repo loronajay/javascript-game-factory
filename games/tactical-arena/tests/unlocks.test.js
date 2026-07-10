@@ -6,9 +6,14 @@ import {
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
   TUTORIAL_PROGRESS_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
+  WANDERING_SKIN_PACK_ID,
+  getCampaignSkinReward,
+  getCampaignSkinRewardChoices,
+  isCampaignSkinRewardGranted,
   isProgressSkinUnlocked,
   readUnlockProgress,
   resetUnlockProgress,
+  selectCampaignRewardSkin,
   selectTutorialRewardSkin
 } from "../src/progression/unlocks.js";
 import {
@@ -85,6 +90,56 @@ test("skin reward cannot be selected before every tutorial is complete", () => {
   assert.equal(selected.accepted, false);
   assert.equal(selected.errorCode, "TUTORIAL_REWARD_LOCKED");
   assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), false);
+});
+
+test("wandering skin pack offers the four wandering skins", () => {
+  assert.deepEqual(getCampaignSkinRewardChoices(WANDERING_SKIN_PACK_ID), [
+    { type: "swordsman", slug: "wandering" },
+    { type: "archer", slug: "wandering" },
+    { type: "mystic", slug: "wandering" },
+    { type: "magician", slug: "wandering" },
+  ]);
+  assert.equal(getCampaignSkinRewardChoices("no-such-pack"), null);
+});
+
+test("selecting a campaign reward unlocks exactly that skin and is a final one-time grant", () => {
+  const storage = storageAdapter();
+  assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
+
+  const first = selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "archer", slug: "wandering" });
+  assert.equal(first.accepted, true);
+  assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), true);
+  assert.deepEqual(getCampaignSkinReward(storage, WANDERING_SKIN_PACK_ID), { type: "archer", slug: "wandering" });
+  // Only the chosen skin unlocks — the rest of the pack stays locked (no grinding).
+  assert.equal(isProgressSkinUnlocked("archer", "wandering", storage), true);
+  assert.equal(isProgressSkinUnlocked("swordsman", "wandering", storage), false);
+  assert.equal(getSkin("archer", "wandering", storage)?.unlocked, true);
+  assert.equal(normalizeSkinSlug("archer", "wandering", storage), "wandering");
+
+  // A second pick is rejected — the choice is final, even for a different skin.
+  const second = selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "swordsman", slug: "wandering" });
+  assert.equal(second.accepted, false);
+  assert.equal(second.errorCode, "CAMPAIGN_REWARD_ALREADY_GRANTED");
+  assert.equal(isProgressSkinUnlocked("swordsman", "wandering", storage), false);
+});
+
+test("campaign reward rejects unknown packs and off-pack choices", () => {
+  const storage = storageAdapter();
+  assert.equal(selectCampaignRewardSkin(storage, "bogus", { type: "archer", slug: "wandering" }).errorCode, "INVALID_SKIN_PACK");
+  assert.equal(selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "paladin", slug: "count" }).errorCode, "INVALID_CAMPAIGN_REWARD");
+  assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
+});
+
+test("campaign reward skin survives a read/write round trip and reset clears it", () => {
+  const storage = storageAdapter();
+  selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "mystic", slug: "wandering" });
+  const reread = readUnlockProgress(storage);
+  assert.deepEqual(reread.campaignRewardSkins[WANDERING_SKIN_PACK_ID], { type: "mystic", slug: "wandering" });
+  assert.ok(reread.unlockedSkins.some((skin) => skin.type === "mystic" && skin.slug === "wandering"));
+
+  resetUnlockProgress(storage);
+  assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
+  assert.equal(isProgressSkinUnlocked("mystic", "wandering", storage), false);
 });
 
 test("resetting progress clears stored tutorial unlocks and returns to a fresh profile", () => {
