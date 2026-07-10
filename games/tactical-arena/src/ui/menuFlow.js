@@ -57,7 +57,7 @@ export function campaignUnitChoiceGroups(unlockedTypes = [], squad = [], slot = 
     choices: group.types.map((type) => ({
       value: type,
       label: UNIT_TYPES[type].name,
-      sub: "Unlocked",
+      sub: UNIT_TYPES[type].classType,
       type,
     })),
   }));
@@ -516,7 +516,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       .map((type) => ({
         value: type,
         label: UNIT_TYPES[type].name,
-        sub: `${UNIT_TYPES[type].classType} · unlocked`,
+        sub: UNIT_TYPES[type].classType,
         type,
       }));
     const picked = await openChoiceModal({
