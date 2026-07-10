@@ -38,22 +38,33 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  PALADIN_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
+  campaignMapCutsceneScript,
   campaignOpeningScript,
   clodRageWarningScript,
   completeCampaignMission,
   fatherTimeRageWarningScript,
+  markCampaignMapCutsceneSeen,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
+  paladinDefeatScript,
+  paladinLightseekerWarningScript,
+  paladinRageWarningScript,
+  paladinStatusTauntScript,
   prepareCampaignMatchState,
+  shouldShowCampaignMapCutscene,
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowPaladinLightseekerWarning,
+  shouldShowPaladinRageWarning,
+  shouldShowPaladinStatusTaunt,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
@@ -193,6 +204,13 @@ function createCampaignMeta() {
     virusPoisonWarningShown: false,
     virusEnemyStatusTauntShown: false,
     playerAfflictedEnemyStatus: false,
+    // Paladin (mission 6)
+    paladinLightseekerWarningShown: false,
+    paladinStatusTauntShown: false,
+    paladinRageWarningShown: false,
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+    paladinDefeatDialogueShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -272,7 +290,7 @@ const rulesModal = new RulesModal(refModal, document.querySelector("#refCloseBtn
 const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
 const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
 const dialogue = createDialogueSystem(dialogueLayer, { getState: () => state, onOpen: render, onClose: render });
-const menu = createMenuFlow({ audio, onStartMatch: startMatch, openCodex, onLeaveMatch });
+const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, openCodex, onLeaveMatch });
 window.tacticalArenaDialogue = dialogue;
 
 // Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
@@ -368,6 +386,16 @@ function setMessage(text, isError = false) {
 }
 
 // --- Match lifecycle ---
+
+async function onStartCampaignMission(config) {
+  const missionId = config?.campaignMissionId;
+  if (missionId && shouldShowCampaignMapCutscene(globalThis.localStorage, missionId)) {
+    markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
+    const script = campaignMapCutsceneScript(missionId);
+    if (script.length) await dialogue.show(script);
+  }
+  startMatch(config);
+}
 
 function startMatch(config) {
   window.clearTimeout(resultsTimer);
@@ -571,8 +599,25 @@ function announceTurnChange(prevPlayer) {
     if (matchConfig?.mode === "campaign" && campaignMissionId) {
       summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
     }
-    window.clearTimeout(resultsTimer);
-    resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
+    const showResults = () => {
+      window.clearTimeout(resultsTimer);
+      resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
+    };
+    if (
+      campaignMissionId === PALADIN_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.paladinDefeatDialogueShown
+    ) {
+      campaignMeta.paladinDefeatDialogueShown = true;
+      const script = paladinDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
+    } else {
+      showResults();
+    }
   } else if (state.currentPlayer !== prevPlayer) {
     announceTurn(state.currentPlayer);
     if (net && state.currentPlayer !== mySeat) setMessage(`Player ${state.currentPlayer}'s turn — please wait.`);
@@ -620,7 +665,7 @@ function dispatch(command) {
   lastDispatchEvents = result.events ?? [];
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(result);
+  recordCampaignProgressHooks(prepared, result);
   broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
@@ -648,7 +693,7 @@ function recordCampaignRejection(command, result) {
   maybeShowCampaignDialogue();
 }
 
-function recordCampaignProgressHooks(result) {
+function recordCampaignProgressHooks(command, result) {
   if (matchConfig?.mode !== "campaign") return;
   const events = result.events ?? [];
   if (campaignMissionId === CLOD_MISSION_ID) {
@@ -725,8 +770,49 @@ function recordCampaignProgressHooks(result) {
         campaignMeta.rewindUsed = true;
       }
     }
+  } else if (campaignMissionId === PALADIN_MISSION_ID) {
+    for (const event of events) {
+      if (event.type === "ART_RESOLVED" && event.actorId === "p2-0-paladin" && event.artId === "lightseeker") {
+        const playerHits = (event.targetIds ?? []).filter((id) =>
+          findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0);
+        campaignMeta.paladinLightseekerDamageTakenCount += playerHits.length;
+      }
+    }
+    if (playerTriedStatusOnPaladin(command, events)) {
+      campaignMeta.paladinStatusAttempted = true;
+    }
   }
   maybeShowCampaignDialogue();
+}
+
+function playerTriedStatusOnPaladin(command, events = []) {
+  if (command?.type !== "USE_ART" || command.player !== 1) return false;
+  const actor = findUnit(state, command.unitId);
+  const art = actor ? getArt(actor.type, command.artId) : null;
+  if (!artHasStatusEffect(art)) return false;
+  if (command.targetId === "p2-0-paladin") return true;
+  const paladin = findUnit(state, "p2-0-paladin");
+  if (!paladin) return false;
+  if (!command.targetId && (art.selfCast || art.globalStatus || art.targeting?.shape === "selfAura")) return true;
+  return events.some((event) =>
+    event.type === "ART_RESOLVED" &&
+    event.actorId === command.unitId &&
+    (
+      event.targetId === "p2-0-paladin" ||
+      (event.targetIds ?? []).includes("p2-0-paladin") ||
+      (event.statusTargets ?? []).includes("p2-0-paladin") ||
+      (event.blinded ?? []).includes("p2-0-paladin")
+    ));
+}
+
+function artHasStatusEffect(value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.effect?.type === "status" || value.type === "status") return true;
+  if (typeof value.status === "string" && value.type !== "immunity") return true;
+  return Object.values(value).some((child) => {
+    if (Array.isArray(child)) return child.some(artHasStatusEffect);
+    return child && typeof child === "object" && artHasStatusEffect(child);
+  });
 }
 
 function playerLandedEnemyStatus(events) {
@@ -823,6 +909,26 @@ function nextCampaignDialogueBeat() {
       playerAfflictedEnemyStatus: campaignMeta.playerAfflictedEnemyStatus,
     })) {
       return { markShown: () => { campaignMeta.virusEnemyStatusTauntShown = true; }, script: virusEnemyStatusTauntScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === PALADIN_MISSION_ID) {
+    if (shouldShowPaladinLightseekerWarning(state, {
+      warningShown: campaignMeta.paladinLightseekerWarningShown,
+      lightseekerDamageTakenCount: campaignMeta.paladinLightseekerDamageTakenCount,
+    })) {
+      return { markShown: () => { campaignMeta.paladinLightseekerWarningShown = true; }, script: paladinLightseekerWarningScript };
+    }
+    if (shouldShowPaladinStatusTaunt(state, {
+      warningShown: campaignMeta.paladinStatusTauntShown,
+      statusAttempted: campaignMeta.paladinStatusAttempted,
+    })) {
+      return { markShown: () => { campaignMeta.paladinStatusTauntShown = true; }, script: paladinStatusTauntScript };
+    }
+    if (shouldShowPaladinRageWarning(state, {
+      warningShown: campaignMeta.paladinRageWarningShown,
+    })) {
+      return { markShown: () => { campaignMeta.paladinRageWarningShown = true; }, script: paladinRageWarningScript };
     }
     return null;
   }

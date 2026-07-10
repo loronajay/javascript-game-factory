@@ -13,6 +13,7 @@ export const NECROMANCER_MISSION_ID = "necromancer-rise";
 export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
 export const FATHER_TIME_MISSION_ID = "timeless-woods";
 export const VIRUS_MISSION_ID = "virus-root";
+export const PALADIN_MISSION_ID = "wandering-paladin";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -105,6 +106,19 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 11,
     fullHp: true,
   },
+  [PALADIN_MISSION_ID]: {
+    id: PALADIN_MISSION_ID,
+    title: "Wandering Paladin",
+    subtitle: "Lesson: light tiles, status immunity, and honorable duels",
+    description: "Choose one champion for a 1v1 duel against a traveling Paladin. Lightseeker punishes light tiles, Chosen shrugs off status tricks, and a melee victory earns his respect.",
+    unitType: "paladin",
+    requiredStars: 10,
+    rewardUnits: Object.freeze(["paladin"]),
+    playerSlots: 1,
+    enemySquad: Object.freeze(["paladin"]),
+    size: 5,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -141,7 +155,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "Ancient trees lean over a path where seconds fall like leaves. A clock-crowned keeper waits beside a patient archer." },
   { id: VIRUS_MISSION_ID, cell: { col: 4, row: 4 }, point: { x: 11.4, y: 44.7 }, region: "mire", locationName: "The Viral Root",
     blurb: "Where the swamp drains to the sea, the rot has roots. A poisonous squad waits in the black water." },
-  { id: "uncharted-06", cell: { col: 5, row: 4 }, point: { x: 29.1, y: 34.2 }, region: "coast", locationName: "Tidewatch Harbor",
+  { id: PALADIN_MISSION_ID, cell: { col: 5, row: 4 }, point: { x: 29.1, y: 34.2 }, region: "coast", locationName: "Tidewatch Harbor",
     blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
   { id: "uncharted-07", cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Saltbreak Pier",
     blurb: "Narrow jetties over deep water. Get shoved off and the sea keeps you." },
@@ -250,12 +264,14 @@ function progressFallback() {
   return {
     completedMissions: [],
     missionStars: {},
+    seenMapCutscenes: [],
   };
 }
 
 export function normalizeCampaignProgress(value = {}) {
   const missionIds = new Set(CAMPAIGN_MISSIONS.map((mission) => mission.id));
   const completedMissions = uniqueStrings(value.completedMissions).filter((id) => missionIds.has(id));
+  const seenMapCutscenes = uniqueStrings(value.seenMapCutscenes).filter((id) => missionIds.has(id));
   const missionStars = {};
   for (const mission of CAMPAIGN_MISSIONS) {
     const stars = Math.max(0, Math.min(3, Math.floor(Number(value.missionStars?.[mission.id]) || 0)));
@@ -264,7 +280,7 @@ export function normalizeCampaignProgress(value = {}) {
   for (const id of completedMissions) {
     missionStars[id] = Math.max(1, missionStars[id] ?? 0);
   }
-  return { completedMissions, missionStars };
+  return { completedMissions, missionStars, seenMapCutscenes };
 }
 
 export function readCampaignProgress(storage = defaultStorage()) {
@@ -294,6 +310,38 @@ export function resetCampaignProgress(storage = defaultStorage()) {
     // Best-effort reset.
   }
   return progressFallback();
+}
+
+export function campaignMapCutsceneScript(missionId) {
+  if (missionId !== PALADIN_MISSION_ID) return [];
+  return [
+    {
+      speaker: "paladin",
+      text: "Well met. I have been walking this map alone, and the road is better with a worthy party beside you.",
+    },
+    {
+      speaker: "swordsman",
+      text: "You want to join us?",
+    },
+    {
+      speaker: "paladin",
+      text: "Gladly, if your strongest ally can best me in a clean duel. One champion, one Paladin, no hard feelings.",
+    },
+  ];
+}
+
+export function shouldShowCampaignMapCutscene(storage = defaultStorage(), missionId) {
+  return campaignMapCutsceneScript(missionId).length > 0 &&
+    !readCampaignProgress(storage).seenMapCutscenes.includes(missionId);
+}
+
+export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionId) {
+  const current = readCampaignProgress(storage);
+  if (current.seenMapCutscenes.includes(missionId)) return current;
+  return writeCampaignProgress(storage, {
+    ...current,
+    seenMapCutscenes: [...current.seenMapCutscenes, missionId],
+  });
 }
 
 export function totalCampaignStars(progress) {
@@ -405,6 +453,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Timeless Court"
         : mission.id === VIRUS_MISSION_ID
         ? "Viral Root"
+        : mission.id === PALADIN_MISSION_ID
+        ? "Wandering Paladin"
         : mission.id === WITCH_DOCTOR_MISSION_ID
         ? "Swamp Coven"
         : mission.id === NECROMANCER_MISSION_ID
@@ -558,6 +608,19 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fallback: (unit) => ({ ...unit.position }),
     fullHp: true,
   },
+  // Wandering Paladin (5x5): a clean 1v1. The player's chosen champion starts in
+  // the near corner; the Paladin waits in the opposite corner on a default light
+  // tile so Lightseeker is immediately legible if the player also stands in light.
+  [PALADIN_MISSION_ID]: {
+    positions: {
+      "p2-0-paladin": { x: 4, y: 0 },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? { x: 0, y: 4 }
+        : { x: 4, y: 0 },
+    fullHp: true,
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -689,6 +752,26 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       draftedWitchDoctor,
       virusesDefeated,
       witchDoctorDefeated: Boolean(witchDoctor && witchDoctor.hp <= 0),
+    };
+  } else if (missionId === PALADIN_MISSION_ID) {
+    const paladinLightseekerDamageTakenCount = Math.max(0, Math.floor(Number(meta.paladinLightseekerDamageTakenCount) || 0));
+    const paladinStatusAttempted = Boolean(meta.paladinStatusAttempted);
+    const duelist = playerUnits[0] ?? null;
+    const draftedMelee = Boolean(duelist && getUnitType(duelist.type).classType === "melee");
+    const paladin = enemyUnits.find((unit) => unit.type === "paladin") ?? null;
+    objectives = [
+      complete,
+      { id: "noLightseeker", label: "Avoid Lightseeker damage", earned: victory && paladinLightseekerDamageTakenCount === 0 },
+      { id: "noStatus", label: "Do not try status effects on the Paladin", earned: victory && !paladinStatusAttempted },
+    ];
+    bonusObjectives = [
+      { id: "meleeDuel", label: "Bonus: win the challenge with a melee unit", earned: victory && draftedMelee },
+    ];
+    extra = {
+      paladinDefeated: Boolean(paladin && paladin.hp <= 0),
+      paladinLightseekerDamageTakenCount,
+      paladinStatusAttempted,
+      draftedMelee,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -1118,9 +1201,111 @@ export function virusEnemyStatusTauntScript(state) {
   ];
 }
 
+// --- Mission 6: Wandering Paladin dialogue ------------------------------------
+// The map cutscene introduces the traveler; these in-battle beats react to the
+// Paladin's kit as the duel unfolds.
+
+export function paladinMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const paladin = findUnit(state, "p2-0-paladin");
+  return [
+    {
+      speakerId: paladin?.id,
+      text: "One champion against one Paladin. Win, and I join your march as gladly as I drew my blade.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Then let's find out if worthy travels both ways.",
+    },
+  ];
+}
+
+export function shouldShowPaladinLightseekerWarning(state, { warningShown = false, lightseekerDamageTakenCount = 0 } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return Math.max(0, Math.floor(Number(lightseekerDamageTakenCount) || 0)) > 0;
+}
+
+export function paladinLightseekerWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const paladin = findUnit(state, "p2-0-paladin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: paladin?.id,
+      text: "Lightseeker finds anyone standing where the light approves. Convenient, is it not?",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Light spaces are not just decoration. Step off them or make him pay before he casts again.",
+    },
+  ];
+}
+
+export function shouldShowPaladinStatusTaunt(state, { warningShown = false, statusAttempted = false } = {}) {
+  if (warningShown || !statusAttempted || state?.phase !== "playing") return false;
+  const paladin = findUnit(state, "p2-0-paladin");
+  return Boolean(paladin && paladin.hp > 0);
+}
+
+export function paladinStatusTauntScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const paladin = findUnit(state, "p2-0-paladin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: paladin?.id,
+      text: "Chosen protects me from little status tricks. Poison, silence, blind, slow, stun -- all very dramatic, all wasted.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Fine. No shortcuts. We beat him straight up.",
+    },
+  ];
+}
+
+export function shouldShowPaladinRageWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  const paladin = findUnit(state, "p2-0-paladin");
+  return Boolean(paladin && paladin.hp > 0 && paladin.hp <= 5);
+}
+
+export function paladinRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const paladin = findUnit(state, "p2-0-paladin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: paladin?.id,
+      text: "RAGE opens Heaven's Realm. Brace yourself -- I am about to bring the heat.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "His reach just changed. Watch the light tiles and finish this clean.",
+    },
+  ];
+}
+
+export function paladinDefeatScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const paladin = findUnit(state, "p2-0-paladin") ?? (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === "paladin");
+  return [
+    {
+      speakerId: paladin?.id,
+      speaker: "paladin",
+      text: "Enough. You are worthy, and a vow is a vow. I will join you.",
+    },
+    ...(speaker ? [{
+      speakerId: speaker.id,
+      text: "Welcome to the party.",
+    }] : []),
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === PALADIN_MISSION_ID) return paladinMissionOpeningScript(state);
   if (missionId === VIRUS_MISSION_ID) return virusMissionOpeningScript(state);
   if (missionId === FATHER_TIME_MISSION_ID) return fatherTimeMissionOpeningScript(state);
   if (missionId === WITCH_DOCTOR_MISSION_ID) return witchDoctorMissionOpeningScript(state);

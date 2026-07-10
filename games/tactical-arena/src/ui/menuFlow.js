@@ -60,7 +60,7 @@ export function syncScreenMusic(audio, screenName) {
   else audio.startMusic("menu");
 }
 
-export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch }) {
+export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, openCodex, onLeaveMatch }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
@@ -87,6 +87,13 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
     lastConfig = config;
     audio.stopMusic();
     onStartMatch(config);
+  }
+
+  async function startCampaignMatchTracked(config) {
+    lastConfig = config;
+    audio.stopMusic();
+    if (onStartCampaignMission) await onStartCampaignMission(config);
+    else onStartMatch(config);
   }
 
   function showScreen(name, params) {
@@ -710,7 +717,7 @@ export function createMenuFlow({ audio, onStartMatch, openCodex, onLeaveMatch })
         break;
       }
       case "startCampaignMission": {
-        startMatchTracked(createCampaignMatchConfig(actionBtn.dataset.missionId || selectedCampaignMissionId, campaignSquad));
+        void startCampaignMatchTracked(createCampaignMatchConfig(actionBtn.dataset.missionId || selectedCampaignMissionId, campaignSquad));
         break;
       }
       case "startTutorial": {

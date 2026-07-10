@@ -9,8 +9,10 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  PALADIN_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_MISSION_ID,
+  campaignMapCutsceneScript,
   campaignOpeningScript,
   clodMissionOpeningScript,
   clodRageWarningScript,
@@ -20,23 +22,34 @@ import {
   fatherTimeMissionOpeningScript,
   fatherTimeRageWarningScript,
   getCampaignMap,
+  markCampaignMapCutsceneSeen,
   necromancerMissionOpeningScript,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
   normalizeCampaignSquad,
   prepareCampaignMatchState,
+  resetCampaignProgress,
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
+  shouldShowCampaignMapCutscene,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowPaladinLightseekerWarning,
+  shouldShowPaladinRageWarning,
+  shouldShowPaladinStatusTaunt,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
   shouldShowWitchDoctorFireWarning,
   shouldShowWitchDoctorGhoulWarning,
   shouldShowWitchDoctorRageWarning,
+  paladinDefeatScript,
+  paladinLightseekerWarningScript,
+  paladinMissionOpeningScript,
+  paladinRageWarningScript,
+  paladinStatusTauntScript,
   virusEnemyStatusTauntScript,
   virusMissionOpeningScript,
   virusPoisonWarningScript,
@@ -271,6 +284,13 @@ function virusMatchState(squad = ["swordsman", "archer", "mystic", "witch-doctor
   return prepareCampaignMatchState(
     createMatchState(createCampaignMatchConfig(VIRUS_MISSION_ID, squad)),
     VIRUS_MISSION_ID,
+  );
+}
+
+function paladinMatchState(squad = ["swordsman"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(PALADIN_MISSION_ID, squad)),
+    PALADIN_MISSION_ID,
   );
 }
 
@@ -933,6 +953,169 @@ test("completing Root of the Virus unlocks Virus and records its stars", () => {
   assert.deepEqual(completed.newRewardUnits, ["virus"]);
   assert.equal(isUnitUnlocked("virus", storage), true);
   assert.equal(readCampaignProgressStars(storage, VIRUS_MISSION_ID), 3);
+});
+
+// --- Mission 6: Wandering Paladin ---------------------------------------------
+
+test("Wandering Paladin replaces the sixth coastal placeholder once enough stars are banked", () => {
+  const storage = storageAdapter();
+  const perfect = (missionId, state, meta) => completeCampaignMission(storage, missionId, {
+    ...state,
+    phase: "complete",
+    winner: 1,
+    units: state.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  }, meta);
+
+  perfect(CLOD_MISSION_ID, prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+  ), { clodChargeHitCount: 1 });
+  perfect(NECROMANCER_MISSION_ID, necromancerMatchState(), { cleanseUsed: true, spreadHitCount: 0 });
+  perfect(WITCH_DOCTOR_MISSION_ID, witchDoctorMatchState(), {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+  perfect(FATHER_TIME_MISSION_ID, fatherTimeMatchState(), {
+    archerDefeatedBeforeFatherTime: true,
+    rewindUsed: false,
+    archerBlinded: true,
+  });
+  perfect(VIRUS_MISSION_ID, virusMatchState(), { spreadHitCount: 0 });
+
+  const node = getCampaignMap(storage).nodes[5];
+  assert.equal(node.id, PALADIN_MISSION_ID);
+  assert.equal(node.title, "Wandering Paladin");
+  assert.equal(node.status, "available");
+  assert.equal(node.displayType, "paladin");
+  assert.equal(node.biome, "water");
+});
+
+test("Wandering Paladin builds a full-HP 5x5 chosen-unit duel with Paladin in the far corner", () => {
+  const config = createCampaignMatchConfig(PALADIN_MISSION_ID, ["mystic"]);
+  const match = paladinMatchState(["mystic"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 5);
+  assert.deepEqual(config.squads[1], ["mystic"]);
+  assert.deepEqual(config.squads[2], ["paladin"]);
+  assert.equal(config.teamNames[2], "Wandering Paladin");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.deepEqual(findUnit(match, "p1-0-mystic").position, { x: 0, y: 4 });
+  assert.deepEqual(findUnit(match, "p2-0-paladin").position, { x: 4, y: 0 });
+  assert.equal(findUnit(match, "p1-0-mystic").hp, 23);
+  assert.equal(findUnit(match, "p2-0-paladin").hp, 26);
+});
+
+test("Wandering Paladin map cutscene is a first-click switch cleared by progress reset", () => {
+  const storage = storageAdapter();
+
+  assert.equal(shouldShowCampaignMapCutscene(storage, PALADIN_MISSION_ID), true);
+  assert.equal(campaignMapCutsceneScript(PALADIN_MISSION_ID).length >= 3, true);
+  markCampaignMapCutsceneSeen(storage, PALADIN_MISSION_ID);
+  assert.equal(shouldShowCampaignMapCutscene(storage, PALADIN_MISSION_ID), false);
+
+  resetCampaignProgress(storage);
+  assert.equal(shouldShowCampaignMapCutscene(storage, PALADIN_MISSION_ID), true);
+  assert.equal(shouldShowCampaignMapCutscene(storage, CLOD_MISSION_ID), false);
+});
+
+test("Wandering Paladin dialogue covers the duel, Lightseeker, status immunity, RAGE, and defeat", () => {
+  const state = paladinMatchState(["mystic"]);
+  const direct = paladinMissionOpeningScript(state);
+
+  assert.deepEqual(campaignOpeningScript(PALADIN_MISSION_ID, state), direct);
+  assert.equal(direct.length >= 2, true);
+  assert.equal(direct[0].speakerId, "p2-0-paladin");
+  assert.match(direct.map((line) => line.text).join(" "), /duel|join|worthy/i);
+
+  assert.equal(shouldShowPaladinLightseekerWarning({ ...state, phase: "playing" }, { lightseekerDamageTakenCount: 1 }), true);
+  assert.equal(shouldShowPaladinLightseekerWarning({ ...state, phase: "playing" }, { lightseekerDamageTakenCount: 1, warningShown: true }), false);
+  assert.match(paladinLightseekerWarningScript(state).map((line) => line.text).join(" "), /Lightseeker|light/i);
+
+  assert.equal(shouldShowPaladinStatusTaunt({ ...state, phase: "playing" }, { statusAttempted: true }), true);
+  assert.equal(shouldShowPaladinStatusTaunt({ ...state, phase: "playing" }, { statusAttempted: true, warningShown: true }), false);
+  assert.match(paladinStatusTauntScript(state).map((line) => line.text).join(" "), /immune|Chosen|status/i);
+
+  const withHp = (hp) => ({
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) => unit.id === "p2-0-paladin" ? { ...unit, hp } : unit),
+  });
+  assert.equal(shouldShowPaladinRageWarning(withHp(6)), false);
+  assert.equal(shouldShowPaladinRageWarning(withHp(5)), true);
+  assert.equal(shouldShowPaladinRageWarning(withHp(5), { warningShown: true }), false);
+  assert.match(paladinRageWarningScript(withHp(5)).map((line) => line.text).join(" "), /heat|RAGE|realm/i);
+
+  const defeated = withHp(0);
+  assert.match(paladinDefeatScript(defeated).map((line) => line.text).join(" "), /worthy|join/i);
+});
+
+test("Wandering Paladin grading rewards victory, avoiding Lightseeker damage, no status attempts, and a melee bonus", () => {
+  const base = paladinMatchState(["swordsman"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(PALADIN_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noLightseeker", "noStatus"]);
+  assert.equal(perfect.bonusObjectives[0].id, "meleeDuel");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const hitByLight = evaluateCampaignMission(PALADIN_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 1,
+    paladinStatusAttempted: false,
+  });
+  assert.equal(hitByLight.objectives.find((objective) => objective.id === "noLightseeker").earned, false);
+  assert.equal(hitByLight.stars, 3, "the melee bonus can cover one missed base objective");
+
+  const casterBase = paladinMatchState(["mystic"]);
+  const casterWon = {
+    ...casterBase,
+    phase: "complete",
+    winner: 1,
+    units: casterBase.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+  const statusCaster = evaluateCampaignMission(PALADIN_MISSION_ID, casterWon, {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: true,
+  });
+  assert.equal(statusCaster.objectives.find((objective) => objective.id === "noStatus").earned, false);
+  assert.equal(statusCaster.bonusObjectives[0].earned, false);
+  assert.equal(statusCaster.stars, 2);
+});
+
+test("completing Wandering Paladin unlocks Paladin and records its stars", () => {
+  const storage = storageAdapter();
+  const base = paladinMatchState(["swordsman"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, PALADIN_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["paladin"]);
+  assert.equal(isUnitUnlocked("paladin", storage), true);
+  assert.equal(readCampaignProgressStars(storage, PALADIN_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {
