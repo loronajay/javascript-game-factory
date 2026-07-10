@@ -1253,7 +1253,7 @@ function resolveBlastingCap(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
-    targetIds, damageByTarget, hit: true, critical: swing.critical, stunned, center,
+    targetIds, damageByTarget, damage: dealt, hit: true, critical: swing.critical, stunned, center,
     pushed: splash.pushed, blocked: splash.blocked, mpCost: cost
   }]);
 }

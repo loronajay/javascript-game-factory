@@ -2592,8 +2592,13 @@ function playRolloverFx(events) {
   // Fat Cleric's Snack Break (defend top-up) and Emergency Snacks (per-turn RAGE regen)
   // both surface as fire-and-forget HP/MP floats over her.
   const snacks = events.filter((e) => e.type === "SNACK_BREAK" || e.type === "EMERGENCY_SNACK");
+  // Miner's Diamond Harvester (rage entry) instantly refills ore — give it the same
+  // "full harvest" presentation as a manually-cast Ore Abundance instead of a silent stat jump.
+  const oreRageFills = events.filter((e) =>
+    e.type === "RAGE_REGENERATE" && (e.mpRestored ?? 0) > 0 && findUnit(state, e.unitId)?.type === "miner");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
-      !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length) return;
+      !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length &&
+      !oreRageFills.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -2703,6 +2708,17 @@ function playRolloverFx(events) {
     const center = unitCenter(metrics, unit);
     if (snack.hpRestored > 0) effects.floatText(center, `+${snack.hpRestored}`, "#8cf0a4");
     if (snack.mpRestored > 0) effects.floatText(center, `+${snack.mpRestored} MP`, "#8cc8ff");
+  }
+
+  // Diamond Harvester: reuse Ore Abundance's bigger gather-windup VFX for the free
+  // full-ore fill Miner gets the instant he enters RAGE.
+  for (const fill of oreRageFills) {
+    const unit = findUnit(state, fill.unitId);
+    if (!unit) continue;
+    const center = unitCenter(metrics, unit);
+    effects.playAbilityVfx("ore-abundance", { actor: unit, targets: [unit] }).then(() => {
+      effects.floatText(center, `+${fill.mpRestored} ORE`, "#d8b35e");
+    }).catch(() => {});
   }
 
   if (killed) audio.play("unitDefeated");
