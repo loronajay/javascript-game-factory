@@ -35,6 +35,8 @@ export function openSkinGallery() {
   renderList();
   card.appendChild(body);
 
+  let savedScrollTop = 0;
+
   function renderList() {
     body.replaceChildren();
     for (const group of groupedUnitTypes(Object.keys(UNIT_TYPES))) {
@@ -55,13 +57,17 @@ export function openSkinGallery() {
           copy.appendChild(el("span", "skin-gallery-skin", skin.name));
           copy.appendChild(el("span", "skin-gallery-status", skin.unlocked ? "Unlocked" : "Locked"));
           item.appendChild(copy);
-          item.addEventListener("click", () => renderDetail(type, skin));
+          item.addEventListener("click", () => {
+            savedScrollTop = body.scrollTop;
+            renderDetail(type, skin);
+          });
           grid.appendChild(item);
         }
       }
       section.appendChild(grid);
       body.appendChild(section);
     }
+    body.scrollTop = savedScrollTop;
   }
 
   function renderDetail(type, skin) {
