@@ -147,6 +147,7 @@ test("Stone Throw: 8 physical (STR-scaled) and a guaranteed slow on a landed hit
   const swDef = getUnitType("swordsman").stats.defense; // 8 - DEF
   assert.equal(res.events.find((e) => e.type === "ART_RESOLVED").damageByTarget.e, 8 - swDef);
   assert.deepEqual(findUnit(res.nextState, "e").statuses.map((x) => x.type), ["slow"], "the target is slowed (no roll)");
+  assert.equal(getEffectiveStats(findUnit(res.nextState, "e")).moveRange, getUnitType("swordsman").stats.moveRange - 1, "slow actually reduces MOVE by 1");
 });
 
 test("Stone Throw: a critical hit stuns instead of slowing", () => {

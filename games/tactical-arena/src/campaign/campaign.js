@@ -835,25 +835,35 @@ export function applyMonkTrialIntroBeat(state, beat) {
 
 // The High Ground plateau (13×13): destructible cover walls (hp 1) and permanent
 // cliff-fire tiles spread across the whole board, not clustered into one lane — the
-// plateau should read as a contested field with cover and hazards in every quadrant.
+// plateau should read as a contested field with patterned cover and hazards in every quadrant.
 // Walls block both physical and magic sightlines (isWallBetween) and are the
 // "destroy a wall" objective's targets; the permanent fire never burns out, so
 // "avoid fire damage" is a full-match route constraint. Neither set sits on or beside
 // a spawn tile (see SNIPER_MISSION_ID's standard-formation layout below).
 const SNIPER_WALL_POSITIONS = Object.freeze([
-  Object.freeze({ x: 3, y: 9 }),
+  Object.freeze({ x: 3, y: 10 }),
+  Object.freeze({ x: 4, y: 9 }),
+  Object.freeze({ x: 3, y: 8 }),
   Object.freeze({ x: 9, y: 3 }),
-  Object.freeze({ x: 2, y: 2 }),
-  Object.freeze({ x: 10, y: 10 }),
-  Object.freeze({ x: 6, y: 7 }),
+  Object.freeze({ x: 10, y: 3 }),
+  Object.freeze({ x: 9, y: 4 }),
+  Object.freeze({ x: 5, y: 6 }),
+  Object.freeze({ x: 6, y: 6 }),
+  Object.freeze({ x: 7, y: 6 }),
 ]);
 const SNIPER_FIRE_POSITIONS = Object.freeze([
-  Object.freeze({ x: 7, y: 2 }),
   Object.freeze({ x: 2, y: 7 }),
-  Object.freeze({ x: 10, y: 4 }),
-  Object.freeze({ x: 4, y: 10 }),
-  Object.freeze({ x: 6, y: 6 }),
-  Object.freeze({ x: 9, y: 9 }),
+  Object.freeze({ x: 3, y: 7 }),
+  Object.freeze({ x: 4, y: 7 }),
+  Object.freeze({ x: 8, y: 5 }),
+  Object.freeze({ x: 9, y: 5 }),
+  Object.freeze({ x: 10, y: 5 }),
+  Object.freeze({ x: 5, y: 10 }),
+  Object.freeze({ x: 6, y: 10 }),
+  Object.freeze({ x: 7, y: 10 }),
+  Object.freeze({ x: 5, y: 2 }),
+  Object.freeze({ x: 6, y: 2 }),
+  Object.freeze({ x: 7, y: 2 }),
 ]);
 
 // Each campaign mission owns a spawn layout: hardcoded coordinates for the fixed
@@ -957,7 +967,7 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
   // formation — the Archer (pinned to slot one) and her chosen ally spawn in the
   // player's usual corner block, the enemy Sniper and Clod spawn in theirs, same as
   // every other default-formation mission. Cover walls + permanent cliff-fire are
-  // scattered across the whole board (see SNIPER_WALL/FIRE_POSITIONS above).
+  // patterned across the whole board (see SNIPER_WALL/FIRE_POSITIONS above).
   [SNIPER_MISSION_ID]: {
     positions: {},
     fallback: (unit) => ({ ...unit.position }),

@@ -1607,22 +1607,24 @@ test("The High Ground builds a full-HP 13x13 2v2 with the Archer locked in slot 
   assert.equal(findUnit(match, "p2-1-clod").hp, 30);
 });
 
-test("The High Ground scatters destructible cover walls and permanent cliff-fire", () => {
+test("The High Ground lays dense cover pockets and permanent cliff-fire bands", () => {
   const match = sniperMatchState();
   const objects = match.tileObjects ?? {};
 
   const walls = Object.entries(objects).filter(([, obj]) => obj.kind === "wall");
   const fires = Object.entries(objects).filter(([, obj]) => obj.kind === "fire");
-  assert.equal(walls.length, 5, "five cover walls on the plateau");
-  assert.equal(fires.length, 6, "six cliff-fire tiles");
+  assert.equal(walls.length, 9, "nine cover walls on the plateau");
+  assert.equal(fires.length, 12, "twelve cliff-fire tiles");
 
   // Walls are 1-HP (one Archer shot each); fire is permanent terrain, not a countdown.
-  assert.deepEqual(objects["3,9"], { kind: "wall", hp: 1 });
-  assert.deepEqual(objects["10,10"], { kind: "wall", hp: 1 });
-  assert.deepEqual(objects["6,6"], { kind: "fire", permanent: true });
-  assert.deepEqual(objects["9,9"], { kind: "fire", permanent: true });
+  for (const key of ["3,10", "4,9", "3,8", "9,3", "10,3", "9,4", "5,6", "6,6", "7,6"]) {
+    assert.deepEqual(objects[key], { kind: "wall", hp: 1 }, `${key} is a destructible wall`);
+  }
+  for (const key of ["2,7", "3,7", "4,7", "8,5", "9,5", "10,5", "5,10", "6,10", "7,10", "5,2", "6,2", "7,2"]) {
+    assert.deepEqual(objects[key], { kind: "fire", permanent: true }, `${key} is permanent cliff-fire`);
+  }
 
-  // Hazards spread across every quadrant of the board, not one narrow lane.
+  // Hazards spread across every quadrant, with readable clusters instead of one-off scatter.
   const wallXs = walls.map(([key]) => Number(key.split(",")[0]));
   const wallYs = walls.map(([key]) => Number(key.split(",")[1]));
   assert.ok(Math.max(...wallXs) - Math.min(...wallXs) > 6, "walls spread across the width");

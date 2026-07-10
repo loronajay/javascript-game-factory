@@ -14,7 +14,7 @@ import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
 import { AudioManager, musicKeyForMatchMode } from "./audio/sounds.js";
-import { renderBoard } from "./ui/boardRenderer.js";
+import { isHealArtConfirmTile, renderBoard } from "./ui/boardRenderer.js";
 import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
 import { resolveAnimatedMove } from "./ui/animatedCommands.js";
@@ -3020,9 +3020,8 @@ async function handleTile(position) {
         setMessage(`${art.name} resolved. This unit's activation is complete.`);
       }
     } else if (art?.effect?.type === "healAllies") {
-      const clickedAlly = unitAt(state, position);
-      if (!clickedAlly || clickedAlly.player !== unit.player) {
-        setMessage("Click a highlighted ally to confirm.", true);
+      if (!isHealArtConfirmTile(state, unit, art, position)) {
+        setMessage(`${art.name}: click a highlighted heal tile to confirm.`, true);
       } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId))) {
         mode = null;
         setMessage(`${art.name} resolved. This unit's activation is complete.`);

@@ -77,7 +77,7 @@ export const CLOD = Object.freeze({
       // like the Monk's Front Kick. Rolls to-hit/crit; DEF + Defend still apply.
       damage: Object.freeze({ type: "physical", amount: 8, scaleStat: "strength", baseStat: 9 }),
       // Guaranteed on a landed hit (NO roll): a crit stuns instead of slowing.
-      onHit: Object.freeze({ status: "slow", durationTurns: 1 }),
+      onHit: Object.freeze({ status: "slow", durationTurns: 1, statModifiers: Object.freeze({ moveRange: -1 }) }),
       onCrit: Object.freeze({ status: "stun", durationTurns: 1 }),
       description: "Hurl a boulder at an enemy within 4 for 8 physical damage (scaling with STR), slowing it by 1 for 1 turn. On a critical hit it stuns for 1 turn instead.",
       implemented: true,

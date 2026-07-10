@@ -10,10 +10,10 @@ import { beginActivation, moveUnit } from "../src/core/commands.js";
 import { TEMPO_GAUGE_MAX, enableTempoBattle } from "../src/core/tempoBattle.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
-import { isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
+import { isHealArtConfirmTile, isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createUnitFigure, UNIT_VISUAL_LIFT } from "../src/ui/unitRenderer.js";
 import { createEffects } from "../src/ui/effects.js";
-import { UNIT_TYPES } from "../src/core/unitCatalog.js";
+import { UNIT_TYPES, getArt } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes, mountCodex } from "../src/ui/codex.js";
 
 const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -601,6 +601,52 @@ test("the board only treats attack and enemy-target ARTS as targeted modes", () 
   assert.equal(isTargetedMode("art:pray", actor), false);
   assert.equal(isTargetedMode("art:wish", actor), false);
   assert.equal(isTargetedMode("art:volley-shot", { type: "archer" }), false);
+});
+
+test("self-aura heal ARTS can be confirmed from any highlighted heal tile", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 10,
+      units: [
+        { id: "fc", player: 1, type: "fat-cleric", x: 5, y: 5, hp: 10, mp: 20 },
+        { id: "ally", player: 1, type: "swordsman", x: 6, y: 5, hp: 10 },
+        { id: "enemy", player: 2, type: "swordsman", x: 9, y: 9 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "fc");
+    const art = getArt("fat-cleric", "hope");
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+    const clicked = [];
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:hope",
+      selectedId: "fc",
+      footworkPath: [],
+      onTileClick: (position) => clicked.push(position)
+    });
+
+    const emptyHealTile = findSvgByAttribute(boardLayer, "data-key", "7,5");
+    const outsideTile = findSvgByAttribute(boardLayer, "data-key", "9,5");
+
+    assert.ok(emptyHealTile.classList.contains("legal-heal"), "empty aura tiles should look clickable");
+    assert.equal(isHealArtConfirmTile(state, actor, art, { x: 7, y: 5 }), true);
+    assert.equal(isHealArtConfirmTile(state, actor, art, { x: 9, y: 5 }), false);
+
+    emptyHealTile.listeners.get("click")();
+    assert.deepEqual(clicked, [{ x: 7, y: 5 }]);
+    assert.equal(outsideTile.classList.contains("legal-heal"), false);
+  } finally {
+    globalThis.document = previousDocument;
+  }
 });
 
 test("Volley Shot previews its cone when hovering any tile inside that cone", () => {

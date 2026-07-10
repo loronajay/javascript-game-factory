@@ -156,6 +156,18 @@ export function isTargetedMode(mode, actor) {
   );
 }
 
+export function isHealArtConfirmTile(state, actor, art, position) {
+  if (!state || !actor || !art || art.effect?.type !== "healAllies" || !position || !isOnBoard(state, position)) return false;
+
+  if (art.targeting?.shape === "selfAura") {
+    const radius = art.targeting.radius ?? art.effect.radius ?? 3;
+    return chebyshevDistance(actor.position, position) <= radius;
+  }
+
+  const clicked = unitAt(state, position);
+  return Boolean(clicked && clicked.hp > 0 && clicked.player === actor.player);
+}
+
 // Hovering a Volley direction lights that cone's tiles so the player sees the
 // shot before clicking. Pure DOM class toggling — no re-render — so it can't
 // loop on mouseenter.
@@ -345,12 +357,8 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
           for (let dy = -radius; dy <= radius; dy += 1) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
             const pos = { x: actor.position.x + dx, y: actor.position.y + dy };
-            if (isOnBoard(state, pos)) range.add(positionKey(pos));
+            if (isOnBoard(state, pos)) legal.add(positionKey(pos));
           }
-        }
-        for (const u of state.units) {
-          if (u.hp > 0 && u.player === actor.player && chebyshevDistance(actor.position, u.position) <= radius)
-            legal.add(positionKey(u.position));
         }
       } else {
         for (const u of state.units) {
