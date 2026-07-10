@@ -22,6 +22,7 @@ import { FAT_KNIGHT } from "./units/fat-knight.js";
 import { FAT_WIZARD } from "./units/fat-wizard.js";
 import { FAT_CLERIC } from "./units/fat-cleric.js";
 import { FAT_BOWMAN } from "./units/fat-bowman.js";
+import { MINER } from "./units/miner.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -46,7 +47,8 @@ export const UNIT_TYPES = Object.freeze({
   "fat-knight": FAT_KNIGHT,
   "fat-wizard": FAT_WIZARD,
   "fat-cleric": FAT_CLERIC,
-  "fat-bowman": FAT_BOWMAN
+  "fat-bowman": FAT_BOWMAN,
+  miner: MINER
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -82,6 +84,17 @@ export function getUnitType(type) {
   const definition = UNIT_TYPES[type];
   if (!definition) throw new Error(`Unknown unit type: ${type}`);
   return definition;
+}
+
+export function getResourceMeta(typeOrDefinition) {
+  const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
+  return definition?.resource ?? Object.freeze({ id: "mp", label: "MP", shortLabel: "MP", startsAt: definition?.stats?.maxMp ?? 0 });
+}
+
+export function getInitialMp(typeOrDefinition) {
+  const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
+  const resource = getResourceMeta(definition);
+  return Number.isFinite(resource.startsAt) ? resource.startsAt : definition.stats.maxMp;
 }
 
 export function getArt(type, artId) {
@@ -543,6 +556,17 @@ export function getEffectiveStats(unit, state = null) {
       if (name in stats && Number.isFinite(value)) stats[name] += value;
     }
   }
+  if (passiveEffect?.type === "oreHarvester") {
+    const resource = Math.max(0, Number(unit.mp) || 0);
+    if (resource <= 0 && Number.isFinite(passiveEffect.emptyAttackRange)) {
+      stats.attackRange = Math.min(stats.attackRange, passiveEffect.emptyAttackRange);
+    }
+    if (resource >= stats.maxMp) {
+      for (const [name, value] of Object.entries(passiveEffect.fullResourceStats ?? {})) {
+        if (name in stats && Number.isFinite(value)) stats[name] += value;
+      }
+    }
+  }
   if (isRaging(unit)) {
     for (const source of rageStatSources(getUnitType(unit.type))) {
       // Only statModifiers rage sources feed the unit's OWN stats. A rage source
@@ -614,6 +638,14 @@ export function getArtMpCost(unit, art, state = null) {
   return Math.max(support.minCost, base - support.reduction);
 }
 
+export function getBasicAttackResourceCost(attacker, target) {
+  if (!attacker || !target) return 0;
+  const effect = getUnitType(attacker.type).passive?.effect;
+  if (effect?.type !== "oreHarvester") return 0;
+  const distance = chebyshev(attacker.position, target.position);
+  return distance > 1 ? Math.max(0, Number(effect.rangedAttackCost) || 0) : 0;
+}
+
 export function getRageArtRangeBonus(unit) {
   if (!unit || !isRaging(unit)) return 0;
   const definition = getUnitType(unit.type);
@@ -678,9 +710,10 @@ export function projectsHealingLockout(unit) {
 // Presentation/query helper — not permission to activate an ART.
 export function getAvailableArts(unit) {
   const definition = getUnitType(unit.type);
-  return isRaging(unit)
-    ? [...definition.arts, definition.rageArt].filter(Boolean)
+  const arts = isRaging(unit)
+    ? [...definition.arts.filter((art) => !art.replacedByRageArt), definition.rageArt].filter(Boolean)
     : [...definition.arts];
+  return arts;
 }
 
 // --- CPU AI metadata --------------------------------------------------------

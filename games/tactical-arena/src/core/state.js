@@ -1,4 +1,4 @@
-import { getUnitType } from "./unitCatalog.js";
+import { getInitialMp, getUnitType } from "./unitCatalog.js";
 import { createRngState } from "./rng.js";
 import { createRoster, FORMATS, playerColor } from "./roster.js";
 
@@ -12,7 +12,7 @@ export function createUnit(spec) {
     skin: spec.skin ?? null,
     position: { x: spec.x, y: spec.y },
     hp: spec.hp ?? definition.stats.maxHp,
-    mp: spec.mp ?? definition.stats.maxMp,
+    mp: spec.mp ?? getInitialMp(definition),
     statModifiers: { ...(spec.statModifiers ?? {}) },
     statuses: (spec.statuses ?? []).map((status) => ({ ...status })),
     statusResistUsed: spec.statusResistUsed ?? false,

@@ -176,6 +176,22 @@ function getMissingHpCritBonus(attacker) {
   return bonus;
 }
 
+function getResourceCritBonus(attacker) {
+  const definition = getUnitType(attacker.type);
+  let bonus = 0;
+  for (const source of [definition.passive, ...definition.arts]) {
+    const effect = source?.effect;
+    const crit = effect?.critPerResource;
+    if (!crit) continue;
+    const per = Math.max(1, Number(crit.per) || 1);
+    const amount = isRaging(attacker)
+      ? (Number(crit.rageBonus) || Number(crit.bonus) || 0)
+      : (Number(crit.bonus) || 0);
+    bonus += Math.floor(Math.max(0, Number(attacker.mp) || 0) / per) * amount;
+  }
+  return bonus;
+}
+
 // Probability that this attacker's swing misses *right now*. Never-miss (raging
 // Archer) overrides everything; otherwise a blinded unit always misses; otherwise
 // the base whiff chance.
@@ -191,7 +207,7 @@ export function getMissChance(attacker) {
 export function getCritChance(attacker) {
   const crit = rageCombat(attacker)?.criticalChance;
   const base = Number.isFinite(crit) ? crit : COMBAT.CRIT_CHANCE;
-  return Math.min(1, base + getMissingHpCritBonus(attacker));
+  return Math.min(1, base + getMissingHpCritBonus(attacker) + getResourceCritBonus(attacker));
 }
 
 // Resolve a single swing's to-hit and crit against the authoritative seed. Draws
@@ -230,6 +246,13 @@ export function getRangeDamageBonus(attacker, target) {
     ? Math.hypot(attacker.position.x - target.position.x, attacker.position.y - target.position.y)
     : Math.max(Math.abs(attacker.position.x - target.position.x), Math.abs(attacker.position.y - target.position.y));
   return Math.floor(distance) - (effect.neutralDistance ?? 2);
+}
+
+function getAdjacentDamageBonus(attacker, target) {
+  const effect = getUnitType(attacker.type).passive?.effect;
+  if (!effect?.adjacentDamageBonus) return 0;
+  const distance = Math.max(Math.abs(attacker.position.x - target.position.x), Math.abs(attacker.position.y - target.position.y));
+  return distance <= 1 ? Math.max(0, Number(effect.adjacentDamageBonus) || 0) : 0;
 }
 
 // A hard floor a passive places under a landed physical hit (the Sniper's Rifle
@@ -356,11 +379,12 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   });
   const proximityBonus = proximity ? getProximityBonus(attacker, target) : 0;
   const rangeDamageBonus = proximity ? getRangeDamageBonus(attacker, target) : 0;
+  const adjacentDamageBonus = proximity ? getAdjacentDamageBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
   // Fire Stance adds flat crit damage — only on a landed crit, so the normal-hit
   // forecast (critical:false) never shows it.
   const stanceCritBonus = effectiveCritical ? getStanceCritBonus(attacker) : 0;
-  let damage = result.damage + proximityBonus + rangeDamageBonus + tileStrikeBonus + stanceCritBonus;
+  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + stanceCritBonus;
   if (damage >= 1 || result.damage >= 1) {
     const passiveMinimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
     if (Number.isFinite(passiveMinimum)) damage = Math.max(passiveMinimum, damage);
@@ -373,7 +397,7 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   // absolutely last so no bonus/floor can leak through, and honestly (the forecast
   // resolves through here too, so it shows 0 against a braced Clod).
   if (negatesPhysicalWhileDefending(target)) damage = 0;
-  return { ...result, critical: effectiveCritical, proximityBonus, rangeDamageBonus, tileStrikeBonus, damage };
+  return { ...result, critical: effectiveCritical, proximityBonus, rangeDamageBonus, adjacentDamageBonus, tileStrikeBonus, damage };
 }
 
 // A blinded unit's attack roll is a guaranteed miss unless a combat override (the

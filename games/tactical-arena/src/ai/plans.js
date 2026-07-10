@@ -811,6 +811,7 @@ function artUsableForPlanning(state, unit, art) {
     unit.hp > 0 && !unit.spent &&
     !isStunned(unit) &&
     !unit.statuses?.some((status) => status.type === "silence") &&
+    !(isRaging(unit) && art.replacedByRageArt) &&
     unit.mp >= getArtMpCost(unit, art, state) &&
     (!art.rageLocked || isRaging(unit)) &&
     !(art.effect?.type === "studyTarget" && unit.studiedTargetId && state.units.some((target) => target.id === unit.studiedTargetId && target.hp > 0)) &&

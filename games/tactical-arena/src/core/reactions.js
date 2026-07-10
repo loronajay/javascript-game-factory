@@ -94,7 +94,7 @@ function hasRageEntryEffect(unit) {
   const definition = getUnitType(unit.type);
   const effects = [definition.ragePassive, definition.rageArt].map((source) => source?.effect);
   return Boolean(
-    effects.some((effect) => effect?.type === "rageEntryRestore") ||
+    effects.some((effect) => effect?.type === "rageEntryRestore" || effect?.rageEntryRestore) ||
     getRageEffectValue(unit, "freePyroclasm", null)
   );
 }
@@ -120,7 +120,8 @@ function applyRageEntryEffects(prevState, next, events, hooks) {
       const definition = getUnitType(unit.type);
       const restore = [definition.ragePassive, definition.rageArt]
         .map((source) => source?.effect)
-        .find((effect) => effect?.type === "rageEntryRestore");
+        .map((effect) => effect?.type === "rageEntryRestore" ? effect : effect?.rageEntryRestore)
+        .find(Boolean);
       if (restore) {
         const beforeHp = unit.hp;
         const beforeMp = unit.mp;

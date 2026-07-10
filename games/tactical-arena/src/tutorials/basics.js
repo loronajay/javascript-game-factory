@@ -1,6 +1,6 @@
 import { COMMANDS, attack, beginActivation, defend, finishActivation, moveUnit } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getEffectiveStats, getUnitType, takesTurns } from "../core/unitCatalog.js";
+import { getEffectiveStats, getInitialMp, getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { getLegalMoves, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 import {
@@ -272,7 +272,7 @@ export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID
           ...unit,
           position: { ...(positions[unit.id] ?? unit.position) },
           hp: isTrapMagician ? RAGE_MAGICIAN_HP : isArcher ? 0 : isSwordsman ? RAGE_SWORDSMAN_HP : definition.stats.maxHp,
-          mp: definition.stats.maxMp,
+          mp: getInitialMp(definition),
           spent: isArcher,
           defending: false,
         };
@@ -296,7 +296,7 @@ export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID
           ...unit,
           position: { ...(positions[unit.id] ?? unit.position) },
           hp: definition.stats.maxHp,
-          mp: definition.stats.maxMp,
+          mp: getInitialMp(definition),
           spent: unit.id === TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
           defending: false,
         };
@@ -325,7 +325,7 @@ export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID
         ...unit,
         position: { ...position },
         hp: hiddenMystic ? 0 : definition.stats.maxHp,
-        mp: definition.stats.maxMp,
+        mp: getInitialMp(definition),
         spent: hiddenMystic ? true : false,
         defending: false,
       };

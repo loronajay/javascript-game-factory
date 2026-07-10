@@ -303,6 +303,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (actor && mode === "art:flight") legal = getFlightTiles(state, actor, getArt(actor.type, "flight"));
   if (actor && mode === "art:summon-ghoul") legal = getSummonPlacementTiles(state, actor, getArt(actor.type, "summon-ghoul"));
   if (actor && mode === "art:build-cover") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "build-cover"));
+  if (actor && mode === "art:shaft-prop") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "shaft-prop"));
   if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));
   // Rewind places a revived ally on an empty tile within range (same rule as a summon).
   if (actor && mode === "art:rewind") legal = getRevivePlacementTiles(state, actor, getArt(actor.type, "rewind"));

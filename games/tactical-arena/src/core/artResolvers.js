@@ -1,4 +1,4 @@
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
@@ -81,11 +81,13 @@ const ART_RESOLVERS = new Map([
   ["wish", resolveHealAllies],
   ["silence", resolveStatusCast],
   ["smoke-bomb", resolveStatusCast],
+  ["headlamp", resolveStatusCast],
   ["flee", resolveFlee],
   ["nuke", resolveNuke],
   ["dark-bomb", resolveNuke],
   ["summon-ghoul", resolveSummonGhoul],
   ["build-cover", resolveBuildCover],
+  ["shaft-prop", resolveBuildCover],
   ["throw-cigar", resolveThrowCigar],
   ["lightseeker", resolveTilePulse],
   ["darkseeker", resolveTilePulse],
@@ -144,7 +146,11 @@ const ART_RESOLVERS = new Map([
   // backfire single-ally heal.
   ["hope", resolveHealAllies],
   ["cleanse", resolveCleanseAlly],
-  ["focus-prayer", resolveFocusPrayer]
+  ["focus-prayer", resolveFocusPrayer],
+  // Miner: ore economy and a small demolition charge.
+  ["ore-harvest", resolveOreHarvest],
+  ["ore-abundance", resolveOreHarvest],
+  ["blasting-cap", resolveBlastingCap]
 ]);
 
 export function useArt(state, command) {
@@ -1043,7 +1049,7 @@ function createSummon(id, type, player, team, position, summonerId, skin = null)
     skin,
     position: { ...position },
     hp: definition.stats.maxHp,
-    mp: definition.stats.maxMp,
+    mp: getInitialMp(definition),
     statModifiers: {},
     statuses: [],
     linkedStatMods: [],
@@ -1112,6 +1118,136 @@ function resolveBuildCover(state, command, art) {
 
 // Throw Cigar: set a tile alight within range (an occupied tile is allowed — fire at
 // the target's feet). The fire burns at every rollover via applyFireTick.
+function rollOreAmount(state, command, art) {
+  if (art.ore?.full) return null;
+  const roll = drawValue(state.rngState, command.effectRoll);
+  state.rngState = roll.rngState;
+  const table = art.ore?.table;
+  if (Array.isArray(table) && table.length) {
+    return table[Math.min(table.length - 1, Math.floor(roll.value * table.length))];
+  }
+  const min = Math.max(0, Number(art.ore?.min) || 0);
+  const max = Math.max(min, Number(art.ore?.max) || min);
+  return min + Math.floor(roll.value * (max - min + 1));
+}
+
+function resolveOreHarvest(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const maxOre = getEffectiveStats(actor, next).maxMp;
+  const before = actor.mp;
+  const amount = art.ore?.full ? maxOre : rollOreAmount(next, command, art);
+  actor.mp = Math.min(maxOre, actor.mp + amount);
+
+  if (art.nextTurnStatus) {
+    const result = applyStatus(actor, {
+      type: art.nextTurnStatus.type,
+      duration: art.nextTurnStatus.duration,
+      statModifiers: { ...(art.nextTurnStatus.statModifiers ?? {}) },
+      ignoreResistance: true
+    });
+    if (result.applied) actor.statuses = result.statuses;
+  }
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    oreGained: actor.mp - before,
+    oreAfter: actor.mp,
+    mpCost: cost
+  }]);
+}
+
+function blastPushDestination(center, target) {
+  const dx = Math.sign(target.position.x - center.x);
+  const dy = Math.sign(target.position.y - center.y);
+  if (Math.abs(target.position.x - center.x) >= Math.abs(target.position.y - center.y)) {
+    return { x: target.position.x + dx, y: target.position.y };
+  }
+  return { x: target.position.x, y: target.position.y + dy };
+}
+
+function resolveBlastingCap(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, targetIds: [], damageByTarget: {},
+      pushed: {}, blocked: [], mpCost: cost
+    }]);
+  }
+
+  const center = { ...target.position };
+  const targetIds = [target.id];
+  const damageByTarget = {};
+  const initialDamage = Math.max(0, Number(art.damage?.amount) || 0);
+  const dealt = Math.min(target.hp, initialDamage);
+  target.hp = Math.max(0, target.hp - initialDamage);
+  damageByTarget[target.id] = dealt;
+
+  let stunned = false;
+  if (swing.critical && target.hp > 0 && art.onCrit?.status) {
+    const result = applyStatus(target, { type: art.onCrit.status, duration: art.onCrit.durationTurns ?? 1 });
+    if (result.applied) {
+      target.statuses = result.statuses;
+      stunned = true;
+    }
+  }
+
+  const radius = Math.max(0, Number(art.splash?.radius) || 1);
+  const blockedDamage = Math.max(0, Number(art.splash?.blockedDamage) || 0);
+  const originalOccupied = new Set(livingUnits(next).map((unit) => positionKey(unit.position)));
+  const pushed = {};
+  const blocked = [];
+  for (const victim of livingUnits(next)) {
+    if (victim.id === target.id || !areEnemies(actor, victim)) continue;
+    if (chebyshevDistance(center, victim.position) > radius) continue;
+    const destination = blastPushDestination(center, victim);
+    if (!isOnBoard(next, destination) || isWallAt(next, destination) || originalOccupied.has(positionKey(destination))) {
+      const splashDealt = Math.min(victim.hp, blockedDamage);
+      victim.hp = Math.max(0, victim.hp - blockedDamage);
+      blocked.push(victim.id);
+      targetIds.push(victim.id);
+      damageByTarget[victim.id] = (damageByTarget[victim.id] ?? 0) + splashDealt;
+      continue;
+    }
+    const from = { ...victim.position };
+    victim.position = destination;
+    pushed[victim.id] = { from, to: { ...destination } };
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    targetIds, damageByTarget, hit: true, critical: swing.critical, stunned, center,
+    pushed, blocked, mpCost: cost
+  }]);
+}
+
 function resolveThrowCigar(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const placement = command.targetPosition;
@@ -1502,7 +1638,7 @@ function resolveStatusCast(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
   // A wall blocks a pure cast (Silence) just like any other ranged ability.

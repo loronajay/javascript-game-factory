@@ -98,6 +98,18 @@ Base stats live in the unit file:
 - `maxHp`
 - `maxMp`
 
+Units may declare a custom resource label while still storing the live value in
+`unit.mp` for lockstep/state-hash compatibility:
+
+```js
+resource: Object.freeze({ id: "ore", label: "Ore", shortLabel: "ORE", startsAt: 0 })
+```
+
+Use this for MP-like pools that have different starting values or UI labels. The
+state factory and scripted reveal/reset paths read `getInitialMp(definition)`, so
+do not manually refill such units to `definition.stats.maxMp` unless the script
+intentionally grants a full resource.
+
 Live stats are resolved only through `getEffectiveStats(unit)` in
 `src/core/unitCatalog.js`. That function folds together:
 
@@ -414,6 +426,11 @@ Already landed (reuse these rather than reinventing them):
 - area targeting (self-centered AoE — Nuke/Dark Bomb `resolveNuke`; cone — Volley Shot)
 - aura-based enemy debuffs (`enemyAura` — Deathly Aura)
 
+- custom MP-like resource labels/starting values (`resource` + `getInitialMp`;
+  Miner stores ore in `unit.mp` but displays ORE and starts empty)
+- resource-driven stat/range/crit hooks (`oreHarvester`) and ranged basic-attack
+  resource costs (`getBasicAttackResourceCost`)
+
 Likely needed soon:
 
 - cleanse and status prevention
@@ -485,6 +502,27 @@ When you add a unit whose RAGE both changes its own stats *and* projects an aura
 keep the self-stat change as a `statModifiers` rage source — the rage self-stat
 loop in `getEffectiveStats` deliberately ignores non-`statModifiers` sources so a
 nested `enemyAura` never leaks onto the raging unit.
+
+## Miner implementation notes
+
+Miner is a rebuild-original Ranger that uses Ore instead of MP. Ore is stored in
+`unit.mp` for engine compatibility, but the unit declares `resource` metadata so
+the HUD/action labels show ORE and the state factory starts him at 0. Implemented
+data:
+
+- HP 25, Move 2, Range 5, STR 8, DEF 4, max Ore 25, starts with 0 Ore.
+- **Ore Harvester / Pickaxe:** +1% crit chance per 5 ore, doubled to +2% per 5
+  ore in RAGE; at max ore gain +1 STR/+1 DEF; adjacent basic attacks deal +2;
+  ranged basic attacks cost 1 ore, and 0 ore clamps attack range to 1.
+- **Ore Harvest:** free self-cast, weighted 2-5 ore gain (3/4 common, 2/5 rare),
+  capped at 25, and a +1 MOVE buff on the next activation.
+- **Headlamp:** range-1 guaranteed 1-turn Blind, no damage.
+- **Shaft Prop:** ore-costed Build Cover clone, same 1-HP wall placement seam.
+- **Blasting Cap:** range-3 rolled true-damage hit; on hit deals 3 true to the
+  target, shoves nearby enemies away from the blast tile, deals 2 true if blocked,
+  and stuns the original target on crit.
+- RAGE = **Diamond Harvester:** +1 MOVE/+1 STR, instant max ore on rage entry, and
+  **Ore Abundance** replaces Ore Harvest to refill to max on demand.
 
 ## Done checklist
 

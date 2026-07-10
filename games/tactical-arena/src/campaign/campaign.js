@@ -1,4 +1,4 @@
-import { getUnitType } from "../core/unitCatalog.js";
+import { getInitialMp, getUnitType } from "../core/unitCatalog.js";
 import { createUnit, findUnit } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { isNegativeStatus } from "../rules/statuses.js";
@@ -1005,7 +1005,7 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       ...unit,
       position: { ...(layout.positions[unit.id] ?? layout.fallback(unit)) },
       hp: layout.fullHp ? maxHp : Math.ceil(maxHp / 2),
-      mp: definition.stats.maxMp,
+      mp: getInitialMp(definition),
       spent: false,
       defending: false,
       ...(layout.skinFor ? { skin: layout.skinFor(unit) } : {}),

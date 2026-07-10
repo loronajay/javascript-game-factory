@@ -32,7 +32,8 @@ const ATTACK_PROJECTILES = Object.freeze({
   nemesis: Object.freeze({ shape: "orb", arcHeight: 44, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#c89cff", trail: "#241030" }) }),
   // Angel is a bow user — a radiant, gold-white blessed arrow (its magic tint reads holy).
   angel: Object.freeze({ shape: "arrow", arcHeight: 58, durationMs: 430, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#d8c078" }) }),
-  "fat-bowman": Object.freeze({ shape: "arrow", arcHeight: 64, durationMs: 450, size: 1.08, colors: Object.freeze({ core: "#ffd9a0", trail: "#8a5a30" }) })
+  "fat-bowman": Object.freeze({ shape: "arrow", arcHeight: 64, durationMs: 450, size: 1.08, colors: Object.freeze({ core: "#ffd9a0", trail: "#8a5a30" }) }),
+  miner: Object.freeze({ shape: "rock", arcHeight: 48, durationMs: 420, size: 0.75, colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630" }) })
 });
 
 const DEFAULT_ATTACK_PROJECTILE = Object.freeze({
@@ -750,6 +751,48 @@ const ABILITY_VFX = Object.freeze({
     boardFlash: true,
     afterglow: true,
     colors: Object.freeze({ core: "#c9b37a", trail: "#5a4326", impact: "#efe0b0" })
+  }),
+  "ore-harvest": Object.freeze({
+    type: "healPulse",
+    soundKey: "recharge",
+    particleCount: 10,
+    radius: 28,
+    durationMs: 520,
+    colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630", impact: "#fff0b8" })
+  }),
+  "ore-abundance": Object.freeze({
+    type: "healPulse",
+    soundKey: "recharge",
+    particleCount: 16,
+    radius: 34,
+    durationMs: 640,
+    windup: Object.freeze({ style: "gather", durationMs: 320, particleCount: 9 }),
+    colors: Object.freeze({ core: "#8ed6e8", trail: "#5d6b7a", impact: "#ffffff" })
+  }),
+  headlamp: Object.freeze({
+    type: "statusStrike",
+    soundKey: "blindApplied",
+    status: "blind",
+    motif: "blink",
+    particleCount: 10,
+    colors: Object.freeze({ core: "#f0d77a", trail: "#705f1e", impact: "#fff2a8" })
+  }),
+  "shaft-prop": Object.freeze({
+    type: "magicBurst",
+    soundKey: "buildCover",
+    particleCount: 10,
+    radius: 26,
+    durationMs: 460,
+    colors: Object.freeze({ core: "#c8a46a", trail: "#5a4630", impact: "#f0d8a0" })
+  }),
+  "blasting-cap": Object.freeze({
+    type: "statusStrike",
+    soundKey: "nuke",
+    motif: "impact",
+    particleCount: 12,
+    windup: Object.freeze({ style: "toss" }),
+    projectile: Object.freeze({ shape: "lob", arcHeight: 70, durationMs: 500, size: 0.8, colors: Object.freeze({ core: "#d8b35e", trail: "#5a4630" }) }),
+    colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630", impact: "#fff0b8" })
   })
 });
 

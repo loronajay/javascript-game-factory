@@ -1,4 +1,4 @@
-import { getAvailableArts, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt, getFootworkSteps } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
@@ -10,8 +10,9 @@ function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function artTip(art) {
-  return `${art.name} · ${art.mpCost} MP — ${art.description}`;
+function artTip(art, unitOrDefinition = null) {
+  const resource = unitOrDefinition ? getResourceMeta(unitOrDefinition.type ?? unitOrDefinition) : getResourceMeta(null);
+  return `${art.name} · ${art.mpCost} ${resource.shortLabel} — ${art.description}`;
 }
 
 function toggleClass(element, className, enabled) {
@@ -140,6 +141,7 @@ export function renderUnitCard(unit, state, unitCard) {
     return;
   }
   const definition = getUnitType(unit.type);
+  const resource = getResourceMeta(definition);
   const stats = getEffectiveStats(unit, state);
   const raging = isRaging(unit);
   unitCard.style.setProperty("--team", colorOf(state, unit.player));
@@ -156,7 +158,7 @@ export function renderUnitCard(unit, state, unitCard) {
       </div>
       <div class="vitals">
         ${vitalHtml("hp", "HP", unit.hp, stats.maxHp, { low: unit.hp <= stats.maxHp * 0.3 })}
-        ${vitalHtml("mp", "MP", unit.mp, stats.maxMp)}
+        ${vitalHtml("mp", resource.shortLabel, unit.mp, stats.maxMp)}
         ${tempoGaugeHtml(state, unit)}
       </div>
       ${statLineHtml(definition, stats)}
@@ -193,7 +195,7 @@ export function renderActions(
   if (isCommandOnly(unit)) {
     actions.innerHTML = getAvailableArts(unit)
       .filter((art) => art.kind === "active" && art.implemented)
-      .map((art) => `<button class="art-tile command-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}</button>`)
+      .map((art) => `<button class="art-tile command-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}</button>`)
       .join("");
     actionHelp.textContent = "Issue a command — it rallies your whole squad for this turn.";
     actions.querySelectorAll("button").forEach((button) => {
@@ -207,11 +209,11 @@ export function renderActions(
   const stats = getEffectiveStats(unit, state);
   const footwork = getUnitType(unit.type).arts.find((art) => art.id === "footwork");
   const footworkBtn = footwork
-    ? `<button class="${mode === "footwork" ? "is-active" : ""}" data-action="footwork" title="${escapeAttr(artTip(footwork))}" ${canUseArt(state, unit, footwork.id) ? "" : "disabled"}>Footwork<kbd class="key">A</kbd></button>`
+    ? `<button class="${mode === "footwork" ? "is-active" : ""}" data-action="footwork" title="${escapeAttr(artTip(footwork, unit))}" ${canUseArt(state, unit, footwork.id) ? "" : "disabled"}>Footwork<kbd class="key">A</kbd></button>`
     : "";
   const artBtns = getAvailableArts(unit)
     .filter((art) => art.kind === "active" && art.id !== "footwork" && art.implemented)
-    .map((art) => `<button class="art-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}<kbd class="key">${art.mpCost}<span class="kbd-unit">MP</span></kbd></button>`)
+    .map((art) => `<button class="art-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}<kbd class="key">${art.mpCost}<span class="kbd-unit">${getResourceMeta(unit.type).shortLabel}</span></kbd></button>`)
     .join("");
 
   actions.innerHTML = [
@@ -250,6 +252,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
 
     for (const unit of state.units.filter((u) => u.player === player && !u.introHidden)) {
       const definition = getUnitType(unit.type);
+      const resource = getResourceMeta(definition);
       if (definition.summon) continue;
       const stats = getEffectiveStats(unit, state);
       const row = document.createElement("div");
@@ -276,7 +279,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
           </div>
           <div class="vitals">
             ${vitalHtml("hp", "HP", Math.max(0, unit.hp), stats.maxHp, { low: !dead && unit.hp <= stats.maxHp * 0.3 })}
-            ${vitalHtml("mp", "MP", unit.mp, stats.maxMp)}
+            ${vitalHtml("mp", resource.shortLabel, unit.mp, stats.maxMp)}
             ${tempoGaugeHtml(state, unit)}
           </div>
           ${statLineHtml(definition, stats)}

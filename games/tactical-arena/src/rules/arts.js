@@ -475,6 +475,7 @@ export function canUseArt(state, actor, artId) {
     activation?.unitId === actor.id &&
     actionAvailable &&
     !actor.spent &&
+    !(isRaging(actor) && art.replacedByRageArt) &&
     !(art.id === "realm-traversal" && actor.realmTraversalLocked) &&
     !isStunned(actor) &&
     !actor.statuses?.some((status) => status.type === "silence") &&

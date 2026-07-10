@@ -1,6 +1,6 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
-import { getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getLineAttackTargets, getMeleeDefendRetaliation, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
@@ -244,11 +244,14 @@ function attack(state, command) {
   const basicDamageType = getBasicAttackDamageType(result.unit);
   if (isShotBlocked(state, result.unit.position, target.position, result.unit) ||
       isWallBetween(state, result.unit.position, target.position, result.unit)) return reject(ERR.TARGET_OBSTRUCTED);
+  const resourceCost = getBasicAttackResourceCost(result.unit, target);
+  if (resourceCost > 0 && result.unit.mp < resourceCost) return reject(ERR.ART_NOT_AVAILABLE);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.actorId);
   const nextTarget = findUnit(next, command.targetId);
   next.activation.primaryUsed = true;
+  if (resourceCost > 0) actor.mp = Math.max(0, actor.mp - resourceCost);
 
   // Witch Doctor stance on-attack triggers fire on the swing itself (hit or miss):
   // Rain charges next-turn haste, Spirit restores MP to nearby allies. No-op for
@@ -261,7 +264,7 @@ function attack(state, command) {
   next.rngState = swing.rngState;
   if (swing.missed) {
     const desperationEvents = consumeOneShotRage(actor);
-    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll }, ...triggerEvents, ...desperationEvents]);
+    return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll, ...(resourceCost > 0 ? { mpCost: resourceCost } : {}) }, ...triggerEvents, ...desperationEvents]);
   }
   const targets = getLineAttackTargets(next, actor, nextTarget);
   const targetIds = [];
@@ -331,6 +334,7 @@ function attack(state, command) {
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
     hit: true, missed: false, roll: swing.hitRoll, targetHpAfter: nextTarget.hp, targetIds, damageByTarget,
+    ...(resourceCost > 0 ? { mpCost: resourceCost } : {}),
     ...(blinded.length ? { blinded } : {}),
     ...(fireTiles.length ? { fireTiles } : {}),
     ...damageFields

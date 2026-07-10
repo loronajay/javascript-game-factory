@@ -1,5 +1,5 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
-import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getUnitType } from "./core/unitCatalog.js";
+import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
@@ -1331,7 +1331,7 @@ function revealTutorialUnit(unitId, position = null, hp = null, mp = null) {
   const definition = getUnitType(unit.type);
   if (position) unit.position = { ...position };
   unit.hp = Number.isFinite(hp) ? hp : definition.stats.maxHp;
-  unit.mp = Number.isFinite(mp) ? mp : definition.stats.maxMp;
+  unit.mp = Number.isFinite(mp) ? mp : getInitialMp(definition);
   unit.spent = false;
   unit.defending = false;
   if (unitId === TUTORIAL_ARTS_PLAYER_MYSTIC_ID) {
@@ -1676,11 +1676,14 @@ async function resolveInstantArt(command) {
   } else if (resolved?.artId === "summon-ghoul" && actorBefore) {
     const ghoul = findUnit(result.nextState, resolved.summonedUnitId);
     if (ghoul) await effects.playAbilityVfx("summon-ghoul", { actor: actorBefore, targets: [ghoul] });
-  } else if (resolved?.artId === "build-cover" && resolved.position) {
+  } else if ((resolved?.artId === "build-cover" || resolved?.artId === "shaft-prop") && resolved.position) {
     const point = unitCenter(createBoardMetrics(state.size), { position: resolved.position });
     audio.play("buildCover");
     effects.impact(point, false);
     effects.shake(4);
+  } else if ((resolved?.artId === "ore-harvest" || resolved?.artId === "ore-abundance") && actorBefore) {
+    await effects.playAbilityVfx(resolved.artId, { actor: actorBefore, targets: [actorBefore] });
+    await effects.floatText(unitCenter(createBoardMetrics(state.size), actorBefore), `+${resolved.oreGained} ORE`, "#d8b35e");
   } else if (resolved?.artId === "throw-cigar" && resolved.position && actorBefore) {
     // The cigar visibly tumbles from the Sniper to the tile before the fire takes
     // (the lob recipe plays the throwCigar sound and lands its own impact).
@@ -2462,13 +2465,14 @@ function playEventSounds(events) {
           artId === "spark" || artId === "pray" || artId === "wish" ||
           artId === "lightseeker" || artId === "darkseeker" ||
           artId === "dark-bomb" || artId === "summon-ghoul" ||
-          artId === "smoke-bomb" || artId === "build-cover" || artId === "throw-cigar" ||
+          artId === "smoke-bomb" || artId === "build-cover" || artId === "shaft-prop" || artId === "throw-cigar" ||
           artId === "age" || artId === "time-stretch" || artId === "rewind" ||
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
           artId === "self-destruct" ||
           artId === "anoint" || artId === "purify" || artId === "elevate" || artId === "heavenseeker" ||
           artId === "hope" || artId === "cleanse" || artId === "focus-prayer" ||
           artId === "flight" || artId === "pyroclasm" ||
+          artId === "ore-harvest" || artId === "ore-abundance" || artId === "headlamp" || artId === "blasting-cap" ||
           artId === "dark-pulse" || artId === "realm-traversal" ||
           artId === "quake" || artId === "thunderous-charge" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
@@ -2865,6 +2869,14 @@ async function handleTile(position) {
       mode = null;
       setMessage("Cover raised. This unit's activation is complete.");
     }
+  } else if (mode === "art:shaft-prop") {
+    const placement = getWallPlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "shaft-prop"));
+    if (!placement.has(positionKey(position))) {
+      setMessage("Shaft Prop: choose a highlighted empty tile to raise the wall.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "shaft-prop", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Shaft prop raised. This unit's activation is complete.");
+    }
   } else if (mode === "art:throw-cigar") {
     const placement = getFirePlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "throw-cigar"));
     if (!placement.has(positionKey(position))) {
@@ -3172,8 +3184,10 @@ async function handleActionClick(action, unit) {
             ? "Choose a highlighted empty tile to raise the Ghoul."
             : action === "art:build-cover"
               ? "Choose a highlighted empty tile to raise the wall."
-              : action === "art:throw-cigar"
-                ? "Choose a highlighted tile to set alight."
+              : action === "art:shaft-prop"
+                ? "Choose a highlighted empty tile to raise the wall."
+                : action === "art:throw-cigar"
+                  ? "Choose a highlighted tile to set alight."
                 : art?.effect?.type === "healAllies"
                   ? "Click any highlighted ally to confirm."
                   : art?.targeting?.shape === "ally"
