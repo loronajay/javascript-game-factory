@@ -600,5 +600,40 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-bowman",
     slug: "violet",
     file: "violet-fat-bowman.png"
+  },
+  {
+    type: "miner",
+    slug: "summer-vibes",
+    file: "summer-vibes-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "firefighter",
+    file: "firefighter-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "gold-rush",
+    file: "gold-rush-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "jade prospector",
+    file: "jade prospector-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "ruin-digger",
+    file: "ruin-digger-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "shipwreck-scavenger",
+    file: "shipwreck-scavenger-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "steampunk-engineer",
+    file: "steampunk-engineer-miner.png"
   }
 ]);
