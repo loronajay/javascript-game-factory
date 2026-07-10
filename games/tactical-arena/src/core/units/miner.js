@@ -1,7 +1,7 @@
 export const MINER = Object.freeze({
   id: "miner",
   name: "Miner",
-  glyph: "M",
+  glyph: "⛏", // ⛏ pickaxe
   classType: "ranger",
   ai: Object.freeze({ threatValue: 13, role: "ranged", protect: true }),
   tempo: Object.freeze({ agility: 5 }),
@@ -24,9 +24,11 @@ export const MINER = Object.freeze({
       emptyAttackRange: 1,
       adjacentDamageBonus: 2,
       rangedAttackCost: 1,
+      wallKillRange: 1,
+      wallKillOreReward: 2,
       critPerResource: Object.freeze({ per: 5, bonus: 0.01, rageBonus: 0.02 })
     }),
-    description: "Gain +1% crit chance for every 5 ore harvested. At max ore, gain +1 STR and +1 DEF. Adjacent basic attacks deal +2 damage. Ranged basic attacks cost 1 ore; at 0 ore, range becomes 1.",
+    description: "Gain +1% crit chance for every 5 ore harvested. At max ore, gain +1 STR and +1 DEF. Adjacent basic attacks deal +2 damage and destroying a wall within 1 grants +2 ore. Ranged basic attacks cost 1 ore; at 0 ore, range becomes 1.",
     implemented: true
   }),
   arts: Object.freeze([
@@ -77,7 +79,7 @@ export const MINER = Object.freeze({
       damage: Object.freeze({ type: "true", amount: 3 }),
       splash: Object.freeze({ radius: 1, blockedDamage: 2 }),
       onCrit: Object.freeze({ status: "stun", durationTurns: 1 }),
-      description: "Spend 2 ore and roll to hit an enemy within 3. On hit, deal 3 true damage, then push nearby enemies away from the blast tile; blocked enemies take 2 true damage. On crit, stun the initial target for 1 turn.",
+      description: "Spend 2 ore and roll to hit an enemy within 3. On hit, deal 3 true damage, then push nearby enemies away from the blast tile; blocked enemies take 2 true damage. May target a wall in range without a roll, destroying that wall for no ore and splashing only units. On crit, stun the initial enemy target for 1 turn.",
       implemented: true,
       ai: Object.freeze({ intent: "strike", evHints: Object.freeze({ splashDamage: 2 }), tags: Object.freeze(["control"]) })
     })

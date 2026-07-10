@@ -1,6 +1,6 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
-import { getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getLineAttackTargets, getMeleeDefendRetaliation, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
@@ -354,15 +354,36 @@ function attackWall(state, command, attacker) {
   }
   if (isShotBlocked(state, attacker.position, pos, attacker) ||
       isWallBetween(state, attacker.position, pos, attacker)) return reject(ERR.TARGET_OBSTRUCTED);
+  const resourceCost = getBasicAttackResourceCost(attacker, pos);
+  if (resourceCost > 0 && attacker.mp < resourceCost) return reject(ERR.ART_NOT_AVAILABLE);
 
   const next = cloneState(state);
   const key = positionKey(pos);
   const wall = next.tileObjects[key];
-  wall.hp = Math.max(0, wall.hp - getEffectiveStats(findUnit(next, command.actorId), next).strength);
+  const actor = findUnit(next, command.actorId);
+  if (resourceCost > 0) actor.mp = Math.max(0, actor.mp - resourceCost);
+  wall.hp = Math.max(0, wall.hp - getEffectiveStats(actor, next).strength);
   next.activation.primaryUsed = true;
   const destroyed = wall.hp <= 0;
-  if (destroyed) delete next.tileObjects[key];
-  return accept(next, [{ type: "WALL_ATTACKED", actorId: command.actorId, position: { ...pos }, destroyed, hpAfter: destroyed ? 0 : wall.hp }]);
+  let oreGained = 0;
+  if (destroyed) {
+    delete next.tileObjects[key];
+    const reward = getWallKillResourceReward(actor, pos);
+    if (reward > 0) {
+      const before = actor.mp;
+      actor.mp = Math.min(getEffectiveStats(actor, next).maxMp, actor.mp + reward);
+      oreGained = actor.mp - before;
+    }
+  }
+  return accept(next, [{
+    type: "WALL_ATTACKED",
+    actorId: command.actorId,
+    position: { ...pos },
+    destroyed,
+    hpAfter: destroyed ? 0 : wall.hp,
+    ...(resourceCost > 0 ? { mpCost: resourceCost } : {}),
+    ...(oreGained > 0 ? { oreGained, oreAfter: actor.mp } : {})
+  }]);
 }
 
 function defend(state, command) {

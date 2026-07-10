@@ -767,6 +767,41 @@ test("Curve Shot highlights an enemy behind an intervening unit as a legal targe
   }
 });
 
+test("Blasting Cap highlights wall tiles as legal targets", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      units: [
+        { id: "miner", player: 1, type: "miner", x: 1, y: 1, mp: 2 },
+        { id: "target", player: 2, type: "swordsman", x: 4, y: 1 }
+      ],
+      tileObjects: [{ kind: "wall", x: 3, y: 1, hp: 1 }]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:blasting-cap",
+      selectedId: "miner",
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const wallTile = findSvgByAttribute(boardLayer, "data-key", "3,1");
+    assert.ok(wallTile.classList.contains("legal-art"));
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("Build Cover walls render as low pass-through cover instead of click-blocking slabs", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };

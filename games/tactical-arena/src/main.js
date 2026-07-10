@@ -1421,7 +1421,7 @@ async function resolveCombat(command) {
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
   const events = result.events ?? [];
-  const rolled = events.find((e) => (e.type === "ATTACK_RESOLVED" || e.type === "ART_RESOLVED") && "hit" in e);
+  const rolled = events.find((e) => (e.type === "ATTACK_RESOLVED" || e.type === "ART_RESOLVED") && "hit" in e && e.rolled !== false);
 
   // Capture every pre-command snapshot BEFORE beginResolve commits (in tempo `state` becomes
   // the post-command board the instant beginResolve runs). `before` pins the deeper animation
@@ -2053,6 +2053,24 @@ async function resolveInstantArt(command) {
         await effects.floatText(unitCenter(metrics, targetBefore), statusLabel, "#c89cff");
       }
     }
+  } else if (resolved?.artId === "blasting-cap" && resolved.destroyedWall && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    const center = unitCenter(metrics, { position: resolved.position });
+    await effects.animateAttack(actorBefore, { id: `wall:${positionKey(resolved.position)}`, position: resolved.position }, true, "blasting-cap");
+    audio.play("wallBreak");
+    effects.impact(center, false, "true");
+    effects.deathBurst(center, "#9a9384");
+    effects.shake(8);
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      if (dmg <= 0) return;
+      const targetCenter = unitCenter(metrics, target);
+      effects.impact(targetCenter, false, "true");
+      await effects.hitRecoil(target.id, target.position, false);
+      await effects.floatText(targetCenter, `-${dmg}`, "#ff7684");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -2297,7 +2315,7 @@ async function applyCpuCommand(command) {
       // A strike ART rolls to-hit (resolveCombat handles ART_RESOLVED-with-hit); every
       // other ART is instant. Peek the events to route — applyCommand is pure.
       const peek = applyCommand(state, command);
-      const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e);
+      const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e && e.rolled !== false);
       return rolled ? resolveCombat(command) : resolveInstantArt(command);
     }
     case "FINISH_ACTIVATION": {
@@ -2358,7 +2376,7 @@ async function applyRemoteCommand(command) {
         // A strike ART rolls to-hit (resolveCombat handles the hit path); every other
         // ART is instant. Peek the events to route — applyCommand is pure.
         const peek = applyCommand(state, command);
-        const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e);
+        const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e && e.rolled !== false);
         if (rolled) await resolveCombat(command); else await resolveInstantArt(command);
         return;
       }
@@ -3054,10 +3072,12 @@ async function handleTile(position) {
     } else {
       const target = unitAt(state, position);
       let resolved = false;
-      if (target) {
+      if (art?.id === "blasting-cap" && isWallAt(state, position)) {
+        resolved = await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: position }));
+      } else if (target) {
         const command = useArt(state.currentPlayer, unit.id, artId, { targetId: target.id });
         const peek = applyCommand(state, command);
-        const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event);
+        const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event && event.rolled !== false);
         resolved = rolled ? await resolveCombat(command) : await resolveInstantArt(command);
       }
       if (resolved) {
@@ -3202,7 +3222,9 @@ async function handleActionClick(action, unit) {
                         ? "Click a highlighted enemy on a straight line to punch it."
                         : art?.resolution === "statusCast"
                           ? "Choose a highlighted enemy target."
-                          : "Choose a highlighted enemy target.";
+                          : action === "art:blasting-cap"
+                            ? "Choose a highlighted enemy or wall target."
+                            : "Choose a highlighted enemy target.";
       // Line abilities: the purple wash shows the ability's reach on every ray; if nothing
       // is actually in line there is no legal target, so say so rather than leaving the
       // player clicking an empty ray and wondering why nothing resolves.

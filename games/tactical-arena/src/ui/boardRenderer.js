@@ -268,13 +268,13 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     // In attack mode, an in-range wall with a clear shot is itself a legal target
     // (you can destroy cover). A body or another wall between still blocks it; the
     // Sniper's pierce reaches a covered wall.
-    if (mode === "attack") {
+    if (mode === "attack" || art?.id === "blasting-cap") {
       for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
         if (obj.kind !== "wall") continue;
         const [wx, wy] = key.split(",").map(Number);
         const pos = { x: wx, y: wy };
         if (chebyshevDistance(actor.position, pos) <= reach &&
-            !isShotBlocked(state, actor.position, pos, actor) &&
+            (art?.id === "blasting-cap" || !isShotBlocked(state, actor.position, pos, actor)) &&
             !isWallBetween(state, actor.position, pos, actor)) {
           legal.add(key);
         }

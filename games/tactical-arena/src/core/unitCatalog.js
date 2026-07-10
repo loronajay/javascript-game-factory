@@ -642,8 +642,18 @@ export function getBasicAttackResourceCost(attacker, target) {
   if (!attacker || !target) return 0;
   const effect = getUnitType(attacker.type).passive?.effect;
   if (effect?.type !== "oreHarvester") return 0;
-  const distance = chebyshev(attacker.position, target.position);
+  const targetPosition = target.position ?? target;
+  const distance = chebyshev(attacker.position, targetPosition);
   return distance > 1 ? Math.max(0, Number(effect.rangedAttackCost) || 0) : 0;
+}
+
+export function getWallKillResourceReward(attacker, position) {
+  if (!attacker || !position) return 0;
+  const effect = getUnitType(attacker.type).passive?.effect;
+  if (effect?.type !== "oreHarvester") return 0;
+  const range = Number.isFinite(effect.wallKillRange) ? effect.wallKillRange : 1;
+  if (chebyshev(attacker.position, position) > range) return 0;
+  return Math.max(0, Number(effect.wallKillOreReward) || 0);
 }
 
 export function getRageArtRangeBonus(unit) {

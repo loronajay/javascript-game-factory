@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { attack, beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
+import { attack, attackTile, beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
@@ -67,6 +67,33 @@ test("basic ranged attacks cost 1 ore, while adjacent pickaxe strikes do +2 dama
   s = run(s, attack(1, "miner", "near", NORMAL_HIT)).nextState;
   assert.equal(findUnit(s, "miner").mp, 1, "adjacent basic attack does not spend ore");
   assert.equal(findUnit(s, "near").hp, 20, "adjacent pickaxe strike adds +2 damage");
+});
+
+test("adjacent basic attacks that destroy walls grant Miner 2 ore", () => {
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 1 });
+  state.tileObjects["1,2"] = { kind: "wall", hp: 1 };
+
+  let s = run(state, beginActivation(1, "miner")).nextState;
+  const result = run(s, attackTile(1, "miner", 1, 2));
+  s = result.nextState;
+
+  assert.equal(s.tileObjects["1,2"], undefined);
+  assert.equal(findUnit(s, "miner").mp, 3);
+  assert.equal(result.events[0].oreGained, 2);
+  assert.equal(result.events[0].oreAfter, 3);
+});
+
+test("ranged wall basic attacks spend ore and do not grant Miner wall-kill ore", () => {
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 3 });
+  state.tileObjects["4,1"] = { kind: "wall", hp: 1 };
+
+  let s = run(state, beginActivation(1, "miner")).nextState;
+  const result = run(s, attackTile(1, "miner", 4, 1));
+  s = result.nextState;
+
+  assert.equal(s.tileObjects["4,1"], undefined);
+  assert.equal(findUnit(s, "miner").mp, 2, "ranged wall attack costs ore and gives no adjacent reward");
+  assert.equal(result.events[0].oreGained, undefined);
 });
 
 test("Ore Harvest gathers weighted ore, caps at 25, and grants +1 move next turn", () => {
@@ -137,6 +164,36 @@ test("Blasting Cap miss spends ore but does nothing else", () => {
   assert.equal(findUnit(s, "nearby").hp, 24);
   assert.deepEqual(findUnit(s, "nearby").position, { x: 3, y: 4 });
   assert.equal(findUnit(s, "miner").mp, 0);
+});
+
+test("Blasting Cap can target a wall without a roll, destroy it for no ore, and splash only units", () => {
+  const state = scenario([
+    { id: "pushed", player: 2, type: "archer", x: 3, y: 4 },
+    { id: "blocked", player: 2, type: "archer", x: 2, y: 3 },
+    { id: "far", player: 2, type: "archer", x: 5, y: 5 }
+  ], { mp: 5 });
+  state.tileObjects["3,3"] = { kind: "wall", hp: 1 };
+  state.tileObjects["1,3"] = { kind: "wall", hp: 1 };
+  state.tileObjects["3,2"] = { kind: "wall", hp: 1 };
+
+  let s = run(state, beginActivation(1, "miner")).nextState;
+  const result = run(s, useArt(1, "miner", "blasting-cap", {
+    targetPosition: { x: 3, y: 3 },
+    attackRoll: 0.01,
+    critRoll: 0.01
+  }));
+  s = result.nextState;
+
+  assert.equal(s.tileObjects["3,3"], undefined, "targeted wall is destroyed");
+  assert.deepEqual(s.tileObjects["3,2"], { kind: "wall", hp: 1 }, "other nearby walls are not splashed");
+  assert.equal(findUnit(s, "miner").mp, 3, "Blasting Cap costs ore but grants no wall-kill ore");
+  assert.deepEqual(findUnit(s, "pushed").position, { x: 3, y: 5 });
+  assert.equal(findUnit(s, "blocked").hp, 22, "blocked splash unit takes 2 true damage");
+  assert.equal(findUnit(s, "far").hp, 24);
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].rolled, false);
+  assert.equal(result.events[0].destroyedWall, true);
+  assert.deepEqual(result.events[0].position, { x: 3, y: 3 });
 });
 
 test("Diamond Harvester fills ore on rage entry and Ore Abundance replaces Ore Harvest", () => {
