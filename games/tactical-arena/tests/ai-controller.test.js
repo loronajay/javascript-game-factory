@@ -110,6 +110,67 @@ test("the CPU Miner digs an adjacent wall for ore when boxed in", () => {
   assert.equal(findUnit(after, "p2-miner").mp, 2, "adjacent wall kill grants ore");
 });
 
+test("the CPU Miner stops farming walls once an enemy is adjacent", () => {
+  const state = createBattleState({
+    size: 9, seed: 12,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 7, y: 0 },
+      { id: "p2-miner", type: "miner", player: 2, x: 8, y: 0, mp: 0 }
+    ],
+    tileObjects: [
+      { x: 7, y: 1, kind: "wall", hp: 1 },
+      { x: 8, y: 1, kind: "wall", hp: 1 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(!commands.some((c) => c.type === "ATTACK" && c.targetPosition), "expected Miner not to attack a wall while engaged");
+  assert.ok(commands.some((c) =>
+    (c.type === "ATTACK" && c.targetId === "p1-sword") ||
+    (c.type === "USE_ART" && c.targeting?.targetId === "p1-sword")
+  ), "expected Miner to do something hostile to the adjacent swordsman");
+  replay(state, commands);
+});
+
+test("the CPU Miner shoots a clean ranged target instead of farming an adjacent wall", () => {
+  const state = createBattleState({
+    size: 9, seed: 12,
+    units: [
+      { id: "p1-archer", type: "archer", player: 1, x: 3, y: 0 },
+      { id: "p2-miner", type: "miner", player: 2, x: 8, y: 0, mp: 2 }
+    ],
+    tileObjects: [
+      { x: 8, y: 1, kind: "wall", hp: 1 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(!commands.some((c) => c.type === "ATTACK" && c.targetPosition), "expected Miner not to farm a wall with a clean shot available");
+  assert.ok(commands.some((c) => c.type === "ATTACK" && c.targetId === "p1-archer"), "expected Miner to shoot the archer");
+  replay(state, commands);
+});
+
+test("the CPU Miner may keep mining when a ranged enemy is only reachable through cover", () => {
+  const state = createBattleState({
+    size: 9, seed: 12,
+    units: [
+      { id: "p1-sniper", type: "sniper", player: 1, x: 3, y: 0 },
+      { id: "p2-miner", type: "miner", player: 2, x: 8, y: 0, mp: 2 }
+    ],
+    tileObjects: [
+      { x: 6, y: 0, kind: "wall", hp: 1 },
+      { x: 8, y: 1, kind: "wall", hp: 1 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(commands.some((c) => c.type === "ATTACK" && c.targetPosition), "expected a wall attack when no clean shot exists");
+  replay(state, commands);
+});
+
 test("a full CPU squad turn is legal and terminates, handing the turn back", () => {
   let s = skirmish(2);
   let guard = 0;

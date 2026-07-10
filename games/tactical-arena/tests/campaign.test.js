@@ -1890,16 +1890,32 @@ test("Dug Your Own Grave covers every non-spawn walkable tile with a 1-HP wall",
   }
 });
 
-test("Dug Your Own Grave map cutscene repeats and uses the chosen volunteer without spoiling the solve", () => {
+test("Dug Your Own Grave map cutscene waits to pick a volunteer until the party asks for one", () => {
   const storage = storageAdapter();
   assert.equal(shouldShowCampaignMapCutscene(storage, MINER_MISSION_ID), true);
   markCampaignMapCutsceneSeen(storage, MINER_MISSION_ID);
   assert.equal(shouldShowCampaignMapCutscene(storage, MINER_MISSION_ID), true);
 
+  const preChoice = campaignMapCutsceneScript(MINER_MISSION_ID, null, { phase: "preChoice" });
+  assert.equal(preChoice.some((line) => line.type === "sniper"), false);
+  assert.match(preChoice.map((line) => line.text).join(" "), /someone should check|one person/i);
+
+  const postChoice = campaignMapCutsceneScript(MINER_MISSION_ID, ["sniper"], { phase: "postChoice" });
+  assert.equal(postChoice.some((line) => line.type === "sniper"), true);
+  assert.match(postChoice.map((line) => line.text).join(" "), /sealed|too thick|cannot hear/i);
+  assert.equal(
+    postChoice.findIndex((line) => line.type === "sniper") < postChoice.findIndex((line) => /sealed/i.test(line.text)),
+    true,
+  );
+
   const mapScript = campaignMapCutsceneScript(MINER_MISSION_ID, ["sniper"]);
   assert.equal(mapScript.length >= 5, true);
   assert.ok(mapScript.some((line) => line.type === "sniper"));
   assert.match(mapScript.map((line) => line.text).join(" "), /hole|sealed|stuck|check/i);
+  assert.doesNotMatch(
+    mapScript.slice(mapScript.findIndex((line) => /sealed/i.test(line.text)) + 1).map((line) => line.text).join(" "),
+    /I am still standing|nobody panic/i,
+  );
   assert.doesNotMatch(mapScript.map((line) => line.text).join(" "), /shoot past walls|bonus star|Sniper is/i);
 });
 
@@ -1923,7 +1939,7 @@ test("Dug Your Own Grave battle dialogue covers opening, splash, rage, and defea
     units: playing.units.map((unit) => unit.id === "p2-0-miner" ? { ...unit, hp: 5 } : unit),
   };
   assert.equal(shouldShowMinerRageWarning(raging, { warningShown: false, minerRageHarvested: true }), true);
-  assert.equal(shouldShowMinerRageWarning(raging, { warningShown: false, minerRageHarvested: false }), false);
+  assert.equal(shouldShowMinerRageWarning(raging, { warningShown: false, minerRageHarvested: false }), true);
   assert.match(minerRageWarningScript(raging).map((line) => line.text).join(" "), /diamond|ore|mine/i);
   assert.match(minerDefeatScript({ ...playing, winner: 1 }).map((line) => line.text).join(" "), /air|out|help/i);
 });

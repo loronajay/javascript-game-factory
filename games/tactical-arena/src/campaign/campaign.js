@@ -411,11 +411,11 @@ function volunteerType(selectedSquad) {
   return (Array.isArray(selectedSquad) ? selectedSquad : []).find((type) => UNIT_TYPE_KEYS.includes(type)) ?? "swordsman";
 }
 
-export function campaignMapCutsceneScript(missionId, selectedSquad = null) {
+export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
   if (missionId === MINER_MISSION_ID) {
     const type = volunteerType(selectedSquad);
     const name = getUnitType(type).name;
-    return [
+    const preChoice = [
       {
         speaker: "swordsman",
         text: "No. Absolutely not. That is another hole.",
@@ -428,25 +428,27 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null) {
         speaker: "archer",
         text: "Someone should check whether it opens onto the trail. One person, quick look, then back up.",
       },
+    ];
+    const postChoice = [
       {
         type,
         name,
         side: "left",
         player: 1,
-        text: "I'll go. If it is nothing, you can all pretend you were brave from up here.",
+        text: "I'll go. If it bends left, I will call back before--",
       },
       {
         speaker: "swordsman",
         text: "The entrance just sealed. The entrance definitely just sealed.",
       },
       {
-        type,
-        name,
-        side: "left",
-        player: 1,
-        text: "I am still standing. Nobody panic loudly enough to bring the ceiling down.",
+        speaker: "mystic",
+        text: "I cannot hear them through the stone. The wall is too thick.",
       },
     ];
+    if (phase === "preChoice") return preChoice;
+    if (phase === "postChoice") return postChoice;
+    return [...preChoice, ...postChoice];
   }
   if (missionId === WANDERING_PARTY_MISSION_ID) {
     return [
@@ -2019,8 +2021,8 @@ export function minerBlastingCapSplashWarningScript(state) {
   ];
 }
 
-export function shouldShowMinerRageWarning(state, { warningShown = false, minerRageHarvested = false } = {}) {
-  if (warningShown || !minerRageHarvested || state?.phase !== "playing") return false;
+export function shouldShowMinerRageWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
   const miner = findUnit(state, "p2-0-miner");
   return Boolean(miner && miner.hp > 0 && miner.hp <= 5);
 }

@@ -12,10 +12,10 @@
 // a replay reproduces the same moves.
 
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, getWallKillResourceReward, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getBasicAttackResourceCost, getEffectiveStats, getWallKillResourceReward, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { getSelfBlastRadius } from "../rules/arts.js";
-import { isFireDamageImmune } from "../rules/combat.js";
+import { isFireDamageImmune, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
 import { isStunned } from "../rules/statuses.js";
 import {
@@ -153,7 +153,7 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
 
   // 4. Zone control from a placed wall / fire.
   score += weights.zone * planZoneValue(unit, plan);
-  score += wallBreakValue(unit, plan);
+  score += wallBreakValue(state, unit, plan);
 
   // 5. Don't burn a costly blast on too few targets for no kill (decision 1/5 economy).
   const primaryArtAi = artAiFor(unit, plan);
@@ -285,14 +285,29 @@ function planZoneValue(unit, plan) {
   return ai?.intent === "placeObject" ? (ai.evHints?.zoneValue ?? 0) : 0;
 }
 
-function wallBreakValue(unit, plan) {
+function wallBreakValue(state, unit, plan) {
   if (plan.primary.kind !== "attackTile") return 0;
   const target = plan.primary.targetPosition;
+  const actorPos = plan.movePhase === "before" && plan.moveTo ? plan.moveTo : unit.position;
+  if (hasCleanBasicAttackTarget(state, unit, actorPos)) return 0;
   const oreReward = getWallKillResourceReward(
-    { ...unit, position: plan.movePhase === "before" && plan.moveTo ? plan.moveTo : unit.position },
+    { ...unit, position: actorPos },
     target,
   );
   return WALL_BREAK_VALUE + oreReward * WALL_ORE_VALUE;
+}
+
+function hasCleanBasicAttackTarget(state, unit, position) {
+  const actor = { ...unit, position };
+  const range = getEffectiveStats(actor, state).attackRange;
+  if (range < 1) return false;
+  return livingUnits(state).some((other) =>
+    areEnemies(unit, other) &&
+    chebyshevDistance(position, other.position) <= range &&
+    getBasicAttackResourceCost(actor, other) <= actor.mp &&
+    !isWallBetween(state, position, other.position, actor) &&
+    !isShotBlocked(state, position, other.position, actor)
+  );
 }
 
 function artAiFor(unit, plan) {

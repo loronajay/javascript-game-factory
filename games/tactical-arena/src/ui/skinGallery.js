@@ -32,10 +32,9 @@ export function openSkinGallery() {
   card.appendChild(head);
 
   const body = el("div", "skin-gallery-body");
+  let savedScrollTop = 0;
   renderList();
   card.appendChild(body);
-
-  let savedScrollTop = 0;
 
   function renderList() {
     body.replaceChildren();

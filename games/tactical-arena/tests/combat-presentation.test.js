@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets } from "../src/ui/combatPresentation.js";
+import {
+  clumsySplashTargets,
+  healingPresentationTargets,
+  orderedHitTargets,
+  shouldUseRangedAttackAnimation
+} from "../src/ui/combatPresentation.js";
 
 test("line attack hit presentation follows the reducer's closest-first target order", () => {
   const units = new Map([
@@ -58,4 +63,22 @@ test("Clumsy splash presentation can read keyed splash payloads without targetId
     clumsySplashTargets(resolved, (id) => ({ id })).map((unit) => unit.id),
     ["left", "right"]
   );
+});
+
+test("Miner basic attack animation uses a melee lunge only at adjacent range", () => {
+  const miner = { id: "miner", type: "miner", position: { x: 2, y: 2 } };
+  const adjacent = { id: "adjacent", type: "swordsman", position: { x: 3, y: 2 } };
+  const distant = { id: "distant", type: "swordsman", position: { x: 4, y: 2 } };
+
+  assert.equal(shouldUseRangedAttackAnimation(miner, adjacent), false);
+  assert.equal(shouldUseRangedAttackAnimation(miner, distant), true);
+});
+
+test("Ranged presentation keeps existing projectile behavior outside Miner basic attacks", () => {
+  const archer = { id: "archer", type: "archer", position: { x: 2, y: 2 } };
+  const clod = { id: "clod", type: "clod", position: { x: 2, y: 2 } };
+  const adjacent = { id: "adjacent", type: "swordsman", position: { x: 3, y: 2 } };
+
+  assert.equal(shouldUseRangedAttackAnimation(archer, adjacent), true);
+  assert.equal(shouldUseRangedAttackAnimation(clod, adjacent, { artRange: 4 }), true);
 });

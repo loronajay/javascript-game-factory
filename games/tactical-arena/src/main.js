@@ -9,7 +9,7 @@ import { applyCommand } from "./core/reducer.js";
 import { chooseActivation, cpuRng } from "./ai/cpuController.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
-import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets } from "./ui/combatPresentation.js";
+import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets, shouldUseRangedAttackAnimation } from "./ui/combatPresentation.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
@@ -437,9 +437,9 @@ function setMessage(text, isError = false) {
 // The one-time overworld cutscene plays when the mission node is first selected on
 // the map — before the briefing/details panel — so the story beat leads into the
 // mission, not into the match launch. Marked seen only once it has actually shown.
-async function onCampaignMissionSelected(missionId, selectedSquad = null) {
+async function onCampaignMissionSelected(missionId, selectedSquad = null, options = {}) {
   if (!missionId || !shouldShowCampaignMapCutscene(globalThis.localStorage, missionId)) return;
-  const script = campaignMapCutsceneScript(missionId, selectedSquad);
+  const script = campaignMapCutsceneScript(missionId, selectedSquad, options);
   if (!script.length) return;
   // Mark seen only after the cutscene has actually played out, so an interrupted or
   // never-rendered show doesn't silently burn the one-time story beat.
@@ -1531,9 +1531,7 @@ async function resolveCombat(command) {
     // A ranged ART fires a projectile even from a melee-range unit (Clod's Stone Throw is
     // range 4), so read the ART's own reach when one is being cast.
     const artRange = rolled.artId ? artDefinition(attackerBefore, rolled.artId)?.targeting?.range : null;
-    const ranged = Number.isFinite(artRange)
-      ? artRange > 1
-      : getUnitType(attackerBefore.type).stats.attackRange > 1;
+    const ranged = shouldUseRangedAttackAnimation(attackerBefore, targetBefore, { artRange });
     const center = unitCenter(metrics, targetBefore);
 
     await effects.animateAttack(attackerBefore, targetBefore, ranged, rolled.artId ?? null);
@@ -1653,7 +1651,7 @@ async function resolveWallAttack(command) {
   const attackerBefore = findUnit(state, command.actorId); // captured before beginResolve commits
   beginResolve(result);
   if (event && attackerBefore) {
-    const ranged = getUnitType(attackerBefore.type).stats.attackRange > 1;
+    const ranged = shouldUseRangedAttackAnimation(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position });
     const center = unitCenter(metrics, { position: event.position });
     await effects.animateAttack(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position }, ranged);
     audio.play(ranged ? "arrowHit" : "attackHit");

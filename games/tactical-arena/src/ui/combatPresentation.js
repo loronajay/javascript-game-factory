@@ -1,3 +1,6 @@
+import { getUnitType } from "../core/unitCatalog.js";
+import { chebyshevDistance } from "../rules/movement.js";
+
 export function orderedHitTargets(rolled, findUnitById) {
   if (!rolled || typeof findUnitById !== "function") return [];
   const ids = Array.isArray(rolled.targetIds) && rolled.targetIds.length
@@ -20,4 +23,13 @@ export function clumsySplashTargets(resolved, findUnitById, kind = "damage") {
   const byTarget = kind === "healing" ? resolved.splashHealingByTarget : resolved.splashDamageByTarget;
   for (const id of Object.keys(byTarget ?? {})) ids.add(id);
   return [...ids].map((id) => findUnitById(id)).filter(Boolean);
+}
+
+export function shouldUseRangedAttackAnimation(attacker, target, { artRange = null } = {}) {
+  if (!attacker || !target?.position) return false;
+  if (Number.isFinite(artRange)) return artRange > 1;
+  if (attacker.type === "miner") {
+    return chebyshevDistance(attacker.position, target.position) > 1;
+  }
+  return getUnitType(attacker.type).stats.attackRange > 1;
 }

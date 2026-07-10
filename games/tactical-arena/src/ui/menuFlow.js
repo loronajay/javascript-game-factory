@@ -533,9 +533,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       choices,
       groups,
     });
-    if (!picked) return;
+    if (!picked) return null;
     campaignSquad[slot] = picked;
     renderCampaignSquad();
+    return picked;
   }
 
   function unitLabel(type) {
@@ -822,13 +823,16 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
             campaignSquadSize(selectedCampaignNode),
             selectedCampaignNode?.lockedSlots ?? null,
           );
-          void chooseCampaignUnit(0).then(() => {
-            if (campaignSquadReady() && onCampaignMissionSelected) {
-              campaignDynamicLockedSlots = { missionId, slots: { 0: campaignSquad[0] } };
-              return Promise.resolve(onCampaignMissionSelected(missionId, campaignSquad));
+          void (async () => {
+            if (onCampaignMissionSelected) {
+              await onCampaignMissionSelected(missionId, null, { phase: "preChoice" });
             }
-            return null;
-          }).finally(() => renderCampaign());
+            const picked = await chooseCampaignUnit(0);
+            if (picked && campaignSquadReady() && onCampaignMissionSelected) {
+              campaignDynamicLockedSlots = { missionId, slots: { 0: campaignSquad[0] } };
+              await onCampaignMissionSelected(missionId, campaignSquad, { phase: "postChoice" });
+            }
+          })().finally(() => renderCampaign());
           break;
         }
         campaignDynamicLockedSlots = null;
