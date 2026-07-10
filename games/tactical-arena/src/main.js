@@ -38,24 +38,28 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   GARGOYLE_MISSION_ID,
+  HASBEEN_HEROES_FAT_TYPES,
+  HASBEEN_HEROES_MISSION_ID,
   MINER_MISSION_ID,
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
   PALADIN_MISSION_ID,
   SNIPER_MISSION_ID,
   VIRUS_MISSION_ID,
-  WANDERING_PARTY_MISSION_ID,
-  WANDERING_PARTY_SKIN_PACK,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
   applyMonkTrialIntroBeat,
   campaignMapCutsceneScript,
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
+  campaignRewardPickedScript,
   clodRageWarningScript,
   completeCampaignMission,
   fatherTimeRageWarningScript,
   gargoyleRageWarningScript,
+  getCampaignMission,
+  hasbeenFatRageWarningScript,
+  hasbeenHeroesDefeatScript,
   markCampaignMapCutsceneSeen,
   markCampaignPostMatchCutsceneSeen,
   minerBlastingCapSplashWarningScript,
@@ -75,6 +79,7 @@ import {
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
   shouldShowGargoyleRageWarning,
+  shouldShowHasbeenFatRageWarning,
   shouldShowMinerBlastingCapSplashWarning,
   shouldShowMinerRageWarning,
   shouldShowNecromancerRageWarning,
@@ -253,6 +258,11 @@ function createCampaignMeta() {
     minerEnteredRage: false,
     minerRageHarvested: false,
     minerDefeatDialogueShown: false,
+    // Has-Been Heroes (mission 12)
+    fartDisplacementDamageTakenCount: 0,
+    hasbeenDefeatDialogueShown: false,
+    // Per-fat-member one-time RAGE popup flags, keyed by unit type.
+    hasbeenFatRageWarned: Object.fromEntries(HASBEEN_HEROES_FAT_TYPES.map((type) => [type, false])),
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -464,7 +474,13 @@ async function onCampaignMapEntered({ openCampaignRewardChoice } = {}) {
     if (script.length) await dialogue.show(script);
     markCampaignPostMatchCutsceneSeen(globalThis.localStorage, pending.missionId);
   }
-  await openCampaignRewardChoice?.(pending.packId);
+  const picked = await openCampaignRewardChoice?.(pending.packId);
+  // A closing beat plays only if the player actually took a reward (Has-Been Heroes'
+  // Mystic payoff line); declining the pick shows nothing.
+  if (picked) {
+    const closer = campaignRewardPickedScript(pending.missionId);
+    if (closer.length) await dialogue.show(closer);
+  }
 }
 
 async function handleDialogueLineAction(action) {
@@ -701,15 +717,17 @@ function announceTurnChange(prevPlayer) {
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
     if (matchConfig?.mode === "campaign" && campaignMissionId) {
       summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
-      // The Wandering Party's skin reward runs on the map after results. Only queue it on
-      // a win whose reward hasn't already been granted, and force the results screen to
-      // route back through the map so the cutscene + reward pick can't be skipped.
+      // Skin-reward missions (The Wandering Party, Has-Been Heroes) run their reward pick on
+      // the map AFTER results. Only queue it on a win whose reward hasn't already been
+      // granted, and force the results screen to route back through the map so the
+      // post-match cutscene + reward pick can't be skipped.
+      const rewardPack = getCampaignMission(campaignMissionId)?.rewardSkinPack ?? null;
       if (
-        campaignMissionId === WANDERING_PARTY_MISSION_ID &&
+        rewardPack &&
         state.winner === 1 &&
-        !isCampaignSkinRewardGranted(globalThis.localStorage, WANDERING_PARTY_SKIN_PACK)
+        !isCampaignSkinRewardGranted(globalThis.localStorage, rewardPack)
       ) {
-        pendingCampaignReward = { missionId: campaignMissionId, packId: WANDERING_PARTY_SKIN_PACK };
+        pendingCampaignReward = { missionId: campaignMissionId, packId: rewardPack };
         summary.campaign.forceMapReturn = true;
       }
     }
@@ -736,6 +754,18 @@ function announceTurnChange(prevPlayer) {
     ) {
       campaignMeta.minerDefeatDialogueShown = true;
       const script = minerDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
+    } else if (
+      campaignMissionId === HASBEEN_HEROES_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.hasbeenDefeatDialogueShown
+    ) {
+      campaignMeta.hasbeenDefeatDialogueShown = true;
+      const script = hasbeenHeroesDefeatScript(state);
       if (script.length) {
         void dialogue.show(script).then(showResults);
       } else {
@@ -974,6 +1004,19 @@ function recordCampaignProgressHooks(command, result) {
         }
       }
     }
+  } else if (campaignMissionId === HASBEEN_HEROES_MISSION_ID) {
+    // The star is "take no Fart displacement damage": a Fart that CAN'T shove its target
+    // (wall/body/edge behind it) deals true damage instead, surfaced on the resolve event's
+    // `blocked` list. Count each blocked-shove that actually hit one of the player's units.
+    for (const event of events) {
+      if (event.type !== "ART_RESOLVED" || event.artId !== "fart") continue;
+      if (findUnit(state, event.actorId)?.player !== 2) continue;
+      for (const id of event.blocked ?? []) {
+        if (findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0) {
+          campaignMeta.fartDisplacementDamageTakenCount += 1;
+        }
+      }
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -1199,6 +1242,20 @@ function nextCampaignDialogueBeat() {
         },
         script: minerRageWarningScript,
       };
+    }
+    return null;
+  }
+  if (campaignMissionId === HASBEEN_HEROES_MISSION_ID) {
+    // Each fat member gets ONE popup the first time it enters RAGE. Progression is not
+    // gated on these — the player is meant to avoid pushing them this far. Fire them in
+    // fielding order, one per check, so simultaneous rages queue instead of colliding.
+    for (const type of HASBEEN_HEROES_FAT_TYPES) {
+      if (shouldShowHasbeenFatRageWarning(state, type, { warned: campaignMeta.hasbeenFatRageWarned[type] })) {
+        return {
+          markShown: () => { campaignMeta.hasbeenFatRageWarned[type] = true; },
+          script: (matchState) => hasbeenFatRageWarningScript(matchState, type),
+        };
+      }
     }
     return null;
   }

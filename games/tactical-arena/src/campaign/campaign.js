@@ -4,7 +4,7 @@ import { nextRandom } from "../core/rng.js";
 import { isNegativeStatus } from "../rules/statuses.js";
 import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
-import { readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
+import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { computeCampaignGeometry, computeRegionBoxes } from "./campaignMap.js";
 
@@ -20,9 +20,17 @@ export const GARGOYLE_MISSION_ID = "gargoyle-inferno";
 export const SNIPER_MISSION_ID = "sniper-highground";
 export const WANDERING_PARTY_MISSION_ID = "wandering-party";
 export const MINER_MISSION_ID = "dug-your-own-grave";
+export const HASBEEN_HEROES_MISSION_ID = "hasbeen-heroes";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
+// Has-Been Heroes rewards a Mystic skin the same way (see CAMPAIGN_SKIN_PACKS /
+// HASBEEN_MYSTIC_SKIN_PACK_ID in progression/unlocks.js — keep the string in sync).
+export const HASBEEN_MYSTIC_SKIN_PACK = "hasbeen-mystic";
+// The four members of the touring fat squad, in the order they field on the board
+// ("p2-<index>-<type>" ids follow this order). Their overworld/rage/defeat banter and
+// the "bring the whole starter squad" bonus all read off this list.
+export const HASBEEN_HEROES_FAT_TYPES = Object.freeze(["fat-knight", "fat-bowman", "fat-cleric", "fat-wizard"]);
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -210,6 +218,28 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 9,
     fullHp: true,
   },
+  // Has-Been Heroes (13×13): a plain full-HP 4v4 in a crowded market town — both parties
+  // just passing through Highmarket and bumping shoulders. No board puzzle; the fat squad
+  // fields as themselves. Like The Wandering Party, the reward is a SKIN not a unit
+  // (rewardUnits empty; rewardSkinPack points at the Mystic "hasbeen-mystic" pack). It owns
+  // two flag-gated cutscenes — an overworld meeting BEFORE the brief, and a post-match
+  // "let's go shopping" beat AFTER results that leads into the one-time Mystic skin pick.
+  // This is a story rite-of-passage: a later mission unlocks the fat squad outright.
+  [HASBEEN_HEROES_MISSION_ID]: {
+    id: HASBEEN_HEROES_MISSION_ID,
+    title: "Has-Been Heroes",
+    subtitle: "A worn-out party blocks the market road",
+    description: "A tired band of travelers crosses your path in the crowded town of Highmarket. Beat all four of them in a fair four-on-four. Bring any squad — the old starter four have a little extra to prove here.",
+    unitType: "fat-knight",
+    requiredStars: 22,
+    rewardUnits: Object.freeze([]),
+    rewardLabel: "A new look for the Mystic",
+    rewardSkinPack: HASBEEN_MYSTIC_SKIN_PACK,
+    playerSlots: 4,
+    enemySquad: Object.freeze([...HASBEEN_HEROES_FAT_TYPES]),
+    size: 13,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -230,6 +260,7 @@ export const CAMPAIGN_REGIONS = Object.freeze([
   Object.freeze({ id: "plateau", biome: "plateau", label: "The High Cliffs" }),
   Object.freeze({ id: "ashfall", biome: "volcanic", label: "Ashfall Caldera" }),
   Object.freeze({ id: "wood", biome: "forest", label: "Whisperwood" }),
+  Object.freeze({ id: "town", biome: "town", label: "Highmarket" }),
   Object.freeze({ id: "frost", biome: "snow", label: "Frostcrown Peaks" }),
   Object.freeze({ id: "waste", biome: "ruins", label: "The Shattered Waste" }),
 ]);
@@ -257,8 +288,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "Flat cliffs and long sightlines. Whoever holds the plateau's height holds every lane across it." },
   { id: WANDERING_PARTY_MISSION_ID, cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood" },
   { id: MINER_MISSION_ID, cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves" },
-  { id: "uncharted-13", cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "wood", locationName: "Elderroot",
-    blurb: "An old grove said to shelter a blindfolded, winged archer whose arrows never truly miss." },
+  { id: HASBEEN_HEROES_MISSION_ID, cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "town", locationName: "Highmarket" },
   { id: "uncharted-14", cell: { col: 0, row: 3 }, point: { x: 57.9, y: 72.5 }, region: "wood", locationName: "Thornhollow",
     blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
   { id: "uncharted-15", cell: { col: 0, row: 2 }, point: { x: 71.2, y: 78.9 }, region: "frost", locationName: "Frostcrown Foothills",
@@ -450,6 +480,25 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
     if (phase === "postChoice") return postChoice;
     return [...preChoice, ...postChoice];
   }
+  if (missionId === HASBEEN_HEROES_MISSION_ID) {
+    // Overworld meeting in the crowded town: both parties just passing through. The fat
+    // squad speaks on the right (player 2, their own art); your Swordsman + Mystic answer
+    // on the left. One-time beat (gated by seenMapCutscenes).
+    const fat = (type, text) => ({ speaker: type, side: "right", player: 2, text });
+    return [
+      fat("fat-knight", "Hold up. Hoooold up. I need a break. My feet have filed a formal complaint."),
+      fat("fat-bowman", "You? A break? I have been on a break since the second castle. This is just how I walk now."),
+      fat("fat-cleric", "Wherever we stop, I hope they have food. Real food. A whole cart of it, ideally."),
+      fat("fat-wizard", "*hic* — has anyone... has anyone seen my staff? It was RIGHT here. It had a little... a little pointy bit."),
+      fat("fat-knight", "Wait. New faces. You lot — where are you headed in such a hurry?"),
+      { speaker: "swordsman", side: "left", text: "The castle. We have business with the king." },
+      fat("fat-knight", "*straightens up* Oh no you're not. WE have a beef to settle with that king. You'll wait your turn."),
+      { speaker: "mystic", side: "left", text: "A beef? What on earth did the king do to you four?" },
+      fat("fat-wizard", "*hic* Banished us! Framed us for a terrible, TERRIBLE crime we did not commit. And the worst part is we're not even from this ti--"),
+      fat("fat-knight", "That's ENOUGH out of you. *ahem.* The point is, there is no way you reach that castle before we do. Not a chance."),
+      { speaker: "swordsman", side: "left", text: "We'll see about that." },
+    ];
+  }
   if (missionId === WANDERING_PARTY_MISSION_ID) {
     return [
       { ...WANDERING_LINE, type: "swordsman", name: "Wandering Swordsman",
@@ -521,6 +570,19 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === HASBEEN_HEROES_MISSION_ID) {
+    // The fat squad has trudged off; the party lingers in town. The Mystic pitches a
+    // shopping trip, which leads straight into the one-time Mystic skin pick. One-time
+    // beat (gated by seenPostMatchCutscenes).
+    return [
+      { speaker: "mystic", side: "left",
+        text: "Well, since we're already in town... we simply have to go shopping. When will we be back in Highmarket, hm?" },
+      { speaker: "swordsman", side: "left",
+        text: "Mystic. We are being chased across a war map by four sad wizards." },
+      { speaker: "mystic", side: "left",
+        text: "Which is exactly why I deserve something nice. Just one little look. It'll be quick, I promise." },
+    ];
+  }
   if (missionId !== WANDERING_PARTY_MISSION_ID) return [];
   return [
     { ...WANDERING_LINE, type: "mystic", name: "Wandering Mystic",
@@ -531,6 +593,19 @@ export function campaignPostMatchCutsceneScript(missionId) {
       text: "Ha! We have more wandering ahead of us, but a promise is a promise. Take a costume from our packs and wear it well." },
     { ...WANDERING_LINE, type: "archer", name: "Wandering Archer",
       text: "Safe travels, friends. Perhaps our roads will cross again someday." },
+  ];
+}
+
+// The closing beat that plays AFTER the player actually picks a reward skin (not shown if
+// the pick is declined). Currently only Has-Been Heroes uses it, for the Mystic's payoff
+// line on her new look.
+export function campaignRewardPickedScript(missionId) {
+  if (missionId !== HASBEEN_HEROES_MISSION_ID) return [];
+  return [
+    { speaker: "mystic", side: "left",
+      text: "Oh, I LOVE it. Don't you just love shopping? I feel like a whole new caster." },
+    { speaker: "swordsman", side: "left",
+      text: "...Can we go beat the fat wizards to a castle now." },
   ];
 }
 
@@ -681,6 +756,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
       1: "Player Vanguard",
       2: mission.id === WANDERING_PARTY_MISSION_ID
         ? "The Wanderers"
+        : mission.id === HASBEEN_HEROES_MISSION_ID
+        ? "The Has-Beens"
         : mission.id === MINER_MISSION_ID
         ? "Buried Claim"
         : mission.id === SNIPER_MISSION_ID
@@ -1074,6 +1151,13 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fullHp: true,
     tileObjects: minerWallObjects,
   },
+  // Has-Been Heroes (13×13): a plain full-HP 4v4 on the default corner blocks — no walls,
+  // no fire, no trial. The fat squad fields as itself in the opposite corner.
+  [HASBEEN_HEROES_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -1284,6 +1368,26 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
     ];
     bonusObjectives = [];
     extra = { rewardSkinPack: mission?.rewardSkinPack ?? WANDERING_PARTY_SKIN_PACK };
+  } else if (missionId === HASBEEN_HEROES_MISSION_ID) {
+    // Win / take no Fart displacement (blocked-shove) true damage / keep everyone alive.
+    // Bonus: field the original starter four (Swordsman, Archer, Mystic, Magician).
+    const fartDisplacementDamageTakenCount = Math.max(0, Math.floor(Number(meta.fartDisplacementDamageTakenCount) || 0));
+    const playerTypes = new Set(playerUnits.map((unit) => unit.type));
+    const broughtStarterSquad = STARTER_UNIT_TYPES.every((type) => playerTypes.has(type));
+    objectives = [
+      complete,
+      { id: "noFartShove", label: "Take no Fart displacement damage", earned: victory && fartDisplacementDamageTakenCount === 0 },
+      survive,
+    ];
+    bonusObjectives = [
+      { id: "starterSquad", label: "Bonus: bring the original starter four", earned: victory && broughtStarterSquad },
+    ];
+    extra = {
+      fartDisplacementDamageTakenCount,
+      broughtStarterSquad,
+      rewardSkinPack: mission?.rewardSkinPack ?? HASBEEN_MYSTIC_SKIN_PACK,
+      fatSquadDefeated: enemyUnits.filter((unit) => HASBEEN_HEROES_FAT_TYPES.includes(unit.type) && unit.hp <= 0).length,
+    };
   } else if (missionId === SNIPER_MISSION_ID) {
     const wallDestroyedCount = Math.max(0, Math.floor(Number(meta.wallDestroyedCount) || 0));
     const fireDamageTakenCount = Math.max(0, Math.floor(Number(meta.fireDamageTakenCount) || 0));
@@ -2064,9 +2168,70 @@ export function minerDefeatScript(state) {
   ];
 }
 
+// --- Mission 12: Has-Been Heroes dialogue -------------------------------------
+// A friendly town brawl. The opening lets all four fat members chime in; each has a
+// one-time RAGE popup (progression is NOT gated on it — the player is meant to avoid
+// letting them rage); the completion beat plays before the results screen.
+
+function fatSquadUnit(state, type) {
+  return (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === type) ?? null;
+}
+
+export function hasbeenHeroesMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const line = (type, text) => {
+    const unit = fatSquadUnit(state, type);
+    return unit ? { speakerId: unit.id, text } : null;
+  };
+  return [
+    line("fat-knight", "Fine, FINE, we do this the hard way. Nobody passes the has-been heroes."),
+    line("fat-bowman", "Can we make it quick? I have a nap scheduled."),
+    line("fat-cleric", "Beat them fast so we can find a tavern. I am running dangerously low on snacks."),
+    line("fat-wizard", "*hic* I found my staff! It was in my other... my other hand. Okay. Magic time."),
+    { speakerId: speaker.id, text: "Watch the big one's Fart — if he shoves you into a wall or a body, it hurts. Keep room behind you." },
+  ].filter(Boolean);
+}
+
+export function shouldShowHasbeenFatRageWarning(state, type, { warned = false } = {}) {
+  if (warned || state?.phase !== "playing") return false;
+  const unit = fatSquadUnit(state, type);
+  return Boolean(unit && unit.hp > 0 && unit.hp <= 5);
+}
+
+const HASBEEN_FAT_RAGE_LINES = Object.freeze({
+  "fat-knight": "RAAAGH! Okay, NOW I'm awake! You woke the knight!",
+  "fat-bowman": "Nap's cancelled. You are going to regret cancelling my nap.",
+  "fat-cleric": "So... hungry... anger is a food group now, right? RIGHT?",
+  "fat-wizard": "*hic* Everything's spinning and I am FURIOUS about it!",
+});
+
+export function hasbeenFatRageWarningScript(state, type) {
+  const unit = fatSquadUnit(state, type);
+  const text = HASBEEN_FAT_RAGE_LINES[type];
+  if (!unit || !text) return [];
+  return [{ speakerId: unit.id, text }];
+}
+
+export function hasbeenHeroesDefeatScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const line = (type, text) => {
+    const unit = fatSquadUnit(state, type);
+    return { speakerId: unit?.id, speaker: type, text };
+  };
+  return [
+    line("fat-knight", "*panting* This... this isn't over. You haven't seen the last of us."),
+    line("fat-cleric", "Soooo hungry... did we win? We didn't win, did we..."),
+    line("fat-bowman", "I'm going back to my nap. Do NOT follow us."),
+    line("fat-wizard", "*hic* Great job everyone. To the next castle. Or... a tavern. Tavern first."),
+    ...(speaker ? [{ speakerId: speaker.id, text: "...I almost feel bad for them. Almost." }] : []),
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === HASBEEN_HEROES_MISSION_ID) return hasbeenHeroesMissionOpeningScript(state);
   if (missionId === MINER_MISSION_ID) return minerMissionOpeningScript(state);
   if (missionId === SNIPER_MISSION_ID) return sniperMissionOpeningScript(state);
   if (missionId === GARGOYLE_MISSION_ID) return gargoyleMissionOpeningScript(state);

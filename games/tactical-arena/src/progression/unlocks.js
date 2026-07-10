@@ -16,12 +16,19 @@ export const TUTORIAL_REWARD_SKIN_CHOICES = Object.freeze([
 // re-opened, so a player can't grind the mission for the rest of the pack. The chosen
 // skin is folded into unlockedSkins the same way the tutorial reward skin is.
 export const WANDERING_SKIN_PACK_ID = "wandering";
+// Has-Been Heroes (campaign mission 12) grants the Mystic one of two curated looks
+// after a friendly duel in town. Same one-final-pick rule as every campaign pack.
+export const HASBEEN_MYSTIC_SKIN_PACK_ID = "hasbeen-mystic";
 export const CAMPAIGN_SKIN_PACKS = Object.freeze({
   [WANDERING_SKIN_PACK_ID]: Object.freeze([
     Object.freeze({ type: "swordsman", slug: "wandering" }),
     Object.freeze({ type: "archer", slug: "wandering" }),
     Object.freeze({ type: "mystic", slug: "wandering" }),
     Object.freeze({ type: "magician", slug: "wandering" }),
+  ]),
+  [HASBEEN_MYSTIC_SKIN_PACK_ID]: Object.freeze([
+    Object.freeze({ type: "mystic", slug: "sun-goddess" }),
+    Object.freeze({ type: "mystic", slug: "lunar-goddess" }),
   ]),
 });
 

@@ -11,6 +11,9 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   GARGOYLE_MISSION_ID,
+  HASBEEN_HEROES_FAT_TYPES,
+  HASBEEN_HEROES_MISSION_ID,
+  HASBEEN_MYSTIC_SKIN_PACK,
   MINER_MISSION_ID,
   NECROMANCER_MISSION_ID,
   MONK_MISSION_ID,
@@ -24,6 +27,11 @@ import {
   campaignMapCutsceneScript,
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
+  campaignRewardPickedScript,
+  hasbeenHeroesMissionOpeningScript,
+  hasbeenHeroesDefeatScript,
+  hasbeenFatRageWarningScript,
+  shouldShowHasbeenFatRageWarning,
   markCampaignPostMatchCutsceneSeen,
   shouldShowCampaignPostMatchCutscene,
   clodMissionOpeningScript,
@@ -1997,4 +2005,170 @@ test("completing Dug Your Own Grave unlocks the Miner and records its stars", ()
   assert.deepEqual(completed.newRewardUnits, ["miner"]);
   assert.equal(isUnitUnlocked("miner", storage), true);
   assert.equal(readCampaignProgressStars(storage, MINER_MISSION_ID), 3);
+});
+
+// --- Mission 12: Has-Been Heroes ---------------------------------------------
+
+const STARTER_FOUR = ["swordsman", "archer", "mystic", "magician"];
+
+function hasbeenMatchState(squad = STARTER_FOUR) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(HASBEEN_HEROES_MISSION_ID, squad)),
+    HASBEEN_HEROES_MISSION_ID,
+  );
+}
+
+function hasbeenWonState(base, { survive = true } = {}) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => {
+      if (unit.player === 2) return { ...unit, hp: 0 };
+      // survive=false drops the first player unit so the survive objective fails.
+      if (!survive && unit.id === base.units.find((u) => u.player === 1)?.id) return { ...unit, hp: 0 };
+      return { ...unit, hp: Math.max(1, unit.hp) };
+    }),
+  };
+}
+
+test("Has-Been Heroes replaces the Elderroot placeholder with a town skin-reward mission", () => {
+  const mission = getCampaignMission(HASBEEN_HEROES_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.locationName, "Highmarket");
+  assert.equal(mission.region, "town");
+  assert.equal(mission.requiredStars, 22);
+  assert.deepEqual(mission.rewardUnits, []);
+  assert.equal(mission.rewardSkinPack, HASBEEN_MYSTIC_SKIN_PACK);
+  assert.deepEqual(mission.enemySquad, HASBEEN_HEROES_FAT_TYPES);
+
+  // The node replaces (not adds to) the map, and reports the new town biome once revealed.
+  const map = getCampaignMap(storageAdapter());
+  assert.equal(map.nodes.length, 19);
+  const node = map.nodes.find((n) => n.id === HASBEEN_HEROES_MISSION_ID);
+  assert.ok(node);
+  assert.equal(node.biome, "town");
+  assert.ok(map.regions.some((region) => region.biome === "town"));
+  // The old Elderroot placeholder id is gone.
+  assert.equal(map.nodes.some((n) => n.id === "uncharted-13"), false);
+});
+
+test("Has-Been Heroes builds a plain full-HP 13x13 4v4 with the fat squad in the far corner", () => {
+  const config = createCampaignMatchConfig(HASBEEN_HEROES_MISSION_ID, ["paladin", "necromancer", "clod", "gargoyle"]);
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 13);
+  assert.deepEqual(config.squads[1], ["paladin", "necromancer", "clod", "gargoyle"]);
+  assert.deepEqual(config.squads[2], HASBEEN_HEROES_FAT_TYPES);
+  assert.equal(config.teamNames[2], "The Has-Beens");
+
+  const match = hasbeenMatchState();
+  // No board hazards, no forced skins on either side, full HP for everyone.
+  const walls = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "wall");
+  const fires = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "fire");
+  assert.equal(walls.length, 0);
+  assert.equal(fires.length, 0);
+  for (const unit of match.units) {
+    assert.equal(unit.skin ?? null, null, `${unit.type} carries no forced skin`);
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.type} starts at full HP`);
+  }
+  assert.ok(findUnit(match, "p2-0-fat-knight"));
+  assert.ok(findUnit(match, "p2-3-fat-wizard"));
+});
+
+test("Has-Been Heroes grading: win, no Fart displacement, survival, and the starter-four bonus", () => {
+  const base = hasbeenMatchState(STARTER_FOUR);
+  const won = hasbeenWonState(base);
+
+  const perfect = evaluateCampaignMission(HASBEEN_HEROES_MISSION_ID, won, { fartDisplacementDamageTakenCount: 0 });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((o) => o.id), ["complete", "noFartShove", "survive"]);
+  assert.equal(perfect.bonusObjectives[0].id, "starterSquad");
+  assert.equal(perfect.broughtStarterSquad, true);
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  // The starter bonus can cover ONE missed base objective (here: took Fart displacement).
+  const cover = evaluateCampaignMission(HASBEEN_HEROES_MISSION_ID, won, { fartDisplacementDamageTakenCount: 2 });
+  assert.equal(cover.objectives.find((o) => o.id === "noFartShove").earned, false);
+  assert.equal(cover.stars, 3);
+
+  // A messy non-starter win: took Fart damage AND lost a unit AND no starter bonus.
+  const messyBase = hasbeenMatchState(["paladin", "necromancer", "clod", "gargoyle"]);
+  const messy = evaluateCampaignMission(
+    HASBEEN_HEROES_MISSION_ID,
+    hasbeenWonState(messyBase, { survive: false }),
+    { fartDisplacementDamageTakenCount: 1 },
+  );
+  assert.equal(messy.broughtStarterSquad, false);
+  assert.equal(messy.earnedBonusStars, 0);
+  assert.equal(messy.stars, 1, "only the win itself is earned");
+
+  const lost = { ...won, winner: 2 };
+  assert.equal(evaluateCampaignMission(HASBEEN_HEROES_MISSION_ID, lost, {}).stars, 0);
+});
+
+test("Has-Been Heroes battle dialogue covers opening banter, per-member rage, and defeat", () => {
+  const state = hasbeenMatchState();
+  const opening = hasbeenHeroesMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(HASBEEN_HEROES_MISSION_ID, state), opening);
+  // Every fat member chimes in at least once, plus the player's Fart warning.
+  for (const type of HASBEEN_HEROES_FAT_TYPES) {
+    const unit = state.units.find((u) => u.player === 2 && u.type === type);
+    assert.ok(opening.some((line) => line.speakerId === unit.id), `${type} speaks in the opening`);
+  }
+  assert.match(opening.map((line) => line.text).join(" "), /fart|shove|wall/i);
+
+  // Each fat member gets its own one-time RAGE popup, gated per member.
+  const playing = { ...state, phase: "playing" };
+  for (const type of HASBEEN_HEROES_FAT_TYPES) {
+    const raging = {
+      ...playing,
+      units: playing.units.map((unit) => (unit.player === 2 && unit.type === type ? { ...unit, hp: 5 } : unit)),
+    };
+    assert.equal(shouldShowHasbeenFatRageWarning(raging, type, { warned: false }), true);
+    assert.equal(shouldShowHasbeenFatRageWarning(raging, type, { warned: true }), false);
+    // A healthy member never triggers its rage line.
+    assert.equal(shouldShowHasbeenFatRageWarning(playing, type, { warned: false }), false);
+    const script = hasbeenFatRageWarningScript(raging, type);
+    assert.equal(script.length, 1);
+    assert.equal(script[0].speakerId, raging.units.find((u) => u.player === 2 && u.type === type).id);
+  }
+
+  const defeat = hasbeenHeroesDefeatScript({ ...playing, winner: 1 });
+  assert.ok(defeat.length >= 4);
+  assert.match(defeat.map((line) => line.text).join(" "), /last of us|hungry|nap|tavern/i);
+});
+
+test("Has-Been Heroes runs a one-time overworld cutscene where the fat squad blocks the road", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, HASBEEN_HEROES_MISSION_ID), true);
+  const script = campaignMapCutsceneScript(HASBEEN_HEROES_MISSION_ID);
+  assert.ok(script.length >= 8);
+  // The fat squad speaks on the right (player 2); the player's party answers on the left.
+  assert.ok(script.some((line) => line.speaker === "fat-knight" && line.side === "right"));
+  assert.ok(script.some((line) => line.speaker === "swordsman" && line.side === "left"));
+  assert.match(script.map((line) => line.text).join(" "), /castle|beef|king|break/i);
+
+  markCampaignMapCutsceneSeen(storage, HASBEEN_HEROES_MISSION_ID);
+  assert.equal(shouldShowCampaignMapCutscene(storage, HASBEEN_HEROES_MISSION_ID), false);
+  // The post-match cutscene tracks a separate flag, so it stays pending.
+  assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), true);
+});
+
+test("Has-Been Heroes post-match shopping cutscene + Mystic payoff line are wired and gated", () => {
+  const storage = storageAdapter();
+  const postMatch = campaignPostMatchCutsceneScript(HASBEEN_HEROES_MISSION_ID);
+  assert.ok(postMatch.length >= 2);
+  assert.match(postMatch.map((line) => line.text).join(" "), /shop|Highmarket/i);
+
+  const picked = campaignRewardPickedScript(HASBEEN_HEROES_MISSION_ID);
+  assert.ok(picked.length >= 1);
+  assert.match(picked.map((line) => line.text).join(" "), /love it|shopping/i);
+  // Other missions have no reward-picked beat.
+  assert.deepEqual(campaignRewardPickedScript(MINER_MISSION_ID), []);
+
+  assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), true);
+  markCampaignPostMatchCutsceneSeen(storage, HASBEEN_HEROES_MISSION_ID);
+  assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), false);
 });

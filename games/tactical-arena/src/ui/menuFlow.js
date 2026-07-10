@@ -13,6 +13,7 @@ import { openSkinPicker } from "./skinPicker.js";
 import { normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
 import {
+  HASBEEN_MYSTIC_SKIN_PACK_ID,
   getCampaignSkinRewardChoices,
   isCampaignSkinRewardGranted,
   resetUnlockProgress,
@@ -681,17 +682,35 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     }
   }
 
-  // The Wandering Party's reward: pick ONE skin from the wandering pack. The grant is
-  // final (selectCampaignRewardSkin rejects a second pick), so the pack can't be farmed
-  // by replaying the mission. Called by the host after the post-match cutscene resolves.
+  // Per-pack framing copy for the one-time campaign skin pick. Falls back to the
+  // traveler wording for any pack without its own entry.
+  const CAMPAIGN_REWARD_COPY = {
+    [HASBEEN_MYSTIC_SKIN_PACK_ID]: {
+      title: "A Little Shopping",
+      subtitle: "The Mystic insists on a souvenir from Highmarket. Choose one new look — this choice is final.",
+      cancelLabel: "Maybe Later",
+    },
+  };
+  const DEFAULT_CAMPAIGN_REWARD_COPY = {
+    title: "A Traveler's Gift",
+    subtitle: "The wandering party shares one costume from their packs. Choose a look — this choice is final.",
+    cancelLabel: "Decide Later",
+  };
+
+  // A skin-reward mission (The Wandering Party, Has-Been Heroes) pays out by letting the
+  // player pick ONE skin from its pack. The grant is final (selectCampaignRewardSkin rejects
+  // a second pick), so the pack can't be farmed by replaying the mission. Called by the host
+  // after the post-match cutscene resolves. Returns the chosen reward (or null if declined /
+  // already granted) so the host can play a closing beat only on a real pick.
   async function openCampaignRewardChoice(packId) {
     const choices = getCampaignSkinRewardChoices(packId);
-    if (!choices || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return;
+    if (!choices || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return null;
+    const copy = CAMPAIGN_REWARD_COPY[packId] ?? DEFAULT_CAMPAIGN_REWARD_COPY;
     const choice = await openChoiceModal({
-      title: "A Traveler's Gift",
-      subtitle: "The wandering party shares one costume from their packs. Choose a look — this choice is final.",
+      title: copy.title,
+      subtitle: copy.subtitle,
       accent: TEAM_COLOR[1],
-      cancelLabel: "Decide Later",
+      cancelLabel: copy.cancelLabel,
       choices: choices.map((reward) => ({
         value: reward,
         label: skinRewardLabel(reward),
@@ -700,9 +719,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         skin: reward.slug,
       })),
     });
-    if (!choice) return;
+    if (!choice) return null;
     selectCampaignRewardSkin(globalThis.localStorage, packId, choice);
     if (screens.active === "campaign") renderCampaign();
+    return choice;
   }
 
   // ── Settings overlay ─────────────────────────────────────────────────────
