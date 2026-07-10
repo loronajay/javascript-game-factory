@@ -9,6 +9,7 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  VIRUS_MISSION_ID,
   WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
   clodMissionOpeningScript,
@@ -30,10 +31,15 @@ import {
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowVirusEnemyStatusTaunt,
+  shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
   shouldShowWitchDoctorFireWarning,
   shouldShowWitchDoctorGhoulWarning,
   shouldShowWitchDoctorRageWarning,
+  virusEnemyStatusTauntScript,
+  virusMissionOpeningScript,
+  virusPoisonWarningScript,
   witchDoctorBlockedShotWarningScript,
   witchDoctorFireWarningScript,
   witchDoctorGhoulWarningScript,
@@ -258,6 +264,13 @@ function fatherTimeMatchState(squad = ["swordsman", "archer"]) {
   return prepareCampaignMatchState(
     createMatchState(createCampaignMatchConfig(FATHER_TIME_MISSION_ID, squad)),
     FATHER_TIME_MISSION_ID,
+  );
+}
+
+function virusMatchState(squad = ["swordsman", "archer", "mystic", "witch-doctor"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(VIRUS_MISSION_ID, squad)),
+    VIRUS_MISSION_ID,
   );
 }
 
@@ -765,6 +778,161 @@ test("completing Timeless Woods unlocks Father Time and records its stars", () =
   assert.deepEqual(completed.newRewardUnits, ["father-time"]);
   assert.equal(isUnitUnlocked("father-time", storage), true);
   assert.equal(readCampaignProgressStars(storage, FATHER_TIME_MISSION_ID), 3);
+});
+
+// --- Mission 5: Root of the Virus ---------------------------------------------
+
+test("Root of the Virus replaces the fifth swamp placeholder once enough stars are banked", () => {
+  const storage = storageAdapter();
+  const perfect = (missionId, state, meta) => completeCampaignMission(storage, missionId, {
+    ...state,
+    phase: "complete",
+    winner: 1,
+    units: state.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  }, meta);
+
+  perfect(CLOD_MISSION_ID, prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+  ), { clodChargeHitCount: 1 });
+  perfect(NECROMANCER_MISSION_ID, necromancerMatchState(), { cleanseUsed: true, spreadHitCount: 0 });
+  perfect(WITCH_DOCTOR_MISSION_ID, witchDoctorMatchState(), {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+
+  const node = getCampaignMap(storage).nodes[4];
+  assert.equal(node.id, VIRUS_MISSION_ID);
+  assert.equal(node.title, "Root of the Virus");
+  assert.equal(node.status, "available");
+  assert.equal(node.displayType, "virus");
+  assert.equal(node.biome, "swamp");
+});
+
+test("Root of the Virus builds a full-HP 11x11 4v4 duel against three Viruses and a Witch Doctor", () => {
+  const config = createCampaignMatchConfig(VIRUS_MISSION_ID, ["swordsman", "archer", "mystic", "witch-doctor"]);
+  const match = virusMatchState(["swordsman", "archer", "mystic", "witch-doctor"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 11);
+  assert.deepEqual(config.squads[1], ["swordsman", "archer", "mystic", "witch-doctor"]);
+  assert.deepEqual(config.squads[2], ["virus", "virus", "virus", "witch-doctor"]);
+  assert.equal(config.teamNames[2], "Viral Root");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 1, y: 10 });
+  assert.deepEqual(findUnit(match, "p1-3-witch-doctor").position, { x: 1, y: 9 });
+  assert.deepEqual(findUnit(match, "p2-0-virus").position, { x: 9, y: 0 });
+  assert.deepEqual(findUnit(match, "p2-3-witch-doctor").position, { x: 9, y: 1 });
+  assert.equal(findUnit(match, "p1-2-mystic").hp, 23);
+  assert.equal(findUnit(match, "p1-3-witch-doctor").hp, 24);
+  assert.equal(findUnit(match, "p2-0-virus").hp, 25);
+  assert.equal(findUnit(match, "p2-3-witch-doctor").hp, 24);
+  assert.equal(match.aiProfile?.virusMisfortune?.sourceId, "p2-3-witch-doctor");
+});
+
+test("Root of the Virus dialogue covers banter, first poison, and status payback", () => {
+  const state = virusMatchState();
+  const direct = virusMissionOpeningScript(state);
+
+  assert.deepEqual(campaignOpeningScript(VIRUS_MISSION_ID, state), direct);
+  assert.equal(direct.length >= 3, true);
+  assert.equal(direct[0].speakerId, "p2-3-witch-doctor");
+  assert.match(direct.map((line) => line.text).join(" "), /root|virus|poison|spread/i);
+
+  const poisoned = {
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) =>
+      unit.id === "p1-0-swordsman" ? { ...unit, statuses: [{ type: "poison", duration: "permanent" }] } : unit),
+  };
+  assert.equal(shouldShowVirusPoisonWarning(poisoned), true);
+  assert.equal(shouldShowVirusPoisonWarning(poisoned, { warningShown: true }), false);
+  assert.match(virusPoisonWarningScript(poisoned).map((line) => line.text).join(" "), /poison|spread|apart/i);
+
+  const cursedEnemy = {
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) =>
+      unit.id === "p2-0-virus" ? { ...unit, statuses: [{ type: "silence", duration: 1 }] } : unit),
+  };
+  assert.equal(shouldShowVirusEnemyStatusTaunt(cursedEnemy, { playerAfflictedEnemyStatus: true }), true);
+  assert.match(virusEnemyStatusTauntScript(cursedEnemy).map((line) => line.text).join(" "), /medicine|taste|curse|status/i);
+});
+
+test("Witch Doctor opens the Virus squad synergy with Misfortune Dance when a Virus can follow up", () => {
+  const state = {
+    ...virusMatchState(),
+    currentPlayer: 2,
+    units: virusMatchState().units.map((unit) => {
+      if (unit.id === "p2-3-witch-doctor") return { ...unit, position: { x: 5, y: 5 } };
+      if (unit.id === "p2-0-virus") return { ...unit, position: { x: 5, y: 6 } };
+      if (unit.id === "p1-0-swordsman") return { ...unit, position: { x: 5, y: 8 } };
+      return unit;
+    }),
+  };
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+
+  assert.ok(commands.some((command) =>
+    command.type === "USE_ART" &&
+    command.unitId === "p2-3-witch-doctor" &&
+    command.artId === "misfortune-dance"
+  ));
+});
+
+test("Root of the Virus grading rewards victory, no Spread, drafting Mystic, and the Witch Doctor plus Mystic bonus", () => {
+  const base = virusMatchState(["swordsman", "archer", "mystic", "witch-doctor"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(VIRUS_MISSION_ID, won, { spreadHitCount: 0 });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noSpread", "draftMystic"]);
+  assert.equal(perfect.bonusObjectives[0].id, "mysticWitchDoctor");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const spread = evaluateCampaignMission(VIRUS_MISSION_ID, won, { spreadHitCount: 1 });
+  assert.equal(spread.objectives.find((objective) => objective.id === "noSpread").earned, false);
+  assert.equal(spread.stars, 3, "the bonus can cover one missed base objective");
+
+  const noMysticBase = virusMatchState(["swordsman", "archer", "magician", "witch-doctor"]);
+  const noMysticWon = {
+    ...noMysticBase,
+    phase: "complete",
+    winner: 1,
+    units: noMysticBase.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+  const noMystic = evaluateCampaignMission(VIRUS_MISSION_ID, noMysticWon, { spreadHitCount: 0 });
+  assert.equal(noMystic.objectives.find((objective) => objective.id === "draftMystic").earned, false);
+  assert.equal(noMystic.bonusObjectives[0].earned, false);
+  assert.equal(noMystic.stars, 2);
+});
+
+test("completing Root of the Virus unlocks Virus and records its stars", () => {
+  const storage = storageAdapter();
+  const base = virusMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, VIRUS_MISSION_ID, won, { spreadHitCount: 0 });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["virus"]);
+  assert.equal(isUnitUnlocked("virus", storage), true);
+  assert.equal(readCampaignProgressStars(storage, VIRUS_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {

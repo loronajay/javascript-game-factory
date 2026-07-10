@@ -289,8 +289,17 @@ function artAiFor(unit, plan) {
 
 function missionPlanBias(state, unit, plan) {
   const carry = state.aiProfile?.fatherTimeCarry;
-  if (!carry || unit.id !== carry.sourceId || plan.primary.kind !== "art") return 0;
+  const virusMisfortune = state.aiProfile?.virusMisfortune;
+  if (plan.primary.kind !== "art") return 0;
   const primary = plan.primary;
+  if (virusMisfortune && unit.id === virusMisfortune.sourceId) {
+    const hasVirusAlly = livingUnits(state, unit.player).some((ally) =>
+      ally.type === "virus" && ally.mp >= (getArt("virus", "cough")?.mpCost ?? 5));
+    if (hasVirusAlly && unit.stance !== "misfortune" && primary.artId === "misfortune-dance") {
+      return 36;
+    }
+  }
+  if (!carry || unit.id !== carry.sourceId) return 0;
   if (primary.artId === "age" && primary.targetId === carry.targetId) {
     return primary.stat === "strength" ? 18 : 12;
   }

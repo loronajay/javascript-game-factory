@@ -12,6 +12,7 @@ export const CLOD_MISSION_ID = "clod-trial";
 export const NECROMANCER_MISSION_ID = "necromancer-rise";
 export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
 export const FATHER_TIME_MISSION_ID = "timeless-woods";
+export const VIRUS_MISSION_ID = "virus-root";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -91,6 +92,19 @@ const AUTHORED_MISSIONS = Object.freeze({
     enemySquad: Object.freeze(["father-time", "archer"]),
     size: 11,
   },
+  [VIRUS_MISSION_ID]: {
+    id: VIRUS_MISSION_ID,
+    title: "Root of the Virus",
+    subtitle: "Lesson: poisonous squad synergy",
+    description: "Lead your first full four-unit campaign squad into a straight duel against three Viruses and a Witch Doctor. Misfortune turns poison into a certainty, tight formations invite Spread, and Mystic's protection gives the rot something to argue with.",
+    unitType: "virus",
+    requiredStars: 8,
+    rewardUnits: Object.freeze(["virus"]),
+    playerSlots: 4,
+    enemySquad: Object.freeze(["virus", "virus", "virus", "witch-doctor"]),
+    size: 11,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -125,8 +139,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "Foul water swallows the causeway. Something chants in the reeds — a witch doctor's dance, they say, that turns your own curses against you." },
   { id: FATHER_TIME_MISSION_ID, cell: { col: 3, row: 4 }, point: { x: 21.3, y: 48.4 }, region: "wood", locationName: "Timeless Woods",
     blurb: "Ancient trees lean over a path where seconds fall like leaves. A clock-crowned keeper waits beside a patient archer." },
-  { id: "uncharted-05", cell: { col: 4, row: 4 }, point: { x: 11.4, y: 44.7 }, region: "mire", locationName: "Gravemarsh",
-    blurb: "Where the swamp drains to the sea, the drowned don't stay drowned. Footing is everything." },
+  { id: VIRUS_MISSION_ID, cell: { col: 4, row: 4 }, point: { x: 11.4, y: 44.7 }, region: "mire", locationName: "The Viral Root",
+    blurb: "Where the swamp drains to the sea, the rot has roots. A poisonous squad waits in the black water." },
   { id: "uncharted-06", cell: { col: 5, row: 4 }, point: { x: 29.1, y: 34.2 }, region: "coast", locationName: "Tidewatch Harbor",
     blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
   { id: "uncharted-07", cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Saltbreak Pier",
@@ -389,6 +403,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
       1: "Player Vanguard",
       2: mission.id === FATHER_TIME_MISSION_ID
         ? "Timeless Court"
+        : mission.id === VIRUS_MISSION_ID
+        ? "Viral Root"
         : mission.id === WITCH_DOCTOR_MISSION_ID
         ? "Swamp Coven"
         : mission.id === NECROMANCER_MISSION_ID
@@ -535,6 +551,13 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     positions: {},
     fallback: (unit) => ({ ...unit.position }),
   },
+  // Root of the Virus (11x11): a normal corner-spawn 4v4 duel. Only HP prep differs
+  // from earlier campaign lessons: this is the first official full-HP squad match.
+  [VIRUS_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -546,10 +569,11 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
   };
   const units = match.units.map((unit) => {
     const definition = getUnitType(unit.type);
+    const maxHp = definition.stats.maxHp;
     return {
       ...unit,
       position: { ...(layout.positions[unit.id] ?? layout.fallback(unit)) },
-      hp: Math.ceil(definition.stats.maxHp / 2),
+      hp: layout.fullHp ? maxHp : Math.ceil(maxHp / 2),
       mp: definition.stats.maxMp,
       spent: false,
       defending: false,
@@ -561,6 +585,8 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
     activation: null,
     ...(missionId === FATHER_TIME_MISSION_ID
       ? { aiProfile: { fatherTimeCarry: { sourceId: "p2-0-father-time", targetId: "p2-1-archer" } } }
+      : missionId === VIRUS_MISSION_ID
+      ? { aiProfile: { virusMisfortune: { sourceId: "p2-3-witch-doctor" } } }
       : {}),
     tileObjects,
     units: [...units, ...(layout.extraUnits?.(match) ?? [])],
@@ -642,6 +668,27 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       archerDefeatedBeforeFatherTime,
       archerBlinded,
       rewindUsed,
+    };
+  } else if (missionId === VIRUS_MISSION_ID) {
+    const spreadHitCount = Math.max(0, Math.floor(Number(meta.spreadHitCount) || 0));
+    const draftedMystic = playerUnits.some((unit) => unit.type === "mystic");
+    const draftedWitchDoctor = playerUnits.some((unit) => unit.type === "witch-doctor");
+    const virusesDefeated = enemyUnits.filter((unit) => unit.type === "virus" && unit.hp <= 0).length;
+    const witchDoctor = enemyUnits.find((unit) => unit.type === "witch-doctor") ?? null;
+    objectives = [
+      complete,
+      { id: "noSpread", label: "Prevent Virus Spread from happening", earned: victory && spreadHitCount === 0 },
+      { id: "draftMystic", label: "Draft Mystic into your squad", earned: victory && draftedMystic },
+    ];
+    bonusObjectives = [
+      { id: "mysticWitchDoctor", label: "Bonus: win with Mystic and Witch Doctor together", earned: victory && draftedMystic && draftedWitchDoctor },
+    ];
+    extra = {
+      spreadHitCount,
+      draftedMystic,
+      draftedWitchDoctor,
+      virusesDefeated,
+      witchDoctorDefeated: Boolean(witchDoctor && witchDoctor.hp <= 0),
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -999,9 +1046,82 @@ export function fatherTimeRageWarningScript(state) {
   ];
 }
 
+// --- Mission 5: Root of the Virus dialogue ------------------------------------
+// A normal duel with a nasty status engine: the opening sells the opposing squad,
+// then two small beats react to the first poison and the player's first status hit.
+
+export function virusMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const witchDoctor = findUnit(state, "p2-3-witch-doctor");
+  const virus = findUnit(state, "p2-0-virus");
+  return [
+    {
+      speakerId: witchDoctor?.id,
+      text: "The root is awake. Every little virus in this marsh knows the dance.",
+    },
+    {
+      speakerId: virus?.id,
+      text: "One cough, one curse, one careless huddle. That is all it takes.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Then we keep our spacing, watch the poison, and make the root taste its own medicine.",
+    },
+  ];
+}
+
+export function shouldShowVirusPoisonWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return (state?.units ?? []).some((unit) =>
+    unit.player === 1 && unit.hp > 0 && (unit.statuses ?? []).some((status) => status.type === "poison"));
+}
+
+export function virusPoisonWarningScript(state) {
+  const poisoned = (state?.units ?? []).find((unit) =>
+    unit.player === 1 && unit.hp > 0 && (unit.statuses ?? []).some((status) => status.type === "poison"));
+  const speaker = poisoned ?? firstLivingPlayerUnit(state);
+  const virus = (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === "virus" && unit.hp > 0);
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: virus?.id,
+      text: "There it is. Let it bloom, and it will not stay lonely.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Poisoned. Break apart before Spread carries it through the line.",
+    },
+  ];
+}
+
+export function shouldShowVirusEnemyStatusTaunt(state, { warningShown = false, playerAfflictedEnemyStatus = false } = {}) {
+  if (warningShown || !playerAfflictedEnemyStatus || state?.phase !== "playing") return false;
+  return (state?.units ?? []).some((unit) =>
+    unit.player === 2 && unit.hp > 0 && (unit.statuses ?? []).some(isNegativeStatus));
+}
+
+export function virusEnemyStatusTauntScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const afflicted = (state?.units ?? []).find((unit) =>
+    unit.player === 2 && unit.hp > 0 && (unit.statuses ?? []).some(isNegativeStatus));
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: speaker.id,
+      text: "A taste of your own medicine.",
+    },
+    {
+      speakerId: afflicted?.id,
+      text: "The root does not like bitter flavors.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === VIRUS_MISSION_ID) return virusMissionOpeningScript(state);
   if (missionId === FATHER_TIME_MISSION_ID) return fatherTimeMissionOpeningScript(state);
   if (missionId === WITCH_DOCTOR_MISSION_ID) return witchDoctorMissionOpeningScript(state);
   if (missionId === NECROMANCER_MISSION_ID) return necromancerMissionOpeningScript(state);

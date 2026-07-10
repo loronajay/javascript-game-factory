@@ -38,6 +38,7 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
   campaignOpeningScript,
@@ -53,10 +54,14 @@ import {
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowVirusEnemyStatusTaunt,
+  shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
   shouldShowWitchDoctorFireWarning,
   shouldShowWitchDoctorGhoulWarning,
   shouldShowWitchDoctorRageWarning,
+  virusEnemyStatusTauntScript,
+  virusPoisonWarningScript,
   witchDoctorBlockedShotWarningScript,
   witchDoctorFireWarningScript,
   witchDoctorGhoulWarningScript,
@@ -184,6 +189,10 @@ function createCampaignMeta() {
     archerDefeatedBeforeFatherTime: false,
     archerBlinded: false,
     rewindUsed: false,
+    // Virus (mission 5)
+    virusPoisonWarningShown: false,
+    virusEnemyStatusTauntShown: false,
+    playerAfflictedEnemyStatus: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -653,20 +662,23 @@ function recordCampaignProgressHooks(result) {
       campaignMeta.clodChargeHitCount = Math.max(campaignMeta.clodChargeHitCount, playerHitIds.length);
       campaignMeta.chargeDefended ||= playerHitIds.some((id) => findUnit(state, id)?.defending);
     }
-  } else if (campaignMissionId === NECROMANCER_MISSION_ID) {
+  } else if (campaignMissionId === NECROMANCER_MISSION_ID || campaignMissionId === VIRUS_MISSION_ID) {
     // A cleanse (Mystic Purify / Fat Cleric Cleanse) that actually stripped something
     // reports a non-empty `cleansed` list; only the player's own cast counts.
     const cleansed = events.some((event) =>
       event.type === "ART_RESOLVED" &&
       Array.isArray(event.cleansed) && event.cleansed.length > 0 &&
       findUnit(state, event.actorId)?.player === 1);
-    if (cleansed) campaignMeta.cleanseUsed = true;
+    if (campaignMissionId === NECROMANCER_MISSION_ID && cleansed) campaignMeta.cleanseUsed = true;
     // Virus's Spread jumping a debuff onto a second player unit fails the spacing bonus.
     for (const event of events) {
       if (event.type !== "STATUS_SPREAD") continue;
       if ((event.spreadTo ?? []).some((id) => findUnit(state, id)?.player === 1)) {
         campaignMeta.spreadHitCount += 1;
       }
+    }
+    if (campaignMissionId === VIRUS_MISSION_ID && playerLandedEnemyStatus(events)) {
+      campaignMeta.playerAfflictedEnemyStatus = true;
     }
   } else if (campaignMissionId === WITCH_DOCTOR_MISSION_ID) {
     campaignMeta.ghoulsDefeatedCount = Math.max(
@@ -715,6 +727,26 @@ function recordCampaignProgressHooks(result) {
     }
   }
   maybeShowCampaignDialogue();
+}
+
+function playerLandedEnemyStatus(events) {
+  return events.some((event) => {
+    const actor = findUnit(state, event.actorId);
+    if (actor?.player !== 1) return false;
+    const targetIds = [
+      event.targetId,
+      ...(event.targetIds ?? []),
+      ...(event.statusTargets ?? []),
+      ...(event.blinded ?? []),
+    ].filter(Boolean);
+    if (!targetIds.some((id) => findUnit(state, id)?.player === 2)) return false;
+    return Boolean(
+      event.effect?.applied ||
+      event.appliedStatus ||
+      event.statusTargets?.length ||
+      event.blinded?.length
+    );
+  });
 }
 
 // Returns the next eligible condition-triggered dialogue beat for the active mission
@@ -777,6 +809,20 @@ function nextCampaignDialogueBeat() {
       rewindUsed: campaignMeta.rewindUsed,
     })) {
       return { markShown: () => { campaignMeta.fatherTimeRageWarningShown = true; }, script: fatherTimeRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === VIRUS_MISSION_ID) {
+    if (shouldShowVirusPoisonWarning(state, {
+      warningShown: campaignMeta.virusPoisonWarningShown,
+    })) {
+      return { markShown: () => { campaignMeta.virusPoisonWarningShown = true; }, script: virusPoisonWarningScript };
+    }
+    if (shouldShowVirusEnemyStatusTaunt(state, {
+      warningShown: campaignMeta.virusEnemyStatusTauntShown,
+      playerAfflictedEnemyStatus: campaignMeta.playerAfflictedEnemyStatus,
+    })) {
+      return { markShown: () => { campaignMeta.virusEnemyStatusTauntShown = true; }, script: virusEnemyStatusTauntScript };
     }
     return null;
   }

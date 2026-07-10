@@ -237,13 +237,16 @@ export function buffAlliesValue(state, caster, art) {
   }
 
   // Misfortune Dance: strip every status globally — worth removing each harmful status
-  // from an ally (the same magnitude as inflicting it). The enemy side keeps its
-  // statuses in the CPU's read (they're cleansed too, but modeling that is a wash we
-  // skip); the clear, immediate gain is protecting the CPU's own team.
+  // from an ally (the same magnitude as inflicting it). It also primes status-heavy
+  // allies, most notably Virus: Cough's 60% poison becomes guaranteed while Misfortune
+  // Stance is active, so the dance has value before anyone is already afflicted.
   if (art.cleanse) {
     let value = 0;
     for (const ally of allies) {
       value += cleanseAllyValue(state, ally);
+    }
+    if (art.stance === "misfortune" && caster.stance !== "misfortune") {
+      value += misfortuneStatusSynergyValue(state, caster, allies, enemies);
     }
     return value;
   }
@@ -262,6 +265,31 @@ export function buffAlliesValue(state, caster, art) {
   }
 
   return 0;
+}
+
+function misfortuneStatusSynergyValue(state, caster, allies, enemies) {
+  if (!enemies.length) return 0;
+  let value = 0;
+  for (const ally of allies) {
+    const definition = getUnitType(ally.type);
+    for (const allyArt of definition.arts ?? []) {
+      if (allyArt.kind !== "active" || allyArt.effect?.type !== "status") continue;
+      if (ally.mp < (allyArt.mpCost ?? 0)) continue;
+      const currentChance = Math.min(1, Number(allyArt.effect.chance) || 0);
+      if (currentChance >= 1) continue;
+      const range = allyArt.targeting?.range ?? getEffectiveStats(ally, state).attackRange;
+      const canThreaten = enemies.some((enemy) =>
+        chebyshevDistance(ally.position, enemy.position) <= range + getEffectiveStats(ally, state).moveRange);
+      if (!canThreaten) continue;
+      const doubledChance = Math.min(1, currentChance * 2);
+      const bestTargetValue = Math.max(...enemies.map((enemy) => statusValue(enemy, allyArt.effect, state)));
+      value += (doubledChance - currentChance) * bestTargetValue;
+      if (ally.type === "virus" && allyArt.effect.status === "poison") value += 4;
+    }
+  }
+  // Small self-preservation guard: don't overpay for dancing if the caster is exposed
+  // and there is no status caster payoff. The caller's full plan score handles danger.
+  return Math.max(0, value);
 }
 
 // Expected outcome of a rolled strike — the basic ATTACK and every `strike` ART.
