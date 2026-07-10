@@ -18,8 +18,8 @@
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
 //   each  -> all : ready     { ready }                          lobby squad lock-in flag
-//   each  -> all : setup     { seat, composition, skins }       blind squad pick / completed draft squad
-//   each  -> all : draft_pick { pickIndex, seat, type, skin }   draft phase pick
+//   each  -> all : setup     { seat, composition, skins, nicknames }  blind squad pick / completed draft squad
+//   each  -> all : draft_pick { pickIndex, seat, type, skin, nickname }   draft phase pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
 //   each  -> all : profile   { playerId, displayName, seat }    name exchange
@@ -151,7 +151,10 @@ function parseSetupMessage(value) {
   const skins = Array.isArray(p.skins)
     ? p.skins.slice(0, 4).map((slug) => (typeof slug === "string" ? slug : null))
     : null;
-  return { seat: Math.floor(seat), composition, skins };
+  const nicknames = Array.isArray(p.nicknames)
+    ? p.nicknames.slice(0, 4).map((name) => (typeof name === "string" ? name : null))
+    : null;
+  return { seat: Math.floor(seat), composition, skins, nicknames };
 }
 
 function parseDraftPickMessage(value) {
@@ -165,6 +168,7 @@ function parseDraftPickMessage(value) {
     seat: Math.floor(seat),
     type: p.type,
     skin: typeof p.skin === "string" ? p.skin : null,
+    nickname: typeof p.nickname === "string" ? p.nickname : null,
   };
 }
 
@@ -232,7 +236,7 @@ export function createOnlineClient() {
     onPlayerLeft: null, // ({ clientId, ownerId, playerCount })
     onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteReady: null, // ({ clientId, ready })
-    onRemoteSetup: null, // ({ seat, composition?, skins? })
+    onRemoteSetup: null, // ({ seat, composition?, skins?, nicknames? })
     onRemoteDraftPick: null, // ({ pickIndex, seat, type, skin? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
@@ -447,11 +451,11 @@ export function createOnlineClient() {
   function sendConfig(config) {
     _lobbyMsg("config", JSON.stringify(config || {}));
   }
-  function sendSetup({ seat, composition = null, skins = null } = {}) {
-    _lobbyMsg("setup", JSON.stringify({ seat, composition, skins }));
+  function sendSetup({ seat, composition = null, skins = null, nicknames = null } = {}) {
+    _lobbyMsg("setup", JSON.stringify({ seat, composition, skins, nicknames }));
   }
-  function sendDraftPick({ pickIndex, seat, type, skin = null } = {}) {
-    _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type, skin }));
+  function sendDraftPick({ pickIndex, seat, type, skin = null, nickname = null } = {}) {
+    _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type, skin, nickname }));
   }
   function sendReady(ready) {
     _lobbyMsg("ready", JSON.stringify({ ready: !!ready }));

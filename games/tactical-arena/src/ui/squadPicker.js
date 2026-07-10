@@ -19,6 +19,7 @@ import {
 } from "./squadModel.js";
 import { openRosterPicker } from "./rosterPicker.js";
 import { createPortrait } from "./portraits.js";
+import { getNicknamePref } from "./nicknameModel.js";
 
 export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, normalizeSquadLoadout, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
 
@@ -67,7 +68,7 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
       chip.append(createPortrait(type, { variant: "is-chip", eager: true, skin: loadout.skins[slot.index] }));
       const name = document.createElement("span");
       name.className = "squad-chip-name";
-      name.textContent = def.name;
+      name.textContent = getNicknamePref(type) || def.name;
       chip.append(name);
       chip.addEventListener("click", () => edit(slot.index));
       chips.appendChild(chip);
@@ -86,6 +87,7 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     isLocked: () => locked,
     getSquad: () => [...loadout.composition],
     getSkins: () => [...loadout.skins],
+    getNicknames: () => loadout.composition.map((type) => getNicknamePref(type)),
     getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] }),
     setLoadout(nextLoadout) {
       loadout = normalizeSquadLoadout(nextLoadout);

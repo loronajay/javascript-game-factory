@@ -14,7 +14,7 @@ function ensureHost() {
 
 const SLOT_LABELS = ["Front 1", "Front 2", "Corner", "Back"];
 
-export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], order = null, accent = null } = {}) {
+export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, accent = null } = {}) {
   const overlay = ensureHost();
   let formationOrder = Array.isArray(order) && order.length === composition.length
     ? [...order]
@@ -65,7 +65,7 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
         const tag = el("span", "draft-formation-tag");
         tag.textContent = SLOT_LABELS[slot] ?? `Slot ${slot + 1}`;
         const name = el("span", "draft-formation-name");
-        name.textContent = def?.name ?? type ?? "Empty";
+        name.textContent = (type && nicknames[pickIndex]) || def?.name || type || "Empty";
         if (type) btn.append(createPortrait(type, { variant: "is-slot", eager: true, skin }));
         btn.append(tag, name);
         btn.addEventListener("click", () => chooseSlot(slot));

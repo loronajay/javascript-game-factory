@@ -64,7 +64,8 @@ test("online setup payload relays skin selections with the squad composition", (
     client.sendSetup({
       seat: 1,
       composition: ["swordsman", "archer", "mystic", "magician"],
-      skins: ["summer-vibes", null, null, "summer-vibes"]
+      skins: ["summer-vibes", null, null, "summer-vibes"],
+      nicknames: ["Leo", null, null, null]
     });
     assert.deepEqual(sent, [{
       type: "lobby_message",
@@ -72,7 +73,8 @@ test("online setup payload relays skin selections with the squad composition", (
       value: JSON.stringify({
         seat: 1,
         composition: ["swordsman", "archer", "mystic", "magician"],
-        skins: ["summer-vibes", null, null, "summer-vibes"]
+        skins: ["summer-vibes", null, null, "summer-vibes"],
+        nicknames: ["Leo", null, null, null]
       })
     }]);
   } finally {
@@ -127,11 +129,11 @@ test("online draft pick payload relays the pick index and unit type", () => {
     };
     const client = createOnlineClient();
     client.connect();
-    client.sendDraftPick({ pickIndex: 3, seat: 1, type: "magician", skin: "summer-vibes" });
+    client.sendDraftPick({ pickIndex: 3, seat: 1, type: "magician", skin: "summer-vibes", nickname: "Leo" });
     assert.deepEqual(sent, [{
       type: "lobby_message",
       messageType: "draft_pick",
-      value: JSON.stringify({ pickIndex: 3, seat: 1, type: "magician", skin: "summer-vibes" })
+      value: JSON.stringify({ pickIndex: 3, seat: 1, type: "magician", skin: "summer-vibes", nickname: "Leo" })
     }]);
   } finally {
     globalThis.WebSocket = previous;
@@ -226,10 +228,10 @@ test("online client parses remote draft picks", () => {
         scope: "lobby",
         senderId: "c_guest",
         messageType: "draft_pick",
-        value: JSON.stringify({ pickIndex: 1, seat: 2, type: "archer", skin: "summer-vibes" })
+        value: JSON.stringify({ pickIndex: 1, seat: 2, type: "archer", skin: "summer-vibes", nickname: "Ryan" })
       })
     });
-    assert.deepEqual(picks, [{ pickIndex: 1, seat: 2, type: "archer", skin: "summer-vibes" }]);
+    assert.deepEqual(picks, [{ pickIndex: 1, seat: 2, type: "archer", skin: "summer-vibes", nickname: "Ryan" }]);
   } finally {
     globalThis.WebSocket = previous;
   }

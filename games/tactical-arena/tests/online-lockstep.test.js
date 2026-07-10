@@ -199,6 +199,20 @@ for (const seed of [1, 42, 31337]) {
   });
 }
 
+// unit.nickname (like unit.skin) is cosmetic-only and must never affect the
+// authoritative lockstep hash — two peers who typed different nicknames for the
+// same unit type must still agree on the state hash.
+test("differing unit nicknames never change the state hash", () => {
+  const seed = 13579;
+  const size = 13;
+  const squads = { 1: DEFAULT_SQUAD, 2: DEFAULT_SQUAD };
+  const leo = createMatchState({ size, seed, squads, nicknames: { 1: ["Leo", null, null, null], 2: [null, null, null, null] } });
+  const ryan = createMatchState({ size, seed, squads, nicknames: { 1: ["Ryan", null, null, null], 2: [null, null, null, null] } });
+  const none = createMatchState({ size, seed, squads });
+  assert.equal(hashState(leo), hashState(ryan));
+  assert.equal(hashState(leo), hashState(none));
+});
+
 // Determinism guarantee the lockstep relies on: the very same seed + the very same
 // command stream reproduces the exact same final state hash, independent of (random)
 // delivery latency. Captured from one deterministic playthrough, replayed twice.

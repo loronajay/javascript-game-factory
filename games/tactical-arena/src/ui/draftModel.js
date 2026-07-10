@@ -1,5 +1,6 @@
 import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
 import { normalizeSkinSlug } from "./skinModel.js";
+import { sanitizeNickname, getNicknamePref } from "./nicknameModel.js";
 
 export const DRAFT_SEATS = Object.freeze([1, 2]);
 export const DRAFT_PICK_ORDER = Object.freeze([1, 2, 2, 1, 1, 2, 2, 1]);
@@ -11,6 +12,7 @@ export function createDraftState({ seats = DRAFT_SEATS } = {}) {
     pickIndex: 0,
     picks: Object.fromEntries((normalizedSeats.length ? normalizedSeats : DRAFT_SEATS).map((seat) => [seat, []])),
     skins: Object.fromEntries((normalizedSeats.length ? normalizedSeats : DRAFT_SEATS).map((seat) => [seat, []])),
+    nicknames: Object.fromEntries((normalizedSeats.length ? normalizedSeats : DRAFT_SEATS).map((seat) => [seat, []])),
   };
 }
 
@@ -40,7 +42,7 @@ export function canDraftType(draft, seat, type, { isUnlocked = isUnitUnlocked } 
   return picks.length < DRAFT_PICK_ORDER.filter((draftSeat) => draftSeat === Number(seat)).length;
 }
 
-export function applyDraftPick(draft, { seat, type, skin = null, isUnlocked = isUnitUnlocked } = {}) {
+export function applyDraftPick(draft, { seat, type, skin = null, nickname = null, isUnlocked = isUnitUnlocked } = {}) {
   const numericSeat = Number(seat);
   if (!canDraftType(draft, numericSeat, type, { isUnlocked })) {
     return { accepted: false, errorCode: "INVALID_DRAFT_PICK", nextState: draft };
@@ -50,9 +52,11 @@ export function applyDraftPick(draft, { seat, type, skin = null, isUnlocked = is
     pickIndex: draft.pickIndex + 1,
     picks: Object.fromEntries(Object.entries(draft.picks).map(([key, value]) => [key, [...value]])),
     skins: Object.fromEntries(Object.entries(draft.skins ?? {}).map(([key, value]) => [key, [...value]])),
+    nicknames: Object.fromEntries(Object.entries(draft.nicknames ?? {}).map(([key, value]) => [key, [...value]])),
   };
   next.picks[numericSeat] = [...(next.picks[numericSeat] ?? []), type];
   next.skins[numericSeat] = [...(next.skins[numericSeat] ?? []), normalizeSkinSlug(type, skin)];
+  next.nicknames[numericSeat] = [...(next.nicknames[numericSeat] ?? []), sanitizeNickname(nickname) ?? getNicknamePref(type)];
   return { accepted: true, nextState: next };
 }
 
@@ -68,9 +72,11 @@ function normalizedFormationOrder(order, length) {
 export function arrangeDraftLoadout(draft, seat, order = null) {
   const picks = [...(draft?.picks?.[seat] ?? [])].slice(0, 4);
   const skins = [...(draft?.skins?.[seat] ?? [])].slice(0, picks.length);
+  const nicknames = [...(draft?.nicknames?.[seat] ?? [])].slice(0, picks.length);
   const formationOrder = normalizedFormationOrder(order, picks.length);
   return {
     composition: formationOrder.map((index) => picks[index]),
     skins: formationOrder.map((index) => normalizeSkinSlug(picks[index], skins[index] ?? null)),
+    nicknames: formationOrder.map((index) => nicknames[index] ?? null),
   };
 }

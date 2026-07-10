@@ -36,7 +36,8 @@ export function normalizeDialogueLine(line = {}, state = null, index = 0, total 
   const type = speakerType(line, speakerUnit);
   const player = line.player ?? speakerUnit?.player ?? null;
   const skin = line.skin ?? speakerUnit?.skin ?? null;
-  const name = line.name ?? safeUnitName(type) ?? "Narrator";
+  const nickname = line.nickname ?? speakerUnit?.nickname ?? null;
+  const name = line.name ?? nickname ?? safeUnitName(type) ?? "Narrator";
   const portrait = type ? getPortrait(type, skin) : null;
 
   return Object.freeze({

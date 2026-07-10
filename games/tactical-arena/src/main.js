@@ -527,6 +527,7 @@ function startMatch(config) {
     size: config.size,
     squads: config.squads,
     skins: config.skins,
+    nicknames: config.nicknames,
     seed: online || config.mode === "tutorial" ? config.seed : undefined,
     playerCount: config.playerCount,
     format: config.format,
@@ -2414,7 +2415,7 @@ async function applyCpuCommand(command) {
       const unit = findUnit(state, command.unitId);
       // setMessage/render are HUD-silent during a tempo CPU activation (see their guards);
       // this line only surfaces in the classic turn-based CPU turn.
-      if (unit) setMessage(`Player ${unit.player} (CPU) activates its ${getUnitType(unit.type).name}.`);
+      if (unit) setMessage(`Player ${unit.player} (CPU) activates its ${unit.nickname || getUnitType(unit.type).name}.`);
       render();
       // No artificial "thinking" beat in real-time tempo — it would just delay the board.
       await sleep(isTempoBattle(state) ? 0 : CPU_STEP_MS);
@@ -2483,7 +2484,7 @@ async function applyRemoteCommand(command) {
         if (!dispatch(command)) return;
         selectedId = command.unitId;
         const unit = findUnit(state, command.unitId);
-        if (unit) setMessage(`Opponent activates its ${getUnitType(unit.type).name}.`);
+        if (unit) setMessage(`Opponent activates its ${unit.nickname || getUnitType(unit.type).name}.`);
         render();
         await sleep(CPU_STEP_MS);
         return;
@@ -2796,7 +2797,7 @@ function beginUnit(unit) {
     mode = null;
     volleyShotOrigin = null;
     audio.play("unitSelect");
-    setMessage(consumeTutorialPrompt(`${getUnitType(unit.type).name} ready. Choose an action.`));
+    setMessage(consumeTutorialPrompt(`${unit.nickname || getUnitType(unit.type).name} ready. Choose an action.`));
     return;
   }
   if (dispatch(beginActivation(unit.player, unit.id))) {
@@ -2804,7 +2805,7 @@ function beginUnit(unit) {
     mode = null;
     volleyShotOrigin = null;
     audio.play("unitSelect");
-    setMessage(consumeTutorialPrompt(`${getUnitType(unit.type).name} ready. Choose an action.`));
+    setMessage(consumeTutorialPrompt(`${unit.nickname || getUnitType(unit.type).name} ready. Choose an action.`));
   }
 }
 
@@ -2821,7 +2822,7 @@ function beginTempoUnit(unit) {
     mode = null;
     volleyShotOrigin = null;
     audio.play("unitSelect");
-    setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
+    setMessage(`${unit.nickname || getUnitType(unit.type).name} ready. Choose an action.`);
     render();
     return;
   }
@@ -2833,7 +2834,7 @@ function beginTempoUnit(unit) {
     mode = null;
     volleyShotOrigin = null;
     audio.play("unitSelect");
-    setMessage(`${getUnitType(unit.type).name} ready. Choose an action.`);
+    setMessage(`${unit.nickname || getUnitType(unit.type).name} ready. Choose an action.`);
     render();
   }
 }
@@ -3052,7 +3053,7 @@ async function handleTile(position) {
     } else {
       const ally = areAllies(target, unit);
       const stat = await openChoiceModal({
-        title: `Age — ${ally ? "empower" : "weaken"} ${getUnitType(target.type).name}`,
+        title: `Age — ${ally ? "empower" : "weaken"} ${target.nickname || getUnitType(target.type).name}`,
         subtitle: ally ? "Grant +1 to a stat until Father Time falls." : "Drain 1 from a stat until Father Time falls.",
         accent: teamColor(unit.player),
         choices: [
@@ -3292,7 +3293,7 @@ async function handleActionClick(action, unit) {
           title: "Rewind — bring back",
           subtitle: "Return a fallen ally to the field, fully healed.",
           accent: teamColor(unit.player),
-          choices: fallen.map((ally) => ({ value: ally.id, label: getUnitType(ally.type).name, sub: "Fallen · returns at full HP", type: ally.type }))
+          choices: fallen.map((ally) => ({ value: ally.id, label: ally.nickname || getUnitType(ally.type).name, sub: "Fallen · returns at full HP", type: ally.type }))
         });
         if (!chosen || mode !== "art:rewind") {
           mode = null;
@@ -3302,7 +3303,10 @@ async function handleActionClick(action, unit) {
           return;
         }
         rewindTargetId = chosen;
-        setMessage(`${art.name}: click a highlighted tile within 3 to place ${getUnitType(findUnit(state, chosen).type).name}.`);
+        {
+          const revivedUnit = findUnit(state, chosen);
+          setMessage(`${art.name}: click a highlighted tile within 3 to place ${revivedUnit.nickname || getUnitType(revivedUnit.type).name}.`);
+        }
         render();
         return;
       }

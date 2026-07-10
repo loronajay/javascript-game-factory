@@ -10,6 +10,14 @@ function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function escapeHtml(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function displayName(unit, definition) {
+  return unit.nickname || definition.name;
+}
+
 function artTip(art, unitOrDefinition = null) {
   const resource = unitOrDefinition ? getResourceMeta(unitOrDefinition.type ?? unitOrDefinition) : getResourceMeta(null);
   return `${art.name} · ${art.mpCost} ${resource.shortLabel} — ${art.description}`;
@@ -152,7 +160,7 @@ export function renderUnitCard(unit, state, unitCard) {
   unitCard.innerHTML = `${portraitHtml(unit.type, "is-hud", unit.skin)}
     <div class="unit-info">
       <div class="unit-title-row">
-        <span class="unit-name">${definition.name}</span>
+        <span class="unit-name">${escapeHtml(displayName(unit, definition))}</span>
         <span class="unit-owner">P${unit.player}</span>
         <span class="unit-tags">${tags}</span>
       </div>
@@ -274,7 +282,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
       row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
         <div class="squad-unit-body">
           <div class="squad-unit-head">
-            <span class="squad-unit-name">${definition.name}</span>
+            <span class="squad-unit-name">${escapeHtml(displayName(unit, definition))}</span>
             <span class="unit-tags">${tags}</span>
           </div>
           <div class="vitals">

@@ -6,7 +6,8 @@ import { normalizeDialogueLine, normalizeDialogueScript } from "../src/ui/dialog
 const state = {
   units: [
     { id: "p1-sword", type: "swordsman", player: 1, skin: "medieval" },
-    { id: "p2-archer", type: "archer", player: 2 }
+    { id: "p2-archer", type: "archer", player: 2 },
+    { id: "p1-nicknamed", type: "mystic", player: 1, nickname: "Leo" }
   ]
 };
 
@@ -49,6 +50,23 @@ test("authored name and side override catalog defaults", () => {
 
   assert.equal(line.name, "Captain Rowan");
   assert.equal(line.side, "right");
+});
+
+test("a speaking unit's nickname takes precedence over its catalog name", () => {
+  const line = normalizeDialogueLine({ speakerId: "p1-nicknamed", text: "Fortune favors us." }, state);
+
+  assert.equal(line.name, "Leo");
+  assert.equal(line.type, "mystic");
+});
+
+test("an authored line name still wins over a speaking unit's nickname", () => {
+  const line = normalizeDialogueLine({
+    speakerId: "p1-nicknamed",
+    name: "Wandering Mystic",
+    text: "We simply must go shopping."
+  }, state);
+
+  assert.equal(line.name, "Wandering Mystic");
 });
 
 test("unknown speakers fall back to a narrator-safe line", () => {

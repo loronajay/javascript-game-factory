@@ -17,6 +17,7 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
   const overlay = ensureHost();
   const def = UNIT_TYPES[type];
   let selected = normalizeSkinSlug(type, initial);
+  let viewing = selected;
 
   return new Promise((resolve) => {
     overlay.replaceChildren();
@@ -55,35 +56,65 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
       const previousGridScrollTop = previousGrid?.scrollTop ?? 0;
       body.replaceChildren();
 
+      const viewingChoice = choicesFor(type).find((choice) => (choice.slug ?? null) === viewing);
+      const viewingLocked = !!viewingChoice && !viewingChoice.unlocked;
+      const isSelected = viewing === selected;
+
       const preview = el("section", "skin-picker-preview");
       preview.appendChild(createPortrait(type, {
         variant: "is-skin-preview",
         eager: true,
-        skin: selected,
-        alt: `${def?.name ?? type} ${skinLabel(type, selected)} skin`
+        skin: viewing,
+        alt: `${def?.name ?? type} ${skinLabel(type, viewing)} skin`
       }));
 
       const copy = el("div", "skin-picker-copy");
       copy.appendChild(el("span", "skin-picker-kicker", def?.name ?? type ?? "Unit"));
-      copy.appendChild(el("h3", "skin-picker-title", skinLabel(type, selected)));
-      copy.appendChild(el("span", "skin-picker-status", selected ? "Unlocked skin" : "Classic look"));
+      copy.appendChild(el("h3", "skin-picker-title", skinLabel(type, viewing)));
+      copy.appendChild(el(
+        "span",
+        "skin-picker-status",
+        viewingLocked ? "Locked — not yet unlocked" : isSelected ? "Currently selected" : "Previewing"
+      ));
+      const selectBtn = el("button", "menu-btn skin-picker-select-btn", isSelected ? "✓ Selected" : "Select This Skin");
+      selectBtn.type = "button";
+      selectBtn.disabled = viewingLocked || isSelected;
+      selectBtn.addEventListener("click", () => {
+        selected = viewing;
+        paint();
+      });
+      copy.appendChild(selectBtn);
       preview.appendChild(copy);
 
       const grid = el("div", "skin-picker-grid");
       for (const choice of choicesFor(type)) {
-        const selectedChoice = (choice.slug ?? null) === selected;
+        const slug = choice.slug ?? null;
+        const selectedChoice = slug === selected;
+        const viewingThisChoice = slug === viewing;
         const locked = !choice.unlocked;
-        const btn = el("button", `skin-picker-choice${selectedChoice ? " is-selected" : ""}${locked ? " is-locked" : ""}`);
+        const classes = ["skin-picker-choice"];
+        if (selectedChoice) classes.push("is-selected");
+        if (viewingThisChoice) classes.push("is-viewing");
+        if (locked) classes.push("is-locked");
+        const btn = el("button", classes.join(" "));
         btn.type = "button";
         btn.dataset.skin = choice.slug ?? "";
-        btn.disabled = locked;
-        btn.setAttribute("aria-label", `Select ${choice.name} skin`);
+        btn.setAttribute("aria-label", `View ${choice.name} skin`);
         btn.appendChild(createPortrait(type, { variant: "is-skin-choice", eager: true, skin: choice.slug }));
         const name = el("span", "skin-picker-choice-name", choice.name);
         const status = el("span", "skin-picker-choice-status", locked ? "Locked" : selectedChoice ? "Selected" : "Unlocked");
         btn.append(name, status);
         btn.addEventListener("click", () => {
-          selected = normalizeSkinSlug(type, choice.slug);
+          // Previewing a locked skin must NOT run it through normalizeSkinSlug — that
+          // clamps locked slugs back to null, which would make locked thumbnails
+          // un-previewable (the whole point of the view/select split).
+          viewing = choice.slug ?? null;
+          paint();
+        });
+        btn.addEventListener("dblclick", () => {
+          if (locked) return;
+          viewing = normalizeSkinSlug(type, choice.slug);
+          selected = viewing;
           paint();
         });
         grid.appendChild(btn);

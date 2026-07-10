@@ -35,6 +35,10 @@ function canonicalStatuses(statuses = []) {
   return statuses.map(stableStringify).join("/");
 }
 
+// unit.skin and unit.nickname are deliberately never enumerated below — both
+// are cosmetic-only and excluded from the authoritative hash on purpose. Do
+// not "fix" this omission; nickname sync for online play rides the dedicated
+// setup/draft_pick peer messages instead (see onlineClient.js/onlineFlow.js).
 function canonicalUnits(units) {
   return [...units]
     .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))

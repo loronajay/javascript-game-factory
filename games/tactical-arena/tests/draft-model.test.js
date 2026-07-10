@@ -129,3 +129,41 @@ test("draft stores normalized skin selections alongside each seat's picks", () =
   assert.deepEqual(draft.picks[2], ["archer"]);
   assert.deepEqual(draft.skins[2], [null]);
 });
+
+test("draft stores an explicit nickname alongside each seat's picks", () => {
+  let draft = createDraftState();
+
+  let result = applyDraftPick(draft, { seat: 1, type: "swordsman", nickname: "Leo" });
+  assert.equal(result.accepted, true);
+  draft = result.nextState;
+
+  result = applyDraftPick(draft, { seat: 2, type: "archer" });
+  assert.equal(result.accepted, true);
+  draft = result.nextState;
+
+  assert.deepEqual(draft.nicknames[1], ["Leo"]);
+  // No nickname passed and no saved preference (no localStorage in the test env) -> null.
+  assert.deepEqual(draft.nicknames[2], [null]);
+});
+
+test("arrangeDraftLoadout reorders nicknames to match the arranged formation", () => {
+  let draft = createDraftState();
+  for (const [seat, type, nickname] of [
+    [1, "swordsman", "Leo"],
+    [2, "archer", null],
+    [2, "mystic", null],
+    [1, "magician", "Big Mage"],
+    [1, "paladin", null],
+    [2, "sniper", null],
+    [2, "angel", null],
+    [1, "witch-doctor", null],
+  ]) {
+    const result = applyDraftPick(draft, { seat, type, nickname, isUnlocked: () => true });
+    assert.equal(result.accepted, true);
+    draft = result.nextState;
+  }
+
+  const loadout = arrangeDraftLoadout(draft, 1, [2, 0, 3, 1]);
+  // picks[1] order was [swordsman, magician, paladin, witch-doctor] -> nicknames [Leo, Big Mage, null, null]
+  assert.deepEqual(loadout.nicknames, [null, "Leo", null, "Big Mage"]);
+});

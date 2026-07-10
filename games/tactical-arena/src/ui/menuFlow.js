@@ -9,6 +9,7 @@ import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 import { openSkinGallery } from "./skinGallery.js";
+import { openNicknameGallery } from "./nicknameGallery.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
@@ -824,6 +825,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
       case "skins": openSkinGallery(); break;
+      case "nicknames": openNicknameGallery(); break;
       case "chooseTutorialReward": openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;
       case "settings": openSettings(); break;
       case "selectCampaignMission": {

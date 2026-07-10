@@ -578,7 +578,7 @@ export function campaignPostMatchCutsceneScript(missionId) {
       { speaker: "mystic", side: "left",
         text: "Well, since we're already in town... we simply have to go shopping. When will we be back in Highmarket, hm?" },
       { speaker: "swordsman", side: "left",
-        text: "Mystic. We are being chased across a war map by four sad wizards." },
+        text: "Mystic. We are being chased across a war map by four self-declared heroes." },
       { speaker: "mystic", side: "left",
         text: "Which is exactly why I deserve something nice. Just one little look. It'll be quick, I promise." },
     ];
@@ -605,7 +605,7 @@ export function campaignRewardPickedScript(missionId) {
     { speaker: "mystic", side: "left",
       text: "Oh, I LOVE it. Don't you just love shopping? I feel like a whole new caster." },
     { speaker: "swordsman", side: "left",
-      text: "...Can we go beat the fat wizards to a castle now." },
+      text: "...Can we go beat those has-beens to a castle now." },
   ];
 }
 
@@ -2185,7 +2185,7 @@ export function hasbeenHeroesMissionOpeningScript(state) {
     return unit ? { speakerId: unit.id, text } : null;
   };
   return [
-    line("fat-knight", "Fine, FINE, we do this the hard way. Nobody passes the has-been heroes."),
+    line("fat-knight", "Fine, FINE, we do this the hard way. Nobody gets past ME."),
     line("fat-bowman", "Can we make it quick? I have a nap scheduled."),
     line("fat-cleric", "Beat them fast so we can find a tavern. I am running dangerously low on snacks."),
     line("fat-wizard", "*hic* I found my staff! It was in my other... my other hand. Okay. Magic time."),

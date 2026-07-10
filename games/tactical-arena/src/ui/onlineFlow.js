@@ -13,6 +13,7 @@
 // start; the match builds only once every seat's squad is in. A future draft-pick
 // mode (back-and-forth with bans) will replace the blind exchange, not this transport.
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
+import { getNicknamePref } from "./nicknameModel.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js";
@@ -96,6 +97,7 @@ export function createOnlineFlow({ onStartMatch }) {
   let membersAtStart = null;
   const compositionsBySeat = {};
   const skinsBySeat = {};
+  const nicknamesBySeat = {};
 
   // ── view helpers ───────────────────────────────────────────────────────────
   function setPanel(name) {
@@ -406,6 +408,7 @@ export function createOnlineFlow({ onStartMatch }) {
       list.className = "draft-picks";
       const picks = draft.picks?.[seat] ?? [];
       const skins = draft.skins?.[seat] ?? [];
+      const nicknames = draft.nicknames?.[seat] ?? [];
       for (let i = 0; i < 4; i += 1) {
         const type = picks[i];
         const slot = document.createElement("div");
@@ -413,7 +416,7 @@ export function createOnlineFlow({ onStartMatch }) {
         if (type) {
           slot.append(createPortrait(type, { variant: "is-chip", eager: true, skin: skins[i] ?? null }));
           const name = document.createElement("span");
-          name.textContent = UNIT_TYPES[type]?.name ?? type;
+          name.textContent = nicknames[i] || UNIT_TYPES[type]?.name || type;
           slot.append(name);
         } else {
           slot.textContent = `Pick ${i + 1}`;
@@ -501,14 +504,15 @@ export function createOnlineFlow({ onStartMatch }) {
       return;
     }
     const skin = chosen.skin ?? null;
-    const result = applyDraftPick(draft, { seat: localSeat, type, skin });
+    const nickname = getNicknamePref(type);
+    const result = applyDraftPick(draft, { seat: localSeat, type, skin, nickname });
     if (!result.accepted) {
       setStatus("That unit is already drafted.");
       renderDraft();
       return;
     }
     draft = result.nextState;
-    client?.sendDraftPick({ pickIndex, seat: localSeat, type, skin });
+    client?.sendDraftPick({ pickIndex, seat: localSeat, type, skin, nickname });
     setStatus(isDraftComplete(draft) ? "Draft complete. Ready to start." : "Pick locked.");
     syncUI();
   }
@@ -518,6 +522,7 @@ export function createOnlineFlow({ onStartMatch }) {
     if (!draft || !isDraftComplete(draft) || !seat || formationPromptOpen) return;
     const picks = [...(draft.picks?.[seat] ?? [])];
     const skins = [...(draft.skins?.[seat] ?? [])];
+    const nicknames = [...(draft.nicknames?.[seat] ?? [])];
     if (picks.length < 4) return;
 
     const wasLocked = localLocked;
@@ -527,6 +532,7 @@ export function createOnlineFlow({ onStartMatch }) {
       title: "Arrange Formation",
       composition: picks,
       skins,
+      nicknames,
       order: localFormationOrder,
       accent: PLAYER_COLOR[seat] ?? PLAYER_COLOR[1],
     });
@@ -625,23 +631,26 @@ export function createOnlineFlow({ onStartMatch }) {
       const arrangedDraft = isDraftMatch() ? arrangeDraftLoadout(draft, mySeat, localFormationOrder) : null;
       const composition = arrangedDraft ? arrangedDraft.composition : squadPicker.getSquad();
       const skins = arrangedDraft ? arrangedDraft.skins : squadPicker.getSkins();
+      const nicknames = arrangedDraft ? arrangedDraft.nicknames : squadPicker.getNicknames();
       compositionsBySeat[mySeat] = composition;
       skinsBySeat[mySeat] = skins;
-      client.sendSetup({ seat: mySeat, composition, skins });
+      nicknamesBySeat[mySeat] = nicknames;
+      client.sendSetup({ seat: mySeat, composition, skins, nicknames });
       if (isOwner) pushConfig(); // ensure the final framing is out
       tryStart();
     };
 
-    cb.onRemoteSetup = ({ seat, composition, skins }) => {
+    cb.onRemoteSetup = ({ seat, composition, skins, nicknames }) => {
       if (!seat) return;
       compositionsBySeat[seat] = Array.isArray(composition) ? composition : [...DEFAULT_SQUAD];
       skinsBySeat[seat] = Array.isArray(skins) ? skins : [null, null, null, null];
+      nicknamesBySeat[seat] = Array.isArray(nicknames) ? nicknames : [null, null, null, null];
       tryStart();
     };
 
-    cb.onRemoteDraftPick = ({ pickIndex, seat, type, skin }) => {
+    cb.onRemoteDraftPick = ({ pickIndex, seat, type, skin, nickname }) => {
       if (!isDraftMatch() || !draft || pickIndex !== draft.pickIndex) return;
-      const result = applyDraftPick(draft, { seat, type, skin });
+      const result = applyDraftPick(draft, { seat, type, skin, nickname });
       if (!result.accepted) return;
       draft = result.nextState;
       setStatus(isDraftComplete(draft) ? "Draft complete. Arrange your formation." : `${draftPlayerLabel(seat)} locked a pick.`);
@@ -687,9 +696,11 @@ export function createOnlineFlow({ onStartMatch }) {
 
     const squads = {};
     const skins = {};
+    const nicknames = {};
     for (let seat = 1; seat <= count; seat += 1) {
       squads[seat] = compositionsBySeat[seat];
       skins[seat] = skinsBySeat[seat] ?? [null, null, null, null];
+      nicknames[seat] = nicknamesBySeat[seat] ?? [null, null, null, null];
     }
 
     const format = matchTypeConfig().format;
@@ -701,6 +712,7 @@ export function createOnlineFlow({ onStartMatch }) {
       mySeat,
       squads,
       skins,
+      nicknames,
       playerCount: count,
       format,
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
@@ -726,6 +738,7 @@ export function createOnlineFlow({ onStartMatch }) {
     membersAtStart = null;
     for (const key of Object.keys(compositionsBySeat)) delete compositionsBySeat[key];
     for (const key of Object.keys(skinsBySeat)) delete skinsBySeat[key];
+    for (const key of Object.keys(nicknamesBySeat)) delete nicknamesBySeat[key];
     roomCodeEl.hidden = true;
   }
 

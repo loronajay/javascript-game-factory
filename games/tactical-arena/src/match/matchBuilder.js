@@ -3,6 +3,7 @@ import { nextRandom } from "../core/rng.js";
 import { getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
 import { normalizeSkinLoadout } from "../ui/skinModel.js";
+import { getNicknamePref } from "../ui/nicknameModel.js";
 
 export function teamColor(playerOrTeam, state = null) {
   if (state?.players) {
@@ -32,7 +33,7 @@ export function hpRemaining(state, player) {
 
 // Map squad compositions onto the four-cell corner spawn blocks. The first two
 // slots preserve the original 2v2 staging, and the extra pair fills the block.
-export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }), skins = null) {
+export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }), skins = null, nicknames = null) {
   const slotsForCorner = (corner) => {
     const max = size - 1;
     const coords = [
@@ -56,6 +57,11 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
     const positions = slotsForCorner(slot.corner);
     const squad = (squads[slot.id] ?? []).slice(0, positions.length);
     const skinLoadout = normalizeSkinLoadout(squad, skins?.[slot.id]);
+    // Nicknames default to each unit type's locally-saved preference (see
+    // nicknameModel.js) unless an explicit per-slot array is passed in — the
+    // explicit path is what online play uses so a peer's own chosen names ride
+    // over the wire rather than getting re-derived from the viewer's local map.
+    const nicknameLoadout = nicknames?.[slot.id] ?? squad.map((type) => getNicknamePref(type));
     // Every unit keeps its natural index cell, EXCEPT the King ("always in the far
     // corner"): he swaps onto positions[2] with whoever held it. King-less squads are
     // untouched (no swap), so the original spawn layout is preserved exactly.
@@ -71,6 +77,7 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
         team: slot.team,
         type,
         skin: skinLoadout[i] ?? null,
+        nickname: nicknameLoadout[i] ?? null,
         x: cells[i].x,
         y: cells[i].y
       });
@@ -87,7 +94,8 @@ export function createMatchState({
   format = FORMATS.FFA,
   teamColors = null,
   teamNames = null,
-  skins = null
+  skins = null,
+  nicknames = null
 } = {}) {
   const players = createRoster({ playerCount, format, teamColors });
   const state = createBattleState({
@@ -98,7 +106,7 @@ export function createMatchState({
     format,
     teamColors,
     teamNames,
-    units: squads ? buildRoster(squads, size, players, skins) : undefined,
+    units: squads ? buildRoster(squads, size, players, skins, nicknames) : undefined,
   });
   const flip = nextRandom(state.rngState);
   const turnOrder = state.turnOrder ?? players.map((slot) => slot.id);

@@ -10,6 +10,7 @@ export function createUnit(spec) {
     team: spec.team ?? spec.player,
     type: spec.type,
     skin: spec.skin ?? null,
+    nickname: spec.nickname ?? null,
     position: { x: spec.x, y: spec.y },
     hp: spec.hp ?? definition.stats.maxHp,
     mp: spec.mp ?? getInitialMp(definition),
