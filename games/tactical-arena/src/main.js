@@ -38,6 +38,7 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   GARGOYLE_MISSION_ID,
+  MINER_MISSION_ID,
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
   PALADIN_MISSION_ID,
@@ -57,6 +58,9 @@ import {
   gargoyleRageWarningScript,
   markCampaignMapCutsceneSeen,
   markCampaignPostMatchCutsceneSeen,
+  minerBlastingCapSplashWarningScript,
+  minerDefeatScript,
+  minerRageWarningScript,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
@@ -71,6 +75,8 @@ import {
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
   shouldShowGargoyleRageWarning,
+  shouldShowMinerBlastingCapSplashWarning,
+  shouldShowMinerRageWarning,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
@@ -240,6 +246,13 @@ function createCampaignMeta() {
     sniperFireWarningShown: false,
     wallDestroyedCount: 0,
     sniperBlinded: false,
+    // Miner (mission 11)
+    minerBlastingCapSplashWarningShown: false,
+    minerRageWarningShown: false,
+    minerBlastingCapSplashTakenCount: 0,
+    minerEnteredRage: false,
+    minerRageHarvested: false,
+    minerDefeatDialogueShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -424,14 +437,14 @@ function setMessage(text, isError = false) {
 // The one-time overworld cutscene plays when the mission node is first selected on
 // the map — before the briefing/details panel — so the story beat leads into the
 // mission, not into the match launch. Marked seen only once it has actually shown.
-async function onCampaignMissionSelected(missionId) {
+async function onCampaignMissionSelected(missionId, selectedSquad = null) {
   if (!missionId || !shouldShowCampaignMapCutscene(globalThis.localStorage, missionId)) return;
-  const script = campaignMapCutsceneScript(missionId);
+  const script = campaignMapCutsceneScript(missionId, selectedSquad);
   if (!script.length) return;
   // Mark seen only after the cutscene has actually played out, so an interrupted or
   // never-rendered show doesn't silently burn the one-time story beat.
   await dialogue.show(script);
-  markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
+  if (missionId !== MINER_MISSION_ID) markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
 }
 
 function onStartCampaignMission(config) {
@@ -716,6 +729,18 @@ function announceTurnChange(prevPlayer) {
       } else {
         showResults();
       }
+    } else if (
+      campaignMissionId === MINER_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.minerDefeatDialogueShown
+    ) {
+      campaignMeta.minerDefeatDialogueShown = true;
+      const script = minerDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
     } else {
       showResults();
     }
@@ -932,6 +957,23 @@ function recordCampaignProgressHooks(command, result) {
         campaignMeta.wallDestroyedCount += 1;
       }
     }
+  } else if (campaignMissionId === MINER_MISSION_ID) {
+    const miner = findUnit(state, "p2-0-miner");
+    if (miner?.hp > 0 && miner.hp <= 5) {
+      campaignMeta.minerEnteredRage = true;
+    }
+    for (const event of events) {
+      if (event.type === "RAGE_REGENERATE" && event.unitId === "p2-0-miner" && (event.mpRestored ?? 0) > 0) {
+        campaignMeta.minerEnteredRage = true;
+        campaignMeta.minerRageHarvested = true;
+      }
+      if (event.type !== "ART_RESOLVED" || event.actorId !== "p2-0-miner" || event.artId !== "blasting-cap") continue;
+      for (const id of event.blocked ?? []) {
+        if (findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0) {
+          campaignMeta.minerBlastingCapSplashTakenCount += 1;
+        }
+      }
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -1133,6 +1175,30 @@ function nextCampaignDialogueBeat() {
       fireDamageTakenCount: campaignMeta.fireDamageTakenCount,
     })) {
       return { markShown: () => { campaignMeta.sniperFireWarningShown = true; }, script: sniperFireWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === MINER_MISSION_ID) {
+    if (shouldShowMinerBlastingCapSplashWarning(state, {
+      warningShown: campaignMeta.minerBlastingCapSplashWarningShown,
+      minerBlastingCapSplashTakenCount: campaignMeta.minerBlastingCapSplashTakenCount,
+    })) {
+      return {
+        markShown: () => { campaignMeta.minerBlastingCapSplashWarningShown = true; },
+        script: minerBlastingCapSplashWarningScript,
+      };
+    }
+    if (shouldShowMinerRageWarning(state, {
+      warningShown: campaignMeta.minerRageWarningShown,
+      minerRageHarvested: campaignMeta.minerRageHarvested,
+    })) {
+      return {
+        markShown: () => {
+          campaignMeta.minerRageWarningShown = true;
+          campaignMeta.minerEnteredRage = true;
+        },
+        script: minerRageWarningScript,
+      };
     }
     return null;
   }

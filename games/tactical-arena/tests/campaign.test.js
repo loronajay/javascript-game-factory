@@ -11,6 +11,7 @@ import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   GARGOYLE_MISSION_ID,
+  MINER_MISSION_ID,
   NECROMANCER_MISSION_ID,
   MONK_MISSION_ID,
   PALADIN_MISSION_ID,
@@ -38,6 +39,10 @@ import {
   getCampaignMap,
   getCampaignMission,
   markCampaignMapCutsceneSeen,
+  minerBlastingCapSplashWarningScript,
+  minerDefeatScript,
+  minerMissionOpeningScript,
+  minerRageWarningScript,
   monkMissionOpeningScript,
   necromancerMissionOpeningScript,
   necromancerRageWarningScript,
@@ -49,6 +54,8 @@ import {
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
   shouldShowGargoyleRageWarning,
+  shouldShowMinerBlastingCapSplashWarning,
+  shouldShowMinerRageWarning,
   shouldShowCampaignMapCutscene,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
@@ -1838,4 +1845,140 @@ test("The Wandering Party post-match cutscene is wandering-skinned and gated by 
   assert.equal(shouldShowCampaignMapCutscene(storage, WANDERING_PARTY_MISSION_ID), true);
   // Other missions have no post-match cutscene.
   assert.deepEqual(campaignPostMatchCutsceneScript(SNIPER_MISSION_ID), []);
+});
+
+// --- Mission 11: Dug Your Own Grave ------------------------------------------
+
+function minerMatchState(squad = ["sniper"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(MINER_MISSION_ID, squad)),
+    MINER_MISSION_ID,
+  );
+}
+
+test("Dug Your Own Grave replaces Whisperwood Eaves with a full-HP 9x9 Miner duel", () => {
+  const mission = getCampaignMission(MINER_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.locationName, "Whisperwood Eaves");
+  assert.equal(mission.requiredStars, 20);
+  assert.deepEqual(mission.rewardUnits, ["miner"]);
+
+  const config = createCampaignMatchConfig(MINER_MISSION_ID, ["sniper"]);
+  const match = minerMatchState(["sniper"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 9);
+  assert.deepEqual(config.squads[1], ["sniper"]);
+  assert.deepEqual(config.squads[2], ["miner"]);
+  assert.equal(config.teamNames[2], "Buried Claim");
+  assert.deepEqual(findUnit(match, "p1-0-sniper").position, { x: 0, y: 8 });
+  assert.deepEqual(findUnit(match, "p2-0-miner").position, { x: 8, y: 0 });
+  assert.equal(findUnit(match, "p1-0-sniper").hp, getUnitType("sniper").stats.maxHp);
+  assert.equal(findUnit(match, "p2-0-miner").hp, getUnitType("miner").stats.maxHp);
+});
+
+test("Dug Your Own Grave covers every non-spawn walkable tile with a 1-HP wall", () => {
+  const match = minerMatchState(["swordsman"]);
+  const walls = Object.entries(match.tileObjects ?? {}).filter(([, obj]) => obj.kind === "wall");
+
+  assert.equal(walls.length, 79, "9x9 board minus the two duelists' spawn tiles");
+  assert.equal(match.tileObjects["0,8"], undefined);
+  assert.equal(match.tileObjects["8,0"], undefined);
+  for (const [key, obj] of walls) {
+    assert.deepEqual(obj, { kind: "wall", hp: 1 }, `${key} is a diggable wall`);
+  }
+});
+
+test("Dug Your Own Grave map cutscene repeats and uses the chosen volunteer without spoiling the solve", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, MINER_MISSION_ID), true);
+  markCampaignMapCutsceneSeen(storage, MINER_MISSION_ID);
+  assert.equal(shouldShowCampaignMapCutscene(storage, MINER_MISSION_ID), true);
+
+  const mapScript = campaignMapCutsceneScript(MINER_MISSION_ID, ["sniper"]);
+  assert.equal(mapScript.length >= 5, true);
+  assert.ok(mapScript.some((line) => line.type === "sniper"));
+  assert.match(mapScript.map((line) => line.text).join(" "), /hole|sealed|stuck|check/i);
+  assert.doesNotMatch(mapScript.map((line) => line.text).join(" "), /shoot past walls|bonus star|Sniper is/i);
+});
+
+test("Dug Your Own Grave battle dialogue covers opening, splash, rage, and defeat", () => {
+  const state = minerMatchState(["sniper"]);
+  const opening = minerMissionOpeningScript(state);
+
+  assert.deepEqual(campaignOpeningScript(MINER_MISSION_ID, state), opening);
+  assert.equal(opening[0].speakerId, "p2-0-miner");
+  assert.equal(opening[1].speakerId, "p1-0-sniper");
+  assert.match(opening.map((line) => line.text).join(" "), /stuck|trust|help/i);
+
+  const playing = { ...state, phase: "playing" };
+  assert.equal(shouldShowMinerBlastingCapSplashWarning(playing, { minerBlastingCapSplashTakenCount: 0 }), false);
+  assert.equal(shouldShowMinerBlastingCapSplashWarning(playing, { minerBlastingCapSplashTakenCount: 1 }), true);
+  assert.equal(shouldShowMinerBlastingCapSplashWarning(playing, { minerBlastingCapSplashTakenCount: 1, warningShown: true }), false);
+  assert.match(minerBlastingCapSplashWarningScript(playing).map((line) => line.text).join(" "), /blast|cap|echo/i);
+
+  const raging = {
+    ...playing,
+    units: playing.units.map((unit) => unit.id === "p2-0-miner" ? { ...unit, hp: 5 } : unit),
+  };
+  assert.equal(shouldShowMinerRageWarning(raging, { warningShown: false, minerRageHarvested: true }), true);
+  assert.equal(shouldShowMinerRageWarning(raging, { warningShown: false, minerRageHarvested: false }), false);
+  assert.match(minerRageWarningScript(raging).map((line) => line.text).join(" "), /diamond|ore|mine/i);
+  assert.match(minerDefeatScript({ ...playing, winner: 1 }).map((line) => line.text).join(" "), /air|out|help/i);
+});
+
+test("Dug Your Own Grave grading rewards victory, no splash, pre-rage kill, and Sniper bonus", () => {
+  const base = minerMatchState(["sniper"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(MINER_MISSION_ID, won, {
+    minerBlastingCapSplashTakenCount: 0,
+    minerEnteredRage: false,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noBlastingCapSplash", "preRageKill"]);
+  assert.equal(perfect.bonusObjectives[0].id, "sniperDuelist");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const messy = evaluateCampaignMission(MINER_MISSION_ID, won, {
+    minerBlastingCapSplashTakenCount: 1,
+    minerEnteredRage: true,
+  });
+  assert.equal(messy.stars, 2, "the Sniper bonus can cover one missed base objective");
+  assert.equal(messy.objectives.find((objective) => objective.id === "noBlastingCapSplash").earned, false);
+  assert.equal(messy.objectives.find((objective) => objective.id === "preRageKill").earned, false);
+
+  const noBonus = evaluateCampaignMission(MINER_MISSION_ID, minerMatchState(["swordsman"]), {
+    minerBlastingCapSplashTakenCount: 0,
+    minerEnteredRage: false,
+  });
+  assert.equal(noBonus.earnedBonusStars, 0);
+});
+
+test("completing Dug Your Own Grave unlocks the Miner and records its stars", () => {
+  const storage = storageAdapter();
+  const base = minerMatchState(["sniper"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, MINER_MISSION_ID, won, {
+    minerBlastingCapSplashTakenCount: 0,
+    minerEnteredRage: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["miner"]);
+  assert.equal(isUnitUnlocked("miner", storage), true);
+  assert.equal(readCampaignProgressStars(storage, MINER_MISSION_ID), 3);
 });

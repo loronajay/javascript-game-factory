@@ -75,6 +75,21 @@ test("an adjacent enemy yields a basic-attack plan", () => {
   assert.ok(plans.some((p) => p.primary.kind === "attack" && p.primary.targetId === "p2-sword"));
 });
 
+test("a unit can generate and replay wall-attack plans", () => {
+  const state = createBattleState({
+    size: 5, seed: 2,
+    units: [
+      { id: "p1-miner", type: "miner", player: 1, x: 0, y: 4 },
+      { id: "p2-sword", type: "swordsman", player: 2, x: 4, y: 0 }
+    ],
+    tileObjects: [{ x: 1, y: 4, kind: "wall", hp: 1 }]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-miner"));
+  const wallPlan = plans.find((p) => p.primary.kind === "attackTile" && p.primary.targetPosition.x === 1 && p.primary.targetPosition.y === 4);
+  assert.ok(wallPlan, "expected the adjacent wall to be attackable");
+  assertPlanReplays(state, 1, wallPlan);
+});
+
 test("a caster yields targeted ART plans (Spark)", () => {
   const state = skirmish();
   const plans = generatePlans(state, findUnit(state, "p1-mage"));

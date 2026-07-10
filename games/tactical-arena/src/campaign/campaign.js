@@ -19,6 +19,7 @@ export const MONK_MISSION_ID = "monk-temple-trial";
 export const GARGOYLE_MISSION_ID = "gargoyle-inferno";
 export const SNIPER_MISSION_ID = "sniper-highground";
 export const WANDERING_PARTY_MISSION_ID = "wandering-party";
+export const MINER_MISSION_ID = "dug-your-own-grave";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -196,6 +197,19 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 13,
     fullHp: true,
   },
+  [MINER_MISSION_ID]: {
+    id: MINER_MISSION_ID,
+    title: "Dug Your Own Grave",
+    subtitle: "A sealed mine shaft leaves one champion below",
+    description: "Send one chosen champion into a buried 9x9 duel with the Miner. The mine is sealed in tight, and every path has to be carved open under pressure.",
+    unitType: "miner",
+    requiredStars: 20,
+    rewardUnits: Object.freeze(["miner"]),
+    playerSlots: 1,
+    enemySquad: Object.freeze(["miner"]),
+    size: 9,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -242,8 +256,7 @@ const CAMPAIGN_TRAIL = [
   { id: SNIPER_MISSION_ID, cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "plateau", locationName: "The High Cliffs",
     blurb: "Flat cliffs and long sightlines. Whoever holds the plateau's height holds every lane across it." },
   { id: WANDERING_PARTY_MISSION_ID, cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood" },
-  { id: "uncharted-12", cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves",
-    blurb: "Living green at last. The canopy blocks arrows and hides watchers with longbows." },
+  { id: MINER_MISSION_ID, cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves" },
   { id: "uncharted-13", cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "wood", locationName: "Elderroot",
     blurb: "An old grove said to shelter a blindfolded, winged archer whose arrows never truly miss." },
   { id: "uncharted-14", cell: { col: 0, row: 3 }, point: { x: 57.9, y: 72.5 }, region: "wood", locationName: "Thornhollow",
@@ -265,7 +278,7 @@ const CAMPAIGN_TRAIL = [
 // Extra visual branches on top of the linear spine, so the map reads as a network
 // with forks rather than one snaking line. Purely cosmetic — unlock stays star-gated.
 const CAMPAIGN_FORKS = [
-  [WITCH_DOCTOR_MISSION_ID, "uncharted-12"],
+  [WITCH_DOCTOR_MISSION_ID, MINER_MISSION_ID],
   ["uncharted-06", "uncharted-09"],
   [WANDERING_PARTY_MISSION_ID, "uncharted-18"],
 ];
@@ -394,7 +407,47 @@ export function resetCampaignProgress(storage = defaultStorage()) {
 // overworld map with no live match units to read a skin off of.
 const WANDERING_LINE = Object.freeze({ skin: "wandering", side: "right", player: 2 });
 
-export function campaignMapCutsceneScript(missionId) {
+function volunteerType(selectedSquad) {
+  return (Array.isArray(selectedSquad) ? selectedSquad : []).find((type) => UNIT_TYPE_KEYS.includes(type)) ?? "swordsman";
+}
+
+export function campaignMapCutsceneScript(missionId, selectedSquad = null) {
+  if (missionId === MINER_MISSION_ID) {
+    const type = volunteerType(selectedSquad);
+    const name = getUnitType(type).name;
+    return [
+      {
+        speaker: "swordsman",
+        text: "No. Absolutely not. That is another hole.",
+      },
+      {
+        speaker: "mystic",
+        text: "It is more of a mine mouth. Technically different. Emotionally worse.",
+      },
+      {
+        speaker: "archer",
+        text: "Someone should check whether it opens onto the trail. One person, quick look, then back up.",
+      },
+      {
+        type,
+        name,
+        side: "left",
+        player: 1,
+        text: "I'll go. If it is nothing, you can all pretend you were brave from up here.",
+      },
+      {
+        speaker: "swordsman",
+        text: "The entrance just sealed. The entrance definitely just sealed.",
+      },
+      {
+        type,
+        name,
+        side: "left",
+        player: 1,
+        text: "I am still standing. Nobody panic loudly enough to bring the ceiling down.",
+      },
+    ];
+  }
   if (missionId === WANDERING_PARTY_MISSION_ID) {
     return [
       { ...WANDERING_LINE, type: "swordsman", name: "Wandering Swordsman",
@@ -447,6 +500,7 @@ export function campaignMapCutsceneScript(missionId) {
 }
 
 export function shouldShowCampaignMapCutscene(storage = defaultStorage(), missionId) {
+  if (missionId === MINER_MISSION_ID) return true;
   return campaignMapCutsceneScript(missionId).length > 0 &&
     !readCampaignProgress(storage).seenMapCutscenes.includes(missionId);
 }
@@ -625,6 +679,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
       1: "Player Vanguard",
       2: mission.id === WANDERING_PARTY_MISSION_ID
         ? "The Wanderers"
+        : mission.id === MINER_MISSION_ID
+        ? "Buried Claim"
         : mission.id === SNIPER_MISSION_ID
         ? "The High Guard"
         : mission.id === FATHER_TIME_MISSION_ID
@@ -866,6 +922,22 @@ const SNIPER_FIRE_POSITIONS = Object.freeze([
   Object.freeze({ x: 7, y: 2 }),
 ]);
 
+const MINER_PLAYER_SPAWN = Object.freeze({ x: 0, y: 8 });
+const MINER_ENEMY_SPAWN = Object.freeze({ x: 8, y: 0 });
+
+function minerWallObjects() {
+  const walls = {};
+  for (let y = 0; y < 9; y += 1) {
+    for (let x = 0; x < 9; x += 1) {
+      const spawn =
+        (x === MINER_PLAYER_SPAWN.x && y === MINER_PLAYER_SPAWN.y) ||
+        (x === MINER_ENEMY_SPAWN.x && y === MINER_ENEMY_SPAWN.y);
+      if (!spawn) walls[positionKey({ x, y })] = { kind: "wall", hp: 1 };
+    }
+  }
+  return walls;
+}
+
 // Each campaign mission owns a spawn layout: hardcoded coordinates for the fixed
 // enemy pieces (their ids are deterministic), plus a slot-index fallback that places
 // whatever units the player drafted (the squad is player-chosen, so player ids are not
@@ -988,6 +1060,17 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fallback: (unit) => ({ ...unit.position }),
     fullHp: true,
     skinFor: (unit) => (unit.player === 2 ? "wandering" : unit.skin ?? null),
+  },
+  [MINER_MISSION_ID]: {
+    positions: {
+      "p2-0-miner": { ...MINER_ENEMY_SPAWN },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? { ...MINER_PLAYER_SPAWN }
+        : { ...MINER_ENEMY_SPAWN },
+    fullHp: true,
+    tileObjects: minerWallObjects,
   },
 });
 
@@ -1218,6 +1301,25 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       wallDestroyedCount,
       fireDamageTakenCount,
       sniperBlinded,
+    };
+  } else if (missionId === MINER_MISSION_ID) {
+    const minerBlastingCapSplashTakenCount = Math.max(0, Math.floor(Number(meta.minerBlastingCapSplashTakenCount) || 0));
+    const minerEnteredRage = Boolean(meta.minerEnteredRage);
+    const draftedSniper = playerUnits.some((unit) => unit.type === "sniper");
+    const miner = enemyUnits.find((unit) => unit.type === "miner") ?? null;
+    objectives = [
+      complete,
+      { id: "noBlastingCapSplash", label: "Avoid Blasting Cap splash damage", earned: victory && minerBlastingCapSplashTakenCount === 0 },
+      { id: "preRageKill", label: "Defeat the Miner before Diamond Harvester", earned: victory && !minerEnteredRage },
+    ];
+    bonusObjectives = [
+      { id: "sniperDuelist", label: "Bonus: bring the Sniper to the duel", earned: victory && draftedSniper },
+    ];
+    extra = {
+      minerDefeated: Boolean(miner && miner.hp <= 0),
+      minerBlastingCapSplashTakenCount,
+      minerEnteredRage,
+      draftedSniper,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -1876,9 +1978,94 @@ export function sniperFireWarningScript(state) {
   ];
 }
 
+// --- Mission 11: Dug Your Own Grave dialogue ----------------------------------
+// The overworld beat handles the volunteer getting sealed in; the battle dialogue
+// stays coy about the best unit choice and lets the board reveal the digging puzzle.
+
+export function minerMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const miner = findUnit(state, "p2-0-miner");
+  return [
+    {
+      speakerId: miner?.id,
+      text: "You are stuck down here unless I show you the way out. Trouble is, I do not trust boots I did not invite.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Then we settle this quickly, and you can decide how much you like fresh air.",
+    },
+  ];
+}
+
+export function shouldShowMinerBlastingCapSplashWarning(state, { warningShown = false, minerBlastingCapSplashTakenCount = 0 } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return Math.max(0, Math.floor(Number(minerBlastingCapSplashTakenCount) || 0)) > 0;
+}
+
+export function minerBlastingCapSplashWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const miner = findUnit(state, "p2-0-miner");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: miner?.id,
+      text: "Blasting caps have a sense of humor in tight tunnels.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "The echo hits almost as hard as the blast.",
+    },
+  ];
+}
+
+export function shouldShowMinerRageWarning(state, { warningShown = false, minerRageHarvested = false } = {}) {
+  if (warningShown || !minerRageHarvested || state?.phase !== "playing") return false;
+  const miner = findUnit(state, "p2-0-miner");
+  return Boolean(miner && miner.hp > 0 && miner.hp <= 5);
+}
+
+export function minerRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const miner = findUnit(state, "p2-0-miner");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: miner?.id,
+      text: "Diamonds in the dark. Ore in the walls. I can hear every glittering vein singing.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "He just found a second wind. End this before the mine starts answering him.",
+    },
+  ];
+}
+
+export function minerDefeatScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const miner = findUnit(state, "p2-0-miner") ?? (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === "miner");
+  return [
+    {
+      speakerId: miner?.id,
+      speaker: "miner",
+      text: "All right. Pickaxe down. I will get you out of here.",
+    },
+    ...(speaker ? [{
+      speakerId: speaker.id,
+      text: "You know the way?",
+    }] : []),
+    {
+      speakerId: miner?.id,
+      speaker: "miner",
+      text: "I dug half of it. Besides, I could use some air.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === MINER_MISSION_ID) return minerMissionOpeningScript(state);
   if (missionId === SNIPER_MISSION_ID) return sniperMissionOpeningScript(state);
   if (missionId === GARGOYLE_MISSION_ID) return gargoyleMissionOpeningScript(state);
   if (missionId === MONK_MISSION_ID) return monkMissionOpeningScript(state);

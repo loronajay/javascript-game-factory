@@ -12,7 +12,7 @@
 // a replay reproduces the same moves.
 
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getWallKillResourceReward, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { getSelfBlastRadius } from "../rules/arts.js";
 import { isFireDamageImmune } from "../rules/combat.js";
@@ -62,6 +62,8 @@ const AOE_WASTE_PENALTY = 8; // sink an AoE that hits too few targets for no kil
 // camping — melee attackers who follow it in eat the burn every rollover. Scaled by the same
 // `zone` weight as a placed wall/fire (in units of that authored evHints.zoneValue scale).
 const FIRE_CAMP_ZONE_VALUE = 6;
+const WALL_BREAK_VALUE = 5;
+const WALL_ORE_VALUE = 4;
 
 export function chooseActivation(
   state,
@@ -151,6 +153,7 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
 
   // 4. Zone control from a placed wall / fire.
   score += weights.zone * planZoneValue(unit, plan);
+  score += wallBreakValue(unit, plan);
 
   // 5. Don't burn a costly blast on too few targets for no kill (decision 1/5 economy).
   const primaryArtAi = artAiFor(unit, plan);
@@ -280,6 +283,16 @@ function planEffectValue(state, unit, plan) {
 function planZoneValue(unit, plan) {
   const ai = artAiFor(unit, plan);
   return ai?.intent === "placeObject" ? (ai.evHints?.zoneValue ?? 0) : 0;
+}
+
+function wallBreakValue(unit, plan) {
+  if (plan.primary.kind !== "attackTile") return 0;
+  const target = plan.primary.targetPosition;
+  const oreReward = getWallKillResourceReward(
+    { ...unit, position: plan.movePhase === "before" && plan.moveTo ? plan.moveTo : unit.position },
+    target,
+  );
+  return WALL_BREAK_VALUE + oreReward * WALL_ORE_VALUE;
 }
 
 function artAiFor(unit, plan) {

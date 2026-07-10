@@ -89,6 +89,27 @@ test("the CPU advances toward the enemy when nothing is in range", () => {
   assert.ok(closedDistance, "the lone CPU unit should close on the enemy");
 });
 
+test("the CPU Miner digs an adjacent wall for ore when boxed in", () => {
+  const state = createBattleState({
+    size: 5, seed: 12,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 4, y: 0 },
+      { id: "p2-miner", type: "miner", player: 2, x: 0, y: 4 }
+    ],
+    tileObjects: [
+      { x: 1, y: 4, kind: "wall", hp: 1 },
+      { x: 0, y: 3, kind: "wall", hp: 1 },
+      { x: 1, y: 3, kind: "wall", hp: 1 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(commands.some((c) => c.type === "ATTACK" && c.targetPosition), "expected a wall attack");
+  const after = replay(state, commands);
+  assert.equal(findUnit(after, "p2-miner").mp, 2, "adjacent wall kill grants ore");
+});
+
 test("a full CPU squad turn is legal and terminates, handing the turn back", () => {
   let s = skirmish(2);
   let guard = 0;

@@ -30,6 +30,7 @@ import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.j
 import {
   CLOD_MISSION_ID,
   MAX_CAMPAIGN_SQUAD_SIZE,
+  MINER_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
   campaignSquadSize,
   createCampaignMatchConfig,
@@ -209,6 +210,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   let selectedCampaignMissionId = CLOD_MISSION_ID;
   let campaignSquad = emptyCampaignSquad();
   let campaignSquadMissionId = null;
+  let campaignDynamicLockedSlots = null;
   // Skins are kept keyed by unit TYPE rather than slot index — normalizeCampaignSquad
   // dedupes/reorders types, and a per-unit skin choice should survive that untouched.
   let campaignSquadSkins = {};
@@ -273,6 +275,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     }
     const selectedNode = map.nodes.find((node) => node.id === selectedCampaignMissionId) ?? map.nodes[0];
     selectedCampaignNode = selectedNode;
+    const dynamicLockedSlots = campaignDynamicLockedSlots?.missionId === selectedCampaignMissionId
+      ? campaignDynamicLockedSlots.slots
+      : null;
     // A squad-locked mission (e.g. the Witch Doctor's solo Archer gauntlet) always deploys
     // its authored defaultSquad — the puzzle there is using that unit's kit, not picking it.
     if (selectedNode?.squadLocked) {
@@ -282,7 +287,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       normalizeCampaignSquadForProgress(
         selectedCampaignMissionId,
         campaignSquadSize(selectedNode),
-        selectedNode?.lockedSlots ?? null,
+        selectedNode?.lockedSlots ?? dynamicLockedSlots,
       );
     }
     campaignStars.textContent = `${map.totalStars} ★`;
@@ -453,7 +458,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   function renderCampaignSquad() {
     campaignSquadHost.replaceChildren();
     const squadLocked = Boolean(selectedCampaignNode?.squadLocked);
-    const lockedSlots = selectedCampaignNode?.lockedSlots ?? null;
+    const dynamicLockedSlots = campaignDynamicLockedSlots?.missionId === selectedCampaignMissionId
+      ? campaignDynamicLockedSlots.slots
+      : null;
+    const lockedSlots = selectedCampaignNode?.lockedSlots ?? dynamicLockedSlots;
     campaignSquad.forEach((type, index) => {
       // A slot is locked either by a whole-squad lock or by a per-slot pin (lockedSlots).
       const locked = squadLocked || Boolean(lockedSlots && lockedSlots[index] != null);
@@ -748,6 +756,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     resetProgressionAnnouncements(globalThis.localStorage);
     campaignSquad = emptyCampaignSquad();
     campaignSquadMissionId = null;
+    campaignDynamicLockedSlots = null;
     campaignSquadSkins = {};
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
@@ -798,7 +807,31 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       case "settings": openSettings(); break;
       case "selectCampaignMission": {
         const missionId = actionBtn.dataset.missionId || CLOD_MISSION_ID;
+        const previousMissionId = selectedCampaignMissionId;
         selectedCampaignMissionId = missionId;
+        if (missionId === MINER_MISSION_ID && previousMissionId === missionId) {
+          renderCampaign();
+          break;
+        }
+        if (missionId === MINER_MISSION_ID && previousMissionId !== missionId) {
+          campaignDynamicLockedSlots = null;
+          const map = getCampaignMap(globalThis.localStorage);
+          selectedCampaignNode = map.nodes.find((node) => node.id === missionId) ?? null;
+          normalizeCampaignSquadForProgress(
+            missionId,
+            campaignSquadSize(selectedCampaignNode),
+            selectedCampaignNode?.lockedSlots ?? null,
+          );
+          void chooseCampaignUnit(0).then(() => {
+            if (campaignSquadReady() && onCampaignMissionSelected) {
+              campaignDynamicLockedSlots = { missionId, slots: { 0: campaignSquad[0] } };
+              return Promise.resolve(onCampaignMissionSelected(missionId, campaignSquad));
+            }
+            return null;
+          }).finally(() => renderCampaign());
+          break;
+        }
+        campaignDynamicLockedSlots = null;
         // Play the one-time overworld cutscene (if any) BEFORE revealing the mission
         // briefing, then render the detail panel once the dialogue closes.
         if (onCampaignMissionSelected) {

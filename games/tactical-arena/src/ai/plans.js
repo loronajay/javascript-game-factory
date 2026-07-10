@@ -23,9 +23,9 @@
 // not set primaryUsed, so it prefixes any plan but still requires a real primary to
 // finish.
 
-import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
+import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -86,6 +86,19 @@ export function generatePlans(state, unit) {
         moveTo: stays ? null : dest,
         movePhase: stays ? null : "before",
         primary: { kind: "attack", targetId: enemy.id }
+      }));
+    }
+  }
+
+  // 1b. Destructible walls are primary attack targets too. This lets CPU units
+  // dig through authored cover and lets Miner harvest adjacent wall kills for ore.
+  for (const dest of destinations) {
+    const stays = dest.x === origin.x && dest.y === origin.y;
+    for (const wall of attackableWallsFrom(state, unit, dest)) {
+      plans.push(makePlan(unit, {
+        moveTo: stays ? null : dest,
+        movePhase: stays ? null : "before",
+        primary: { kind: "attackTile", targetPosition: wall }
       }));
     }
   }
@@ -631,6 +644,7 @@ export function toCommands(player, plan) {
   const p = plan.primary;
   const artPrimary = p.kind === "art";
   if (p.kind === "attack") commands.push(attack(player, plan.unitId, p.targetId));
+  else if (p.kind === "attackTile") commands.push(attackTile(player, plan.unitId, p.targetPosition.x, p.targetPosition.y));
   else if (p.kind === "defend") commands.push(defend(player, plan.unitId));
   else commands.push(artCommand(player, plan.unitId, p));
 
@@ -647,6 +661,7 @@ export function planMpCost(state, plan) {
   // getArtMpCost honors a raging Juggernaut's freeArts (0-cost ARTS), so the CPU doesn't
   // over-count MP it won't actually spend.
   if (plan.bonus) cost += getArtMpCost(unit, getArt(unit.type, plan.bonus.artId), state);
+  if (plan.primary.kind === "attackTile") cost += getBasicAttackResourceCost(unit, plan.primary.targetPosition);
   if (plan.primary.kind === "art") cost += getArtMpCost(unit, getArt(unit.type, plan.primary.artId), state);
   return cost;
 }
@@ -660,6 +675,27 @@ function attackTargetsFrom(state, unit, pos) {
   const actor = findUnit(moved, unit.id);
   if (getEffectiveStats(actor, moved).attackRange < 1) return [];
   return rangedTargetsFrom(moved, actor, pos, true);
+}
+
+function attackableWallsFrom(state, unit, pos) {
+  const moved = withUnitAt(state, unit.id, pos);
+  const actor = findUnit(moved, unit.id);
+  const range = getEffectiveStats(actor, moved).attackRange;
+  if (range < 1) return [];
+  const walls = [];
+  for (const [key, object] of Object.entries(moved.tileObjects ?? {})) {
+    if (object?.kind !== "wall") continue;
+    const [x, y] = key.split(",").map(Number);
+    const wall = { x, y };
+    if (chebyshevDistance(pos, wall) > range) continue;
+    if (isWallBetween(moved, pos, wall, actor) || isShotBlocked(moved, pos, wall, actor)) continue;
+    const resourceCost = getBasicAttackResourceCost(actor, wall);
+    if (resourceCost > 0 && actor.mp < resourceCost) continue;
+    walls.push(wall);
+  }
+  return walls.sort((a, b) =>
+    nearestEnemyDistance(state, unit.player, a) - nearestEnemyDistance(state, unit.player, b)
+  );
 }
 
 // Enemies in range of `pos`, gated by line of sight. `physical` adds the unit
