@@ -37,6 +37,7 @@ import {
 import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
+  MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
   PALADIN_MISSION_ID,
   VIRUS_MISSION_ID,
@@ -211,6 +212,9 @@ function createCampaignMeta() {
     paladinLightseekerDamageTakenCount: 0,
     paladinStatusAttempted: false,
     paladinDefeatDialogueShown: false,
+    // Monk (mission 7)
+    monkFakeKilledBeforeReal: false,
+    monkBlindAttempted: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -790,6 +794,15 @@ function recordCampaignProgressHooks(command, result) {
     if (playerTriedStatusOnPaladin(command, events)) {
       campaignMeta.paladinStatusAttempted = true;
     }
+  } else if (campaignMissionId === MONK_MISSION_ID) {
+    const realMonkId = state.missionRules?.monkTrial?.realMonkId;
+    const realMonk = realMonkId ? findUnit(state, realMonkId) : null;
+    if (realMonk?.hp > 0 && state.units.some((unit) => unit.trialFakeMonk && unit.hp <= 0)) {
+      campaignMeta.monkFakeKilledBeforeReal = true;
+    }
+    if (playerTriedBlindOnMonk(command, events)) {
+      campaignMeta.monkBlindAttempted = true;
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -821,6 +834,36 @@ function artHasStatusEffect(value) {
   return Object.values(value).some((child) => {
     if (Array.isArray(child)) return child.some(artHasStatusEffect);
     return child && typeof child === "object" && artHasStatusEffect(child);
+  });
+}
+
+function playerTriedBlindOnMonk(command, events = []) {
+  if (command?.type !== "USE_ART" || command.player !== 1) return false;
+  const actor = findUnit(state, command.unitId);
+  const art = actor ? getArt(actor.type, command.artId) : null;
+  if (!artHasBlindEffect(art)) return false;
+  if (command.targetId && findUnit(state, command.targetId)?.type === "monk") return true;
+  const monks = state.units.filter((unit) => unit.player === 2 && unit.type === "monk" && unit.hp > 0);
+  if (!monks.length) return false;
+  if (!command.targetId && (art.selfCast || art.globalStatus || art.targeting?.shape === "selfAura")) return true;
+  return events.some((event) =>
+    event.type === "ART_RESOLVED" &&
+    event.actorId === command.unitId &&
+    monks.some((monk) =>
+      event.targetId === monk.id ||
+      (event.targetIds ?? []).includes(monk.id) ||
+      (event.statusTargets ?? []).includes(monk.id) ||
+      (event.blinded ?? []).includes(monk.id)
+    ));
+}
+
+function artHasBlindEffect(value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.effect?.status === "blind" || value.globalStatus?.status === "blind") return true;
+  if (value.status === "blind" && value.type !== "immunity") return true;
+  return Object.values(value).some((child) => {
+    if (Array.isArray(child)) return child.some(artHasBlindEffect);
+    return child && typeof child === "object" && artHasBlindEffect(child);
   });
 }
 
@@ -2236,6 +2279,7 @@ function artDefinition(unit, artId) {
 }
 
 function artCalloutLabel(unit, artId) {
+  if (unit?.fakeArtNames?.[artId]) return unit.fakeArtNames[artId];
   const art = unit ? artDefinition(unit, artId) : null;
   if (art?.name) return art.name;
   return String(artId ?? "ART").split("-").filter(Boolean)

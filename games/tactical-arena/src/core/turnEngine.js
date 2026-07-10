@@ -221,6 +221,26 @@ function applyTimeStealTick(state, events) {
 }
 
 export function resolveVictory(state) {
+  const monkTrial = state.missionRules?.monkTrial;
+  if (monkTrial?.realMonkId) {
+    const playerAlive = livingUnits(state, 1).some(sustainsVictory);
+    if (!playerAlive) {
+      state.winner = 2;
+      state.phase = "complete";
+      state.activation = null;
+      return;
+    }
+    const realMonk = state.units.find((unit) => unit.id === monkTrial.realMonkId);
+    if (realMonk && realMonk.hp <= 0) {
+      for (const unit of state.units) {
+        if (unit.trialFakeMonk && unit.hp > 0) unit.hp = 0;
+      }
+      state.winner = 1;
+      state.phase = "complete";
+      state.activation = null;
+      return;
+    }
+  }
   // Defeat is decided by living units that can actually win, not raw bodies: a player
   // whose only survivor is a turn-less summon or non-combatant commander has lost.
   const livingTeams = new Set(livingUnits(state).filter(sustainsVictory).map(teamOfUnit));

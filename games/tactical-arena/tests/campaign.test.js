@@ -4,11 +4,13 @@ import assert from "node:assert/strict";
 import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { findUnit } from "../src/core/state.js";
+import { resolveVictory } from "../src/core/turnEngine.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  MONK_MISSION_ID,
   PALADIN_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_MISSION_ID,
@@ -22,7 +24,9 @@ import {
   fatherTimeMissionOpeningScript,
   fatherTimeRageWarningScript,
   getCampaignMap,
+  getCampaignMission,
   markCampaignMapCutsceneSeen,
+  monkMissionOpeningScript,
   necromancerMissionOpeningScript,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
@@ -291,6 +295,13 @@ function paladinMatchState(squad = ["swordsman"]) {
   return prepareCampaignMatchState(
     createMatchState(createCampaignMatchConfig(PALADIN_MISSION_ID, squad)),
     PALADIN_MISSION_ID,
+  );
+}
+
+function monkMatchState(squad = ["swordsman", "archer", "mystic", "magician"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(MONK_MISSION_ID, squad)),
+    MONK_MISSION_ID,
   );
 }
 
@@ -1116,6 +1127,168 @@ test("completing Wandering Paladin unlocks Paladin and records its stars", () =>
   assert.deepEqual(completed.newRewardUnits, ["paladin"]);
   assert.equal(isUnitUnlocked("paladin", storage), true);
   assert.equal(readCampaignProgressStars(storage, PALADIN_MISSION_ID), 3);
+});
+
+// --- Mission 7: Temple Trial of the Monk --------------------------------------
+
+test("Temple Trial of the Monk replaces the seventh coastal placeholder once enough stars are banked", () => {
+  const storage = storageAdapter();
+  const perfect = (missionId, state, meta) => completeCampaignMission(storage, missionId, {
+    ...state,
+    phase: "complete",
+    winner: 1,
+    units: state.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  }, meta);
+
+  perfect(CLOD_MISSION_ID, prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+  ), { clodChargeHitCount: 1 });
+  perfect(NECROMANCER_MISSION_ID, necromancerMatchState(), { cleanseUsed: true, spreadHitCount: 0 });
+  perfect(WITCH_DOCTOR_MISSION_ID, witchDoctorMatchState(), {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+  perfect(FATHER_TIME_MISSION_ID, fatherTimeMatchState(), {
+    archerDefeatedBeforeFatherTime: true,
+    rewindUsed: false,
+    archerBlinded: true,
+  });
+  perfect(VIRUS_MISSION_ID, virusMatchState(), { spreadHitCount: 0 });
+  perfect(PALADIN_MISSION_ID, paladinMatchState(), {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+  });
+
+  const node = getCampaignMap(storage).nodes[6];
+  assert.equal(node.id, MONK_MISSION_ID);
+  assert.equal(node.title, "Temple Trial of the Monk");
+  assert.equal(node.status, "available");
+  assert.equal(node.displayType, "monk");
+  assert.equal(node.biome, "water");
+});
+
+test("Temple Trial builds a full-HP 9x9 4v4 with one real Monk and three fake-art decoys", () => {
+  const config = createCampaignMatchConfig(MONK_MISSION_ID, ["swordsman", "archer", "mystic", "magician"]);
+  const mission = getCampaignMission(MONK_MISSION_ID);
+  const match = monkMatchState(["swordsman", "archer", "mystic", "magician"]);
+  const enemyMonks = match.units.filter((unit) => unit.player === 2 && unit.type === "monk");
+  const realMonk = enemyMonks.find((unit) => unit.trialRealMonk);
+  const fakeMonks = enemyMonks.filter((unit) => unit.trialFakeMonk);
+  const enemyPositions = enemyMonks.map((unit) => `${unit.position.x},${unit.position.y}`).sort();
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 9);
+  assert.doesNotMatch(mission.description, /fake ART|no true Monk|canon|Front Kick|Protect/i);
+  assert.deepEqual(config.squads[1], ["swordsman", "archer", "mystic", "magician"]);
+  assert.deepEqual(config.squads[2], ["monk", "monk", "monk", "monk"]);
+  assert.equal(config.teamNames[2], "Temple Monks");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.equal(enemyMonks.length, 4);
+  assert.equal(fakeMonks.length, 3);
+  assert.ok(realMonk, "one monk should be marked as real");
+  assert.equal(match.missionRules?.monkTrial?.realMonkId, realMonk.id);
+  assert.deepEqual(enemyPositions, ["7,0", "7,1", "8,0", "8,1"]);
+  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 1, y: 8 });
+  assert.deepEqual(findUnit(match, "p1-3-magician").position, { x: 1, y: 7 });
+  assert.equal(realMonk.hp, 26);
+  assert.ok(fakeMonks.every((unit) => unit.hp === 26 && unit.fakeArtNames?.["front-kick"] !== "Front Kick"));
+});
+
+test("Temple Trial dialogue introduces the split and real-monk hunt without solving the fake-art riddle", () => {
+  const state = monkMatchState();
+  const direct = monkMissionOpeningScript(state);
+  const copy = direct.map((line) => line.text).join(" ");
+
+  assert.deepEqual(campaignOpeningScript(MONK_MISSION_ID, state), direct);
+  assert.equal(direct.length >= 4, true);
+  assert.equal(direct[0].speaker, "monk");
+  assert.match(copy, /peace|disturbance|worthy|real monk|combat knowledge|shuffle/i);
+  assert.doesNotMatch(copy, /Front Kick|Protect|Heightened Sense|canon kit|fake ART/i);
+});
+
+test("Temple Trial ends as soon as the real Monk dies and clears all fake monks", () => {
+  const base = monkMatchState();
+  const real = base.units.find((unit) => unit.trialRealMonk);
+  const droppedReal = {
+    ...base,
+    units: base.units.map((unit) => unit.id === real.id ? { ...unit, hp: 0 } : unit),
+  };
+
+  resolveVictory(droppedReal);
+
+  assert.equal(droppedReal.phase, "complete");
+  assert.equal(droppedReal.winner, 1);
+  assert.ok(droppedReal.units.filter((unit) => unit.trialFakeMonk).every((unit) => unit.hp === 0));
+});
+
+test("Temple Trial grading rewards victory, full survival, no blind attempts, and the real-first bonus", () => {
+  const base = monkMatchState();
+  const real = base.units.find((unit) => unit.trialRealMonk);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => {
+      if (unit.player === 2) return { ...unit, hp: unit.id === real.id ? 0 : unit.hp };
+      return { ...unit, hp: Math.max(1, unit.hp) };
+    }),
+  };
+
+  const perfect = evaluateCampaignMission(MONK_MISSION_ID, won, {
+    monkFakeKilledBeforeReal: false,
+    monkBlindAttempted: false,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "survive", "noBlind"]);
+  assert.equal(perfect.bonusObjectives[0].id, "realFirst");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const oneDown = {
+    ...won,
+    units: won.units.map((unit) => unit.id === "p1-1-archer" ? { ...unit, hp: 0 } : unit),
+  };
+  const coveredByBonus = evaluateCampaignMission(MONK_MISSION_ID, oneDown, {
+    monkFakeKilledBeforeReal: false,
+    monkBlindAttempted: false,
+  });
+  assert.equal(coveredByBonus.objectives.find((objective) => objective.id === "survive").earned, false);
+  assert.equal(coveredByBonus.stars, 3, "the real-first bonus can cover one missed base objective");
+
+  const fakeFirstBlind = evaluateCampaignMission(MONK_MISSION_ID, won, {
+    monkFakeKilledBeforeReal: true,
+    monkBlindAttempted: true,
+  });
+  assert.equal(fakeFirstBlind.objectives.find((objective) => objective.id === "noBlind").earned, false);
+  assert.equal(fakeFirstBlind.bonusObjectives[0].earned, false);
+  assert.equal(fakeFirstBlind.stars, 2);
+});
+
+test("completing Temple Trial unlocks Monk and records its stars", () => {
+  const storage = storageAdapter();
+  const base = monkMatchState();
+  const real = base.units.find((unit) => unit.trialRealMonk);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: unit.id === real.id ? 0 : unit.hp } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, MONK_MISSION_ID, won, {
+    monkFakeKilledBeforeReal: false,
+    monkBlindAttempted: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["monk"]);
+  assert.equal(isUnitUnlocked("monk", storage), true);
+  assert.equal(readCampaignProgressStars(storage, MONK_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {

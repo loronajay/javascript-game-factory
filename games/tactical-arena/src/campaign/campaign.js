@@ -1,5 +1,6 @@
 import { getUnitType } from "../core/unitCatalog.js";
 import { createUnit, findUnit } from "../core/state.js";
+import { nextRandom } from "../core/rng.js";
 import { isNegativeStatus } from "../rules/statuses.js";
 import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
@@ -14,6 +15,7 @@ export const WITCH_DOCTOR_MISSION_ID = "witch-doctor-swamp";
 export const FATHER_TIME_MISSION_ID = "timeless-woods";
 export const VIRUS_MISSION_ID = "virus-root";
 export const PALADIN_MISSION_ID = "wandering-paladin";
+export const MONK_MISSION_ID = "monk-temple-trial";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -119,6 +121,19 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 5,
     fullHp: true,
   },
+  [MONK_MISSION_ID]: {
+    id: MONK_MISSION_ID,
+    title: "Temple Trial of the Monk",
+    subtitle: "Lesson: read the real kit and find the real master",
+    description: "Bring a full chosen squad into the temple corner trial. Four Monks appear, but only one is real; read the battle carefully and strike the true master.",
+    unitType: "monk",
+    requiredStars: 12,
+    rewardUnits: Object.freeze(["monk"]),
+    playerSlots: 4,
+    enemySquad: Object.freeze(["monk", "monk", "monk", "monk"]),
+    size: 9,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -157,8 +172,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "Where the swamp drains to the sea, the rot has roots. A poisonous squad waits in the black water." },
   { id: PALADIN_MISSION_ID, cell: { col: 5, row: 4 }, point: { x: 29.1, y: 34.2 }, region: "coast", locationName: "Tidewatch Harbor",
     blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
-  { id: "uncharted-07", cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Saltbreak Pier",
-    blurb: "Narrow jetties over deep water. Get shoved off and the sea keeps you." },
+  { id: MONK_MISSION_ID, cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Temple Steps",
+    blurb: "A silent temple waits above the tide. Four identical Monks guard the steps, but only one carries the true discipline." },
   { id: "uncharted-08", cell: { col: 6, row: 3 }, point: { x: 46.2, y: 31.1 }, region: "coast", locationName: "Wreckers' Cliffs",
     blurb: "Cliffside wreckers lure ships to the rocks. High ground and hard falls decide this one." },
   { id: "uncharted-09", cell: { col: 5, row: 3 }, point: { x: 51.9, y: 18.7 }, region: "ashfall", locationName: "Ashfall Flats",
@@ -455,6 +470,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Viral Root"
         : mission.id === PALADIN_MISSION_ID
         ? "Wandering Paladin"
+        : mission.id === MONK_MISSION_ID
+        ? "Temple Monks"
         : mission.id === WITCH_DOCTOR_MISSION_ID
         ? "Swamp Coven"
         : mission.id === NECROMANCER_MISSION_ID
@@ -479,6 +496,17 @@ const WITCH_DOCTOR_GHOUL_POSITIONS = Object.freeze(
     .map((p) => Object.freeze(p))
 );
 const WITCH_DOCTOR_GHOUL_POSITION_KEYS = new Set(WITCH_DOCTOR_GHOUL_POSITIONS.map(positionKey));
+const MONK_TRIAL_POSITIONS = Object.freeze([
+  Object.freeze({ x: 7, y: 0 }),
+  Object.freeze({ x: 8, y: 1 }),
+  Object.freeze({ x: 8, y: 0 }),
+  Object.freeze({ x: 7, y: 1 }),
+]);
+const MONK_TRIAL_FAKE_ART_SETS = Object.freeze([
+  Object.freeze({ "front-kick": "Lotus Uppercut", protect: "Mirror Palm" }),
+  Object.freeze({ "front-kick": "Temple Sweep", protect: "Still Water Guard" }),
+  Object.freeze({ "front-kick": "Cloudbreaker Kick", protect: "Incense Veil" }),
+]);
 
 // Fire has two unioned sources:
 // 1. Each Ghoul's four ORTHOGONAL neighbours, clipped to the board and excluding any tile
@@ -543,6 +571,46 @@ function createCampaignGhoul(index, position) {
     }),
     spent: true,
     summonerId: null,
+  };
+}
+
+function shuffledMonkTrialPositions(rngState) {
+  let state = rngState;
+  const positions = MONK_TRIAL_POSITIONS.map((position) => ({ ...position }));
+  for (let index = positions.length - 1; index > 0; index -= 1) {
+    const roll = nextRandom(state);
+    state = roll.state;
+    const swap = Math.floor(roll.value * (index + 1));
+    [positions[index], positions[swap]] = [positions[swap], positions[index]];
+  }
+  return { positions, rngState: state };
+}
+
+function prepareMonkTrial(match, units) {
+  const monks = units.filter((unit) => unit.player === 2 && unit.type === "monk");
+  if (monks.length !== 4) return { units, rngState: match.rngState, missionRules: null };
+  const realRoll = nextRandom(match.rngState);
+  const realIndex = Math.min(monks.length - 1, Math.floor(realRoll.value * monks.length));
+  const shuffled = shuffledMonkTrialPositions(realRoll.state);
+  const realMonkId = monks[realIndex].id;
+  let fakeIndex = 0;
+  const positionByMonkId = new Map(monks.map((unit, index) => [unit.id, shuffled.positions[index]]));
+  const prepared = units.map((unit) => {
+    if (unit.player !== 2 || unit.type !== "monk") return unit;
+    const real = unit.id === realMonkId;
+    const fakeArtNames = real ? null : MONK_TRIAL_FAKE_ART_SETS[fakeIndex++ % MONK_TRIAL_FAKE_ART_SETS.length];
+    return {
+      ...unit,
+      position: positionByMonkId.get(unit.id) ?? unit.position,
+      trialRealMonk: real,
+      trialFakeMonk: !real,
+      ...(fakeArtNames ? { fakeArtNames: { ...fakeArtNames } } : {}),
+    };
+  });
+  return {
+    units: prepared,
+    rngState: shuffled.rngState,
+    missionRules: { monkTrial: { realMonkId } },
   };
 }
 
@@ -621,6 +689,15 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         : { x: 4, y: 0 },
     fullHp: true,
   },
+  // Temple Trial (9x9): the player's full squad starts in the near corner. The
+  // four enemy Monks are shuffled into the far corner after one is randomly marked
+  // real; only the real Monk sustains the trial.
+  [MONK_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    prepareTrial: prepareMonkTrial,
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -642,6 +719,7 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       defending: false,
     };
   });
+  const trial = layout.prepareTrial?.(match, units) ?? { units, rngState: match.rngState, missionRules: null };
   return {
     ...match,
     currentPlayer: 1,
@@ -652,7 +730,9 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       ? { aiProfile: { virusMisfortune: { sourceId: "p2-3-witch-doctor" } } }
       : {}),
     tileObjects,
-    units: [...units, ...(layout.extraUnits?.(match) ?? [])],
+    rngState: trial.rngState,
+    ...(trial.missionRules ? { missionRules: trial.missionRules } : {}),
+    units: [...trial.units, ...(layout.extraUnits?.(match) ?? [])],
   };
 }
 
@@ -772,6 +852,27 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       paladinLightseekerDamageTakenCount,
       paladinStatusAttempted,
       draftedMelee,
+    };
+  } else if (missionId === MONK_MISSION_ID) {
+    const monkBlindAttempted = Boolean(meta.monkBlindAttempted);
+    const monkFakeKilledBeforeReal = Boolean(meta.monkFakeKilledBeforeReal);
+    const realMonk = enemyUnits.find((unit) => unit.trialRealMonk) ??
+      enemyUnits.find((unit) => unit.id === state?.missionRules?.monkTrial?.realMonkId) ??
+      null;
+    const fakeMonksDefeated = enemyUnits.filter((unit) => unit.trialFakeMonk && unit.hp <= 0).length;
+    objectives = [
+      complete,
+      { id: "survive", label: "Lose no party members", earned: allSurvived },
+      { id: "noBlind", label: "Do not try to blind any Monk", earned: victory && !monkBlindAttempted },
+    ];
+    bonusObjectives = [
+      { id: "realFirst", label: "Bonus: defeat the real Monk before any fake Monk", earned: victory && !monkFakeKilledBeforeReal },
+    ];
+    extra = {
+      realMonkDefeated: Boolean(realMonk && realMonk.hp <= 0),
+      fakeMonksDefeated,
+      monkBlindAttempted,
+      monkFakeKilledBeforeReal,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -1302,9 +1403,44 @@ export function paladinDefeatScript(state) {
   ];
 }
 
+// --- Mission 7: Temple Trial dialogue -----------------------------------------
+// The combat board starts after the visual trick has resolved: one Monk has split
+// into four corner bodies, only one of which carries the real-monk marker. The script
+// sells the preceding beats; the fake-ART clue itself only appears in battle callouts.
+
+export function monkMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const realMonk = (state?.units ?? []).find((unit) => unit.trialRealMonk) ??
+    (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === "monk");
+  if (!speaker) return [];
+  return [
+    {
+      speaker: "monk",
+      text: "The temple is quiet. Too quiet. I sense a disturbance of my peace.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "That would be us.",
+    },
+    {
+      speakerId: realMonk?.id,
+      text: "! Then prove you are worthy to enter. Find the real Monk, or leave the temple path.",
+    },
+    {
+      speaker: "monk",
+      text: "The Monk vanishes to the far corner, splits into four bodies, and shuffles until the eye loses the truth.",
+    },
+    {
+      speaker: "swordsman",
+      text: "This is a test of combat knowledge as much as combat strength. Watch closely once the trial begins.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === MONK_MISSION_ID) return monkMissionOpeningScript(state);
   if (missionId === PALADIN_MISSION_ID) return paladinMissionOpeningScript(state);
   if (missionId === VIRUS_MISSION_ID) return virusMissionOpeningScript(state);
   if (missionId === FATHER_TIME_MISSION_ID) return fatherTimeMissionOpeningScript(state);
