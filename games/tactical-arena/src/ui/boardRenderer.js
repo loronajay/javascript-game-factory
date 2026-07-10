@@ -159,6 +159,8 @@ export function isTargetedMode(mode, actor) {
 export function isHealArtConfirmTile(state, actor, art, position) {
   if (!state || !actor || !art || art.effect?.type !== "healAllies" || !position || !isOnBoard(state, position)) return false;
 
+  if (art.effect.global || art.targeting?.shape === "globalAllies") return true;
+
   if (art.targeting?.shape === "selfAura") {
     const radius = art.targeting.radius ?? art.effect.radius ?? 3;
     return chebyshevDistance(actor.position, position) <= radius;
@@ -351,7 +353,13 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     const healArt = getArt(actor.type, mode.slice("art:".length));
     if (healArt?.effect?.type === "healAllies") {
       isHealArt = true;
-      if (healArt.targeting?.shape === "selfAura") {
+      if (healArt.effect.global || healArt.targeting?.shape === "globalAllies") {
+        for (let x = 0; x < state.size; x += 1) {
+          for (let y = 0; y < state.size; y += 1) {
+            legal.add(positionKey({ x, y }));
+          }
+        }
+      } else if (healArt.targeting?.shape === "selfAura") {
         const radius = healArt.targeting.radius ?? healArt.effect.radius ?? 3;
         for (let dx = -radius; dx <= radius; dx += 1) {
           for (let dy = -radius; dy <= radius; dy += 1) {

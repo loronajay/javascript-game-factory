@@ -649,6 +649,50 @@ test("self-aura heal ARTS can be confirmed from any highlighted heal tile", () =
   }
 });
 
+test("global heal ARTS can be confirmed from any board heal tile", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 10,
+      units: [
+        { id: "mystic", player: 1, type: "mystic", x: 5, y: 5, hp: 10, mp: 20 },
+        { id: "ally", player: 1, type: "swordsman", x: 6, y: 5, hp: 10 },
+        { id: "enemy", player: 2, type: "swordsman", x: 9, y: 9 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "mystic");
+    const art = getArt("mystic", "wish");
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+    const clicked = [];
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:wish",
+      selectedId: "mystic",
+      footworkPath: [],
+      onTileClick: (position) => clicked.push(position)
+    });
+
+    const farHealTile = findSvgByAttribute(boardLayer, "data-key", "0,0");
+
+    assert.ok(farHealTile.classList.contains("legal-heal"), "global heal should green the whole board");
+    assert.equal(isHealArtConfirmTile(state, actor, art, { x: 0, y: 0 }), true);
+    assert.equal(isHealArtConfirmTile(state, actor, art, { x: 10, y: 0 }), false);
+
+    farHealTile.listeners.get("click")();
+    assert.deepEqual(clicked, [{ x: 0, y: 0 }]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("Volley Shot previews its cone when hovering any tile inside that cone", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
