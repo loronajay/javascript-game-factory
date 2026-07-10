@@ -303,12 +303,12 @@ body.tutorial-spotlight-mp .dialogue-layer {
 /* Fixed track width (no 1fr) so a choice button is always the SAME standard width,
    whether its group has one option or five — auto-fit would otherwise stretch a
    lone option to fill the whole row. */
-.choice-group-options { display:grid; grid-template-columns:repeat(auto-fill,9.5rem); justify-content:flex-start; gap:.5rem; }
-.choice-option { display:flex; align-items:center; gap:.7rem; width:100%; padding:.6rem .7rem; border:1px solid var(--brass); border-radius:10px; background:linear-gradient(180deg,var(--btn-hi),var(--btn-lo)); color:var(--text); cursor:pointer; text-align:left; transition:transform .08s ease,border-color .1s,box-shadow .1s; }
+.choice-group-options { display:grid; grid-template-columns:repeat(auto-fill,11.5rem); justify-content:flex-start; gap:.5rem; }
+.choice-option { display:flex; align-items:center; gap:.7rem; width:100%; padding:.6rem .7rem; border:1px solid var(--brass); border-radius:10px; background:linear-gradient(180deg,var(--btn-hi),var(--btn-lo)); color:var(--text); cursor:pointer; text-align:left; transition:transform .08s ease,border-color .1s,box-shadow .1s; overflow:hidden; }
 .choice-option:hover { transform:translateY(-1px); border-color:var(--team,var(--brass-hi)); box-shadow:0 6px 16px rgba(0,0,0,.4); }
 .choice-option.has-portrait .unit-portrait { width:2.875rem; height:2.875rem; flex:0 0 auto; border:1px solid var(--brass); border-radius:8px; overflow:hidden; }
-.choice-option-text { display:flex; flex-direction:column; min-width:0; }
-.choice-option-label { font:800 .92rem var(--font-display); letter-spacing:.04em; }
+.choice-option-text { display:flex; flex-direction:column; min-width:0; flex:1 1 auto; }
+.choice-option-label { font:800 .84rem var(--font-display); letter-spacing:.02em; overflow-wrap:anywhere; }
 .choice-option-sub { font-size:.74rem; opacity:.75; }
 .choice-foot { display:flex; justify-content:flex-end; padding:.1rem 1.1rem 1rem; }
 .ref-unit { padding:.9rem 0; border-bottom:1px dashed rgba(70,100,130,.4); }.ref-unit:last-child { border-bottom:0; }.ref-unit h3 { display:flex; gap:.5rem; align-items:center; margin:0 0 .55rem; color:var(--text); font:800 1rem var(--font-display); letter-spacing:.04em; }.ref-glyph { font-size:1.2rem; }/* Stat grid — the shared stat display model (codex + roster picker). Labeled
