@@ -60,7 +60,7 @@ export function syncScreenMusic(audio, screenName) {
   else audio.startMusic("menu");
 }
 
-export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, openCodex, onLeaveMatch }) {
+export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, openCodex, onLeaveMatch }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
@@ -708,8 +708,15 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, op
       case "chooseTutorialReward": openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;
       case "settings": openSettings(); break;
       case "selectCampaignMission": {
-        selectedCampaignMissionId = actionBtn.dataset.missionId || CLOD_MISSION_ID;
-        renderCampaign();
+        const missionId = actionBtn.dataset.missionId || CLOD_MISSION_ID;
+        selectedCampaignMissionId = missionId;
+        // Play the one-time overworld cutscene (if any) BEFORE revealing the mission
+        // briefing, then render the detail panel once the dialogue closes.
+        if (onCampaignMissionSelected) {
+          void Promise.resolve(onCampaignMissionSelected(missionId)).finally(() => renderCampaign());
+        } else {
+          renderCampaign();
+        }
         break;
       }
       case "chooseCampaignUnit": {

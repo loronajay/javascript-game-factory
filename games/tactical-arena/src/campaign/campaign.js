@@ -110,7 +110,7 @@ const AUTHORED_MISSIONS = Object.freeze({
     id: PALADIN_MISSION_ID,
     title: "Wandering Paladin",
     subtitle: "Lesson: light tiles, status immunity, and honorable duels",
-    description: "Choose one champion for a 1v1 duel against a traveling Paladin. Lightseeker punishes light tiles, Chosen shrugs off status tricks, and a melee victory earns his respect.",
+    description: "A wandering Paladin blocks the road and offers honest terms: your strongest champion against his blade, one on one, no tricks. Win his respect and he'll march at your side from here on.",
     unitType: "paladin",
     requiredStars: 10,
     rewardUnits: Object.freeze(["paladin"]),

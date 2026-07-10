@@ -290,7 +290,7 @@ const rulesModal = new RulesModal(refModal, document.querySelector("#refCloseBtn
 const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
 const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
 const dialogue = createDialogueSystem(dialogueLayer, { getState: () => state, onOpen: render, onClose: render });
-const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, openCodex, onLeaveMatch });
+const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, openCodex, onLeaveMatch });
 window.tacticalArenaDialogue = dialogue;
 
 // Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
@@ -387,13 +387,18 @@ function setMessage(text, isError = false) {
 
 // --- Match lifecycle ---
 
-async function onStartCampaignMission(config) {
-  const missionId = config?.campaignMissionId;
-  if (missionId && shouldShowCampaignMapCutscene(globalThis.localStorage, missionId)) {
-    markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
-    const script = campaignMapCutsceneScript(missionId);
-    if (script.length) await dialogue.show(script);
-  }
+// The one-time overworld cutscene plays when the mission node is first selected on
+// the map — before the briefing/details panel — so the story beat leads into the
+// mission, not into the match launch. Marked seen only once it has actually shown.
+async function onCampaignMissionSelected(missionId) {
+  if (!missionId || !shouldShowCampaignMapCutscene(globalThis.localStorage, missionId)) return;
+  const script = campaignMapCutsceneScript(missionId);
+  if (!script.length) return;
+  markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
+  await dialogue.show(script);
+}
+
+function onStartCampaignMission(config) {
   startMatch(config);
 }
 
@@ -695,7 +700,9 @@ function recordCampaignRejection(command, result) {
 
 function recordCampaignProgressHooks(command, result) {
   if (matchConfig?.mode !== "campaign") return;
-  const events = result.events ?? [];
+  // Defensive: a bad call site passing no result must never throw here — an
+  // exception in a resolver leaves `resolving` stuck and hardlocks the match.
+  const events = result?.events ?? [];
   if (campaignMissionId === CLOD_MISSION_ID) {
     const charge = events.find((event) =>
       event.type === "ART_RESOLVED" &&
@@ -1188,7 +1195,7 @@ function endResolve(prepared, result, prevPlayer) {
   if (tempo) tempoAnimating = Math.max(0, tempoAnimating - 1);
   else state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(result);
+  recordCampaignProgressHooks(prepared, result);
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
@@ -1896,7 +1903,7 @@ async function resolveInstantArt(command) {
 
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(result);
+  recordCampaignProgressHooks(prepared, result);
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
