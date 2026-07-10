@@ -16,6 +16,7 @@ export const FATHER_TIME_MISSION_ID = "timeless-woods";
 export const VIRUS_MISSION_ID = "virus-root";
 export const PALADIN_MISSION_ID = "wandering-paladin";
 export const MONK_MISSION_ID = "monk-temple-trial";
+export const GARGOYLE_MISSION_ID = "gargoyle-inferno";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -33,8 +34,9 @@ export const WITCH_DOCTOR_BOARD_SIZE = 9;
 export const WITCH_DOCTOR_HEAL_CAST_CAP = 3;
 export const MIN_CAMPAIGN_SQUAD_SIZE = 1;
 export const MAX_CAMPAIGN_SQUAD_SIZE = 4;
-// The campaign map is capped for now so the whole journey stays surveyable at once;
-// authored missions fill placeholder stops one at a time up to this count.
+// The campaign map is capped for now so the journey stays surveyable at once;
+// authored missions fill placeholder stops one at a time up to this count. Some
+// painted landmarks intentionally stay node-less until a future unit needs them.
 export const MAX_CAMPAIGN_MISSIONS = 20;
 
 // Fully-authored, playable missions. Everything OTHER than the map graph lives here
@@ -138,12 +140,25 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 9,
     fullHp: true,
   },
+  [GARGOYLE_MISSION_ID]: {
+    id: GARGOYLE_MISSION_ID,
+    title: "Gargoyle's Inferno",
+    subtitle: "A small ruin mouth opens into a furnace",
+    description: "Send one chosen champion into a 9x9 duel with the Gargoyle. Every turn a random open space catches fire, Pyroclasm punishes careless lines, and a fast win can deny Volcanic Rage.",
+    unitType: "gargoyle",
+    requiredStars: 14,
+    rewardUnits: Object.freeze(["gargoyle"]),
+    playerSlots: 1,
+    enemySquad: Object.freeze(["gargoyle"]),
+    size: 9,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
-// cell {col,row} on the CAMPAIGN_GRID. The two authored missions lead; the rest are
-// charted-but-unbuilt placeholder stops so the entire 20-mission map is visible
-// (as "coming soon" / "?" nodes) from day one. Cells wind across the grid so the
+// cell {col,row} on the CAMPAIGN_GRID. The authored missions lead; the rest are
+// charted-but-unbuilt placeholder stops so the active route is visible (as
+// "coming soon" / "?" nodes) from day one. Cells wind across the grid so the
 // path reads like a real map. Promoting a placeholder to a real mission is purely
 // additive: give its id an AUTHORED_MISSIONS entry — the cell + trails already exist.
 // The map's geography: named biome regions the trail passes through, in paint order
@@ -178,10 +193,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
   { id: MONK_MISSION_ID, cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Temple Steps",
     blurb: "A silent temple waits above the tide. Four identical Monks guard the steps, but only one carries the true discipline." },
-  { id: "uncharted-08", cell: { col: 6, row: 3 }, point: { x: 46.2, y: 31.1 }, region: "coast", locationName: "Wreckers' Cliffs",
-    blurb: "Cliffside wreckers lure ships to the rocks. High ground and hard falls decide this one." },
-  { id: "uncharted-09", cell: { col: 5, row: 3 }, point: { x: 51.9, y: 18.7 }, region: "ashfall", locationName: "Ashfall Flats",
-    blurb: "The land turns black and warm. Cinders drift; a stone sentinel stirs in the heat haze." },
+  { id: GARGOYLE_MISSION_ID, cell: { col: 5, row: 3 }, point: { x: 51.9, y: 18.7 }, region: "ashfall", locationName: "Ashfall Flats",
+    blurb: "A low ruin mouth exhales heat from beneath the flats. Something stone-winged waits in the old dark." },
   { id: "uncharted-10", cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "ashfall", locationName: "The Caldera",
     blurb: "The mountain's open mouth. Lava seams split the field — fire immunity is worth more than armor here." },
   { id: "uncharted-11", cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood",
@@ -332,6 +345,26 @@ export function resetCampaignProgress(storage = defaultStorage()) {
 }
 
 export function campaignMapCutsceneScript(missionId) {
+  if (missionId === GARGOYLE_MISSION_ID) {
+    return [
+      {
+        speaker: "swordsman",
+        text: "That is not a cave. That is a doorway pretending to be a crack in the rocks.",
+      },
+      {
+        speaker: "mystic",
+        text: "Old ruins, small entrance, warm air coming out. Wonderful signs, all of them.",
+      },
+      {
+        speaker: "archer",
+        text: "It is too narrow for the whole party. Maybe one of us climbs in, takes a look, and climbs right back out.",
+      },
+      {
+        speaker: "swordsman",
+        text: "Right back out. That part feels important.",
+      },
+    ];
+  }
   if (missionId !== PALADIN_MISSION_ID) return [];
   return [
     {
@@ -476,6 +509,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Wandering Paladin"
         : mission.id === MONK_MISSION_ID
         ? "Temple Monks"
+        : mission.id === GARGOYLE_MISSION_ID
+        ? "Ashfall Guardian"
         : mission.id === WITCH_DOCTOR_MISSION_ID
         ? "Swamp Coven"
         : mission.id === NECROMANCER_MISSION_ID
@@ -756,6 +791,19 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fullHp: true,
     prepareTrial: prepareMonkTrial,
   },
+  // Gargoyle's Inferno (9x9): a clean corner duel with a mission rule that adds one
+  // temporary fire tile at every turn rollover while the Gargoyle lives.
+  [GARGOYLE_MISSION_ID]: {
+    positions: {
+      "p2-0-gargoyle": { x: 8, y: 0 },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? { x: 0, y: 8 }
+        : { x: 8, y: 0 },
+    fullHp: true,
+    missionRules: () => ({ randomFire: { sourceId: "p2-0-gargoyle", turnsLeft: 3 } }),
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -791,7 +839,9 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       : {}),
     tileObjects,
     rngState: trial.rngState,
-    ...(trial.missionRules ? { missionRules: trial.missionRules } : {}),
+    ...(trial.missionRules || layout.missionRules
+      ? { missionRules: { ...(layout.missionRules?.(match) ?? {}), ...(trial.missionRules ?? {}) } }
+      : {}),
     units: [...trial.units, ...(layout.extraUnits?.(match) ?? [])],
   };
 }
@@ -933,6 +983,25 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       fakeMonksDefeated,
       monkBlindAttempted,
       monkFakeKilledBeforeReal,
+    };
+  } else if (missionId === GARGOYLE_MISSION_ID) {
+    const gargoylePyroclasmDamageTakenCount = Math.max(0, Math.floor(Number(meta.gargoylePyroclasmDamageTakenCount) || 0));
+    const fireDamageTakenCount = Math.max(0, Math.floor(Number(meta.fireDamageTakenCount) || 0));
+    const gargoyleEnteredRage = Boolean(meta.gargoyleEnteredRage);
+    const gargoyle = enemyUnits.find((unit) => unit.type === "gargoyle") ?? null;
+    objectives = [
+      complete,
+      { id: "noPyroclasm", label: "Avoid Pyroclasm damage", earned: victory && gargoylePyroclasmDamageTakenCount === 0 },
+      { id: "noFire", label: "Avoid fire space damage", earned: victory && fireDamageTakenCount === 0 },
+    ];
+    bonusObjectives = [
+      { id: "preRageKill", label: "Bonus: defeat the Gargoyle before Volcanic Rage", earned: victory && !gargoyleEnteredRage },
+    ];
+    extra = {
+      gargoyleDefeated: Boolean(gargoyle && gargoyle.hp <= 0),
+      gargoylePyroclasmDamageTakenCount,
+      fireDamageTakenCount,
+      gargoyleEnteredRage,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -1499,9 +1568,60 @@ export function monkMissionOpeningScript(state) {
   ];
 }
 
+// --- Mission 8: Gargoyle's Inferno dialogue -----------------------------------
+// The map cutscene gets the party into the ruin; the battle script reveals the
+// guardian and the one-shot RAGE warning rides before Volcanic Rage's free Pyroclasm.
+
+export function gargoyleMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const gargoyle = findUnit(state, "p2-0-gargoyle");
+  return [
+    {
+      speakerId: gargoyle?.id,
+      text: "You should never have entered my ruins. Stone remembers trespass, and flame remembers flesh.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Good. A talking statue in a tiny murder basement. That is about what I expected.",
+    },
+    {
+      speakerId: gargoyle?.id,
+      text: "You will be trapped in flame forever. My fire will crisp you up until even your shadow begs to leave.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Then I had better make this quick.",
+    },
+  ];
+}
+
+export function shouldShowGargoyleRageWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  const gargoyle = findUnit(state, "p2-0-gargoyle");
+  return Boolean(gargoyle && gargoyle.hp > 0 && gargoyle.hp <= 5);
+}
+
+export function gargoyleRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const gargoyle = findUnit(state, "p2-0-gargoyle");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: gargoyle?.id,
+      text: "ARRRRGH! The inferno wakes with me!",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Volcanic Rage. Pyroclasm is about to erupt for free -- move if you can, end it if you cannot.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === GARGOYLE_MISSION_ID) return gargoyleMissionOpeningScript(state);
   if (missionId === MONK_MISSION_ID) return monkMissionOpeningScript(state);
   if (missionId === PALADIN_MISSION_ID) return paladinMissionOpeningScript(state);
   if (missionId === VIRUS_MISSION_ID) return virusMissionOpeningScript(state);

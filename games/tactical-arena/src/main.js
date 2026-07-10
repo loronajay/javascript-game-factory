@@ -37,6 +37,7 @@ import {
 import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
+  GARGOYLE_MISSION_ID,
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
   PALADIN_MISSION_ID,
@@ -49,6 +50,7 @@ import {
   clodRageWarningScript,
   completeCampaignMission,
   fatherTimeRageWarningScript,
+  gargoyleRageWarningScript,
   markCampaignMapCutsceneSeen,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
@@ -61,6 +63,7 @@ import {
   shouldShowCampaignMapCutscene,
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
+  shouldShowGargoyleRageWarning,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
@@ -216,6 +219,10 @@ function createCampaignMeta() {
     // Monk (mission 7)
     monkFakeKilledBeforeReal: false,
     monkBlindAttempted: false,
+    // Gargoyle (mission 8)
+    gargoyleRageWarningShown: false,
+    gargoyleEnteredRage: false,
+    gargoylePyroclasmDamageTakenCount: 0,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -842,6 +849,28 @@ function recordCampaignProgressHooks(command, result) {
     if (playerTriedBlindOnMonk(command, events)) {
       campaignMeta.monkBlindAttempted = true;
     }
+  } else if (campaignMissionId === GARGOYLE_MISSION_ID) {
+    const gargoyle = findUnit(state, "p2-0-gargoyle");
+    if (gargoyle?.hp > 0 && gargoyle.hp <= 5) {
+      campaignMeta.gargoyleEnteredRage = true;
+    }
+    for (const event of events) {
+      if (event.type === "FIRE_DAMAGE" && findUnit(state, event.unitId)?.player === 1) {
+        campaignMeta.fireDamageTakenCount += 1;
+      }
+      const isChosenPyroclasm =
+        event.type === "ART_RESOLVED" &&
+        event.actorId === "p2-0-gargoyle" &&
+        event.artId === "pyroclasm";
+      const isFreePyroclasm =
+        event.type === "PYROCLASM_ERUPT" &&
+        event.actorId === "p2-0-gargoyle";
+      if (!isChosenPyroclasm && !isFreePyroclasm) continue;
+      const playerHits = (event.targetIds ?? []).filter((id) =>
+        findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0);
+      campaignMeta.gargoylePyroclasmDamageTakenCount += playerHits.length;
+      if (isFreePyroclasm) campaignMeta.gargoyleEnteredRage = true;
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -1020,6 +1049,20 @@ function nextCampaignDialogueBeat() {
       warningShown: campaignMeta.paladinRageWarningShown,
     })) {
       return { markShown: () => { campaignMeta.paladinRageWarningShown = true; }, script: paladinRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === GARGOYLE_MISSION_ID) {
+    if (shouldShowGargoyleRageWarning(state, {
+      warningShown: campaignMeta.gargoyleRageWarningShown,
+    })) {
+      return {
+        markShown: () => {
+          campaignMeta.gargoyleRageWarningShown = true;
+          campaignMeta.gargoyleEnteredRage = true;
+        },
+        script: gargoyleRageWarningScript,
+      };
     }
     return null;
   }

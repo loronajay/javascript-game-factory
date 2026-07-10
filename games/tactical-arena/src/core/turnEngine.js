@@ -122,6 +122,7 @@ function advanceTurnIfExhausted(state) {
     applyBlackDeathTick(state, fireEvents);
     applyTimeStealTick(state, fireEvents);
     applyAutoStrikeTick(state, fireEvents);
+    applyRandomFireTick(state, fireEvents);
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
@@ -145,6 +146,33 @@ function applyFireTick(state, events) {
     obj.turnsLeft -= 1;
     if (obj.turnsLeft <= 0) delete state.tileObjects[key];
   }
+}
+
+function applyRandomFireTick(state, events) {
+  const rule = state.missionRules?.randomFire;
+  if (!rule) return;
+  const source = rule.sourceId ? state.units.find((unit) => unit.id === rule.sourceId) : null;
+  if (rule.sourceId && (!source || source.hp <= 0)) return;
+  const candidates = [];
+  for (let y = 0; y < state.size; y += 1) {
+    for (let x = 0; x < state.size; x += 1) {
+      const position = { x, y };
+      if (state.tileObjects?.[`${x},${y}`]) continue;
+      if (unitAt(state, position)) continue;
+      candidates.push(position);
+    }
+  }
+  if (!candidates.length) return;
+  const draw = drawValue(state.rngState);
+  state.rngState = draw.rngState;
+  const position = candidates[Math.min(candidates.length - 1, Math.floor(draw.value * candidates.length))];
+  const key = `${position.x},${position.y}`;
+  state.tileObjects[key] = { kind: "fire", turnsLeft: Math.max(1, Math.floor(Number(rule.turnsLeft) || 3)) };
+  events.push({
+    type: "RANDOM_FIRE_LIT",
+    sourceId: source?.id ?? null,
+    position: { ...position },
+  });
 }
 
 function applyBlackDeathTick(state, events) {

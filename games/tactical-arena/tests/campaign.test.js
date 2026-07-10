@@ -9,6 +9,7 @@ import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
+  GARGOYLE_MISSION_ID,
   NECROMANCER_MISSION_ID,
   MONK_MISSION_ID,
   PALADIN_MISSION_ID,
@@ -24,6 +25,8 @@ import {
   evaluateCampaignMission,
   fatherTimeMissionOpeningScript,
   fatherTimeRageWarningScript,
+  gargoyleMissionOpeningScript,
+  gargoyleRageWarningScript,
   getCampaignMap,
   getCampaignMission,
   markCampaignMapCutsceneSeen,
@@ -37,6 +40,7 @@ import {
   resetCampaignProgress,
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
+  shouldShowGargoyleRageWarning,
   shouldShowCampaignMapCutscene,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
@@ -64,6 +68,8 @@ import {
   witchDoctorMissionOpeningScript,
   witchDoctorRageWarningScript,
 } from "../src/campaign/campaign.js";
+import { applyCommand } from "../src/core/reducer.js";
+import { beginActivation, defend, finishActivation } from "../src/core/commands.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -74,12 +80,12 @@ function storageAdapter() {
   };
 }
 
-test("fresh campaign map surveys the whole 20-stop graph with Clod live and the rest gated", () => {
+test("fresh campaign map surveys the active campaign graph with Clod live and the rest gated", () => {
   const map = getCampaignMap(storageAdapter());
 
   assert.equal(map.totalStars, 0);
   // The full journey is always visible so the player gets an overview.
-  assert.equal(map.nodes.length, 20);
+  assert.equal(map.nodes.length, 19);
   assert.equal(map.nodes[0].id, CLOD_MISSION_ID);
   assert.equal(map.nodes[0].status, "available");
   assert.equal(map.nodes[0].displayType, "clod");
@@ -303,6 +309,13 @@ function monkMatchState(squad = ["swordsman", "archer", "mystic", "magician"]) {
   return prepareCampaignMatchState(
     createMatchState(createCampaignMatchConfig(MONK_MISSION_ID, squad)),
     MONK_MISSION_ID,
+  );
+}
+
+function gargoyleMatchState(squad = ["swordsman"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(GARGOYLE_MISSION_ID, squad)),
+    GARGOYLE_MISSION_ID,
   );
 }
 
@@ -1333,6 +1346,193 @@ test("completing Temple Trial unlocks Monk and records its stars", () => {
   assert.deepEqual(completed.newRewardUnits, ["monk"]);
   assert.equal(isUnitUnlocked("monk", storage), true);
   assert.equal(readCampaignProgressStars(storage, MONK_MISSION_ID), 3);
+});
+
+// --- Mission 8: Gargoyle's Inferno -------------------------------------------
+
+test("Gargoyle's Inferno replaces the eighth Ashfall Flats placeholder once enough stars are banked", () => {
+  const storage = storageAdapter();
+  const perfect = (missionId, state, meta) => completeCampaignMission(storage, missionId, {
+    ...state,
+    phase: "complete",
+    winner: 1,
+    units: state.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  }, meta);
+
+  perfect(CLOD_MISSION_ID, prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+  ), { clodChargeHitCount: 1 });
+  perfect(NECROMANCER_MISSION_ID, necromancerMatchState(), { cleanseUsed: true, spreadHitCount: 0 });
+  perfect(WITCH_DOCTOR_MISSION_ID, witchDoctorMatchState(), {
+    ghoulsDefeatedCount: 1,
+    fireDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    blackDeathDanceUsed: false,
+  });
+  perfect(FATHER_TIME_MISSION_ID, fatherTimeMatchState(), {
+    archerDefeatedBeforeFatherTime: true,
+    rewindUsed: false,
+    archerBlinded: true,
+  });
+  perfect(VIRUS_MISSION_ID, virusMatchState(), { spreadHitCount: 0 });
+  perfect(PALADIN_MISSION_ID, paladinMatchState(), {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+  });
+  perfect(MONK_MISSION_ID, monkMatchState(), {
+    monkFakeKilledBeforeReal: false,
+    monkBlindAttempted: false,
+  });
+
+  const node = getCampaignMap(storage).nodes[7];
+  assert.equal(node.id, GARGOYLE_MISSION_ID);
+  assert.equal(node.title, "Gargoyle's Inferno");
+  assert.equal(node.locationName, "Ashfall Flats");
+  assert.equal(node.status, "available");
+  assert.equal(node.displayType, "gargoyle");
+  assert.equal(node.biome, "volcanic");
+});
+
+test("Gargoyle's Inferno builds a full-HP 9x9 chosen-unit duel with random inferno fires armed", () => {
+  const config = createCampaignMatchConfig(GARGOYLE_MISSION_ID, ["mystic"]);
+  const match = gargoyleMatchState(["mystic"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 9);
+  assert.deepEqual(config.squads[1], ["mystic"]);
+  assert.deepEqual(config.squads[2], ["gargoyle"]);
+  assert.equal(config.teamNames[2], "Ashfall Guardian");
+  assert.equal(match.currentPlayer, 1);
+
+  assert.deepEqual(findUnit(match, "p1-0-mystic").position, { x: 0, y: 8 });
+  assert.deepEqual(findUnit(match, "p2-0-gargoyle").position, { x: 8, y: 0 });
+  assert.equal(findUnit(match, "p1-0-mystic").hp, 23);
+  assert.equal(findUnit(match, "p2-0-gargoyle").hp, 30);
+  assert.deepEqual(match.missionRules?.randomFire, {
+    sourceId: "p2-0-gargoyle",
+    turnsLeft: 3,
+  });
+});
+
+test("Gargoyle's Inferno map cutscene is first-view only and uses party ruin banter", () => {
+  const storage = storageAdapter();
+
+  assert.equal(shouldShowCampaignMapCutscene(storage, GARGOYLE_MISSION_ID), true);
+  const script = campaignMapCutsceneScript(GARGOYLE_MISSION_ID);
+  assert.equal(script.length >= 3, true);
+  assert.match(script.map((line) => line.text).join(" "), /ruins|entrance|climb|look/i);
+  assert.ok(script.some((line) => line.speaker === "swordsman"));
+
+  markCampaignMapCutsceneSeen(storage, GARGOYLE_MISSION_ID);
+  assert.equal(shouldShowCampaignMapCutscene(storage, GARGOYLE_MISSION_ID), false);
+
+  resetCampaignProgress(storage);
+  assert.equal(shouldShowCampaignMapCutscene(storage, GARGOYLE_MISSION_ID), true);
+});
+
+test("Gargoyle's Inferno dialogue covers the ruin trap banter and RAGE eruption warning", () => {
+  const state = gargoyleMatchState(["swordsman"]);
+  const direct = gargoyleMissionOpeningScript(state);
+
+  assert.deepEqual(campaignOpeningScript(GARGOYLE_MISSION_ID, state), direct);
+  assert.equal(direct.length >= 3, true);
+  assert.equal(direct[0].speakerId, "p2-0-gargoyle");
+  assert.match(direct.map((line) => line.text).join(" "), /ruins|flame|crisp|trapped/i);
+
+  const withHp = (hp) => ({
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) => unit.id === "p2-0-gargoyle" ? { ...unit, hp } : unit),
+  });
+  assert.equal(shouldShowGargoyleRageWarning(withHp(6)), false);
+  assert.equal(shouldShowGargoyleRageWarning(withHp(5)), true);
+  assert.equal(shouldShowGargoyleRageWarning(withHp(5), { warningShown: true }), false);
+  assert.match(gargoyleRageWarningScript(withHp(5)).map((line) => line.text).join(" "), /ARR+G|RAGE|Pyroclasm|erupts/i);
+});
+
+test("Gargoyle's Inferno lights one random open space on fire at each turn rollover", () => {
+  let state = gargoyleMatchState(["swordsman"]);
+  state = {
+    ...state,
+    rngState: 123,
+  };
+
+  state = applyCommand(state, beginActivation(1, "p1-0-swordsman")).nextState;
+  state = applyCommand(state, defend(1, "p1-0-swordsman")).nextState;
+  const finished = applyCommand(state, finishActivation(1, "p1-0-swordsman"));
+  const event = finished.events.find((e) => e.type === "RANDOM_FIRE_LIT");
+  const fireEntries = Object.entries(finished.nextState.tileObjects ?? {})
+    .filter(([, obj]) => obj.kind === "fire");
+
+  assert.ok(event, "turn rollover should surface the lit fire tile");
+  assert.deepEqual(event.sourceId, "p2-0-gargoyle");
+  assert.equal(fireEntries.length, 1);
+  assert.deepEqual(fireEntries[0][1], { kind: "fire", turnsLeft: 3 });
+  assert.deepEqual(fireEntries[0][0], `${event.position.x},${event.position.y}`);
+  assert.notDeepEqual(event.position, findUnit(finished.nextState, "p1-0-swordsman").position);
+  assert.notDeepEqual(event.position, findUnit(finished.nextState, "p2-0-gargoyle").position);
+});
+
+test("Gargoyle's Inferno grading rewards victory, avoiding Pyroclasm and fire, with a pre-RAGE kill bonus", () => {
+  const base = gargoyleMatchState(["swordsman"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(GARGOYLE_MISSION_ID, won, {
+    gargoylePyroclasmDamageTakenCount: 0,
+    fireDamageTakenCount: 0,
+    gargoyleEnteredRage: false,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noPyroclasm", "noFire"]);
+  assert.equal(perfect.bonusObjectives[0].id, "preRageKill");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const burned = evaluateCampaignMission(GARGOYLE_MISSION_ID, won, {
+    gargoylePyroclasmDamageTakenCount: 0,
+    fireDamageTakenCount: 1,
+    gargoyleEnteredRage: false,
+  });
+  assert.equal(burned.objectives.find((objective) => objective.id === "noFire").earned, false);
+  assert.equal(burned.stars, 3, "the pre-RAGE bonus can cover one missed base objective");
+
+  const scorchedRage = evaluateCampaignMission(GARGOYLE_MISSION_ID, won, {
+    gargoylePyroclasmDamageTakenCount: 1,
+    fireDamageTakenCount: 1,
+    gargoyleEnteredRage: true,
+  });
+  assert.equal(scorchedRage.objectives.find((objective) => objective.id === "noPyroclasm").earned, false);
+  assert.equal(scorchedRage.bonusObjectives[0].earned, false);
+  assert.equal(scorchedRage.stars, 1);
+});
+
+test("completing Gargoyle's Inferno unlocks Gargoyle and records its stars", () => {
+  const storage = storageAdapter();
+  const base = gargoyleMatchState(["swordsman"]);
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, GARGOYLE_MISSION_ID, won, {
+    gargoylePyroclasmDamageTakenCount: 0,
+    fireDamageTakenCount: 0,
+    gargoyleEnteredRage: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["gargoyle"]);
+  assert.equal(isUnitUnlocked("gargoyle", storage), true);
+  assert.equal(readCampaignProgressStars(storage, GARGOYLE_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {

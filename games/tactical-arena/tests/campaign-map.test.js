@@ -11,6 +11,7 @@ import {
 import {
   CAMPAIGN_MISSIONS,
   CAMPAIGN_REGIONS,
+  GARGOYLE_MISSION_ID,
   MAX_CAMPAIGN_MISSIONS,
   getCampaignMap,
 } from "../src/campaign/campaign.js";
@@ -87,7 +88,7 @@ test("computeCampaignGeometry ignores connections to unknown nodes", () => {
 
 test("the authored campaign graph is capped, uniquely celled, and fully connected", () => {
   assert.ok(CAMPAIGN_MISSIONS.length <= MAX_CAMPAIGN_MISSIONS);
-  assert.equal(CAMPAIGN_MISSIONS.length, 20);
+  assert.equal(CAMPAIGN_MISSIONS.length, 19);
 
   // No two missions share a grid cell (nodes never overlap on the map).
   const cellKeys = new Set(CAMPAIGN_MISSIONS.map((m) => `${m.cell.col},${m.cell.row}`));
@@ -119,6 +120,20 @@ test("the authored campaign graph is capped, uniquely celled, and fully connecte
     }
   }
   assert.equal(seen.size, CAMPAIGN_MISSIONS.length, "all stops reachable via trails");
+});
+
+test("Ashfall Flats sits on the mining landmark while the old farmland landmark stays node-less", () => {
+  const oldFarmlandPoint = { x: 46.2, y: 31.1 };
+  const miningPoint = { x: 51.9, y: 18.7 };
+  const oldFarmlandNode = CAMPAIGN_MISSIONS.find((mission) =>
+    mission.point?.x === oldFarmlandPoint.x && mission.point?.y === oldFarmlandPoint.y
+  );
+  const ashfallFlats = CAMPAIGN_MISSIONS.find((mission) => mission.id === GARGOYLE_MISSION_ID);
+
+  assert.equal(oldFarmlandNode, undefined);
+  assert.ok(ashfallFlats, "Ashfall Flats should remain on the campaign trail");
+  assert.equal(ashfallFlats.locationName, "Ashfall Flats");
+  assert.deepEqual(ashfallFlats.point, miningPoint);
 });
 
 test("every mission belongs to a real region and names its place on the map", () => {
