@@ -57,12 +57,13 @@ export function normalizeDialogueScript(lines = [], state = null) {
   return script.map((line, index) => normalizeDialogueLine(line, state, index, script.length));
 }
 
-export function createDialogueSystem(host, { getState = () => null, onOpen = () => {}, onClose = () => {} } = {}) {
+export function createDialogueSystem(host, { getState = () => null, onOpen = () => {}, onClose = () => {}, onLineAction = () => {} } = {}) {
   if (!host) throw new Error("createDialogueSystem requires a host element");
 
   let lines = [];
   let index = 0;
   let open = false;
+  let advancing = false;
   let resolveCurrent = null;
 
   host.classList.add("dialogue-layer");
@@ -91,6 +92,7 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
   function hide({ completed = false } = {}) {
     if (!open) return;
     open = false;
+    advancing = false;
     host.hidden = true;
     host.replaceChildren();
     document.removeEventListener("keydown", onKey);
@@ -100,14 +102,30 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
     if (resolve) resolve({ completed, index });
   }
 
-  function next() {
-    if (!open) return;
-    if (index >= lines.length - 1) {
-      hide({ completed: true });
-      return;
+  async function next() {
+    if (!open || advancing) return;
+    advancing = true;
+    try {
+      const line = lines[index];
+      if (line?.afterAction) {
+        await onLineAction(line.afterAction, line);
+        if (!open) {
+          advancing = false;
+          return;
+        }
+      }
+      if (index >= lines.length - 1) {
+        advancing = false;
+        hide({ completed: true });
+        return;
+      }
+      index += 1;
+      advancing = false;
+      render();
+    } catch (error) {
+      advancing = false;
+      throw error;
     }
-    index += 1;
-    render();
   }
 
   function onKey(event) {
@@ -117,7 +135,7 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
       hide({ completed: false });
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      next();
+      void next();
     }
   }
 
@@ -150,7 +168,7 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
     skip.type = "button";
     advance.type = "button";
     skip.addEventListener("click", () => hide({ completed: false }));
-    advance.addEventListener("click", next);
+    advance.addEventListener("click", () => { void next(); });
     controls.append(skip, advance);
     foot.append(count, controls);
     body.append(heading, text, foot);

@@ -43,6 +43,7 @@ import {
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
+  applyMonkTrialIntroBeat,
   campaignMapCutsceneScript,
   campaignOpeningScript,
   clodRageWarningScript,
@@ -293,7 +294,12 @@ let audioUnlocked = false;
 const rulesModal = new RulesModal(refModal, document.querySelector("#refCloseBtn"));
 const effects = createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics: createBoardMetrics(state.size), audio });
 const turnFlash = new TurnAnnouncer(document.querySelector("#turnFlash"));
-const dialogue = createDialogueSystem(dialogueLayer, { getState: () => state, onOpen: render, onClose: render });
+const dialogue = createDialogueSystem(dialogueLayer, {
+  getState: () => state,
+  onOpen: render,
+  onClose: render,
+  onLineAction: handleDialogueLineAction,
+});
 const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, openCodex, onLeaveMatch });
 window.tacticalArenaDialogue = dialogue;
 
@@ -408,6 +414,38 @@ function onStartCampaignMission(config) {
   startMatch(config);
 }
 
+async function handleDialogueLineAction(action) {
+  if (matchConfig?.mode !== "campaign" || campaignMissionId !== MONK_MISSION_ID) return;
+  if (action === "monkIntroRevealAndMove") {
+    const realMonkId = state.missionRules?.monkTrial?.realMonkId;
+    const from = realMonkId ? findUnit(state, realMonkId)?.position : null;
+    state = applyMonkTrialIntroBeat(state, action);
+    render();
+    const moved = realMonkId ? findUnit(state, realMonkId) : null;
+    if (from && moved) {
+      resolving = true;
+      await effects.animateMovement(moved.id, from, moved.position);
+      resolving = false;
+      render();
+    }
+    return;
+  }
+  if (action === "monkIntroSplitShuffle") {
+    state = applyMonkTrialIntroBeat(state, action);
+    render();
+    effects.shake(5);
+    await sleep(260);
+  }
+}
+
+function finalizeCampaignOpeningState() {
+  if (matchConfig?.mode !== "campaign" || campaignMissionId !== MONK_MISSION_ID) return;
+  if (state.missionRules?.monkTrial?.introComplete) return;
+  state = applyMonkTrialIntroBeat(state, "monkIntroComplete");
+  resolving = false;
+  render();
+}
+
 function startMatch(config) {
   window.clearTimeout(resultsTimer);
   window.clearTimeout(tutorialPresentationTimer);
@@ -479,6 +517,7 @@ function startMatch(config) {
   else if (matchConfig?.mode === "campaign" && campaignMissionId) {
     const script = campaignOpeningScript(campaignMissionId, state);
     if (script.length) void dialogue.show(script).then(() => {
+      finalizeCampaignOpeningState();
       maybeShowCampaignDialogue();
       maybeStartCpuTurn();
     });

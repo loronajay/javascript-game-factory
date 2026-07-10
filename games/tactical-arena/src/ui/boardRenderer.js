@@ -519,7 +519,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   // fire shares a tile, and `z` keeps that unit above its own fire.
   const renderables = [];
   for (const u of state.units) {
-    if (u.hp <= 0) continue;
+    if (u.hp <= 0 || u.introHidden) continue;
     renderables.push({
       depth: u.position.x + u.position.y,
       z: 1,

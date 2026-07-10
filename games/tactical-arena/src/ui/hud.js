@@ -248,7 +248,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
     panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list"></div>`;
     const list = panel.querySelector(".squad-list");
 
-    for (const unit of state.units.filter((u) => u.player === player)) {
+    for (const unit of state.units.filter((u) => u.player === player && !u.introHidden)) {
       const definition = getUnitType(unit.type);
       if (definition.summon) continue;
       const stats = getEffectiveStats(unit, state);

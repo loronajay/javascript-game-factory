@@ -38,13 +38,17 @@ export const MAX_CAMPAIGN_SQUAD_SIZE = 4;
 export const MAX_CAMPAIGN_MISSIONS = 20;
 
 // Fully-authored, playable missions. Everything OTHER than the map graph lives here
-// (squads, lesson copy, rewards); the mission's cell + trail wiring comes from
+// (squads, flavor copy, rewards); the mission's cell + trail wiring comes from
 // CAMPAIGN_TRAIL below so this object never carries hand-placed map coordinates.
+// Player-facing subtitle/description text stays in-world (no "Lesson:" framing) —
+// the campaign doubles as a teaching tool but should read as a campaign, not a
+// tutorial. The underlying tactical lesson each mission teaches is documented for
+// dev/design reference in CAMPAIGN_MISSION_LESSONS.md instead.
 const AUTHORED_MISSIONS = Object.freeze({
   [CLOD_MISSION_ID]: {
     id: CLOD_MISSION_ID,
     title: "Clod on the Ridge",
-    subtitle: "Lesson: armor, magic, and RAGE spacing",
+    subtitle: "A stone golem holds the high road",
     description: "Take two units into a half-HP duel against Clod and a Juggernaut. Magic damage cuts through defense; loose spacing keeps Thunderous Charge from ending the run.",
     unitType: "clod",
     requiredStars: 0,
@@ -57,7 +61,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   [NECROMANCER_MISSION_ID]: {
     id: NECROMANCER_MISSION_ID,
     title: "Necromancer's Gate",
-    subtitle: "Lesson: status pressure and cleansing",
+    subtitle: "The old gate reeks of rot and rising dead",
     description: "Two units against a Necromancer and a Virus at the old gate. Physical damage slips past Dead Zone, spacing starves Spread, and a cure keeps permanent poison from becoming a losing clock.",
     unitType: "necromancer",
     requiredStars: 2,
@@ -69,7 +73,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   [WITCH_DOCTOR_MISSION_ID]: {
     id: WITCH_DOCTOR_MISSION_ID,
     title: "Cursed Swamp of the Witch Doctor",
-    subtitle: "Lesson: body-blocks, fire lanes, and Volley Shot",
+    subtitle: "A cursed swamp, and something dancing at its heart",
     description: "Send the Archer alone into a solid Ghoul block pinned in the swamp's far corner. Orthogonal fire marks the only tiles that don't bite twice, Volley Shot reaches through blockers, and speed denies Black Death Dance.",
     unitType: "witch-doctor",
     requiredStars: 4,
@@ -86,7 +90,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   [FATHER_TIME_MISSION_ID]: {
     id: FATHER_TIME_MISSION_ID,
     title: "Timeless Woods",
-    subtitle: "Lesson: permanent stat buffs and RAGE revives",
+    subtitle: "Time bends strangely beneath these old trees",
     description: "Bring two chosen units into the old woods against Father Time and an Archer. Father Time will try to turn the Archer into a carry with Age, then threaten Rewind if he reaches RAGE.",
     unitType: "father-time",
     requiredStars: 6,
@@ -98,7 +102,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   [VIRUS_MISSION_ID]: {
     id: VIRUS_MISSION_ID,
     title: "Root of the Virus",
-    subtitle: "Lesson: poisonous squad synergy",
+    subtitle: "The rot has a root, and it's spreading",
     description: "Lead your first full four-unit campaign squad into a straight duel against three Viruses and a Witch Doctor. Misfortune turns poison into a certainty, tight formations invite Spread, and Mystic's protection gives the rot something to argue with.",
     unitType: "virus",
     requiredStars: 8,
@@ -111,7 +115,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   [PALADIN_MISSION_ID]: {
     id: PALADIN_MISSION_ID,
     title: "Wandering Paladin",
-    subtitle: "Lesson: light tiles, status immunity, and honorable duels",
+    subtitle: "A lone knight blocks the road, blade drawn in challenge",
     description: "A wandering Paladin blocks the road and offers honest terms: your strongest champion against his blade, one on one, no tricks. Win his respect and he'll march at your side from here on.",
     unitType: "paladin",
     requiredStars: 10,
@@ -124,7 +128,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   [MONK_MISSION_ID]: {
     id: MONK_MISSION_ID,
     title: "Temple Trial of the Monk",
-    subtitle: "Lesson: read the real kit and find the real master",
+    subtitle: "Four Monks stand in the temple corner — only one is real",
     description: "Bring a full chosen squad into the temple corner trial. Four Monks appear, but only one is real; read the battle carefully and strike the true master.",
     unitType: "monk",
     requiredStars: 12,
@@ -502,6 +506,8 @@ const MONK_TRIAL_POSITIONS = Object.freeze([
   Object.freeze({ x: 8, y: 0 }),
   Object.freeze({ x: 7, y: 1 }),
 ]);
+const MONK_TRIAL_CENTER_POSITION = Object.freeze({ x: 4, y: 4 });
+const MONK_TRIAL_ALERT_POSITION = Object.freeze({ x: 8, y: 0 });
 const MONK_TRIAL_FAKE_ART_SETS = Object.freeze([
   Object.freeze({ "front-kick": "Lotus Uppercut", protect: "Mirror Palm" }),
   Object.freeze({ "front-kick": "Temple Sweep", protect: "Still Water Guard" }),
@@ -595,13 +601,20 @@ function prepareMonkTrial(match, units) {
   const realMonkId = monks[realIndex].id;
   let fakeIndex = 0;
   const positionByMonkId = new Map(monks.map((unit, index) => [unit.id, shuffled.positions[index]]));
+  const finalPositions = Object.fromEntries(monks.map((unit) => {
+    const position = positionByMonkId.get(unit.id) ?? unit.position;
+    return [unit.id, { x: position.x, y: position.y }];
+  }));
   const prepared = units.map((unit) => {
+    if (unit.player === 1) return { ...unit, introHidden: true };
     if (unit.player !== 2 || unit.type !== "monk") return unit;
     const real = unit.id === realMonkId;
     const fakeArtNames = real ? null : MONK_TRIAL_FAKE_ART_SETS[fakeIndex++ % MONK_TRIAL_FAKE_ART_SETS.length];
     return {
       ...unit,
-      position: positionByMonkId.get(unit.id) ?? unit.position,
+      position: real ? { ...MONK_TRIAL_CENTER_POSITION } : (positionByMonkId.get(unit.id) ?? unit.position),
+      introHidden: !real,
+      trialIntroAlert: false,
       trialRealMonk: real,
       trialFakeMonk: !real,
       ...(fakeArtNames ? { fakeArtNames: { ...fakeArtNames } } : {}),
@@ -610,8 +623,53 @@ function prepareMonkTrial(match, units) {
   return {
     units: prepared,
     rngState: shuffled.rngState,
-    missionRules: { monkTrial: { realMonkId } },
+    missionRules: { monkTrial: { realMonkId, finalPositions, introComplete: false } },
   };
+}
+
+export function applyMonkTrialIntroBeat(state, beat) {
+  if (!state?.missionRules?.monkTrial) return state;
+  if (beat === "monkIntroRevealAndMove") {
+    const realMonkId = state.missionRules.monkTrial.realMonkId;
+    return {
+      ...state,
+      units: state.units.map((unit) => {
+        if (unit.player === 1) return { ...unit, introHidden: false };
+        if (unit.id === realMonkId) {
+          return {
+            ...unit,
+            position: { ...MONK_TRIAL_ALERT_POSITION },
+            introHidden: false,
+            trialIntroAlert: true,
+          };
+        }
+        return unit;
+      }),
+    };
+  }
+  if (beat === "monkIntroSplitShuffle" || beat === "monkIntroComplete") {
+    const finalPositions = state.missionRules.monkTrial.finalPositions ?? {};
+    return {
+      ...state,
+      missionRules: {
+        ...state.missionRules,
+        monkTrial: {
+          ...state.missionRules.monkTrial,
+          introComplete: true,
+        },
+      },
+      units: state.units.map((unit) => {
+        const finalPosition = finalPositions[unit.id];
+        return {
+          ...unit,
+          ...(finalPosition ? { position: { ...finalPosition } } : {}),
+          introHidden: false,
+          trialIntroAlert: false,
+        };
+      }),
+    };
+  }
+  return state;
 }
 
 // Each campaign mission owns a spawn layout: hardcoded coordinates for the fixed
@@ -728,6 +786,8 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       ? { aiProfile: { fatherTimeCarry: { sourceId: "p2-0-father-time", targetId: "p2-1-archer" } } }
       : missionId === VIRUS_MISSION_ID
       ? { aiProfile: { virusMisfortune: { sourceId: "p2-3-witch-doctor" } } }
+      : missionId === MONK_MISSION_ID
+      ? { aiProfile: { monkTrialArts: true } }
       : {}),
     tileObjects,
     rngState: trial.rngState,
@@ -1404,9 +1464,9 @@ export function paladinDefeatScript(state) {
 }
 
 // --- Mission 7: Temple Trial dialogue -----------------------------------------
-// The combat board starts after the visual trick has resolved: one Monk has split
-// into four corner bodies, only one of which carries the real-monk marker. The script
-// sells the preceding beats; the fake-ART clue itself only appears in battle callouts.
+// The combat board stages the trick in the opening: one centered Monk greets the
+// party, then line actions reveal the squad, move the Monk to the corner, and split
+// the four bodies into their shuffled combat positions.
 
 export function monkMissionOpeningScript(state) {
   const speaker = firstLivingPlayerUnit(state);
@@ -1417,6 +1477,7 @@ export function monkMissionOpeningScript(state) {
     {
       speaker: "monk",
       text: "The temple is quiet. Too quiet. I sense a disturbance of my peace.",
+      afterAction: "monkIntroRevealAndMove",
     },
     {
       speakerId: speaker.id,
@@ -1425,10 +1486,11 @@ export function monkMissionOpeningScript(state) {
     {
       speakerId: realMonk?.id,
       text: "! Then prove you are worthy to enter. Find the real Monk, or leave the temple path.",
+      afterAction: "monkIntroSplitShuffle",
     },
     {
-      speaker: "monk",
-      text: "The Monk vanishes to the far corner, splits into four bodies, and shuffles until the eye loses the truth.",
+      speaker: "swordsman",
+      text: "Four of him. Of course there are four of him.",
     },
     {
       speaker: "swordsman",

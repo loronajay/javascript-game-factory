@@ -72,3 +72,13 @@ test("scripts carry progress metadata for rendering", () => {
     { index: 1, current: 2, total: 2 }
   ]);
 });
+
+test("dialogue normalization preserves scripted line actions", () => {
+  const line = normalizeDialogueLine({
+    speaker: "swordsman",
+    text: "Move on my mark.",
+    afterAction: "reveal-allies"
+  }, state);
+
+  assert.equal(line.afterAction, "reveal-allies");
+});

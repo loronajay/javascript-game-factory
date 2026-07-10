@@ -412,6 +412,18 @@ function createStanceBadge(unit) {
   return badge;
 }
 
+function createIntroAlertBadge(unit) {
+  if (!unit.trialIntroAlert) return null;
+  const badge = svgElement("g", { class: "intro-alert-badge", transform: "translate(0 -68)" });
+  const glyph = svgElement("text", { class: "intro-alert-mark", x: 0, y: 5, "text-anchor": "middle" });
+  glyph.textContent = "!";
+  badge.append(
+    svgElement("circle", { class: "intro-alert-disc", cx: 0, cy: 0, r: 11 }),
+    glyph
+  );
+  return badge;
+}
+
 export function createUnitFigure(metrics, unit, { isTarget = false, selectedId = null, onUnitClick, state = null }) {
   const point = gridToScreen(metrics, unit.position.x, unit.position.y);
   const stats = getEffectiveStats(unit, state);
@@ -478,6 +490,8 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   if (statusBadges) body.append(statusBadges);
   const stanceBadge = createStanceBadge(unit);
   if (stanceBadge) body.append(stanceBadge);
+  const introAlertBadge = createIntroAlertBadge(unit);
+  if (introAlertBadge) body.append(introAlertBadge);
 
   if (isTarget) {
     const reticle = svgElement("g", { class: "target-mark" });

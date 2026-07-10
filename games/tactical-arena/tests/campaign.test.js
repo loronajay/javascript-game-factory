@@ -18,6 +18,7 @@ import {
   campaignOpeningScript,
   clodMissionOpeningScript,
   clodRageWarningScript,
+  applyMonkTrialIntroBeat,
   createCampaignMatchConfig,
   completeCampaignMission,
   evaluateCampaignMission,
@@ -1177,7 +1178,7 @@ test("Temple Trial builds a full-HP 9x9 4v4 with one real Monk and three fake-ar
   const enemyMonks = match.units.filter((unit) => unit.player === 2 && unit.type === "monk");
   const realMonk = enemyMonks.find((unit) => unit.trialRealMonk);
   const fakeMonks = enemyMonks.filter((unit) => unit.trialFakeMonk);
-  const enemyPositions = enemyMonks.map((unit) => `${unit.position.x},${unit.position.y}`).sort();
+  const visibleUnits = match.units.filter((unit) => !unit.introHidden);
 
   assert.equal(config.mode, "campaign");
   assert.equal(config.size, 9);
@@ -1191,14 +1192,54 @@ test("Temple Trial builds a full-HP 9x9 4v4 with one real Monk and three fake-ar
   assert.equal(fakeMonks.length, 3);
   assert.ok(realMonk, "one monk should be marked as real");
   assert.equal(match.missionRules?.monkTrial?.realMonkId, realMonk.id);
-  assert.deepEqual(enemyPositions, ["7,0", "7,1", "8,0", "8,1"]);
+  assert.deepEqual(visibleUnits.map((unit) => unit.id), [realMonk.id]);
+  assert.deepEqual(realMonk.position, { x: 4, y: 4 });
+  assert.equal(realMonk.trialIntroAlert, false);
   assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 1, y: 8 });
   assert.deepEqual(findUnit(match, "p1-3-magician").position, { x: 1, y: 7 });
   assert.equal(realMonk.hp, 26);
   assert.ok(fakeMonks.every((unit) => unit.hp === 26 && unit.fakeArtNames?.["front-kick"] !== "Front Kick"));
 });
 
-test("Temple Trial dialogue introduces the split and real-monk hunt without solving the fake-art riddle", () => {
+test("Temple Trial intro beats reveal the squad, move the Monk, then split into shuffled corner bodies", () => {
+  const staged = monkMatchState(["swordsman", "archer", "mystic", "magician"]);
+  const realMonk = staged.units.find((unit) => unit.trialRealMonk);
+
+  const confronted = applyMonkTrialIntroBeat(staged, "monkIntroRevealAndMove");
+  const confrontedReal = findUnit(confronted, realMonk.id);
+  assert.ok(confronted.units.filter((unit) => unit.player === 1).every((unit) => !unit.introHidden));
+  assert.deepEqual(confrontedReal.position, { x: 8, y: 0 });
+  assert.equal(confrontedReal.trialIntroAlert, true);
+  assert.ok(confronted.units.filter((unit) => unit.trialFakeMonk).every((unit) => unit.introHidden));
+
+  const split = applyMonkTrialIntroBeat(confronted, "monkIntroSplitShuffle");
+  const enemyPositions = split.units
+    .filter((unit) => unit.player === 2 && unit.type === "monk")
+    .map((unit) => `${unit.position.x},${unit.position.y}`)
+    .sort();
+  assert.deepEqual(enemyPositions, ["7,0", "7,1", "8,0", "8,1"]);
+  assert.ok(split.units.every((unit) => !unit.introHidden));
+  assert.ok(split.units.every((unit) => unit.trialIntroAlert !== true));
+  assert.equal(split.missionRules?.monkTrial?.introComplete, true);
+});
+
+test("Temple Trial CPU opens with clue-giving Monk ARTS after the split", () => {
+  const staged = monkMatchState(["swordsman", "archer", "mystic", "magician"]);
+  const confronted = applyMonkTrialIntroBeat(staged, "monkIntroRevealAndMove");
+  const split = {
+    ...applyMonkTrialIntroBeat(confronted, "monkIntroSplitShuffle"),
+    currentPlayer: 2,
+  };
+
+  const commands = chooseActivation(split, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(split) });
+
+  assert.ok(commands.some((command) =>
+    command.type === "USE_ART" &&
+    ["front-kick", "protect"].includes(command.artId)
+  ), "the Temple Trial monk AI should reveal real/fake art callouts instead of only basic attacking");
+});
+
+test("Temple Trial dialogue drives visual intro beats without narrating the split as text", () => {
   const state = monkMatchState();
   const direct = monkMissionOpeningScript(state);
   const copy = direct.map((line) => line.text).join(" ");
@@ -1206,7 +1247,10 @@ test("Temple Trial dialogue introduces the split and real-monk hunt without solv
   assert.deepEqual(campaignOpeningScript(MONK_MISSION_ID, state), direct);
   assert.equal(direct.length >= 4, true);
   assert.equal(direct[0].speaker, "monk");
-  assert.match(copy, /peace|disturbance|worthy|real monk|combat knowledge|shuffle/i);
+  assert.equal(direct[0].afterAction, "monkIntroRevealAndMove");
+  assert.equal(direct[2].afterAction, "monkIntroSplitShuffle");
+  assert.match(copy, /peace|disturbance|worthy|real monk|combat knowledge/i);
+  assert.doesNotMatch(copy, /vanishes|splits into four bodies|shuffles/i);
   assert.doesNotMatch(copy, /Front Kick|Protect|Heightened Sense|canon kit|fake ART/i);
 });
 

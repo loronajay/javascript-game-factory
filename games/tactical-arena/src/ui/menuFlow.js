@@ -461,7 +461,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       }));
     const picked = await openChoiceModal({
       title: `Choose Slot ${slot + 1}`,
-      subtitle: `This mission deploys ${campaignSquad.length} unit${campaignSquad.length === 1 ? "" : "s"}. Pick around the lesson.`,
+      subtitle: `This mission deploys ${campaignSquad.length} unit${campaignSquad.length === 1 ? "" : "s"}. Pick your approach.`,
       accent: TEAM_COLOR[1],
       choices,
       groups,

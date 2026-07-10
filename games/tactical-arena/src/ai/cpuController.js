@@ -290,8 +290,19 @@ function artAiFor(unit, plan) {
 function missionPlanBias(state, unit, plan) {
   const carry = state.aiProfile?.fatherTimeCarry;
   const virusMisfortune = state.aiProfile?.virusMisfortune;
+  const monkTrialArts = state.aiProfile?.monkTrialArts;
   if (plan.primary.kind !== "art") return 0;
   const primary = plan.primary;
+  if (
+    monkTrialArts &&
+    unit.type === "monk" &&
+    (unit.trialRealMonk || unit.trialFakeMonk) &&
+    (primary.artId === "front-kick" || primary.artId === "protect")
+  ) {
+    // Mission 7 is a read-the-kit puzzle: Monk ART callouts are how the player
+    // distinguishes the true master from fake-art decoys.
+    return primary.artId === "front-kick" ? 22 : 18;
+  }
   if (virusMisfortune && unit.id === virusMisfortune.sourceId) {
     const hasVirusAlly = livingUnits(state, unit.player).some((ally) =>
       ally.type === "virus" && ally.mp >= (getArt("virus", "cough")?.mpCost ?? 5));
