@@ -57,7 +57,6 @@ export function campaignUnitChoiceGroups(unlockedTypes = [], squad = [], slot = 
     choices: group.types.map((type) => ({
       value: type,
       label: UNIT_TYPES[type].name,
-      sub: UNIT_TYPES[type].classType,
       type,
     })),
   }));
