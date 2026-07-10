@@ -13,8 +13,10 @@ import {
   NECROMANCER_MISSION_ID,
   MONK_MISSION_ID,
   PALADIN_MISSION_ID,
+  SNIPER_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_MISSION_ID,
+  applyLockedSlots,
   campaignMapCutsceneScript,
   campaignOpeningScript,
   clodMissionOpeningScript,
@@ -48,6 +50,7 @@ import {
   shouldShowPaladinLightseekerWarning,
   shouldShowPaladinRageWarning,
   shouldShowPaladinStatusTaunt,
+  shouldShowSniperFireWarning,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
@@ -59,6 +62,8 @@ import {
   paladinMissionOpeningScript,
   paladinRageWarningScript,
   paladinStatusTauntScript,
+  sniperFireWarningScript,
+  sniperMissionOpeningScript,
   virusEnemyStatusTauntScript,
   virusMissionOpeningScript,
   virusPoisonWarningScript,
@@ -67,6 +72,7 @@ import {
   witchDoctorGhoulWarningScript,
   witchDoctorMissionOpeningScript,
   witchDoctorRageWarningScript,
+  writeCampaignProgress,
 } from "../src/campaign/campaign.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, defend, finishActivation } from "../src/core/commands.js";
@@ -1533,6 +1539,191 @@ test("completing Gargoyle's Inferno unlocks Gargoyle and records its stars", () 
   assert.deepEqual(completed.newRewardUnits, ["gargoyle"]);
   assert.equal(isUnitUnlocked("gargoyle", storage), true);
   assert.equal(readCampaignProgressStars(storage, GARGOYLE_MISSION_ID), 3);
+});
+
+function sniperMatchState(squad = ["archer", "swordsman"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(SNIPER_MISSION_ID, squad)),
+    SNIPER_MISSION_ID,
+  );
+}
+
+test("The High Ground of the Sniper reveals on the plateau once 16 stars are banked", () => {
+  const storage = storageAdapter();
+
+  // At zero stars the plateau stop is charted but locked, with its portrait hidden.
+  const lockedNode = getCampaignMap(storage).nodes.find((node) => node.id === SNIPER_MISSION_ID);
+  assert.ok(lockedNode, "the plateau stop is on the campaign trail");
+  assert.equal(lockedNode.status, "locked");
+  assert.equal(lockedNode.locationName, "The High Cliffs");
+  assert.equal(lockedNode.displayType, null);
+  assert.equal(lockedNode.requiredStars, 16);
+
+  // Bank enough stars across earlier missions to clear the 16-star gate.
+  writeCampaignProgress(storage, {
+    completedMissions: [
+      CLOD_MISSION_ID, NECROMANCER_MISSION_ID, WITCH_DOCTOR_MISSION_ID,
+      FATHER_TIME_MISSION_ID, VIRUS_MISSION_ID, PALADIN_MISSION_ID,
+    ],
+    missionStars: {
+      [CLOD_MISSION_ID]: 3, [NECROMANCER_MISSION_ID]: 3, [WITCH_DOCTOR_MISSION_ID]: 3,
+      [FATHER_TIME_MISSION_ID]: 3, [VIRUS_MISSION_ID]: 3, [PALADIN_MISSION_ID]: 3,
+    },
+  });
+
+  const node = getCampaignMap(storage).nodes.find((node) => node.id === SNIPER_MISSION_ID);
+  assert.equal(node.status, "available");
+  assert.equal(node.title, "The High Ground of the Sniper");
+  assert.equal(node.displayType, "sniper");
+  assert.equal(node.biome, "plateau");
+});
+
+test("The High Ground builds a full-HP 13x13 2v2 with the Archer locked in slot one", () => {
+  const config = createCampaignMatchConfig(SNIPER_MISSION_ID, ["archer", "magician"]);
+  const match = sniperMatchState(["archer", "magician"]);
+
+  assert.equal(config.mode, "campaign");
+  assert.equal(config.size, 13);
+  assert.deepEqual(config.squads[1], ["archer", "magician"]);
+  assert.deepEqual(config.squads[2], ["sniper", "clod"]);
+  assert.equal(config.teamNames[2], "The High Guard");
+  assert.equal(match.currentPlayer, 1);
+
+  // Standard opposing-corner formation; the Archer is pinned to slot one (p1-0).
+  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 2, y: 10 });
+  assert.deepEqual(findUnit(match, "p1-1-magician").position, { x: 1, y: 11 });
+  assert.deepEqual(findUnit(match, "p2-0-sniper").position, { x: 10, y: 2 });
+  assert.deepEqual(findUnit(match, "p2-1-clod").position, { x: 9, y: 4 });
+
+  // Full HP (this is a standard duel, not a half-HP lesson).
+  assert.equal(findUnit(match, "p1-0-archer").hp, 24);
+  assert.equal(findUnit(match, "p2-0-sniper").hp, 23);
+  assert.equal(findUnit(match, "p2-1-clod").hp, 30);
+});
+
+test("The High Ground scatters destructible cover walls and permanent cliff-fire", () => {
+  const match = sniperMatchState();
+  const objects = match.tileObjects ?? {};
+
+  const walls = Object.entries(objects).filter(([, obj]) => obj.kind === "wall");
+  const fires = Object.entries(objects).filter(([, obj]) => obj.kind === "fire");
+  assert.equal(walls.length, 5, "five cover walls on the plateau");
+  assert.equal(fires.length, 6, "six cliff-fire tiles");
+
+  // Walls are 1-HP (one Archer shot each); fire is permanent terrain, not a countdown.
+  assert.deepEqual(objects["4,9"], { kind: "wall", hp: 1 });
+  assert.deepEqual(objects["6,6"], { kind: "wall", hp: 1 });
+  assert.deepEqual(objects["5,5"], { kind: "fire", permanent: true });
+  assert.deepEqual(objects["6,9"], { kind: "fire", permanent: true });
+
+  // Neither hazard sits on a spawn tile.
+  for (const spawn of ["2,10", "1,11", "10,2", "9,4"]) {
+    assert.equal(objects[spawn], undefined, `${spawn} is a clear spawn`);
+  }
+});
+
+test("applyLockedSlots forces the Archer into slot one regardless of the sent squad", () => {
+  const mission = getCampaignMission(SNIPER_MISSION_ID);
+
+  // A well-formed pick is untouched.
+  assert.deepEqual(applyLockedSlots(["archer", "magician"], mission), ["archer", "magician"]);
+  // The pin overrides slot one and pulls a stray Archer out of slot two to avoid a dupe.
+  assert.deepEqual(applyLockedSlots(["magician", "archer"], mission), ["archer", null]);
+  // Missions with no lockedSlots pass through unchanged.
+  assert.deepEqual(applyLockedSlots(["mystic", "magician"], getCampaignMission(CLOD_MISSION_ID)), ["mystic", "magician"]);
+
+  // Even a bad config call still deploys the Archer in slot one and a valid ally.
+  const config = createCampaignMatchConfig(SNIPER_MISSION_ID, ["magician", "mystic"]);
+  assert.equal(config.squads[1][0], "archer");
+  assert.equal(config.squads[1].length, 2);
+  assert.ok(!config.squads[1].slice(1).includes("archer"));
+});
+
+test("The High Ground opening banter and permanent-fire warning read for the duel", () => {
+  const state = sniperMatchState();
+  const opening = sniperMissionOpeningScript(state);
+
+  assert.deepEqual(campaignOpeningScript(SNIPER_MISSION_ID, state), opening);
+  assert.equal(opening.length >= 3, true);
+  assert.equal(opening[0].speakerId, "p2-0-sniper");
+  assert.equal(opening[1].speakerId, "p2-1-clod");
+  assert.equal(opening[2].speakerId, "p1-0-archer");
+  assert.match(opening.map((line) => line.text).join(" "), /plateau|high|cover|flame|scope/i);
+
+  const playing = { ...state, phase: "playing" };
+  assert.equal(shouldShowSniperFireWarning(playing, { fireDamageTakenCount: 0 }), false);
+  assert.equal(shouldShowSniperFireWarning(playing, { fireDamageTakenCount: 1 }), true);
+  assert.equal(shouldShowSniperFireWarning(playing, { fireDamageTakenCount: 1, warningShown: true }), false);
+  assert.match(sniperFireWarningScript(playing).map((line) => line.text).join(" "), /burn out|cliffs|route/i);
+});
+
+test("The High Ground grading rewards victory, a wall break, avoiding fire, and blinding the Sniper", () => {
+  const base = sniperMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const perfect = evaluateCampaignMission(SNIPER_MISSION_ID, won, {
+    wallDestroyedCount: 1,
+    fireDamageTakenCount: 0,
+    sniperBlinded: true,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "wallBreak", "noFire"]);
+  assert.equal(perfect.bonusObjectives[0].id, "blindSniper");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const noWall = evaluateCampaignMission(SNIPER_MISSION_ID, won, {
+    wallDestroyedCount: 0,
+    fireDamageTakenCount: 0,
+    sniperBlinded: true,
+  });
+  assert.equal(noWall.objectives.find((objective) => objective.id === "wallBreak").earned, false);
+  assert.equal(noWall.stars, 3, "the blind bonus can cover one missed base objective");
+
+  const messy = evaluateCampaignMission(SNIPER_MISSION_ID, won, {
+    wallDestroyedCount: 0,
+    fireDamageTakenCount: 2,
+    sniperBlinded: false,
+  });
+  assert.equal(messy.objectives.find((objective) => objective.id === "noFire").earned, false);
+  assert.equal(messy.bonusObjectives[0].earned, false);
+  assert.equal(messy.stars, 1);
+
+  // A loss earns nothing, even with every side objective hit.
+  const lost = evaluateCampaignMission(SNIPER_MISSION_ID, { ...base, phase: "complete", winner: 2 }, {
+    wallDestroyedCount: 1,
+    fireDamageTakenCount: 0,
+    sniperBlinded: true,
+  });
+  assert.equal(lost.victory, false);
+  assert.equal(lost.stars, 0);
+});
+
+test("completing The High Ground unlocks the Sniper and records its stars", () => {
+  const storage = storageAdapter();
+  const base = sniperMatchState();
+  const won = {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+
+  const completed = completeCampaignMission(storage, SNIPER_MISSION_ID, won, {
+    wallDestroyedCount: 1,
+    fireDamageTakenCount: 0,
+    sniperBlinded: true,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["sniper"]);
+  assert.equal(isUnitUnlocked("sniper", storage), true);
+  assert.equal(readCampaignProgressStars(storage, SNIPER_MISSION_ID), 3);
 });
 
 function readCampaignProgressStars(storage, missionId) {

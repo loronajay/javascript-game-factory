@@ -227,11 +227,17 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   // DIFFERENT mission always starts from empty slots too — otherwise a pick made for one
   // mission (e.g. slot 0 = Archer on a 2-slot mission) silently carries over as a
   // pre-filled slot 0 on the next mission selected, masquerading as an auto-pick.
-  function normalizeCampaignSquadForProgress(missionId, slotCount = 2) {
+  function normalizeCampaignSquadForProgress(missionId, slotCount = 2, lockedSlots = null) {
     const unlocked = campaignUnlockedTypes();
     const carryForward = missionId === campaignSquadMissionId;
     const next = [];
     for (let i = 0; i < slotCount; i += 1) {
+      // A pinned slot (e.g. the Sniper mission's Archer) always deploys its required
+      // unit; the rest carry forward the player's last pick when it's still unlocked.
+      if (lockedSlots && lockedSlots[i] != null) {
+        next.push(lockedSlots[i]);
+        continue;
+      }
       const type = carryForward ? campaignSquad[i] : null;
       next.push(type && unlocked.includes(type) ? type : null);
     }
@@ -253,7 +259,11 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       campaignSquad = [...(selectedNode.defaultSquad ?? [])];
       campaignSquadMissionId = selectedCampaignMissionId;
     } else {
-      normalizeCampaignSquadForProgress(selectedCampaignMissionId, campaignSquadSize(selectedNode));
+      normalizeCampaignSquadForProgress(
+        selectedCampaignMissionId,
+        campaignSquadSize(selectedNode),
+        selectedNode?.lockedSlots ?? null,
+      );
     }
     campaignStars.textContent = `${map.totalStars} ★`;
     campaignMapHost.replaceChildren();
@@ -422,8 +432,11 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
 
   function renderCampaignSquad() {
     campaignSquadHost.replaceChildren();
-    const locked = Boolean(selectedCampaignNode?.squadLocked);
+    const squadLocked = Boolean(selectedCampaignNode?.squadLocked);
+    const lockedSlots = selectedCampaignNode?.lockedSlots ?? null;
     campaignSquad.forEach((type, index) => {
+      // A slot is locked either by a whole-squad lock or by a per-slot pin (lockedSlots).
+      const locked = squadLocked || Boolean(lockedSlots && lockedSlots[index] != null);
       const button = document.createElement("button");
       button.type = "button";
       button.className = `campaign-squad-slot${type ? "" : " is-empty"}${locked ? " is-locked" : ""}`;

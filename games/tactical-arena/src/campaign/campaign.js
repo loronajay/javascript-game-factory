@@ -17,6 +17,7 @@ export const VIRUS_MISSION_ID = "virus-root";
 export const PALADIN_MISSION_ID = "wandering-paladin";
 export const MONK_MISSION_ID = "monk-temple-trial";
 export const GARGOYLE_MISSION_ID = "gargoyle-inferno";
+export const SNIPER_MISSION_ID = "sniper-highground";
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -153,6 +154,23 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 9,
     fullHp: true,
   },
+  [SNIPER_MISSION_ID]: {
+    id: SNIPER_MISSION_ID,
+    title: "The High Ground of the Sniper",
+    subtitle: "A sharpshooter rules the plateau's flat cliffs",
+    description: "Lock the Archer into a 2v2 across the high plateau against a Sniper and Clod. Cover walls block both sightlines, cliff-fire never burns out, and the enemy marksman owns the long lanes.",
+    unitType: "sniper",
+    requiredStars: 16,
+    rewardUnits: Object.freeze(["sniper"]),
+    playerSlots: 2,
+    // Slot one is pinned to the Archer (the mission is an archer-vs-sniper duel); the
+    // second slot stays a free pick so the player chooses who spots for her.
+    lockedSlots: Object.freeze({ 0: "archer" }),
+    defaultSquad: Object.freeze(["archer", "swordsman"]),
+    enemySquad: Object.freeze(["sniper", "clod"]),
+    size: 13,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -170,6 +188,7 @@ export const CAMPAIGN_REGIONS = Object.freeze([
   Object.freeze({ id: "barrow", biome: "burial", label: "The Old Gate" }),
   Object.freeze({ id: "mire", biome: "swamp", label: "Mirefen Swamp" }),
   Object.freeze({ id: "coast", biome: "water", label: "Tidewatch Coast" }),
+  Object.freeze({ id: "plateau", biome: "plateau", label: "The High Cliffs" }),
   Object.freeze({ id: "ashfall", biome: "volcanic", label: "Ashfall Caldera" }),
   Object.freeze({ id: "wood", biome: "forest", label: "Whisperwood" }),
   Object.freeze({ id: "frost", biome: "snow", label: "Frostcrown Peaks" }),
@@ -195,8 +214,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "A silent temple waits above the tide. Four identical Monks guard the steps, but only one carries the true discipline." },
   { id: GARGOYLE_MISSION_ID, cell: { col: 5, row: 3 }, point: { x: 51.9, y: 18.7 }, region: "ashfall", locationName: "Ashfall Flats",
     blurb: "A low ruin mouth exhales heat from beneath the flats. Something stone-winged waits in the old dark." },
-  { id: "uncharted-10", cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "ashfall", locationName: "The Caldera",
-    blurb: "The mountain's open mouth. Lava seams split the field — fire immunity is worth more than armor here." },
+  { id: SNIPER_MISSION_ID, cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "plateau", locationName: "The High Cliffs",
+    blurb: "Flat cliffs and long sightlines. Whoever holds the plateau's height holds every lane across it." },
   { id: "uncharted-11", cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood",
     blurb: "A forest burned to charcoal spires. Everything here is kindling, including the plans." },
   { id: "uncharted-12", cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves",
@@ -480,6 +499,24 @@ export function getCampaignMap(storage = defaultStorage()) {
   };
 }
 
+// Pins a mission's `lockedSlots` (e.g. {0:"archer"}) onto a chosen squad regardless of
+// what the UI sent — the locked type is forced into its slot and pulled out of any other
+// slot so it can't duplicate. A defensive belt to the menu's per-slot lock; the actual
+// slot-index fill still happens in normalizeCampaignSquad afterward.
+export function applyLockedSlots(squad, mission) {
+  const lockedSlots = mission?.lockedSlots;
+  if (!lockedSlots) return squad;
+  const out = [...(Array.isArray(squad) ? squad : [])];
+  for (const [indexKey, type] of Object.entries(lockedSlots)) {
+    const index = Number(indexKey);
+    for (let i = 0; i < out.length; i += 1) {
+      if (i !== index && out[i] === type) out[i] = null;
+    }
+    out[index] = type;
+  }
+  return out;
+}
+
 export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedSquad = null) {
   const mission = getCampaignMission(missionId);
   if (!mission || mission.comingSoon) throw new Error(`Campaign mission is not playable: ${missionId}`);
@@ -488,7 +525,10 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
   // else in.
   const playerSquad = mission.squadLocked
     ? normalizeCampaignSquad(mission.defaultSquad ?? DEFAULT_SQUAD, mission)
-    : normalizeCampaignSquad(selectedSquad ?? mission.defaultSquad ?? DEFAULT_SQUAD, mission);
+    : normalizeCampaignSquad(
+        applyLockedSlots(selectedSquad ?? mission.defaultSquad ?? DEFAULT_SQUAD, mission),
+        mission,
+      );
   return {
     mode: "campaign",
     campaignMissionId: mission.id,
@@ -501,7 +541,9 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     },
     teamNames: {
       1: "Player Vanguard",
-      2: mission.id === FATHER_TIME_MISSION_ID
+      2: mission.id === SNIPER_MISSION_ID
+        ? "The High Guard"
+        : mission.id === FATHER_TIME_MISSION_ID
         ? "Timeless Court"
         : mission.id === VIRUS_MISSION_ID
         ? "Viral Root"
@@ -707,6 +749,27 @@ export function applyMonkTrialIntroBeat(state, beat) {
   return state;
 }
 
+// The High Ground plateau (13×13): destructible cover walls (hp 1) and permanent
+// cliff-fire tiles scattered through the contested midfield. Walls block both physical
+// and magic sightlines (isWallBetween) and are the "destroy a wall" objective's targets;
+// the permanent fire never burns out, so "avoid fire damage" is a full-match route
+// constraint. Neither set sits on a spawn tile (see SNIPER_MISSION_ID layout below).
+const SNIPER_WALL_POSITIONS = Object.freeze([
+  Object.freeze({ x: 4, y: 9 }),
+  Object.freeze({ x: 6, y: 6 }),
+  Object.freeze({ x: 5, y: 7 }),
+  Object.freeze({ x: 7, y: 5 }),
+  Object.freeze({ x: 8, y: 4 }),
+]);
+const SNIPER_FIRE_POSITIONS = Object.freeze([
+  Object.freeze({ x: 6, y: 9 }),
+  Object.freeze({ x: 3, y: 8 }),
+  Object.freeze({ x: 5, y: 5 }),
+  Object.freeze({ x: 7, y: 7 }),
+  Object.freeze({ x: 9, y: 6 }),
+  Object.freeze({ x: 6, y: 3 }),
+]);
+
 // Each campaign mission owns a spawn layout: hardcoded coordinates for the fixed
 // enemy pieces (their ids are deterministic), plus a slot-index fallback that places
 // whatever units the player drafted (the squad is player-chosen, so player ids are not
@@ -803,6 +866,26 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         : { x: 8, y: 0 },
     fullHp: true,
     missionRules: () => ({ randomFire: { sourceId: "p2-0-gargoyle", turnsLeft: 3 } }),
+  },
+  // The High Ground of the Sniper (13×13): a full-HP 2v2. The Archer (pinned to slot
+  // one) and her chosen ally start in the near corner; the enemy Sniper holds the high
+  // backline with Clod pushed forward as a wall. Cover walls + permanent cliff-fire are
+  // scattered through the midfield (see SNIPER_WALL/FIRE_POSITIONS above).
+  [SNIPER_MISSION_ID]: {
+    positions: {
+      "p1-0-archer": { x: 2, y: 10 },
+      "p2-0-sniper": { x: 10, y: 2 },
+      "p2-1-clod": { x: 9, y: 4 },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? (unit.id.includes("-0-") ? { x: 2, y: 10 } : { x: 1, y: 11 })
+        : (unit.id.includes("-0-") ? { x: 10, y: 2 } : { x: 9, y: 4 }),
+    fullHp: true,
+    tileObjects: () => ({
+      ...Object.fromEntries(SNIPER_WALL_POSITIONS.map((position) => [positionKey(position), { kind: "wall", hp: 1 }])),
+      ...Object.fromEntries(SNIPER_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])),
+    }),
   },
 });
 
@@ -1002,6 +1085,26 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       gargoylePyroclasmDamageTakenCount,
       fireDamageTakenCount,
       gargoyleEnteredRage,
+    };
+  } else if (missionId === SNIPER_MISSION_ID) {
+    const wallDestroyedCount = Math.max(0, Math.floor(Number(meta.wallDestroyedCount) || 0));
+    const fireDamageTakenCount = Math.max(0, Math.floor(Number(meta.fireDamageTakenCount) || 0));
+    const sniper = enemyUnits.find((unit) => unit.type === "sniper") ?? null;
+    const sniperBlinded = Boolean(meta.sniperBlinded) ||
+      Boolean(sniper?.statuses?.some((status) => status.type === "blind"));
+    objectives = [
+      complete,
+      { id: "wallBreak", label: "Destroy a wall tile", earned: victory && wallDestroyedCount >= 1 },
+      { id: "noFire", label: "Avoid fire damage", earned: victory && fireDamageTakenCount === 0 },
+    ];
+    bonusObjectives = [
+      { id: "blindSniper", label: "Bonus: blind the Sniper", earned: victory && sniperBlinded },
+    ];
+    extra = {
+      sniperDefeated: Boolean(sniper && sniper.hp <= 0),
+      wallDestroyedCount,
+      fireDamageTakenCount,
+      sniperBlinded,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -1618,9 +1721,52 @@ export function gargoyleRageWarningScript(state) {
   ];
 }
 
+// --- Mission 9: The High Ground of the Sniper dialogue ------------------------
+// Standard duel banter: the enemy marksman lords the high cliffs, Clod holds the low
+// road, and the Archer answers. The one mid-battle beat reminds the player the cliff
+// fire is permanent so it reads as terrain to route around, not a passing hazard.
+
+export function sniperMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const sniper = findUnit(state, "p2-0-sniper");
+  const clod = findUnit(state, "p2-1-clod");
+  return [
+    {
+      speakerId: sniper?.id,
+      text: "I can see the whole plateau from up here. You picked a bad hill to climb.",
+    },
+    {
+      speakerId: clod?.id,
+      text: "Clod holds the low road. The sniper holds the high one. You hold nothing.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "High ground cuts both ways. Break their cover, mind the flame, and I'll put a shaft through that scope.",
+    },
+  ];
+}
+
+export function shouldShowSniperFireWarning(state, { warningShown = false, fireDamageTakenCount = 0 } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  return Math.max(0, Math.floor(Number(fireDamageTakenCount) || 0)) > 0;
+}
+
+export function sniperFireWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: speaker.id,
+      text: "These fires don't burn out -- they're part of the cliffs. Route around them, not through them.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === SNIPER_MISSION_ID) return sniperMissionOpeningScript(state);
   if (missionId === GARGOYLE_MISSION_ID) return gargoyleMissionOpeningScript(state);
   if (missionId === MONK_MISSION_ID) return monkMissionOpeningScript(state);
   if (missionId === PALADIN_MISSION_ID) return paladinMissionOpeningScript(state);

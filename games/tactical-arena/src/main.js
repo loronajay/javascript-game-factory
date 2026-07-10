@@ -41,6 +41,7 @@ import {
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
   PALADIN_MISSION_ID,
+  SNIPER_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
@@ -60,6 +61,7 @@ import {
   paladinRageWarningScript,
   paladinStatusTauntScript,
   prepareCampaignMatchState,
+  sniperFireWarningScript,
   shouldShowCampaignMapCutscene,
   shouldShowClodRageWarning,
   shouldShowFatherTimeRageWarning,
@@ -70,6 +72,7 @@ import {
   shouldShowPaladinLightseekerWarning,
   shouldShowPaladinRageWarning,
   shouldShowPaladinStatusTaunt,
+  shouldShowSniperFireWarning,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
@@ -223,6 +226,10 @@ function createCampaignMeta() {
     gargoyleRageWarningShown: false,
     gargoyleEnteredRage: false,
     gargoylePyroclasmDamageTakenCount: 0,
+    // Sniper (mission 9) — shares fireDamageTakenCount above
+    sniperFireWarningShown: false,
+    wallDestroyedCount: 0,
+    sniperBlinded: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -871,6 +878,23 @@ function recordCampaignProgressHooks(command, result) {
       campaignMeta.gargoylePyroclasmDamageTakenCount += playerHits.length;
       if (isFreePyroclasm) campaignMeta.gargoyleEnteredRage = true;
     }
+  } else if (campaignMissionId === SNIPER_MISSION_ID) {
+    // A blind can tick off before the match ends, so latch the moment the enemy Sniper
+    // wears one (mirrors Father Time's archerBlinded latch).
+    const sniper = state.units.find((unit) => unit.player === 2 && unit.type === "sniper") ?? null;
+    if (sniper?.statuses?.some((status) => status.type === "blind")) {
+      campaignMeta.sniperBlinded = true;
+    }
+    for (const event of events) {
+      if (event.type === "FIRE_DAMAGE" && findUnit(state, event.unitId)?.player === 1) {
+        campaignMeta.fireDamageTakenCount += 1;
+      }
+      // Any wall the player brings down (a scattered cover wall or one the enemy Sniper
+      // built) satisfies the destroy-a-wall objective.
+      if (event.type === "WALL_ATTACKED" && event.destroyed && findUnit(state, event.actorId)?.player === 1) {
+        campaignMeta.wallDestroyedCount += 1;
+      }
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -1063,6 +1087,15 @@ function nextCampaignDialogueBeat() {
         },
         script: gargoyleRageWarningScript,
       };
+    }
+    return null;
+  }
+  if (campaignMissionId === SNIPER_MISSION_ID) {
+    if (shouldShowSniperFireWarning(state, {
+      warningShown: campaignMeta.sniperFireWarningShown,
+      fireDamageTakenCount: campaignMeta.fireDamageTakenCount,
+    })) {
+      return { markShown: () => { campaignMeta.sniperFireWarningShown = true; }, script: sniperFireWarningScript };
     }
     return null;
   }

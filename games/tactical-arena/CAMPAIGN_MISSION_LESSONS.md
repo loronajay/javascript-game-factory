@@ -15,6 +15,8 @@ the copy players see.
 | Root of the Virus (`virus-root`) | Poisonous squad synergy — Misfortune turns poison into a certainty, tight formations invite Spread, and protective support gives the rot something to argue with. |
 | Wandering Paladin (`wandering-paladin`) | Light tiles, status immunity, and honorable duels — a 1v1 that gates on status immunity. |
 | Temple Trial of the Monk (`monk-temple-trial`) | Read the real kit and find the real master — four Monks appear, only one is real; read the battle rather than guessing. |
+| Gargoyle's Inferno (`gargoyle-inferno`) | Fire discipline and denying RAGE — a random tile ignites each turn, Pyroclasm punishes careless lines, and a fast kill denies Volcanic Rage's free eruption. |
+| The High Ground of the Sniper (`sniper-highground`) | Cover, terrain fire, and a partly-fixed squad — destructible walls block both sightlines (shoot through them), the permanent cliff-fire must be routed around, and the Archer is pinned in slot one so the lesson is fought archer-vs-sniper; a blind on the enemy marksman is the bonus. |
 
 When authoring a new mission, add its lesson here alongside the in-world subtitle/
 description in `AUTHORED_MISSIONS` — keep the two in sync but never merge them back
