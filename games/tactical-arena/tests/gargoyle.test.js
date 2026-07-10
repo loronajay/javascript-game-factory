@@ -29,7 +29,7 @@ test("Gargoyle is registered with its tank stat block", () => {
   const def = getUnitType("gargoyle");
   assert.equal(def.name, "Gargoyle");
   assert.equal(def.classType, "tank");
-  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 1, strength: 10, defense: 7, maxHp: 30, maxMp: 20 });
+  assert.deepEqual(def.stats, { moveRange: 2, attackRange: 1, strength: 9, defense: 7, maxHp: 30, maxMp: 20 });
 });
 
 test("Heavy: effective Move can never exceed 3 no matter the speed buff", () => {

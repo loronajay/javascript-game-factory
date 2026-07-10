@@ -39,7 +39,7 @@ export const GARGOYLE = Object.freeze({
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 1,
-    strength: 10,
+    strength: 9,
     defense: 7,
     maxHp: 30,
     maxMp: 20
