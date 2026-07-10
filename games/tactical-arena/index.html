@@ -445,7 +445,6 @@
               <div class="turn-flash-sub"></div>
             </div>
           </div>
-          <div id="dialogueLayer" class="dialogue-layer" hidden></div>
           <div id="squadOverlays" class="squad-overlays"></div>
           <div id="message" role="status" aria-live="polite">Select an unspent piece.</div>
         </main>
@@ -464,6 +463,11 @@
           </section>
         </footer>
       </section>
+
+      <!-- Story/tutorial dialogue overlay. Lives at the #app level (not inside the
+           match screen) so map cutscenes render over the campaign screen too — the
+           match screen is display:none when the overworld map is active. -->
+      <div id="dialogueLayer" class="dialogue-layer" hidden></div>
     </div>
 
     <!-- Field Manual — four-tab reference overlay reachable from the title,

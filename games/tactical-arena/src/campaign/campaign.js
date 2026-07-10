@@ -1281,7 +1281,7 @@ export function paladinRageWarningScript(state) {
     },
     {
       speakerId: speaker.id,
-      text: "His reach just changed. Watch the light tiles and finish this clean.",
+      text: "Now he hits light AND dark tiles -- Darkseeker reaches the whole board. There is no safe tile. Rush him down fast.",
     },
   ];
 }

@@ -394,8 +394,10 @@ async function onCampaignMissionSelected(missionId) {
   if (!missionId || !shouldShowCampaignMapCutscene(globalThis.localStorage, missionId)) return;
   const script = campaignMapCutsceneScript(missionId);
   if (!script.length) return;
-  markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
+  // Mark seen only after the cutscene has actually played out, so an interrupted or
+  // never-rendered show doesn't silently burn the one-time story beat.
   await dialogue.show(script);
+  markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
 }
 
 function onStartCampaignMission(config) {
