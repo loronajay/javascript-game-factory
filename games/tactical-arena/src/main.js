@@ -9,7 +9,7 @@ import { applyCommand } from "./core/reducer.js";
 import { chooseActivation, cpuRng } from "./ai/cpuController.js";
 import { createBoardMetrics, gridToScreen } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
-import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets, shouldUseRangedAttackAnimation } from "./ui/combatPresentation.js";
+import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets, shouldUseRangedAttackAnimation, wallOreGainFloat } from "./ui/combatPresentation.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
@@ -1660,6 +1660,8 @@ async function resolveWallAttack(command) {
     if (event.destroyed) {
       audio.play("wallBreak");
       effects.deathBurst(center, "#9a9384");
+      const oreFloat = wallOreGainFloat(event);
+      if (oreFloat) await effects.floatText(unitCenter(metrics, attackerBefore), oreFloat.text, oreFloat.color);
       setMessage("Wall destroyed.");
     } else {
       setMessage(`Wall struck — ${event.hpAfter} HP left.`);

@@ -5,7 +5,8 @@ import {
   clumsySplashTargets,
   healingPresentationTargets,
   orderedHitTargets,
-  shouldUseRangedAttackAnimation
+  shouldUseRangedAttackAnimation,
+  wallOreGainFloat
 } from "../src/ui/combatPresentation.js";
 
 test("line attack hit presentation follows the reducer's closest-first target order", () => {
@@ -81,4 +82,13 @@ test("Ranged presentation keeps existing projectile behavior outside Miner basic
 
   assert.equal(shouldUseRangedAttackAnimation(archer, adjacent), true);
   assert.equal(shouldUseRangedAttackAnimation(clod, adjacent, { artRange: 4 }), true);
+});
+
+test("wall presentation floats Miner ore gained from adjacent wall breaks", () => {
+  assert.deepEqual(
+    wallOreGainFloat({ type: "WALL_ATTACKED", oreGained: 2 }),
+    { text: "+2 ORE", color: "#d8b35e" }
+  );
+  assert.equal(wallOreGainFloat({ type: "WALL_ATTACKED", destroyed: true }), null);
+  assert.equal(wallOreGainFloat({ type: "WALL_ATTACKED", oreGained: 0 }), null);
 });

@@ -33,3 +33,9 @@ export function shouldUseRangedAttackAnimation(attacker, target, { artRange = nu
   }
   return getUnitType(attacker.type).stats.attackRange > 1;
 }
+
+export function wallOreGainFloat(event) {
+  const gained = event?.oreGained ?? 0;
+  if (gained <= 0) return null;
+  return { text: `+${gained} ORE`, color: "#d8b35e" };
+}
