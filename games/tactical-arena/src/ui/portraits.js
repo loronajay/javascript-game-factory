@@ -27,6 +27,7 @@ export const PORTRAITS = Object.freeze({
   archer:      portrait("archer",      { x: 0.173, y: 0.012, w: 0.707, h: 0.970 }),
   mystic:      portrait("mystic",      { x: 0.175, y: 0.015, w: 0.628, h: 0.955 }),
   magician:    portrait("magician",    { x: 0.145, y: 0.022, w: 0.693, h: 0.937 }),
+  summoner:    portrait("summoner",    { x: 0.100, y: 0.030, w: 0.800, h: 0.920 }),
   paladin:     portrait("paladin",     { x: 0.063, y: 0.038, w: 0.777, h: 0.920 }),
   necromancer: portrait("necromancer", { x: 0.085, y: 0.030, w: 0.737, h: 0.910 }),
   "witch-doctor": portrait("witch-doctor", { x: 0.080, y: 0.030, w: 0.780, h: 0.920 }),

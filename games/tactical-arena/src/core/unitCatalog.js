@@ -28,6 +28,8 @@ import { LITTLE_BROTHER } from "./units/little-brother.js";
 import { BLACKSWORD } from "./units/blacksword.js";
 import { RONIN } from "./units/ronin.js";
 import { MOTHER_NATURE } from "./units/mother-nature.js";
+import { SUMMONER } from "./units/summoner.js";
+import { drawValue } from "./rng.js";
 import { areAllies, areEnemies } from "./state.js";
 import { WEATHER_TYPES, normalizeWeatherSpec } from "./weather.js";
 
@@ -59,7 +61,8 @@ export const UNIT_TYPES = Object.freeze({
   "little-brother": LITTLE_BROTHER,
   blacksword: BLACKSWORD,
   ronin: RONIN,
-  "mother-nature": MOTHER_NATURE
+  "mother-nature": MOTHER_NATURE,
+  summoner: SUMMONER
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -88,7 +91,7 @@ export function isCommandOnly(unit) {
 // non-combatant commander (King) can't win on their own, so neither sustains victory —
 // a player left with only these has lost. Default true for every ordinary unit.
 export function sustainsVictory(unit) {
-  return takesTurns(unit) && !getUnitType(unit.type).commandOnly;
+  return takesTurns(unit) && !unit.ghost && !getUnitType(unit.type).commandOnly;
 }
 
 export function getUnitType(type) {
@@ -112,6 +115,27 @@ export function getArt(type, artId) {
   const definition = getUnitType(type);
   return definition.arts.find((art) => art.id === artId) ??
     (definition.rageArt?.id === artId ? definition.rageArt : null);
+}
+
+export function getSoulShuffleChoices(unit, rngState) {
+  const passive = getUnitType(unit.type).passive?.effect;
+  const count = Math.max(1, Number(passive?.choices) || 5);
+  const excluded = new Set();
+  if (passive?.excludeSelf) excluded.add(unit.type);
+  if (passive?.excludeLastGhost && unit.lastGhostType) excluded.add(unit.lastGhostType);
+  const candidates = Object.keys(UNIT_TYPES).filter((type) => {
+    const definition = UNIT_TYPES[type];
+    return !excluded.has(type) && !definition.summon && !definition.commandOnly;
+  });
+  const shuffled = [...candidates];
+  let nextRngState = rngState;
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const draw = drawValue(nextRngState);
+    nextRngState = draw.rngState;
+    const swap = Math.floor(draw.value * (index + 1));
+    [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+  }
+  return { choices: shuffled.slice(0, count), rngState: nextRngState };
 }
 
 export function isRaging(unit) {

@@ -213,7 +213,7 @@ function applyCommanderReactions(prevState, next, events) {
   if (!reactingKings.length) return;
 
   const wasAlive = new Map(prevState.units.map((u) => [u.id, u.hp > 0]));
-  const isAlly = (unit) => takesTurns(unit) && !isCommandOnly(unit);
+  const isAlly = (unit) => takesTurns(unit) && !unit.ghost && !isCommandOnly(unit);
   const fell = [];
   const revived = [];
   for (const unit of next.units) {

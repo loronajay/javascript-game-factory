@@ -25,7 +25,7 @@
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
-import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -193,8 +193,11 @@ function generateArtPlans(state, unit, art, ai, plans) {
       const maxActive = art.summon?.maxActive ?? 1;
       const activeSummons = state.units.filter((u) => u.hp > 0 && u.summonerId === unit.id).length;
       if (activeSummons >= maxActive) break;
+      const summonType = art.resolution === "summonGhost"
+        ? getSoulShuffleChoices(unit, state.rngState).choices[0]?.id
+        : null;
       for (const tile of summonCandidates(state, unit, art)) {
-        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile } }));
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile, summonType } }));
       }
       break;
     }
@@ -496,7 +499,8 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break;
     }
     case "summon": {
-      const summonType = art.summon.type;
+      const summonType = art.summon?.type ?? primary.summonType ?? getSoulShuffleChoices(actor, state.rngState).choices[0]?.id;
+      if (!summonType) break;
       board.push({
         id: `${actor.id}-proj-summon`, type: summonType, player: actor.player,
         hp: getUnitType(summonType).stats.maxHp, position: { ...primary.targetPosition },
@@ -888,6 +892,7 @@ function artCommand(player, unitId, primary) {
   const targeting = {};
   if (primary.targetId != null) targeting.targetId = primary.targetId;
   if (primary.targetPosition) targeting.targetPosition = primary.targetPosition;
+  if (primary.summonType) targeting.summonType = primary.summonType;
   if (primary.stat) targeting.stat = primary.stat;
   return Object.keys(targeting).length
     ? useArt(player, unitId, primary.artId, targeting)

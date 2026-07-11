@@ -1,5 +1,5 @@
 import { getUnitType, sustainsVictory, takesTurns } from "./unitCatalog.js";
-import { areEnemies, livingUnits, teamOfUnit, unitAt } from "./state.js";
+import { areEnemies, findUnit, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
@@ -14,6 +14,29 @@ const FIRE_DAMAGE = 1;
 export function spendAndAdvance(state, unit) {
   if (isTempoBattle(state)) {
     finishTempoActivation(state, unit);
+    return;
+  }
+  if (unit.ghost && state.activation?.summonerId) {
+    const summoner = findUnit(state, state.activation.summonerId);
+    const position = { ...unit.position };
+    unit.statuses = tickStatuses(unit.statuses);
+    unit.spent = true;
+    unit.hp = 0;
+    if (summoner && summoner.hp > 0) {
+      summoner.statuses = tickStatuses(summoner.statuses);
+      summoner.spent = true;
+    }
+    appendPendingRolloverEvents(state, [{
+      type: "GHOST_DISSIPATED",
+      unitId: unit.id,
+      summonerId: state.activation.summonerId,
+      artId: state.activation.summonerArtId ?? unit.ghostArtId ?? null,
+      position,
+      ghostType: unit.type
+    }]);
+    state.activation = null;
+    resolveVictory(state);
+    advanceTurnIfExhausted(state);
     return;
   }
   if (getUnitType(unit.type).actsFirst) unit.commandTurn = state.turnNumber;

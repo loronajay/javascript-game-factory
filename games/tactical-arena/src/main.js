@@ -1,5 +1,5 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
-import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getUnitType } from "./core/unitCatalog.js";
+import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getSoulShuffleChoices, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
@@ -865,7 +865,8 @@ function dispatch(command) {
   broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
-  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+  if (state.activation) selectedId = state.activation.unitId;
+  else { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   announceTurnChange(prevPlayer);
   maybeStartCpuTurn();
   return true;
@@ -2022,15 +2023,18 @@ async function resolveInstantArt(command) {
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
-  } else if (resolved?.artId === "flee" && actorBefore) {
-    await effects.playAbilityVfx("flee", {
+  } else if ((resolved?.artId === "flee" || resolved?.artId === "dematerialize") && actorBefore) {
+    await effects.playAbilityVfx(resolved.artId, {
       actor: actorBefore,
       targets: [],
       path: resolved.path ?? [actorBefore.position]
     });
-  } else if (resolved?.artId === "summon-ghoul" && actorBefore) {
-    const ghoul = findUnit(result.nextState, resolved.summonedUnitId);
-    if (ghoul) await effects.playAbilityVfx("summon-ghoul", { actor: actorBefore, targets: [ghoul] });
+  } else if ((resolved?.artId === "summon-ghoul" || resolved?.artId === "summon" || resolved?.artId === "beckon") && actorBefore) {
+    const summoned = findUnit(result.nextState, resolved.summonedUnitId);
+    if (summoned) {
+      await effects.playAbilityVfx(resolved.artId, { actor: actorBefore, targets: [summoned] });
+      if (resolved.ghostTurn) await effects.floatText(unitCenter(createBoardMetrics(state.size), summoned), "GHOST", "#cbb8ff");
+    }
   } else if ((resolved?.artId === "build-cover" || resolved?.artId === "shaft-prop") && resolved.position) {
     const point = unitCenter(createBoardMetrics(state.size), { position: resolved.position });
     audio.play("buildCover");
@@ -2196,8 +2200,9 @@ async function resolveInstantArt(command) {
   } else if (resolved?.artId === "recharge" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx("recharge", { actor: actorBefore, targets: [actorBefore] });
-    if (resolved.mpRestored > 0) await effects.floatText(unitCenter(metrics, actorBefore), `+${resolved.mpRestored} MP`, "#7fd0ff");
-    else if (resolved.hpHealed > 0) await effects.floatText(unitCenter(metrics, actorBefore), `+${resolved.hpHealed}`, "#8cf0a4");
+    const recipient = findUnit(result.nextState, resolved.recipientId) ?? actorBefore;
+    if (resolved.mpRestored > 0) await effects.floatText(unitCenter(metrics, recipient), `+${resolved.mpRestored} MP`, "#7fd0ff");
+    else if (resolved.hpHealed > 0) await effects.floatText(unitCenter(metrics, recipient), `+${resolved.hpHealed}`, "#8cf0a4");
   } else if (resolved?.artId === "polarity-shift" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx("polarity-shift", { actor: actorBefore, targets: [actorBefore] });
@@ -2613,7 +2618,8 @@ async function resolveInstantArt(command) {
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
-  if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
+  if (state.activation) selectedId = state.activation.unitId;
+  else { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   render();
   announceTurnChange(prevPlayer);
   resolving = false;
@@ -2968,9 +2974,10 @@ function playEventSounds(events) {
       const artId = event.artId;
       // VFX-managed arts play their own sound through the animation path
       if (artId === "footwork" || artId === "dark-rush" || artId === "flee" || artId === "nuke" ||
+          artId === "dematerialize" ||
           artId === "spark" || artId === "pray" || artId === "wish" ||
           artId === "lightseeker" || artId === "darkseeker" ||
-          artId === "dark-bomb" || artId === "summon-ghoul" ||
+          artId === "dark-bomb" || artId === "summon-ghoul" || artId === "summon" || artId === "beckon" ||
           artId === "smoke-bomb" || artId === "build-cover" || artId === "shaft-prop" || artId === "throw-cigar" ||
           artId === "age" || artId === "time-stretch" || artId === "rewind" ||
           artId === "tether-grab" || artId === "rocket-punch" || artId === "recharge" ||
@@ -3025,11 +3032,19 @@ function playRolloverFx(events) {
   const duelHeals = events.filter((e) => e.type === "DUELIST_HEAL");
   const recoils = events.filter((e) => e.type === "ATTACK_RECOIL");
   const critMpRestores = events.filter((e) => e.type === "CRIT_MP_RESTORE");
+  const ghostDissipations = events.filter((e) => e.type === "GHOST_DISSIPATED");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
       !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length &&
-      !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length) return;
+      !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length && !ghostDissipations.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
+
+  for (const ghost of ghostDissipations) {
+    const unit = findUnit(state, ghost.unitId);
+    const shell = unit ?? { id: ghost.unitId, player: state.currentPlayer, position: ghost.position };
+    effects.floatText(unitCenter(metrics, shell), "DISSIPATE", "#cbb8ff");
+    effects.deathDissolve(ghost.unitId, ghost.position, teamColor(shell.player));
+  }
 
   // Free Pyroclasm eruption (Volcanic Rage): float the magic damage on every enemy the
   // rays caught, with a fiery impact. The state here is already post-eruption.
@@ -3386,13 +3401,18 @@ async function handleTile(position) {
         setMessage(`${art.name}: choose step ${footworkPath.length + 1} of ${steps}.`);
       }
     }
-  } else if (mode === "art:flee") {
-    const fleeLegal = getLegalFleeTiles(state, unit);
+  } else if (mode?.startsWith("art:") && (() => {
+    const art = getArt(unit.type, mode.slice("art:".length));
+    return art?.targeting?.shape === "flee" || art?.resolution === "flee";
+  })()) {
+    const artId = mode.slice("art:".length);
+    const art = getArt(unit.type, artId);
+    const fleeLegal = getLegalFleeTiles(state, unit, art);
     if (!fleeLegal.has(positionKey(position))) {
-      setMessage("Flee: choose a highlighted empty tile to teleport to.", true);
-    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "flee", { targetPosition: position }))) {
+      setMessage(`${art.name}: choose a highlighted empty tile to teleport to.`, true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
       mode = null;
-      setMessage("Flee complete. This unit's activation is complete.");
+      setMessage(`${art.name} complete. This unit's activation is complete.`);
     }
   } else if (mode === "art:flight") {
     const flightLegal = getFlightTiles(state, unit, getArt(unit.type, "flight"));
@@ -3420,13 +3440,43 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: origin }))) {
       setMessage(`${art.name} resolved. This unit's activation is complete.`);
     }
-  } else if (mode === "art:summon-ghoul") {
-    const placement = getSummonPlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "summon-ghoul"));
+  } else if (mode?.startsWith("art:") && (() => {
+    const art = getArt(unit.type, mode.slice("art:".length));
+    return art?.targeting?.shape === "placement" && (art.resolution === "summon" || art.resolution === "summonGhost");
+  })()) {
+    const artId = mode.slice("art:".length);
+    const art = getArt(unit.type, artId);
+    const placement = getSummonPlacementTiles(state, unit, art);
     if (!placement.has(positionKey(position))) {
-      setMessage("Summon Ghoul: choose a highlighted empty tile near the Necromancer.", true);
-    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "summon-ghoul", { targetPosition: position }))) {
+      setMessage(`${art.name}: choose a highlighted empty tile.`, true);
+    } else if (art.resolution === "summonGhost") {
+      const shuffled = getSoulShuffleChoices(unit, state.rngState).choices;
+      setMessage(`${art.name}: choose a spirit to call.`);
+      render();
+      const summonType = await openChoiceModal({
+        title: `${art.name} — Soul Shuffle`,
+        subtitle: "Choose one ghost. It takes a full turn, then dissipates.",
+        accent: teamColor(unit.player),
+        choices: shuffled.map((type) => ({
+          value: type,
+          label: getUnitType(type).name,
+          sub: getUnitType(type).classType,
+          type
+        }))
+      });
+      if (!summonType || mode !== `art:${artId}`) {
+        mode = null;
+        setMessage(`${art.name} cancelled. Choose an action below.`);
+        render();
+        return;
+      }
+      if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: position, summonType }))) {
+        mode = null;
+        setMessage(`${getUnitType(summonType).name} beckoned as a ghost. Take its turn.`);
+      }
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
       mode = null;
-      setMessage("Ghoul raised. This unit's activation is complete.");
+      setMessage(`${art.name} complete. This unit's activation is complete.`);
     }
   } else if (mode === "art:build-cover") {
     const placement = getWallPlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "build-cover"));
@@ -3750,10 +3800,10 @@ async function handleActionClick(action, unit) {
           ? `Choose step 1 of ${getRushSteps(unit, art, state)}.`
         : action === "art:flight"
           ? "Choose a highlighted empty tile to fly onto."
-        : action === "art:flee"
+        : art?.targeting?.shape === "flee" || art?.resolution === "flee"
           ? "Choose a highlighted empty tile to teleport to."
-          : action === "art:summon-ghoul"
-            ? "Choose a highlighted empty tile to raise the Ghoul."
+          : art?.targeting?.shape === "placement" && (art?.resolution === "summon" || art?.resolution === "summonGhost")
+            ? "Choose a highlighted empty tile for the summon."
             : action === "art:build-cover"
               ? "Choose a highlighted empty tile to raise the wall."
               : action === "art:shaft-prop"

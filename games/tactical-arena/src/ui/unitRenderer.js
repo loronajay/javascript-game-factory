@@ -429,6 +429,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   const stats = getEffectiveStats(unit, state);
   const classes = ["unit", `player-${unit.player}`, "idle"];
   if (unit.spent) classes.push("spent");
+  if (unit.ghost) classes.push("ghost");
   if (isDefending(unit)) classes.push("defending");
   if (isRaging(unit)) classes.push("is-raging");
   if (unit.id === selectedId) classes.push("active");

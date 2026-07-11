@@ -506,10 +506,18 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     const rushArt = getArt(actor.type, mode.slice("art:".length));
     if (rushArt?.targeting?.shape === "rushPath") legal = getRushStepOptions(state, actor, footworkPath, rushArt);
   }
-  if (actor && mode === "art:flee") legal = getLegalFleeTiles(state, actor);
+  if (actor && mode?.startsWith("art:")) {
+    const fleeArt = getArt(actor.type, mode.slice("art:".length));
+    if (fleeArt?.targeting?.shape === "flee" || fleeArt?.resolution === "flee") legal = getLegalFleeTiles(state, actor, fleeArt);
+  }
   // Flight: fly onto a highlighted empty tile (Chebyshev, diagonals allowed).
   if (actor && mode === "art:flight") legal = getFlightTiles(state, actor, getArt(actor.type, "flight"));
-  if (actor && mode === "art:summon-ghoul") legal = getSummonPlacementTiles(state, actor, getArt(actor.type, "summon-ghoul"));
+  if (actor && mode?.startsWith("art:")) {
+    const summonArt = getArt(actor.type, mode.slice("art:".length));
+    if (summonArt?.targeting?.shape === "placement" && (summonArt.resolution === "summon" || summonArt.resolution === "summonGhost")) {
+      legal = getSummonPlacementTiles(state, actor, summonArt);
+    }
+  }
   if (actor && mode === "art:build-cover") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "build-cover"));
   if (actor && mode === "art:shaft-prop") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "shaft-prop"));
   if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));

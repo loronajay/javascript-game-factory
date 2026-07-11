@@ -59,6 +59,10 @@ export function createUnit(spec) {
     realmTraversalCharged: spec.realmTraversalCharged ?? false,
     realmTraversalLocked: spec.realmTraversalLocked ?? false,
     studiedTargetId: spec.studiedTargetId ?? null,
+    lastGhostType: spec.lastGhostType ?? null,
+    ghost: spec.ghost ?? false,
+    ghostArtId: spec.ghostArtId ?? null,
+    summonerId: spec.summonerId ?? null,
     // Dark Ether (Blacksword): a one-shot charge forcing the next basic attack to crit.
     // Meaningless for every other unit (stays false).
     guaranteedCritCharged: spec.guaranteedCritCharged ?? false
@@ -216,6 +220,10 @@ export function cloneState(state) {
       // would share the array across clones and leak mutations between states.
       linkedStatMods: (unit.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
       studiedTargetId: unit.studiedTargetId ?? null,
+      lastGhostType: unit.lastGhostType ?? null,
+      ghost: Boolean(unit.ghost),
+      ghostArtId: unit.ghostArtId ?? null,
+      summonerId: unit.summonerId ?? null,
       weather: unit.weather ?? null,
       lastWeather: unit.lastWeather ?? null,
       weatherMoveCharged: unit.weatherMoveCharged ?? 0,

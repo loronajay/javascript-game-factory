@@ -805,5 +805,30 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "mother-nature",
     slug: "geisha",
     file: "geisha-mother-nature.png"
+  },
+  {
+    type: "summoner",
+    slug: "ascended",
+    file: "ascended-summoner.png"
+  },
+  {
+    type: "summoner",
+    slug: "blood-moon",
+    file: "blood-moon-summoner.png"
+  },
+  {
+    type: "summoner",
+    slug: "frostbitten",
+    file: "frostbitten-summoner.png"
+  },
+  {
+    type: "summoner",
+    slug: "hellfire",
+    file: "hellfire-summoner.png"
+  },
+  {
+    type: "summoner",
+    slug: "void-dweller",
+    file: "void-dweller-summoner.png"
   }
 ]);

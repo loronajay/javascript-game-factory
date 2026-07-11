@@ -27,6 +27,7 @@ const ATTACK_PROJECTILES = Object.freeze({
   archer: Object.freeze({ shape: "arrow", arcHeight: 62, durationMs: 430, size: 1, colors: Object.freeze({ core: "#f2e4b8", trail: "#8a6d3a" }) }),
   sniper: Object.freeze({ shape: "tracer", arcHeight: 8, durationMs: 230, size: 1, colors: Object.freeze({ core: "#ffd9a0", trail: "#c0653a" }) }),
   magician: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 430, size: 1, colors: Object.freeze({ core: "#a0c8ff", trail: "#4488dd" }) }),
+  summoner: Object.freeze({ shape: "orb", arcHeight: 48, durationMs: 440, size: 1, colors: Object.freeze({ core: "#cbb8ff", trail: "#553276" }) }),
   mystic: Object.freeze({ shape: "orb", arcHeight: 50, durationMs: 460, size: 0.9, colors: Object.freeze({ core: "#bff4d2", trail: "#64d99a" }) }),
   necromancer: Object.freeze({ shape: "orb", arcHeight: 46, durationMs: 450, size: 1, colors: Object.freeze({ core: "#9be08a", trail: "#38256f" }) }),
   nemesis: Object.freeze({ shape: "orb", arcHeight: 44, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#c89cff", trail: "#241030" }) }),
@@ -232,6 +233,14 @@ const ABILITY_VFX = Object.freeze({
     sparkCount: 8,
     colors: Object.freeze({ core: "#e0c0ff", trail: "#9958d8", impact: "#f0e0ff" })
   }),
+  dematerialize: Object.freeze({
+    type: "dashTrail",
+    soundKey: "flee",
+    durationMs: 420,
+    afterimageCount: 3,
+    sparkCount: 12,
+    colors: Object.freeze({ core: "#d8ccff", trail: "#553276", impact: "#f2ecff" })
+  }),
   banish: Object.freeze({
     type: "statusStrike",
     soundKey: "banish",
@@ -298,6 +307,26 @@ const ABILITY_VFX = Object.freeze({
     windup: Object.freeze({ style: "gather", durationMs: 460, particleCount: 10 }),
     stream: Object.freeze({ shape: "orb", arcHeight: 32, durationMs: 400, size: 1.1, colors: Object.freeze({ core: "#9be08a", trail: "#244d1f" }) }),
     colors: Object.freeze({ core: "#9be08a", trail: "#244d1f", impact: "#e8ffd6" })
+  }),
+  summon: Object.freeze({
+    type: "summonRise",
+    soundKey: "darkseeker",
+    soilCount: 4,
+    miasmaCount: 10,
+    riseDurationMs: 520,
+    windup: Object.freeze({ style: "gather", durationMs: 420, particleCount: 10 }),
+    stream: Object.freeze({ shape: "orb", arcHeight: 34, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#d8ccff", trail: "#553276" }) }),
+    colors: Object.freeze({ core: "#cbb8ff", trail: "#553276", impact: "#f2ecff" })
+  }),
+  beckon: Object.freeze({
+    type: "summonRise",
+    soundKey: "rageActivated",
+    soilCount: 5,
+    miasmaCount: 14,
+    riseDurationMs: 600,
+    windup: Object.freeze({ style: "gather", durationMs: 520, particleCount: 14 }),
+    stream: Object.freeze({ shape: "orb", arcHeight: 38, durationMs: 470, size: 1.25, colors: Object.freeze({ core: "#ffb0f0", trail: "#5a1d76" }) }),
+    colors: Object.freeze({ core: "#ffb0f0", trail: "#5a1d76", impact: "#ffe6ff" })
   }),
   wither: Object.freeze({
     type: "statusStrike",

@@ -147,8 +147,8 @@ export function getVolleyShotOriginForTarget(state, actor, targetPosition) {
   return getConeOriginForTarget(state, actor, targetPosition, getArt(actor.type, "volley-shot") ?? 5);
 }
 
-export function getLegalFleeTiles(state, actor) {
-  const art = getArt(actor.type, "flee");
+export function getLegalFleeTiles(state, actor, art = null) {
+  art = art ?? getArt(actor.type, "flee") ?? getAvailableFleeArt(actor);
   const range = getEffectiveStats(actor, state).moveRange + FLEE_RANGE_BONUS + getWeatherMovementArtRangeBonus(state, art);
   const legal = new Set();
   for (let dx = -range; dx <= range; dx += 1) {
@@ -161,6 +161,10 @@ export function getLegalFleeTiles(state, actor) {
     }
   }
   return legal;
+}
+
+function getAvailableFleeArt(actor) {
+  return actor ? getArt(actor.type, "dematerialize") : null;
 }
 
 export function getArtTargetRange(state, actor, art) {

@@ -278,6 +278,11 @@ body.tutorial-spotlight-mp .dialogue-layer {
    from the recolored coin/ring. A soft drop-shadow grounds the piece on the disc. */
 .unit .sprite-img { filter:drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
 .unit.is-raging .sprite-img { filter:drop-shadow(0 0 8px rgba(255,48,34,.86)) drop-shadow(0 2px 1px rgba(0,0,0,.45)); }
+.unit.ghost { opacity:.84; filter:drop-shadow(0 0 12px rgba(188,150,255,.78)) saturate(.85); }
+.unit.ghost .base-top { fill:color-mix(in srgb,var(--team,var(--p1)) 22%,#201238); }
+.unit.ghost .rim { stroke:#cbb8ff; stroke-dasharray:5 5; animation:rim-spin 2.2s linear infinite; }
+.unit.ghost .sprite-img { opacity:.68; filter:drop-shadow(0 0 10px rgba(188,150,255,.85)) drop-shadow(0 2px 1px rgba(0,0,0,.35)); }
+.unit.ghost .hp-front { fill:#cbb8ff; }
 .unit .fig-body { fill:url(#ivory); stroke:#281e12; stroke-width:1.1; vector-effect:non-scaling-stroke; }
 .unit .fig-shade { fill:rgba(38,27,14,.30); stroke:none; }
 .unit .fig-light { fill:rgba(255,250,236,.55); stroke:none; }

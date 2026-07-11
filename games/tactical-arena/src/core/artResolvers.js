@@ -1,4 +1,4 @@
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, finalizeMagicDamage, getAttackRecoil, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
@@ -91,9 +91,12 @@ const ART_RESOLVERS = new Map([
   ["smoke-bomb", resolveStatusCast],
   ["headlamp", resolveStatusCast],
   ["flee", resolveFlee],
+  ["dematerialize", resolveFlee],
   ["nuke", resolveNuke],
   ["dark-bomb", resolveNuke],
   ["summon-ghoul", resolveSummonGhoul],
+  ["summon", resolveSummonGhost],
+  ["beckon", resolveSummonGhost],
   ["build-cover", resolveBuildCover],
   ["shaft-prop", resolveBuildCover],
   ["throw-cigar", resolveThrowCigar],
@@ -482,14 +485,12 @@ function applyStudyLeech(state, actor, target, damageDealt, events) {
   if (damageDealt <= 0) return;
   const reward = getMagicDamageReward(actor, target);
   if (!reward) return;
-  const beforeHp = actor.hp;
-  const beforeMp = actor.mp;
-  restoreHp(state, actor, actor, reward.hp);
-  restoreMp(state, actor, actor, reward.mp);
-  const hpRestored = actor.hp - beforeHp;
-  const mpRestored = actor.mp - beforeMp;
+  const hp = restoreHp(state, actor, actor, reward.hp);
+  const mp = restoreMp(state, actor, actor, reward.mp);
+  const hpRestored = hp.hpRestored;
+  const mpRestored = mp.mpRestored;
   if (hpRestored > 0 || mpRestored > 0) {
-    events.push({ type: "STUDY_LEECH", actorId: actor.id, targetId: target.id, hpRestored, mpRestored });
+    events.push({ type: "STUDY_LEECH", actorId: hp.targetId ?? mp.targetId ?? actor.id, sourceId: actor.id, targetId: target.id, hpRestored, mpRestored });
   }
 }
 
@@ -1158,7 +1159,7 @@ function resolveRealmTraversal(state, command, art) {
 // A summoned piece is a full unit object (same shape createUnit produces) plus a
 // `summonerId` so the per-Necromancer summon cap can find it. It spawns already
 // `spent` so the turn loop never offers it an activation.
-function createSummon(id, type, player, team, position, summonerId, skin = null) {
+function createSummon(id, type, player, team, position, summonerId, skin = null, { spent = true, ghost = false, ghostArtId = null } = {}) {
   const definition = getUnitType(type);
   return {
     id,
@@ -1173,13 +1174,29 @@ function createSummon(id, type, player, team, position, summonerId, skin = null)
     statuses: [],
     linkedStatMods: [],
     defending: false,
-    spent: true,
     mageChargeCount: 0,
     stance: null,
     rainCharged: 0,
+    weather: null,
+    lastWeather: null,
+    weatherMoveCharged: 0,
+    command: null,
+    previousCommand: null,
+    commandTurn: 0,
+    volcanicCounter: 0,
+    emergencySnackCount: 0,
+    stationaryStrength: 0,
+    desperationShotSpent: false,
+    desperationRageArmed: false,
+    skipNextActivation: false,
     realmTraversalCharged: false,
     realmTraversalLocked: false,
-    summonerId
+    studiedTargetId: null,
+    guaranteedCritCharged: false,
+    spent,
+    summonerId,
+    ghost,
+    ghostArtId
   };
 }
 
@@ -1279,6 +1296,57 @@ function resolveOreHarvest(state, command, art) {
     oreGained: actor.mp - before,
     oreAfter: actor.mp,
     mpCost: cost
+  }]);
+}
+
+function resolveSummonGhost(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const placement = command.targetPosition;
+  if (!placement || !getSummonPlacementTiles(state, actorState, art).has(positionKey(placement))) {
+    return reject(ERR.INVALID_TARGET);
+  }
+
+  const preview = getSoulShuffleChoices(actorState, state.rngState);
+  const chosenType = command.summonType ?? preview.choices[0];
+  if (!preview.choices.includes(chosenType)) return reject(ERR.INVALID_TARGET);
+
+  const next = cloneState(state);
+  next.rngState = preview.rngState;
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  actor.lastGhostType = chosenType;
+  actor.defending = false;
+
+  const seq = next.units.filter((unit) => unit.summonerId === actor.id && unit.ghost).length;
+  const ghostId = `${actor.id}-ghost-${seq}`;
+  const ghost = createSummon(ghostId, chosenType, actor.player, teamOfUnit(actor), placement, actor.id, null, {
+    spent: false,
+    ghost: true,
+    ghostArtId: art.id
+  });
+  next.units.push(ghost);
+  next.activation = {
+    unitId: ghost.id,
+    origin: { ...ghost.position },
+    moved: false,
+    primaryUsed: false,
+    spellUsed: false,
+    bonusActionGroups: [],
+    summonerId: actor.id,
+    summonerArtId: art.id
+  };
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    summonedUnitId: ghostId,
+    summonedType: chosenType,
+    choices: [...preview.choices],
+    position: { ...placement },
+    mpCost: cost,
+    ghostTurn: true
   }]);
 }
 
@@ -1477,8 +1545,8 @@ function resolveGreatFlood(state, command, art) {
     actorId: actor.id,
     targetIds,
     damageByTarget,
-    healingByTarget: healed.hpRestored > 0 ? { [actor.id]: healed.hpRestored } : {},
-    restoredByTarget: healed.mpRestored > 0 ? { [actor.id]: healed.mpRestored } : {},
+    healingByTarget: healed.hpRestored > 0 ? { [healed.targetId ?? actor.id]: healed.hpRestored } : {},
+    restoredByTarget: healed.mpRestored > 0 ? { [healed.targetId ?? actor.id]: healed.mpRestored } : {},
     beforePositions,
     afterPositions,
     mpCost: cost
@@ -1952,9 +2020,10 @@ function resolveHealAllies(state, command, art) {
     const restored = restoreHp(next, actor, target, amount);
     const healed = restored.hpRestored;
     if (healed <= 0 && restored.mpRestored <= 0) continue;
-    targetIds.push(target.id);
-    if (healed > 0) healingByTarget[target.id] = healed;
-    if (restored.mpRestored > 0) restoredByTarget[target.id] = restored.mpRestored;
+    const targetId = restored.targetId ?? target.id;
+    if (!targetIds.includes(targetId)) targetIds.push(targetId);
+    if (healed > 0) healingByTarget[targetId] = (healingByTarget[targetId] ?? 0) + healed;
+    if (restored.mpRestored > 0) restoredByTarget[targetId] = (restoredByTarget[targetId] ?? 0) + restored.mpRestored;
   }
 
   completeArtUse(next, actor, art, keepsActivationOpen);
@@ -2778,14 +2847,17 @@ function resolveRecharge(state, command, art) {
   const stats = getEffectiveStats(actor, next);
   let mpRestored = 0;
   let hpHealed = 0;
+  let recipientId = actor.id;
   if (actor.mp < stats.maxMp) {
     const restored = restoreMp(next, actor, actor, art.restore?.mp ?? 0, { bypassPolarity: Boolean(art.restore?.bypassPolarity) });
     mpRestored = restored.mpRestored;
     hpHealed = restored.hpRestored;
+    recipientId = restored.targetId ?? actor.id;
   } else {
     const restored = restoreHp(next, actor, actor, art.restore?.hpIfFull ?? 0, { bypassPolarity: Boolean(art.restore?.bypassPolarity) });
     hpHealed = restored.hpRestored;
     mpRestored = restored.mpRestored;
+    recipientId = restored.targetId ?? actor.id;
     if ((hpHealed > 0 || mpRestored > 0) && art.nextTurnStatus) {
       const result = applyStatus(actor, {
         type: art.nextTurnStatus.type,
@@ -2797,7 +2869,7 @@ function resolveRecharge(state, command, art) {
   }
   spendAndAdvance(next, actor);
   return accept(next, [{
-    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpRestored, hpHealed, mpCost: getArtMpCost(actor, art, next)
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpRestored, hpHealed, recipientId, mpCost: getArtMpCost(actor, art, next)
   }]);
 }
 

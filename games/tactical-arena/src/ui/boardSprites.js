@@ -59,6 +59,7 @@ export const BOARD_SPRITES = Object.freeze({
   archer:      sprite("archer"),
   mystic:      sprite("mystic"),
   magician:    sprite("magician"),
+  summoner:    sprite("summoner"),
   paladin:     sprite("paladin"),
   necromancer: sprite("necromancer"),
   "witch-doctor": sprite("witch-doctor"),

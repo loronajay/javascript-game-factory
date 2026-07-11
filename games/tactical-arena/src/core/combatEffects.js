@@ -21,7 +21,7 @@ export function applyGrowth(state, actor, amount) {
   if (!(amount > 0)) return [];
   const restored = restoreMp(state, actor, actor, amount);
   return restored.mpRestored > 0 || restored.hpRestored > 0
-    ? [{ type: "GROWTH_MP", unitId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored }]
+    ? [{ type: "GROWTH_MP", unitId: restored.targetId ?? actor.id, sourceId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored }]
     : [];
 }
 
@@ -33,7 +33,7 @@ export function applyRockHardDefense(state, target, isPhysical) {
   if (refund <= 0) return [];
   const restored = restoreMp(state, target, target, refund);
   return restored.mpRestored > 0 || restored.hpRestored > 0
-    ? [{ type: "ROCK_HARD_MP", unitId: target.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored }]
+    ? [{ type: "ROCK_HARD_MP", unitId: restored.targetId ?? target.id, sourceId: target.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored }]
     : [];
 }
 
@@ -45,11 +45,14 @@ export function applyDarkTreadLifesteal(state, actor, damagedTargets) {
   const cfg = getUnitType(actor.type).passive?.effect?.darkTileLifesteal;
   if (!cfg || actor.hp <= 0 || !damagedTargets?.length) return [];
   let hpRestored = 0;
+  let recipientId = actor.id;
   for (const target of damagedTargets) {
     if (getTileAffinity(state, target.position) !== cfg.affinity) continue;
-    hpRestored += restoreHp(state, actor, actor, cfg.amount).hpRestored;
+    const restored = restoreHp(state, actor, actor, cfg.amount);
+    hpRestored += restored.hpRestored;
+    recipientId = restored.targetId ?? recipientId;
   }
-  return hpRestored > 0 ? [{ type: "DARK_TREAD_HEAL", unitId: actor.id, hpRestored }] : [];
+  return hpRestored > 0 ? [{ type: "DARK_TREAD_HEAL", unitId: recipientId, sourceId: actor.id, hpRestored }] : [];
 }
 
 export function applyMagicDamageReaction(target, damageDealt) {
@@ -111,17 +114,29 @@ export function isRestorePolarityShifted(state) {
   return Boolean(state?.restorePolarityShift);
 }
 
+function redirectedSelfRestoreTarget(state, actor, target) {
+  if (!state?.units || !actor || !target || actor.id !== target.id || !target.ghost || !target.summonerId) return target;
+  const summoner = state.units.find((unit) => unit.id === target.summonerId && unit.hp > 0);
+  return summoner && getUnitType(summoner.type).passive?.effect?.redirectGhostSelfRestore ? summoner : target;
+}
+
 export function restoreHp(state, actor, target, amount, { bypassPolarity = false, bypassHealingLockout = false } = {}) {
   const base = Math.max(0, Number(amount) || 0);
   if (base <= 0 || !target) return { hpRestored: 0, mpRestored: 0 };
   if (isRestorePolarityShifted(state) && !bypassPolarity) {
     return restoreMp(state, actor, target, base, { bypassPolarity: true });
   }
+  const recipient = redirectedSelfRestoreTarget(state, actor, target);
   const value = base + getWeatherRestoreBonus(state);
-  if (!bypassHealingLockout && isHealingDisabled(state, target)) return { hpRestored: 0, mpRestored: 0 };
-  const before = target.hp;
-  target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + value);
-  return { hpRestored: target.hp - before, mpRestored: 0 };
+  if (!bypassHealingLockout && isHealingDisabled(state, recipient)) return { hpRestored: 0, mpRestored: 0, targetId: recipient.id };
+  const before = recipient.hp;
+  recipient.hp = Math.min(getEffectiveStats(recipient, state).maxHp, recipient.hp + value);
+  return {
+    hpRestored: recipient.hp - before,
+    mpRestored: 0,
+    targetId: recipient.id,
+    redirectedFromId: recipient.id !== target.id ? target.id : null
+  };
 }
 
 export function restoreMp(state, actor, target, amount, { bypassPolarity = false } = {}) {
@@ -130,8 +145,14 @@ export function restoreMp(state, actor, target, amount, { bypassPolarity = false
   if (isRestorePolarityShifted(state) && !bypassPolarity) {
     return restoreHp(state, actor, target, base, { bypassPolarity: true });
   }
+  const recipient = redirectedSelfRestoreTarget(state, actor, target);
   const value = base + getWeatherRestoreBonus(state);
-  const before = target.mp;
-  target.mp = Math.min(getEffectiveStats(target, state).maxMp, target.mp + value);
-  return { hpRestored: 0, mpRestored: target.mp - before };
+  const before = recipient.mp;
+  recipient.mp = Math.min(getEffectiveStats(recipient, state).maxMp, recipient.mp + value);
+  return {
+    hpRestored: 0,
+    mpRestored: recipient.mp - before,
+    targetId: recipient.id,
+    redirectedFromId: recipient.id !== target.id ? target.id : null
+  };
 }

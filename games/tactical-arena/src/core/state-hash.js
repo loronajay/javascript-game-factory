@@ -66,6 +66,9 @@ function canonicalUnits(units) {
         `${unit.stationaryStrength ?? 0},${unit.desperationShotSpent ? 1 : 0},` +
         `${unit.desperationRageArmed ? 1 : 0},${unit.skipNextActivation ? 1 : 0},` +
         `${unit.studiedTargetId ?? "-"},` +
+        // Summoner: lastGhostType gates the next Soul Shuffle list; ghost/summonerId mark
+        // temporary units whose self-restores redirect and whose completion spends the host.
+        `${unit.lastGhostType ?? "-"},${unit.ghost ? 1 : 0},${unit.ghostArtId ?? "-"},${unit.summonerId ?? "-"},` +
         // Dark Ether (Blacksword): a charged guaranteed crit forces the next swing's crit
         // outcome, which draws the RNG, so it is part of the authoritative hash.
         `${unit.guaranteedCritCharged ? 1 : 0},` +
@@ -86,7 +89,7 @@ function canonicalActivation(activation) {
   return (
     `${activation.unitId},${activation.origin.x},${activation.origin.y},` +
     `${activation.moved ? 1 : 0},${activation.primaryUsed ? 1 : 0},` +
-    `${activation.spellUsed ? 1 : 0},` +
+    `${activation.spellUsed ? 1 : 0},${activation.summonerId ?? "-"},${activation.summonerArtId ?? "-"},` +
     `[${(activation.bonusActionGroups ?? []).map(stableStringify).join(",")}]`
   );
 }

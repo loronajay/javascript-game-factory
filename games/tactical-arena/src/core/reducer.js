@@ -60,6 +60,7 @@ function beginActivation(state, command) {
   // Stun is auto-spent at turn refresh, and this guard keeps hand-built states from
   // opening an action panel for a stunned unit.
   if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit)) return reject(ERR.UNIT_SPENT);
+  if (state.activation?.summonerId && state.activation.unitId !== result.unit.id) return reject(ERR.ACTIVATION_ALREADY_OPEN);
   if (state.activation && state.activation.unitId !== result.unit.id &&
       (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
   // The King commands first: no other unit of this owner may open an activation while a
@@ -352,13 +353,13 @@ function attack(state, command) {
   const critLifesteal = getDuelistCritLifesteal(actor);
   if (swing.critical && critLifesteal > 0 && primaryDamageDealt > 0) {
     const restored = restoreHp(next, actor, actor, Math.round(primaryDamageDealt * critLifesteal));
-    if (restored.hpRestored > 0) duelistEvents.push({ type: "DUELIST_HEAL", unitId: actor.id, hpRestored: restored.hpRestored });
+    if (restored.hpRestored > 0) duelistEvents.push({ type: "DUELIST_HEAL", unitId: restored.targetId ?? actor.id, sourceId: actor.id, hpRestored: restored.hpRestored });
   }
   const critMpRestore = getBasicAttackCritMpRestore(actor);
   if (swing.critical && critMpRestore > 0) {
     const restored = restoreMp(next, actor, actor, critMpRestore);
     if (restored.mpRestored > 0 || restored.hpRestored > 0) {
-      duelistEvents.push({ type: "CRIT_MP_RESTORE", unitId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
+      duelistEvents.push({ type: "CRIT_MP_RESTORE", unitId: restored.targetId ?? actor.id, sourceId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
     }
   }
   if (getAttackRecoil(actor) && totalDamageDealt > 0) {
@@ -537,14 +538,13 @@ function defend(state, command) {
   // passive so no rule hard-codes the unit.
   const snack = getUnitType(unit.type).passive?.effect;
   if (snack?.type === "defendRestore" && !next.activation.moved) {
-    const beforeHp = unit.hp;
-    const beforeMp = unit.mp;
-    restoreHp(next, unit, unit, snack.hp ?? 0);
-    restoreMp(next, unit, unit, snack.mp ?? 0);
-    const hpRestored = unit.hp - beforeHp;
-    const mpRestored = unit.mp - beforeMp;
+    const hp = restoreHp(next, unit, unit, snack.hp ?? 0);
+    const mp = restoreMp(next, unit, unit, snack.mp ?? 0);
+    const hpRestored = hp.hpRestored;
+    const mpRestored = mp.mpRestored;
+    const recipientId = hp.targetId ?? mp.targetId ?? unit.id;
     if (hpRestored > 0 || mpRestored > 0) {
-      events.push({ type: "SNACK_BREAK", unitId: unit.id, hpRestored, mpRestored });
+      events.push({ type: "SNACK_BREAK", unitId: recipientId, sourceId: unit.id, hpRestored, mpRestored });
     }
   }
   return accept(next, events);
