@@ -91,6 +91,20 @@ test("Stumble uses Move +2 steps and deals 3 true damage to contacted enemies", 
   assert.equal(findUnit(result.nextState, "fk").mp, 17);
 });
 
+test("Blizzard extends Stumble by one movement-art step", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5 },
+    { id: "e", type: "swordsman", player: 2, x: 6, y: 5 }
+  ], { weather: "blizzard" });
+  const art = getUnitType("fat-knight").arts.find((entry) => entry.id === "stumble");
+  assert.equal(getRushSteps(findUnit(state, "fk"), art, state), 5);
+
+  const s = run(state, beginActivation(1, "fk")).nextState;
+  const path = [{ x: 6, y: 5 }, { x: 7, y: 5 }, { x: 8, y: 5 }, { x: 8, y: 6 }, { x: 8, y: 7 }];
+  const result = run(s, useArt(1, "fk", "stumble", path));
+  assert.deepEqual(findUnit(result.nextState, "fk").position, { x: 8, y: 7 });
+});
+
 test("Fart pushes nearby enemies away, or deals true damage when blocked", () => {
   const state = scenario([
     { id: "fk", type: "fat-knight", player: 1, x: 5, y: 5 },

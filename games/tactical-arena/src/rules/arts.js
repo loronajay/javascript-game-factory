@@ -16,8 +16,8 @@ export function getRushContactDamage(actor, art) {
   return (art?.contactDamage ?? FOOTWORK_DAMAGE) + Math.max(0, Number(getRageEffectValue(actor, "trampleDamage", 0)) || 0);
 }
 
-export function getFootworkSteps(actor) {
-  return getRushSteps(actor, getArt(actor.type, "footwork"));
+export function getFootworkSteps(actor, state = null) {
+  return getRushSteps(actor, getArt(actor.type, "footwork"), state);
 }
 
 export function validateRushPath(state, actor, path, art = getArt(actor.type, "footwork")) {

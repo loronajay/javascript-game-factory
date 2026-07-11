@@ -2242,26 +2242,47 @@ test("Battle for the Bridge replaces Thornhollow with a full-HP 9x9 Ronin duel",
   assert.equal(node.point.x < 57.9, true, "the Thornhollow node nudges left onto its painted map node");
 });
 
-test("Battle for the Bridge mission weather changes every two squad turns", () => {
+test("Battle for the Bridge mission weather changes every two turn cycles", () => {
   let state = roninMatchState(["swordsman"]);
   assert.equal(getActiveWeather(state).id, "blizzard");
 
-  state = applyCommand(applyCommand(state, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman")).nextState;
-  state = applyCommand(state, finishActivation(1, "p1-0-swordsman")).nextState;
+  // A turn cycle is one full round in which both players act; the ronin duel swaps
+  // weather every two cycles, so a single cycle must NOT change it.
+  const finishP1 = (s) => {
+    s = applyCommand(applyCommand(s, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman")).nextState;
+    return applyCommand(s, finishActivation(1, "p1-0-swordsman"));
+  };
+  const finishP2 = (s) => {
+    s = applyCommand(applyCommand(s, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin")).nextState;
+    return applyCommand(s, finishActivation(2, "p2-0-ronin"));
+  };
+
+  // Cycle 1 (turns 1-2) holds the opening weather.
+  state = finishP1(state).nextState;
   assert.equal(state.turnNumber, 2);
   assert.equal(getActiveWeather(state).id, "blizzard");
-
-  state = applyCommand(applyCommand(state, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin")).nextState;
-  const roninFinish = applyCommand(state, finishActivation(2, "p2-0-ronin"));
-  state = roninFinish.nextState;
+  state = finishP2(state).nextState;
   assert.equal(state.turnNumber, 3);
-  assert.equal(getActiveWeather(state).id, "heatwave");
-  assert.ok(roninFinish.events.some((event) => event.type === "MISSION_WEATHER_CHANGED" && event.weather === "heatwave"));
+  assert.equal(getActiveWeather(state).id, "blizzard", "one full cycle must not swap the weather yet");
 
-  state = applyCommand(applyCommand(state, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman")).nextState;
-  state = applyCommand(state, finishActivation(1, "p1-0-swordsman")).nextState;
-  state = applyCommand(applyCommand(state, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin")).nextState;
-  state = applyCommand(state, finishActivation(2, "p2-0-ronin")).nextState;
+  // Cycle 2 (turns 3-4): its opening turn still holds, and the rollover into cycle 3
+  // is where two full cycles have elapsed and the weather finally advances.
+  state = finishP1(state).nextState;
+  assert.equal(state.turnNumber, 4);
+  assert.equal(getActiveWeather(state).id, "blizzard");
+  const intoCycle3 = finishP2(state);
+  state = intoCycle3.nextState;
+  assert.equal(state.turnNumber, 5);
+  assert.equal(getActiveWeather(state).id, "heatwave");
+  assert.ok(intoCycle3.events.some((event) => event.type === "MISSION_WEATHER_CHANGED" && event.weather === "heatwave"));
+
+  // Cycles 3-4 hold heatwave; the rollover into cycle 5 advances to the next weather.
+  state = finishP1(state).nextState; // turn 6
+  state = finishP2(state).nextState; // turn 7
+  assert.equal(getActiveWeather(state).id, "heatwave");
+  state = finishP1(state).nextState; // turn 8
+  state = finishP2(state).nextState; // turn 9 — cycle 5 opens
+  assert.equal(state.turnNumber, 9);
   assert.equal(getActiveWeather(state).id, "spring");
 });
 

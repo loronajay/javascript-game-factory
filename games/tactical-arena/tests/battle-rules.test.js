@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { getAvailableArts, getEffectiveStats, UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { getFootworkSteps } from "../src/rules/arts.js";
 import { resolveDamage } from "../src/rules/damage.js";
-import { createBattleState } from "../src/core/state.js";
+import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import {
   attack,
@@ -197,6 +197,27 @@ test("Footwork uses all current movement plus three, including RAGE and future m
   assert.equal(getFootworkSteps({ type: "swordsman", hp: 26 }), 6);
   assert.equal(getFootworkSteps({ type: "swordsman", hp: 5 }), 9);
   assert.equal(getFootworkSteps({ type: "swordsman", hp: 26, statModifiers: { moveRange: 2 } }), 8);
+});
+
+test("Footwork step count includes active weather movement-art bonuses", () => {
+  const state = createBattleState({
+    weather: "blizzard",
+    units: [
+      {
+        id: "p1-swordsman",
+        player: 1,
+        type: "swordsman",
+        x: 0,
+        y: 0,
+        statuses: [{ type: "slow", duration: 1, statModifiers: { moveRange: -1 } }]
+      },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 7, y: 7 }
+    ]
+  });
+  const sword = findUnit(state, "p1-swordsman");
+
+  assert.equal(getFootworkSteps(sword), 5, "without state, only the unit's current MOVE is visible");
+  assert.equal(getFootworkSteps(sword, state), 6, "Blizzard's persistent +1 movement-art reach offsets its slow");
 });
 
 test("physical damage uses strength minus defense, with defend halving the result", () => {

@@ -186,7 +186,13 @@ function applyWeatherCycleTick(state, events) {
   const sequence = Array.isArray(rule?.sequence) ? rule.sequence.filter((id) => typeof id === "string" && id) : [];
   if (!sequence.length) return;
   const interval = Math.max(1, Math.floor(Number(rule.intervalTurns) || 1));
-  const index = Math.floor((Math.max(1, Number(state.turnNumber) || 1) - 1) / interval) % sequence.length;
+  // A weather "cycle" is one full round in which every player takes a turn — NOT a
+  // single turn rollover. turnNumber counts rollovers, so fold it down by the number
+  // of players before applying the interval, otherwise a 2-player duel would swap
+  // weather twice as often as intended.
+  const playerCount = Math.max(1, state.turnOrder?.length || 2);
+  const cyclesElapsed = Math.floor((Math.max(1, Number(state.turnNumber) || 1) - 1) / playerCount);
+  const index = Math.floor(cyclesElapsed / interval) % sequence.length;
   const weather = sequence[index];
   if (state.weather?.id === weather && (state.weather?.sourceId ?? null) === (rule.sourceId ?? null)) return;
   state.weather = { id: weather, sourceId: rule.sourceId ?? null };

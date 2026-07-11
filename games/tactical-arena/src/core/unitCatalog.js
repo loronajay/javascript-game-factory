@@ -382,7 +382,7 @@ export function getWeatherMovementArtRangeBonus(state, art = null) {
   if (!art) return 0;
   const shape = art.targeting?.shape;
   const intent = art.ai?.intent;
-  const movementArt = shape === "rushPath" || shape === "flight" || art.id === "flee" ||
+  const movementArt = shape === "rushPath" || shape === "flightMove" || shape === "flee" || art.id === "flee" ||
     intent === "rush" || intent === "reposition" || intent === "flightStrike";
   return movementArt ? Math.max(0, Number(activeWeatherPersistent(state)?.movementArtRangeBonus) || 0) : 0;
 }

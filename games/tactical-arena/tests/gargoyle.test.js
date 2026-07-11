@@ -206,6 +206,18 @@ test("Flight: fly range is Move + 1, and a tile beyond it is illegal", () => {
   assert.equal(rejected.accepted, false);
 });
 
+test("Blizzard extends Flight by one movement-art tile", () => {
+  const state = scenario([{ id: "g", type: "gargoyle", player: 1, x: 5, y: 5 }], { weather: "blizzard" });
+  const art = getArt("gargoyle", "flight");
+  const g = findUnit(state, "g");
+  const tiles = getFlightTiles(state, g, art);
+  assert.ok(tiles.has(positionKey({ x: 5, y: 9 })), "Move 2 + Flight 1 + Blizzard 1 reaches distance 4");
+
+  const s = run(state, beginActivation(1, "g")).nextState;
+  const result = run(s, useArt(1, "g", "flight", { targetPosition: { x: 5, y: 9 } }));
+  assert.deepEqual(findUnit(result.nextState, "g").position, { x: 5, y: 9 });
+});
+
 test("Flight: reposition then a 2 true blast to enemies within 1 of the landing", () => {
   const state = scenario([
     { id: "g", type: "gargoyle", player: 1, x: 5, y: 5 },

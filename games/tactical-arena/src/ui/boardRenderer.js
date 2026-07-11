@@ -43,6 +43,143 @@ function scalePoint(center, point, factor) {
   };
 }
 
+function weatherStyle(tokens) {
+  return Object.entries(tokens)
+    .map(([name, value]) => `${name}:${value}`)
+    .join(";");
+}
+
+function addSnowField(g, metrics, bounds) {
+  const field = svgElement("g", { class: "weather-field weather-field--snow" });
+  for (let i = 0; i < 56; i += 1) {
+    const depth = i % 4;
+    const x = bounds.w.x + bounds.width * (((i * 37) % 101) / 100);
+    const y = bounds.n.y + bounds.height * (0.05 + (((i * 53) % 91) / 100));
+    const radius = Math.max(1.1, metrics.tileWidth * (0.012 + depth * 0.004));
+    field.append(svgElement("circle", {
+      class: `weather-flake weather-flake--d${depth}`,
+      cx: x.toFixed(2),
+      cy: y.toFixed(2),
+      r: radius.toFixed(2),
+      style: weatherStyle({
+        "--wx": `${(((i * 17) % 15) - 7).toFixed(0)}px`,
+        "--wy": `${(10 + depth * 7).toFixed(0)}px`,
+        "--delay": `${(-((i * 13) % 31) / 10).toFixed(1)}s`,
+        "--dur": `${(4.8 + depth * 1.15 + ((i * 7) % 9) / 10).toFixed(1)}s`
+      })
+    }));
+  }
+  g.append(field);
+}
+
+function addRainField(g, metrics, bounds, { storm = false } = {}) {
+  const count = storm ? 34 : 42;
+  const field = svgElement("g", { class: `weather-field ${storm ? "weather-field--storm" : "weather-field--rain"}` });
+  for (let i = 0; i < count; i += 1) {
+    const depth = i % 3;
+    const x = bounds.w.x + bounds.width * (((i * 29 + (storm ? 7 : 0)) % 103) / 102);
+    const y = bounds.n.y + bounds.height * (((i * 47 + 11) % 88) / 100);
+    const dropHeight = Math.max(16, metrics.tileHeight * (0.55 + depth * 0.1));
+    const dropWidth = Math.max(2, metrics.tileWidth * (storm ? 0.034 : 0.026));
+    const wrap = svgElement("g", {
+      class: `weather-drop-wrap weather-drop-wrap--d${depth}`,
+      transform: `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${storm ? -13 : -8})`
+    });
+    const cycle = svgElement("g", {
+      class: "weather-drop-cycle",
+      style: weatherStyle({
+        "--fall": `${Math.max(38, metrics.tileHeight * (1.7 + depth * 0.4)).toFixed(0)}px`,
+        "--delay": `${(-((i * 11) % 24) / 10).toFixed(1)}s`,
+        "--dur": `${(storm ? 0.55 : 0.8) + depth * 0.11}s`
+      })
+    });
+    cycle.append(
+      svgElement("rect", {
+        class: "weather-drop",
+        x: (-dropWidth / 2).toFixed(2),
+        y: (-dropHeight).toFixed(2),
+        width: dropWidth.toFixed(2),
+        height: dropHeight.toFixed(2),
+        rx: (dropWidth / 2).toFixed(2)
+      }),
+      svgElement("ellipse", {
+        class: "weather-splat",
+        cx: "0",
+        cy: "0",
+        rx: Math.max(2.4, metrics.tileWidth * (storm ? 0.038 : 0.03)).toFixed(2),
+        ry: Math.max(1, metrics.tileHeight * 0.028).toFixed(2)
+      })
+    );
+    wrap.append(cycle);
+    field.append(wrap);
+  }
+  g.append(field);
+}
+
+function addSpringBlooms(g, metrics, bounds) {
+  const blooms = svgElement("g", { class: "weather-blooms" });
+  for (let i = 0; i < 12; i += 1) {
+    const x = bounds.w.x + bounds.width * (((i * 31 + 9) % 99) / 100);
+    const y = bounds.n.y + bounds.height * (0.54 + (((i * 23) % 30) / 100));
+    blooms.append(svgElement("circle", {
+      class: "weather-bloom",
+      cx: x.toFixed(2),
+      cy: y.toFixed(2),
+      r: Math.max(3, metrics.tileWidth * (0.024 + (i % 3) * 0.007)).toFixed(2),
+      style: weatherStyle({
+        "--delay": `${(-((i * 5) % 18) / 10).toFixed(1)}s`
+      })
+    }));
+  }
+  g.append(blooms);
+}
+
+function addHeatField(g, metrics, bounds) {
+  const field = svgElement("g", { class: "weather-field weather-field--heat" });
+  for (let i = 0; i < 9; i += 1) {
+    const x = bounds.w.x + bounds.width * (0.16 + (i % 3) * 0.34);
+    const y = bounds.n.y + bounds.height * (0.24 + Math.floor(i / 3) * 0.22);
+    field.append(svgElement("ellipse", {
+      class: `weather-heat-cell weather-heat-cell--d${i % 3}`,
+      cx: x.toFixed(2),
+      cy: y.toFixed(2),
+      rx: Math.max(16, metrics.tileWidth * (0.34 + (i % 2) * 0.06)).toFixed(2),
+      ry: Math.max(7, metrics.tileHeight * (0.18 + (i % 3) * 0.03)).toFixed(2),
+      style: weatherStyle({
+        "--delay": `${(-((i * 7) % 15) / 10).toFixed(1)}s`
+      })
+    }));
+  }
+  g.append(field);
+}
+
+function addStormCells(g, metrics, bounds) {
+  const cells = svgElement("g", { class: "weather-storm-cells" });
+  for (let i = 0; i < 5; i += 1) {
+    cells.append(svgElement("ellipse", {
+      class: "weather-storm-cell",
+      cx: (bounds.w.x + bounds.width * (0.18 + i * 0.16)).toFixed(2),
+      cy: (bounds.n.y + bounds.height * (0.18 + ((i * 3) % 4) * 0.08)).toFixed(2),
+      rx: Math.max(18, metrics.tileWidth * 0.38).toFixed(2),
+      ry: Math.max(8, metrics.tileHeight * 0.18).toFixed(2),
+      style: weatherStyle({ "--delay": `${(-i * 0.35).toFixed(2)}s` })
+    }));
+  }
+  g.append(cells);
+  g.append(svgElement("polygon", {
+    class: "weather-bolt",
+    points: pointsToString([
+      [bounds.center.x - metrics.tileWidth * 0.28, bounds.n.y + bounds.height * 0.22],
+      [bounds.center.x + metrics.tileWidth * 0.1, bounds.n.y + bounds.height * 0.22],
+      [bounds.center.x - metrics.tileWidth * 0.05, bounds.n.y + bounds.height * 0.4],
+      [bounds.center.x + metrics.tileWidth * 0.26, bounds.n.y + bounds.height * 0.4],
+      [bounds.center.x - metrics.tileWidth * 0.22, bounds.n.y + bounds.height * 0.72],
+      [bounds.center.x - metrics.tileWidth * 0.02, bounds.n.y + bounds.height * 0.49],
+      [bounds.center.x - metrics.tileWidth * 0.3, bounds.n.y + bounds.height * 0.49]
+    ])
+  }));
+}
+
 function createWeatherOverlay(metrics, size, weather) {
   if (!Object.hasOwn(WEATHER_LABELS, weather)) return null;
   const diamond = getBoardDiamond(metrics, size);
@@ -65,91 +202,27 @@ function createWeatherOverlay(metrics, size, weather) {
     points: pointsToString([[n.x, n.y], [e.x, e.y], [s.x, s.y], [w.x, w.y]])
   }));
 
+  const clipId = `weather-clip-${weather}-${size}`;
+  const defs = svgElement("defs");
+  const clip = svgElement("clipPath", { id: clipId });
+  clip.append(svgElement("polygon", {
+    points: pointsToString([[n.x, n.y], [e.x, e.y], [s.x, s.y], [w.x, w.y]])
+  }));
+  defs.append(clip);
+  const fields = svgElement("g", { class: "weather-fields", "clip-path": `url(#${clipId})` });
+  g.append(defs, fields);
+
+  const bounds = { n, e, s, w, center, width, height };
   if (weather === "blizzard") {
-    for (let i = 0; i < 18; i += 1) {
-      const t = (i + 0.5) / 18;
-      const x = w.x + width * t;
-      const y = n.y + height * (0.18 + ((i * 7) % 11) / 17);
-      g.append(svgElement("line", {
-        class: "weather-streak weather-streak--snow",
-        x1: x - metrics.tileWidth * 0.32,
-        y1: y - metrics.tileHeight * 0.42,
-        x2: x + metrics.tileWidth * 0.18,
-        y2: y + metrics.tileHeight * 0.08
-      }));
-    }
-    for (let i = 0; i < 16; i += 1) {
-      const t = (i + 0.35) / 16;
-      g.append(svgElement("circle", {
-        class: "weather-speck weather-speck--snow",
-        cx: w.x + width * t,
-        cy: n.y + height * (0.25 + ((i * 5) % 9) / 16),
-        r: Math.max(1.6, metrics.tileWidth * (i % 3 === 0 ? 0.032 : 0.022))
-      }));
-    }
+    addSnowField(fields, metrics, bounds);
   } else if (weather === "spring") {
-    for (let i = 0; i < 14; i += 1) {
-      const t = (i + 0.5) / 14;
-      const x = w.x + width * t;
-      const y = n.y + height * (0.2 + ((i * 4) % 9) / 16);
-      g.append(svgElement("line", {
-        class: "weather-streak weather-streak--rain",
-        x1: x - metrics.tileWidth * 0.12,
-        y1: y - metrics.tileHeight * 0.54,
-        x2: x - metrics.tileWidth * 0.02,
-        y2: y
-      }));
-    }
-    for (let i = 0; i < 9; i += 1) {
-      const t = (i + 0.55) / 9;
-      g.append(svgElement("circle", {
-        class: "weather-bloom",
-        cx: w.x + width * t,
-        cy: n.y + height * (0.55 + ((i * 2) % 5) / 12),
-        r: Math.max(4, metrics.tileWidth * 0.06)
-      }));
-    }
+    addRainField(fields, metrics, bounds);
+    addSpringBlooms(fields, metrics, bounds);
   } else if (weather === "heatwave") {
-    for (let i = 0; i < 7; i += 1) {
-      const y = n.y + height * (0.25 + i * 0.085);
-      g.append(svgElement("path", {
-        class: "weather-heat-ripple",
-        d: `M ${w.x + width * 0.17} ${y} C ${w.x + width * 0.34} ${y - metrics.tileHeight * 0.4}, ${w.x + width * 0.52} ${y + metrics.tileHeight * 0.4}, ${w.x + width * 0.7} ${y} S ${w.x + width * 0.9} ${y + metrics.tileHeight * 0.16}, ${w.x + width * 0.98} ${y}`
-      }));
-    }
-    for (let i = 0; i < 12; i += 1) {
-      const t = (i + 0.4) / 12;
-      g.append(svgElement("circle", {
-        class: "weather-ember",
-        cx: w.x + width * t,
-        cy: n.y + height * (0.35 + ((i * 5) % 8) / 14),
-        r: Math.max(2.3, metrics.tileWidth * 0.028)
-      }));
-    }
+    addHeatField(fields, metrics, bounds);
   } else if (weather === "thunderstorm") {
-    for (let i = 0; i < 12; i += 1) {
-      const t = (i + 0.5) / 12;
-      const x = w.x + width * t;
-      const y = n.y + height * (0.2 + ((i * 3) % 8) / 15);
-      g.append(svgElement("line", {
-        class: "weather-streak weather-streak--storm",
-        x1: x - metrics.tileWidth * 0.18,
-        y1: y - metrics.tileHeight * 0.44,
-        x2: x - metrics.tileWidth * 0.04,
-        y2: y + metrics.tileHeight * 0.18
-      }));
-    }
-    g.append(svgElement("polyline", {
-      class: "weather-lightning",
-      points: pointsToString([
-        [center.x - metrics.tileWidth * 1.2, n.y + height * 0.18],
-        [center.x - metrics.tileWidth * 0.3, n.y + height * 0.38],
-        [center.x - metrics.tileWidth * 0.7, n.y + height * 0.38],
-        [center.x + metrics.tileWidth * 0.55, n.y + height * 0.7],
-        [center.x + metrics.tileWidth * 0.15, n.y + height * 0.49],
-        [center.x + metrics.tileWidth * 1.05, n.y + height * 0.49]
-      ])
-    }));
+    addStormCells(fields, metrics, bounds);
+    addRainField(fields, metrics, bounds, { storm: true });
   }
 
   return g;

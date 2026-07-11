@@ -1,5 +1,5 @@
 import { getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
-import { canUseArt, getFootworkSteps } from "../rules/arts.js";
+import { canUseArt } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
 import { colorOf } from "../core/state.js";

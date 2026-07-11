@@ -3363,7 +3363,7 @@ async function handleTile(position) {
     if (!options.has(positionKey(position))) { setMessage("Choose the next highlighted Footwork tile.", true); }
     else {
       footworkPath.push(position);
-      const steps = getFootworkSteps(unit);
+      const steps = getFootworkSteps(unit, state);
       if (footworkPath.length === steps) {
         if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "footwork", [...footworkPath])))
           setMessage("Footwork complete. This unit's activation is complete.");
@@ -3681,7 +3681,7 @@ async function handleActionClick(action, unit) {
       setMessage(`Trample: choose step 1 of up to ${getEffectiveStats(unit, state).moveRange} — walking into an enemy tramples it for true damage.`);
     } else if (action === "footwork") {
       const footwork = getUnitType(unit.type).arts.find((a) => a.id === "footwork");
-      setMessage(`Footwork (${footwork.mpCost} MP): ${footwork.description} Choose step 1 of ${getFootworkSteps(unit)}.`);
+      setMessage(`Footwork (${footwork.mpCost} MP): ${footwork.description} Choose step 1 of ${getFootworkSteps(unit, state)}.`);
     } else if (action.startsWith("art:")) {
       const artId = action.slice(4);
       const art = getAvailableArts(unit).find((a) => a.id === artId);

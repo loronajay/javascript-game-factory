@@ -838,7 +838,9 @@ test("Mother Nature weather renders a persistent non-clicking board overlay", ()
     assert.equal(overlay.getAttribute("aria-label"), "Blizzard board weather");
     assert.equal(overlay.listeners.has("click"), false, "overlay should not own board clicks");
     assert.ok(overlay.findByClass("weather-overlay-wash"), "overlay should tint the board");
-    assert.ok(overlay.findByClass("weather-streak--snow"), "blizzard overlay should include snow streaks");
+    assert.ok(overlay.findByClass("weather-field--snow"), "blizzard overlay should include a layered snow field");
+    assert.ok(overlay.findAllByClass("weather-flake").length >= 36, "blizzard should draw a dense field of drifting flakes");
+    assert.equal(overlay.findByClass("weather-streak--snow"), null, "blizzard should not use blunt line streaks");
     assert.equal(boardLayer.children.at(-1), overlay, "weather should paint above tiles but below units");
   } finally {
     globalThis.document = previousDocument;
@@ -876,7 +878,8 @@ test("authored board weather renders without a Mother Nature unit", () => {
     const overlay = boardLayer.findByClass("weather-overlay");
     assert.equal(getActiveBoardWeather(state), "thunderstorm");
     assert.equal(board.getAttribute("data-weather"), "thunderstorm");
-    assert.ok(overlay.findByClass("weather-lightning"));
+    assert.ok(overlay.findByClass("weather-field--storm"));
+    assert.ok(overlay.findByClass("weather-bolt"));
   } finally {
     globalThis.document = previousDocument;
   }
@@ -888,9 +891,9 @@ test("the board weather overlay follows each Mother Nature weather and clears wh
 
   try {
     for (const [weather, expectedDetail] of [
-      ["spring", "weather-bloom"],
-      ["heatwave", "weather-heat-ripple"],
-      ["thunderstorm", "weather-lightning"]
+      ["spring", "weather-field--rain"],
+      ["heatwave", "weather-field--heat"],
+      ["thunderstorm", "weather-field--storm"]
     ]) {
       const state = createBattleState({
         size: 8,

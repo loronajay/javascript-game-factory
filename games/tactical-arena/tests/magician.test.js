@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { UNIT_TYPES, getEffectiveStats, isRaging } from "../src/core/unitCatalog.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
-import { createBattleState } from "../src/core/state.js";
+import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, finishActivation, useArt } from "../src/core/commands.js";
 import { getLegalFleeTiles } from "../src/rules/arts.js";
@@ -321,6 +321,18 @@ test("getLegalFleeTiles returns empty tiles within moveRange+2 (chebyshev 4)", (
   assert.ok(tiles.has("4,0")); // 4 tiles right, on 10x10 board
   assert.ok(!tiles.has("0,0")); // current position excluded
   assert.ok(!tiles.has("3,0")); // p2-sword is there — occupied
+});
+
+test("Blizzard extends Flee by one movement-art tile", () => {
+  const state = makeState();
+  state.weather = { id: "blizzard", sourceId: null };
+  const mag = findUnit(state, "p1-mag");
+  const tiles = getLegalFleeTiles(state, mag);
+
+  assert.ok(tiles.has("0,5"), "Move 2 + Flee 2 + Blizzard 1 reaches distance 5");
+  const s1 = activate(state, "p1-mag");
+  const result = applyCommand(s1, useArt(1, "p1-mag", "flee", { targetPosition: { x: 0, y: 5 } }));
+  assert.ok(result.accepted);
 });
 
 test("Flee teleports unit to target empty tile and spends unit", () => {
