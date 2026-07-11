@@ -1893,6 +1893,13 @@ const COMMAND_FLOAT = Object.freeze({
   "higher-ground": { stat: "attackRange", suffix: "RANGE", color: "#f2d472" }
 });
 
+const WEATHER_FLOAT = Object.freeze({
+  blizzard: { label: "-1 MOVE", color: "#70b7ff" },
+  "spring-shower": { label: "SPRING", color: "#8cf0a4" },
+  heatwave: { label: "+1 STR", color: "#ff9a4c" },
+  thunderstorm: { label: "+1 MAGIC", color: "#b08cff" }
+});
+
 async function resolveInstantArt(command) {
   const prevPlayer = state.currentPlayer;
   const { prepared, result } = resolveCommand(command);
@@ -2405,6 +2412,101 @@ async function resolveInstantArt(command) {
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
+  } else if (resolved?.weather && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    const beaconTargets = (resolved.beaconTargetIds ?? resolved.targetIds ?? resolved.statusTargets ?? [])
+      .map((id) => findUnit(state, id))
+      .filter(Boolean);
+    await effects.playAbilityVfx(resolved.artId, {
+      actor: actorBefore,
+      targets: beaconTargets
+    });
+
+    const floats = [];
+    for (const [id, amount] of Object.entries(resolved.healingByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), `+${amount}`, "#8cf0a4"));
+    }
+    for (const [id, amount] of Object.entries(resolved.restoredByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), `+${amount} MP`, "#7fd0ff"));
+    }
+    const weatherFloat = WEATHER_FLOAT[resolved.artId];
+    const statusLabel = resolved.buffLabel ?? weatherFloat?.label;
+    if (statusLabel) {
+      for (const id of resolved.statusTargets ?? []) {
+        const unit = findUnit(state, id);
+        if (unit) floats.push(effects.floatText(unitCenter(metrics, unit), statusLabel, weatherFloat?.color ?? "#f7e9c0"));
+      }
+    }
+    if (!floats.length && weatherFloat) {
+      floats.push(effects.floatText(unitCenter(metrics, actorBefore), weatherFloat.label, weatherFloat.color));
+    }
+    await Promise.all(floats);
+  } else if (resolved?.artId === "landscaper" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("landscaper", {
+      actor: actorBefore,
+      targets: targetBefore ? [targetBefore] : [],
+      targetPosition: resolved.from
+    });
+    if (targetBefore && resolved.pushed) {
+      await effects.animateMovement(targetBefore.id, resolved.from, resolved.to);
+      const wallCenter = unitCenter(metrics, { position: resolved.from });
+      effects.impact(wallCenter, false, "physical");
+      effects.deathBurst(wallCenter, "#8f7a52");
+      await effects.floatText(wallCenter, "WALL", "#c8b06a");
+    } else if (targetBefore) {
+      const dmg = resolved.damageByTarget?.[targetBefore.id] ?? resolved.damage?.damage ?? 0;
+      const center = unitCenter(metrics, targetBefore);
+      if (dmg > 0) {
+        effects.impact(center, false, "physical");
+        effects.shake(7);
+        await effects.hitRecoil(targetBefore.id, targetBefore.position, false);
+        await effects.floatText(center, `-${dmg}`, "#ff7684");
+      }
+      const after = findUnit(result.nextState, targetBefore.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(targetBefore.id, targetBefore.position, teamColor(targetBefore.player));
+    }
+  } else if (resolved?.artId === "great-flood" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("great-flood", { actor: actorBefore, targets: targetsBefore });
+    effects.shake(12);
+
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "magic");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText({ ...center, y: center.y - 8 }, `-${dmg}`, "#6fb7f2");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+
+    const restoreFloats = [];
+    for (const [id, amount] of Object.entries(resolved.healingByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      if (unit) restoreFloats.push(effects.floatText({ ...unitCenter(metrics, unit), y: unitCenter(metrics, unit).y + 10 }, `+${amount}`, "#8cf0a4"));
+    }
+    for (const [id, amount] of Object.entries(resolved.restoredByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(state, id);
+      if (unit) restoreFloats.push(effects.floatText({ ...unitCenter(metrics, unit), y: unitCenter(metrics, unit).y + 10 }, `+${amount} MP`, "#7fd0ff"));
+    }
+    await Promise.all(restoreFloats);
+
+    await Promise.all(Object.entries(resolved.afterPositions ?? {}).map(([id, to]) => {
+      const from = resolved.beforePositions?.[id];
+      const unit = findUnit(state, id);
+      if (!unit || !from || positionKey(from) === positionKey(to)) return Promise.resolve();
+      return effects.animateMovement(id, from, to);
+    }));
   } else if (resolved?.damageByTarget && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx(resolved.artId, {
@@ -2829,6 +2931,9 @@ function playEventSounds(events) {
           artId === "ore-harvest" || artId === "ore-abundance" || artId === "headlamp" || artId === "blasting-cap" ||
           artId === "dark-pulse" || artId === "realm-traversal" ||
           artId === "quake" || artId === "thunderous-charge" ||
+          artId === "blizzard" || artId === "spring-shower" || artId === "heatwave" ||
+          artId === "landscaper" || artId === "thunderstorm" || artId === "great-flood" ||
+          artId === "patient-blade" || artId === "broken-oath" || artId === "challenge" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
@@ -2866,9 +2971,13 @@ function playRolloverFx(events) {
   // "full harvest" presentation as a manually-cast Ore Abundance instead of a silent stat jump.
   const oreRageFills = events.filter((e) =>
     e.type === "RAGE_REGENERATE" && (e.mpRestored ?? 0) > 0 && findUnit(state, e.unitId)?.type === "miner");
+  // Ronin's Wanderer crit self-heal and Final Draw attack recoil ride whatever attack fired them.
+  const duelHeals = events.filter((e) => e.type === "DUELIST_HEAL");
+  const recoils = events.filter((e) => e.type === "ATTACK_RECOIL");
+  const critMpRestores = events.filter((e) => e.type === "CRIT_MP_RESTORE");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
       !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length &&
-      !oreRageFills.length) return;
+      !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -2912,6 +3021,30 @@ function playRolloverFx(events) {
     effects.impact(center, false, "true");
     effects.floatText(center, `-${bite.damage}`, "#e8f4ff");
     if (!offender || offender.hp <= 0) { effects.deathBurst(center, teamColor(offender?.player ?? 1)); killed = true; }
+  }
+
+  // Wanderer crit self-heal: a green tick over Ronin.
+  for (const heal of duelHeals) {
+    const unit = findUnit(state, heal.unitId);
+    if (!unit || !(heal.hpRestored > 0)) continue;
+    effects.floatText(unitCenter(metrics, unit), `+${heal.hpRestored}`, "#8cf0a4");
+  }
+  // Final Draw recoil: Ronin takes his own damage — a red tick, and a death burst if it fells him.
+  for (const recoil of recoils) {
+    const unit = findUnit(state, recoil.unitId);
+    const center = unitCenter(metrics, unit ?? { position: { x: 0, y: 0 } });
+    effects.floatText(center, `-${recoil.damage}`, "#ff7684");
+    if (!unit || unit.hp <= 0) { effects.deathBurst(center, teamColor(unit?.player ?? 1)); killed = true; }
+  }
+
+  // Weather Commander: Mother Nature's basic-attack crit restores MP, or HP if a global
+  // polarity effect has flipped the restoration channel.
+  for (const restore of critMpRestores) {
+    const unit = findUnit(state, restore.unitId);
+    if (!unit) continue;
+    const center = unitCenter(metrics, unit);
+    if (restore.mpGained > 0) effects.floatText(center, `+${restore.mpGained} MP`, "#7fd0ff");
+    else if (restore.hpRestored > 0) effects.floatText(center, `+${restore.hpRestored}`, "#8cf0a4");
   }
 
   if (bites.length) audio.play("attackHit");

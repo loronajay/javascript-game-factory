@@ -1,9 +1,9 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
-import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
-import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, getAttackRecoil, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
@@ -97,6 +97,11 @@ function beginActivation(state, command) {
     const hasted = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { moveRange: unit.rainCharged } });
     if (hasted.applied) unit.statuses = hasted.statuses;
     unit.rainCharged = 0;
+  }
+  if (unit.weatherMoveCharged) {
+    const hasted = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { moveRange: unit.weatherMoveCharged } });
+    if (hasted.applied) unit.statuses = hasted.statuses;
+    unit.weatherMoveCharged = 0;
   }
   next.activation = {
     unitId: unit.id,
@@ -268,6 +273,8 @@ function attack(state, command) {
   // buffed, hit OR miss ("still roll for misses").
   if (actor.guaranteedCritCharged) actor.guaranteedCritCharged = false;
   if (swing.missed) {
+    // Wanderer (Ronin): a foe that whiffs on Ronin is marked for +1 damage on his next turn.
+    if (duelistTracksMisses(nextTarget)) addDuelMark(nextTarget, actor.id);
     const desperationEvents = consumeOneShotRage(actor);
     return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll, ...(resourceCost > 0 ? { mpCost: resourceCost } : {}) }, ...triggerEvents, ...desperationEvents]);
   }
@@ -276,6 +283,7 @@ function attack(state, command) {
   const damageByTarget = {};
   let totalDamageDealt = 0;
   let primaryDamage = null;
+  let primaryDamageDealt = 0;
   // On-hit status riders. A raging kit that poisons EVERY landed hit (Virus's Infectious
   // Affinity) applies unconditionally; otherwise a crit rider (Angel's Blessed Arrow blind,
   // Virus's Spread crit-poison) applies only on a critical. Immunity is enforced by
@@ -284,6 +292,7 @@ function attack(state, command) {
   const rageAttackStatus = getRageAttackStatus(actor);
   const poisonRefund = getPoisonMpRefund(actor);
   const critFire = getCritCreatesFire(actor);
+  const weatherCritFire = getWeatherCritCreatesFire(next);
   const blinded = []; // targets that received an on-hit status (event key kept for back-compat)
   const fireTiles = [];
   const rockHardEvents = []; // Rock Hard (Clod): MP refunded per physical strike while defending
@@ -312,9 +321,10 @@ function attack(state, command) {
         if (onHit.status === "poison") poisonedByAttack += 1;
       }
     }
-    if (swing.critical && critFire) {
+    if (swing.critical && (critFire || weatherCritFire)) {
       const position = { ...targetUnit.position };
-      next.tileObjects[positionKey(position)] = { kind: critFire.kind ?? "fire", permanent: Boolean(critFire.permanent) };
+      const fire = critFire ?? weatherCritFire;
+      next.tileObjects[positionKey(position)] = { kind: fire.kind ?? "fire", permanent: Boolean(fire.permanent) };
       fireTiles.push(position);
     }
     const critPull = swing.critical ? getCritPullEffect(actor) : null;
@@ -332,9 +342,30 @@ function attack(state, command) {
         if (applied.applied) targetUnit.statuses = applied.statuses;
       }
     }
-    if (targetUnit.id === nextTarget.id) primaryDamage = damage;
+    if (targetUnit.id === nextTarget.id) { primaryDamage = damage; primaryDamageDealt = damageDealt; }
   }
   const damage = primaryDamage ?? strike(nextTarget);
+  // Wanderer (Ronin): a critical basic strike heals Ronin for half the damage dealt to the
+  // target (honoring a board-wide healing lockout). RAGE Final Draw: the attack then recoils
+  // its full damage back onto Ronin (this can kill him — resolveVictory below settles it).
+  const duelistEvents = [];
+  const critLifesteal = getDuelistCritLifesteal(actor);
+  if (swing.critical && critLifesteal > 0 && primaryDamageDealt > 0) {
+    const restored = restoreHp(next, actor, actor, Math.round(primaryDamageDealt * critLifesteal));
+    if (restored.hpRestored > 0) duelistEvents.push({ type: "DUELIST_HEAL", unitId: actor.id, hpRestored: restored.hpRestored });
+  }
+  const critMpRestore = getBasicAttackCritMpRestore(actor);
+  if (swing.critical && critMpRestore > 0) {
+    const restored = restoreMp(next, actor, actor, critMpRestore);
+    if (restored.mpRestored > 0 || restored.hpRestored > 0) {
+      duelistEvents.push({ type: "CRIT_MP_RESTORE", unitId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
+    }
+  }
+  if (getAttackRecoil(actor) && totalDamageDealt > 0) {
+    const recoil = Math.min(actor.hp, totalDamageDealt);
+    actor.hp = Math.max(0, actor.hp - totalDamageDealt);
+    duelistEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
+  }
   // A magic strike (Blessed Arrow) never feeds a physical-damage heal aura (Hand of Life).
   const healingEvents = basicDamageType === "physical" ? resolvePhysicalDamageHealing(next, actor, totalDamageDealt) : [];
   // Stone Body (Gargoyle): a landed MELEE strike on a DEFENDING Gargoyle returns TRUE
@@ -357,6 +388,12 @@ function attack(state, command) {
   const freeConeEvents = applyBasicAttackFreeCone(next, actor, nextTarget);
   const desperationEvents = consumeOneShotRage(actor);
   resolveVictory(next);
+  // If the attacker died resolving its own strike (Ronin's Final Draw recoil, or Stone Body
+  // thorns), close out its now-dangling activation so the turn isn't soft-locked on a dead
+  // unit — the player could otherwise neither continue with it nor open another unit.
+  if (next.phase === "playing" && actor.hp <= 0 && next.activation?.unitId === actor.id) {
+    spendAndAdvance(next, actor);
+  }
   const { type: _dmgType, ...damageFields } = damage;
   return accept(next, [{
     type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id,
@@ -366,7 +403,12 @@ function attack(state, command) {
     ...(fireTiles.length ? { fireTiles } : {}),
     ...(Object.keys(pulled).length ? { pulled } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...darkTreadEvents, ...splashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...darkTreadEvents, ...splashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents, ...duelistEvents]);
+}
+
+function getBasicAttackCritMpRestore(unit) {
+  const effect = getUnitType(unit.type).passive?.effect;
+  return effect?.type === "weatherCommander" ? Math.max(0, Number(effect.critMpRestore) || 0) : 0;
 }
 
 function applyCritSplashDamage(state, actor, originalTarget, splash) {

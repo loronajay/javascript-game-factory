@@ -1,4 +1,4 @@
-import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
+import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
@@ -177,8 +177,17 @@ export function finalizeMagicDamage({ attacker, target, state = null, rawDamage,
   if (immune) return 0;
   const reduced = Math.max(0, rawDamage - getTeamDamageReduction(target, state, "magic"));
   return reduced > 0
-    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getTileVulnerability(target, state)
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker)
     : reduced;
+}
+
+function getWeatherMagicDamageBonus(attacker) {
+  let bonus = 0;
+  for (const status of attacker?.statuses ?? []) {
+    if (status.type !== "weather-magic") continue;
+    bonus += Math.max(0, Number(status.magicDamageBonus) || 0);
+  }
+  return bonus;
 }
 
 export function ignoresCriticalDamage(unit) {
@@ -286,6 +295,79 @@ function getAdjacentDamageBonus(attacker, target) {
   if (!effect?.adjacentDamageBonus) return 0;
   const distance = Math.max(Math.abs(attacker.position.x - target.position.x), Math.abs(attacker.position.y - target.position.y));
   return distance <= 1 ? Math.max(0, Number(effect.adjacentDamageBonus) || 0) : 0;
+}
+
+// True when a unit has no LIVING ally within `radius` Chebyshev tiles (itself excluded).
+// The isolation test behind Ronin's Wanderer bonuses.
+function isIsolated(unit, state, radius) {
+  if (!state?.units) return true;
+  return !state.units.some((other) =>
+    other.id !== unit.id && other.hp > 0 && areAllies(other, unit) &&
+    Math.max(Math.abs(other.position.x - unit.position.x), Math.abs(other.position.y - unit.position.y)) <= radius);
+}
+
+// Wanderer (Ronin): a data-driven `duelist` passive that stacks physical bonus damage from
+// three duelling conditions — the attacker fighting alone, the target fighting alone, and a
+// target that whiffed on the attacker last turn (tracked in `attacker.duelMarks`). Folded
+// into resolvePhysicalStrike so the on-board forecast stays honest. Returns 0 for any unit
+// without the passive. Needs state (ally proximity); returns 0 when state is unavailable.
+export function getDuelistDamageBonus(attacker, target, state) {
+  if (!state) return 0;
+  const effect = getUnitType(attacker.type).passive?.effect;
+  if (effect?.type !== "duelist") return 0;
+  const radius = Math.max(0, Number(effect.isolationRadius) || 0);
+  let bonus = 0;
+  if (isIsolated(attacker, state, radius)) bonus += Math.max(0, Number(effect.isolatedAttackerBonus) || 0);
+  if (isIsolated(target, state, radius)) bonus += Math.max(0, Number(effect.isolatedTargetBonus) || 0);
+  if ((attacker.duelMarks ?? []).includes(target.id)) bonus += Math.max(0, Number(effect.missedMeBonus) || 0);
+  return bonus;
+}
+
+// The fraction of the damage dealt that a `duelist` attacker heals when its BASIC attack
+// crits (Ronin's Wanderer: half). 0 for any unit without the passive.
+export function getDuelistCritLifesteal(attacker) {
+  const effect = getUnitType(attacker.type).passive?.effect;
+  return effect?.type === "duelist" ? Math.max(0, Number(effect.critLifestealFraction) || 0) : 0;
+}
+
+// True when a unit records the id of any enemy that MISSES a roll against it (Ronin's
+// Wanderer missed-me rider). The reducer's miss branches call addDuelMark on such a unit.
+export function duelistTracksMisses(unit) {
+  const effect = getUnitType(unit.type).passive?.effect;
+  return effect?.type === "duelist" && Math.max(0, Number(effect.missedMeBonus) || 0) > 0;
+}
+
+// Add an offender to a duelist's mark list, kept sorted + unique so the online state hash is
+// order-independent across clients. Mutates the unit in place (a cloned-state unit).
+export function addDuelMark(unit, offenderId) {
+  const marks = new Set(unit.duelMarks ?? []);
+  marks.add(offenderId);
+  unit.duelMarks = [...marks].sort();
+}
+
+// Challenge (Ronin): a mutual grudge. A `challenged` status names its challenger (`from`)
+// and a `bonus`; the challenger deals +bonus to the marked unit. Both directions of the
+// duel carry the SAME status shape (Ronin marks the enemy, and marks himself naming the
+// enemy), so this one symmetric read covers "Ronin hits foe" and "foe hits Ronin". Folded
+// into resolvePhysicalStrike, so the forecast stays honest. 0 without a matching mark.
+export function getChallengeDamageBonus(attacker, target) {
+  if (!attacker || !target) return 0;
+  let bonus = 0;
+  for (const status of target.statuses ?? []) {
+    if (status.type === "challenged" && status.from === attacker.id) {
+      bonus += Math.max(0, Number(status.bonus) || 0);
+    }
+  }
+  return bonus;
+}
+
+// Final Draw (Ronin RAGE): the raging attacker takes damage equal to the damage its attack
+// deals. Read off the rage source flag so no strike path hard-codes the unit; the reducer
+// applies the recoil at the basic-attack and attack-ART sites. 0 for any non-raging unit.
+export function getAttackRecoil(unit) {
+  if (!isRaging(unit)) return false;
+  const definition = getUnitType(unit.type);
+  return Boolean(definition.ragePassive?.effect?.attackRecoil || definition.rageArt?.effect?.attackRecoil);
 }
 
 // A hard floor a passive places under a landed physical hit (the Sniper's Rifle
@@ -416,8 +498,9 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   }
   const actorStats = getEffectiveStats(attacker, state);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
-  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical: critical && !ignoresCriticalDamage(target) && !ignoresOwnCriticalDamage(attacker) });
-  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, damageAffinity });
+  const effectiveCritical = critical && !ignoresCriticalDamage(target) && !ignoresOwnCriticalDamage(attacker);
+  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical: effectiveCritical });
+  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage + (effectiveCritical ? getWeatherCritDamageBonus(state) : 0), damageAffinity });
   return { ...result, critical, proximityBonus: 0, damage };
 }
 
@@ -429,7 +512,7 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
 // resolvePhysicalStrike/resolveBaseStrike.
 export function resolveFixedMagicStrike(attacker, target, amount, { critical = false, state = null, art = null } = {}) {
   const effectiveCritical = critical && !ignoresCriticalDamage(target);
-  const base = effectiveCritical ? Math.ceil(Math.max(0, amount) * CRIT_MULTIPLIER) : Math.max(0, amount);
+  const base = effectiveCritical ? Math.ceil(Math.max(0, amount) * CRIT_MULTIPLIER) + getWeatherCritDamageBonus(state) : Math.max(0, amount);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: { strength: base }, defender: targetStats, type: "magic" });
   const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, art });
@@ -444,7 +527,8 @@ export function resolveFixedPhysicalStrike(attacker, target, amount, { critical 
     type: "physical",
     critical: effectiveCritical
   });
-  const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+  let damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+  if (effectiveCritical && damage > 0) damage += getWeatherCritDamageBonus(state);
   return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
 }
 
@@ -482,7 +566,12 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   // Fire Stance adds flat crit damage — only on a landed crit, so the normal-hit
   // forecast (critical:false) never shows it.
   const stanceCritBonus = effectiveCritical ? getStanceCritBonus(attacker) : 0;
-  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + tileAffinityBonus + tileVulnerability + stanceCritBonus;
+  const weatherCritBonus = effectiveCritical ? getWeatherCritDamageBonus(state) : 0;
+  // Ronin: Wanderer duelling bonuses (isolation + missed-me) and Challenge grudge bonus.
+  // Both fold in here so the forecast reads the same number the reducer delivers.
+  const duelistBonus = getDuelistDamageBonus(attacker, target, state);
+  const challengeBonus = getChallengeDamageBonus(attacker, target);
+  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + tileAffinityBonus + tileVulnerability + stanceCritBonus + weatherCritBonus + duelistBonus + challengeBonus;
   if (damage >= 1 || result.damage >= 1) {
     const passiveMinimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
     if (Number.isFinite(passiveMinimum)) damage = Math.max(passiveMinimum, damage);

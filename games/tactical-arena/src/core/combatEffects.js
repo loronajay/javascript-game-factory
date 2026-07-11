@@ -1,4 +1,4 @@
-import { getCommandHealBonus, getEffectiveStats, getUnitType, isDefending } from "./unitCatalog.js";
+import { getCommandHealBonus, getEffectiveStats, getUnitType, getWeatherRestoreBonus, isDefending } from "./unitCatalog.js";
 import { getTileAffinity, livingTeamUnits } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getRockHardMpRefund, isHealingDisabled } from "../rules/combat.js";
@@ -112,11 +112,12 @@ export function isRestorePolarityShifted(state) {
 }
 
 export function restoreHp(state, actor, target, amount, { bypassPolarity = false, bypassHealingLockout = false } = {}) {
-  const value = Math.max(0, Number(amount) || 0);
-  if (value <= 0 || !target) return { hpRestored: 0, mpRestored: 0 };
+  const base = Math.max(0, Number(amount) || 0);
+  if (base <= 0 || !target) return { hpRestored: 0, mpRestored: 0 };
   if (isRestorePolarityShifted(state) && !bypassPolarity) {
-    return restoreMp(state, actor, target, value, { bypassPolarity: true });
+    return restoreMp(state, actor, target, base, { bypassPolarity: true });
   }
+  const value = base + getWeatherRestoreBonus(state);
   if (!bypassHealingLockout && isHealingDisabled(state, target)) return { hpRestored: 0, mpRestored: 0 };
   const before = target.hp;
   target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + value);
@@ -124,11 +125,12 @@ export function restoreHp(state, actor, target, amount, { bypassPolarity = false
 }
 
 export function restoreMp(state, actor, target, amount, { bypassPolarity = false } = {}) {
-  const value = Math.max(0, Number(amount) || 0);
-  if (value <= 0 || !target) return { hpRestored: 0, mpRestored: 0 };
+  const base = Math.max(0, Number(amount) || 0);
+  if (base <= 0 || !target) return { hpRestored: 0, mpRestored: 0 };
   if (isRestorePolarityShifted(state) && !bypassPolarity) {
-    return restoreHp(state, actor, target, value, { bypassPolarity: true });
+    return restoreHp(state, actor, target, base, { bypassPolarity: true });
   }
+  const value = base + getWeatherRestoreBonus(state);
   const before = target.mp;
   target.mp = Math.min(getEffectiveStats(target, state).maxMp, target.mp + value);
   return { hpRestored: 0, mpRestored: target.mp - before };

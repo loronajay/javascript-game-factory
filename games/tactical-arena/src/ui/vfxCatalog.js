@@ -838,6 +838,95 @@ const ABILITY_VFX = Object.freeze({
     arcHeight: 18,
     projectile: Object.freeze({ shape: "orb", size: 0.75, colors: Object.freeze({ core: "#ffb45e", trail: "#7a2c10" }) }),
     colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffd9a0" })
+  }),
+  // Mother Nature - each weather is a global ritual with a distinct battlefield read.
+  blizzard: Object.freeze({
+    type: "ritual",
+    soundKey: "slowApplied",
+    durationMs: 860,
+    particleCount: 18,
+    windup: Object.freeze({ style: "gather", durationMs: 360, particleCount: 9 }),
+    colors: Object.freeze({ core: "#8ed6e8", trail: "#2b5f80", impact: "#e6f8ff" })
+  }),
+  "spring-shower": Object.freeze({
+    type: "ritual",
+    soundKey: "pray",
+    durationMs: 820,
+    particleCount: 18,
+    windup: Object.freeze({ style: "gather", durationMs: 340, particleCount: 8 }),
+    colors: Object.freeze({ core: "#8cf0a4", trail: "#2e7a4a", impact: "#e8ffe6" })
+  }),
+  heatwave: Object.freeze({
+    type: "ritual",
+    soundKey: "rageActivated",
+    durationMs: 860,
+    particleCount: 20,
+    shake: 5,
+    windup: Object.freeze({ style: "gather", durationMs: 380, particleCount: 10 }),
+    colors: Object.freeze({ core: "#ff9a4c", trail: "#7a2c10", impact: "#ffe0b8" })
+  }),
+  thunderstorm: Object.freeze({
+    type: "ritual",
+    soundKey: "spark",
+    durationMs: 900,
+    particleCount: 20,
+    shake: 6,
+    windup: Object.freeze({ style: "gather", durationMs: 400, particleCount: 10 }),
+    colors: Object.freeze({ core: "#b08cff", trail: "#2c286f", impact: "#f0e6ff" })
+  }),
+  // Landscaper raises terrain or punishes blocked movement with a physical hit.
+  landscaper: Object.freeze({
+    type: "projectileFan",
+    soundKey: "buildCover",
+    projectileCount: 1,
+    spread: 0,
+    arcHeight: 34,
+    staggerMs: 0,
+    durationMs: 420,
+    impactRadius: 24,
+    windup: Object.freeze({ style: "gather", durationMs: 260, particleCount: 7 }),
+    projectile: Object.freeze({ shape: "rock", arcHeight: 34, durationMs: 420, size: 0.9, colors: Object.freeze({ core: "#c8b06a", trail: "#4f6b38" }) }),
+    colors: Object.freeze({ core: "#c8b06a", trail: "#4f6b38", impact: "#e6d8a8" })
+  }),
+  "great-flood": Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    blast: true,
+    blastTiles: 4,
+    shake: 12,
+    particleCount: 30,
+    radius: 58,
+    durationMs: 780,
+    boardFlash: true,
+    windup: Object.freeze({ style: "gather", durationMs: 540, particleCount: 14 }),
+    colors: Object.freeze({ core: "#6fb7f2", trail: "#1f4a72", impact: "#e6f4ff" })
+  }),
+  // Ronin - Flashing Steel: a brighter blinding cut (Moonstrike's motif, higher blind).
+  "flashing-steel": Object.freeze({
+    type: "statusStrike",
+    soundKey: "blindApplied",
+    status: "blind",
+    motif: "moon",
+    particleCount: 11,
+    colors: Object.freeze({ core: "#e8eef7", trail: "#5a6270", impact: "#ffffff" })
+  }),
+  // Ronin — Shuriken: a fast thrown blade (a spinning tracer) for the range-3 true hit.
+  shuriken: Object.freeze({
+    type: "statusStrike",
+    soundKey: "attackHit",
+    motif: "impact",
+    particleCount: 8,
+    projectile: Object.freeze({ shape: "tracer", arcHeight: 8, durationMs: 240, size: 0.9, colors: Object.freeze({ core: "#d7dde6", trail: "#3a4048" }) }),
+    colors: Object.freeze({ core: "#d7dde6", trail: "#3a4048", impact: "#ffffff" })
+  }),
+  // Ronin — Challenge: a taunting grudge mark (no damage), a snare-style flourish on the foe.
+  challenge: Object.freeze({
+    type: "statusStrike",
+    soundKey: "recharge",
+    status: "challenged",
+    motif: "snare",
+    particleCount: 10,
+    colors: Object.freeze({ core: "#e0645e", trail: "#5a1e1e", impact: "#ffd0cc" })
   })
 });
 

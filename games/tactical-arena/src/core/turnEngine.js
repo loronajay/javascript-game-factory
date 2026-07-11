@@ -16,8 +16,12 @@ export function spendAndAdvance(state, unit) {
     finishTempoActivation(state, unit);
     return;
   }
+  if (getUnitType(unit.type).actsFirst) unit.commandTurn = state.turnNumber;
   unit.statuses = tickStatuses(unit.statuses);
   unit.spent = true;
+  // Wanderer (Ronin): duel marks are "enemies that missed me last turn" — clear them once
+  // Ronin has had his turn, so a whiff only ever grants the +1 for a single following turn.
+  if (unit.duelMarks?.length) unit.duelMarks = [];
 
   const spellUsed = state.activation?.spellUsed ?? false;
   const realmTraversalActive = state.activation?.unitId === unit.id && state.activation?.realmTraversalActive;
@@ -50,6 +54,7 @@ function autoSpendStunnedUnits(state, player) {
     if (!takesTurns(member) || member.spent || !isStunned(member)) continue;
 
     member.defending = false;
+    if (getUnitType(member.type).actsFirst) member.commandTurn = state.turnNumber;
     member.statuses = tickStatuses(member.statuses);
     member.spent = true;
     events.push({ type: "UNIT_STUNNED", unitId: member.id });

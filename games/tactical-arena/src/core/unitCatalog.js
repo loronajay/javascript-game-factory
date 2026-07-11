@@ -26,6 +26,8 @@ import { MINER } from "./units/miner.js";
 import { BIG_BROTHER } from "./units/big-brother.js";
 import { LITTLE_BROTHER } from "./units/little-brother.js";
 import { BLACKSWORD } from "./units/blacksword.js";
+import { RONIN } from "./units/ronin.js";
+import { MOTHER_NATURE } from "./units/mother-nature.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -54,7 +56,9 @@ export const UNIT_TYPES = Object.freeze({
   miner: MINER,
   "big-brother": BIG_BROTHER,
   "little-brother": LITTLE_BROTHER,
-  blacksword: BLACKSWORD
+  blacksword: BLACKSWORD,
+  ronin: RONIN,
+  "mother-nature": MOTHER_NATURE
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -345,6 +349,48 @@ function getTeamMpCostReduction(unit, state) {
     minCost = Math.max(minCost, Number(effect.minMpCost) || 0);
   }
   return { reduction, minCost };
+}
+
+export function getActiveWeather(state) {
+  for (const unit of state?.units ?? []) {
+    const weatherId = unit.weather ?? null;
+    const weather = weatherId ? getUnitType(unit.type).weathers?.[weatherId] : null;
+    if (weather) return { id: weatherId, sourceId: unit.id, ...weather };
+  }
+  return null;
+}
+
+function activeWeatherPersistent(state) {
+  return getActiveWeather(state)?.persistent ?? null;
+}
+
+export function getWeatherRestoreBonus(state) {
+  return Math.max(0, Number(activeWeatherPersistent(state)?.restoreBonus) || 0);
+}
+
+export function getWeatherMovementArtRangeBonus(state, art = null) {
+  if (!art) return 0;
+  const shape = art.targeting?.shape;
+  const intent = art.ai?.intent;
+  const movementArt = shape === "rushPath" || shape === "flight" || art.id === "flee" ||
+    intent === "rush" || intent === "reposition" || intent === "flightStrike";
+  return movementArt ? Math.max(0, Number(activeWeatherPersistent(state)?.movementArtRangeBonus) || 0) : 0;
+}
+
+export function getWeatherCritDamageBonus(state) {
+  return Math.max(0, Number(activeWeatherPersistent(state)?.critDamageBonus) || 0);
+}
+
+export function getWeatherCritCreatesFire(state) {
+  return activeWeatherPersistent(state)?.critCreatesFire ?? null;
+}
+
+function getWeatherArtMpCostReduction(state) {
+  const persistent = activeWeatherPersistent(state);
+  return {
+    reduction: Math.max(0, Number(persistent?.artMpCostReduction) || 0),
+    minCost: Math.max(0, Number(persistent?.minArtMpCost) || 0)
+  };
 }
 
 // The Chebyshev radius an enemy-debuff aura currently reaches from `source`. An
@@ -680,8 +726,9 @@ export function getArtMpCost(unit, art, state = null) {
   const base = art.mpCost ?? 0;
   if (base <= 0) return base;
   const support = getTeamMpCostReduction(unit, state);
-  if (support.reduction <= 0) return base;
-  return Math.max(support.minCost, base - support.reduction);
+  const weather = getWeatherArtMpCostReduction(state);
+  const reduced = base - support.reduction - weather.reduction;
+  return Math.max(Math.max(support.minCost, weather.minCost), reduced);
 }
 
 export function getBasicAttackResourceCost(attacker, target) {

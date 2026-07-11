@@ -160,6 +160,24 @@ test("the King's four commands declare distinct color-keyed ritual recipes", () 
   assert.equal(new Set(cores).size, cores.length);
 });
 
+test("Mother Nature arts declare weather, terrain, and flood VFX recipes", () => {
+  for (const id of ["blizzard", "spring-shower", "heatwave", "thunderstorm"]) {
+    const vfx = getAbilityVfx(id);
+    assert.equal(vfx?.type, "ritual", `${id} should use the global weather ritual VFX`);
+    assert.equal(vfx.windup?.style, "gather", `${id} should gather before release`);
+    assert.ok(vfx.colors?.core && vfx.colors?.impact, `${id} needs full colors`);
+    assert.ok(vfx.soundKey, `${id} needs a sound`);
+  }
+
+  assert.equal(getAbilityVfx("landscaper")?.type, "projectileFan");
+  assert.equal(getAbilityVfx("landscaper")?.projectile?.shape, "rock");
+
+  const flood = getAbilityVfx("great-flood");
+  assert.equal(flood?.type, "magicBurst");
+  assert.equal(flood.blast, true);
+  assert.equal(flood.boardFlash, true);
+});
+
 test("impacts are styled per damage type with a physical fallback", () => {
   const kinds = ["physical", "magic", "fire", "true"].map((kind) => getImpactVfx(kind));
   for (const style of kinds) {

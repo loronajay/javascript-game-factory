@@ -28,6 +28,12 @@ export function createUnit(spec) {
     // pending Rain-Stance on-attack haste, converted to a buff at the next activation.
     stance: spec.stance ?? null,
     rainCharged: spec.rainCharged ?? false,
+    // Mother Nature weather state: `weather` is the single active global weather
+    // source, `lastWeather` gates repeat casts, and `weatherMoveCharged` becomes a
+    // +MOVE buff at her next activation.
+    weather: spec.weather ?? null,
+    lastWeather: spec.lastWeather ?? null,
+    weatherMoveCharged: spec.weatherMoveCharged ?? 0,
     // King commander state: the currently/last issued command, the one before it (for
     // Strike's Pursue bonus), and the turnNumber it was issued on (a command only buffs
     // during that same turn). Meaningless for every non-commander unit (stays null/0).
@@ -203,7 +209,13 @@ export function cloneState(state) {
       // Deep-copy the source-linked modifier list (Age) — a shallow `...unit` spread
       // would share the array across clones and leak mutations between states.
       linkedStatMods: (unit.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
-      studiedTargetId: unit.studiedTargetId ?? null
+      studiedTargetId: unit.studiedTargetId ?? null,
+      weather: unit.weather ?? null,
+      lastWeather: unit.lastWeather ?? null,
+      weatherMoveCharged: unit.weatherMoveCharged ?? 0,
+      // Ronin's Wanderer duel marks (ids of enemies that missed him). Deep-copy so a
+      // shallow spread never shares the array across clones.
+      ...(unit.duelMarks ? { duelMarks: [...unit.duelMarks] } : {})
     })),
     activation: state.activation ? {
       ...state.activation,

@@ -688,6 +688,16 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "blacksword",
+    slug: "summer-vibes",
+    file: "summer-vibes-blacksword.png"
+  },
+  {
+    type: "blacksword",
+    slug: "apprentice",
+    file: "apprentice-blacksword.png"
+  },
+  {
+    type: "blacksword",
     slug: "blood-knight",
     file: "blood-knight-blacksword.png"
   },
@@ -710,5 +720,90 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "blacksword",
     slug: "void-dweller",
     file: "void-dweller-blacksword.png"
+  },
+  {
+    type: "ronin",
+    slug: "summer-vibes",
+    file: "summer-vibes-ronin.png"
+  },
+  {
+    type: "ronin",
+    slug: "arcane",
+    file: "arcane-ronin.png"
+  },
+  {
+    type: "ronin",
+    slug: "armored",
+    file: "armored-ronin.png"
+  },
+  {
+    type: "ronin",
+    slug: "blood-moon",
+    file: "blood-moon-ronin.png"
+  },
+  {
+    type: "ronin",
+    slug: "eastern-vampire",
+    file: "eastern-vampire-ronin.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "summer-vibes",
+    file: "summer-vibes-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "autumn-spirit",
+    file: "autumn-spirit-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "autumn-witch",
+    file: "autumn-witch-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "black-widow",
+    file: "black-widow-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "blood-rose",
+    file: "blood-rose-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "bronze-witch",
+    file: "bronze-witch-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "desert-oasis",
+    file: "desert-oasis-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "discord-kitten",
+    file: "discord-kitten-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "discord-kitten-(alternate)",
+    file: "discord-kitten-(alternate)-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "everfrost",
+    file: "everfrost-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "gaia-elemental",
+    file: "gaia-elemental-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
+    slug: "geisha",
+    file: "geisha-mother-nature.png"
   }
 ]);

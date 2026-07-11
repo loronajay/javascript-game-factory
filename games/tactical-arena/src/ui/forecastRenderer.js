@@ -175,15 +175,20 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
     // STR-scaled hit — the same resolver the reducer uses, so the number can't drift.
     const fixedMagic = isStrikeArt && art?.damageType === "magic" && Number.isFinite(art?.damage?.amount);
     const fixedPhysical = isStrikeArt && art?.damage?.type === "physical" && art.damage.fixed && Number.isFinite(art.damage.amount);
+    // A fixed-amount TRUE strike (Ronin's Shuriken) shows its authored amount — true damage
+    // ignores DEF and Defend, so the normal-hit number is exactly `damage.amount`.
+    const fixedTrue = isStrikeArt && art?.damage?.type === "true" && art.damage.fixed && Number.isFinite(art.damage.amount);
     // Fixed-power physical ARTS that scale with STR above a base (Front Kick, Stone Throw)
     // resolve their own power formula, not a plain STR strike.
     const strike = art?.damage?.scaleStat
       ? scaledPowerForecast(actor, target, art, state)
-      : fixedMagic
-        ? resolveFixedMagicStrike(actor, target, art.damage.amount, { state, art })
-        : fixedPhysical
-          ? resolveFixedPhysicalStrike(actor, target, art.damage.amount, { state })
-          : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
+      : fixedTrue
+        ? { damage: Math.max(0, art.damage.amount) }
+        : fixedMagic
+          ? resolveFixedMagicStrike(actor, target, art.damage.amount, { state, art })
+          : fixedPhysical
+            ? resolveFixedPhysicalStrike(actor, target, art.damage.amount, { state })
+            : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
     drawForecastBadge(forecastLayer, metrics, target, damageLabel(strike.damage, target), damageClass(strike.damage, target));
   }
 }

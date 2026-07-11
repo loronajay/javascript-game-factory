@@ -59,6 +59,10 @@ export const PORTRAITS = Object.freeze({
   // Dark duelist; measured alpha bbox off the 600×600 source (the black sword spreads the
   // silhouette wide, balanced around the body centre ≈ 0.51).
   blacksword:  portrait("blacksword",  { x: 0.017, y: 0.037, w: 0.983, h: 0.920 }),
+  // Wandering duelist; measured alpha bbox off the 600×600 source (a lean standing figure,
+  // katana held to one side — the body centre sits near 0.43).
+  ronin:       portrait("ronin",       { x: 0.163, y: 0.013, w: 0.530, h: 0.987 }),
+  "mother-nature": portrait("mother-nature", { x: 0.080, y: 0.030, w: 0.780, h: 0.920 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

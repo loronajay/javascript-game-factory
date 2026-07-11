@@ -1,7 +1,7 @@
-import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
-import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, finalizeMagicDamage, getAttackRecoil, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../rules/movement.js";
@@ -162,7 +162,19 @@ const ART_RESOLVERS = new Map([
   // Big Brother: targeted true/status attack, ally+enemy shove aura, global restore swap.
   ["force-tug", resolveForceTug],
   ["force-push", resolveForcePush],
-  ["polarity-shift", resolvePolarityShift]
+  ["polarity-shift", resolvePolarityShift],
+  // Ronin: a self-buff (defend + next-turn buff), a mutual grudge mark, and a thrown finisher.
+  ["patient-blade", resolveSelfBuff],
+  ["broken-oath", resolveSelfBuff],
+  ["challenge", resolveChallenge],
+  ["shuriken", resolveShuriken],
+  // Mother Nature: global weather activations, terrain push/control, and a board shuffle.
+  ["blizzard", resolveWeather],
+  ["spring-shower", resolveWeather],
+  ["heatwave", resolveWeather],
+  ["thunderstorm", resolveWeather],
+  ["landscaper", resolveLandscaper],
+  ["great-flood", resolveGreatFlood]
 ]);
 
 export function useArt(state, command) {
@@ -357,6 +369,8 @@ function resolveTargetedArt(state, command, art) {
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
   if (swing.missed) {
+    // Wanderer (Ronin): a foe that whiffs an attack ART on Ronin is marked for +1 next turn.
+    if (duelistTracksMisses(target)) addDuelMark(target, actor.id);
     const desperationEvents = consumeOneShotRage(actor);
     spendAndAdvance(next, actor);
     return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost, hit: false, missed: true, roll: swing.hitRoll }, ...desperationEvents]);
@@ -375,6 +389,20 @@ function resolveTargetedArt(state, command, art) {
   const damageDealt = Math.min(target.hp, damage.damage);
   target.hp = Math.max(0, target.hp - damage.damage);
   const magicReaction = damage.type === "magic" ? applyMagicDamageReaction(target, damageDealt) : null;
+  const fireTiles = [];
+  const weatherCritFire = swing.critical ? getWeatherCritCreatesFire(next) : null;
+  if (weatherCritFire) {
+    const position = { ...target.position };
+    next.tileObjects[positionKey(position)] = { kind: weatherCritFire.kind ?? "fire", permanent: Boolean(weatherCritFire.permanent) };
+    fireTiles.push(position);
+  }
+  // Final Draw (Ronin RAGE): an attack ART recoils its damage back onto the raging attacker.
+  const recoilEvents = [];
+  if (getAttackRecoil(actor) && damageDealt > 0) {
+    const recoil = Math.min(actor.hp, damageDealt);
+    actor.hp = Math.max(0, actor.hp - damageDealt);
+    recoilEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
+  }
 
   let effect = null;
   let poisonedEnemy = false;
@@ -432,8 +460,9 @@ function resolveTargetedArt(state, command, art) {
     critical: swing.critical,
     roll: swing.hitRoll,
     damage,
+    ...(fireTiles.length ? { fireTiles } : {}),
     ...(effect ? { effect } : {})
-  }, ...healingEvents, ...growthEvents, ...desperationEvents, ...rockHardEvents, ...(magicReaction ? [magicReaction] : [])]);
+  }, ...healingEvents, ...growthEvents, ...desperationEvents, ...rockHardEvents, ...recoilEvents, ...(magicReaction ? [magicReaction] : [])]);
 }
 
 function clumsyEffect(actor) {
@@ -1251,6 +1280,322 @@ function resolveOreHarvest(state, command, art) {
     oreAfter: actor.mp,
     mpCost: cost
   }]);
+}
+
+function weatherCommanderEffect(unit) {
+  const effect = getUnitType(unit.type).passive?.effect;
+  return effect?.type === "weatherCommander" ? effect : null;
+}
+
+function weatherStatusDuration(target, actor, durationTurns) {
+  const duration = Math.max(1, Number(durationTurns) || 1);
+  return target.id === actor.id ? duration + 1 : duration;
+}
+
+function applyGlobalWeatherStatus(state, actor, art, event) {
+  if (!art.globalStatus) return;
+  const affected = [];
+  for (const target of livingUnits(state)) {
+    const result = applyStatus(target, {
+      type: art.globalStatus.status,
+      duration: weatherStatusDuration(target, actor, art.globalStatus.durationTurns),
+      ...(art.globalStatus.statModifiers ? { statModifiers: { ...art.globalStatus.statModifiers } } : {}),
+      ...(Number.isFinite(art.globalStatus.magicDamageBonus) ? { magicDamageBonus: art.globalStatus.magicDamageBonus } : {}),
+      ignoreResistance: true
+    });
+    if (!result.applied) continue;
+    target.statuses = result.statuses;
+    affected.push(target.id);
+  }
+  event.statusTargets = affected;
+  if (art.globalStatus.statModifiers) event.buffLabel = formatStatModifierLabel(art.globalStatus.statModifiers);
+  else if (Number.isFinite(art.globalStatus.magicDamageBonus) && art.globalStatus.magicDamageBonus) {
+    event.buffLabel = `${art.globalStatus.magicDamageBonus > 0 ? "+" : ""}${art.globalStatus.magicDamageBonus} MAGIC`;
+  }
+}
+
+function applyGlobalWeatherHeal(state, actor, art, event) {
+  if (!art.globalHeal) return;
+  const amount = Math.max(0, Number(art.globalHeal.amount) || 0) + getGlobalHealBonus(state) + getCommandHealBonus(state, actor);
+  const targetIds = [];
+  const healingByTarget = {};
+  for (const target of livingUnits(state)) {
+    const restored = restoreHp(state, actor, target, amount);
+    if (restored.hpRestored <= 0) continue;
+    targetIds.push(target.id);
+    healingByTarget[target.id] = restored.hpRestored;
+  }
+  event.targetIds = targetIds;
+  event.healingByTarget = healingByTarget;
+}
+
+function resolveWeather(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const event = {
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    mpCost: cost,
+    weather: art.weather,
+    beaconTargetIds: livingUnits(next).map((unit) => unit.id)
+  };
+
+  applyGlobalWeatherHeal(next, actor, art, event);
+  applyGlobalWeatherStatus(next, actor, art, event);
+
+  for (const unit of next.units) {
+    if (unit.id !== actor.id) unit.weather = null;
+  }
+  actor.weather = art.weather;
+  actor.lastWeather = art.weather;
+  const move = Math.max(0, Number(weatherCommanderEffect(actor)?.nextWeatherMove) || 0);
+  if (move > 0) actor.weatherMoveCharged = Math.max(actor.weatherMoveCharged ?? 0, move);
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [event]);
+}
+
+function landscaperPushDestination(actor, target) {
+  return {
+    x: target.position.x + Math.sign(target.position.x - actor.position.x),
+    y: target.position.y + Math.sign(target.position.y - actor.position.y)
+  };
+}
+
+function resolveLandscaper(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const from = { ...target.position };
+  const to = landscaperPushDestination(actor, target);
+  const blocked = !isOnBoard(next, to) || isWallAt(next, to) || Boolean(unitAt(next, to)) || resistsDisplacement(target);
+  const damageByTarget = {};
+  let damage = null;
+  let pushed = false;
+  if (blocked) {
+    damage = resolveFixedPhysicalStrike(actor, target, art.damage?.amount ?? 10, { state: next });
+    const dealt = Math.min(target.hp, damage.damage);
+    target.hp = Math.max(0, target.hp - damage.damage);
+    damageByTarget[target.id] = dealt;
+  } else {
+    target.position = { ...to };
+    next.tileObjects[positionKey(from)] = { kind: "wall", hp: art.wall?.hp ?? 1 };
+    pushed = true;
+  }
+
+  const rockHardEvents = blocked ? applyRockHardDefense(next, target, true) : [];
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    from,
+    to: pushed ? { ...to } : { ...from },
+    pushed,
+    blocked,
+    ...(pushed ? { position: { ...from } } : { damage, damageByTarget }),
+    mpCost: cost
+  }, ...rockHardEvents]);
+}
+
+function shufflePositions(state, units) {
+  const original = units.map((unit) => ({ ...unit.position }));
+  const shuffled = original.map((position) => ({ ...position }));
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const draw = drawValue(state.rngState);
+    state.rngState = draw.rngState;
+    const j = Math.floor(draw.value * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  if (shuffled.length > 1 && shuffled.every((position, index) => positionKey(position) === positionKey(original[index]))) {
+    shuffled.push(shuffled.shift());
+  }
+  units.forEach((unit, index) => { unit.position = { ...shuffled[index] }; });
+  return { original, shuffled };
+}
+
+function resolveGreatFlood(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  next.activation.spellUsed = true;
+
+  const targetIds = [];
+  const damageByTarget = {};
+  const reactionEvents = [];
+  for (const target of livingUnits(next)) {
+    const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
+    const result = resolveDamage({ attacker: { strength: art.damage?.amount ?? 7 }, defender: targetStats, type: "magic" });
+    const damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: result.damage, art });
+    const dealt = Math.min(target.hp, damage);
+    target.hp = Math.max(0, target.hp - damage);
+    const reaction = applyMagicDamageReaction(target, dealt);
+    if (reaction) reactionEvents.push(reaction);
+    targetIds.push(target.id);
+    damageByTarget[target.id] = damage;
+  }
+
+  const healed = restoreHp(next, actor, actor, art.restore?.hp ?? 0);
+  const shufflers = livingUnits(next).filter((unit) => unit.id !== actor.id);
+  const beforePositions = {};
+  const afterPositions = {};
+  if (shufflers.length > 1) {
+    const { original, shuffled } = shufflePositions(next, shufflers);
+    shufflers.forEach((unit, index) => {
+      beforePositions[unit.id] = original[index];
+      afterPositions[unit.id] = shuffled[index];
+    });
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetIds,
+    damageByTarget,
+    healingByTarget: healed.hpRestored > 0 ? { [actor.id]: healed.hpRestored } : {},
+    restoredByTarget: healed.mpRestored > 0 ? { [actor.id]: healed.mpRestored } : {},
+    beforePositions,
+    afterPositions,
+    mpCost: cost
+  }, ...reactionEvents]);
+}
+
+// Ronin's Patient Blade / Broken Oath: a self-cast that optionally braces (Defend) and/or
+// applies a timed self status (an `empowered` buff). `duration: 2` on the status carries it
+// through to Ronin's next turn (it survives this activation's end-of-turn tick). Reuses the
+// same status lifecycle as Miner's Ore Harvest haste and the Witch Doctor's Fire Dance.
+function resolveSelfBuff(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const buff = art.selfBuff ?? {};
+  if (buff.defend) actor.defending = true;
+  let buffApplied = false;
+  if (buff.status) {
+    const result = applyStatus(actor, {
+      type: buff.status.type,
+      duration: buff.status.duration,
+      statModifiers: { ...(buff.status.statModifiers ?? {}) },
+      ignoreResistance: true
+    });
+    if (result.applied) { actor.statuses = result.statuses; buffApplied = true; }
+  }
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpCost: cost,
+    defended: Boolean(buff.defend), buffApplied
+  }]);
+}
+
+// Ronin's Challenge: a mutual grudge on an enemy within range. No damage — it marks BOTH
+// Ronin and the target with the same `challenged` status naming the OTHER as `from`, so
+// getChallengeDamageBonus (rules/combat.js) grants +bonus in each direction of the duel.
+// `duration: 2` carries the marks through the coming turn. The call ignores status
+// resistance/immunity (it's a taunt, not a debuff).
+function resolveChallenge(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  const invalid = validateTargetedEnemyCast(state, actorState, targetState, art);
+  if (invalid) return reject(invalid);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const bonus = Math.max(0, Number(art.challenge?.bonus) || 0);
+  const duration = art.challenge?.durationTurns ?? 2;
+  const markTarget = applyStatus(target, { type: "challenged", duration, from: actor.id, bonus, ignoreResistance: true });
+  if (markTarget.applied) target.statuses = markTarget.statuses;
+  const markSelf = applyStatus(actor, { type: "challenged", duration, from: target.id, bonus, ignoreResistance: true });
+  if (markSelf.applied) actor.statuses = markSelf.statuses;
+
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost,
+    effect: { attempted: true, applied: true, status: "challenged" }
+  }]);
+}
+
+// Ronin's Shuriken: a range-3 throw that rolls to-hit for a FIXED amount of TRUE damage
+// (bypasses DEF and Defend). A crit still multiplies. A body doesn't block a thrown blade,
+// but a wall does. Records a duel mark on a whiff against a Ronin target, and recoils under
+// Final Draw like his other attacks.
+function resolveShuriken(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    if (duelistTracksMisses(target)) addDuelMark(target, actor.id);
+    spendAndAdvance(next, actor);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, targetIds: [], damageByTarget: {}, mpCost: cost
+    }]);
+  }
+
+  const base = Math.max(0, Number(art.damage?.amount) || 0);
+  const amount = swing.critical && !ignoresCriticalDamage(target) ? Math.ceil(base * CRIT_MULTIPLIER) : base;
+  const damageDealt = Math.min(target.hp, amount);
+  target.hp = Math.max(0, target.hp - amount);
+
+  const recoilEvents = [];
+  if (getAttackRecoil(actor) && damageDealt > 0) {
+    const recoil = Math.min(actor.hp, damageDealt);
+    actor.hp = Math.max(0, actor.hp - damageDealt);
+    recoilEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+    hit: true, critical: swing.critical, roll: swing.hitRoll, damage: amount,
+    targetIds: [target.id], damageByTarget: { [target.id]: damageDealt }, mpCost: cost
+  }, ...recoilEvents]);
 }
 
 function blastPushDestination(center, target) {

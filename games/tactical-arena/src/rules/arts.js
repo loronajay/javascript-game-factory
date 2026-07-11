@@ -1,5 +1,5 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -9,7 +9,7 @@ export const FLEE_RANGE_BONUS = 2;
 
 export function getRushSteps(actor, art = getArt(actor.type, "footwork"), state = null) {
   const rageBonus = isRaging(actor) ? Math.max(0, Number(art?.rageExtraMove) || 0) : 0;
-  return getEffectiveStats(actor, state).moveRange + (art?.extraMove ?? 0) + rageBonus;
+  return getEffectiveStats(actor, state).moveRange + (art?.extraMove ?? 0) + rageBonus + getWeatherMovementArtRangeBonus(state, art);
 }
 
 export function getRushContactDamage(actor, art) {
@@ -148,7 +148,8 @@ export function getVolleyShotOriginForTarget(state, actor, targetPosition) {
 }
 
 export function getLegalFleeTiles(state, actor) {
-  const range = getEffectiveStats(actor).moveRange + FLEE_RANGE_BONUS;
+  const art = getArt(actor.type, "flee");
+  const range = getEffectiveStats(actor, state).moveRange + FLEE_RANGE_BONUS + getWeatherMovementArtRangeBonus(state, art);
   const legal = new Set();
   for (let dx = -range; dx <= range; dx += 1) {
     for (let dy = -range; dy <= range; dy += 1) {
@@ -343,7 +344,7 @@ export function getDarkPulseRays(state, actor) {
 // folds Heavy's cap + any King MOVE buff via getEffectiveStats, so the reach can't
 // drift from the live stat. Reuses the flee-style empty-tile sweep.
 export function getFlightRange(state, actor, art) {
-  return getEffectiveStats(actor, state).moveRange + (art?.targeting?.moveBonus ?? 1);
+  return getEffectiveStats(actor, state).moveRange + (art?.targeting?.moveBonus ?? 1) + getWeatherMovementArtRangeBonus(state, art);
 }
 export function getFlightTiles(state, actor, art) {
   const range = getFlightRange(state, actor, art);
@@ -540,6 +541,7 @@ export function canUseArt(state, actor, artId) {
     !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= getArtMpCost(actor, art, state) &&
     (!art.rageLocked || isRaging(actor)) &&
+    !(art.weather && actor.lastWeather === art.weather) &&
     (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor)) &&
     // HP-cost ARTS (Blacksword) can never suicide him; an all-HP ultimate opts in via
     // selfKill instead. And a condition-gated burst is only usable with a matching enemy.
