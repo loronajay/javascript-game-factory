@@ -242,6 +242,31 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "count-paladin.png"
   },
   {
+    type: "paladin",
+    slug: "crusader",
+    file: "crusader-paladin.png"
+  },
+  {
+    type: "paladin",
+    slug: "gaia's-protector",
+    file: "gaia's-protector-paladin.png"
+  },
+  {
+    type: "paladin",
+    slug: "galactic-guardian",
+    file: "galactic-guardian-paladin.png"
+  },
+  {
+    type: "paladin",
+    slug: "reef-guardian",
+    file: "reef-guardian-paladin.png"
+  },
+  {
+    type: "paladin",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-paladin.png"
+  },
+  {
     type: "necromancer",
     slug: "summer-vibes",
     file: "summer-vibes-necromancer.png"
@@ -418,8 +443,28 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "angel",
+    slug: "dragonslayer",
+    file: "dragonslayer-angel.png"
+  },
+  {
+    type: "angel",
     slug: "fallen",
     file: "fallen-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "raging-storm",
+    file: "raging-storm-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "sol",
+    file: "sol-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-angel.png"
   },
   {
     type: "monk",
@@ -428,13 +473,38 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "monk",
+    slug: "artist",
+    file: "artist-monk.png"
+  },
+  {
+    type: "monk",
     slug: "blood-moon",
     file: "blood-moon-monk.png"
   },
   {
     type: "monk",
+    slug: "blue-lightning",
+    file: "blue-lightning-monk.png"
+  },
+  {
+    type: "monk",
+    slug: "desert-temple",
+    file: "desert-temple-monk.png"
+  },
+  {
+    type: "monk",
+    slug: "jade-dragon",
+    file: "jade-dragon-monk.png"
+  },
+  {
+    type: "monk",
     slug: "mummy",
     file: "mummy-monk.png"
+  },
+  {
+    type: "monk",
+    slug: "void-dweller",
+    file: "void-dweller-monk.png"
   },
   {
     type: "gargoyle",
@@ -448,8 +518,28 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "gargoyle",
+    slug: "blood-moon",
+    file: "blood-moon-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
     slug: "dragon",
     file: "dragon-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
+    slug: "holy-guardian",
+    file: "holy-guardian-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
+    slug: "runic-flame",
+    file: "runic-flame-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-gargoyle.png"
   },
   {
     type: "nemesis",
@@ -850,6 +940,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "riot-cop",
     slug: "snow-patrol",
     file: "snow-patrol-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "street-patrol",
+    file: "street-patrol-riot-cop.png"
   },
   {
     type: "riot-cop",
