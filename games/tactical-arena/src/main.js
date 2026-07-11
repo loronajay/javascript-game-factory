@@ -37,6 +37,7 @@ import {
 import {
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
+  BROTHERS_MISSION_ID,
   GARGOYLE_MISSION_ID,
   HASBEEN_HEROES_FAT_TYPES,
   HASBEEN_HEROES_MISSION_ID,
@@ -53,6 +54,8 @@ import {
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
   campaignRewardPickedScript,
+  brothersDefeatScript,
+  brothersRageWarningScript,
   clodRageWarningScript,
   completeCampaignMission,
   fatherTimeRageWarningScript,
@@ -74,6 +77,7 @@ import {
   paladinStatusTauntScript,
   prepareCampaignMatchState,
   sniperFireWarningScript,
+  shouldShowBrothersRageWarning,
   shouldShowCampaignMapCutscene,
   shouldShowCampaignPostMatchCutscene,
   shouldShowClodRageWarning,
@@ -258,6 +262,11 @@ function createCampaignMeta() {
     minerEnteredRage: false,
     minerRageHarvested: false,
     minerDefeatDialogueShown: false,
+    // Mechs on the Farm (mission 7.5)
+    flamethrowerBothHitCount: 0,
+    brothersEnteredRage: false,
+    brothersDefeatDialogueShown: false,
+    brothersRageWarned: { "big-brother": false, "little-brother": false },
     // Has-Been Heroes (mission 12)
     fartDisplacementDamageTakenCount: 0,
     hasbeenDefeatDialogueShown: false,
@@ -772,6 +781,18 @@ function announceTurnChange(prevPlayer) {
       } else {
         showResults();
       }
+    } else if (
+      campaignMissionId === BROTHERS_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.brothersDefeatDialogueShown
+    ) {
+      campaignMeta.brothersDefeatDialogueShown = true;
+      const script = brothersDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
     } else {
       showResults();
     }
@@ -1018,6 +1039,26 @@ function recordCampaignProgressHooks(command, result) {
         }
       }
     }
+  } else if (campaignMissionId === BROTHERS_MISSION_ID) {
+    // Latch the "kill before RAGE" star fail the moment either brother sits at RAGE
+    // threshold (<=5 HP) while still alive (mirrors the Gargoyle/Miner rage latch).
+    const bigBrother = findUnit(state, "p2-0-big-brother");
+    const littleBrother = findUnit(state, "p2-1-little-brother");
+    if ((bigBrother?.hp > 0 && bigBrother.hp <= 5) || (littleBrother?.hp > 0 && littleBrother.hp <= 5)) {
+      campaignMeta.brothersEnteredRage = true;
+    }
+    // The "avoid double flame" star: any single Flamethrower cone — the active Little
+    // Brother ART or the raging Flamespitter free cone — that damaged BOTH player units.
+    for (const event of events) {
+      const isFlamethrower =
+        (event.type === "ART_RESOLVED" && event.artId === "flamethrower") ||
+        (event.type === "FLAMESPITTER" && event.artId === "flamethrower");
+      if (!isFlamethrower) continue;
+      if (findUnit(state, event.actorId)?.player !== 2) continue;
+      const playerHits = (event.targetIds ?? []).filter((id) =>
+        findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0);
+      if (playerHits.length >= 2) campaignMeta.flamethrowerBothHitCount += 1;
+    }
   }
   maybeShowCampaignDialogue();
 }
@@ -1255,6 +1296,22 @@ function nextCampaignDialogueBeat() {
         return {
           markShown: () => { campaignMeta.hasbeenFatRageWarned[type] = true; },
           script: (matchState) => hasbeenFatRageWarningScript(matchState, type),
+        };
+      }
+    }
+    return null;
+  }
+  if (campaignMissionId === BROTHERS_MISSION_ID) {
+    // Each brother gets ONE popup the first time it enters RAGE. Firing it also latches the
+    // "kill before RAGE" star fail. Big Brother first, then Little Brother, one per check.
+    for (const type of ["big-brother", "little-brother"]) {
+      if (shouldShowBrothersRageWarning(state, type, { warned: campaignMeta.brothersRageWarned[type] })) {
+        return {
+          markShown: () => {
+            campaignMeta.brothersRageWarned[type] = true;
+            campaignMeta.brothersEnteredRage = true;
+          },
+          script: (matchState) => brothersRageWarningScript(matchState, type),
         };
       }
     }

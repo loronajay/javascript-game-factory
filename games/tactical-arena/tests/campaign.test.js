@@ -8,6 +8,7 @@ import { findUnit } from "../src/core/state.js";
 import { resolveVictory } from "../src/core/turnEngine.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
+  BROTHERS_MISSION_ID,
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   GARGOYLE_MISSION_ID,
@@ -24,6 +25,10 @@ import {
   WANDERING_PARTY_SKIN_PACK,
   WITCH_DOCTOR_MISSION_ID,
   applyLockedSlots,
+  brothersDefeatScript,
+  brothersMissionOpeningScript,
+  brothersRageWarningScript,
+  shouldShowBrothersRageWarning,
   campaignMapCutsceneScript,
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
@@ -112,7 +117,7 @@ test("fresh campaign map surveys the active campaign graph with Clod live and th
 
   assert.equal(map.totalStars, 0);
   // The full journey is always visible so the player gets an overview.
-  assert.equal(map.nodes.length, 19);
+  assert.equal(map.nodes.length, 20);
   assert.equal(map.nodes[0].id, CLOD_MISSION_ID);
   assert.equal(map.nodes[0].status, "available");
   assert.equal(map.nodes[0].displayType, "clod");
@@ -1412,7 +1417,9 @@ test("Gargoyle's Inferno replaces the eighth Ashfall Flats placeholder once enou
     monkBlindAttempted: false,
   });
 
-  const node = getCampaignMap(storage).nodes[7];
+  // Mechs on the Farm now sits between Monk and Gargoyle on the trail, so Gargoyle is
+  // node index 8 (Mechs on the Farm is index 7).
+  const node = getCampaignMap(storage).nodes[8];
   assert.equal(node.id, GARGOYLE_MISSION_ID);
   assert.equal(node.title, "Gargoyle's Inferno");
   assert.equal(node.locationName, "Ashfall Flats");
@@ -1798,9 +1805,9 @@ test("The Wandering Party replaces the Cinderwood placeholder with an authored s
   assert.equal(mission.requiredStars, 18);
   assert.deepEqual(mission.rewardUnits, []);
   assert.equal(mission.rewardSkinPack, WANDERING_PARTY_SKIN_PACK);
-  // The node is still present on the map (a replacement, not an addition).
+  // The node is still present on the map.
   const map = getCampaignMap(storageAdapter());
-  assert.equal(map.nodes.length, 19);
+  assert.equal(map.nodes.length, 20);
   assert.ok(map.nodes.some((node) => node.id === WANDERING_PARTY_MISSION_ID));
 });
 
@@ -2043,9 +2050,9 @@ test("Has-Been Heroes replaces the Elderroot placeholder with a town skin-reward
   assert.equal(mission.rewardSkinPack, HASBEEN_MYSTIC_SKIN_PACK);
   assert.deepEqual(mission.enemySquad, HASBEEN_HEROES_FAT_TYPES);
 
-  // The node replaces (not adds to) the map, and reports the new town biome once revealed.
+  // The node reports the new town biome once revealed.
   const map = getCampaignMap(storageAdapter());
-  assert.equal(map.nodes.length, 19);
+  assert.equal(map.nodes.length, 20);
   const node = map.nodes.find((n) => n.id === HASBEEN_HEROES_MISSION_ID);
   assert.ok(node);
   assert.equal(node.biome, "town");
@@ -2176,4 +2183,117 @@ test("Has-Been Heroes post-match shopping cutscene + Mystic payoff line are wire
   assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), true);
   markCampaignPostMatchCutsceneSeen(storage, HASBEEN_HEROES_MISSION_ID);
   assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), false);
+});
+
+// --- Mechs on the Farm (mission 7.5) -----------------------------------------
+
+function brothersMatchState(squad = ["swordsman", "archer"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(BROTHERS_MISSION_ID, squad)),
+    BROTHERS_MISSION_ID,
+  );
+}
+
+function brothersWonState(base, { survive = true } = {}) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => {
+      if (unit.player === 2) return { ...unit, hp: 0 };
+      if (!survive && unit.id === base.units.find((u) => u.player === 1)?.id) return { ...unit, hp: 0 };
+      return { ...unit, hp: Math.max(1, unit.hp) };
+    }),
+  };
+}
+
+test("Mechs on the Farm is a full-HP 9x9 2v2 vs Big and Little Brother, rewarding both", () => {
+  const mission = getCampaignMission(BROTHERS_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.requiredStars, 13);
+  assert.deepEqual(mission.rewardUnits, ["big-brother", "little-brother"]);
+  assert.equal(mission.playerSlots, 2);
+
+  const config = createCampaignMatchConfig(BROTHERS_MISSION_ID, ["swordsman", "archer"]);
+  assert.equal(config.size, 9);
+  assert.deepEqual(config.squads[1], ["swordsman", "archer"]);
+  assert.deepEqual(config.squads[2], ["big-brother", "little-brother"]);
+  assert.equal(config.teamNames[2], "The Brothers");
+
+  const match = brothersMatchState();
+  const walls = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "wall");
+  const fires = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "fire");
+  assert.equal(walls.length, 0);
+  assert.equal(fires.length, 0);
+  for (const unit of match.units) {
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.type} starts at full HP`);
+  }
+  assert.ok(findUnit(match, "p2-0-big-brother"));
+  assert.ok(findUnit(match, "p2-1-little-brother"));
+});
+
+test("Mechs on the Farm grading: win, no double-flame, kill before rage, plus the survival bonus", () => {
+  const won = brothersWonState(brothersMatchState());
+
+  const perfect = evaluateCampaignMission(BROTHERS_MISSION_ID, won, {
+    flamethrowerBothHitCount: 0,
+    brothersEnteredRage: false,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((o) => o.id), ["complete", "noDoubleFlame", "preRageKill"]);
+  assert.equal(perfect.bonusObjectives[0].id, "survive");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  // A double-flame + a rage means only the win counts, but the survival bonus covers ONE.
+  const messy = evaluateCampaignMission(BROTHERS_MISSION_ID, won, {
+    flamethrowerBothHitCount: 1,
+    brothersEnteredRage: true,
+  });
+  assert.equal(messy.objectives.find((o) => o.id === "noDoubleFlame").earned, false);
+  assert.equal(messy.objectives.find((o) => o.id === "preRageKill").earned, false);
+  assert.equal(messy.stars, 2, "win + survival bonus");
+
+  // Same mess but a unit lost: bonus gone too, only the win remains.
+  const messyDead = evaluateCampaignMission(BROTHERS_MISSION_ID, brothersWonState(brothersMatchState(), { survive: false }), {
+    flamethrowerBothHitCount: 2,
+    brothersEnteredRage: true,
+  });
+  assert.equal(messyDead.stars, 1);
+
+  const lost = { ...won, winner: 2 };
+  assert.equal(evaluateCampaignMission(BROTHERS_MISSION_ID, lost, {}).stars, 0);
+});
+
+test("Mechs on the Farm dialogue: arguing brothers turn on the party, each rages, then make up", () => {
+  const state = brothersMatchState();
+  const opening = brothersMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(BROTHERS_MISSION_ID, state), opening);
+  const big = state.units.find((u) => u.id === "p2-0-big-brother");
+  const little = state.units.find((u) => u.id === "p2-1-little-brother");
+  assert.ok(opening.some((line) => line.speakerId === big.id));
+  assert.ok(opening.some((line) => line.speakerId === little.id));
+  assert.ok(opening.some((line) => /^p1-/.test(line.speakerId ?? "")), "the party tries to mediate");
+  assert.match(opening.map((line) => line.text).join(" "), /stay out of it/i);
+  assert.match(opening.map((line) => line.text).join(" "), /truce/i);
+
+  // Each brother has its own one-time RAGE line, gated per brother.
+  const playing = { ...state, phase: "playing" };
+  for (const type of ["big-brother", "little-brother"]) {
+    const raging = {
+      ...playing,
+      units: playing.units.map((u) => (u.player === 2 && u.type === type ? { ...u, hp: 5 } : u)),
+    };
+    assert.equal(shouldShowBrothersRageWarning(raging, type, { warned: false }), true);
+    assert.equal(shouldShowBrothersRageWarning(raging, type, { warned: true }), false);
+    assert.equal(shouldShowBrothersRageWarning(playing, type, { warned: false }), false);
+    const script = brothersRageWarningScript(raging, type);
+    assert.equal(script.length, 1);
+    assert.equal(script[0].speakerId, raging.units.find((u) => u.player === 2 && u.type === type).id);
+  }
+
+  const defeat = brothersDefeatScript({ ...playing, winner: 1 });
+  assert.ok(defeat.length >= 4);
+  assert.match(defeat.map((line) => line.text).join(" "), /sorry|deal|split/i);
 });

@@ -17,6 +17,7 @@ export const FATHER_TIME_MISSION_ID = "timeless-woods";
 export const VIRUS_MISSION_ID = "virus-root";
 export const PALADIN_MISSION_ID = "wandering-paladin";
 export const MONK_MISSION_ID = "monk-temple-trial";
+export const BROTHERS_MISSION_ID = "mechs-on-the-farm";
 export const GARGOYLE_MISSION_ID = "gargoyle-inferno";
 export const SNIPER_MISSION_ID = "sniper-highground";
 export const WANDERING_PARTY_MISSION_ID = "wandering-party";
@@ -155,6 +156,27 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 9,
     fullHp: true,
   },
+  // Mechs on the Farm (9×9): a standard full-HP 2v2 on the default corner blocks against
+  // the feuding mech brothers, Big Brother and Little Brother. No board puzzle — the fight
+  // IS the lesson (keep your two units apart so one Little Brother Flamethrower cone can't
+  // scorch both; race the brothers' RAGE). A win unlocks BOTH brothers as playable units.
+  // Owns an arguing-brothers opening, per-brother RAGE lines, and a make-up beat before the
+  // results screen (brothersDefeatScript). Sits on the reserved farmland landmark that the
+  // gargoyle mission's map test deliberately left node-less "for a future unit."
+  [BROTHERS_MISSION_ID]: {
+    id: BROTHERS_MISSION_ID,
+    title: "Mechs on the Farm",
+    subtitle: "Two feuding machines are tearing up the fields",
+    description: "A pair of mech brothers are wrecking the old homestead over a squabble. Bring any two units into a standard duel. Keep them apart so a single Flamethrower cone can't scorch both, and finish the brothers before they hit RAGE.",
+    unitType: "big-brother",
+    requiredStars: 13,
+    rewardUnits: Object.freeze(["big-brother", "little-brother"]),
+    rewardLabel: "Big Brother and Little Brother",
+    playerSlots: 2,
+    enemySquad: Object.freeze(["big-brother", "little-brother"]),
+    size: 9,
+    fullHp: true,
+  },
   [GARGOYLE_MISSION_ID]: {
     id: GARGOYLE_MISSION_ID,
     title: "Gargoyle's Inferno",
@@ -259,6 +281,7 @@ export const CAMPAIGN_REGIONS = Object.freeze([
   Object.freeze({ id: "mire", biome: "swamp", label: "Mirefen Swamp" }),
   Object.freeze({ id: "coast", biome: "water", label: "Tidewatch Coast" }),
   Object.freeze({ id: "plateau", biome: "plateau", label: "The High Cliffs" }),
+  Object.freeze({ id: "farm", biome: "farm", label: "Meadowmill" }),
   Object.freeze({ id: "ashfall", biome: "volcanic", label: "Ashfall Caldera" }),
   Object.freeze({ id: "wood", biome: "forest", label: "Whisperwood" }),
   Object.freeze({ id: "town", biome: "town", label: "Highmarket" }),
@@ -283,6 +306,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
   { id: MONK_MISSION_ID, cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Temple Steps",
     blurb: "A silent temple waits above the tide. Four identical Monks guard the steps, but only one carries the true discipline." },
+  { id: BROTHERS_MISSION_ID, cell: { col: 3, row: 1 }, point: { x: 46.2, y: 31.1 }, region: "farm", locationName: "Meadowmill Farm" },
   { id: GARGOYLE_MISSION_ID, cell: { col: 5, row: 3 }, point: { x: 51.9, y: 18.7 }, region: "ashfall", locationName: "Ashfall Flats",
     blurb: "A low ruin mouth exhales heat from beneath the flats. Something stone-winged waits in the old dark." },
   { id: SNIPER_MISSION_ID, cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "plateau", locationName: "The High Cliffs",
@@ -781,6 +805,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Temple Monks"
         : mission.id === GARGOYLE_MISSION_ID
         ? "Ashfall Guardian"
+        : mission.id === BROTHERS_MISSION_ID
+        ? "The Brothers"
         : mission.id === WITCH_DOCTOR_MISSION_ID
         ? "Swamp Coven"
         : mission.id === NECROMANCER_MISSION_ID
@@ -1137,6 +1163,14 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
       ...Object.fromEntries(SNIPER_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])),
     }),
   },
+  // Mechs on the Farm (9×9): a standard full-HP 2v2 on the default corner blocks — no
+  // walls, fire, or trial. The brothers field as themselves in the opposite corner. The
+  // deterministic ids (p2-0-big-brother / p2-1-little-brother) back the dialogue + grading.
+  [BROTHERS_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+  },
   // The Wandering Party (13×13): a plain full-HP 4v4 on the default corner blocks. The
   // only twist is skinFor, which paints the enemy party in its "wandering" skins so the
   // travelers read as the costumed party the cutscenes describe (board sprites + any
@@ -1441,6 +1475,28 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       minerBlastingCapSplashTakenCount,
       minerEnteredRage,
       draftedSniper,
+    };
+  } else if (missionId === BROTHERS_MISSION_ID) {
+    // Win / never let one Flamethrower cone catch both your units / kill both before RAGE.
+    // Bonus: lose no units. flamethrowerBothHitCount counts single casts (the active ART or
+    // the Flamespitter free cone) that damaged two of the player's units at once.
+    const flamethrowerBothHitCount = Math.max(0, Math.floor(Number(meta.flamethrowerBothHitCount) || 0));
+    const brothersEnteredRage = Boolean(meta.brothersEnteredRage);
+    const bigBrother = enemyUnits.find((unit) => unit.type === "big-brother") ?? null;
+    const littleBrother = enemyUnits.find((unit) => unit.type === "little-brother") ?? null;
+    objectives = [
+      complete,
+      { id: "noDoubleFlame", label: "Never let Flamethrower catch both your units at once", earned: victory && flamethrowerBothHitCount === 0 },
+      { id: "preRageKill", label: "Defeat both brothers before either RAGES", earned: victory && !brothersEnteredRage },
+    ];
+    bonusObjectives = [
+      { id: "survive", label: "Bonus: lose no units", earned: allSurvived },
+    ];
+    extra = {
+      bigBrotherDefeated: Boolean(bigBrother && bigBrother.hp <= 0),
+      littleBrotherDefeated: Boolean(littleBrother && littleBrother.hp <= 0),
+      flamethrowerBothHitCount,
+      brothersEnteredRage,
     };
   } else {
     const clodChargeHitCount = Math.max(0, Math.floor(Number(meta.clodChargeHitCount) || 0));
@@ -2007,6 +2063,64 @@ export function monkMissionOpeningScript(state) {
   ];
 }
 
+// --- Mission 7.5: Mechs on the Farm dialogue ----------------------------------
+// The mech brothers are mid-argument when the party arrives. The party's attempt to
+// mediate makes both of them turn on the strangers instead, calling a temporary truce.
+// Each brother gets its own one-time RAGE line; a make-up beat plays after the win,
+// before the results screen (mirrors paladinDefeatScript / minerDefeatScript).
+
+function brotherUnit(state, type) {
+  return (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === type) ?? null;
+}
+
+export function brothersMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const big = brotherUnit(state, "big-brother");
+  const little = brotherUnit(state, "little-brother");
+  return [
+    { speakerId: big?.id, text: "You NEVER hold your lane, Little Brother. I said the west field was MINE. West. Field." },
+    { speakerId: little?.id, text: "Because you hog the whole farm, Big Brother! Your dumb magnet yanks every shot I take off target!" },
+    { speakerId: big?.id, text: "Oh, here we go. It is ALWAYS the magnet with you." },
+    { speakerId: speaker.id, text: "Hey -- hey! Easy, both of you. Maybe just... take turns? Talk it out before you flatten the whole farm?" },
+    { speakerId: little?.id, text: "...Who asked YOU?" },
+    { speakerId: big?.id, text: "Stay out of it. This is a BROTHER thing. You would not get it." },
+    { speakerId: little?.id, text: "Truce, Big Brother. Just till we scrap these nosy strangers." },
+    { speakerId: big?.id, text: "Agreed. Strangers first. Then I win the argument." },
+  ];
+}
+
+export function shouldShowBrothersRageWarning(state, type, { warned = false } = {}) {
+  if (warned || state?.phase !== "playing") return false;
+  const unit = brotherUnit(state, type);
+  return Boolean(unit && unit.hp > 0 && unit.hp <= 5);
+}
+
+const BROTHERS_RAGE_LINES = Object.freeze({
+  "big-brother": "ROGUE MECH ONLINE! No more holding back -- MY magnet, MY field, MY rules!",
+  "little-brother": "Flamespitter's lit! Everybody's getting toasted -- and you three are first!",
+});
+
+export function brothersRageWarningScript(state, type) {
+  const unit = brotherUnit(state, type);
+  const text = BROTHERS_RAGE_LINES[type];
+  if (!unit || !text) return [];
+  return [{ speakerId: unit.id, text }];
+}
+
+export function brothersDefeatScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const big = brotherUnit(state, "big-brother");
+  const little = brotherUnit(state, "little-brother");
+  return [
+    { speakerId: big?.id, speaker: "big-brother", text: "*sparks* ...ow. Okay. Okay, we lost. Little Brother, you still running?" },
+    { speakerId: little?.id, speaker: "little-brother", text: "Barely. ...Big Brother, I'm sorry I yelled about the magnet. You held the west field good. Real good." },
+    { speakerId: big?.id, speaker: "big-brother", text: "...And I hogged the whole farm. Split it down the middle? You take the fields, I take the barn." },
+    { speakerId: little?.id, speaker: "little-brother", text: "Deal. DEAL! ...We really did wreck the place, huh." },
+    ...(speaker ? [{ speakerId: speaker.id, text: "There it is. Come on -- help us mend these fences, and we could use two mechs who actually get along." }] : []),
+  ];
+}
+
 // --- Mission 8: Gargoyle's Inferno dialogue -----------------------------------
 // The map cutscene gets the party into the ruin; the battle script reveals the
 // guardian and the one-shot RAGE warning rides before Volcanic Rage's free Pyroclasm.
@@ -2250,6 +2364,7 @@ export function campaignOpeningScript(missionId, state) {
   if (missionId === MINER_MISSION_ID) return minerMissionOpeningScript(state);
   if (missionId === SNIPER_MISSION_ID) return sniperMissionOpeningScript(state);
   if (missionId === GARGOYLE_MISSION_ID) return gargoyleMissionOpeningScript(state);
+  if (missionId === BROTHERS_MISSION_ID) return brothersMissionOpeningScript(state);
   if (missionId === MONK_MISSION_ID) return monkMissionOpeningScript(state);
   if (missionId === PALADIN_MISSION_ID) return paladinMissionOpeningScript(state);
   if (missionId === VIRUS_MISSION_ID) return virusMissionOpeningScript(state);

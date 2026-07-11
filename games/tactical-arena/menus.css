@@ -322,6 +322,7 @@
 .campaign-terrain.is-swamp { background:radial-gradient(circle at 42% 46%, rgba(98,134,70,.55), transparent 64%), radial-gradient(circle at 62% 62%, rgba(70,94,56,.46), transparent 60%); }
 .campaign-terrain.is-water { background:radial-gradient(circle at 44% 44%, rgba(72,132,184,.5), transparent 64%), radial-gradient(circle at 64% 64%, rgba(54,96,152,.42), transparent 62%); }
 .campaign-terrain.is-plateau { background:radial-gradient(circle at 42% 44%, rgba(198,188,166,.5), transparent 66%), radial-gradient(circle at 64% 62%, rgba(150,140,120,.42), transparent 60%); }
+.campaign-terrain.is-farm { background:radial-gradient(circle at 42% 44%, rgba(206,182,86,.48), transparent 64%), radial-gradient(circle at 64% 62%, rgba(126,158,72,.42), transparent 60%); }
 .campaign-terrain.is-volcanic { background:radial-gradient(circle at 44% 46%, rgba(200,98,58,.55), transparent 62%), radial-gradient(circle at 62% 60%, rgba(150,54,40,.46), transparent 60%); }
 .campaign-terrain.is-forest { background:radial-gradient(circle at 40% 42%, rgba(74,152,94,.52), transparent 62%), radial-gradient(circle at 64% 62%, rgba(50,112,74,.44), transparent 60%); }
 .campaign-terrain.is-snow { background:radial-gradient(circle at 44% 44%, rgba(208,226,240,.56), transparent 64%), radial-gradient(circle at 64% 64%, rgba(152,182,210,.42), transparent 60%); }
