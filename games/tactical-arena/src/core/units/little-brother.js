@@ -1,7 +1,7 @@
 export const LITTLE_BROTHER = Object.freeze({
   id: "little-brother",
   name: "Little Brother",
-  glyph: "LB",
+  glyph: "\u{2699}\u{FE0F}", // ⚙️ gear
   classType: "ranger",
   ai: Object.freeze({ threatValue: 14, role: "ranged", protect: true }),
   tempo: Object.freeze({ agility: 5 }),
@@ -72,7 +72,7 @@ export const LITTLE_BROTHER = Object.freeze({
       mpCost: 5,
       targeting: Object.freeze({ shape: "cone", range: 3 }),
       rageRangeBonus: 2,
-      damage: Object.freeze({ type: "true", amount: 3 }),
+      damage: Object.freeze({ type: "true", amount: 3, affinity: "fire" }),
       description: "Deal 3 true damage to enemies in a range-3 cone. While raging, the cone gains +2 range.",
       implemented: true,
       ai: Object.freeze({ intent: "coneAoe", evHints: Object.freeze({ minTargets: 2 }) })

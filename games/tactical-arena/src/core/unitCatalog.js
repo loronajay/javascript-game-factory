@@ -259,6 +259,19 @@ function friendlyAuraRadius(source) {
   return effect?.type === "allyAura" ? Math.max(0, Number(effect.radius) || 0) : 0;
 }
 
+// The Chebyshev radius of a unit's healing-lockout aura (Big Brother's Magnetic
+// Field), for the board overlay. Scans passive + arts, mirroring how
+// isHealingDisabled (rules/combat.js) finds the same effect. 0 for any unit
+// without one.
+function healingLockoutAuraRadius(source) {
+  const definition = getUnitType(source.type);
+  for (const passive of [definition.passive, ...definition.arts]) {
+    const effect = passive?.effect;
+    if (effect?.type === "healingLockoutAura") return Math.max(0, Number(effect.radius) || 0);
+  }
+  return 0;
+}
+
 function teamMagicSupportSources(unit, state) {
   const sources = [];
   if (!state?.units) return sources;
@@ -377,6 +390,8 @@ export function getUnitAuraRadius(source, state) {
   if (passiveEffect?.type === "damageAura") radius = Math.max(radius, passiveEffect.radius ?? 2);
   // Brick House (Clod): a friendly buff aura also projects a visible zone.
   radius = Math.max(radius, friendlyAuraRadius(source));
+  // Magnetic Field (Big Brother): a healing-lockout aura also projects a visible zone.
+  radius = Math.max(radius, healingLockoutAuraRadius(source));
   return radius;
 }
 

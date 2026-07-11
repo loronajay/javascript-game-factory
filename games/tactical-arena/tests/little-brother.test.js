@@ -154,6 +154,34 @@ test("Flamespitter does not trigger on diagonal basic attacks", () => {
   assert.equal(findUnit(s, "behind").hp, 24);
 });
 
+test("Flamethrower does not damage a fire-immune enemy (Gargoyle's One With The Flames)", () => {
+  const state = scenario([
+    { id: "gargoyle", player: 2, type: "gargoyle", x: 3, y: 1 },
+    { id: "swordsman", player: 2, type: "swordsman", x: 4, y: 1 }
+  ]);
+
+  let s = run(state, beginActivation(1, "lb")).nextState;
+  const result = run(s, useArt(1, "lb", "flamethrower", { targetPosition: { x: 3, y: 1 } }));
+  s = result.nextState;
+
+  assert.equal(findUnit(s, "gargoyle").hp, getUnitType("gargoyle").stats.maxHp, "Gargoyle ignores Flamethrower's fire damage");
+  assert.equal(findUnit(s, "swordsman").hp, getUnitType("swordsman").stats.maxHp - 3, "non-immune enemies in the cone still burn");
+  assert.ok(!result.events[0].targetIds.includes("gargoyle"));
+});
+
+test("Flamespitter's free rage cone also spares fire-immune enemies", () => {
+  const state = scenario([
+    { id: "target", player: 2, type: "swordsman", x: 3, y: 1 },
+    { id: "gargoyle", player: 2, type: "gargoyle", x: 4, y: 1 }
+  ], { hp: 5 });
+
+  let s = run(state, beginActivation(1, "lb")).nextState;
+  const result = run(s, attack(1, "lb", "target", HIT));
+  s = result.nextState;
+
+  assert.equal(findUnit(s, "gargoyle").hp, getUnitType("gargoyle").stats.maxHp, "Gargoyle ignores the free Flamethrower's fire damage");
+});
+
 test("Little Brother active arts register VFX recipes", () => {
   for (const artId of ["cannon-fire", "flamethrower"]) {
     assert.ok(getAbilityVfx(artId), `${artId} has VFX`);

@@ -1,7 +1,7 @@
 export const BIG_BROTHER = Object.freeze({
   id: "big-brother",
   name: "Big Brother",
-  glyph: "B",
+  glyph: "\u{1F9BE}", // 🦾 mechanical arm
   classType: "tank",
   ai: Object.freeze({ threatValue: 15, role: "bruiser", protect: false }),
   tempo: Object.freeze({ agility: 2 }),

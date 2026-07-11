@@ -3,7 +3,7 @@ import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from ".
 import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
-import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getLineAttackTargets, getMeleeDefendRetaliation, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
+import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
@@ -401,10 +401,12 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
   if (!cells) return [];
   const cellKeys = new Set(cells.map(positionKey));
   const amount = Math.max(0, Number(art.damage.amount) || 0);
+  const fireBased = isFireBasedDamage({ art });
   const targetIds = [];
   const damageByTarget = {};
   for (const target of livingUnits(state)) {
     if (!areEnemies(actor, target) || !cellKeys.has(positionKey(target.position))) continue;
+    if (fireBased && isFireDamageImmune(target)) continue;
     const dealt = Math.min(target.hp, amount);
     target.hp = Math.max(0, target.hp - amount);
     if (dealt > 0) {
@@ -523,12 +525,14 @@ function applyStanceAttackTriggers(state, actor) {
 
   if (Number.isFinite(trigger.allyMp) && trigger.allyMp > 0) {
     const restoredByTarget = {};
+    const healedByTarget = {};
     for (const ally of alliesInRadius(state, actor, trigger.allyMpRadius)) {
       const restored = restoreMp(state, actor, ally, trigger.allyMp);
       if (restored.mpRestored > 0) restoredByTarget[ally.id] = restored.mpRestored;
+      if (restored.hpRestored > 0) healedByTarget[ally.id] = restored.hpRestored;
     }
-    if (Object.keys(restoredByTarget).length) {
-      events.push({ type: "STANCE_MP_RESTORED", unitId: actor.id, restoredByTarget });
+    if (Object.keys(restoredByTarget).length || Object.keys(healedByTarget).length) {
+      events.push({ type: "STANCE_MP_RESTORED", unitId: actor.id, restoredByTarget, healedByTarget });
     }
   }
 

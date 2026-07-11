@@ -1,7 +1,7 @@
 import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
-import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../rules/movement.js";
@@ -1936,9 +1936,11 @@ function resolveConeArt(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const targetIds = [];
   const damageByTarget = {};
+  const fireBased = isFireBasedDamage({ art });
   for (const position of cells) {
     const target = unitAt(next, position);
     if (!target || !areEnemies(actor, target)) continue;
+    if (fireBased && isFireDamageImmune(target)) continue;
     const damage = art.damage.amount + (art.id === "volley-shot" ? getProximityBonus(actor, target) : 0);
     target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);

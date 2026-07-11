@@ -2100,7 +2100,7 @@ export function shouldShowBrothersRageWarning(state, type, { warned = false } = 
 
 const BROTHERS_RAGE_LINES = Object.freeze({
   "big-brother": "ROGUE MECH ONLINE! No more holding back -- MY magnet, MY field, MY rules!",
-  "little-brother": "Flamespitter's lit! Everybody's getting toasted -- and you three are first!",
+  "little-brother": "Flamespitter's lit! Everybody's getting toasted -- and you two are first!",
 });
 
 export function brothersRageWarningScript(state, type) {

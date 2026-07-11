@@ -4,7 +4,7 @@ import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, 
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
-import { isShotBlocked, isWallBetween } from "../rules/combat.js";
+import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
@@ -247,11 +247,16 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     const art = mode?.startsWith("art:") ? getArt(actor.type, mode.slice("art:".length)) : null;
     const reach = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
     const blockable = mode === "attack" || artIsBodyBlocked(art);
+    // Big Brother's Super Magnet: basic attacks must land on one of the 8 straight
+    // rays out of the actor, so the wash/target set is culled to those rays instead
+    // of the full Chebyshev square — mirrors the reducer's requiresRayBasicAttack gate.
+    const rayOnly = mode === "attack" && requiresRayBasicAttack(actor);
     for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
       for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
         const cell = { x, y };
         if (!isOnBoard(state, cell)) continue;
         if (chebyshevDistance(actor.position, cell) === 0) continue;
+        if (rayOnly && !isStraightRayTarget(actor.position, cell)) continue;
         if (blockable && isShotBlocked(state, actor.position, cell, actor)) continue;
         // A wall blocks the line for EVERY ranged ability (physical or magic), so it
         // culls the wash unconditionally — only the Sniper's pierce reaches through.
@@ -261,6 +266,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
     for (const target of state.units) {
       if (target.hp > 0 && areEnemies(actor, target) && chebyshevDistance(actor.position, target.position) <= reach &&
+          !(rayOnly && !isStraightRayTarget(actor.position, target.position)) &&
           !(blockable && isShotBlocked(state, actor.position, target.position, actor)) &&
           !isWallBetween(state, actor.position, target.position, actor)) {
         legal.add(positionKey(target.position));
@@ -275,6 +281,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         const [wx, wy] = key.split(",").map(Number);
         const pos = { x: wx, y: wy };
         if (chebyshevDistance(actor.position, pos) <= reach &&
+            !(rayOnly && !isStraightRayTarget(actor.position, pos)) &&
             (art?.id === "blasting-cap" || !isShotBlocked(state, actor.position, pos, actor)) &&
             !isWallBetween(state, actor.position, pos, actor)) {
           legal.add(key);

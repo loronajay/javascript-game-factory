@@ -1,7 +1,7 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
-import { canUseArt, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
+import { canUseArt, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
 import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
@@ -1743,11 +1743,108 @@ async function resolveCombat(command) {
       await effects.playAbilityVfx("hand-of-life", { actor: paladinBefore, targets: healedUnitsBefore });
       await Promise.all(healedUnitsBefore.map((unit) => {
         const healed = handOfLifeEvent.healingByTarget[unit.id] ?? 0;
-        return healed > 0
-          ? effects.floatText(unitCenter(metrics, unit), `+${healed}`, "#f7e27d")
-          : Promise.resolve();
+        const restored = handOfLifeEvent.restoredByTarget?.[unit.id] ?? 0;
+        const floats = [];
+        if (healed > 0) floats.push(effects.floatText(unitCenter(metrics, unit), `+${healed}`, "#f7e27d"));
+        if (restored > 0) floats.push(effects.floatText(unitCenter(metrics, unit), `+${restored} MP`, "#8cc8ff"));
+        return Promise.all(floats);
       }));
     }
+  }
+
+  // Growth (Virus): restores the caster MP whenever a cast poisons an enemy — under
+  // Polarity Shift the same call restores HP instead, so read whichever side landed.
+  const growthEvent = events.find((e) => e.type === "GROWTH_MP");
+  if (growthEvent) {
+    const unit = findUnit(before, growthEvent.unitId);
+    if (unit) {
+      const center = unitCenter(metrics, unit);
+      if (growthEvent.mpGained > 0) effects.floatText(center, `+${growthEvent.mpGained} MP`, "#8cc8ff");
+      else if (growthEvent.hpRestored > 0) effects.floatText(center, `+${growthEvent.hpRestored}`, "#8cf0a4");
+    }
+  }
+
+  // Rock Hard (Clod): a landed physical strike against a defending Clod refunds MP
+  // (or HP under Polarity Shift) in addition to negating the damage.
+  const rockHardEvent = events.find((e) => e.type === "ROCK_HARD_MP");
+  if (rockHardEvent) {
+    const unit = findUnit(before, rockHardEvent.unitId);
+    if (unit) {
+      const center = unitCenter(metrics, unit);
+      if (rockHardEvent.mpGained > 0) effects.floatText(center, `+${rockHardEvent.mpGained} MP`, "#8cc8ff");
+      else if (rockHardEvent.hpRestored > 0) effects.floatText(center, `+${rockHardEvent.hpRestored}`, "#8cf0a4");
+    }
+  }
+
+  // Study (Fat Wizard): magic damage to the studied target leeches HP/MP back to her.
+  const studyLeechEvent = events.find((e) => e.type === "STUDY_LEECH");
+  if (studyLeechEvent) {
+    const unit = findUnit(before, studyLeechEvent.actorId);
+    if (unit) {
+      const center = unitCenter(metrics, unit);
+      if (studyLeechEvent.hpRestored > 0) effects.floatText(center, `+${studyLeechEvent.hpRestored}`, "#8cf0a4");
+      if (studyLeechEvent.mpRestored > 0) effects.floatText(center, `+${studyLeechEvent.mpRestored} MP`, "#8cc8ff");
+    }
+  }
+
+  // Spirit Stance (Witch Doctor): a basic attack restores MP to nearby allies (or HP
+  // under Polarity Shift).
+  const stanceMpEvent = events.find((e) => e.type === "STANCE_MP_RESTORED");
+  if (stanceMpEvent) {
+    for (const [id, amount] of Object.entries(stanceMpEvent.restoredByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(before, id);
+      if (unit) effects.floatText(unitCenter(metrics, unit), `+${amount} MP`, "#8cc8ff");
+    }
+    for (const [id, amount] of Object.entries(stanceMpEvent.healedByTarget ?? {})) {
+      if (amount <= 0) continue;
+      const unit = findUnit(before, id);
+      if (unit) effects.floatText(unitCenter(metrics, unit), `+${amount}`, "#8cf0a4");
+    }
+  }
+
+  // Flamespitter (Little Brother RAGE): a basic attack triggers a free Flamethrower
+  // cone. The reducer already applied the damage; without this the free cast is
+  // silent — no VFX, no float, no visible sign it happened.
+  const flamespitterEvent = events.find((e) => e.type === "FLAMESPITTER");
+  if (flamespitterEvent) {
+    const casterBefore = findUnit(before, flamespitterEvent.actorId);
+    const art = casterBefore ? artDefinition(casterBefore, flamespitterEvent.artId) : null;
+    const hitTargetsBefore = (flamespitterEvent.targetIds ?? []).map((id) => findUnit(before, id)).filter(Boolean);
+    if (casterBefore && art) {
+      const coneCells = getConeCells(before, casterBefore, flamespitterEvent.targetPosition, art) ?? [];
+      await effects.playAbilityVfx(art.id, {
+        actor: casterBefore,
+        targets: hitTargetsBefore,
+        targetPosition: flamespitterEvent.targetPosition,
+        coneCells
+      });
+      await Promise.all(hitTargetsBefore.map(async (target) => {
+        const center = unitCenter(metrics, target);
+        await effects.hitRecoil(target.id, target.position, false);
+        const dmg = flamespitterEvent.damageByTarget?.[target.id] ?? 0;
+        await effects.floatText(center, `-${dmg}`, "#ff7684");
+        const after = findUnit(result.nextState, target.id);
+        if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+      }));
+    }
+  }
+
+  // Splash Fire (Little Brother passive): a crit basic attack splashes true damage
+  // onto enemies near the original target. The reducer already applied the damage;
+  // without this the splash was silent — no float, no visible sign it happened.
+  const splashFireEvent = events.find((e) => e.type === "SPLASH_FIRE");
+  if (splashFireEvent) {
+    const splashTargetsBefore = (splashFireEvent.targetIds ?? []).map((id) => findUnit(before, id)).filter(Boolean);
+    await Promise.all(splashTargetsBefore.map(async (target) => {
+      const center = unitCenter(metrics, target);
+      effects.impact(center, false, "true");
+      await effects.hitRecoil(target.id, target.position, false);
+      const dmg = splashFireEvent.damageByTarget?.[target.id] ?? 0;
+      await effects.floatText(center, `-${dmg}`, "#ff7684");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
   }
 
   return endResolve(prepared, result, prevPlayer);
@@ -1845,6 +1942,26 @@ async function resolveInstantArt(command) {
       const center = unitCenter(metrics, target);
       await effects.hitRecoil(target.id, target.position, false);
       await effects.floatText(center, "-2", "#ff7684");
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+  } else if (resolved?.artId && artDefinition(actorBefore, resolved.artId)?.targeting?.shape === "cone" && actorBefore) {
+    // Any other cone-shaped ART cast manually through the ART button (e.g. Flamethrower),
+    // generalized from the Volley Shot branch above — reads its own per-target damage
+    // instead of a hardcoded amount.
+    const metrics = createBoardMetrics(state.size);
+    const coneCells = getConeCells(state, actorBefore, resolved.targetPosition, artDefinition(actorBefore, resolved.artId)) ?? [];
+    await effects.playAbilityVfx(resolved.artId, {
+      actor: actorBefore,
+      targets: targetsBefore,
+      targetPosition: resolved.targetPosition,
+      coneCells
+    });
+    await Promise.all(targetsBefore.map(async (target) => {
+      const center = unitCenter(metrics, target);
+      await effects.hitRecoil(target.id, target.position, false);
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      await effects.floatText(center, `-${dmg}`, "#ff7684");
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
@@ -2024,6 +2141,11 @@ async function resolveInstantArt(command) {
     await effects.playAbilityVfx("recharge", { actor: actorBefore, targets: [actorBefore] });
     if (resolved.mpRestored > 0) await effects.floatText(unitCenter(metrics, actorBefore), `+${resolved.mpRestored} MP`, "#7fd0ff");
     else if (resolved.hpHealed > 0) await effects.floatText(unitCenter(metrics, actorBefore), `+${resolved.hpHealed}`, "#8cf0a4");
+  } else if (resolved?.artId === "polarity-shift" && actorBefore) {
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("polarity-shift", { actor: actorBefore, targets: [actorBefore] });
+    const label = resolved.restorePolarityShift ? "POLARITY SHIFTED" : "POLARITY RESTORED";
+    await effects.floatText(unitCenter(metrics, actorBefore), label, "#b08cff");
   } else if (resolved?.artId === "self-destruct" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx("self-destruct", { actor: actorBefore, targets: targetsBefore });
@@ -2276,9 +2398,11 @@ async function resolveInstantArt(command) {
     });
     await Promise.all(targetsBefore.map((target) => {
       const healed = resolved.healingByTarget[target.id] ?? 0;
-      return healed > 0
-        ? effects.floatText(unitCenter(metrics, target), `+${healed}`, "#8cf0a4")
-        : Promise.resolve();
+      const restored = resolved.restoredByTarget?.[target.id] ?? 0;
+      const floats = [];
+      if (healed > 0) floats.push(effects.floatText(unitCenter(metrics, target), `+${healed}`, "#8cf0a4"));
+      if (restored > 0) floats.push(effects.floatText(unitCenter(metrics, target), `+${restored} MP`, "#7fd0ff"));
+      return Promise.all(floats);
     }));
   } else if (resolved?.effect && actorBefore) {
     const targetBefore = targetsBefore[0];
@@ -2790,7 +2914,10 @@ function playRolloverFx(events) {
     }
     for (const mp of events.filter((e) => e.type === "TIME_STEAL_MP")) {
       const src = findUnit(state, mp.sourceId);
-      if (src) effects.floatText(unitCenter(metrics, src), `+${mp.mpGained} MP`, "#7fd0ff");
+      if (!src) continue;
+      const center = unitCenter(metrics, src);
+      if (mp.mpGained > 0) effects.floatText(center, `+${mp.mpGained} MP`, "#7fd0ff");
+      else if (mp.hpRestored > 0) effects.floatText(center, `+${mp.hpRestored}`, "#8cf0a4");
     }
   }
 
@@ -3067,6 +3194,17 @@ async function handleTile(position) {
       setMessage("Click a tile inside a highlighted Volley Shot cone.", true);
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "volley-shot", { targetPosition: origin }))) {
       setMessage("Volley Shot resolved. This unit's activation is complete.");
+    }
+  } else if (mode?.startsWith("art:") && getAvailableArts(unit).find((a) => a.id === mode.slice("art:".length))?.targeting?.shape === "cone") {
+    // Any other cone-shaped ART (e.g. Flamethrower) — same aim-direction targeting
+    // as Volley Shot, generalized instead of hardcoded to that one art id.
+    const artId = mode.slice("art:".length);
+    const art = getAvailableArts(unit).find((a) => a.id === artId);
+    const origin = getConeOriginForTarget(state, unit, position, art);
+    if (!origin) {
+      setMessage(`Click a tile inside a highlighted ${art.name} cone.`, true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: origin }))) {
+      setMessage(`${art.name} resolved. This unit's activation is complete.`);
     }
   } else if (mode === "art:summon-ghoul") {
     const placement = getSummonPlacementTiles(state, unit, getUnitType(unit.type).arts.find((a) => a.id === "summon-ghoul"));
@@ -3390,7 +3528,7 @@ async function handleActionClick(action, unit) {
         render();
         return;
       }
-      const lead = action === "art:volley-shot"
+      const lead = action === "art:volley-shot" || art?.targeting?.shape === "cone"
         ? "Hover a direction to preview the cone, then click to fire."
         : action === "art:thunderous-charge"
           ? "Hover a highlighted tile to preview the blast, then click to charge (not an enemy's tile)."
