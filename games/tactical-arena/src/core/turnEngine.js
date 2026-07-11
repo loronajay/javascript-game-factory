@@ -1,4 +1,4 @@
-import { getEffectiveStats, getUnitType, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getUnitType, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areEnemies, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { isFireDamageImmune } from "../rules/combat.js";
@@ -6,6 +6,7 @@ import { getGlobalTrueTick } from "../rules/stances.js";
 import { isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { drawValue } from "./rng.js";
 import { finishTempoActivation, isTempoBattle } from "./tempoBattle.js";
+import { restoreMp } from "./combatEffects.js";
 
 const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 const FIRE_DAMAGE = 1;
@@ -27,8 +28,7 @@ export function spendAndAdvance(state, unit) {
     } else {
       unit.mageChargeCount = (unit.mageChargeCount ?? 0) + 1;
       if (unit.mageChargeCount >= passive.effect.interval) {
-        const maxMp = getEffectiveStats(unit, state).maxMp;
-        unit.mp = Math.min(maxMp, unit.mp + passive.effect.amount);
+        restoreMp(state, unit, unit, passive.effect.amount);
         unit.mageChargeCount = 0;
       }
     }
@@ -240,10 +240,10 @@ function applyTimeStealTick(state, events) {
       events.push({ type: "TIME_STEAL", sourceId: source.id, targetId: target.id, position: { ...target.position }, damage: dealt });
     }
     if (totalDealt > 0 && effect.refundMpPerDamage) {
-      const before = source.mp;
-      source.mp = Math.min(getEffectiveStats(source, state).maxMp, source.mp + totalDealt * effect.refundMpPerDamage);
-      const gained = source.mp - before;
-      if (gained > 0) events.push({ type: "TIME_STEAL_MP", sourceId: source.id, mpGained: gained });
+      const restored = restoreMp(state, source, source, totalDealt * effect.refundMpPerDamage);
+      if (restored.mpRestored > 0 || restored.hpRestored > 0) {
+        events.push({ type: "TIME_STEAL_MP", sourceId: source.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
+      }
     }
   }
 }

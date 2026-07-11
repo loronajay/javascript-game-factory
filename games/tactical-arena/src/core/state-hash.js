@@ -99,6 +99,7 @@ export function canonicalString(state) {
     state.turnNumber,
     state.currentPlayer,
     state.winner ?? "-",
+    state.restorePolarityShift ? 1 : 0,
     state.rngState,
     canonicalActivation(state.activation),
     canonicalKeyedMap(state.tileObjects),

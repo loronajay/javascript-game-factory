@@ -5,7 +5,7 @@ import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.j
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { artIsBodyBlocked, getArtTargetRange, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getVolleyShotAimOptions, getVolleyShotCells, getWallPlacementTiles } from "../rules/arts.js";
+import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -126,10 +126,11 @@ function createBoardDais(metrics, size) {
 
 export function isTargetedMode(mode, actor) {
   if (mode === "attack") return true;
-  if (!actor || !mode?.startsWith("art:") || mode === "art:volley-shot") return false;
+  if (!actor || !mode?.startsWith("art:")) return false;
   const art = getArt(actor.type, mode.slice("art:".length));
   return Boolean(
     art &&
+    art.targeting?.shape !== "cone" &&
     art.effect?.type !== "healAllies" &&
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
@@ -283,14 +284,17 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   }
 
   let volleyCones = null;
-  if (actor && mode === "art:volley-shot") {
-    volleyCones = getVolleyShotAimOptions(state, actor).map((origin) => ({
+  if (actor && mode?.startsWith("art:")) {
+    const coneArt = getArt(actor.type, mode.slice("art:".length));
+    if (coneArt?.targeting?.shape === "cone") {
+      volleyCones = getConeAimOptions(state, actor).map((origin) => ({
       origin,
       key: positionKey(origin),
-      cells: (getVolleyShotCells(state, actor, origin) ?? []).map(positionKey)
-    }));
-    for (const cone of volleyCones) for (const k of cone.cells) range.add(k);
-    legal = new Set(volleyCones.map((cone) => cone.key));
+        cells: (getConeCells(state, actor, origin, coneArt) ?? []).map(positionKey)
+      }));
+      for (const cone of volleyCones) for (const k of cone.cells) range.add(k);
+      legal = new Set(volleyCones.map((cone) => cone.key));
+    }
   }
 
   if (actor && mode === "footwork") legal = getFootworkStepOptions(state, actor, footworkPath);

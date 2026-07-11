@@ -30,6 +30,8 @@ import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
   getArtTargetRange,
+  getConeAimOptions,
+  getConeCells,
   getDarkPulseTargets,
   getFirePlacementTiles,
   getFlightTiles,
@@ -47,8 +49,6 @@ import {
   getTargetedBlastAimTiles,
   getTargetedBlastTargets,
   getTilePulseTargets,
-  getVolleyShotAimOptions,
-  getVolleyShotCells,
   getWallPlacementTiles,
   validateRushPath
 } from "../rules/arts.js";
@@ -153,8 +153,8 @@ function generateArtPlans(state, unit, art, ai, plans) {
       break;
     }
     case "coneAoe": {
-      for (const direction of getVolleyShotAimOptions(state, unit)) {
-        const cells = getVolleyShotCells(state, unit, direction);
+      for (const direction of getConeAimOptions(state, unit)) {
+        const cells = getConeCells(state, unit, direction, art);
         if (cells && coneHitsEnemy(state, unit, cells)) {
           plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: direction } }));
         }
@@ -447,11 +447,11 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "statusCast":
       break; // no HP change; the status is a controller score term
     case "coneAoe": {
-      const cells = getVolleyShotCells(state, actor, primary.targetPosition) ?? [];
+      const cells = getConeCells(state, actor, primary.targetPosition, art) ?? [];
       const cellKeys = new Set(cells.map(positionKey));
       for (const target of board) {
         if (!areEnemies(actor, target) || !cellKeys.has(positionKey(target.position))) continue;
-        const amount = art.damage.amount + getProximityBonus(actor, target);
+        const amount = art.damage.amount + (art.id === "volley-shot" ? getProximityBonus(actor, target) : 0);
         target.hp = Math.max(0, target.hp - amount);
       }
       break;

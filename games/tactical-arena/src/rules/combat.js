@@ -90,7 +90,9 @@ export const COMBAT = Object.freeze({
 // never-miss + 50% crit). Non-raging units, and units whose RAGE has no combat
 // block (the Swordsman's Quick), get null and fall back to the base chances.
 function rageCombat(unit) {
-  return isRaging(unit) ? (getUnitType(unit.type).rageArt?.combat ?? null) : null;
+  if (!isRaging(unit)) return null;
+  const definition = getUnitType(unit.type);
+  return definition.ragePassive?.combat ?? definition.rageArt?.combat ?? null;
 }
 
 // The damage type of a unit's BASIC attack. Default physical; a `blessedAttack`
@@ -98,6 +100,14 @@ function rageCombat(unit) {
 // Targeting/line-of-sight is separate: only explicit pierce passives shoot through bodies.
 export function getBasicAttackDamageType(unit) {
   return getUnitType(unit.type).passive?.effect?.attackDamageType ?? "physical";
+}
+
+export function requiresRayBasicAttack(unit) {
+  return Boolean(getUnitType(unit.type).passive?.effect?.basicAttackRayOnly);
+}
+
+export function isStraightRayTarget(from, to) {
+  return Boolean(straightLineStep(from, to));
 }
 
 // A status a unit's passive lands on the target when its BASIC attack CRITS (Angel's
@@ -108,6 +118,13 @@ export function getBasicAttackDamageType(unit) {
 export function getCritOnHitStatus(unit) {
   for (const effect of passiveEffects(unit)) {
     if (effect.critStatus) return effect.critStatus;
+  }
+  return null;
+}
+
+export function getCritPullEffect(unit) {
+  for (const effect of passiveEffects(unit)) {
+    if (effect.critPull) return effect.critPull;
   }
   return null;
 }
@@ -130,6 +147,14 @@ export function isFireDamageImmune(unit) {
 export function getCritCreatesFire(unit) {
   for (const effect of passiveEffects(unit)) {
     if (effect.critCreatesFire) return effect.critCreatesFire;
+  }
+  return null;
+}
+
+export function getCritSplashDamage(unit) {
+  for (const effect of passiveEffects(unit)) {
+    if (effect?.type === "critSplashDamage") return effect;
+    if (effect?.critSplashDamage) return effect.critSplashDamage;
   }
   return null;
 }
@@ -158,6 +183,10 @@ export function finalizeMagicDamage({ attacker, target, state = null, rawDamage,
 
 export function ignoresCriticalDamage(unit) {
   return passiveEffects(unit).some((effect) => effect.ignoreCriticalDamage);
+}
+
+export function ignoresOwnCriticalDamage(unit) {
+  return passiveEffects(unit).some((effect) => effect.noCriticalDamage);
 }
 
 // Passive crit-chance bonus that scales with missing HP (Angel's Inner Strength:
@@ -206,8 +235,9 @@ export function getMissChance(attacker) {
 // Strength) adds on top, clamped so the final chance never exceeds 1.
 export function getCritChance(attacker) {
   const crit = rageCombat(attacker)?.criticalChance;
+  const rageBonus = Number(rageCombat(attacker)?.criticalBonus) || 0;
   const base = Number.isFinite(crit) ? crit : COMBAT.CRIT_CHANCE;
-  return Math.min(1, base + getMissingHpCritBonus(attacker) + getResourceCritBonus(attacker));
+  return Math.min(1, base + rageBonus + getMissingHpCritBonus(attacker) + getResourceCritBonus(attacker));
 }
 
 // Resolve a single swing's to-hit and crit against the authoritative seed. Draws
@@ -321,8 +351,21 @@ export function getSelfMagicVulnerability(target) {
 // True when any living unit is projecting a board-wide healing lockout (a raging
 // Juggernaut's Null Zone). Read at every heal site so a healer can't top anyone up while
 // it holds. Presentation-free — a pure query over match state.
-export function isHealingDisabled(state) {
-  return Boolean(state?.units?.some((unit) => projectsHealingLockout(unit)));
+export function isHealingDisabled(state, target = null) {
+  if (state?.units?.some((unit) => projectsHealingLockout(unit))) return true;
+  if (!target || target.hp <= 0) return false;
+  for (const source of state?.units ?? []) {
+    if (source.hp <= 0 || source.id === target.id) continue;
+    const passives = [getUnitType(source.type).passive, ...getUnitType(source.type).arts, getUnitType(source.type).ragePassive, getUnitType(source.type).rageArt];
+    for (const passive of passives) {
+      const effect = passive?.effect;
+      if (effect?.type !== "healingLockoutAura") continue;
+      const radius = Math.max(0, Number(effect.radius) || 0);
+      const distance = Math.max(Math.abs(source.position.x - target.position.x), Math.abs(source.position.y - target.position.y));
+      if (distance <= radius) return true;
+    }
+  }
+  return false;
 }
 
 // Resolves a strike with an explicit damage type override (used by magic-damage ARTS
@@ -332,9 +375,21 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   if (!damageType || damageType === "physical") {
     return resolvePhysicalStrike(attacker, target, { proximity, critical, state });
   }
+  if (damageType === "true") {
+    const damage = Math.max(0, getEffectiveStats(attacker, state).strength);
+    return {
+      type: "true",
+      base: damage,
+      afterDefense: damage,
+      defended: false,
+      critical: false,
+      proximityBonus: 0,
+      damage
+    };
+  }
   const actorStats = getEffectiveStats(attacker, state);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
-  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical: critical && !ignoresCriticalDamage(target) });
+  const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical: critical && !ignoresCriticalDamage(target) && !ignoresOwnCriticalDamage(attacker) });
   const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, damageAffinity });
   return { ...result, critical, proximityBonus: 0, damage };
 }
@@ -354,6 +409,18 @@ export function resolveFixedMagicStrike(attacker, target, amount, { critical = f
   return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
 }
 
+export function resolveFixedPhysicalStrike(attacker, target, amount, { critical = false, state = null } = {}) {
+  const effectiveCritical = critical && !ignoresCriticalDamage(target);
+  const result = resolveDamage({
+    attacker: { strength: Math.max(0, amount) },
+    defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },
+    type: "physical",
+    critical: effectiveCritical
+  });
+  const damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+  return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
+}
+
 // THE single source of truth for the damage a physical strike will deal *right now*.
 // The reducer's basic ATTACK and its targeted-ART attacks resolve through here, and
 // so does the on-board damage forecast — so a player can never be shown a number the
@@ -370,7 +437,7 @@ export function resolveFixedMagicStrike(attacker, target, amount, { critical = f
 // `proximity` gates the proximity passive for callers that represent attacks. The
 // current Archer kit opts in for basic ATTACK, targeted attack ARTS, and Volley Shot.
 export function resolvePhysicalStrike(attacker, target, { proximity = false, critical = false, state = null } = {}) {
-  const effectiveCritical = critical && !ignoresCriticalDamage(target);
+  const effectiveCritical = critical && !ignoresCriticalDamage(target) && !ignoresOwnCriticalDamage(attacker);
   const result = resolveDamage({
     attacker: getEffectiveStats(attacker, state),
     defender: { ...getEffectiveStats(target, state), defending: isDefending(target) },

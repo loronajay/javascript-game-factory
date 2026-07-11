@@ -67,22 +67,38 @@ export function getFootworkStepOptions(state, actor, path) {
   return getRushStepOptions(state, actor, path, getArt(actor.type, "footwork"));
 }
 
-export function getVolleyShotAimOptions(state, actor) {
+export function getConeAimOptions(state, actor) {
   return ORTHOGONAL_DIRECTIONS
     .map((direction) => ({ x: actor.position.x + direction.x, y: actor.position.y + direction.y }))
     .filter((position) => isOnBoard(state, position));
 }
 
+export function getVolleyShotAimOptions(state, actor) {
+  return getConeAimOptions(state, actor);
+}
+
+function coneDepth(state, actor, artOrRange) {
+  const base = Number.isFinite(artOrRange)
+    ? artOrRange
+    : Number.isFinite(artOrRange?.targeting?.range)
+      ? artOrRange.targeting.range
+      : 5;
+  const rageBonus = !Number.isFinite(artOrRange) && isRaging(actor)
+    ? Math.max(0, Number(artOrRange?.rageRangeBonus) || 0)
+    : 0;
+  return base + getCommandRangeBonus(state, actor) + rageBonus;
+}
+
 // The selected origin is the first cell in the rain. Each further row widens
 // one tile to either side: 1, 3, 5, 7, then 9 cells across.
-export function getVolleyShotCells(state, actor, origin) {
+export function getConeCells(state, actor, origin, artOrRange = 5) {
   if (!origin || !isOnBoard(state, origin) || !isOrthogonallyAdjacent(actor.position, origin)) return null;
   const direction = { x: origin.x - actor.position.x, y: origin.y - actor.position.y };
   const perpendicular = { x: -direction.y, y: direction.x };
   const cells = [];
 
   // Higher Ground extends the rain's reach (an area ART, per the command's promise).
-  const maxDepth = 5 + getCommandRangeBonus(state, actor);
+  const maxDepth = coneDepth(state, actor, artOrRange);
   for (let depth = 1; depth <= maxDepth; depth += 1) {
     for (let offset = -(depth - 1); offset <= depth - 1; offset += 1) {
       const position = {
@@ -95,15 +111,23 @@ export function getVolleyShotCells(state, actor, origin) {
   return cells;
 }
 
-export function getVolleyShotOriginForTarget(state, actor, targetPosition) {
+export function getVolleyShotCells(state, actor, origin) {
+  return getConeCells(state, actor, origin, getArt(actor.type, "volley-shot") ?? 5);
+}
+
+export function getConeOriginForTarget(state, actor, targetPosition, artOrRange = 5) {
   if (!targetPosition || !isOnBoard(state, targetPosition)) return null;
   const targetKey = positionKey(targetPosition);
-  for (const origin of getVolleyShotAimOptions(state, actor)) {
-    if (getVolleyShotCells(state, actor, origin)?.some((cell) => positionKey(cell) === targetKey)) {
+  for (const origin of getConeAimOptions(state, actor)) {
+    if (getConeCells(state, actor, origin, artOrRange)?.some((cell) => positionKey(cell) === targetKey)) {
       return origin;
     }
   }
   return null;
+}
+
+export function getVolleyShotOriginForTarget(state, actor, targetPosition) {
+  return getConeOriginForTarget(state, actor, targetPosition, getArt(actor.type, "volley-shot") ?? 5);
 }
 
 export function getLegalFleeTiles(state, actor) {

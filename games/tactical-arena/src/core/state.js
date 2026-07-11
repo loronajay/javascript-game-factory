@@ -168,7 +168,8 @@ export function createBattleState({
     // Authoritative roll seed lives in match state so every actor draws identical
     // rolls from the same seed + command stream. A fresh match varies; an online
     // or replay match is handed a fixed seed.
-    rngState: createRngState(seed ?? (Date.now() & 0xffffffff))
+    rngState: createRngState(seed ?? (Date.now() & 0xffffffff)),
+    restorePolarityShift: false
   };
 }
 
@@ -186,6 +187,7 @@ function normalizeTeamNames(names) {
 export function cloneState(state) {
   return {
     ...state,
+    restorePolarityShift: Boolean(state.restorePolarityShift),
     tileAffinities: { ...(state.tileAffinities ?? {}) },
     tileObjects: Object.fromEntries(
       Object.entries(state.tileObjects ?? {}).map(([key, obj]) => [key, { ...obj }])

@@ -3,8 +3,8 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
-import { artIsBodyBlocked, getArtTargetRange, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets, getVolleyShotCells } from "../rules/arts.js";
-import { finalizeMagicDamage, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike } from "../rules/combat.js";
+import { artIsBodyBlocked, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
+import { finalizeMagicDamage, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
@@ -109,12 +109,16 @@ function areaForecastEntries(state, actor, art, areaCenter) {
   }
   if (shape === "cone") {
     if (!areaCenter) return [];
-    const cells = getVolleyShotCells(state, actor, areaCenter) ?? [];
+    const cells = getConeCells(state, actor, areaCenter, art) ?? [];
     const cellKeys = new Set(cells.map(positionKey));
     const amount = Math.max(0, Number(art.damage?.amount) || 0);
+    const type = art.damage?.type ?? "true";
     return state.units
       .filter((target) => target.hp > 0 && areEnemies(actor, target) && cellKeys.has(positionKey(target.position)))
-      .map((target) => ({ target, damage: amount + getProximityBonus(actor, target) }));
+      .map((target) => ({
+        target,
+        damage: areaDamage(actor, target, art, state, amount, type) + (art.id === "volley-shot" ? getProximityBonus(actor, target) : 0)
+      }));
   }
   if (shape === "lineBurst") {
     const amount = Math.max(0, Number(art.damage?.amount) || 0);
@@ -170,13 +174,16 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
     // A fixed-amount magic art (Virus's Cough) forecasts its authored amount, not a
     // STR-scaled hit — the same resolver the reducer uses, so the number can't drift.
     const fixedMagic = isStrikeArt && art?.damageType === "magic" && Number.isFinite(art?.damage?.amount);
+    const fixedPhysical = isStrikeArt && art?.damage?.type === "physical" && art.damage.fixed && Number.isFinite(art.damage.amount);
     // Fixed-power physical ARTS that scale with STR above a base (Front Kick, Stone Throw)
     // resolve their own power formula, not a plain STR strike.
     const strike = art?.damage?.scaleStat
       ? scaledPowerForecast(actor, target, art, state)
       : fixedMagic
         ? resolveFixedMagicStrike(actor, target, art.damage.amount, { state, art })
-        : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
+        : fixedPhysical
+          ? resolveFixedPhysicalStrike(actor, target, art.damage.amount, { state })
+          : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
     drawForecastBadge(forecastLayer, metrics, target, damageLabel(strike.damage, target), damageClass(strike.damage, target));
   }
 }

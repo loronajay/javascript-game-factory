@@ -54,6 +54,8 @@ export const PORTRAITS = Object.freeze({
   "fat-cleric": portrait("fat-cleric", { x: 0.068, y: 0.060, w: 0.878, h: 0.860 }),
   "fat-bowman": portrait("fat-bowman", { x: 0.080, y: 0.050, w: 0.840, h: 0.880 }),
   miner:       portrait("miner",       { x: 0.100, y: 0.045, w: 0.800, h: 0.900 }),
+  "big-brother": portrait("big-brother", { x: 0.100, y: 0.040, w: 0.800, h: 0.920 }),
+  "little-brother": portrait("little-brother", { x: 0.120, y: 0.060, w: 0.760, h: 0.880 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

@@ -1,5 +1,4 @@
 import {
-  getEffectiveStats,
   getRageEffectValue,
   getStatusSpreadConfig,
   getUnitType,
@@ -10,6 +9,7 @@ import {
 import { areAllies, areEnemies, findUnit, teamOfUnit } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { isHealingDisabled } from "../rules/combat.js";
+import { restoreHp, restoreMp } from "./combatEffects.js";
 import { applyStatus } from "../rules/statuses.js";
 import { resolveVictory } from "./turnEngine.js";
 
@@ -125,8 +125,8 @@ function applyRageEntryEffects(prevState, next, events, hooks) {
       if (restore) {
         const beforeHp = unit.hp;
         const beforeMp = unit.mp;
-        unit.hp = Math.min(getEffectiveStats(unit, next).maxHp, unit.hp + (restore.hp ?? 0));
-        unit.mp = Math.min(getEffectiveStats(unit, next).maxMp, unit.mp + (restore.mp ?? 0));
+        restoreHp(next, unit, unit, restore.hp ?? 0);
+        restoreMp(next, unit, unit, restore.mp ?? 0);
         events.push({
           type: "RAGE_REGENERATE",
           unitId: unit.id,
@@ -240,7 +240,7 @@ function applyCommanderReactions(prevState, next, events) {
     }
     if (teamRevived.length && effect?.healPerAllyRevived && !healingOff) {
       const before = king.hp;
-      king.hp = Math.min(getEffectiveStats(king, next).maxHp, king.hp + effect.healPerAllyRevived * teamRevived.length);
+      restoreHp(next, king, king, effect.healPerAllyRevived * teamRevived.length);
       const healed = king.hp - before;
       if (healed > 0) events.push({ type: "KING_RESTORED", kingId: king.id, healing: healed });
     }
@@ -260,7 +260,7 @@ function applyCommanderReactions(prevState, next, events) {
       for (const ally of next.units) {
         if (ally.hp <= 0 || teamOfUnit(ally) !== team || !isAlly(ally)) continue;
         const before = ally.hp;
-        ally.hp = Math.min(getEffectiveStats(ally, next).maxHp, ally.hp + rally * falls);
+        restoreHp(next, ally, ally, rally * falls);
         if (ally.hp > before) rallied.push(ally.id);
       }
       if (rallied.length) events.push({ type: "SQUAD_RALLY", team, healing: rally * falls, rallied });

@@ -1,12 +1,13 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
-import { getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
-import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getLineAttackTargets, getMeleeDefendRetaliation, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, rollToHit } from "../rules/combat.js";
+import { getConeCells } from "../rules/arts.js";
+import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getLineAttackTargets, getMeleeDefendRetaliation, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
-import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing } from "./combatEffects.js";
+import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } from "./commandValidation.js";
 import { applyPostCommandReactions, consumeOneShotRage, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
@@ -137,15 +138,13 @@ function applyRageRegen(state, unit, events) {
   const regen = getRageRegen(unit);
   if (!regen) return false;
   if ((unit.emergencySnackCount ?? 0) >= (regen.maxProcs ?? Infinity)) return false;
-  if (isHealingDisabled(state)) return false;
-  const stats = getEffectiveStats(unit, state);
   const beforeHp = unit.hp;
   const beforeMp = unit.mp;
   const wasBelowThreshold = beforeHp <= 5;
-  unit.hp = Math.min(stats.maxHp, unit.hp + (regen.hp ?? 0));
+  restoreHp(state, unit, unit, regen.hp ?? 0);
   unit.emergencySnackCount = (unit.emergencySnackCount ?? 0) + 1;
   if (wasBelowThreshold && unit.hp > 5) {
-    unit.mp = Math.min(stats.maxMp, unit.mp + (regen.exitMp ?? 0));
+    restoreMp(state, unit, unit, regen.exitMp ?? 0);
   }
   events.push({ type: "EMERGENCY_SNACK", unitId: unit.id, hpRestored: unit.hp - beforeHp, mpRestored: unit.mp - beforeMp });
   return true;
@@ -238,6 +237,9 @@ function attack(state, command) {
   if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
+  if (requiresRayBasicAttack(result.unit) && !isStraightRayTarget(result.unit.position, target.position)) {
+    return reject(ERR.INVALID_TARGET);
+  }
   // A basic attack is body-blocked by any unit in between unless the attacker has an
   // explicit pierce passive (Sniper). Angel's Blessed Arrow changes damage type, not
   // targeting. A wall between blocks too, unless pierce says otherwise.
@@ -283,6 +285,7 @@ function attack(state, command) {
   const fireTiles = [];
   const rockHardEvents = []; // Rock Hard (Clod): MP refunded per physical strike while defending
   const magicReactionEvents = [];
+  const pulled = {};
   let poisonedByAttack = 0;
   const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
   for (const targetUnit of targets) {
@@ -309,6 +312,21 @@ function attack(state, command) {
       next.tileObjects[positionKey(position)] = { kind: critFire.kind ?? "fire", permanent: Boolean(critFire.permanent) };
       fireTiles.push(position);
     }
+    const critPull = swing.critical ? getCritPullEffect(actor) : null;
+    if (critPull && targetUnit.hp > 0) {
+      const dx = Math.sign(targetUnit.position.x - actor.position.x);
+      const dy = Math.sign(targetUnit.position.y - actor.position.y);
+      const destination = { x: actor.position.x + dx, y: actor.position.y + dy };
+      const from = { ...targetUnit.position };
+      const blocked = destination.x < 0 || destination.y < 0 || destination.x >= next.size || destination.y >= next.size ||
+        isWallAt(next, destination) || (unitAt(next, destination) && unitAt(next, destination).id !== targetUnit.id);
+      if (!blocked) {
+        targetUnit.position = destination;
+        pulled[targetUnit.id] = { from, to: { ...destination } };
+        const applied = applyStatus(targetUnit, { type: critPull.status, duration: critPull.durationTurns ?? critPull.duration ?? 1 });
+        if (applied.applied) targetUnit.statuses = applied.statuses;
+      }
+    }
     if (targetUnit.id === nextTarget.id) primaryDamage = damage;
   }
   const damage = primaryDamage ?? strike(nextTarget);
@@ -328,6 +346,8 @@ function attack(state, command) {
   }
   // Growth (Virus): restore MP for each enemy this attack poisoned.
   const growthEvents = poisonRefund > 0 ? applyGrowth(next, actor, poisonRefund * poisonedByAttack) : [];
+  const splashEvents = swing.critical ? applyCritSplashDamage(next, actor, nextTarget, getCritSplashDamage(actor)) : [];
+  const freeConeEvents = applyBasicAttackFreeCone(next, actor, nextTarget);
   const desperationEvents = consumeOneShotRage(actor);
   resolveVictory(next);
   const { type: _dmgType, ...damageFields } = damage;
@@ -337,8 +357,70 @@ function attack(state, command) {
     ...(resourceCost > 0 ? { mpCost: resourceCost } : {}),
     ...(blinded.length ? { blinded } : {}),
     ...(fireTiles.length ? { fireTiles } : {}),
+    ...(Object.keys(pulled).length ? { pulled } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...splashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents]);
+}
+
+function applyCritSplashDamage(state, actor, originalTarget, splash) {
+  const amount = Math.max(0, Number(splash?.amount) || 0);
+  if (amount <= 0 || !originalTarget) return [];
+  const radius = Math.max(0, Number(splash.radius) || 0);
+  const damageByTarget = {};
+  const targetIds = [];
+  for (const target of livingUnits(state)) {
+    if (target.id === originalTarget.id || !areEnemies(actor, target)) continue;
+    if (chebyshevDistance(originalTarget.position, target.position) > radius) continue;
+    const dealt = Math.min(target.hp, amount);
+    target.hp = Math.max(0, target.hp - amount);
+    if (dealt > 0) {
+      targetIds.push(target.id);
+      damageByTarget[target.id] = dealt;
+    }
+  }
+  return targetIds.length ? [{
+    type: "SPLASH_FIRE",
+    actorId: actor.id,
+    sourceTargetId: originalTarget.id,
+    targetIds,
+    damageByTarget
+  }] : [];
+}
+
+function applyBasicAttackFreeCone(state, actor, originalTarget) {
+  if (!isRaging(actor)) return [];
+  const trigger = getRageEffectValue(actor, "basicAttackCone", null);
+  if (!trigger?.artId || !originalTarget) return [];
+  const dx = Math.sign(originalTarget.position.x - actor.position.x);
+  const dy = Math.sign(originalTarget.position.y - actor.position.y);
+  if (trigger.orthogonalOnly && !((dx === 0) !== (dy === 0))) return [];
+  const art = getArt(actor.type, trigger.artId);
+  if (!art?.damage) return [];
+  const origin = { x: actor.position.x + dx, y: actor.position.y + dy };
+  const cells = getConeCells(state, actor, origin, art);
+  if (!cells) return [];
+  const cellKeys = new Set(cells.map(positionKey));
+  const amount = Math.max(0, Number(art.damage.amount) || 0);
+  const targetIds = [];
+  const damageByTarget = {};
+  for (const target of livingUnits(state)) {
+    if (!areEnemies(actor, target) || !cellKeys.has(positionKey(target.position))) continue;
+    const dealt = Math.min(target.hp, amount);
+    target.hp = Math.max(0, target.hp - amount);
+    if (dealt > 0) {
+      targetIds.push(target.id);
+      damageByTarget[target.id] = dealt;
+    }
+  }
+  return targetIds.length ? [{
+    type: "FLAMESPITTER",
+    actorId: actor.id,
+    artId: art.id,
+    targetPosition: origin,
+    targetIds,
+    damageByTarget,
+    mpCost: 0
+  }] : [];
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
@@ -351,6 +433,9 @@ function attackWall(state, command, attacker) {
   if (!isWallAt(state, pos)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(attacker.position, pos) > getEffectiveStats(attacker, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (requiresRayBasicAttack(attacker) && !isStraightRayTarget(attacker.position, pos)) {
+    return reject(ERR.INVALID_TARGET);
   }
   if (isShotBlocked(state, attacker.position, pos, attacker) ||
       isWallBetween(state, attacker.position, pos, attacker)) return reject(ERR.TARGET_OBSTRUCTED);
@@ -401,11 +486,10 @@ function defend(state, command) {
   // passive so no rule hard-codes the unit.
   const snack = getUnitType(unit.type).passive?.effect;
   if (snack?.type === "defendRestore" && !next.activation.moved) {
-    const stats = getEffectiveStats(unit, next);
     const beforeHp = unit.hp;
     const beforeMp = unit.mp;
-    if (!isHealingDisabled(next)) unit.hp = Math.min(stats.maxHp, unit.hp + (snack.hp ?? 0));
-    unit.mp = Math.min(stats.maxMp, unit.mp + (snack.mp ?? 0));
+    restoreHp(next, unit, unit, snack.hp ?? 0);
+    restoreMp(next, unit, unit, snack.mp ?? 0);
     const hpRestored = unit.hp - beforeHp;
     const mpRestored = unit.mp - beforeMp;
     if (hpRestored > 0 || mpRestored > 0) {
@@ -440,10 +524,8 @@ function applyStanceAttackTriggers(state, actor) {
   if (Number.isFinite(trigger.allyMp) && trigger.allyMp > 0) {
     const restoredByTarget = {};
     for (const ally of alliesInRadius(state, actor, trigger.allyMpRadius)) {
-      const before = ally.mp;
-      ally.mp = Math.min(getEffectiveStats(ally, state).maxMp, ally.mp + trigger.allyMp);
-      const restored = ally.mp - before;
-      if (restored > 0) restoredByTarget[ally.id] = restored;
+      const restored = restoreMp(state, actor, ally, trigger.allyMp);
+      if (restored.mpRestored > 0) restoredByTarget[ally.id] = restored.mpRestored;
     }
     if (Object.keys(restoredByTarget).length) {
       events.push({ type: "STANCE_MP_RESTORED", unitId: actor.id, restoredByTarget });

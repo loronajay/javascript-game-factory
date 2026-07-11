@@ -635,5 +635,55 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "miner",
     slug: "steampunk-engineer",
     file: "steampunk-engineer-miner.png"
+  },
+  {
+    type: "big-brother",
+    slug: "summer-vibes",
+    file: "summer-vibes-big-brother.png"
+  },
+  {
+    type: "big-brother",
+    slug: "fire-rescue",
+    file: "fire-rescue-big-brother.png"
+  },
+  {
+    type: "big-brother",
+    slug: "hell-mech",
+    file: "hell-mech-big-brother.png"
+  },
+  {
+    type: "big-brother",
+    slug: "junkyard-king",
+    file: "junkyard-king-big-brother.png"
+  },
+  {
+    type: "big-brother",
+    slug: "ruin-scavenger",
+    file: "ruin-scavenger-big-brother.png"
+  },
+  {
+    type: "little-brother",
+    slug: "summer-vibes",
+    file: "summer-vibes-little-brother.png"
+  },
+  {
+    type: "little-brother",
+    slug: "arcane",
+    file: "arcane-little-brother.png"
+  },
+  {
+    type: "little-brother",
+    slug: "arctic-ops",
+    file: "arctic-ops-little-brother.png"
+  },
+  {
+    type: "little-brother",
+    slug: "crusader-mech",
+    file: "crusader-mech-little-brother.png"
+  },
+  {
+    type: "little-brother",
+    slug: "galaxy-defender",
+    file: "galaxy-defender-little-brother.png"
   }
 ]);

@@ -17,7 +17,7 @@
 
 import { areEnemies, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging, normalizeUnitAi, takesTurns } from "../core/unitCatalog.js";
-import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike } from "../rules/combat.js";
+import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../rules/damage.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { statusImmunities } from "../rules/statuses.js";
@@ -300,8 +300,13 @@ function misfortuneStatusSynergyValue(state, caster, allies, enemies) {
 export function expectedStrike(state, attacker, target, art = null) {
   const damageType = art?.damageType ?? "physical";
   const damageAffinity = art?.damageAffinity ?? art?.damage?.affinity ?? null;
-  const normal = resolveBaseStrike(attacker, target, { proximity: true, critical: false, state, damageType, damageAffinity }).damage;
-  const crit = resolveBaseStrike(attacker, target, { proximity: true, critical: true, state, damageType, damageAffinity }).damage;
+  const fixedPhysical = art?.damage?.type === "physical" && art.damage.fixed && Number.isFinite(art.damage.amount);
+  const normal = fixedPhysical
+    ? resolveFixedPhysicalStrike(attacker, target, art.damage.amount, { critical: false, state }).damage
+    : resolveBaseStrike(attacker, target, { proximity: true, critical: false, state, damageType, damageAffinity }).damage;
+  const crit = fixedPhysical
+    ? resolveFixedPhysicalStrike(attacker, target, art.damage.amount, { critical: true, state }).damage
+    : resolveBaseStrike(attacker, target, { proximity: true, critical: true, state, damageType, damageAffinity }).damage;
 
   const pMiss = getMissChance(attacker);
   const pHit = 1 - pMiss;

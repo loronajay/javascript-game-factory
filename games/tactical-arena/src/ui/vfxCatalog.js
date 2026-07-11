@@ -33,7 +33,9 @@ const ATTACK_PROJECTILES = Object.freeze({
   // Angel is a bow user — a radiant, gold-white blessed arrow (its magic tint reads holy).
   angel: Object.freeze({ shape: "arrow", arcHeight: 58, durationMs: 430, size: 1, colors: Object.freeze({ core: "#fff2a8", trail: "#d8c078" }) }),
   "fat-bowman": Object.freeze({ shape: "arrow", arcHeight: 64, durationMs: 450, size: 1.08, colors: Object.freeze({ core: "#ffd9a0", trail: "#8a5a30" }) }),
-  miner: Object.freeze({ shape: "rock", arcHeight: 48, durationMs: 420, size: 0.75, colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630" }) })
+  miner: Object.freeze({ shape: "rock", arcHeight: 48, durationMs: 420, size: 0.75, colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630" }) }),
+  "big-brother": Object.freeze({ shape: "tracer", arcHeight: 10, durationMs: 280, size: 1.25, colors: Object.freeze({ core: "#8ed6e8", trail: "#395d68" }) }),
+  "little-brother": Object.freeze({ shape: "tracer", arcHeight: 24, durationMs: 320, size: 1.15, colors: Object.freeze({ core: "#ffca8a", trail: "#8a3a22" }) })
 });
 
 const DEFAULT_ATTACK_PROJECTILE = Object.freeze({
@@ -793,6 +795,49 @@ const ABILITY_VFX = Object.freeze({
     windup: Object.freeze({ style: "toss" }),
     projectile: Object.freeze({ shape: "lob", arcHeight: 70, durationMs: 500, size: 0.8, colors: Object.freeze({ core: "#d8b35e", trail: "#5a4630" }) }),
     colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630", impact: "#fff0b8" })
+  }),
+  "force-tug": Object.freeze({
+    type: "statusStrike",
+    soundKey: "tetherGrab",
+    status: "slow",
+    motif: "snare",
+    particleCount: 10,
+    projectile: Object.freeze({ shape: "tracer", arcHeight: 12, durationMs: 300, size: 1.1, colors: Object.freeze({ core: "#8ed6e8", trail: "#395d68" }) }),
+    colors: Object.freeze({ core: "#8ed6e8", trail: "#395d68", impact: "#e8fbff" })
+  }),
+  "force-push": Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    radius: 1,
+    ringCount: 3,
+    particleCount: 18,
+    colors: Object.freeze({ core: "#8ed6e8", trail: "#395d68", impact: "#ffffff" })
+  }),
+  "polarity-shift": Object.freeze({
+    type: "ritual",
+    soundKey: "recharge",
+    durationMs: 780,
+    particleCount: 16,
+    windup: Object.freeze({ style: "gather", durationMs: 320, particleCount: 8 }),
+    colors: Object.freeze({ core: "#8ed6e8", trail: "#b08cff", impact: "#ffffff" })
+  }),
+  "cannon-fire": Object.freeze({
+    type: "statusStrike",
+    soundKey: "rocketPunch",
+    status: "stun",
+    motif: "impact",
+    particleCount: 12,
+    projectile: Object.freeze({ shape: "tracer", arcHeight: 18, durationMs: 330, size: 1.35, colors: Object.freeze({ core: "#ffb45e", trail: "#7a2c10" }) }),
+    colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffe0b8" })
+  }),
+  flamethrower: Object.freeze({
+    type: "volleyRain",
+    soundKey: "nuke",
+    staggerMs: 28,
+    durationMs: 260,
+    arcHeight: 18,
+    projectile: Object.freeze({ shape: "orb", size: 0.75, colors: Object.freeze({ core: "#ffb45e", trail: "#7a2c10" }) }),
+    colors: Object.freeze({ core: "#ff8a4c", trail: "#7a2c10", impact: "#ffd9a0" })
   })
 });
 

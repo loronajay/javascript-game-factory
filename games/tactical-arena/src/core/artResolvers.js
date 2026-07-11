@@ -1,13 +1,13 @@
 import { getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { artIsBodyBlocked, canUseArt, getArtTargetRange, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
-import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
+import { artIsBodyBlocked, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
+import { finalizeMagicDamage, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../rules/movement.js";
 import { applyStatus, isNegativeStatus, NEGATIVE_STATUS_TYPES, reflectsStatus } from "../rules/statuses.js";
 import { getGlobalHealBonus, getGlobalStatusChanceMultiplier } from "../rules/stances.js";
-import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, applyRolledStatus, resolvePhysicalDamageHealing } from "./combatEffects.js";
+import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, applyRolledStatus, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { validateOpenActivation } from "./commandValidation.js";
 import { consumeOneShotRage } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
@@ -77,6 +77,8 @@ const ART_RESOLVERS = new Map([
   ["stumble", resolveRushPath],
   ["fart", resolveFart],
   ["volley-shot", resolveVolleyShot],
+  ["cannon-fire", resolveCannonFire],
+  ["flamethrower", resolveConeArt],
   ["pray", resolveHealAllies],
   ["wish", resolveHealAllies],
   ["silence", resolveStatusCast],
@@ -150,7 +152,11 @@ const ART_RESOLVERS = new Map([
   // Miner: ore economy and a small demolition charge.
   ["ore-harvest", resolveOreHarvest],
   ["ore-abundance", resolveOreHarvest],
-  ["blasting-cap", resolveBlastingCap]
+  ["blasting-cap", resolveBlastingCap],
+  // Big Brother: targeted true/status attack, ally+enemy shove aura, global restore swap.
+  ["force-tug", resolveForceTug],
+  ["force-push", resolveForcePush],
+  ["polarity-shift", resolvePolarityShift]
 ]);
 
 export function useArt(state, command) {
@@ -327,9 +333,9 @@ function resolveTargetedArt(state, command, art) {
     const successful = roll.value >= 0 && roll.value < art.effect.chance;
     // Rain Stance's global heal bonus rides on a successful heal; a raging Juggernaut's
     // Null Zone shuts all healing off (isHealingDisabled) regardless of the roll.
-    const healing = (successful && !isHealingDisabled(next)) ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor) : 0;
-    actor.hp = Math.min(getEffectiveStats(actor, next).maxHp, actor.hp + healing);
-    effect = { attempted: true, applied: successful, healing };
+    const healing = successful ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor) : 0;
+    const restored = restoreHp(next, actor, actor, healing);
+    effect = { attempted: true, applied: successful, healing: restored.hpRestored, mpRestored: restored.mpRestored };
   }
 
   const healingEvents = damage.type === "physical" ? resolvePhysicalDamageHealing(next, actor, damageDealt) : [];
@@ -374,8 +380,8 @@ function applyStudyLeech(state, actor, target, damageDealt, events) {
   if (!reward) return;
   const beforeHp = actor.hp;
   const beforeMp = actor.mp;
-  actor.hp = Math.min(getEffectiveStats(actor, state).maxHp, actor.hp + reward.hp);
-  actor.mp = Math.min(getEffectiveStats(actor, state).maxMp, actor.mp + reward.mp);
+  restoreHp(state, actor, actor, reward.hp);
+  restoreMp(state, actor, actor, reward.mp);
   const hpRestored = actor.hp - beforeHp;
   const mpRestored = actor.mp - beforeMp;
   if (hpRestored > 0 || mpRestored > 0) {
@@ -401,14 +407,13 @@ function applyMagicSplash(state, actor, center, { amount, excludeId, art, damage
 }
 
 function applyAreaHeal(state, actor, center, { amount, excludeId, healingByTarget, targetIds }) {
-  if (!(amount > 0) || isHealingDisabled(state)) return;
+  if (!(amount > 0)) return;
   const boosted = amount + getGlobalHealBonus(state) + getCommandHealBonus(state, actor);
   for (const target of livingUnits(state)) {
     if (target.id === excludeId) continue;
     if (chebyshevDistance(center.position, target.position) > (clumsyEffect(actor)?.radius ?? 1)) continue;
-    const before = target.hp;
-    target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + boosted);
-    const healed = target.hp - before;
+    const restored = restoreHp(state, actor, target, boosted);
+    const healed = restored.hpRestored;
     if (healed <= 0) continue;
     targetIds.push(target.id);
     healingByTarget[target.id] = (healingByTarget[target.id] ?? 0) + healed;
@@ -548,15 +553,11 @@ function resolveFatWizardSurge(state, command, art) {
     });
   } else {
     const amount = swing.critical ? (art.heal?.critAmount ?? art.heal?.amount ?? 0) : (art.heal?.amount ?? 0);
-    if (!isHealingDisabled(next)) {
-      const boosted = amount + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
-      const before = target.hp;
-      target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + boosted);
-      const healed = target.hp - before;
-      if (healed > 0) {
-        healTargetIds.push(target.id);
-        healingByTarget[target.id] = healed;
-      }
+    const boosted = amount + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+    const restored = restoreHp(next, actor, target, boosted);
+    if (restored.hpRestored > 0) {
+      healTargetIds.push(target.id);
+      healingByTarget[target.id] = restored.hpRestored;
     }
     const rageSplash = getRageEffectValue(actor, "surgeSplashOnHit", null);
     const splashAmount = swing.critical ? (clumsy?.surgeHeal ?? 0) : (rageSplash?.amount ?? 0);
@@ -597,10 +598,8 @@ function resolveRelayPower(state, command, art) {
   actor.mp = Math.max(0, actor.mp - mp);
   const beforeHp = target.hp;
   const beforeMp = target.mp;
-  if (!isHealingDisabled(next)) {
-    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + hp + getGlobalHealBonus(next) + getCommandHealBonus(next, actor));
-  }
-  target.mp = Math.min(getEffectiveStats(target, next).maxMp, target.mp + mp);
+  restoreHp(next, actor, target, hp + getGlobalHealBonus(next) + getCommandHealBonus(next, actor));
+  restoreMp(next, actor, target, mp);
   const healed = target.hp - beforeHp;
   const restored = target.mp - beforeMp;
   spendAndAdvance(next, actor);
@@ -1295,6 +1294,121 @@ function resolveBlastingCapWall(state, command, art, actorState) {
   }]);
 }
 
+function resolveForceTug(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    resolveVictory(next);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, damage: 0, mpCost: cost
+    }]);
+  }
+
+  const damage = resolveBaseStrike(actor, target, { critical: swing.critical, state: next, damageType: art.damageType ?? "true" });
+  const dealt = Math.min(target.hp, damage.damage);
+  target.hp = Math.max(0, target.hp - damage.damage);
+
+  let effect = null;
+  if (target.hp > 0) {
+    const spec = swing.critical ? art.critEffect : art.effect;
+    const roll = drawValue(next.rngState, command.effectRoll);
+    next.rngState = roll.rngState;
+    effect = applyRolledStatus(target, spec, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+  }
+
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    targetIds: [target.id],
+    damageByTarget: { [target.id]: dealt },
+    damage,
+    hit: true,
+    critical: swing.critical,
+    roll: swing.hitRoll,
+    ...(effect ? { effect } : {}),
+    mpCost: cost
+  }]);
+}
+
+function resolveForcePush(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const radius = art.targeting?.radius ?? 1;
+  const amount = art.damage?.amount ?? 2;
+  const originalOccupied = new Set(livingUnits(next).map((unit) => positionKey(unit.position)));
+  const pushed = {};
+  const blocked = [];
+  const damageByTarget = {};
+
+  for (const target of livingUnits(next)) {
+    if (target.id === actor.id) continue;
+    if (chebyshevDistance(actor.position, target.position) > radius) continue;
+    const destination = fartPushDestination(actor, target);
+    if (!isOnBoard(next, destination) || isWallAt(next, destination) || originalOccupied.has(positionKey(destination))) {
+      const dealt = Math.min(target.hp, amount);
+      target.hp = Math.max(0, target.hp - amount);
+      blocked.push(target.id);
+      damageByTarget[target.id] = dealt;
+      continue;
+    }
+    const from = { ...target.position };
+    target.position = destination;
+    pushed[target.id] = { from, to: { ...destination } };
+  }
+
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    pushed,
+    blocked,
+    damageByTarget,
+    mpCost: cost
+  }]);
+}
+
+function resolvePolarityShift(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+  next.restorePolarityShift = !Boolean(next.restorePolarityShift);
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    restorePolarityShift: next.restorePolarityShift,
+    mpCost: cost
+  }]);
+}
+
 function resolveThrowCigar(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const placement = command.targetPosition;
@@ -1334,16 +1448,13 @@ function resolveTilePulse(state, command, art) {
   const healTargetIds = [];
   const healingByTarget = {};
   if (art.effect.heal) {
-    const healAmount = isHealingDisabled(next)
-      ? 0
-      : Math.max(0, Number(art.effect.heal.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+    const healAmount = Math.max(0, Number(art.effect.heal.amount) || 0) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
     if (healAmount > 0) {
       for (const ally of livingTeamUnits(next, actor)) {
         if (getTileAffinity(next, ally.position) !== art.effect.affinity) continue;
         if (!art.effect.global && chebyshevDistance(actor.position, ally.position) > (art.effect.range ?? 0)) continue;
-        const before = ally.hp;
-        ally.hp = Math.min(getEffectiveStats(ally, next).maxHp, ally.hp + healAmount);
-        const healed = ally.hp - before;
+        const restored = restoreHp(next, actor, ally, healAmount);
+        const healed = restored.hpRestored;
         if (healed <= 0) continue;
         healTargetIds.push(ally.id);
         healingByTarget[ally.id] = healed;
@@ -1380,11 +1491,12 @@ function resolveHealAllies(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   const healingByTarget = {};
+  const restoredByTarget = {};
   const targetIds = [];
   // A randomAmount heal (Fat Cleric's Hope) rolls ONE shared value in [min,max] from the
   // authoritative RNG and applies it to every ally — deterministic, so online clients agree.
   let base = Math.max(0, Number(art.effect.amount) || 0);
-  if (!isHealingDisabled(next) && art.effect.randomAmount) {
+  if (art.effect.randomAmount) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     const min = Math.max(0, Number(art.effect.randomAmount.min) || 0);
@@ -1393,18 +1505,18 @@ function resolveHealAllies(state, command, art) {
   }
   // Rain Stance's global heal bonus lifts every heal on the board (Pray/Wish too); a
   // raging Juggernaut's Null Zone zeroes all healing.
-  const amount = isHealingDisabled(next) ? 0 : base + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
+  const amount = base + getGlobalHealBonus(next) + getCommandHealBonus(next, actor);
 
   for (const target of livingTeamUnits(next, actor)) {
     if (!art.effect.global && chebyshevDistance(actor.position, target.position) > art.effect.radius) continue;
     // Tile-affinity-gated heal (Angel's Elevate: only allies on a white/light tile).
     if (art.effect.affinity && getTileAffinity(next, target.position) !== art.effect.affinity) continue;
-    const before = target.hp;
-    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + amount);
-    const healed = target.hp - before;
-    if (healed <= 0) continue;
+    const restored = restoreHp(next, actor, target, amount);
+    const healed = restored.hpRestored;
+    if (healed <= 0 && restored.mpRestored <= 0) continue;
     targetIds.push(target.id);
-    healingByTarget[target.id] = healed;
+    if (healed > 0) healingByTarget[target.id] = healed;
+    if (restored.mpRestored > 0) restoredByTarget[target.id] = restored.mpRestored;
   }
 
   spendAndAdvance(next, actor);
@@ -1414,6 +1526,7 @@ function resolveHealAllies(state, command, art) {
     actorId: actor.id,
     targetIds,
     healingByTarget,
+    restoredByTarget,
     mpCost: cost
   }]);
 }
@@ -1716,11 +1829,93 @@ function resolveStatusCast(state, command, art) {
   }]);
 }
 
-function resolveVolleyShot(state, command, art) {
+function applyTrueSplashDamage(state, actor, center, { amount = 0, radius = 1 } = {}, excludeId = null) {
+  const damageByTarget = {};
+  const targetIds = [];
+  const damage = Math.max(0, Number(amount) || 0);
+  if (damage <= 0) return { targetIds, damageByTarget };
+  for (const target of livingUnits(state)) {
+    if (target.id === excludeId || !areEnemies(actor, target)) continue;
+    if (chebyshevDistance(center, target.position) > radius) continue;
+    const dealt = Math.min(target.hp, damage);
+    target.hp = Math.max(0, target.hp - damage);
+    if (dealt > 0) {
+      targetIds.push(target.id);
+      damageByTarget[target.id] = dealt;
+    }
+  }
+  return { targetIds, damageByTarget };
+}
+
+function resolveCannonFire(state, command, art) {
   const actorState = findUnit(state, command.unitId);
-  const origin = getVolleyShotOriginForTarget(state, actorState, command.targetPosition);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  if (isWallBetween(state, actorState.position, targetState.position, actorState) ||
+      isShotBlocked(state, actorState.position, targetState.position, actorState)) {
+    return reject(ERR.TARGET_OBSTRUCTED);
+  }
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp -= cost;
+
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  next.rngState = swing.rngState;
+  if (swing.missed) {
+    spendAndAdvance(next, actor);
+    return accept(next, [{
+      type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
+      hit: false, missed: true, roll: swing.hitRoll, targetIds: [], damageByTarget: {}, mpCost: cost
+    }]);
+  }
+
+  const damage = resolveFixedPhysicalStrike(actor, target, art.damage?.amount ?? 10, { critical: swing.critical, state: next });
+  const damageDealt = Math.min(target.hp, damage.damage);
+  target.hp = Math.max(0, target.hp - damage.damage);
+
+  let stunned = false;
+  if (swing.critical && target.hp > 0 && art.onCrit?.status) {
+    const result = applyStatus(target, { type: art.onCrit.status, duration: art.onCrit.durationTurns ?? 1 });
+    if (result.applied) {
+      target.statuses = result.statuses;
+      stunned = true;
+    }
+  }
+
+  const splash = swing.critical
+    ? applyTrueSplashDamage(next, actor, target.position, art.onCrit?.splash, target.id)
+    : { targetIds: [], damageByTarget: {} };
+  const rockHardEvents = applyRockHardDefense(next, target, true);
+  const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    hit: true,
+    critical: swing.critical,
+    stunned,
+    roll: swing.hitRoll,
+    damage,
+    targetIds: [target.id, ...splash.targetIds],
+    damageByTarget: { [target.id]: damageDealt, ...splash.damageByTarget },
+    mpCost: cost
+  }, ...healingEvents, ...rockHardEvents]);
+}
+
+function resolveConeArt(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const origin = getConeOriginForTarget(state, actorState, command.targetPosition, art);
   if (!origin) return reject(ERR.INVALID_TARGET);
-  const cells = getVolleyShotCells(state, actorState, origin);
+  const cells = getConeCells(state, actorState, origin, art);
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
@@ -1729,7 +1924,7 @@ function resolveVolleyShot(state, command, art) {
   for (const position of cells) {
     const target = unitAt(next, position);
     if (!target || !areEnemies(actor, target)) continue;
-    const damage = art.damage.amount + getProximityBonus(actor, target);
+    const damage = art.damage.amount + (art.id === "volley-shot" ? getProximityBonus(actor, target) : 0);
     target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
@@ -2107,11 +2302,12 @@ function resolveProtect(state, command, art) {
   actor.mp -= cost;
 
   let healed = 0;
+  let mpRestored = 0;
   const healAmount = Number(getRageEffectValue(actor, "protectHeal", 0)) || 0;
-  if (healAmount > 0 && !isHealingDisabled(next)) {
-    const before = target.hp;
-    target.hp = Math.min(getEffectiveStats(target, next).maxHp, target.hp + healAmount + getGlobalHealBonus(next) + getCommandHealBonus(next, actor));
-    healed = target.hp - before;
+  if (healAmount > 0) {
+    const restored = restoreHp(next, actor, target, healAmount + getGlobalHealBonus(next) + getCommandHealBonus(next, actor));
+    healed = restored.hpRestored;
+    mpRestored = restored.mpRestored;
   }
 
   spendAndAdvance(next, actor);
@@ -2119,8 +2315,16 @@ function resolveProtect(state, command, art) {
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     from, to: { ...destination }, defended: [actor.id, target.id],
     healingByTarget: healed > 0 ? { [target.id]: healed } : {},
+    restoredByTarget: mpRestored > 0 ? { [target.id]: mpRestored } : {},
     mpCost: cost
   }]);
+}
+
+function resolveVolleyShot(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const origin = getVolleyShotOriginForTarget(state, actorState, command.targetPosition);
+  if (!origin) return reject(ERR.INVALID_TARGET);
+  return resolveConeArt(state, { ...command, targetPosition: origin }, art);
 }
 
 // Recharge: vent the reactor. Restore MP up to full; if already at full MP, mend 1 HP
@@ -2133,13 +2337,21 @@ function resolveRecharge(state, command, art) {
   let mpRestored = 0;
   let hpHealed = 0;
   if (actor.mp < stats.maxMp) {
-    const before = actor.mp;
-    actor.mp = Math.min(stats.maxMp, actor.mp + (art.restore?.mp ?? 0));
-    mpRestored = actor.mp - before;
-  } else if (!isHealingDisabled(next)) {
-    const before = actor.hp;
-    actor.hp = Math.min(stats.maxHp, actor.hp + (art.restore?.hpIfFull ?? 0));
-    hpHealed = actor.hp - before;
+    const restored = restoreMp(next, actor, actor, art.restore?.mp ?? 0, { bypassPolarity: Boolean(art.restore?.bypassPolarity) });
+    mpRestored = restored.mpRestored;
+    hpHealed = restored.hpRestored;
+  } else {
+    const restored = restoreHp(next, actor, actor, art.restore?.hpIfFull ?? 0, { bypassPolarity: Boolean(art.restore?.bypassPolarity) });
+    hpHealed = restored.hpRestored;
+    mpRestored = restored.mpRestored;
+    if ((hpHealed > 0 || mpRestored > 0) && art.nextTurnStatus) {
+      const result = applyStatus(actor, {
+        type: art.nextTurnStatus.type,
+        duration: art.nextTurnStatus.duration,
+        statModifiers: { ...(art.nextTurnStatus.statModifiers ?? {}) }
+      });
+      if (result.applied) actor.statuses = result.statuses;
+    }
   }
   spendAndAdvance(next, actor);
   return accept(next, [{

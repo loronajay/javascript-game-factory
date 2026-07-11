@@ -23,6 +23,8 @@ import { FAT_WIZARD } from "./units/fat-wizard.js";
 import { FAT_CLERIC } from "./units/fat-cleric.js";
 import { FAT_BOWMAN } from "./units/fat-bowman.js";
 import { MINER } from "./units/miner.js";
+import { BIG_BROTHER } from "./units/big-brother.js";
+import { LITTLE_BROTHER } from "./units/little-brother.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -48,7 +50,9 @@ export const UNIT_TYPES = Object.freeze({
   "fat-wizard": FAT_WIZARD,
   "fat-cleric": FAT_CLERIC,
   "fat-bowman": FAT_BOWMAN,
-  miner: MINER
+  miner: MINER,
+  "big-brother": BIG_BROTHER,
+  "little-brother": LITTLE_BROTHER
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -207,6 +211,28 @@ function teamCompositionStats(unit, state) {
       ally.type === type &&
       areAllies(ally, unit)));
     if (!hasTeam) continue;
+    const key = passiveStackKey(source, effect);
+    if (applied.has(key)) continue;
+    applied.add(key);
+    for (const [name, value] of Object.entries(effect.stats ?? {})) {
+      if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
+    }
+  }
+  return totals;
+}
+
+function globalTypePresenceStats(unit, state) {
+  const totals = {};
+  if (!state?.units) return totals;
+  const applied = new Set();
+  for (const source of allPassiveSources(getUnitType(unit.type))) {
+    const effect = source.effect;
+    if (effect?.type !== "globalTypePresenceStats") continue;
+    const required = effect.requiredTypes ?? [];
+    const active = required.every((type) => state.units.some((candidate) =>
+      candidate.hp > 0 &&
+      candidate.type === type));
+    if (!active) continue;
     const key = passiveStackKey(source, effect);
     if (applied.has(key)) continue;
     applied.add(key);
@@ -504,6 +530,9 @@ export function getEffectiveStats(unit, state = null) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(teamCompositionStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  for (const [name, value] of Object.entries(globalTypePresenceStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(enemyAuraStats(unit, state))) {
