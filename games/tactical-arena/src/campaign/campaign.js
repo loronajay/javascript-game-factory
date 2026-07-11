@@ -1151,12 +1151,14 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fullHp: true,
     tileObjects: minerWallObjects,
   },
-  // Has-Been Heroes (13×13): a plain full-HP 4v4 on the default corner blocks — no walls,
-  // no fire, no trial. The fat squad fields as itself in the opposite corner.
+  // Has-Been Heroes (13×13): a 4v4 on the default corner blocks — no walls, no fire, no
+  // trial. The fat squad fields as itself in the opposite corner, worn down to 20 HP
+  // apiece (per the mission's "worn-out"/"a little extra to prove" framing) while the
+  // player's squad stays at full HP.
   [HASBEEN_HEROES_MISSION_ID]: {
     positions: {},
     fallback: (unit) => ({ ...unit.position }),
-    fullHp: true,
+    hpFor: (unit, maxHp) => (unit.player === 2 ? Math.min(20, maxHp) : maxHp),
   },
 });
 
@@ -1173,7 +1175,11 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
     return {
       ...unit,
       position: { ...(layout.positions[unit.id] ?? layout.fallback(unit)) },
-      hp: layout.fullHp ? maxHp : Math.ceil(maxHp / 2),
+      hp: layout.hpFor
+        ? layout.hpFor(unit, maxHp)
+        : layout.fullHp
+        ? maxHp
+        : Math.ceil(maxHp / 2),
       mp: getInitialMp(definition),
       spent: false,
       defending: false,

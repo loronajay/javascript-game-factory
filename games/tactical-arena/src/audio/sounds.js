@@ -5,16 +5,19 @@
 
 import { HybridAudioEngine } from "./hybridAudioEngine.js";
 import { SOUND_CATALOG, SAMPLE_SOURCES } from "./soundCatalog.js";
+import { HASBEEN_HEROES_MISSION_ID } from "../campaign/campaign.js";
 
 export const MUSIC_FILES = Object.freeze({
   menu: "menu.mp3",
   missionBattle: "mission-battle.mp3",
   vsBattle: "vs-battle.mp3",
+  fattyBattle: "fatty-battle.mp3",
 });
 const MUSIC_BASE = new URL("../../sounds/", import.meta.url);
 
-export function musicKeyForMatchMode(mode) {
-  return mode === "campaign" ? "missionBattle" : "vsBattle";
+export function musicKeyForMatchMode(mode, campaignMissionId = null) {
+  if (mode !== "campaign") return "vsBattle";
+  return campaignMissionId === HASBEEN_HEROES_MISSION_ID ? "fattyBattle" : "missionBattle";
 }
 
 export class AudioManager {

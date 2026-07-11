@@ -2054,7 +2054,7 @@ test("Has-Been Heroes replaces the Elderroot placeholder with a town skin-reward
   assert.equal(map.nodes.some((n) => n.id === "uncharted-13"), false);
 });
 
-test("Has-Been Heroes builds a plain full-HP 13x13 4v4 with the fat squad in the far corner", () => {
+test("Has-Been Heroes builds a 13x13 4v4 with the worn-out fat squad at 20 HP in the far corner", () => {
   const config = createCampaignMatchConfig(HASBEEN_HEROES_MISSION_ID, ["paladin", "necromancer", "clod", "gargoyle"]);
   assert.equal(config.mode, "campaign");
   assert.equal(config.size, 13);
@@ -2063,14 +2063,19 @@ test("Has-Been Heroes builds a plain full-HP 13x13 4v4 with the fat squad in the
   assert.equal(config.teamNames[2], "The Has-Beens");
 
   const match = hasbeenMatchState();
-  // No board hazards, no forced skins on either side, full HP for everyone.
+  // No board hazards, no forced skins on either side; the player squad is full HP but
+  // the worn-out fat squad starts at 20 HP apiece.
   const walls = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "wall");
   const fires = Object.values(match.tileObjects ?? {}).filter((obj) => obj.kind === "fire");
   assert.equal(walls.length, 0);
   assert.equal(fires.length, 0);
   for (const unit of match.units) {
     assert.equal(unit.skin ?? null, null, `${unit.type} carries no forced skin`);
-    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.type} starts at full HP`);
+    if (unit.player === 2) {
+      assert.equal(unit.hp, 20, `${unit.type} starts worn down to 20 HP`);
+    } else {
+      assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.type} starts at full HP`);
+    }
   }
   assert.ok(findUnit(match, "p2-0-fat-knight"));
   assert.ok(findUnit(match, "p2-3-fat-wizard"));

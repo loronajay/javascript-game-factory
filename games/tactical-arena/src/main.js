@@ -577,7 +577,7 @@ function startMatch(config) {
   if (isTempoBattle(state)) setMessage("Tempo Battle begins. Units become ready by AGILITY.");
   if (tutorial) setMessage(tutorial.prompt);
   menu.show("match");
-  if (audioUnlocked && !muted) audio.startMusic(musicKeyForMatchMode(config.mode));
+  if (audioUnlocked && !muted) audio.startMusic(musicKeyForMatchMode(config.mode, campaignMissionId));
   // Bind AFTER the match screen + state exist so any remote commands buffered during
   // the lobby→match handoff flush onto a live board.
   if (online) net.bind(onlineController);
@@ -678,7 +678,7 @@ function updateTempoGauges() {
 
 function resumeActiveMusic() {
   if (muted || !audioUnlocked) return;
-  audio.startMusic(menu.active === "match" ? musicKeyForMatchMode(matchConfig?.mode) : "menu");
+  audio.startMusic(menu.active === "match" ? musicKeyForMatchMode(matchConfig?.mode, campaignMissionId) : "menu");
 }
 
 // Called by the menu when the match screen is left. Abandon a still-live online
