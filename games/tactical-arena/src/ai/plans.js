@@ -25,7 +25,7 @@
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -649,7 +649,7 @@ export function toCommands(player, plan) {
   else commands.push(artCommand(player, plan.unitId, p));
 
   if (plan.movePhase === "after" && plan.moveTo) commands.push(moveUnit(player, plan.unitId, plan.moveTo.x, plan.moveTo.y));
-  if (!artPrimary) commands.push(finishActivation(player, plan.unitId));
+  if (!artPrimary || plan.primaryKeepsActivationOpen) commands.push(finishActivation(player, plan.unitId));
   return commands;
 }
 
@@ -833,8 +833,21 @@ function placementCandidates(state, unit, art, ai) {
 
 // --- shared utilities -------------------------------------------------------
 
+function artPrimaryKeepsActivationOpen(unit, primary) {
+  if (primary?.kind !== "art") return false;
+  const art = getArt(unit.type, primary.artId);
+  return Boolean(!art?.bonusActionGroup && getRageEffectValue(unit, "moveAndUseArts", false));
+}
+
 function makePlan(unit, { bonus = null, moveTo = null, movePhase = null, primary }) {
-  return { unitId: unit.id, bonus, moveTo, movePhase, primary };
+  return {
+    unitId: unit.id,
+    bonus,
+    moveTo,
+    movePhase,
+    primary,
+    primaryKeepsActivationOpen: artPrimaryKeepsActivationOpen(unit, primary)
+  };
 }
 
 // Planning-time ART legality. Mirrors canUseArt's SUBSTANTIVE gates (implemented,

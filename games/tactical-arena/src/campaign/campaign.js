@@ -7,6 +7,7 @@ import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { computeCampaignGeometry, computeRegionBoxes } from "./campaignMap.js";
+import { getNicknamePref } from "../ui/nicknameModel.js";
 
 export const CAMPAIGN_PROGRESS_KEY = "tacticalArenaCampaignProgressV1";
 export const CLOD_MISSION_ID = "clod-trial";
@@ -751,6 +752,14 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     // back onto the normalized squad's slot order here for buildRoster.
     skins: {
       1: playerSquad.map((type) => selectedSkins?.[type] ?? null),
+    },
+    // The enemy squad is scripted, not a real local player — it must never inherit
+    // the player's own local nickname preferences (buildRoster's default fallback
+    // applies per-type, so an enemy Swordsman would otherwise wear the same
+    // nickname as the player's own Swordsman).
+    nicknames: {
+      1: playerSquad.map((type) => getNicknamePref(type)),
+      2: mission.enemySquad.map(() => null),
     },
     teamNames: {
       1: "Player Vanguard",

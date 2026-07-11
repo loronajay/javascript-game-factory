@@ -234,12 +234,12 @@
 .nickname-gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr)); gap:.55rem; }
 .nickname-gallery-row { display:grid; grid-template-columns:2.75rem minmax(0,1fr); gap:.6rem; align-items:center; min-width:0; padding:.5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.42)); }
 .nickname-gallery-row .unit-portrait.is-chip { width:2.75rem; height:3.4rem; border-radius:7px; }
-.nickname-gallery-copy { display:grid; gap:.3rem; min-width:0; }
+.nickname-gallery-copy { display:grid; grid-template-columns:minmax(0,1fr); gap:.3rem; min-width:0; }
 .nickname-gallery-unit { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:800 .68rem var(--font-display); letter-spacing:.03em; }
-.nickname-gallery-field { display:flex; gap:.35rem; align-items:center; }
+.nickname-gallery-field { display:flex; gap:.35rem; align-items:center; min-width:0; }
 .nickname-gallery-input { flex:1; min-width:0; padding:.35rem .5rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.55); color:var(--text); font:600 .68rem var(--font-display); }
 .nickname-gallery-input:focus-visible { outline:2px solid var(--brass-hi); outline-offset:1px; }
-.nickname-gallery-clear { padding:.3rem .55rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.68); color:var(--muted); font:700 .58rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+.nickname-gallery-clear { flex-shrink:0; padding:.3rem .55rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.68); color:var(--muted); font:700 .58rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
 .nickname-gallery-clear:hover { border-color:var(--brass); color:var(--brass-hi); }
 
 /* Progression reward announcements */

@@ -81,8 +81,13 @@ export const MYSTIC = Object.freeze({
     name: "RAGE Passive",
     kind: "passive",
     mpCost: 0,
-    effect: Object.freeze({ type: "statModifiers", stats: Object.freeze({ moveRange: 6 }), defending: true }),
-    description: "At 5 HP or lower, gain +6 MOVE and passively halve incoming physical and magic damage.",
+    effect: Object.freeze({
+      type: "statModifiers",
+      stats: Object.freeze({ moveRange: 6 }),
+      defending: true,
+      moveAndUseArts: true
+    }),
+    description: "At 5 HP or lower, gain +6 MOVE, may move and use ARTS in the same activation, and passively halve incoming physical and magic damage.",
     implemented: true
   })
 });

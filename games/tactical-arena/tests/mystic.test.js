@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation, useArt } from "../src/core/commands.js";
+import { beginActivation, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getArt, UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
@@ -85,4 +85,94 @@ test("Purify has a registered cleanse VFX recipe", () => {
   assert.equal(vfx.soundKey, "pray");
   assert.equal(vfx.windup?.style, "gather");
   assert.equal(vfx.projectile.shape, "orb");
+});
+
+test("raging Mystic can move before using an ART", () => {
+  const state = createBattleState({
+    size: 9,
+    units: [
+      { id: "mystic", player: 1, type: "mystic", x: 0, y: 0, hp: 5 },
+      { id: "ally", player: 1, type: "swordsman", x: 3, y: 0, hp: 10 },
+      { id: "foe", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+
+  let next = begin(state, "mystic");
+  const moved = applyCommand(next, moveUnit(1, "mystic", 1, 0));
+  assert.ok(moved.accepted, moved.errorCode);
+  next = moved.nextState;
+
+  const cast = applyCommand(next, useArt(1, "mystic", "pray"));
+  assert.ok(cast.accepted, cast.errorCode);
+  assert.equal(findUnit(cast.nextState, "mystic").spent, false);
+  assert.equal(cast.nextState.activation.unitId, "mystic");
+  assert.equal(cast.nextState.activation.moved, true);
+  assert.equal(cast.nextState.activation.primaryUsed, true);
+  assert.equal(findUnit(cast.nextState, "ally").hp, 13);
+
+  const finished = applyCommand(cast.nextState, finishActivation(1, "mystic"));
+  assert.ok(finished.accepted, finished.errorCode);
+  assert.equal(findUnit(finished.nextState, "mystic").spent, true);
+});
+
+test("raging Mystic can move after using an ART", () => {
+  const state = createBattleState({
+    size: 9,
+    units: [
+      { id: "mystic", player: 1, type: "mystic", x: 0, y: 0, hp: 5 },
+      { id: "ally", player: 1, type: "swordsman", x: 3, y: 0, hp: 10 },
+      { id: "foe", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+
+  let next = begin(state, "mystic");
+  const cast = applyCommand(next, useArt(1, "mystic", "pray"));
+  assert.ok(cast.accepted, cast.errorCode);
+  assert.equal(findUnit(cast.nextState, "mystic").spent, false);
+  assert.equal(cast.nextState.activation.primaryUsed, true);
+
+  const moved = applyCommand(cast.nextState, moveUnit(1, "mystic", 1, 0));
+  assert.ok(moved.accepted, moved.errorCode);
+  assert.equal(findUnit(moved.nextState, "mystic").position.x, 1);
+  assert.equal(moved.nextState.activation.moved, true);
+
+  const finished = applyCommand(moved.nextState, finishActivation(1, "mystic"));
+  assert.ok(finished.accepted, finished.errorCode);
+  assert.equal(findUnit(finished.nextState, "mystic").spent, true);
+});
+
+test("raging Mystic can move before casting Silence", () => {
+  const state = createBattleState({
+    size: 9,
+    units: [
+      { id: "mystic", player: 1, type: "mystic", x: 0, y: 0, hp: 5 },
+      { id: "foe", player: 2, type: "swordsman", x: 5, y: 0 }
+    ]
+  });
+
+  const opened = begin(state, "mystic");
+  const moved = applyCommand(opened, moveUnit(1, "mystic", 1, 0));
+  assert.ok(moved.accepted, moved.errorCode);
+
+  const cast = applyCommand(moved.nextState, useArt(1, "mystic", "silence", { targetId: "foe", effectRoll: 0.1 }));
+  assert.ok(cast.accepted, cast.errorCode);
+  assert.equal(findUnit(cast.nextState, "mystic").spent, false);
+  assert.deepEqual(findUnit(cast.nextState, "foe").statuses, [{ type: "silence", duration: 1 }]);
+  assert.equal(cast.nextState.activation.primaryUsed, true);
+});
+
+test("Mystic still needs rage to move before using an ART", () => {
+  const state = createBattleState({
+    size: 9,
+    units: [
+      { id: "mystic", player: 1, type: "mystic", x: 0, y: 0, hp: 6 },
+      { id: "ally", player: 1, type: "swordsman", x: 3, y: 0, hp: 10 },
+      { id: "foe", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+
+  const opened = begin(state, "mystic");
+  const moved = applyCommand(opened, moveUnit(1, "mystic", 1, 0));
+  assert.ok(moved.accepted, moved.errorCode);
+  assert.equal(applyCommand(moved.nextState, useArt(1, "mystic", "pray")).accepted, false);
 });

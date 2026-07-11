@@ -116,7 +116,7 @@ test("mystic is available with healing ARTS, Silence, Guardian, and RAGE data", 
     type: "teamAura", stats: { defense: 1 }
   });
   assert.deepEqual(UNIT_TYPES.mystic.rageArt.effect, {
-    type: "statModifiers", stats: { moveRange: 6 }, defending: true
+    type: "statModifiers", stats: { moveRange: 6 }, defending: true, moveAndUseArts: true
   });
 });
 

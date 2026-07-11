@@ -11,14 +11,21 @@ const state = {
   ]
 };
 
-test("a unit type speaker resolves to its catalog name and portrait", () => {
+const nicknamedBothSidesState = {
+  units: [
+    { id: "p1-sword", type: "swordsman", player: 1, nickname: "Leo" },
+    { id: "p2-sword", type: "swordsman", player: 2, nickname: null }
+  ]
+};
+
+test("a unit type speaker resolves to its catalog name and the live unit's portrait/skin", () => {
   const line = normalizeDialogueLine({ speaker: "swordsman", text: "Keep your shield up." }, state);
 
   assert.equal(line.name, "Swordsman");
   assert.equal(line.type, "swordsman");
   assert.equal(line.text, "Keep your shield up.");
   assert.equal(line.side, "left");
-  assert.equal(line.portrait?.src, "assets/units/swordsman.png");
+  assert.equal(line.portrait?.src, "assets/units/skins/swordsman/medieval-swordsman.png");
 });
 
 test("a speaker unit id resolves live player side and selected skin", () => {
@@ -67,6 +74,27 @@ test("an authored line name still wins over a speaking unit's nickname", () => {
   }, state);
 
   assert.equal(line.name, "Wandering Mystic");
+});
+
+test("a bare unit-type speaker resolves to the same nickname as a speakerId line for that unit", () => {
+  const line = normalizeDialogueLine({ speaker: "mystic", text: "Fortune favors us again." }, state);
+
+  assert.equal(line.name, "Leo");
+  assert.equal(line.type, "mystic");
+});
+
+test("a bare unit-type speaker defaults to the human party (player 1) and never borrows an enemy's line", () => {
+  const line = normalizeDialogueLine({ speaker: "swordsman", text: "Stay spread out." }, nicknamedBothSidesState);
+
+  assert.equal(line.name, "Leo");
+  assert.equal(line.player, 1);
+});
+
+test("a bare unit-type speaker explicitly scoped to player two never picks up the player one nickname", () => {
+  const line = normalizeDialogueLine({ speaker: "swordsman", player: 2, text: "Hold the line." }, nicknamedBothSidesState);
+
+  assert.equal(line.name, "Swordsman");
+  assert.equal(line.player, 2);
 });
 
 test("unknown speakers fall back to a narrator-safe line", () => {

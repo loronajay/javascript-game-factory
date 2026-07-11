@@ -482,6 +482,11 @@ export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   const activation = state.activation;
   const usedBonusGroups = activation?.bonusActionGroups ?? [];
+  const moveAndArtAvailable = Boolean(
+    getRageEffectValue(actor, "moveAndUseArts", false) &&
+    activation?.unitId === actor.id &&
+    !activation?.primaryUsed
+  );
   const bonusActionAvailable = Boolean(
     art?.bonusActionGroup &&
     activation?.unitId === actor.id &&
@@ -493,7 +498,7 @@ export function canUseArt(state, actor, artId) {
     !activation?.primaryUsed;
   const actionAvailable = art?.bonusActionGroup
     ? bonusActionAvailable
-    : ((!activation?.moved && !activation?.primaryUsed) || realmTraversalPulse);
+    : (moveAndArtAvailable || (!activation?.moved && !activation?.primaryUsed) || realmTraversalPulse);
   return Boolean(
     art?.implemented && art.kind === "active" &&
     activation?.unitId === actor.id &&

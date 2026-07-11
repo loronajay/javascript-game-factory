@@ -98,6 +98,25 @@ test("a caster yields targeted ART plans (Spark)", () => {
   assert.ok(plans.some((p) => p.primary.kind === "art" && p.primary.artId === "nuke"));
 });
 
+test("raging Mystic ART plans explicitly finish after the ART keeps activation open", () => {
+  const state = createBattleState({
+    size: 9, seed: 1,
+    units: [
+      { id: "p1-mystic", type: "mystic", player: 1, x: 1, y: 1, hp: 5 },
+      { id: "p1-ally", type: "swordsman", player: 1, x: 2, y: 1, hp: 10 },
+      { id: "p2-sword", type: "swordsman", player: 2, x: 8, y: 8 }
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-mystic"));
+  const pray = plans.find((p) => p.primary.kind === "art" && p.primary.artId === "pray");
+  assert.ok(pray, "expected a Pray plan");
+  assert.equal(pray.primaryKeepsActivationOpen, true);
+  assert.deepEqual(toCommands(1, pray).map((command) => command.type), [
+    "BEGIN_ACTIVATION", "USE_ART", "FINISH_ACTIVATION"
+  ]);
+  assertPlanReplays(state, 1, pray);
+});
+
 test("footwork plans are always valid full-length paths", () => {
   const state = skirmish();
   const plans = generatePlans(state, findUnit(state, "p1-sword"))

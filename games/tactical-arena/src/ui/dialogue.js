@@ -7,10 +7,24 @@ const VALID_SIDES = new Set(["left", "right"]);
 function findSpeakerUnit(state, line) {
   if (!state?.units?.length) return null;
   if (line.speakerId) return state.units.find((unit) => unit.id === line.speakerId) ?? null;
-  if (line.speaker && !UNIT_TYPES[line.speaker]) {
+  if (!line.speaker) return null;
+  if (!UNIT_TYPES[line.speaker]) {
     return state.units.find((unit) => unit.id === line.speaker) ?? null;
   }
-  return null;
+  // A bare unit-type speaker (no id) still needs to resolve to a real unit so it
+  // picks up that unit's nickname exactly like a speakerId line does — otherwise
+  // the same character flips between its nickname and its base type name across
+  // dialogue boxes depending on which shorthand a given line happened to use.
+  // Scoped to a specific player (defaulting to the human party, player 1) so a
+  // same-typed enemy can never resolve to — and borrow — the local player's
+  // nickname preference.
+  const type = line.speaker;
+  const player = line.player ?? 1;
+  return (
+    state.units.find((unit) => unit.type === type && unit.player === player && unit.hp > 0) ??
+    state.units.find((unit) => unit.type === type && unit.player === player) ??
+    null
+  );
 }
 
 function speakerType(line, speakerUnit) {

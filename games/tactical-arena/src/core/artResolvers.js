@@ -168,6 +168,18 @@ export function useArt(state, command) {
   return resolver(state, command, art);
 }
 
+function artKeepsActivationOpen(actor, art) {
+  return Boolean(!art?.bonusActionGroup && getRageEffectValue(actor, "moveAndUseArts", false));
+}
+
+function completeArtUse(state, actor, art, keepsActivationOpen = artKeepsActivationOpen(actor, art)) {
+  if (keepsActivationOpen) {
+    state.activation.primaryUsed = true;
+    return;
+  }
+  spendAndAdvance(state, actor);
+}
+
 function resolveRushPath(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   if (!validateRushPath(state, actorState, command.path, art)) return reject(ERR.INVALID_ART_PATH);
@@ -1488,6 +1500,7 @@ function resolveTilePulse(state, command, art) {
 function resolveHealAllies(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
+  const keepsActivationOpen = artKeepsActivationOpen(actor, art);
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   const healingByTarget = {};
@@ -1519,7 +1532,7 @@ function resolveHealAllies(state, command, art) {
     if (restored.mpRestored > 0) restoredByTarget[target.id] = restored.mpRestored;
   }
 
-  spendAndAdvance(next, actor);
+  completeArtUse(next, actor, art, keepsActivationOpen);
   return accept(next, [{
     type: "ART_RESOLVED",
     artId: art.id,
@@ -1577,6 +1590,7 @@ function resolveCleanseAlly(state, command, art) {
 
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
+  const keepsActivationOpen = artKeepsActivationOpen(actor, art);
   const cost = getArtMpCost(actor, art, next);
   const target = findUnit(next, command.targetId);
   actor.mp -= cost;
@@ -1588,7 +1602,7 @@ function resolveCleanseAlly(state, command, art) {
   const hadStatuses = before.length > kept.length;
   target.statuses = kept;
 
-  spendAndAdvance(next, actor);
+  completeArtUse(next, actor, art, keepsActivationOpen);
   return accept(next, [{
     type: "ART_RESOLVED",
     artId: art.id,
@@ -1809,6 +1823,7 @@ function resolveStatusCast(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
+  const keepsActivationOpen = artKeepsActivationOpen(actor, art);
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
@@ -1818,7 +1833,7 @@ function resolveStatusCast(state, command, art) {
   // Stone Body reflects a targeted status back onto the caster (applyRolledStatus).
   const effect = applyRolledStatus(target, art.effect, roll.value, actor, getGlobalStatusChanceMultiplier(next));
 
-  spendAndAdvance(next, actor);
+  completeArtUse(next, actor, art, keepsActivationOpen);
   return accept(next, [{
     type: "ART_RESOLVED",
     artId: art.id,

@@ -10,9 +10,11 @@ import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
+import { getNicknamePref } from "./nicknameModel.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
+import { openRewardSkinPicker } from "./rewardSkinPicker.js";
 import {
   HASBEEN_MYSTIC_SKIN_PACK_ID,
   getCampaignSkinRewardChoices,
@@ -59,7 +61,7 @@ export function campaignUnitChoiceGroups(unlockedTypes = [], squad = [], slot = 
     label: group.label,
     choices: group.types.map((type) => ({
       value: type,
-      label: UNIT_TYPES[type].name,
+      label: getNicknamePref(type) || UNIT_TYPES[type].name,
       type,
     })),
   }));
@@ -185,7 +187,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       difficulty,
       size,
       squads: { 1: spPickers.p1.getSquad(), 2: spPickers.p2.getSquad() },
-      skins: { 1: spPickers.p1.getSkins(), 2: spPickers.p2.getSkins() }
+      skins: { 1: spPickers.p1.getSkins(), 2: spPickers.p2.getSkins() },
+      // Player 2 is CPU-controlled — only the human's own nickname preferences
+      // should ride onto the board, never re-derived onto the CPU's squad.
+      nicknames: { 1: spPickers.p1.getNicknames(), 2: spPickers.p2.getSquad().map(() => null) }
     };
   }
 
@@ -198,7 +203,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       difficulty,
       size,
       squads: { 1: tempoSpPickers.p1.getSquad(), 2: tempoSpPickers.p2.getSquad() },
-      skins: { 1: tempoSpPickers.p1.getSkins(), 2: tempoSpPickers.p2.getSkins() }
+      skins: { 1: tempoSpPickers.p1.getSkins(), 2: tempoSpPickers.p2.getSkins() },
+      nicknames: { 1: tempoSpPickers.p1.getNicknames(), 2: tempoSpPickers.p2.getSquad().map(() => null) }
     };
   }
 
@@ -524,7 +530,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       .filter((type) => !campaignSquad.includes(type) || campaignSquad[slot] === type)
       .map((type) => ({
         value: type,
-        label: UNIT_TYPES[type].name,
+        label: getNicknamePref(type) || UNIT_TYPES[type].name,
         sub: UNIT_TYPES[type].classType,
         type,
       }));
@@ -659,7 +665,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   async function openTutorialRewardChoice(summary = {}) {
     const current = readProgress(globalThis.localStorage);
     if (!current.allTutorialsComplete || current.rewardGranted) return;
-    const choice = await openChoiceModal({
+    const choice = await openRewardSkinPicker({
       title: "Juggernaut Unlocked",
       subtitle: "Your first tank joins the roster. Choose one skin reward for this fresh playthrough.",
       accent: TEAM_COLOR[1],
@@ -669,7 +675,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         label: skinRewardLabel(reward),
         sub: reward.type === "juggernaut" ? "New Juggernaut skin" : "Starter unit skin",
         type: reward.type,
-        skin: reward.slug,
+        slug: reward.slug,
       })),
     });
     if (!choice) return;
@@ -707,7 +713,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     const choices = getCampaignSkinRewardChoices(packId);
     if (!choices || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return null;
     const copy = CAMPAIGN_REWARD_COPY[packId] ?? DEFAULT_CAMPAIGN_REWARD_COPY;
-    const choice = await openChoiceModal({
+    const choice = await openRewardSkinPicker({
       title: copy.title,
       subtitle: copy.subtitle,
       accent: TEAM_COLOR[1],
@@ -717,7 +723,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         label: skinRewardLabel(reward),
         sub: `${unitLabel(reward.type)} costume`,
         type: reward.type,
-        skin: reward.slug,
+        slug: reward.slug,
       })),
     });
     if (!choice) return null;
