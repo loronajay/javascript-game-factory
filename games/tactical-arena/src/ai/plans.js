@@ -24,8 +24,8 @@
 // finish.
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
-import { areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
-import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
+import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
+import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -877,6 +877,11 @@ function artUsableForPlanning(state, unit, art) {
     !unit.statuses?.some((status) => status.type === "silence") &&
     !(isRaging(unit) && art.replacedByRageArt) &&
     unit.mp >= getArtMpCost(unit, art, state) &&
+    // Riot Cop: a depleted finite-use art is off the table, and Lockdown is only plan- able
+    // while no squadmate has acted yet this turn (it must be the first command).
+    hasAbilityUsesRemaining(unit, art) &&
+    !(art.firstCommandOnly && (state.units ?? []).some((ally) =>
+      ally.hp > 0 && ally.id !== unit.id && areAllies(ally, unit) && takesTurns(ally) && ally.spent)) &&
     (!art.rageLocked || isRaging(unit)) &&
     !(art.hpCost && !art.selfKill && unit.hp <= art.hpCost) &&
     (!art.requiresConditionEnemy || hasConditionEnemy(state, unit, art.condition)) &&

@@ -160,6 +160,30 @@ test("Beckon is rage-locked and costs 20 MP while using Soul Shuffle", () => {
   assert.equal(result.events.find((entry) => entry.type === "ART_RESOLVED").summonedType, choice);
 });
 
+test("Beckon's ghost arrives already RAGING, unlike a plain Summon's ghost", () => {
+  const raging = begin(makeState(2, 5), "summoner");
+  const choice = getSoulShuffleChoices(findUnit(raging, "summoner"), raging.rngState).choices[0];
+  const beckoned = applyCommand(raging, useArt(1, "summoner", "beckon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: choice
+  }));
+  assert.ok(beckoned.accepted, beckoned.errorCode);
+  const beckonEvent = beckoned.events.find((entry) => entry.type === "ART_RESOLVED");
+  const beckonedGhost = findUnit(beckoned.nextState, beckonEvent.summonedUnitId);
+  assert.ok(isRaging(beckonedGhost), "Beckon's ghost should spawn already raging");
+
+  const summoned = begin(makeState(3), "summoner");
+  const summonChoice = getSoulShuffleChoices(findUnit(summoned, "summoner"), summoned.rngState).choices[0];
+  const cast = applyCommand(summoned, useArt(1, "summoner", "summon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: summonChoice
+  }));
+  assert.ok(cast.accepted, cast.errorCode);
+  const summonEvent = cast.events.find((entry) => entry.type === "ART_RESOLVED");
+  const summonedGhost = findUnit(cast.nextState, summonEvent.summonedUnitId);
+  assert.ok(!isRaging(summonedGhost), "a plain Summon's ghost should spawn at full health");
+});
+
 test("Energy Retrieval redirects a ghost's self MP restore to Summoner", () => {
   const seed = seedWithChoice("juggernaut");
   const opened = begin(makeState(seed), "summoner");

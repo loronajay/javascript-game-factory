@@ -29,6 +29,7 @@ import { BLACKSWORD } from "./units/blacksword.js";
 import { RONIN } from "./units/ronin.js";
 import { MOTHER_NATURE } from "./units/mother-nature.js";
 import { SUMMONER } from "./units/summoner.js";
+import { RIOT_COP } from "./units/riot-cop.js";
 import { drawValue } from "./rng.js";
 import { areAllies, areEnemies } from "./state.js";
 import { WEATHER_TYPES, normalizeWeatherSpec } from "./weather.js";
@@ -62,7 +63,8 @@ export const UNIT_TYPES = Object.freeze({
   blacksword: BLACKSWORD,
   ronin: RONIN,
   "mother-nature": MOTHER_NATURE,
-  summoner: SUMMONER
+  summoner: SUMMONER,
+  "riot-cop": RIOT_COP
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -109,6 +111,42 @@ export function getInitialMp(typeOrDefinition) {
   const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
   const resource = getResourceMeta(definition);
   return Number.isFinite(resource.startsAt) ? resource.startsAt : definition.stats.maxMp;
+}
+
+// --- Finite ability uses (Riot Cop) -----------------------------------------
+// Some arts are gated by a finite pool of USES rather than MP (Riot Cop's Stun Gun /
+// Smoke Bomb). Each such art declares a numeric `uses` (its max); the live per-art
+// remaining counter lives on `unit.abilityUses`, and `unit.abilityRecharge` tracks how
+// many of the unit's own turns a depleted pool has waited (see the reducer's
+// beginActivation recharge). Arts without `uses` are infinite (Shield Bash / Cover).
+export function getAbilityUseMax(art) {
+  return Number.isFinite(art?.uses) ? art.uses : null;
+}
+
+// A fresh { artId: max } map for every finite-use art a definition owns (the rageArt
+// included). Seeds createUnit and the rage-entry refresh.
+export function initialAbilityUses(typeOrDefinition) {
+  const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
+  const uses = {};
+  for (const art of [...(definition.arts ?? []), definition.rageArt].filter(Boolean)) {
+    if (Number.isFinite(art.uses)) uses[art.id] = art.uses;
+  }
+  return uses;
+}
+
+// Remaining uses of a finite-use art on `unit` (its max when the unit has no counter
+// yet); null for an infinite-use / MP-costed art.
+export function getAbilityUsesRemaining(unit, art) {
+  if (!Number.isFinite(art?.uses)) return null;
+  const stored = unit?.abilityUses?.[art.id];
+  return Number.isFinite(stored) ? stored : art.uses;
+}
+
+// True when a finite-use art still has a use left (always true for an infinite-use art).
+// The single gate read by canUseArt + the CPU planner so both agree.
+export function hasAbilityUsesRemaining(unit, art) {
+  const remaining = getAbilityUsesRemaining(unit, art);
+  return remaining === null || remaining > 0;
 }
 
 export function getArt(type, artId) {

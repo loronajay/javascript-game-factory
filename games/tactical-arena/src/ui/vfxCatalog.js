@@ -825,6 +825,48 @@ const ABILITY_VFX = Object.freeze({
     projectile: Object.freeze({ shape: "lob", arcHeight: 70, durationMs: 500, size: 0.8, colors: Object.freeze({ core: "#d8b35e", trail: "#5a4630" }) }),
     colors: Object.freeze({ core: "#d8b35e", trail: "#6b5630", impact: "#fff0b8" })
   }),
+  // Riot Cop — Stun Gun: an electric dart tracer, no windup (a quick snap shot). Its
+  // impact/floats + the STUN/SLOW readout are driven by resolveCombat.
+  "stun-gun": Object.freeze({
+    type: "statusStrike",
+    soundKey: "spark",
+    motif: "impact",
+    projectile: Object.freeze({ shape: "tracer", arcHeight: 12, durationMs: 300, size: 0.9, colors: Object.freeze({ core: "#8fe6ff", trail: "#2f6fae" }) }),
+    colors: Object.freeze({ core: "#8fe6ff", trail: "#2f6fae", impact: "#dff6ff" })
+  }),
+  // Riot Cop — Smoke Bomb: a canister lobbed at a tile that bursts into a blinding cloud.
+  "smoke-bomb-riot": Object.freeze({
+    type: "lob",
+    soundKey: "smokeBomb",
+    motif: "smoke",
+    puffCount: 10,
+    windup: Object.freeze({ style: "toss" }),
+    projectile: Object.freeze({ shape: "lob", arcHeight: 78, durationMs: 560, size: 1, colors: Object.freeze({ core: "#cfd3cb", trail: "#7c8078" }) }),
+    colors: Object.freeze({ core: "#cfd3cb", trail: "#7c8078", impact: "#e8ece2" })
+  }),
+  // Riot Cop — Cover: a steel-blue guard pulse as he braces in the ally's place.
+  cover: Object.freeze({
+    type: "healPulse",
+    soundKey: "buildCover",
+    particleCount: 10,
+    radius: 30,
+    durationMs: 460,
+    colors: Object.freeze({ core: "#bcd0e8", trail: "#4a5a70", impact: "#e6eefa" })
+  }),
+  // Riot Cop — Lockdown (RAGE): a riot-shield shockwave crackdown that washes the whole area.
+  lockdown: Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    blast: true,
+    blastTiles: 3,
+    shake: 10,
+    particleCount: 20,
+    radius: 46,
+    durationMs: 680,
+    windup: Object.freeze({ style: "gather", durationMs: 340, particleCount: 10 }),
+    boardFlash: true,
+    colors: Object.freeze({ core: "#8fb4e8", trail: "#33507e", impact: "#dbe8fb" })
+  }),
   "force-tug": Object.freeze({
     type: "statusStrike",
     soundKey: "tetherGrab",

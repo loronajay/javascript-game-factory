@@ -1,5 +1,5 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -513,6 +513,15 @@ export function hasConditionEnemy(state, actor, condition) {
       : getTileAffinity(state, unit.position) === condition.affinity));
 }
 
+// True when it is still `actor`'s FIRST command of the turn (Riot Cop's Lockdown must be
+// used before he moves or any squadmate acts). The activation is fresh (no move/primary),
+// and no allied turn-taking unit has spent its activation yet this turn.
+export function isFirstTurnCommand(state, actor) {
+  if (state.activation?.moved || state.activation?.primaryUsed) return false;
+  return !(state.units ?? []).some((unit) =>
+    unit.hp > 0 && unit.id !== actor.id && areAllies(unit, actor) && takesTurns(unit) && unit.spent);
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   const activation = state.activation;
@@ -544,6 +553,9 @@ export function canUseArt(state, actor, artId) {
     !isStunned(actor) &&
     !actor.statuses?.some((status) => status.type === "silence") &&
     actor.mp >= getArtMpCost(actor, art, state) &&
+    // Riot Cop: a finite-use art needs a use left, and Lockdown must be the first command.
+    hasAbilityUsesRemaining(actor, art) &&
+    (!art.firstCommandOnly || isFirstTurnCommand(state, actor)) &&
     (!art.rageLocked || isRaging(actor)) &&
     !(art.weather && actor.lastWeather === art.weather) &&
     (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor)) &&

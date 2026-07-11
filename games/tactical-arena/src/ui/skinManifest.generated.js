@@ -830,5 +830,35 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "summoner",
     slug: "void-dweller",
     file: "void-dweller-summoner.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "summer-vibes",
+    file: "summer-vibes-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "firefighter",
+    file: "firefighter-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "neon-squad",
+    file: "neon-squad-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "snow-patrol",
+    file: "snow-patrol-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "swat-team",
+    file: "swat-team-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "transylvanian-guard",
+    file: "transylvanian-guard-riot-cop.png"
   }
 ]);

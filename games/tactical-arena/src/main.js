@@ -2283,6 +2283,39 @@ async function resolveInstantArt(command) {
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
+  } else if (resolved?.artId === "smoke-bomb-riot" && actorBefore) {
+    // Riot Cop lobs a canister at the tile; on a landed throw every caught enemy floats
+    // BLIND, on a fizzle the tile puffs harmlessly.
+    const metrics = createBoardMetrics(state.size);
+    const clouded = (resolved.statusTargets ?? []).map((id) => findUnit(state, id)).filter(Boolean);
+    await effects.playAbilityVfx("smoke-bomb-riot", { actor: actorBefore, targets: clouded, targetPosition: resolved.center });
+    if (resolved.missed) {
+      await effects.floatText(unitCenter(metrics, { position: resolved.center }), "FIZZLE", "#b9b19a");
+    } else {
+      await Promise.all(clouded.map((target) => effects.floatText(unitCenter(metrics, target), "BLIND", "#d9d2c0")));
+    }
+  } else if (resolved?.artId === "cover" && actorBefore) {
+    // Riot Cop and the ally slide through each other's tiles, then he braces (guard pulse).
+    const metrics = createBoardMetrics(state.size);
+    const targetBefore = targetsBefore[0];
+    if (targetBefore && resolved.swap) {
+      await Promise.all([
+        effects.animateMovement(actorBefore.id, actorBefore.position, resolved.swap[actorBefore.id]),
+        effects.animateMovement(targetBefore.id, targetBefore.position, resolved.swap[targetBefore.id])
+      ]);
+    }
+    await effects.playAbilityVfx("cover", { actor: actorBefore, targets: targetBefore ? [targetBefore] : [] });
+    if (resolved.empowered) {
+      const landing = resolved.swap?.[actorBefore.id] ?? actorBefore.position;
+      await effects.floatText(unitCenter(metrics, { position: landing }), "+1 STR", "#ff9a4c");
+    }
+  } else if (resolved?.artId === "lockdown" && actorBefore) {
+    // A self-centred crackdown shockwave; every unit caught (allies included) floats LOCKDOWN.
+    const metrics = createBoardMetrics(state.size);
+    const affected = (resolved.statusTargets ?? []).map((id) => findUnit(state, id)).filter(Boolean);
+    await effects.playAbilityVfx("lockdown", { actor: actorBefore, targets: affected });
+    effects.shake(9);
+    await Promise.all(affected.map((target) => effects.floatText(unitCenter(metrics, target), "LOCKDOWN", "#8fb4e8")));
   } else if (resolved?.artId === "smog" && actorBefore) {
     // A blind cloud rolls out from Virus; every caught enemy floats BLIND (no roll).
     const metrics = createBoardMetrics(state.size);
@@ -3472,7 +3505,9 @@ async function handleTile(position) {
       }
       if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: position, summonType }))) {
         mode = null;
-        setMessage(`${getUnitType(summonType).name} beckoned as a ghost. Take its turn.`);
+        setMessage(artId === "beckon"
+          ? `${getUnitType(summonType).name} beckoned as a raging ghost. Take its turn.`
+          : `${getUnitType(summonType).name} called as a ghost. Take its turn.`);
       }
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
       mode = null;
@@ -3618,6 +3653,28 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "thunderous-charge", { targetPosition: position }))) {
       mode = null;
       setMessage("Thunderous Charge resolved. This unit's activation is complete.");
+    }
+  } else if (mode === "art:smoke-bomb-riot") {
+    // Riot Cop's Smoke Bomb: pick a highlighted clear tile within range (targetedBlast).
+    const art = getAvailableArts(unit).find((a) => a.id === "smoke-bomb-riot");
+    if (!art || !getTargetedBlastAimTiles(state, unit, art).has(positionKey(position))) {
+      setMessage("Smoke Bomb: click a highlighted empty tile within range.", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "smoke-bomb-riot", { targetPosition: position }))) {
+      mode = null;
+      setMessage("Smoke Bomb thrown. This unit's activation is complete.");
+    }
+  } else if (mode === "art:cover") {
+    // Riot Cop's Cover: click an adjacent ally to swap with (never yourself).
+    const target = unitAt(state, position);
+    const art = getArt(unit.type, "cover");
+    const reach = art?.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+    const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
+      chebyshevDistance(unit.position, target.position) <= reach;
+    if (!inReach) {
+      setMessage("Cover: click a highlighted adjacent ally to swap with (not yourself).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "cover", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Cover: you swap in and brace. This unit's activation is complete.");
     }
   } else if (mode === "art:rewind") {
     const placement = getRevivePlacementTiles(state, unit, getAvailableArts(unit).find((a) => a.id === "rewind"));
@@ -3794,8 +3851,8 @@ async function handleActionClick(action, unit) {
       }
       const lead = action === "art:volley-shot" || art?.targeting?.shape === "cone"
         ? "Hover a direction to preview the cone, then click to fire."
-        : action === "art:thunderous-charge"
-          ? "Hover a highlighted tile to preview the blast, then click to charge (not an enemy's tile)."
+        : art?.targeting?.shape === "targetedBlast"
+          ? "Hover a highlighted tile to preview the area, then click it (not a tile a unit stands on)."
         : art?.targeting?.shape === "rushPath"
           ? `Choose step 1 of ${getRushSteps(unit, art, state)}.`
         : action === "art:flight"

@@ -1,4 +1,4 @@
-import { getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getAbilityUseMax, getAbilityUsesRemaining, getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
@@ -26,12 +26,28 @@ function artCostParts(art, unitOrDefinition = null) {
     const [main, ...rest] = String(art.costLabel).split(" ");
     return { main, unit: rest.join(" ") };
   }
+  // Riot Cop's finite-use arts advertise how many uses are left rather than an MP cost, so
+  // the player can see the pool draining (and refilling a full turn after it runs dry).
+  const useMax = getAbilityUseMax(art);
+  if (useMax !== null) {
+    const remaining = unitOrDefinition && unitOrDefinition.abilityUses
+      ? getAbilityUsesRemaining(unitOrDefinition, art)
+      : useMax;
+    return { main: `${remaining}/${useMax}`, unit: "USE" };
+  }
   if (art.hpCost) return { main: String(art.hpCost), unit: "HP" };
   const resource = unitOrDefinition ? getResourceMeta(unitOrDefinition.type ?? unitOrDefinition) : getResourceMeta(null);
   return { main: String(art.mpCost), unit: resource.shortLabel };
 }
 
 function artTip(art, unitOrDefinition = null) {
+  const useMax = getAbilityUseMax(art);
+  if (useMax !== null) {
+    const remaining = unitOrDefinition && unitOrDefinition.abilityUses
+      ? getAbilityUsesRemaining(unitOrDefinition, art)
+      : useMax;
+    return `${art.name} · ${remaining}/${useMax} uses left — ${art.description}`;
+  }
   const cost = artCostParts(art, unitOrDefinition);
   return `${art.name} · ${cost.main}${cost.unit ? ` ${cost.unit}` : ""} — ${art.description}`;
 }

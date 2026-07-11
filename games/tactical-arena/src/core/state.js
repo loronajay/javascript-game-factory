@@ -1,4 +1,4 @@
-import { getInitialMp, getUnitType } from "./unitCatalog.js";
+import { getInitialMp, getUnitType, initialAbilityUses } from "./unitCatalog.js";
 import { createRngState } from "./rng.js";
 import { createRoster, FORMATS, playerColor } from "./roster.js";
 import { normalizeWeatherSpec } from "./weather.js";
@@ -65,7 +65,14 @@ export function createUnit(spec) {
     summonerId: spec.summonerId ?? null,
     // Dark Ether (Blacksword): a one-shot charge forcing the next basic attack to crit.
     // Meaningless for every other unit (stays false).
-    guaranteedCritCharged: spec.guaranteedCritCharged ?? false
+    guaranteedCritCharged: spec.guaranteedCritCharged ?? false,
+    // Riot Cop finite ability uses: `abilityUses` is the live per-art remaining counter
+    // (Stun Gun / Smoke Bomb), `abilityRecharge` counts the turns a depleted pool has
+    // waited, and `lockdownRefreshed` guards the one-shot rage-entry refill. Meaningless
+    // for every other unit (empty maps / false).
+    abilityUses: spec.abilityUses ? { ...spec.abilityUses } : initialAbilityUses(definition),
+    abilityRecharge: { ...(spec.abilityRecharge ?? {}) },
+    lockdownRefreshed: spec.lockdownRefreshed ?? false
   };
 }
 
@@ -229,7 +236,11 @@ export function cloneState(state) {
       weatherMoveCharged: unit.weatherMoveCharged ?? 0,
       // Ronin's Wanderer duel marks (ids of enemies that missed him). Deep-copy so a
       // shallow spread never shares the array across clones.
-      ...(unit.duelMarks ? { duelMarks: [...unit.duelMarks] } : {})
+      ...(unit.duelMarks ? { duelMarks: [...unit.duelMarks] } : {}),
+      // Riot Cop finite ability uses — deep-copy the keyed maps so a shallow spread
+      // never shares them across clones.
+      ...(unit.abilityUses ? { abilityUses: { ...unit.abilityUses } } : {}),
+      ...(unit.abilityRecharge ? { abilityRecharge: { ...unit.abilityRecharge } } : {})
     })),
     activation: state.activation ? {
       ...state.activation,

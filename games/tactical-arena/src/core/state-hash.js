@@ -72,6 +72,10 @@ function canonicalUnits(units) {
         // Dark Ether (Blacksword): a charged guaranteed crit forces the next swing's crit
         // outcome, which draws the RNG, so it is part of the authoritative hash.
         `${unit.guaranteedCritCharged ? 1 : 0},` +
+        // Riot Cop finite ability uses + recharge counters + the one-shot rage refill guard
+        // all change future legal actions, so they are part of the authoritative hash.
+        `${stableStringify(unit.abilityUses ?? {})},${stableStringify(unit.abilityRecharge ?? {})},` +
+        `${unit.lockdownRefreshed ? 1 : 0},` +
         // Wanderer (Ronin): the ids of enemies that missed Ronin last turn change his future
         // damage, so they are part of the authoritative hash (stored sorted, so it is stable).
         `[${(unit.duelMarks ?? []).join("+")}],` +

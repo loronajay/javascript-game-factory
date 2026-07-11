@@ -28,7 +28,7 @@ export const SUMMONER = Object.freeze({
       mpCost: 5,
       resolution: "summonGhost",
       targeting: Object.freeze({ shape: "placement", radius: 3 }),
-      description: "Choose an empty tile within 3, then call one unit from a fresh Soul Shuffle as a ghost. The ghost immediately takes one full turn, then dissipates.",
+      description: "Choose an empty tile within 3, then call one unit from a fresh Soul Shuffle as a ghost. The ghost takes one full turn at full health, then dissipates.",
       implemented: true,
       ai: Object.freeze({ intent: "summon", evHints: Object.freeze({ placeNear: "enemy" }), tags: Object.freeze(["tempo", "summon"]) })
     }),
@@ -52,7 +52,7 @@ export const SUMMONER = Object.freeze({
     rageLocked: true,
     resolution: "summonGhost",
     targeting: Object.freeze({ shape: "placement", radius: 3 }),
-    description: "RAGE: Choose an empty tile within 3, then call one unit from a fresh Soul Shuffle as a ghost. The ghost immediately takes one full turn, then dissipates.",
+    description: "RAGE: Choose an empty tile within 3, then call one unit from a fresh Soul Shuffle as a ghost that arrives already RAGING (its RAGE passive and RAGE ART are available). The ghost takes one full turn, then dissipates.",
     implemented: true,
     ai: Object.freeze({ intent: "summon", evHints: Object.freeze({ placeNear: "enemy" }), tags: Object.freeze(["tempo", "summon", "rageOnly"]) })
   }),

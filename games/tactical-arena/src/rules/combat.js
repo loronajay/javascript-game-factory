@@ -173,6 +173,8 @@ export function isDamageTypeImmune(unit, damageType) {
 export function finalizeMagicDamage({ attacker, target, state = null, rawDamage, damageAffinity = null, art = null }) {
   const immune = isDamageTypeImmune(target, "magic") ||
     isDamageTypeImmuneByStance(target, "magic") ||
+    // Riot Cop's Riot Shield: a DEFENDING unit nullifies ALL magic damage aimed at it.
+    negatesMagicWhileDefending(target) ||
     (isFireBasedDamage({ damageAffinity, art }) && isFireDamageImmune(target));
   if (immune) return 0;
   const reduced = Math.max(0, rawDamage - getTeamDamageReduction(target, state, "magic"));
@@ -480,9 +482,9 @@ export function isHealingDisabled(state, target = null) {
 // Resolves a strike with an explicit damage type override (used by magic-damage ARTS
 // like Spark and Banish). Falls back to a physical strike when no override is given.
 // Returns the same shape as resolvePhysicalStrike so callers and the forecast are interchangeable.
-export function resolveBaseStrike(attacker, target, { proximity = false, critical = false, state = null, damageType = null, damageAffinity = null } = {}) {
+export function resolveBaseStrike(attacker, target, { proximity = false, critical = false, state = null, damageType = null, damageAffinity = null, basicAttack = false } = {}) {
   if (!damageType || damageType === "physical") {
-    return resolvePhysicalStrike(attacker, target, { proximity, critical, state });
+    return resolvePhysicalStrike(attacker, target, { proximity, critical, state, basicAttack });
   }
   if (damageType === "true") {
     const damage = Math.max(0, getEffectiveStats(attacker, state).strength);
@@ -547,7 +549,7 @@ export function resolveFixedPhysicalStrike(attacker, target, amount, { critical 
 //
 // `proximity` gates the proximity passive for callers that represent attacks. The
 // current Archer kit opts in for basic ATTACK, targeted attack ARTS, and Volley Shot.
-export function resolvePhysicalStrike(attacker, target, { proximity = false, critical = false, state = null } = {}) {
+export function resolvePhysicalStrike(attacker, target, { proximity = false, critical = false, state = null, basicAttack = false } = {}) {
   const effectiveCritical = critical && !ignoresCriticalDamage(target) && !ignoresOwnCriticalDamage(attacker);
   const result = resolveDamage({
     attacker: getEffectiveStats(attacker, state),
@@ -580,6 +582,13 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   // the attacker's passive sets — last, after every bonus.
   const minimum = getMinimumDamage(attacker);
   if (minimum > 0 && damage >= 1) damage = Math.max(minimum, damage);
+  // Riot Shield (Riot Cop): a RANGED basic attack (distance > 1) deals 1 less to him.
+  // Gated on `basicAttack` so ARTS and melee blows are untouched; folded here so the
+  // on-board forecast (which also resolves through this path) reads the mitigated number.
+  if (basicAttack) {
+    const distance = Math.max(Math.abs(attacker.position.x - target.position.x), Math.abs(attacker.position.y - target.position.y));
+    if (distance > 1) damage = Math.max(0, damage - getRangedBasicAttackReduction(target));
+  }
   // Rock Hard (Clod): a defending target negates physical damage entirely — applied
   // absolutely last so no bonus/floor can leak through, and honestly (the forecast
   // resolves through here too, so it shows 0 against a braced Clod).
@@ -636,4 +645,28 @@ export function negatesPhysicalWhileDefending(unit) {
 export function getRockHardMpRefund(unit) {
   const effect = rockHardEffect(unit);
   return effect ? Math.max(0, Number(effect.mpOnPhysical) || 0) : 0;
+}
+
+// --- Riot Shield / Utility Belt (Riot Cop) -----------------------------------
+// Read centrally so no strike path hard-codes the unit; scans every passive source (the
+// mitigation rider is a `kind:"passive"` art entry), mirroring the Rock Hard / crit-status
+// seams. All return 0/false for any unit without the passive.
+function riotShieldEffect(unit) {
+  for (const effect of passiveEffects(unit)) if (effect.type === "riotShield") return effect;
+  return null;
+}
+
+// Flat damage a unit shaves off a RANGED BASIC attack aimed at it (Riot Cop takes 1 less).
+// Only folds into a basic attack from distance > 1 — the caller passes `basicAttack` +
+// the two units so the forecast and the reducer agree.
+export function getRangedBasicAttackReduction(target) {
+  const effect = riotShieldEffect(target);
+  return effect ? Math.max(0, Number(effect.rangedBasicReduction) || 0) : 0;
+}
+
+// True when a DEFENDING unit nullifies magic damage entirely (Riot Cop's Riot Shield).
+// Folded into finalizeMagicDamage, so every magic path (arts, blasts, pulses) and the
+// forecast agree.
+export function negatesMagicWhileDefending(unit) {
+  return Boolean(riotShieldEffect(unit)?.magicNullifyWhileDefending) && isDefending(unit);
 }

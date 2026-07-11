@@ -1,6 +1,6 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
-import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, initialAbilityUses, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, getAttackRecoil, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
@@ -90,6 +90,10 @@ function beginActivation(state, command) {
         (unit.stationaryStrength ?? 0) + Math.max(0, Number(planted.amount) || 0)
       );
     }
+    // Riot Cop: refresh finite ability uses (rage entry) and progress depleted pools
+    // toward their restore. Fired at the START of each fresh turn (deterministic, no
+    // roll), so online lockstep clients all agree.
+    applyAbilityRecharge(unit);
   }
   // Rain Stance's on-attack charge (set last turn) becomes a live +MOVE buff for this
   // whole activation — applied here, not at attack time, so it lands on the NEXT turn
@@ -154,6 +158,45 @@ function applyRageRegen(state, unit, events) {
   }
   events.push({ type: "EMERGENCY_SNACK", unitId: unit.id, hpRestored: unit.hp - beforeHp, mpRestored: unit.mp - beforeMp });
   return true;
+}
+
+// Riot Cop's finite ability uses. Fired at the start of each fresh activation: the
+// RAGE entry refill (Lockdown), and the one-full-turn-empty recharge for any depleted
+// pool. Data-first off `art.uses` + the ragePassive `refreshResources` flag, so it is a
+// no-op for every unit without finite-use arts.
+function applyAbilityRecharge(unit) {
+  const definition = getUnitType(unit.type);
+  const useArts = (definition.arts ?? []).filter((art) => Number.isFinite(art.uses));
+  if (!useArts.length) return;
+  if (!unit.abilityUses) unit.abilityUses = initialAbilityUses(definition);
+  if (!unit.abilityRecharge) unit.abilityRecharge = {};
+
+  // Lockdown (RAGE): the instant Riot Cop rages, refill every finite pool to full — once
+  // per rage window, re-armable if he ever climbs back above the threshold.
+  if (isRaging(unit) && getRageEffectValue(unit, "refreshResources", false)) {
+    if (!unit.lockdownRefreshed) {
+      unit.abilityUses = initialAbilityUses(definition);
+      unit.abilityRecharge = {};
+      unit.lockdownRefreshed = true;
+    }
+  } else if (!isRaging(unit)) {
+    unit.lockdownRefreshed = false;
+  }
+
+  // A pool at 0 must experience one FULL turn empty before it restores: the turn it hits
+  // 0 doesn't count, the next turn it is empty (counter → 1), and the turn after that it
+  // restores to full (counter reaches the 2 threshold at this turn's start).
+  for (const art of useArts) {
+    const remaining = Number.isFinite(unit.abilityUses[art.id]) ? unit.abilityUses[art.id] : art.uses;
+    if (remaining > 0) { delete unit.abilityRecharge[art.id]; continue; }
+    const waited = (unit.abilityRecharge[art.id] ?? 0) + 1;
+    if (waited >= 2) {
+      unit.abilityUses[art.id] = art.uses;
+      delete unit.abilityRecharge[art.id];
+    } else {
+      unit.abilityRecharge[art.id] = waited;
+    }
+  }
 }
 
 function moveUnit(state, command) {
@@ -301,7 +344,7 @@ function attack(state, command) {
   const pulled = {};
   const damagedForLifesteal = []; // Dark Tread (Blacksword): enemies hurt this swing
   let poisonedByAttack = 0;
-  const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
+  const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType, basicAttack: true });
   for (const targetUnit of targets) {
     const damage = strike(targetUnit);
     const damageDealt = Math.min(targetUnit.hp, damage.damage);
