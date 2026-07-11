@@ -10,7 +10,7 @@ import { beginActivation, moveUnit } from "../src/core/commands.js";
 import { TEMPO_GAUGE_MAX, enableTempoBattle } from "../src/core/tempoBattle.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
-import { isHealArtConfirmTile, isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
+import { getActiveBoardWeather, isHealArtConfirmTile, isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createUnitFigure, UNIT_VISUAL_LIFT } from "../src/ui/unitRenderer.js";
 import { createEffects } from "../src/ui/effects.js";
 import { UNIT_TYPES, getArt } from "../src/core/unitCatalog.js";
@@ -797,6 +797,117 @@ test("Blasting Cap highlights wall tiles as legal targets", () => {
 
     const wallTile = findSvgByAttribute(boardLayer, "data-key", "3,1");
     assert.ok(wallTile.classList.contains("legal-art"));
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("Mother Nature weather renders a persistent non-clicking board overlay", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      units: [
+        { id: "mn", player: 1, type: "mother-nature", x: 1, y: 1, weather: "blizzard", lastWeather: "blizzard" },
+        { id: "target", player: 2, type: "swordsman", x: 6, y: 6 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const overlay = boardLayer.findByClass("weather-overlay");
+    assert.equal(getActiveBoardWeather(state), "blizzard");
+    assert.equal(board.getAttribute("data-weather"), "blizzard");
+    assert.ok(overlay, "active weather should add a board overlay");
+    assert.match(overlay.getAttribute("class"), /\bweather-overlay--blizzard\b/);
+    assert.equal(overlay.getAttribute("data-weather"), "blizzard");
+    assert.equal(overlay.getAttribute("aria-label"), "Blizzard board weather");
+    assert.equal(overlay.listeners.has("click"), false, "overlay should not own board clicks");
+    assert.ok(overlay.findByClass("weather-overlay-wash"), "overlay should tint the board");
+    assert.ok(overlay.findByClass("weather-streak--snow"), "blizzard overlay should include snow streaks");
+    assert.equal(boardLayer.children.at(-1), overlay, "weather should paint above tiles but below units");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("the board weather overlay follows each Mother Nature weather and clears when inactive", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    for (const [weather, expectedDetail] of [
+      ["spring", "weather-bloom"],
+      ["heatwave", "weather-heat-ripple"],
+      ["thunderstorm", "weather-lightning"]
+    ]) {
+      const state = createBattleState({
+        size: 8,
+        units: [
+          { id: `mn-${weather}`, player: 1, type: "mother-nature", x: 1, y: 1, weather, lastWeather: weather },
+          { id: `target-${weather}`, player: 2, type: "swordsman", x: 6, y: 6 }
+        ]
+      });
+      const board = new TestSvgElement("svg");
+      const boardLayer = new TestSvgElement("g");
+      const unitsLayer = new TestSvgElement("g");
+
+      renderBoard({
+        board,
+        boardLayer,
+        unitsLayer,
+        state,
+        mode: null,
+        selectedId: null,
+        footworkPath: [],
+        onTileClick: () => {}
+      });
+
+      const overlay = boardLayer.findByClass("weather-overlay");
+      assert.equal(board.getAttribute("data-weather"), weather);
+      assert.match(overlay.getAttribute("class"), new RegExp(`\\bweather-overlay--${weather}\\b`));
+      assert.ok(overlay.findByClass(expectedDetail), `${weather} should render its own weather detail`);
+    }
+
+    const defeatedWeatherSource = createBattleState({
+      size: 8,
+      units: [
+        { id: "mn", player: 1, type: "mother-nature", x: 1, y: 1, hp: 0, weather: "heatwave", lastWeather: "heatwave" },
+        { id: "target", player: 2, type: "swordsman", x: 6, y: 6 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state: defeatedWeatherSource,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    assert.equal(getActiveBoardWeather(defeatedWeatherSource), null);
+    assert.equal(board.getAttribute("data-weather"), "none");
+    assert.equal(boardLayer.findByClass("weather-overlay"), null);
   } finally {
     globalThis.document = previousDocument;
   }

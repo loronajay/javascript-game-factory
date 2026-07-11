@@ -788,8 +788,8 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "mother-nature",
-    slug: "discord-kitten-(alternate)",
-    file: "discord-kitten-(alternate)-mother-nature.png"
+    slug: "discord-kitten-(alt.)",
+    file: "discord-kitten-(alt.)-mother-nature.png"
   },
   {
     type: "mother-nature",

@@ -7,6 +7,21 @@ import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, is
 import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
 
+const BOARD_WEATHER_LABELS = Object.freeze({
+  blizzard: "Blizzard",
+  spring: "Spring Shower",
+  heatwave: "Heatwave",
+  thunderstorm: "Thunderstorm"
+});
+
+export function getActiveBoardWeather(state) {
+  return state?.units?.find((unit) =>
+    unit.hp > 0 &&
+    unit.type === "mother-nature" &&
+    Object.hasOwn(BOARD_WEATHER_LABELS, unit.weather)
+  )?.weather ?? null;
+}
+
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
   const hw = metrics.tileWidth / 2;
@@ -29,6 +44,125 @@ function createTile(metrics, position, { affinity, selected, legal, targetKind, 
     svgElement("polygon", { class: "tile-face", points: pointsToString(top) })
   );
   return tile;
+}
+
+function scalePoint(center, point, factor) {
+  return {
+    x: center.x + (point.x - center.x) * factor,
+    y: center.y + (point.y - center.y) * factor
+  };
+}
+
+function createWeatherOverlay(metrics, size, weather) {
+  if (!Object.hasOwn(BOARD_WEATHER_LABELS, weather)) return null;
+  const diamond = getBoardDiamond(metrics, size);
+  const center = { x: diamond.cx, y: diamond.cy + metrics.tileHeight * 0.55 };
+  const scale = 1.025;
+  const n = scalePoint(center, diamond.n, scale);
+  const e = scalePoint(center, diamond.e, scale);
+  const s = scalePoint(center, { x: diamond.s.x, y: diamond.s.y + metrics.depth * 0.45 }, scale);
+  const w = scalePoint(center, diamond.w, scale);
+  const width = e.x - w.x;
+  const height = s.y - n.y;
+  const g = svgElement("g", {
+    class: `weather-overlay weather-overlay--${weather}`,
+    "data-weather": weather,
+    "aria-label": `${BOARD_WEATHER_LABELS[weather]} board weather`
+  });
+
+  g.append(svgElement("polygon", {
+    class: "weather-overlay-wash",
+    points: pointsToString([[n.x, n.y], [e.x, e.y], [s.x, s.y], [w.x, w.y]])
+  }));
+
+  if (weather === "blizzard") {
+    for (let i = 0; i < 18; i += 1) {
+      const t = (i + 0.5) / 18;
+      const x = w.x + width * t;
+      const y = n.y + height * (0.18 + ((i * 7) % 11) / 17);
+      g.append(svgElement("line", {
+        class: "weather-streak weather-streak--snow",
+        x1: x - metrics.tileWidth * 0.32,
+        y1: y - metrics.tileHeight * 0.42,
+        x2: x + metrics.tileWidth * 0.18,
+        y2: y + metrics.tileHeight * 0.08
+      }));
+    }
+    for (let i = 0; i < 16; i += 1) {
+      const t = (i + 0.35) / 16;
+      g.append(svgElement("circle", {
+        class: "weather-speck weather-speck--snow",
+        cx: w.x + width * t,
+        cy: n.y + height * (0.25 + ((i * 5) % 9) / 16),
+        r: Math.max(1.6, metrics.tileWidth * (i % 3 === 0 ? 0.032 : 0.022))
+      }));
+    }
+  } else if (weather === "spring") {
+    for (let i = 0; i < 14; i += 1) {
+      const t = (i + 0.5) / 14;
+      const x = w.x + width * t;
+      const y = n.y + height * (0.2 + ((i * 4) % 9) / 16);
+      g.append(svgElement("line", {
+        class: "weather-streak weather-streak--rain",
+        x1: x - metrics.tileWidth * 0.12,
+        y1: y - metrics.tileHeight * 0.54,
+        x2: x - metrics.tileWidth * 0.02,
+        y2: y
+      }));
+    }
+    for (let i = 0; i < 9; i += 1) {
+      const t = (i + 0.55) / 9;
+      g.append(svgElement("circle", {
+        class: "weather-bloom",
+        cx: w.x + width * t,
+        cy: n.y + height * (0.55 + ((i * 2) % 5) / 12),
+        r: Math.max(4, metrics.tileWidth * 0.06)
+      }));
+    }
+  } else if (weather === "heatwave") {
+    for (let i = 0; i < 7; i += 1) {
+      const y = n.y + height * (0.25 + i * 0.085);
+      g.append(svgElement("path", {
+        class: "weather-heat-ripple",
+        d: `M ${w.x + width * 0.17} ${y} C ${w.x + width * 0.34} ${y - metrics.tileHeight * 0.4}, ${w.x + width * 0.52} ${y + metrics.tileHeight * 0.4}, ${w.x + width * 0.7} ${y} S ${w.x + width * 0.9} ${y + metrics.tileHeight * 0.16}, ${w.x + width * 0.98} ${y}`
+      }));
+    }
+    for (let i = 0; i < 12; i += 1) {
+      const t = (i + 0.4) / 12;
+      g.append(svgElement("circle", {
+        class: "weather-ember",
+        cx: w.x + width * t,
+        cy: n.y + height * (0.35 + ((i * 5) % 8) / 14),
+        r: Math.max(2.3, metrics.tileWidth * 0.028)
+      }));
+    }
+  } else if (weather === "thunderstorm") {
+    for (let i = 0; i < 12; i += 1) {
+      const t = (i + 0.5) / 12;
+      const x = w.x + width * t;
+      const y = n.y + height * (0.2 + ((i * 3) % 8) / 15);
+      g.append(svgElement("line", {
+        class: "weather-streak weather-streak--storm",
+        x1: x - metrics.tileWidth * 0.18,
+        y1: y - metrics.tileHeight * 0.44,
+        x2: x - metrics.tileWidth * 0.04,
+        y2: y + metrics.tileHeight * 0.18
+      }));
+    }
+    g.append(svgElement("polyline", {
+      class: "weather-lightning",
+      points: pointsToString([
+        [center.x - metrics.tileWidth * 1.2, n.y + height * 0.18],
+        [center.x - metrics.tileWidth * 0.3, n.y + height * 0.38],
+        [center.x - metrics.tileWidth * 0.7, n.y + height * 0.38],
+        [center.x + metrics.tileWidth * 0.55, n.y + height * 0.7],
+        [center.x + metrics.tileWidth * 0.15, n.y + height * 0.49],
+        [center.x + metrics.tileWidth * 1.05, n.y + height * 0.49]
+      ])
+    }));
+  }
+
+  return g;
 }
 
 // Throw Cigar fire: a cluster of flame tongues licking up off the tile face, with a
@@ -488,10 +622,12 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   const path = new Set(footworkPath.map(positionKey));
   const metrics = createBoardMetrics(state.size);
   const view = createBoardViewBox(metrics, state.size);
+  const activeWeather = getActiveBoardWeather(state);
   board.setAttribute("viewBox", `${view.x} ${view.y} ${view.width} ${view.height}`);
   boardLayer.replaceChildren();
   unitsLayer.replaceChildren();
   board.classList.toggle("board-focused", Boolean(actor));
+  board.setAttribute("data-weather", activeWeather ?? "none");
   boardLayer.append(createBoardDais(metrics, state.size));
 
   // Deathly Aura zones (Necromancer + the Ghoul that carries it), tile → source
@@ -534,6 +670,9 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       tileByKey.set(key, tile);
     }
   }
+
+  const weatherOverlay = createWeatherOverlay(metrics, state.size, activeWeather);
+  if (weatherOverlay) boardLayer.append(weatherOverlay);
 
   if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state, onAreaHover);
   if (blastArt) wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal, onAreaHover);
