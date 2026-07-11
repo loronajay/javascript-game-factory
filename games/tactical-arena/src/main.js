@@ -45,6 +45,7 @@ import {
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
   PALADIN_MISSION_ID,
+  RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
@@ -76,6 +77,8 @@ import {
   paladinRageWarningScript,
   paladinStatusTauntScript,
   prepareCampaignMatchState,
+  roninBlindWarningScript,
+  roninRageWarningScript,
   sniperFireWarningScript,
   shouldShowBrothersRageWarning,
   shouldShowCampaignMapCutscene,
@@ -92,6 +95,8 @@ import {
   shouldShowPaladinLightseekerWarning,
   shouldShowPaladinRageWarning,
   shouldShowPaladinStatusTaunt,
+  shouldShowRoninBlindWarning,
+  shouldShowRoninRageWarning,
   shouldShowSniperFireWarning,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
@@ -272,6 +277,11 @@ function createCampaignMeta() {
     hasbeenDefeatDialogueShown: false,
     // Per-fat-member one-time RAGE popup flags, keyed by unit type.
     hasbeenFatRageWarned: Object.fromEntries(HASBEEN_HEROES_FAT_TYPES.map((type) => [type, false])),
+    // Ronin (mission 13)
+    roninBlindWarningShown: false,
+    roninRageWarningShown: false,
+    roninBlindApplied: false,
+    roninEnteredRage: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -463,7 +473,9 @@ async function onCampaignMissionSelected(missionId, selectedSquad = null, option
   // Mark seen only after the cutscene has actually played out, so an interrupted or
   // never-rendered show doesn't silently burn the one-time story beat.
   await dialogue.show(script);
-  if (missionId !== MINER_MISSION_ID) markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
+  if (missionId !== MINER_MISSION_ID && missionId !== RONIN_MISSION_ID) {
+    markCampaignMapCutsceneSeen(globalThis.localStorage, missionId);
+  }
 }
 
 function onStartCampaignMission(config) {
@@ -483,7 +495,7 @@ async function onCampaignMapEntered({ openCampaignRewardChoice } = {}) {
     if (script.length) await dialogue.show(script);
     markCampaignPostMatchCutsceneSeen(globalThis.localStorage, pending.missionId);
   }
-  const picked = await openCampaignRewardChoice?.(pending.packId);
+  const picked = pending.packId ? await openCampaignRewardChoice?.(pending.packId) : null;
   // A closing beat plays only if the player actually took a reward (Has-Been Heroes'
   // Mystic payoff line); declining the pick shows nothing.
   if (picked) {
@@ -738,6 +750,12 @@ function announceTurnChange(prevPlayer) {
         !isCampaignSkinRewardGranted(globalThis.localStorage, rewardPack)
       ) {
         pendingCampaignReward = { missionId: campaignMissionId, packId: rewardPack };
+        summary.campaign.forceMapReturn = true;
+      } else if (
+        state.winner === 1 &&
+        shouldShowCampaignPostMatchCutscene(globalThis.localStorage, campaignMissionId)
+      ) {
+        pendingCampaignReward = { missionId: campaignMissionId, packId: null };
         summary.campaign.forceMapReturn = true;
       }
     }
@@ -1039,6 +1057,15 @@ function recordCampaignProgressHooks(command, result) {
         }
       }
     }
+  } else if (campaignMissionId === RONIN_MISSION_ID) {
+    const ronin = findUnit(state, "p2-0-ronin");
+    if (ronin?.hp > 0 && ronin.hp <= 5) {
+      campaignMeta.roninEnteredRage = true;
+    }
+    if (state.units.some((unit) =>
+      unit.player === 1 && unit.statuses?.some((status) => status.type === "blind"))) {
+      campaignMeta.roninBlindApplied = true;
+    }
   } else if (campaignMissionId === BROTHERS_MISSION_ID) {
     // Latch the "kill before RAGE" star fail the moment either brother sits at RAGE
     // threshold (<=5 HP) while still alive (mirrors the Gargoyle/Miner rage latch).
@@ -1298,6 +1325,29 @@ function nextCampaignDialogueBeat() {
           script: (matchState) => hasbeenFatRageWarningScript(matchState, type),
         };
       }
+    }
+    return null;
+  }
+  if (campaignMissionId === RONIN_MISSION_ID) {
+    if (shouldShowRoninBlindWarning(state, {
+      warningShown: campaignMeta.roninBlindWarningShown,
+      roninBlindApplied: campaignMeta.roninBlindApplied,
+    })) {
+      return {
+        markShown: () => { campaignMeta.roninBlindWarningShown = true; },
+        script: roninBlindWarningScript,
+      };
+    }
+    if (shouldShowRoninRageWarning(state, {
+      warningShown: campaignMeta.roninRageWarningShown,
+    })) {
+      return {
+        markShown: () => {
+          campaignMeta.roninRageWarningShown = true;
+          campaignMeta.roninEnteredRage = true;
+        },
+        script: roninRageWarningScript,
+      };
     }
     return null;
   }

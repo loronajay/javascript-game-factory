@@ -35,6 +35,7 @@ import {
   CLOD_MISSION_ID,
   MAX_CAMPAIGN_SQUAD_SIZE,
   MINER_MISSION_ID,
+  RONIN_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
   campaignSquadSize,
   createCampaignMatchConfig,
@@ -42,6 +43,8 @@ import {
   resetCampaignProgress
 } from "../campaign/campaign.js";
 import { createTutorialMatchConfig, getNextTutorialId, getTutorialList, readProgress } from "../tutorials/basics.js";
+
+const CAMPAIGN_PRE_BRIEF_PICK_MISSIONS = new Set([MINER_MISSION_ID, RONIN_MISSION_ID]);
 
 const TEAM_COLOR = { 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" };
 const CONFETTI_COUNT = 44;
@@ -838,11 +841,11 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         const missionId = actionBtn.dataset.missionId || CLOD_MISSION_ID;
         const previousMissionId = selectedCampaignMissionId;
         selectedCampaignMissionId = missionId;
-        if (missionId === MINER_MISSION_ID && previousMissionId === missionId) {
+        if (CAMPAIGN_PRE_BRIEF_PICK_MISSIONS.has(missionId) && previousMissionId === missionId) {
           renderCampaign();
           break;
         }
-        if (missionId === MINER_MISSION_ID && previousMissionId !== missionId) {
+        if (CAMPAIGN_PRE_BRIEF_PICK_MISSIONS.has(missionId) && previousMissionId !== missionId) {
           campaignDynamicLockedSlots = null;
           const map = getCampaignMap(globalThis.localStorage);
           selectedCampaignNode = map.nodes.find((node) => node.id === missionId) ?? null;

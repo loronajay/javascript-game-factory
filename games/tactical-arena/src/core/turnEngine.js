@@ -128,6 +128,7 @@ function advanceTurnIfExhausted(state) {
     applyTimeStealTick(state, fireEvents);
     applyAutoStrikeTick(state, fireEvents);
     applyRandomFireTick(state, fireEvents);
+    applyWeatherCycleTick(state, fireEvents);
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
@@ -177,6 +178,22 @@ function applyRandomFireTick(state, events) {
     type: "RANDOM_FIRE_LIT",
     sourceId: source?.id ?? null,
     position: { ...position },
+  });
+}
+
+function applyWeatherCycleTick(state, events) {
+  const rule = state.missionRules?.weatherCycle;
+  const sequence = Array.isArray(rule?.sequence) ? rule.sequence.filter((id) => typeof id === "string" && id) : [];
+  if (!sequence.length) return;
+  const interval = Math.max(1, Math.floor(Number(rule.intervalTurns) || 1));
+  const index = Math.floor((Math.max(1, Number(state.turnNumber) || 1) - 1) / interval) % sequence.length;
+  const weather = sequence[index];
+  if (state.weather?.id === weather && (state.weather?.sourceId ?? null) === (rule.sourceId ?? null)) return;
+  state.weather = { id: weather, sourceId: rule.sourceId ?? null };
+  events.push({
+    type: "MISSION_WEATHER_CHANGED",
+    weather,
+    sourceId: rule.sourceId ?? null,
   });
 }
 
@@ -254,6 +271,19 @@ function applyTimeStealTick(state, events) {
 }
 
 export function resolveVictory(state) {
+  const roninDuel = state.missionRules?.roninDuel;
+  if (roninDuel) {
+    const ronin = state.units.find((unit) => unit.id === roninDuel.roninId) ??
+      state.units.find((unit) => unit.player === 2 && unit.type === "ronin");
+    const player = state.units.find((unit) => unit.id === roninDuel.playerId) ??
+      state.units.find((unit) => unit.player === 1);
+    if (ronin && player && ronin.hp <= 0 && player.hp <= 0) {
+      state.winner = 2;
+      state.phase = "complete";
+      state.activation = null;
+      return;
+    }
+  }
   const monkTrial = state.missionRules?.monkTrial;
   if (monkTrial?.realMonkId) {
     const playerAlive = livingUnits(state, 1).some(sustainsVictory);

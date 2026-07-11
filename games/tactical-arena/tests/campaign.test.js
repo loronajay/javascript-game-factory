@@ -19,6 +19,7 @@ import {
   NECROMANCER_MISSION_ID,
   MONK_MISSION_ID,
   PALADIN_MISSION_ID,
+  RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
   VIRUS_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
@@ -56,6 +57,10 @@ import {
   minerDefeatScript,
   minerMissionOpeningScript,
   minerRageWarningScript,
+  roninBlindWarningScript,
+  roninDefeatScript,
+  roninMissionOpeningScript,
+  roninRageWarningScript,
   monkMissionOpeningScript,
   necromancerMissionOpeningScript,
   necromancerRageWarningScript,
@@ -76,6 +81,8 @@ import {
   shouldShowPaladinLightseekerWarning,
   shouldShowPaladinRageWarning,
   shouldShowPaladinStatusTaunt,
+  shouldShowRoninBlindWarning,
+  shouldShowRoninRageWarning,
   shouldShowSniperFireWarning,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
@@ -2185,6 +2192,190 @@ test("Has-Been Heroes post-match shopping cutscene + Mystic payoff line are wire
   assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), true);
   markCampaignPostMatchCutsceneSeen(storage, HASBEEN_HEROES_MISSION_ID);
   assert.equal(shouldShowCampaignPostMatchCutscene(storage, HASBEEN_HEROES_MISSION_ID), false);
+});
+
+// --- Battle for the Bridge (mission 13) --------------------------------------
+
+function roninMatchState(squad = ["swordsman"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(RONIN_MISSION_ID, squad)),
+    RONIN_MISSION_ID,
+  );
+}
+
+function roninWonState(base = roninMatchState(), { playerHp = 1 } = {}) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: playerHp }),
+  };
+}
+
+test("Battle for the Bridge replaces Thornhollow with a full-HP 9x9 Ronin duel", () => {
+  const mission = getCampaignMission(RONIN_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.locationName, "Thornhollow Bridge");
+  assert.equal(mission.region, "wood");
+  assert.equal(mission.requiredStars, 24);
+  assert.equal(mission.playerSlots, 1);
+  assert.deepEqual(mission.rewardUnits, ["ronin"]);
+
+  const config = createCampaignMatchConfig(RONIN_MISSION_ID, ["archer"]);
+  assert.equal(config.size, 9);
+  assert.deepEqual(config.squads[1], ["archer"]);
+  assert.deepEqual(config.squads[2], ["ronin"]);
+  assert.equal(config.teamNames[2], "Island Protector");
+
+  const match = roninMatchState(["archer"]);
+  assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 0, y: 4 });
+  assert.deepEqual(findUnit(match, "p2-0-ronin").position, { x: 8, y: 4 });
+  assert.equal(findUnit(match, "p1-0-archer").hp, getUnitType("archer").stats.maxHp);
+  assert.equal(findUnit(match, "p2-0-ronin").hp, getUnitType("ronin").stats.maxHp);
+  assert.deepEqual(match.weather, { id: "blizzard", sourceId: null });
+
+  const node = getCampaignMap(storageAdapter()).nodes.find((n) => n.id === RONIN_MISSION_ID);
+  assert.ok(node);
+  assert.equal(node.locationName, "Thornhollow Bridge");
+  assert.equal(node.point.x < 57.9, true, "the Thornhollow node nudges left onto its painted map node");
+});
+
+test("Battle for the Bridge mission weather changes every two squad turns", () => {
+  let state = roninMatchState(["swordsman"]);
+  assert.equal(getActiveWeather(state).id, "blizzard");
+
+  state = applyCommand(applyCommand(state, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman")).nextState;
+  state = applyCommand(state, finishActivation(1, "p1-0-swordsman")).nextState;
+  assert.equal(state.turnNumber, 2);
+  assert.equal(getActiveWeather(state).id, "blizzard");
+
+  state = applyCommand(applyCommand(state, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin")).nextState;
+  const roninFinish = applyCommand(state, finishActivation(2, "p2-0-ronin"));
+  state = roninFinish.nextState;
+  assert.equal(state.turnNumber, 3);
+  assert.equal(getActiveWeather(state).id, "heatwave");
+  assert.ok(roninFinish.events.some((event) => event.type === "MISSION_WEATHER_CHANGED" && event.weather === "heatwave"));
+
+  state = applyCommand(applyCommand(state, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman")).nextState;
+  state = applyCommand(state, finishActivation(1, "p1-0-swordsman")).nextState;
+  state = applyCommand(applyCommand(state, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin")).nextState;
+  state = applyCommand(state, finishActivation(2, "p2-0-ronin")).nextState;
+  assert.equal(getActiveWeather(state).id, "spring");
+});
+
+test("Battle for the Bridge map cutscene repeats and splits around the duel choice", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, RONIN_MISSION_ID), true);
+  markCampaignMapCutsceneSeen(storage, RONIN_MISSION_ID);
+  assert.equal(shouldShowCampaignMapCutscene(storage, RONIN_MISSION_ID), true);
+
+  const preChoice = campaignMapCutsceneScript(RONIN_MISSION_ID, null, { phase: "preChoice" });
+  assert.match(preChoice.map((line) => line.text).join(" "), /bridge|weather|protector|island|one on one/i);
+  assert.equal(preChoice.some((line) => line.type === "swordsman" && /handle/i.test(line.text)), false);
+
+  const postChoice = campaignMapCutsceneScript(RONIN_MISSION_ID, ["mystic"], { phase: "postChoice" });
+  assert.ok(postChoice.some((line) => line.type === "mystic"));
+  assert.match(postChoice.map((line) => line.text).join(" "), /handle|step back/i);
+
+  const full = campaignMapCutsceneScript(RONIN_MISSION_ID, ["swordsman"]);
+  assert.ok(full.length > preChoice.length);
+  assert.match(full.map((line) => line.text).join(" "), /careful crossing|draws his blade|step back/i);
+});
+
+test("Battle for the Bridge dialogue covers opening banter, blind, rage, and post-win recruitment", () => {
+  const state = roninMatchState(["swordsman"]);
+  const opening = roninMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(RONIN_MISSION_ID, state), opening);
+  assert.equal(opening[0].speakerId, "p2-0-ronin");
+  assert.equal(opening[1].speakerId, "p1-0-swordsman");
+  assert.match(opening.map((line) => line.text).join(" "), /bridge|draw|duel/i);
+
+  const blinded = {
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) =>
+      unit.player === 1 ? { ...unit, statuses: [{ type: "blind", duration: 1 }] } : unit),
+  };
+  assert.equal(shouldShowRoninBlindWarning(blinded, { warningShown: false, roninBlindApplied: true }), true);
+  assert.equal(shouldShowRoninBlindWarning(blinded, { warningShown: true, roninBlindApplied: true }), false);
+  assert.match(roninBlindWarningScript(blinded).map((line) => line.text).join(" "), /blind|steel|eyes/i);
+
+  const raging = {
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) => unit.id === "p2-0-ronin" ? { ...unit, hp: 5 } : unit),
+  };
+  assert.equal(shouldShowRoninRageWarning(raging, { warningShown: false }), true);
+  assert.equal(shouldShowRoninRageWarning(raging, { warningShown: true }), false);
+  assert.match(roninRageWarningScript(raging).map((line) => line.text).join(" "), /Final Draw|RAGE|recoil|suicide/i);
+
+  const defeat = roninDefeatScript({ ...state, winner: 1 });
+  assert.match(defeat.map((line) => line.text).join(" "), /king|wrongs|just|services/i);
+});
+
+test("Battle for the Bridge grading rewards the duel, no blind, no Ronin rage, and Swordsman bonus", () => {
+  const won = roninWonState();
+  const perfect = evaluateCampaignMission(RONIN_MISSION_ID, won, {
+    roninBlindApplied: false,
+    roninEnteredRage: false,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noBlind", "preRageKill"]);
+  assert.equal(perfect.bonusObjectives[0].id, "swordsmanDuelist");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const messy = evaluateCampaignMission(RONIN_MISSION_ID, won, {
+    roninBlindApplied: true,
+    roninEnteredRage: true,
+  });
+  assert.equal(messy.stars, 2, "the Swordsman bonus can cover one missed base objective");
+  assert.equal(messy.objectives.find((objective) => objective.id === "noBlind").earned, false);
+  assert.equal(messy.objectives.find((objective) => objective.id === "preRageKill").earned, false);
+
+  const archerWin = evaluateCampaignMission(RONIN_MISSION_ID, roninWonState(roninMatchState(["archer"])), {
+    roninBlindApplied: false,
+    roninEnteredRage: false,
+  });
+  assert.equal(archerWin.earnedBonusStars, 0);
+
+  const lost = { ...won, winner: 2 };
+  assert.equal(evaluateCampaignMission(RONIN_MISSION_ID, lost, {}).stars, 0);
+});
+
+test("Battle for the Bridge awards a Final Draw double-KO to the Ronin", () => {
+  const state = roninMatchState(["swordsman"]);
+  const doubleKo = {
+    ...state,
+    units: state.units.map((unit) => ({ ...unit, hp: 0 })),
+  };
+
+  resolveVictory(doubleKo);
+
+  assert.equal(doubleKo.phase, "complete");
+  assert.equal(doubleKo.winner, 2);
+});
+
+test("completing Battle for the Bridge unlocks the Ronin, records stars, and gates only the post-match cutscene", () => {
+  const storage = storageAdapter();
+  const won = roninWonState();
+
+  const completed = completeCampaignMission(storage, RONIN_MISSION_ID, won, {
+    roninBlindApplied: false,
+    roninEnteredRage: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["ronin"]);
+  assert.equal(isUnitUnlocked("ronin", storage), true);
+  assert.equal(readCampaignProgressStars(storage, RONIN_MISSION_ID), 3);
+  assert.equal(shouldShowCampaignPostMatchCutscene(storage, RONIN_MISSION_ID), true);
+  markCampaignPostMatchCutsceneSeen(storage, RONIN_MISSION_ID);
+  assert.equal(shouldShowCampaignPostMatchCutscene(storage, RONIN_MISSION_ID), false);
+  assert.equal(shouldShowCampaignMapCutscene(storage, RONIN_MISSION_ID), true);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

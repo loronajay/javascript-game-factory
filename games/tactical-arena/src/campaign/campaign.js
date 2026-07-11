@@ -24,6 +24,7 @@ export const SNIPER_MISSION_ID = "sniper-highground";
 export const WANDERING_PARTY_MISSION_ID = "wandering-party";
 export const MINER_MISSION_ID = "dug-your-own-grave";
 export const HASBEEN_HEROES_MISSION_ID = "hasbeen-heroes";
+export const RONIN_MISSION_ID = "battle-for-the-bridge";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -264,6 +265,19 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 13,
     fullHp: true,
   },
+  [RONIN_MISSION_ID]: {
+    id: RONIN_MISSION_ID,
+    title: "Battle for the Bridge",
+    subtitle: "A sworn protector bars the island bridge",
+    description: "Choose one champion for a 9x9 duel across a narrow bridge against the Ronin. The weather turns strange every two turns, and his Final Draw can make even a winning blow dangerous.",
+    unitType: "ronin",
+    requiredStars: 24,
+    rewardUnits: Object.freeze(["ronin"]),
+    playerSlots: 1,
+    enemySquad: Object.freeze(["ronin"]),
+    size: 9,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -315,7 +329,7 @@ const CAMPAIGN_TRAIL = [
   { id: WANDERING_PARTY_MISSION_ID, cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood" },
   { id: MINER_MISSION_ID, cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves" },
   { id: HASBEEN_HEROES_MISSION_ID, cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "town", locationName: "Highmarket" },
-  { id: "uncharted-14", cell: { col: 0, row: 3 }, point: { x: 57.9, y: 72.5 }, region: "wood", locationName: "Thornhollow",
+  { id: RONIN_MISSION_ID, cell: { col: 0, row: 3 }, point: { x: 55.7, y: 72.5 }, region: "wood", locationName: "Thornhollow Bridge",
     blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
   { id: "uncharted-15", cell: { col: 0, row: 2 }, point: { x: 71.2, y: 78.9 }, region: "frost", locationName: "Frostcrown Foothills",
     blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
@@ -468,6 +482,64 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  if (missionId === RONIN_MISSION_ID) {
+    const type = volunteerType(selectedSquad);
+    const name = getNicknamePref(type) ?? getUnitType(type).name;
+    const preChoice = [
+      {
+        speaker: "mystic",
+        text: "Careful crossing the bridge. The weather is odd around here -- snow on warm stone, thunder with no clouds.",
+      },
+      {
+        speaker: "ronin",
+        side: "right",
+        player: 2,
+        text: "Stop. No one crosses to the island without my leave.",
+      },
+      {
+        speaker: "swordsman",
+        text: "We do not have time for another roadblock.",
+      },
+      {
+        speaker: "ronin",
+        side: "right",
+        player: 2,
+        text: "I am the protector of this island. My life was spared for this duty, and a debt repaid becomes an oath.",
+      },
+      {
+        speaker: "ronin",
+        side: "right",
+        player: 2,
+        text: "I am sworn to protect this island with my life.",
+      },
+      {
+        speaker: "swordsman",
+        text: "Then move, or we cross through you.",
+      },
+      {
+        speaker: "ronin",
+        side: "right",
+        player: 2,
+        text: "*draws his blade*",
+      },
+      {
+        speaker: "mystic",
+        text: "There is barely room on the bridge for a full party fight. This should be one on one.",
+      },
+    ];
+    const postChoice = [
+      {
+        type,
+        name,
+        side: "left",
+        player: 1,
+        text: "I'll handle the Ronin. Everyone else, step back.",
+      },
+    ];
+    if (phase === "preChoice") return preChoice;
+    if (phase === "postChoice") return postChoice;
+    return [...preChoice, ...postChoice];
+  }
   if (missionId === MINER_MISSION_ID) {
     const type = volunteerType(selectedSquad);
     // The volunteer is the player's own champion, so honor the nickname they set for
@@ -579,7 +651,7 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
 }
 
 export function shouldShowCampaignMapCutscene(storage = defaultStorage(), missionId) {
-  if (missionId === MINER_MISSION_ID) return true;
+  if (missionId === MINER_MISSION_ID || missionId === RONIN_MISSION_ID) return true;
   return campaignMapCutsceneScript(missionId).length > 0 &&
     !readCampaignProgress(storage).seenMapCutscenes.includes(missionId);
 }
@@ -598,6 +670,7 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === RONIN_MISSION_ID) return roninDefeatScript();
   if (missionId === HASBEEN_HEROES_MISSION_ID) {
     // The fat squad has trudged off; the party lingers in town. The Mystic pitches a
     // shopping trip, which leads straight into the one-time Mystic skin pick. One-time
@@ -796,6 +869,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "The Has-Beens"
         : mission.id === MINER_MISSION_ID
         ? "Buried Claim"
+        : mission.id === RONIN_MISSION_ID
+        ? "Island Protector"
         : mission.id === SNIPER_MISSION_ID
         ? "The High Guard"
         : mission.id === FATHER_TIME_MISSION_ID
@@ -1041,6 +1116,9 @@ const SNIPER_FIRE_POSITIONS = Object.freeze([
 
 const MINER_PLAYER_SPAWN = Object.freeze({ x: 0, y: 8 });
 const MINER_ENEMY_SPAWN = Object.freeze({ x: 8, y: 0 });
+const RONIN_PLAYER_SPAWN = Object.freeze({ x: 0, y: 4 });
+const RONIN_ENEMY_SPAWN = Object.freeze({ x: 8, y: 4 });
+const RONIN_WEATHER_CYCLE = Object.freeze(["blizzard", "heatwave", "spring", "thunderstorm"]);
 
 function minerWallObjects() {
   const walls = {};
@@ -1206,6 +1284,28 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     positions: {},
     fallback: (unit) => ({ ...unit.position }),
     hpFor: (unit, maxHp) => (unit.player === 2 ? Math.min(20, maxHp) : maxHp),
+  },
+  [RONIN_MISSION_ID]: {
+    positions: {
+      "p2-0-ronin": { ...RONIN_ENEMY_SPAWN },
+    },
+    fallback: (unit) =>
+      unit.player === 1
+        ? { ...RONIN_PLAYER_SPAWN }
+        : { ...RONIN_ENEMY_SPAWN },
+    fullHp: true,
+    weather: RONIN_WEATHER_CYCLE[0],
+    missionRules: () => ({
+      weatherCycle: {
+        sequence: [...RONIN_WEATHER_CYCLE],
+        intervalTurns: 2,
+        sourceId: null,
+      },
+      roninDuel: {
+        playerId: null,
+        roninId: "p2-0-ronin",
+      },
+    }),
   },
 });
 
@@ -1441,6 +1541,26 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       broughtStarterSquad,
       rewardSkinPack: mission?.rewardSkinPack ?? HASBEEN_MYSTIC_SKIN_PACK,
       fatSquadDefeated: enemyUnits.filter((unit) => HASBEEN_HEROES_FAT_TYPES.includes(unit.type) && unit.hp <= 0).length,
+    };
+  } else if (missionId === RONIN_MISSION_ID) {
+    const roninBlindApplied = Boolean(meta.roninBlindApplied) ||
+      playerUnits.some((unit) => unit.statuses?.some((status) => status.type === "blind"));
+    const roninEnteredRage = Boolean(meta.roninEnteredRage);
+    const draftedSwordsman = playerUnits.some((unit) => unit.type === "swordsman");
+    const ronin = enemyUnits.find((unit) => unit.type === "ronin") ?? null;
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "noBlind", label: "Avoid being blinded by the Ronin", earned: victory && !roninBlindApplied },
+      { id: "preRageKill", label: "Defeat the Ronin before Final Draw", earned: victory && !roninEnteredRage },
+    ];
+    bonusObjectives = [
+      { id: "swordsmanDuelist", label: "Bonus: recruit the Swordsman for the duel", earned: victory && draftedSwordsman },
+    ];
+    extra = {
+      roninDefeated: Boolean(ronin && ronin.hp <= 0),
+      roninBlindApplied,
+      roninEnteredRage,
+      draftedSwordsman,
     };
   } else if (missionId === SNIPER_MISSION_ID) {
     const wallDestroyedCount = Math.max(0, Math.floor(Number(meta.wallDestroyedCount) || 0));
@@ -2362,9 +2482,101 @@ export function hasbeenHeroesDefeatScript(state) {
   ];
 }
 
+// --- Mission 13: Battle for the Bridge dialogue ------------------------------
+// The map cutscene stages the challenge and unit pick. In-battle beats cover the
+// duel's opening, Ronin's blind, Final Draw, and the once-gated overworld recruitment.
+
+export function roninMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const ronin = findUnit(state, "p2-0-ronin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: ronin?.id,
+      text: "The bridge is narrow. Draw cleanly, cross honorably, or fall.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "One duel, one crossing. Let's end this.",
+    },
+  ];
+}
+
+export function shouldShowRoninBlindWarning(state, { warningShown = false, roninBlindApplied = false } = {}) {
+  if (warningShown || !roninBlindApplied || state?.phase !== "playing") return false;
+  return (state?.units ?? []).some((unit) =>
+    unit.player === 1 && unit.hp > 0 && unit.statuses?.some((status) => status.type === "blind"));
+}
+
+export function roninBlindWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const ronin = findUnit(state, "p2-0-ronin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: ronin?.id,
+      text: "Flashing Steel steals the eyes before it takes the breath.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Blind. I can still hear where your blade lands.",
+    },
+  ];
+}
+
+export function shouldShowRoninRageWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  const ronin = findUnit(state, "p2-0-ronin");
+  return Boolean(ronin && ronin.hp > 0 && ronin.hp <= 5);
+}
+
+export function roninRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const ronin = findUnit(state, "p2-0-ronin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: ronin?.id,
+      text: "Final Draw. If this oath ends, it ends with my blade moving forward.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "RAGE. He hits harder now, but every strike recoils on him. Do not let a suicide blow take us both.",
+    },
+  ];
+}
+
+export function roninDefeatScript() {
+  return [
+    {
+      speaker: "ronin",
+      side: "right",
+      player: 2,
+      text: "Hold. What are you after, crossing this island in such haste?",
+    },
+    {
+      speaker: "swordsman",
+      side: "left",
+      text: "The king. He has inflicted enough wrongs on the people, and we mean to make him answer for them.",
+    },
+    {
+      speaker: "mystic",
+      side: "left",
+      text: "We are not here to take your island. We are here to right what has been broken.",
+    },
+    {
+      speaker: "ronin",
+      side: "right",
+      player: 2,
+      text: "Then your cause is just. My oath has protected this bridge long enough. Accept my services, and my blade crosses with you.",
+    },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === RONIN_MISSION_ID) return roninMissionOpeningScript(state);
   if (missionId === HASBEEN_HEROES_MISSION_ID) return hasbeenHeroesMissionOpeningScript(state);
   if (missionId === MINER_MISSION_ID) return minerMissionOpeningScript(state);
   if (missionId === SNIPER_MISSION_ID) return sniperMissionOpeningScript(state);
