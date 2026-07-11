@@ -53,7 +53,7 @@ test("getNicknamePref is null for a type with no saved preference", () => {
   assert.equal(getNicknamePref("archer", storage), null);
 });
 
-test("createMatchState resolves unit.nickname from local storage by default", () => {
+test("createMatchState defaults local nicknames onto player 1 only, never the opponent", () => {
   const storage = new FakeLocalStorage({
     "tactical-arena.nicknames": JSON.stringify({ swordsman: "Leo" })
   });
@@ -67,9 +67,11 @@ test("createMatchState resolves unit.nickname from local storage by default", ()
       state.units.filter((unit) => unit.player === 1).map((unit) => [unit.type, unit.nickname]),
       [["swordsman", "Leo"], ["archer", null], ["mystic", null], ["magician", null]]
     );
+    // The device owner's personal rename must NOT leak onto the opponent's same-typed
+    // units — a rival Swordsman keeps its base name (null nickname).
     assert.deepEqual(
       state.units.filter((unit) => unit.player === 2).map((unit) => [unit.type, unit.nickname]),
-      [["swordsman", "Leo"], ["archer", null], ["mystic", null], ["magician", null]]
+      [["swordsman", null], ["archer", null], ["mystic", null], ["magician", null]]
     );
   } finally {
     delete globalThis.localStorage;

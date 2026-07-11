@@ -469,7 +469,9 @@ function volunteerType(selectedSquad) {
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
   if (missionId === MINER_MISSION_ID) {
     const type = volunteerType(selectedSquad);
-    const name = getUnitType(type).name;
+    // The volunteer is the player's own champion, so honor the nickname they set for
+    // that unit type (this cutscene runs on the map with no live unit to read).
+    const name = getNicknamePref(type) ?? getUnitType(type).name;
     const preChoice = [
       {
         speaker: "swordsman",

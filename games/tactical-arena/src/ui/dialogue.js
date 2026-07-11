@@ -1,6 +1,7 @@
 import { UNIT_TYPES, getUnitType } from "../core/unitCatalog.js";
 import { colorOf } from "../core/state.js";
 import { createPortrait, getPortrait } from "./portraits.js";
+import { getNicknamePref } from "./nicknameModel.js";
 
 const VALID_SIDES = new Set(["left", "right"]);
 
@@ -50,7 +51,18 @@ export function normalizeDialogueLine(line = {}, state = null, index = 0, total 
   const type = speakerType(line, speakerUnit);
   const player = line.player ?? speakerUnit?.player ?? null;
   const skin = line.skin ?? speakerUnit?.skin ?? null;
-  const nickname = line.nickname ?? speakerUnit?.nickname ?? null;
+  // The saved nickname is the device owner's personal label for their OWN units
+  // (player 1). A live unit's nickname always wins, but overworld cutscenes play with
+  // no live match units to read (getState is stale/empty), so a player-side speaker
+  // (player 1, or unspecified — which defaults to the local player) falls back to the
+  // saved preference. This is what makes "my Swordsman" still speak under the nickname I
+  // set on the map. Enemy lines (player 2) never take this fallback, so a rival Swordsman
+  // keeps its base name.
+  const isLocalSpeaker = player == null || player === 1;
+  const nickname =
+    line.nickname ??
+    speakerUnit?.nickname ??
+    (isLocalSpeaker && type ? getNicknamePref(type) : null);
   const name = line.name ?? nickname ?? safeUnitName(type) ?? "Narrator";
   const portrait = type ? getPortrait(type, skin) : null;
 

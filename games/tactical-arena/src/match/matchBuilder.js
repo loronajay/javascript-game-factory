@@ -57,11 +57,16 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
     const positions = slotsForCorner(slot.corner);
     const squad = (squads[slot.id] ?? []).slice(0, positions.length);
     const skinLoadout = normalizeSkinLoadout(squad, skins?.[slot.id]);
-    // Nicknames default to each unit type's locally-saved preference (see
-    // nicknameModel.js) unless an explicit per-slot array is passed in — the
-    // explicit path is what online play uses so a peer's own chosen names ride
-    // over the wire rather than getting re-derived from the viewer's local map.
-    const nicknameLoadout = nicknames?.[slot.id] ?? squad.map((type) => getNicknamePref(type));
+    // Nicknames are the device owner's personal labels for THEIR OWN units, so the
+    // local-preference default (see nicknameModel.js) only rides onto player 1 — the
+    // local human in every mode that omits an explicit map (hot-seat, single, campaign,
+    // tempo, tutorial). Other seats (a CPU/opponent squad) default to no nickname so a
+    // rival Swordsman keeps its base name instead of wearing your personal rename. An
+    // explicit per-slot array still populates ANY seat directly — that's the path online
+    // play uses so a peer's own chosen names ride over the wire.
+    const nicknameLoadout =
+      nicknames?.[slot.id] ??
+      (slot.id === 1 ? squad.map((type) => getNicknamePref(type)) : squad.map(() => null));
     // Every unit keeps its natural index cell, EXCEPT the King ("always in the far
     // corner"): he swaps onto positions[2] with whoever held it. King-less squads are
     // untouched (no swap), so the original spawn layout is preserved exactly.

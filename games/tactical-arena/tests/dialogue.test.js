@@ -18,6 +18,30 @@ const nicknamedBothSidesState = {
   ]
 };
 
+class FakeLocalStorage {
+  constructor(initial = {}) {
+    this.values = new Map(Object.entries(initial));
+  }
+  getItem(key) {
+    return this.values.has(key) ? this.values.get(key) : null;
+  }
+  setItem(key, value) {
+    this.values.set(key, String(value));
+  }
+}
+
+function withSavedNickname(type, nickname, run) {
+  const storage = new FakeLocalStorage({
+    "tactical-arena.nicknames": JSON.stringify({ [type]: nickname })
+  });
+  globalThis.localStorage = storage;
+  try {
+    return run();
+  } finally {
+    delete globalThis.localStorage;
+  }
+}
+
 test("a unit type speaker resolves to its catalog name and the live unit's portrait/skin", () => {
   const line = normalizeDialogueLine({ speaker: "swordsman", text: "Keep your shield up." }, state);
 
@@ -95,6 +119,24 @@ test("a bare unit-type speaker explicitly scoped to player two never picks up th
 
   assert.equal(line.name, "Swordsman");
   assert.equal(line.player, 2);
+});
+
+test("a player-side speaker with no live unit in scope falls back to the saved nickname (overworld cutscene)", () => {
+  // Cutscenes on the map play with no match state, so the speaker can't be resolved to a
+  // live unit — the player's own Swordsman must still speak under the nickname they set.
+  const line = withSavedNickname("swordsman", "Leo", () =>
+    normalizeDialogueLine({ speaker: "swordsman", side: "left", text: "The castle awaits." }, null)
+  );
+
+  assert.equal(line.name, "Leo");
+});
+
+test("an enemy cutscene speaker (player 2) never borrows the saved local nickname", () => {
+  const line = withSavedNickname("swordsman", "Leo", () =>
+    normalizeDialogueLine({ speaker: "swordsman", player: 2, side: "right", text: "Out of our way." }, null)
+  );
+
+  assert.equal(line.name, "Swordsman");
 });
 
 test("unknown speakers fall back to a narrator-safe line", () => {
