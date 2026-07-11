@@ -1911,7 +1911,7 @@ async function resolveInstantArt(command) {
   playArtCallout(resolved);
   render();
 
-  if ((resolved?.artId === "footwork" || resolved?.artId === "stumble") && actorBefore) {
+  if ((resolved?.artId === "footwork" || resolved?.artId === "stumble" || resolved?.artId === "dark-rush") && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     // Map each harmed enemy to its tile so we can strike it as the dasher arrives there,
     // instead of dumping every hit after the slide. The dasher glides tile-by-tile and
@@ -2259,6 +2259,37 @@ async function resolveInstantArt(command) {
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));
     await effects.deathDissolve(actorBefore.id, actorBefore.position, teamColor(actorBefore.player));
+  } else if (resolved?.artId === "dark-tick" && actorBefore) {
+    // Every blinded enemy convulses for true damage (ignores DEF/Defend), anywhere.
+    const metrics = createBoardMetrics(state.size);
+    await Promise.all(targetsBefore.map(async (target) => {
+      const dmg = resolved.damageByTarget?.[target.id] ?? 0;
+      const center = unitCenter(metrics, target);
+      if (dmg > 0) {
+        effects.impact(center, false, "true");
+        await effects.hitRecoil(target.id, target.position, false);
+        await effects.floatText(center, `-${dmg}`, "#c8a2ff");
+      }
+      const after = findUnit(result.nextState, target.id);
+      if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+  } else if (resolved?.artId === "banish-dark" && actorBefore) {
+    // The RAGE ultimate: every enemy on a dark tile is destroyed, then Blacksword falls.
+    const metrics = createBoardMetrics(state.size);
+    effects.shake(12);
+    await Promise.all(targetsBefore.map(async (target) => {
+      const center = unitCenter(metrics, target);
+      effects.impact(center, true, "true");
+      await effects.hitRecoil(target.id, target.position, true);
+      await effects.deathDissolve(target.id, target.position, teamColor(target.player));
+    }));
+    await effects.deathDissolve(actorBefore.id, actorBefore.position, teamColor(actorBefore.player));
+  } else if (resolved?.artId === "dark-ether" && actorBefore) {
+    // A self crit-charge: no target, just a dark shimmer + a readiness float on Blacksword.
+    const metrics = createBoardMetrics(state.size);
+    const center = unitCenter(metrics, actorBefore);
+    effects.impact(center, false, "magic");
+    await effects.floatText(center, "CRIT READY", "#c8a2ff");
   } else if (resolved?.artId === "quake" && actorBefore) {
     // A self-centred ground slam: earthen magic ripples out and shakes everyone caught.
     const metrics = createBoardMetrics(state.size);
@@ -2784,7 +2815,7 @@ function playEventSounds(events) {
     else if (event.type === "ART_RESOLVED") {
       const artId = event.artId;
       // VFX-managed arts play their own sound through the animation path
-      if (artId === "footwork" || artId === "flee" || artId === "nuke" ||
+      if (artId === "footwork" || artId === "dark-rush" || artId === "flee" || artId === "nuke" ||
           artId === "spark" || artId === "pray" || artId === "wish" ||
           artId === "lightseeker" || artId === "darkseeker" ||
           artId === "dark-bomb" || artId === "summon-ghoul" ||

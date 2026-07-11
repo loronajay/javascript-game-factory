@@ -685,5 +685,30 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "little-brother",
     slug: "galaxy-defender",
     file: "galaxy-defender-little-brother.png"
+  },
+  {
+    type: "blacksword",
+    slug: "blood-knight",
+    file: "blood-knight-blacksword.png"
+  },
+  {
+    type: "blacksword",
+    slug: "blood-moon",
+    file: "blood-moon-blacksword.png"
+  },
+  {
+    type: "blacksword",
+    slug: "judicator",
+    file: "judicator-blacksword.png"
+  },
+  {
+    type: "blacksword",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-blacksword.png"
+  },
+  {
+    type: "blacksword",
+    slug: "void-dweller",
+    file: "void-dweller-blacksword.png"
   }
 ]);

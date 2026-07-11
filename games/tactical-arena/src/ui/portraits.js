@@ -56,6 +56,9 @@ export const PORTRAITS = Object.freeze({
   miner:       portrait("miner",       { x: 0.100, y: 0.045, w: 0.800, h: 0.900 }),
   "big-brother": portrait("big-brother", { x: 0.100, y: 0.040, w: 0.800, h: 0.920 }),
   "little-brother": portrait("little-brother", { x: 0.120, y: 0.060, w: 0.760, h: 0.880 }),
+  // Dark duelist; measured alpha bbox off the 600×600 source (the black sword spreads the
+  // silhouette wide, balanced around the body centre ≈ 0.51).
+  blacksword:  portrait("blacksword",  { x: 0.017, y: 0.037, w: 0.983, h: 0.920 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })

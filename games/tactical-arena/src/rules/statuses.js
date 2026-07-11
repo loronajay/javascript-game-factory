@@ -13,9 +13,13 @@ export function isNegativeStatus(status) {
 export function statusImmunities(unit) {
   const definition = getUnitType(unit.type);
   const sources = [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt];
-  return new Set(sources.flatMap((source) =>
-    source?.effect?.type === "immunity" ? source.effect.statuses : []
-  ));
+  // An `immunity`-typed passive lists its statuses directly; any other passive may also
+  // carry an `immuneStatuses` rider (Blacksword's Dark Tread bundles Blind immunity into
+  // its main passive), so both are folded here.
+  return new Set(sources.flatMap((source) => [
+    ...(source?.effect?.type === "immunity" ? source.effect.statuses : []),
+    ...(source?.effect?.immuneStatuses ?? [])
+  ]));
 }
 
 export function damageTypeImmunities(unit) {

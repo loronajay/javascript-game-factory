@@ -63,6 +63,9 @@ function canonicalUnits(units) {
         `${unit.stationaryStrength ?? 0},${unit.desperationShotSpent ? 1 : 0},` +
         `${unit.desperationRageArmed ? 1 : 0},${unit.skipNextActivation ? 1 : 0},` +
         `${unit.studiedTargetId ?? "-"},` +
+        // Dark Ether (Blacksword): a charged guaranteed crit forces the next swing's crit
+        // outcome, which draws the RNG, so it is part of the authoritative hash.
+        `${unit.guaranteedCritCharged ? 1 : 0},` +
         `${stableStringify(unit.statModifiers ?? {})},` +
         // Source-linked modifiers (Father Time's Age) change future effective stats, so
         // they are part of the authoritative hash.

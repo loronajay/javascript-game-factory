@@ -52,6 +52,8 @@ export function statGridHtml(stats) {
 export function unitDetailHtml(def) {
   const statGrid = statGridHtml(def.stats);
 
+  // Most ARTS spend MP; Blacksword's spend HP (or all HP for Banish, via costLabel).
+  const artCostText = (art) => art.costLabel ?? (art.hpCost ? `${art.hpCost} HP` : `${art.mpCost} MP`);
   const passiveEntries = [
     def.passive ? { tag: "Passive", ...def.passive } : null,
     ...def.arts.filter((a) => a.kind === "passive").map((a) => ({ tag: "Passive", ...a })),
@@ -64,8 +66,8 @@ export function unitDetailHtml(def) {
     .join("");
 
   const arts = [
-    ...def.arts.filter((art) => art.kind === "active").map((art) => ({ tag: `ART · ${art.mpCost} MP`, ...art })),
-    ...(def.rageArt?.kind === "active" ? [{ tag: `RAGE ART · ${def.rageArt.mpCost} MP`, ...def.rageArt }] : [])
+    ...def.arts.filter((art) => art.kind === "active").map((art) => ({ tag: `ART · ${artCostText(art)}`, ...art })),
+    ...(def.rageArt?.kind === "active" ? [{ tag: `RAGE ART · ${artCostText(def.rageArt)}`, ...def.rageArt }] : [])
   ]
     .map((art) => `<div class="ref-line"><span class="ref-tag art">${art.tag}</span><b>${art.name}</b> — ${art.description}</div>`)
     .join("");

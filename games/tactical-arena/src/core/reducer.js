@@ -7,7 +7,7 @@ import { getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCr
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
-import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
+import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } from "./commandValidation.js";
 import { applyPostCommandReactions, consumeOneShotRage, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
@@ -264,6 +264,9 @@ function attack(state, command) {
   // folded into the chance, so a guaranteed miss reads through the same path.
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
+  // Dark Ether (Blacksword): a one-shot guaranteed-crit charge is spent by the attack it
+  // buffed, hit OR miss ("still roll for misses").
+  if (actor.guaranteedCritCharged) actor.guaranteedCritCharged = false;
   if (swing.missed) {
     const desperationEvents = consumeOneShotRage(actor);
     return accept(next, [{ type: "ATTACK_RESOLVED", actorId: actor.id, targetId: nextTarget.id, hit: false, missed: true, roll: swing.hitRoll, ...(resourceCost > 0 ? { mpCost: resourceCost } : {}) }, ...triggerEvents, ...desperationEvents]);
@@ -286,12 +289,14 @@ function attack(state, command) {
   const rockHardEvents = []; // Rock Hard (Clod): MP refunded per physical strike while defending
   const magicReactionEvents = [];
   const pulled = {};
+  const damagedForLifesteal = []; // Dark Tread (Blacksword): enemies hurt this swing
   let poisonedByAttack = 0;
   const strike = (unit) => resolveBaseStrike(actor, unit, { proximity: true, critical: swing.critical, state: next, damageType: basicDamageType });
   for (const targetUnit of targets) {
     const damage = strike(targetUnit);
     const damageDealt = Math.min(targetUnit.hp, damage.damage);
     targetUnit.hp = Math.max(0, targetUnit.hp - damage.damage);
+    if (damageDealt > 0) damagedForLifesteal.push(targetUnit);
     const magicReaction = basicDamageType === "magic" ? applyMagicDamageReaction(targetUnit, damageDealt) : null;
     if (magicReaction) magicReactionEvents.push(magicReaction);
     targetIds.push(targetUnit.id);
@@ -346,6 +351,8 @@ function attack(state, command) {
   }
   // Growth (Virus): restore MP for each enemy this attack poisoned.
   const growthEvents = poisonRefund > 0 ? applyGrowth(next, actor, poisonRefund * poisonedByAttack) : [];
+  // Dark Tread (Blacksword): heal for each enemy struck while it stood on a dark tile.
+  const darkTreadEvents = applyDarkTreadLifesteal(next, actor, damagedForLifesteal);
   const splashEvents = swing.critical ? applyCritSplashDamage(next, actor, nextTarget, getCritSplashDamage(actor)) : [];
   const freeConeEvents = applyBasicAttackFreeCone(next, actor, nextTarget);
   const desperationEvents = consumeOneShotRage(actor);
@@ -359,7 +366,7 @@ function attack(state, command) {
     ...(fireTiles.length ? { fireTiles } : {}),
     ...(Object.keys(pulled).length ? { pulled } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...splashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...darkTreadEvents, ...splashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents]);
 }
 
 function applyCritSplashDamage(state, actor, originalTarget, splash) {

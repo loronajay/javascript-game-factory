@@ -37,6 +37,16 @@ export function validateRushPath(state, actor, path, art = getArt(actor.type, "f
     visited.add(key);
     previous = step;
   }
+  // Dark Rush (Blacksword): a straight-line charge — every step must continue the single
+  // orthogonal direction set by the first step.
+  if (art?.targeting?.straightLine) {
+    const dir = { x: Math.sign(path[0].x - actor.position.x), y: Math.sign(path[0].y - actor.position.y) };
+    let prev = actor.position;
+    for (const step of path) {
+      if (step.x !== prev.x + dir.x || step.y !== prev.y + dir.y) return false;
+      prev = step;
+    }
+  }
   return true;
 }
 
@@ -59,6 +69,13 @@ export function getRushStepOptions(state, actor, path, art = getArt(actor.type, 
     const occupant = unitAt(state, candidate);
     if (occupant && (!areEnemies(actor, occupant) || lastStep)) continue;
     options.add(positionKey(candidate));
+  }
+  // Dark Rush (Blacksword): once the direction is chosen (first step taken), only the tile
+  // continuing that straight line stays a legal step.
+  if (art?.targeting?.straightLine && path.length >= 1) {
+    const dir = { x: Math.sign(path[0].x - actor.position.x), y: Math.sign(path[0].y - actor.position.y) };
+    const forced = positionKey({ x: prior.x + dir.x, y: prior.y + dir.y });
+    for (const key of [...options]) if (key !== forced) options.delete(key);
   }
   return options;
 }
@@ -478,6 +495,19 @@ export function hasPoisonedEnemy(state, actor) {
     unit.hp > 0 && areEnemies(actor, unit) && (unit.statuses ?? []).some((status) => status.type === "poison"));
 }
 
+// True when at least one living enemy of `actor` matches an ART's `condition` — a blinded
+// enemy (Dark Tick) or an enemy standing on a given tile affinity (Banish). The gate for
+// `requiresConditionEnemy`, so a costed/rage burst is only offered/accepted when it would
+// actually catch something. A null condition matches nothing gate-worthy → true.
+export function hasConditionEnemy(state, actor, condition) {
+  if (!condition) return true;
+  return (state.units ?? []).some((unit) =>
+    unit.hp > 0 && areEnemies(actor, unit) &&
+    (condition.status
+      ? (unit.statuses ?? []).some((status) => status.type === condition.status)
+      : getTileAffinity(state, unit.position) === condition.affinity));
+}
+
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
   const activation = state.activation;
@@ -511,6 +541,10 @@ export function canUseArt(state, actor, artId) {
     actor.mp >= getArtMpCost(actor, art, state) &&
     (!art.rageLocked || isRaging(actor)) &&
     (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor)) &&
+    // HP-cost ARTS (Blacksword) can never suicide him; an all-HP ultimate opts in via
+    // selfKill instead. And a condition-gated burst is only usable with a matching enemy.
+    !(art.hpCost && !art.selfKill && actor.hp <= art.hpCost) &&
+    (!art.requiresConditionEnemy || hasConditionEnemy(state, actor, art.condition)) &&
     !(art.effect?.type === "studyTarget" && hasLivingStudiedTarget(actor, state)) &&
     !(art.effect?.type === "relayPower" && (actor.hp <= (art.effect.hp ?? 0) || actor.mp < (art.effect.mp ?? 0)))
   );

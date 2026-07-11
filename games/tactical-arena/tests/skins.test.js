@@ -45,16 +45,22 @@ test("summer-vibes is the first authored skin collection slug", () => {
   assert.equal(SUMMER_VIBES_SKIN_SLUG, "summer-vibes");
 });
 
-test("every registered unit has a summer-vibes skin asset, currently locked (no unlock UI yet)", () => {
+test("every registered unit's skins are locked by default with real assets on disk", () => {
   for (const type of Object.keys(UNIT_TYPES)) {
     const skins = getUnitSkins(type);
-    assert.equal(skins[0]?.slug, SUMMER_VIBES_SKIN_SLUG, `${type} first skin should be summer-vibes`);
-    assert.equal(skins[0]?.unlocked, false, `${type} summer-vibes should be locked until the skin-choice UI ships`);
-    assert.equal(skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG), `assets/units/skins/${type}/summer-vibes-${type}.png`);
-    assert.ok(
-      existsSync(join(GAME_ROOT, skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG))),
-      `${type} summer-vibes asset is missing`
-    );
+    if (!skins.length) continue;
+    // The first skin is locked until the skin-choice UI ships, and every declared skin
+    // points at a real asset.
+    assert.equal(skins[0].unlocked, false, `${type} first skin should be locked until the skin-choice UI ships`);
+    for (const entry of skins) {
+      assert.ok(existsSync(join(GAME_ROOT, entry.portraitSrc)), `${type} skin asset is missing: ${entry.portraitSrc}`);
+    }
+    // Launch-roster units lead with the summer-vibes collection; a unit that ships a
+    // bespoke themed set instead (e.g. Blacksword) simply has no summer-vibes entry.
+    if (skins.some((entry) => entry.slug === SUMMER_VIBES_SKIN_SLUG)) {
+      assert.equal(skins[0].slug, SUMMER_VIBES_SKIN_SLUG, `${type} should lead with summer-vibes`);
+      assert.equal(skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG), `assets/units/skins/${type}/summer-vibes-${type}.png`);
+    }
   }
 });
 

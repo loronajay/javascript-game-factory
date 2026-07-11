@@ -51,7 +51,10 @@ export function createUnit(spec) {
     // Dark Pulse; locked prevents re-arming until that charged activation finishes.
     realmTraversalCharged: spec.realmTraversalCharged ?? false,
     realmTraversalLocked: spec.realmTraversalLocked ?? false,
-    studiedTargetId: spec.studiedTargetId ?? null
+    studiedTargetId: spec.studiedTargetId ?? null,
+    // Dark Ether (Blacksword): a one-shot charge forcing the next basic attack to crit.
+    // Meaningless for every other unit (stays false).
+    guaranteedCritCharged: spec.guaranteedCritCharged ?? false
   };
 }
 

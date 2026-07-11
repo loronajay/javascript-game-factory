@@ -25,6 +25,7 @@ import { FAT_BOWMAN } from "./units/fat-bowman.js";
 import { MINER } from "./units/miner.js";
 import { BIG_BROTHER } from "./units/big-brother.js";
 import { LITTLE_BROTHER } from "./units/little-brother.js";
+import { BLACKSWORD } from "./units/blacksword.js";
 import { areAllies, areEnemies } from "./state.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -52,7 +53,8 @@ export const UNIT_TYPES = Object.freeze({
   "fat-bowman": FAT_BOWMAN,
   miner: MINER,
   "big-brother": BIG_BROTHER,
-  "little-brother": LITTLE_BROTHER
+  "little-brother": LITTLE_BROTHER,
+  blacksword: BLACKSWORD
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import

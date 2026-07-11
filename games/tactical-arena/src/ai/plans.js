@@ -24,7 +24,7 @@
 // finish.
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
-import { areEnemies, findUnit, livingUnits } from "../core/state.js";
+import { areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
 import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getUnitType, isCommandOnly, isRaging, normalizeArtAi } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -50,6 +50,7 @@ import {
   getTargetedBlastTargets,
   getTilePulseTargets,
   getWallPlacementTiles,
+  hasConditionEnemy,
   validateRushPath
 } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
@@ -369,12 +370,16 @@ function generateArtPlans(state, unit, art, ai, plans) {
       break;
     }
     case "poisonBurst": {
-      // Poison Tick / Explosion: detonate poisoned enemies. Offer only when at least one
-      // enemy is poisoned — this also keeps every plan legal for Explosion
-      // (requiresPoisonedEnemy), so it replays cleanly through the reducer.
-      const poisoned = livingUnits(state).some((u) =>
-        areEnemies(unit, u) && (u.statuses ?? []).some((s) => s.type === "poison"));
-      if (poisoned) {
+      // Poison Tick / Explosion / Dark Tick / Banish: detonate enemies matching the art's
+      // condition (poison / blind status, or a tile affinity). Offer only when one exists —
+      // this also keeps every plan legal for the condition-gated bursts, so it replays
+      // cleanly through the reducer.
+      const condition = art.condition ?? { status: "poison" };
+      const any = livingUnits(state).some((u) => areEnemies(unit, u) &&
+        (condition.status
+          ? (u.statuses ?? []).some((s) => s.type === condition.status)
+          : getTileAffinity(state, u.position) === condition.affinity));
+      if (any) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
       }
       break;
@@ -598,19 +603,25 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "statusAoe":
       break; // Smog changes no HP now; the blind value is a controller score term.
     case "poisonBurst": {
-      // Poison Tick / Explosion: TRUE damage (no DEF/Defend) to every poisoned enemy, plus
-      // a splash to enemies near a poisoned one. Explosion consumes the caster (selfKill).
+      // Poison Tick / Explosion / Dark Tick / Banish: TRUE damage (no DEF/Defend) to every
+      // enemy matching the art's condition, plus a splash to enemies near one. selfKill
+      // (Explosion / Banish) consumes the caster; an hpCost (Dark Tick) is modeled too.
       const amount = Math.max(0, Number(art.damage?.amount) || 0);
       const splash = art.splash ?? null;
-      const poisoned = board.filter((u) => areEnemies(actor, u) && (u.statuses ?? []).some((s) => s.type === "poison"));
-      const poisonedIds = new Set(poisoned.map((u) => u.id));
+      const condition = art.condition ?? { status: "poison" };
+      const matches = (u) => condition.status
+        ? (u.statuses ?? []).some((s) => s.type === condition.status)
+        : getTileAffinity(state, u.position) === condition.affinity;
+      const affected = board.filter((u) => areEnemies(actor, u) && matches(u));
+      const affectedIds = new Set(affected.map((u) => u.id));
       for (const target of board) {
         if (!areEnemies(actor, target)) continue;
         let dmg = 0;
-        if (poisonedIds.has(target.id)) dmg = amount;
-        else if (splash && poisoned.some((p) => chebyshevDistance(p.position, target.position) <= splash.radius)) dmg = Math.max(0, Number(splash.amount) || 0);
+        if (affectedIds.has(target.id)) dmg = amount;
+        else if (splash && affected.some((p) => chebyshevDistance(p.position, target.position) <= splash.radius)) dmg = Math.max(0, Number(splash.amount) || 0);
         if (dmg > 0) target.hp = Math.max(0, target.hp - dmg);
       }
+      if (art.hpCost) actor.hp = Math.max(0, actor.hp - art.hpCost);
       if (art.selfKill) actor.hp = 0;
       break;
     }
@@ -863,6 +874,8 @@ function artUsableForPlanning(state, unit, art) {
     !(isRaging(unit) && art.replacedByRageArt) &&
     unit.mp >= getArtMpCost(unit, art, state) &&
     (!art.rageLocked || isRaging(unit)) &&
+    !(art.hpCost && !art.selfKill && unit.hp <= art.hpCost) &&
+    (!art.requiresConditionEnemy || hasConditionEnemy(state, unit, art.condition)) &&
     !(art.effect?.type === "studyTarget" && unit.studiedTargetId && state.units.some((target) => target.id === unit.studiedTargetId && target.hp > 0)) &&
     !(art.effect?.type === "relayPower" && (unit.hp <= (art.effect.hp ?? 0) || unit.mp < (art.effect.mp ?? 0)))
   );

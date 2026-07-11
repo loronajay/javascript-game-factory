@@ -1,5 +1,5 @@
 import { getCommandHealBonus, getEffectiveStats, getUnitType, isDefending } from "./unitCatalog.js";
-import { livingTeamUnits } from "./state.js";
+import { getTileAffinity, livingTeamUnits } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getRockHardMpRefund, isHealingDisabled } from "../rules/combat.js";
 import { getGlobalHealBonus } from "../rules/stances.js";
@@ -35,6 +35,21 @@ export function applyRockHardDefense(state, target, isPhysical) {
   return restored.mpRestored > 0 || restored.hpRestored > 0
     ? [{ type: "ROCK_HARD_MP", unitId: target.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored }]
     : [];
+}
+
+// Dark Tread (Blacksword): heal per enemy damaged while that enemy stands on a dark tile.
+// Read off the actor's passive so no rule hard-codes the unit; called at his damage sites
+// (basic attack, Dark Rush, Dark Tick). `damagedTargets` are the enemies this action just
+// hurt. Returns a single DARK_TREAD_HEAL event (or none). A dead actor never heals.
+export function applyDarkTreadLifesteal(state, actor, damagedTargets) {
+  const cfg = getUnitType(actor.type).passive?.effect?.darkTileLifesteal;
+  if (!cfg || actor.hp <= 0 || !damagedTargets?.length) return [];
+  let hpRestored = 0;
+  for (const target of damagedTargets) {
+    if (getTileAffinity(state, target.position) !== cfg.affinity) continue;
+    hpRestored += restoreHp(state, actor, actor, cfg.amount).hpRestored;
+  }
+  return hpRestored > 0 ? [{ type: "DARK_TREAD_HEAL", unitId: actor.id, hpRestored }] : [];
 }
 
 export function applyMagicDamageReaction(target, damageDealt) {

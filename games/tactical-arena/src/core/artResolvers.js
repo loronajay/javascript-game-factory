@@ -7,7 +7,7 @@ import { drawValue } from "./rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../rules/movement.js";
 import { applyStatus, isNegativeStatus, NEGATIVE_STATUS_TYPES, reflectsStatus } from "../rules/statuses.js";
 import { getGlobalHealBonus, getGlobalStatusChanceMultiplier } from "../rules/stances.js";
-import { applyGrowth, applyMagicDamageReaction, applyRockHardDefense, applyRolledStatus, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
+import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, applyRolledStatus, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { validateOpenActivation } from "./commandValidation.js";
 import { consumeOneShotRage } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
@@ -75,6 +75,12 @@ function applyPyroclasmDamage(state, actor, art) {
 const ART_RESOLVERS = new Map([
   ["footwork", resolveRushPath],
   ["stumble", resolveRushPath],
+  // Blacksword: a straight-line HP-cost dash, a self crit-charge, and two condition-driven
+  // true-damage bursts (Dark Tick = blinded enemies, Banish = enemies on dark tiles).
+  ["dark-rush", resolveDarkRush],
+  ["dark-ether", resolveDarkEther],
+  ["dark-tick", resolvePoisonBurst],
+  ["banish-dark", resolvePoisonBurst],
   ["fart", resolveFart],
   ["volley-shot", resolveVolleyShot],
   ["cannon-fire", resolveCannonFire],
@@ -211,6 +217,63 @@ function resolveRushPath(state, command, art) {
     harmed,
     damageByTarget,
     mpCost: cost
+  }]);
+}
+
+// Dark Rush (Blacksword): a Footwork clone restricted to a single orthogonal direction
+// (validateRushPath honors `straightLine`). Spends HP, deals tile-scaled TRUE damage to
+// every enemy passed through (more on dark tiles), heals via Dark Tread on the dark-tile
+// hits, and ends on empty ground.
+function resolveDarkRush(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  if (!validateRushPath(state, actorState, command.path, art)) return reject(ERR.INVALID_ART_PATH);
+
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const hpCost = art.hpCost ?? 0;
+  const lightDamage = art.contactDamage?.light ?? 3;
+  const darkDamage = art.contactDamage?.dark ?? 4;
+  const harmed = [];
+  const damageByTarget = {};
+  const damaged = [];
+  for (const step of command.path) {
+    const target = unitAt(next, step);
+    if (!target || !areEnemies(actor, target)) continue;
+    const amount = getTileAffinity(next, target.position) === "dark" ? darkDamage : lightDamage;
+    const dealt = Math.min(target.hp, amount);
+    target.hp = Math.max(0, target.hp - amount);
+    harmed.push(target.id);
+    damageByTarget[target.id] = (damageByTarget[target.id] ?? 0) + dealt;
+    if (dealt > 0) damaged.push(target);
+  }
+  actor.position = { ...command.path.at(-1) };
+  const darkTreadEvents = applyDarkTreadLifesteal(next, actor, damaged);
+  actor.hp = Math.max(0, actor.hp - hpCost);
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    path: command.path.map((step) => ({ ...step })),
+    harmed,
+    damageByTarget,
+    mpCost: 0,
+    hpCost
+  }, ...darkTreadEvents]);
+}
+
+// Dark Ether (Blacksword): spend HP to charge a guaranteed crit on the next basic attack
+// (getCritChance reads the flag; the reducer's attack() consumes it). A pure self-cast.
+function resolveDarkEther(state, command, art) {
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const hpCost = art.hpCost ?? 0;
+  actor.hp = Math.max(0, actor.hp - hpCost);
+  actor.guaranteedCritCharged = true;
+  spendAndAdvance(next, actor);
+  return accept(next, [{
+    type: "ART_RESOLVED", artId: art.id, actorId: actor.id, mpCost: 0, hpCost, charged: true
   }]);
 }
 
@@ -774,22 +837,32 @@ function resolvePoisonBurst(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
   const cost = getArtMpCost(actor, art, next);
-  actor.mp -= cost;
+  const hpCost = art.hpCost ?? 0;
+  // Dark Tick (Blacksword) pays HP; Virus's Poison Tick / Explosion (and Banish's all-HP
+  // cost, which rides on selfKill below) keep paying MP.
+  if (hpCost > 0) actor.hp = Math.max(0, actor.hp - hpCost);
+  else actor.mp -= cost;
 
   const amount = Math.max(0, Number(art.damage?.amount) || 0);
   const splash = art.splash ?? null;
-  const poisoned = livingUnits(next).filter((unit) =>
-    areEnemies(actor, unit) && (unit.statuses ?? []).some((status) => status.type === "poison"));
-  const poisonedIds = new Set(poisoned.map((unit) => unit.id));
+  // The "affected" set: enemies carrying a status (poison / blind) OR standing on a given
+  // tile affinity (Banish's dark tiles). Defaults to poison so Virus stays unchanged.
+  const condition = art.condition ?? { status: "poison" };
+  const matches = (unit) => condition.status
+    ? (unit.statuses ?? []).some((status) => status.type === condition.status)
+    : getTileAffinity(next, unit.position) === condition.affinity;
+  const affected = livingUnits(next).filter((unit) => areEnemies(actor, unit) && matches(unit));
+  const affectedIds = new Set(affected.map((unit) => unit.id));
 
   const damageByTarget = {};
   const targetIds = [];
+  const damaged = [];
   for (const target of livingUnits(next)) {
     if (!areEnemies(actor, target)) continue;
     let dealt = 0;
-    if (poisonedIds.has(target.id)) {
+    if (affectedIds.has(target.id)) {
       dealt = amount;
-    } else if (splash && poisoned.some((p) => chebyshevDistance(p.position, target.position) <= splash.radius)) {
+    } else if (splash && affected.some((p) => chebyshevDistance(p.position, target.position) <= splash.radius)) {
       dealt = Math.max(0, Number(splash.amount) || 0);
     }
     if (dealt <= 0) continue;
@@ -797,15 +870,21 @@ function resolvePoisonBurst(state, command, art) {
     target.hp = Math.max(0, target.hp - dealt);
     targetIds.push(target.id);
     damageByTarget[target.id] = applied;
+    if (applied > 0) damaged.push(target);
   }
 
-  if (art.selfKill) actor.hp = 0; // Explosion consumes Virus
+  // Dark Tread lifesteal on Dark Tick's dark-tile hits (skipped for a self-killing Banish,
+  // which consumes Blacksword anyway).
+  const darkTreadEvents = art.selfKill ? [] : applyDarkTreadLifesteal(next, actor, damaged);
+  if (art.selfKill) actor.hp = 0; // Explosion consumes Virus / Banish consumes Blacksword
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
-    ...(art.selfKill ? { selfDestruct: true } : {}), mpCost: cost
-  }]);
+    ...(art.selfKill ? { selfDestruct: true } : {}),
+    mpCost: hpCost > 0 ? 0 : cost,
+    ...(hpCost > 0 ? { hpCost } : {})
+  }, ...darkTreadEvents]);
 }
 
 // Quake (Clod): a self-centred ground slam. Every enemy within the radius takes the SAME

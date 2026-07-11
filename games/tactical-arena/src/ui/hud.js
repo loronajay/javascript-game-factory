@@ -18,9 +18,22 @@ function displayName(unit, definition) {
   return unit.nickname || definition.name;
 }
 
-function artTip(art, unitOrDefinition = null) {
+// The cost an ART shows on its tile/tooltip. Most spend MP; an HP-cost ART (Blacksword's
+// Dark Rush/Ether/Tick) reads "N HP", and an all-HP ultimate (Banish) carries its own
+// `costLabel`. Returned split so the button can style the unit suffix.
+function artCostParts(art, unitOrDefinition = null) {
+  if (art.costLabel) {
+    const [main, ...rest] = String(art.costLabel).split(" ");
+    return { main, unit: rest.join(" ") };
+  }
+  if (art.hpCost) return { main: String(art.hpCost), unit: "HP" };
   const resource = unitOrDefinition ? getResourceMeta(unitOrDefinition.type ?? unitOrDefinition) : getResourceMeta(null);
-  return `${art.name} · ${art.mpCost} ${resource.shortLabel} — ${art.description}`;
+  return { main: String(art.mpCost), unit: resource.shortLabel };
+}
+
+function artTip(art, unitOrDefinition = null) {
+  const cost = artCostParts(art, unitOrDefinition);
+  return `${art.name} · ${cost.main}${cost.unit ? ` ${cost.unit}` : ""} — ${art.description}`;
 }
 
 function toggleClass(element, className, enabled) {
@@ -221,7 +234,10 @@ export function renderActions(
     : "";
   const artBtns = getAvailableArts(unit)
     .filter((art) => art.kind === "active" && art.id !== "footwork" && art.implemented)
-    .map((art) => `<button class="art-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}<kbd class="key">${art.mpCost}<span class="kbd-unit">${getResourceMeta(unit.type).shortLabel}</span></kbd></button>`)
+    .map((art) => {
+      const cost = artCostParts(art, unit);
+      return `<button class="art-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}<kbd class="key">${cost.main}<span class="kbd-unit">${cost.unit}</span></kbd></button>`;
+    })
     .join("");
 
   actions.innerHTML = [

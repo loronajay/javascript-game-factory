@@ -177,7 +177,7 @@ export function finalizeMagicDamage({ attacker, target, state = null, rawDamage,
   if (immune) return 0;
   const reduced = Math.max(0, rawDamage - getTeamDamageReduction(target, state, "magic"));
   return reduced > 0
-    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target)
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getTileVulnerability(target, state)
     : reduced;
 }
 
@@ -234,6 +234,9 @@ export function getMissChance(attacker) {
 // 50%; everyone else uses the base chance. A missing-HP passive (Angel's Inner
 // Strength) adds on top, clamped so the final chance never exceeds 1.
 export function getCritChance(attacker) {
+  // Dark Ether (Blacksword): a one-shot charge that forces the next landed swing to crit.
+  // The to-hit roll is untouched (he can still miss); the reducer consumes the flag.
+  if (attacker.guaranteedCritCharged) return 1;
   const crit = rageCombat(attacker)?.criticalChance;
   const rageBonus = Number(rageCombat(attacker)?.criticalBonus) || 0;
   const base = Number.isFinite(crit) ? crit : COMBAT.CRIT_CHANCE;
@@ -291,6 +294,30 @@ function getAdjacentDamageBonus(attacker, target) {
 function getMinimumDamage(attacker) {
   const minimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
   return Number.isFinite(minimum) ? minimum : 0;
+}
+
+// Dark Tread (Blacksword): a PASSIVE tile-affinity damage bonus vs enemies standing on a
+// dark tile, with a bigger bonus when the attacker is also on one. Unlike the RAGE-only
+// tileStrikeBonus above, this is always on and asymmetric. Read centrally so the reducer
+// and the on-board forecast agree. Returns 0 for any unit without the passive.
+export function getTileAffinityDamageBonus(attacker, target, state) {
+  if (!state) return 0;
+  const cfg = getUnitType(attacker.type).passive?.effect?.tileAffinityDamage;
+  if (!cfg) return 0;
+  if (getTileAffinity(state, target.position) !== cfg.affinity) return 0;
+  return getTileAffinity(state, attacker.position) === cfg.affinity
+    ? Math.max(0, Number(cfg.bothBonus) || 0)
+    : Math.max(0, Number(cfg.targetBonus) || 0);
+}
+
+// Dark Tread (Blacksword): +damage TAKEN while the target stands on a light/white tile.
+// Read off the target's passive so no rule hard-codes the unit; folded into both physical
+// and magic damage. Returns 0 for any unit without the passive or off the marked tile.
+export function getTileVulnerability(target, state) {
+  if (!state) return 0;
+  const cfg = getUnitType(target.type).passive?.effect?.tileVulnerability;
+  if (!cfg) return 0;
+  return getTileAffinity(state, target.position) === cfg.affinity ? Math.max(0, Number(cfg.amount) || 0) : 0;
 }
 
 function getTileStrikeBonus(attacker, target, state) {
@@ -448,10 +475,14 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   const rangeDamageBonus = proximity ? getRangeDamageBonus(attacker, target) : 0;
   const adjacentDamageBonus = proximity ? getAdjacentDamageBonus(attacker, target) : 0;
   const tileStrikeBonus = getTileStrikeBonus(attacker, target, state);
+  // Dark Tread (Blacksword): passive tile-affinity attack bonus + the target's white-tile
+  // vulnerability. Both fold in here so the forecast stays honest.
+  const tileAffinityBonus = getTileAffinityDamageBonus(attacker, target, state);
+  const tileVulnerability = getTileVulnerability(target, state);
   // Fire Stance adds flat crit damage — only on a landed crit, so the normal-hit
   // forecast (critical:false) never shows it.
   const stanceCritBonus = effectiveCritical ? getStanceCritBonus(attacker) : 0;
-  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + stanceCritBonus;
+  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + tileAffinityBonus + tileVulnerability + stanceCritBonus;
   if (damage >= 1 || result.damage >= 1) {
     const passiveMinimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
     if (Number.isFinite(passiveMinimum)) damage = Math.max(passiveMinimum, damage);

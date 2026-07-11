@@ -91,6 +91,7 @@ export const BOARD_SPRITES = Object.freeze({
   miner: sprite("miner"),
   "big-brother": sprite("big-brother"),
   "little-brother": sprite("little-brother"),
+  blacksword:  sprite("blacksword"),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul", { scale: 0.82 })
