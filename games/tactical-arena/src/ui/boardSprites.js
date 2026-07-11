@@ -95,8 +95,8 @@ export const BOARD_SPRITES = Object.freeze({
   blacksword:  sprite("blacksword"),
   ronin:       sprite("ronin"),
   "mother-nature": sprite("mother-nature"),
-  // Riot Cop base art is the user-provided SWAT riot-cop PNG (see portraits.js); inherits
-  // the approximate box/scale via PORTRAITS["riot-cop"].
+  // Riot Cop base art is the user-provided default Riot Cop PNG (see portraits.js);
+  // inherits the approximate box/scale via PORTRAITS["riot-cop"].
   "riot-cop": sprite("riot-cop"),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.

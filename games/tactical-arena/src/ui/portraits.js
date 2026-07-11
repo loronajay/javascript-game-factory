@@ -64,7 +64,7 @@ export const PORTRAITS = Object.freeze({
   // katana held to one side — the body centre sits near 0.43).
   ronin:       portrait("ronin",       { x: 0.163, y: 0.013, w: 0.530, h: 0.987 }),
   "mother-nature": portrait("mother-nature", { x: 0.080, y: 0.030, w: 0.780, h: 0.920 }),
-  // Riot Cop base art is the user-provided SWAT riot-cop skin PNG (real Riot Cop art).
+  // Riot Cop base art is the user-provided default Riot Cop PNG (not a skin variant).
   // The box below is an approximate standing-humanoid crop — re-measure the alpha bbox
   // off the 600×600 source if the on-board seating/centering needs tightening.
   "riot-cop": portrait("riot-cop", { x: 0.10, y: 0.03, w: 0.80, h: 0.92 }),
