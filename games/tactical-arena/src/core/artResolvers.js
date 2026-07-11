@@ -1350,6 +1350,7 @@ function resolveWeather(state, command, art) {
   for (const unit of next.units) {
     if (unit.id !== actor.id) unit.weather = null;
   }
+  next.weather = { id: art.weather, sourceId: actor.id };
   actor.weather = art.weather;
   actor.lastWeather = art.weather;
   const move = Math.max(0, Number(weatherCommanderEffect(actor)?.nextWeatherMove) || 0);

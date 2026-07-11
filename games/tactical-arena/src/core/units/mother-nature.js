@@ -1,4 +1,4 @@
-const weather = (id, persistent) => Object.freeze({ id, persistent: Object.freeze(persistent) });
+import { WEATHER_TYPES } from "../weather.js";
 
 export const MOTHER_NATURE = Object.freeze({
   id: "mother-nature",
@@ -23,12 +23,7 @@ export const MOTHER_NATURE = Object.freeze({
     description: "Mother Nature must act first. Her last weather persists globally until a new weather is activated; a new weather charges +1 MOVE for her next turn, and a basic-attack crit restores 10 MP.",
     implemented: true
   }),
-  weathers: Object.freeze({
-    blizzard: weather("blizzard", { movementArtRangeBonus: 1 }),
-    spring: weather("spring", { restoreBonus: 1 }),
-    heatwave: weather("heatwave", { critDamageBonus: 1, critCreatesFire: Object.freeze({ kind: "fire", permanent: true }) }),
-    thunderstorm: weather("thunderstorm", { artMpCostReduction: 1, minArtMpCost: 0 })
-  }),
+  weathers: WEATHER_TYPES,
   arts: Object.freeze([
     Object.freeze({
       id: "blizzard",

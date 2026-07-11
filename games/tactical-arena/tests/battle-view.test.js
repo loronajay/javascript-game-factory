@@ -845,6 +845,43 @@ test("Mother Nature weather renders a persistent non-clicking board overlay", ()
   }
 });
 
+test("authored board weather renders without a Mother Nature unit", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      weather: "thunderstorm",
+      units: [
+        { id: "hero", player: 1, type: "swordsman", x: 1, y: 1 },
+        { id: "target", player: 2, type: "swordsman", x: 6, y: 6 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const overlay = boardLayer.findByClass("weather-overlay");
+    assert.equal(getActiveBoardWeather(state), "thunderstorm");
+    assert.equal(board.getAttribute("data-weather"), "thunderstorm");
+    assert.ok(overlay.findByClass("weather-lightning"));
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("the board weather overlay follows each Mother Nature weather and clears when inactive", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };

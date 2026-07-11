@@ -109,6 +109,7 @@ export function canonicalString(state) {
     state.currentPlayer,
     state.winner ?? "-",
     state.restorePolarityShift ? 1 : 0,
+    stableStringify(state.weather ?? null),
     state.rngState,
     canonicalActivation(state.activation),
     canonicalKeyedMap(state.tileObjects),

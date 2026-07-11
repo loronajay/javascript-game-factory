@@ -1,6 +1,7 @@
 import { getInitialMp, getUnitType } from "./unitCatalog.js";
 import { createRngState } from "./rng.js";
 import { createRoster, FORMATS, playerColor } from "./roster.js";
+import { normalizeWeatherSpec } from "./weather.js";
 
 export function createUnit(spec) {
   const definition = getUnitType(spec.type);
@@ -146,6 +147,7 @@ export function createBattleState({
   seed,
   tiles = [],
   tileObjects = [],
+  weather = null,
   players = null,
   playerCount = 2,
   format = FORMATS.FFA,
@@ -154,6 +156,8 @@ export function createBattleState({
 } = {}) {
   const playerRoster = players ?? createRoster({ playerCount, format, teamColors });
   const roster = units ?? defaultRoster(size, playerRoster);
+  const activeWeather = normalizeWeatherSpec(weather) ??
+    normalizeWeatherSpec(roster.find((unit) => unit?.weather && (unit.hp ?? 1) > 0)?.weather);
 
   return {
     size,
@@ -161,6 +165,7 @@ export function createBattleState({
     teamNames: normalizeTeamNames(teamNames),
     players: playerRoster,
     turnOrder: playerRoster.map((slot) => slot.id),
+    weather: activeWeather,
     tileAffinities: normalizeTileAffinities(tiles),
     tileObjects: normalizeTileObjects(tileObjects),
     units: roster.map(createUnit),
@@ -197,6 +202,7 @@ export function cloneState(state) {
   return {
     ...state,
     restorePolarityShift: Boolean(state.restorePolarityShift),
+    weather: normalizeWeatherSpec(state.weather),
     tileAffinities: { ...(state.tileAffinities ?? {}) },
     tileObjects: Object.fromEntries(
       Object.entries(state.tileObjects ?? {}).map(([key, obj]) => [key, { ...obj }])

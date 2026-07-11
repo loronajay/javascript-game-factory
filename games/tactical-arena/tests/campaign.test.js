@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
-import { getUnitType } from "../src/core/unitCatalog.js";
+import { getActiveWeather, getUnitType } from "../src/core/unitCatalog.js";
 import { findUnit } from "../src/core/state.js";
 import { resolveVictory } from "../src/core/turnEngine.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
@@ -1443,6 +1443,8 @@ test("Gargoyle's Inferno builds a full-HP 9x9 chosen-unit duel with random infer
   assert.deepEqual(findUnit(match, "p2-0-gargoyle").position, { x: 8, y: 0 });
   assert.equal(findUnit(match, "p1-0-mystic").hp, 23);
   assert.equal(findUnit(match, "p2-0-gargoyle").hp, 30);
+  assert.deepEqual(match.weather, { id: "heatwave", sourceId: null });
+  assert.equal(getActiveWeather(match).id, "heatwave");
   assert.deepEqual(match.missionRules?.randomFire, {
     sourceId: "p2-0-gargoyle",
     turnsLeft: 3,

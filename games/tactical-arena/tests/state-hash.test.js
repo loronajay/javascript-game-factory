@@ -65,6 +65,7 @@ for (const [label, mutate] of [
   ["phase", (s) => (s.phase = "complete")],
   ["winner", (s) => (s.winner = 1)],
   ["rngState", (s) => (s.rngState = (s.rngState + 1) >>> 0)],
+  ["board weather", (s) => (s.weather = { id: "blizzard", sourceId: null })],
   ["tileObjects", (s) => (s.tileObjects = { "5,5": { kind: "fire", turnsLeft: 2 } })],
   ["tileAffinities", (s) => (s.tileAffinities = { "0,0": "dark" })],
   ["activation", (s) => (s.activation = { unitId: s.units[0].id, origin: { x: 0, y: 0 }, moved: true, primaryUsed: false, spellUsed: false, bonusActionGroups: [] })],

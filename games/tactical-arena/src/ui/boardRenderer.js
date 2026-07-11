@@ -1,25 +1,15 @@
 import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, getBoardDiamond, gridToScreen, pointsToString } from "./isometric.js";
-import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
+import { getActiveWeather, getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
-
-const BOARD_WEATHER_LABELS = Object.freeze({
-  blizzard: "Blizzard",
-  spring: "Spring Shower",
-  heatwave: "Heatwave",
-  thunderstorm: "Thunderstorm"
-});
+import { WEATHER_LABELS } from "../core/weather.js";
 
 export function getActiveBoardWeather(state) {
-  return state?.units?.find((unit) =>
-    unit.hp > 0 &&
-    unit.type === "mother-nature" &&
-    Object.hasOwn(BOARD_WEATHER_LABELS, unit.weather)
-  )?.weather ?? null;
+  return getActiveWeather(state)?.id ?? null;
 }
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
@@ -54,7 +44,7 @@ function scalePoint(center, point, factor) {
 }
 
 function createWeatherOverlay(metrics, size, weather) {
-  if (!Object.hasOwn(BOARD_WEATHER_LABELS, weather)) return null;
+  if (!Object.hasOwn(WEATHER_LABELS, weather)) return null;
   const diamond = getBoardDiamond(metrics, size);
   const center = { x: diamond.cx, y: diamond.cy + metrics.tileHeight * 0.55 };
   const scale = 1.025;
@@ -67,7 +57,7 @@ function createWeatherOverlay(metrics, size, weather) {
   const g = svgElement("g", {
     class: `weather-overlay weather-overlay--${weather}`,
     "data-weather": weather,
-    "aria-label": `${BOARD_WEATHER_LABELS[weather]} board weather`
+    "aria-label": `${WEATHER_LABELS[weather]} board weather`
   });
 
   g.append(svgElement("polygon", {

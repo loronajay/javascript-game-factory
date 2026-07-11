@@ -29,6 +29,7 @@ import { BLACKSWORD } from "./units/blacksword.js";
 import { RONIN } from "./units/ronin.js";
 import { MOTHER_NATURE } from "./units/mother-nature.js";
 import { areAllies, areEnemies } from "./state.js";
+import { WEATHER_TYPES, normalizeWeatherSpec } from "./weather.js";
 
 export const UNIT_TYPES = Object.freeze({
   swordsman: SWORDSMAN,
@@ -352,9 +353,18 @@ function getTeamMpCostReduction(unit, state) {
 }
 
 export function getActiveWeather(state) {
+  const boardWeather = normalizeWeatherSpec(state?.weather);
+  if (boardWeather) {
+    return {
+      ...WEATHER_TYPES[boardWeather.id],
+      sourceId: boardWeather.sourceId
+    };
+  }
+
   for (const unit of state?.units ?? []) {
+    if (unit.hp <= 0) continue;
     const weatherId = unit.weather ?? null;
-    const weather = weatherId ? getUnitType(unit.type).weathers?.[weatherId] : null;
+    const weather = weatherId ? WEATHER_TYPES[weatherId] ?? getUnitType(unit.type).weathers?.[weatherId] : null;
     if (weather) return { id: weatherId, sourceId: unit.id, ...weather };
   }
   return null;

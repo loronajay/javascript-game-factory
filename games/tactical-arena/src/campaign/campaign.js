@@ -3,6 +3,7 @@ import { createUnit, findUnit } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { isNegativeStatus } from "../rules/statuses.js";
 import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
+import { normalizeWeatherSpec } from "../core/weather.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
@@ -1149,6 +1150,7 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         ? { x: 0, y: 8 }
         : { x: 8, y: 0 },
     fullHp: true,
+    weather: "heatwave",
     missionRules: () => ({ randomFire: { sourceId: "p2-0-gargoyle", turnsLeft: 3 } }),
   },
   // The High Ground of the Sniper (13×13): a full-HP 2v2 on the STANDARD corner
@@ -1244,6 +1246,7 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       ? { aiProfile: { monkTrialArts: true } }
       : {}),
     tileObjects,
+    weather: normalizeWeatherSpec(layout.weather ?? match.weather),
     rngState: trial.rngState,
     ...(trial.missionRules || layout.missionRules
       ? { missionRules: { ...(layout.missionRules?.(match) ?? {}), ...(trial.missionRules ?? {}) } }

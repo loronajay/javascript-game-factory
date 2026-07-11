@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { attack, beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
-import { getArt, getArtMpCost, getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
+import { getActiveWeather, getArt, getArtMpCost, getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
 import { getLegalFleeTiles, getRushSteps } from "../src/rules/arts.js";
 import { resolvePhysicalStrike } from "../src/rules/combat.js";
 import { positionKey } from "../src/rules/movement.js";
@@ -92,6 +92,7 @@ test("activating a new weather grants +1 MOVE on Mother Nature's next turn", () 
   let next = run(scenario(), beginActivation(1, "mn"));
   next = run(next, useArt(1, "mn", "spring-shower"));
   const afterCast = findUnit(next, "mn");
+  assert.deepEqual(next.weather, { id: "spring", sourceId: "mn" });
   assert.equal(afterCast.weather, "spring");
   assert.equal(getEffectiveStats(afterCast, next).moveRange, 3, "own end tick has not left the next-turn buff live yet");
 
@@ -103,6 +104,50 @@ test("activating a new weather grants +1 MOVE on Mother Nature's next turn", () 
   });
   const opened = run(fresh, beginActivation(1, "mn"));
   assert.equal(getEffectiveStats(findUnit(opened, "mn"), opened).moveRange, 4);
+});
+
+test("authored board weather works without Mother Nature on the roster", () => {
+  const heated = createBattleState({
+    weather: "heatwave",
+    units: [
+      { id: "hero", type: "swordsman", player: 1, x: 1, y: 1 },
+      { id: "foe", type: "swordsman", player: 2, x: 2, y: 1, hp: 20 }
+    ]
+  });
+  const neutral = createBattleState({
+    units: [
+      { id: "hero", type: "swordsman", player: 1, x: 1, y: 1 },
+      { id: "foe", type: "swordsman", player: 2, x: 2, y: 1, hp: 20 }
+    ]
+  });
+
+  assert.equal(getActiveWeather(heated).id, "heatwave");
+  assert.equal(getActiveWeather(heated).sourceId, null);
+
+  const baseDamage = resolvePhysicalStrike(findUnit(neutral, "hero"), findUnit(neutral, "foe"), { critical: true, state: neutral }).damage;
+  let next = run(heated, beginActivation(1, "hero"));
+  next = run(next, attack(1, "hero", "foe", CRIT));
+
+  assert.equal(findUnit(next, "foe").hp, 20 - baseDamage - 1);
+  assert.deepEqual(next.tileObjects["2,1"], { kind: "fire", permanent: true });
+});
+
+test("Mother Nature replaces mission-authored weather with her latest cast", () => {
+  let next = createBattleState({
+    weather: "blizzard",
+    units: [
+      { id: "mn", type: "mother-nature", player: 1, x: 1, y: 1 },
+      { id: "foe", type: "swordsman", player: 2, x: 7, y: 7 }
+    ]
+  });
+
+  assert.equal(getActiveWeather(next).id, "blizzard");
+  next = run(next, beginActivation(1, "mn"));
+  next = run(next, useArt(1, "mn", "heatwave"));
+
+  assert.deepEqual(next.weather, { id: "heatwave", sourceId: "mn" });
+  assert.equal(getActiveWeather(next).id, "heatwave");
+  assert.equal(findUnit(next, "mn").lastWeather, "heatwave");
 });
 
 test("Spring Shower heals all units and then boosts later HP and MP restoration globally", () => {
