@@ -12,9 +12,12 @@
 //     defending.
 //   • `firstCommandOnly` — Lockdown must be this turn's first command (gated in canUseArt).
 //
-// The +1 DEF ally aura is the MAIN passive (`allyAura`, the same seam Clod's Brick House
-// uses) so getEffectiveStats + the board aura overlay pick it up; the mitigation rider and
-// Heavy Boots are `kind:"passive"` art entries, the multi-passive pattern other units use.
+// The +1 DEF ally aura is mechanically the MAIN passive (`allyAura`, the same seam Clod's
+// Brick House uses) so getEffectiveStats + the board aura overlay pick it up, but its
+// player-facing name/description is "Utility Belt" reserved for the ability-USES resource
+// economy — the aura's own explanation is folded into the "Riot Shield" description instead,
+// alongside its `kind:"passive"` mitigation effect. Heavy Boots is the third `kind:"passive"`
+// art entry, the multi-passive pattern other units use.
 export const RIOT_COP = Object.freeze({
   id: "riot-cop",
   name: "Riot Cop",
@@ -30,8 +33,11 @@ export const RIOT_COP = Object.freeze({
     maxHp: 30,
     maxMp: 0
   }),
-  // Utility Belt: allies huddled behind the shield wall gain +1 DEF (a proximity aura,
-  // folded live off positions by getEffectiveStats + drawn as an always-on board zone).
+  // Utility Belt: mechanically still the +1 DEF proximity aura (allyAura, the same seam
+  // Clod's Brick House uses — folded live off positions by getEffectiveStats + drawn as an
+  // always-on board zone), but the name/description is reserved for explaining Riot Cop's
+  // finite-ability-USES economy (Stun Gun/Smoke Bomb); the DEF aura itself reads under the
+  // Riot Shield passive below.
   passive: Object.freeze({
     id: "utility-belt",
     name: "Utility Belt",
@@ -40,7 +46,7 @@ export const RIOT_COP = Object.freeze({
       radius: 1,
       stats: Object.freeze({ defense: 1 })
     }),
-    description: "Allies within 1 tile of Riot Cop gain +1 DEF.",
+    description: "Riot Cop's gear runs on limited charges instead of MP: Stun Gun has 5 uses and Smoke Bomb has 3. A pool that empties must sit dry for one full turn before it recharges to full; reaching RAGE instantly refills every pool.",
     implemented: true
   }),
   arts: Object.freeze([
@@ -112,7 +118,9 @@ export const RIOT_COP = Object.freeze({
       description: "Riot Cop cannot be slowed.",
       implemented: true
     }),
-    // Riot Shield: the defender mitigation rider (read centrally by rules/combat.js).
+    // Riot Shield: the defender mitigation rider (read centrally by rules/combat.js). Its
+    // description also covers the +1 DEF ally aura (mechanically the top-level `passive`
+    // above, named Utility Belt) since both are "the shield wall" from a player's perspective.
     Object.freeze({
       id: "riot-shield",
       name: "Riot Shield",
@@ -123,7 +131,7 @@ export const RIOT_COP = Object.freeze({
         rangedBasicReduction: 1,
         magicNullifyWhileDefending: true
       }),
-      description: "Riot Cop takes 1 less damage from ranged basic attacks, and completely nullifies magic damage aimed at him while defending.",
+      description: "Allies within 1 tile of Riot Cop's shield wall gain +1 DEF. Riot Cop himself takes 1 less damage from ranged basic attacks, and completely nullifies magic damage aimed at him while defending.",
       implemented: true
     })
   ]),

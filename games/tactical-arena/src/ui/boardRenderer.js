@@ -7,6 +7,7 @@ import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, is
 import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
 import { WEATHER_LABELS } from "../core/weather.js";
+import { setSceneWeather } from "./sceneBackdrop.js";
 
 export function getActiveBoardWeather(state) {
   return getActiveWeather(state)?.id ?? null;
@@ -184,7 +185,12 @@ function createWeatherOverlay(metrics, size, weather) {
   if (!Object.hasOwn(WEATHER_LABELS, weather)) return null;
   const diamond = getBoardDiamond(metrics, size);
   const center = { x: diamond.cx, y: diamond.cy + metrics.tileHeight * 0.55 };
-  const scale = 1.025;
+  // Slightly wider than the tile diamond so the wash bleeds onto the stone dais
+  // rim instead of hugging the tiles exactly — the board's SVG viewBox only has
+  // ~34px of margin around the board, so this stays conservative; the bulk of the
+  // "environmental" spread comes from the full-scene weather layer in
+  // sceneBackdrop.js (see setSceneWeather), which isn't bound by that viewBox.
+  const scale = 1.07;
   const n = scalePoint(center, diamond.n, scale);
   const e = scalePoint(center, diamond.e, scale);
   const s = scalePoint(center, { x: diamond.s.x, y: diamond.s.y + metrics.depth * 0.45 }, scale);
@@ -699,6 +705,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   unitsLayer.replaceChildren();
   board.classList.toggle("board-focused", Boolean(actor));
   board.setAttribute("data-weather", activeWeather ?? "none");
+  setSceneWeather(activeWeather);
   boardLayer.append(createBoardDais(metrics, state.size));
 
   // Deathly Aura zones (Necromancer + the Ghoul that carries it), tile → source

@@ -87,6 +87,86 @@ function buildEmbers(count) {
   return field;
 }
 
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+// Full-SCENE weather (as opposed to boardRenderer.js's tight on-board SVG wash,
+// which is clipped hard to the board's diamond + a nearly-zero viewBox margin).
+// This layer spans the whole atmospheric backdrop so a weather effect reads as
+// something happening to the world, not a sticker sitting on the tiles. Built
+// once per match-view mount and cross-faded via .is-active (see setSceneWeather)
+// so switching weather never rebuilds/restarts the particle field.
+function buildSnowWeather(count) {
+  const field = layer("bk-weather bk-weather--blizzard");
+  for (let i = 0; i < count; i += 1) {
+    const flake = document.createElement("span");
+    flake.className = "bk-snow";
+    const size = randomBetween(3, 8.5);
+    flake.style.left = `${Math.random() * 100}%`;
+    flake.style.width = `${size}px`;
+    flake.style.height = `${size}px`;
+    flake.style.setProperty("--fall", `${randomBetween(8, 17)}s`);
+    flake.style.setProperty("--delay", `${-Math.random() * 18}s`);
+    flake.style.setProperty("--drift", `${randomBetween(-60, 60).toFixed(0)}px`);
+    flake.style.setProperty("--op", randomBetween(0.55, 1).toFixed(2));
+    field.append(flake);
+  }
+  return field;
+}
+
+function buildRainWeather(count, storm) {
+  const field = layer(`bk-weather bk-weather--${storm ? "thunderstorm" : "spring"}`);
+  for (let i = 0; i < count; i += 1) {
+    const drop = document.createElement("span");
+    drop.className = storm ? "bk-rain bk-rain--storm" : "bk-rain";
+    drop.style.left = `${Math.random() * 100}%`;
+    drop.style.height = `${randomBetween(18, 34)}px`;
+    drop.style.setProperty("--fall", `${randomBetween(storm ? 0.5 : 0.75, storm ? 0.85 : 1.3)}s`);
+    drop.style.setProperty("--delay", `${(-Math.random() * 2).toFixed(2)}s`);
+    field.append(drop);
+  }
+  if (storm) {
+    const clouds = document.createElement("div");
+    clouds.className = "bk-storm-clouds";
+    const flash = document.createElement("div");
+    flash.className = "bk-lightning";
+    field.append(clouds, flash);
+  }
+  return field;
+}
+
+function buildHeatWeather() {
+  const field = layer("bk-weather bk-weather--heatwave");
+  field.append(Object.assign(document.createElement("div"), { className: "bk-heat-haze" }));
+  for (let i = 0; i < 7; i += 1) {
+    const band = document.createElement("span");
+    band.className = "bk-heat-band";
+    band.style.left = `${randomBetween(2, 92)}%`;
+    band.style.setProperty("--delay", `${(-Math.random() * 3).toFixed(2)}s`);
+    band.style.setProperty("--dur", `${randomBetween(2.2, 3.8).toFixed(2)}s`);
+    field.append(band);
+  }
+  return field;
+}
+
+let weatherLayerEls = null;
+let activeWeatherId = null;
+
+// Cross-fades the active full-scene weather layer in place — called every board
+// render (boardRenderer.js already recomputes activeWeather each frame), but only
+// touches the DOM when the weather id actually changes, so the CSS animations
+// backing each layer never restart.
+export function setSceneWeather(weatherId) {
+  if (!weatherLayerEls) return;
+  const id = weatherId ?? null;
+  if (id === activeWeatherId) return;
+  activeWeatherId = id;
+  for (const [key, el] of weatherLayerEls) {
+    el.classList.toggle("is-active", key === id);
+  }
+}
+
 export function mountSceneBackdrop(container) {
   if (!container) return;
   // This is a turn-based game with no render loop, so the only continuous GPU
@@ -96,6 +176,17 @@ export function mountSceneBackdrop(container) {
   // so we never even create 28 perpetually-animating nodes there.
   const coarse =
     typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const snowWeather = buildSnowWeather(coarse ? 24 : 58);
+  const springWeather = buildRainWeather(coarse ? 16 : 34, false);
+  const heatWeather = buildHeatWeather();
+  const stormWeather = buildRainWeather(coarse ? 14 : 26, true);
+  weatherLayerEls = new Map([
+    ["blizzard", snowWeather],
+    ["spring", springWeather],
+    ["heatwave", heatWeather],
+    ["thunderstorm", stormWeather]
+  ]);
+  activeWeatherId = null;
   const layers = [
     layer("bk-sky"),
     layer("bk-stars"),
@@ -106,7 +197,11 @@ export function mountSceneBackdrop(container) {
     buildSkyline(),
     layer("bk-clouds"),
     layer("bk-rays"),
-    layer("bk-fog")
+    layer("bk-fog"),
+    snowWeather,
+    springWeather,
+    heatWeather,
+    stormWeather
   ];
   if (!coarse) layers.push(buildEmbers(28));
   container.replaceChildren(...layers);

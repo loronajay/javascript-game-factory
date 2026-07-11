@@ -894,7 +894,9 @@ body:has(.ref-modal:not([hidden])) .back-link {
   .bk-rays,
   .bk-fog,
   .bk-clouds,
-  .bk-ember {
+  .bk-ember,
+  .bk-heat-haze,
+  .bk-storm-clouds {
     display: none;
   }
 
