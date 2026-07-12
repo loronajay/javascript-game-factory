@@ -2441,7 +2441,7 @@ test("Wrong Place, Wrong Time promotes Frostcrown Foothills into a town riot-cop
   assert.ok(node);
   assert.equal(node.biome, "town");
   assert.equal(node.displayType, null, "locked mission keeps its unit hidden");
-  assert.equal(node.point.x < 66, true, "the old foothills marker is nudged left onto the painted node");
+  assert.equal(node.point.x > 67 && node.point.x < 70, true, "the foothills marker sits on the painted node base");
 });
 
 test("Wrong Place, Wrong Time locks the starter squad into a 7x7 rage duel vs named riot cops", () => {

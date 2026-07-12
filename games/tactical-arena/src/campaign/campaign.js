@@ -348,7 +348,7 @@ const CAMPAIGN_TRAIL = [
   { id: HASBEEN_HEROES_MISSION_ID, cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "town", locationName: "Highmarket" },
   { id: RONIN_MISSION_ID, cell: { col: 0, row: 3 }, point: { x: 55.7, y: 72.5 }, region: "wood", locationName: "Thornhollow Bridge",
     blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
-  { id: WRONG_PLACE_MISSION_ID, cell: { col: 0, row: 2 }, point: { x: 64.2, y: 78.9 }, region: "town", locationName: "Frostcrown Foothills",
+  { id: WRONG_PLACE_MISSION_ID, cell: { col: 0, row: 2 }, point: { x: 68.5, y: 78.9 }, region: "town", locationName: "Frostcrown Foothills",
     blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
   { id: "uncharted-16", cell: { col: 1, row: 2 }, point: { x: 84.5, y: 86.4 }, region: "frost", locationName: "Rimefang Pass",
     blurb: "A knife-edge pass walled by ice. Cover shatters; nowhere stays safe for long." },
