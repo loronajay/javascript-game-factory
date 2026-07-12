@@ -287,6 +287,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "trick-or-treat-necromancer.png"
   },
   {
+    type: "necromancer",
+    slug: "void-dweller",
+    file: "void-dweller-necromancer.png"
+  },
+  {
     type: "ghoul",
     slug: "summer-vibes",
     file: "summer-vibes-ghoul.png"
@@ -305,6 +310,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "ghoul",
     slug: "trick-or-treat",
     file: "trick-or-treat-ghoul.png"
+  },
+  {
+    type: "ghoul",
+    slug: "void-dweller",
+    file: "void-dweller-ghoul.png"
   },
   {
     type: "sniper",
@@ -365,6 +375,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "witch-doctor",
     slug: "blood-moon",
     file: "blood-moon-witch-doctor.png"
+  },
+  {
+    type: "witch-doctor",
+    slug: "void-dweller",
+    file: "void-dweller-witch-doctor.png"
   },
   {
     type: "father-time",
@@ -465,6 +480,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "angel",
     slug: "southern-kingdom",
     file: "southern-kingdom-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "void-dweller",
+    file: "void-dweller-angel.png"
   },
   {
     type: "monk",
@@ -625,6 +645,31 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-wizard",
     slug: "black-mage",
     file: "black-mage-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "fire-mage",
+    file: "fire-mage-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "ice-mage",
+    file: "ice-mage-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "lightning-mage",
+    file: "lightning-mage-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "poison-mage",
+    file: "poison-mage-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "void-magic",
+    file: "void-magic-fat-wizard.png"
   },
   {
     type: "fat-cleric",
