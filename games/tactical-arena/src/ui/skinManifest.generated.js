@@ -397,6 +397,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "steampunk-wizard-father-time.png"
   },
   {
+    type: "father-time",
+    slug: "void-dweller",
+    file: "void-dweller-father-time.png"
+  },
+  {
     type: "juggernaut",
     slug: "summer-vibes",
     file: "summer-vibes-juggernaut.png"

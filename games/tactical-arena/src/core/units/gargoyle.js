@@ -96,9 +96,12 @@ export const GARGOYLE = Object.freeze({
       effect: Object.freeze({
         type: "fireImmunity",
         fireDamageImmune: true,
-        critCreatesFire: Object.freeze({ kind: "fire", permanent: true })
+        critCreatesFire: Object.freeze({ kind: "fire", permanent: true }),
+        weatherRestore: Object.freeze({
+          heatwave: Object.freeze({ hp: 1, mp: 1 })
+        })
       }),
-      description: "The Gargoyle takes no damage from fire-based ARTS or fire tiles. Whenever the Gargoyle crits with a basic attack, the target's tile becomes permanent fire.",
+      description: "The Gargoyle takes no damage from fire-based ARTS or fire tiles. During Heatwave, it restores 1 HP and 1 MP each turn cycle. Whenever the Gargoyle crits with a basic attack, the target's tile becomes permanent fire.",
       implemented: true
     }),
     // Heavy: a hard Move ceiling that no speed buff can exceed (folded by getEffectiveStats).

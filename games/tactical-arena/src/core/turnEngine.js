@@ -1,4 +1,4 @@
-import { getUnitType, getWeatherAffinityRestore, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { getUnitType, getWeatherAffinityRestore, getWeatherPassiveRestore, sustainsVictory, takesTurns } from "./unitCatalog.js";
 import { areAllies, areEnemies, findUnit, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getFireVulnerability, isFireDamageImmune } from "../rules/combat.js";
@@ -170,13 +170,16 @@ function applySquadTurnChargeStatuses(state, player) {
 function applyWeatherAffinityRegen(state, events) {
   for (const unit of livingUnits(state)) {
     if (isInvulnerable(unit)) continue;
-    const restore = getWeatherAffinityRestore(unit, state);
+    const affinity = getWeatherAffinityRestore(unit, state);
+    const passive = getWeatherPassiveRestore(unit, state);
+    const restore = { hp: affinity.hp + passive.hp, mp: affinity.mp + passive.mp };
     if (restore.hp <= 0 && restore.mp <= 0) continue;
-    const before = unit.hp + unit.mp;
-    restoreHp(state, unit, unit, restore.hp);
-    restoreMp(state, unit, unit, restore.mp);
-    if (unit.hp + unit.mp > before) {
-      events.push({ type: "WEATHER_REGEN", unitId: unit.id, hpRestored: restore.hp, mpRestored: restore.mp });
+    const hp = restoreHp(state, unit, unit, restore.hp);
+    const mp = restoreMp(state, unit, unit, restore.mp);
+    const hpRestored = hp.hpRestored + mp.hpRestored;
+    const mpRestored = hp.mpRestored + mp.mpRestored;
+    if (hpRestored > 0 || mpRestored > 0) {
+      events.push({ type: "WEATHER_REGEN", unitId: unit.id, hpRestored, mpRestored });
     }
   }
 }

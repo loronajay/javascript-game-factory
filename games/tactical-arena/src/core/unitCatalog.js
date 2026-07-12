@@ -497,6 +497,25 @@ export function getWeatherAffinityRestore(unit, state) {
   return { hp: Math.max(0, Number(restore.hp) || 0), mp: Math.max(0, Number(restore.mp) || 0) };
 }
 
+// Passive weather restore: any passive source can declare `weatherRestore` keyed by
+// active weather id. Used by Gargoyle's One With The Flames during Heatwave.
+export function getWeatherPassiveRestore(unit, state) {
+  const weatherId = getActiveWeather(state)?.id ?? null;
+  if (!weatherId) return { hp: 0, mp: 0 };
+  const definition = getUnitType(unit.type);
+  let hp = 0;
+  let mp = 0;
+  for (const source of allPassiveSources(definition)) {
+    if (source.kind && source.kind !== "passive") continue;
+    if ((source === definition.ragePassive || source === definition.rageArt) && !isRaging(unit)) continue;
+    const restore = source.effect?.weatherRestore?.[weatherId] ?? null;
+    if (!restore) continue;
+    hp += Math.max(0, Number(restore.hp) || 0);
+    mp += Math.max(0, Number(restore.mp) || 0);
+  }
+  return { hp, mp };
+}
+
 // Deep Roots (positionalDefense): +DEF while every living enemy sits inside the unit's
 // BASE attack range, +DEF while every OTHER living ally does (a "keep the squad close"
 // reward, so a lone unit with no team earns nothing from the ally half). Uses base

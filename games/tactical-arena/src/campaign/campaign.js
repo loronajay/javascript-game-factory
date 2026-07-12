@@ -42,7 +42,7 @@ export const HASBEEN_MYSTIC_SKIN_PACK = "hasbeen-mystic";
 // the "bring the whole starter squad" bonus all read off this list.
 export const HASBEEN_HEROES_FAT_TYPES = Object.freeze(["fat-knight", "fat-bowman", "fat-cleric", "fat-wizard"]);
 export const SHOWDOWN_FAT_TYPES = Object.freeze(["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]);
-export const NOT_MY_KING_ENEMY_TYPES = Object.freeze(["king", "angel", "gargoyle", "ronin"]);
+export const NOT_MY_KING_ENEMY_TYPES = Object.freeze(["king", "angel", "gargoyle", "father-time"]);
 export const VOIDWOOD_SKIN_REWARDS = Object.freeze([
   Object.freeze({ type: "treant", slug: "voidroot" }),
 ]);
@@ -370,7 +370,7 @@ const AUTHORED_MISSIONS = Object.freeze({
     id: NOT_MY_KING_MISSION_ID,
     title: "Not My King",
     subtitle: "The crown answers with silence and fire",
-    description: "Bring any four-unit squad into a 13x13 duel against the void-bound King, Angel, Gargoyle, and Ronin. The heatwave is permanent, every enemy wears a void skin, and the enemy squad moves first.",
+    description: "Bring any four-unit squad into a 13x13 duel against the void-bound King, Angel, Gargoyle, and Father Time. The heatwave is permanent, every enemy wears a void skin, and the enemy squad moves first.",
     unitType: "king",
     requiredStars: 0,
     requiresPreviousMissionsComplete: true,
@@ -895,29 +895,29 @@ export function campaignPostMatchCutsceneScript(missionId) {
     return [
       { speaker: "fat-wizard", side: "left",
         text: "*hic* Your Majesty... I owe you an apology. The gate, the panic, the rumor. I made the whole mess louder than it had to be." },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "The rumor was not what took me. The void gate let in another entity: Nemesis." },
       { speaker: "fat-wizard", side: "left",
         text: "*hic* The cloaked figure. It was Nemesis. Not the king, and not... well, not only my terrible judgment." },
       { speaker: "mystic", side: "left",
         text: "Nemesis came through the same gate as the Summoner?" },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "Nemesis and the Summoner had been locked in battle for thousands of years, each fighting for control of the void." },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "Then a third entity appeared. Blacksword. Far too powerful for either of them, and stronger still inside the void." },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "Nemesis and the Summoner seized their chance. They escaped through the opened gate with a plan to draw Blacksword out of his realm, where he would be less powerful." },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "I saw Blacksword ascend from the gate with my own eyes. Then everything went black, and I remember nothing after." },
       { speaker: "treant", side: "left",
         text: "So Nemesis and the Summoner mean to pause their eternal war and combine forces against him." },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "Yes. Blacksword was already trying to bring Earth to the void. He began by targeting Earth's spiritual sites." },
       { speaker: "swordsman", side: "left",
         text: "Then we help stop Blacksword somehow, but we do not work directly with Nemesis or the Summoner." },
       { speaker: "mystic", side: "left",
         text: "A careful alliance at a distance. I dislike it, which probably means it is the only sane option." },
-      { speaker: "king", side: "right", player: 2,
+      { speaker: "king", type: "king", skin: null, side: "right", player: 2,
         text: "Return with me to the castle. We will make a plan inside the kingdom walls." },
       { speaker: "swordsman", side: "left",
         text: "Then to the castle. Together." },

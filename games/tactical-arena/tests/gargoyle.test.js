@@ -67,6 +67,39 @@ test("One With The Flames: fire tiles do not damage the Gargoyle", () => {
   assert.equal(res.nextState.tileObjects["5,5"].turnsLeft, 2, "the fire still counts down");
 });
 
+test("One With The Flames: Heatwave restores 1 HP and 1 MP each turn cycle", () => {
+  const state = scenario([
+    { id: "p1", type: "swordsman", player: 1, x: 0, y: 0 },
+    { id: "g", type: "gargoyle", player: 2, x: 5, y: 5, hp: 20, mp: 10 }
+  ], { weather: "heatwave" });
+
+  let s = run(state, beginActivation(1, "p1")).nextState;
+  s = run(s, defend(1, "p1")).nextState;
+  const res = run(s, finishActivation(1, "p1"));
+
+  assert.equal(findUnit(res.nextState, "g").hp, 21);
+  assert.equal(findUnit(res.nextState, "g").mp, 11);
+  assert.ok(res.events.some((e) =>
+    e.type === "WEATHER_REGEN" &&
+    e.unitId === "g" &&
+    e.hpRestored === 1 &&
+    e.mpRestored === 1));
+});
+
+test("One With The Flames: no passive restore outside Heatwave", () => {
+  const state = scenario([
+    { id: "p1", type: "swordsman", player: 1, x: 0, y: 0 },
+    { id: "g", type: "gargoyle", player: 2, x: 5, y: 5, hp: 20, mp: 10 }
+  ], { weather: "spring" });
+
+  let s = run(state, beginActivation(1, "p1")).nextState;
+  s = run(s, defend(1, "p1")).nextState;
+  const after = run(s, finishActivation(1, "p1")).nextState;
+
+  assert.equal(findUnit(after, "g").hp, 20);
+  assert.equal(findUnit(after, "g").mp, 10);
+});
+
 test("One With The Flames: fire-based ARTS do not damage the Gargoyle", () => {
   const state = scenario([
     { id: "g1", type: "gargoyle", player: 1, x: 6, y: 6 },

@@ -3194,7 +3194,7 @@ test("Not My King is a 13x13 chosen 4v4 under permanent heatwave with void enemi
   const config = createCampaignMatchConfig(NOT_MY_KING_MISSION_ID, ["paladin", "treant", "ronin", "angel"]);
   assert.equal(config.size, 13);
   assert.deepEqual(config.squads[1], ["paladin", "treant", "ronin", "angel"]);
-  assert.deepEqual(config.squads[2], ["king", "angel", "gargoyle", "ronin"]);
+  assert.deepEqual(config.squads[2], ["king", "angel", "gargoyle", "father-time"]);
   assert.deepEqual(config.skins[2], ["void-dweller", "void-dweller", "void-dweller", "void-dweller"]);
   assert.equal(config.teamNames[2], "Void Crown");
 
@@ -3205,6 +3205,7 @@ test("Not My King is a 13x13 chosen 4v4 under permanent heatwave with void enemi
   assert.equal(match.missionRules?.permanentWeather?.weather, "heatwave");
   assert.deepEqual(match.units.filter((unit) => unit.player === 2).map((unit) => unit.type), NOT_MY_KING_ENEMY_TYPES);
   assert.deepEqual(match.units.filter((unit) => unit.player === 2).map((unit) => unit.skin), ["void-dweller", "void-dweller", "void-dweller", "void-dweller"]);
+  assert.equal(findUnit(match, "p2-3-father-time").skin, "void-dweller");
   for (const unit of match.units) {
     assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
   }
@@ -3260,6 +3261,10 @@ test("Not My King dialogue covers the inferno cutscene, silent king banter, RAGE
   assert.match(notMyKingDefeatScript(notMyKingWonState()).map((line) => line.text).join(" "), /Where am I|kingdom walls/i);
   const post = campaignPostMatchCutsceneScript(NOT_MY_KING_MISSION_ID);
   assert.match(post.map((line) => line.text).join(" "), /sorry|void gate|nemesis|summoner|blacksword|spiritual sites|castle/i);
+  assert.ok(post.some((line) => line.speaker === "king"), "post-match lore beat should include the restored King");
+  for (const line of post.filter((line) => line.speaker === "king")) {
+    assert.equal(line.skin, null, "the King returns to his classic look after the battle");
+  }
 });
 
 test("completing Not My King unlocks the King", () => {
