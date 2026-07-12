@@ -447,6 +447,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "pumpkin-king.png"
   },
   {
+    type: "king",
+    slug: "void-dweller",
+    file: "void-dweller-king.png"
+  },
+  {
     type: "angel",
     slug: "summer-vibes",
     file: "summer-vibes-angel.png"
@@ -560,6 +565,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "gargoyle",
     slug: "southern-kingdom",
     file: "southern-kingdom-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
+    slug: "void-dweller",
+    file: "void-dweller-gargoyle.png"
   },
   {
     type: "nemesis",
@@ -880,6 +890,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "ronin",
     slug: "eastern-vampire",
     file: "eastern-vampire-ronin.png"
+  },
+  {
+    type: "ronin",
+    slug: "void-dweller",
+    file: "void-dweller-ronin.png"
   },
   {
     type: "mother-nature",

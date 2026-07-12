@@ -180,7 +180,7 @@ test("blind does not make generic targeted magic ARTS miss", () => {
 
   let selected = applyCommand(state, beginActivation(1, "nec"));
   let result = applyCommand(selected.nextState, useArt(1, "nec", "wither", {
-    targetId: "wither-target", attackRoll: 0.5, effectRoll: 0.99
+    targetId: "wither-target", attackRoll: 0.5, critRoll: 0.99, effectRoll: 0.99
   }));
   assert.equal(result.events[0].hit, true);
   assert.equal(result.events[0].missed, undefined);
@@ -191,7 +191,7 @@ test("blind does not make generic targeted magic ARTS miss", () => {
   result.nextState.units.find((u) => u.id === "virus").spent = false;
   selected = applyCommand(result.nextState, beginActivation(1, "virus"));
   result = applyCommand(selected.nextState, useArt(1, "virus", "cough", {
-    targetId: "cough-target", attackRoll: 0.5, effectRoll: 0.99
+    targetId: "cough-target", attackRoll: 0.5, critRoll: 0.99, effectRoll: 0.99
   }));
   assert.equal(result.events[0].hit, true);
   assert.equal(result.events[0].missed, undefined);
