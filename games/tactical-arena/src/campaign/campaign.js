@@ -406,7 +406,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "A deserted island beach curls around an ancient temple. Someone has been enjoying the quiet a little too much." },
   { id: VOIDWOOD_MISSION_ID, cell: { col: 2, row: 2 }, point: { x: 74.9, y: 64.8 }, region: "wood", locationName: "Voidwood Forest",
     blurb: "Void-black trees crowd the old trail. Something ancient waits where the summit marker used to sit." },
-  { id: SPIRIT_WOODS_MISSION_ID, cell: { col: 6, row: 1 }, point: { x: 38.4, y: 47.4 }, region: "wood", locationName: "Spirit Grove",
+  { id: SPIRIT_WOODS_MISSION_ID, cell: { col: 6, row: 1 }, point: { x: 30.0, y: 56.9 }, region: "wood", locationName: "Spirit Grove",
     blurb: "A quiet forest node waits east of the Timeless Woods. The wind moves here even when the trees do not." },
   { id: "uncharted-18", cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },

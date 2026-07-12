@@ -182,6 +182,22 @@ test("Father Time offers statBuff / hasten / revive plans that all replay cleanl
   for (const plan of plans) assertPlanReplays(state, 1, plan);
 });
 
+test("Mother Nature weather plans skip her last weather and replay cleanly", () => {
+  const state = createBattleState({
+    size: 11, seed: 8,
+    units: [
+      { id: "p1-mn", type: "mother-nature", player: 1, x: 2, y: 2, lastWeather: "thunderstorm", weather: "thunderstorm" },
+      { id: "p1-tree", type: "treant", player: 1, x: 2, y: 3, hp: 20 },
+      { id: "p2-sword", type: "swordsman", player: 2, x: 7, y: 7 }
+    ],
+    weather: { id: "thunderstorm", sourceId: "p1-mn" }
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-mn"));
+  assert.ok(!plans.some((p) => p.primary.kind === "art" && p.primary.artId === "thunderstorm"));
+  assert.ok(plans.some((p) => p.primary.kind === "art" && p.primary.artId === "spring-shower"));
+  for (const plan of plans) assertPlanReplays(state, 1, plan);
+});
+
 test("a healthy (non-raging) Father Time offers no Rewind plans", () => {
   const state = createBattleState({
     size: 13, seed: 5,

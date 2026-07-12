@@ -52,21 +52,43 @@ function weatherStyle(tokens) {
 
 function addSnowField(g, metrics, bounds) {
   const field = svgElement("g", { class: "weather-field weather-field--snow" });
-  for (let i = 0; i < 56; i += 1) {
+
+  // Wind-driven gust streaks sweeping across the board — what makes it read as a
+  // BLIZZARD rather than gentle flurries. Big, soft, blurred bands drifting sideways.
+  const gusts = svgElement("g", { class: "weather-snow-gusts" });
+  for (let i = 0; i < 4; i += 1) {
+    gusts.append(svgElement("ellipse", {
+      class: "weather-snow-gust",
+      cx: bounds.w.x.toFixed(1),
+      cy: (bounds.n.y + bounds.height * (0.22 + i * 0.19)).toFixed(1),
+      rx: (bounds.width * 0.32).toFixed(1),
+      ry: Math.max(10, metrics.tileHeight * 0.5).toFixed(1),
+      style: weatherStyle({
+        "--delay": `${(-i * 1.7).toFixed(2)}s`,
+        "--dur": `${(5.4 + i * 0.9).toFixed(1)}s`,
+        "--sweep": `${(bounds.width * 1.25).toFixed(0)}px`
+      })
+    }));
+  }
+  field.append(gusts);
+
+  // Dense, layered, swaying flakes. Deeper layers are bigger/brighter/slower.
+  for (let i = 0; i < 84; i += 1) {
     const depth = i % 4;
     const x = bounds.w.x + bounds.width * (((i * 37) % 101) / 100);
-    const y = bounds.n.y + bounds.height * (0.05 + (((i * 53) % 91) / 100));
-    const radius = Math.max(1.1, metrics.tileWidth * (0.012 + depth * 0.004));
+    const y = bounds.n.y + bounds.height * (0.03 + (((i * 53) % 94) / 100));
+    const radius = Math.max(1.1, metrics.tileWidth * (0.011 + depth * 0.004));
     field.append(svgElement("circle", {
       class: `weather-flake weather-flake--d${depth}`,
       cx: x.toFixed(2),
       cy: y.toFixed(2),
       r: radius.toFixed(2),
       style: weatherStyle({
-        "--wx": `${(((i * 17) % 15) - 7).toFixed(0)}px`,
-        "--wy": `${(10 + depth * 7).toFixed(0)}px`,
+        // sway amplitude (side to side) + total fall distance (a couple tiles)
+        "--wx": `${(metrics.tileWidth * (0.05 + depth * 0.018)).toFixed(0)}px`,
+        "--wy": `${(metrics.tileHeight * (1.5 + depth * 0.7)).toFixed(0)}px`,
         "--delay": `${(-((i * 13) % 31) / 10).toFixed(1)}s`,
-        "--dur": `${(4.8 + depth * 1.15 + ((i * 7) % 9) / 10).toFixed(1)}s`
+        "--dur": `${(5.2 + depth * 1.2 + ((i * 7) % 9) / 10).toFixed(1)}s`
       })
     }));
   }
@@ -117,40 +139,91 @@ function addRainField(g, metrics, bounds, { storm = false } = {}) {
   g.append(field);
 }
 
-function addSpringBlooms(g, metrics, bounds) {
-  const blooms = svgElement("g", { class: "weather-blooms" });
-  for (let i = 0; i < 12; i += 1) {
+// Spring: soft petals drifting down over the rain — reads as a fresh spring shower
+// instead of the old random green blobs. Each petal sways side to side and tumbles
+// (rotation) as it falls, on its own staggered cycle. cx/cy set the base spot; the
+// drift/tumble is a CSS transform layered on top (same pattern as the flakes).
+function addSpringPetals(g, metrics, bounds) {
+  const petals = svgElement("g", { class: "weather-petals" });
+  for (let i = 0; i < 15; i += 1) {
     const x = bounds.w.x + bounds.width * (((i * 31 + 9) % 99) / 100);
-    const y = bounds.n.y + bounds.height * (0.54 + (((i * 23) % 30) / 100));
-    blooms.append(svgElement("circle", {
-      class: "weather-bloom",
-      cx: x.toFixed(2),
-      cy: y.toFixed(2),
-      r: Math.max(3, metrics.tileWidth * (0.024 + (i % 3) * 0.007)).toFixed(2),
+    const y = bounds.n.y + bounds.height * (((i * 23) % 82) / 100);
+    const size = Math.max(3, metrics.tileWidth * (0.02 + (i % 3) * 0.006));
+    petals.append(svgElement("ellipse", {
+      class: `weather-petal weather-petal--d${i % 3}`,
+      cx: x.toFixed(1),
+      cy: y.toFixed(1),
+      rx: size.toFixed(1),
+      ry: (size * 0.52).toFixed(1),
       style: weatherStyle({
-        "--delay": `${(-((i * 5) % 18) / 10).toFixed(1)}s`
+        "--sway": `${(metrics.tileWidth * 0.12).toFixed(0)}px`,
+        "--fall": `${(metrics.tileHeight * (1.4 + (i % 3) * 0.5)).toFixed(0)}px`,
+        "--delay": `${((-(i * 7) % 44) / 10).toFixed(1)}s`,
+        "--dur": `${(4.4 + (i % 4) * 0.9).toFixed(1)}s`
       })
     }));
   }
-  g.append(blooms);
+  g.append(petals);
 }
 
-function addHeatField(g, metrics, bounds) {
+// Heatwave: rising, wobbling shimmer columns (hot-air distortion) plus a scatter of
+// drifting embers, instead of the old vague grey blobs. The shimmer rects are filled
+// with a vertical transparent→warm→transparent gradient and heavily blurred in CSS so
+// they read as air warp, not solid bars; the wobble/rise/breathe lives in the keyframes.
+function addHeatField(g, metrics, bounds, size) {
   const field = svgElement("g", { class: "weather-field weather-field--heat" });
-  for (let i = 0; i < 9; i += 1) {
-    const x = bounds.w.x + bounds.width * (0.16 + (i % 3) * 0.34);
-    const y = bounds.n.y + bounds.height * (0.24 + Math.floor(i / 3) * 0.22);
-    field.append(svgElement("ellipse", {
-      class: `weather-heat-cell weather-heat-cell--d${i % 3}`,
-      cx: x.toFixed(2),
-      cy: y.toFixed(2),
-      rx: Math.max(16, metrics.tileWidth * (0.34 + (i % 2) * 0.06)).toFixed(2),
-      ry: Math.max(7, metrics.tileHeight * (0.18 + (i % 3) * 0.03)).toFixed(2),
+
+  const gradId = `weather-heat-grad-${size}`;
+  const defs = svgElement("defs");
+  const grad = svgElement("linearGradient", { id: gradId, x1: "0", y1: "1", x2: "0", y2: "0" });
+  for (const [offset, color] of [
+    ["0%", "rgba(255,150,54,0)"],
+    ["30%", "rgba(255,170,74,.55)"],
+    ["62%", "rgba(255,206,120,.34)"],
+    ["100%", "rgba(255,235,175,0)"]
+  ]) {
+    grad.append(svgElement("stop", { offset, "stop-color": color }));
+  }
+  defs.append(grad);
+  field.append(defs);
+
+  const cols = 7;
+  for (let i = 0; i < cols; i += 1) {
+    const cx = bounds.w.x + bounds.width * (0.08 + i * (0.84 / (cols - 1)));
+    const w = Math.max(26, metrics.tileWidth * (0.5 + (i % 3) * 0.14));
+    const h = bounds.height * (0.66 + (i % 2) * 0.22);
+    const yTop = bounds.n.y + bounds.height * 0.14;
+    field.append(svgElement("rect", {
+      class: `weather-heat-shimmer weather-heat-shimmer--d${i % 3}`,
+      x: (cx - w / 2).toFixed(1),
+      y: yTop.toFixed(1),
+      width: w.toFixed(1),
+      height: h.toFixed(1),
+      fill: `url(#${gradId})`,
       style: weatherStyle({
-        "--delay": `${(-((i * 7) % 15) / 10).toFixed(1)}s`
+        "--delay": `${(-i * 0.5).toFixed(2)}s`,
+        "--dur": `${(3.4 + (i % 3) * 0.7).toFixed(1)}s`
       })
     }));
   }
+
+  const embers = svgElement("g", { class: "weather-heat-embers" });
+  for (let i = 0; i < 14; i += 1) {
+    const x = bounds.w.x + bounds.width * (((i * 37 + 11) % 100) / 100);
+    const y = bounds.n.y + bounds.height * (0.4 + ((i * 17) % 55) / 100);
+    embers.append(svgElement("circle", {
+      class: "weather-heat-ember",
+      cx: x.toFixed(1),
+      cy: y.toFixed(1),
+      r: Math.max(1.3, metrics.tileWidth * 0.012 * (1 + (i % 3) * 0.5)).toFixed(1),
+      style: weatherStyle({
+        "--delay": `${((-(i * 7) % 40) / 10).toFixed(1)}s`,
+        "--dur": `${(3 + (i % 4) * 0.8).toFixed(1)}s`
+      })
+    }));
+  }
+  field.append(embers);
+
   g.append(field);
 }
 
@@ -167,18 +240,53 @@ function addStormCells(g, metrics, bounds) {
     }));
   }
   g.append(cells);
-  g.append(svgElement("polygon", {
-    class: "weather-bolt",
-    points: pointsToString([
-      [bounds.center.x - metrics.tileWidth * 0.28, bounds.n.y + bounds.height * 0.22],
-      [bounds.center.x + metrics.tileWidth * 0.1, bounds.n.y + bounds.height * 0.22],
-      [bounds.center.x - metrics.tileWidth * 0.05, bounds.n.y + bounds.height * 0.4],
-      [bounds.center.x + metrics.tileWidth * 0.26, bounds.n.y + bounds.height * 0.4],
-      [bounds.center.x - metrics.tileWidth * 0.22, bounds.n.y + bounds.height * 0.72],
-      [bounds.center.x - metrics.tileWidth * 0.02, bounds.n.y + bounds.height * 0.49],
-      [bounds.center.x - metrics.tileWidth * 0.3, bounds.n.y + bounds.height * 0.49]
-    ])
-  }));
+}
+
+// A single jagged lightning stroke: a thin zig-zag polyline dropping downward with
+// index-seeded horizontal jitter (no RNG — deterministic like the rest of this file)
+// plus one short fork branch, so it reads as a real bolt instead of a fat wedge.
+function boltPath(startX, startY, totalHeight, seed) {
+  const segs = 7;
+  const segH = totalHeight / segs;
+  let x = startX;
+  let y = startY;
+  let d = `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+  let forkD = "";
+  for (let i = 1; i <= segs; i += 1) {
+    const jitter = (((seed * 13 + i * 41) % 23) / 22 - 0.5) * segH * 1.05;
+    x += jitter;
+    y += segH;
+    d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    // one glancing fork partway down
+    if (i === 3) {
+      const fx = x + segH * (0.9 + (seed % 3) * 0.2) * (seed % 2 ? 1 : -1);
+      const fy = y + segH * 1.3;
+      forkD = ` M ${x.toFixed(1)} ${y.toFixed(1)} L ${fx.toFixed(1)} ${fy.toFixed(1)}`;
+    }
+  }
+  return d + forkD;
+}
+
+// Lightning strikes are appended to the UNCLIPPED overlay root (not the board-clipped
+// field group) on purpose — the user wants bolts that can flash down outside the tile
+// diamond, not one permanent wedge stapled to the board centre. Each bolt flashes
+// briefly on its own staggered cycle so at any instant the sky is mostly dark with the
+// odd strike, the way real lightning reads.
+function addLightningBolts(g, metrics, bounds) {
+  const bolts = svgElement("g", { class: "weather-bolts" });
+  const strikes = 4;
+  for (let i = 0; i < strikes; i += 1) {
+    // spread across a span wider than the board so strikes land off the tiles too
+    const startX = bounds.w.x + bounds.width * (-0.12 + i * 0.4 + (i % 2) * 0.06);
+    const startY = bounds.n.y - bounds.height * (0.16 + (i % 2) * 0.05);
+    const h = bounds.height * (0.85 + (i % 3) * 0.14);
+    bolts.append(svgElement("path", {
+      class: "weather-bolt",
+      d: boltPath(startX, startY, h, i * 7 + 3),
+      style: weatherStyle({ "--delay": `${(i * 1.35).toFixed(2)}s` })
+    }));
+  }
+  g.append(bolts);
 }
 
 function createWeatherOverlay(metrics, size, weather) {
@@ -223,12 +331,14 @@ function createWeatherOverlay(metrics, size, weather) {
     addSnowField(fields, metrics, bounds);
   } else if (weather === "spring") {
     addRainField(fields, metrics, bounds);
-    addSpringBlooms(fields, metrics, bounds);
+    addSpringPetals(fields, metrics, bounds);
   } else if (weather === "heatwave") {
-    addHeatField(fields, metrics, bounds);
+    addHeatField(fields, metrics, bounds, size);
   } else if (weather === "thunderstorm") {
     addStormCells(fields, metrics, bounds);
     addRainField(fields, metrics, bounds, { storm: true });
+    // bolts go on the unclipped root so strikes can fall beyond the board edge
+    addLightningBolts(g, metrics, bounds);
   }
 
   return g;

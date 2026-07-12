@@ -481,11 +481,12 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break;
     }
     case "healAllies": {
-      const amount = Math.max(0, Number(art.effect.amount) || 0);
-      for (const ally of board) {
-        if (ally.player !== actor.player) continue;
-        if (!art.effect.global && chebyshevDistance(actor.position, ally.position) > art.effect.radius) continue;
-        ally.hp = Math.min(getEffectiveStats(ally, state).maxHp, ally.hp + amount);
+      const amount = getTeamHealAmount(art);
+      const globalWeatherHeal = Boolean(art.globalHeal);
+      for (const target of board) {
+        if (!globalWeatherHeal && target.player !== actor.player) continue;
+        if (!globalWeatherHeal && !art.effect?.global && chebyshevDistance(actor.position, target.position) > (art.effect?.radius ?? 0)) continue;
+        target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + amount);
       }
       break;
     }
@@ -753,9 +754,20 @@ function enemiesWithin(state, actor, radius) {
 }
 
 function woundedAlliesInReach(state, actor, art) {
+  const amount = getTeamHealAmount(art);
+  if (amount <= 0) return [];
+  if (art.globalHeal) {
+    return livingUnits(state).filter((unit) => unit.hp < getEffectiveStats(unit, state).maxHp);
+  }
+  const effect = art.effect ?? {};
+  if (!effect.global && !Number.isFinite(effect.radius)) return [];
   return livingUnits(state, actor.player).filter((ally) =>
     ally.hp < getEffectiveStats(ally, state).maxHp &&
-    (art.effect.global || chebyshevDistance(actor.position, ally.position) <= art.effect.radius));
+    (effect.global || chebyshevDistance(actor.position, ally.position) <= effect.radius));
+}
+
+function getTeamHealAmount(art) {
+  return Math.max(0, Number(art.globalHeal?.amount ?? art.effect?.amount ?? 0) || 0);
 }
 
 // The reachable tile that closes the most distance to the nearest enemy, for a
@@ -890,6 +902,7 @@ function artUsableForPlanning(state, unit, art) {
     !(art.firstCommandOnly && (state.units ?? []).some((ally) =>
       ally.hp > 0 && ally.id !== unit.id && areAllies(ally, unit) && takesTurns(ally) && ally.spent)) &&
     (!art.rageLocked || isRaging(unit)) &&
+    !(art.weather && unit.lastWeather === art.weather) &&
     !(art.hpCost && !art.selfKill && unit.hp <= art.hpCost) &&
     (!art.requiresConditionEnemy || hasConditionEnemy(state, unit, art.condition)) &&
     !(art.effect?.type === "studyTarget" && unit.studiedTargetId && state.units.some((target) => target.id === unit.studiedTargetId && target.hp > 0)) &&

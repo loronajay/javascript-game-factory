@@ -2866,8 +2866,8 @@ test("Spirit of the Woods is mission 17 and keeps Shattered Waste locked until a
   const wasteIndex = fresh.nodes.findIndex((node) => node.locationName === "The Shattered Waste");
   assert.equal(spiritIndex > -1, true);
   assert.equal(wasteIndex, spiritIndex + 1);
-  assert.equal(fresh.nodes[spiritIndex].point.x > 38 && fresh.nodes[spiritIndex].point.x < 39, true);
-  assert.equal(fresh.nodes[spiritIndex].point.y > 47 && fresh.nodes[spiritIndex].point.y < 48, true);
+  assert.equal(fresh.nodes[spiritIndex].point.x > 29.5 && fresh.nodes[spiritIndex].point.x < 30.5, true, "the marker sits on the painted forest node east of Timeless Woods");
+  assert.equal(fresh.nodes[spiritIndex].point.y > 56.5 && fresh.nodes[spiritIndex].point.y < 57.3, true, "the marker sits on the painted forest node east of Timeless Woods");
 
   const storage = storageAdapter();
   const priorWithoutSpirit = fresh.nodes.slice(0, spiritIndex).map((node) => node.id);
