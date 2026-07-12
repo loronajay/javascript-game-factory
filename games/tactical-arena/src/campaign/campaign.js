@@ -444,7 +444,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "A quiet forest node waits east of the Timeless Woods. The wind moves here even when the trees do not." },
   { id: SHOWDOWN_MISSION_ID, cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
-  { id: NOT_MY_KING_MISSION_ID, cell: { col: 5, row: 2 }, point: { x: 80.8, y: 34.6 }, region: "waste", locationName: "Ember Crown Rise", requiredStars: 0, requiresPreviousMissionsComplete: true,
+  { id: NOT_MY_KING_MISSION_ID, cell: { col: 5, row: 2 }, point: { x: 84.5, y: 30.9 }, region: "waste", locationName: "Ember Crown Rise", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "A lower painted marker smolders above the shattered waste. The castle can wait; the crown has come to the road." },
 ];
 

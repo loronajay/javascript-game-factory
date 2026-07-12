@@ -3170,8 +3170,8 @@ test("Not My King replaces the Iron Citadel placeholder on the lower painted nod
   const kingIndex = fresh.nodes.findIndex((node) => node.id === NOT_MY_KING_MISSION_ID);
   assert.equal(kingIndex, showdownIndex + 1);
   assert.equal(fresh.nodes[kingIndex].locationName.includes("Iron Citadel"), false);
-  assert.equal(fresh.nodes[kingIndex].point.x > 78 && fresh.nodes[kingIndex].point.x < 83, true, "the marker stays over the painted route above The Showdown");
-  assert.equal(fresh.nodes[kingIndex].point.y > 31 && fresh.nodes[kingIndex].point.y < 38, true, "the marker moved down from the castle placeholder");
+  assert.equal(fresh.nodes[kingIndex].point.x > 84 && fresh.nodes[kingIndex].point.x < 85, true, "the marker sits on the painted snow-route node above The Showdown");
+  assert.equal(fresh.nodes[kingIndex].point.y > 30 && fresh.nodes[kingIndex].point.y < 32, true, "the marker sits on the painted snow-route node above The Showdown");
 
   const storage = storageAdapter();
   const prior = fresh.nodes.slice(0, kingIndex).map((node) => node.id);
