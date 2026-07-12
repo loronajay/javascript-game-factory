@@ -26,7 +26,7 @@
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
 import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
-import { getProximityBonus, isShotBlocked, isWallBetween } from "../rules/combat.js";
+import { getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
   getArtTargetRange,
@@ -692,7 +692,9 @@ function attackTargetsFrom(state, unit, pos) {
   const moved = withUnitAt(state, unit.id, pos);
   const actor = findUnit(moved, unit.id);
   if (getEffectiveStats(actor, moved).attackRange < 1) return [];
-  return rangedTargetsFrom(moved, actor, pos, true);
+  const targets = rangedTargetsFrom(moved, actor, pos, true);
+  if (!requiresRayBasicAttack(actor)) return targets;
+  return targets.filter((target) => isStraightRayTarget(pos, target.position));
 }
 
 function attackableWallsFrom(state, unit, pos) {
@@ -700,12 +702,14 @@ function attackableWallsFrom(state, unit, pos) {
   const actor = findUnit(moved, unit.id);
   const range = getEffectiveStats(actor, moved).attackRange;
   if (range < 1) return [];
+  const rayOnly = requiresRayBasicAttack(actor);
   const walls = [];
   for (const [key, object] of Object.entries(moved.tileObjects ?? {})) {
     if (object?.kind !== "wall") continue;
     const [x, y] = key.split(",").map(Number);
     const wall = { x, y };
     if (chebyshevDistance(pos, wall) > range) continue;
+    if (rayOnly && !isStraightRayTarget(pos, wall)) continue;
     if (isWallBetween(moved, pos, wall, actor) || isShotBlocked(moved, pos, wall, actor)) continue;
     const resourceCost = getBasicAttackResourceCost(actor, wall);
     if (resourceCost > 0 && actor.mp < resourceCost) continue;

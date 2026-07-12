@@ -318,7 +318,10 @@ export function expectedStrike(state, attacker, target, art = null) {
     ? resolveFixedPhysicalStrike(attacker, target, art.damage.amount, { critical: true, state }).damage
     : resolveBaseStrike(attacker, target, { proximity: true, critical: true, state, damageType, damageAffinity }).damage;
 
-  const pMiss = getMissChance(attacker);
+  // Magic-damage ARTS ignore Blind (Silence, not Blind, is the mage counter — see
+  // artResolvers.js's resolveTargetedArt), so the EV math must match or the CPU would
+  // undervalue casting while blinded.
+  const pMiss = getMissChance(attacker, { ignoreBlind: damageType === "magic" });
   const pHit = 1 - pMiss;
   const pCrit = getCritChance(attacker);
 

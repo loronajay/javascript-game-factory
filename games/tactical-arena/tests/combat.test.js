@@ -180,7 +180,7 @@ test("blind does not make generic targeted magic ARTS miss", () => {
 
   let selected = applyCommand(state, beginActivation(1, "nec"));
   let result = applyCommand(selected.nextState, useArt(1, "nec", "wither", {
-    targetId: "wither-target", attackRoll: 0.01, effectRoll: 0.99
+    targetId: "wither-target", attackRoll: 0.5, effectRoll: 0.99
   }));
   assert.equal(result.events[0].hit, true);
   assert.equal(result.events[0].missed, undefined);
@@ -191,12 +191,28 @@ test("blind does not make generic targeted magic ARTS miss", () => {
   result.nextState.units.find((u) => u.id === "virus").spent = false;
   selected = applyCommand(result.nextState, beginActivation(1, "virus"));
   result = applyCommand(selected.nextState, useArt(1, "virus", "cough", {
-    targetId: "cough-target", attackRoll: 0.01, effectRoll: 0.99
+    targetId: "cough-target", attackRoll: 0.5, effectRoll: 0.99
   }));
   assert.equal(result.events[0].hit, true);
   assert.equal(result.events[0].missed, undefined);
   assert.equal(result.events[0].damage.type, "magic");
   assert.equal(result.nextState.units.find((u) => u.id === "cough-target").hp, 20);
+});
+
+test("blind-ignoring magic ARTS can still whiff on a genuinely low roll", () => {
+  const state = createBattleState({
+    units: [
+      { id: "nec", player: 1, type: "necromancer", x: 0, y: 0, statuses: [{ type: "blind", duration: 1 }] },
+      { id: "wither-target", player: 2, type: "swordsman", x: 3, y: 0 }
+    ]
+  });
+
+  const selected = applyCommand(state, beginActivation(1, "nec"));
+  const result = applyCommand(selected.nextState, useArt(1, "nec", "wither", {
+    targetId: "wither-target", attackRoll: 0.01, effectRoll: 0.99
+  }));
+  assert.equal(result.events[0].hit, false);
+  assert.equal(result.events[0].missed, true);
 });
 
 test("rolls are deterministic from the seed: same seed + commands ⇒ same outcome", () => {

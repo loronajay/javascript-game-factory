@@ -1987,11 +1987,7 @@ async function resolveCombat(command) {
     const center = unitCenter(metrics, targetBefore);
 
     await effects.animateAttack(attackerBefore, targetBefore, ranged, rolled.artId ?? null);
-    // Magic casts (Spark, Banish, Wither, ...) skip the attacker accuracy roll entirely
-    // (rolled: false) — no dice were drawn, so there's nothing to reveal.
-    if (rolled.rolled !== false) {
-      await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
-    }
+    await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
     playAttackImpactSound(rolled, ranged);
 
     if (rolled.missed) {

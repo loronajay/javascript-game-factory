@@ -522,7 +522,7 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
       damageByTarget[target.id] = dealt;
     }
   }
-  return targetIds.length ? [{
+  return [{
     type: "FLAMESPITTER",
     actorId: actor.id,
     artId: art.id,
@@ -530,7 +530,7 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
     targetIds,
     damageByTarget,
     mpCost: 0
-  }] : [];
+  }];
 }
 
 // A Build Cover wall is a destructible obstacle, not a unit: an attack against it
