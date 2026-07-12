@@ -1,5 +1,12 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
+import {
+  DEPLOYMENT_TILES,
+  DEPLOYMENT_ZONE_SIZE,
+  deploymentSlotDescriptor,
+  deploymentTileLabel,
+  normalizeDeploymentPositions
+} from "./squadModel.js";
 
 let host = null;
 
@@ -12,13 +19,12 @@ function ensureHost() {
   return host;
 }
 
-const SLOT_LABELS = ["Front 1", "Front 2", "Corner", "Back"];
-
-export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, accent = null } = {}) {
+export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, positions: initialPositions = null, accent = null } = {}) {
   const overlay = ensureHost();
   let formationOrder = Array.isArray(order) && order.length === composition.length
     ? [...order]
     : composition.map((_, index) => index);
+  let positions = normalizeDeploymentPositions(initialPositions, composition.length).map((position) => ({ ...position }));
   let selectedSlot = null;
 
   return new Promise((resolve) => {
@@ -31,9 +37,10 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
     head.innerHTML =
       `<div class="ref-head-title"><h2>${escapeHtml(title)}</h2>` +
       `<button class="ref-close" type="button" data-formation="cancel" aria-label="Close">X</button></div>` +
-      `<p class="roster-sub">Swap your drafted pieces into the four starting slots, then lock formation.</p>`;
+      `<p class="roster-sub">Swap your drafted pieces and place each one in your deployment zone.</p>`;
 
     const grid = el("div", "draft-formation-grid");
+    const deployment = el("div", "deployment-picker draft-deployment-picker");
     const foot = el("div", "roster-foot");
     const resetBtn = el("button", "menu-btn ghost");
     resetBtn.type = "button";
@@ -49,7 +56,7 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
     lockBtn.textContent = "Lock Formation";
     lockBtn.dataset.formation = "lock";
     foot.append(resetBtn, cancelBtn, lockBtn);
-    card.append(head, grid, foot);
+    card.append(head, grid, deployment, foot);
     overlay.appendChild(card);
 
     function paint() {
@@ -59,17 +66,42 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
         const type = composition[pickIndex];
         const skin = skins[pickIndex] ?? null;
         const def = UNIT_TYPES[type];
+        const descriptor = deploymentSlotDescriptor(slot, positions[slot]);
         const btn = el("button", `draft-formation-slot${selectedSlot === slot ? " is-selected" : ""}`);
         btn.type = "button";
         btn.dataset.slot = String(slot);
         const tag = el("span", "draft-formation-tag");
-        tag.textContent = SLOT_LABELS[slot] ?? `Slot ${slot + 1}`;
+        tag.textContent = `${slot + 1} · ${descriptor.label}`;
         const name = el("span", "draft-formation-name");
         name.textContent = (type && nicknames[pickIndex]) || def?.name || type || "Empty";
         if (type) btn.append(createPortrait(type, { variant: "is-slot", eager: true, skin }));
         btn.append(tag, name);
         btn.addEventListener("click", () => chooseSlot(slot));
         grid.appendChild(btn);
+      }
+      paintDeployment();
+    }
+
+    function paintDeployment() {
+      deployment.replaceChildren();
+      for (const tile of DEPLOYMENT_TILES) {
+        const occupant = positions.findIndex((position) => position.x === tile.x && position.y === tile.y);
+        const rankLabel = deploymentTileLabel(tile);
+        const btn = el("button", `deployment-tile row-${rankLabel.toLowerCase()}${occupant >= 0 ? " is-occupied" : ""}${occupant === selectedSlot ? " is-active" : ""}`);
+        btn.type = "button";
+        btn.style.gridColumn = String(tile.x + 1);
+        btn.style.gridRow = String(DEPLOYMENT_ZONE_SIZE - tile.y);
+        btn.title = `${rankLabel} deployment tile`;
+        btn.setAttribute("aria-label", `${rankLabel} deployment tile`);
+        if (occupant >= 0) {
+          const pickIndex = formationOrder[occupant];
+          const type = composition[pickIndex];
+          const marker = el("span", "deployment-marker");
+          marker.textContent = String(occupant + 1);
+          if (type) btn.append(marker, createPortrait(type, { variant: "is-chip", eager: true, skin: skins[pickIndex] ?? null }));
+        }
+        btn.addEventListener("click", () => chooseDeploymentTile(tile, occupant));
+        deployment.appendChild(btn);
       }
     }
 
@@ -80,6 +112,24 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
         selectedSlot = null;
       } else {
         [formationOrder[selectedSlot], formationOrder[slot]] = [formationOrder[slot], formationOrder[selectedSlot]];
+        selectedSlot = null;
+      }
+      paint();
+    }
+
+    function chooseDeploymentTile(tile, occupant) {
+      if (selectedSlot === null) {
+        if (occupant >= 0) selectedSlot = occupant;
+        paint();
+        return;
+      }
+      if (occupant === selectedSlot) {
+        selectedSlot = null;
+      } else if (occupant >= 0) {
+        [positions[selectedSlot], positions[occupant]] = [positions[occupant], positions[selectedSlot]];
+        selectedSlot = null;
+      } else {
+        positions[selectedSlot] = { x: tile.x, y: tile.y };
         selectedSlot = null;
       }
       paint();
@@ -98,8 +148,13 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
     card.addEventListener("click", (event) => {
       const action = event.target.closest("[data-formation]")?.dataset.formation;
       if (action === "cancel") close(null);
-      if (action === "reset") { formationOrder = composition.map((_, index) => index); selectedSlot = null; paint(); }
-      if (action === "lock") close({ order: [...formationOrder] });
+      if (action === "reset") {
+        formationOrder = composition.map((_, index) => index);
+        positions = normalizeDeploymentPositions(null, composition.length).map((position) => ({ ...position }));
+        selectedSlot = null;
+        paint();
+      }
+      if (action === "lock") close({ order: [...formationOrder], positions: positions.map((position) => ({ ...position })) });
     });
     overlay.addEventListener("click", onOverlay);
     document.addEventListener("keydown", onKey, true);

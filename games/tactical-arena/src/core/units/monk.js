@@ -16,8 +16,8 @@ export const MONK = Object.freeze({
   passive: Object.freeze({
     id: "shadow-step",
     name: "Shadow Step",
-    effect: Object.freeze({ type: "movementShape", shape: "radius" }),
-    description: "The Monk can move diagonally; movement uses a radius instead of orthogonal pathing.",
+    effect: Object.freeze({ type: "movementShape", shape: "radius", moveAndUseArts: true }),
+    description: "The Monk can move diagonally (movement uses a radius instead of orthogonal pathing) and may move and use an ART in the same activation.",
     implemented: true
   }),
   arts: Object.freeze([

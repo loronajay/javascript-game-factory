@@ -65,7 +65,8 @@ test("online setup payload relays skin selections with the squad composition", (
       seat: 1,
       composition: ["swordsman", "archer", "mystic", "magician"],
       skins: ["summer-vibes", null, null, "summer-vibes"],
-      nicknames: ["Leo", null, null, null]
+      nicknames: ["Leo", null, null, null],
+      positions: [{ x: 3, y: 3 }, { x: 2, y: 1 }, { x: 0, y: 0 }, { x: 1, y: 2 }]
     });
     assert.deepEqual(sent, [{
       type: "lobby_message",
@@ -74,8 +75,50 @@ test("online setup payload relays skin selections with the squad composition", (
         seat: 1,
         composition: ["swordsman", "archer", "mystic", "magician"],
         skins: ["summer-vibes", null, null, "summer-vibes"],
-        nicknames: ["Leo", null, null, null]
+        nicknames: ["Leo", null, null, null],
+        positions: [{ x: 3, y: 3 }, { x: 2, y: 1 }, { x: 0, y: 0 }, { x: 1, y: 2 }]
       })
+    }]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
+test("online client parses remote setup deployment positions", () => {
+  const previous = globalThis.WebSocket;
+  let messageHandler = null;
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener(type, handler) {
+        if (type === "message") messageHandler = handler;
+      }
+      send() {}
+    };
+    const client = createOnlineClient();
+    const setups = [];
+    client.cb.onRemoteSetup = (payload) => setups.push(payload);
+    client.connect();
+    messageHandler({
+      data: JSON.stringify({
+        event: "message",
+        scope: "lobby",
+        senderId: "c_guest",
+        messageType: "setup",
+        value: JSON.stringify({
+          seat: 2,
+          composition: ["mystic", "swordsman"],
+          positions: [{ x: 3, y: 3 }, { x: 0, y: 0 }]
+        })
+      })
+    });
+    assert.deepEqual(setups, [{
+      seat: 2,
+      composition: ["mystic", "swordsman"],
+      skins: null,
+      nicknames: null,
+      positions: [{ x: 3, y: 3 }, { x: 0, y: 0 }]
     }]);
   } finally {
     globalThis.WebSocket = previous;

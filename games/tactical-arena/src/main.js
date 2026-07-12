@@ -609,6 +609,7 @@ function startMatch(config) {
     squads: config.squads,
     skins: config.skins,
     nicknames: config.nicknames,
+    formations: config.formations,
     seed: online || config.mode === "tutorial" ? config.seed : undefined,
     playerCount: config.playerCount,
     format: config.format,

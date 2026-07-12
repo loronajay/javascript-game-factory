@@ -146,6 +146,17 @@ test("unknown speakers fall back to a narrator-safe line", () => {
   assert.equal(line.type, null);
   assert.equal(line.portrait, null);
   assert.equal(line.side, "left");
+  assert.equal(line.narration, false);
+});
+
+test("speakerless action beats normalize as narration with no presented speaker", () => {
+  const line = normalizeDialogueLine({ text: "A horn sounds." }, state);
+
+  assert.equal(line.name, "");
+  assert.equal(line.type, null);
+  assert.equal(line.portrait, null);
+  assert.equal(line.side, "left");
+  assert.equal(line.narration, true);
 });
 
 test("scripts carry progress metadata for rendering", () => {

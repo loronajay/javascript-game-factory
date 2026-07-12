@@ -10,7 +10,8 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import {
   UNIT_TYPE_KEYS,
   DEFAULT_SQUAD,
-  SLOT_LAYOUT,
+  DEPLOYMENT_ZONE_SIZE,
+  deploymentSlotDescriptor,
   normalizeSquad,
   normalizeSquadLoadout,
   availableTypesForSlot,
@@ -58,13 +59,16 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     editBtn.disabled = locked;
     editBtn.textContent = locked ? "Squad Locked" : "Edit Squad";
     chips.replaceChildren();
-    for (const slot of SLOT_LAYOUT) {
+    for (const slot of loadout.positions.map((position, index) => deploymentSlotDescriptor(index, position))) {
       const type = loadout.composition[slot.index];
       const def = UNIT_TYPES[type];
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `squad-chip row-${slot.row}`;
+      chip.style.gridColumn = String(slot.x + 1);
+      chip.style.gridRow = String(DEPLOYMENT_ZONE_SIZE - slot.y);
       chip.disabled = locked;
+      chip.title = `${slot.label} deployment tile`;
       chip.append(createPortrait(type, { variant: "is-chip", eager: true, skin: loadout.skins[slot.index] }));
       const name = document.createElement("span");
       name.className = "squad-chip-name";
@@ -87,8 +91,13 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     isLocked: () => locked,
     getSquad: () => [...loadout.composition],
     getSkins: () => [...loadout.skins],
+    getPositions: () => loadout.positions.map((position) => ({ ...position })),
     getNicknames: () => loadout.composition.map((type) => getNicknamePref(type)),
-    getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] }),
+    getLoadout: () => ({
+      composition: [...loadout.composition],
+      skins: [...loadout.skins],
+      positions: loadout.positions.map((position) => ({ ...position }))
+    }),
     setLoadout(nextLoadout) {
       loadout = normalizeSquadLoadout(nextLoadout);
       paintChips();

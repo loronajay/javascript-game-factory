@@ -919,6 +919,18 @@ export function getRageEffectValue(unit, key, fallback = null) {
   return definition.ragePassive?.effect?.[key] ?? definition.rageArt?.effect?.[key] ?? fallback;
 }
 
+// True for a unit that may move AND use an ART in the same activation (normally mutually
+// exclusive). Some units only gain this while raging (Mystic's rage source, Summoner's
+// Disturbed Spirit rage passive); others carry it as a standing, always-on passive
+// (Monk's Shadow Step). Scans every passive source so either shape works.
+export function canMoveAndUseArts(unit) {
+  if (!unit) return false;
+  if (getRageEffectValue(unit, "moveAndUseArts", false)) return true;
+  const definition = getUnitType(unit.type);
+  const staticSources = [definition.passive, ...definition.arts].filter(Boolean);
+  return staticSources.some((source) => source.effect?.moveAndUseArts === true);
+}
+
 // --- Virus (contagion) ------------------------------------------------------
 // Spread: a status inflicted on an enemy of a living Virus propagates to that enemy's
 // nearby allies. The radius grows by `rageRadiusBonus` while the Virus rages (Infectious

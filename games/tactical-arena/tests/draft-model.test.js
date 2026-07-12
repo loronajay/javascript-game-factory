@@ -11,6 +11,7 @@ import {
   draftedTypes,
   isDraftComplete,
 } from "../src/ui/draftModel.js";
+import { DEFAULT_DEPLOYMENT_POSITIONS } from "../src/ui/squadModel.js";
 
 test("draft uses a snake pick order for two four-unit squads", () => {
   assert.deepEqual(DRAFT_PICK_ORDER, [1, 2, 2, 1, 1, 2, 2, 1]);
@@ -38,7 +39,31 @@ test("draft formation order reorders composition and skins without changing pick
   // Skins are all locked right now, so every slug normalizes to classic (null)
   // regardless of what was picked during the draft.
   assert.deepEqual(loadout.skins, [null, null, null, null]);
+  assert.deepEqual(loadout.positions, [...DEFAULT_DEPLOYMENT_POSITIONS]);
   assert.deepEqual(draft.picks[1], ["swordsman", "magician", "paladin", "witch-doctor"]);
+});
+
+test("draft formation can carry custom deployment positions", () => {
+  let draft = createDraftState();
+  for (const [seat, type] of [
+    [1, "swordsman"],
+    [2, "archer"],
+    [2, "mystic"],
+    [1, "magician"],
+    [1, "paladin"],
+    [2, "sniper"],
+    [2, "angel"],
+    [1, "witch-doctor"],
+  ]) {
+    const result = applyDraftPick(draft, { seat, type, isUnlocked: () => true });
+    assert.equal(result.accepted, true);
+    draft = result.nextState;
+  }
+
+  const positions = [{ x: 3, y: 3 }, { x: 2, y: 2 }, { x: 0, y: 0 }, { x: 1, y: 3 }];
+  const loadout = arrangeDraftLoadout(draft, 1, { order: [2, 0, 3, 1], positions });
+  assert.deepEqual(loadout.composition, ["paladin", "swordsman", "witch-doctor", "magician"]);
+  assert.deepEqual(loadout.positions, positions);
 });
 
 test("draft formation falls back to pick order unless order is a full permutation", () => {

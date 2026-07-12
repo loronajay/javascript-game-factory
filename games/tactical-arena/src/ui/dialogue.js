@@ -47,6 +47,8 @@ function normalizeSide(side, player) {
 }
 
 export function normalizeDialogueLine(line = {}, state = null, index = 0, total = 1) {
+  const hasPresentedSpeaker = Boolean(line.speakerId || line.speaker || line.type || line.unitType || line.name);
+  const narration = line.narration === true || !hasPresentedSpeaker;
   const speakerUnit = findSpeakerUnit(state, line);
   const type = speakerType(line, speakerUnit);
   const player = line.player ?? speakerUnit?.player ?? null;
@@ -63,12 +65,13 @@ export function normalizeDialogueLine(line = {}, state = null, index = 0, total 
     line.nickname ??
     speakerUnit?.nickname ??
     (isLocalSpeaker && type ? getNicknamePref(type) : null);
-  const name = line.name ?? nickname ?? safeUnitName(type) ?? "Narrator";
-  const portrait = type ? getPortrait(type, skin) : null;
+  const name = narration ? "" : (line.name ?? nickname ?? safeUnitName(type) ?? "Narrator");
+  const portrait = !narration && type ? getPortrait(type, skin) : null;
 
   return Object.freeze({
     ...line,
     text: String(line.text ?? ""),
+    narration,
     name,
     type,
     player,
@@ -173,18 +176,19 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
     host.classList.toggle("is-left", line.side === "left");
     host.classList.toggle("is-right", line.side === "right");
 
-    const card = el("section", `dialogue-card is-${line.side}`);
+    const card = el("section", `dialogue-card is-${line.side}${line.narration ? " is-narration" : ""}`);
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-live", "polite");
-    card.setAttribute("aria-label", `${line.name} dialogue`);
+    card.setAttribute("aria-label", line.narration ? "Story beat" : `${line.name} dialogue`);
     if (line.player && currentState) card.style.setProperty("--team", colorOf(currentState, line.player));
 
-    const portrait = line.type
-      ? createPortrait(line.type, { variant: "is-dialogue", alt: `${line.name} portrait`, eager: true, skin: line.skin })
-      : el("figure", "unit-portrait is-dialogue is-glyph-fallback dialogue-narrator", "!");
+    const portrait = line.narration
+      ? null
+      : line.type
+        ? createPortrait(line.type, { variant: "is-dialogue", alt: `${line.name} portrait`, eager: true, skin: line.skin })
+        : el("figure", "unit-portrait is-dialogue is-glyph-fallback dialogue-narrator", "!");
 
     const body = el("div", "dialogue-body");
-    const heading = el("div", "dialogue-speaker", line.name);
     const text = el("p", "dialogue-text", line.text);
     const foot = el("footer", "dialogue-foot");
     const count = el("span", "dialogue-count", `${line.progress.current}/${line.progress.total}`);
@@ -198,8 +202,10 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
     advance.addEventListener("click", () => { void next(); });
     controls.append(skip, advance);
     foot.append(count, controls);
-    body.append(heading, text, foot);
-    card.append(portrait, body);
+    if (!line.narration) body.append(el("div", "dialogue-speaker", line.name));
+    body.append(text, foot);
+    if (portrait) card.append(portrait);
+    card.append(body);
     host.append(card);
     advance.focus({ preventScroll: true });
   }

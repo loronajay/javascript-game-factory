@@ -1,5 +1,5 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { canMoveAndUseArts, getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -528,7 +528,7 @@ export function canUseArt(state, actor, artId) {
   const activation = state.activation;
   const usedBonusGroups = activation?.bonusActionGroups ?? [];
   const moveAndArtAvailable = Boolean(
-    getRageEffectValue(actor, "moveAndUseArts", false) &&
+    canMoveAndUseArts(actor) &&
     activation?.unitId === actor.id &&
     !activation?.primaryUsed
   );

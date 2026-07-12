@@ -1115,7 +1115,9 @@ test("Wandering Paladin map cutscene is a first-click switch cleared by progress
   const storage = storageAdapter();
 
   assert.equal(shouldShowCampaignMapCutscene(storage, PALADIN_MISSION_ID), true);
-  assert.equal(campaignMapCutsceneScript(PALADIN_MISSION_ID).length >= 3, true);
+  const script = campaignMapCutsceneScript(PALADIN_MISSION_ID);
+  assert.equal(script.length >= 3, true);
+  assert.match(script.map((line) => line.text).join(" "), /road north|royal sorcerer|worthy/i);
   markCampaignMapCutsceneSeen(storage, PALADIN_MISSION_ID);
   assert.equal(shouldShowCampaignMapCutscene(storage, PALADIN_MISSION_ID), false);
 
@@ -2207,7 +2209,9 @@ test("Has-Been Heroes runs a one-time overworld cutscene where the fat squad blo
   // The fat squad speaks on the right (player 2); the player's party answers on the left.
   assert.ok(script.some((line) => line.speaker === "fat-knight" && line.side === "right"));
   assert.ok(script.some((line) => line.speaker === "swordsman" && line.side === "left"));
-  assert.match(script.map((line) => line.text).join(" "), /castle|beef|king|break/i);
+  const text = script.map((line) => line.text).join(" ");
+  assert.match(text, /castle|rumor|sorcerer|void|beef|king|banished|framed|break/i);
+  assert.doesNotMatch(text, /void gate|cloaked figure|not even from/i);
 
   markCampaignMapCutsceneSeen(storage, HASBEEN_HEROES_MISSION_ID);
   assert.equal(shouldShowCampaignMapCutscene(storage, HASBEEN_HEROES_MISSION_ID), false);
@@ -2371,7 +2375,7 @@ test("Battle for the Bridge dialogue covers opening banter, blind, rage, and pos
   assert.match(roninRageWarningScript(raging).map((line) => line.text).join(" "), /Final Draw|RAGE|recoil|suicide/i);
 
   const defeat = roninDefeatScript({ ...state, winner: 1 });
-  assert.match(defeat.map((line) => line.text).join(" "), /king|wrongs|just|services/i);
+  assert.match(defeat.map((line) => line.text).join(" "), /king|sorcerer|void|wrongs|just|services/i);
 });
 
 test("Battle for the Bridge grading rewards the duel, no blind, no Ronin rage, and Swordsman bonus", () => {
@@ -2548,12 +2552,12 @@ test("Wrong Place, Wrong Time cutscenes and battle dialogue use named riot cops"
   const state = wrongPlaceMatchState();
   const opening = wrongPlaceMissionOpeningScript(state);
   assert.deepEqual(campaignOpeningScript(WRONG_PLACE_MISSION_ID, state), opening);
-  assert.match(opening.map((line) => line.text).join(" "), /wizard outfit|criminals|shut it|arrested/i);
+  assert.match(opening.map((line) => line.text).join(" "), /wizard outfit|criminals|sorcerer|shut it|arrested/i);
   assert.ok(opening.some((line) => line.name === "John" || line.speakerId === "p2-0-riot-cop"));
 
   const post = campaignPostMatchCutsceneScript(WRONG_PLACE_MISSION_ID);
   assert.deepEqual(post, wrongPlaceDefeatScript());
-  assert.match(post.map((line) => line.text).join(" "), /John|wizard costume|mosquito|justice|arsonist/i);
+  assert.match(post.map((line) => line.text).join(" "), /John|wizard costume|wreckage|mosquito|justice|arsonist/i);
 });
 
 test("completing Wrong Place, Wrong Time unlocks Riot Cop and records stars", () => {
@@ -2942,6 +2946,7 @@ test("Spirit of the Woods dialogue covers the forest challenge and conditional b
   assert.equal(shouldShowCampaignMapCutscene(storage, SPIRIT_WOODS_MISSION_ID), true);
   const preBrief = campaignMapCutsceneScript(SPIRIT_WOODS_MISSION_ID);
   assert.match(preBrief.map((line) => line.text).join(" "), /anyone there|gust of wind|not ordinary|ready/i);
+  assert.ok(preBrief.some((line) => line.narration === true && /gust of wind/i.test(line.text)));
 
   const state = spiritWoodsMatchState();
   const opening = spiritWoodsMissionOpeningScript(state);
@@ -3241,6 +3246,7 @@ test("Not My King dialogue covers the inferno cutscene, silent king banter, RAGE
   assert.equal(shouldShowCampaignMapCutscene(storage, NOT_MY_KING_MISSION_ID), true);
   const preBrief = campaignMapCutsceneScript(NOT_MY_KING_MISSION_ID);
   assert.match(preBrief.map((line) => line.text).join(" "), /my king|no more|void magic|trap|inferno|embers|ready/i);
+  assert.ok(preBrief.some((line) => line.narration === true && /inferno/i.test(line.text)));
 
   const state = notMyKingMatchState();
   const opening = notMyKingMissionOpeningScript(state);

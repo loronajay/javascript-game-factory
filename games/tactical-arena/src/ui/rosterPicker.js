@@ -12,7 +12,16 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
 import { createPortrait } from "./portraits.js";
-import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
+import {
+  DEPLOYMENT_TILES,
+  DEPLOYMENT_ZONE_SIZE,
+  deploymentSlotDescriptor,
+  deploymentTileLabel,
+  normalizeSquadLoadout,
+  availableTypesForSlot,
+  groupedUnitTypes,
+  isUnitUnlocked
+} from "./squadModel.js";
 import { normalizeSkinSlug, skinLabel } from "./skinModel.js";
 import { openSkinPicker } from "./skinPicker.js";
 
@@ -34,6 +43,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
   const loadout = normalizeSquadLoadout(initial);
   const squad = [...loadout.composition];
   const skins = [...loadout.skins];
+  const positions = loadout.positions.map((position) => ({ ...position }));
   const skinDrafts = squad.map((type, index) => ({ type, slug: skins[index] ?? null }));
   let activeSlot = clampSlot(startSlot);
   let focusedType = squad[activeSlot];
@@ -51,12 +61,14 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     head.innerHTML =
       `<div class="ref-head-title"><h2>${escapeHtml(title)}</h2>` +
       `<button class="ref-close" type="button" data-roster="close" aria-label="Close">✕</button></div>` +
-      `<p class="roster-sub">Pick a slot, click a unit to read its card, then press <b>Place</b> beside its name. Double-click a unit to place it instantly.</p>`;
+      `<p class="roster-sub">Pick a slot, choose its deployment tile, then press <b>Place</b> beside a unit name.</p>`;
     card.appendChild(head);
 
     // Squad tray (the four slots being filled)
     const tray = el("div", "roster-tray");
     card.appendChild(tray);
+    const deployment = el("div", "deployment-picker");
+    card.appendChild(deployment);
 
     // Body: roster grid (left) + detail pane (right)
     const body = el("div", "roster-body");
@@ -86,12 +98,12 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     // ── Renders ──────────────────────────────────────────────────────────────
     function paintTray() {
       tray.replaceChildren();
-      for (const slot of SLOT_LAYOUT) {
+      for (const slot of positions.map((position, index) => deploymentSlotDescriptor(index, position))) {
         const def = UNIT_TYPES[squad[slot.index]];
         const btn = el("button", `roster-slot row-${slot.row}${slot.index === activeSlot ? " is-active" : ""}`);
         btn.type = "button";
         const tag = el("span", "roster-slot-tag");
-        tag.textContent = `${slot.index + 1} · ${slot.row === "front" ? "Front" : "Back"}`;
+        tag.textContent = `${slot.index + 1} · ${slot.label}`;
         const name = el("span", "roster-slot-name");
         name.textContent = def.name;
         btn.append(tag, createPortrait(squad[slot.index], { variant: "is-slot", eager: true, skin: skins[slot.index] }), name);
@@ -102,6 +114,27 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
           paintAll();
         });
         tray.appendChild(btn);
+      }
+    }
+
+    function paintDeployment() {
+      deployment.replaceChildren();
+      for (const tile of DEPLOYMENT_TILES) {
+        const occupant = positions.findIndex((position) => position.x === tile.x && position.y === tile.y);
+        const rankLabel = deploymentTileLabel(tile);
+        const btn = el("button", `deployment-tile row-${rankLabel.toLowerCase()}${occupant >= 0 ? " is-occupied" : ""}${occupant === activeSlot ? " is-active" : ""}`);
+        btn.type = "button";
+        btn.style.gridColumn = String(tile.x + 1);
+        btn.style.gridRow = String(DEPLOYMENT_ZONE_SIZE - tile.y);
+        btn.title = `${rankLabel} deployment tile`;
+        btn.setAttribute("aria-label", `${rankLabel} deployment tile`);
+        if (occupant >= 0) {
+          const marker = el("span", "deployment-marker");
+          marker.textContent = String(occupant + 1);
+          btn.append(marker, createPortrait(squad[occupant], { variant: "is-chip", eager: true, skin: skins[occupant] }));
+        }
+        btn.addEventListener("click", () => chooseDeploymentTile(tile, occupant));
+        deployment.appendChild(btn);
       }
     }
 
@@ -184,8 +217,8 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     // disables itself when that unit can't go there (already in squad, draft rule).
     function paintAssign() {
       const available = new Set(availableTypesForSlot(squad, activeSlot, allowDuplicates));
-      const activeSlotDef = SLOT_LAYOUT.find((s) => s.index === activeSlot) ?? SLOT_LAYOUT[0];
-      const rowLabel = activeSlotDef.row === "front" ? "Front" : "Back";
+      const activeSlotDef = deploymentSlotDescriptor(activeSlot, positions[activeSlot]);
+      const rowLabel = activeSlotDef.label;
       const canAssign = available.has(focusedType);
       assignBtn.disabled = !canAssign;
       assignBtn.textContent = canAssign
@@ -193,7 +226,19 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         : isUnitUnlocked(focusedType) ? "Already in squad" : "🔒 Locked";
     }
 
-    function paintAll() { paintTray(); paintGrid(); paintDetail(); }
+    function paintAll() { paintTray(); paintDeployment(); paintGrid(); paintDetail(); }
+
+    function chooseDeploymentTile(tile, occupant) {
+      if (occupant === activeSlot) return;
+      if (occupant >= 0) {
+        activeSlot = occupant;
+        focusedType = squad[activeSlot];
+        primeSlotDraft(activeSlot);
+      } else {
+        positions[activeSlot] = { x: tile.x, y: tile.y };
+      }
+      paintAll();
+    }
 
     // Place `type` in the active slot, then advance to the next slot so a player
     // can tap straight down the roster.
@@ -228,7 +273,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
     function createSkinSummary(type) {
       const current = selectedSkinForType(type);
-      const slot = SLOT_LAYOUT.find((item) => item.index === activeSlot) ?? SLOT_LAYOUT[0];
+      const slot = deploymentSlotDescriptor(activeSlot, positions[activeSlot]);
       const summary = el("div", "skin-summary");
       summary.appendChild(createPortrait(type, { variant: "is-skin-summary", eager: true, skin: current }));
 
@@ -238,7 +283,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const name = el("div", "skin-summary-name");
       name.textContent = skinLabel(type, current);
       const hint = el("div", "skin-summary-hint");
-      hint.textContent = `${slot.row === "front" ? "Front" : "Back"} row cosmetic`;
+      hint.textContent = `${slot.label} tile cosmetic`;
       copy.append(title, name, hint);
 
       const btn = el("button", "skin-summary-btn");
@@ -265,7 +310,13 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       overlay.replaceChildren();
       resolve(result);
     }
-    function finish() { close({ composition: [...squad], skins: [...skins] }); }
+    function finish() {
+      close({
+        composition: [...squad],
+        skins: [...skins],
+        positions: positions.map((position) => ({ ...position }))
+      });
+    }
     function cancel() { close(null); }
 
     function onOverlay(event) { if (event.target === overlay) cancel(); }
@@ -290,7 +341,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
 function clampSlot(index) {
   const n = Number(index) || 0;
-  return Math.min(Math.max(0, n), SLOT_LAYOUT.length - 1);
+  return Math.min(Math.max(0, n), 3);
 }
 
 function el(tag, className) {

@@ -1,4 +1,4 @@
-import { getAbilityUsesRemaining, getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { canMoveAndUseArts, getAbilityUsesRemaining, getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, artUsesPhysicalStrike, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, finalizeMagicDamage, getAttackRecoil, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
@@ -202,7 +202,7 @@ export function useArt(state, command) {
 }
 
 function artKeepsActivationOpen(actor, art) {
-  return Boolean(!art?.bonusActionGroup && getRageEffectValue(actor, "moveAndUseArts", false));
+  return Boolean(!art?.bonusActionGroup && canMoveAndUseArts(actor));
 }
 
 function completeArtUse(state, actor, art, keepsActivationOpen = artKeepsActivationOpen(actor, art)) {

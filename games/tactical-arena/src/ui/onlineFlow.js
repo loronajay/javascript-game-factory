@@ -75,6 +75,7 @@ export function createOnlineFlow({ onStartMatch }) {
   let draft = null;
   let draftMembersKey = "";
   let localFormationOrder = null;
+  let localFormationPositions = null;
   let formationPromptOpen = false;
 
   // Owner-authored framing, mirrored to every client via `config`.
@@ -98,6 +99,7 @@ export function createOnlineFlow({ onStartMatch }) {
   const compositionsBySeat = {};
   const skinsBySeat = {};
   const nicknamesBySeat = {};
+  const formationsBySeat = {};
 
   // ── view helpers ───────────────────────────────────────────────────────────
   function setPanel(name) {
@@ -202,6 +204,7 @@ export function createOnlineFlow({ onStartMatch }) {
       draft = null;
       draftMembersKey = "";
       localFormationOrder = null;
+      localFormationPositions = null;
       formationPromptOpen = false;
       return;
     }
@@ -209,6 +212,7 @@ export function createOnlineFlow({ onStartMatch }) {
       draft = createDraftState({ seats: [1, 2] });
       draftMembersKey = key;
       localFormationOrder = null;
+      localFormationPositions = null;
       formationPromptOpen = false;
       localLocked = false;
       if (myClientId) readyByClientId.set(myClientId, false);
@@ -534,6 +538,7 @@ export function createOnlineFlow({ onStartMatch }) {
       skins,
       nicknames,
       order: localFormationOrder,
+      positions: localFormationPositions,
       accent: PLAYER_COLOR[seat] ?? PLAYER_COLOR[1],
     });
     formationPromptOpen = false;
@@ -543,6 +548,7 @@ export function createOnlineFlow({ onStartMatch }) {
       return;
     }
     localFormationOrder = result.order;
+    localFormationPositions = result.positions;
     setStatus("Formation locked. Waiting for the other side.");
     setLocalLocked(true);
   }
@@ -628,23 +634,28 @@ export function createOnlineFlow({ onStartMatch }) {
       seed = matchSeed;
       setStatus("Match starting…");
 
-      const arrangedDraft = isDraftMatch() ? arrangeDraftLoadout(draft, mySeat, localFormationOrder) : null;
+      const arrangedDraft = isDraftMatch()
+        ? arrangeDraftLoadout(draft, mySeat, { order: localFormationOrder, positions: localFormationPositions })
+        : null;
       const composition = arrangedDraft ? arrangedDraft.composition : squadPicker.getSquad();
       const skins = arrangedDraft ? arrangedDraft.skins : squadPicker.getSkins();
       const nicknames = arrangedDraft ? arrangedDraft.nicknames : squadPicker.getNicknames();
+      const positions = arrangedDraft ? arrangedDraft.positions : squadPicker.getPositions();
       compositionsBySeat[mySeat] = composition;
       skinsBySeat[mySeat] = skins;
       nicknamesBySeat[mySeat] = nicknames;
-      client.sendSetup({ seat: mySeat, composition, skins, nicknames });
+      formationsBySeat[mySeat] = positions;
+      client.sendSetup({ seat: mySeat, composition, skins, nicknames, positions });
       if (isOwner) pushConfig(); // ensure the final framing is out
       tryStart();
     };
 
-    cb.onRemoteSetup = ({ seat, composition, skins, nicknames }) => {
+    cb.onRemoteSetup = ({ seat, composition, skins, nicknames, positions }) => {
       if (!seat) return;
       compositionsBySeat[seat] = Array.isArray(composition) ? composition : [...DEFAULT_SQUAD];
       skinsBySeat[seat] = Array.isArray(skins) ? skins : [null, null, null, null];
       nicknamesBySeat[seat] = Array.isArray(nicknames) ? nicknames : [null, null, null, null];
+      formationsBySeat[seat] = Array.isArray(positions) ? positions : null;
       tryStart();
     };
 
@@ -697,10 +708,12 @@ export function createOnlineFlow({ onStartMatch }) {
     const squads = {};
     const skins = {};
     const nicknames = {};
+    const formations = {};
     for (let seat = 1; seat <= count; seat += 1) {
       squads[seat] = compositionsBySeat[seat];
       skins[seat] = skinsBySeat[seat] ?? [null, null, null, null];
       nicknames[seat] = nicknamesBySeat[seat] ?? [null, null, null, null];
+      formations[seat] = formationsBySeat[seat] ?? null;
     }
 
     const format = matchTypeConfig().format;
@@ -713,6 +726,7 @@ export function createOnlineFlow({ onStartMatch }) {
       squads,
       skins,
       nicknames,
+      formations,
       playerCount: count,
       format,
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
@@ -728,6 +742,7 @@ export function createOnlineFlow({ onStartMatch }) {
     draft = null;
     draftMembersKey = "";
     localFormationOrder = null;
+    localFormationPositions = null;
     formationPromptOpen = false;
     squadPicker.setLocked(false);
     lockBtn.textContent = "Lock Squad";
@@ -739,6 +754,7 @@ export function createOnlineFlow({ onStartMatch }) {
     for (const key of Object.keys(compositionsBySeat)) delete compositionsBySeat[key];
     for (const key of Object.keys(skinsBySeat)) delete skinsBySeat[key];
     for (const key of Object.keys(nicknamesBySeat)) delete nicknamesBySeat[key];
+    for (const key of Object.keys(formationsBySeat)) delete formationsBySeat[key];
     roomCodeEl.hidden = true;
   }
 

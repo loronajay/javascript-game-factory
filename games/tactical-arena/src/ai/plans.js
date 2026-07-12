@@ -25,7 +25,7 @@
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
-import { getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
+import { canMoveAndUseArts, getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -870,7 +870,7 @@ function placementCandidates(state, unit, art, ai) {
 function artPrimaryKeepsActivationOpen(unit, primary) {
   if (primary?.kind !== "art") return false;
   const art = getArt(unit.type, primary.artId);
-  return Boolean(!art?.bonusActionGroup && getRageEffectValue(unit, "moveAndUseArts", false));
+  return Boolean(!art?.bonusActionGroup && canMoveAndUseArts(unit));
 }
 
 function makePlan(unit, { bonus = null, moveTo = null, movePhase = null, primary }) {

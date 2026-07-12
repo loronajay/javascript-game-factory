@@ -1,4 +1,9 @@
 import { createBattleState } from "../core/state.js";
+import {
+  DEFAULT_DEPLOYMENT_POSITIONS,
+  deploymentPositionToBoard,
+  normalizeDeploymentPositions
+} from "../core/deployment.js";
 import { nextRandom } from "../core/rng.js";
 import { getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
@@ -31,31 +36,15 @@ export function hpRemaining(state, player) {
     .reduce((sum, u) => sum + Math.max(0, u.hp), 0);
 }
 
-// Map squad compositions onto the four-cell corner spawn blocks. The first two
-// slots preserve the original 2v2 staging, and the extra pair fills the block.
-export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }), skins = null, nicknames = null) {
-  const slotsForCorner = (corner) => {
-    const max = size - 1;
-    const coords = [
-      { cx: 0, cy: max },
-      { cx: max, cy: 0 },
-      { cx: 0, cy: 0 },
-      { cx: max, cy: max },
-    ][corner] ?? { cx: 0, cy: max };
-    const inwardX = coords.cx === 0 ? 1 : -1;
-    const inwardY = coords.cy === 0 ? 1 : -1;
-    return [
-      { x: coords.cx + inwardX, y: coords.cy },
-      { x: coords.cx, y: coords.cy + inwardY },
-      { x: coords.cx, y: coords.cy },
-      { x: coords.cx + inwardX, y: coords.cy + inwardY }
-    ];
-  };
-  const CORNER_CELL = 2; // positions[2] is the very corner cell ({cx,cy})
+// Map squad compositions onto each player's local deployment zone. Formation
+// positions are local offsets from that player's home corner toward board center,
+// then mirrored into the correct battle corner.
+export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }), skins = null, nicknames = null, formations = null) {
+  const HOME_TILE = DEFAULT_DEPLOYMENT_POSITIONS[2]; // {0,0}, the far corner cell.
   const units = [];
   for (const slot of players) {
-    const positions = slotsForCorner(slot.corner);
-    const squad = (squads[slot.id] ?? []).slice(0, positions.length);
+    const squad = (squads[slot.id] ?? []).slice(0, 4);
+    const localPositions = normalizeDeploymentPositions(formations?.[slot.id], squad.length);
     const skinLoadout = normalizeSkinLoadout(squad, skins?.[slot.id]);
     // Nicknames are the device owner's personal labels for THEIR OWN units, so the
     // local-preference default (see nicknameModel.js) only rides onto player 1 — the
@@ -67,15 +56,17 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
     const nicknameLoadout =
       nicknames?.[slot.id] ??
       (slot.id === 1 ? squad.map((type) => getNicknamePref(type)) : squad.map(() => null));
-    // Every unit keeps its natural index cell, EXCEPT the King ("always in the far
-    // corner"): he swaps onto positions[2] with whoever held it. King-less squads are
-    // untouched (no swap), so the original spawn layout is preserved exactly.
-    const cells = squad.map((_, i) => positions[i]);
+    // Every unit keeps its chosen tile, EXCEPT the King ("always in the far
+    // corner"): he swaps onto the home tile with whoever held it, or moves there
+    // directly if the player left the corner unused.
     const kingSlot = squad.findIndex((type) => getUnitType(type).actsFirst);
-    if (kingSlot >= 0 && kingSlot !== CORNER_CELL && cells[CORNER_CELL]) {
-      [cells[kingSlot], cells[CORNER_CELL]] = [cells[CORNER_CELL], cells[kingSlot]];
+    const homeSlot = localPositions.findIndex((pos) => pos.x === HOME_TILE.x && pos.y === HOME_TILE.y);
+    if (kingSlot >= 0 && kingSlot !== homeSlot) {
+      if (homeSlot >= 0) [localPositions[kingSlot], localPositions[homeSlot]] = [localPositions[homeSlot], localPositions[kingSlot]];
+      else localPositions[kingSlot] = HOME_TILE;
     }
     squad.forEach((type, i) => {
+      const cell = deploymentPositionToBoard(size, slot.corner, localPositions[i]);
       units.push({
         id: `p${slot.id}-${i}-${type}`,
         player: slot.id,
@@ -83,8 +74,8 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
         type,
         skin: skinLoadout[i] ?? null,
         nickname: nicknameLoadout[i] ?? null,
-        x: cells[i].x,
-        y: cells[i].y
+        x: cell.x,
+        y: cell.y
       });
     });
   }
@@ -100,7 +91,8 @@ export function createMatchState({
   teamColors = null,
   teamNames = null,
   skins = null,
-  nicknames = null
+  nicknames = null,
+  formations = null
 } = {}) {
   const players = createRoster({ playerCount, format, teamColors });
   const state = createBattleState({
@@ -111,7 +103,7 @@ export function createMatchState({
     format,
     teamColors,
     teamNames,
-    units: squads ? buildRoster(squads, size, players, skins, nicknames) : undefined,
+    units: squads ? buildRoster(squads, size, players, skins, nicknames, formations) : undefined,
   });
   const flip = nextRandom(state.rngState);
   const turnOrder = state.turnOrder ?? players.map((slot) => slot.id);

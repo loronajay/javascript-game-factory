@@ -593,6 +593,10 @@ function riotCopLine(index, text) {
   return { ...RIOT_COP_LINES[index], text };
 }
 
+function narration(text, extra = {}) {
+  return { narration: true, side: "left", text, ...extra };
+}
+
 function volunteerType(selectedSquad) {
   return (Array.isArray(selectedSquad) ? selectedSquad : []).find((type) => UNIT_TYPE_KEYS.includes(type)) ?? "swordsman";
 }
@@ -610,8 +614,7 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
         text: "I have heard the void magic say the same thing about Treant." },
       { speaker: "swordsman", side: "left",
         text: "It might be a trap!" },
-      { speaker: "gargoyle", skin: "void-dweller", side: "right", player: 2,
-        text: "*A giant inferno blazes over the land.*" },
+      narration("A giant inferno blazes over the land."),
       { speaker: "mystic", side: "left",
         text: "The snow... all of it is gone. Nothing but embers and flames." },
       { speaker: "swordsman", side: "left",
@@ -650,8 +653,7 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
     return [
       { speaker: "swordsman", side: "left",
         text: "Is anyone there?" },
-      { speaker: "mother-nature", side: "right", player: 2,
-        text: "*A gust of wind answers through the branches.*" },
+      narration("A gust of wind answers through the branches."),
       { speaker: "mystic", side: "left",
         text: "That was not ordinary wind. Something is awake here." },
       { speaker: "archer", side: "left",
@@ -812,11 +814,11 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
       fat("fat-cleric", "Wherever we stop, I hope they have food. Real food. A whole cart of it, ideally."),
       fat("fat-wizard", "*hic* — has anyone... has anyone seen my staff? It was RIGHT here. It had a little... a little pointy bit."),
       fat("fat-knight", "Wait. New faces. You lot — where are you headed in such a hurry?"),
-      { speaker: "swordsman", side: "left", text: "The castle. We have business with the king." },
+      { speaker: "swordsman", side: "left", text: "The castle. The rumor says the king has a sorcerer helping him drag the void into the world, and every road is starting to point that way." },
       fat("fat-knight", "*straightens up* Oh no you're not. WE have a beef to settle with that king. You'll wait your turn."),
       { speaker: "mystic", side: "left", text: "A beef? What on earth did the king do to you four?" },
-      fat("fat-wizard", "*hic* Banished us! Framed us for a terrible, TERRIBLE crime we did not commit. And the worst part is we're not even from this ti--"),
-      fat("fat-knight", "That's ENOUGH out of you. *ahem.* The point is, there is no way you reach that castle before we do. Not a chance."),
+      fat("fat-wizard", "*hic* Banished us! Framed us for a terrible, TERRIBLE crime we did not commit."),
+      fat("fat-knight", "That's ENOUGH. *ahem.* The point is, there is no way you reach that castle before we do. Not a chance."),
       { speaker: "swordsman", side: "left", text: "We'll see about that." },
     ];
   }
@@ -827,7 +829,7 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
       { speaker: "swordsman", side: "left",
         text: "Wanderers, and yet you have the whole road blocked." },
       { ...WANDERING_LINE, type: "mystic", name: "Wandering Mystic",
-        text: "Only for a moment. The road is long and dull. How about a friendly bout to pass the time? Four of us, four of you." },
+        text: "Only for a moment. The road is long, the weather is strange, and everyone could use proof their blades still answer. Four of us, four of you." },
       { ...WANDERING_LINE, type: "archer", name: "Wandering Archer",
         text: "Win, and we will gift you one of the costumes we have gathered on our travels. A little souvenir of the meeting." },
       { speaker: "swordsman", side: "left",
@@ -838,11 +840,11 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
     return [
       {
         speaker: "swordsman",
-        text: "That is not a cave. That is a doorway pretending to be a crack in the rocks.",
+        text: "That is not a cave. That is a doorway pretending to be a crack in the rocks, right where the northern road bends off the map.",
       },
       {
         speaker: "mystic",
-        text: "Old ruins, small entrance, warm air coming out. Wonderful signs, all of them.",
+        text: "Old ruins, small entrance, warm air coming out. The trail keeps offering invitations that feel like warnings.",
       },
       {
         speaker: "archer",
@@ -858,7 +860,7 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
   return [
     {
       speaker: "paladin",
-      text: "Well met. I have been walking this map alone, and the road is better with a worthy party beside you.",
+      text: "Well met. The road north is filling with frightened travelers and rumors of a royal sorcerer. It is better with a worthy party beside you.",
     },
     {
       speaker: "swordsman",
@@ -3302,7 +3304,7 @@ export function roninDefeatScript() {
     {
       speaker: "swordsman",
       side: "left",
-      text: "The king. He has inflicted enough wrongs on the people, and we mean to make him answer for them.",
+      text: "The king. The rumor says a sorcerer serves him and the void follows after. Too many wrongs are being done in his name, and we mean to find out why.",
     },
     {
       speaker: "mystic",
@@ -3343,7 +3345,7 @@ export function wrongPlaceMissionOpeningScript(state) {
     },
     {
       speakerId: speaker.id,
-      text: "We are not involved. We are chasing someone, but we did not burn anything down.",
+      text: "We are not involved. We are chasing a lead about a sorcerer, but we did not burn anything down.",
     },
     {
       speakerId: riotCopUnit(state, 2)?.id,
@@ -3358,7 +3360,7 @@ export function wrongPlaceDefeatScript() {
     riotCopLine(0, "All right. Shields down. I am sorry -- I jumped to conclusions back there."),
     { speaker: "mystic", side: "left", text: "A small amount of conclusions. A whole sprint, perhaps." },
     riotCopLine(0, "Dispatch said it was some drunk guy in a wizard costume. Burned a building down trying to kill a mosquito, then fled the scene."),
-    { speaker: "magician", side: "left", text: "That is exactly the party we are after." },
+    { speaker: "magician", side: "left", text: "A wizard in the wreckage... that sounds like the same trail we are following." },
     riotCopLine(0, "You are hunting the arsonist too? Then let me come along. John joins you, and I bring justice to the mosquito maniac."),
     { speaker: "swordsman", side: "left", text: "Fine. But if you arrest us again, you carry the bags." },
   ];

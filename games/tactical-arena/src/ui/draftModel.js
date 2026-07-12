@@ -1,4 +1,4 @@
-import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
+import { UNIT_TYPE_KEYS, isUnitUnlocked, normalizeDeploymentPositions } from "./squadModel.js";
 import { normalizeSkinSlug } from "./skinModel.js";
 import { sanitizeNickname, getNicknamePref } from "./nicknameModel.js";
 
@@ -69,14 +69,16 @@ function normalizedFormationOrder(order, length) {
   return normalized;
 }
 
-export function arrangeDraftLoadout(draft, seat, order = null) {
+export function arrangeDraftLoadout(draft, seat, formation = null) {
   const picks = [...(draft?.picks?.[seat] ?? [])].slice(0, 4);
   const skins = [...(draft?.skins?.[seat] ?? [])].slice(0, picks.length);
   const nicknames = [...(draft?.nicknames?.[seat] ?? [])].slice(0, picks.length);
+  const order = Array.isArray(formation) ? formation : formation?.order;
   const formationOrder = normalizedFormationOrder(order, picks.length);
   return {
     composition: formationOrder.map((index) => picks[index]),
     skins: formationOrder.map((index) => normalizeSkinSlug(picks[index], skins[index] ?? null)),
     nicknames: formationOrder.map((index) => nicknames[index] ?? null),
+    positions: normalizeDeploymentPositions(Array.isArray(formation) ? null : formation?.positions, formationOrder.length),
   };
 }

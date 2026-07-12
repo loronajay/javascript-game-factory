@@ -1,4 +1,5 @@
 import { getInitialMp, getUnitType, initialAbilityUses } from "./unitCatalog.js";
+import { deploymentSlots } from "./deployment.js";
 import { createRngState } from "./rng.js";
 import { createRoster, FORMATS, playerColor } from "./roster.js";
 import { normalizeWeatherSpec } from "./weather.js";
@@ -116,26 +117,8 @@ const DEFAULT_ROSTER = [
   { id: "magician", type: "magician" }
 ];
 
-const CORNERS = Object.freeze([
-  Object.freeze({ cx: 0, cy: 1 }),
-  Object.freeze({ cx: 1, cy: 0 }),
-  Object.freeze({ cx: 0, cy: 0 }),
-  Object.freeze({ cx: 1, cy: 1 }),
-]);
-
 function spawnSlots(size, cornerIndex) {
-  const max = size - 1;
-  const corner = CORNERS[cornerIndex] ?? CORNERS[0];
-  const cx = corner.cx === 0 ? 0 : max;
-  const cy = corner.cy === 0 ? 0 : max;
-  const inwardX = cx === 0 ? 1 : -1;
-  const inwardY = cy === 0 ? 1 : -1;
-  return [
-    { x: cx + inwardX, y: cy },
-    { x: cx, y: cy + inwardY },
-    { x: cx, y: cy },
-    { x: cx + inwardX, y: cy + inwardY }
-  ];
+  return deploymentSlots(size, cornerIndex);
 }
 
 function defaultRoster(size, players = createRoster()) {
