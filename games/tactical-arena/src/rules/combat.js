@@ -1,10 +1,10 @@
-import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
+import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherAffinityMagicBonus, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
 import { areAllies, areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
 import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
-import { damageTypeImmunities } from "./statuses.js";
+import { damageTypeImmunities, isInvulnerable } from "./statuses.js";
 
 // True when an attacker's shot ignores intervening obstacles entirely — the
 // Sniper's Rifle Powered passive (pierces both bodies AND Build Cover walls). Read
@@ -171,16 +171,30 @@ export function isDamageTypeImmune(unit, damageType) {
 }
 
 export function finalizeMagicDamage({ attacker, target, state = null, rawDamage, damageAffinity = null, art = null }) {
+  // Petrify (Treant): an invulnerable statue takes no damage of any kind.
+  if (isInvulnerable(target)) return 0;
+  const fireBased = isFireBasedDamage({ damageAffinity, art });
   const immune = isDamageTypeImmune(target, "magic") ||
     isDamageTypeImmuneByStance(target, "magic") ||
     // Riot Cop's Riot Shield: a DEFENDING unit nullifies ALL magic damage aimed at it.
     negatesMagicWhileDefending(target) ||
-    (isFireBasedDamage({ damageAffinity, art }) && isFireDamageImmune(target));
+    (fireBased && isFireDamageImmune(target));
   if (immune) return 0;
   const reduced = Math.max(0, rawDamage - getTeamDamageReduction(target, state, "magic"));
+  // Enchanted Roots (Treant): +1 damage taken from fire-based abilities.
+  const fireVulnerability = fireBased ? getFireVulnerability(target) : 0;
   return reduced > 0
-    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker)
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker) + getWeatherAffinityMagicBonus(attacker, state) + fireVulnerability
     : reduced;
+}
+
+// Enchanted Roots (Treant): flat extra damage a unit takes from fire-based abilities and
+// fire-tile ticks. Read off passive data so no rule hard-codes the unit; scans every
+// passive source. 0 for any unit without the rider.
+export function getFireVulnerability(unit) {
+  let bonus = 0;
+  for (const effect of passiveEffects(unit)) bonus += Math.max(0, Number(effect.fireVulnerability) || 0);
+  return bonus;
 }
 
 function getWeatherMagicDamageBonus(attacker) {
@@ -487,7 +501,8 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
     return resolvePhysicalStrike(attacker, target, { proximity, critical, state, basicAttack });
   }
   if (damageType === "true") {
-    const damage = Math.max(0, getEffectiveStats(attacker, state).strength);
+    // Petrify (Treant): true damage still can't touch an invulnerable statue.
+    const damage = isInvulnerable(target) ? 0 : Math.max(0, getEffectiveStats(attacker, state).strength);
     return {
       type: "true",
       base: damage,
@@ -529,7 +544,7 @@ export function resolveFixedPhysicalStrike(attacker, target, amount, { critical 
     type: "physical",
     critical: effectiveCritical
   });
-  let damage = negatesPhysicalWhileDefending(target) ? 0 : result.damage;
+  let damage = (negatesPhysicalWhileDefending(target) || isInvulnerable(target)) ? 0 : result.damage;
   if (effectiveCritical && damage > 0) damage += getWeatherCritDamageBonus(state);
   return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
 }
@@ -591,8 +606,9 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   }
   // Rock Hard (Clod): a defending target negates physical damage entirely — applied
   // absolutely last so no bonus/floor can leak through, and honestly (the forecast
-  // resolves through here too, so it shows 0 against a braced Clod).
-  if (negatesPhysicalWhileDefending(target)) damage = 0;
+  // resolves through here too, so it shows 0 against a braced Clod). Petrify (Treant): an
+  // invulnerable statue negates all damage the same way.
+  if (negatesPhysicalWhileDefending(target) || isInvulnerable(target)) damage = 0;
   return { ...result, critical: effectiveCritical, proximityBonus, rangeDamageBonus, adjacentDamageBonus, tileStrikeBonus, damage };
 }
 

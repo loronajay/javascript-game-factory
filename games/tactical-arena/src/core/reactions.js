@@ -10,8 +10,34 @@ import { areAllies, areEnemies, findUnit, teamOfUnit } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { isHealingDisabled } from "../rules/combat.js";
 import { restoreHp, restoreMp } from "./combatEffects.js";
-import { applyStatus } from "../rules/statuses.js";
+import { applyStatus, isNegativeStatus } from "../rules/statuses.js";
 import { resolveVictory } from "./turnEngine.js";
+
+// --- Treant reaction helpers ------------------------------------------------
+// The Verdant Bond buff-share config (radius) for a unit that carries the passive, or null.
+function buffShareConfig(unit) {
+  const definition = getUnitType(unit.type);
+  for (const source of [definition.passive, ...definition.arts]) {
+    if (source?.effect?.type === "buffShare") return { radius: Math.max(0, Number(source.effect.radius) || 0) };
+  }
+  return null;
+}
+
+// The Ether config (the stat block banked on MP recovery) for a unit, or null.
+function mpRecoveryBuffConfig(unit) {
+  const definition = getUnitType(unit.type);
+  for (const source of [definition.passive, ...definition.arts]) {
+    if (source?.effect?.type === "mpRecoveryBuff") return source.effect.stats ?? {};
+  }
+  return null;
+}
+
+// A stat buff worth sharing: a non-negative status carrying at least one positive stat mod
+// (empowered, etc.). Negative statuses (slow, etc.) and pure markers never share.
+function isShareableBuff(status) {
+  if (isNegativeStatus(status) || !status?.statModifiers) return false;
+  return Object.values(status.statModifiers).some((value) => Number(value) > 0);
+}
 
 function oneShotRageEffect(unit) {
   const definition = getUnitType(unit.type);
@@ -48,10 +74,64 @@ export function consumeOneShotRage(unit) {
 
 export function applyPostCommandReactions(prevState, next, events, hooks) {
   applySpreadReactions(prevState, next, events);
+  applyBuffShareReactions(prevState, next, events);
+  applyEtherReactions(prevState, next, events);
   applyNemesisThresholdReactions(prevState, next, events, hooks);
   applyOneShotRageTransitions(prevState, next, events);
   applyRageEntryEffects(prevState, next, events, hooks);
   applyCommanderReactions(prevState, next, events);
+}
+
+// Verdant Bond (Treant): a positive stat-buff STATUS newly landed on an ally within a
+// Treant's radius also lands on the Treant. Diff-based, one hop (a buff the Treant just
+// picked up is not itself re-shared), mirroring applySpreadReactions.
+function applyBuffShareReactions(prevState, next, events) {
+  if (next.phase !== "playing") return;
+  const treants = next.units
+    .map((unit) => ({ unit, config: unit.hp > 0 ? buffShareConfig(unit) : null }))
+    .filter((entry) => entry.config);
+  if (!treants.length) return;
+
+  const before = new Map(prevState.units.map((unit) =>
+    [unit.id, new Set((unit.statuses ?? []).map((status) => status.type))]));
+
+  const newlyBuffed = [];
+  for (const unit of next.units) {
+    if (unit.hp <= 0) continue;
+    const had = before.get(unit.id) ?? new Set();
+    for (const status of unit.statuses ?? []) {
+      if (!had.has(status.type) && isShareableBuff(status)) newlyBuffed.push({ unit, status });
+    }
+  }
+
+  for (const { unit, status } of newlyBuffed) {
+    for (const { unit: treant, config } of treants) {
+      if (treant.id === unit.id || treant.hp <= 0 || !areAllies(treant, unit)) continue;
+      if (chebyshevDistance(treant.position, unit.position) > config.radius) continue;
+      const applied = applyStatus(treant, { ...status, ignoreResistance: true });
+      if (applied.applied) {
+        treant.statuses = applied.statuses;
+        events.push({ type: "BUFF_SHARED", sourceUnitId: unit.id, treantId: treant.id, status: status.type });
+      }
+    }
+  }
+}
+
+// Ether (Treant): whenever the Treant's MP goes UP as a result of a command, bank his
+// mpRecoveryBuff stat block onto `etherCharged`; beginActivation applies it as a one-turn
+// empowered buff at his next turn (the Rain-haste pattern). Diff-based against the input MP.
+function applyEtherReactions(prevState, next, events) {
+  if (next.phase !== "playing") return;
+  const beforeMp = new Map(prevState.units.map((unit) => [unit.id, unit.mp]));
+  for (const unit of next.units) {
+    if (unit.hp <= 0) continue;
+    const stats = mpRecoveryBuffConfig(unit);
+    if (!stats) continue;
+    const prev = beforeMp.get(unit.id);
+    if (!Number.isFinite(prev) || unit.mp <= prev) continue;
+    unit.etherCharged = { ...stats };
+    events.push({ type: "ETHER_CHARGED", unitId: unit.id });
+  }
 }
 
 function nemesisThresholdBand(hp) {

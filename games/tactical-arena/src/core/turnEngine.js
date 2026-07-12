@@ -1,12 +1,12 @@
-import { getUnitType, sustainsVictory, takesTurns } from "./unitCatalog.js";
-import { areEnemies, findUnit, livingUnits, teamOfUnit, unitAt } from "./state.js";
+import { getUnitType, getWeatherAffinityRestore, sustainsVictory, takesTurns } from "./unitCatalog.js";
+import { areAllies, areEnemies, findUnit, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
-import { isFireDamageImmune } from "../rules/combat.js";
+import { getFireVulnerability, isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
-import { isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { isInvulnerable, isPetrified, isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { drawValue } from "./rng.js";
 import { finishTempoActivation, isTempoBattle } from "./tempoBattle.js";
-import { restoreMp } from "./combatEffects.js";
+import { restoreHp, restoreMp } from "./combatEffects.js";
 
 const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 const FIRE_DAMAGE = 1;
@@ -74,7 +74,18 @@ function appendPendingRolloverEvents(state, events) {
 function autoSpendStunnedUnits(state, player) {
   const events = [];
   for (const member of livingUnits(state, player)) {
-    if (!takesTurns(member) || member.spent || !isStunned(member)) continue;
+    if (!takesTurns(member) || member.spent) continue;
+    // Petrify (Treant): a petrified statue takes no action, but each of its own turns it
+    // pulses the restore/drain aura and counts down toward waking. Handled before the stun
+    // check so a petrified unit is never also processed as merely stunned.
+    if (isPetrified(member)) {
+      member.defending = false;
+      member.statuses = tickStatuses(member.statuses); // the permanent petrified marker survives
+      applyPetrifyTurn(state, member, events);
+      member.spent = true;
+      continue;
+    }
+    if (!isStunned(member)) continue;
 
     member.defending = false;
     if (getUnitType(member.type).actsFirst) member.commandTurn = state.turnNumber;
@@ -86,20 +97,98 @@ function autoSpendStunnedUnits(state, player) {
   return events;
 }
 
+// The petrify config a raging Treant declared on its rage art. Read live so the numbers
+// stay in the unit definition.
+function petrifyConfig(unit) {
+  return getUnitType(unit.type).rageArt?.petrify ?? null;
+}
+
+// One petrified turn: restore HP/MP to the statue and to allies within radius, drain HP/MP
+// from enemies within radius, then count down and wake the unit when the timer expires.
+function applyPetrifyTurn(state, unit, events) {
+  const cfg = petrifyConfig(unit);
+  if (!cfg) { unit.statuses = (unit.statuses ?? []).filter((s) => s.type !== "petrified"); return; }
+  const radius = Math.max(0, Number(cfg.radius) || 0);
+
+  const beforeHp = unit.hp;
+  const beforeMp = unit.mp;
+  restoreHp(state, unit, unit, cfg.selfRestore?.hp ?? 0);
+  restoreMp(state, unit, unit, cfg.selfRestore?.mp ?? 0);
+
+  const alliesHealed = [];
+  const enemiesDrained = [];
+  for (const other of livingUnits(state)) {
+    if (other.id === unit.id) continue;
+    if (chebyshevDistance(unit.position, other.position) > radius) continue;
+    if (areAllies(other, unit)) {
+      const b = other.hp + other.mp;
+      restoreHp(state, unit, other, cfg.allyRestore?.hp ?? 0);
+      restoreMp(state, unit, other, cfg.allyRestore?.mp ?? 0);
+      if (other.hp + other.mp > b) alliesHealed.push(other.id);
+    } else if (areEnemies(other, unit) && !isInvulnerable(other)) {
+      const dh = Math.min(other.hp, Math.max(0, Number(cfg.enemyDrain?.hp) || 0));
+      const dm = Math.min(other.mp, Math.max(0, Number(cfg.enemyDrain?.mp) || 0));
+      other.hp = Math.max(0, other.hp - dh);
+      other.mp = Math.max(0, other.mp - dm);
+      if (dh > 0 || dm > 0) enemiesDrained.push(other.id);
+    }
+  }
+
+  const remaining = (Number.isFinite(unit.petrified) ? unit.petrified : (cfg.turns ?? 1)) - 1;
+  if (remaining <= 0) {
+    unit.statuses = (unit.statuses ?? []).filter((s) => s.type !== "petrified");
+    delete unit.petrified;
+  } else {
+    unit.petrified = remaining;
+  }
+  events.push({
+    type: "PETRIFY_PULSE",
+    unitId: unit.id,
+    hpRestored: unit.hp - beforeHp,
+    mpRestored: unit.mp - beforeMp,
+    alliesHealed,
+    enemiesDrained,
+    woke: remaining <= 0
+  });
+  resolveVictory(state);
+}
+
 function applySquadTurnChargeStatuses(state, player) {
   const events = [];
   for (const member of livingUnits(state, player)) {
+    // Petrify (Treant): an invulnerable statue shrugs off poison/DOT ticks too.
+    if (isInvulnerable(member)) continue;
     events.push(...resolveTurnStartStatuses(member));
   }
   if (events.length) resolveVictory(state);
   return events;
 }
 
+// Enchanted Roots (Treant): a weather-attuned unit restores HP/MP each turn rollover while
+// the matching weather holds (Rain → +1 HP). Data-first off the weatherAffinity passive, so
+// a no-op for every unit without it.
+function applyWeatherAffinityRegen(state, events) {
+  for (const unit of livingUnits(state)) {
+    if (isInvulnerable(unit)) continue;
+    const restore = getWeatherAffinityRestore(unit, state);
+    if (restore.hp <= 0 && restore.mp <= 0) continue;
+    const before = unit.hp + unit.mp;
+    restoreHp(state, unit, unit, restore.hp);
+    restoreMp(state, unit, unit, restore.mp);
+    if (unit.hp + unit.mp > before) {
+      events.push({ type: "WEATHER_REGEN", unitId: unit.id, hpRestored: restore.hp, mpRestored: restore.mp });
+    }
+  }
+}
+
 function releaseStunLoopGuard(state) {
   const unitIds = [];
   for (const member of livingUnits(state, state.currentPlayer)) {
     if (!takesTurns(member)) continue;
-    member.statuses = (member.statuses ?? []).filter((status) => status.type !== "stun");
+    // A safety valve for a pathological all-incapacitated board: release both stun and
+    // petrify so the turn can resolve.
+    member.statuses = (member.statuses ?? []).filter((status) => status.type !== "stun" && status.type !== "petrified");
+    if (Number.isFinite(member.petrified)) delete member.petrified;
     member.spent = false;
     unitIds.push(member.id);
   }
@@ -152,6 +241,7 @@ function advanceTurnIfExhausted(state) {
     applyAutoStrikeTick(state, fireEvents);
     applyRandomFireTick(state, fireEvents);
     applyWeatherCycleTick(state, fireEvents);
+    applyWeatherAffinityRegen(state, fireEvents);
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
@@ -166,9 +256,11 @@ function applyFireTick(state, events) {
     if (obj.kind !== "fire") continue;
     const [x, y] = key.split(",").map(Number);
     const occupant = unitAt(state, { x, y });
-    if (occupant && !isFireDamageImmune(occupant)) {
-      const dealt = Math.min(occupant.hp, FIRE_DAMAGE);
-      occupant.hp = Math.max(0, occupant.hp - FIRE_DAMAGE);
+    if (occupant && !isFireDamageImmune(occupant) && !isInvulnerable(occupant)) {
+      // Enchanted Roots (Treant): +fireVulnerability extra damage from a fire-tile tick.
+      const amount = FIRE_DAMAGE + getFireVulnerability(occupant);
+      const dealt = Math.min(occupant.hp, amount);
+      occupant.hp = Math.max(0, occupant.hp - amount);
       if (dealt > 0) events.push({ type: "FIRE_DAMAGE", unitId: occupant.id, position: { x, y }, damage: dealt });
     }
     if (obj.permanent) continue;

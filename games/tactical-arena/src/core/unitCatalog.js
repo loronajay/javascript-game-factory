@@ -30,6 +30,7 @@ import { RONIN } from "./units/ronin.js";
 import { MOTHER_NATURE } from "./units/mother-nature.js";
 import { SUMMONER } from "./units/summoner.js";
 import { RIOT_COP } from "./units/riot-cop.js";
+import { TREANT } from "./units/treant.js";
 import { drawValue } from "./rng.js";
 import { areAllies, areEnemies } from "./state.js";
 import { WEATHER_TYPES, normalizeWeatherSpec } from "./weather.js";
@@ -64,7 +65,8 @@ export const UNIT_TYPES = Object.freeze({
   ronin: RONIN,
   "mother-nature": MOTHER_NATURE,
   summoner: SUMMONER,
-  "riot-cop": RIOT_COP
+  "riot-cop": RIOT_COP,
+  treant: TREANT
 });
 
 // Local Chebyshev so this module stays free of a rules/movement.js import
@@ -465,6 +467,59 @@ function getWeatherArtMpCostReduction(state) {
   };
 }
 
+// --- Treant (Enchanted Roots + Deep Roots) ----------------------------------
+// The active weather's per-weather block for a unit that carries a weatherAffinity
+// passive (the Treant's Enchanted Roots), or null. Read off the board-wide weather so
+// a mission weather cycle or a Mother Nature cast both drive it.
+function weatherAffinityBlock(unit, state) {
+  const effect = getUnitType(unit.type).passive?.effect;
+  if (effect?.type !== "weatherAffinity") return null;
+  const weather = getActiveWeather(state);
+  return weather ? effect.weathers?.[weather.id] ?? null : null;
+}
+
+// Enchanted Roots: the current weather's flat stat bonus (Snow +1 DEF, Fire +2 STR/−1
+// DEF). Folded into getEffectiveStats. {} when there is no weather or no matching block.
+function weatherAffinityStats(unit, state) {
+  return weatherAffinityBlock(unit, state)?.stats ?? {};
+}
+
+// Enchanted Roots (Thunderstorm): +1 magic damage the Treant DEALS while a storm holds.
+// Read attacker-side by finalizeMagicDamage (rules/combat.js).
+export function getWeatherAffinityMagicBonus(attacker, state) {
+  return Math.max(0, Number(weatherAffinityBlock(attacker, state)?.magicDamage) || 0);
+}
+
+// Enchanted Roots (Rain): the HP/MP a weather-attuned unit restores each turn rollover.
+// Ticked by turnEngine.js. { hp, mp } (zeros when the weather has no regen).
+export function getWeatherAffinityRestore(unit, state) {
+  const restore = weatherAffinityBlock(unit, state)?.restorePerTurn ?? {};
+  return { hp: Math.max(0, Number(restore.hp) || 0), mp: Math.max(0, Number(restore.mp) || 0) };
+}
+
+// Deep Roots (positionalDefense): +DEF while every living enemy sits inside the unit's
+// BASE attack range, +DEF while every OTHER living ally does (a "keep the squad close"
+// reward, so a lone unit with no team earns nothing from the ally half). Uses base
+// attackRange to stay non-recursive inside getEffectiveStats. {} when no set qualifies.
+function positionalDefenseStats(unit, state) {
+  const effect = getUnitType(unit.type).arts?.find((art) => art.effect?.type === "positionalDefense")?.effect ??
+    (getUnitType(unit.type).passive?.effect?.type === "positionalDefense" ? getUnitType(unit.type).passive.effect : null);
+  if (!effect || !state?.units) return {};
+  const radius = getUnitType(unit.type).stats.attackRange;
+  const inRange = (other) => chebyshev(unit.position, other.position) <= radius;
+  const enemies = state.units.filter((other) => other.hp > 0 && areEnemies(other, unit));
+  const allies = state.units.filter((other) => other.hp > 0 && other.id !== unit.id && areAllies(other, unit));
+  const totals = {};
+  const add = (stats) => {
+    for (const [name, value] of Object.entries(stats ?? {})) {
+      if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
+    }
+  };
+  if (enemies.length && enemies.every(inRange)) add(effect.enemyStats);
+  if (allies.length && allies.every(inRange)) add(effect.allyStats);
+  return totals;
+}
+
 // The Chebyshev radius an enemy-debuff aura currently reaches from `source`. An
 // aura extends one tile further while its OWNER rages: a Ghoul has no rage of its
 // own, so it borrows its summoner's rage state — a raging Necromancer widens both
@@ -671,6 +726,13 @@ export function getEffectiveStats(unit, state = null) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(enemyAuraStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  // Treant: Enchanted Roots (current-weather stat bonus) + Deep Roots (positional DEF).
+  for (const [name, value] of Object.entries(weatherAffinityStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  for (const [name, value] of Object.entries(positionalDefenseStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(linkedStatModTotals(unit, state))) {

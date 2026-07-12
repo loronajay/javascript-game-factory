@@ -219,6 +219,16 @@ export function buffAlliesValue(state, caster, art) {
   const allies = livingUnits(state, caster.player);
   const enemies = livingUnits(state).filter((unit) => areEnemies(caster, unit));
 
+  // Petrify (Treant RAGE): a self-preservation ultimate — worth reaching for while raging
+  // (low HP) with enemies on the board. The invulnerable turtle + the restore/drain aura is
+  // valued as a couple of hits saved, scaled up when there are enemies adjacent to drain.
+  if (art.selfProtect) {
+    if (!isRaging(caster) || !enemies.length) return 0;
+    const radius = Math.max(0, Number(art.petrify?.radius) || 0);
+    const drained = enemies.filter((enemy) => chebyshevDistance(caster.position, enemy.position) <= radius).length;
+    return HIT_BASELINE * 2 + drained * 2;
+  }
+
   // Fire Dance: +1 STR to the team for a turn — worth ~1 landed hit's worth of extra
   // damage for each unit that can actually reach an enemy next turn (the Witch Doctor
   // included, via the Fire Stance it enters).

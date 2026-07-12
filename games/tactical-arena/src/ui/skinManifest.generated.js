@@ -955,5 +955,35 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "riot-cop",
     slug: "transylvanian-guard",
     file: "transylvanian-guard-riot-cop.png"
+  },
+  {
+    type: "treant",
+    slug: "summer-vibes",
+    file: "summer-vibes-treant.png"
+  },
+  {
+    type: "treant",
+    slug: "arcane",
+    file: "arcane-treant.png"
+  },
+  {
+    type: "treant",
+    slug: "blood-moon",
+    file: "blood-moon-treant.png"
+  },
+  {
+    type: "treant",
+    slug: "rotting",
+    file: "rotting-treant.png"
+  },
+  {
+    type: "treant",
+    slug: "sapling",
+    file: "sapling-treant.png"
+  },
+  {
+    type: "treant",
+    slug: "voidroot",
+    file: "voidroot-treant.png"
   }
 ]);

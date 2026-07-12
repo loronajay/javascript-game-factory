@@ -25,6 +25,7 @@ export const WANDERING_PARTY_MISSION_ID = "wandering-party";
 export const MINER_MISSION_ID = "dug-your-own-grave";
 export const HASBEEN_HEROES_MISSION_ID = "hasbeen-heroes";
 export const RONIN_MISSION_ID = "battle-for-the-bridge";
+export const WRONG_PLACE_MISSION_ID = "wrong-place-wrong-time";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -278,6 +279,22 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 9,
     fullHp: true,
   },
+  [WRONG_PLACE_MISSION_ID]: {
+    id: WRONG_PLACE_MISSION_ID,
+    title: "Wrong Place, Wrong Time",
+    subtitle: "A burned-out town street, four riot shields, one bad assumption",
+    description: "Your starter party is caught near a crime scene and forced into a 7x7 rage duel with four Riot Cops. Everyone is already seeing red, so control the stun guns and set up the Magician's nuke fast.",
+    unitType: "riot-cop",
+    requiredStars: 26,
+    rewardUnits: Object.freeze(["riot-cop"]),
+    playerSlots: 4,
+    defaultSquad: Object.freeze([...DEFAULT_SQUAD]),
+    squadLocked: true,
+    enemySquad: Object.freeze(["riot-cop", "riot-cop", "riot-cop", "riot-cop"]),
+    enemySkins: Object.freeze([null, "swat-team", "firefighter", "street-patrol"]),
+    enemyNicknames: Object.freeze(["John", "Mara", "Brock", "Sunny"]),
+    size: 7,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -331,7 +348,7 @@ const CAMPAIGN_TRAIL = [
   { id: HASBEEN_HEROES_MISSION_ID, cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "town", locationName: "Highmarket" },
   { id: RONIN_MISSION_ID, cell: { col: 0, row: 3 }, point: { x: 55.7, y: 72.5 }, region: "wood", locationName: "Thornhollow Bridge",
     blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
-  { id: "uncharted-15", cell: { col: 0, row: 2 }, point: { x: 71.2, y: 78.9 }, region: "frost", locationName: "Frostcrown Foothills",
+  { id: WRONG_PLACE_MISSION_ID, cell: { col: 0, row: 2 }, point: { x: 64.2, y: 78.9 }, region: "town", locationName: "Frostcrown Foothills",
     blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
   { id: "uncharted-16", cell: { col: 1, row: 2 }, point: { x: 84.5, y: 86.4 }, region: "frost", locationName: "Rimefang Pass",
     blurb: "A knife-edge pass walled by ice. Cover shatters; nowhere stays safe for long." },
@@ -476,12 +493,31 @@ export function resetCampaignProgress(storage = defaultStorage()) {
 // declared directly on each line (side/player/name too) since these cutscenes play on the
 // overworld map with no live match units to read a skin off of.
 const WANDERING_LINE = Object.freeze({ skin: "wandering", side: "right", player: 2 });
+const RIOT_COP_LINES = Object.freeze([
+  Object.freeze({ speaker: "riot-cop", type: "riot-cop", name: "John", skin: null, side: "right", player: 2 }),
+  Object.freeze({ speaker: "riot-cop", type: "riot-cop", name: "Mara", skin: "swat-team", side: "right", player: 2 }),
+  Object.freeze({ speaker: "riot-cop", type: "riot-cop", name: "Brock", skin: "firefighter", side: "right", player: 2 }),
+  Object.freeze({ speaker: "riot-cop", type: "riot-cop", name: "Sunny", skin: "street-patrol", side: "right", player: 2 }),
+]);
+
+function riotCopLine(index, text) {
+  return { ...RIOT_COP_LINES[index], text };
+}
 
 function volunteerType(selectedSquad) {
   return (Array.isArray(selectedSquad) ? selectedSquad : []).find((type) => UNIT_TYPE_KEYS.includes(type)) ?? "swordsman";
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  if (missionId === WRONG_PLACE_MISSION_ID) {
+    return [
+      riotCopLine(0, "You there -- halt!"),
+      { speaker: "mystic", side: "left", text: "Us?" },
+      riotCopLine(1, "Do not move. You are under arrest!"),
+      { speaker: "swordsman", side: "left", text: "Under arrest for what? We just got here." },
+      riotCopLine(2, "Tell it to the station after you drop the weapons."),
+    ];
+  }
   if (missionId === RONIN_MISSION_ID) {
     const type = volunteerType(selectedSquad);
     const name = getNicknamePref(type) ?? getUnitType(type).name;
@@ -670,6 +706,7 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === WRONG_PLACE_MISSION_ID) return wrongPlaceDefeatScript();
   if (missionId === RONIN_MISSION_ID) return roninDefeatScript();
   if (missionId === HASBEEN_HEROES_MISSION_ID) {
     // The fat squad has trudged off; the party lingers in town. The Mystic pitches a
@@ -852,6 +889,7 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     // back onto the normalized squad's slot order here for buildRoster.
     skins: {
       1: playerSquad.map((type) => selectedSkins?.[type] ?? null),
+      2: mission.enemySkins ? [...mission.enemySkins] : mission.enemySquad.map(() => null),
     },
     // The enemy squad is scripted, not a real local player — it must never inherit
     // the player's own local nickname preferences (buildRoster's default fallback
@@ -859,7 +897,7 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     // nickname as the player's own Swordsman).
     nicknames: {
       1: playerSquad.map((type) => getNicknamePref(type)),
-      2: mission.enemySquad.map(() => null),
+      2: mission.enemyNicknames ? [...mission.enemyNicknames] : mission.enemySquad.map(() => null),
     },
     teamNames: {
       1: "Player Vanguard",
@@ -871,6 +909,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Buried Claim"
         : mission.id === RONIN_MISSION_ID
         ? "Island Protector"
+        : mission.id === WRONG_PLACE_MISSION_ID
+        ? "Riot Detail"
         : mission.id === SNIPER_MISSION_ID
         ? "The High Guard"
         : mission.id === FATHER_TIME_MISSION_ID
@@ -1307,6 +1347,16 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
       },
     }),
   },
+  [WRONG_PLACE_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    hpFor: () => 5,
+    skinFor: (unit) => (
+      unit.player === 2 && unit.type === "riot-cop"
+        ? [null, "swat-team", "firefighter", "street-patrol"][Number(unit.id.match(/^p2-(\d+)-/)?.[1]) || 0] ?? null
+        : unit.skin ?? null
+    ),
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -1561,6 +1611,23 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       roninBlindApplied,
       roninEnteredRage,
       draftedSwordsman,
+    };
+  } else if (missionId === WRONG_PLACE_MISSION_ID) {
+    const wrongPlacePlayerStunned = Boolean(meta.wrongPlacePlayerStunned) ||
+      playerUnits.some((unit) => unit.statuses?.some((status) => status.type === "stun"));
+    const wrongPlaceNukedAllEnemies = Boolean(meta.wrongPlaceNukedAllEnemies);
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "survive", label: "Keep all party members alive", earned: allSurvived },
+      { id: "noStun", label: "Avoid stun status", earned: victory && !wrongPlacePlayerStunned },
+    ];
+    bonusObjectives = [
+      { id: "nukeAll", label: "Bonus: hit every enemy with Magician's Nuke", earned: victory && wrongPlaceNukedAllEnemies },
+    ];
+    extra = {
+      wrongPlacePlayerStunned,
+      wrongPlaceNukedAllEnemies,
+      riotCopsDefeated: enemyUnits.filter((unit) => unit.type === "riot-cop" && unit.hp <= 0).length,
     };
   } else if (missionId === SNIPER_MISSION_ID) {
     const wallDestroyedCount = Math.max(0, Math.floor(Number(meta.wallDestroyedCount) || 0));
@@ -2573,9 +2640,56 @@ export function roninDefeatScript() {
   ];
 }
 
+// --- Mission 14: Wrong Place, Wrong Time dialogue ----------------------------
+// Four same-type enemies need stable character names, so both their live unit
+// nicknames (battle) and explicit overworld `name` fields (map cutscenes) introduce
+// John and the rest of the riot detail without changing the base unit name.
+
+function riotCopUnit(state, index) {
+  return findUnit(state, `p2-${index}-riot-cop`);
+}
+
+export function wrongPlaceMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: riotCopUnit(state, 0)?.id,
+      name: "John",
+      text: "We saw a guy in a wizard outfit fleeing the scene. You lot must be with the criminals.",
+    },
+    {
+      speakerId: riotCopUnit(state, 1)?.id,
+      name: "Mara",
+      text: "Look at them. Sword, bow, robes, wand. Definitely involved.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "We are not involved. We are chasing someone, but we did not burn anything down.",
+    },
+    {
+      speakerId: riotCopUnit(state, 2)?.id,
+      name: "Brock",
+      text: "Shut it and prepare to be arrested.",
+    },
+  ];
+}
+
+export function wrongPlaceDefeatScript() {
+  return [
+    riotCopLine(0, "All right. Shields down. I am sorry -- I jumped to conclusions back there."),
+    { speaker: "mystic", side: "left", text: "A small amount of conclusions. A whole sprint, perhaps." },
+    riotCopLine(0, "Dispatch said it was some drunk guy in a wizard costume. Burned a building down trying to kill a mosquito, then fled the scene."),
+    { speaker: "magician", side: "left", text: "That is exactly the party we are after." },
+    riotCopLine(0, "You are hunting the arsonist too? Then let me come along. John joins you, and I bring justice to the mosquito maniac."),
+    { speaker: "swordsman", side: "left", text: "Fine. But if you arrest us again, you carry the bags." },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === WRONG_PLACE_MISSION_ID) return wrongPlaceMissionOpeningScript(state);
   if (missionId === RONIN_MISSION_ID) return roninMissionOpeningScript(state);
   if (missionId === HASBEEN_HEROES_MISSION_ID) return hasbeenHeroesMissionOpeningScript(state);
   if (missionId === MINER_MISSION_ID) return minerMissionOpeningScript(state);

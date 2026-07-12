@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
-import { getActiveWeather, getUnitType } from "../src/core/unitCatalog.js";
+import { getActiveWeather, getUnitType, isRaging } from "../src/core/unitCatalog.js";
 import { findUnit } from "../src/core/state.js";
 import { resolveVictory } from "../src/core/turnEngine.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
@@ -25,6 +25,7 @@ import {
   WANDERING_PARTY_MISSION_ID,
   WANDERING_PARTY_SKIN_PACK,
   WITCH_DOCTOR_MISSION_ID,
+  WRONG_PLACE_MISSION_ID,
   applyLockedSlots,
   brothersDefeatScript,
   brothersMissionOpeningScript,
@@ -61,6 +62,8 @@ import {
   roninDefeatScript,
   roninMissionOpeningScript,
   roninRageWarningScript,
+  wrongPlaceDefeatScript,
+  wrongPlaceMissionOpeningScript,
   monkMissionOpeningScript,
   necromancerMissionOpeningScript,
   necromancerRageWarningScript,
@@ -2397,6 +2400,139 @@ test("completing Battle for the Bridge unlocks the Ronin, records stars, and gat
   markCampaignPostMatchCutsceneSeen(storage, RONIN_MISSION_ID);
   assert.equal(shouldShowCampaignPostMatchCutscene(storage, RONIN_MISSION_ID), false);
   assert.equal(shouldShowCampaignMapCutscene(storage, RONIN_MISSION_ID), true);
+});
+
+// --- Wrong Place, Wrong Time (mission 14) -----------------------------------
+
+function wrongPlaceMatchState(squad = STARTER_FOUR) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(WRONG_PLACE_MISSION_ID, squad)),
+    WRONG_PLACE_MISSION_ID,
+  );
+}
+
+function wrongPlaceWonState(base = wrongPlaceMatchState(), { survive = true } = {}) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => {
+      if (unit.player === 2) return { ...unit, hp: 0 };
+      if (!survive && unit.id === "p1-1-archer") return { ...unit, hp: 0 };
+      return { ...unit, hp: Math.max(1, unit.hp) };
+    }),
+  };
+}
+
+test("Wrong Place, Wrong Time promotes Frostcrown Foothills into a town riot-cop mission", () => {
+  const mission = getCampaignMission(WRONG_PLACE_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.title, "Wrong Place, Wrong Time");
+  assert.equal(mission.locationName, "Frostcrown Foothills");
+  assert.equal(mission.region, "town");
+  assert.equal(mission.requiredStars, 26);
+  assert.equal(mission.playerSlots, 4);
+  assert.equal(mission.squadLocked, true);
+  assert.deepEqual(mission.defaultSquad, STARTER_FOUR);
+  assert.deepEqual(mission.rewardUnits, ["riot-cop"]);
+
+  const node = getCampaignMap(storageAdapter()).nodes.find((n) => n.id === WRONG_PLACE_MISSION_ID);
+  assert.ok(node);
+  assert.equal(node.biome, "town");
+  assert.equal(node.displayType, null, "locked mission keeps its unit hidden");
+  assert.equal(node.point.x < 66, true, "the old foothills marker is nudged left onto the painted node");
+});
+
+test("Wrong Place, Wrong Time locks the starter squad into a 7x7 rage duel vs named riot cops", () => {
+  const config = createCampaignMatchConfig(WRONG_PLACE_MISSION_ID, ["paladin", "ronin", "miner", "clod"]);
+  assert.equal(config.size, 7);
+  assert.deepEqual(config.squads[1], STARTER_FOUR);
+  assert.deepEqual(config.squads[2], ["riot-cop", "riot-cop", "riot-cop", "riot-cop"]);
+  assert.deepEqual(config.skins[2], [null, "swat-team", "firefighter", "street-patrol"]);
+  assert.deepEqual(config.nicknames[2], ["John", "Mara", "Brock", "Sunny"]);
+  assert.equal(config.teamNames[2], "Riot Detail");
+
+  const match = wrongPlaceMatchState(["paladin", "ronin", "miner", "clod"]);
+  assert.deepEqual(findUnit(match, "p1-0-swordsman").position, { x: 1, y: 6 });
+  assert.deepEqual(findUnit(match, "p1-1-archer").position, { x: 0, y: 5 });
+  assert.deepEqual(findUnit(match, "p1-2-mystic").position, { x: 0, y: 6 });
+  assert.deepEqual(findUnit(match, "p1-3-magician").position, { x: 1, y: 5 });
+  assert.deepEqual(findUnit(match, "p2-0-riot-cop").position, { x: 5, y: 0 });
+  assert.deepEqual(findUnit(match, "p2-3-riot-cop").position, { x: 5, y: 1 });
+
+  for (const unit of match.units) {
+    assert.equal(unit.hp, 5, `${unit.id} starts at rage HP`);
+    assert.equal(isRaging(unit), true, `${unit.id} is raging`);
+  }
+  assert.equal(findUnit(match, "p2-0-riot-cop").nickname, "John");
+  assert.equal(findUnit(match, "p2-0-riot-cop").skin, null);
+  assert.equal(findUnit(match, "p2-1-riot-cop").skin, "swat-team");
+  assert.equal(findUnit(match, "p2-2-riot-cop").skin, "firefighter");
+  assert.equal(findUnit(match, "p2-3-riot-cop").skin, "street-patrol");
+});
+
+test("Wrong Place, Wrong Time grading tracks win, survival, no stun, and Magician nuke bonus", () => {
+  const won = wrongPlaceWonState();
+
+  const perfect = evaluateCampaignMission(WRONG_PLACE_MISSION_ID, won, {
+    wrongPlacePlayerStunned: false,
+    wrongPlaceNukedAllEnemies: true,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "survive", "noStun"]);
+  assert.equal(perfect.bonusObjectives[0].id, "nukeAll");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const stunned = evaluateCampaignMission(WRONG_PLACE_MISSION_ID, won, {
+    wrongPlacePlayerStunned: true,
+    wrongPlaceNukedAllEnemies: false,
+  });
+  assert.equal(stunned.stars, 2);
+  assert.equal(stunned.objectives.find((objective) => objective.id === "noStun").earned, false);
+
+  const oneDown = evaluateCampaignMission(WRONG_PLACE_MISSION_ID, wrongPlaceWonState(undefined, { survive: false }), {
+    wrongPlacePlayerStunned: false,
+    wrongPlaceNukedAllEnemies: false,
+  });
+  assert.equal(oneDown.stars, 2);
+});
+
+test("Wrong Place, Wrong Time cutscenes and battle dialogue use named riot cops", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, WRONG_PLACE_MISSION_ID), true);
+  const preBrief = campaignMapCutsceneScript(WRONG_PLACE_MISSION_ID);
+  assert.match(preBrief.map((line) => line.text).join(" "), /halt|under arrest|us\?/i);
+  assert.ok(preBrief.some((line) => line.name === "John" && line.speaker === "riot-cop"));
+
+  markCampaignMapCutsceneSeen(storage, WRONG_PLACE_MISSION_ID);
+  assert.equal(shouldShowCampaignMapCutscene(storage, WRONG_PLACE_MISSION_ID), false);
+  assert.equal(shouldShowCampaignPostMatchCutscene(storage, WRONG_PLACE_MISSION_ID), true);
+
+  const state = wrongPlaceMatchState();
+  const opening = wrongPlaceMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(WRONG_PLACE_MISSION_ID, state), opening);
+  assert.match(opening.map((line) => line.text).join(" "), /wizard outfit|criminals|shut it|arrested/i);
+  assert.ok(opening.some((line) => line.name === "John" || line.speakerId === "p2-0-riot-cop"));
+
+  const post = campaignPostMatchCutsceneScript(WRONG_PLACE_MISSION_ID);
+  assert.deepEqual(post, wrongPlaceDefeatScript());
+  assert.match(post.map((line) => line.text).join(" "), /John|wizard costume|mosquito|justice|arsonist/i);
+});
+
+test("completing Wrong Place, Wrong Time unlocks Riot Cop and records stars", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, WRONG_PLACE_MISSION_ID, wrongPlaceWonState(), {
+    wrongPlacePlayerStunned: false,
+    wrongPlaceNukedAllEnemies: true,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["riot-cop"]);
+  assert.equal(isUnitUnlocked("riot-cop", storage), true);
+  assert.equal(readCampaignProgressStars(storage, WRONG_PLACE_MISSION_ID), 3);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

@@ -50,6 +50,7 @@ import {
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
+  WRONG_PLACE_MISSION_ID,
   applyMonkTrialIntroBeat,
   campaignMapCutsceneScript,
   campaignOpeningScript,
@@ -282,6 +283,9 @@ function createCampaignMeta() {
     roninRageWarningShown: false,
     roninBlindApplied: false,
     roninEnteredRage: false,
+    // Wrong Place, Wrong Time (mission 14)
+    wrongPlacePlayerStunned: false,
+    wrongPlaceNukedAllEnemies: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -1067,6 +1071,34 @@ function recordCampaignProgressHooks(command, result) {
       unit.player === 1 && unit.statuses?.some((status) => status.type === "blind"))) {
       campaignMeta.roninBlindApplied = true;
     }
+  } else if (campaignMissionId === WRONG_PLACE_MISSION_ID) {
+    const playerStunned = events.some((event) => {
+      const targetIds = [
+        event.targetId,
+        ...(event.targetIds ?? []),
+        ...(event.statusTargets ?? []),
+        ...(event.stunnedIds ?? []),
+      ].filter(Boolean);
+      const appliedStun =
+        event.appliedStatus === "stun" ||
+        event.effect?.status === "stun" ||
+        event.status === "stun" ||
+        event.stunned === true;
+      return appliedStun && targetIds.some((id) => findUnit(state, id)?.player === 1);
+    });
+    if (playerStunned || state.units.some((unit) =>
+      unit.player === 1 && unit.statuses?.some((status) => status.type === "stun"))) {
+      campaignMeta.wrongPlacePlayerStunned = true;
+    }
+    for (const event of events) {
+      if (event.type !== "ART_RESOLVED" || event.artId !== "nuke") continue;
+      const actor = findUnit(state, event.actorId);
+      if (actor?.player !== 1 || actor.type !== "magician") continue;
+      const enemyIds = state.units.filter((unit) => unit.player === 2 && unit.type === "riot-cop").map((unit) => unit.id);
+      if (enemyIds.length > 0 && enemyIds.every((id) => (event.targetIds ?? []).includes(id))) {
+        campaignMeta.wrongPlaceNukedAllEnemies = true;
+      }
+    }
   } else if (campaignMissionId === BROTHERS_MISSION_ID) {
     // Latch the "kill before RAGE" star fail the moment either brother sits at RAGE
     // threshold (<=5 HP) while still alive (mirrors the Gargoyle/Miner rage latch).
@@ -1742,14 +1774,20 @@ async function resolveCombat(command) {
           }
         }
         if (art?.effect?.type === "heal" && rolled.effect?.attempted) {
+          // Soul Sap (Treant) drinks MP instead of HP (effect.restore === "mp").
+          const drinksMp = art.effect.restore === "mp";
           await revealRoll(
             { missed: !rolled.effect.applied, critical: false },
-            rolled.effect.applied ? "HEALED" : "NO HEAL",
+            rolled.effect.applied ? (drinksMp ? "DRAINED" : "HEALED") : (drinksMp ? "NO DRAIN" : "NO HEAL"),
             attackerBefore
           );
           if (rolled.effect.applied) {
             await effects.playAbilityVfx(rolled.artId, { actor: attackerBefore, target: targetBefore, effect: rolled.effect });
-            if (rolled.effect.healing > 0) await effects.floatText(unitCenter(metrics, attackerBefore), `+${rolled.effect.healing}`, "#8cf0a4");
+            if (drinksMp) {
+              if (rolled.effect.mpRestored > 0) await effects.floatText(unitCenter(metrics, attackerBefore), `+${rolled.effect.mpRestored} MP`, "#8cc8ff");
+            } else if (rolled.effect.healing > 0) {
+              await effects.floatText(unitCenter(metrics, attackerBefore), `+${rolled.effect.healing}`, "#8cf0a4");
+            }
           }
         }
       }
@@ -2203,6 +2241,30 @@ async function resolveInstantArt(command) {
     const recipient = findUnit(result.nextState, resolved.recipientId) ?? actorBefore;
     if (resolved.mpRestored > 0) await effects.floatText(unitCenter(metrics, recipient), `+${resolved.mpRestored} MP`, "#7fd0ff");
     else if (resolved.hpHealed > 0) await effects.floatText(unitCenter(metrics, recipient), `+${resolved.hpHealed}`, "#8cf0a4");
+  } else if (resolved?.artId === "enrich" && actorBefore) {
+    // Treant pours power into an ally: MP (or HP if the ally was already full MP).
+    const metrics = createBoardMetrics(state.size);
+    const targetBefore = targetsBefore[0];
+    await effects.playAbilityVfx("enrich", { actor: actorBefore, target: targetBefore, targets: targetBefore ? [targetBefore] : [] });
+    for (const [id, amount] of Object.entries(resolved.restoredByTarget ?? {})) {
+      const unit = findUnit(state, id);
+      if (unit && amount > 0) await effects.floatText(unitCenter(metrics, unit), `+${amount} MP`, "#8cc8ff");
+    }
+    for (const [id, amount] of Object.entries(resolved.healingByTarget ?? {})) {
+      const unit = findUnit(state, id);
+      if (unit && amount > 0) await effects.floatText(unitCenter(metrics, unit), `+${amount}`, "#8cf0a4");
+    }
+  } else if (resolved?.artId === "source-shift" && actorBefore) {
+    // The Treant's HP and MP pools swap in a shimmer; float the new totals.
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("source-shift", { actor: actorBefore, targets: [actorBefore] });
+    await effects.floatText(unitCenter(metrics, actorBefore), "SOURCE SHIFT", "#a0e0c0");
+  } else if (resolved?.artId === "petrify" && actorBefore) {
+    // The grove-guardian roots into an invulnerable stone statue.
+    const metrics = createBoardMetrics(state.size);
+    await effects.playAbilityVfx("petrify", { actor: actorBefore, targets: [actorBefore] });
+    effects.shake(8);
+    await effects.floatText(unitCenter(metrics, actorBefore), "PETRIFY", "#d8c9a8");
   } else if (resolved?.artId === "polarity-shift" && actorBefore) {
     const metrics = createBoardMetrics(state.size);
     await effects.playAbilityVfx("polarity-shift", { actor: actorBefore, targets: [actorBefore] });
@@ -2970,7 +3032,7 @@ function playAttackImpactSound(rolled, ranged) {
   if (rolled.defended) { audio.play("defendedHit"); return; }
   if (rolled.artId === "spark")  { audio.play("spark");  return; }
   if (rolled.artId === "banish") { audio.play("banish"); return; }
-  if (rolled.effect?.applied && rolled.artId === "life-sap") audio.play("lifeSap");
+  if (rolled.effect?.applied && (rolled.artId === "life-sap" || rolled.artId === "soul-sap")) audio.play("lifeSap");
   audio.play(ranged ? "arrowHit" : "attackHit");
 }
 
@@ -3024,6 +3086,7 @@ function playEventSounds(events) {
           artId === "blizzard" || artId === "spring-shower" || artId === "heatwave" ||
           artId === "landscaper" || artId === "thunderstorm" || artId === "great-flood" ||
           artId === "patient-blade" || artId === "broken-oath" || artId === "challenge" ||
+          artId === "enrich" || artId === "source-shift" || artId === "petrify" ||
           artId === "strike" || artId === "hold" || artId === "pursue" || artId === "higher-ground") continue;
       const ranged = findUnit(state, event.actorId)?.type === "archer";
       if (event.healingByTarget) audio.play("heal");
@@ -3066,9 +3129,14 @@ function playRolloverFx(events) {
   const recoils = events.filter((e) => e.type === "ATTACK_RECOIL");
   const critMpRestores = events.filter((e) => e.type === "CRIT_MP_RESTORE");
   const ghostDissipations = events.filter((e) => e.type === "GHOST_DISSIPATED");
+  // Treant: the Petrify statue's per-turn restore/drain aura, and Enchanted Roots' weather
+  // regen (Rain heal), both fired at the rollover.
+  const petrifyPulses = events.filter((e) => e.type === "PETRIFY_PULSE");
+  const weatherRegens = events.filter((e) => e.type === "WEATHER_REGEN");
   if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
       !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length &&
-      !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length && !ghostDissipations.length) return;
+      !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length && !ghostDissipations.length &&
+      !petrifyPulses.length && !weatherRegens.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
 
@@ -3143,6 +3211,35 @@ function playRolloverFx(events) {
     const center = unitCenter(metrics, unit);
     if (restore.mpGained > 0) effects.floatText(center, `+${restore.mpGained} MP`, "#7fd0ff");
     else if (restore.hpRestored > 0) effects.floatText(center, `+${restore.hpRestored}`, "#8cf0a4");
+  }
+
+  // Enchanted Roots (Treant): a small green regen tick over each weather-attuned unit.
+  for (const regen of weatherRegens) {
+    const unit = findUnit(state, regen.unitId);
+    if (!unit) continue;
+    if (regen.hpRestored > 0) effects.floatText(unitCenter(metrics, unit), `+${regen.hpRestored}`, "#8cf0a4");
+    else if (regen.mpRestored > 0) effects.floatText(unitCenter(metrics, unit), `+${regen.mpRestored} MP`, "#8cc8ff");
+  }
+
+  // Petrify (Treant): the statue restores itself + allies within 2 and drains enemies within 2.
+  for (const pulse of petrifyPulses) {
+    const statue = findUnit(state, pulse.unitId);
+    if (statue && (pulse.hpRestored > 0 || pulse.mpRestored > 0)) {
+      const parts = [];
+      if (pulse.hpRestored > 0) parts.push(`+${pulse.hpRestored}`);
+      if (pulse.mpRestored > 0) parts.push(`+${pulse.mpRestored} MP`);
+      effects.floatText(unitCenter(metrics, statue), parts.join(" "), "#c9e6b0");
+    }
+    for (const id of pulse.alliesHealed ?? []) {
+      const ally = findUnit(state, id);
+      if (ally) effects.floatText(unitCenter(metrics, ally), "+", "#8cf0a4");
+    }
+    for (const id of pulse.enemiesDrained ?? []) {
+      const enemy = findUnit(state, id);
+      const center = unitCenter(metrics, enemy ?? { position: { x: 0, y: 0 } });
+      effects.floatText(center, "DRAIN", "#c48fbf");
+      if (!enemy || enemy.hp <= 0) { effects.deathBurst(center, teamColor(enemy?.player ?? 1)); killed = true; }
+    }
   }
 
   if (bites.length) audio.play("attackHit");
@@ -3662,6 +3759,19 @@ async function handleTile(position) {
     } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "smoke-bomb-riot", { targetPosition: position }))) {
       mode = null;
       setMessage("Smoke Bomb thrown. This unit's activation is complete.");
+    }
+  } else if (mode === "art:enrich") {
+    // Treant's Enrich: click a highlighted ally in range to pour MP (or HP) into (never self).
+    const target = unitAt(state, position);
+    const art = getArt(unit.type, "enrich");
+    const reach = art?.targeting?.range ?? getEffectiveStats(unit, state).attackRange;
+    const inReach = target && target.id !== unit.id && areAllies(unit, target) &&
+      chebyshevDistance(unit.position, target.position) <= reach;
+    if (!inReach) {
+      setMessage("Enrich: click a highlighted ally in range (not yourself).", true);
+    } else if (await resolveInstantArt(useArt(state.currentPlayer, unit.id, "enrich", { targetId: target.id }))) {
+      mode = null;
+      setMessage("Enrich resolved. This unit's activation is complete.");
     }
   } else if (mode === "art:cover") {
     // Riot Cop's Cover: click an adjacent ally to swap with (never yourself).

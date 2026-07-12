@@ -5,7 +5,7 @@ import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from 
 import { getConeCells } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, getAttackRecoil, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
-import { applyStatus, isStunned } from "../rules/statuses.js";
+import { applyStatus, isPetrified, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
 import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } from "./commandValidation.js";
@@ -59,7 +59,9 @@ function beginActivation(state, command) {
   // summon can never open an activation even if some path clears its spent flag.
   // Stun is auto-spent at turn refresh, and this guard keeps hand-built states from
   // opening an action panel for a stunned unit.
-  if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit)) return reject(ERR.UNIT_SPENT);
+  // Petrify (Treant): a petrified statue cannot open an activation — it auto-spends each
+  // of its turns (turnEngine.js) until it wakes.
+  if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit) || isPetrified(result.unit)) return reject(ERR.UNIT_SPENT);
   if (state.activation?.summonerId && state.activation.unitId !== result.unit.id) return reject(ERR.ACTIVATION_ALREADY_OPEN);
   if (state.activation && state.activation.unitId !== result.unit.id &&
       (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
@@ -107,6 +109,13 @@ function beginActivation(state, command) {
     const hasted = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { moveRange: unit.weatherMoveCharged } });
     if (hasted.applied) unit.statuses = hasted.statuses;
     unit.weatherMoveCharged = 0;
+  }
+  // Ether (Treant): a banked +stat buff from recovering MP last turn lands now, for this
+  // whole activation (the Rain-haste pattern above).
+  if (unit.etherCharged) {
+    const empowered = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { ...unit.etherCharged } });
+    if (empowered.applied) unit.statuses = empowered.statuses;
+    unit.etherCharged = null;
   }
   next.activation = {
     unitId: unit.id,
@@ -358,7 +367,13 @@ function attack(state, command) {
     rockHardEvents.push(...applyRockHardDefense(next, targetUnit, basicDamageType === "physical"));
     const onHit = rageAttackStatus ?? (swing.critical ? critStatus : null);
     if (onHit && targetUnit.hp > 0) {
-      const applied = applyStatus(targetUnit, { type: onHit.status, duration: onHit.duration });
+      // Carry statModifiers when the crit-status is a stat debuff (Treant's Verdant Bond
+      // slow = −1 MOVE); blind/poison riders have none.
+      const applied = applyStatus(targetUnit, {
+        type: onHit.status,
+        duration: onHit.duration,
+        ...(onHit.statModifiers ? { statModifiers: { ...onHit.statModifiers } } : {})
+      });
       if (applied.applied) {
         targetUnit.statuses = applied.statuses;
         blinded.push(targetUnit.id);

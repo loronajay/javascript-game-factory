@@ -98,6 +98,8 @@ export const BOARD_SPRITES = Object.freeze({
   // Riot Cop base art is the user-provided default Riot Cop PNG (see portraits.js);
   // inherits the approximate box/scale via PORTRAITS["riot-cop"].
   "riot-cop": sprite("riot-cop"),
+  // Rooted grove-guardian; inherits the approximate box/scale via PORTRAITS.treant.
+  treant: sprite("treant"),
   // Hunched/crouched — its full-canvas height under-reads its size, so a pure
   // normalize would blow it up to a swordsman's height. Hold it a touch smaller.
   ghoul:       sprite("ghoul", { scale: 0.82 })

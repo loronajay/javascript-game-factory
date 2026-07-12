@@ -369,6 +369,13 @@ const STATUS_ICON_BUILDERS = {
       svgElement("path", { class: "ic-boot", d: "M -5 -6 L -1.2 -6 L -1.2 1.4 L 4.8 1.4 Q 7 1.4 7 3.8 L 7 6 L -5 6 Z" }),
       svgElement("path", { class: "ic-down", d: "M 2.6 -7 L 2.6 -1.4 M 0.4 -3.4 L 2.6 -1.4 L 4.8 -3.4" })
     );
+  },
+  // Petrify (Treant): a chunky faceted rock.
+  petrified(g) {
+    g.append(
+      svgElement("path", { class: "ic-rock", d: "M -6 2.4 L -3.4 -5 L 3 -6 L 6.4 -0.6 L 4 5.6 L -3.6 6 Z" }),
+      svgElement("path", { class: "ic-rock-facet", d: "M -3.4 -5 L 0.6 -0.4 L 6.4 -0.6 M 0.6 -0.4 L -3.6 6" })
+    );
   }
 };
 

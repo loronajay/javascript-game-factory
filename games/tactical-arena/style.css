@@ -402,6 +402,7 @@ body.tutorial-spotlight-mp .dialogue-layer {
 .status-icon .ic-lens { fill:#14131a; stroke:var(--status); stroke-width:1.2; }.status-icon .ic-bridge,.status-icon .ic-temple { fill:none; stroke:var(--status); stroke-width:1.4; }
 /* slow — a boot with a down arrow */
 .status-icon .ic-boot { fill:var(--status); stroke:rgba(8,24,44,.7); stroke-width:.7; }.status-icon .ic-down { fill:none; stroke:#eaf4ff; stroke-width:1.4; }
+.status-icon .ic-rock { fill:var(--status); stroke:rgba(30,22,10,.75); stroke-width:.7; }.status-icon .ic-rock-facet { fill:none; stroke:rgba(20,15,8,.6); stroke-width:.9; }
 /* Persistent stance badge (Witch Doctor's "Dancing Man") — sits lower than the
    transient status stack and holds steady instead of floating, so it reads as a
    fixed emblem of "this is currently his passive" rather than a wearing-off buff. */

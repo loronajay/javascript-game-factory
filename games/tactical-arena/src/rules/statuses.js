@@ -65,6 +65,20 @@ function isStunDuration(duration) {
   return Number.isFinite(value) && value > 0;
 }
 
+// Petrify (Treant RAGE): a self-applied status that makes the unit both invulnerable and
+// unable to act for a fixed number of its own turns (the countdown lives on
+// `unit.petrified`, driven by turnEngine.js's auto-spend). The status itself is the marker
+// every predicate reads.
+export function isPetrified(unit) {
+  return (unit?.statuses ?? []).some((status) => status.type === "petrified");
+}
+
+// True when a unit currently takes no damage from any source (Petrify). Read centrally by
+// the strike resolvers (rules/combat.js) and the rollover ticks (turnEngine.js).
+export function isInvulnerable(unit) {
+  return isPetrified(unit);
+}
+
 export function isStunned(unit) {
   return (unit.statuses ?? []).some((status) => {
     if (status.type !== "stun") return false;

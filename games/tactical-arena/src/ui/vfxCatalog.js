@@ -3,7 +3,9 @@ const STATUS_VFX = Object.freeze({
   slow: Object.freeze({ type: "slow", label: "SLW", color: "#70b7ff", glow: "#244c80", ring: "drag" }),
   blind: Object.freeze({ type: "blind", label: "BLD", color: "#f0d77a", glow: "#705f1e", ring: "blink" }),
   silence: Object.freeze({ type: "silence", label: "SIL", color: "#c89cff", glow: "#553276", ring: "mute" }),
-  stun: Object.freeze({ type: "stun", label: "STN", color: "#ffe45e", glow: "#7a6310", ring: "jolt" })
+  stun: Object.freeze({ type: "stun", label: "STN", color: "#ffe45e", glow: "#7a6310", ring: "jolt" }),
+  // Petrify (Treant): the invulnerable-statue marker badge.
+  petrified: Object.freeze({ type: "petrified", label: "PET", color: "#b9a88a", glow: "#4a3d2a", ring: "stone" })
 });
 
 // Witch Doctor stances — the "Dancing Man" passive. Each stance gets a persistent
@@ -133,6 +135,45 @@ const ABILITY_VFX = Object.freeze({
     // motes travel it, and the drinker pulses as the stolen life lands.
     tether: true,
     colors: Object.freeze({ core: "#8cf0a4", trail: "#3fbf86", impact: "#d8ffd6" })
+  }),
+  // Soul Sap (Treant): a Life Sap clone recolored blue — it drinks MP instead of HP.
+  "soul-sap": Object.freeze({
+    type: "drain",
+    soundKey: "lifeSap",
+    particleCount: 18,
+    durationMs: 680,
+    staggerMs: 18,
+    curveHeight: 54,
+    tether: true,
+    colors: Object.freeze({ core: "#8cc8ff", trail: "#3f7fd0", impact: "#d6ecff" })
+  }),
+  // Enrich (Treant): a verdant power stream that pours HP/MP into an ally.
+  enrich: Object.freeze({
+    type: "healPulse",
+    soundKey: "recharge",
+    particleCount: 10,
+    radius: 28,
+    durationMs: 520,
+    colors: Object.freeze({ core: "#9be86b", trail: "#3f8a3a", impact: "#e6ffcf" })
+  }),
+  // Source Shift (Treant): a self shimmer as the HP/MP pools swap.
+  "source-shift": Object.freeze({
+    type: "healPulse",
+    soundKey: "recharge",
+    particleCount: 10,
+    radius: 30,
+    durationMs: 520,
+    colors: Object.freeze({ core: "#a0e0c0", trail: "#3f8a70", impact: "#e0fff0" })
+  }),
+  // Petrify (Treant RAGE): the grove-guardian roots into an invulnerable stone statue.
+  petrify: Object.freeze({
+    type: "magicBurst",
+    soundKey: "recharge",
+    shake: 8,
+    particleCount: 20,
+    radius: 46,
+    durationMs: 640,
+    colors: Object.freeze({ core: "#b9a88a", trail: "#5a4a34", impact: "#e8ddc8" })
   }),
   "poison-arrow": Object.freeze({
     type: "statusStrike",

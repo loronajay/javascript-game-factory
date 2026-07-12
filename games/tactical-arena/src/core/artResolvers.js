@@ -178,6 +178,11 @@ const ART_RESOLVERS = new Map([
   ["shield-bash", resolveShieldBash],
   ["cover", resolveCover],
   ["lockdown", resolveLockdown],
+  // Treant: an ally power-transfer, a self HP/MP swap, and the RAGE petrify statue.
+  // (Soul Sap is a plain targeted attack + MP-heal effect, so it uses resolveTargetedArt.)
+  ["enrich", resolveEnrich],
+  ["source-shift", resolveSourceShift],
+  ["petrify", resolvePetrify],
   // Mother Nature: global weather activations, terrain push/control, and a board shuffle.
   ["blizzard", resolveWeather],
   ["spring-shower", resolveWeather],
@@ -444,10 +449,14 @@ function resolveTargetedArt(state, command, art) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     const successful = roll.value >= 0 && roll.value < art.effect.chance;
-    // Rain Stance's global heal bonus rides on a successful heal; a raging Juggernaut's
+    // Soul Sap (Treant) drinks MP instead of HP (restore:"mp"); the heal-bonus riders are
+    // HP-healing bonuses, so they only apply to an HP drain.
+    const drinksMp = art.effect.restore === "mp";
+    const base = successful ? Math.round(damage.damage / 2) : 0;
+    // Rain Stance's global heal bonus rides on a successful HP heal; a raging Juggernaut's
     // Null Zone shuts all healing off (isHealingDisabled) regardless of the roll.
-    const healing = successful ? Math.round(damage.damage / 2) + getGlobalHealBonus(next) + getCommandHealBonus(next, actor) : 0;
-    const restored = restoreHp(next, actor, actor, healing);
+    const healing = drinksMp ? base : (successful ? base + getGlobalHealBonus(next) + getCommandHealBonus(next, actor) : 0);
+    const restored = drinksMp ? restoreMp(next, actor, actor, healing) : restoreHp(next, actor, actor, healing);
     effect = { attempted: true, applied: successful, healing: restored.hpRestored, mpRestored: restored.mpRestored };
   }
 
@@ -726,6 +735,97 @@ function resolveRelayPower(state, command, art) {
     mpPaid: mp,
     healingByTarget: healed > 0 ? { [target.id]: healed } : {},
     restoredByTarget: restored > 0 ? { [target.id]: restored } : {}
+  }]);
+}
+
+// Enrich (Treant): a friendly power transfer — restore MP to an ally within range (never
+// self), or HP if that ally is already at full MP.
+function resolveEnrich(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  const targetState = findUnit(state, command.targetId);
+  if (!targetState || targetState.hp <= 0 || targetState.id === actorState.id || !areAllies(actorState, targetState)) {
+    return reject(ERR.INVALID_TARGET);
+  }
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
+    return reject(ERR.TARGET_OUT_OF_RANGE);
+  }
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const target = findUnit(next, command.targetId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp = Math.max(0, actor.mp - cost);
+  const beforeHp = target.hp;
+  const beforeMp = target.mp;
+  const atFullMp = target.mp >= getEffectiveStats(target, next).maxMp;
+  if (atFullMp) restoreHp(next, actor, target, art.effect?.hpIfFull ?? 0);
+  else restoreMp(next, actor, target, art.effect?.mp ?? 0);
+  const healed = target.hp - beforeHp;
+  const restored = target.mp - beforeMp;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    targetId: target.id,
+    mpCost: cost,
+    mode: atFullMp ? "hp" : "mp",
+    healingByTarget: healed > 0 ? { [target.id]: healed } : {},
+    restoredByTarget: restored > 0 ? { [target.id]: restored } : {}
+  }]);
+}
+
+// Source Shift (Treant): pay 1 HP + 1 MP, then swap the Treant's current HP and MP pools
+// (clamped to each maximum). A finite-use resource (Riot Cop's USES seam).
+function resolveSourceShift(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  if (!actorState) return reject(ERR.INVALID_TARGET);
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  spendAbilityUse(actor, art);
+  const cost = getArtMpCost(actor, art, next);
+  const hpCost = art.hpCost ?? 0;
+  const pooledMp = Math.max(0, actor.mp - cost);
+  const pooledHp = Math.max(0, actor.hp - hpCost);
+  const stats = getEffectiveStats(actor, next);
+  actor.hp = Math.min(stats.maxHp, pooledMp); // HP becomes the (post-cost) MP value
+  actor.mp = Math.min(stats.maxMp, pooledHp); // MP becomes the (post-cost) HP value
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    mpCost: cost,
+    hpCost,
+    hpAfter: actor.hp,
+    mpAfter: actor.mp,
+    usesLeft: getAbilityUsesRemaining(actor, art)
+  }]);
+}
+
+// Petrify (Treant RAGE): become an invulnerable, dormant statue for a fixed number of
+// turns. The per-turn restore/drain aura + the countdown are driven by turnEngine.js's
+// auto-spend; this resolver just applies the marker status + the counter and spends the turn.
+function resolvePetrify(state, command, art) {
+  const actorState = findUnit(state, command.unitId);
+  if (!actorState) return reject(ERR.INVALID_TARGET);
+  const next = cloneState(state);
+  const actor = findUnit(next, command.unitId);
+  const cost = getArtMpCost(actor, art, next);
+  actor.mp = Math.max(0, actor.mp - cost);
+  actor.defending = false;
+  actor.petrified = Math.max(1, Number(art.petrify?.turns) || 1);
+  const applied = applyStatus(actor, { type: "petrified", duration: "permanent", ignoreResistance: true });
+  if (applied.applied) actor.statuses = applied.statuses;
+  spendAndAdvance(next, actor);
+  resolveVictory(next);
+  return accept(next, [{
+    type: "ART_RESOLVED",
+    artId: art.id,
+    actorId: actor.id,
+    mpCost: cost,
+    petrified: actor.petrified
   }]);
 }
 

@@ -269,7 +269,10 @@ function generateArtPlans(state, unit, art, ai, plans) {
         if (chebyshevDistance(unit.position, target.position) > range) continue;
         const stats = getEffectiveStats(target, state);
         const relay = art.effect?.type === "relayPower";
-        const useful = relay
+        // Arts that restore MP to an ally (relayPower, Treant's Enrich) are useful for a
+        // full-HP-but-MP-short ally too, not just a wounded one.
+        const restoresMp = relay || art.effect?.restore === "mp" || Number.isFinite(art.effect?.mp);
+        const useful = restoresMp
           ? (target.hp < stats.maxHp || target.mp < stats.maxMp)
           : target.hp < stats.maxHp;
         if (!useful) continue;

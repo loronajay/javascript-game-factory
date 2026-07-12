@@ -68,6 +68,9 @@ export const PORTRAITS = Object.freeze({
   // The box below is an approximate standing-humanoid crop — re-measure the alpha bbox
   // off the 600×600 source if the on-board seating/centering needs tightening.
   "riot-cop": portrait("riot-cop", { x: 0.10, y: 0.03, w: 0.80, h: 0.92 }),
+  // Rooted grove-guardian. Approximate standing crop off the 600×600 source — re-measure
+  // the alpha bbox if the on-board seating/centering needs tightening.
+  treant:      portrait("treant",      { x: 0.10, y: 0.03, w: 0.80, h: 0.94 }),
   // Hunched/crouched — its bbox height under-reads its "creature size", so it would
   // blow up to a swordsman's height under pure normalization. Hold it a touch smaller.
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })
