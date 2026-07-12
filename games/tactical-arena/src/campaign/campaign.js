@@ -27,6 +27,7 @@ export const HASBEEN_HEROES_MISSION_ID = "hasbeen-heroes";
 export const RONIN_MISSION_ID = "battle-for-the-bridge";
 export const WRONG_PLACE_MISSION_ID = "wrong-place-wrong-time";
 export const OUT_OF_RETIREMENT_MISSION_ID = "out-of-retirement";
+export const VOIDWOOD_MISSION_ID = "voidwood-forest";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -37,6 +38,9 @@ export const HASBEEN_MYSTIC_SKIN_PACK = "hasbeen-mystic";
 // ("p2-<index>-<type>" ids follow this order). Their overworld/rage/defeat banter and
 // the "bring the whole starter squad" bonus all read off this list.
 export const HASBEEN_HEROES_FAT_TYPES = Object.freeze(["fat-knight", "fat-bowman", "fat-cleric", "fat-wizard"]);
+export const VOIDWOOD_SKIN_REWARDS = Object.freeze([
+  Object.freeze({ type: "treant", slug: "voidroot" }),
+]);
 // A spread 3×3 Ghoul lattice (spacing 2, not contiguous) fits with exactly 1 tile of
 // clearance from the board edge on every side, so none of its own orthogonal fire gets
 // clipped off-board. A separate fire border runs along the true map edge itself (all four
@@ -312,6 +316,22 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 7,
     fullHp: true,
   },
+  [VOIDWOOD_MISSION_ID]: {
+    id: VOIDWOOD_MISSION_ID,
+    title: "Voidwood Forest",
+    subtitle: "An old guardian stirs beneath void-black branches",
+    description: "Bring any four-unit squad into a 9x9 duel against a voidroot Treant, a void-dweller Angel, Witch Doctor, and Necromancer. Ghouls choke the forest floor, but no fire marks their edges this time.",
+    unitType: "treant",
+    requiredStars: 30,
+    rewardUnits: Object.freeze(["treant"]),
+    rewardSkins: VOIDWOOD_SKIN_REWARDS,
+    rewardLabel: "Treant and the Voidroot Treant skin",
+    playerSlots: 4,
+    enemySquad: Object.freeze(["treant", "angel", "witch-doctor", "necromancer"]),
+    enemySkins: Object.freeze(["voidroot", "void-dweller", "void-dweller", "void-dweller"]),
+    size: 9,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -369,8 +389,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
   { id: OUT_OF_RETIREMENT_MISSION_ID, cell: { col: 1, row: 2 }, point: { x: 85.2, y: 87.1 }, region: "coast", locationName: "Sunbreak Temple",
     blurb: "A deserted island beach curls around an ancient temple. Someone has been enjoying the quiet a little too much." },
-  { id: "uncharted-17", cell: { col: 2, row: 2 }, point: { x: 74.9, y: 62.1 }, region: "frost", locationName: "The White Summit",
-    blurb: "Above the clouds, a frostguard holds the peak. Bring warmth, or bring numbers." },
+  { id: VOIDWOOD_MISSION_ID, cell: { col: 2, row: 2 }, point: { x: 74.9, y: 64.8 }, region: "wood", locationName: "Voidwood Forest",
+    blurb: "Void-black trees crowd the old trail. Something ancient waits where the summit marker used to sit." },
   { id: "uncharted-18", cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste",
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
   { id: "uncharted-19", cell: { col: 4, row: 2 }, point: { x: 82.9, y: 30.3 }, region: "waste", locationName: "Ruins of Vael",
@@ -526,6 +546,24 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  if (missionId === VOIDWOOD_MISSION_ID) {
+    return [
+      { speaker: "treant", skin: "voidroot", side: "right", player: 2,
+        text: "Who wakes me beneath these blackened boughs?" },
+      { speaker: "swordsman", side: "left",
+        text: "We are seeking the wisdom of the Treant." },
+      { speaker: "mystic", side: "left",
+        text: "The forest is sick. If anyone remembers how it began, it should be you." },
+      { speaker: "treant", skin: "voidroot", side: "right", player: 2,
+        text: "The real Treant has been gone since long ago. I am what remains." },
+      { speaker: "archer", side: "left",
+        text: "Gone? What happened here?" },
+      { speaker: "necromancer", skin: "void-dweller", side: "right", player: 2,
+        text: "The forest belongs to the void now. You should never have come." },
+      { speaker: "angel", skin: "void-dweller", side: "right", player: 2,
+        text: "We are going to take you somewhere no one will ever see or hear from you again." },
+    ];
+  }
   if (missionId === WRONG_PLACE_MISSION_ID) {
     return [
       riotCopLine(0, "You there -- halt!"),
@@ -741,6 +779,22 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === VOIDWOOD_MISSION_ID) {
+    return [
+      { speaker: "swordsman", side: "left",
+        text: "You were taken hostage by the void. The forest has almost entirely been infected by void magic." },
+      { speaker: "treant", side: "right", player: 2,
+        text: "Then I slept while my roots were used to poison everything I was meant to protect." },
+      { speaker: "treant", side: "right", player: 2,
+        text: "I am ashamed I let it grow this bad. Whoever is responsible will answer for it." },
+      { speaker: "mystic", side: "left",
+        text: "It might be the king." },
+      { speaker: "treant", side: "right", player: 2,
+        text: "The king and I go way back. I would be shocked if this was truly his doing." },
+      { speaker: "treant", side: "right", player: 2,
+        text: "Nevertheless, I would like to pay a visit to my old friend." },
+    ];
+  }
   if (missionId === WRONG_PLACE_MISSION_ID) return wrongPlaceDefeatScript();
   if (missionId === RONIN_MISSION_ID) return roninDefeatScript();
   if (missionId === HASBEEN_HEROES_MISSION_ID) {
@@ -948,6 +1002,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Riot Detail"
         : mission.id === OUT_OF_RETIREMENT_MISSION_ID
         ? "Retired Saints"
+        : mission.id === VOIDWOOD_MISSION_ID
+        ? "Voidwood Remnant"
         : mission.id === SNIPER_MISSION_ID
         ? "The High Guard"
         : mission.id === FATHER_TIME_MISSION_ID
@@ -1049,10 +1105,10 @@ const WITCH_DOCTOR_FIRE_POSITIONS = Object.freeze(
   })
 );
 
-function createCampaignGhoul(index, position) {
+function createCampaignGhoul(index, position, idPrefix = "p2-swamp-ghoul", skin = null) {
   return {
     ...createUnit({
-      id: `p2-swamp-ghoul-${index}`,
+      id: `${idPrefix}-${index}`,
       player: 2,
       team: 2,
       type: "ghoul",
@@ -1060,6 +1116,7 @@ function createCampaignGhoul(index, position) {
       y: position.y,
       hp: 5,
       mp: 0,
+      skin,
     }),
     spent: true,
     summonerId: null,
@@ -1405,6 +1462,23 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         : unit.skin ?? null
     ),
   },
+  [VOIDWOOD_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    skinFor: (unit) => (
+      unit.player === 2
+        ? ({
+            treant: "voidroot",
+            angel: "void-dweller",
+            "witch-doctor": "void-dweller",
+            necromancer: "void-dweller",
+          }[unit.type] ?? unit.skin ?? null)
+        : unit.skin ?? null
+    ),
+    extraUnits: () => WITCH_DOCTOR_GHOUL_POSITIONS.map((position, index) =>
+      createCampaignGhoul(index, position, "p2-voidwood-ghoul", "void-dweller")),
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -1697,6 +1771,28 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       angelDefeatedBeforePaladin,
       paladinLightseekerDamageTakenCount,
       paladinStatusAttempted,
+      rewardSkins: [...(mission?.rewardSkins ?? [])],
+    };
+  } else if (missionId === VOIDWOOD_MISSION_ID) {
+    const voidwoodDarkBombDamageTakenCount = Math.max(0, Math.floor(Number(meta.voidwoodDarkBombDamageTakenCount) || 0));
+    const ghoulBiteTakenCount = Math.max(0, Math.floor(Number(meta.ghoulBiteTakenCount) || 0));
+    const playerMagicDamageDealtCount = Math.max(0, Math.floor(Number(meta.playerMagicDamageDealtCount) || 0));
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "noDarkBomb", label: "Avoid Dark Bomb damage", earned: victory && voidwoodDarkBombDamageTakenCount === 0 },
+      { id: "noGhoulBite", label: "Avoid Ghoul Bite damage", earned: victory && ghoulBiteTakenCount === 0 },
+    ];
+    bonusObjectives = [
+      { id: "noMagicDamage", label: "Bonus: win without using magic damage", earned: victory && playerMagicDamageDealtCount === 0 },
+    ];
+    extra = {
+      voidwoodDarkBombDamageTakenCount,
+      ghoulBiteTakenCount,
+      playerMagicDamageDealtCount,
+      treantDefeated: enemyUnits.some((unit) => unit.type === "treant" && unit.hp <= 0),
+      angelDefeated: enemyUnits.some((unit) => unit.type === "angel" && unit.hp <= 0),
+      witchDoctorDefeated: enemyUnits.some((unit) => unit.type === "witch-doctor" && unit.hp <= 0),
+      necromancerDefeated: enemyUnits.some((unit) => unit.type === "necromancer" && unit.hp <= 0),
       rewardSkins: [...(mission?.rewardSkins ?? [])],
     };
   } else if (missionId === SNIPER_MISSION_ID) {
@@ -2862,9 +2958,37 @@ export function wrongPlaceDefeatScript() {
   ];
 }
 
+export function voidwoodMissionOpeningScript() {
+  return [];
+}
+
+export function voidwoodEnemyFallScript(state, unitId) {
+  const unit = findUnit(state, unitId);
+  if (!unit || unit.player !== 2) return [];
+  const textByType = {
+    treant: "The roots... are not mine...",
+    angel: "No. The void promised no one would find us here.",
+    "witch-doctor": "The dance breaks. The dark goes hungry.",
+    necromancer: "This forest is already buried. You are only digging after it.",
+  };
+  const text = textByType[unit.type];
+  if (!text) return [];
+  return [{ speakerId: unit.id, text }];
+}
+
+export function voidwoodDefeatScript() {
+  return [
+    { speaker: "treant", type: "treant", skin: null, side: "right", player: 2,
+      text: "Where am I? Why does the forest feel so far away?" },
+    { speaker: "treant", type: "treant", skin: null, side: "right", player: 2,
+      text: "What happened to me?" },
+  ];
+}
+
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === VOIDWOOD_MISSION_ID) return voidwoodMissionOpeningScript(state);
   if (missionId === OUT_OF_RETIREMENT_MISSION_ID) return outOfRetirementMissionOpeningScript(state);
   if (missionId === WRONG_PLACE_MISSION_ID) return wrongPlaceMissionOpeningScript(state);
   if (missionId === RONIN_MISSION_ID) return roninMissionOpeningScript(state);

@@ -22,6 +22,7 @@ import {
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
+  VOIDWOOD_MISSION_ID,
   VIRUS_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
   WANDERING_PARTY_SKIN_PACK,
@@ -110,6 +111,9 @@ import {
   virusEnemyStatusTauntScript,
   virusMissionOpeningScript,
   virusPoisonWarningScript,
+  voidwoodDefeatScript,
+  voidwoodEnemyFallScript,
+  voidwoodMissionOpeningScript,
   witchDoctorBlockedShotWarningScript,
   witchDoctorFireWarningScript,
   witchDoctorGhoulWarningScript,
@@ -2675,6 +2679,146 @@ test("completing Out of Retirement unlocks Angel plus both summer skins", () => 
     { type: "paladin", slug: "summer-vibes" },
   ]);
   assert.equal(readCampaignProgressStars(storage, OUT_OF_RETIREMENT_MISSION_ID), 3);
+});
+
+// --- Mission 16: Voidwood Forest --------------------------------------------
+
+function voidwoodMatchState(squad = ["swordsman", "archer", "mystic", "magician"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(VOIDWOOD_MISSION_ID, squad)),
+    VOIDWOOD_MISSION_ID,
+  );
+}
+
+function voidwoodWonState(base = voidwoodMatchState()) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+}
+
+test("Voidwood Forest replaces the White Summit placeholder and nudges the marker down", () => {
+  const mission = getCampaignMission(VOIDWOOD_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.title, "Voidwood Forest");
+  assert.equal(mission.locationName, "Voidwood Forest");
+  assert.equal(mission.requiredStars, 30);
+  assert.equal(mission.playerSlots, 4);
+  assert.deepEqual(mission.rewardUnits, ["treant"]);
+  assert.deepEqual(mission.rewardSkins, [{ type: "treant", slug: "voidroot" }]);
+  assert.equal(mission.region, "wood");
+  assert.equal(mission.point.x > 74 && mission.point.x < 76, true);
+  assert.equal(mission.point.y > 64 && mission.point.y < 66, true, "the old summit node is pulled down onto the painted node");
+
+  const node = getCampaignMap(storageAdapter()).nodes[16];
+  assert.equal(node.id, VOIDWOOD_MISSION_ID);
+  assert.equal(node.title, "Voidwood Forest");
+  assert.equal(node.displayType, null, "locked nodes still hide the unit silhouette");
+});
+
+test("Voidwood Forest builds a full-HP 9x9 4v4 against void skins with Witch Doctor ghouls but no fire", () => {
+  const config = createCampaignMatchConfig(VOIDWOOD_MISSION_ID, ["swordsman", "archer", "mystic", "magician"]);
+  assert.equal(config.size, 9);
+  assert.deepEqual(config.squads[1], ["swordsman", "archer", "mystic", "magician"]);
+  assert.deepEqual(config.squads[2], ["treant", "angel", "witch-doctor", "necromancer"]);
+  assert.deepEqual(config.skins[2], ["voidroot", "void-dweller", "void-dweller", "void-dweller"]);
+  assert.equal(config.teamNames[2], "Voidwood Remnant");
+
+  const match = voidwoodMatchState();
+  assert.equal(match.size, 9);
+  assert.equal(match.units.filter((unit) => unit.player === 1).length, 4);
+  assert.equal(match.units.filter((unit) => unit.player === 2 && unit.type !== "ghoul").length, 4);
+  assert.equal(findUnit(match, "p2-0-treant").skin, "voidroot");
+  assert.equal(findUnit(match, "p2-1-angel").skin, "void-dweller");
+  assert.equal(findUnit(match, "p2-2-witch-doctor").skin, "void-dweller");
+  assert.equal(findUnit(match, "p2-3-necromancer").skin, "void-dweller");
+
+  const ghouls = match.units.filter((unit) => unit.type === "ghoul");
+  assert.equal(ghouls.length, 8);
+  assert.deepEqual(
+    ghouls.map((unit) => `${unit.position.x},${unit.position.y}`).sort(),
+    ["2,2", "2,4", "2,6", "4,2", "4,4", "4,6", "6,4", "6,6"],
+  );
+  assert.equal(Object.values(match.tileObjects ?? {}).some((object) => object.kind === "fire"), false);
+  for (const unit of match.units.filter((unit) => unit.type !== "ghoul")) {
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
+  }
+});
+
+test("Voidwood Forest grading tracks Dark Bomb, Ghoul Bite, and no-magic bonus", () => {
+  const won = voidwoodWonState();
+
+  const perfect = evaluateCampaignMission(VOIDWOOD_MISSION_ID, won, {
+    voidwoodDarkBombDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    playerMagicDamageDealtCount: 0,
+  });
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noDarkBomb", "noGhoulBite"]);
+  assert.equal(perfect.bonusObjectives[0].id, "noMagicDamage");
+  assert.deepEqual(perfect.rewardSkins, [{ type: "treant", slug: "voidroot" }]);
+
+  const messy = evaluateCampaignMission(VOIDWOOD_MISSION_ID, won, {
+    voidwoodDarkBombDamageTakenCount: 1,
+    ghoulBiteTakenCount: 1,
+    playerMagicDamageDealtCount: 0,
+  });
+  assert.equal(messy.stars, 2, "win plus no-magic bonus covers one missed star");
+  assert.equal(messy.objectives.find((objective) => objective.id === "noDarkBomb").earned, false);
+  assert.equal(messy.objectives.find((objective) => objective.id === "noGhoulBite").earned, false);
+  assert.equal(evaluateCampaignMission(VOIDWOOD_MISSION_ID, won, {
+    voidwoodDarkBombDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    playerMagicDamageDealtCount: 1,
+  }).earnedBonusStars, 0);
+});
+
+test("Voidwood Forest dialogue covers the corrupted Treant, enemy fall lines, restored Treant, and post-match vow", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, VOIDWOOD_MISSION_ID), true);
+  const preBrief = campaignMapCutsceneScript(VOIDWOOD_MISSION_ID);
+  assert.match(preBrief.map((line) => line.text).join(" "), /who wakes|wisdom|real Treant|forest belongs to the void|hear from you/i);
+  assert.ok(preBrief.some((line) => line.speaker === "treant" && line.skin === "voidroot"));
+
+  const state = voidwoodMatchState();
+  const opening = voidwoodMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(VOIDWOOD_MISSION_ID, state), opening);
+  assert.equal(opening.length, 0, "battle starts with no banter");
+
+  for (const id of ["p2-0-treant", "p2-1-angel", "p2-2-witch-doctor", "p2-3-necromancer"]) {
+    const fallen = {
+      ...state,
+      units: state.units.map((unit) => unit.id === id ? { ...unit, hp: 0 } : unit),
+    };
+    const script = voidwoodEnemyFallScript(fallen, id);
+    assert.equal(script.length, 1);
+    assert.equal(script[0].speakerId, id);
+  }
+
+  assert.match(voidwoodDefeatScript(voidwoodWonState()).map((line) => line.text).join(" "), /where am I|what happened/i);
+  const post = campaignPostMatchCutsceneScript(VOIDWOOD_MISSION_ID);
+  assert.match(post.map((line) => line.text).join(" "), /hostage|void magic|justice|king|old friend/i);
+});
+
+test("completing Voidwood Forest unlocks Treant plus the voidroot skin", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, VOIDWOOD_MISSION_ID, voidwoodWonState(), {
+    voidwoodDarkBombDamageTakenCount: 0,
+    ghoulBiteTakenCount: 0,
+    playerMagicDamageDealtCount: 0,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["treant"]);
+  assert.deepEqual(completed.newRewardSkins, [{ type: "treant", slug: "voidroot" }]);
+  assert.equal(isUnitUnlocked("treant", storage), true);
+  assert.equal(isProgressSkinUnlocked("treant", "voidroot", storage), true);
+  assert.equal(readCampaignProgressStars(storage, VOIDWOOD_MISSION_ID), 3);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

@@ -48,6 +48,7 @@ import {
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
+  VOIDWOOD_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
@@ -113,6 +114,8 @@ import {
   shouldShowWitchDoctorRageWarning,
   virusEnemyStatusTauntScript,
   virusPoisonWarningScript,
+  voidwoodDefeatScript,
+  voidwoodEnemyFallScript,
   witchDoctorBlockedShotWarningScript,
   witchDoctorFireWarningScript,
   witchDoctorGhoulWarningScript,
@@ -296,6 +299,11 @@ function createCampaignMeta() {
     angelRageWarningShown: false,
     angelDefeatedBeforePaladin: false,
     outOfRetirementDefeatDialogueShown: false,
+    // Voidwood Forest (mission 16) -- reuses Ghoul Bite counter above.
+    voidwoodDarkBombDamageTakenCount: 0,
+    playerMagicDamageDealtCount: 0,
+    voidwoodFallLinesShown: {},
+    voidwoodDefeatDialogueShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -778,6 +786,18 @@ function announceTurnChange(prevPlayer) {
       resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
     };
     if (
+      campaignMissionId === VOIDWOOD_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.voidwoodDefeatDialogueShown
+    ) {
+      campaignMeta.voidwoodDefeatDialogueShown = true;
+      const script = voidwoodDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
+    } else if (
       campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID &&
       state.winner === 1 &&
       !campaignMeta.outOfRetirementDefeatDialogueShown
@@ -1017,6 +1037,21 @@ function recordCampaignProgressHooks(command, result) {
         campaignMeta.angelDefeatedBeforePaladin = true;
       }
     }
+  } else if (campaignMissionId === VOIDWOOD_MISSION_ID) {
+    campaignMeta.playerMagicDamageDealtCount += countPlayerMagicDamageDealt(events);
+    for (const event of events) {
+      if (event.type === "AUTO_STRIKE") {
+        const source = findUnit(state, event.sourceId);
+        const target = findUnit(state, event.targetId);
+        if (source?.type === "ghoul" && target?.player === 1) campaignMeta.ghoulBiteTakenCount += 1;
+      }
+      if (event.type !== "ART_RESOLVED" || event.artId !== "dark-bomb") continue;
+      const actor = findUnit(state, event.actorId);
+      if (actor?.player !== 2 || actor.type !== "necromancer") continue;
+      const playerHits = eventTargetIds(event).filter((id) =>
+        findUnit(state, id)?.player === 1 && eventDamageForTarget(event, id) > 0);
+      campaignMeta.voidwoodDarkBombDamageTakenCount += playerHits.length;
+    }
   } else if (campaignMissionId === MONK_MISSION_ID) {
     const realMonkId = state.missionRules?.monkTrial?.realMonkId;
     const realMonk = realMonkId ? findUnit(state, realMonkId) : null;
@@ -1236,6 +1271,44 @@ function playerLandedEnemyStatus(events) {
   });
 }
 
+function numericDamage(value) {
+  if (typeof value === "number") return Math.max(0, value);
+  if (value && typeof value.damage === "number") return Math.max(0, value.damage);
+  return 0;
+}
+
+function eventTargetIds(event) {
+  return [...new Set([
+    event.targetId,
+    ...(event.targetIds ?? []),
+    ...Object.keys(event.damageByTarget ?? {}),
+  ].filter(Boolean))];
+}
+
+function eventDamageForTarget(event, targetId) {
+  if (typeof event.damageByTarget?.[targetId] === "number") return Math.max(0, event.damageByTarget[targetId]);
+  const targets = eventTargetIds(event);
+  if (event.targetId === targetId || targets.length <= 1) return numericDamage(event.damage);
+  return 0;
+}
+
+function countPlayerMagicDamageDealt(events) {
+  let count = 0;
+  for (const event of events) {
+    if (event.type !== "ATTACK_RESOLVED" && event.type !== "ART_RESOLVED") continue;
+    const actor = findUnit(state, event.actorId);
+    if (actor?.player !== 1) continue;
+    const damageType = event.type === "ART_RESOLVED"
+      ? getArt(actor.type, event.artId)?.damageType
+      : getBasicAttackDamageType(actor);
+    if (damageType !== "magic") continue;
+    for (const targetId of eventTargetIds(event)) {
+      if (findUnit(state, targetId)?.player === 2 && eventDamageForTarget(event, targetId) > 0) count += 1;
+    }
+  }
+  return count;
+}
+
 // Returns the next eligible condition-triggered dialogue beat for the active mission
 // (or null). Each beat marks its own once-only flag so the same warning never repeats.
 function nextCampaignDialogueBeat() {
@@ -1352,6 +1425,18 @@ function nextCampaignDialogueBeat() {
       warningShown: campaignMeta.angelRageWarningShown,
     })) {
       return { markShown: () => { campaignMeta.angelRageWarningShown = true; }, script: outOfRetirementAngelRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === VOIDWOOD_MISSION_ID) {
+    for (const id of ["p2-0-treant", "p2-1-angel", "p2-2-witch-doctor", "p2-3-necromancer"]) {
+      const unit = findUnit(state, id);
+      if (unit?.hp <= 0 && !campaignMeta.voidwoodFallLinesShown[id]) {
+        return {
+          markShown: () => { campaignMeta.voidwoodFallLinesShown[id] = true; },
+          script: (matchState) => voidwoodEnemyFallScript(matchState, id),
+        };
+      }
     }
     return null;
   }
@@ -1740,7 +1825,7 @@ async function resolveCombat(command) {
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
   const events = result.events ?? [];
-  const rolled = events.find((e) => (e.type === "ATTACK_RESOLVED" || e.type === "ART_RESOLVED") && "hit" in e && e.rolled !== false);
+  const rolled = events.find((e) => (e.type === "ATTACK_RESOLVED" || e.type === "ART_RESOLVED") && "hit" in e);
 
   // Capture every pre-command snapshot BEFORE beginResolve commits (in tempo `state` becomes
   // the post-command board the instant beginResolve runs). `before` pins the deeper animation
@@ -1788,7 +1873,11 @@ async function resolveCombat(command) {
     const center = unitCenter(metrics, targetBefore);
 
     await effects.animateAttack(attackerBefore, targetBefore, ranged, rolled.artId ?? null);
-    await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
+    // Magic casts (Spark, Banish, Wither, ...) skip the attacker accuracy roll entirely
+    // (rolled: false) — no dice were drawn, so there's nothing to reveal.
+    if (rolled.rolled !== false) {
+      await revealRoll({ missed: Boolean(rolled.missed), critical: Boolean(rolled.critical) }, null, attackerBefore);
+    }
     playAttackImpactSound(rolled, ranged);
 
     if (rolled.missed) {
@@ -2960,7 +3049,7 @@ async function applyCpuCommand(command) {
       // A strike ART rolls to-hit (resolveCombat handles ART_RESOLVED-with-hit); every
       // other ART is instant. Peek the events to route — applyCommand is pure.
       const peek = applyCommand(state, command);
-      const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e && e.rolled !== false);
+      const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e);
       return rolled ? resolveCombat(command) : resolveInstantArt(command);
     }
     case "FINISH_ACTIVATION": {
@@ -3021,7 +3110,7 @@ async function applyRemoteCommand(command) {
         // A strike ART rolls to-hit (resolveCombat handles the hit path); every other
         // ART is instant. Peek the events to route — applyCommand is pure.
         const peek = applyCommand(state, command);
-        const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e && e.rolled !== false);
+        const rolled = (peek.events ?? []).some((e) => e.type === "ART_RESOLVED" && "hit" in e);
         if (rolled) await resolveCombat(command); else await resolveInstantArt(command);
         return;
       }
@@ -3899,7 +3988,7 @@ async function handleTile(position) {
       } else if (target) {
         const command = useArt(state.currentPlayer, unit.id, artId, { targetId: target.id });
         const peek = applyCommand(state, command);
-        const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event && event.rolled !== false);
+        const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event);
         resolved = rolled ? await resolveCombat(command) : await resolveInstantArt(command);
       }
       if (resolved) {
