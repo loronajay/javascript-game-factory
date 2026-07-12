@@ -55,6 +55,28 @@ test("chooseActivation is deterministic for a given state", () => {
   assert.deepEqual(a, b);
 });
 
+test("the CPU commands a non-King actsFirst unit (Mother Nature) before any squadmate", () => {
+  // Mother Nature is actsFirst but not commandOnly (isCommandOnly is King-only), so a
+  // controller that filters on isCommandOnly instead of isCommander would offer other
+  // squad units first and stall every command against KING_MUST_ACT_FIRST.
+  const state = createBattleState({
+    size: 13,
+    seed: 1,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 5, y: 5 },
+      { id: "p2-nature", type: "mother-nature", player: 2, x: 8, y: 5 },
+      { id: "p2-treant", type: "treant", player: 2, x: 9, y: 6 },
+      { id: "p2-clod", type: "clod", player: 2, x: 9, y: 7 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.equal(commands[0].type, "BEGIN_ACTIVATION");
+  assert.equal(commands[0].unitId, "p2-nature");
+  replay(state, commands);
+});
+
 test("the CPU takes a lethal shot when one is available", () => {
   // A 2-HP archer sits adjacent to the CPU swordsman: the kill should dominate scoring.
   const state = createBattleState({

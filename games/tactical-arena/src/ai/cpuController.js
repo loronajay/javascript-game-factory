@@ -12,7 +12,7 @@
 // a replay reproduces the same moves.
 
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
-import { getArt, getBasicAttackResourceCost, getEffectiveStats, getWallKillResourceReward, isCommandOnly, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
+import { getArt, getBasicAttackResourceCost, getEffectiveStats, getWallKillResourceReward, isCommander, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { getSelfBlastRadius } from "../rules/arts.js";
 import { isFireDamageImmune, isShotBlocked, isWallBetween } from "../rules/combat.js";
@@ -74,11 +74,13 @@ export function chooseActivation(
 
   const weights = WEIGHTS[difficulty] ?? WEIGHTS.normal;
 
-  // The King commands before any squadmate may act — while an un-commanded King is still
-  // unspent it is the ONLY unit the reducer will let this player activate, so restrict the
-  // search to it (offering another unit would only replay into a KING_MUST_ACT_FIRST stall).
-  const kings = units.filter((u) => isCommandOnly(u));
-  const actable = kings.length ? kings : units;
+  // An actsFirst commander (King, Mother Nature) must act before any squadmate may act —
+  // while one is still unspent it is the ONLY unit the reducer will let this player
+  // activate, so restrict the search to it (offering another unit would only replay into
+  // a KING_MUST_ACT_FIRST stall). Not just isCommandOnly: the King never moves/attacks,
+  // but Mother Nature is actsFirst too and still has normal move/art plans.
+  const commanders = units.filter((u) => isCommander(u));
+  const actable = commanders.length ? commanders : units;
 
   // Optional per-call ART denylist. Used by scripted content (e.g. a campaign mission
   // capping how many times a stalling unit may re-cast a self-heal) to remove a plan
