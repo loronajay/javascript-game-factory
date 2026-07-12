@@ -17,6 +17,8 @@ import {
   HASBEEN_MYSTIC_SKIN_PACK,
   MINER_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  NOT_MY_KING_ENEMY_TYPES,
+  NOT_MY_KING_MISSION_ID,
   MONK_MISSION_ID,
   OUT_OF_RETIREMENT_MISSION_ID,
   PALADIN_MISSION_ID,
@@ -64,6 +66,9 @@ import {
   minerDefeatScript,
   minerMissionOpeningScript,
   minerRageWarningScript,
+  notMyKingDefeatScript,
+  notMyKingEnemyRageWarningScript,
+  notMyKingMissionOpeningScript,
   roninBlindWarningScript,
   roninDefeatScript,
   roninMissionOpeningScript,
@@ -88,6 +93,7 @@ import {
   shouldShowGargoyleRageWarning,
   shouldShowMinerBlastingCapSplashWarning,
   shouldShowMinerRageWarning,
+  shouldShowNotMyKingEnemyRageWarning,
   shouldShowCampaignMapCutscene,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
@@ -3128,6 +3134,145 @@ test("completing The Showdown unlocks the full fat party", () => {
     assert.equal(isUnitUnlocked(type, storage), true, `${type} unlocked`);
   }
   assert.equal(readCampaignProgressStars(storage, SHOWDOWN_MISSION_ID), 3);
+});
+
+// --- Mission 19: Not My King --------------------------------------------------
+
+function notMyKingMatchState(squad = ["swordsman", "archer", "mystic", "magician"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(NOT_MY_KING_MISSION_ID, squad)),
+    NOT_MY_KING_MISSION_ID,
+  );
+}
+
+function notMyKingWonState(base = notMyKingMatchState()) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+}
+
+test("Not My King replaces the Iron Citadel placeholder on the lower painted node above The Showdown", () => {
+  const mission = getCampaignMission(NOT_MY_KING_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.title, "Not My King");
+  assert.equal(mission.locationName, "Ember Crown Rise");
+  assert.equal(mission.region, "waste");
+  assert.equal(mission.requiresPreviousMissionsComplete, true);
+  assert.deepEqual(mission.rewardUnits, ["king"]);
+
+  const fresh = getCampaignMap(storageAdapter());
+  const showdownIndex = fresh.nodes.findIndex((node) => node.id === SHOWDOWN_MISSION_ID);
+  const kingIndex = fresh.nodes.findIndex((node) => node.id === NOT_MY_KING_MISSION_ID);
+  assert.equal(kingIndex, showdownIndex + 1);
+  assert.equal(fresh.nodes[kingIndex].locationName.includes("Iron Citadel"), false);
+  assert.equal(fresh.nodes[kingIndex].point.x > 78 && fresh.nodes[kingIndex].point.x < 83, true, "the marker stays over the painted route above The Showdown");
+  assert.equal(fresh.nodes[kingIndex].point.y > 31 && fresh.nodes[kingIndex].point.y < 38, true, "the marker moved down from the castle placeholder");
+
+  const storage = storageAdapter();
+  const prior = fresh.nodes.slice(0, kingIndex).map((node) => node.id);
+  writeCampaignProgress(storage, {
+    completedMissions: prior.slice(0, -1),
+    missionStars: Object.fromEntries(prior.slice(0, -1).map((id) => [id, 3])),
+  });
+  assert.equal(getCampaignMap(storage).nodes[kingIndex].status, "locked");
+
+  writeCampaignProgress(storage, {
+    completedMissions: prior,
+    missionStars: Object.fromEntries(prior.map((id) => [id, 1])),
+  });
+  const unlocked = getCampaignMap(storage).nodes[kingIndex];
+  assert.equal(unlocked.status, "available");
+  assert.equal(unlocked.displayType, "king");
+});
+
+test("Not My King is a 13x13 chosen 4v4 under permanent heatwave with void enemies and CPU first", () => {
+  const config = createCampaignMatchConfig(NOT_MY_KING_MISSION_ID, ["paladin", "treant", "ronin", "angel"]);
+  assert.equal(config.size, 13);
+  assert.deepEqual(config.squads[1], ["paladin", "treant", "ronin", "angel"]);
+  assert.deepEqual(config.squads[2], ["king", "angel", "gargoyle", "ronin"]);
+  assert.deepEqual(config.skins[2], ["void-dweller", "void-dweller", "void-dweller", "void-dweller"]);
+  assert.equal(config.teamNames[2], "Void Crown");
+
+  const match = notMyKingMatchState();
+  assert.equal(match.size, 13);
+  assert.equal(match.currentPlayer, 2);
+  assert.equal(getActiveWeather(match)?.id, "heatwave");
+  assert.equal(match.missionRules?.permanentWeather?.weather, "heatwave");
+  assert.deepEqual(match.units.filter((unit) => unit.player === 2).map((unit) => unit.type), NOT_MY_KING_ENEMY_TYPES);
+  assert.deepEqual(match.units.filter((unit) => unit.player === 2).map((unit) => unit.skin), ["void-dweller", "void-dweller", "void-dweller", "void-dweller"]);
+  for (const unit of match.units) {
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
+  }
+});
+
+test("Not My King grading rewards winning, avoiding enemy RAGE, and survival", () => {
+  const won = notMyKingWonState();
+
+  const perfect = evaluateCampaignMission(NOT_MY_KING_MISSION_ID, won, {
+    notMyKingEnemyEnteredRage: false,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noEnemyRage", "survive"]);
+
+  const rage = evaluateCampaignMission(NOT_MY_KING_MISSION_ID, won, {
+    notMyKingEnemyEnteredRage: true,
+  });
+  assert.equal(rage.stars, 2);
+  assert.equal(rage.objectives.find((objective) => objective.id === "noEnemyRage").earned, false);
+
+  const oneDown = {
+    ...won,
+    units: won.units.map((unit) => unit.id === "p1-0-swordsman" ? { ...unit, hp: 0 } : unit),
+  };
+  assert.equal(evaluateCampaignMission(NOT_MY_KING_MISSION_ID, oneDown, {
+    notMyKingEnemyEnteredRage: false,
+  }).stars, 2);
+});
+
+test("Not My King dialogue covers the inferno cutscene, silent king banter, RAGE ellipses, and the lore reveal", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, NOT_MY_KING_MISSION_ID), true);
+  const preBrief = campaignMapCutsceneScript(NOT_MY_KING_MISSION_ID);
+  assert.match(preBrief.map((line) => line.text).join(" "), /my king|no more|void magic|trap|inferno|embers|ready/i);
+
+  const state = notMyKingMatchState();
+  const opening = notMyKingMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(NOT_MY_KING_MISSION_ID, state), opening);
+  assert.match(opening.map((line) => line.text).join(" "), /return to your senses|\.\.\./i);
+
+  const playing = { ...state, phase: "playing" };
+  for (const type of NOT_MY_KING_ENEMY_TYPES) {
+    const raging = {
+      ...playing,
+      units: playing.units.map((unit) => unit.player === 2 && unit.type === type ? { ...unit, hp: 5 } : unit),
+    };
+    assert.equal(shouldShowNotMyKingEnemyRageWarning(raging, type, { warned: false }), true);
+    assert.equal(shouldShowNotMyKingEnemyRageWarning(raging, type, { warned: true }), false);
+    assert.deepEqual(notMyKingEnemyRageWarningScript(raging, type).map((line) => line.text), ["..."]);
+  }
+
+  assert.match(notMyKingDefeatScript(notMyKingWonState()).map((line) => line.text).join(" "), /Where am I|kingdom walls/i);
+  const post = campaignPostMatchCutsceneScript(NOT_MY_KING_MISSION_ID);
+  assert.match(post.map((line) => line.text).join(" "), /sorry|void gate|nemesis|summoner|blacksword|spiritual sites|castle/i);
+});
+
+test("completing Not My King unlocks the King", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, NOT_MY_KING_MISSION_ID, notMyKingWonState(), {
+    notMyKingEnemyEnteredRage: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["king"]);
+  assert.equal(isUnitUnlocked("king", storage), true);
+  assert.equal(readCampaignProgressStars(storage, NOT_MY_KING_MISSION_ID), 3);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

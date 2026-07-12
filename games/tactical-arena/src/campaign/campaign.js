@@ -30,6 +30,7 @@ export const OUT_OF_RETIREMENT_MISSION_ID = "out-of-retirement";
 export const VOIDWOOD_MISSION_ID = "voidwood-forest";
 export const SPIRIT_WOODS_MISSION_ID = "spirit-of-the-woods";
 export const SHOWDOWN_MISSION_ID = "the-showdown";
+export const NOT_MY_KING_MISSION_ID = "not-my-king";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -41,6 +42,7 @@ export const HASBEEN_MYSTIC_SKIN_PACK = "hasbeen-mystic";
 // the "bring the whole starter squad" bonus all read off this list.
 export const HASBEEN_HEROES_FAT_TYPES = Object.freeze(["fat-knight", "fat-bowman", "fat-cleric", "fat-wizard"]);
 export const SHOWDOWN_FAT_TYPES = Object.freeze(["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]);
+export const NOT_MY_KING_ENEMY_TYPES = Object.freeze(["king", "angel", "gargoyle", "ronin"]);
 export const VOIDWOOD_SKIN_REWARDS = Object.freeze([
   Object.freeze({ type: "treant", slug: "voidroot" }),
 ]);
@@ -364,6 +366,21 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 11,
     fullHp: true,
   },
+  [NOT_MY_KING_MISSION_ID]: {
+    id: NOT_MY_KING_MISSION_ID,
+    title: "Not My King",
+    subtitle: "The crown answers with silence and fire",
+    description: "Bring any four-unit squad into a 13x13 duel against the void-bound King, Angel, Gargoyle, and Ronin. The heatwave is permanent, every enemy wears a void skin, and the enemy squad moves first.",
+    unitType: "king",
+    requiredStars: 0,
+    requiresPreviousMissionsComplete: true,
+    rewardUnits: Object.freeze(["king"]),
+    playerSlots: 4,
+    enemySquad: Object.freeze([...NOT_MY_KING_ENEMY_TYPES]),
+    enemySkins: Object.freeze(["void-dweller", "void-dweller", "void-dweller", "void-dweller"]),
+    size: 13,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -427,8 +444,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "A quiet forest node waits east of the Timeless Woods. The wind moves here even when the trees do not." },
   { id: SHOWDOWN_MISSION_ID, cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
-  { id: "uncharted-19", cell: { col: 5, row: 2 }, point: { x: 86.8, y: 16.8 }, region: "waste", locationName: "The Iron Citadel",
-    blurb: "The last gate. A crowned commander waits on the throne — end the campaign or serve it." },
+  { id: NOT_MY_KING_MISSION_ID, cell: { col: 5, row: 2 }, point: { x: 80.8, y: 34.6 }, region: "waste", locationName: "Ember Crown Rise", requiredStars: 0, requiresPreviousMissionsComplete: true,
+    blurb: "A lower painted marker smolders above the shattered waste. The castle can wait; the crown has come to the road." },
 ];
 
 // Extra visual branches on top of the linear spine, so the map reads as a network
@@ -581,6 +598,26 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  if (missionId === NOT_MY_KING_MISSION_ID) {
+    return [
+      { speaker: "treant", side: "left",
+        text: "My king, why are you here?" },
+      { speaker: "king", skin: "void-dweller", side: "right", player: 2,
+        text: "Your king is no more." },
+      { speaker: "treant", side: "left",
+        text: "!" },
+      { speaker: "mystic", side: "left",
+        text: "I have heard the void magic say the same thing about Treant." },
+      { speaker: "swordsman", side: "left",
+        text: "It might be a trap!" },
+      { speaker: "gargoyle", skin: "void-dweller", side: "right", player: 2,
+        text: "*A giant inferno blazes over the land.*" },
+      { speaker: "mystic", side: "left",
+        text: "The snow... all of it is gone. Nothing but embers and flames." },
+      { speaker: "swordsman", side: "left",
+        text: "Everyone ready yourselves!" },
+    ];
+  }
   if (missionId === SHOWDOWN_MISSION_ID) {
     return [
       { speaker: "mother-nature", side: "left",
@@ -854,6 +891,38 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === NOT_MY_KING_MISSION_ID) {
+    return [
+      { speaker: "fat-wizard", side: "left",
+        text: "*hic* Your Majesty... I owe you an apology. The gate, the panic, the rumor. I made the whole mess louder than it had to be." },
+      { speaker: "king", side: "right", player: 2,
+        text: "The rumor was not what took me. The void gate let in another entity: Nemesis." },
+      { speaker: "fat-wizard", side: "left",
+        text: "*hic* The cloaked figure. It was Nemesis. Not the king, and not... well, not only my terrible judgment." },
+      { speaker: "mystic", side: "left",
+        text: "Nemesis came through the same gate as the Summoner?" },
+      { speaker: "king", side: "right", player: 2,
+        text: "Nemesis and the Summoner had been locked in battle for thousands of years, each fighting for control of the void." },
+      { speaker: "king", side: "right", player: 2,
+        text: "Then a third entity appeared. Blacksword. Far too powerful for either of them, and stronger still inside the void." },
+      { speaker: "king", side: "right", player: 2,
+        text: "Nemesis and the Summoner seized their chance. They escaped through the opened gate with a plan to draw Blacksword out of his realm, where he would be less powerful." },
+      { speaker: "king", side: "right", player: 2,
+        text: "I saw Blacksword ascend from the gate with my own eyes. Then everything went black, and I remember nothing after." },
+      { speaker: "treant", side: "left",
+        text: "So Nemesis and the Summoner mean to pause their eternal war and combine forces against him." },
+      { speaker: "king", side: "right", player: 2,
+        text: "Yes. Blacksword was already trying to bring Earth to the void. He began by targeting Earth's spiritual sites." },
+      { speaker: "swordsman", side: "left",
+        text: "Then we help stop Blacksword somehow, but we do not work directly with Nemesis or the Summoner." },
+      { speaker: "mystic", side: "left",
+        text: "A careful alliance at a distance. I dislike it, which probably means it is the only sane option." },
+      { speaker: "king", side: "right", player: 2,
+        text: "Return with me to the castle. We will make a plan inside the kingdom walls." },
+      { speaker: "swordsman", side: "left",
+        text: "Then to the castle. Together." },
+    ];
+  }
   if (missionId === SHOWDOWN_MISSION_ID) {
     return [
       { speaker: "mystic", side: "left",
@@ -1150,6 +1219,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Retired Saints"
         : mission.id === SPIRIT_WOODS_MISSION_ID
         ? "Wild Court"
+        : mission.id === NOT_MY_KING_MISSION_ID
+        ? "Void Crown"
         : mission.id === SHOWDOWN_MISSION_ID
         ? "The Fat Party"
         : mission.id === VOIDWOOD_MISSION_ID
@@ -1631,6 +1702,21 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
       permanentWeather: { weather: "blizzard", sourceId: null },
     }),
   },
+  [NOT_MY_KING_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    weather: "heatwave",
+    currentPlayer: 2,
+    skinFor: (unit) => (
+      unit.player === 2 && NOT_MY_KING_ENEMY_TYPES.includes(unit.type)
+        ? "void-dweller"
+        : unit.skin ?? null
+    ),
+    missionRules: () => ({
+      permanentWeather: { weather: "heatwave", sourceId: null },
+    }),
+  },
   [VOIDWOOD_MISSION_ID]: {
     positions: {},
     fallback: (unit) => ({ ...unit.position }),
@@ -1677,7 +1763,7 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
   const trial = layout.prepareTrial?.(match, units) ?? { units, rngState: match.rngState, missionRules: null };
   return {
     ...match,
-    currentPlayer: 1,
+    currentPlayer: layout.currentPlayer ?? 1,
     activation: null,
     ...(missionId === FATHER_TIME_MISSION_ID
       ? { aiProfile: { fatherTimeCarry: { sourceId: "p2-0-father-time", targetId: "p2-1-archer" } } }
@@ -1979,6 +2065,18 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       showdownAnyUnitEnteredRage,
       showdownFootworkHitAllEnemies,
       fatPartyDefeated: enemyUnits.filter((unit) => SHOWDOWN_FAT_TYPES.includes(unit.type) && unit.hp <= 0).length,
+    };
+  } else if (missionId === NOT_MY_KING_MISSION_ID) {
+    const notMyKingEnemyEnteredRage = Boolean(meta.notMyKingEnemyEnteredRage);
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "noEnemyRage", label: "Avoid any enemy reaching RAGE", earned: victory && !notMyKingEnemyEnteredRage },
+      { id: "survive", label: "Keep all party members alive", earned: allSurvived },
+    ];
+    bonusObjectives = [];
+    extra = {
+      notMyKingEnemyEnteredRage,
+      voidCrownDefeated: enemyUnits.filter((unit) => NOT_MY_KING_ENEMY_TYPES.includes(unit.type) && unit.hp <= 0).length,
     };
   } else if (missionId === VOIDWOOD_MISSION_ID) {
     const voidwoodDarkBombDamageTakenCount = Math.max(0, Math.floor(Number(meta.voidwoodDarkBombDamageTakenCount) || 0));
@@ -3084,6 +3182,51 @@ export function showdownDefeatScript(state) {
   ];
 }
 
+// --- Mission 19: Not My King dialogue ---------------------------------------
+// The crown has been void-bound, so the enemy side speaks almost entirely through
+// the King's silence until the battle breaks the possession.
+
+export function notMyKingMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const king = findUnit(state, "p2-0-king");
+  if (!speaker) return [];
+  return [
+    { speakerId: speaker.id,
+      text: "Your Majesty, please. Return to your senses. The kingdom still needs you." },
+    { speakerId: king?.id, speaker: "king", side: "right", player: 2,
+      text: "..." },
+  ];
+}
+
+function notMyKingEnemyUnit(state, type) {
+  return (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === type) ?? null;
+}
+
+export function shouldShowNotMyKingEnemyRageWarning(state, type, { warned = false } = {}) {
+  if (warned || state?.phase !== "playing") return false;
+  if (!NOT_MY_KING_ENEMY_TYPES.includes(type)) return false;
+  const unit = notMyKingEnemyUnit(state, type);
+  return Boolean(unit && unit.hp > 0 && unit.hp <= 5);
+}
+
+export function notMyKingEnemyRageWarningScript(state) {
+  const king = findUnit(state, "p2-0-king");
+  return [{ speakerId: king?.id, speaker: "king", side: "right", player: 2, text: "..." }];
+}
+
+export function notMyKingDefeatScript() {
+  return [
+    { speaker: "king", type: "king", skin: null, side: "right", player: 2,
+      text: "Where am I?" },
+    { speaker: "king", type: "king", skin: null, side: "right", player: 2,
+      text: "Why am I outside of the kingdom walls?" },
+    { speaker: "treant", side: "left",
+      text: "My king, you were taken by the void." },
+    { speaker: "king", type: "king", skin: null, side: "right", player: 2,
+      text: "Then I have much to tell you, and little time to waste." },
+  ];
+}
+
 // --- Mission 13: Battle for the Bridge dialogue ------------------------------
 // The map cutscene stages the challenge and unit pick. In-battle beats cover the
 // duel's opening, Ronin's blind, Final Draw, and the once-gated overworld recruitment.
@@ -3334,6 +3477,7 @@ export function voidwoodDefeatScript() {
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === NOT_MY_KING_MISSION_ID) return notMyKingMissionOpeningScript(state);
   if (missionId === SHOWDOWN_MISSION_ID) return showdownMissionOpeningScript(state);
   if (missionId === SPIRIT_WOODS_MISSION_ID) return spiritWoodsMissionOpeningScript(state);
   if (missionId === VOIDWOOD_MISSION_ID) return voidwoodMissionOpeningScript(state);

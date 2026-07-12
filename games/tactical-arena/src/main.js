@@ -44,6 +44,8 @@ import {
   MINER_MISSION_ID,
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  NOT_MY_KING_ENEMY_TYPES,
+  NOT_MY_KING_MISSION_ID,
   OUT_OF_RETIREMENT_MISSION_ID,
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
@@ -75,6 +77,8 @@ import {
   minerBlastingCapSplashWarningScript,
   minerDefeatScript,
   minerRageWarningScript,
+  notMyKingDefeatScript,
+  notMyKingEnemyRageWarningScript,
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
@@ -106,6 +110,7 @@ import {
   shouldShowHasbeenFatRageWarning,
   shouldShowMinerBlastingCapSplashWarning,
   shouldShowMinerRageWarning,
+  shouldShowNotMyKingEnemyRageWarning,
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
@@ -332,6 +337,10 @@ function createCampaignMeta() {
     showdownFootworkHitAllEnemies: false,
     showdownDefeatDialogueShown: false,
     showdownFatRageWarned: Object.fromEntries(SHOWDOWN_FAT_TYPES.map((type) => [type, false])),
+    // Not My King (mission 19)
+    notMyKingEnemyEnteredRage: false,
+    notMyKingDefeatDialogueShown: false,
+    notMyKingEnemyRageWarned: Object.fromEntries(NOT_MY_KING_ENEMY_TYPES.map((type) => [type, false])),
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -815,6 +824,18 @@ function announceTurnChange(prevPlayer) {
       resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
     };
     if (
+      campaignMissionId === NOT_MY_KING_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.notMyKingDefeatDialogueShown
+    ) {
+      campaignMeta.notMyKingDefeatDialogueShown = true;
+      const script = notMyKingDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
+    } else if (
       campaignMissionId === SHOWDOWN_MISSION_ID &&
       state.winner === 1 &&
       !campaignMeta.showdownDefeatDialogueShown
@@ -1116,6 +1137,14 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
       ) {
         campaignMeta.showdownFootworkHitAllEnemies = true;
       }
+    }
+  } else if (campaignMissionId === NOT_MY_KING_MISSION_ID) {
+    if (state.units.some((unit) =>
+      unit.player === 2 &&
+      unit.hp > 0 &&
+      NOT_MY_KING_ENEMY_TYPES.includes(unit.type) &&
+      isRaging(unit))) {
+      campaignMeta.notMyKingEnemyEnteredRage = true;
     }
   } else if (campaignMissionId === VOIDWOOD_MISSION_ID) {
     campaignMeta.playerMagicDamageDealtCount += countPlayerMagicDamageDealt(events);
@@ -1604,6 +1633,20 @@ function nextCampaignDialogueBeat() {
             campaignMeta.showdownAnyUnitEnteredRage = true;
           },
           script: (matchState) => showdownFatRageWarningScript(matchState, type),
+        };
+      }
+    }
+    return null;
+  }
+  if (campaignMissionId === NOT_MY_KING_MISSION_ID) {
+    for (const type of NOT_MY_KING_ENEMY_TYPES) {
+      if (shouldShowNotMyKingEnemyRageWarning(state, type, { warned: campaignMeta.notMyKingEnemyRageWarned[type] })) {
+        return {
+          markShown: () => {
+            campaignMeta.notMyKingEnemyRageWarned[type] = true;
+            campaignMeta.notMyKingEnemyEnteredRage = true;
+          },
+          script: (matchState) => notMyKingEnemyRageWarningScript(matchState, type),
         };
       }
     }

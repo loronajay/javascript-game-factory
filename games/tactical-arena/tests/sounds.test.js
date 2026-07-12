@@ -24,11 +24,13 @@ test("sample URLs resolve inside this game's local sounds directory", () => {
 test("music tracks include local menu, mission battle, and versus battle loops", () => {
   assert.equal(MUSIC_FILES.missionBattle, "mission-battle.mp3");
   assert.equal(MUSIC_FILES.vsBattle, "vs-battle.mp3");
+  assert.equal(MUSIC_FILES.kingBattle, "king-battle.mp3");
   assert.equal(MUSIC_FILES.menu, "menu.mp3");
 });
 
 test("campaign battles use mission music and every other battle uses versus music", () => {
   assert.equal(musicKeyForMatchMode("campaign"), "missionBattle");
+  assert.equal(musicKeyForMatchMode("campaign", "not-my-king"), "kingBattle");
   assert.equal(musicKeyForMatchMode("single"), "vsBattle");
   assert.equal(musicKeyForMatchMode("hotseat"), "vsBattle");
   assert.equal(musicKeyForMatchMode("online"), "vsBattle");
