@@ -118,6 +118,24 @@ test("targeted spell arts still render their normal damage forecast", () => {
   });
 });
 
+test("blind targeted spell arts still render damage instead of miss", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-mag", player: 1, type: "magician", x: 0, y: 0, statuses: [{ type: "blind", duration: 1 }] },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-mag");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:spark", actor, resolving: false });
+
+    assert.equal(forecastLayer.children.length, 1);
+    assert.equal(textContentOf(forecastLayer), "-6");
+  });
+});
+
 test("targeted utility arts do not render damage forecast badges", () => {
   withSvgDocument(() => {
     const state = createBattleState({

@@ -247,11 +247,11 @@ function getResourceCritBonus(attacker) {
 }
 
 // Probability that this attacker's swing misses *right now*. Never-miss (raging
-// Archer) overrides everything; otherwise a blinded unit always misses; otherwise
-// the base whiff chance.
-export function getMissChance(attacker) {
+// Archer) overrides everything; otherwise Blind can force a miss unless the caller
+// is resolving a caster roll that intentionally ignores attacker accuracy.
+export function getMissChance(attacker, { ignoreBlind = false } = {}) {
   if (rageCombat(attacker)?.neverMiss) return 0;
-  if (isBlinded(attacker)) return 1;
+  if (!ignoreBlind && isBlinded(attacker)) return 1;
   return COMBAT.MISS_CHANCE;
 }
 
@@ -272,10 +272,10 @@ export function getCritChance(attacker) {
 // the hit value first; only a landed swing draws for crit (so a miss costs one
 // draw, a hit costs two — deterministic from state, so replay-safe). `overrides`
 // lets a command pin either draw for tests / recorded replay without consuming the
-// seed. Returns the advanced rngState plus the outcome flags and the raw rolls.
-export function rollToHit(rngState, attacker, overrides = {}) {
+// seed. `ignoreBlind` is for mage casts that still have a normal Clumsy-style roll.
+export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false } = {}) {
   const hit = drawValue(rngState, overrides.attackRoll);
-  const missed = hit.value < getMissChance(attacker);
+  const missed = hit.value < getMissChance(attacker, { ignoreBlind });
   if (missed) return { rngState: hit.rngState, missed: true, critical: false, hitRoll: hit.value, critRoll: null };
   const crit = drawValue(hit.rngState, overrides.critRoll);
   return { rngState: crit.rngState, missed: false, critical: crit.value < getCritChance(attacker), hitRoll: hit.value, critRoll: crit.value };

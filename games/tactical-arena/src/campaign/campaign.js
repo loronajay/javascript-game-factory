@@ -5,8 +5,8 @@ import { isNegativeStatus } from "../rules/statuses.js";
 import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { normalizeWeatherSpec } from "../core/weather.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
-import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
-import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import { OUT_OF_RETIREMENT_SKIN_REWARDS, STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
+import { enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { computeCampaignGeometry, computeRegionBoxes } from "./campaignMap.js";
 import { getNicknamePref } from "../ui/nicknameModel.js";
 
@@ -26,6 +26,7 @@ export const MINER_MISSION_ID = "dug-your-own-grave";
 export const HASBEEN_HEROES_MISSION_ID = "hasbeen-heroes";
 export const RONIN_MISSION_ID = "battle-for-the-bridge";
 export const WRONG_PLACE_MISSION_ID = "wrong-place-wrong-time";
+export const OUT_OF_RETIREMENT_MISSION_ID = "out-of-retirement";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -295,6 +296,22 @@ const AUTHORED_MISSIONS = Object.freeze({
     enemyNicknames: Object.freeze(["John", "Mara", "Brock", "Sunny"]),
     size: 7,
   },
+  [OUT_OF_RETIREMENT_MISSION_ID]: {
+    id: OUT_OF_RETIREMENT_MISSION_ID,
+    title: "Out of Retirement",
+    subtitle: "A beachside temple, two retirees, one worthy duel",
+    description: "Angel and Paladin have been enjoying the island sun, but the road north needs Angel's help. Bring any two units into a hot-weather 2v2 duel against their summer-vibes forms.",
+    unitType: "angel",
+    requiredStars: 28,
+    rewardUnits: Object.freeze(["angel"]),
+    rewardSkins: OUT_OF_RETIREMENT_SKIN_REWARDS,
+    rewardLabel: "Angel and two summer looks",
+    playerSlots: 2,
+    enemySquad: Object.freeze(["angel", "paladin"]),
+    enemySkins: Object.freeze(["summer-vibes", "summer-vibes"]),
+    size: 7,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -350,8 +367,8 @@ const CAMPAIGN_TRAIL = [
     blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
   { id: WRONG_PLACE_MISSION_ID, cell: { col: 0, row: 2 }, point: { x: 68.5, y: 78.9 }, region: "town", locationName: "Frostcrown Foothills",
     blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
-  { id: "uncharted-16", cell: { col: 1, row: 2 }, point: { x: 84.5, y: 86.4 }, region: "frost", locationName: "Rimefang Pass",
-    blurb: "A knife-edge pass walled by ice. Cover shatters; nowhere stays safe for long." },
+  { id: OUT_OF_RETIREMENT_MISSION_ID, cell: { col: 1, row: 2 }, point: { x: 85.2, y: 87.1 }, region: "coast", locationName: "Sunbreak Temple",
+    blurb: "A deserted island beach curls around an ancient temple. Someone has been enjoying the quiet a little too much." },
   { id: "uncharted-17", cell: { col: 2, row: 2 }, point: { x: 74.9, y: 62.1 }, region: "frost", locationName: "The White Summit",
     blurb: "Above the clouds, a frostguard holds the peak. Bring warmth, or bring numbers." },
   { id: "uncharted-18", cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste",
@@ -516,6 +533,24 @@ export function campaignMapCutsceneScript(missionId, selectedSquad = null, { pha
       riotCopLine(1, "Do not move. You are under arrest!"),
       { speaker: "swordsman", side: "left", text: "Under arrest for what? We just got here." },
       riotCopLine(2, "Tell it to the station after you drop the weapons."),
+    ];
+  }
+  if (missionId === OUT_OF_RETIREMENT_MISSION_ID) {
+    return [
+      { speaker: "angel", skin: "summer-vibes", side: "right", player: 2,
+        text: "If this is about the tide schedule, I am officially retired from tide schedules." },
+      { speaker: "paladin", skin: "summer-vibes", side: "right", player: 2,
+        text: "And I am retired from standing up before the ice in my drink melts." },
+      { speaker: "swordsman", side: "left",
+        text: "We need Angel's help. We are heading north to face the king." },
+      { speaker: "mystic", side: "left",
+        text: "You know the old routes, the wards, the things people forget until it is too late." },
+      { speaker: "angel", skin: "summer-vibes", side: "right", player: 2,
+        text: "I have been out of the loop and prefer it that way." },
+      { speaker: "angel", skin: "summer-vibes", side: "right", player: 2,
+        text: "Still... if you can prove you are worth helping, I will help. Two of you, two of us. A proper little duel." },
+      { speaker: "paladin", skin: "summer-vibes", side: "right", player: 2,
+        text: "Make it quick. My nap and my drink are both in danger." },
     ];
   }
   if (missionId === RONIN_MISSION_ID) {
@@ -911,6 +946,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Island Protector"
         : mission.id === WRONG_PLACE_MISSION_ID
         ? "Riot Detail"
+        : mission.id === OUT_OF_RETIREMENT_MISSION_ID
+        ? "Retired Saints"
         : mission.id === SNIPER_MISSION_ID
         ? "The High Guard"
         : mission.id === FATHER_TIME_MISSION_ID
@@ -1357,6 +1394,17 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         : unit.skin ?? null
     ),
   },
+  [OUT_OF_RETIREMENT_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    weather: "heatwave",
+    skinFor: (unit) => (
+      unit.player === 2 && (unit.type === "angel" || unit.type === "paladin")
+        ? "summer-vibes"
+        : unit.skin ?? null
+    ),
+  },
 });
 
 export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
@@ -1629,6 +1677,28 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       wrongPlaceNukedAllEnemies,
       riotCopsDefeated: enemyUnits.filter((unit) => unit.type === "riot-cop" && unit.hp <= 0).length,
     };
+  } else if (missionId === OUT_OF_RETIREMENT_MISSION_ID) {
+    const paladinLightseekerDamageTakenCount = Math.max(0, Math.floor(Number(meta.paladinLightseekerDamageTakenCount) || 0));
+    const paladinStatusAttempted = Boolean(meta.paladinStatusAttempted);
+    const angelDefeatedBeforePaladin = Boolean(meta.angelDefeatedBeforePaladin);
+    const angel = enemyUnits.find((unit) => unit.type === "angel") ?? null;
+    const paladin = enemyUnits.find((unit) => unit.type === "paladin") ?? null;
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "noLightseeker", label: "Avoid Lightseeker damage", earned: victory && paladinLightseekerDamageTakenCount === 0 },
+      { id: "noStatus", label: "Do not try status effects on them", earned: victory && !paladinStatusAttempted },
+    ];
+    bonusObjectives = [
+      { id: "angelFirst", label: "Bonus: defeat Angel first", earned: victory && angelDefeatedBeforePaladin },
+    ];
+    extra = {
+      angelDefeated: Boolean(angel && angel.hp <= 0),
+      paladinDefeated: Boolean(paladin && paladin.hp <= 0),
+      angelDefeatedBeforePaladin,
+      paladinLightseekerDamageTakenCount,
+      paladinStatusAttempted,
+      rewardSkins: [...(mission?.rewardSkins ?? [])],
+    };
   } else if (missionId === SNIPER_MISSION_ID) {
     const wallDestroyedCount = Math.max(0, Math.floor(Number(meta.wallDestroyedCount) || 0));
     const fireDamageTakenCount = Math.max(0, Math.floor(Number(meta.fireDamageTakenCount) || 0));
@@ -1734,7 +1804,7 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   const evaluation = evaluateCampaignMission(missionId, state, meta);
   const current = readCampaignProgress(storage);
   if (!evaluation.victory) {
-    return { ...evaluation, progress: current, newRewardUnits: [] };
+    return { ...evaluation, progress: current, newRewardUnits: [], newRewardSkins: [] };
   }
 
   const completedMissions = new Set(current.completedMissions);
@@ -1752,13 +1822,21 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   const unlockProgress = readUnlockProgress(storage);
   const existing = new Set(unlockProgress.unlockedUnits);
   const newRewardUnits = evaluation.rewardUnits.filter((type) => !existing.has(type));
+  const existingSkins = new Set((unlockProgress.unlockedSkins ?? []).map((skin) => `${skin.type}:${skin.slug}`));
+  const rewardSkins = Array.isArray(evaluation.rewardSkins) ? evaluation.rewardSkins : [];
+  const newRewardSkins = rewardSkins.filter((skin) => !existingSkins.has(`${skin.type}:${skin.slug}`));
   writeUnlockProgress(storage, {
     ...unlockProgress,
     unlockedUnits: [...existing, ...evaluation.rewardUnits],
+    campaignGrantedSkins: [
+      ...(unlockProgress.campaignGrantedSkins ?? []),
+      ...rewardSkins,
+    ],
   });
   enqueueUnitUnlockAnnouncements(storage, newRewardUnits);
+  enqueueSkinUnlockAnnouncements(storage, newRewardSkins);
 
-  return { ...evaluation, progress, newRewardUnits };
+  return { ...evaluation, progress, newRewardUnits, newRewardSkins };
 }
 
 export function clodMissionOpeningScript(state) {
@@ -2255,6 +2333,104 @@ export function monkMissionOpeningScript(state) {
   ];
 }
 
+// --- Mission 15: Out of Retirement dialogue ----------------------------------
+
+export function outOfRetirementMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const angel = findUnit(state, "p2-0-angel");
+  const paladin = findUnit(state, "p2-1-paladin");
+  return [
+    {
+      speakerId: angel?.id,
+      text: "All right. Two on two, clean enough. Show me why I should leave a perfectly good beach.",
+    },
+    {
+      speakerId: paladin?.id,
+      text: "Please do. I was having the finest nap of my career, and my drink is getting warm.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Then we make this quick. Beat them straight, watch the light tiles, and no status tricks.",
+    },
+  ];
+}
+
+export function outOfRetirementStatusTauntScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const angel = findUnit(state, "p2-0-angel");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: angel?.id,
+      text: "Retired, yes. Vulnerable to status effects, no. Holy Being and Chosen still work in sandals.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Right. No poison, no blind, no shortcuts. We win this honestly.",
+    },
+  ];
+}
+
+export function outOfRetirementLightseekerWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const paladin = findUnit(state, "p2-1-paladin");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: paladin?.id,
+      text: "Lightseeker. Still bright enough to wake the whole beach.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Light tiles are dangerous while he has MP. Move off them or finish him.",
+    },
+  ];
+}
+
+export function shouldShowOutOfRetirementAngelRageWarning(state, { warningShown = false } = {}) {
+  if (warningShown || state?.phase !== "playing") return false;
+  const angel = findUnit(state, "p2-0-angel");
+  return Boolean(angel && angel.hp > 0 && angel.hp <= 5);
+}
+
+export function outOfRetirementAngelRageWarningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const angel = findUnit(state, "p2-0-angel");
+  if (!speaker) return [];
+  return [
+    {
+      speakerId: angel?.id,
+      text: "There it is. Heaven's Wrath. I may be retired, but I am not rusty.",
+    },
+    {
+      speakerId: speaker.id,
+      text: "Angel is raging. His strength and movement just spiked, and Heavenseeker can punish light tiles globally.",
+    },
+  ];
+}
+
+export function outOfRetirementDefeatScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const angel = findUnit(state, "p2-0-angel") ?? (state?.units ?? []).find((unit) => unit.player === 2 && unit.type === "angel");
+  return [
+    {
+      speakerId: angel?.id,
+      speaker: "angel",
+      text: "All right. I am awake. You have my help.",
+    },
+    ...(speaker ? [{
+      speakerId: speaker.id,
+      text: "You will come north with us?",
+    }] : []),
+    {
+      speakerId: angel?.id,
+      speaker: "angel",
+      text: "Yes. Give me a moment to snap out of this and change into something more appropriate for the journey.",
+    },
+  ];
+}
+
 // --- Mission 7.5: Mechs on the Farm dialogue ----------------------------------
 // The mech brothers are mid-argument when the party arrives. The party's attempt to
 // mediate makes both of them turn on the strangers instead, calling a temporary truce.
@@ -2689,6 +2865,7 @@ export function wrongPlaceDefeatScript() {
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === OUT_OF_RETIREMENT_MISSION_ID) return outOfRetirementMissionOpeningScript(state);
   if (missionId === WRONG_PLACE_MISSION_ID) return wrongPlaceMissionOpeningScript(state);
   if (missionId === RONIN_MISSION_ID) return roninMissionOpeningScript(state);
   if (missionId === HASBEEN_HEROES_MISSION_ID) return hasbeenHeroesMissionOpeningScript(state);

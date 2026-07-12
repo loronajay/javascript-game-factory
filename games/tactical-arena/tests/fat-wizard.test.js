@@ -73,6 +73,19 @@ test("Clumsy: a missed Zap splashes nearby allies and foes around the original t
   assert.deepEqual(result.events[0].splashDamageByTarget, { "near-foe": 2, "near-ally": 2 });
 });
 
+test("Blind does not force Zap to miss", () => {
+  const state = scenario([
+    { id: "fw", type: "fat-wizard", player: 1, x: 5, y: 5, statuses: [{ type: "blind", duration: 1 }] },
+    { id: "target", type: "swordsman", player: 2, x: 5, y: 9 }
+  ]);
+  const s = run(state, beginActivation(1, "fw")).nextState;
+  const result = run(s, useArt(1, "fw", "zap", { targetId: "target", ...HIT }));
+
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].missed, undefined);
+  assert.equal(findUnit(result.nextState, "target").hp, 20);
+});
+
 test("Zap crit silences normally, but raging Lazy Cast makes Zap free, stronger, splashy, and stunning", () => {
   const normal = scenario([
     { id: "fw", type: "fat-wizard", player: 1, x: 5, y: 5 },
@@ -134,6 +147,19 @@ test("Surge heals one ally and Clumsy restores nearby units on miss, crit, and r
   assert.equal(findUnit(result.nextState, "target").hp, 14);
   assert.equal(findUnit(result.nextState, "near").hp, 12, "Lazy Cast splashes Surge healing on any hit");
   assert.equal(findUnit(result.nextState, "fw").mp, 0);
+});
+
+test("Blind does not force Surge to miss", () => {
+  const state = scenario([
+    { id: "fw", type: "fat-wizard", player: 1, x: 5, y: 5, statuses: [{ type: "blind", duration: 1 }] },
+    { id: "target", type: "swordsman", player: 1, x: 5, y: 9, hp: 10 }
+  ]);
+  const s = run(state, beginActivation(1, "fw")).nextState;
+  const result = run(s, useArt(1, "fw", "surge", { targetId: "target", ...HIT }));
+
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].missed, false);
+  assert.equal(findUnit(result.nextState, "target").hp, 14);
 });
 
 test("Relay Power transfers 2 HP and 2 MP from Fat Wizard to an ally", () => {

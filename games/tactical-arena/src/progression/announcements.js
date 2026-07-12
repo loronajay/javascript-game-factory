@@ -47,9 +47,37 @@ export function buildUnitUnlockAnnouncement(type) {
   };
 }
 
+function skinName(slug) {
+  return String(slug || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function buildSkinUnlockAnnouncement(skin) {
+  const def = UNIT_TYPES[skin?.type];
+  if (!def || typeof skin?.slug !== "string" || !skin.slug) return null;
+  const skinLabel = skinName(skin.slug);
+  return {
+    id: `skin-unlock:${skin.type}:${skin.slug}`,
+    kind: "skin-unlock",
+    unitType: skin.type,
+    skinSlug: skin.slug,
+    eyebrow: "New Skin",
+    title: `${skinLabel} ${def.name} Unlocked`,
+    body: `${skinLabel} ${def.name} has been added to your skin collection.`,
+    primaryLabel: "Continue",
+  };
+}
+
 export function normalizeProgressionAnnouncement(value) {
   if (!value || typeof value !== "object") return null;
   if (value.kind === "unit-unlock") return buildUnitUnlockAnnouncement(value.unitType);
+  if (value.kind === "skin-unlock") return buildSkinUnlockAnnouncement({
+    type: value.unitType ?? value.type,
+    slug: value.skinSlug ?? value.slug,
+  });
   return null;
 }
 
@@ -97,6 +125,16 @@ export function enqueueUnitUnlockAnnouncements(storage = defaultStorage(), unitT
   return enqueueProgressionAnnouncements(
     storage,
     uniqueStrings(unitTypes).map((type) => buildUnitUnlockAnnouncement(type)),
+  );
+}
+
+export function enqueueSkinUnlockAnnouncements(storage = defaultStorage(), skins = []) {
+  return enqueueProgressionAnnouncements(
+    storage,
+    (Array.isArray(skins) ? skins : []).map((skin) => {
+      const announcement = buildSkinUnlockAnnouncement(skin);
+      return announcement ? { kind: "skin-unlock", unitType: skin.type, skinSlug: skin.slug } : null;
+    }).filter(Boolean),
   );
 }
 

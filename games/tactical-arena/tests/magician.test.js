@@ -276,13 +276,17 @@ test("Spark spends 4 MP", () => {
   assert.equal(magAfter.mp, 40 - 4);
 });
 
-test("Spark miss spends MP and spends unit, deals no damage", () => {
+test("Spark ignores blind and attack miss rolls", () => {
   const state = makeState();
+  state.units.find((u) => u.id === "p1-mag").statuses = [{ type: "blind", duration: 1 }];
   const s1 = activate(state, "p1-mag");
   const result = applyCommand(s1, useArt(1, "p1-mag", "spark", { targetId: "p2-sword", ...MISS }));
   assert.ok(result.accepted);
   const event = result.events.find((e) => e.type === "ART_RESOLVED");
-  assert.ok(event.missed);
+  assert.equal(event.hit, true);
+  assert.equal(event.missed, undefined);
+  assert.equal(event.damage.type, "magic");
+  assert.equal(event.damage.damage, 6);
   const magAfter = result.nextState.units.find((u) => u.id === "p1-mag");
   assert.equal(magAfter.mp, 36);
   assert.equal(magAfter.spent, true);
@@ -399,6 +403,22 @@ test("Banish silence can fail on a bad roll", () => {
   assert.ok(!event.effect.applied);
   const sword = result.nextState.units.find((u) => u.id === "p2-sword");
   assert.ok(!sword.statuses.some((s) => s.type === "silence"));
+});
+
+test("Banish ignores blind and still rolls only its silence check", () => {
+  const state = makeState();
+  state.units.find((u) => u.id === "p1-mag").statuses = [{ type: "blind", duration: 1 }];
+  const s1 = activate(state, "p1-mag");
+  const result = applyCommand(s1, useArt(1, "p1-mag", "banish", { targetId: "p2-sword", ...MISS, ...EFFECT_HIT }));
+  assert.ok(result.accepted);
+  const event = result.events.find((e) => e.type === "ART_RESOLVED");
+  assert.equal(event.hit, true);
+  assert.equal(event.missed, undefined);
+  assert.equal(event.damage.type, "magic");
+  assert.equal(event.damage.damage, 6);
+  assert.ok(event.effect.applied);
+  const sword = result.nextState.units.find((u) => u.id === "p2-sword");
+  assert.ok(sword.statuses.some((s) => s.type === "silence"));
 });
 
 test("Banish spends 8 MP", () => {

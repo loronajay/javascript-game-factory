@@ -44,6 +44,7 @@ import {
   MINER_MISSION_ID,
   MONK_MISSION_ID,
   NECROMANCER_MISSION_ID,
+  OUT_OF_RETIREMENT_MISSION_ID,
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
@@ -73,6 +74,10 @@ import {
   necromancerRageWarningScript,
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
+  outOfRetirementAngelRageWarningScript,
+  outOfRetirementDefeatScript,
+  outOfRetirementLightseekerWarningScript,
+  outOfRetirementStatusTauntScript,
   paladinDefeatScript,
   paladinLightseekerWarningScript,
   paladinRageWarningScript,
@@ -93,6 +98,7 @@ import {
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowOutOfRetirementAngelRageWarning,
   shouldShowPaladinLightseekerWarning,
   shouldShowPaladinRageWarning,
   shouldShowPaladinStatusTaunt,
@@ -286,6 +292,10 @@ function createCampaignMeta() {
     // Wrong Place, Wrong Time (mission 14)
     wrongPlacePlayerStunned: false,
     wrongPlaceNukedAllEnemies: false,
+    // Out of Retirement (mission 15) -- reuses Paladin Lightseeker/status counters.
+    angelRageWarningShown: false,
+    angelDefeatedBeforePaladin: false,
+    outOfRetirementDefeatDialogueShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -768,6 +778,18 @@ function announceTurnChange(prevPlayer) {
       resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
     };
     if (
+      campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.outOfRetirementDefeatDialogueShown
+    ) {
+      campaignMeta.outOfRetirementDefeatDialogueShown = true;
+      const script = outOfRetirementDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
+    } else if (
       campaignMissionId === PALADIN_MISSION_ID &&
       state.winner === 1 &&
       !campaignMeta.paladinDefeatDialogueShown
@@ -973,16 +995,27 @@ function recordCampaignProgressHooks(command, result) {
         campaignMeta.rewindUsed = true;
       }
     }
-  } else if (campaignMissionId === PALADIN_MISSION_ID) {
+  } else if (campaignMissionId === PALADIN_MISSION_ID || campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID) {
+    const paladinId = campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID ? "p2-1-paladin" : "p2-0-paladin";
     for (const event of events) {
-      if (event.type === "ART_RESOLVED" && event.actorId === "p2-0-paladin" && event.artId === "lightseeker") {
+      if (event.type === "ART_RESOLVED" && event.actorId === paladinId && event.artId === "lightseeker") {
         const playerHits = (event.targetIds ?? []).filter((id) =>
           findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0);
         campaignMeta.paladinLightseekerDamageTakenCount += playerHits.length;
       }
     }
-    if (playerTriedStatusOnPaladin(command, events)) {
+    const immuneTargets = campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID
+      ? ["p2-0-angel", "p2-1-paladin"]
+      : ["p2-0-paladin"];
+    if (playerTriedStatusOnPaladin(command, events, immuneTargets)) {
       campaignMeta.paladinStatusAttempted = true;
+    }
+    if (campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID) {
+      const angel = findUnit(state, "p2-0-angel");
+      const paladin = findUnit(state, "p2-1-paladin");
+      if (angel?.hp <= 0 && paladin?.hp > 0) {
+        campaignMeta.angelDefeatedBeforePaladin = true;
+      }
     }
   } else if (campaignMissionId === MONK_MISSION_ID) {
     const realMonkId = state.missionRules?.monkTrial?.realMonkId;
@@ -1123,23 +1156,23 @@ function recordCampaignProgressHooks(command, result) {
   maybeShowCampaignDialogue();
 }
 
-function playerTriedStatusOnPaladin(command, events = []) {
+function playerTriedStatusOnPaladin(command, events = [], targetIds = ["p2-0-paladin"]) {
   if (command?.type !== "USE_ART" || command.player !== 1) return false;
   const actor = findUnit(state, command.unitId);
   const art = actor ? getArt(actor.type, command.artId) : null;
   if (!artHasStatusEffect(art)) return false;
-  if (command.targetId === "p2-0-paladin") return true;
-  const paladin = findUnit(state, "p2-0-paladin");
-  if (!paladin) return false;
+  const targets = targetIds.filter((id) => findUnit(state, id));
+  if (!targets.length) return false;
+  if (targets.includes(command.targetId)) return true;
   if (!command.targetId && (art.selfCast || art.globalStatus || art.targeting?.shape === "selfAura")) return true;
   return events.some((event) =>
     event.type === "ART_RESOLVED" &&
     event.actorId === command.unitId &&
-    (
-      event.targetId === "p2-0-paladin" ||
-      (event.targetIds ?? []).includes("p2-0-paladin") ||
-      (event.statusTargets ?? []).includes("p2-0-paladin") ||
-      (event.blinded ?? []).includes("p2-0-paladin")
+    targets.some((targetId) =>
+      event.targetId === targetId ||
+      (event.targetIds ?? []).includes(targetId) ||
+      (event.statusTargets ?? []).includes(targetId) ||
+      (event.blinded ?? []).includes(targetId)
     ));
 }
 
@@ -1297,6 +1330,28 @@ function nextCampaignDialogueBeat() {
       warningShown: campaignMeta.paladinRageWarningShown,
     })) {
       return { markShown: () => { campaignMeta.paladinRageWarningShown = true; }, script: paladinRageWarningScript };
+    }
+    return null;
+  }
+  if (campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID) {
+    if (shouldShowPaladinLightseekerWarning(state, {
+      warningShown: campaignMeta.paladinLightseekerWarningShown,
+      lightseekerDamageTakenCount: campaignMeta.paladinLightseekerDamageTakenCount,
+    })) {
+      return { markShown: () => { campaignMeta.paladinLightseekerWarningShown = true; }, script: outOfRetirementLightseekerWarningScript };
+    }
+    if (
+      !campaignMeta.paladinStatusTauntShown &&
+      campaignMeta.paladinStatusAttempted &&
+      state.phase === "playing" &&
+      state.units.some((unit) => unit.player === 2 && (unit.type === "angel" || unit.type === "paladin") && unit.hp > 0)
+    ) {
+      return { markShown: () => { campaignMeta.paladinStatusTauntShown = true; }, script: outOfRetirementStatusTauntScript };
+    }
+    if (shouldShowOutOfRetirementAngelRageWarning(state, {
+      warningShown: campaignMeta.angelRageWarningShown,
+    })) {
+      return { markShown: () => { campaignMeta.angelRageWarningShown = true; }, script: outOfRetirementAngelRageWarningScript };
     }
     return null;
   }
@@ -2037,7 +2092,8 @@ async function resolveInstantArt(command) {
     await Promise.all(targetsBefore.map(async (target) => {
       const center = unitCenter(metrics, target);
       await effects.hitRecoil(target.id, target.position, false);
-      await effects.floatText(center, "-2", "#ff7684");
+      const dmg = resolved.damageByTarget?.[target.id] ?? 2;
+      await effects.floatText(center, `-${dmg}`, "#ff7684");
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));
     }));

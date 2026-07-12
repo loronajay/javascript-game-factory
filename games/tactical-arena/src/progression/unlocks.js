@@ -19,6 +19,10 @@ export const WANDERING_SKIN_PACK_ID = "wandering";
 // Has-Been Heroes (campaign mission 12) grants the Mystic one of two curated looks
 // after a friendly duel in town. Same one-final-pick rule as every campaign pack.
 export const HASBEEN_MYSTIC_SKIN_PACK_ID = "hasbeen-mystic";
+export const OUT_OF_RETIREMENT_SKIN_REWARDS = Object.freeze([
+  Object.freeze({ type: "angel", slug: "summer-vibes" }),
+  Object.freeze({ type: "paladin", slug: "summer-vibes" }),
+]);
 export const CAMPAIGN_SKIN_PACKS = Object.freeze({
   [WANDERING_SKIN_PACK_ID]: Object.freeze([
     Object.freeze({ type: "swordsman", slug: "wandering" }),
@@ -82,6 +86,7 @@ function progressFallback() {
     allTutorialsComplete: false,
     unlockedUnits: [...STARTER_UNIT_TYPES],
     campaignRewardSkins: {},
+    campaignGrantedSkins: [],
     unlockedSkins: [],
   };
 }
@@ -94,11 +99,13 @@ export function normalizeUnlockProgress(value = {}) {
   const unlockedUnits = new Set([...STARTER_UNIT_TYPES, ...uniqueStrings(value.unlockedUnits)]);
   if (allTutorialsComplete) unlockedUnits.add(TUTORIAL_JUGGERNAUT_REWARD_UNIT);
   const campaignRewardSkins = normalizeCampaignRewardSkins(value.campaignRewardSkins);
+  const campaignGrantedSkins = dedupeSkins(value.campaignGrantedSkins);
   // unlockedSkins is fully derived from the granted rewards (tutorial + campaign packs),
   // so it stays consistent no matter what an older/partial payload carried.
   const unlockedSkins = [];
   if (rewardGranted && selectedRewardSkin) unlockedSkins.push(selectedRewardSkin);
   for (const skin of Object.values(campaignRewardSkins)) unlockedSkins.push(skin);
+  unlockedSkins.push(...campaignGrantedSkins);
   return {
     completedTutorials,
     rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
@@ -107,6 +114,7 @@ export function normalizeUnlockProgress(value = {}) {
     allTutorialsComplete,
     unlockedUnits: [...unlockedUnits],
     campaignRewardSkins,
+    campaignGrantedSkins,
     unlockedSkins: dedupeSkins(unlockedSkins),
   };
 }

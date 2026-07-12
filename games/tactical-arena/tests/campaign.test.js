@@ -18,6 +18,7 @@ import {
   MINER_MISSION_ID,
   NECROMANCER_MISSION_ID,
   MONK_MISSION_ID,
+  OUT_OF_RETIREMENT_MISSION_ID,
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
@@ -70,6 +71,11 @@ import {
   necromancerStatusWarningScript,
   necromancerSummonWarningScript,
   normalizeCampaignSquad,
+  outOfRetirementAngelRageWarningScript,
+  outOfRetirementDefeatScript,
+  outOfRetirementLightseekerWarningScript,
+  outOfRetirementMissionOpeningScript,
+  outOfRetirementStatusTauntScript,
   prepareCampaignMatchState,
   resetCampaignProgress,
   shouldShowClodRageWarning,
@@ -81,6 +87,7 @@ import {
   shouldShowNecromancerRageWarning,
   shouldShowNecromancerStatusWarning,
   shouldShowNecromancerSummonWarning,
+  shouldShowOutOfRetirementAngelRageWarning,
   shouldShowPaladinLightseekerWarning,
   shouldShowPaladinRageWarning,
   shouldShowPaladinStatusTaunt,
@@ -112,6 +119,7 @@ import {
 } from "../src/campaign/campaign.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, defend, finishActivation } from "../src/core/commands.js";
+import { isProgressSkinUnlocked, readUnlockProgress } from "../src/progression/unlocks.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -2533,6 +2541,140 @@ test("completing Wrong Place, Wrong Time unlocks Riot Cop and records stars", ()
   assert.deepEqual(completed.newRewardUnits, ["riot-cop"]);
   assert.equal(isUnitUnlocked("riot-cop", storage), true);
   assert.equal(readCampaignProgressStars(storage, WRONG_PLACE_MISSION_ID), 3);
+});
+
+// --- Out of Retirement (mission 15) ------------------------------------------
+
+function outOfRetirementMatchState(squad = ["swordsman", "mystic"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(OUT_OF_RETIREMENT_MISSION_ID, squad)),
+    OUT_OF_RETIREMENT_MISSION_ID,
+  );
+}
+
+function outOfRetirementWonState(base = outOfRetirementMatchState()) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) => unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+}
+
+test("Out of Retirement replaces the Rimefang placeholder on the painted island temple node", () => {
+  const mission = getCampaignMission(OUT_OF_RETIREMENT_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.title, "Out of Retirement");
+  assert.equal(mission.locationName, "Sunbreak Temple");
+  assert.equal(mission.region, "coast");
+  assert.equal(mission.requiredStars, 28);
+  assert.equal(mission.playerSlots, 2);
+  assert.deepEqual(mission.rewardUnits, ["angel"]);
+  assert.deepEqual(mission.rewardSkins, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "paladin", slug: "summer-vibes" },
+  ]);
+
+  const node = getCampaignMap(storageAdapter()).nodes.find((n) => n.id === OUT_OF_RETIREMENT_MISSION_ID);
+  assert.ok(node);
+  assert.equal(node.biome, "water");
+  assert.equal(node.locationName, "Sunbreak Temple");
+  assert.equal(node.point.x > 85 && node.point.x < 86, true, "the marker is nudged right onto the painted island node");
+  assert.equal(node.point.y > 86.8 && node.point.y < 87.5, true, "the marker is nudged down onto the painted island node");
+});
+
+test("Out of Retirement is a hot-weather 7x7 chosen 2v2 against summer Angel and Paladin", () => {
+  const config = createCampaignMatchConfig(OUT_OF_RETIREMENT_MISSION_ID, ["swordsman", "mystic"]);
+  assert.equal(config.size, 7);
+  assert.deepEqual(config.squads[1], ["swordsman", "mystic"]);
+  assert.deepEqual(config.squads[2], ["angel", "paladin"]);
+  assert.deepEqual(config.skins[2], ["summer-vibes", "summer-vibes"]);
+  assert.equal(config.teamNames[2], "Retired Saints");
+
+  const match = outOfRetirementMatchState();
+  assert.equal(getActiveWeather(match)?.id, "heatwave");
+  assert.equal(findUnit(match, "p2-0-angel").skin, "summer-vibes");
+  assert.equal(findUnit(match, "p2-1-paladin").skin, "summer-vibes");
+  for (const unit of match.units) {
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
+  }
+});
+
+test("Out of Retirement grading tracks win, Lightseeker, status attempts, and Angel-first bonus", () => {
+  const won = outOfRetirementWonState();
+
+  const perfect = evaluateCampaignMission(OUT_OF_RETIREMENT_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+    angelDefeatedBeforePaladin: true,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noLightseeker", "noStatus"]);
+  assert.equal(perfect.bonusObjectives[0].id, "angelFirst");
+  assert.deepEqual(perfect.rewardSkins, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "paladin", slug: "summer-vibes" },
+  ]);
+
+  const messy = evaluateCampaignMission(OUT_OF_RETIREMENT_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 1,
+    paladinStatusAttempted: true,
+    angelDefeatedBeforePaladin: true,
+  });
+  assert.equal(messy.stars, 2, "win plus Angel-first bonus covers one missed objective");
+  assert.equal(messy.objectives.find((objective) => objective.id === "noLightseeker").earned, false);
+  assert.equal(messy.objectives.find((objective) => objective.id === "noStatus").earned, false);
+});
+
+test("Out of Retirement dialogue covers the retirees, battle banter, warnings, rage, and pre-results help", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, OUT_OF_RETIREMENT_MISSION_ID), true);
+  const preBrief = campaignMapCutsceneScript(OUT_OF_RETIREMENT_MISSION_ID);
+  assert.match(preBrief.map((line) => line.text).join(" "), /retired|north|king|two of us|nap/i);
+  assert.ok(preBrief.some((line) => line.speaker === "angel" && line.skin === "summer-vibes"));
+
+  const state = outOfRetirementMatchState();
+  const opening = outOfRetirementMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(OUT_OF_RETIREMENT_MISSION_ID, state), opening);
+  assert.match(opening.map((line) => line.text).join(" "), /beach|drink|status/i);
+
+  assert.match(outOfRetirementLightseekerWarningScript(state).map((line) => line.text).join(" "), /Lightseeker|Light tiles/i);
+  assert.match(outOfRetirementStatusTauntScript(state).map((line) => line.text).join(" "), /Holy Being|Chosen|status/i);
+  const raging = {
+    ...state,
+    phase: "playing",
+    units: state.units.map((unit) => unit.id === "p2-0-angel" ? { ...unit, hp: 5 } : unit),
+  };
+  assert.equal(shouldShowOutOfRetirementAngelRageWarning(raging), true);
+  assert.match(outOfRetirementAngelRageWarningScript(raging).map((line) => line.text).join(" "), /Heaven's Wrath|Heavenseeker/i);
+  assert.match(outOfRetirementDefeatScript(outOfRetirementWonState()).map((line) => line.text).join(" "), /awake|help|change/i);
+});
+
+test("completing Out of Retirement unlocks Angel plus both summer skins", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, OUT_OF_RETIREMENT_MISSION_ID, outOfRetirementWonState(), {
+    paladinLightseekerDamageTakenCount: 0,
+    paladinStatusAttempted: false,
+    angelDefeatedBeforePaladin: true,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["angel"]);
+  assert.deepEqual(completed.newRewardSkins, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "paladin", slug: "summer-vibes" },
+  ]);
+  assert.equal(isUnitUnlocked("angel", storage), true);
+  assert.equal(isProgressSkinUnlocked("angel", "summer-vibes", storage), true);
+  assert.equal(isProgressSkinUnlocked("paladin", "summer-vibes", storage), true);
+  assert.deepEqual(readUnlockProgress(storage).campaignGrantedSkins, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "paladin", slug: "summer-vibes" },
+  ]);
+  assert.equal(readCampaignProgressStars(storage, OUT_OF_RETIREMENT_MISSION_ID), 3);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

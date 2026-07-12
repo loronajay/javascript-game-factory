@@ -3,7 +3,7 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
-import { artIsBodyBlocked, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
+import { artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
 import { finalizeMagicDamage, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
@@ -130,7 +130,8 @@ function areaForecastEntries(state, actor, art, areaCenter) {
 }
 
 // While in attack or single-target ART mode, every enemy in range wears a badge
-// showing the predicted normal-hit damage (skull when lethal, "miss" when blinded).
+// showing the predicted normal-hit damage (skull when lethal, "miss" when an attack
+// or physical strike ART is blinded).
 // Uses the same strike resolver the reducer uses, so damage-type changes stay honest.
 export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null }) {
   forecastLayer.replaceChildren();
@@ -151,7 +152,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
   }
 
   const reach = isStrikeArt ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
-  const guaranteedMiss = (isAttack || isStrikeArt) && getMissChance(actor) >= 1;
+  const guaranteedMiss = (isAttack || (isStrikeArt && artUsesPhysicalStrike(art))) && getMissChance(actor) >= 1;
   // The damage type of what's being aimed: a basic attack reads the unit's passive
   // (Angel's Blessed Arrow is magic); an ART carries its own damageType.
   const damageType = isAttack ? getBasicAttackDamageType(actor) : (art?.damageType ?? null);

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   LEGACY_TUTORIAL_PROGRESS_KEY,
+  OUT_OF_RETIREMENT_SKIN_REWARDS,
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
   TUTORIAL_PROGRESS_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
@@ -14,7 +15,8 @@ import {
   readUnlockProgress,
   resetUnlockProgress,
   selectCampaignRewardSkin,
-  selectTutorialRewardSkin
+  selectTutorialRewardSkin,
+  writeUnlockProgress
 } from "../src/progression/unlocks.js";
 import {
   TUTORIAL_ARTS_MP_ID,
@@ -140,6 +142,21 @@ test("campaign reward skin survives a read/write round trip and reset clears it"
   resetUnlockProgress(storage);
   assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
   assert.equal(isProgressSkinUnlocked("mystic", "wandering", storage), false);
+});
+
+test("direct campaign skin grants are folded into unlocked skins", () => {
+  const storage = storageAdapter();
+  const progress = writeUnlockProgress(storage, {
+    campaignGrantedSkins: OUT_OF_RETIREMENT_SKIN_REWARDS,
+  });
+
+  assert.deepEqual(progress.campaignGrantedSkins, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "paladin", slug: "summer-vibes" },
+  ]);
+  assert.equal(isProgressSkinUnlocked("angel", "summer-vibes", storage), true);
+  assert.equal(isProgressSkinUnlocked("paladin", "summer-vibes", storage), true);
+  assert.equal(normalizeSkinSlug("angel", "summer-vibes", storage), "summer-vibes");
 });
 
 test("resetting progress clears stored tutorial unlocks and returns to a fresh profile", () => {

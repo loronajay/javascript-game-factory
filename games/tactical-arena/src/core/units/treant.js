@@ -58,9 +58,12 @@ export const TREANT = Object.freeze({
       }),
       // +1 damage taken from fire-based ARTS and fire-tile ticks (folded in rules/combat.js
       // + turnEngine.js).
-      fireVulnerability: 1
+      fireVulnerability: 1,
+      // A rooted plant-being: immune to poison (folded by statusImmunities alongside any
+      // `immunity`-typed passive, the same bundling pattern as Blacksword's Dark Tread).
+      immuneStatuses: Object.freeze(["poison"])
     }),
-    description: "Weather-attuned: heals 1 HP per turn in Rain, +1 DEF in Snow, +1 magic damage in Thunderstorm, +2 STR / −1 DEF in Fire. Takes +1 damage from fire abilities and fire tiles.",
+    description: "Weather-attuned: heals 1 HP per turn in Rain, +1 DEF in Snow, +1 magic damage in Thunderstorm, +2 STR / −1 DEF in Fire. Takes +1 damage from fire abilities and fire tiles. Immune to poison.",
     implemented: true
   }),
   arts: Object.freeze([

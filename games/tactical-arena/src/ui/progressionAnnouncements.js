@@ -36,6 +36,12 @@ export function openProgressionAnnouncement(announcement) {
     const body = el("div", "progression-announcement-body");
     if (announcement.kind === "unit-unlock" && announcement.unitType) {
       body.appendChild(createPortrait(announcement.unitType, { variant: "is-unlock-hero", eager: true }));
+    } else if (announcement.kind === "skin-unlock" && announcement.unitType) {
+      body.appendChild(createPortrait(announcement.unitType, {
+        variant: "is-unlock-hero",
+        eager: true,
+        skin: announcement.skinSlug ?? null,
+      }));
     }
     const copy = el("div", "progression-announcement-copy");
     copy.appendChild(el("p", "", announcement.body || "A new reward is available."));

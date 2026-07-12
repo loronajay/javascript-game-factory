@@ -1,6 +1,6 @@
 import { getAbilityUsesRemaining, getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
-import { artIsBodyBlocked, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
+import { artIsBodyBlocked, artUsesPhysicalStrike, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, finalizeMagicDamage, getAttackRecoil, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "../rules/damage.js";
 import { drawValue } from "./rng.js";
@@ -378,11 +378,14 @@ function resolveTargetedArt(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
-  // ART attacks roll to-hit like a basic attack (the ART's own status/heal check is
-  // a SECOND, separate roll below). A missed swing deals no damage and lands no
-  // effect, but the ART is still spent — you committed the activation and the MP.
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
-  next.rngState = swing.rngState;
+  // Physical strike ARTS roll to-hit like a basic attack. Magic casts skip attacker
+  // accuracy; Silence, not Blind, is the mage counter.
+  const rollsToHit = artUsesPhysicalStrike(art);
+  let swing = { missed: false, critical: false, hitRoll: null, rngState: next.rngState };
+  if (rollsToHit) {
+    swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+    next.rngState = swing.rngState;
+  }
   if (swing.missed) {
     // Wanderer (Ronin): a foe that whiffs an attack ART on Ronin is marked for +1 next turn.
     if (duelistTracksMisses(target)) addDuelMark(target, actor.id);
@@ -478,6 +481,7 @@ function resolveTargetedArt(state, command, art) {
     hit: true,
     critical: swing.critical,
     roll: swing.hitRoll,
+    ...(rollsToHit ? {} : { rolled: false }),
     damage,
     ...(fireTiles.length ? { fireTiles } : {}),
     ...(effect ? { effect } : {})
@@ -560,7 +564,7 @@ function resolveFatWizardZap(state, command, art) {
   const leechEvents = [];
   const clumsy = clumsyEffect(actor);
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind: true });
   next.rngState = swing.rngState;
   if (swing.missed) {
     applyMagicSplash(next, actor, target, {
@@ -661,7 +665,7 @@ function resolveFatWizardSurge(state, command, art) {
   const splashHealingByTarget = {};
   const healTargetIds = [];
   const splashTargetIds = [];
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind: true });
   next.rngState = swing.rngState;
 
   const clumsy = clumsyEffect(actor);

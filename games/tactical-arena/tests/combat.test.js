@@ -150,6 +150,55 @@ test("a missed ART deals no damage, lands no status, but still spends MP and the
   assert.equal(actor.spent, true);
 });
 
+test("blind makes physical attack ARTS miss", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0, statuses: [{ type: "blind", duration: 1 }] },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const selected = applyCommand(state, beginActivation(1, "p1-archer"));
+  const result = applyCommand(selected.nextState, useArt(1, "p1-archer", "poison-arrow", {
+    targetId: "p2-swordsman", effectRoll: 0, attackRoll: 0.99
+  }));
+
+  const target = result.nextState.units.find((u) => u.id === "p2-swordsman");
+  assert.equal(result.events[0].missed, true);
+  assert.equal(target.hp, 25);
+  assert.deepEqual(target.statuses, []);
+});
+
+test("blind does not make generic targeted magic ARTS miss", () => {
+  const state = createBattleState({
+    units: [
+      { id: "nec", player: 1, type: "necromancer", x: 0, y: 0, statuses: [{ type: "blind", duration: 1 }] },
+      { id: "virus", player: 1, type: "virus", x: 0, y: 2, statuses: [{ type: "blind", duration: 1 }] },
+      { id: "wither-target", player: 2, type: "swordsman", x: 3, y: 0 },
+      { id: "cough-target", player: 2, type: "swordsman", x: 3, y: 2 }
+    ]
+  });
+
+  let selected = applyCommand(state, beginActivation(1, "nec"));
+  let result = applyCommand(selected.nextState, useArt(1, "nec", "wither", {
+    targetId: "wither-target", attackRoll: 0.01, effectRoll: 0.99
+  }));
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].missed, undefined);
+  assert.equal(result.events[0].damage.type, "magic");
+  assert.equal(result.nextState.units.find((u) => u.id === "wither-target").hp, 19);
+
+  result.nextState.currentPlayer = 1;
+  result.nextState.units.find((u) => u.id === "virus").spent = false;
+  selected = applyCommand(result.nextState, beginActivation(1, "virus"));
+  result = applyCommand(selected.nextState, useArt(1, "virus", "cough", {
+    targetId: "cough-target", attackRoll: 0.01, effectRoll: 0.99
+  }));
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].missed, undefined);
+  assert.equal(result.events[0].damage.type, "magic");
+  assert.equal(result.nextState.units.find((u) => u.id === "cough-target").hp, 20);
+});
+
 test("rolls are deterministic from the seed: same seed + commands ⇒ same outcome", () => {
   const run = () => {
     const state = createBattleState({

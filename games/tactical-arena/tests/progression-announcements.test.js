@@ -11,6 +11,7 @@ import {
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import {
   consumeProgressionAnnouncements,
+  enqueueSkinUnlockAnnouncements,
   enqueueUnitUnlockAnnouncements,
   readProgressionAnnouncements,
   readSeenProgressionAnnouncementIds,
@@ -54,6 +55,26 @@ test("unit unlock announcements queue once and mark themselves seen when consume
   assert.deepEqual(readSeenProgressionAnnouncementIds(storage), ["unit-unlock:clod"]);
 
   assert.deepEqual(enqueueUnitUnlockAnnouncements(storage, ["clod"]), []);
+});
+
+test("skin unlock announcements queue with unit and skin identity", () => {
+  const storage = storageAdapter();
+
+  const pending = enqueueSkinUnlockAnnouncements(storage, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "angel", slug: "summer-vibes" },
+    { type: "missing-unit", slug: "summer-vibes" },
+  ]);
+
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].id, "skin-unlock:angel:summer-vibes");
+  assert.equal(pending[0].kind, "skin-unlock");
+  assert.equal(pending[0].unitType, "angel");
+  assert.equal(pending[0].skinSlug, "summer-vibes");
+  assert.equal(pending[0].title, "Summer Vibes Angel Unlocked");
+
+  consumeProgressionAnnouncements(storage);
+  assert.deepEqual(enqueueSkinUnlockAnnouncements(storage, [{ type: "angel", slug: "summer-vibes" }]), []);
 });
 
 test("existing non-starter unit unlocks are audited into pending announcements", () => {

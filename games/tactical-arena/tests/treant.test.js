@@ -7,7 +7,7 @@ import { beginActivation, defend, finishActivation, useArt } from "../src/core/c
 import { getEffectiveStats, getUnitType, getAbilityUsesRemaining } from "../src/core/unitCatalog.js";
 import { canUseArt } from "../src/rules/arts.js";
 import { finalizeMagicDamage, getFireVulnerability, resolvePhysicalStrike } from "../src/rules/combat.js";
-import { isPetrified } from "../src/rules/statuses.js";
+import { applyStatus, isPetrified } from "../src/rules/statuses.js";
 import { getAbilityVfx, getStatusVfx } from "../src/ui/vfxCatalog.js";
 import { generatePlans, toCommands } from "../src/ai/plans.js";
 
@@ -39,6 +39,12 @@ test("Treant is registered with its tank stat block", () => {
   assert.equal(def.name, "Treant");
   assert.equal(def.classType, "tank");
   assert.deepEqual(def.stats, { moveRange: 2, attackRange: 2, strength: 7, defense: 6, maxHp: 30, maxMp: 30 });
+});
+
+test("Enchanted Roots makes the Treant immune to poison but not other statuses", () => {
+  const treant = findUnit(scenario([{ id: "treant", player: 1, type: "treant", x: 6, y: 6 }]), "treant");
+  assert.equal(applyStatus(treant, { type: "poison", duration: "permanent" }).applied, false, "Enchanted Roots blocks poison");
+  assert.equal(applyStatus(treant, { type: "slow", duration: 1 }).applied, true, "only poison is immune");
 });
 
 // --- Enchanted Roots (weather affinity + fire vulnerability) -----------------
