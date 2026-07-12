@@ -22,6 +22,7 @@ import {
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
+  SPIRIT_WOODS_MISSION_ID,
   VOIDWOOD_MISSION_ID,
   VIRUS_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
@@ -95,6 +96,10 @@ import {
   shouldShowRoninBlindWarning,
   shouldShowRoninRageWarning,
   shouldShowSniperFireWarning,
+  shouldShowSpiritWoodsGreatFloodDialogue,
+  shouldShowSpiritWoodsPaladinStatusTaunt,
+  shouldShowSpiritWoodsTreantFireTaunt,
+  shouldShowSpiritWoodsTreantPoisonTaunt,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
@@ -108,6 +113,11 @@ import {
   paladinStatusTauntScript,
   sniperFireWarningScript,
   sniperMissionOpeningScript,
+  spiritWoodsGreatFloodScript,
+  spiritWoodsMissionOpeningScript,
+  spiritWoodsPaladinStatusTauntScript,
+  spiritWoodsTreantFireTauntScript,
+  spiritWoodsTreantPoisonTauntScript,
   virusEnemyStatusTauntScript,
   virusMissionOpeningScript,
   virusPoisonWarningScript,
@@ -2819,6 +2829,138 @@ test("completing Voidwood Forest unlocks Treant plus the voidroot skin", () => {
   assert.equal(isUnitUnlocked("treant", storage), true);
   assert.equal(isProgressSkinUnlocked("treant", "voidroot", storage), true);
   assert.equal(readCampaignProgressStars(storage, VOIDWOOD_MISSION_ID), 3);
+});
+
+// --- Mission 17: Spirit of the Woods -----------------------------------------
+
+function spiritWoodsMatchState(squad = ["swordsman", "archer", "mystic", "magician"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(SPIRIT_WOODS_MISSION_ID, squad)),
+    SPIRIT_WOODS_MISSION_ID,
+  );
+}
+
+function spiritWoodsWonState(base = spiritWoodsMatchState()) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+}
+
+test("Spirit of the Woods is mission 17 and keeps Shattered Waste locked until all prior missions complete", () => {
+  const mission = getCampaignMission(SPIRIT_WOODS_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.title, "Spirit of the Woods");
+  assert.equal(mission.locationName, "Spirit Grove");
+  assert.equal(mission.region, "wood");
+  assert.equal(mission.requiredStars, 32);
+  assert.equal(mission.playerSlots, 4);
+  assert.deepEqual(mission.rewardUnits, ["mother-nature"]);
+
+  const fresh = getCampaignMap(storageAdapter());
+  const spiritIndex = fresh.nodes.findIndex((node) => node.id === SPIRIT_WOODS_MISSION_ID);
+  const wasteIndex = fresh.nodes.findIndex((node) => node.locationName === "The Shattered Waste");
+  assert.equal(spiritIndex > -1, true);
+  assert.equal(wasteIndex, spiritIndex + 1);
+  assert.equal(fresh.nodes[spiritIndex].point.x > 38 && fresh.nodes[spiritIndex].point.x < 39, true);
+  assert.equal(fresh.nodes[spiritIndex].point.y > 47 && fresh.nodes[spiritIndex].point.y < 48, true);
+
+  const storage = storageAdapter();
+  const priorWithoutSpirit = fresh.nodes.slice(0, spiritIndex).map((node) => node.id);
+  writeCampaignProgress(storage, {
+    completedMissions: priorWithoutSpirit,
+    missionStars: Object.fromEntries(priorWithoutSpirit.map((id) => [id, 3])),
+  });
+  const stillLocked = getCampaignMap(storage).nodes[wasteIndex];
+  assert.equal(stillLocked.locationName, "The Shattered Waste");
+  assert.equal(stillLocked.status, "locked");
+
+  writeCampaignProgress(storage, {
+    completedMissions: [...priorWithoutSpirit, SPIRIT_WOODS_MISSION_ID],
+    missionStars: Object.fromEntries([...priorWithoutSpirit, SPIRIT_WOODS_MISSION_ID].map((id) => [id, 1])),
+  });
+  assert.equal(getCampaignMap(storage).nodes[wasteIndex].status, "coming-soon");
+});
+
+test("Spirit of the Woods is an 11x11 chosen 4v4 against Mother Nature's court", () => {
+  const config = createCampaignMatchConfig(SPIRIT_WOODS_MISSION_ID, ["paladin", "treant", "ronin", "angel"]);
+  assert.equal(config.size, 11);
+  assert.deepEqual(config.squads[1], ["paladin", "treant", "ronin", "angel"]);
+  assert.deepEqual(config.squads[2], ["mother-nature", "treant", "clod", "paladin"]);
+  assert.deepEqual(config.skins[2], [null, null, null, "gaia's-protector"]);
+  assert.equal(config.teamNames[2], "Wild Court");
+
+  const match = spiritWoodsMatchState();
+  assert.equal(match.size, 11);
+  for (const unit of match.units) {
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
+  }
+  assert.equal(findUnit(match, "p2-3-paladin").skin, "gaia's-protector");
+});
+
+test("Spirit of the Woods grading tracks Lightseeker, Great Flood, and starter-squad bonus", () => {
+  const won = spiritWoodsWonState();
+
+  const perfect = evaluateCampaignMission(SPIRIT_WOODS_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 0,
+    motherNatureGreatFloodUsed: false,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "noLightseeker", "noGreatFlood"]);
+  assert.equal(perfect.bonusObjectives[0].id, "starterSquad");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const messy = evaluateCampaignMission(SPIRIT_WOODS_MISSION_ID, won, {
+    paladinLightseekerDamageTakenCount: 1,
+    motherNatureGreatFloodUsed: true,
+  });
+  assert.equal(messy.stars, 2, "win plus starter-squad bonus covers one missed star");
+  assert.equal(messy.objectives.find((objective) => objective.id === "noLightseeker").earned, false);
+  assert.equal(messy.objectives.find((objective) => objective.id === "noGreatFlood").earned, false);
+});
+
+test("Spirit of the Woods dialogue covers the forest challenge and conditional battle banter", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, SPIRIT_WOODS_MISSION_ID), true);
+  const preBrief = campaignMapCutsceneScript(SPIRIT_WOODS_MISSION_ID);
+  assert.match(preBrief.map((line) => line.text).join(" "), /anyone there|gust of wind|not ordinary|ready/i);
+
+  const state = spiritWoodsMatchState();
+  const opening = spiritWoodsMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(SPIRIT_WOODS_MISSION_ID, state), opening);
+  assert.match(opening.map((line) => line.text).join(" "), /disturb my rest|snow storm|void|fight for it|duel/i);
+
+  const playing = { ...state, phase: "playing" };
+  assert.equal(shouldShowSpiritWoodsGreatFloodDialogue(playing, { greatFloodUsed: true }), true);
+  assert.match(spiritWoodsGreatFloodScript(playing).map((line) => line.text).join(" "), /Great Flood|whole field/i);
+  assert.equal(shouldShowSpiritWoodsTreantPoisonTaunt(playing, { poisonAttempted: true }), true);
+  assert.match(spiritWoodsTreantPoisonTauntScript(playing).map((line) => line.text).join(" "), /Poison|root/i);
+  assert.equal(shouldShowSpiritWoodsPaladinStatusTaunt(playing, { statusAttempted: true }), true);
+  assert.match(spiritWoodsPaladinStatusTauntScript(playing).map((line) => line.text).join(" "), /Gaia's protector|curses/i);
+  assert.equal(shouldShowSpiritWoodsTreantFireTaunt(playing, { fireHit: true }), true);
+  assert.match(spiritWoodsTreantFireTauntScript(playing).map((line) => line.text).join(" "), /Fire|flame/i);
+
+  const post = campaignPostMatchCutsceneScript(SPIRIT_WOODS_MISSION_ID);
+  assert.match(post.map((line) => line.text).join(" "), /forest mattered|void spreads|calm the storm|king/i);
+});
+
+test("completing Spirit of the Woods unlocks Mother Nature", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, SPIRIT_WOODS_MISSION_ID, spiritWoodsWonState(), {
+    paladinLightseekerDamageTakenCount: 0,
+    motherNatureGreatFloodUsed: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["mother-nature"]);
+  assert.equal(isUnitUnlocked("mother-nature", storage), true);
+  assert.equal(readCampaignProgressStars(storage, SPIRIT_WOODS_MISSION_ID), 3);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

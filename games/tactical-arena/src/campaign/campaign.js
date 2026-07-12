@@ -28,6 +28,7 @@ export const RONIN_MISSION_ID = "battle-for-the-bridge";
 export const WRONG_PLACE_MISSION_ID = "wrong-place-wrong-time";
 export const OUT_OF_RETIREMENT_MISSION_ID = "out-of-retirement";
 export const VOIDWOOD_MISSION_ID = "voidwood-forest";
+export const SPIRIT_WOODS_MISSION_ID = "spirit-of-the-woods";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -332,6 +333,20 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 9,
     fullHp: true,
   },
+  [SPIRIT_WOODS_MISSION_ID]: {
+    id: SPIRIT_WOODS_MISSION_ID,
+    title: "Spirit of the Woods",
+    subtitle: "The forest itself answers the party's call",
+    description: "Bring any four-unit squad into an 11x11 duel against Mother Nature, Treant, Clod, and a Gaia-protected Paladin. The old starter squad has a special stake in this fight.",
+    unitType: "mother-nature",
+    requiredStars: 32,
+    rewardUnits: Object.freeze(["mother-nature"]),
+    playerSlots: 4,
+    enemySquad: Object.freeze(["mother-nature", "treant", "clod", "paladin"]),
+    enemySkins: Object.freeze([null, null, null, "gaia's-protector"]),
+    size: 11,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -391,11 +406,11 @@ const CAMPAIGN_TRAIL = [
     blurb: "A deserted island beach curls around an ancient temple. Someone has been enjoying the quiet a little too much." },
   { id: VOIDWOOD_MISSION_ID, cell: { col: 2, row: 2 }, point: { x: 74.9, y: 64.8 }, region: "wood", locationName: "Voidwood Forest",
     blurb: "Void-black trees crowd the old trail. Something ancient waits where the summit marker used to sit." },
-  { id: "uncharted-18", cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste",
+  { id: SPIRIT_WOODS_MISSION_ID, cell: { col: 6, row: 1 }, point: { x: 38.4, y: 47.4 }, region: "wood", locationName: "Spirit Grove",
+    blurb: "A quiet forest node waits east of the Timeless Woods. The wind moves here even when the trees do not." },
+  { id: "uncharted-18", cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
-  { id: "uncharted-19", cell: { col: 4, row: 2 }, point: { x: 82.9, y: 30.3 }, region: "waste", locationName: "Ruins of Vael",
-    blurb: "A dead capital picked clean by mages. A caster here bends magic and the years to spite you." },
-  { id: "uncharted-20", cell: { col: 5, row: 2 }, point: { x: 86.8, y: 16.8 }, region: "waste", locationName: "The Iron Citadel",
+  { id: "uncharted-19", cell: { col: 5, row: 2 }, point: { x: 86.8, y: 16.8 }, region: "waste", locationName: "The Iron Citadel",
     blurb: "The last gate. A crowned commander waits on the throne — end the campaign or serve it." },
 ];
 
@@ -404,6 +419,7 @@ const CAMPAIGN_TRAIL = [
 const CAMPAIGN_FORKS = [
   [WITCH_DOCTOR_MISSION_ID, MINER_MISSION_ID],
   ["uncharted-06", "uncharted-09"],
+  [FATHER_TIME_MISSION_ID, SPIRIT_WOODS_MISSION_ID],
   [WANDERING_PARTY_MISSION_ID, "uncharted-18"],
 ];
 
@@ -416,7 +432,8 @@ function placeholderMission(stop, trailIndex) {
     subtitle: "Campaign · coming soon",
     description: stop.blurb ?? "This stretch of the war map hasn't been charted yet. New campaigns are on the way.",
     comingSoon: true,
-    requiredStars: 4 + (trailIndex - 2) * 2,
+    requiredStars: Number.isFinite(stop.requiredStars) ? stop.requiredStars : 4 + (trailIndex - 2) * 2,
+    requiresPreviousMissionsComplete: Boolean(stop.requiresPreviousMissionsComplete),
     rewardUnits: Object.freeze([]),
     playerSlots: 2,
     enemySquad: Object.freeze([]),
@@ -435,6 +452,7 @@ function buildCampaignMissions() {
       connections: [],
       region: stop.region,
       locationName: stop.locationName,
+      requiresPreviousMissionsComplete: Boolean(stop.requiresPreviousMissionsComplete ?? base.requiresPreviousMissionsComplete),
     });
   });
   // Spine: every stop trails to the next one in traversal order.
@@ -546,6 +564,18 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  if (missionId === SPIRIT_WOODS_MISSION_ID) {
+    return [
+      { speaker: "swordsman", side: "left",
+        text: "Is anyone there?" },
+      { speaker: "mother-nature", side: "right", player: 2,
+        text: "*A gust of wind answers through the branches.*" },
+      { speaker: "mystic", side: "left",
+        text: "That was not ordinary wind. Something is awake here." },
+      { speaker: "archer", side: "left",
+        text: "Then we should get ready before it decides whether we are welcome." },
+    ];
+  }
   if (missionId === VOIDWOOD_MISSION_ID) {
     return [
       { speaker: "treant", skin: "voidroot", side: "right", player: 2,
@@ -779,6 +809,20 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === SPIRIT_WOODS_MISSION_ID) {
+    return [
+      { speaker: "mother-nature", side: "right", player: 2,
+        text: "You fought as though the forest mattered to you." },
+      { speaker: "mystic", side: "left",
+        text: "The void spreads through roots, stone, and snow. We need more than a path through the pass; we need a way to stop it." },
+      { speaker: "mother-nature", side: "right", player: 2,
+        text: "Then this is no small human quarrel. Take me to the pass, and I will calm the storm." },
+      { speaker: "swordsman", side: "left",
+        text: "Then we can reach the king." },
+      { speaker: "mother-nature", side: "right", player: 2,
+        text: "Yes. And after that, you will show me where the void has taken root." },
+    ];
+  }
   if (missionId === VOIDWOOD_MISSION_ID) {
     return [
       { speaker: "swordsman", side: "left",
@@ -888,10 +932,12 @@ export function getCampaignMap(storage = defaultStorage()) {
   const progress = readCampaignProgress(storage);
   const totalStars = totalCampaignStars(progress);
   const completed = new Set(progress.completedMissions);
-  const nodes = CAMPAIGN_MISSIONS.map((mission) => {
+  const nodes = CAMPAIGN_MISSIONS.map((mission, index) => {
     const stars = progress.missionStars[mission.id] ?? 0;
-    const unlocked = totalStars >= mission.requiredStars;
     const complete = completed.has(mission.id);
+    const previousMissionsComplete = !mission.requiresPreviousMissionsComplete ||
+      CAMPAIGN_MISSIONS.slice(0, index).every((previous) => completed.has(previous.id));
+    const unlocked = totalStars >= mission.requiredStars && previousMissionsComplete;
     const status = !unlocked
       ? "locked"
       : mission.comingSoon
@@ -1002,6 +1048,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Riot Detail"
         : mission.id === OUT_OF_RETIREMENT_MISSION_ID
         ? "Retired Saints"
+        : mission.id === SPIRIT_WOODS_MISSION_ID
+        ? "Wild Court"
         : mission.id === VOIDWOOD_MISSION_ID
         ? "Voidwood Remnant"
         : mission.id === SNIPER_MISSION_ID
@@ -1462,6 +1510,16 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         : unit.skin ?? null
     ),
   },
+  [SPIRIT_WOODS_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    skinFor: (unit) => (
+      unit.player === 2 && unit.type === "paladin"
+        ? "gaia's-protector"
+        : unit.skin ?? null
+    ),
+  },
   [VOIDWOOD_MISSION_ID]: {
     positions: {},
     fallback: (unit) => ({ ...unit.position }),
@@ -1772,6 +1830,28 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       paladinLightseekerDamageTakenCount,
       paladinStatusAttempted,
       rewardSkins: [...(mission?.rewardSkins ?? [])],
+    };
+  } else if (missionId === SPIRIT_WOODS_MISSION_ID) {
+    const paladinLightseekerDamageTakenCount = Math.max(0, Math.floor(Number(meta.paladinLightseekerDamageTakenCount) || 0));
+    const motherNatureGreatFloodUsed = Boolean(meta.motherNatureGreatFloodUsed);
+    const playerTypes = new Set(playerUnits.map((unit) => unit.type));
+    const broughtStarterSquad = STARTER_UNIT_TYPES.every((type) => playerTypes.has(type));
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "noLightseeker", label: "Avoid Lightseeker damage", earned: victory && paladinLightseekerDamageTakenCount === 0 },
+      { id: "noGreatFlood", label: "Avoid Mother Nature's RAGE art", earned: victory && !motherNatureGreatFloodUsed },
+    ];
+    bonusObjectives = [
+      { id: "starterSquad", label: "Bonus: draft the starter squad", earned: victory && broughtStarterSquad },
+    ];
+    extra = {
+      motherNatureDefeated: enemyUnits.some((unit) => unit.type === "mother-nature" && unit.hp <= 0),
+      treantDefeated: enemyUnits.some((unit) => unit.type === "treant" && unit.hp <= 0),
+      clodDefeated: enemyUnits.some((unit) => unit.type === "clod" && unit.hp <= 0),
+      paladinDefeated: enemyUnits.some((unit) => unit.type === "paladin" && unit.hp <= 0),
+      paladinLightseekerDamageTakenCount,
+      motherNatureGreatFloodUsed,
+      broughtStarterSquad,
     };
   } else if (missionId === VOIDWOOD_MISSION_ID) {
     const voidwoodDarkBombDamageTakenCount = Math.max(0, Math.floor(Number(meta.voidwoodDarkBombDamageTakenCount) || 0));
@@ -2958,6 +3038,89 @@ export function wrongPlaceDefeatScript() {
   ];
 }
 
+export function spiritWoodsMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const motherNature = findUnit(state, "p2-0-mother-nature");
+  if (!speaker) return [];
+  return [
+    { speakerId: motherNature?.id,
+      text: "Why do you disturb my rest?" },
+    { speakerId: speaker.id,
+      text: "A snow storm blocks the passage northeast. We need your help to contain it so we can confront the king." },
+    { speakerId: motherNature?.id,
+      text: "You ask me to put a halt to my beautiful work for the affairs of man. That is a selfish request." },
+    { speaker: "mystic",
+      text: "The void has already consumed Treant's forest. Yours could be next." },
+    { speakerId: motherNature?.id,
+      text: "If you truly care for my forest, then fight for it." },
+    { speakerId: speaker.id,
+      text: "A duel for your help calming the storm. We accept." },
+    { speakerId: motherNature?.id,
+      text: "Then let the woods judge your resolve." },
+  ];
+}
+
+export function shouldShowSpiritWoodsGreatFloodDialogue(state, { warningShown = false, greatFloodUsed = false } = {}) {
+  if (warningShown || !greatFloodUsed || state?.phase !== "playing") return false;
+  return Boolean(findUnit(state, "p2-0-mother-nature"));
+}
+
+export function spiritWoodsGreatFloodScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const motherNature = findUnit(state, "p2-0-mother-nature");
+  if (!speaker) return [];
+  return [
+    { speakerId: motherNature?.id,
+      text: "Great Flood. Let every root remember who commands the rain." },
+    { speakerId: speaker.id,
+      text: "She can drown the whole field at once. We cannot let her cast that again." },
+  ];
+}
+
+export function shouldShowSpiritWoodsTreantPoisonTaunt(state, { warningShown = false, poisonAttempted = false } = {}) {
+  if (warningShown || !poisonAttempted || state?.phase !== "playing") return false;
+  const treant = findUnit(state, "p2-1-treant");
+  return Boolean(treant && treant.hp > 0);
+}
+
+export function spiritWoodsTreantPoisonTauntScript(state) {
+  const treant = findUnit(state, "p2-1-treant");
+  return [
+    { speakerId: treant?.id,
+      text: "Poison does not take root in me. The forest has tasted worse and lived." },
+  ];
+}
+
+export function shouldShowSpiritWoodsPaladinStatusTaunt(state, { warningShown = false, statusAttempted = false } = {}) {
+  if (warningShown || !statusAttempted || state?.phase !== "playing") return false;
+  const paladin = findUnit(state, "p2-3-paladin");
+  return Boolean(paladin && paladin.hp > 0);
+}
+
+export function spiritWoodsPaladinStatusTauntScript(state) {
+  const paladin = findUnit(state, "p2-3-paladin");
+  return [
+    { speakerId: paladin?.id,
+      text: "Gaia's protector does not bend to little curses. Try steel, if you must try anything." },
+  ];
+}
+
+export function shouldShowSpiritWoodsTreantFireTaunt(state, { warningShown = false, fireHit = false } = {}) {
+  if (warningShown || !fireHit || state?.phase !== "playing") return false;
+  return Boolean(findUnit(state, "p2-1-treant"));
+}
+
+export function spiritWoodsTreantFireTauntScript(state) {
+  const treant = findUnit(state, "p2-1-treant");
+  const motherNature = findUnit(state, "p2-0-mother-nature");
+  return [
+    { speakerId: treant?.id,
+      text: "Fire bites deep into old bark." },
+    { speakerId: motherNature?.id,
+      text: "Careful, little sparks. The woods remember every flame." },
+  ];
+}
+
 export function voidwoodMissionOpeningScript() {
   return [];
 }
@@ -2988,6 +3151,7 @@ export function voidwoodDefeatScript() {
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === SPIRIT_WOODS_MISSION_ID) return spiritWoodsMissionOpeningScript(state);
   if (missionId === VOIDWOOD_MISSION_ID) return voidwoodMissionOpeningScript(state);
   if (missionId === OUT_OF_RETIREMENT_MISSION_ID) return outOfRetirementMissionOpeningScript(state);
   if (missionId === WRONG_PLACE_MISSION_ID) return wrongPlaceMissionOpeningScript(state);

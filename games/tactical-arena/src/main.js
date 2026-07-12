@@ -2,7 +2,7 @@ import { attack, attackTile, beginActivation, cancelMove, concede, defend, finis
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getSoulShuffleChoices, getUnitType } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
-import { getBasicAttackDamageType, isWallBetween } from "./rules/combat.js";
+import { getBasicAttackDamageType, isFireBasedDamage, isWallBetween } from "./rules/combat.js";
 import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "./rules/movement.js";
 import { isStunned } from "./rules/statuses.js";
 import { applyCommand } from "./core/reducer.js";
@@ -18,7 +18,7 @@ import { isHealArtConfirmTile, renderBoard } from "./ui/boardRenderer.js";
 import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
 import { resolveAnimatedMove } from "./ui/animatedCommands.js";
-import { renderHeader, renderUnitCard, renderActions, renderSquads } from "./ui/hud.js";
+import { renderHeader, renderUnitCard, renderActions, renderSquads, renderWeatherBadge } from "./ui/hud.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
@@ -48,6 +48,7 @@ import {
   PALADIN_MISSION_ID,
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
+  SPIRIT_WOODS_MISSION_ID,
   VOIDWOOD_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
@@ -87,6 +88,10 @@ import {
   roninBlindWarningScript,
   roninRageWarningScript,
   sniperFireWarningScript,
+  spiritWoodsGreatFloodScript,
+  spiritWoodsPaladinStatusTauntScript,
+  spiritWoodsTreantFireTauntScript,
+  spiritWoodsTreantPoisonTauntScript,
   shouldShowBrothersRageWarning,
   shouldShowCampaignMapCutscene,
   shouldShowCampaignPostMatchCutscene,
@@ -106,6 +111,10 @@ import {
   shouldShowRoninBlindWarning,
   shouldShowRoninRageWarning,
   shouldShowSniperFireWarning,
+  shouldShowSpiritWoodsGreatFloodDialogue,
+  shouldShowSpiritWoodsPaladinStatusTaunt,
+  shouldShowSpiritWoodsTreantFireTaunt,
+  shouldShowSpiritWoodsTreantPoisonTaunt,
   shouldShowVirusEnemyStatusTaunt,
   shouldShowVirusPoisonWarning,
   shouldShowWitchDoctorBlockedShotWarning,
@@ -148,6 +157,7 @@ const actions = document.querySelector("#actions");
 const turnTitle = document.querySelector("#turnTitle");
 const turnSub = document.querySelector("#turnSub");
 const turnBanner = document.querySelector("#turnBanner");
+const weatherBadge = document.querySelector("#weatherBadge");
 const actionHelp = document.querySelector("#actionHelp");
 const squadOverlays = document.querySelector("#squadOverlays");
 const message = document.querySelector("#message");
@@ -304,6 +314,14 @@ function createCampaignMeta() {
     playerMagicDamageDealtCount: 0,
     voidwoodFallLinesShown: {},
     voidwoodDefeatDialogueShown: false,
+    // Spirit of the Woods (mission 17) -- reuses Paladin Lightseeker counter above.
+    motherNatureGreatFloodUsed: false,
+    motherNatureGreatFloodDialogueShown: false,
+    spiritWoodsTreantPoisonAttempted: false,
+    spiritWoodsTreantPoisonTauntShown: false,
+    spiritWoodsPaladinStatusTauntShown: false,
+    spiritWoodsTreantFireHit: false,
+    spiritWoodsTreantFireTauntShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -440,6 +458,7 @@ function renderCommandHud() {
 function renderBoardAndRail() {
   const unit = selectedUnit();
   renderHeader(state, { turnTitle, turnSub, turnBanner });
+  renderWeatherBadge(state, weatherBadge);
   // In tempo the rail is the player's selection surface at all times — a ready unit of
   // theirs stays clickable even while the CPU is acting, so a click can preempt it.
   const railEnabled = isTempoBattle(state)
@@ -1037,6 +1056,26 @@ function recordCampaignProgressHooks(command, result) {
         campaignMeta.angelDefeatedBeforePaladin = true;
       }
     }
+  } else if (campaignMissionId === SPIRIT_WOODS_MISSION_ID) {
+    for (const event of events) {
+      if (event.type === "ART_RESOLVED" && event.actorId === "p2-3-paladin" && event.artId === "lightseeker") {
+        const playerHits = (event.targetIds ?? []).filter((id) =>
+          findUnit(state, id)?.player === 1 && (event.damageByTarget?.[id] ?? 0) > 0);
+        campaignMeta.paladinLightseekerDamageTakenCount += playerHits.length;
+      }
+      if (event.type === "ART_RESOLVED" && event.actorId === "p2-0-mother-nature" && event.artId === "great-flood") {
+        campaignMeta.motherNatureGreatFloodUsed = true;
+      }
+      if (playerFireHitTarget(event, "p2-1-treant")) {
+        campaignMeta.spiritWoodsTreantFireHit = true;
+      }
+    }
+    if (playerTriedPoisonOnTarget(command, events, "p2-1-treant")) {
+      campaignMeta.spiritWoodsTreantPoisonAttempted = true;
+    }
+    if (playerTriedStatusOnPaladin(command, events, ["p2-3-paladin"])) {
+      campaignMeta.paladinStatusAttempted = true;
+    }
   } else if (campaignMissionId === VOIDWOOD_MISSION_ID) {
     campaignMeta.playerMagicDamageDealtCount += countPlayerMagicDamageDealt(events);
     for (const event of events) {
@@ -1211,6 +1250,22 @@ function playerTriedStatusOnPaladin(command, events = [], targetIds = ["p2-0-pal
     ));
 }
 
+function playerTriedPoisonOnTarget(command, events = [], targetId) {
+  if (command?.type !== "USE_ART" || command.player !== 1 || !targetId) return false;
+  const actor = findUnit(state, command.unitId);
+  const art = actor ? getArt(actor.type, command.artId) : null;
+  if (!artHasPoisonEffect(art)) return false;
+  if (command.targetId === targetId) return true;
+  return events.some((event) =>
+    event.type === "ART_RESOLVED" &&
+    event.actorId === command.unitId &&
+    (
+      event.targetId === targetId ||
+      (event.targetIds ?? []).includes(targetId) ||
+      (event.statusTargets ?? []).includes(targetId)
+    ));
+}
+
 function artHasStatusEffect(value) {
   if (!value || typeof value !== "object") return false;
   if (value.effect?.type === "status" || value.type === "status") return true;
@@ -1218,6 +1273,16 @@ function artHasStatusEffect(value) {
   return Object.values(value).some((child) => {
     if (Array.isArray(child)) return child.some(artHasStatusEffect);
     return child && typeof child === "object" && artHasStatusEffect(child);
+  });
+}
+
+function artHasPoisonEffect(value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.effect?.status === "poison" || value.globalStatus?.status === "poison") return true;
+  if (value.status === "poison" && value.type !== "immunity") return true;
+  return Object.values(value).some((child) => {
+    if (Array.isArray(child)) return child.some(artHasPoisonEffect);
+    return child && typeof child === "object" && artHasPoisonEffect(child);
   });
 }
 
@@ -1290,6 +1355,16 @@ function eventDamageForTarget(event, targetId) {
   const targets = eventTargetIds(event);
   if (event.targetId === targetId || targets.length <= 1) return numericDamage(event.damage);
   return 0;
+}
+
+function playerFireHitTarget(event, targetId) {
+  if (event?.type !== "ART_RESOLVED" || !targetId) return false;
+  const actor = findUnit(state, event.actorId);
+  if (actor?.player !== 1) return false;
+  const art = getArt(actor.type, event.artId);
+  if (!isFireBasedDamage({ art })) return false;
+  return eventTargetIds(event).some((id) =>
+    id === targetId && eventDamageForTarget(event, id) > 0);
 }
 
 function countPlayerMagicDamageDealt(events) {
@@ -1437,6 +1512,45 @@ function nextCampaignDialogueBeat() {
           script: (matchState) => voidwoodEnemyFallScript(matchState, id),
         };
       }
+    }
+    return null;
+  }
+  if (campaignMissionId === SPIRIT_WOODS_MISSION_ID) {
+    if (shouldShowSpiritWoodsGreatFloodDialogue(state, {
+      warningShown: campaignMeta.motherNatureGreatFloodDialogueShown,
+      greatFloodUsed: campaignMeta.motherNatureGreatFloodUsed,
+    })) {
+      return {
+        markShown: () => { campaignMeta.motherNatureGreatFloodDialogueShown = true; },
+        script: spiritWoodsGreatFloodScript,
+      };
+    }
+    if (shouldShowSpiritWoodsTreantPoisonTaunt(state, {
+      warningShown: campaignMeta.spiritWoodsTreantPoisonTauntShown,
+      poisonAttempted: campaignMeta.spiritWoodsTreantPoisonAttempted,
+    })) {
+      return {
+        markShown: () => { campaignMeta.spiritWoodsTreantPoisonTauntShown = true; },
+        script: spiritWoodsTreantPoisonTauntScript,
+      };
+    }
+    if (shouldShowSpiritWoodsPaladinStatusTaunt(state, {
+      warningShown: campaignMeta.spiritWoodsPaladinStatusTauntShown,
+      statusAttempted: campaignMeta.paladinStatusAttempted,
+    })) {
+      return {
+        markShown: () => { campaignMeta.spiritWoodsPaladinStatusTauntShown = true; },
+        script: spiritWoodsPaladinStatusTauntScript,
+      };
+    }
+    if (shouldShowSpiritWoodsTreantFireTaunt(state, {
+      warningShown: campaignMeta.spiritWoodsTreantFireTauntShown,
+      fireHit: campaignMeta.spiritWoodsTreantFireHit,
+    })) {
+      return {
+        markShown: () => { campaignMeta.spiritWoodsTreantFireTauntShown = true; },
+        script: spiritWoodsTreantFireTauntScript,
+      };
     }
     return null;
   }

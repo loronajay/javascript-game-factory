@@ -1,10 +1,20 @@
-import { getAbilityUseMax, getAbilityUsesRemaining, getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getAbilityUseMax, getAbilityUsesRemaining, getActiveWeather, getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
 import { colorOf } from "../core/state.js";
 import { teamLabel, teamOf } from "../match/matchBuilder.js";
 import { TEMPO_GAUGE_MAX, canBeginTempoActivation, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
+
+// Icon per weather id, shown in the match HUD's weather badge (renderWeatherBadge).
+// "none" is the badge's own resting state, not a WEATHER_TYPES entry.
+const WEATHER_ICONS = {
+  none: "☀",
+  blizzard: "❄",
+  spring: "\u{1F327}",
+  heatwave: "\u{1F525}",
+  thunderstorm: "⛈"
+};
 
 function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -94,6 +104,22 @@ export function renderHeader(state, { turnTitle, turnSub, turnBanner }) {
     ? `${teamLabel(state, state.winner)} wins`
     : `Player ${state.currentPlayer} squad turn`;
   turnSub.textContent = state.phase === "complete" ? "Restart to play again" : `${available} piece${available === 1 ? "" : "s"} still available`;
+}
+
+// Small always-visible badge naming the active board-wide weather (Mother Nature's
+// casts, or a mission-authored weather cycle) so a subtle per-weather stat fold
+// (e.g. Heatwave's +1 crit damage) isn't the only signal a player has that it's active.
+export function renderWeatherBadge(state, weatherBadge) {
+  if (!weatherBadge) return;
+  const weather = getActiveWeather(state);
+  const id = weather?.id ?? "none";
+  const label = weather?.label ?? "None";
+  weatherBadge.dataset.weather = id;
+  weatherBadge.title = weather ? weather.label : "No weather is currently active";
+  const icon = weatherBadge.querySelector(".weather-icon");
+  const text = weatherBadge.querySelector(".weather-text");
+  if (icon) icon.textContent = WEATHER_ICONS[id] ?? WEATHER_ICONS.none;
+  if (text) text.textContent = `Weather: ${label}`;
 }
 
 // HUD portrait as an HTML string (renderUnitCard builds the card via innerHTML).
