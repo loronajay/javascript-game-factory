@@ -5,7 +5,7 @@ import { isNegativeStatus } from "../rules/statuses.js";
 import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { normalizeWeatherSpec } from "../core/weather.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
-import { OUT_OF_RETIREMENT_SKIN_REWARDS, STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
+import { OUT_OF_RETIREMENT_SKIN_REWARDS, STARTER_UNIT_TYPES, isProgressUnitUnlocked, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { computeCampaignGeometry, computeRegionBoxes } from "./campaignMap.js";
 import { getNicknamePref } from "../ui/nicknameModel.js";
@@ -29,6 +29,7 @@ export const WRONG_PLACE_MISSION_ID = "wrong-place-wrong-time";
 export const OUT_OF_RETIREMENT_MISSION_ID = "out-of-retirement";
 export const VOIDWOOD_MISSION_ID = "voidwood-forest";
 export const SPIRIT_WOODS_MISSION_ID = "spirit-of-the-woods";
+export const SHOWDOWN_MISSION_ID = "the-showdown";
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -39,6 +40,7 @@ export const HASBEEN_MYSTIC_SKIN_PACK = "hasbeen-mystic";
 // ("p2-<index>-<type>" ids follow this order). Their overworld/rage/defeat banter and
 // the "bring the whole starter squad" bonus all read off this list.
 export const HASBEEN_HEROES_FAT_TYPES = Object.freeze(["fat-knight", "fat-bowman", "fat-cleric", "fat-wizard"]);
+export const SHOWDOWN_FAT_TYPES = Object.freeze(["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]);
 export const VOIDWOOD_SKIN_REWARDS = Object.freeze([
   Object.freeze({ type: "treant", slug: "voidroot" }),
 ]);
@@ -347,6 +349,21 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 11,
     fullHp: true,
   },
+  [SHOWDOWN_MISSION_ID]: {
+    id: SHOWDOWN_MISSION_ID,
+    title: "The Showdown",
+    subtitle: "The pass freezes over as old rivals make their stand",
+    description: "Bring any four-unit squad into a standard 11x11 duel against the fat party. The blizzard never lets up, and one clean Footwork through all four enemies can swing the whole pass.",
+    unitType: "fat-knight",
+    requiredStars: 0,
+    requiresPreviousMissionsComplete: true,
+    rewardUnits: Object.freeze([...SHOWDOWN_FAT_TYPES]),
+    rewardLabel: "Fat Knight, Fat Wizard, Fat Cleric, and Fat Bowman",
+    playerSlots: 4,
+    enemySquad: Object.freeze([...SHOWDOWN_FAT_TYPES]),
+    size: 11,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -408,7 +425,7 @@ const CAMPAIGN_TRAIL = [
     blurb: "Void-black trees crowd the old trail. Something ancient waits where the summit marker used to sit." },
   { id: SPIRIT_WOODS_MISSION_ID, cell: { col: 6, row: 1 }, point: { x: 30.0, y: 56.9 }, region: "wood", locationName: "Spirit Grove",
     blurb: "A quiet forest node waits east of the Timeless Woods. The wind moves here even when the trees do not." },
-  { id: "uncharted-18", cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
+  { id: SHOWDOWN_MISSION_ID, cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
   { id: "uncharted-19", cell: { col: 5, row: 2 }, point: { x: 86.8, y: 16.8 }, region: "waste", locationName: "The Iron Citadel",
     blurb: "The last gate. A crowned commander waits on the throne — end the campaign or serve it." },
@@ -420,7 +437,7 @@ const CAMPAIGN_FORKS = [
   [WITCH_DOCTOR_MISSION_ID, MINER_MISSION_ID],
   ["uncharted-06", "uncharted-09"],
   [FATHER_TIME_MISSION_ID, SPIRIT_WOODS_MISSION_ID],
-  [WANDERING_PARTY_MISSION_ID, "uncharted-18"],
+  [WANDERING_PARTY_MISSION_ID, SHOWDOWN_MISSION_ID],
 ];
 
 function placeholderMission(stop, trailIndex) {
@@ -564,6 +581,34 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  if (missionId === SHOWDOWN_MISSION_ID) {
+    return [
+      { speaker: "mother-nature", side: "left",
+        text: "I will calm the storm enough for you to cross the pass." },
+      { speaker: "mother-nature", side: "left",
+        text: "But I cannot go farther. The void spread is clawing at my forest, and I must return to protect it." },
+      { speaker: "mystic", side: "left",
+        text: "Then we carry on from here. Thank you, Mother Nature." },
+      { speaker: "swordsman", side: "left",
+        text: "The path is opening. Move before the wind changes its mind." },
+      { speaker: "fat-cleric", side: "right", player: 2,
+        text: "I cannot feel my toes. I miss feeling my toes. I miss snacks more, but the toes are up there." },
+      { speaker: "fat-bowman", side: "right", player: 2,
+        text: "If I freeze to death on this pass, bury me somewhere warm. Or near a bakery." },
+      { speaker: "fat-wizard", side: "right", player: 2,
+        text: "*hic* I told you we should have taken the tavern road. Taverns have walls. And chairs. And mistakes." },
+      { speaker: "fat-knight", side: "right", player: 2,
+        text: "Quit whining. We are almost-- hey wait a minute look. It's those wannabes!" },
+      { speaker: "mystic", side: "left",
+        text: "Wannabes?" },
+      { speaker: "fat-wizard", side: "right", player: 2,
+        text: "We gotta stop these guys, they're going to ruin everything!" },
+      { speaker: "fat-knight", side: "right", player: 2,
+        text: "Yeah. And we owe these guys a little payback anyways." },
+      { speaker: "mystic", side: "left",
+        text: "We can't all fit on the pass. We need to make a squad." },
+    ];
+  }
   if (missionId === SPIRIT_WOODS_MISSION_ID) {
     return [
       { speaker: "swordsman", side: "left",
@@ -809,6 +854,36 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === SHOWDOWN_MISSION_ID) {
+    return [
+      { speaker: "mystic", side: "left",
+        text: "Start from the beginning. What actually happened to you four?" },
+      { speaker: "fat-wizard", side: "right", player: 2,
+        text: "*hic* I opened the void gate. Accidentally. While experimenting. Also accidentally drunk." },
+      { speaker: "fat-knight", side: "right", player: 2,
+        text: "A cloaked figure came out of it and beat him half to pieces. Buildings came down in the fight." },
+      { speaker: "fat-bowman", side: "right", player: 2,
+        text: "Then the figure left through another void gate. All anyone saw was our wizard standing in the wreckage." },
+      { speaker: "fat-cleric", side: "right", player: 2,
+        text: "We tried to tell them he would never destroy the kingdom on purpose. They banished all of us anyway." },
+      { speaker: "fat-wizard", side: "right", player: 2,
+        text: "And I started a drunken rumor in a tavern that it was the king's fault. By morning, shame had already sobered me up." },
+      { speaker: "fat-knight", side: "right", player: 2,
+        text: "So we swore we would return, set the record straight, and let him take responsibility for the rumor." },
+      { speaker: "fat-bowman", side: "right", player: 2,
+        text: "The road back was not exactly quiet. Void things, ambushes, bad weather, worse inns." },
+      { speaker: "fat-cleric", side: "right", player: 2,
+        text: "But now that we have made it to the pass, we cannot turn back." },
+      { speaker: "fat-knight", side: "right", player: 2,
+        text: "Let us come with you. We clear the king's name, and the wizard tells the truth." },
+      { speaker: "swordsman", side: "left",
+        text: "Then we go together. No more rumors. No more running." },
+      { speaker: "mystic", side: "left",
+        text: "And no more calling us wannabes." },
+      { speaker: "fat-knight", side: "right", player: 2,
+        text: "...Fair." },
+    ];
+  }
   if (missionId === SPIRIT_WOODS_MISSION_ID) {
     return [
       { speaker: "mother-nature", side: "right", player: 2,
@@ -900,6 +975,31 @@ export function totalCampaignStars(progress) {
 
 export function getCampaignMission(missionId) {
   return CAMPAIGN_MISSIONS.find((mission) => mission.id === missionId) ?? null;
+}
+
+export function campaignMissionHasAuthoredWeather(missionOrId) {
+  const missionId = typeof missionOrId === "string" ? missionOrId : missionOrId?.id ?? null;
+  if (!missionId || missionId === SPIRIT_WOODS_MISSION_ID) return false;
+  const layout = CAMPAIGN_LAYOUTS[missionId];
+  if (!layout) return false;
+  const rules = typeof layout.missionRules === "function" ? layout.missionRules() : layout.missionRules;
+  return Boolean(layout.weather || rules?.permanentWeather || rules?.weatherCycle);
+}
+
+export function campaignRestrictedUnitTypes(storage = defaultStorage(), missionOrId = null) {
+  return campaignMissionHasAuthoredWeather(missionOrId) ? ["mother-nature"] : [];
+}
+
+export function campaignRetiredUnitTypes(storage = defaultStorage(), missionOrId = null) {
+  return campaignRestrictedUnitTypes(storage, missionOrId);
+}
+
+export function campaignSelectableUnitTypes(types = UNIT_TYPE_KEYS, storage = defaultStorage(), missionOrId = null) {
+  const restricted = new Set(campaignRestrictedUnitTypes(storage, missionOrId));
+  return (Array.isArray(types) ? types : UNIT_TYPE_KEYS)
+    .filter((type) => UNIT_TYPE_KEYS.includes(type))
+    .filter((type) => isProgressUnitUnlocked(type, storage))
+    .filter((type) => !restricted.has(type));
 }
 
 export function campaignSquadSize(mission) {
@@ -1050,6 +1150,8 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
         ? "Retired Saints"
         : mission.id === SPIRIT_WOODS_MISSION_ID
         ? "Wild Court"
+        : mission.id === SHOWDOWN_MISSION_ID
+        ? "The Fat Party"
         : mission.id === VOIDWOOD_MISSION_ID
         ? "Voidwood Remnant"
         : mission.id === SNIPER_MISSION_ID
@@ -1520,6 +1622,15 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         : unit.skin ?? null
     ),
   },
+  [SHOWDOWN_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    weather: "blizzard",
+    missionRules: () => ({
+      permanentWeather: { weather: "blizzard", sourceId: null },
+    }),
+  },
   [VOIDWOOD_MISSION_ID]: {
     positions: {},
     fallback: (unit) => ({ ...unit.position }),
@@ -1852,6 +1963,22 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       paladinLightseekerDamageTakenCount,
       motherNatureGreatFloodUsed,
       broughtStarterSquad,
+    };
+  } else if (missionId === SHOWDOWN_MISSION_ID) {
+    const showdownAnyUnitEnteredRage = Boolean(meta.showdownAnyUnitEnteredRage);
+    const showdownFootworkHitAllEnemies = Boolean(meta.showdownFootworkHitAllEnemies);
+    objectives = [
+      { id: "complete", label: "Win the duel", earned: victory },
+      { id: "rageEntered", label: "Have any unit enter RAGE", earned: victory && showdownAnyUnitEnteredRage },
+      { id: "survive", label: "Keep all party members alive", earned: allSurvived },
+    ];
+    bonusObjectives = [
+      { id: "footworkAll", label: "Bonus: hit all enemy units with one Footwork while they are standing", earned: victory && showdownFootworkHitAllEnemies },
+    ];
+    extra = {
+      showdownAnyUnitEnteredRage,
+      showdownFootworkHitAllEnemies,
+      fatPartyDefeated: enemyUnits.filter((unit) => SHOWDOWN_FAT_TYPES.includes(unit.type) && unit.hp <= 0).length,
     };
   } else if (missionId === VOIDWOOD_MISSION_ID) {
     const voidwoodDarkBombDamageTakenCount = Math.max(0, Math.floor(Number(meta.voidwoodDarkBombDamageTakenCount) || 0));
@@ -2901,6 +3028,62 @@ export function hasbeenHeroesDefeatScript(state) {
   ];
 }
 
+// --- Mission 18: The Showdown dialogue ---------------------------------------
+// A cold-pass rematch that finally turns the fat party from rivals into allies.
+// The battle itself uses a normal 4v4 shell; these beats carry the story turn.
+
+export function showdownMissionOpeningScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  if (!speaker) return [];
+  const line = (type, text) => {
+    const unit = fatSquadUnit(state, type);
+    return unit ? { speakerId: unit.id, text } : { speaker: type, side: "right", player: 2, text };
+  };
+  return [
+    line("fat-knight", "Nobody gets through this pass until we do. Not the king, not the void, and definitely not you."),
+    line("fat-wizard", "*hic* If they reach the castle first, the truth gets buried and everything gets worse. We cannot let them ruin everything."),
+    { speakerId: speaker.id, text: "We are trying to stop the void too. Stand down and explain yourselves." },
+    line("fat-bowman", "Explain after. Arrows now. My fingers are too cold for a long speech."),
+    line("fat-cleric", "I will heal everyone after we win. Or after we lose. Mostly I just want to stop freezing."),
+    { speaker: "mystic", side: "left", text: "Then we settle it here. One squad, one pass." },
+  ];
+}
+
+export function shouldShowShowdownFatRageWarning(state, type, { warned = false } = {}) {
+  if (warned || state?.phase !== "playing") return false;
+  const unit = fatSquadUnit(state, type);
+  return Boolean(unit && unit.hp > 0 && unit.hp <= 5);
+}
+
+const SHOWDOWN_FAT_RAGE_LINES = Object.freeze({
+  "fat-knight": "RAGE! Payback does not freeze. It waits, shivering, and then it hits you with a sword!",
+  "fat-wizard": "RAGE! I am sorry in advance for whatever spell happens next!",
+  "fat-cleric": "RAGE! The truth is I am cold, hungry, and very tired of losing!",
+  "fat-bowman": "RAGE! My fingers are frozen, but my aim is still rude!",
+});
+
+export function showdownFatRageWarningScript(state, type) {
+  const unit = fatSquadUnit(state, type);
+  const text = SHOWDOWN_FAT_RAGE_LINES[type];
+  if (!unit || !text) return [];
+  return [{ speakerId: unit.id, text }];
+}
+
+export function showdownDefeatScript(state) {
+  const speaker = firstLivingPlayerUnit(state);
+  const line = (type, text) => {
+    const unit = fatSquadUnit(state, type);
+    return { speakerId: unit?.id, speaker: type, side: "right", player: 2, text };
+  };
+  return [
+    line("fat-knight", "*panting* Fine. You got us."),
+    line("fat-bowman", "Can we admit they are better than us and find literally any place with a roof?"),
+    line("fat-cleric", "They are not wannabes. They are warm-blooded winners. I respect that."),
+    line("fat-wizard", "*hic* Maybe we should tell them. The whole thing. The ugly version."),
+    ...(speaker ? [{ speakerId: speaker.id, text: "Start talking." }] : []),
+  ];
+}
+
 // --- Mission 13: Battle for the Bridge dialogue ------------------------------
 // The map cutscene stages the challenge and unit pick. In-battle beats cover the
 // duel's opening, Ronin's blind, Final Draw, and the once-gated overworld recruitment.
@@ -3151,6 +3334,7 @@ export function voidwoodDefeatScript() {
 // Dispatcher so the match seam can ask for a mission's opening without a per-mission
 // branch of its own.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === SHOWDOWN_MISSION_ID) return showdownMissionOpeningScript(state);
   if (missionId === SPIRIT_WOODS_MISSION_ID) return spiritWoodsMissionOpeningScript(state);
   if (missionId === VOIDWOOD_MISSION_ID) return voidwoodMissionOpeningScript(state);
   if (missionId === OUT_OF_RETIREMENT_MISSION_ID) return outOfRetirementMissionOpeningScript(state);

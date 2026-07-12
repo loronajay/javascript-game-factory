@@ -23,6 +23,8 @@ import {
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
   SPIRIT_WOODS_MISSION_ID,
+  SHOWDOWN_FAT_TYPES,
+  SHOWDOWN_MISSION_ID,
   VOIDWOOD_MISSION_ID,
   VIRUS_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
@@ -38,6 +40,7 @@ import {
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
   campaignRewardPickedScript,
+  campaignSelectableUnitTypes,
   hasbeenHeroesMissionOpeningScript,
   hasbeenHeroesDefeatScript,
   hasbeenFatRageWarningScript,
@@ -118,6 +121,10 @@ import {
   spiritWoodsPaladinStatusTauntScript,
   spiritWoodsTreantFireTauntScript,
   spiritWoodsTreantPoisonTauntScript,
+  showdownDefeatScript,
+  showdownFatRageWarningScript,
+  showdownMissionOpeningScript,
+  shouldShowShowdownFatRageWarning,
   virusEnemyStatusTauntScript,
   virusMissionOpeningScript,
   virusPoisonWarningScript,
@@ -2850,7 +2857,7 @@ function spiritWoodsWonState(base = spiritWoodsMatchState()) {
   };
 }
 
-test("Spirit of the Woods is mission 17 and keeps Shattered Waste locked until all prior missions complete", () => {
+test("Spirit of the Woods is mission 17 and keeps The Showdown locked until all prior missions complete", () => {
   const mission = getCampaignMission(SPIRIT_WOODS_MISSION_ID);
   assert.ok(mission);
   assert.equal(mission.comingSoon ?? false, false);
@@ -2863,7 +2870,7 @@ test("Spirit of the Woods is mission 17 and keeps Shattered Waste locked until a
 
   const fresh = getCampaignMap(storageAdapter());
   const spiritIndex = fresh.nodes.findIndex((node) => node.id === SPIRIT_WOODS_MISSION_ID);
-  const wasteIndex = fresh.nodes.findIndex((node) => node.locationName === "The Shattered Waste");
+  const wasteIndex = fresh.nodes.findIndex((node) => node.id === SHOWDOWN_MISSION_ID);
   assert.equal(spiritIndex > -1, true);
   assert.equal(wasteIndex, spiritIndex + 1);
   assert.equal(fresh.nodes[spiritIndex].point.x > 29.5 && fresh.nodes[spiritIndex].point.x < 30.5, true, "the marker sits on the painted forest node east of Timeless Woods");
@@ -2883,7 +2890,7 @@ test("Spirit of the Woods is mission 17 and keeps Shattered Waste locked until a
     completedMissions: [...priorWithoutSpirit, SPIRIT_WOODS_MISSION_ID],
     missionStars: Object.fromEntries([...priorWithoutSpirit, SPIRIT_WOODS_MISSION_ID].map((id) => [id, 1])),
   });
-  assert.equal(getCampaignMap(storage).nodes[wasteIndex].status, "coming-soon");
+  assert.equal(getCampaignMap(storage).nodes[wasteIndex].status, "available");
 });
 
 test("Spirit of the Woods is an 11x11 chosen 4v4 against Mother Nature's court", () => {
@@ -2960,7 +2967,167 @@ test("completing Spirit of the Woods unlocks Mother Nature", () => {
   assert.equal(completed.stars, 3);
   assert.deepEqual(completed.newRewardUnits, ["mother-nature"]);
   assert.equal(isUnitUnlocked("mother-nature", storage), true);
+  assert.deepEqual(campaignSelectableUnitTypes(["mother-nature", "swordsman"], storage, SPIRIT_WOODS_MISSION_ID), ["mother-nature", "swordsman"]);
+  assert.deepEqual(campaignSelectableUnitTypes(["mother-nature", "swordsman"], storage, VIRUS_MISSION_ID), ["mother-nature", "swordsman"]);
   assert.equal(readCampaignProgressStars(storage, SPIRIT_WOODS_MISSION_ID), 3);
+});
+
+test("campaign squad selection gates Mother Nature from weather-related missions except her own", () => {
+  const storage = storageAdapter();
+  completeCampaignMission(storage, SPIRIT_WOODS_MISSION_ID, spiritWoodsWonState(), {
+    paladinLightseekerDamageTakenCount: 0,
+    motherNatureGreatFloodUsed: false,
+  });
+
+  const choices = ["mother-nature", "swordsman"];
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, SPIRIT_WOODS_MISSION_ID), choices);
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, VIRUS_MISSION_ID), choices);
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, GARGOYLE_MISSION_ID), ["swordsman"]);
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, OUT_OF_RETIREMENT_MISSION_ID), ["swordsman"]);
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, RONIN_MISSION_ID), ["swordsman"]);
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, SHOWDOWN_MISSION_ID), ["swordsman"]);
+});
+
+// --- Mission 18: The Showdown -------------------------------------------------
+
+function showdownMatchState(squad = ["swordsman", "archer", "mystic", "magician"]) {
+  return prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(SHOWDOWN_MISSION_ID, squad)),
+    SHOWDOWN_MISSION_ID,
+  );
+}
+
+function showdownWonState(base = showdownMatchState()) {
+  return {
+    ...base,
+    phase: "complete",
+    winner: 1,
+    units: base.units.map((unit) =>
+      unit.player === 2 ? { ...unit, hp: 0 } : { ...unit, hp: Math.max(1, unit.hp) }),
+  };
+}
+
+test("The Showdown replaces the Shattered Waste placeholder and unlocks only after all previous missions are complete", () => {
+  const mission = getCampaignMission(SHOWDOWN_MISSION_ID);
+  assert.ok(mission);
+  assert.equal(mission.comingSoon ?? false, false);
+  assert.equal(mission.title, "The Showdown");
+  assert.equal(mission.locationName, "The Shattered Waste");
+  assert.equal(mission.region, "waste");
+  assert.equal(mission.requiresPreviousMissionsComplete, true);
+  assert.deepEqual(mission.rewardUnits, ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]);
+
+  const fresh = getCampaignMap(storageAdapter());
+  const showdownIndex = fresh.nodes.findIndex((node) => node.id === SHOWDOWN_MISSION_ID);
+  assert.equal(showdownIndex > -1, true);
+  assert.equal(fresh.nodes[showdownIndex].status, "locked");
+  assert.equal(fresh.nodes[showdownIndex].displayType, null);
+
+  const storage = storageAdapter();
+  const prior = fresh.nodes.slice(0, showdownIndex).map((node) => node.id);
+  writeCampaignProgress(storage, {
+    completedMissions: prior.slice(0, -1),
+    missionStars: Object.fromEntries(prior.slice(0, -1).map((id) => [id, 3])),
+  });
+  assert.equal(getCampaignMap(storage).nodes[showdownIndex].status, "locked");
+
+  writeCampaignProgress(storage, {
+    completedMissions: prior,
+    missionStars: Object.fromEntries(prior.map((id) => [id, 1])),
+  });
+  const unlocked = getCampaignMap(storage).nodes[showdownIndex];
+  assert.equal(unlocked.status, "available");
+  assert.equal(unlocked.displayType, "fat-knight");
+});
+
+test("The Showdown is a full-HP 11x11 4v4 under permanent blizzard", () => {
+  const config = createCampaignMatchConfig(SHOWDOWN_MISSION_ID, ["paladin", "treant", "ronin", "angel"]);
+  assert.equal(config.size, 11);
+  assert.deepEqual(config.squads[1], ["paladin", "treant", "ronin", "angel"]);
+  assert.deepEqual(config.squads[2], SHOWDOWN_FAT_TYPES);
+  assert.equal(config.teamNames[2], "The Fat Party");
+
+  const match = showdownMatchState();
+  assert.equal(match.size, 11);
+  assert.equal(getActiveWeather(match)?.id, "blizzard");
+  assert.equal(match.missionRules?.permanentWeather?.weather, "blizzard");
+  assert.deepEqual(match.units.filter((unit) => unit.player === 2).map((unit) => unit.type), SHOWDOWN_FAT_TYPES);
+  for (const unit of match.units) {
+    assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
+  }
+});
+
+test("The Showdown grading rewards win, any RAGE, survival, and all-standing Footwork bonus", () => {
+  const won = showdownWonState();
+
+  const perfect = evaluateCampaignMission(SHOWDOWN_MISSION_ID, won, {
+    showdownAnyUnitEnteredRage: true,
+    showdownFootworkHitAllEnemies: true,
+  });
+  assert.equal(perfect.victory, true);
+  assert.equal(perfect.stars, 3);
+  assert.deepEqual(perfect.objectives.map((objective) => objective.id), ["complete", "rageEntered", "survive"]);
+  assert.equal(perfect.bonusObjectives[0].id, "footworkAll");
+  assert.equal(perfect.earnedBonusStars, 1);
+
+  const noRage = evaluateCampaignMission(SHOWDOWN_MISSION_ID, won, {
+    showdownAnyUnitEnteredRage: false,
+    showdownFootworkHitAllEnemies: false,
+  });
+  assert.equal(noRage.stars, 2);
+  assert.equal(noRage.objectives.find((objective) => objective.id === "rageEntered").earned, false);
+
+  const oneDown = {
+    ...won,
+    units: won.units.map((unit) => unit.id === "p1-0-swordsman" ? { ...unit, hp: 0 } : unit),
+  };
+  assert.equal(evaluateCampaignMission(SHOWDOWN_MISSION_ID, oneDown, {
+    showdownAnyUnitEnteredRage: true,
+    showdownFootworkHitAllEnemies: true,
+  }).stars, 3, "the bonus can cover one missed base objective");
+});
+
+test("The Showdown dialogue covers the cold pass, battle banter, fat RAGE lines, admission, and post-match reveal", () => {
+  const storage = storageAdapter();
+  assert.equal(shouldShowCampaignMapCutscene(storage, SHOWDOWN_MISSION_ID), true);
+  const preBrief = campaignMapCutsceneScript(SHOWDOWN_MISSION_ID);
+  assert.match(preBrief.map((line) => line.text).join(" "), /calm the storm|forest|void spread|cross|freeze|wannabes|payback|squad/i);
+
+  const state = showdownMatchState();
+  const opening = showdownMissionOpeningScript(state);
+  assert.deepEqual(campaignOpeningScript(SHOWDOWN_MISSION_ID, state), opening);
+  assert.match(opening.map((line) => line.text).join(" "), /king|truth|pass|ruin everything/i);
+
+  const playing = { ...state, phase: "playing" };
+  for (const type of SHOWDOWN_FAT_TYPES) {
+    const raging = {
+      ...playing,
+      units: playing.units.map((unit) => unit.player === 2 && unit.type === type ? { ...unit, hp: 5 } : unit),
+    };
+    assert.equal(shouldShowShowdownFatRageWarning(raging, type, { warned: false }), true);
+    assert.equal(shouldShowShowdownFatRageWarning(raging, type, { warned: true }), false);
+    assert.match(showdownFatRageWarningScript(raging, type).map((line) => line.text).join(" "), /RAGE|payback|freeze|truth|sorry/i);
+  }
+
+  assert.match(showdownDefeatScript(showdownWonState()).map((line) => line.text).join(" "), /got us|better than us|wannabes/i);
+  const post = campaignPostMatchCutsceneScript(SHOWDOWN_MISSION_ID);
+  assert.match(post.map((line) => line.text).join(" "), /void gate|drunk|cloaked figure|banished|king's name/i);
+});
+
+test("completing The Showdown unlocks the full fat party", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, SHOWDOWN_MISSION_ID, showdownWonState(), {
+    showdownAnyUnitEnteredRage: true,
+    showdownFootworkHitAllEnemies: true,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.deepEqual(completed.newRewardUnits, ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]);
+  for (const type of ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
+    assert.equal(isUnitUnlocked(type, storage), true, `${type} unlocked`);
+  }
+  assert.equal(readCampaignProgressStars(storage, SHOWDOWN_MISSION_ID), 3);
 });
 
 // --- Mechs on the Farm (mission 7.5) -----------------------------------------

@@ -1,5 +1,5 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
-import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getSoulShuffleChoices, getUnitType } from "./core/unitCatalog.js";
+import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getSoulShuffleChoices, getUnitType, isRaging } from "./core/unitCatalog.js";
 import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isFireBasedDamage, isWallBetween } from "./rules/combat.js";
@@ -49,6 +49,8 @@ import {
   RONIN_MISSION_ID,
   SNIPER_MISSION_ID,
   SPIRIT_WOODS_MISSION_ID,
+  SHOWDOWN_FAT_TYPES,
+  SHOWDOWN_MISSION_ID,
   VOIDWOOD_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
@@ -92,6 +94,9 @@ import {
   spiritWoodsPaladinStatusTauntScript,
   spiritWoodsTreantFireTauntScript,
   spiritWoodsTreantPoisonTauntScript,
+  showdownDefeatScript,
+  showdownFatRageWarningScript,
+  shouldShowShowdownFatRageWarning,
   shouldShowBrothersRageWarning,
   shouldShowCampaignMapCutscene,
   shouldShowCampaignPostMatchCutscene,
@@ -322,6 +327,11 @@ function createCampaignMeta() {
     spiritWoodsPaladinStatusTauntShown: false,
     spiritWoodsTreantFireHit: false,
     spiritWoodsTreantFireTauntShown: false,
+    // The Showdown (mission 18)
+    showdownAnyUnitEnteredRage: false,
+    showdownFootworkHitAllEnemies: false,
+    showdownDefeatDialogueShown: false,
+    showdownFatRageWarned: Object.fromEntries(SHOWDOWN_FAT_TYPES.map((type) => [type, false])),
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -805,6 +815,18 @@ function announceTurnChange(prevPlayer) {
       resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
     };
     if (
+      campaignMissionId === SHOWDOWN_MISSION_ID &&
+      state.winner === 1 &&
+      !campaignMeta.showdownDefeatDialogueShown
+    ) {
+      campaignMeta.showdownDefeatDialogueShown = true;
+      const script = showdownDefeatScript(state);
+      if (script.length) {
+        void dialogue.show(script).then(showResults);
+      } else {
+        showResults();
+      }
+    } else if (
       campaignMissionId === VOIDWOOD_MISSION_ID &&
       state.winner === 1 &&
       !campaignMeta.voidwoodDefeatDialogueShown
@@ -917,6 +939,7 @@ function commandErrorMessage(result) {
 
 function dispatch(command) {
   const prevPlayer = state.currentPlayer;
+  const beforeState = state;
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) {
     recordCampaignRejection(prepared, result);
@@ -926,7 +949,7 @@ function dispatch(command) {
   lastDispatchEvents = result.events ?? [];
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(prepared, result);
+  recordCampaignProgressHooks(prepared, result, beforeState);
   broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
   playRolloverFx(result.events ?? []);
@@ -955,7 +978,7 @@ function recordCampaignRejection(command, result) {
   maybeShowCampaignDialogue();
 }
 
-function recordCampaignProgressHooks(command, result) {
+function recordCampaignProgressHooks(command, result, beforeState = null) {
   if (matchConfig?.mode !== "campaign") return;
   // Defensive: a bad call site passing no result must never throw here — an
   // exception in a resolver leaves `resolving` stuck and hardlocks the match.
@@ -1075,6 +1098,24 @@ function recordCampaignProgressHooks(command, result) {
     }
     if (playerTriedStatusOnPaladin(command, events, ["p2-3-paladin"])) {
       campaignMeta.paladinStatusAttempted = true;
+    }
+  } else if (campaignMissionId === SHOWDOWN_MISSION_ID) {
+    if (state.units.some((unit) => unit.hp > 0 && isRaging(unit))) {
+      campaignMeta.showdownAnyUnitEnteredRage = true;
+    }
+    for (const event of events) {
+      if (event.type !== "ART_RESOLVED" || event.artId !== "footwork") continue;
+      if (findUnit(state, event.actorId)?.player !== 1) continue;
+      const enemiesBefore = (beforeState?.units ?? state.units)
+        .filter((unit) => unit.player === 2 && unit.hp > 0);
+      const harmed = new Set([...(event.harmed ?? []), ...(event.targetIds ?? [])]);
+      if (
+        enemiesBefore.length === SHOWDOWN_FAT_TYPES.length &&
+        enemiesBefore.every((unit) => SHOWDOWN_FAT_TYPES.includes(unit.type)) &&
+        enemiesBefore.every((unit) => harmed.has(unit.id))
+      ) {
+        campaignMeta.showdownFootworkHitAllEnemies = true;
+      }
     }
   } else if (campaignMissionId === VOIDWOOD_MISSION_ID) {
     campaignMeta.playerMagicDamageDealtCount += countPlayerMagicDamageDealt(events);
@@ -1554,6 +1595,20 @@ function nextCampaignDialogueBeat() {
     }
     return null;
   }
+  if (campaignMissionId === SHOWDOWN_MISSION_ID) {
+    for (const type of SHOWDOWN_FAT_TYPES) {
+      if (shouldShowShowdownFatRageWarning(state, type, { warned: campaignMeta.showdownFatRageWarned[type] })) {
+        return {
+          markShown: () => {
+            campaignMeta.showdownFatRageWarned[type] = true;
+            campaignMeta.showdownAnyUnitEnteredRage = true;
+          },
+          script: (matchState) => showdownFatRageWarningScript(matchState, type),
+        };
+      }
+    }
+    return null;
+  }
   if (campaignMissionId === GARGOYLE_MISSION_ID) {
     if (shouldShowGargoyleRageWarning(state, {
       warningShown: campaignMeta.gargoyleRageWarningShown,
@@ -1907,10 +1962,11 @@ function beginResolve(result, artCalloutEvent = null) {
 function endResolve(prepared, result, prevPlayer) {
   const events = result.events ?? [];
   const tempo = isTempoBattle(state);
+  const beforeState = tempo ? null : state;
   if (tempo) tempoAnimating = Math.max(0, tempoAnimating - 1);
   else state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(prepared, result);
+  recordCampaignProgressHooks(prepared, result, beforeState);
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);
@@ -2962,9 +3018,10 @@ async function resolveInstantArt(command) {
     }
   }
 
+  const beforeState = state;
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(prepared, result);
+  recordCampaignProgressHooks(prepared, result, beforeState);
   broadcastIfLocal(prepared);
   playEventSounds(events);
   playRolloverFx(events);

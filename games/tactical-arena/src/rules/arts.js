@@ -524,6 +524,7 @@ export function isFirstTurnCommand(state, actor) {
 
 export function canUseArt(state, actor, artId) {
   const art = getArt(actor.type, artId);
+  const permanentWeather = state?.missionRules?.permanentWeather?.weather ?? null;
   const activation = state.activation;
   const usedBonusGroups = activation?.bonusActionGroups ?? [];
   const moveAndArtAvailable = Boolean(
@@ -557,6 +558,7 @@ export function canUseArt(state, actor, artId) {
     hasAbilityUsesRemaining(actor, art) &&
     (!art.firstCommandOnly || isFirstTurnCommand(state, actor)) &&
     (!art.rageLocked || isRaging(actor)) &&
+    !(art.weather && permanentWeather && art.weather !== permanentWeather) &&
     !(art.weather && actor.lastWeather === art.weather) &&
     (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor)) &&
     // HP-cost ARTS (Blacksword) can never suicide him; an all-HP ultimate opts in via

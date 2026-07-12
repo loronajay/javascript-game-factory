@@ -30,7 +30,7 @@ import {
 import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
-import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
+import { UNIT_TYPE_KEYS, groupedUnitTypes } from "./squadModel.js";
 import {
   CLOD_MISSION_ID,
   MAX_CAMPAIGN_SQUAD_SIZE,
@@ -38,6 +38,7 @@ import {
   RONIN_MISSION_ID,
   WANDERING_PARTY_MISSION_ID,
   campaignSquadSize,
+  campaignSelectableUnitTypes,
   createCampaignMatchConfig,
   getCampaignMap,
   resetCampaignProgress
@@ -250,8 +251,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     }, delay);
   }
 
-  function campaignUnlockedTypes() {
-    return UNIT_TYPE_KEYS.filter((type) => isUnitUnlocked(type, globalThis.localStorage));
+  function campaignUnlockedTypes(missionId = selectedCampaignMissionId) {
+    return campaignSelectableUnitTypes(UNIT_TYPE_KEYS, globalThis.localStorage, missionId);
   }
 
   // Resizes the squad slot array to the mission's slot count WITHOUT inferring
@@ -528,8 +529,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   }
 
   async function chooseCampaignUnit(slot) {
-    const groups = campaignUnitChoiceGroups(campaignUnlockedTypes(), campaignSquad, slot);
-    const choices = campaignUnlockedTypes()
+    const unlocked = campaignUnlockedTypes(selectedCampaignMissionId);
+    const groups = campaignUnitChoiceGroups(unlocked, campaignSquad, slot);
+    const choices = unlocked
       .filter((type) => !campaignSquad.includes(type) || campaignSquad[slot] === type)
       .map((type) => ({
         value: type,
